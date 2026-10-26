@@ -197,6 +197,24 @@ main {
 .hold.held, .hold.held:hover:not(:disabled) { background: var(--team); color: #fff; }
 .tap { font-size: 12px; padding: 2px 6px; }
 
+/* Inputs beyond press and hold: tags, keypad, hits, GM commands. */
+.extras { display: grid; gap: 8px; }
+.extras fieldset { margin: 0; padding: 6px 8px 8px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.extras legend { font-size: 12px; color: var(--muted); padding: 0 4px; }
+.extras form { display: flex; flex-wrap: wrap; align-items: end; gap: 6px; }
+.extras label { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
+.extras input { font: inherit; }
+.extras input[type="text"], .extras input[type="number"], .extras select {
+  min-width: 0; padding: 3px 6px; color: var(--text); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 6px;
+}
+.extras input[type="text"] { width: 9em; }
+.extras input[type="number"] { width: 5em; }
+.extras input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.keypad { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; width: 100%; }
+.keypad button { padding: 2px 0; }
+.log-links { margin: 4px 0 0; }
+
 .node footer { display: flex; justify-content: space-between; gap: 8px; }
 .logs pre {
   margin: 6px 0 0;

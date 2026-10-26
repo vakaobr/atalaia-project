@@ -15,6 +15,10 @@ several threads, so every public method takes the game's lock.
 
 from __future__ import annotations
 
+import csv
+import hashlib
+import io
+import json
 import re
 import threading
 import time
@@ -22,7 +26,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from .mode import MODE_ID_MAX, Mode, ModeError, mode_from_text
+from . import tag as player_tag
+from .mode import COMMAND_NAME, MODE_ID_MAX, Mode, ModeError, mode_from_text
 from .sim import CONTROLLER, HOLD_STEP_MS, SimError, Simulation
 
 SPEEDS = (1, 2, 5, 10, 30, 60)
@@ -38,6 +43,22 @@ NODE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,23}$")
 SCRIPT_LINE = re.compile(r"\b(node|field)\.lua:(\d+):")
 # Script errors the view keeps, the newest last.
 MAX_SCRIPT_ERRORS = 50
+
+
+# The events a node's script handles, found in its source: on("keypad.key", ...). A role gets
+# an input when its script handles the event and the role has the capability that makes it
+# (a role that lists none of them is not held to the check, nor are the boxes of a main mode
+# with modifiers).
+HANDLER = re.compile(r"""\bon\(\s*["']([a-z_]+(?:\.[a-z_]+)+)["']""")
+EVENT_CAPABILITY = {"nfc.tag": "nfc", "keypad.key": "keypad", "hit.hit": "hit"}
+# What a scanned tag can be: a good one, one signed with another key, one of another game, and a
+# blank one (a uid and no payload); the core says why it refuses each.
+TAG_KINDS = ("valid", "forged", "other_game", "blank")
+KEYS = frozenset("0123456789*#")
+MAX_KEYS = 32
+# Spreadsheets run a cell that starts with one of these as a formula.
+CSV_RISKY = ("=", "+", "-", "@", "\t", "\r")
+CSV_COLUMNS = ("t_ms", "node", "seq", "type", "team", "prio", "bytes", "data")
 
 
 class LiveError(Exception):
@@ -84,6 +105,37 @@ def _check_nodes(nodes: Any, roles: dict[str, Any]) -> None:
             raise ModeError(f"nodes: {name!r} is not a box's name (1-24 letters, digits, - and _)")
         if not isinstance(role, str) or role not in roles:
             raise ModeError(f"nodes: {name} has the role {role!r}, which the mode does not have")
+
+
+def node_inputs(mode: Mode, role: str) -> dict[str, Any]:
+    """The inputs beyond press and hold that a node of this role uses: tag reads, keypad keys,
+    hits and the GM's commands (set_owner, and the mode commands the manifest offers for the
+    role). Read from the role's script and capabilities, so a mode that never looks at a tag
+    does not offer one."""
+    handled = set(HANDLER.findall(mode.node_script_for(role)))
+    spec = mode.roles.get(role)
+    caps = None
+    # Modifiers added to a main mode (Codes next to Domination) listen on the main mode's boxes
+    # whatever those list; a lone mode, and a role package, are held to their roles' capabilities.
+    alone = len(mode.parts) <= 1 or role in mode.role_parts
+    if alone and isinstance(spec, dict) and isinstance(spec.get("requires"), list):
+        caps = set(spec["requires"]) | set(spec.get("optional") or [])
+
+    def uses(event: str) -> bool:
+        return event in handled and (caps is None or EVENT_CAPABILITY[event] in caps)
+
+    commands = [{"name": name, "label": str(c.get("label") or name)}
+                for name, c in mode.commands.items()
+                if isinstance(c, dict) and role in (c.get("roles") or [])
+                and COMMAND_NAME.match(str(name))]
+    return {"nfc": uses("nfc.tag"), "keypad": uses("keypad.key"), "hit": uses("hit.hit"),
+            "set_owner": "cmd.set_owner" in handled, "commands": commands}
+
+
+def _csv_cell(value: Any) -> Any:
+    if isinstance(value, str) and value.startswith(CSV_RISKY):
+        return "'" + value
+    return value
 
 
 @dataclass
@@ -244,6 +296,61 @@ class LiveGame:
             self.sim.input(args["node"], "team_input.release",
                            _team_data(hold, ms=self.sim.time_ms - hold.start_ms))
 
+    def _do_scan(self, args: dict[str, Any]) -> None:
+        """A tag read on a node: the tag is made and signed as a player's tag is, and the core
+        checks it (Simulation.scan), so a refused tag is refused for the reason a box gives."""
+        self._require_on()
+        sim, kind = self.sim, args.get("kind", "valid")
+        player, team = args.get("player"), args.get("team")
+        if not player_tag.player_ok(player):
+            raise LiveError("the player id is 1 to 32 letters, digits, '-', '_' or '.'")
+        if team is not None and team not in sim.teams:
+            raise LiveError(f"unknown team '{team}'")
+        if kind not in TAG_KINDS:
+            raise LiveError(f"the tag is one of {', '.join(TAG_KINDS)}")
+        sim.node(args["node"])
+        uid = b"\x04" + hashlib.sha256(player.encode()).digest()[:6]
+        payload = None
+        if kind != "blank":
+            key = sim.game_key if kind != "forged" else bytes(b ^ 0xFF for b in sim.game_key)
+            game_id = sim.game_id if kind != "other_game" else (sim.game_id + 1) & 0xFFFF
+            payload = player_tag.encode(
+                {"player": player, "team": sim.teams.index(team) + 1 if team else 0,
+                 "game_id": game_id}, key)
+        sim.scan(args["node"], uid, payload)
+
+    def _do_keys(self, args: dict[str, Any]) -> None:
+        """Keypad presses, one keypad.key per character."""
+        self._require_on()
+        keys = args.get("keys")
+        if not isinstance(keys, str) or not 1 <= len(keys) <= MAX_KEYS or not set(keys) <= KEYS:
+            raise LiveError(f"keys: 1 to {MAX_KEYS} of the digits, * and #")
+        self.sim.keys(args["node"], keys)
+
+    def _do_hit(self, args: dict[str, Any]) -> None:
+        self._require_on()
+        strength = args.get("strength", 255)
+        if isinstance(strength, bool) or not isinstance(strength, int) or not 0 <= strength <= 255:
+            raise LiveError("strength is a whole number from 0 to 255")
+        self.sim.input(args["node"], "hit.hit", {"strength": strength})
+
+    def _do_command(self, args: dict[str, Any]) -> None:
+        """A GM command to a node, as the controller sends it: set_owner (a team) or one of the
+        mode's own commands (cmd.mode with its name)."""
+        self._require_on()
+        node, name = args["node"], args.get("name")
+        vnode = self.sim.node(node)
+        if name == "set_owner":
+            team = args.get("team")
+            if team not in self.sim.teams:
+                raise LiveError(f"unknown team '{team}'")
+            self.sim.input(node, "cmd.set_owner", {"team": team})
+            return
+        offered = [c["name"] for c in node_inputs(self.sim.mode, vnode.role)["commands"]]
+        if name not in offered:
+            raise LiveError(f"{node} has no GM command '{name}'")
+        self.sim.input(node, "cmd.mode", {"name": name})
+
     def _release_all(self) -> None:
         for node in list(self.holds):
             self._do_release({"node": node})
@@ -331,6 +438,7 @@ class LiveGame:
                     "audio": audio,
                     "outputs": list(outputs.values()),
                     "input": vnode.last_input,
+                    "inputs": node_inputs(sim.mode, vnode.role),
                     "hold": None if hold is None else {"team": hold.team, "ms": sim.time_ms - hold.start_ms},
                     "logs": vnode.logs[-20:],
                 })
@@ -361,17 +469,44 @@ class LiveGame:
                 "nodes": nodes,
                 "events_total": len(arrivals),
                 "events_from": since,
-                "events": [{
-                    "t": e.t_ms, "node": e.node, "seq": e.seq, "type": e.type, "team": e.team,
-                    "prio": e.prio, "data": e.data, "bytes": e.wire_bytes,
-                } for e in arrivals[since:]],
+                "events": [_event_row(e) for e in arrivals[since:]],
                 "problems": list(sim.problems),
                 "script_errors": self.script_errors(),
             }
 
+    # -- the event log, for download --
+
+    def export_json(self) -> dict[str, Any]:
+        """The game's events as the controller's log has them, with what a reader needs to make
+        sense of them."""
+        with self._lock:
+            sim = self.sim
+            return {
+                "mode": {"id": sim.mode.id, "name": sim.mode.name, "version": sim.mode.version},
+                "teams": list(sim.teams), "params": sim.params, "time_ms": sim.time_ms,
+                "events": [_event_row(e) for e in sim.arrivals],
+            }
+
+    def export_csv(self) -> str:
+        """The same events, one row each; the data as JSON in the last column."""
+        out = io.StringIO()
+        writer = csv.writer(out, lineterminator="\r\n")
+        writer.writerow(CSV_COLUMNS)
+        for e in self.export_json()["events"]:
+            writer.writerow([_csv_cell(v) for v in (
+                e["t"], e["node"], e["seq"], e["type"], e["team"] or "", e["prio"],
+                "" if e["bytes"] is None else e["bytes"],
+                json.dumps(e["data"], separators=(",", ":"), ensure_ascii=False))])
+        return out.getvalue()
+
     def close(self) -> None:
         with self._lock:
             self.sim.close()
+
+
+def _event_row(e: Any) -> dict[str, Any]:
+    return {"t": e.t_ms, "node": e.node, "seq": e.seq, "type": e.type, "team": e.team,
+            "prio": e.prio, "data": e.data, "bytes": e.wire_bytes}
 
 
 def _team_data(hold: Hold, **extra: Any) -> dict[str, Any]:

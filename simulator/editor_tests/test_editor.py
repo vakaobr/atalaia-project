@@ -812,6 +812,16 @@ class EditorTests(unittest.TestCase):
         expect(sim.locator("#controller")).to_be_visible()
         expect(sim.locator("#controller-status")).to_have_text("running")
         expect(sim.locator(".node")).to_have_count(2)
+        # The inputs Hold-All's boxes use besides holding: the GM's set_owner, typed on the page
+        # (keyboard: Enter in the form sends it), and the log it can download.
+        form = sim.locator(".node").first.locator(".extras fieldset", has_text="GM command")
+        expect(form).to_have_count(1)
+        form.get_by_label("Team").select_option("blue")
+        form.get_by_role("button", name="Send").click()
+        expect(sim.locator("#events")).to_contain_text("zone.captured")
+        with sim.expect_download() as download:
+            sim.click("#log-csv")
+        self.assertTrue(download.value.suggested_filename.endswith("-events.csv"))
         # Playing it: red holds both boxes, and the controller's script scores for red.
         for node in ("zone1", "zone2"):
             self.game.act("hold", {"node": node, "team": "red"})

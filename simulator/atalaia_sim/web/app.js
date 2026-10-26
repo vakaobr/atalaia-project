@@ -233,9 +233,82 @@ function makeCard(node) {
     tap.addEventListener("click", () => act("press", { node: node.name, team }));
     teams.append(el("div", { class: "team" }, hold, tap));
   }
+  makeExtras(card.querySelector(".extras"), node);
   $("nodes").append(card);
   cards.set(node.name, card);
   return card;
+}
+
+// The inputs the node's role uses besides press and hold (node.inputs, from its script): each
+// is a small form, so Enter sends it, and every control has a label.
+const TAG_KINDS = [
+  ["valid", "valid tag"], ["forged", "forged signature"],
+  ["other_game", "tag of another game"], ["blank", "blank tag (no signature)"],
+];
+
+function field(label, control) {
+  return el("label", {}, label, control);
+}
+
+function form(legend, onsubmit, ...children) {
+  const f = el("form", {}, ...children);
+  f.addEventListener("submit", (e) => { e.preventDefault(); onsubmit(); });
+  return el("fieldset", {}, el("legend", { textContent: legend }), f);
+}
+
+function teamSelect(withNone) {
+  const options = state.teams.map((t) => el("option", { value: t, textContent: t }));
+  if (withNone) options.push(el("option", { value: "", textContent: "no team" }));
+  return el("select", {}, ...options);
+}
+
+function makeExtras(box, node) {
+  const { inputs } = node;
+  const name = node.name;
+  if (inputs.nfc) {
+    const player = el("input", { type: "text", value: "p1", maxLength: 32, required: true,
+                                 pattern: "[A-Za-z0-9._\\-]{1,32}" });
+    const team = teamSelect(true);
+    const kind = el("select", {}, ...TAG_KINDS.map(([v, t]) => el("option", { value: v, textContent: t })));
+    box.append(form("Read a tag", () => act("scan", { node: name, player: player.value,
+                                                      team: team.value || null, kind: kind.value }),
+      field("Player", player), field("Team", team), field("Tag", kind),
+      el("button", { type: "submit", textContent: "Scan" })));
+  }
+  if (inputs.keypad) {
+    const keys = el("input", { type: "text", inputMode: "numeric", maxLength: 32, required: true,
+                               pattern: "[0-9*#]{1,32}", autocomplete: "off",
+                               title: "Digits, * and #" });
+    const pad = el("div", { class: "keypad", role: "group", "aria-label": "Keypad" },
+      ..."123456789*0#".split("").map((k) => {
+        const b = el("button", { type: "button", textContent: k, title: `Press ${k}` });
+        b.addEventListener("click", () => act("keys", { node: name, keys: k }));
+        return b;
+      }));
+    box.append(form("Keypad", () => { act("keys", { node: name, keys: keys.value }); keys.value = ""; },
+      field("Code (digits, * and #)", keys),
+      el("button", { type: "submit", textContent: "Send" }), pad));
+  }
+  if (inputs.hit) {
+    const strength = el("input", { type: "number", min: 0, max: 255, step: 1, value: 255, required: true });
+    box.append(form("Hit", () => act("hit", { node: name, strength: Number(strength.value) }),
+      field("Strength (0 to 255)", strength), el("button", { type: "submit", textContent: "Hit" })));
+  }
+  const gm = [];
+  if (inputs.set_owner) gm.push(["set_owner", "Set the owner"]);
+  for (const c of inputs.commands) gm.push([c.name, c.label]);
+  if (gm.length) {
+    const command = el("select", {}, ...gm.map(([v, t]) => el("option", { value: v, textContent: t })));
+    const team = teamSelect(false);
+    const teamField = field("Team", team);
+    const sync = () => { teamField.hidden = command.value !== "set_owner"; };
+    command.addEventListener("change", sync);
+    box.append(form("GM command", () => act("command", {
+      node: name, name: command.value, ...(command.value === "set_owner" ? { team: team.value } : {}),
+    }), field("Command", command), teamField,
+      el("button", { type: "submit", textContent: "Send" })));
+    sync();
+  }
 }
 
 function renderNode(node) {
@@ -289,7 +362,9 @@ function renderNode(node) {
   }
 
   const playable = game.started && !game.ended && !game.paused && node.status === "running";
-  for (const button of card.querySelectorAll(".hold, .tap")) button.disabled = !playable;
+  for (const control of card.querySelectorAll(".hold, .tap, .extras button, .extras input, .extras select")) {
+    control.disabled = !playable;
+  }
   for (const hold of card.querySelectorAll(".hold")) {
     const held = node.hold && node.hold.team === hold.dataset.team;
     hold.classList.toggle("held", Boolean(held));

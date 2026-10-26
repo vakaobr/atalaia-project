@@ -20,6 +20,7 @@ A reloaded mode's scripts run in the core's sandbox, as every mode's do.
 from __future__ import annotations
 
 import json
+import re
 import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -147,7 +148,28 @@ class _Handler(BaseHTTPRequestHandler):
             except ValueError:
                 since = 0
             return self._json(HTTPStatus.OK, self.server.game.snapshot(since))
+        if url.path in ("/api/log.json", "/api/log.csv"):
+            return self._download(url.path.rsplit(".", 1)[1])
         self._error(HTTPStatus.NOT_FOUND, "not found")
+
+    def _download(self, kind: str) -> None:
+        """The game's events as a file to save: JSON (with the mode, teams and parameters) or CSV."""
+        game = self.server.game
+        name = re.sub(r"[^A-Za-z0-9._-]", "_", game.sim.mode.id)
+        if kind == "json":
+            body, content_type = json.dumps(game.export_json(), indent=2).encode(), "application/json"
+        else:
+            body, content_type = game.export_csv().encode(), "text/csv; charset=utf-8"
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Disposition", f'attachment; filename="atalaia-{name}-events.{kind}"')
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy", DEFAULT_CSP)
+        self.end_headers()
+        self.wfile.write(body)
 
     def _editor_file(self, name: str) -> None:
         """A file of editor/: plain names only, no dot files, a known suffix, inside the folder."""

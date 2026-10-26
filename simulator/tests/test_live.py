@@ -7,15 +7,17 @@ They need the shared core library and are skipped without it.
 
 from __future__ import annotations
 
+import csv
 import http.client
+import io
 import json
 import threading
 import unittest
 from pathlib import Path
 
 from atalaia_sim.core import Core, find_library
-from atalaia_sim.live import LiveError, LiveGame, ReloadError
-from atalaia_sim.mode import load_mode
+from atalaia_sim.live import LiveError, LiveGame, ReloadError, _csv_cell, node_inputs
+from atalaia_sim.mode import compose, load_mode
 from atalaia_sim.sim import Simulation
 from atalaia_sim.web import make_server
 
@@ -37,6 +39,13 @@ def live(mode: str, **params) -> LiveGame:
     resolved = m.resolve_params(params, ["red", "blue"])
     role = next(iter(m.roles))
     return LiveGame(lambda: Simulation(CORE, m, {role: role}, ["red", "blue"], resolved))
+
+
+def live_with(mode, nodes: dict, modifiers=(), **params) -> LiveGame:
+    """A game of a mode (with modifiers or role packages) on the given boxes, {name: role}."""
+    m = compose(load_mode(REPO / "modes" / mode), [load_mode(REPO / "modes" / x) for x in modifiers])
+    resolved = m.resolve_params(params, ["red", "blue"])
+    return LiveGame(lambda: Simulation(CORE, m, dict(nodes), ["red", "blue"], resolved))
 
 
 def events(game: LiveGame, type_: str) -> list:
@@ -261,6 +270,171 @@ class FieldScriptAndReloadTests(unittest.TestCase):
 
 
 @unittest.skipIf(CORE is None, "the shared core library is not built")
+class LiveInputTests(unittest.TestCase):
+    """Tags, keypad, hits and GM commands from the page, through the same core and scripts."""
+
+    def play(self, *args, **kw) -> LiveGame:
+        game = live_with(*args, **kw)
+        self.addCleanup(game.close)
+        game.act("start", {})
+        return game
+
+    def inputs(self, mode, role, modifiers=()):
+        m = compose(load_mode(REPO / "modes" / mode), [load_mode(REPO / "modes" / x) for x in modifiers])
+        return node_inputs(m, role)
+
+    def test_a_node_offers_what_its_role_uses(self):
+        none = {"nfc": False, "keypad": False, "hit": False, "set_owner": False, "commands": []}
+        self.assertEqual(self.inputs("domination", "zone"), none)
+        self.assertEqual(self.inputs("holdall", "zone"), {**none, "set_owner": True})
+        self.assertEqual(self.inputs("target_windows", "target"), {**none, "hit": True})
+        self.assertEqual(self.inputs("kill_confirmed", "station"), {**none, "nfc": True})
+        self.assertEqual(self.inputs("hacking_terminal", "terminal")["keypad"], True)
+        factory = self.inputs("money_factory", "factory")
+        self.assertEqual((factory["nfc"], factory["keypad"], factory["set_owner"]), (True, False, True))
+        self.assertTrue(self.inputs("money_factory", "bank")["nfc"])
+        # A role package brings its own: the medic kit reads tags and the GM can refill it.
+        kit = self.inputs("domination", "medic", ["medic"])
+        self.assertEqual((kit["nfc"], kit["keypad"]), (True, False))
+        self.assertEqual([c["name"] for c in kit["commands"]], ["refill"])
+        self.assertEqual(self.inputs("domination", "zone", ["medic"])["commands"], [])
+        # Codes next to a main mode listens on its boxes, whatever capabilities they list.
+        self.assertTrue(self.inputs("domination", "zone", ["codes"])["keypad"])
+        self.assertTrue(self.inputs("bomb", "bomb")["keypad"])
+
+    def test_the_snapshot_says_which_inputs_each_node_has(self):
+        game = live_with("money_factory", {"plant": "factory", "vault": "bank"})
+        self.addCleanup(game.close)
+        by_name = {n["name"]: n["inputs"] for n in game.snapshot()["nodes"]}
+        self.assertTrue(by_name["plant"]["nfc"] and by_name["vault"]["nfc"])
+
+    def test_a_tag_read_is_checked_by_the_core(self):
+        game = self.play("kill_confirmed", {"station": "station"})
+        game.act("press", {"node": "station", "team": "red"})
+        game.act("scan", {"node": "station", "player": "b1", "team": "blue"})
+        [kill] = events(game, "kill.confirmed")
+        self.assertEqual((kill.team, kill.data["player"], kill.data["owner"]), ("red", "b1", "blue"))
+        self.assertEqual(game.snapshot()["nodes"][0]["input"]["type"], "nfc.tag")
+        self.assertTrue(game.snapshot()["nodes"][0]["input"]["data"]["valid"])
+        # A teammate's tag denies a kill; forged, other-game and blank tags are refused, each for
+        # its own reason, and count for nothing.
+        game.act("scan", {"node": "station", "player": "r1", "team": "red"})
+        self.assertEqual(len(events(game, "kill.denied")), 1)
+        reasons = {}
+        for kind in ("forged", "other_game", "blank"):
+            game.act("scan", {"node": "station", "player": "x1", "team": "blue", "kind": kind})
+            data = game.snapshot()["nodes"][0]["input"]["data"]
+            self.assertFalse(data["valid"], kind)
+            reasons[kind] = data["reason"]
+        self.assertEqual(len(set(reasons.values())), 3, reasons)
+        self.assertEqual(len(events(game, "kill.confirmed")), 1)
+        self.assertEqual(game.sim.score("red"), 1)
+
+    def test_a_player_with_no_team_has_a_tag_without_one(self):
+        game = self.play("kill_confirmed", {"station": "station"})
+        game.act("press", {"node": "station", "team": "red"})
+        game.act("scan", {"node": "station", "player": "n1", "team": None})
+        self.assertIsNone(game.snapshot()["nodes"][0]["input"]["data"].get("team"))
+        self.assertEqual(events(game, "kill.confirmed"), [])
+
+    def test_a_medic_kit_heals_from_a_scan_and_a_hold(self):
+        game = self.play("domination", {"zone": "zone", "kit": "medic"}, ["medic"], heal_hold_s=2)
+        game.act("scan", {"node": "kit", "player": "r1", "team": "red"})
+        game.act("hold", {"node": "kit", "team": "red"})
+        game.act("step", {"seconds": 4})
+        game.act("release", {"node": "kit"})
+        self.assertEqual(len(events(game, "medic.heal")), 1)
+
+    def test_keypad_codes_reach_the_script(self):
+        game = self.play("domination", {"zone": "zone"}, ["codes"], codes="9000:points:20")
+        game.act("hold", {"node": "zone", "team": "red"})
+        game.act("step", {"seconds": 3})
+        game.act("release", {"node": "zone"})
+        game.act("keys", {"node": "zone", "keys": "9000#"})
+        [used] = events(game, "code.used")
+        self.assertEqual((used.team, used.data["kind"], used.data["amount"]), ("red", "points", 20))
+        self.assertEqual(game.sim.score("red"), 20)
+        game.act("keys", {"node": "zone", "keys": "9"})  # one key at a time, as the keypad does
+        self.assertEqual(game.snapshot()["nodes"][0]["input"]["data"], {"key": "9"})
+
+    def test_a_bomb_defuse_code_typed_on_the_keypad(self):
+        game = self.play("bomb", {"bomb": "bomb"}, fuse_s=60)
+        game.act("hold", {"node": "bomb", "team": "red"})
+        game.act("step", {"seconds": 5})
+        game.act("release", {"node": "bomb"})
+        game.act("keys", {"node": "bomb", "keys": "0000#"})  # a wrong code only shows on the screen
+        self.assertEqual(events(game, "bomb.exploded"), [])
+        self.assertEqual(game.snapshot()["nodes"][0]["input"]["type"], "keypad.key")
+
+    def test_hits_have_a_strength(self):
+        game = self.play("target_windows", {"target": "target"}, interval_s=1)
+        game.act("step", {"seconds": 1.5})  # a window is open
+        game.act("hit", {"node": "target", "strength": 255})
+        [hit] = events(game, "target.hit")
+        self.assertTrue(hit.data["window_open"])
+        self.assertEqual(game.snapshot()["nodes"][0]["input"]["data"], {"strength": 255})
+
+    def test_gm_commands(self):
+        game = self.play("holdall", {"a": "zone", "b": "zone"})
+        game.act("command", {"node": "a", "name": "set_owner", "team": "blue"})
+        [captured] = events(game, "zone.captured")
+        self.assertEqual(captured.team, "blue")
+        # A mode's own command goes to the nodes of the roles it names, as cmd.mode.
+        kit = self.play("domination", {"zone": "zone", "kit": "medic"}, ["medic"])
+        kit.act("command", {"node": "kit", "name": "refill"})
+        self.assertEqual(kit.snapshot()["nodes"][1]["input"]["data"], {"name": "refill"})
+        self.assertEqual(kit.snapshot()["nodes"][1]["input"]["type"], "cmd.mode")
+
+    def test_bad_inputs_are_refused_with_a_reason(self):
+        game = self.play("kill_confirmed", {"station": "station"})
+        for action, args, text in (
+            ("scan", {"node": "station", "player": "bad id", "team": "red"}, "player id"),
+            ("scan", {"node": "station", "player": "p1", "team": "green"}, "unknown team"),
+            ("scan", {"node": "station", "player": "p1", "team": "red", "kind": "magic"}, "one of"),
+            ("scan", {"node": "nowhere", "player": "p1", "team": "red"}, "no node"),
+            ("keys", {"node": "station", "keys": "12a"}, "digits"),
+            ("keys", {"node": "station", "keys": ""}, "digits"),
+            ("keys", {"node": "station", "keys": "1" * 33}, "digits"),
+            ("hit", {"node": "station", "strength": 256}, "0 to 255"),
+            ("hit", {"node": "station", "strength": True}, "0 to 255"),
+            ("command", {"node": "station", "name": "set_owner", "team": "green"}, "unknown team"),
+            ("command", {"node": "station", "name": "refill"}, "no GM command"),
+        ):
+            with self.assertRaises(LiveError, msg=(action, args)) as ctx:
+                game.act(action, args)
+            self.assertIn(text, str(ctx.exception))
+        fresh = live_with("kill_confirmed", {"station": "station"})
+        self.addCleanup(fresh.close)
+        with self.assertRaisesRegex(LiveError, "has not started"):
+            fresh.act("scan", {"node": "station", "player": "p1", "team": "red"})
+        game.act("end", {})
+        with self.assertRaisesRegex(LiveError, "over"):
+            game.act("keys", {"node": "station", "keys": "1"})
+
+    def test_the_log_downloads_as_json_and_csv(self):
+        game = self.play("kill_confirmed", {"station": "station"})
+        game.act("press", {"node": "station", "team": "red"})
+        game.act("scan", {"node": "station", "player": "b1", "team": "blue"})
+        log = game.export_json()
+        self.assertEqual(log["mode"]["id"], "org.atalaia.kill_confirmed")
+        self.assertEqual(log["teams"], ["red", "blue"])
+        self.assertEqual(log["events"], game.snapshot()["events"])
+        self.assertIn("kill.confirmed", [e["type"] for e in log["events"]])
+        rows = list(csv.reader(io.StringIO(game.export_csv())))
+        self.assertEqual(rows[0], ["t_ms", "node", "seq", "type", "team", "prio", "bytes", "data"])
+        self.assertEqual(len(rows), 1 + len(log["events"]))
+        [kill] = [r for r in rows if r[3] == "kill.confirmed"]
+        self.assertEqual((kill[1], kill[4]), ("station", "red"))
+        self.assertEqual(json.loads(kill[7])["player"], "b1")
+
+    def test_csv_cells_do_not_run_as_formulas(self):
+        self.assertEqual(_csv_cell("=1+1"), "'=1+1")
+        self.assertEqual(_csv_cell("@x"), "'@x")
+        self.assertEqual(_csv_cell("plain"), "plain")
+        self.assertEqual(_csv_cell(5), 5)
+
+
+@unittest.skipIf(CORE is None, "the shared core library is not built")
 class WebServerTests(unittest.TestCase):
     def setUp(self):
         self.game = live("bomb")
@@ -307,6 +481,30 @@ class WebServerTests(unittest.TestCase):
         res, body = self.post({"action": "start"})
         self.assertEqual(res.status, 409)
         self.assertIn("already started", json.loads(body)["error"])
+
+    def test_input_actions_and_log_downloads(self):
+        self.post({"action": "start"})
+        res, body = self.post({"action": "keys", "node": "bomb", "keys": "12x"})
+        self.assertEqual(res.status, 409)
+        res, _ = self.post({"action": "keys", "node": "bomb", "keys": "12#"})
+        self.assertEqual(res.status, 200)
+        node = json.loads(self.request("GET", "/api/state")[1])["nodes"][0]
+        self.assertTrue(node["inputs"]["keypad"])
+        self.assertEqual(node["input"]["data"], {"key": "#"})
+        self.post({"action": "hold", "node": "bomb", "team": "red"})
+        self.post({"action": "step", "seconds": 5})
+        res, body = self.request("GET", "/api/log.json")
+        self.assertEqual(res.status, 200)
+        self.assertEqual(res.getheader("Content-Type"), "application/json")
+        self.assertEqual(res.getheader("Content-Disposition"),
+                         'attachment; filename="atalaia-org.atalaia.bomb-events.json"')
+        self.assertIn("bomb.armed", [e["type"] for e in json.loads(body)["events"]])
+        res, body = self.request("GET", "/api/log.csv")
+        self.assertEqual(res.getheader("Content-Type"), "text/csv; charset=utf-8")
+        self.assertIn('filename="atalaia-org.atalaia.bomb-events.csv"', res.getheader("Content-Disposition"))
+        self.assertIn(b"bomb.armed", body)
+        res, _ = self.request("GET", "/api/log.csv", headers={"Host": "evil.example"})
+        self.assertEqual(res.status, 403)
 
     def test_refuses_foreign_hosts_and_non_json(self):
         res, _ = self.request("GET", "/api/state", headers={"Host": "evil.example"})

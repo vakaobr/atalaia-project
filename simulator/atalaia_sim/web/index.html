@@ -65,6 +65,9 @@ SPDX-License-Identifier: GPL-3.0-or-later
       </section>
       <section class="panel feed-panel">
         <h2>Events <span id="event-count" class="muted small"></span></h2>
+        <p class="log-links small">Download the log:
+          <a id="log-json" href="/api/log.json" download>JSON</a> ·
+          <a id="log-csv" href="/api/log.csv" download>CSV</a></p>
         <div class="feed-wrap">
           <table class="feed">
             <thead><tr><th>Time</th><th>Node</th><th>Event</th><th>Data</th><th title="CBOR payload on LoRa">Bytes</th></tr></thead>
@@ -89,6 +92,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
       <ul class="outputs" aria-label="Outputs"></ul>
       <p class="audio muted small"></p>
       <div class="teams" aria-label="Team inputs"></div>
+      <div class="extras" aria-label="Other inputs"></div>
       <p class="input muted small"></p>
       <footer class="small">
         <span class="node-scores"></span>
