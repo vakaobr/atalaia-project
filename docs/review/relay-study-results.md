@@ -737,3 +737,228 @@ The same harness, the same seeds (1, 2, 3), 90 minutes of Domination, 20 and 30 
 | as923-tw | CQB (walls) | 30 | core | 2.34 / 2.76 | 0 | 100 / 94.7 | 3.46 | 56.6 |
 
 The core agrees with the model. Airtime is within 0.15 point (mean) and 0.3 (worst box) in every row (the largest gap: the long field of 30 boxes on EU868, 4.2 / 5.7 % model, 4.0 / 5.5 % core). No frame was refused by the budget in any run. Captures were delivered 100 % in a mesh and in CQB (the long field: 99-100 % at 20 boxes, 92-96 % at 30, as the model says) and ACKed within about 3 points of the model in a mesh and in CQB and within 2 in the long field. Where the two differ most, the long field of 30 on EU868 (capture latency p95 111 s model, 74 s core) and CQB of 30 on EU868 (ACKed 94.2 % model, 91.1 % core), the runs are the bistable ones the study warned of: three seeds, one layout each. Nothing here changes SL-9 (a long field of 30 is not served by any relay rule) or the order of the study's candidates.
+
+
+## 11. Listen-before-talk on the built rules (decision SL-25)
+
+SL-19 measured listen-before-talk (LBT: a CAD before every transmission) on rule D and on the old firmware. This section measures it on what is built, A+backoff: two new policies, **`A_backoff_lbt`** (the model's A+backoff plus LBT) and **`A_backoff_core_lbt`** (every box running the core's own `atalaia_relay_*` and `atalaia_retry_gap_ms`, plus LBT). The LBT is the one of `D_lbt` and `lbt`: when the radio task is about to send a frame, the box does a CAD; if a frame it can hear has been on air for two symbols (2.1 ms) it waits a random 20-200 ms and tries again, at most 8 times, and then sends anyway. **The CAD is a simulator-side wrapper around the core's TX decision** (`Box.pop` in `relay_study.py`): the core has no CAD and no notion of one, the wrapper asks the shared channel model before the frame goes to the radio, for either rule set, and counts every CAD (`lbt_cads_per_box_hour` in the results). Nothing in `core/` or `firmware/` changed. No box was ever refused by the duty-cycle budget, in any run, with or without LBT; the worst box of the whole matrix is 6.4 % of airtime (the long field of 30, EU868, with LBT; 5.5 % without).
+
+    python -m atalaia_sim.relay_study --games domination,scenario --sizes 10,20,30 \
+        --policies A_backoff,A_backoff_lbt,A_backoff_core,A_backoff_core_lbt --regions eu868,as923-tw \
+        --minutes 90 --seeds 1,2,3 --lib build/libatalaia_core.so --out lbt.json
+    python -m atalaia_sim.relay_report --lbt-json lbt.json
+
+Medians of three seeds, 90 minutes, 10/20/30 boxes, three layouts, both regions, both games (432 runs). The scenario's "captures" columns count every event the scenario sends, a dozen in 90 minutes, so its ACKed percentages move in steps of 20 points on three seeds: read the Domination rows for the size of an effect and the scenario's for its direction. The model rows (`A_backoff`) and the core rows (`A_backoff_core`) agree as in section 10; the two LBT rows agree with each other the same way.
+
+**The CAD's cost.** Per box-hour: the CADs made (a frame that waits makes one CAD per try), times the duration of a CAD, times its current. Figures from the SX1261/2 datasheet (DS.SX1261-2 rev 2.1) and Semtech's CAD application note AN1200.48, **taken from memory of those documents and not re-read from the PDFs while this was written: check them before building**. A two-symbol CAD at SF7/125 kHz and at SF9/500 kHz is 2 x 1.024 ms of symbols plus the chip's processing and the wake from standby: **4 ms** is used. Its current is the receiver's (4.6 mA, DC-DC, LoRa): **6 mA** is used. A transmission is taken as the datasheet's +14 dBm, **45 mA** (the box sends at 13 dBm conducted). The front-end module's own current (LNA on receive, PA on transmit) is left out of both and has to be measured on the board. The CAD columns are `CADs/box/h x 4 ms x 6 mA` and `airtime % x 3600 s x 45 mA`, in uAh per hour.
+
+### The core's rules, without and with LBT (the numbers SL-25 quotes)
+
+**domination, eu868** (core rules; each cell without the CAD, then with it)
+
+| layout | N | air % mean / worst box | captures delivered / ACKed % | capture latency p50 / p95 s | STATE heard % | frames refused | CADs per box-hour | CAD energy, % of TX |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| all in range | 10 | 2.73 / 2.84 > 2.97 / 3.04 | 100 / 100 > 100 / 100 | 0.1 / 3.04 > 0.1 / 0.45 | 79.7 > 98.9 | 0 > 0 | 2180.6 | 1.1 |
+| all in range | 20 | 2.65 / 2.86 > 2.97 / 3.1 | 100 / 99.7 > 100 / 100 | 0.1 / 3.62 > 0.1 / 1.2 | 64.4 > 92.8 | 0 > 0 | 3305 | 1.6 |
+| all in range | 30 | 2.68 / 2.95 > 3.26 / 3.42 | 100 / 99.2 > 100 / 100 | 0.57 / 3.78 > 0.43 / 2.28 | 52.2 > 81.1 | 0 > 0 | 5215.3 | 2.4 |
+| CQB (walls) | 10 | 2.7 / 2.88 > 2.92 / 3.05 | 100 / 100 > 100 / 100 | 0.1 / 3.19 > 0.1 / 0.7 | 84.5 > 97.9 | 0 > 0 | 1876 | 1.0 |
+| CQB (walls) | 20 | 2.68 / 3.06 > 2.86 / 3.05 | 100 / 99.3 > 100 / 100 | 0.1 / 3.55 > 0.14 / 1.02 | 68.9 > 88.4 | 0 > 0 | 2292.8 | 1.2 |
+| CQB (walls) | 30 | 2.91 / 3.41 > 2.87 / 3.26 | 100 / 91.1 > 100 / 99 | 0.6 / 4.3 > 0.56 / 1.53 | 51.3 > 69.2 | 0 > 0 | 2670.4 | 1.4 |
+| long field | 10 | 2.37 / 2.71 > 2.39 / 2.69 | 100 / 97.8 > 100 / 100 | 0.1 / 3.25 > 0.1 / 0.92 | 74.9 > 85.5 | 0 > 0 | 1130 | 0.7 |
+| long field | 20 | 2.9 / 3.56 > 2.7 / 3.03 | 100 / 75.7 > 100 / 89.9 | 0.76 / 11.98 > 0.65 / 1.72 | 44.4 > 55.2 | 0 > 0 | 1626.9 | 0.9 |
+| long field | 30 | 4.05 / 5.47 > 4.35 / 5.79 | 92.3 / 57.2 > 99.5 / 64.1 | 1.09 / 74.41 > 0.93 / 10.72 | 32.8 > 40.6 | 0 > 0 | 3646.7 | 1.2 |
+
+**domination, as923-tw** (core rules; each cell without the CAD, then with it)
+
+| layout | N | air % mean / worst box | captures delivered / ACKed % | capture latency p50 / p95 s | STATE heard % | frames refused | CADs per box-hour | CAD energy, % of TX |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| all in range | 10 | 2.25 / 2.39 > 2.36 / 2.44 | 100 / 100 > 100 / 100 | 0.08 / 2.71 > 0.08 / 0.38 | 83.6 > 99.1 | 0 > 0 | 1851.1 | 1.2 |
+| all in range | 20 | 2.2 / 2.41 > 2.38 / 2.48 | 100 / 99.7 > 100 / 99.7 | 0.08 / 3.13 > 0.09 / 0.9 | 69.5 > 95.8 | 0 > 0 | 2703.7 | 1.7 |
+| all in range | 30 | 2.29 / 2.48 > 2.52 / 2.64 | 100 / 99.5 > 100 / 100 | 0.12 / 3.52 > 0.21 / 1.39 | 58.9 > 90.1 | 0 > 0 | 3991.8 | 2.3 |
+| CQB (walls) | 10 | 2.21 / 2.36 > 2.33 / 2.43 | 100 / 100 > 100 / 100 | 0.08 / 2.75 > 0.08 / 0.57 | 86.6 > 98.7 | 0 > 0 | 1658.2 | 1.1 |
+| CQB (walls) | 20 | 2.22 / 2.52 > 2.28 / 2.5 | 100 / 99.3 > 100 / 100 | 0.08 / 1.37 > 0.09 / 0.82 | 72.8 > 91.7 | 0 > 0 | 1925.9 | 1.3 |
+| CQB (walls) | 30 | 2.34 / 2.76 > 2.3 / 2.58 | 100 / 94.7 > 100 / 99.2 | 0.55 / 3.46 > 0.34 / 1.17 | 56.6 > 73.1 | 0 > 0 | 2213.7 | 1.4 |
+| long field | 10 | 1.92 / 2.17 > 1.92 / 2.2 | 100 / 99.4 > 100 / 100 | 0.09 / 3.24 > 0.09 / 0.88 | 77.5 > 86.1 | 0 > 0 | 1075.3 | 0.8 |
+| long field | 20 | 2.37 / 2.83 > 2.17 / 2.44 | 99.3 / 80.6 > 100 / 88.2 | 0.63 / 10.01 > 0.6 / 1.51 | 47.9 > 56.7 | 0 > 0 | 1415 | 1.0 |
+| long field | 30 | 3.34 / 4.66 > 3.33 / 4.41 | 95.9 / 58.1 > 100 / 68.5 | 0.82 / 48.91 > 0.82 / 9.63 | 34.7 > 42.7 | 0 > 0 | 2997.6 | 1.3 |
+
+**scenario, eu868** (core rules; each cell without the CAD, then with it)
+
+| layout | N | air % mean / worst box | captures delivered / ACKed % | capture latency p50 / p95 s | STATE heard % | frames refused | CADs per box-hour | CAD energy, % of TX |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| all in range | 10 | 2.35 / 2.41 > 2.67 / 2.72 | 100 / 100 > 100 / 100 | 0.55 / 3.31 > 0.09 / 0.64 | 79.8 > 98.9 | 0 > 0 | 2028.1 | 1.1 |
+| all in range | 20 | 2.07 / 2.13 > 2.59 / 2.68 | 100 / 100 > 100 / 100 | 0.09 / 4.33 > 0.31 / 1.43 | 71.1 > 94.7 | 0 > 0 | 2672.3 | 1.5 |
+| all in range | 30 | 2.05 / 2.18 > 2.58 / 2.66 | 100 / 100 > 100 / 100 | 0.82 / 44.57 > 0.88 / 4.67 | 64.7 > 91.6 | 0 > 0 | 3127.6 | 1.8 |
+| CQB (walls) | 10 | 2.28 / 2.37 > 2.59 / 2.67 | 100 / 100 > 100 / 100 | 0.6 / 3.18 > 0.23 / 0.94 | 84.5 > 97.6 | 0 > 0 | 1554.5 | 0.9 |
+| CQB (walls) | 20 | 2.01 / 2.15 > 2.35 / 2.54 | 100 / 100 > 100 / 100 | 0.54 / 4.18 > 0.09 / 1.39 | 71.1 > 90 | 0 > 0 | 1639 | 1.0 |
+| CQB (walls) | 30 | 1.9 / 2.04 > 2.07 / 2.34 | 100 / 100 > 100 / 100 | 1.2 / 4.17 > 1.21 / 3.32 | 64.4 > 76.3 | 0 > 0 | 1338.9 | 1.0 |
+| long field | 10 | 1.87 / 2.25 > 2.05 / 2.34 | 100 / 100 > 100 / 100 | 0.09 / 2.57 > 0.09 / 0.73 | 76.5 > 84.9 | 0 > 0 | 1002.4 | 0.7 |
+| long field | 20 | 1.95 / 2.42 > 1.87 / 2.06 | 100 / 80 > 100 / 80 | 4.16 / 10.73 > 0.88 / 2.11 | 44.3 > 58.6 | 0 > 0 | 970.6 | 0.8 |
+| long field | 30 | 2.88 / 4.25 > 2.83 / 3.78 | 100 / 40 > 100 / 80 | 10.34 / 148.86 > 5.04 / 46.13 | 40.2 > 45.6 | 0 > 0 | 1789 | 0.9 |
+
+### Every rule, every cell (model and core, with and without LBT)
+
+### domination, as923-tw
+
+| layout | N | rule | air % mean | air % worst box | captures delivered % | captures ACKed % | capture lat p50 s | p95 s | STATE heard % | frames refused/box | CADs/box/h | CAD uAh/h | TX uAh/h | CAD as % of TX energy |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| all in range | 10 | A_backoff | 2.3 | 2.4 | 100.0 | 100.0 | 0.1 | 1.4 | 82.5 | 0.0 | - | - | 1022.0 | - |
+| all in range | 10 | A_backoff_lbt | 2.4 | 2.4 | 100.0 | 100.0 | 0.1 | 0.3 | 99.2 | 0.0 | 1871.9 | 12.5 | 1071.0 | 1.2 |
+| all in range | 10 | A_backoff_core | 2.2 | 2.4 | 100.0 | 100.0 | 0.1 | 2.7 | 83.6 | 0.0 | - | - | 1012.0 | - |
+| all in range | 10 | A_backoff_core_lbt | 2.4 | 2.4 | 100.0 | 100.0 | 0.1 | 0.4 | 99.1 | 0.0 | 1851.1 | 12.3 | 1062.0 | 1.2 |
+| all in range | 20 | A_backoff | 2.2 | 2.4 | 100.0 | 99.7 | 0.1 | 3.1 | 69.1 | 0.0 | - | - | 981.0 | - |
+| all in range | 20 | A_backoff_lbt | 2.4 | 2.5 | 100.0 | 99.7 | 0.1 | 0.8 | 95.8 | 0.0 | 2675.9 | 17.8 | 1071.0 | 1.7 |
+| all in range | 20 | A_backoff_core | 2.2 | 2.4 | 100.0 | 99.7 | 0.1 | 3.1 | 69.5 | 0.0 | - | - | 990.0 | - |
+| all in range | 20 | A_backoff_core_lbt | 2.4 | 2.5 | 100.0 | 99.7 | 0.1 | 0.9 | 95.8 | 0.0 | 2703.7 | 18.0 | 1071.0 | 1.7 |
+| all in range | 30 | A_backoff | 2.3 | 2.5 | 100.0 | 99.7 | 0.1 | 3.7 | 58.2 | 0.0 | - | - | 1017.0 | - |
+| all in range | 30 | A_backoff_lbt | 2.6 | 2.7 | 100.0 | 100.0 | 0.2 | 1.6 | 89.8 | 0.0 | 4155.2 | 27.7 | 1174.0 | 2.4 |
+| all in range | 30 | A_backoff_core | 2.3 | 2.5 | 100.0 | 99.5 | 0.1 | 3.5 | 58.9 | 0.0 | - | - | 1030.0 | - |
+| all in range | 30 | A_backoff_core_lbt | 2.5 | 2.6 | 100.0 | 100.0 | 0.2 | 1.4 | 90.1 | 0.0 | 3991.8 | 26.6 | 1134.0 | 2.4 |
+| long field | 10 | A_backoff | 2.0 | 2.3 | 100.0 | 99.4 | 0.1 | 3.1 | 75.9 | 0.0 | - | - | 882.0 | - |
+| long field | 10 | A_backoff_lbt | 1.9 | 2.2 | 100.0 | 100.0 | 0.1 | 0.9 | 85.8 | 0.0 | 1064.0 | 7.1 | 868.0 | 0.8 |
+| long field | 10 | A_backoff_core | 1.9 | 2.2 | 100.0 | 99.4 | 0.1 | 3.2 | 77.5 | 0.0 | - | - | 864.0 | - |
+| long field | 10 | A_backoff_core_lbt | 1.9 | 2.2 | 100.0 | 100.0 | 0.1 | 0.9 | 86.1 | 0.0 | 1075.3 | 7.2 | 864.0 | 0.8 |
+| long field | 20 | A_backoff | 2.4 | 2.9 | 100.0 | 78.4 | 0.7 | 9.4 | 47.4 | 0.0 | - | - | 1084.0 | - |
+| long field | 20 | A_backoff_lbt | 2.2 | 2.4 | 100.0 | 91.3 | 0.6 | 1.5 | 57.4 | 0.0 | 1360.9 | 9.1 | 994.0 | 0.9 |
+| long field | 20 | A_backoff_core | 2.4 | 2.8 | 99.3 | 80.6 | 0.6 | 10.0 | 47.9 | 0.0 | - | - | 1067.0 | - |
+| long field | 20 | A_backoff_core_lbt | 2.2 | 2.4 | 100.0 | 88.2 | 0.6 | 1.5 | 56.7 | 0.0 | 1415.0 | 9.4 | 976.0 | 1.0 |
+| long field | 30 | A_backoff | 3.4 | 4.8 | 96.2 | 57.9 | 0.9 | 45.7 | 35.3 | 0.0 | - | - | 1539.0 | - |
+| long field | 30 | A_backoff_lbt | 3.3 | 4.4 | 100.0 | 71.5 | 0.8 | 5.1 | 42.7 | 0.0 | 2934.0 | 19.6 | 1503.0 | 1.3 |
+| long field | 30 | A_backoff_core | 3.3 | 4.7 | 95.9 | 58.1 | 0.8 | 48.9 | 34.7 | 0.0 | - | - | 1503.0 | - |
+| long field | 30 | A_backoff_core_lbt | 3.3 | 4.4 | 100.0 | 68.5 | 0.8 | 9.6 | 42.7 | 0.0 | 2997.6 | 20.0 | 1498.0 | 1.3 |
+| CQB (walls) | 10 | A_backoff | 2.2 | 2.4 | 100.0 | 100.0 | 0.1 | 2.5 | 86.5 | 0.0 | - | - | 1012.0 | - |
+| CQB (walls) | 10 | A_backoff_lbt | 2.4 | 2.4 | 100.0 | 100.0 | 0.1 | 0.5 | 98.6 | 0.0 | 1645.4 | 11.0 | 1057.0 | 1.0 |
+| CQB (walls) | 10 | A_backoff_core | 2.2 | 2.4 | 100.0 | 100.0 | 0.1 | 2.8 | 86.6 | 0.0 | - | - | 994.0 | - |
+| CQB (walls) | 10 | A_backoff_core_lbt | 2.3 | 2.4 | 100.0 | 100.0 | 0.1 | 0.6 | 98.7 | 0.0 | 1658.2 | 11.1 | 1048.0 | 1.1 |
+| CQB (walls) | 20 | A_backoff | 2.2 | 2.5 | 100.0 | 99.3 | 0.1 | 1.5 | 72.4 | 0.0 | - | - | 986.0 | - |
+| CQB (walls) | 20 | A_backoff_lbt | 2.3 | 2.5 | 100.0 | 100.0 | 0.1 | 0.8 | 91.8 | 0.0 | 1904.3 | 12.7 | 1017.0 | 1.2 |
+| CQB (walls) | 20 | A_backoff_core | 2.2 | 2.5 | 100.0 | 99.3 | 0.1 | 1.4 | 72.8 | 0.0 | - | - | 999.0 | - |
+| CQB (walls) | 20 | A_backoff_core_lbt | 2.3 | 2.5 | 100.0 | 100.0 | 0.1 | 0.8 | 91.7 | 0.0 | 1925.9 | 12.8 | 1026.0 | 1.2 |
+| CQB (walls) | 30 | A_backoff | 2.4 | 2.7 | 100.0 | 92.9 | 0.6 | 3.4 | 56.2 | 0.0 | - | - | 1057.0 | - |
+| CQB (walls) | 30 | A_backoff_lbt | 2.3 | 2.5 | 100.0 | 99.5 | 0.3 | 1.2 | 73.2 | 0.0 | 2191.0 | 14.6 | 1022.0 | 1.4 |
+| CQB (walls) | 30 | A_backoff_core | 2.3 | 2.8 | 100.0 | 94.7 | 0.6 | 3.5 | 56.6 | 0.0 | - | - | 1053.0 | - |
+| CQB (walls) | 30 | A_backoff_core_lbt | 2.3 | 2.6 | 100.0 | 99.2 | 0.3 | 1.2 | 73.1 | 0.0 | 2213.7 | 14.8 | 1035.0 | 1.4 |
+
+### domination, eu868
+
+| layout | N | rule | air % mean | air % worst box | captures delivered % | captures ACKed % | capture lat p50 s | p95 s | STATE heard % | frames refused/box | CADs/box/h | CAD uAh/h | TX uAh/h | CAD as % of TX energy |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| all in range | 10 | A_backoff | 2.7 | 2.9 | 100.0 | 100.0 | 0.1 | 3.0 | 79.7 | 0.0 | - | - | 1233.0 | - |
+| all in range | 10 | A_backoff_lbt | 3.0 | 3.1 | 100.0 | 100.0 | 0.1 | 0.5 | 98.8 | 0.0 | 2211.8 | 14.8 | 1346.0 | 1.1 |
+| all in range | 10 | A_backoff_core | 2.7 | 2.8 | 100.0 | 100.0 | 0.1 | 3.0 | 79.7 | 0.0 | - | - | 1228.0 | - |
+| all in range | 10 | A_backoff_core_lbt | 3.0 | 3.0 | 100.0 | 100.0 | 0.1 | 0.5 | 98.9 | 0.0 | 2180.6 | 14.5 | 1336.0 | 1.1 |
+| all in range | 20 | A_backoff | 2.6 | 2.8 | 100.0 | 99.7 | 0.1 | 3.6 | 64.7 | 0.0 | - | - | 1170.0 | - |
+| all in range | 20 | A_backoff_lbt | 3.0 | 3.1 | 100.0 | 100.0 | 0.1 | 1.2 | 93.3 | 0.0 | 3285.6 | 21.9 | 1350.0 | 1.6 |
+| all in range | 20 | A_backoff_core | 2.6 | 2.9 | 100.0 | 99.7 | 0.1 | 3.6 | 64.4 | 0.0 | - | - | 1192.0 | - |
+| all in range | 20 | A_backoff_core_lbt | 3.0 | 3.1 | 100.0 | 100.0 | 0.1 | 1.2 | 92.8 | 0.0 | 3305.0 | 22.0 | 1336.0 | 1.6 |
+| all in range | 30 | A_backoff | 2.7 | 3.1 | 100.0 | 99.5 | 0.6 | 4.0 | 52.6 | 0.0 | - | - | 1233.0 | - |
+| all in range | 30 | A_backoff_lbt | 3.2 | 3.3 | 100.0 | 100.0 | 0.5 | 2.5 | 81.2 | 0.0 | 4976.9 | 33.2 | 1426.0 | 2.3 |
+| all in range | 30 | A_backoff_core | 2.7 | 3.0 | 100.0 | 99.2 | 0.6 | 3.8 | 52.2 | 0.0 | - | - | 1206.0 | - |
+| all in range | 30 | A_backoff_core_lbt | 3.3 | 3.4 | 100.0 | 100.0 | 0.4 | 2.3 | 81.1 | 0.0 | 5215.3 | 34.8 | 1467.0 | 2.4 |
+| long field | 10 | A_backoff | 2.4 | 2.7 | 100.0 | 98.9 | 0.1 | 3.3 | 73.3 | 0.0 | - | - | 1071.0 | - |
+| long field | 10 | A_backoff_lbt | 2.4 | 2.7 | 100.0 | 100.0 | 0.1 | 0.9 | 84.4 | 0.0 | 1137.0 | 7.6 | 1076.0 | 0.7 |
+| long field | 10 | A_backoff_core | 2.4 | 2.7 | 100.0 | 97.8 | 0.1 | 3.2 | 74.9 | 0.0 | - | - | 1067.0 | - |
+| long field | 10 | A_backoff_core_lbt | 2.4 | 2.7 | 100.0 | 100.0 | 0.1 | 0.9 | 85.5 | 0.0 | 1130.0 | 7.5 | 1076.0 | 0.7 |
+| long field | 20 | A_backoff | 2.9 | 3.6 | 99.0 | 77.4 | 0.7 | 10.6 | 45.2 | 0.0 | - | - | 1305.0 | - |
+| long field | 20 | A_backoff_lbt | 2.7 | 2.9 | 100.0 | 91.0 | 0.7 | 1.7 | 55.7 | 0.0 | 1614.9 | 10.8 | 1201.0 | 0.9 |
+| long field | 20 | A_backoff_core | 2.9 | 3.6 | 100.0 | 75.7 | 0.8 | 12.0 | 44.4 | 0.0 | - | - | 1305.0 | - |
+| long field | 20 | A_backoff_core_lbt | 2.7 | 3.0 | 100.0 | 89.9 | 0.7 | 1.7 | 55.2 | 0.0 | 1626.9 | 10.8 | 1215.0 | 0.9 |
+| long field | 30 | A_backoff | 4.2 | 5.7 | 93.5 | 56.2 | 1.1 | 111.0 | 33.1 | 0.0 | - | - | 1872.0 | - |
+| long field | 30 | A_backoff_lbt | 4.4 | 5.8 | 99.7 | 62.6 | 0.9 | 12.3 | 40.3 | 0.0 | 3601.8 | 24.0 | 1980.0 | 1.2 |
+| long field | 30 | A_backoff_core | 4.0 | 5.5 | 92.3 | 57.2 | 1.1 | 74.4 | 32.8 | 0.0 | - | - | 1823.0 | - |
+| long field | 30 | A_backoff_core_lbt | 4.3 | 5.8 | 99.5 | 64.1 | 0.9 | 10.7 | 40.6 | 0.0 | 3646.7 | 24.3 | 1958.0 | 1.2 |
+| CQB (walls) | 10 | A_backoff | 2.7 | 2.9 | 100.0 | 100.0 | 0.1 | 2.8 | 84.1 | 0.0 | - | - | 1233.0 | - |
+| CQB (walls) | 10 | A_backoff_lbt | 2.9 | 3.0 | 100.0 | 100.0 | 0.1 | 0.6 | 98.0 | 0.0 | 1873.5 | 12.5 | 1323.0 | 0.9 |
+| CQB (walls) | 10 | A_backoff_core | 2.7 | 2.9 | 100.0 | 100.0 | 0.1 | 3.2 | 84.5 | 0.0 | - | - | 1215.0 | - |
+| CQB (walls) | 10 | A_backoff_core_lbt | 2.9 | 3.0 | 100.0 | 100.0 | 0.1 | 0.7 | 97.9 | 0.0 | 1876.0 | 12.5 | 1314.0 | 0.9 |
+| CQB (walls) | 20 | A_backoff | 2.7 | 3.1 | 100.0 | 98.7 | 0.1 | 3.6 | 68.9 | 0.0 | - | - | 1220.0 | - |
+| CQB (walls) | 20 | A_backoff_lbt | 2.9 | 3.1 | 100.0 | 100.0 | 0.1 | 1.1 | 88.9 | 0.0 | 2258.2 | 15.1 | 1287.0 | 1.2 |
+| CQB (walls) | 20 | A_backoff_core | 2.7 | 3.1 | 100.0 | 99.3 | 0.1 | 3.5 | 68.9 | 0.0 | - | - | 1206.0 | - |
+| CQB (walls) | 20 | A_backoff_core_lbt | 2.9 | 3.0 | 100.0 | 100.0 | 0.1 | 1.0 | 88.4 | 0.0 | 2292.8 | 15.3 | 1287.0 | 1.2 |
+| CQB (walls) | 30 | A_backoff | 2.9 | 3.3 | 100.0 | 94.2 | 0.6 | 4.0 | 51.4 | 0.0 | - | - | 1300.0 | - |
+| CQB (walls) | 30 | A_backoff_lbt | 2.9 | 3.3 | 100.0 | 98.7 | 0.6 | 1.7 | 69.1 | 0.0 | 2738.2 | 18.2 | 1318.0 | 1.4 |
+| CQB (walls) | 30 | A_backoff_core | 2.9 | 3.4 | 100.0 | 91.1 | 0.6 | 4.3 | 51.3 | 0.0 | - | - | 1310.0 | - |
+| CQB (walls) | 30 | A_backoff_core_lbt | 2.9 | 3.3 | 100.0 | 99.0 | 0.6 | 1.5 | 69.2 | 0.0 | 2670.4 | 17.8 | 1291.0 | 1.4 |
+
+### scenario, as923-tw
+
+| layout | N | rule | air % mean | air % worst box | captures delivered % | captures ACKed % | capture lat p50 s | p95 s | STATE heard % | frames refused/box | CADs/box/h | CAD uAh/h | TX uAh/h | CAD as % of TX energy |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| all in range | 10 | A_backoff | 1.9 | 2.0 | 100.0 | 100.0 | 0.6 | 4.3 | 82.7 | 0.0 | - | - | 864.0 | - |
+| all in range | 10 | A_backoff_lbt | 2.1 | 2.2 | 100.0 | 100.0 | 0.1 | 0.1 | 99.3 | 0.0 | 1733.2 | 11.6 | 958.0 | 1.2 |
+| all in range | 10 | A_backoff_core | 1.9 | 2.0 | 100.0 | 100.0 | 0.7 | 3.0 | 83.3 | 0.0 | - | - | 855.0 | - |
+| all in range | 10 | A_backoff_core_lbt | 2.1 | 2.2 | 100.0 | 100.0 | 0.2 | 0.6 | 99.1 | 0.0 | 1731.8 | 11.6 | 949.0 | 1.2 |
+| all in range | 20 | A_backoff | 1.7 | 1.8 | 100.0 | 100.0 | 0.6 | 3.4 | 75.1 | 0.0 | - | - | 756.0 | - |
+| all in range | 20 | A_backoff_lbt | 2.1 | 2.1 | 100.0 | 100.0 | 0.1 | 0.3 | 97.1 | 0.0 | 2173.7 | 14.5 | 931.0 | 1.6 |
+| all in range | 20 | A_backoff_core | 1.7 | 1.8 | 100.0 | 100.0 | 0.5 | 3.7 | 74.5 | 0.0 | - | - | 760.0 | - |
+| all in range | 20 | A_backoff_core_lbt | 2.1 | 2.1 | 100.0 | 100.0 | 0.2 | 0.7 | 96.8 | 0.0 | 2166.1 | 14.4 | 931.0 | 1.6 |
+| all in range | 30 | A_backoff | 1.7 | 1.8 | 100.0 | 100.0 | 1.3 | 3.7 | 70.3 | 0.0 | - | - | 752.0 | - |
+| all in range | 30 | A_backoff_lbt | 2.0 | 2.1 | 100.0 | 100.0 | 0.1 | 2.5 | 95.4 | 0.0 | 2468.2 | 16.4 | 922.0 | 1.8 |
+| all in range | 30 | A_backoff_core | 1.7 | 1.8 | 100.0 | 100.0 | 0.7 | 1.5 | 70.2 | 0.0 | - | - | 760.0 | - |
+| all in range | 30 | A_backoff_core_lbt | 2.1 | 2.2 | 100.0 | 100.0 | 0.8 | 2.0 | 95.3 | 0.0 | 2670.4 | 17.8 | 949.0 | 1.9 |
+| long field | 10 | A_backoff | 1.5 | 1.8 | 100.0 | 100.0 | 0.1 | 3.3 | 79.6 | 0.0 | - | - | 689.0 | - |
+| long field | 10 | A_backoff_lbt | 1.6 | 1.9 | 100.0 | 100.0 | 0.1 | 1.1 | 86.1 | 0.0 | 958.5 | 6.4 | 733.0 | 0.9 |
+| long field | 10 | A_backoff_core | 1.5 | 1.8 | 100.0 | 100.0 | 0.1 | 0.6 | 79.2 | 0.0 | - | - | 693.0 | - |
+| long field | 10 | A_backoff_core_lbt | 1.6 | 1.9 | 100.0 | 100.0 | 0.1 | 0.7 | 84.7 | 0.0 | 949.3 | 6.3 | 733.0 | 0.9 |
+| long field | 20 | A_backoff | 1.6 | 2.0 | 100.0 | 80.0 | 0.9 | 4.2 | 53.3 | 0.0 | - | - | 720.0 | - |
+| long field | 20 | A_backoff_lbt | 1.5 | 1.7 | 100.0 | 100.0 | 1.3 | 1.7 | 60.0 | 0.0 | 901.5 | 6.0 | 679.0 | 0.9 |
+| long field | 20 | A_backoff_core | 1.5 | 1.8 | 100.0 | 80.0 | 1.6 | 4.7 | 54.2 | 0.0 | - | - | 684.0 | - |
+| long field | 20 | A_backoff_core_lbt | 1.6 | 1.8 | 100.0 | 100.0 | 0.8 | 3.3 | 59.2 | 0.0 | 917.7 | 6.1 | 698.0 | 0.9 |
+| long field | 30 | A_backoff | 2.3 | 3.2 | 100.0 | 60.0 | 22.8 | 167.3 | 42.1 | 0.0 | - | - | 1040.0 | - |
+| long field | 30 | A_backoff_lbt | 2.0 | 2.6 | 100.0 | 80.0 | 1.7 | 44.6 | 46.9 | 0.0 | 1405.7 | 9.4 | 922.0 | 1.0 |
+| long field | 30 | A_backoff_core | 2.3 | 3.3 | 80.0 | 40.0 | 9.8 | 20.4 | 41.7 | 0.0 | - | - | 1044.0 | - |
+| long field | 30 | A_backoff_core_lbt | 1.9 | 2.4 | 100.0 | 80.0 | 1.7 | 82.0 | 47.0 | 0.0 | 1313.8 | 8.8 | 864.0 | 1.0 |
+| CQB (walls) | 10 | A_backoff | 1.9 | 2.0 | 100.0 | 100.0 | 0.5 | 2.3 | 87.8 | 0.0 | - | - | 842.0 | - |
+| CQB (walls) | 10 | A_backoff_lbt | 2.1 | 2.2 | 100.0 | 100.0 | 0.1 | 0.1 | 98.3 | 0.0 | 1438.2 | 9.6 | 936.0 | 1.0 |
+| CQB (walls) | 10 | A_backoff_core | 1.9 | 2.0 | 100.0 | 100.0 | 0.5 | 0.8 | 87.2 | 0.0 | - | - | 837.0 | - |
+| CQB (walls) | 10 | A_backoff_core_lbt | 2.1 | 2.1 | 100.0 | 100.0 | 0.1 | 0.1 | 98.3 | 0.0 | 1403.9 | 9.4 | 931.0 | 1.0 |
+| CQB (walls) | 20 | A_backoff | 1.6 | 1.8 | 100.0 | 100.0 | 0.5 | 1.4 | 75.9 | 0.0 | - | - | 743.0 | - |
+| CQB (walls) | 20 | A_backoff_lbt | 1.9 | 2.1 | 100.0 | 100.0 | 0.3 | 1.2 | 92.8 | 0.0 | 1499.5 | 10.0 | 855.0 | 1.2 |
+| CQB (walls) | 20 | A_backoff_core | 1.7 | 1.8 | 100.0 | 100.0 | 0.1 | 0.8 | 75.5 | 0.0 | - | - | 760.0 | - |
+| CQB (walls) | 20 | A_backoff_core_lbt | 1.9 | 2.0 | 100.0 | 100.0 | 0.1 | 0.8 | 92.5 | 0.0 | 1494.6 | 10.0 | 855.0 | 1.2 |
+| CQB (walls) | 30 | A_backoff | 1.5 | 1.7 | 100.0 | 100.0 | 0.8 | 4.5 | 67.6 | 0.0 | - | - | 679.0 | - |
+| CQB (walls) | 30 | A_backoff_lbt | 1.6 | 1.9 | 100.0 | 100.0 | 0.7 | 1.5 | 78.9 | 0.0 | 1212.4 | 8.1 | 743.0 | 1.1 |
+| CQB (walls) | 30 | A_backoff_core | 1.5 | 1.7 | 100.0 | 100.0 | 0.6 | 1.4 | 67.7 | 0.0 | - | - | 689.0 | - |
+| CQB (walls) | 30 | A_backoff_core_lbt | 1.6 | 1.9 | 100.0 | 100.0 | 0.8 | 1.5 | 79.4 | 0.0 | 1178.3 | 7.9 | 733.0 | 1.1 |
+
+### scenario, eu868
+
+| layout | N | rule | air % mean | air % worst box | captures delivered % | captures ACKed % | capture lat p50 s | p95 s | STATE heard % | frames refused/box | CADs/box/h | CAD uAh/h | TX uAh/h | CAD as % of TX energy |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| all in range | 10 | A_backoff | 2.3 | 2.4 | 100.0 | 100.0 | 0.7 | 3.8 | 80.1 | 0.0 | - | - | 1048.0 | - |
+| all in range | 10 | A_backoff_lbt | 2.7 | 2.8 | 100.0 | 100.0 | 0.3 | 0.6 | 98.7 | 0.0 | 1963.9 | 13.1 | 1201.0 | 1.1 |
+| all in range | 10 | A_backoff_core | 2.4 | 2.4 | 100.0 | 100.0 | 0.6 | 3.3 | 79.8 | 0.0 | - | - | 1057.0 | - |
+| all in range | 10 | A_backoff_core_lbt | 2.7 | 2.7 | 100.0 | 100.0 | 0.1 | 0.6 | 98.9 | 0.0 | 2028.1 | 13.5 | 1201.0 | 1.1 |
+| all in range | 20 | A_backoff | 2.1 | 2.2 | 100.0 | 100.0 | 1.1 | 2.8 | 71.4 | 0.0 | - | - | 927.0 | - |
+| all in range | 20 | A_backoff_lbt | 2.6 | 2.6 | 100.0 | 100.0 | 0.2 | 1.3 | 94.9 | 0.0 | 2643.8 | 17.6 | 1156.0 | 1.5 |
+| all in range | 20 | A_backoff_core | 2.1 | 2.1 | 100.0 | 100.0 | 0.1 | 4.3 | 71.1 | 0.0 | - | - | 931.0 | - |
+| all in range | 20 | A_backoff_core_lbt | 2.6 | 2.7 | 100.0 | 100.0 | 0.3 | 1.4 | 94.7 | 0.0 | 2672.3 | 17.8 | 1166.0 | 1.5 |
+| all in range | 30 | A_backoff | 2.0 | 2.1 | 100.0 | 100.0 | 0.7 | 3.6 | 64.6 | 0.0 | - | - | 918.0 | - |
+| all in range | 30 | A_backoff_lbt | 2.5 | 2.7 | 100.0 | 100.0 | 2.0 | 4.5 | 91.5 | 0.0 | 3111.4 | 20.7 | 1148.0 | 1.8 |
+| all in range | 30 | A_backoff_core | 2.0 | 2.2 | 100.0 | 100.0 | 0.8 | 44.6 | 64.7 | 0.0 | - | - | 922.0 | - |
+| all in range | 30 | A_backoff_core_lbt | 2.6 | 2.7 | 100.0 | 100.0 | 0.9 | 4.7 | 91.6 | 0.0 | 3127.6 | 20.9 | 1161.0 | 1.8 |
+| long field | 10 | A_backoff | 1.9 | 2.2 | 100.0 | 100.0 | 0.1 | 0.7 | 76.7 | 0.0 | - | - | 850.0 | - |
+| long field | 10 | A_backoff_lbt | 2.1 | 2.4 | 100.0 | 100.0 | 0.1 | 0.9 | 84.5 | 0.0 | 992.9 | 6.6 | 927.0 | 0.7 |
+| long field | 10 | A_backoff_core | 1.9 | 2.2 | 100.0 | 100.0 | 0.1 | 2.6 | 76.5 | 0.0 | - | - | 842.0 | - |
+| long field | 10 | A_backoff_core_lbt | 2.0 | 2.3 | 100.0 | 100.0 | 0.1 | 0.7 | 84.9 | 0.0 | 1002.4 | 6.7 | 922.0 | 0.7 |
+| long field | 20 | A_backoff | 2.0 | 2.5 | 100.0 | 100.0 | 3.5 | 21.4 | 44.7 | 0.0 | - | - | 896.0 | - |
+| long field | 20 | A_backoff_lbt | 1.9 | 2.0 | 100.0 | 100.0 | 1.5 | 3.5 | 59.0 | 0.0 | 946.4 | 6.3 | 833.0 | 0.8 |
+| long field | 20 | A_backoff_core | 1.9 | 2.4 | 100.0 | 80.0 | 4.2 | 10.7 | 44.3 | 0.0 | - | - | 878.0 | - |
+| long field | 20 | A_backoff_core_lbt | 1.9 | 2.1 | 100.0 | 80.0 | 0.9 | 2.1 | 58.6 | 0.0 | 970.6 | 6.5 | 842.0 | 0.8 |
+| long field | 30 | A_backoff | 3.0 | 4.4 | 100.0 | 40.0 | 10.2 | 228.1 | 40.8 | 0.0 | - | - | 1346.0 | - |
+| long field | 30 | A_backoff_lbt | 2.7 | 3.5 | 100.0 | 80.0 | 4.0 | 51.2 | 45.6 | 0.0 | 1672.1 | 11.2 | 1215.0 | 0.9 |
+| long field | 30 | A_backoff_core | 2.9 | 4.2 | 100.0 | 40.0 | 10.3 | 148.9 | 40.2 | 0.0 | - | - | 1296.0 | - |
+| long field | 30 | A_backoff_core_lbt | 2.8 | 3.8 | 100.0 | 80.0 | 5.0 | 46.1 | 45.6 | 0.0 | 1789.0 | 11.9 | 1274.0 | 0.9 |
+| CQB (walls) | 10 | A_backoff | 2.3 | 2.4 | 100.0 | 100.0 | 0.7 | 1.1 | 86.1 | 0.0 | - | - | 1040.0 | - |
+| CQB (walls) | 10 | A_backoff_lbt | 2.6 | 2.7 | 100.0 | 100.0 | 0.1 | 0.1 | 97.8 | 0.0 | 1565.7 | 10.4 | 1170.0 | 0.9 |
+| CQB (walls) | 10 | A_backoff_core | 2.3 | 2.4 | 100.0 | 100.0 | 0.6 | 3.2 | 84.5 | 0.0 | - | - | 1026.0 | - |
+| CQB (walls) | 10 | A_backoff_core_lbt | 2.6 | 2.7 | 100.0 | 100.0 | 0.2 | 0.9 | 97.6 | 0.0 | 1554.5 | 10.4 | 1166.0 | 0.9 |
+| CQB (walls) | 20 | A_backoff | 2.0 | 2.2 | 100.0 | 100.0 | 0.5 | 0.9 | 71.1 | 0.0 | - | - | 900.0 | - |
+| CQB (walls) | 20 | A_backoff_lbt | 2.4 | 2.5 | 100.0 | 100.0 | 0.3 | 1.1 | 89.6 | 0.0 | 1693.8 | 11.3 | 1067.0 | 1.1 |
+| CQB (walls) | 20 | A_backoff_core | 2.0 | 2.1 | 100.0 | 100.0 | 0.5 | 4.2 | 71.1 | 0.0 | - | - | 904.0 | - |
+| CQB (walls) | 20 | A_backoff_core_lbt | 2.4 | 2.5 | 100.0 | 100.0 | 0.1 | 1.4 | 90.0 | 0.0 | 1639.0 | 10.9 | 1057.0 | 1.0 |
+| CQB (walls) | 30 | A_backoff | 1.8 | 2.1 | 100.0 | 100.0 | 0.8 | 4.0 | 64.6 | 0.0 | - | - | 828.0 | - |
+| CQB (walls) | 30 | A_backoff_lbt | 2.1 | 2.3 | 100.0 | 100.0 | 1.1 | 4.1 | 76.2 | 0.0 | 1323.0 | 8.8 | 927.0 | 0.9 |
+| CQB (walls) | 30 | A_backoff_core | 1.9 | 2.0 | 100.0 | 100.0 | 1.2 | 4.2 | 64.4 | 0.0 | - | - | 855.0 | - |
+| CQB (walls) | 30 | A_backoff_core_lbt | 2.1 | 2.3 | 100.0 | 100.0 | 1.2 | 3.3 | 76.3 | 0.0 | 1338.9 | 8.9 | 931.0 | 1.0 |
+

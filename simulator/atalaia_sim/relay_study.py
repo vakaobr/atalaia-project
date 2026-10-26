@@ -430,6 +430,15 @@ POLICIES: dict[str, Policy] = {
                               retry_backoff=True, core_rules=True,
                               summary="A+backoff run by the core's atalaia_relay_* and atalaia_retry_gap_ms "
                                       "(what the box ships), not by this file's model"),
+    # SL-25: listen-before-talk on the rules that are built (the CAD wraps the TX decision in the harness)
+    "A_backoff_lbt": replace(FIRMWARE, name="A_backoff_lbt", jitter_mode="uniform", jitter_ms=(20, 600),
+                             relay_slots=8, density_c=3.0, ack_cancel=True, ack_relay_path=True,
+                             retry_backoff=True, lbt=True,
+                             summary="A_backoff plus listen-before-talk (CAD, 20-200 ms backoff, at most 8 times)"),
+    "A_backoff_core_lbt": replace(FIRMWARE, name="A_backoff_core_lbt", jitter_mode="uniform", jitter_ms=(20, 600),
+                                  relay_slots=8, density_c=3.0, ack_cancel=True, ack_relay_path=True,
+                                  retry_backoff=True, core_rules=True, lbt=True,
+                                  summary="A_backoff_core (the core's rules) plus a simulator-side CAD before TX"),
     "D_lbt": replace(FIRMWARE, name="D_lbt", jitter_mode="uniform", jitter_ms=(20, 600), relay_slots=8,
                      density_c=3.0, ack_cancel=True, ack_relay_path=True, state_period_ms=_adaptive_period,
                      retry_backoff=True, lbt=True, summary="D plus listen-before-talk"),
@@ -481,6 +490,7 @@ class Stats:
         self.relay_cancelled = 0
         self.relay_skipped = 0  # the policy decided not to relay at all
         self.lbt_deferred = 0
+        self.lbt_cads = 0  # channel-activity detections made before a transmission (the energy cost, SL-25)
         self.relayed = 0
         self.rx_ok = 0
         self.rx_dup = 0
@@ -542,6 +552,10 @@ class Node:
         self.kick(t_us)
         return True
 
+    def _cad(self, t_us: int) -> bool:
+        self.stats.lbt_cads += 1
+        return self.eng.chan.busy_for(self.idx, t_us)
+
     def kick(self, t_us: int) -> None:
         if self.tx_busy or self.pop_scheduled or not self.txq:
             return
@@ -557,7 +571,9 @@ class Node:
             self.pop_scheduled = True
             self.eng.at(self.radio_at(self.next_ok_us), self.pop)
             return
-        if pol.lbt and self.lbt_waits < pol.lbt_tries and self.eng.chan.busy_for(self.idx, t_us):
+        # The CAD is a simulator-side wrapper around the TX decision: the core has no CAD (SL-25), so with
+        # lbt the harness asks the channel before handing the frame to the radio, for either rule set.
+        if pol.lbt and self.lbt_waits < pol.lbt_tries and self._cad(t_us):
             self.lbt_waits += 1
             self.stats.lbt_deferred += 1
             self.pop_scheduled = True
@@ -1180,6 +1196,7 @@ class Engine:
         res["relay_cancelled"] = sum(b.stats.relay_cancelled for b in boxes)
         res["relay_skipped"] = sum(b.stats.relay_skipped for b in boxes)
         res["lbt_deferred"] = sum(b.stats.lbt_deferred for b in boxes)
+        res["lbt_cads_per_box_hour"] = round(sum(b.stats.lbt_cads for b in boxes) / n / (dur_s / 3600.0), 1)
         res["relays_sent"] = sum(b.stats.relayed for b in boxes)
         res["dedupe_evictions"] = sum(b.stats.dedupe_evictions for b in boxes)
         res["dup_after_evict"] = sum(b.stats.dup_after_evict for b in boxes)

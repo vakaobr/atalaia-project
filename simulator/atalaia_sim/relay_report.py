@@ -137,6 +137,65 @@ def decision_tables(results: list[Result]) -> str:
     return "\n".join(out) + "\n"
 
 
+# --- listen-before-talk on A+backoff (decision SL-25) -----------------------------------------------
+# The CAD's cost. The figures are the SX1261/2 datasheet's (DS.SX1261-2 rev 2.1) and Semtech AN1200.48's as
+# the study's author remembers them: NOT checked against the PDF in this session, so re-check them before
+# building. A two-symbol CAD from standby is two symbols of 1.024 ms (both regions) plus the chip's
+# processing and the wake from standby, taken as 4 ms in all. Its current is the receiver's (4.6 mA, DC-DC,
+# LoRa), taken as 6 mA to leave some room. A transmission at the box's 13 dBm conducted power is taken as
+# the datasheet's +14 dBm, 45 mA (DC-DC). The front-end module's own current (LNA on receive, PA on
+# transmit) is excluded from both: it is board-level and to be measured.
+CAD_MS = 4.0
+CAD_MA = 6.0
+TX_MA = 45.0
+RX_MA = 4.6
+
+LBT_RULES = [("A_backoff", "A_backoff_lbt"), ("A_backoff_core", "A_backoff_core_lbt")]
+
+
+def lbt_energy(cads_per_hour: float, air_pct: float) -> tuple[float, float]:
+    """(CAD mC per hour, TX mC per hour) of one box."""
+    return cads_per_hour * CAD_MS / 1000.0 * CAD_MA, air_pct / 100.0 * 3600.0 * TX_MA
+
+
+def lbt_table(results: list[Result], game: str, region: str) -> str:
+    """One row per layout, size and rule (with and without the CAD): the numbers of SL-25."""
+    g = group(results)
+    ev = "events.all_game_events" if game == "scenario" else "events.captures"
+    layouts = [lay for lay in LAYOUT_NAMES if any(r["layout"] == lay for r in results)]
+    sizes = sorted({r["n"] for r in results})
+    rows = []
+    for layout in layouts:
+        for n in sizes:
+            for base, lbt in LBT_RULES:
+                for pol in (base, lbt):
+                    grp = g.get((game, layout, n, region, pol))
+                    if not grp:
+                        continue
+                    cads = med(grp, "lbt_cads_per_box_hour") or 0.0
+                    air = med(grp, "airtime_pct.mean") or 0.0
+                    cad_mc, tx_mc = lbt_energy(cads, air)
+                    rows.append([LAYOUT_NAMES.get(layout, layout), n, pol, med(grp, "airtime_pct.mean"),
+                                 med(grp, "airtime_pct.max"), med(grp, ev + ".delivered_pct"),
+                                 med(grp, ev + ".acked_pct"), med(grp, ev + ".latency_p50_s"),
+                                 med(grp, ev + ".latency_p95_s"), med(grp, "states.heard_pct"),
+                                 med(grp, "dc_dropped.per_box_mean"), cads if cads else "-",
+                                 round(cad_mc / 3.6, 2) if cads else "-", round(tx_mc / 3.6, 0),
+                                 round(100.0 * cad_mc / tx_mc, 2) if cads and tx_mc else "-"])
+    return table(["layout", "N", "rule", "air % mean", "air % worst box", "captures delivered %",
+                  "captures ACKed %", "capture lat p50 s", "p95 s", "STATE heard %", "frames refused/box",
+                  "CADs/box/h", "CAD uAh/h", "TX uAh/h", "CAD as % of TX energy"], rows)
+
+
+def lbt_section(results: list[Result]) -> str:
+    out = []
+    for game in sorted({r["game"] for r in results}):
+        for region in sorted({r["region"] for r in results}):
+            out.append(f"\n### {game}, {region}\n")
+            out.append(lbt_table(results, game, region))
+    return "\n".join(out) + "\n"
+
+
 # --- the full report -------------------------------------------------------------------------------
 
 LAYOUT_NAMES = {"all_in_range": "all in range", "long": "long field", "cqb": "CQB (walls)"}
@@ -351,7 +410,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("--out", default=None, help="write the Markdown here (default: stdout)")
     ap.add_argument("--json", default=None, help="also write every result as JSON here")
     ap.add_argument("--from-json", default=None, help="do not run anything: render the report from this JSON")
+    ap.add_argument("--lbt-json", default=None, help="print SL-25's listen-before-talk tables from this JSON")
     args = ap.parse_args(argv)
+    if args.lbt_json:
+        print(lbt_section(load(args.lbt_json)))
+        return 0
     if args.from_json:
         text, results = render(load(args.from_json)), []
     else:

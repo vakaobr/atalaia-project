@@ -295,6 +295,25 @@ class RelayBehaviourTests(unittest.TestCase):
         self.assertGreater(resends("firmware"), 80)  # five minutes at one a 3 s
         self.assertLess(resends("backoff"), 20)
 
+    def test_listen_before_talk_on_a_plus_backoff_defers_and_counts_its_cads(self):
+        """SL-25: A_backoff_lbt is A_backoff plus the CAD; every deferral is a CAD that saw a frame."""
+        self.assertTrue(POLICIES["A_backoff_lbt"].lbt)
+        self.assertTrue(POLICIES["A_backoff_core_lbt"].lbt and POLICIES["A_backoff_core_lbt"].core_rules)
+        for name in ("jitter_ms", "relay_slots", "density_c", "ack_cancel", "ack_relay_path", "retry_backoff"):
+            self.assertEqual(getattr(POLICIES["A_backoff_lbt"], name), getattr(POLICIES["A_backoff"], name))
+        plain = run_one("domination", 20, "all_in_range", "eu868", "A_backoff", 6, 1, LIB, trace=_empty(20, 6))
+        lbt = run_one("domination", 20, "all_in_range", "eu868", "A_backoff_lbt", 6, 1, LIB, trace=_empty(20, 6))
+        self.assertEqual(plain["lbt_cads_per_box_hour"], 0)
+        self.assertGreater(lbt["lbt_cads_per_box_hour"], 100)  # at least one CAD per frame sent
+        self.assertGreater(lbt["lbt_deferred"], 0)
+        self.assertEqual(lbt["dc_dropped"]["total"], 0)
+
+    @unittest.skipIf(LIB is None, "the shared core is not built")
+    def test_listen_before_talk_wraps_the_cores_rules_too(self):
+        res = run_one("domination", 12, "all_in_range", "eu868", "A_backoff_core_lbt", 6, 1, LIB, trace=_empty(12, 6))
+        self.assertGreater(res["lbt_cads_per_box_hour"], 100)
+        self.assertEqual(res["dc_dropped"]["total"], 0)
+
     def test_the_run_is_deterministic_per_seed(self):
         a = run_one("domination", 8, "cqb", "eu868", "firmware", 4, 5, LIB, trace=_empty(8, 4))
         b = run_one("domination", 8, "cqb", "eu868", "firmware", 4, 5, LIB, trace=_empty(8, 4))
@@ -349,6 +368,17 @@ class ReportTests(unittest.TestCase):
         self.assertIn("A_relay", text)
         self.assertIn("as923-tw", relay_report.decision_tables(res))
         self.assertIn("air %", relay_report.per_box_table(res[0]))
+
+    def test_the_lbt_table_prices_the_cads(self):
+        """SL-25's table: CADs per box-hour, their energy next to the TX energy, with and without the CAD."""
+        res = run_matrix(["domination"], [6], ["all_in_range"], ["eu868"], ["A_backoff", "A_backoff_lbt"], 3, [1],
+                         LIB, workers=1)
+        text = relay_report.lbt_section(res)
+        self.assertIn("A_backoff_lbt", text)
+        self.assertIn("CAD as % of TX energy", text)
+        cad_mc, tx_mc = relay_report.lbt_energy(3600.0, 2.0)  # one CAD a second, 2 % airtime
+        self.assertAlmostEqual(cad_mc, 3600 * 0.004 * 6.0)
+        self.assertAlmostEqual(tx_mc, 0.02 * 3600 * 45.0)
 
 
 @unittest.skipUnless(LIB, "the C core's shared library is not built")
