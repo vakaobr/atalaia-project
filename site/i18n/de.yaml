@@ -707,8 +707,8 @@ roadmap:
     Sechs Phasen, jede mit einem echten Feldtest als Abschluss, ihrem Gate. Die Software ist der
     Hardware vorausgeeilt: Die Phasen 1 und 2 sind in Software fertig, echte Boards spielen auf dem
     Labortisch schon ganze Spiele mit dem Feld-Controller, und die Gates warten auf gebaute Boxen
-    und Feldtests; Phase 3 ist in Software fertig, außer iOS und den letzten Teilen des Handys als
-    Feld-Controller, und alle Software-Schritte der Phasen 4 und 5 sind gebaut und warten auf
+    und Feldtests; Phase 3 ist in Software fertig, die iOS-App eingeschlossen (sie hat ihre Checkliste auf einem
+    iPhone bestanden), und alle Software-Schritte der Phasen 4 und 5 sind gebaut und warten auf
     Hardware, einen echten Server und das Repository der Registry.
   # The main page shows each phase's title and short line, then this link to the roadmap page.
   more: Die ganze Roadmap, mit dem Inhalt jeder Phase und ihrem Gate →
@@ -764,7 +764,7 @@ roadmap:
     title: Android und Spielende
     short: >-
       Android-Props, der I/O-Pod, die Spieler-App und die Modi, die Handys brauchen, Money Factory
-      eingeschlossen: in Software fertig, außer iOS; der Feldtest wartet auf echte Handys und Pods.
+      eingeschlossen: in Software fertig, iOS eingeschlossen (auf einem iPhone geprüft); der Feldtest wartet auf echte Handys und Pods.
     text: >-
       Android-Props, der <a href="{{ page.to.glossary }}#glossar-android-prop">I/O-Pod</a>, die App
       für Spielende, Marshals und die Spielleitung und die Modi, die Handys und Tags der Spielenden
@@ -810,8 +810,8 @@ roadmap:
       Spielschlüssel gemeldet wird, neue Boxen, aufgenommen über den Code, den sie zeigen, oder mit
       einer Feldkarte, die das Handy per NFC schreibt, und Firmware-Updates zwischen Spielen (mit
       dem USB-Funkmodem des Pi am Handy: der I/O-Pod reicht diese Nachrichten noch nicht weiter); und Presets, hochgeladene Modi und signierte Moduspakete, die an Boxen geschickt werden, denen sie fehlen, auf dem Handy kompilierte Szenarien, Rollenpakete in einem Spiel sowie Teamnamen und Wappen;
-      und, ebenfalls vorgezogen, der Rest dessen, was der Pi kann: die Ausfallübernahme, sodass ein Handy und ein Pi einander als Bereitschafts-Controller dienen, der Abgleich mit dem Site-Server (Spiele, Protokolle und Punkte gehen hin, sobald Internet da ist; Anmeldelisten, Branding und die Szenariobibliothek kommen von dort), die Remote-Spielleitung und der ATAK-Feed); und die iOS-Version (ihr Projekt liegt im Repository, die CI baut es auf einem Mac, und es lief schon auf einem iPhone; der QR-Scanner, die atalaia://-Links und das Teilen der Position, nur solange die App auf dem Bildschirm ist, sind geschrieben, aber noch nicht auf einem Handy ausprobiert; NFC braucht ein bezahltes Apple-Konto; der Prop und das Handy als Feld-Controller bleiben nur Android). Planphase G, der Feldtest mit echten Handys und Pods, wartet auf die Hardware: Bisher
-      lief die App nur auf Android-Emulatoren und die Pod-Firmware nur als eigener Code auf einem
+      und, ebenfalls vorgezogen, der Rest dessen, was der Pi kann: die Ausfallübernahme, sodass ein Handy und ein Pi einander als Bereitschafts-Controller dienen, der Abgleich mit dem Site-Server (Spiele, Protokolle und Punkte gehen hin, sobald Internet da ist; Anmeldelisten, Branding und die Szenariobibliothek kommen von dort), die Remote-Spielleitung und der ATAK-Feed); und die iOS-Version (ihr Projekt liegt im Repository, die CI baut es auf einem Mac, und es lief schon auf einem iPhone; am 2026-10-26 hat sie ihre Checkliste auf einem iPhone bestanden (12 automatische Prüfungen und von Hand: QR-Scannen mit der Kamera, Check-in mit dem Plakat des Felds über HTTPS, Teilen der Position, solange die App auf dem Bildschirm ist, die Warnung außerhalb des Felds und ihre Vibration, die atalaia://-Links); NFC braucht ein bezahltes Apple-Konto; der Prop und das Handy als Feld-Controller bleiben nur Android). Planphase G, der Feldtest mit echten Handys und Pods, wartet auf die Hardware: Bisher
+      lief die App auf Android-Emulatoren und auf einem iPhone am Controller des Prüfstands, und die Pod-Firmware nur als eigener Code auf einem
       Computer.
     gate: "Gate: Ein Spiel mischt ESP32- und Android-Props ohne Probleme."
   p4:
