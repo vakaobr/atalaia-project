@@ -1099,6 +1099,17 @@
     "code_id": "id {id}",
     "code_duplicate": "More than one box offers itself under this name: type the code only into the entry whose id is the one on the box's screen."
   },
+  "poster_prompt": {
+    "title": "Print the check-in poster?",
+    "body": "Players check in by scanning the field's poster. If it is not up yet, print it before they arrive for “{game}”. It is the same for every game.",
+    "countdown": "Closes in {n} s",
+    "announce": "This message closes by itself in {n} seconds.",
+    "never": "Don't show this again",
+    "open": "Open the poster page",
+    "close": "Close",
+    "setting_title": "Check-in poster suggestion",
+    "setting": "Suggest printing the check-in poster after a game is created"
+  },
   "invites": {
     "open": "Invite boxes",
     "title": "Boxes for this game",

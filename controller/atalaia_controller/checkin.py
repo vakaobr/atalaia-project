@@ -58,6 +58,7 @@ import yaml
 
 from . import REPO_ROOT, chrono, player_token
 from . import checkin_poster as posterfmt
+from .addresses import FieldAddresses, saved_poster_urls, warn_dropped
 from . import checkin_ticket as ticketfmt
 from .engine import Conflict, ControllerError, NotFound
 
@@ -284,12 +285,19 @@ class RateLimit:
 class Checkin:
     def __init__(self, controller: "Controller", *, ca_sha256: Optional[bytes] = None,
                  default_urls: Optional[list[str]] = None, wall: Callable[[], float] = time.time,
-                 tz: Optional[datetime.tzinfo] = None) -> None:
+                 tz: Optional[datetime.tzinfo] = None, addresses: Optional[FieldAddresses] = None) -> None:
         self.ctrl = controller
         self.cfg = controller.cfg
         self.store = controller.store
         self.ca_sha256 = ca_sha256
         self.default_urls = list(default_urls or [])
+        # With the host's addresses (main.build), a saved poster's or [checkin] urls' address that is not
+        # on an interface now is left out, warned about and dropped from the saved poster at start
+        # (check-R8); without, the lists are used as given (tests).
+        self.addresses = addresses
+        self.explicit_urls: list[str] = []
+        if addresses is not None:
+            self._rederive()
         self._wall = wall
         self._tz = tz  # None: the controller's local time zone
         self._lock = threading.RLock()
@@ -334,6 +342,25 @@ class Checkin:
         self.ctrl._emit({"type": "checkin_settings", "settings": cur, "_staff": True})
         return cur
 
+    def _rederive(self) -> None:
+        """The GM's addresses that are still current: the saved poster's, else [checkin] urls. Stale ones
+        are dropped from the saved poster (it keeps its other fields)."""
+        assert self.addresses is not None
+        had = saved_poster_urls(self.store)
+        plan = self.addresses.plan(had, self.cfg.checkin_urls)
+        kept, _ = self.addresses.keep(had)
+        if kept != had:
+            try:
+                doc = json.loads(self.store.get_setting("checkin.poster") or "{}")
+            except ValueError:
+                doc = {}
+            if kept:
+                doc["urls"] = kept
+            else:
+                doc.pop("urls", None)
+            self.store.set_setting("checkin.poster", json.dumps(doc))
+        self.explicit_urls = plan.explicit
+
     def poster_fields(self) -> dict[str, Any]:
         saved = {}
         raw = self.store.get_setting("checkin.poster")
@@ -342,7 +369,10 @@ class Checkin:
                 saved = json.loads(raw)
             except ValueError:
                 saved = {}
-        urls = saved.get("urls") or self.cfg.checkin_urls or self.default_urls
+        if self.addresses is not None:
+            urls = self.explicit_urls or self.default_urls
+        else:
+            urls = saved.get("urls") or self.cfg.checkin_urls or self.default_urls
         return {"field_id": self.cfg.field_id, "field_name": saved.get("field_name") or self.cfg.field_name,
                 "urls": list(urls)[:3], "ca_sha256": self.ca_sha256,
                 "wifi_ssid": saved.get("wifi_ssid", self.cfg.wifi_ssid or None) or None,
@@ -376,6 +406,11 @@ class Checkin:
         unknown = set(spec) - {"urls", "wifi_ssid", "game_id", "field_name"}
         if unknown:
             raise ControllerError(f"unknown poster fields {sorted(unknown)}")
+        if self.addresses is not None and isinstance(spec.get("urls"), list):
+            # An address typed now that is on no interface is left out, as at start.
+            kept, dropped = self.addresses.keep(spec["urls"])
+            warn_dropped(dropped, "check-in poster")
+            spec = {**spec, "urls": kept}
         trial = {**self.poster_fields(), **{k: v for k, v in spec.items()}}
         if trial.get("wifi_ssid") == "":
             trial["wifi_ssid"] = None
@@ -393,9 +428,11 @@ class Checkin:
         except posterfmt.PosterError as exc:
             raise ControllerError(str(exc)) from None
         saved = {k: trial.get(k) for k in ("urls", "wifi_ssid", "game_id", "field_name")}
-        if "urls" not in spec:
+        if "urls" not in spec or (self.addresses is not None and not spec["urls"]):
             saved.pop("urls")
         self.store.set_setting("checkin.poster", json.dumps(saved))
+        if self.addresses is not None:
+            self._rederive()
         return self.poster()
 
     def notice(self) -> dict[str, Any]:

@@ -15,6 +15,8 @@ With a site server, players can register for a scheduled game beforehand (ADR-P4
 
 The GM console prints the poster (*Check-in* tab, *Print the poster*): an A4 page with a QR code, the field's name, three steps in European Portuguese and English, and the short form of the field CA's fingerprint so staff can compare it with the console. It is **per field**, printed once, and leads to whichever games are open for check-in; the GM may pin it to one game.
 
+**Which addresses it lists** (decisions check-R8 to check-R13). Only the configured names and the addresses the controller has on an interface *now*. A configured address that is on no interface (a lease that moved) is left out and warned about in the controller's log, at every start; a host name stays, because a name cannot be checked; a container keeps what is configured (its interfaces are not the field's). This applies to the Pi's `[api] tls_names` and `[checkin] urls`, to the urls of a saved poster (`PUT /api/v1/checkin/poster`, re-derived on start; its `wifi_ssid`, `game_id` and `field_name` stay) and, on the phone controller, to its saved poster and its configured urls, re-read every few seconds. A list the GM typed that keeps at least one address is the poster as it is, never padded; with none left the poster is the default (`tls_names`, then the addresses found, at most 3). The server certificate covers a superset of the poster's hosts, so an address on the poster never fails with a certificate-name error; the CA, and with it every pin, is never touched. Both controllers pass the cases `poster_addresses` of [`vectors/checkin.json`](vectors/checkin.json).
+
 The QR code holds a text:
 
 ```

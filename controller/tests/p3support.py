@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 from support import CORE, config  # noqa: F401  (also puts the controller on the path)
 
 from atalaia_controller import chrono
+from atalaia_controller.addresses import FieldAddresses
 from atalaia_controller.main import build
 
 GM = {"Authorization": "Bearer gm-secret"}
@@ -100,7 +101,9 @@ class P3Case(unittest.TestCase):
         self.open_bundle()
 
     def open_bundle(self) -> None:
-        self.bundle = build(self.cfg, core=CORE, load_core_lib=False)
+        # The configured address stands for one of this machine's (a test host has no 10.0.2.2).
+        addrs = FieldAddresses.current(self.cfg.tls_names, self.cfg.tls_port, extra_interfaces=self.cfg.tls_names)
+        self.bundle = build(self.cfg, core=CORE, load_core_lib=False, addresses=addrs)
         self.ctrl = self.bundle.controller
         self.svc = self.ctrl.checkin
         self.now = getattr(self, "now", T0)

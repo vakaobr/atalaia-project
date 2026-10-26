@@ -48,6 +48,7 @@ const SHELL = [
     'components/ortho-coverage.js',
     'components/ortho-sources.js',
     'components/place-search.js',
+    'components/poster-prompt.js',
     'components/preset-builder.js',
     'components/radio-settings.js',
     'components/scenario-builder.js',

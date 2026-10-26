@@ -79,6 +79,7 @@ import 'controller_schedule.dart';
 import 'controller_signed_modes.dart';
 import 'controller_store.dart';
 import 'controller_sync.dart';
+import 'field_addresses.dart';
 import 'field_tls.dart';
 import 'mqtt_broker.dart';
 import 'pod_modem.dart';
@@ -303,14 +304,28 @@ class ControllerHost {
   List<String> get addresses => List.unmodifiable(_addresses);
 
   /// The https addresses phones use (the poster, join key 14): up to 3.
-  List<String> get urls => boot.open
-      ? [
-          for (final a in _addresses.take(3))
-            boot.httpsPort == 443
-                ? 'https://$a'
-                : 'https://$a:${https?.port ?? boot.httpsPort}',
-        ]
-      : const [];
+  List<String> get urls =>
+      boot.open ? _fieldAddresses().plan().defaultUrls : const [];
+
+  /// The phone's addresses now, with the rules of the poster's addresses
+  /// (field_addresses.dart, decision check-R8).
+  FieldAddresses _fieldAddresses([List<String>? addresses]) => FieldAddresses(
+    found: addresses ?? _addresses,
+    interfaces: addresses ?? _addresses,
+    tlsPort: https?.port ?? boot.httpsPort,
+    filterFound: false, // localAddresses has filtered them
+  );
+
+  /// The names the server certificate covers: a superset of the poster's
+  /// addresses (check-R9), so a poster address never fails with a name
+  /// mismatch; an address that is stale is in neither.
+  List<String> _certificateNames(
+    String? savedPoster, {
+    List<String>? addresses,
+    List<String> checkinUrls = const [],
+  }) => _fieldAddresses(
+    addresses,
+  ).plan(saved: savedPosterUrls(savedPoster), checkinUrls: checkinUrls).san;
 
   Future<List<String>> _currentAddresses() async =>
       boot.addresses ?? await _addressesOf();
@@ -319,9 +334,10 @@ class ControllerHost {
     final dir = Directory(boot.dir)..createSync(recursive: true);
     secrets = ShellSecrets.load(dir.path);
     _addresses = await _currentAddresses();
+    final store = FileControllerStore(Directory('${dir.path}/store'));
     tls = FieldTls.ensure(
       '${dir.path}/tls',
-      certificateNames(_addresses),
+      _certificateNames(store.getSetting('checkin.poster')),
       fieldName: boot.fieldName,
       now: _now(),
     );
@@ -343,7 +359,7 @@ class ControllerHost {
             ? boot.failoverMode
             : 'manual',
       ),
-      store: FileControllerStore(Directory('${dir.path}/store')),
+      store: store,
       core: core,
       modem: modem,
     )..joinKey = boot.joinKey;
@@ -474,10 +490,13 @@ class ControllerHost {
     https = s;
   }
 
-  /// The poster's default addresses and join payloads' keys 13 and 14.
+  /// The poster's default addresses and join payloads' keys 13 and 14; the
+  /// saved poster's and `config.urls`' addresses are checked against the
+  /// phone's addresses now (check-R8).
   void _applyLinks() {
     final u = urls;
     checkin.defaultUrls = List.of(u);
+    checkin.useAddresses(_fieldAddresses());
     engine
       ..caSha256 = boot.open ? tls.caSha256 : null
       ..linkUrls = u;
@@ -497,14 +516,22 @@ class ControllerHost {
     try {
       final now = await _currentAddresses();
       final changed = now.join(',') != _addresses.join(',');
+      // The poster's addresses are in the certificate (check-R9): a name the
+      // GM saved on the poster since the last look makes a new one too.
+      final names = _certificateNames(
+        checkin.engine.store.getSetting('checkin.poster'),
+        addresses: now,
+        checkinUrls: checkin.config.urls,
+      );
       final due =
           tls.notAfter.difference(_now().toUtc()) <
           const Duration(days: renewDays);
-      if (!changed && !due) return;
+      final namesChanged = names.join(',') != tls.names.join(',');
+      if (!changed && !due && !namesChanged) return;
       _addresses = now;
       tls = FieldTls.ensure(
         tls.dir,
-        certificateNames(now),
+        names,
         fieldName: boot.fieldName,
         now: _now(),
       );

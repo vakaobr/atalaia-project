@@ -36,6 +36,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -49,6 +50,7 @@ import '../protocol/checkin_ticket.dart';
 import '../security/bytes.dart';
 import '../security/player_token.dart';
 import 'controller_engine.dart';
+import 'field_addresses.dart';
 
 final _playerIdRe = RegExp(r'^p-[a-z2-7]{12}$');
 final _secretRe = RegExp(r'^[A-Za-z0-9_-]{43}$');
@@ -359,6 +361,22 @@ class ControllerCheckin {
   /// slice S6, controller_host.dart); null: the poster says `https_off`.
   Uint8List? caSha256;
   List<String> defaultUrls;
+
+  /// The phone's addresses now (controller_host.dart `_applyLinks`), set by
+  /// [useAddresses]: a saved poster's or `config.urls`' address that is on no
+  /// interface is then left out and warned about (check-R8). Null: the lists
+  /// are used as given (tests).
+  FieldAddresses? addresses;
+
+  /// The GM's addresses that are still current (saved poster, else
+  /// `config.urls`); empty: the poster is [defaultUrls].
+  List<String> explicitUrls = const [];
+
+  /// Where the warnings about a dropped address go (default: the developer
+  /// log, `flutter run` and `adb logcat` show it).
+  void Function(String message) warn = _warnDefault;
+  static void _warnDefault(String m) =>
+      developer.log(m, name: 'atalaia.addresses', level: 900);
   final LimitTemplate limits;
   final RateLimit rate;
   final RateLimit infoRate;
@@ -685,11 +703,57 @@ class ControllerCheckin {
     }
   }
 
+  List<String> _savedUrls() {
+    final u = _savedPoster()['urls'];
+    return u is List
+        ? [
+            for (final x in u)
+              if (x is String) x,
+          ]
+        : const [];
+  }
+
+  void _warnDropped(Iterable<String> dropped) {
+    for (final d in dropped) {
+      warn(
+        'check-in poster: $d is not an address on any interface of this '
+        'phone now: left out of the poster and the server certificate '
+        '(a host name would stay)',
+      );
+    }
+  }
+
+  /// The addresses this phone has now (every start and every change of
+  /// them). The saved poster is re-derived, not kept as it was: its urls that
+  /// are stale are dropped from the setting (it keeps its other fields).
+  void useAddresses(FieldAddresses a, {bool quiet = false}) {
+    addresses = a;
+    final had = _savedUrls();
+    final plan = a.plan(saved: had, checkinUrls: config.urls);
+    if (!quiet) _warnDropped(plan.dropped);
+    final (kept, _) = a.keep(had);
+    if (kept.length != had.length) {
+      final doc = {..._savedPoster()};
+      if (kept.isEmpty) {
+        doc.remove('urls');
+      } else {
+        doc['urls'] = kept;
+      }
+      engine.store.setSetting('checkin.poster', jsonEncode(doc));
+    }
+    explicitUrls = plan.explicit;
+  }
+
   Map<String, Object?> posterFields() {
     final saved = _savedPoster();
-    final urls = _truthy(saved['urls'])
-        ? saved['urls']! as List
-        : (config.urls.isNotEmpty ? config.urls : defaultUrls);
+    final List<Object?> urls;
+    if (addresses != null) {
+      urls = explicitUrls.isNotEmpty ? explicitUrls : defaultUrls;
+    } else {
+      urls = _truthy(saved['urls'])
+          ? saved['urls']! as List
+          : (config.urls.isNotEmpty ? config.urls : defaultUrls);
+    }
     final name = saved['field_name'];
     final ssid = saved.containsKey('wifi_ssid')
         ? saved['wifi_ssid']
@@ -743,7 +807,18 @@ class ControllerCheckin {
     if (unknown.isNotEmpty) {
       throw ControllerError('unknown poster fields $unknown');
     }
-    final trial = {...posterFields(), ...spec};
+    final a = addresses;
+    var given = spec;
+    if (a != null && spec['urls'] is List) {
+      // An address typed now that is on no interface is left out, as at start.
+      final (kept, dropped) = a.keep([
+        for (final u in spec['urls']! as List)
+          if (u is String) u,
+      ]);
+      _warnDropped(dropped);
+      given = {...spec, 'urls': kept};
+    }
+    final trial = {...posterFields(), ...given};
     if (trial['wifi_ssid'] == '') trial['wifi_ssid'] = null;
     if (!_truthy(trial['urls'])) {
       trial['urls'] = config.urls.isNotEmpty ? config.urls : defaultUrls;
@@ -762,8 +837,11 @@ class ControllerCheckin {
       throw ControllerError(e.message);
     }
     final saved = {for (final k in keys) k: trial[k]};
-    if (!spec.containsKey('urls')) saved.remove('urls');
+    if (!spec.containsKey('urls') || (a != null && !_truthy(given['urls']))) {
+      saved.remove('urls');
+    }
     engine.store.setSetting('checkin.poster', jsonEncode(saved));
+    if (a != null) useAddresses(a, quiet: true);
     return poster();
   }
 

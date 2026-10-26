@@ -1099,6 +1099,17 @@
     "code_id": "ID {id}",
     "code_duplicate": "Mehr als eine Box bietet sich unter diesem Namen an: Gib den Code nur in den Eintrag ein, dessen ID auf dem Bildschirm der Box steht."
   },
+  "poster_prompt": {
+    "title": "Check-in-Plakat drucken?",
+    "body": "Die Spielenden checken ein, indem sie das Plakat des Feldes scannen. Hängt es noch nicht, druck es aus, bevor sie zu „{game}“ kommen. Es ist für alle Spiele gleich.",
+    "countdown": "Schließt in {n} s",
+    "announce": "Diese Meldung schließt sich in {n} Sekunden von selbst.",
+    "never": "Nicht mehr anzeigen",
+    "open": "Plakatseite öffnen",
+    "close": "Schließen",
+    "setting_title": "Vorschlag Check-in-Plakat",
+    "setting": "Nach dem Anlegen eines Spiels vorschlagen, das Check-in-Plakat zu drucken"
+  },
   "invites": {
     "open": "Boxen einladen",
     "title": "Boxen für dieses Spiel",

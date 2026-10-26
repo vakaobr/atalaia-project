@@ -7,7 +7,7 @@
 
 import { html, render, Component, t, loadLanguage, LANGS, api, ApiError, Stream,
          savedToken, saveToken, takeHashToken, serves, AREAS, clock, OFFLINE_MS, fetchBranding,
-         brandingUrl } from './ui.js';
+         brandingUrl, inWebView } from './ui.js';
 import { GameControl, ControllerPanel } from './components/game-control.js';
 import { ScorePanel } from './components/score-panel.js';
 import { LiveFeed } from './components/live-feed.js';
@@ -25,6 +25,7 @@ import { ModePackages } from './components/mode-packages.js';
 import { CheckinPanel } from './components/checkin-panel.js';
 import { BrandingSettings, TeamPresets, FieldBrand, accentRef } from './components/branding-settings.js';
 import { discover } from './components/box-invites.js';
+import { PosterPrompt, PosterPromptSetting, posterPromptWanted } from './components/poster-prompt.js';
 
 const TABS = ['game', 'checkin', 'field', 'nodes', 'join', 'adopt', 'presets', 'scenarios', 'feed', 'controller', 'settings'];
 const FEED_MAX = 500;
@@ -51,7 +52,7 @@ class App extends Component {
             nodes: {}, seen: {}, feed: [], alerts: [], modes: [], presets: [],
             positions: {}, scoreHistory: [], clockBase: null, toast: '', now: Date.now(),
             radio: null, chronoCounts: null, branding: null, teamPresets: [],
-            boxes: null, invites: [], invitePicker: false, mapFeatures: [], modeFetch: null,
+            boxes: null, invites: [], invitePicker: false, mapFeatures: [], modeFetch: null, posterPrompt: null,
         };
         this.checkinPanel = null;
         this.stream = null;
@@ -128,7 +129,24 @@ class App extends Component {
         this.features = null;
         saveToken('');
         this.setState({ token: '', role: null, features: null, connected: null, loginError: reason || '',
-                        game: null, status: null, nodes: {}, feed: [], alerts: [], radio: null });
+                        game: null, status: null, nodes: {}, feed: [], alerts: [], radio: null, posterPrompt: null });
+    }
+
+    /** After this console created a game: suggests printing the check-in poster (components/poster-prompt.js,
+     * decisions check-R10 to check-R17). Only for a GM, where the controller has a poster to print, where
+     * a page can be printed, and unless the GM chose "Don't show this again". `typing`: the GM was typing
+     * in a field when the game was created. */
+    async offerPoster(game, typing) {
+        if (this.state.role !== 'gm' || !this.serves('checkin') || inWebView() || !posterPromptWanted()) return;
+        try {
+            const poster = await api(this.token, 'GET', '/checkin/poster');
+            if (!poster.text) return; // HTTPS off or no address: there is no poster to print yet
+        } catch (e) {
+            return; // the suggestion is not worth an error
+        }
+        if (this.state.invitePicker || this.state.role !== 'gm') return;
+        this.posterSeq = (this.posterSeq || 0) + 1;
+        this.setState({ posterPrompt: { seq: this.posterSeq, typing: !!typing, game: { id: game.id, name: game.name } } });
     }
 
     /** Whether the controller serves one of the console's areas (whoami's "features"; PE24-70). */
@@ -529,6 +547,7 @@ class App extends Component {
             return html`<${ControllerPanel} app=${this} />`;
         case 'settings':
             return html`${this.serves('radio') && html`<${RadioSettings} app=${this} />`}<${BoxLanguageSettings} app=${this} />${
+                this.state.role === 'gm' && this.serves('checkin') && html`<${PosterPromptSetting} />`}${
                 this.serves('branding') && html`<${BrandingSettings} app=${this} />`}${
                 this.serves('presets') && html`<${TeamPresets} app=${this} />`}`;
         default:
@@ -556,6 +575,8 @@ class App extends Component {
             <main class="content">${this.renderTab(shown)}</main>
             ${state.toast && html`<div class="toast" role="alert" data-testid="toast">
                 ${state.toast} <button type="button" class="link" onClick=${() => this.setState({ toast: '' })}>×</button></div>`}
+            ${state.posterPrompt && html`<${PosterPrompt} key=${state.posterPrompt.seq} app=${this} game=${state.posterPrompt.game}
+                typing=${state.posterPrompt.typing} onClose=${() => this.setState({ posterPrompt: null })} />`}
         </div>`;
     }
 }

@@ -321,6 +321,40 @@ void main() {
     },
   );
 
+  test(
+    'the poster and the certificate follow the addresses (check-R8, R9)',
+    () async {
+      var now = ['127.0.0.1', '10.42.0.1'];
+      final h = await start(boot(addresses: null), addresses: () async => now);
+      final port = h.status()['https_port'];
+      h.checkin.warn = (_) {};
+      // The GM pins the poster to a name and to an address of this phone.
+      h.checkin.setPoster({
+        'urls': ['https://campo.lan:$port', 'https://10.42.0.1:$port'],
+      });
+      await h.check();
+      expect(h.status()['cert_names'], contains('campo.lan'));
+      expect(h.checkin.posterFields()['urls'], [
+        'https://campo.lan:$port',
+        'https://10.42.0.1:$port',
+      ]);
+      // The address goes away: the poster loses it, the name stays, and the
+      // certificate no longer covers the address.
+      final warned = <String>[];
+      h.checkin.warn = warned.add;
+      now = ['127.0.0.1', '192.168.43.1'];
+      await h.check();
+      expect(warned.single, contains('10.42.0.1'));
+      expect(h.checkin.posterFields()['urls'], ['https://campo.lan:$port']);
+      expect(h.status()['cert_names'], [
+        'localhost',
+        '127.0.0.1',
+        'campo.lan',
+        '192.168.43.1',
+      ]);
+    },
+  );
+
   test('a restart keeps the live game, the tokens and the CA', () async {
     final a = await start(boot());
     final first = a.status();

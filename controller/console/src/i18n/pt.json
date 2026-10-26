@@ -1099,6 +1099,17 @@
     "code_id": "id {id}",
     "code_duplicate": "Mais do que uma caixa se oferece com este nome: escreve o código só na entrada cujo id é o que está no ecrã da caixa."
   },
+  "poster_prompt": {
+    "title": "Imprimir o cartaz de check-in?",
+    "body": "Os jogadores fazem o check-in lendo o cartaz do campo. Se ainda não está afixado, imprima-o antes de chegarem para «{game}». É o mesmo para todos os jogos.",
+    "countdown": "Fecha em {n} s",
+    "announce": "Esta mensagem fecha-se sozinha em {n} segundos.",
+    "never": "Não mostrar outra vez",
+    "open": "Abrir a página do cartaz",
+    "close": "Fechar",
+    "setting_title": "Sugestão do cartaz de check-in",
+    "setting": "Sugerir a impressão do cartaz de check-in depois de criar um jogo"
+  },
   "invites": {
     "open": "Convidar caixas",
     "title": "Caixas para este jogo",

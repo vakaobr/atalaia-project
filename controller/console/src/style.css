@@ -1606,6 +1606,33 @@ textarea.scenario-editor {
     margin-top: 2rem;
 }
 
+/* The check-in poster suggestion (components/poster-prompt.js): a modal, or, while the GM is typing in a
+   field, a card in the corner that leaves the page and its focus alone. */
+.poster-prompt {
+    max-width: 28rem;
+}
+
+.poster-prompt:focus {
+    outline: none;
+}
+
+.modal-floating {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    left: 1rem;
+    display: flex;
+    justify-content: flex-end;
+    z-index: 50;
+    pointer-events: none;
+}
+
+.modal-floating .modal {
+    margin-top: 0;
+    pointer-events: auto;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+}
+
 table.invites {
     width: 100%;
     border-collapse: collapse;

@@ -6,6 +6,7 @@
 // box, adjust a team's score. ControllerPanel: role, term, radio, promote.
 
 import { html, Component, createRef, t, lang, clock, ConfirmButton, modeText, teamName } from '../ui.js';
+import { isTyping } from './poster-prompt.js';
 import { FirstSetupNotice, mhz } from './radio-settings.js';
 import { TeamFields, TeamsEditor, teamInfoBody } from './branding-settings.js';
 import { BoxInvites, StartCheck } from './box-invites.js';
@@ -100,9 +101,11 @@ class CreateGame extends Component {
             body.mode_id = mode.id;
             if (mods.length) body.modifiers = mods.map((m) => m.id);
         }
+        const typingBefore = isTyping(document.activeElement); // Enter in a field: still typing there
         const game = await this.props.app.call('POST', '/games', body);
         if (game) {
             const app = this.props.app;
+            const typing = typingBefore || isTyping(document.activeElement);
             app.setGame(game);
             app.setState({ invites: [] });
             // The boxes for this game: when free boxes have been heard over the radio, the
@@ -110,6 +113,7 @@ class CreateGame extends Component {
             await app.loadBoxes(true);
             const boxes = (app.state.boxes && app.state.boxes.boxes) || [];
             if (boxes.length) app.setState({ invitePicker: true });
+            else app.offerPoster(game, typing); // the boxes' dialog is the next step when there are boxes
         }
     }
 

@@ -31,6 +31,7 @@ from typing import Any, Callable, Optional
 from atalaia_sim.core import Core, LibraryNotFound, find_library
 
 from . import tls as tlsmod
+from .addresses import FieldAddresses, saved_poster_urls, warn_dropped
 from .adoption import PREVIOUS_SETTING, Adoption
 from .api import Auth, create_app
 from .atak import AtakEmitter
@@ -94,32 +95,33 @@ def tls_dir(cfg: Config) -> Path:
     return Path(os.path.dirname(os.path.abspath(cfg.db_path))) / "tls"
 
 
-def ensure_tls(cfg: Config) -> Optional[tlsmod.FieldTls]:
-    """The field CA and the server certificate, made on first start (None with tls_port = 0)."""
+def ensure_tls(cfg: Config, names: Optional[list[str]] = None) -> Optional[tlsmod.FieldTls]:
+    """The field CA and the server certificate, made on first start (None with tls_port = 0). ``names``:
+    what the certificate covers (``addresses.Plan.san``: a superset of the poster's hosts, check-R9);
+    default the configured names and what this host has."""
     if not cfg.tls_port:
         return None
-    return tlsmod.ensure(tls_dir(cfg), tlsmod.local_names(cfg.tls_names), cfg.field_name)
+    return tlsmod.ensure(tls_dir(cfg), names if names is not None else tlsmod.local_names(cfg.tls_names),
+                         cfg.field_name)
+
+
+CONTAINER_NO_NAMES = ("running in a container with no [api] tls_names: the boxes and the check-in poster get no "
+                      "address for this controller (its own host name and addresses resolve only inside the "
+                      "container); set [api] tls_names to the address the field reaches it at")
 
 
 def poster_urls(cfg: Config, tls: Optional[tlsmod.FieldTls], container: Optional[bool] = None) -> list[str]:
     """The https addresses of the poster and of the boxes' joins (key 14): the configured names first,
-    then this host's names and addresses that another device can reach (none in a container: OT-10)."""
+    then this host's names and addresses that another device can reach (none in a container: OT-10).
+    Configured addresses not on an interface now are left out (check-R8, addresses.py)."""
     if tls is None:
         return []
     if container is None:
         container = tlsmod.in_container()
-    names = tlsmod.link_names(cfg.tls_names, tls.names, container)
     if container and not cfg.tls_names:
-        log.warning("running in a container with no [api] tls_names: the boxes and the check-in poster get no "
-                    "address for this controller (its own host name and addresses resolve only inside the "
-                    "container); set [api] tls_names to the address the field reaches it at")
-    out = []
-    for name in names:
-        host = f"[{name}]" if ":" in name else name
-        url = f"https://{host}:{cfg.tls_port}" if cfg.tls_port != 443 else f"https://{host}"
-        if url not in out and len(url) <= 64:
-            out.append(url)
-    return out[:3]
+        log.warning(CONTAINER_NO_NAMES)
+    return FieldAddresses(tls_names=cfg.tls_names, found=tls.names, tls_port=cfg.tls_port,
+                          container=container).plan().default
 
 
 @dataclass
@@ -138,7 +140,7 @@ class Bundle:
 
 
 def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = True,
-          serial_factory: Optional[Callable[[], Any]] = None) -> Bundle:
+          serial_factory: Optional[Callable[[], Any]] = None, addresses: Optional[FieldAddresses] = None) -> Bundle:
     store = Store(cfg.db_path)
     gm, read = ensure_tokens(cfg, store)
     join_key = ensure_join_key(cfg, store)
@@ -151,10 +153,18 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
     else:
         log.warning("no modem port configured: the controller runs without a radio")
     controller = Controller(cfg, store, modem=modem, core=core, join_key=join_key)
-    tls = ensure_tls(cfg)
+    # The poster's addresses and the certificate's names, from what this host has now (check-R8/R9):
+    # a configured address on no interface is left out of both and warned about.
+    addrs = addresses or FieldAddresses.current(cfg.tls_names, cfg.tls_port)
+    plan = addrs.plan(saved_poster_urls(store), cfg.checkin_urls)
+    warn_dropped(plan.dropped)
+    tls = ensure_tls(cfg, plan.san)
     controller.ca_sha256 = tls.ca_sha256 if tls else None
-    controller.link_urls = poster_urls(cfg, tls)
-    Checkin(controller, ca_sha256=tls.ca_sha256 if tls else None, default_urls=controller.link_urls)
+    controller.link_urls = plan.default if tls else []
+    if tls and addrs.container and not cfg.tls_names:
+        log.warning(CONTAINER_NO_NAMES)
+    Checkin(controller, ca_sha256=tls.ca_sha256 if tls else None, default_urls=plan.default if tls else [],
+            addresses=addrs)
     Positions(controller)
     PropLinks(controller)
     FirmwareUpdates(controller, firmware_dir(cfg.db_path, cfg.firmware_dir), cfg.firmware_release_keys,

@@ -43,6 +43,7 @@ import httpx  # noqa: E402
 import uvicorn  # noqa: E402
 
 from atalaia_controller import checkin_poster  # noqa: E402
+from atalaia_controller.addresses import FieldAddresses  # noqa: E402
 from atalaia_controller.main import build  # noqa: E402
 from atalaia_sim import codec, join, lobby  # noqa: E402
 from atalaia_sim import field_frame as ff  # noqa: E402
@@ -113,7 +114,8 @@ class Field:
         cfg = {"tls_names": ["10.42.0.1"], **(cfg or {})}
         cfg = config(self.tmp.name, port=self.host.url, api_port=self.port, host="127.0.0.1",
                      join_key=JOIN_KEY.hex(), scan_dwell_s=1.1, **(cfg or {}))
-        self.bundle = build(cfg, core=CORE, load_core_lib=False)
+        addrs = FieldAddresses.current(cfg.tls_names, cfg.tls_port, extra_interfaces=cfg.tls_names)
+        self.bundle = build(cfg, core=CORE, load_core_lib=False, addresses=addrs)
         self.server = uvicorn.Server(uvicorn.Config(self.bundle.app, host="127.0.0.1", port=self.port,
                                                     log_level="error", lifespan="on"))
         self.thread = threading.Thread(target=self.server.run, daemon=True)
@@ -196,9 +198,14 @@ class ConsoleBrowserTests(unittest.TestCase):
 
     # --- helpers --------------------------------------------------------------
 
-    def page(self, path: str = "/console/", width: int = 1280, height: int = 900, setup=None, **ctx_kw):
+    def page(self, path: str = "/console/", width: int = 1280, height: int = 900, setup=None,
+             poster_prompt: bool = False, **ctx_kw):
         ctx = self.browser.new_context(viewport={"width": width, "height": height}, device_scale_factor=2, **ctx_kw)
         self.contexts.append(ctx)
+        if not poster_prompt:
+            # "Print the check-in poster?" (check-R10) covers the page for ten seconds after a game is
+            # created; the tests that are not about it have chosen "Don't show this again".
+            ctx.add_init_script("try { localStorage.setItem('atalaia.posterPrompt', 'off'); } catch (e) {}")
         page = ctx.new_page()
         page.on("pageerror", lambda e: self.errors.append(f"pageerror: {e}"))
         page.on("console", lambda m: self.errors.append(f"console: {m.text}") if m.type == "error" else None)
@@ -3826,6 +3833,138 @@ class ConsoleBrowserTests(unittest.TestCase):
         live.select_option("members")
         self.assertTrue(wait_for(lambda: self.field.http.get(f"/api/v1/games/{game['id']}").json()
                                  ["scenario"]["disclosure"] == "members", 5))
+
+    # --- the check-in poster suggestion after a game is created (check-R10 to check-R17) ---------------------
+
+    def create_game_in_console(self, page, name: str = "Domingo", enter: bool = False) -> None:
+        page.get_by_test_id("game-name").fill(name)
+        page.get_by_test_id("game-source").select_option(f"mode:{DOMINATION}")
+        if enter:
+            page.get_by_test_id("game-name").press("Enter")  # the GM never left the field
+        else:
+            page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+
+    def end_game(self, page) -> None:
+        self.field.http.post(f"/api/v1/games/{self.field.bundle.controller.game['id']}/end", json={})
+        expect(page.get_by_test_id("game-create")).to_be_visible()
+        self.drop_errors("409")  # the page asked for the ended game's positions and chrono list
+
+    def test_poster_prompt_after_creating_a_game_counts_down_and_closes_itself(self):
+        page = self.console(poster_prompt=True)
+        t0 = time.monotonic()
+        self.create_game_in_console(page, "Domingo de manhã")
+        dialog = page.get_by_test_id("poster-prompt")
+        expect(dialog).to_be_visible()
+        expect(dialog).to_have_attribute("role", "dialog")
+        expect(dialog).to_have_attribute("aria-modal", "true")
+        expect(page.get_by_test_id("poster-prompt-body")).to_contain_text("Domingo de manhã")
+        expect(page.get_by_test_id("poster-prompt-countdown")).to_contain_text("Fecha em")
+        # The countdown is in sight, and a polite live region says it to a screen reader.
+        expect(page.get_by_test_id("poster-prompt-countdown")).to_have_attribute("aria-hidden", "true")
+        expect(page.get_by_test_id("poster-prompt-live")).to_have_attribute("aria-live", "polite")
+        expect(page.get_by_test_id("poster-prompt-live")).to_contain_text("10 segundos")
+        # Focus moved into it (onto the box, not onto a button).
+        self.assertEqual(page.evaluate("document.activeElement.getAttribute('data-testid')"), "poster-prompt")
+        expect(page.get_by_test_id("poster-prompt-countdown")).not_to_contain_text("10 s", timeout=4000)
+        expect(page.get_by_test_id("poster-prompt-live")).to_contain_text("5 segundos", timeout=8000)
+        # ... and it closes itself after ten seconds, the focus going back to the page's content.
+        expect(dialog).to_be_hidden(timeout=12000)
+        took = time.monotonic() - t0
+        self.assertTrue(9.0 <= took <= 13.5, f"closed after {took:.1f} s")
+        self.assertEqual(page.evaluate("document.activeElement.className"), "content")
+        self.assertIsNone(page.evaluate("localStorage.getItem('atalaia.posterPrompt')"))  # nothing was chosen
+
+    def test_poster_prompt_closes_early_with_the_button_and_with_esc(self):
+        page = self.console(poster_prompt=True)
+        self.create_game_in_console(page)
+        dialog = page.get_by_test_id("poster-prompt")
+        expect(dialog).to_be_visible()
+        page.get_by_test_id("poster-prompt-close").click()
+        expect(dialog).to_be_hidden(timeout=1500)
+        self.assertEqual(page.evaluate("document.activeElement.className"), "content")
+        # Another game: Esc closes it, from the keyboard alone (Tab stays inside while it is open).
+        self.end_game(page)
+        self.create_game_in_console(page, "Segundo")
+        expect(dialog).to_be_visible()
+        expect(page.get_by_test_id("poster-prompt-body")).to_contain_text("Segundo")
+        for _ in range(5):
+            page.keyboard.press("Tab")
+            inside = page.evaluate("document.querySelector('[data-testid=poster-prompt]').contains(document.activeElement)")
+            self.assertTrue(inside, "Tab left the dialog")
+        page.keyboard.press("Escape")
+        expect(dialog).to_be_hidden(timeout=1500)
+        self.assertEqual(page.evaluate("document.activeElement.className"), "content")
+        self.assertEqual(self.field.http.get("/api/v1/checkin/poster").json()["game_id"], None)  # nothing was pinned
+
+    def test_poster_prompt_opens_the_poster_page(self):
+        page = self.console(poster_prompt=True)
+        self.create_game_in_console(page)
+        expect(page.get_by_test_id("poster-prompt")).to_be_visible()
+        with page.expect_popup() as popup:
+            page.get_by_test_id("poster-prompt-open").click()
+        poster = popup.value
+        poster.on("pageerror", lambda e: self.errors.append(f"pageerror: {e}"))
+        self.assertTrue(poster.url.endswith("/console/poster.html"), poster.url)
+        expect(poster.get_by_test_id("poster-qr")).to_be_visible()
+        expect(page.get_by_test_id("poster-prompt")).to_be_hidden(timeout=1500)
+
+    def test_poster_prompt_not_for_a_read_token_nor_without_a_poster(self):
+        game = self.field.create_game("Domingo")
+        reader = self.console(READ, poster_prompt=True)
+        expect(reader.get_by_test_id("header-game")).to_contain_text("Domingo")
+        expect(reader.get_by_test_id("game-create")).to_have_count(0)  # a read token creates nothing
+        self.field.http.post(f"/api/v1/games/{game['id']}/end", json={})
+        self.field.create_game("Segundo")  # a game made elsewhere does not ask this console either
+        expect(reader.get_by_test_id("header-game")).to_contain_text("Segundo")
+        reader.wait_for_timeout(1500)
+        expect(reader.get_by_test_id("poster-prompt")).to_have_count(0)
+        # HTTPS off: there is no poster to print, so nothing to suggest.
+        reader.context.close()
+        self.field.close()
+        self.drop_errors("409")
+        self.field = Field(cfg={"tls_port": 0})
+        page = self.console(poster_prompt=True)
+        self.create_game_in_console(page)
+        page.wait_for_timeout(1500)
+        expect(page.get_by_test_id("poster-prompt")).to_have_count(0)
+
+    def test_poster_prompt_leaves_focus_alone_while_the_gm_types(self):
+        page = self.console(poster_prompt=True)
+        self.create_game_in_console(page, enter=True)  # Enter in the name field: the GM is typing
+        dialog = page.get_by_test_id("poster-prompt")
+        expect(dialog).to_be_visible()
+        expect(dialog).to_have_attribute("aria-modal", "false")
+        expect(dialog).to_have_attribute("data-modal", "false")
+        self.assertFalse(page.evaluate("document.querySelector('[data-testid=poster-prompt]').contains(document.activeElement)"))
+        # No backdrop: the page stays usable, and a field typed into keeps what is typed.
+        page.get_by_test_id("tab-feed").click()
+        expect(page.get_by_test_id("tab-feed")).to_have_class("active")
+        page.keyboard.press("Escape")
+        expect(dialog).to_be_hidden(timeout=1500)
+
+    def test_poster_prompt_dont_show_again_is_kept_in_this_browser(self):
+        page = self.console(poster_prompt=True)
+        self.create_game_in_console(page)
+        page.get_by_test_id("poster-prompt-never").check()
+        page.get_by_test_id("poster-prompt-close").click()
+        expect(page.get_by_test_id("poster-prompt")).to_be_hidden(timeout=1500)
+        self.assertEqual(page.evaluate("localStorage.getItem('atalaia.posterPrompt')"), "off")
+        self.end_game(page)
+        self.create_game_in_console(page, "Segundo")
+        page.wait_for_timeout(1500)
+        expect(page.get_by_test_id("poster-prompt")).to_have_count(0)
+        # Settings brings it back.
+        page.get_by_test_id("tab-settings").click()
+        setting = page.get_by_test_id("poster-prompt-setting")
+        expect(setting).not_to_be_checked()
+        setting.check()
+        self.assertIsNone(page.evaluate("localStorage.getItem('atalaia.posterPrompt')"))
+        page.reload()
+        expect(page.get_by_test_id("tab-game")).to_be_visible()
+        self.end_game(page)
+        self.create_game_in_console(page, "Terceiro")
+        expect(page.get_by_test_id("poster-prompt")).to_be_visible()
 
     def test_poster_renders_a_qr_code_with_the_poster_text(self):
         if not ZBARIMG:

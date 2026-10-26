@@ -762,5 +762,472 @@
         }
       ]
     }
+  },
+  "poster_addresses": {
+    "description": "Which addresses the check-in poster lists and the server certificate covers (decisions check-R8, check-R9). input: tls_names ([api] tls_names, the Pi only), found (the host's names and addresses now, best first), interfaces (the IP addresses on an interface now), tls_port, container, saved_urls (the saved poster's), checkin_urls ([checkin] urls). expected: poster (the https urls listed, at most 3), dropped (configured addresses left out because they are on no interface, in the order saved_urls, checkin_urls, tls_names), san (the names the certificate covers, as a set: always a superset of the poster's hosts). A name is never dropped; an IP literal is kept if it is on an interface (or in a container). controller/atalaia_controller/addresses.py and app/lib/controller/field_addresses.dart both pass it.",
+    "cases": [
+      {
+        "name": "current_address_present",
+        "why": "a configured address that is on an interface now is listed, first",
+        "input": {
+          "tls_names": [
+            "10.42.0.1"
+          ],
+          "found": [
+            "localhost",
+            "127.0.0.1",
+            "pi",
+            "pi.local",
+            "10.42.0.1"
+          ],
+          "interfaces": [
+            "10.42.0.1",
+            "127.0.0.1"
+          ],
+          "tls_port": 8443,
+          "container": false,
+          "saved_urls": [],
+          "checkin_urls": []
+        },
+        "expected": {
+          "poster": [
+            "https://10.42.0.1:8443",
+            "https://pi:8443",
+            "https://pi.local:8443"
+          ],
+          "dropped": [],
+          "san": [
+            "10.42.0.1",
+            "127.0.0.1",
+            "localhost",
+            "pi",
+            "pi.local"
+          ]
+        }
+      },
+      {
+        "name": "stale_configured_address_dropped",
+        "why": "a configured address on no interface is left out of the poster and the certificate, and named in dropped",
+        "input": {
+          "tls_names": [
+            "192.168.1.50",
+            "10.42.0.1"
+          ],
+          "found": [
+            "localhost",
+            "127.0.0.1",
+            "pi",
+            "pi.local",
+            "10.42.0.1"
+          ],
+          "interfaces": [
+            "10.42.0.1",
+            "127.0.0.1"
+          ],
+          "tls_port": 8443,
+          "container": false,
+          "saved_urls": [],
+          "checkin_urls": []
+        },
+        "expected": {
+          "poster": [
+            "https://10.42.0.1:8443",
+            "https://pi:8443",
+            "https://pi.local:8443"
+          ],
+          "dropped": [
+            "192.168.1.50"
+          ],
+          "san": [
+            "10.42.0.1",
+            "127.0.0.1",
+            "localhost",
+            "pi",
+            "pi.local"
+          ]
+        }
+      },
+      {
+        "name": "configured_name_kept",
+        "why": "a host name cannot be checked against interfaces: it stays, before the addresses found",
+        "input": {
+          "tls_names": [
+            "campo.lan"
+          ],
+          "found": [
+            "localhost",
+            "127.0.0.1",
+            "pi",
+            "pi.local",
+            "10.42.0.1"
+          ],
+          "interfaces": [
+            "10.42.0.1",
+            "127.0.0.1"
+          ],
+          "tls_port": 8443,
+          "container": false,
+          "saved_urls": [],
+          "checkin_urls": []
+        },
+        "expected": {
+          "poster": [
+            "https://campo.lan:8443",
+            "https://pi:8443",
+            "https://pi.local:8443"
+          ],
+          "dropped": [],
+          "san": [
+            "10.42.0.1",
+            "127.0.0.1",
+            "campo.lan",
+            "localhost",
+            "pi",
+            "pi.local"
+          ]
+        }
+      },
+      {
+        "name": "saved_poster_stale_is_rederived",
+        "why": "a saved poster whose only address is stale is not kept: the poster is the default again",
+        "input": {
+          "tls_names": [],
+          "found": [
+            "localhost",
+            "127.0.0.1",
+            "pi",
+            "pi.local",
+            "10.42.0.1"
+          ],
+          "interfaces": [
+            "10.42.0.1",
+            "127.0.0.1"
+          ],
+          "tls_port": 8443,
+          "container": false,
+          "saved_urls": [
+            "https://192.168.1.50:8443"
+          ],
+          "checkin_urls": []
+        },
+        "expected": {
+          "poster": [
+            "https://pi:8443",
+            "https://pi.local:8443",
+            "https://10.42.0.1:8443"
+          ],
+          "dropped": [
+            "https://192.168.1.50:8443"
+          ],
+          "san": [
+            "10.42.0.1",
+            "127.0.0.1",
+            "localhost",
+            "pi",
+            "pi.local"
+          ]
+        }
+      },
+      {
+        "name": "saved_poster_partly_kept",
+        "why": "the GM's list loses its stale address and is not padded with others",
+        "input": {
+          "tls_names": [],
+          "found": [
+            "localhost",
+            "127.0.0.1",
+            "pi",
+            "pi.local",
+            "10.42.0.1"
+          ],
+          "interfaces": [
+            "10.42.0.1",
+            "127.0.0.1"
+          ],
+          "tls_port": 8443,
+          "container": false,
+          "saved_urls": [
+            "https://192.168.1.50:8443",
+            "https://10.42.0.1:8443"
+          ],
+          "checkin_urls": []
+        },
+        "expected": {
+          "poster": [
+            "https://10.42.0.1:8443"
+          ],
+          "dropped": [
+            "https://192.168.1.50:8443"
+          ],
+          "san": [
+            "10.42.0.1",
+            "127.0.0.1",
+            "localhost",
+            "pi",
+            "pi.local"
+          ]
+        }
+      },
+      {
+        "name": "saved_poster_hostname_kept",
+        "why": "a name typed by the GM stays and its host is in the certificate (a superset of the poster)",
+        "input": {
+          "tls_names": [],
+          "found": [
+            "localhost",
+            "127.0.0.1",
+            "pi",
+            "pi.local",
+            "10.42.0.1"
+          ],
+          "interfaces": [
+            "10.42.0.1",
+            "127.0.0.1"
+          ],
+          "tls_port": 8443,
+          "container": false,
+          "saved_urls": [
+            "https://campo.lan:9443"
+          ],
+          "checkin_urls": []
+        },
+        "expected": {
+          "poster": [
+            "https://campo.lan:9443"
+          ],
+          "dropped": [],
+          "san": [
+            "10.42.0.1",
+            "127.0.0.1",
+            "campo.lan",
+            "localhost",
+            "pi",
+            "pi.local"
+          ]
+        }
+      },
+      {
+        "name": "checkin_urls_ip_dropped_name_kept",
+        "why": "[checkin] urls: an IP not on an interface is dropped and warned about, a name stays",
+        "input": {
+          "tls_names": [],
+          "found": [
+            "localhost",
+            "127.0.0.1",
+            "pi",
+            "pi.local",
+            "10.42.0.1"
+          ],
+          "interfaces": [
+            "10.42.0.1",
+            "127.0.0.1"
+          ],
+          "tls_port": 8443,
+          "container": false,
+          "saved_urls": [],
+          "checkin_urls": [
+            "https://172.16.9.9:8443",
+            "https://campo.lan"
+          ]
+        },
+        "expected": {
+          "poster": [
+            "https://campo.lan"
+          ],
+          "dropped": [
+            "https://172.16.9.9:8443"
+          ],
+          "san": [
+            "10.42.0.1",
+            "127.0.0.1",
+            "campo.lan",
+            "localhost",
+            "pi",
+            "pi.local"
+          ]
+        }
+      },
+      {
+        "name": "saved_stale_falls_to_checkin_urls",
+        "why": "the saved poster is stale: [checkin] urls is tried next, then the default",
+        "input": {
+          "tls_names": [],
+          "found": [
+            "localhost",
+            "127.0.0.1",
+            "pi",
+            "pi.local",
+            "10.42.0.1"
+          ],
+          "interfaces": [
+            "10.42.0.1",
+            "127.0.0.1"
+          ],
+          "tls_port": 8443,
+          "container": false,
+          "saved_urls": [
+            "https://192.168.1.50:8443"
+          ],
+          "checkin_urls": [
+            "https://10.42.0.1:8443"
+          ]
+        },
+        "expected": {
+          "poster": [
+            "https://10.42.0.1:8443"
+          ],
+          "dropped": [
+            "https://192.168.1.50:8443"
+          ],
+          "san": [
+            "10.42.0.1",
+            "127.0.0.1",
+            "localhost",
+            "pi",
+            "pi.local"
+          ]
+        }
+      },
+      {
+        "name": "container_keeps_configured",
+        "why": "in a container the interfaces are the container's own: a configured address cannot be checked and stays; nothing found is listed (OT-10)",
+        "input": {
+          "tls_names": [
+            "192.168.1.50"
+          ],
+          "found": [
+            "abcdef012345",
+            "172.17.0.2"
+          ],
+          "interfaces": [
+            "172.17.0.2"
+          ],
+          "tls_port": 8443,
+          "container": true,
+          "saved_urls": [],
+          "checkin_urls": []
+        },
+        "expected": {
+          "poster": [
+            "https://192.168.1.50:8443"
+          ],
+          "dropped": [],
+          "san": [
+            "127.0.0.1",
+            "172.17.0.2",
+            "192.168.1.50",
+            "abcdef012345",
+            "localhost"
+          ]
+        }
+      },
+      {
+        "name": "ipv6_and_port_443",
+        "why": "an IPv6 address on an interface is kept, in brackets; port 443 is left out of the url",
+        "input": {
+          "tls_names": [
+            "fd00::1",
+            "fd00::2"
+          ],
+          "found": [
+            "fd00::1"
+          ],
+          "interfaces": [
+            "fd00::1"
+          ],
+          "tls_port": 443,
+          "container": false,
+          "saved_urls": [],
+          "checkin_urls": []
+        },
+        "expected": {
+          "poster": [
+            "https://[fd00::1]"
+          ],
+          "dropped": [
+            "fd00::2"
+          ],
+          "san": [
+            "127.0.0.1",
+            "fd00::1",
+            "localhost"
+          ]
+        }
+      },
+      {
+        "name": "three_at_most",
+        "why": "the default has at most 3 addresses",
+        "input": {
+          "tls_names": [],
+          "found": [
+            "10.0.0.1",
+            "10.0.0.2",
+            "10.0.0.3",
+            "10.0.0.4"
+          ],
+          "interfaces": [
+            "10.0.0.1",
+            "10.0.0.2",
+            "10.0.0.3",
+            "10.0.0.4"
+          ],
+          "tls_port": 8443,
+          "container": false,
+          "saved_urls": [],
+          "checkin_urls": []
+        },
+        "expected": {
+          "poster": [
+            "https://10.0.0.1:8443",
+            "https://10.0.0.2:8443",
+            "https://10.0.0.3:8443"
+          ],
+          "dropped": [],
+          "san": [
+            "10.0.0.1",
+            "10.0.0.2",
+            "10.0.0.3",
+            "10.0.0.4",
+            "127.0.0.1",
+            "localhost"
+          ]
+        }
+      },
+      {
+        "name": "found_loopback_and_link_local_not_listed",
+        "why": "what is found is listed only if another device can use it; the certificate still covers it",
+        "input": {
+          "tls_names": [],
+          "found": [
+            "127.0.0.1",
+            "169.254.3.4",
+            "10.0.0.1",
+            "myhost"
+          ],
+          "interfaces": [
+            "10.0.0.1",
+            "169.254.3.4"
+          ],
+          "tls_port": 8443,
+          "container": false,
+          "saved_urls": [],
+          "checkin_urls": []
+        },
+        "expected": {
+          "poster": [
+            "https://10.0.0.1:8443",
+            "https://myhost:8443"
+          ],
+          "dropped": [],
+          "san": [
+            "10.0.0.1",
+            "127.0.0.1",
+            "169.254.3.4",
+            "localhost",
+            "myhost"
+          ]
+        }
+      }
+    ]
   }
 }
