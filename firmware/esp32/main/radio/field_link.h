@@ -7,15 +7,20 @@
  *   - every game event the node emits goes out as an EVENT packet; normal
  *     and critical ones ask for an ACK and stay in an outbox (and in the
  *     flash event log) until the controller acknowledges them, resent
- *     every ATALAIA_ACK_RETRY_MS in a new packet (new seq, same event);
+ *     at 3, 6, 12, 24, then every 30 s (each x0.75-1.25), in a new packet (new seq,
+ *     same event; RFC 0001 Amendment 13);
  *   - HELLO after a join or a reboot, until acknowledged;
  *   - STATE (owner, phase, game time, score counters, epoch) every
  *     state_interval_ms and after a change of owner;
  *   - TIME beacons drive the time sync and the leader (highest term);
  *   - CMDs for this node (or every node) go to the shell through on_cmd;
  *   - ACKs (ack_seq + bitmap, D7) clear the outbox;
- *   - authenticated packets from others are relayed once with hop_limit
- *     clamped to max_hops and decremented, after a 10-50 ms jitter (ADR-P2-6).
+ *   - authenticated packets from others are relayed at most once with hop_limit
+ *     clamped to max_hops and decremented, by the rules of Amendment 13 (core
+ *     atalaia_relay_*: a frame that asks for an ACK waits 350-700 ms and is
+ *     cancelled if the controller's ACK is heard; the controller's ACK is relayed
+ *     only for a box whose frame this box relayed; the rest with probability
+ *     min(1, 3 / neighbours) after 20-600 ms; 8 slots), all from the box's own entropy.
  *
  * No FreeRTOS, no ESP-IDF: the shell feeds it received packets and the
  * time, and supplies the TX sink, so the host tests and the host box
@@ -29,6 +34,7 @@
 #include <stdint.h>
 
 #include "atalaia/event.h"
+#include "atalaia/flood.h"
 #include "atalaia/join.h"
 #include "atalaia/msg_codec.h"
 #include "event_log.h"
@@ -38,11 +44,10 @@
 #define FIELD_LINK_OUTBOX      32
 #define FIELD_LINK_DEDUPE      64
 #define FIELD_LINK_DEDUPE_MS   30000
-#define FIELD_LINK_RELAYS      4
-#define FIELD_LINK_HELLO_RETRY 3000
-#define FIELD_LINK_STATE_MS    15000 /* default STATE interval */
-#define FIELD_LINK_AIRTIME_MS  40    /* rough TIME airtime at SF7/BW125 */
-#define FIELD_LINK_MAX_RETRIES 10    /* normal priority; critical retries until ACK */
+#define FIELD_LINK_RELAYS      ATALAIA_RELAY_SLOTS /* 8 (was 4 before Amendment 13) */
+#define FIELD_LINK_STATE_MS    15000               /* default STATE interval */
+#define FIELD_LINK_AIRTIME_MS  40                  /* rough TIME airtime at SF7/BW125 */
+#define FIELD_LINK_MAX_RETRIES 10                  /* normal priority; critical retries until ACK */
 
 /* CMD opcodes (ADR-P2-3; FIELD_CMD_MODE: RFC 0001 Amendment 5; FIELD_CMD_UPDATE:
  * Amendment 6, protocol/firmware-update.md). */
@@ -79,6 +84,9 @@ typedef struct {
     uint32_t (*game_time)(void *user);
     /* A log line (may be NULL). */
     void (*log)(void *user, const char *line);
+    /* Random bytes from the box's entropy (the shell's, shell.random: timing spread, never a
+     * nonce). NULL: a fixed per-node sequence (host tests that do not care). */
+    void (*random)(void *user, uint8_t *buf, size_t len);
     void *user;
     /* Where packets go (proto.tx): NULL = radio_task_send(). */
     bool (*tx)(void *ctx, const uint8_t *pkt, size_t len);
@@ -106,8 +114,6 @@ typedef struct {
 } field_link_seen_t;
 
 typedef struct {
-    bool used;
-    uint32_t due_ms;
     uint8_t len;
     uint8_t pkt[RADIO_MAX_PKT_LEN];
 } field_link_relay_t;
@@ -115,6 +121,7 @@ typedef struct {
 typedef struct {
     uint32_t events_sent, retries, acked, expired;
     uint32_t rx_ok, rx_rejected, rx_duplicates, relayed;
+    uint32_t relay_skipped, relay_cancelled, relay_no_slot; /* Amendment 13's rules at work */
     uint32_t cmds, times, states_sent, hellos_sent, tx_refused;
 } field_link_stats_t;
 
@@ -130,7 +137,9 @@ typedef struct {
     bool backlog;          /* the log holds events the outbox had no room for */
     uint16_t next_log_seq; /* 1.. */
     field_link_seen_t seen[FIELD_LINK_DEDUPE];
-    field_link_relay_t relays[FIELD_LINK_RELAYS];
+    atalaia_relay_t relay;                        /* the rules and the slots state */
+    field_link_relay_t relays[FIELD_LINK_RELAYS]; /* the packets, by slot */
+    uint32_t rand_fallback;                       /* io.random == NULL */
 
     uint32_t now_ms;
     uint32_t state_interval_ms;

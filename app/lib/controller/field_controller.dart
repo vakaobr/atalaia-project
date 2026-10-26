@@ -148,8 +148,9 @@ class FieldNode {
 /// received. Same rule as AckTracker in simulator/atalaia_sim/
 /// field_controller.py; protocol/vectors/ack_tracker.json pins both.
 class AckTracker {
-  /// The box's outbox holds 32 entries resent every 3 s at most, so one
-  /// still waiting is never this old; 128 is half the bitmap.
+  /// The box's outbox holds 32 entries resent every 3 s at most (the
+  /// shortest gap of RFC 0001 Amendment 13's backoff), so one still waiting
+  /// is never this old; 128 is half the bitmap.
   static const gapWindow = 128;
 
   final _contig = <(int, int), int>{};

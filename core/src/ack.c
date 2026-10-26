@@ -91,3 +91,22 @@ void atalaia_ack_tick(atalaia_ack_tracker_t *t, uint32_t now_ms)
         }
     }
 }
+
+bool atalaia_ack_covers(uint16_t ack_seq, const uint8_t *bitmap, size_t bitmap_len, uint16_t seq)
+{
+    int32_t contig = ack_seq == 0xFFFF ? -1 : (int32_t)ack_seq;
+    if ((int32_t)seq <= contig) return true;
+    int32_t bit = (int32_t)seq - contig - 1;
+    if (bitmap == NULL || bit < 0 || (size_t)(bit / 8) >= bitmap_len) return false;
+    return ((bitmap[bit / 8] >> (bit % 8)) & 1) != 0;
+}
+
+uint32_t atalaia_retry_gap_ms(unsigned sends_so_far, uint32_t rand32)
+{
+    unsigned doublings = sends_so_far > 1 ? sends_so_far - 1 : 0;
+    if (doublings > 4) doublings = 4;
+    uint32_t base = (uint32_t)ATALAIA_RETRY_FIRST_MS << doublings;
+    if (base > ATALAIA_RETRY_MAX_MS) base = ATALAIA_RETRY_MAX_MS;
+    uint32_t permille = 750u + rand32 % 501u; /* 0.750 .. 1.250 */
+    return (uint32_t)((uint64_t)base * permille / 1000u);
+}

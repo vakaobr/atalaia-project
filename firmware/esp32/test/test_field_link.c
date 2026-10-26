@@ -73,7 +73,37 @@ typedef struct {
     uint32_t local_ms;
     uint8_t owner;
     uint32_t counter_red;
+    /* The box's entropy: a scripted stub. Every draw returns rnd_next() from the script (then
+     * the last value again), so a test says exactly what the rules drew. The default, 250,
+     * is the middle of each range: a resend gap of exactly 3 s (750 + 250 = 1000 permille), a
+     * relay delay of 270 ms, an ACK wait of 600 ms. */
+    uint32_t rnd[16];
+    int rnd_count, rnd_used;
+    int rnd_draws;
 } shell_t;
+
+#define RND_DEFAULT 250u
+
+static void io_random(void *user, uint8_t *buf, size_t len)
+{
+    shell_t *sh = (shell_t *)user;
+    uint32_t v = RND_DEFAULT;
+    if (sh->rnd_used < sh->rnd_count) {
+        v = sh->rnd[sh->rnd_used++];
+    } else if (sh->rnd_count > 0) {
+        v = sh->rnd[sh->rnd_count - 1];
+    }
+    sh->rnd_draws++;
+    for (size_t i = 0; i < len; i++) buf[i] = (uint8_t)(v >> (8 * (i % 4)));
+}
+
+/* From now on every draw is v (a script of one value). */
+static void rnd_always(shell_t *sh, uint32_t v)
+{
+    sh->rnd[0] = v;
+    sh->rnd_count = 1;
+    sh->rnd_used = 0;
+}
 
 static void io_get_state(void *user, atalaia_state_msg_t *st)
 {
@@ -146,6 +176,7 @@ static bool box_up(box_t *b, event_log_t *log, uint32_t now)
                           .on_cmd = io_on_cmd,
                           .game_time = io_game_time,
                           .log = NULL,
+                          .random = io_random,
                           .user = &b->shell,
                           .tx = sink_tx,
                           .tx_ctx = &b->sink};
@@ -358,19 +389,87 @@ static void test_retry_limits_and_telemetry(void)
     CHECK(ATALAIA_VF_ACK(h.version_flags) == 0 && ATALAIA_VF_PRIO(h.version_flags) == 0);
     CHECK(field_link_pending(&b.link) == 2);
 
+    /* Resends back off (3, 6, 12, 24, then 30 s): normal priority is 1 send + 10 resends, then
+     * given up (3 + 6 + 12 + 24 + 6 x 30 = 225 s, so well inside 400 s); critical keeps trying. */
     uint32_t now = 1;
-    for (int i = 0; i < 12; i++) {
-        now += 3000;
+    for (int i = 0; i < 400; i++) {
+        now += 1000;
         field_link_tick(&b.link, now);
     }
-    /* Normal: 1 send + 10 retries, then given up; critical: still trying. */
     CHECK(b.link.stats.expired == 1);
     CHECK(field_link_pending(&b.link) == 1);
-    for (int i = 0; i < 20; i++) {
-        now += 3000;
+    for (int i = 0; i < 2000; i++) {
+        now += 1000;
         field_link_tick(&b.link, now);
     }
     CHECK(field_link_pending(&b.link) == 1);
+    /* The critical event is still resent, every 30 s once the backoff has run its course. */
+    b.sink.count = 0; /* the sink keeps 96 packets: count the last window on its own */
+    int resent = 0;
+    for (int i = 0; i < 300; i++) {
+        now += 1000;
+        field_link_tick(&b.link, now);
+    }
+    int more = count_type(&b, resent, ATALAIA_MSG_EVENT);
+    CHECK(more == 9 || more == 10); /* one per 30 s over 300 s, whichever way the phase falls */
+}
+
+/* RFC 0001 Amendment 13 rule 3 (decision SL-16): an unacknowledged EVENT or HELLO is resent
+ * after 3, 6, 12, 24 s and then every 30 s, each gap x 0.75-1.25 from the box's entropy. */
+static int resends_between(box_t *b, uint32_t from, uint32_t to, uint8_t type, uint32_t *times,
+                           int cap)
+{
+    /* Ticks every 10 ms (the shell's loop) and notes when a packet of this type went out. */
+    int found = 0;
+    for (uint32_t t = from; t <= to; t += 10) {
+        int before = b->sink.count;
+        field_link_tick(&b->link, t);
+        for (int i = before; i < b->sink.count; i++) {
+            atalaia_header_t h;
+            uint8_t pl[PKT_CAP];
+            size_t n;
+            if (open_box(b, i, &h, pl, &n) && h.type == type && found < cap) times[found++] = t;
+        }
+    }
+    return found;
+}
+
+static void test_retry_backoff_schedule(void)
+{
+    static box_t b;
+    memset(&b, 0, sizeof(b));
+    b.shell.local_ms = 0;
+    CHECK(box_up(&b, NULL, 1000)); /* HELLO at 1000, never acknowledged */
+    uint32_t t[16];
+    /* The middle of the range: exactly 3, 6, 12, 24, 30, 30 s after the one before. */
+    int n = resends_between(&b, 1010, 1000 + 3000 + 6000 + 12000 + 24000 + 30000 + 30000 + 20,
+                            ATALAIA_MSG_HELLO, t, 16);
+    CHECK(n == 6);
+    uint32_t expect[6] = {3000, 6000, 12000, 24000, 30000, 30000};
+    uint32_t at = 1000;
+    for (int i = 0; i < 6 && i < n; i++) {
+        at += expect[i];
+        CHECK(t[i] == at);
+    }
+
+    /* The extremes of the range: 0.75 x and 1.25 x. */
+    for (int which = 0; which < 2; which++) {
+        static box_t e;
+        memset(&e, 0, sizeof(e));
+        rnd_always(&e.shell, which == 0 ? 0u : 500u); /* 750 and 1250 permille */
+        CHECK(box_up(&e, NULL, 1000));
+        uint32_t te[16];
+        int ne = resends_between(&e, 1010, 1000 + 80000, ATALAIA_MSG_HELLO, te, 16);
+        uint32_t base[5] = {3000, 6000, 12000, 24000, 30000};
+        uint32_t when = 1000;
+        for (int i = 0; i < 5 && i < ne; i++) {
+            uint32_t gap = which == 0 ? base[i] * 3 / 4 : base[i] * 5 / 4;
+            when += gap;
+            CHECK(te[i] >= when && te[i] < when + 10);
+            when = te[i];
+        }
+        CHECK(ne >= 4);
+    }
 }
 
 static void test_cmd_time_and_leader(void)
@@ -464,13 +563,16 @@ static void test_relay_and_filters(void)
     ctl_up(&other, 9, 1);
     uint8_t pl[] = {0xA0};
 
-    /* Another box's packet with hop_limit 2: relayed once, after the jitter, with hop 1. */
+    /* Another box's packet with hop_limit 2: relayed once, after 20-600 ms (270 ms: the stub's
+     * draw), with hop 1. One neighbour heard: probability 1. */
     CHECK(atalaia_radio_proto_send_payload(&other.proto, ATALAIA_MSG_STATE, 0, false, pl, 1, NULL));
     field_link_on_packet(&b.link, other.sink.pkt[0], other.sink.len[0], -70);
     int before = b.sink.count;
     field_link_tick(&b.link, 105);
-    CHECK(b.sink.count == before); /* not yet: 10-50 ms jitter */
-    field_link_tick(&b.link, 160);
+    CHECK(b.sink.count == before); /* not yet */
+    field_link_tick(&b.link, 100 + 269);
+    CHECK(b.sink.count == before);
+    field_link_tick(&b.link, 100 + 270);
     CHECK(b.sink.count == before + 1);
     CHECK(b.sink.len[before] == other.sink.len[0]);
     CHECK(b.sink.pkt[before][ATALAIA_RF_HOP_LIMIT_OFFSET] == 1);
@@ -484,7 +586,7 @@ static void test_relay_and_filters(void)
                                  &atalaia_crypto_test_stub));
     /* The same packet again: not relayed twice. */
     field_link_on_packet(&b.link, other.sink.pkt[0], other.sink.len[0], -70);
-    field_link_tick(&b.link, 300);
+    field_link_tick(&b.link, 700);
     CHECK(b.link.stats.relayed == 1);
 
     /* hop_limit = relays left (core flood.c): 0 is not relayed, 1 is relayed once more
@@ -499,7 +601,7 @@ static void test_relay_and_filters(void)
     CHECK(atalaia_radio_proto_send_payload(&other.proto, ATALAIA_MSG_STATE, 0, false, pl, 1, NULL));
     field_link_on_packet(&b.link, other.sink.pkt[3], other.sink.len[3], -70);
     before = b.sink.count;
-    field_link_tick(&b.link, 500);
+    field_link_tick(&b.link, 700 + 270);
     CHECK(b.sink.count == before + 2);
     int hops = 0;
     for (int i = before; i < b.sink.count; i++) {
@@ -523,6 +625,226 @@ static void test_relay_and_filters(void)
     CHECK(atalaia_radio_proto_send_payload(&forger.proto, ATALAIA_MSG_CMD, 2, false, pl, 1, NULL));
     field_link_on_packet(&b.link, forger.sink.pkt[0], forger.sink.len[0], -40);
     CHECK(b.link.stats.rx_ok == ok && b.link.stats.rx_rejected == 1);
+}
+
+/* ---- Amendment 13's relay rules, on the box ---------------------------------------------- */
+
+/* Another box (9) sends an EVENT that asks for an ACK (seq assigned by its proto), heard by b. */
+static void box9_event(ctl_t *other, box_t *b, int *index)
+{
+    static const uint8_t pl[] = {0xA1};
+    *index = other->sink.count;
+    CHECK(atalaia_radio_proto_send_payload(&other->proto, ATALAIA_MSG_EVENT, 2, true, pl, 1, NULL));
+    field_link_on_packet(&b->link, other->sink.pkt[*index], other->sink.len[*index], -70);
+}
+
+/* An ACK from the controller for `node` (not necessarily the box under test). */
+static void ctl_ack_for(ctl_t *c, box_t *b, uint16_t node, uint16_t ack_seq, const uint8_t *bits,
+                        size_t bits_len)
+{
+    atalaia_ack_msg_t a;
+    memset(&a, 0, sizeof(a));
+    a.ack_node = node;
+    a.ack_seq = ack_seq;
+    if (bits_len) memcpy(a.ack_bitmap, bits, bits_len);
+    a.ack_bitmap_len = bits_len;
+    uint8_t buf[64];
+    size_t n = atalaia_ack_msg_encode(&a, buf, sizeof(buf));
+    CHECK(n > 0);
+    ctl_to_box(c, b, ATALAIA_MSG_ACK, buf, n);
+}
+
+/* A frame that asks for an ACK waits 350-700 ms; the controller's ACK, heard first, cancels it. */
+static void test_relay_waits_for_the_acks_and_is_cancelled(void)
+{
+    static box_t b;
+    memset(&b, 0, sizeof(b));
+    CHECK(box_up(&b, NULL, 100));
+    ctl_t other, c;
+    ctl_up(&other, 9, 1);
+    ctl_up(&c, 0, 1);
+    int i;
+    /* The box sends no EVENT of its own here, so every EVENT it puts on air is a relay. */
+    CHECK(count_type(&b, 0, ATALAIA_MSG_EVENT) == 0);
+
+    /* Not cancelled: relayed after 350 + 250 = 600 ms, not before (the draw is the stub's). */
+    box9_event(&other, &b, &i);
+    field_link_tick(&b.link, 100 + 599);
+    CHECK(count_type(&b, 0, ATALAIA_MSG_EVENT) == 0);
+    field_link_tick(&b.link, 100 + 600);
+    CHECK(count_type(&b, 0, ATALAIA_MSG_EVENT) == 1);
+
+    /* The range: 350 ms and 700 ms at the ends of the draw. */
+    field_link_tick(&b.link, 1000);
+    rnd_always(&b.shell, 0);
+    box9_event(&other, &b, &i);
+    field_link_tick(&b.link, 1000 + 349);
+    CHECK(count_type(&b, 0, ATALAIA_MSG_EVENT) == 1);
+    field_link_tick(&b.link, 1000 + 350);
+    CHECK(count_type(&b, 0, ATALAIA_MSG_EVENT) == 2);
+    field_link_tick(&b.link, 2000);
+    rnd_always(&b.shell, 350);
+    box9_event(&other, &b, &i);
+    field_link_tick(&b.link, 2000 + 699);
+    CHECK(count_type(&b, 0, ATALAIA_MSG_EVENT) == 2);
+    field_link_tick(&b.link, 2000 + 700);
+    CHECK(count_type(&b, 0, ATALAIA_MSG_EVENT) == 3);
+
+    /* The controller's ACK for that very (source, seq), heard in the wait: no relay. */
+    rnd_always(&b.shell, RND_DEFAULT);
+    field_link_tick(&b.link, 3000);
+    box9_event(&other, &b, &i);
+    atalaia_header_t h;
+    uint8_t pl[PKT_CAP];
+    size_t n;
+    CHECK(atalaia_packet_decrypt(other.sink.pkt[i], other.sink.len[i], 1, KEY, &h, pl, &n,
+                                 &atalaia_crypto_test_stub));
+    uint16_t seq3 = h.seq;
+    field_link_tick(&b.link, 3000 + 100);
+    ctl_ack_for(&c, &b, 9, seq3, NULL, 0);
+    CHECK(b.link.stats.relay_cancelled == 1);
+    field_link_tick(&b.link, 3000 + 2000);
+    CHECK(count_type(&b, 0, ATALAIA_MSG_EVENT) == 3);
+
+    /* An ACK that names another box's frame, or does not reach this seq, cancels nothing. */
+    field_link_tick(&b.link, 6000);
+    box9_event(&other, &b, &i);
+    CHECK(atalaia_packet_decrypt(other.sink.pkt[i], other.sink.len[i], 1, KEY, &h, pl, &n,
+                                 &atalaia_crypto_test_stub));
+    uint16_t seq4 = h.seq;
+    ctl_ack_for(&c, &b, 8, seq4, NULL, 0);                 /* another box */
+    ctl_ack_for(&c, &b, 9, (uint16_t)(seq4 - 1), NULL, 0); /* one short of it, no bit for it */
+    CHECK(b.link.stats.relay_cancelled == 1);
+    field_link_tick(&b.link, 6000 + 600);
+    CHECK(count_type(&b, 0, ATALAIA_MSG_EVENT) == 4);
+
+    /* The bitmap names a seq above the contiguous one: that counts too. */
+    field_link_tick(&b.link, 9000);
+    box9_event(&other, &b, &i);
+    CHECK(atalaia_packet_decrypt(other.sink.pkt[i], other.sink.len[i], 1, KEY, &h, pl, &n,
+                                 &atalaia_crypto_test_stub));
+    uint16_t seq5 = h.seq;
+    uint8_t bits[2] = {0, 0};
+    int bit = 5 - 1; /* ack_seq = seq5 - 5: bit n is ack_seq + 1 + n, so seq5 is bit 4 */
+    bits[bit / 8] |= (uint8_t)(1u << (bit % 8));
+    ctl_ack_for(&c, &b, 9, (uint16_t)(seq5 - 5), bits, 2);
+    CHECK(b.link.stats.relay_cancelled == 2);
+    field_link_tick(&b.link, 9000 + 1000);
+    CHECK(count_type(&b, 0, ATALAIA_MSG_EVENT) == 4);
+}
+
+/* The controller's ACK is relayed only for a box whose frame this box relayed (30 s). */
+static void test_ack_relayed_only_on_the_path_it_serves(void)
+{
+    static box_t b;
+    memset(&b, 0, sizeof(b));
+    CHECK(box_up(&b, NULL, 100));
+    ctl_t other, c;
+    ctl_up(&other, 9, 1);
+    ctl_up(&c, 0, 1);
+
+    /* No frame of box 9 relayed yet: its ACK is not relayed. */
+    ctl_ack_for(&c, &b, 9, 0, NULL, 0);
+    CHECK(b.link.stats.relay_skipped == 1);
+    field_link_tick(&b.link, 100 + 1000);
+    CHECK(count_type(&b, 0, ATALAIA_MSG_ACK) == 0);
+
+    /* Relay box 9's EVENT (nobody ACKs it in time): box 9 is on the path. */
+    int i;
+    box9_event(&other, &b, &i);
+    field_link_tick(&b.link, 1100 + 1000);
+    CHECK(count_type(&b, 0, ATALAIA_MSG_EVENT) == 1);
+    ctl_ack_for(&c, &b, 9, 0xFFFF, NULL, 0); /* a new ACK frame (new seq) for box 9 */
+    field_link_tick(&b.link, 2100 + 1000);
+    CHECK(count_type(&b, 0, ATALAIA_MSG_ACK) == 1); /* relayed (one neighbour: always) */
+    /* An ACK for a box not on the path, and an ACK for this box itself: not relayed. */
+    uint32_t skipped = b.link.stats.relay_skipped;
+    ctl_ack_for(&c, &b, 8, 0, NULL, 0);
+    ctl_ack_for(&c, &b, BOX, 0, NULL, 0);
+    CHECK(b.link.stats.relay_skipped == skipped + 2);
+    field_link_tick(&b.link, 3100 + 1000);
+    CHECK(count_type(&b, 0, ATALAIA_MSG_ACK) == 1);
+
+    /* 30 s after the relay of box 9's frame (at 1100 + 1000) the path is gone. */
+    skipped = b.link.stats.relay_skipped;
+    field_link_tick(&b.link, 2100 + 30000 + 10);
+    ctl_ack_for(&c, &b, 9, 5, NULL, 0);
+    CHECK(b.link.stats.relay_skipped == skipped + 1);
+}
+
+/* Everything else relays with probability min(1, 3 / boxes heard in 10 min), a draw per frame. */
+static void test_relay_probability_follows_the_neighbours(void)
+{
+    static box_t b;
+    memset(&b, 0, sizeof(b));
+    CHECK(box_up(&b, NULL, 100));
+    static const uint8_t pl[] = {0xA0};
+    /* Twelve boxes (ids 20-31) are heard, one frame each; the stub's draw is always 250. */
+    static ctl_t boxes[12];
+    for (int k = 0; k < 12; k++) {
+        ctl_up(&boxes[k], (uint16_t)(20 + k), 1);
+        CHECK(atalaia_radio_proto_send_payload(&boxes[k].proto, ATALAIA_MSG_STATE, 0, false, pl, 1,
+                                               NULL));
+    }
+    for (int k = 0; k < 12; k++) {
+        field_link_on_packet(&b.link, boxes[k].sink.pkt[0], boxes[k].sink.len[0], -70);
+    }
+    /* Frame k is heard with n = k + 1 neighbours: n 1-3 always relayed (no draw), then a draw d
+     * relays when d % n < 3: 250 % n is 2, 0, 4, 5, 2, 7, 0, 8, 10 for n = 4..12, so n = 4, 5,
+     * 8 and 10 relay and 6, 7, 9, 11 and 12 do not. */
+    CHECK(b.link.stats.relay_skipped == 5);
+    CHECK(atalaia_relay_pending(&b.link.relay) == 7);
+    field_link_tick(&b.link, 100 + 1000);
+    CHECK(b.link.stats.relayed == 7);
+
+    /* 12 neighbours: p = 3 / 12. A draw below 3 relays, any other does not. Frames 1-12 of
+     * box 20 are new (the first was seen above). */
+    for (int d = 0; d < 12; d++) {
+        rnd_always(&b.shell, (uint32_t)d);
+        CHECK(atalaia_radio_proto_send_payload(&boxes[0].proto, ATALAIA_MSG_STATE, 0, false, pl, 1,
+                                               NULL));
+        uint32_t skipped = b.link.stats.relay_skipped;
+        field_link_on_packet(&b.link, boxes[0].sink.pkt[1 + d], boxes[0].sink.len[1 + d], -70);
+        CHECK((b.link.stats.relay_skipped == skipped) == (d < 3));
+    }
+
+    /* The neighbours are remembered for 10 minutes and then forgotten: a lone box relays always,
+     * whatever the draw. */
+    field_link_tick(&b.link, 100 + 1000 + 600 * 1000 + 5000);
+    rnd_always(&b.shell, 11);
+    CHECK(atalaia_radio_proto_send_payload(&boxes[0].proto, ATALAIA_MSG_STATE, 0, false, pl, 1,
+                                           NULL));
+    uint32_t skipped = b.link.stats.relay_skipped;
+    field_link_on_packet(&b.link, boxes[0].sink.pkt[13], boxes[0].sink.len[13], -70);
+    CHECK(b.link.stats.relay_skipped == skipped);
+    CHECK(atalaia_relay_neighbours(&b.link.relay, b.link.now_ms) == 1);
+
+    /* A controller is not a neighbour. */
+    ctl_t c;
+    ctl_up(&c, 0, 1);
+    send_time(&c, &b, FIELD_GAME_RUNNING, 5000, 1);
+    CHECK(atalaia_relay_neighbours(&b.link.relay, b.link.now_ms) == 1);
+}
+
+/* Eight relay slots, not four. */
+static void test_eight_relay_slots(void)
+{
+    static box_t b;
+    memset(&b, 0, sizeof(b));
+    CHECK(box_up(&b, NULL, 100));
+    CHECK(FIELD_LINK_RELAYS == 8 && ATALAIA_RELAY_SLOTS == 8);
+    ctl_t other;
+    ctl_up(&other, 9, 1);
+    static const uint8_t pl[] = {0xA0};
+    for (int k = 0; k < 9; k++) {
+        CHECK(atalaia_radio_proto_send_payload(&other.proto, ATALAIA_MSG_STATE, 0, false, pl, 1,
+                                               NULL));
+        field_link_on_packet(&b.link, other.sink.pkt[k], other.sink.len[k], -70);
+    }
+    CHECK(atalaia_relay_pending(&b.link.relay) == 8);
+    CHECK(b.link.stats.relay_no_slot == 1);
+    field_link_tick(&b.link, 100 + 1000);
+    CHECK(b.link.stats.relayed == 8 && atalaia_relay_pending(&b.link.relay) == 0);
 }
 
 static void test_state_contents_and_interval(void)
@@ -696,10 +1018,15 @@ void run_field_link_tests(void)
     test_hello_event_retry_and_ack();
     test_ack_seq_ffff_and_cumulative();
     test_retry_limits_and_telemetry();
+    test_retry_backoff_schedule();
     test_cmd_time_and_leader();
     test_late_start_from_time();
     test_time_sync();
     test_relay_and_filters();
+    test_relay_waits_for_the_acks_and_is_cancelled();
+    test_ack_relayed_only_on_the_path_it_serves();
+    test_relay_probability_follows_the_neighbours();
+    test_eight_relay_slots();
     test_state_contents_and_interval();
     test_log_replay_after_reboot();
     test_refused_tx_still_acknowledged();

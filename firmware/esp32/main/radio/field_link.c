@@ -10,10 +10,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "atalaia/ack.h"
 #include "atalaia/codec.h"
 #include "atalaia/flood.h"
-
-#define ACK_RETRY_MS 3000
 
 static void say(field_link_t *l, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 
@@ -26,6 +25,22 @@ static void say(field_link_t *l, const char *fmt, ...)
     vsnprintf(line, sizeof(line), fmt, ap);
     va_end(ap);
     l->io.log(l->io.user, line);
+}
+
+/* A random 32-bit number: the box's entropy, or (no source) a fixed sequence per node. */
+static uint32_t link_rand(void *ctx)
+{
+    field_link_t *l = (field_link_t *)ctx;
+    uint32_t v;
+    if (l->io.random != NULL) {
+        uint8_t b[4];
+        l->io.random(l->io.user, b, sizeof(b));
+        v = (uint32_t)b[0] | (uint32_t)b[1] << 8 | (uint32_t)b[2] << 16 | (uint32_t)b[3] << 24;
+    } else {
+        l->rand_fallback = l->rand_fallback * 1664525u + 1013904223u; /* a counter, not entropy */
+        v = l->rand_fallback >> 8 | l->rand_fallback << 24;
+    }
+    return v;
 }
 
 /* ---- Outbox ---------------------------------------------------------------- */
@@ -55,7 +70,7 @@ static void transmit(field_link_t *l, field_link_pending_t *p)
         p->sent = true;
     }
     p->tries++;
-    p->next_ms = l->now_ms + ACK_RETRY_MS;
+    p->next_ms = l->now_ms + atalaia_retry_gap_ms(p->tries, link_rand(l));
 }
 
 /* The lowest log seq still unacknowledged; everything below may be compacted. */
@@ -318,6 +333,8 @@ bool field_link_init(field_link_t *l, const atalaia_join_t *join,
     memset(l, 0, sizeof(*l));
     l->join = *join;
     l->io = *io;
+    l->rand_fallback = 0x9E3779B9u ^ ((uint32_t)join->node_id << 8 | join->node_id);
+    atalaia_relay_init(&l->relay, link_rand, l);
     l->hello = *hello;
     l->log = log;
     l->now_ms = now_ms;
@@ -366,35 +383,46 @@ static bool seen_before(field_link_t *l, uint16_t source, uint16_t epoch, uint16
     return false;
 }
 
+/*
+ * RFC 0001 Amendment 13: which of the three kinds of frame this is, and so when (and whether) it
+ * is relayed; the rules themselves are the core's (atalaia_relay_plan). ack_node: the box an ACK
+ * (kind ACK) is for.
+ */
 static void schedule_relay(field_link_t *l, const uint8_t *pkt, size_t len,
-                           const atalaia_header_t *h)
+                           const atalaia_header_t *h, uint16_t ack_node)
 {
     uint8_t hop;
     if (!atalaia_flood_should_relay(h->hop_limit, l->join.max_hops, &hop)) return;
-    for (size_t i = 0; i < FIELD_LINK_RELAYS; i++) {
-        field_link_relay_t *r = &l->relays[i];
-        if (r->used) continue;
-        r->used = true;
-        r->len = (uint8_t)len;
-        memcpy(r->pkt, pkt, len);
-        r->pkt[ATALAIA_RF_HOP_LIMIT_OFFSET] = hop; /* not in the AAD: the MIC stays valid */
-        r->due_ms = l->now_ms + atalaia_flood_jitter_ms(h->source, h->seq);
+    atalaia_relay_kind_t kind = ATALAIA_RELAY_OTHER;
+    if (h->type == ATALAIA_MSG_ACK) {
+        kind = ATALAIA_RELAY_ACK;
+    } else if (ATALAIA_VF_ACK(h->version_flags)) {
+        kind = ATALAIA_RELAY_ASKS_ACK;
+    }
+    l->relay.rand_ctx = l; /* the link may have been moved since init */
+    int slot = atalaia_relay_plan(&l->relay, kind, h->source, h->seq, ack_node, l->now_ms);
+    if (slot == ATALAIA_RELAY_SKIP) {
+        l->stats.relay_skipped++;
         return;
     }
+    if (slot == ATALAIA_RELAY_NO_SLOT) {
+        l->stats.relay_no_slot++;
+        return;
+    }
+    field_link_relay_t *r = &l->relays[slot];
+    r->len = (uint8_t)len;
+    memcpy(r->pkt, pkt, len);
+    r->pkt[ATALAIA_RF_HOP_LIMIT_OFFSET] = hop; /* not in the AAD: the MIC stays valid */
 }
 
 static void apply_acks(field_link_t *l, const atalaia_ack_msg_t *ack)
 {
-    int32_t contig = ack->ack_seq == 0xFFFF ? -1 : (int32_t)ack->ack_seq;
     for (size_t i = 0; i < FIELD_LINK_OUTBOX; i++) {
         field_link_pending_t *p = &l->outbox[i];
         if (!p->used || !p->sent) continue;
-        bool acked = (int32_t)p->pkt_seq <= contig;
-        int32_t bit = (int32_t)p->pkt_seq - contig - 1;
-        if (!acked && bit >= 0 && (size_t)(bit / 8) < ack->ack_bitmap_len) {
-            acked = (ack->ack_bitmap[bit / 8] >> (bit % 8)) & 1;
+        if (atalaia_ack_covers(ack->ack_seq, ack->ack_bitmap, ack->ack_bitmap_len, p->pkt_seq)) {
+            done(l, p, true);
         }
-        if (acked) done(l, p, true);
     }
     update_log_ack(l);
 }
@@ -497,16 +525,28 @@ void field_link_on_packet(field_link_t *l, const uint8_t *pkt, size_t len, int8_
     }
     l->stats.rx_ok++;
     l->last_rssi = rssi;
-    schedule_relay(l, pkt, len, &h);
+    /* The neighbour count comes from frames already heard: boxes only, not a controller. */
+    if (h.source != l->leader && h.source != l->join.controller_id) {
+        atalaia_relay_heard(&l->relay, h.source, l->now_ms);
+    }
+    /* The controller's ACK: it cancels the relays of the frames it covers, and is itself
+     * relayed only for a box on this box's path. */
+    atalaia_ack_msg_t ack;
+    bool is_ack = h.type == ATALAIA_MSG_ACK && atalaia_ack_msg_decode(pl, n, &ack);
+    if (is_ack) {
+        l->stats.relay_cancelled += (uint32_t)atalaia_relay_ack_heard(
+            &l->relay, ack.ack_node, ack.ack_seq, ack.ack_bitmap, ack.ack_bitmap_len);
+    }
+    if (h.type != ATALAIA_MSG_ACK || is_ack) {
+        schedule_relay(l, pkt, len, &h, is_ack ? ack.ack_node : 0);
+    }
 
     switch (h.type) {
     case ATALAIA_MSG_TIME: on_time(l, &h, pl, n); break;
     case ATALAIA_MSG_CMD: on_cmd(l, &h, pl, n); break;
-    case ATALAIA_MSG_ACK: {
-        atalaia_ack_msg_t a;
-        if (atalaia_ack_msg_decode(pl, n, &a) && a.ack_node == l->join.node_id) apply_acks(l, &a);
+    case ATALAIA_MSG_ACK:
+        if (is_ack && ack.ack_node == l->join.node_id) apply_acks(l, &ack);
         break;
-    }
     default: break; /* other boxes' EVENT, STATE, HELLO, and CLAIM: relayed only */
     }
 }
@@ -522,14 +562,14 @@ void field_link_tick(field_link_t *l, uint32_t now_ms)
 {
     l->now_ms = now_ms;
 
-    /* Relays whose jitter has passed. */
-    for (size_t i = 0; i < FIELD_LINK_RELAYS; i++) {
-        field_link_relay_t *r = &l->relays[i];
-        if (!r->used || (int32_t)(now_ms - r->due_ms) < 0) continue;
+    /* Relays whose delay has passed (a frame that asked for an ACK and was not cancelled by it
+     * puts its source on this box's path as it goes out). */
+    int slot;
+    while ((slot = atalaia_relay_take_due(&l->relay, now_ms)) >= 0) {
+        field_link_relay_t *r = &l->relays[slot];
         bool ok = l->proto.tx != NULL ? l->proto.tx(l->proto.tx_ctx, r->pkt, r->len)
                                       : radio_task_send(r->pkt, r->len);
         if (ok) l->stats.relayed++;
-        r->used = false;
     }
 
     /* Retries: a new packet for each, so the controller ACKs it again. */

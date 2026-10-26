@@ -3,10 +3,10 @@ SPDX-FileCopyrightText: 2026 The Atalaia contributors
 SPDX-License-Identifier: CC-BY-SA-4.0
 -->
 
-# RFC 0000: Relay, ACK and retry rules for a field of 20-30 boxes
+# RFC 0000: Relay, ACK and retry rules for a field of 20-30 boxes (superseded by RFC 0001 Amendment 13)
 
 - **Author(s):** The Atalaia contributors (the relay study, decisions SL-7 to SL-20)
-- **Status:** Draft (2026-10-26): **proposed, not applied.** It amends RFC 0001 section 5 (flood routing), section 8 (duty cycle) and the ACK message of section 4, and Amendment 1's single channel. Nothing in `core/`, `firmware/`, `controller/` or the wire format implements any of it; the maintainer accepts it (or part of it) and gives it an amendment number in RFC 0001 (decision SL-17).
+- **Status:** **Superseded (2026-10-26)** by [RFC 0001 Amendment 13](0001-skirmesh-rf-wire-format.md), which applies it as built (decision SL-16, accepted by the maintainer; SL-17). Kept for the study's reasoning and the numbers it was written with. Differences: Amendment 13 leaves out part 4 (the STATE period that grows with the field, join key 19 `boxes`), says in section 8 that a packet over the budget is **dropped** (the draft left the code alone, too), and takes the random numbers from the box's entropy source.
 - **Discussion:** the pull request that adds this file
 
 ## Summary

@@ -266,6 +266,10 @@ flood.
 4. If `hop_limit > 0`, clamp it to the game's configured maximum
    (default 2), decrement, and rebroadcast after a random jitter
    of 10-50 ms (seeded deterministically by source + seq).
+   *Amendment 13 (2026-10-26) replaces this rebroadcast: whether to relay
+   and after how long now depend on the kind of frame, on the controller's
+   ACK and on how many boxes the relayer hears; the check, clamp and
+   decrement of steps 1-4 stay.*
 
 The controller does not rebroadcast received packets. It originates
 TIME and CMD on the 10% sub-band.
@@ -313,8 +317,17 @@ round-robin, with independent per-channel duty-cycle tracking.
 Controller TIME and CMD use the g2 sub-band.
 
 The radio HAL tracks airtime per sub-band with a 60-bucket sliding
-1-hour window. If the budget is exhausted, `send()` returns
-`DUTY_CYCLE_EXCEEDED` and the packet is queued for retry.
+1-hour window. If the budget is exhausted (or the packet's time on air does not fit in
+what is left), `send()` refuses it (`DUTY_CYCLE_EXCEEDED`; the radio task
+reports `RADIO_TX_RESULT_DUTY_CYCLE`) and the packet is **dropped, not
+queued**: nothing is held for later. What must arrive is sent again by its
+sender: an EVENT or HELLO is resent from the box's outbox on the schedule
+of Amendment 13, a STATE is replaced by the next one, and a relay is not
+repeated. (This sentence said "queued for retry" until Amendment 13; the
+radio task never did that, and the relay study measured why it should not:
+with the rules of Amendment 13 no box was refused a single frame at 20 or
+30 boxes, so a queue would only fill when a field is already saturated,
+and would then release stale relays in a burst.)
 
 **Power cap with FEM (Heltec V4.3):** the board's front-end module
 adds ~14 dB of gain. The SX1262 output power is set so the total ERP
@@ -694,6 +707,28 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 
 **Reason:** the Traditional Chinese page reaches Taiwanese fields, whose band the firmware could not use (P5K-12); a table rather than a second set of if/else keeps the next region (US915, AU915: RF-AS923-12) a row and its tests.
 
+## Amendment 13 (2026-10-26): Relay, ACK and retry rules for a field of 20-30 boxes
+
+**Status:** built, from decision SL-16 of the maintainer (2026-10-26; decisions SL-7 to SL-24 in `docs/review/decisions-to-review.md`, the study in `docs/review/relay-study-results.md`). The core, the box's field link and both controllers carry it; not yet confirmed on air (SL-18 says what a field test should measure). The draft it came from, `docs/rfcs/0000-relay-ack-and-retry-rules.md`, is marked superseded by this text.
+
+**Supersedes:** in section 5, step 4's rebroadcast (every authenticated frame once, after 10-50 ms seeded by source and sequence number) and the 4 relay slots; in section 8, the sentence "the packet is queued for retry" (corrected in place above: the packet is refused); and the box's resend of an unacknowledged EVENT or HELLO every 3 s (ADR-P2-3's `ACK_RETRY_MS`). Section 4's ACK message, the header, every encoding, the nonce, the dedupe key, `max_hops`, the channel, the regions and the budgets are unchanged.
+
+**Change:**
+
+1. **The controller skips a hole in a box's sequence** (decision SL-8, built the same day in `AckTracker`, Python and Dart): every sequence number more than 128 below the highest one received from a (node, epoch) counts as received, so `ack_seq` is never more than 129 behind the box's newest packet and its bitmap always reaches it. Before this, one packet lost for good (a STATE; an EVENT's resend takes a new number) left a hole that closed the box's ACKs for good 256 packets later (about an hour). The bound must stay above `FIELD_LINK_OUTBOX` plus the packets a box sends in one ACK round trip. No change on the box or the wire.
+2. **Relaying** (every box; `atalaia_relay_*` in `core/src/flood.c`, called by `field_link.c`). After the checks and the clamp of section 5, a frame that has `hop_limit` left is one of three kinds:
+   - **A frame that asks for an ACK** (header `ack_req`: an EVENT or HELLO). The relay waits a random **350-700 ms**. If the controller's ACK for that (source, seq) is heard first (`ack_node` is the source and `ack_seq` or the bitmap covers the seq), the relay is cancelled. Otherwise it goes out, and the source is *on this box's path* for 30 s.
+   - **The controller's ACK** (type 3) is relayed only for an `ack_node` that is on the box's path (a box none of whose frames this box relayed has nothing to be delivered here), and then like the next kind.
+   - **Everything else** (STATE, TIME, CMD, CLAIM, an EVENT that asks for no ACK, and an ACK on the path) is relayed with probability **min(1, 3 / n)** after a uniform random **20-600 ms**; `n` is the number of different boxes (sources other than the controller) heard in the last 600 s, at least 1, counted from the frames the box accepts anyway. Up to three neighbours it always relays; `n` is local, so a box at the end of a field relays everything.
+   - The relay table has **8 slots** (was 4); a frame that finds none is dropped. The dedupe table stays at 64 entries and 30 s. `hop_limit`, the clamp, "never relay your own frame" and "FIELD and PAIR frames are not relayed" are unchanged. A box also keeps the controller's ACK for *itself* out of the relay (it is never on its own path).
+   - **The random numbers come from the box's own entropy** (the shell's `random` source, the one for the device id and timing spread; never a nonce): a delay is `min + r mod (max - min + 1)`, the probability a draw `r mod n < 3`. They are no longer a function of the frame (`atalaia_flood_jitter_ms`, kept for its tests, is not called): a function of the frame cannot give two boxes different delays, which was the point.
+3. **Resends back off.** An unacknowledged EVENT or HELLO is sent again after **3, 6, 12, 24 s and then every 30 s**, each gap times a random 0.75-1.25 (`atalaia_retry_gap_ms`). Normal priority still gives up after 10 resends and critical resends until acknowledged; a resend is a new packet (new `seq`) as before.
+4. **Not built: a STATE period that grows with the field** (the draft's optional join key 19 `boxes`). The maintainer's answer to SL-5 (15 s) stands; the model says rules 1-3 hold 20-30 boxes at about 2.6-2.9 % airtime without it (SL-15), and key 19 is not defined here.
+
+**Compatibility:** no change to the packet or to any message. A box from before relays more than a box with these rules (as today) and resends every 3 s; a mixed field is safe and gains in proportion to the boxes that have the rules. The controller's rule (1) works with every box. A box with these rules adds up to 0.7 s per hop to an EVENT or HELLO that the controller did not hear directly. The reach is unchanged: `hop_limit` 2 reaches three hops, so a field longer than about nineteen boxes in a line is not served by any relay rule (`max_hops` 3 in the join, or a second controller; SL-9).
+
+**Reason:** the relay study (`simulator/atalaia_sim/relay_study.py`, decisions SL-7 to SL-20): with the flood of section 5, 20-30 boxes spent 8-12 % of every box's airtime (the budget is 10 %), lost most of the controller's ACKs to their own relays and stopped acknowledging after an hour; with these rules every box stays at about 2.6-2.9 % airtime, no frame is refused, and 94-100 % of captures are acknowledged in a mesh and in CQB (a long field of 30 boxes: 56 %, which no relay rule can fix). The model's numbers and the numbers of the same harness run on the code that was built are in the study's results, and agree within a point or two.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit
@@ -709,3 +744,9 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
   (Amendment 1 replaced hopping with one shared channel per game, and
   Amendment 3 adds a noise scan when the field's channel is chosen; moving
   a game to another channel while it runs is still open.)
+- Amendment 13's values (350-700 ms, `c` = 3, 600 s, 128, 30 s) come from a model whose link
+  budget and capture effect are assumptions; a field test with the counters the box already keeps
+  (`field_link_stats_t`, now with `relay_skipped`, `relay_cancelled` and `relay_no_slot`)
+  should confirm them (decision SL-18). Whether a box's last STATE (the one that ends the game)
+  should ask for an ACK and be resent, and whether `max_hops` 3 should be the default above ten
+  boxes, are open (SL-20, SL-9).

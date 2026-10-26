@@ -2,7 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The relay study: what the field's flood does to airtime, duty cycle and delivery.
 
-Decisions SL-7 to SL-20 (docs/review/decisions-to-review.md). A packet-level, discrete-event
+Decisions SL-7 to SL-20 (docs/review/decisions-to-review.md). **"firmware" below is the Field Box as it
+was before RFC 0001 Amendment 13** (every frame relayed after the same 10-50 ms, 4 relay slots, a 3 s
+resend); the Amendment, decision SL-16, built the "A+backoff" rules into the core and the box, and the
+``A_backoff_core`` policy runs this harness on that code (``relay_core.py``) beside ``A_backoff``, the
+model of it. A packet-level, discrete-event
 model of one field's shared radio channel: N boxes and a controller, the real firmware's
 relay rules (firmware/esp32/main/radio/field_link.c, core/src/flood.c, radio_task.c,
 hal_esp_radio.c) and the project's own airtime and duty-cycle formulas, with what the older
@@ -61,9 +65,9 @@ from .packet import ack_encode, cmd_encode
 HEADER = 9  # RFC 0001 section 2
 MIC = 8
 STATE_MS = 15_000  # FIELD_LINK_STATE_MS (field_link.h)
-ACK_RETRY_MS = 3_000  # ACK_RETRY_MS (field_link.c)
+ACK_RETRY_MS = 3_000  # the pre-Amendment-13 resend gap, and the first gap of the backoff (ATALAIA_RETRY_FIRST_MS)
 MAX_RETRIES = 10  # FIELD_LINK_MAX_RETRIES: normal priority
-RELAY_SLOTS = 4  # FIELD_LINK_RELAYS
+RELAY_SLOTS = 4  # FIELD_LINK_RELAYS before Amendment 13 (8 now: ATALAIA_RELAY_SLOTS)
 DEDUPE = 64  # FIELD_LINK_DEDUPE / ATALAIA_DEDUPE_SIZE
 DEDUPE_MS = 30_000  # FIELD_LINK_DEDUPE_MS
 TX_QUEUE = 8  # RADIO_TX_QUEUE_LEN
@@ -348,6 +352,8 @@ class Policy:
     lbt: bool = False  # listen before talk: a frame waits (random backoff) while the channel is heard busy
     lbt_backoff_ms: tuple[int, int] = (20, 200)
     lbt_tries: int = 8  # then it goes anyway (RFC 0001 section 8 does not use LBT today)
+    core_rules: bool = False  # every box runs the core's own relay rules (core/src/flood.c, ack.c; relay_core.py)
+                              # instead of this file's model of them: RFC 0001 Amendment 13, the shipped code
 
     def period(self, n_boxes: int) -> int:
         return self.state_period_ms(n_boxes) if self.state_period_ms else STATE_MS
@@ -418,6 +424,12 @@ POLICIES: dict[str, Policy] = {
     "A_backoff": replace(FIRMWARE, name="A_backoff", jitter_mode="uniform", jitter_ms=(20, 600),
                          relay_slots=8, density_c=3.0, ack_cancel=True, ack_relay_path=True, retry_backoff=True,
                          summary="A + EVENT/HELLO retries back off; STATE stays at 15 s (keeps SL-5)"),
+    # A+backoff as built (RFC 0001 Amendment 13): the same rules, run by the core's own code
+    "A_backoff_core": replace(FIRMWARE, name="A_backoff_core", jitter_mode="uniform", jitter_ms=(20, 600),
+                              relay_slots=8, density_c=3.0, ack_cancel=True, ack_relay_path=True,
+                              retry_backoff=True, core_rules=True,
+                              summary="A+backoff run by the core's atalaia_relay_* and atalaia_retry_gap_ms "
+                                      "(what the box ships), not by this file's model"),
     "D_lbt": replace(FIRMWARE, name="D_lbt", jitter_mode="uniform", jitter_ms=(20, 600), relay_slots=8,
                      density_c=3.0, ack_cancel=True, ack_relay_path=True, state_period_ms=_adaptive_period,
                      retry_backoff=True, lbt=True, summary="D plus listen-before-talk"),
@@ -694,6 +706,11 @@ class Box(Node):
         self.last_time_us = 0
         self.max_time_gap_us = 0
         self.acks_for_me = 0  # the controller's ACKs addressed to this box that it heard (first copies)
+        self.core = None
+        self.core_frames: dict[int, Frame] = {}  # core relay slot -> the frame it holds
+        if eng.policy.core_rules:
+            from .relay_core import CoreRelay
+            self.core = CoreRelay(eng.rng, eng.lib)
 
     # -- own frames --
     def state_frame(self, t_us: int) -> Frame:
@@ -730,7 +747,9 @@ class Box(Node):
         p.tries += 1
         p.ev.tx_count += 1
         gap_ms = ACK_RETRY_MS
-        if self.eng.policy.retry_backoff:
+        if self.core is not None:
+            gap_ms = self.core.retry_gap_ms(p.tries)
+        elif self.eng.policy.retry_backoff:
             gap_ms = min(30_000, ACK_RETRY_MS * 2 ** min(p.tries - 1, 4)) * self.eng.rng.uniform(0.75, 1.25)
         p.next_us = t_us + int(gap_ms * 1000 * self.drift)
         self.eng.at(self.tick_at(p.next_us), lambda t, p=p: self.retry(t, p))
@@ -797,6 +816,8 @@ class Box(Node):
         self.stats.rx_ok += 1
         if f.src != CONTROLLER:
             self.heard[f.src] = t_ms
+            if self.core is not None:
+                self.core.heard(f.src, t_ms)
         if f.ptype == "ACK":
             self.on_ack(f, t_us)
         elif f.ptype == "CMD":
@@ -812,8 +833,39 @@ class Box(Node):
             self._n_cache = (t_ms, max(n, 1))
         return self._n_cache[1]
 
+    def schedule_relay_core(self, f: Frame, t_us: int) -> None:
+        """field_link.c schedule_relay: the core's rules decide; this only holds the frame by slot."""
+        new_hop = should_relay(f.hop, MAX_HOPS)
+        if new_hop is None:
+            return
+        from . import relay_core
+        kind = relay_core.ACK if f.ptype == "ACK" else relay_core.ASKS_ACK if f.ack_req else relay_core.OTHER
+        t_ms = t_us // 1000
+        slot = self.core.plan(kind, f.src, f.seq, f.ref[1] if f.ptype == "ACK" else 0, t_ms)
+        if slot == relay_core.SKIP:
+            self.stats.relay_skipped += 1
+            return
+        if slot == relay_core.NO_SLOT:
+            self.stats.relay_slot_dropped += 1
+            return
+        self.core_frames[slot] = f.copy_with_hop(new_hop)
+        due = self.tick_at(self.core.due_ms(slot) * 1000)
+        self.eng.at(due, self.relay_due_core)
+
+    def relay_due_core(self, t_us: int) -> None:
+        """field_link_tick: every slot whose delay has passed goes out (an ACK-waiting frame joins the path)."""
+        while True:
+            slot = self.core.take_due(t_us // 1000)
+            if slot < 0:
+                return
+            frame = self.core_frames.pop(slot)
+            if self.enqueue(frame, "relay", t_us):
+                self.stats.relayed += 1
+
     def schedule_relay(self, f: Frame, t_us: int) -> None:
         pol = self.eng.policy
+        if self.core is not None:
+            return self.schedule_relay_core(f, t_us)
         new_hop = should_relay(f.hop, MAX_HOPS)
         if new_hop is None:
             return
@@ -868,7 +920,9 @@ class Box(Node):
         if who == self.idx:
             self.acks_for_me += 1
         pol = self.eng.policy
-        if pol.ack_cancel:
+        if self.core is not None:
+            self.stats.relay_cancelled += self.core.ack_heard(who, contig, above)
+        elif pol.ack_cancel:
             for key, ent in list(self.pending.items()):
                 fr = ent[0]
                 if ent[3] and fr.src == who and _covers(contig, above, fr.seq):
@@ -977,7 +1031,8 @@ class Controller(Node):
 class Engine:
     def __init__(self, layout: Layout, trace: Any, region: str, policy: Policy, seed: int = 1,
                  minutes: Optional[int] = None, ideal_channel: bool = False, loss: float = 0.0,
-                 drift_ppm: float = 20.0, capture_db: float = CAPTURE_DB) -> None:
+                 drift_ppm: float = 20.0, capture_db: float = CAPTURE_DB, lib: Optional[str] = None) -> None:
+        self.lib = lib
         self.drift_ppm = drift_ppm
         self.layout, self.trace, self.policy = layout, trace, policy
         self.region = regions.get(region)
@@ -1240,7 +1295,7 @@ def run_one(game: str, n: int, layout: str, region: str, policy: str, minutes: i
     tr = trace or get_trace(game, n, minutes, seed, lib, **trace_kw)
     lay = LAYOUTS[layout](n, seed)
     eng = Engine(lay, tr, region, POLICIES[policy], seed=seed, minutes=minutes, ideal_channel=ideal_channel,
-                 loss=loss, capture_db=capture_db, drift_ppm=drift_ppm)
+                 loss=loss, capture_db=capture_db, drift_ppm=drift_ppm, lib=lib)
     res = eng.run()
     res["seed"] = seed
     return res

@@ -753,12 +753,18 @@ controller's game.
   `cmd.mode`. At the end the stored join is
   erased, and the key in RAM once the last events are acknowledged.
 - **The radio link** -- `main/radio/field_link.c` sends every event the mode
-  emits (normal and critical ones wait for an ACK, are resent every 3 s in a
-  new packet, and are written to the flash log first), STATE every
+  emits (normal and critical ones wait for an ACK, are resent in a new packet
+  after 3, 6, 12, 24 s and then every 30 s, and are written to the flash log first), STATE every
   `CONFIG_ATALAIA_STATE_INTERVAL_S` seconds and after a capture (owner, game
   state, game time, points gained per team, epoch), follows the controller
   with the highest term, applies the time sync (slew, or a step ahead, or
-  holding the clock), and relays every authenticated packet once.
+  holding the clock), and relays authenticated packets by the rules of RFC 0001
+  Amendment 13 (core `atalaia_relay_*`, entropy from the shell): a frame that asks
+  for an ACK (EVENT, HELLO) waits 350-700 ms and is not relayed if the controller's
+  ACK is heard first; the controller's ACK is relayed only for a box whose frame
+  this box relayed in the last 30 s; every other frame is relayed with probability
+  min(1, 3 / boxes heard in 10 minutes) after 20-600 ms; 8 relay slots. A frame
+  over the duty-cycle budget is dropped, not queued (RFC 0001 section 8).
 - **Battery** -- with a MAX17048 gauge, HELLO and STATE carry its level, and
   in a joined game the box reads it every 10 s and sends one `battery.low`
   (telemetry: one packet, no ACK, the level in `percent`) when it falls below

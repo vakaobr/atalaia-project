@@ -199,7 +199,8 @@ class AckTracker:
     """
 
     #: A seq this far below the highest received is given up on. The box's
-    #: outbox holds 32 entries resent every 3 s at most, so one still
+    #: outbox holds 32 entries resent every 3 s at most (3 s is the
+    #: shortest gap of Amendment 13's backoff), so one still
     #: waiting is never this old; and 128 is half the bitmap, so the highest
     #: seq always stays inside it.
     GAP_WINDOW = 128

@@ -93,6 +93,17 @@ static bool link_tx(void *ctx, const uint8_t *pkt, size_t len)
     return g->shell.radio_send(g->shell.user, pkt, len);
 }
 
+/* The link's timing spread (relay delays, resend gaps) comes from the shell's entropy. */
+static void link_random(void *user, uint8_t *buf, size_t len)
+{
+    box_game_t *g = (box_game_t *)user;
+    if (g->shell.random != NULL) {
+        g->shell.random(g->shell.user, buf, len);
+    } else {
+        memset(buf, 0, len);
+    }
+}
+
 static uint32_t link_game_time(void *user)
 {
     return ((box_game_t *)user)->runner->game_time_ms;
@@ -503,6 +514,7 @@ static bool link_up(box_game_t *g, const atalaia_join_t *j, bool fresh)
                           .on_cmd = link_on_cmd,
                           .game_time = link_game_time,
                           .log = link_log,
+                          .random = g->shell.random != NULL ? link_random : NULL,
                           .user = g,
                           .tx = g->shell.radio_send != NULL ? link_tx : NULL,
                           .tx_ctx = g};

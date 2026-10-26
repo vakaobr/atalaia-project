@@ -16,6 +16,8 @@
 #define ATALAIA_ACK_QUEUE_SIZE  32
 #define ATALAIA_ACK_RETRY_MS    3000
 #define ATALAIA_ACK_MAX_RETRIES 10
+#define ATALAIA_RETRY_FIRST_MS  3000  /* the field link's first resend gap (Amendment 13) */
+#define ATALAIA_RETRY_MAX_MS    30000 /* and the longest */
 
 typedef enum {
     ATALAIA_ACK_PENDING,
@@ -36,6 +38,19 @@ typedef struct {
     atalaia_ack_entry_t entries[ATALAIA_ACK_QUEUE_SIZE];
     size_t count;
 } atalaia_ack_tracker_t;
+
+/*
+ * Does an ACK message (highest contiguous seq ack_seq, 0xFFFF for none, and a bitmap of the
+ * seqs above it, bit n = ack_seq + 1 + n; RFC 0001 section 4) name seq?
+ */
+bool atalaia_ack_covers(uint16_t ack_seq, const uint8_t *bitmap, size_t bitmap_len, uint16_t seq);
+
+/*
+ * The wait before the next send of an unacknowledged EVENT or HELLO (RFC 0001 Amendment 13,
+ * decision SL-16): sends_so_far is how many times it has been sent (1 after the first); the
+ * gap is 3, 6, 12, 24, then 30 s, each scaled by a uniform 0.75-1.25 from rand32.
+ */
+uint32_t atalaia_retry_gap_ms(unsigned sends_so_far, uint32_t rand32);
 
 void atalaia_ack_init(atalaia_ack_tracker_t *t);
 

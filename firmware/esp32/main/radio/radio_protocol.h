@@ -92,8 +92,9 @@ typedef struct {
 
 /* The wide search (HELLO and TIME, and a provisional source's packets) costs up to 257
  * decryptions: at most once per source every ATALAIA_WIDE_GAP_MS, and ATALAIA_WIDE_PER_MIN
- * times a minute in all (decision BN-20). A node's HELLO is resent every 3 s until it is
- * acknowledged, so a genuine one is searched within a retry or two. */
+ * times a minute in all (decision BN-20). A node's HELLO is resent until it is
+ * acknowledged (after 3, 6, 12, 24 s, then every 30 s: RFC 0001 Amendment 13), so a genuine one is
+ * searched within a retry or two. */
 #define ATALAIA_WIDE_GAP_MS  2000
 #define ATALAIA_WIDE_PER_MIN 20
 #define ATALAIA_WIDE_SOURCES 8
