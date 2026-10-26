@@ -18,7 +18,7 @@ import json
 import tempfile
 import unittest
 
-from support import MODEM_HOST, HostModem, config, node_packet, packet_decrypt, wait_for
+from support import MODEM_HOST, WAIT_FLOOR_S, HostModem, config, node_packet, packet_decrypt, wait_for
 from atalaia_controller import modem_framing as mf
 from atalaia_controller.engine import Controller
 from atalaia_controller import channels
@@ -179,11 +179,11 @@ class ChannelLimitsAndMeasureTests(unittest.TestCase):
         self.host.close()
 
     def status(self):
-        before = self.modem.status
-        self.modem._write(mf.CMD, bytes([mf.CMD_STATUS]))
-        self.assertTrue(wait_for(lambda: self.modem.status is not before
-                                 and self.modem.status.get("cmd") == mf.CMD_STATUS, 3))
-        return self.modem.status
+        """The modem's answer to STATUS (RadioModem.request_status): `modem.status` is the latest reply
+        to any command, and a ping's reply could replace this one before a poll saw it."""
+        reply = self.modem.request_status(WAIT_FLOOR_S)
+        self.assertIsNotNone(reply, "no STATUS reply")
+        return reply
 
     def test_budget_follows_the_channel(self):
         self.start()
@@ -261,7 +261,7 @@ class ChannelLimitsAndMeasureTests(unittest.TestCase):
                 self.assertEqual(ctrl.scan_status()["suggestion"],
                                  {"channel_hz": 869_475_000, "reason": "quiet_full_power"})
                 ctrl.set_field_channel(869_475_000, "scan")
-                self.assertTrue(wait_for(lambda: self.status()["channel_hz"] == 869_475_000, 3))
+                self.assertEqual(self.status()["channel_hz"], 869_475_000)
             finally:
                 ctrl.stop()
                 store.close()

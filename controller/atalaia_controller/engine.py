@@ -972,9 +972,14 @@ class Controller:
         if state["state"] != "running":
             self._last_scan = state
             self.store.set_setting("radio.last_scan", json.dumps(state))
-            if self.modem is not None and self.modem.is_up:
-                self.modem.set_channel(self.field_channel)  # back on the field's channel
-                self._modem_moved("a channel scan ended")
+            # Back on the field's channel, read and sent under the lock like set_field_channel's own
+            # retune: the scan reads "done" before this runs, so a GM's new channel can arrive first,
+            # and an unlocked read of the old one could then be sent after it (the modem left on
+            # the old channel while the setting says the new one).
+            with self._lock:
+                if self.modem is not None and self.modem.is_up:
+                    self.modem.set_channel(self.field_channel)
+                    self._modem_moved("a channel scan ended")
         self._emit({"type": "radio_scan", "scan": state})
 
     def game_key(self, game_id: int) -> bytes:

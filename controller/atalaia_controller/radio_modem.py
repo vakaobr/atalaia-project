@@ -93,6 +93,11 @@ class RadioModem:
         self.state = CLOSED
         self.ident: Optional[dict[str, Any]] = None
         self.status: Optional[dict[str, Any]] = None
+        # Every command is answered with a STATUS (cmd = its opcode), so `status` is whatever
+        # answered last, often a ping's. Replies to STATUS itself are counted apart.
+        self._status_cond = threading.Condition()
+        self._status_replies = 0
+        self._status_reply: Optional[dict[str, Any]] = None
         self.reconnects = 0
         self.decoder = mf.FrameDecoder()
 
@@ -154,6 +159,26 @@ class RadioModem:
         pairs = sorted(epochs.items())
         for i in range(0, len(pairs), 60):  # 60 pairs = 241 bytes, under the 256-byte limit
             self._write(mf.CMD, mf.peer_epoch_payload(pairs[i:i + 60]))
+
+    def request_status(self, timeout: float = 5.0, retry_s: float = 1.0) -> Optional[dict[str, Any]]:
+        """Sends STATUS and returns the modem's answer to it (None after ``timeout``).
+
+        The answer is the reply with cmd = STATUS, kept apart from the pings' and the other commands'
+        replies, which would overwrite ``status`` before a caller saw it. STATUS changes nothing, so
+        it is sent again every ``retry_s`` seconds: a write lost to a link that was reconnecting
+        gets a new one, not a wait for a reply that cannot come.
+        """
+        end = time.monotonic() + timeout
+        with self._status_cond:
+            seen = self._status_replies
+        while True:
+            left = end - time.monotonic()
+            if left <= 0:
+                return None
+            self._write(mf.CMD, bytes([mf.CMD_STATUS]))
+            with self._status_cond:
+                if self._status_cond.wait_for(lambda: self._status_replies != seen, min(retry_s, left)):
+                    return self._status_reply
 
     @property
     def can_measure(self) -> bool:
@@ -355,6 +380,11 @@ class RadioModem:
                     self.on_field_ack(tx_id, status)
             elif frame_type == mf.STATUS:
                 self.status = json.loads(payload.decode("utf-8"))
+                if self.status.get("cmd") == mf.CMD_STATUS:
+                    with self._status_cond:
+                        self._status_reply = self.status
+                        self._status_replies += 1
+                        self._status_cond.notify_all()
                 if self.status.get("ping") == self._pending_ping:
                     self._pending_ping = None
                     self._missed = 0
