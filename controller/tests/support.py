@@ -90,8 +90,14 @@ def free_port(kind: int = socket.SOCK_STREAM) -> int:
         return s.getsockname()[1]
 
 
+WAIT_FLOOR_S = 20.0  # a full verification runs six suites at once: a C host modem can stall for seconds
+
+
 def wait_for(predicate, timeout: float = 5.0, step: float = 0.01) -> bool:
-    end = time.monotonic() + timeout
+    """Waits until predicate() holds, at least WAIT_FLOOR_S: every caller waits for something that should
+    happen (none uses it to show that something does not), so a longer deadline only costs time when a
+    test is failing anyway. test_engine_scan_over_the_c_modem missed its 3 s under load (2026-10-26)."""
+    end = time.monotonic() + max(timeout, WAIT_FLOOR_S)
     while time.monotonic() < end:
         if predicate():
             return True
