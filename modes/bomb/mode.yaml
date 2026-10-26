@@ -48,7 +48,7 @@ i18n:
       team_codes: "Team-Codes, z. B. red=1234,blue=5678: das Tastenfeld macht scharf (der Code eines Teams) und entschärft (der Code eines anderen Teams) statt der Knöpfe"
   zh-tw:
     name: 炸彈 / Rush
-    description: 進攻方啟動炸彈並守住它；防守方必須在爆炸前拆除。使用隊伍代碼時，各隊用自己的代碼在按鍵上啟動與拆除。
+    description: 進攻方啟動炸彈並守住它；防守方必須在爆炸前拆除。使用隊伍密碼時，各隊用自己的密碼在按鍵上啟動與拆除。
     params:
       attackers: 進攻方
       defenders: 防守方
@@ -57,4 +57,4 @@ i18n:
       defuse_hold_ms: 拆除需按住的時間（毫秒）
       reset_after_defuse: 拆除後回到待命
       auto_arm_after_s: 自動啟動的時間（秒）
-      team_codes: 隊伍代碼，例如 red=1234,blue=5678：改用按鍵啟動（某一隊的代碼）與拆除（另一隊的代碼），不用按鈕
+      team_codes: 隊伍密碼，例如 red=1234,blue=5678：改用按鍵啟動（某一隊的密碼）與拆除（另一隊的密碼），不用按鈕

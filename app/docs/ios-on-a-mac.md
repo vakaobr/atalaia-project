@@ -178,6 +178,23 @@ do not change the bundle id between installs (that is a different app, with
 none of the saved field join key, marshal key or settings). Put a reminder on
 day 6 before a field test.
 
+## Tests on the Mac (the Dart tests, not the iPhone)
+
+The app's Dart tests load the C core through `dart:ffi`, so the core has to be
+built for the Mac first (`brew install cmake`; from the repository root):
+
+```sh
+cmake -S core -B build -DATALAIA_SHARED=ON
+cmake --build build
+cd app && flutter test test/ffi test/ui
+```
+
+The libraries are `build/libatalaia_core.dylib` and
+`build/libatalaia_core_stub.dylib`, which the tests find by themselves. The
+whole of it, what is left off on a Mac and why, is in the app's README
+("Tests on a Mac"). This was written without a Mac: if the build or a test
+stops, copy the first error into the session.
+
 ## Troubleshooting
 
 - **"Untrusted Developer" / the app closes at once**: trust the certificate

@@ -14,7 +14,7 @@ layout:
     style: { width: fill, height: 44, background: "{team || owner || 'panel'}" }
     children:
       - type: label
-        text: "{params.lang == 'en' && 'CRACK THE CODE' || params.lang == 'de' && 'KNACK DEN CODE' || params.lang == 'zh-tw' && '破解代碼' || 'DECIFRA O CÓDIGO'}"
+        text: "{params.lang == 'en' && 'CRACK THE CODE' || params.lang == 'de' && 'KNACK DEN CODE' || params.lang == 'zh-tw' && '破解密碼' || 'DECIFRA O CÓDIGO'}"
         style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: label
     text: "{params.lang == 'zh-tw' && '終端：' || 'Terminal: '}{owner|upper}"
@@ -47,7 +47,7 @@ layout:
       visible: "{!locked && note == 'enter'}"
       padding: { bottom: 10 }
   - type: label
-    text: "{params.lang == 'en' && 'The code has' || params.lang == 'de' && 'Der Code hat' || params.lang == 'zh-tw' && '代碼有' || 'O código tem'} {digits} {params.lang == 'en' && 'digits' || params.lang == 'de' && 'Ziffern' || params.lang == 'zh-tw' && '位數' || 'algarismos'}"
+    text: "{params.lang == 'en' && 'The code has' || params.lang == 'de' && 'Der Code hat' || params.lang == 'zh-tw' && '密碼有' || 'O código tem'} {digits} {params.lang == 'en' && 'digits' || params.lang == 'de' && 'Ziffern' || params.lang == 'zh-tw' && '位數' || 'algarismos'}"
     style:
       font_size: 14
       color: muted

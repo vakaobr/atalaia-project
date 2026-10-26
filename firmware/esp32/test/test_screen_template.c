@@ -186,11 +186,11 @@ static void test_text_fold(void)
     fold_is("A \xe7\xb4\x85\xe9\x9a\x8a", "A ?\xe9\x9a\x8a");
     fold_at("\xe7\xb4\x85\xe9\x9a\x8a\xef\xbc\x8c", 14, "?\xe9\x9a\x8a\xef\xbc\x8c");
     /* 中立 at 48 px (TX_NEUTRAL_UP); 隊 is not in the 48 px font, but in the 28 px one it falls
-     * back on. 鈔 (印鈔廠) is in the templates at 14 and 20 px only. */
+     * back on. 亮 (the Target Windows' 標靶亮你的顏色) is in the templates at 14 and 20 px only. */
     fold_at("\xe4\xb8\xad\xe7\xab\x8b", 48, "\xe4\xb8\xad\xe7\xab\x8b");
     fold_at("\xe9\x9a\x8a", 48, "\xe9\x9a\x8a");
-    fold_at("\xe9\x88\x94", 20, "\xe9\x88\x94");
-    fold_at("\xe9\x88\x94", 48, "?");
+    fold_at("\xe4\xba\xae", 20, "\xe4\xba\xae");
+    fold_at("\xe4\xba\xae", 48, "?");
 }
 
 /* The Medic Kit's Portuguese screens on the box: folded, and the language follows params.lang. */

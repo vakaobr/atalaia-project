@@ -18,7 +18,7 @@ layout:
     text: "{team|upper}"
     style: { font_size: 20, color: contrast, visible: "{team}" }
   - type: label
-    text: "{params.lang == 'en' && 'Code' || params.lang == 'de' && 'Code' || params.lang == 'zh-tw' && '代碼' || 'Código'}"
+    text: "{params.lang == 'en' && 'Code' || params.lang == 'de' && 'Code' || params.lang == 'zh-tw' && '密碼' || 'Código'}"
     style:
       font_size: 14
       color: contrast

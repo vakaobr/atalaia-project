@@ -121,6 +121,9 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
     if (!t || strcmp(t, "@mode") == 0) return false;
     if (!data) data = "{}";
     const char *mode = mode_title && mode_title[0] ? mode_title : "ATALAIA";
+    /* A built-in mode's name in the box's language; a package's stays as its id says. */
+    const char *named = box_text_mode_name(mode);
+    if (named) mode = named;
 
     char s[32];
     long v = 0;
@@ -290,7 +293,7 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
     if (strcmp(t, "code_entry") == 0) {
         if (screen_json_str(data, "title", s, sizeof(s)) && s[0]) {
             upper(s);
-            set(out->head, sizeof(out->head), s);
+            set(out->head, sizeof(out->head), box_text_title(s));
         }
         screen_json_int(data, "digits", &v);
         dots(v, out->big, sizeof(out->big));
@@ -308,8 +311,11 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
     } else if (strcmp(t, "final_score") == 0) {
         set_text(out->big, sizeof(out->big), TX_GAME_OVER_UP);
     } else {
-        set(out->big, sizeof(out->big), t);
-        upper(out->big);
+        /* A built-in template's name in the box's language (DESARMADA, not DEFUSED); any other
+         * as its name says. */
+        const char *named_t = box_text_screen_name(t);
+        set(out->big, sizeof(out->big), named_t ? named_t : t);
+        if (!named_t) upper(out->big);
     }
     out->bar = share_pct(data, strcmp(t, "countdown") == 0 ? "defuse" : "progress");
     if (out->bar >= 0 && strcmp(t, "countdown") == 0) {

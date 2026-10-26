@@ -7,6 +7,7 @@
  */
 #include <string.h>
 
+#include "box_text.h"
 #include "check.h"
 #include "oled_view.h"
 
@@ -307,6 +308,56 @@ static void test_version_lines(void)
     oled_version_lines("0.4.0-dev.12+gabc1234", NULL, 0, NULL, 0); /* no buffers: nothing */
 }
 
+/* A built-in mode's end screen, header and keypad title in the box's language; the name of a
+ * mode package or an unknown template as its id says; English as before. */
+static void test_names_in_the_boxs_language(void)
+{
+    char title[32];
+    oled_mode_title("org.atalaia.bomb {}", title, sizeof(title));
+
+    box_lang_set(BOX_LANG_EN);
+    oled_text_t t = map(title, "defused", "{\"team\":\"blue\"}");
+    CHECK(strcmp(t.head, "BOMB") == 0 && strcmp(t.big, "DEFUSED") == 0);
+
+    box_lang_set(BOX_LANG_PT);
+    t = map(title, "defused", "{\"team\":\"blue\"}");
+    CHECK(strcmp(t.head, "BOMBA") == 0 && strcmp(t.big, "DESARMADA") == 0);
+    CHECK(strcmp(t.foot, "BLUE") == 0); /* the team is the GM's word */
+    t = map(title, "exploded", "{\"team\":\"red\"}");
+    CHECK(strcmp(t.big, "EXPLODIU") == 0);
+
+    box_lang_set(BOX_LANG_DE);
+    t = map(title, "exploded", "{\"team\":\"red\"}");
+    CHECK(strcmp(t.head, "BOMBE") == 0 && strcmp(t.big, "EXPLODIERT") == 0);
+    t = map(title, "code_entry", "{\"title\":\"ARM\",\"digits\":1}");
+    CHECK(strcmp(t.head, "SCH\xc3\x84RFEN") == 0);
+    t = map(title, "code_entry", "{\"title\":\"DEFUSE\",\"digits\":1}");
+    CHECK(strcmp(t.head, "ENTSCH\xc3\x84RFEN") == 0);
+
+    box_lang_set(BOX_LANG_ZH_TW);
+    t = map(title, "defused", "{\"team\":\"blue\"}");
+    CHECK(strcmp(t.head, "炸彈") == 0 && strcmp(t.big, "已拆除") == 0);
+    t = map(title, "code_entry", "{\"title\":\"CODE\",\"digits\":1}");
+    CHECK(strcmp(t.head, "密碼") == 0);
+    oled_mode_title("org.atalaia.kill_confirmed {}", title, sizeof(title));
+    t = map(title, "tags", "{}");
+    CHECK(strcmp(t.head, "擊殺確認") == 0 && strcmp(t.big, "標籤") == 0);
+    /* A script's own header, a package's mode and a template with no name here stay as they are. */
+    t = map(title, "code_entry", "{\"title\":\"Hello\",\"digits\":1}");
+    CHECK(strcmp(t.head, "HELLO") == 0);
+    t = map("ACME HILL", "my_screen", "{}");
+    CHECK(strcmp(t.head, "ACME HILL") == 0 && strcmp(t.big, "MY SCREEN") == 0);
+
+    box_lang_set(BOX_LANG_EN);
+    oled_mode_title("org.atalaia.medic {}", title, sizeof(title));
+    t = map(title, "medic_refused", "{\"team\":\"red\"}");
+    CHECK(strcmp(t.head, "MEDIC") == 0 && strcmp(t.big, "MEDIC REFUSED") == 0);
+    box_lang_set(BOX_LANG_PT);
+    t = map(title, "medic_refused", "{\"team\":\"red\"}");
+    CHECK(strcmp(t.head, "LIGADURAS") == 0 && strcmp(t.big, "RECUSADO") == 0);
+    box_lang_set(BOX_LANG_EN);
+}
+
 void run_oled_view_tests(void)
 {
     test_version_lines();
@@ -320,4 +371,5 @@ void run_oled_view_tests(void)
     test_zone_screens();
     test_box_hold_bar();
     test_pack();
+    test_names_in_the_boxs_language();
 }

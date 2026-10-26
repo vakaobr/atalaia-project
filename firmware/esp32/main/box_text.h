@@ -149,6 +149,9 @@ typedef enum {
     TX_TRY_IN_MIN,    /* "%lu": minutes */
     TX_NO_ADMIN_PIN,  /* a Field Box with no admin PIN set (AD-29) */
     TX_SET_ADMIN_PIN, /* how to set one */
+    /* the keypad screen's headers a mode's script sends in English (box_text_title) */
+    TX_TITLE_ARM,
+    TX_TITLE_DEFUSE,
     /* the on-board OLED (16 characters a line) */
     TXO_ADMIN_PIN,
     TXO_WRONG_PIN,
@@ -177,6 +180,45 @@ typedef enum {
     TXO_SET_PIN,
     TXO_POINTS,   /* "%ld": a team's points on this box (the captured screen's header) */
     TXO_HELD_FOR, /* %s: how long the team has held the zone (game time since its capture) */
+    /* the built-in modes' names in the OLED's header (box_text_mode_name) */
+    TXO_M_BOMB,
+    TXO_M_DOMINATION,
+    TXO_M_HOLDALL,
+    TXO_M_LASTSTAND,
+    TXO_M_CODES,
+    TXO_M_KILLCONF,
+    TXO_M_RESPAWN,
+    TXO_M_CHECKIN,
+    TXO_M_MEDIC,
+    TXO_M_MASTERSAT,
+    TXO_M_HACKING,
+    TXO_M_VIP,
+    TXO_M_OBJECTIVES,
+    TXO_M_MONEY,
+    TXO_M_TARGETS,
+    TXO_M_PROGDOM,
+    /* the built-in templates' names on the OLED's middle line (box_text_screen_name) */
+    TXO_S_TAGS,
+    TXO_S_RESPAWN,
+    TXO_S_CHECKIN,
+    TXO_S_SEQUENCE,
+    TXO_S_SOLVED,
+    TXO_S_WIRES,
+    TXO_S_MASTER,
+    TXO_S_EMPTY,
+    TXO_S_HEALED,
+    TXO_S_HEALING,
+    TXO_S_REFUSED,
+    TXO_S_BANK,
+    TXO_S_FACTORY,
+    TXO_S_COLLECTED,
+    TXO_S_DEPOSITED,
+    TXO_S_CAPTURE,
+    TXO_S_TARGET,
+    TXO_S_PAYLOAD,
+    TXO_S_HELD,
+    TXO_S_INACTIVE,
+    TXO_S_COMPLETED,
     TX_COUNT,
 } box_text_id_t;
 
@@ -185,5 +227,17 @@ const char *box_text(box_text_id_t id);
 
 /* The same in a given language (the tests). */
 const char *box_text_in(box_lang_t lang, box_text_id_t id);
+
+/* A built-in mode's script sends the header of its keypad screen in English ("ARM", "DEFUSE",
+ * "CODE", any case): the same word in the box's language, and any other title as it is. */
+const char *box_text_title(const char *title);
+
+/* The OLED shows what a mode's id and its templates' names say in English (the id's last part,
+ * "KILL_CONFIRMED", and the template's name, "medic_refused"). For a built-in mode or template
+ * and a language other than English, the name in the box's language; NULL for any other name (a
+ * mode package's) and for English, which keeps the raw one. mode_upper is the id's last part in
+ * capitals (oled_mode_title). */
+const char *box_text_mode_name(const char *mode_upper);
+const char *box_text_screen_name(const char *template_name);
 
 #endif /* ATALAIA_BOX_TEXT_H */

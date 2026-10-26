@@ -583,7 +583,11 @@ class _Parser {
             }
             out.add(utf8.encode(String.fromCharCode(cp)));
           default:
-            fail(y.line, "unknown escape '\\${String.fromCharCode(e)}'");
+            // The core names the escape by its byte: the first of a multi-byte letter is no
+            // character of its own, and its message reads as U+FFFD (a Chinese letter after a
+            // backslash in a template's text, as the Kill Confirmed and Respawn ones have).
+            final named = e >= 0x80 ? '�' : String.fromCharCode(e);
+            fail(y.line, "unknown escape '\\$named'");
             return null;
         }
       }

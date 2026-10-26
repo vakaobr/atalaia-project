@@ -39,6 +39,6 @@ i18n:
       codes: "Codes: Ziffern:Art[:Punkte][:Team], durch Kommas getrennt; Art ist points, hint oder unlock (z. B. 4711:points:50,0815:hint,2222:unlock:red)"
   zh-tw:
     name: 密碼
-    description: 在按鍵輸入代碼可得到分數、提示或解鎖，可與同一個盒子上的任何主要模式並用。每個代碼每場遊戲只能用一次。主辦會看到每個用過的代碼、計分的隊伍，以及當時佔有盒子的隊伍。
+    description: 在按鍵輸入密碼可得到分數、提示或解鎖，可與同一個盒子上的任何主要模式並用。每個密碼每場遊戲只能用一次。主辦會看到每個用過的密碼、計分的隊伍，以及當時佔有盒子的隊伍。
     params:
-      codes: "代碼：數字:種類[:分數][:隊伍]，以逗號分隔；種類為 points、hint 或 unlock（例如 4711:points:50,0815:hint,2222:unlock:red）"
+      codes: "密碼：數字:種類[:分數][:隊伍]，以逗號分隔；種類為 points、hint 或 unlock（例如 4711:points:50,0815:hint,2222:unlock:red）"

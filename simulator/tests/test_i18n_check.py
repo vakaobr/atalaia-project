@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -239,6 +240,42 @@ class BoxFontCheckTests(unittest.TestCase):
         code, _, err = self.check()
         self.assertEqual(code, 1)
         self.assertIn("add it to LATIN", err)
+
+
+class OledNamesTests(unittest.TestCase):
+    """The OLED's header is the mode's id and its middle line the template's name (oled_view.c):
+    in German, Portuguese and Chinese every built-in mode and template has its name in the box's
+    language (box_text.c's mode_names and screen_names), so a new mode or template cannot show
+    the English id on the box's small screen unnoticed."""
+
+    # The templates oled_view.c draws with a line of its own, or from its data (a countdown, the
+    # zone's words, the final score), not by the template's name.
+    OWN_LINE = {"countdown", "standby", "neutral", "captured", "final_score", "paused", "playing",
+                "code_entry"}
+
+    def names(self, table: str) -> set[str]:
+        text = (REPO / "firmware/esp32/main/box_text.c").read_text(encoding="utf-8")
+        body = text[text.index(f"{table}[] = {{"):]
+        body = body[:body.index("};")]
+        return set(re.findall(r'\{"([^"]+)", [A-Z_0-9]+\}', body))
+
+    def test_every_built_in_template_has_a_name_or_its_own_line(self):
+        mapped = self.names("screen_names")
+        for path in sorted(REPO.glob("modes/*/assets/screens/*.yaml")):
+            name = path.stem
+            if name in self.OWN_LINE:
+                continue
+            self.assertIn(name, mapped, f"{path.relative_to(REPO)}: add '{name}' to screen_names "
+                          "in firmware/esp32/main/box_text.c (the OLED shows it in English)")
+
+    def test_every_built_in_mode_has_a_name_for_the_header(self):
+        mapped = self.names("mode_names")
+        for path in sorted(REPO.glob("modes/*/mode.yaml")):
+            mode_id = path.read_text(encoding="utf-8").split("id: ", 1)[1].split()[0]
+            # oled_mode_title(): the id's last part, capitals, "_" a space.
+            key = mode_id.rsplit(".", 1)[-1].upper().replace("_", " ")
+            self.assertIn(key, mapped, f"{path.relative_to(REPO)}: add '{key}' to mode_names in "
+                          "firmware/esp32/main/box_text.c")
 
 
 if __name__ == "__main__":

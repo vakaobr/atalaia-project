@@ -96,6 +96,8 @@ process.
 | keypad | teclado | Tastenfeld | 按鍵 | zh-tw: 數字按鍵 |
 | NFC tag | etiqueta NFC | Tag | NFC 標籤 | |
 | join card / key / code | cartão / chave / código de entrada | Beitrittskarte / -schlüssel / -code | 加入卡 / 加入金鑰 / 加入代碼 | |
+| code to type or guess (keypad: the Codes modifier, Bomb's team codes, the Hacking Terminal and an objective's code) | código | Code | 密碼 | zh-tw: **密碼** for a secret the players know and type to open something (P5K-16); the pairing, join, ticket and access codes below stay **代碼**: a number that names or looks something up |
+| code that names or looks something up (pairing, join, ticket, access token, the box's "Code" row) | código | Code | 代碼 | zh-tw: 代碼, not 密碼: nobody has to keep it secret from the other team; the account's password is 密碼 too, as everywhere |
 | field card | cartão de campo | Feldkarte | 場地卡 | |
 | standby controller | controlador de reserva | Bereitschafts-Controller | 備援控制器 | |
 | airtime | tempo de emissão | Sendezeit | 發射時間 | "Duty Cycle" kept; zh-tw: Duty Cycle 照用 |

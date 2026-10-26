@@ -48,6 +48,12 @@ typedef struct {
 #define MEDIC_ZH "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"zh-tw\"}"
 #define MONEY    "org.atalaia.money_factory {\"capacity\":50,\"capture_hold_ms\":3000}"
 #define PROG     "org.atalaia.progressive_domination {\"capture_hold_ms\":3000,\"complete_min\":10}"
+#define KILL     "org.atalaia.kill_confirmed {\"turn_in_s\":20}"
+#define RESPAWN  "org.atalaia.respawn {\"lives\":20,\"per_player\":false}"
+#define CHECKIN  "org.atalaia.player_checkin {\"points\":1}"
+#define HACK     "org.atalaia.hacking_terminal {\"puzzle\":\"code\",\"digits\":4}"
+#define MASTER   "org.atalaia.master_satellites {\"capture_hold_ms\":3000}"
+#define CODES    "org.atalaia.codes {\"codes\":\"\"}"
 
 /* The splashes are drawn by oled_view_splash(), not by a screen update; data is the firmware's
  * version (FV-8): a release, a development build, one with a three-digit count and changes. */
@@ -168,6 +174,46 @@ static const oled_case_t cases[] = {
     {"prog_captured", PROG, "captured",
      "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"held_min\":1,\"points\":6}"},
     {"prog_completed", PROG, "completed", "{\"team\":\"blue\",\"step\":1,\"of\":4,\"done\":1}"},
+    /* A built-in mode's end screens, its header and the keypad's titles in the box's language
+     * (the template's name and the mode's were English whatever the language). */
+    {"defused_pt", BOMB, "defused", "{\"team\":\"blue\"}"},
+    {"exploded_pt", BOMB, "exploded", "{\"team\":\"red\"}"},
+    {"code_entry_pt", BOMB, "code_entry", "{\"title\":\"ARM\",\"digits\":2}"},
+    {"code_entry_defuse_pt", BOMB, "code_entry", "{\"title\":\"DEFUSE\",\"digits\":1,\"left\":61}"},
+    {"code_entry_codes_pt", CODES, "code_entry", "{\"title\":\"CODE\",\"digits\":4}"},
+    {"tags_pt", KILL, "tags", "{\"error\":false}"},
+    {"respawn_pt", RESPAWN, "respawn", "{\"team\":\"blue\",\"lives\":17}"},
+    {"checkin_pt", CHECKIN, "checkin", "{\"total\":5,\"team\":\"red\"}"},
+    {"hack_solved_pt", HACK, "hack_solved", "{\"team\":\"red\"}"},
+    {"master_status_pt", MASTER, "master_status", "{\"team\":\"red\",\"held\":2,\"of\":3}"},
+    {"defused_de", BOMB, "defused", "{\"team\":\"blue\"}"},
+    {"exploded_de", BOMB, "exploded", "{\"team\":\"red\"}"},
+    {"code_entry_de", BOMB, "code_entry", "{\"title\":\"ARM\",\"digits\":2}"},
+    {"code_entry_defuse_de", BOMB, "code_entry", "{\"title\":\"DEFUSE\",\"digits\":1,\"left\":61}"},
+    {"code_entry_codes_de", CODES, "code_entry", "{\"title\":\"CODE\",\"digits\":4}"},
+    {"tags_de", KILL, "tags", "{\"error\":false}"},
+    {"respawn_de", RESPAWN, "respawn", "{\"team\":\"blue\",\"lives\":17}"},
+    {"checkin_de", CHECKIN, "checkin", "{\"total\":5,\"team\":\"red\"}"},
+    {"hack_solved_de", HACK, "hack_solved", "{\"team\":\"red\"}"},
+    {"master_status_de", MASTER, "master_status", "{\"team\":\"red\",\"held\":2,\"of\":3}"},
+    {"defused_zh-tw", BOMB, "defused", "{\"team\":\"blue\"}"},
+    {"exploded_zh-tw", BOMB, "exploded", "{\"team\":\"red\"}"},
+    {"code_entry_zh-tw", BOMB, "code_entry", "{\"title\":\"ARM\",\"digits\":2}"},
+    {"code_entry_defuse_zh-tw", BOMB, "code_entry",
+     "{\"title\":\"DEFUSE\",\"digits\":1,\"left\":61}"},
+    {"code_entry_codes_zh-tw", CODES, "code_entry", "{\"title\":\"CODE\",\"digits\":4}"},
+    {"tags_zh-tw", KILL, "tags", "{\"error\":false}"},
+    {"respawn_zh-tw", RESPAWN, "respawn", "{\"team\":\"blue\",\"lives\":17}"},
+    {"checkin_zh-tw", CHECKIN, "checkin", "{\"total\":5,\"team\":\"red\"}"},
+    {"hack_solved_zh-tw", HACK, "hack_solved", "{\"team\":\"red\"}"},
+    {"master_status_zh-tw", MASTER, "master_status", "{\"team\":\"red\",\"held\":2,\"of\":3}"},
+    {"prog_inactive_pt", PROG, "inactive", "{\"done\":1,\"of\":4}"},
+    {"prog_completed_pt", PROG, "completed", "{\"team\":\"blue\",\"step\":1,\"of\":4,\"done\":1}"},
+    {"prog_inactive_de", PROG, "inactive", "{\"done\":1,\"of\":4}"},
+    {"prog_completed_de", PROG, "completed", "{\"team\":\"blue\",\"step\":1,\"of\":4,\"done\":1}"},
+    {"prog_inactive_zh-tw", PROG, "inactive", "{\"done\":1,\"of\":4}"},
+    {"prog_completed_zh-tw", PROG, "completed",
+     "{\"team\":\"blue\",\"step\":1,\"of\":4,\"done\":1}"},
     {"wifi_setup", NULL, "wifi_setup", "{\"ssid\":\"atalaia-7c4f\"}"},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))

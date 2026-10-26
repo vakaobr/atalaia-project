@@ -684,7 +684,7 @@ static void update_code_entry(const char *data)
         snprintf(text, sizeof(text), "%s", box_text(TX_CODE_UP));
     }
     upper(text);
-    lv_label_set_text(slot[0], text);
+    lv_label_set_text(slot[0], box_text_title(text));
 
     long left = 0;
     bool has_left = screen_json_int(data, "left", &left);

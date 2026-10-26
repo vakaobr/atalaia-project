@@ -12,7 +12,7 @@ layout:
     style: { width: fill, height: 44, background: "{team || 'panel'}" }
     children:
       - type: label
-        text: "{label || lang == 'en' && 'CODE' || lang == 'de' && 'CODE' || lang == 'zh-tw' && '代碼' || 'CÓDIGO'}"
+        text: "{label || lang == 'en' && 'CODE' || lang == 'de' && 'CODE' || lang == 'zh-tw' && '密碼' || 'CÓDIGO'}"
         style: { font_size: 20, width: fill, align: center, color: "{team && 'contrast' || 'white'}" }
   - type: spacer
     height: fill
@@ -26,19 +26,19 @@ layout:
     icon: ok
     style: { font_size: 48, color: "{team && 'contrast' || 'accent'}", visible: "{note == 'ok'}" }
   - type: label
-    text: "{lang == 'en' && 'CODE ACCEPTED' || lang == 'de' && 'CODE RICHTIG' || lang == 'zh-tw' && '代碼正確' || 'CÓDIGO ACEITE'}"
+    text: "{lang == 'en' && 'CODE ACCEPTED' || lang == 'de' && 'CODE RICHTIG' || lang == 'zh-tw' && '密碼正確' || 'CÓDIGO ACEITE'}"
     style: { font_size: 28, color: "{team && 'contrast' || 'white'}", visible: "{note == 'ok'}" }
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'en' && 'Wrong code' || lang == 'de' && 'Falscher Code' || lang == 'zh-tw' && '代碼錯誤' || 'Código errado'}"
+    text: "{lang == 'en' && 'Wrong code' || lang == 'de' && 'Falscher Code' || lang == 'zh-tw' && '密碼錯誤' || 'Código errado'}"
     style:
       font_size: 20
       color: danger
       visible: "{note == 'wrong'}"
       padding: { bottom: 8 }
   - type: label
-    text: "{lang == 'en' && 'Type the code, then #  (* clears)' || lang == 'de' && 'Code tippen, dann #  (* löscht)' || lang == 'zh-tw' && '輸入代碼後按 #（* 清除）' || 'Marca o código e #  (* apaga)'}"
+    text: "{lang == 'en' && 'Type the code, then #  (* clears)' || lang == 'de' && 'Code tippen, dann #  (* löscht)' || lang == 'zh-tw' && '輸入密碼後按 #（* 清除）' || 'Marca o código e #  (* apaga)'}"
     style:
       font_size: 14
       color: muted

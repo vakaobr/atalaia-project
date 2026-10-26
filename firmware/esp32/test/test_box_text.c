@@ -144,9 +144,47 @@ static void test_language_codes(void)
     CHECK(strcmp(box_text(TX_READY_UP), "READY") == 0);
 }
 
+/* The built-in modes' names for the OLED's header, the templates' for its middle line and the
+ * keypad's titles: in the box's language, never for English (the raw name stays) or an unknown
+ * one. */
+static void test_names(void)
+{
+    box_lang_set(BOX_LANG_EN);
+    CHECK(box_text_mode_name("BOMB") == NULL);
+    CHECK(box_text_screen_name("defused") == NULL);
+    CHECK(strcmp(box_text_title("ARM"), "ARM") == 0);
+    CHECK(strcmp(box_text_title("defuse"), "DEFUSE") == 0);
+    CHECK(strcmp(box_text_title("Hello"), "Hello") == 0);
+    CHECK(strcmp(box_text_title(NULL), "") == 0);
+
+    box_lang_set(BOX_LANG_PT);
+    CHECK(strcmp(box_text_mode_name("KILL CONFIRMED"), "BAIXA CONF.") == 0);
+    CHECK(strcmp(box_text_screen_name("exploded"), "EXPLODIU") == 0);
+    CHECK(strcmp(box_text_screen_name("medic_idle"), "PRONTA") == 0);
+    CHECK(box_text_mode_name("ACME HILL") == NULL);
+    CHECK(box_text_screen_name("my_screen") == NULL);
+    CHECK(box_text_screen_name(NULL) == NULL);
+    CHECK(strcmp(box_text_title("CODE"), "C\xc3\x93"
+                                         "DIGO") == 0);
+
+    box_lang_set(BOX_LANG_DE);
+    CHECK(strcmp(box_text_screen_name("defused"), "ENTSCH\xc3\x84RFT") == 0);
+    CHECK(strcmp(box_text_mode_name("TARGET WINDOWS"), "ZIELFENSTER") == 0);
+
+    box_lang_set(BOX_LANG_ZH_TW);
+    CHECK(strcmp(box_text_screen_name("defused"), "已拆除") == 0);
+    CHECK(strcmp(box_text_mode_name("CODES"), "密碼") == 0);
+    CHECK(strcmp(box_text_title("DEFUSE"), "拆除") == 0);
+    /* The pairing code of the status screen is a 代碼 (P5K-16), the keypad's a 密碼. */
+    CHECK(strcmp(box_text(TX_ROW_CODE), "代碼") == 0);
+    CHECK(strcmp(box_text(TX_CODE_UP), "密碼") == 0);
+    box_lang_set(BOX_LANG_EN);
+}
+
 void run_box_text_tests(void)
 {
     test_every_text();
+    test_names();
     test_chinese_punctuation();
     test_language_codes();
 }

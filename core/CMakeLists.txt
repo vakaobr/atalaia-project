@@ -11,8 +11,39 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(ATALAIA_SHARED "Also build the core as a shared library (used by the simulator and the app)" OFF)
-option(ATALAIA_STUB "Also build libatalaia_core_stub, the FFI stub the app's Dart tests load" OFF)
-option(ATALAIA_MBEDTLS "Use mbedtls for real AES-128-CCM when it is installed" ON)
+# On a Mac the shared build is for the app's Dart tests, which need the stub as well, and the core's
+# own unit tests (BUILD_TESTING) are not built unless asked for: the one command
+# `cmake -S core -B build -DATALAIA_SHARED=ON && cmake --build build` makes what `flutter test` loads.
+if(APPLE AND ATALAIA_SHARED)
+    set(ATALAIA_STUB_DEFAULT ON)
+    if(NOT DEFINED BUILD_TESTING)
+        set(BUILD_TESTING OFF)
+    endif()
+else()
+    set(ATALAIA_STUB_DEFAULT OFF)
+endif()
+option(ATALAIA_STUB "Also build libatalaia_core_stub, the FFI stub the app's Dart tests load" ${ATALAIA_STUB_DEFAULT})
+# On macOS Homebrew's mbedtls is 3.x or later, not the 2.28 the firmware and CI's Ubuntu have
+# (src/crypto_mbedtls.c is written and tested against that), so it is off there unless asked for:
+# the shared library the app's tests load never needs it (the Android build has none either).
+if(APPLE)
+    set(ATALAIA_MBEDTLS_DEFAULT OFF)
+else()
+    set(ATALAIA_MBEDTLS_DEFAULT ON)
+endif()
+option(ATALAIA_MBEDTLS "Use mbedtls for real AES-128-CCM when it is installed" ${ATALAIA_MBEDTLS_DEFAULT})
+# Warnings are errors, as CI's GCC and Clang build them; Apple's Clang is another version of Clang
+# than any CI has, so on macOS they are shown but do not stop the build unless asked for.
+if(APPLE)
+    set(ATALAIA_WERROR_DEFAULT OFF)
+else()
+    set(ATALAIA_WERROR_DEFAULT ON)
+endif()
+option(ATALAIA_WERROR "Treat the core's compiler warnings as errors" ${ATALAIA_WERROR_DEFAULT})
+set(ATALAIA_WARNINGS -Wall -Wextra -Wpedantic)
+if(ATALAIA_WERROR)
+    list(APPEND ATALAIA_WARNINGS -Werror)
+endif()
 # The scenario validator and compiler (decision PE24-109): Lua sources in core/scenario/, embedded.
 # The Pi's and the phone's controllers use it; the Field Box does not compile scenarios, and its
 # firmware (firmware/esp32/components/atalaia_core) lists the core's sources without it.
@@ -125,12 +156,15 @@ function(atalaia_core_target name type)
         target_link_libraries(${name} PRIVATE ${MBEDCRYPTO_LIB})
     endif()
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(${name} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        target_compile_options(${name} PRIVATE ${ATALAIA_WARNINGS})
     endif()
 endfunction()
 
 atalaia_core_target(atalaia_core STATIC)
 
+# The file is libatalaia_core.so on Linux, libatalaia_core.dylib on macOS (no linker script or
+# export list: every symbol is visible, and the Lua sub-build is a PIC static library linked in)
+# and atalaia_core.dll on Windows.
 if(ATALAIA_SHARED)
     atalaia_core_target(atalaia_core_shared SHARED)
     set_target_properties(atalaia_core_shared PROPERTIES
@@ -145,7 +179,7 @@ if(ATALAIA_STUB)
     add_library(atalaia_core_stub SHARED tests/stub.c)
     target_include_directories(atalaia_core_stub PRIVATE include)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(atalaia_core_stub PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        target_compile_options(atalaia_core_stub PRIVATE ${ATALAIA_WARNINGS})
     endif()
 endif()
 
@@ -162,7 +196,7 @@ if(BUILD_TESTING)
     target_include_directories(test_core PRIVATE src)
     target_link_libraries(test_core PRIVATE atalaia_core)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(test_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        target_compile_options(test_core PRIVATE ${ATALAIA_WARNINGS})
     endif()
     add_test(NAME core COMMAND test_core)
 
@@ -172,7 +206,7 @@ if(BUILD_TESTING)
     target_include_directories(test_sandbox_escape PRIVATE src)
     target_link_libraries(test_sandbox_escape PRIVATE atalaia_core)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(test_sandbox_escape PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        target_compile_options(test_sandbox_escape PRIVATE ${ATALAIA_WARNINGS})
     endif()
     add_test(NAME sandbox_escape COMMAND test_sandbox_escape)
 
@@ -182,7 +216,7 @@ if(BUILD_TESTING)
         target_include_directories(test_scenario PRIVATE src)
         target_link_libraries(test_scenario PRIVATE atalaia_core)
         if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-            target_compile_options(test_scenario PRIVATE -Wall -Wextra -Wpedantic -Werror)
+            target_compile_options(test_scenario PRIVATE ${ATALAIA_WARNINGS})
         endif()
         add_test(NAME scenario COMMAND test_scenario)
     endif()

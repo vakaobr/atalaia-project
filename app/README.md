@@ -206,6 +206,18 @@ What the tests cover:
 
 With Flutter 3.44 installed locally and the core built (`cmake -S core -B build -DATALAIA_SHARED=ON -DATALAIA_STUB=ON -DATALAIA_MBEDTLS=OFF && cmake --build build`), `flutter test` in `app/` does the same; the tests find the libraries in `../build/` when the variables are not set. A missing library fails the tests that need it: nothing is skipped. `tools/check.sh` does not run the Dart tests (its image has no Dart); it does run the controller's side of the shared chrono and token vectors, and checks the simulator's ctypes structs against the stub's layout report.
 
+#### Tests on a Mac
+
+The same commands work on a Mac with Xcode's command line tools, CMake (`brew install cmake`) and Flutter 3.44.0 (the iOS guide, [`docs/ios-on-a-mac.md`](docs/ios-on-a-mac.md), installs them), run from the repository root and then in `app/`:
+
+```sh
+cmake -S core -B build -DATALAIA_SHARED=ON
+cmake --build build
+cd app && flutter test
+```
+
+CMake names the libraries as the platform does, `build/libatalaia_core.dylib` and `build/libatalaia_core_stub.dylib` here (`.so` on Linux, `.dll` on Windows), and `test/support/core_libs.dart` looks for that name in `../build/` (`$ATALAIA_CORE_LIB` and `$ATALAIA_CORE_STUB_LIB` still win; `test/ffi/core_libs_test.dart` checks the names). On macOS the core's CMake changes four defaults, so that the one `-DATALAIA_SHARED=ON` is enough (Linux's are as they were): the FFI stub is built too (`ATALAIA_STUB`), the core's own unit tests are not (`BUILD_TESTING`; `-DBUILD_TESTING=ON` builds them, for `ctest`), `ATALAIA_MBEDTLS` is off (Homebrew's mbedtls is not the 2.28 that `src/crypto_mbedtls.c` is written for; the app's tests never need the real AES-CCM) and `ATALAIA_WERROR` is off (compiler warnings are shown, not errors, since Apple's Clang is not a compiler CI builds with); `-DATALAIA_MBEDTLS=ON` or `-DATALAIA_WERROR=ON` turn those back on. No linker flag is Linux-only: the shared library has no version script, exports every symbol, and the vendored Lua is a position-independent static library linked into it. The tests that drive the firmware's host programs (`ATALAIA_POD_HOST`, `ATALAIA_MODEM_HOST` and `ATALAIA_BOX_HOST`, built from `firmware/esp32/test/*_host` with CMake as CI's `flutter-test` job does) fail with a message naming the variable until those are built; they have not been tried on a Mac, so run the rest with `flutter test test/ffi test/ui`, for example. Written without a Mac: the first run on one may need a fix, which is a bug to report.
+
 Not run yet: the app on a real phone (for the field controller: a whole game with the screen off, the hotspot's address, the local hotspot, the pod's link, the console in the web view), NFC with real tags, the QR scanner with a real camera, a real I/O pod (the USB and Bluetooth plugins, pairing, the pod's radio on air: firmware/esp32/docs/BRING_UP.md, "The I/O pod"), and iOS (not built: decision PD10).
 
 ### Dependencies

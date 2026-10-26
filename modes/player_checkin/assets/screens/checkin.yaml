@@ -2,14 +2,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # The checkpoint. Data: total (check-ins), counts (per team, as text),
-# team (of the last check-in), message, error.
+# team (of the last check-in), message, error; lang (pt, de, zh-tw, else English) from
+# the box.
 template: checkin
 layout:
   - type: row
     style: { width: fill, height: 44, background: "{team || 'panel'}" }
     children:
       - type: label
-        text: CHECK-IN
+        text: "{lang == 'pt' && 'REGISTO DE PRESENÇA' || lang == 'de' && 'CHECK-IN' || lang == 'zh-tw' && '玩家報到' || 'CHECK-IN'}"
         style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
@@ -17,7 +18,7 @@ layout:
     text: "{total}"
     style: { font_size: 48 }
   - type: label
-    text: players checked in
+    text: "{lang == 'pt' && 'participantes registados' || lang == 'de' && 'Spielende eingecheckt' || lang == 'zh-tw' && '玩家已報到' || 'players checked in'}"
     style: { font_size: 20, color: muted }
   - type: label
     text: "{counts}"
@@ -33,7 +34,7 @@ layout:
   - type: spacer
     height: fill
   - type: label
-    text: Scan your tag to check in
+    text: "{lang == 'pt' && 'Lê a tua etiqueta para o registo' || lang == 'de' && 'Scanne deinen Tag zum Einchecken' || lang == 'zh-tw' && '感應你的標籤來報到' || 'Scan your tag to check in'}"
     style:
       font_size: 14
       color: muted

@@ -21,6 +21,7 @@
 
 #include <stddef.h>
 #include <string.h>
+#include <strings.h>
 
 static volatile int current = BOX_LANG_EN;
 static volatile bool given;
@@ -144,7 +145,7 @@ static const char *const texts[TX_COUNT][BOX_LANG_COUNT] = {
                             "Falsche PIN, neuer Versuch", "PIN 碼錯誤，請再試一次"},
     [TX_KEYS_ENTER_DELETE] = {"#  enter        *  delete", "#  confirmar        *  apagar",
                               "#  bestätigen        *  löschen", "#  確認        *  刪除"},
-    [TX_CODE_UP] = {"CODE", "CÓDIGO", "CODE", "代碼"},
+    [TX_CODE_UP] = {"CODE", "CÓDIGO", "CODE", "密碼"},
     [TX_CHOOSE_GAME_UP] = {"CHOOSE A GAME", "ESCOLHE UM JOGO", "SPIEL WÄHLEN", "選擇遊戲"},
     [TX_NO_GAMES] = {"No games stored", "Nenhum jogo guardado", "Keine Spiele gespeichert",
                      "沒有儲存的遊戲"},
@@ -218,6 +219,8 @@ static const char *const texts[TX_COUNT][BOX_LANG_COUNT] = {
                          "尚未設定管理 PIN 碼"},
     [TX_SET_ADMIN_PIN] = {"USB console: @admin-pin", "Consola USB: @admin-pin",
                           "USB-Konsole: @admin-pin", "USB 主控台：@admin-pin"},
+    [TX_TITLE_ARM] = {"ARM", "ARMAR", "SCHÄRFEN", "啟動"},
+    [TX_TITLE_DEFUSE] = {"DEFUSE", "DESARMAR", "ENTSCHÄRFEN", "拆除"},
     [TXO_ADMIN_PIN] = {"ADMIN PIN", "PIN ADMIN", "ADMIN-PIN", "管理 PIN"},
     [TXO_WRONG_PIN] = {"Wrong PIN", "PIN errado", "Falsche PIN", "PIN 碼錯誤"},
     [TXO_ENTER_DELETE] = {"# enter  * delete", "# ok  * apagar", "# ok  * löschen",
@@ -239,7 +242,7 @@ static const char *const texts[TX_COUNT][BOX_LANG_COUNT] = {
     [TXO_ARMING] = {"ARMING", "A ARMAR", "SCHARF", "啟動中"},
     [TXO_HOLD_TO_ARM] = {"Hold %s to arm", "%s: premir", "%s: halten", "按住 %s 啟動"},
     [TXO_WAIT_GM] = {"Wait for the GM", "Aguarda a org.", "Warte auf Orga", "等待主辦"},
-    [TXO_DEFUSE] = {"DEFUSE", "DESARMAR", "DEFUSE", "拆除"},
+    [TXO_DEFUSE] = {"DEFUSE", "DESARM.", "ENTSCH.", "拆除"},
     [TXO_KEY_PICKER] = {"key: game picker", "tecla: jogos", "Taste: Spiele", "按鍵：選遊戲"},
     [TXO_NOT_STARTED] = {"not started yet", "não começou", "nicht gestartet", "尚未開始"},
     [TXO_HOLD_TO_CAPTURE] = {"Hold to capture", "Premir: capturar", "Gedrückt halten",
@@ -251,7 +254,134 @@ static const char *const texts[TX_COUNT][BOX_LANG_COUNT] = {
     [TXO_POINTS] = {"%ld pts", "%ld pts", "%ld Pkt.", "%ld 分"},
     /* A duration, not the game time of the capture (the TFT's TX_HELD_SINCE). */
     [TXO_HELD_FOR] = {"held for %s", "ocupada %s", "gehalten %s", "已佔領 %s"},
+    /* The OLED's header: a built-in mode's name (16 columns, a Han letter two). */
+    [TXO_M_BOMB] = {"BOMB", "BOMBA", "BOMBE", "炸彈"},
+    [TXO_M_DOMINATION] = {"DOMINATION", "DOMÍNIO", "DOMINATION", "佔點"},
+    [TXO_M_HOLDALL] = {"HOLDALL", "DOMÍNIO TOTAL", "HOLD-ALL", "全佔點"},
+    [TXO_M_LASTSTAND] = {"LASTSTAND", "ÚLTIMO ELEMENTO", "LAST STAND", "最後一人"},
+    [TXO_M_CODES] = {"CODES", "CÓDIGOS", "CODES", "密碼"},
+    [TXO_M_KILLCONF] = {"KILL CONFIRMED", "BAIXA CONF.", "KILL CONFIRMED", "擊殺確認"},
+    [TXO_M_RESPAWN] = {"RESPAWN", "REENTRADAS", "RESPAWN", "復活"},
+    [TXO_M_CHECKIN] = {"PLAYER CHECKIN", "REGISTO", "CHECK-IN", "玩家報到"},
+    [TXO_M_MEDIC] = {"MEDIC", "LIGADURAS", "MEDIC-KIT", "醫護包"},
+    [TXO_M_MASTERSAT] = {"MASTER SATELLITES", "MESTRE E SATÉL.", "MASTER/SAT.", "主站與衛星"},
+    [TXO_M_HACKING] = {"HACKING TERMINAL", "HACKEIA", "HACKING", "駭客終端"},
+    [TXO_M_VIP] = {"VIP PAYLOAD", "VIP / CARGA", "VIP / PAYLOAD", "VIP / 護送"},
+    [TXO_M_OBJECTIVES] = {"OBJECTIVES", "OBJETIVOS", "ZIELE", "任務目標"},
+    [TXO_M_MONEY] = {"MONEY FACTORY", "FÁBRICA", "MONEY FACTORY", "印鈔廠"},
+    [TXO_M_TARGETS] = {"TARGET WINDOWS", "JANELAS DE ALVO", "ZIELFENSTER", "標靶時窗"},
+    [TXO_M_PROGDOM] = {"PROGRESSIVE DOMINATION", "PROGRESSIVO", "PROGRESSIVE", "漸進佔點"},
+    /* The OLED's middle line: a built-in template's name where it has no countdown. */
+    [TXO_S_TAGS] = {"TAGS", "ETIQUETAS", "TAGS", "標籤"},
+    [TXO_S_RESPAWN] = {"RESPAWN", "REENTRADA", "RESPAWN", "復活"},
+    [TXO_S_CHECKIN] = {"CHECK-IN", "PRESENÇA", "CHECK-IN", "報到"},
+    [TXO_S_SEQUENCE] = {"SEQUENCE", "SEQUÊNCIA", "FOLGE", "順序"},
+    [TXO_S_SOLVED] = {"SOLVED", "RESOLVIDO", "GELÖST", "已破解"},
+    [TXO_S_WIRES] = {"WIRES", "FIOS", "DRÄHTE", "電線"},
+    [TXO_S_MASTER] = {"MASTER", "MESTRE", "MASTER", "主站"},
+    [TXO_S_EMPTY] = {"EMPTY", "VAZIO", "LEER", "已用完"},
+    [TXO_S_HEALED] = {"HEALED", "TRATADO", "BEHANDELT", "已治療"},
+    [TXO_S_HEALING] = {"HEALING", "A TRATAR", "BEHANDLUNG", "治療中"},
+    [TXO_S_REFUSED] = {"REFUSED", "RECUSADO", "ABGELEHNT", "已拒絕"},
+    [TXO_S_BANK] = {"BANK", "BANCO", "BANK", "銀行"},
+    [TXO_S_FACTORY] = {"FACTORY", "FÁBRICA", "FABRIK", "印鈔廠"},
+    [TXO_S_COLLECTED] = {"COLLECTED", "RECOLHIDO", "ABGEHOLT", "已領取"},
+    [TXO_S_DEPOSITED] = {"DEPOSITED", "DEPOSITADO", "EINGEZAHLT", "已存入"},
+    [TXO_S_CAPTURE] = {"CAPTURE", "CAPTURA", "EINNEHMEN", "佔領"},
+    [TXO_S_TARGET] = {"TARGET", "ALVO", "ZIELSCHEIBE", "標靶"},
+    [TXO_S_PAYLOAD] = {"PAYLOAD", "CARGA", "PAYLOAD", "護送"},
+    [TXO_S_HELD] = {"HELD", "OCUPADO", "BESETZT", "已佔領"},
+    [TXO_S_INACTIVE] = {"INACTIVE", "INATIVA", "INAKTIV", "未啟用"},
+    [TXO_S_COMPLETED] = {"COMPLETED", "COMPLETA", "FERTIG", "已完成"},
 };
+
+typedef struct {
+    const char *name; /* the English name */
+    box_text_id_t id;
+} name_map_t;
+
+static const name_map_t mode_names[] = {
+    {"BOMB", TXO_M_BOMB},
+    {"DOMINATION", TXO_M_DOMINATION},
+    {"HOLDALL", TXO_M_HOLDALL},
+    {"LASTSTAND", TXO_M_LASTSTAND},
+    {"CODES", TXO_M_CODES},
+    {"KILL CONFIRMED", TXO_M_KILLCONF},
+    {"RESPAWN", TXO_M_RESPAWN},
+    {"PLAYER CHECKIN", TXO_M_CHECKIN},
+    {"MEDIC", TXO_M_MEDIC},
+    {"MASTER SATELLITES", TXO_M_MASTERSAT},
+    {"HACKING TERMINAL", TXO_M_HACKING},
+    {"VIP PAYLOAD", TXO_M_VIP},
+    {"OBJECTIVES", TXO_M_OBJECTIVES},
+    {"MONEY FACTORY", TXO_M_MONEY},
+    {"TARGET WINDOWS", TXO_M_TARGETS},
+    {"PROGRESSIVE DOMINATION", TXO_M_PROGDOM},
+};
+
+/* Every built-in template the OLED's generic line names (final_score, the countdowns and the
+ * zone screens have their own lines in oled_view.c). */
+static const name_map_t screen_names[] = {
+    {"defused", TX_DEFUSED_UP},
+    {"exploded", TX_EXPLODED_UP},
+    {"tags", TXO_S_TAGS},
+    {"respawn", TXO_S_RESPAWN},
+    {"checkin", TXO_S_CHECKIN},
+    {"hack_code", TX_CODE_UP},
+    {"hack_sequence", TXO_S_SEQUENCE},
+    {"hack_solved", TXO_S_SOLVED},
+    {"hack_wires", TXO_S_WIRES},
+    {"master_status", TXO_S_MASTER},
+    {"medic_empty", TXO_S_EMPTY},
+    {"medic_healed", TXO_S_HEALED},
+    {"medic_hold", TXO_S_HEALING},
+    {"medic_idle", TX_READY_UP},
+    {"medic_refused", TXO_S_REFUSED},
+    {"refused", TXO_S_REFUSED},
+    {"bank", TXO_S_BANK},
+    {"factory", TXO_S_FACTORY},
+    {"collected", TXO_S_COLLECTED},
+    {"deposited", TXO_S_DEPOSITED},
+    {"obj_bomb", TXO_M_BOMB},
+    {"obj_capture", TXO_S_CAPTURE},
+    {"obj_code", TX_CODE_UP},
+    {"obj_status", TX_STATUS_UP},
+    {"obj_tags", TXO_S_TAGS},
+    {"window", TXO_S_TARGET},
+    {"payload", TXO_S_PAYLOAD},
+    {"checkpoint_free", TX_NEUTRAL_UP},
+    {"checkpoint_held", TXO_S_HELD},
+    {"inactive", TXO_S_INACTIVE},
+    {"completed", TXO_S_COMPLETED},
+};
+
+static const char *lookup(const name_map_t *map, size_t n, const char *name)
+{
+    if (name == NULL || box_lang() == BOX_LANG_EN) return NULL;
+    for (size_t i = 0; i < n; i++) {
+        if (strcmp(map[i].name, name) == 0) return box_text(map[i].id);
+    }
+    return NULL;
+}
+
+const char *box_text_mode_name(const char *mode_upper)
+{
+    return lookup(mode_names, sizeof(mode_names) / sizeof(mode_names[0]), mode_upper);
+}
+
+const char *box_text_screen_name(const char *template_name)
+{
+    return lookup(screen_names, sizeof(screen_names) / sizeof(screen_names[0]), template_name);
+}
+
+const char *box_text_title(const char *title)
+{
+    if (title == NULL) return "";
+    if (strcasecmp(title, "ARM") == 0) return box_text(TX_TITLE_ARM);
+    if (strcasecmp(title, "DEFUSE") == 0) return box_text(TX_TITLE_DEFUSE);
+    if (strcasecmp(title, "CODE") == 0) return box_text(TX_CODE_UP);
+    return title;
+}
 
 const char *box_text_in(box_lang_t lang, box_text_id_t id)
 {

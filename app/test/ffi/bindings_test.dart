@@ -5,6 +5,8 @@
 // fixed, so these tests check the bridge itself: strings both ways, the
 // callbacks, field operations, the score struct and the node's life cycle.
 
+import 'dart:io';
+
 import 'package:atalaia_app/core/node_types.dart';
 import 'package:atalaia_app/ffi/bindings.dart';
 import 'package:atalaia_app/ffi/callbacks.dart';
@@ -68,7 +70,10 @@ void main() {
       resolveCoreLibrary('/x/libatalaia_core.so'),
       '/x/libatalaia_core.so',
     );
-    expect(defaultCoreLibraryName(), 'libatalaia_core.so');
+    expect(
+      defaultCoreLibraryName(),
+      Platform.isMacOS ? 'libatalaia_core.dylib' : 'libatalaia_core.so',
+    );
     expect(stub.path, stubLibraryPath());
     expect(stub.version, 'stub');
   });

@@ -2,25 +2,26 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # The Kill Confirmed station. Data: team (the team turning in tags, while the
-# station is open), left (seconds left to scan), message, error.
+# station is open), left (seconds left to scan), message, error; lang (pt, de, zh-tw,
+# else English) from the box.
 template: tags
 layout:
   - type: row
     style: { width: fill, height: 44, background: "{team || 'panel'}" }
     children:
       - type: label
-        text: KILL CONFIRMED
+        text: "{lang == 'pt' && 'BAIXA CONFIRMADA' || lang == 'de' && 'KILL CONFIRMED' || lang == 'zh-tw' && '擊殺確認' || 'KILL CONFIRMED'}"
         style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{!team}" }
       - type: label
-        text: "{team|upper}: SCAN TAGS"
+        text: "{team|upper}{lang == 'pt' && ': LÊ AS ETIQUETAS' || lang == 'de' && ': TAGS SCANNEN' || lang == 'zh-tw' && '：感應標籤' || ': SCAN TAGS'}"
         style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{team}" }
   - type: spacer
     height: fill
   - type: label
-    text: Press your button
+    text: "{lang == 'pt' && 'Carrega no botão' || lang == 'de' && 'Knopf drücken' || lang == 'zh-tw' && '按你的按鈕' || 'Press your button'}"
     style: { font_size: 28, visible: "{!team}" }
   - type: label
-    text: then scan the tags
+    text: "{lang == 'pt' && 'e lê as etiquetas' || lang == 'de' && 'dann die Tags scannen' || lang == 'zh-tw' && '然後感應標籤' || 'then scan the tags'}"
     style: { font_size: 20, color: muted, visible: "{!team}" }
   - type: label
     text: "{left}"
@@ -39,7 +40,7 @@ layout:
   - type: spacer
     height: fill
   - type: label
-    text: "Enemy tag: confirmed. Team tag: denied."
+    text: "{lang == 'pt' && 'Inimiga confirma, da equipa recusa.' || lang == 'de' && 'Gegner-Tag zählt, Team-Tag nicht.' || lang == 'zh-tw' && '敵隊標籤確認，自隊標籤拒絕。' || 'Enemy tag: confirmed. Team tag: denied.'}"
     style:
       font_size: 14
       color: muted

@@ -2,14 +2,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # The respawn point. Data: lives (left, for the last team or player),
-# team, player (the last respawn), message, error.
+# team, player (the last respawn), message, error; lang (pt, de, zh-tw, else English)
+# from the box.
 template: respawn
 layout:
   - type: row
     style: { width: fill, height: 44, background: "{team || 'panel'}" }
     children:
       - type: label
-        text: RESPAWN
+        text: "{lang == 'pt' && 'REENTRADA' || lang == 'de' && 'RESPAWN' || lang == 'zh-tw' && '復活' || 'RESPAWN'}"
         style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
@@ -17,14 +18,22 @@ layout:
     text: "{lives}"
     style: { font_size: 48, color: "{lives == 0 && 'danger' || 'white'}" }
   - type: label
-    text: lives left
+    text: "{lang == 'pt' && 'vidas restantes' || lang == 'de' && 'Leben übrig' || lang == 'zh-tw' && '剩餘命數' || 'lives left'}"
     style: { font_size: 20, color: muted, visible: "{!team && !player}" }
+  # The team's and the player's lives: Portuguese, German and English put the name last, Chinese
+  # first (a label of its own: a string of a chain holds no value to fill in).
   - type: label
-    text: "lives left for {team|upper}"
-    style: { font_size: 20, color: team, visible: "{team && !params.per_player}" }
+    text: "{lang == 'pt' && 'vidas de ' || lang == 'de' && 'Leben für ' || 'lives left for '}{team|upper}"
+    style: { font_size: 20, color: team, visible: "{team && !params.per_player && lang != 'zh-tw'}" }
   - type: label
-    text: "lives left for {player}"
-    style: { font_size: 20, color: muted, visible: "{player && params.per_player}" }
+    text: "{team|upper} 隊剩餘命數"
+    style: { font_size: 20, color: team, visible: "{team && !params.per_player && lang == 'zh-tw'}" }
+  - type: label
+    text: "{lang == 'pt' && 'vidas de ' || lang == 'de' && 'Leben für ' || 'lives left for '}{player}"
+    style: { font_size: 20, color: muted, visible: "{player && params.per_player && lang != 'zh-tw'}" }
+  - type: label
+    text: "{player} 的剩餘命數"
+    style: { font_size: 20, color: muted, visible: "{player && params.per_player && lang == 'zh-tw'}" }
   - type: label
     text: "{message}"
     style:
@@ -36,7 +45,7 @@ layout:
   - type: spacer
     height: fill
   - type: label
-    text: Scan your tag to come back in
+    text: "{lang == 'pt' && 'Lê a tua etiqueta para voltares ao jogo' || lang == 'de' && 'Scanne deinen Tag, um zurückzukehren' || lang == 'zh-tw' && '感應你的標籤回到遊戲' || 'Scan your tag to come back in'}"
     style:
       font_size: 14
       color: muted
