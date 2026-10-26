@@ -44,7 +44,7 @@ typedef struct {
 void lbt_profile_build(lbt_profile_t *p, atalaia_region_t region);
 
 /*
- * The AS923-TW proxy. det_peak / det_min: -1 keeps the AS923-TW table's value (23 / 10), else
+ * The AS923-TW proxy. det_peak / det_min: -1 keeps the AS923-TW table's value (29 / 10), else
  * 10..40 / 1..30 (a sweep). power_dbm: INT8_MIN for LBT_PROXY_POWER_DEFAULT_DBM, else -9..22
  * (the HAL still refuses one above the sub-band's legal power). False, p untouched, when a value
  * is out of range or the channel is not legal (lbt_profile_channel_ok).

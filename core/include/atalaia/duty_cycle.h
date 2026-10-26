@@ -85,10 +85,11 @@ typedef enum {
 /*
  * The radio's channel-activity-detection settings for the region's SF and bandwidth (listen
  * before talk, RFC 0001 Amendment 14, decision SL-25): SetCadParams' number of symbols,
- * detection peak and minimum. det_peak is Semtech's (AN1200.48): 22 at SF7/125 kHz, 23 at
- * SF9/500 kHz. det_peak_bench_proven says whether it was measured on a board: the EU868 value was
- * (the bench gate of 2026-10-26), the AS923-TW one has not been (the gate ran on EU868 only), so
- * it is Semtech's figure and nothing more until the same gate has run on an AS923-TW image.
+ * detection peak and minimum. det_peak is Semtech's (AN1200.48) 22 at SF7/125 kHz, and 29 at
+ * SF9/500 kHz from the bench (Semtech's 23 gave 17.8 % false busy; decision SL-38).
+ * det_peak_bench_proven says whether the gate passed on a board: the EU868 value did (2026-10-26);
+ * the AS923-TW one was measured with its modulation on 868.3 MHz, not on an AS923-TW image, so it
+ * stays unproven until the same gate has run on one.
  */
 typedef struct {
     uint8_t symbols;  /* cadSymbolNum, in symbols (2) */

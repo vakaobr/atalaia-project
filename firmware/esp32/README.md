@@ -783,8 +783,9 @@ controller's game.
   ~10 ms (`recv()` waits 10 ms, set through `hal_radio_ops_t.set_recv_wait_ms`, then one
   tick) so a wait is honoured to about that; without it the loop is what it was (50 + 10 ms).
   The CAD's settings are the region's (core `atalaia_region_info()->cad`: 2 symbols, detection
-  peak 22 at SF7/125 kHz, 23 at SF9/500 kHz, minimum 10; the EU868 peak was measured on the
-  bench, **the AS923-TW one is Semtech's figure and unproven** until the bench gate has run on an
+  peak 22 at SF7/125 kHz, 29 at SF9/500 kHz, minimum 10; the EU868 peak passed the bench gate;
+  the AS923-TW one was measured with its modulation on 868.3 MHz (Semtech's 23 gave 17.8 % false
+  busy, 29 gave 0.5 %, decision SL-38) and stays **unproven** until the gate has run on an
   AS923-TW image). Counters: `lbt_cads`, `lbt_deferrals`, `lbt_gave_up` (below). The switch is
   Kconfig only (`python3 tools/docker_fw.py build --lbt=off`): the controller cannot push it
   without a wire change (a new join key), so a field test that compares the two builds the

@@ -347,7 +347,7 @@ static void test_profile_proxy(void)
     CHECK(p.sf == 9 && p.bw_hz == 500000u && p.freq_hz == 868300000u);
     /* the CAD settings are the AS923-TW table's, the value under test */
     const atalaia_region_info_t *as = atalaia_region_info(ATALAIA_REGION_AS923_TW);
-    CHECK(p.cad.symbols == as->cad.symbols && p.cad.det_peak == 23 && p.cad.det_min == 10);
+    CHECK(p.cad.symbols == as->cad.symbols && p.cad.det_peak == 29 && p.cad.det_min == 10);
     CHECK(!p.cad.det_peak_bench_proven);
     /* sub-band g: 1 %, 14 dBm ERP, 36 s an hour; the guard keeps 70 % */
     CHECK(p.duty_ppm == 10000u && p.limit_dbm == 14 && p.eu868_band == ATALAIA_BAND_G);

@@ -200,7 +200,7 @@ static void test_regions(void)
      * 10; only the EU868 peak has been measured on a board. */
     CHECK(eu->cad.symbols == 2 && eu->cad.det_peak == 22 && eu->cad.det_min == 10);
     CHECK(eu->cad.det_peak_bench_proven);
-    CHECK(tw->cad.symbols == 2 && tw->cad.det_peak == 23 && tw->cad.det_min == 10);
+    CHECK(tw->cad.symbols == 2 && tw->cad.det_peak == 29 && tw->cad.det_min == 10);
     CHECK(!tw->cad.det_peak_bench_proven);
     CHECK(atalaia_region_from_code("eu868") == ATALAIA_REGION_EU868);
     CHECK(atalaia_region_from_code("as923-tw") == ATALAIA_REGION_AS923_TW);

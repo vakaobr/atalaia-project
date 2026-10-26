@@ -35,8 +35,10 @@ static const atalaia_band_info_t as923_tw_bands[1] = {
  * and Meshtastic's TW default (923.875 MHz) (decision RF-AS923-5). */
 static const atalaia_region_info_t region_table[ATALAIA_REGION_COUNT] = {
     {"eu868", 7, 125000u, 869525000u, 0, ATALAIA_BAND_COUNT, eu868_bands, {2, 22, 10, true}},
-    /* det_peak 23 at SF9/500 kHz is AN1200.48's figure, not yet measured on a board. */
-    {"as923-tw", 9, 500000u, 921500000u, 0, 1, as923_tw_bands, {2, 23, 10, false}},
+    /* det_peak 29 at SF9/500 kHz: AN1200.48's 23 is a 125 kHz figure and gave 17.8 % false busy
+     * on a quiet channel on the bench (decision SL-38: 0.5 % at 29, frames still detected); the
+     * modulation was measured on 868.3 MHz, not on 921.5 MHz, so it stays unproven. */
+    {"as923-tw", 9, 500000u, 921500000u, 0, 1, as923_tw_bands, {2, 29, 10, false}},
 };
 
 const atalaia_region_info_t *atalaia_region_info(atalaia_region_t region)

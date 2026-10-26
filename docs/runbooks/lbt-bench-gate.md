@@ -136,11 +136,11 @@ Then start `com_bridge.py` (COM4 <-> 127.0.0.1:7600) and the `atalaia-controller
 
 ## The AS923-TW modulation on 868.3 MHz
 
-SL-25's AS923-TW question is the CAD's detection peak **23 at SF9/500 kHz** (the core's `atalaia_region_info(AS923_TW)->cad`, Semtech's figure from a table for 125 kHz, **unproven**). CAD behaves by SF and bandwidth, not by carrier, so the test needs the modulation, not 921.5 MHz, which is not allowed here (and the boards' antennas are for 868 MHz). The bench image runs **AS923-TW's modulation on 868.3 MHz** when the command says `proxy=as923`:
+SL-25's AS923-TW question is the CAD's detection peak at SF9/500 kHz (the core's `atalaia_region_info(AS923_TW)->cad`). Semtech's 23, from a table for 125 kHz, failed here on 2026-10-26 (17.8 % false busy on a quiet channel); the table now has **29** (0.5 %, frames still detected; decision SL-38), still **unproven** on an AS923-TW image. CAD behaves by SF and bandwidth, not by carrier, so the test needs the modulation, not 921.5 MHz, which is not allowed here (and the boards' antennas are for 868 MHz). The bench image runs **AS923-TW's modulation on 868.3 MHz** when the command says `proxy=as923`:
 
 | | the proxy run |
 |---|---|
-| modulation | SF9, 500 kHz, CR 4/5, the AS923-TW table's CAD settings: 2 symbols, **detPeak 23**, detMin 10 (`peak=N` / `min=N` change them for a sweep) |
+| modulation | SF9, 500 kHz, CR 4/5, the AS923-TW table's CAD settings: 2 symbols, **detPeak 29**, detMin 10 (`peak=N` / `min=N` change them for a sweep) |
 | channel | **868.3 MHz, 500 kHz wide: 868.05-868.55 MHz**, inside EU868 sub-band g (868.0-868.6 MHz) |
 | limits | sub-band g's: **1 % duty (36 s of airtime per rolling hour), 14 dBm = 25 mW ERP**: with the Kconfig defaults (FEM 14 dB, antenna 2 dBi) 0 dBm conducted is the legal maximum |
 | TX power | **-9 dBm conducted** by default (the SX1262's lowest, 9 dB under the 0 dBm limit; the boards are metres apart). `power=N` raises it, up to 0: the radio refuses more |
@@ -189,9 +189,9 @@ The transmitter stops by itself (`reason=duty_guard`) when the budget left falls
 4. **The quiet channel** (false detect), transmitter off: `--send "@lbt probe 1 proxy=as923"` on board 1; it ends after 60 s with no frame and reports the share of probes that found the channel busy.
 5. Three runs for the record, an hour apart (the budget), attach the logs to SL-25; **put board 2 back to the modem image (step 4 above)**.
 
-### What PASS means for detPeak 23
+### What PASS means for the detection peak
 
-`PASS` (exit 0), in the same report as the EU run: **more than 90 % of the probes made inside a frame find the channel busy, overall and in every tenth of the frame**, at SF9/500 kHz with detPeak 23 (the report says `with detPeak 23 at SF9 / 500 kHz`), **and** the quiet-channel run (step 4) finds the channel busy in well under 1 % of its probes. Then 23 holds at SF9/500 kHz: set `det_peak_bench_proven` to `true` in the AS923-TW row of `core/src/duty_cycle.c` (and update `core/include/atalaia/duty_cycle.h`'s comment, SL-34, the radio field-test runbook's AS923-TW note and `relay-study-results.md` section 13), and a Taiwanese field may keep `--lbt=on`. Read the preamble row and `found busy by: CAD` too: the receiver's flags cover most of a frame, so the CAD's own share shows in the first 12.25 symbols of each frame (12.5 ms); a preamble row far under the rest means the CAD alone misses preambles at this peak. Carrier and antenna differ from the 921.5 MHz case (868 MHz, the 868 MHz antennas): that does not change a CAD's detection, but the real AS923-TW channel is still unmeasured on air; say so in SL-25.
+`PASS` (exit 0), in the same report as the EU run: **more than 90 % of the probes made inside a frame find the channel busy, overall and in every tenth of the frame**, at SF9/500 kHz with the table's detPeak (the report says, for example, `with detPeak 29 at SF9 / 500 kHz`), **and** the quiet-channel run (step 4) finds the channel busy in well under 1 % of its probes. Then that peak holds at SF9/500 kHz: set `det_peak_bench_proven` to `true` in the AS923-TW row of `core/src/duty_cycle.c` (and update `core/include/atalaia/duty_cycle.h`'s comment, SL-34, the radio field-test runbook's AS923-TW note and `relay-study-results.md` section 13), and a Taiwanese field may keep `--lbt=on`. Read the preamble row and `found busy by: CAD` too: the receiver's flags cover most of a frame, so the CAD's own share shows in the first 12.25 symbols of each frame (12.5 ms); a preamble row far under the rest means the CAD alone misses preambles at this peak. Carrier and antenna differ from the 921.5 MHz case (868 MHz, the 868 MHz antennas): that does not change a CAD's detection, but the real AS923-TW channel is still unmeasured on air; say so in SL-25.
 
 ### If it fails
 
