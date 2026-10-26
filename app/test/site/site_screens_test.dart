@@ -49,6 +49,13 @@ Future<void> tapKey(WidgetTester tester, String key) async {
   final f = await reveal(tester, find.byKey(Key(key)));
   await tester.ensureVisible(f);
   await tester.pumpAndSettle();
+  // ensureVisible can leave a button in the list's cache extent, below the
+  // screen, when a form is long: scroll on until it is on the screen.
+  final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+  for (var i = 0; i < 10 && tester.getCenter(f).dy > screen.height - 8; i++) {
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -150));
+    await tester.pumpAndSettle();
+  }
   await tester.tap(f);
   await tester.pumpAndSettle();
 }

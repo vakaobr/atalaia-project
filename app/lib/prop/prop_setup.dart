@@ -291,6 +291,7 @@ class _PropSetupScreenState extends State<PropSetupScreen> {
             decoration: InputDecoration(
               labelText: s.t('setup.minutes'),
               helperText: s.t('setup.minutes_hint'),
+              helperMaxLines: 3,
             ),
           ),
           const SizedBox(height: 24),

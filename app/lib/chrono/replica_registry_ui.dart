@@ -191,6 +191,7 @@ class _ReplicaFormScreenState extends State<ReplicaFormScreen> {
             decoration: InputDecoration(
               labelText: s.t('replica.owner'),
               helperText: s.t('tags.player_hint'),
+              helperMaxLines: 3,
             ),
           ),
           const SizedBox(height: 12),

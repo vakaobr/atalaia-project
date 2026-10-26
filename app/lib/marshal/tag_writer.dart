@@ -157,6 +157,7 @@ class _TagWriterScreenState extends State<TagWriterScreen> {
               decoration: InputDecoration(
                 labelText: s.t('tags.player'),
                 helperText: s.t('tags.player_hint'),
+                helperMaxLines: 3,
               ),
             ),
             const SizedBox(height: 12),

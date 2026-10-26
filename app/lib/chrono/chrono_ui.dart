@@ -272,6 +272,7 @@ class _ChronoScreenState extends State<ChronoScreen> {
             decoration: InputDecoration(
               labelText: s.t('chrono.replica'),
               helperText: _nfcOn ? s.t('chrono.replica_nfc') : null,
+              helperMaxLines: 3,
             ),
             items: [
               for (final r in records.replicas)

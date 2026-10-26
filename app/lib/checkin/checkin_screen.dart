@@ -434,7 +434,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
             s.t('checkin.for_game', {'game': '${game['name']}'}),
             key: const Key('checkin-game'),
           ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         TextField(
           key: const Key('checkin-name'),
           controller: _name,
@@ -442,9 +442,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
           decoration: InputDecoration(
             labelText: s.t('checkin.name'),
             helperText: s.t('checkin.name_hint'),
+            helperMaxLines: 3,
           ),
         ),
-        if (info.federation != 'off')
+        if (info.federation != 'off') ...[
+          const SizedBox(height: 16),
           TextField(
             key: const Key('checkin-federation'),
             controller: _fed,
@@ -457,9 +459,12 @@ class _CheckinScreenState extends State<CheckinScreen> {
                 {'label': info.federationLabel},
               ),
               helperText: s.t('checkin.federation_hint'),
+              helperMaxLines: 3,
             ),
           ),
-        if (teams.isNotEmpty)
+        ],
+        if (teams.isNotEmpty) ...[
+          const SizedBox(height: 16),
           DropdownButtonFormField<String?>(
             key: const Key('checkin-team'),
             initialValue: _team,
@@ -474,7 +479,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
             ],
             onChanged: (v) => setState(() => _team = v),
           ),
-        if (_tickets.isNotEmpty)
+        ],
+        if (_tickets.isNotEmpty) ...[
+          const SizedBox(height: 16),
           DropdownButtonFormField<KeptTicket?>(
             key: const Key('checkin-registration'),
             initialValue: _ticket,
@@ -500,6 +507,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
             ],
             onChanged: (v) => setState(() => _ticket = v),
           ),
+        ],
         if (mine.isNotEmpty) ...[
           SectionTitle(s.t('checkin.bring')),
           for (final r in mine)

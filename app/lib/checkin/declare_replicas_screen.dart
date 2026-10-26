@@ -208,6 +208,7 @@ class _NewReplicaDialogState extends State<NewReplicaDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               key: const Key('replica-type'),
               initialValue: _type,
@@ -221,6 +222,7 @@ class _NewReplicaDialogState extends State<NewReplicaDialog> {
               ],
               onChanged: (v) => setState(() => _type = v ?? 'aeg'),
             ),
+            const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               key: const Key('replica-class'),
               initialValue: _class,
@@ -231,6 +233,7 @@ class _NewReplicaDialogState extends State<NewReplicaDialog> {
               ],
               onChanged: (v) => setState(() => _class = v ?? _class),
             ),
+            const SizedBox(height: 16),
             TextField(
               key: const Key('replica-make'),
               controller: _make,

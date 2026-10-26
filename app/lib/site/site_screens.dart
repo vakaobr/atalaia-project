@@ -342,6 +342,7 @@ class _SiteScreenState extends State<SiteScreen> {
 
   List<Widget> _totpStep(Strings s) => [
     Text(s.t('site.totp_text')),
+    const SizedBox(height: 16),
     TextField(
       key: const Key('site-code'),
       controller: _code,
@@ -750,6 +751,7 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
     final mine = context.services.checkins.replicas;
     return [
       SectionTitle(s.t(_reg == null ? 'site.form' : 'site.form_change')),
+      const SizedBox(height: 4),
       TextField(
         key: const Key('reg-name'),
         controller: _name,
@@ -757,9 +759,11 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
         decoration: InputDecoration(
           labelText: s.t('checkin.name'),
           helperText: s.t('site.name_hint'),
+          helperMaxLines: 3,
         ),
       ),
-      if (g.federation != 'off')
+      if (g.federation != 'off') ...[
+        const SizedBox(height: 16),
         TextField(
           key: const Key('reg-federation'),
           controller: _fed,
@@ -773,7 +777,9 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
             ),
           ),
         ),
-      if (g.teams.isNotEmpty)
+      ],
+      if (g.teams.isNotEmpty) ...[
+        const SizedBox(height: 16),
         DropdownButtonFormField<String?>(
           key: const Key('reg-team'),
           initialValue: g.teams.contains(_team) ? _team : null,
@@ -785,6 +791,7 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
           ],
           onChanged: (v) => setState(() => _team = v),
         ),
+      ],
       if (g.predeclareReplicas) ...[
         SectionTitle(s.t('site.replicas', {'n': f.maxReplicas})),
         if (mine.isEmpty) Text(s.t('checkin.no_replicas')),
