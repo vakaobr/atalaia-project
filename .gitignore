@@ -28,6 +28,8 @@ app/android/local.properties
 app/assets/console/
 app/assets/notices/
 app/ios/Pods/
+# What flutter test writes when a golden image differs.
+app/test/goldens/failures/
 
 # Python
 __pycache__/

@@ -7,16 +7,17 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 A step-by-step guide for the first tests (decisions iOS-1 to iOS-12 in
 [docs/review/decisions-to-review.md](../../docs/review/decisions-to-review.md)).
-Nothing here has been run on a Mac yet: the project in [`ios/`](../ios/) was
-generated and edited on Linux with the pinned Flutter, and CI's `ios-build`
-job compiles it on a Mac runner. If a step differs on your machine, the
+The project in [`ios/`](../ios/) was generated and edited on Linux with the
+pinned Flutter; it was first built on a Mac on 2026-10-26 (Xcode 27.1, macOS
+27.0, Apple silicon: `flutter build ios --release --no-codesign`), and CI's
+`ios-build` job compiles it on a Mac runner. It has not run on an iPhone yet. If a step differs on your machine, the
 troubleshooting list at the end is where to look first, and please write down
 what you found.
 
 ## What you need
 
 - A Mac (Apple silicon or Intel) with about 40 GB free, and an iPhone with a USB
-  cable (Lightning or USB-C). iOS 13 or later; for NFC, an iPhone 7 or later.
+  cable (Lightning or USB-C). iOS 15 or later (an iPhone 6s or later); for NFC, an iPhone 7 or later.
 - An Apple ID. A **free** one is enough for these first tests (see
   [Free account or paid](#free-account-or-paid)).
 - Xcode, CocoaPods and Flutter 3.44.0, installed below.
