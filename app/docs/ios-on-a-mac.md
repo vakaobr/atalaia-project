@@ -187,6 +187,14 @@ day 6 before a field test.
   build/ios/iphoneos/Runner.app ... Error running application". Trust the
   certificate (Settings > General > VPN & Device Management) and open the app,
   or run again.
+- **A run that worked fails with "Could not run build/ios/iphoneos/Runner.app"**:
+  with a free Personal Team, Xcode may refresh the provisioning profile between
+  installs (a debug and a release build, an integration test, a new profile),
+  and iOS then asks to trust the developer certificate again, even if you
+  trusted it earlier the same day. Look in Settings > General > VPN & Device
+  Management for a new trust prompt, trust it, and run again (seen on the
+  iPhone on 2026-10-26: `site_registration_test.dart` then passed with no
+  other change).
 - **No Developer Mode switch on the iPhone**: it appears only after Xcode has
   tried to run something on the phone once: pick the iPhone as the run
   destination in Xcode's toolbar and press Run (Xcode 27 has no Window >
@@ -221,9 +229,23 @@ day 6 before a field test.
 - **"Unable to find directory 'assets/console/'"**: `dart tool/sync_console.dart` (step 4).
 - **A strange build state** after changing Flutter versions: `flutter clean`,
   delete `ios/Flutter/ephemeral/` and `ios/Pods/`, then step 5 again.
+- **TLS to the field controller fails on iOS but works on Android**: check the
+  server certificate's validity. Apple's SecTrust (iOS and macOS, what `dart:io`
+  uses there) refuses any TLS server certificate valid for more than 825 days,
+  private CAs included; Android does not. The field's own are 365 days
+  (`SERVER_DAYS`, `serverDays`; the CA's 3653 days are fine) and guard tests
+  keep them under 825.
 - **Local network**: the first time the app talks to the controller, iOS asks
   "Atalaia would like to find and connect to devices on your local network".
   Answer **Allow**. If you said no: Settings > Atalaia > Local Network.
+
+## Integration tests on the iPhone
+
+Run with `flutter test integration_test/<file> -d <iPhone id>`. State on
+2026-10-26: `integration_test/site_registration_test.dart` passes on iOS (1/1);
+`integration_test/check_in_test.dart` failed there on its fixed 10-year server
+certificate (see Troubleshooting) and now makes a 365-day one at run time; it
+has not yet been run again on an iPhone.
 
 ## What to try on the iPhone
 

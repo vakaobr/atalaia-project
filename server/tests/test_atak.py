@@ -898,3 +898,10 @@ async def hosted_status(url: str, slug: str, status: str) -> None:
     from atalaia_server import hosted  # noqa: PLC0415
 
     await hosted.set_status(url, slug, status, "test", "test:operator")
+
+
+def test_relay_leaf_validity_within_apple_limit() -> None:
+    # Apple refuses TLS server certificates valid for more than 825 days (iOS/macOS SecTrust); a longer one breaks every iPhone's check-in over HTTPS
+    from atalaia_server import atak_pki  # noqa: PLC0415
+
+    assert atak_pki.LEAF_DAYS <= 825

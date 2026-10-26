@@ -3,7 +3,9 @@
 
 // On an Android device or emulator: checking in at the field with its
 // poster, over real HTTPS. The phone serves a stand-in field controller on
-// 127.0.0.1 with a test-only CA (test_certs.dart; the API's answers come
+// 127.0.0.1 with a CA and server certificate made at run time by the app's
+// own lib/controller/field_tls.dart (365-day server certificate, as in
+// production: Apple's SecTrust refuses longer ones; the API's answers come
 // from test/support/fake_field.dart, the shapes controller/atalaia_controller
 // sends). The app pins that CA from the poster's fingerprint, checks in,
 // declares a replica, and follows the game over WSS, where the snapshot's
@@ -16,7 +18,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:atalaia_app/checkin/checkin_screen.dart';
-import 'package:atalaia_app/checkin/field_trust.dart';
+import 'package:atalaia_app/controller/field_tls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -24,15 +26,16 @@ import 'package:integration_test/integration_test.dart';
 import '../test/support/branding.dart';
 import '../test/support/fake_field.dart';
 import 'support.dart';
-import 'test_certs.dart';
 
 /// The stand-in controller: HTTPS on a free port, the check-in API from
 /// [FakeField], the CA endpoint, and the live stream.
 class DeviceField {
-  DeviceField._(this.server, this.field);
+  DeviceField._(this.server, this.field, this.tlsDir, this.caPem);
 
   final HttpServer server;
   final FakeField field;
+  final Directory tlsDir;
+  final String caPem;
   final branding = FakeBrandingField(
     accent: '#ffd400',
     logo: testLogo(),
@@ -43,20 +46,27 @@ class DeviceField {
   final streamTokens = <String>[];
 
   static Future<DeviceField> start() async {
-    final ctx = SecurityContext()
-      ..useCertificateChainBytes(utf8.encode(testServerCertPem))
-      ..usePrivateKeyBytes(utf8.encode(testServerKeyPem));
+    // TEST ONLY: a throwaway CA and server certificate, new every run, in a
+    // temporary folder removed at the end. Never a fixed long-lived PEM: it
+    // would expire, and a server certificate valid for more than 825 days is
+    // refused on iOS and macOS.
+    final dir = Directory.systemTemp.createTempSync('atalaia-test-tls-');
+    final tls = FieldTls.ensure(
+      dir.path,
+      certificateNames(const []),
+      fieldName: 'Atalaia on-device test (not a real field)',
+    );
     final server = await HttpServer.bindSecure(
       InternetAddress.loopbackIPv4,
       0,
-      ctx,
+      tls.context(),
     );
-    final field = FakeField(der: pemToDer(testCaPem)!, pem: testCaPem)
+    final field = FakeField(der: tls.caDer, pem: tls.caPem)
       ..wifiSsid = 'Atalaia';
     field.urls
       ..clear()
       ..add('https://127.0.0.1:${server.port}');
-    final f = DeviceField._(server, field);
+    final f = DeviceField._(server, field, dir, tls.caPem);
     server.listen(f._serve);
     return f;
   }
@@ -68,7 +78,7 @@ class DeviceField {
         'application',
         'x-pem-file',
       );
-      req.response.write(testCaPem);
+      req.response.write(caPem);
       await req.response.close();
       return;
     }
@@ -151,6 +161,7 @@ class DeviceField {
       await ws.close();
     }
     await server.close(force: true);
+    if (tlsDir.existsSync()) tlsDir.deleteSync(recursive: true);
   }
 }
 

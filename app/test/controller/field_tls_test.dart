@@ -238,4 +238,22 @@ void main() {
       '192.168.43.1',
     ]);
   });
+
+  test('the server certificate stays within the 825 days Apple allows', () {
+    // Apple refuses TLS server certificates valid for more than 825 days (iOS/macOS SecTrust); a longer one breaks every iPhone's check-in over HTTPS
+    expect(serverDays, lessThanOrEqualTo(825));
+    final t0 = DateTime.utc(2027, 1, 15, 8);
+    final tls = FieldTls.ensure(tmp.path, ['localhost'], now: t0);
+    expect(
+      tls.notAfter.difference(t0),
+      lessThanOrEqualTo(const Duration(days: 825)),
+    );
+    // Renewal makes the certificate again with the same constant.
+    final late = t0.add(const Duration(days: serverDays - renewDays + 1));
+    final renewed = FieldTls.ensure(tmp.path, ['localhost'], now: late);
+    expect(
+      renewed.notAfter.difference(late),
+      lessThanOrEqualTo(const Duration(days: 825)),
+    );
+  });
 }

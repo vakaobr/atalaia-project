@@ -50,6 +50,14 @@ class FieldCaTests(unittest.TestCase):
             for name in ("ca.key", "server.key"):
                 self.assertEqual(stat.S_IMODE(os.stat(os.path.join(self.dir, name)).st_mode), 0o600)
 
+    def test_server_certificate_validity_within_apple_limit(self):
+        # Apple refuses TLS server certificates valid for more than 825 days (iOS/macOS SecTrust); a longer one breaks every iPhone's check-in over HTTPS
+        from cryptography import x509
+
+        self.assertLessEqual(tls.SERVER_DAYS, 825)
+        cert = x509.load_pem_x509_certificate(tls.ensure(self.dir, ["10.0.2.2"]).server_cert.read_bytes())
+        self.assertLessEqual(tls._not_after(cert) - datetime.datetime.now(datetime.timezone.utc), datetime.timedelta(days=825))
+
     def test_names_and_renewal(self):
         from cryptography import x509
 
