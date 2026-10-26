@@ -13,6 +13,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
+import '../storage/secret_vault.dart';
 import 'services.dart';
 
 const _prefix = 'org.atalaia.app';
@@ -214,4 +215,40 @@ class ChannelQrScanner implements QrScanner {
   @override
   Future<String?> scan({required String hint, required String cancel}) =>
       _call<String?>(_ch, 'scan', null, {'hint': hint, 'cancel': cancel});
+}
+
+/// The AndroidKeyStore's AES-GCM key (KeystorePlugin.kt). A missing plugin
+/// (iOS, the web, a widget test) is "not available", never a crash.
+class ChannelSecretVault implements SecretVault {
+  static const _ch = MethodChannel('$_prefix/keystore');
+
+  @override
+  Future<bool> available() async {
+    try {
+      return await _call<bool>(_ch, 'available', false);
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  @override
+  Future<Uint8List> seal(Uint8List plain) => _go('seal', plain);
+
+  @override
+  Future<Uint8List> open(Uint8List sealed) => _go('open', sealed);
+
+  Future<Uint8List> _go(String method, Uint8List data) async {
+    try {
+      final r = await _ch.invokeMethod<Object?>(method, {'data': data});
+      if (r is Uint8List) return r;
+      throw const VaultException(VaultFailure.unavailable, 'no answer');
+    } on MissingPluginException {
+      throw const VaultException(VaultFailure.unavailable, 'no plugin');
+    } on PlatformException catch (e) {
+      throw VaultException(
+        e.code == 'key_lost' ? VaultFailure.keyLost : VaultFailure.unavailable,
+        '${e.code} ${e.message ?? ''}',
+      );
+    }
+  }
 }

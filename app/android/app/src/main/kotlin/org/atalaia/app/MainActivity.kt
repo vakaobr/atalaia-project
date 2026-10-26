@@ -55,6 +55,7 @@ class MainActivity : FlutterActivity() {
         nfc = NfcPlugin(this, messenger)
         qr = QrScanPlugin(this, messenger)
         LocationPlugin(this, messenger)
+        KeystorePlugin(messenger)
         links = LinkPlugin(messenger, intent)
         // The pod's links and the local hotspot belong to the engine: an
         // engine an earlier activity left running keeps the ones it has, so

@@ -4,8 +4,11 @@
 /// The app's settings and records, as JSON files in the app's private
 /// folder (Android's Context.filesDir; other apps cannot read it, and
 /// android:allowBackup is off so it is not copied to the cloud). The field
-/// join key and the marshal's private key live here too: protected by
-/// Android's app sandbox, not by a hardware-backed keystore (decision PD6).
+/// join key, the marshal's private key and the read code are not in
+/// `settings.json` on Android: they are sealed with a key in the
+/// AndroidKeyStore (`secrets.enc`, secret_vault.dart, decision PD6). Where
+/// there is no Keystore plugin (iOS) they stay in the file, protected by the
+/// app sandbox.
 /// Writes go to a temporary file first, then replace the old one. Binary
 /// files (a field's logo and wallpaper, team crests: lib/branding/) are
 /// kept the same way under `blobs/`.
@@ -21,6 +24,7 @@ import 'package:flutter/material.dart' show ThemeMode;
 
 import '../l10n/strings.dart';
 import '../security/bytes.dart';
+import 'secret_vault.dart';
 
 /// What the field controller last told this phone about its marshal id
 /// (decisions MR-2 to MR-5): the id and name come from the GM's list, never
@@ -283,12 +287,32 @@ String _checkBlobName(String name) {
   return name;
 }
 
+/// The settings keys that are secrets at rest (decision PD6): the field join
+/// key, the marshal's Ed25519 seed and the player's read code.
+const _secretKeys = ['join_key', 'marshal_seed', 'read_token'];
+
 class FileAppStore implements AppStore {
-  FileAppStore(this.dir);
+  /// With a [vault] (Android's Keystore), the secrets in [_secretKeys] are
+  /// kept sealed in `secrets.enc`, never in `settings.json`; a plaintext
+  /// `settings.json` from an earlier version is migrated on the first load.
+  /// Without one, or where it is not available (iOS, tests), they stay in
+  /// `settings.json` as before.
+  FileAppStore(this.dir, {this.vault});
 
   final String dir;
+  final SecretVault? vault;
+
+  /// Why the vault last failed to give or take the secrets, for the logs and
+  /// tests; the app itself just sees the secrets as missing (re-join).
+  VaultFailure? lastVaultFailure;
+
+  bool _vaultWorks = false;
+  String? _sealedJson; // the secrets the file on disk holds, as sealed last
+  bool _unreadable = false; // sealed secrets exist but could not be read now
+  Future<void> _turn = Future.value();
 
   File _file(String name) => File('$dir/$name.json');
+  File get _sealedFile => File('$dir/secrets.enc');
 
   Future<Object?> _read(String name) async {
     final f = _file(name);
@@ -300,22 +324,149 @@ class FileAppStore implements AppStore {
     }
   }
 
-  Future<void> _write(String name, Object? value) async {
-    await Directory(dir).create(recursive: true);
-    final tmp = File('$dir/$name.json.tmp');
-    await tmp.writeAsString(jsonEncode(value), flush: true);
-    await tmp.rename(_file(name).path);
+  Future<void> _writeBytes(File target, List<int> bytes) async {
+    await target.parent.create(recursive: true);
+    final tmp = File('${target.path}.tmp');
+    await tmp.writeAsBytes(bytes, flush: true);
+    await tmp.rename(target.path);
+  }
+
+  Future<void> _write(String name, Object? value) =>
+      _writeBytes(_file(name), utf8.encode(jsonEncode(value)));
+
+  /// One settings read or write at a time: both touch two files.
+  Future<T> _serial<T>(Future<T> Function() job) {
+    final done = _turn.then((_) => job());
+    _turn = done.then<void>((_) {}, onError: (Object _) {});
+    return done;
+  }
+
+  Future<bool> _vaultReady() async {
+    final v = vault;
+    if (v == null) return false;
+    if (_vaultWorks) return true;
+    try {
+      return _vaultWorks = await v.available();
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<void> _seal(Map<String, Object?> secrets) async {
+    final json = jsonEncode(secrets);
+    if (json == _sealedJson && await _sealedFile.exists()) return;
+    final sealed = await vault!.seal(Uint8List.fromList(utf8.encode(json)));
+    await _writeBytes(_sealedFile, sealed);
+    _sealedJson = json;
+  }
+
+  Future<void> _dropSealed() async {
+    _sealedJson = null;
+    if (await _sealedFile.exists()) await _sealedFile.delete();
+  }
+
+  /// The sealed secrets, or empty if there are none or they cannot be read:
+  /// a lost key or a damaged file means they can never be read, so the file
+  /// goes and the app asks to join again; a Keystore that did not answer
+  /// leaves the file for a later try.
+  Future<Map<String, Object?>> _unseal() async {
+    try {
+      if (!await _sealedFile.exists()) return {};
+      final plain = await vault!.open(await _sealedFile.readAsBytes());
+      final j = jsonDecode(utf8.decode(plain));
+      if (j is Map<String, Object?>) {
+        _sealedJson = jsonEncode(j);
+        return {
+          for (final e in j.entries)
+            if (_secretKeys.contains(e.key) && e.value is String)
+              e.key: e.value,
+        };
+      }
+      throw const FormatException('not a map');
+    } on VaultException catch (e) {
+      lastVaultFailure = e.failure;
+      if (e.failure == VaultFailure.keyLost) {
+        await _dropSealed().catchError((Object _) {});
+      } else {
+        _unreadable = true;
+      }
+    } on FormatException {
+      lastVaultFailure = VaultFailure.keyLost;
+      await _dropSealed().catchError((Object _) {});
+    } on FileSystemException {
+      lastVaultFailure = VaultFailure.unavailable;
+      _unreadable = true;
+    }
+    return {};
   }
 
   @override
-  Future<AppSettings> loadSettings() async {
+  Future<AppSettings> loadSettings() => _serial(() async {
     final j = await _read('settings');
-    return j is Map<String, Object?> ? AppSettings.fromJson(j) : AppSettings();
-  }
+    if (!await _vaultReady()) {
+      return j is Map<String, Object?>
+          ? AppSettings.fromJson(j)
+          : AppSettings();
+    }
+    final map = j is Map<String, Object?> ? {...j} : <String, Object?>{};
+    _unreadable = false;
+    final plain = {
+      for (final k in _secretKeys)
+        if (map[k] is String) k: map[k],
+    };
+    if (plain.isNotEmpty) {
+      // An earlier version's plaintext: seal it, check it reads back, and only
+      // then rewrite settings.json without it. Any failure leaves the
+      // plaintext as it was (the secrets are not lost over a Keystore hiccup)
+      // and the next start tries again.
+      try {
+        await _seal(plain);
+        final back = await vault!.open(await _sealedFile.readAsBytes());
+        if (utf8.decode(back) != jsonEncode(plain)) {
+          throw const VaultException(VaultFailure.unavailable, 'read-back');
+        }
+        for (final k in _secretKeys) {
+          map.remove(k);
+        }
+        await _write('settings', map);
+        map.addAll(plain);
+      } on VaultException catch (e) {
+        lastVaultFailure = e.failure;
+      } on FileSystemException {
+        lastVaultFailure = VaultFailure.unavailable;
+      }
+    } else {
+      map.addAll(await _unseal());
+    }
+    return AppSettings.fromJson(map);
+  });
 
   @override
-  Future<void> saveSettings(AppSettings settings) =>
-      _write('settings', settings.toJson());
+  Future<void> saveSettings(AppSettings settings) => _serial(() async {
+    final json = settings.toJson();
+    if (!await _vaultReady()) return _write('settings', json);
+    final secrets = <String, Object?>{
+      for (final k in _secretKeys)
+        if (json.remove(k) case final String v) k: v,
+    };
+    try {
+      if (secrets.isNotEmpty) {
+        await _seal(secrets);
+        _unreadable = false;
+      } else if (!_unreadable) {
+        await _dropSealed();
+      }
+    } on VaultException catch (e) {
+      // Never to disk in the clear: the secrets stay in memory for this run,
+      // the old sealed copy (now stale) goes, and the next start asks to
+      // join again.
+      lastVaultFailure = e.failure;
+      await _dropSealed().catchError((Object _) {});
+    } on FileSystemException {
+      lastVaultFailure = VaultFailure.unavailable;
+    }
+    await _write('settings', json);
+  });
 
   @override
   Future<List<Map<String, Object?>>> loadList(String name) async {

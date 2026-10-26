@@ -1733,7 +1733,9 @@ Playing never requires an account (spec section 12).  For each field,
 the app makes a **field identity** on its first check-in there: a
 `player_id` of `p-` and 12 random base32 characters (it fits the
 player token's and the player tag's id rules) and a 32-byte random
-`player_secret`, both kept in the app's private storage (PD6).  The
+`player_secret`, both kept in the app's private storage (PD6; the
+join key, marshal seed and read code are Keystore-sealed since
+2026-10-26, this secret is not yet).  The
 controller keeps the `player_id` and SHA-256 of the secret.  The next
 check-in at that field sends both, so the same player keeps the same
 id (and the same replica history) across game days, while two fields

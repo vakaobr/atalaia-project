@@ -15,7 +15,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final device = ChannelDeviceServices();
   final dir = await device.filesDir();
-  final AppStore store = dir == null ? MemoryAppStore() : FileAppStore(dir);
+  final AppStore store = dir == null
+      ? MemoryAppStore()
+      : FileAppStore(dir, vault: ChannelSecretVault());
   final settings = await store.loadSettings();
   runApp(
     AtalaiaApp(
