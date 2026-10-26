@@ -234,12 +234,18 @@ class _FieldScript implements FieldOperations {
   List<Map<String, Object?>> nodes(String? role) {
     final all = _fc.nodes.values.toList()
       ..sort((a, b) => a.nodeId.compareTo(b.nodeId));
+    // A scenario's node names, as the GM gave them to the boxes in the Join tab
+    // (M6-7, P4R8); else the box's own name (engine.py `_nodes`).
+    final gameId = engine._game?['id'];
+    final names = gameId is int
+        ? engine.scenarios?.nodeNames(gameId) ?? const <int, String>{}
+        : const <int, String>{};
     return [
       for (final n in all)
         if (role == null || n.role == role)
           {
             'id': n.nodeId,
-            'name': n.name,
+            'name': names[n.nodeId] ?? n.name,
             'role': n.role,
             'owner': n.ownerName(_fc.teams),
           },
@@ -551,7 +557,9 @@ class ControllerEngine {
     final svc = scenarios;
     if (meta != null && svc != null) {
       // The staff's view: every objective, and the boxes the GM named.
-      out['scenario'] = meta.staffView();
+      out['scenario'] = meta.staffView(
+        svc.disclosure(game['id']! as int, meta),
+      );
       final names = svc.nodeNames(game['id']! as int);
       final ids = names.keys.toList()..sort();
       out['scenario_nodes'] = {for (final k in ids) '$k': names[k]};
@@ -593,6 +601,7 @@ class ControllerEngine {
         viewer,
         game,
         svc.revealed(game['id']! as int),
+        svc.disclosure(game['id']! as int, meta),
       );
     }
     return out;
@@ -614,7 +623,13 @@ class ControllerEngine {
         ? _game
         : store.game(gameId);
     final meta = game == null ? null : scenarioMeta(game['mode_id']);
-    return scenarioEvent(viewer, ev, game, meta?.objectives);
+    return scenarioEvent(
+      viewer,
+      ev,
+      game,
+      meta?.objectives,
+      scenarios?.disclosure(gameId, meta) ?? 'members',
+    );
   }
 
   List<Map<String, Object?>> listGames() => [
@@ -735,6 +750,16 @@ class ControllerEngine {
     if (squads < 0 || squads > squadsMax) {
       throw ControllerError('squads: 0 (none) to $squadsMax per team');
     }
+    // Who of a squad is told its scenario objectives: the GM's choice, else
+    // the scenario's (SQ-4).
+    final disclosure = ControllerScenarios.checkDisclosure(
+      spec['objective_disclosure'],
+    );
+    if (disclosure != null && scenarioMeta(mode.id) == null) {
+      throw ControllerError(
+        'objective_disclosure: only a scenario\'s game has objectives to disclose',
+      );
+    }
     // Team branding (decisions BR12-BR15): display names and crests next to
     // the colours, which stay the team names the boxes and the radio know.
     final b = branding;
@@ -778,6 +803,7 @@ class ControllerEngine {
     };
     store.createGame(game, key: config.persistGameKey ? key : null);
     if (boxLang != null) store.setSetting('box_lang:$id', boxLang);
+    if (disclosure != null) scenarios?.storeDisclosure(id, disclosure);
     _activate(store.game(id)!, key);
     final out = getGame(id);
     _emit({'type': 'game', 'game': out});
@@ -1455,6 +1481,36 @@ class ControllerEngine {
   void updateTeamInfo(int gameId, Map<String, Object?> info) {
     store.updateGame(gameId, {'team_info': info});
     if (_game != null && _game!['id'] == gameId) _game!['team_info'] = info;
+  }
+
+  /// PUT /api/v1/games/{id}/objective-disclosure {"disclosure": "members" |
+  /// "leader" | null}: who of a squad is told its scenario objectives, until
+  /// the game ends (SQ-4; engine.py `set_objective_disclosure`). The players'
+  /// apps get the game again, so a change shows at once.
+  Map<String, Object?> setObjectiveDisclosure(int gameId, Object? spec) {
+    final game = store.game(gameId);
+    if (game == null) throw ControllerError.notFound('no game $gameId');
+    if (game['state'] == 'ended') {
+      throw ControllerError.conflict('game $gameId has ended');
+    }
+    final svc = scenarios;
+    if (svc == null || scenarioMeta(game['mode_id']) == null) {
+      throw ControllerError(
+        'this game has no scenario, so no objectives to disclose',
+      );
+    }
+    if (spec is! Map || spec.length != 1 || !spec.containsKey('disclosure')) {
+      throw ControllerError(
+        'the body is {"disclosure": "members" | "leader" | null}',
+      );
+    }
+    svc.storeDisclosure(
+      gameId,
+      ControllerScenarios.checkDisclosure(spec['disclosure']),
+    );
+    final out = getGame(gameId);
+    _emit({'type': 'game', 'game': out});
+    return out;
   }
 
   // --- the boxes' language (join key 15) -----------------------------------

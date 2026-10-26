@@ -19,10 +19,35 @@ function parseTeams(text) {
     return text.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
+/** Who of a squad is told its scenario objectives, for the live game (SQ-4): the scenario's own,
+ * every member, or the squad leader only. The apps get the game again, so a change shows at once. */
+class DisclosureEditor extends Component {
+    async change(value) {
+        const { app, game } = this.props;
+        const out = await app.call('PUT', `/games/${game.id}/objective-disclosure`, { disclosure: value || null });
+        if (out) app.setGame(out);
+    }
+
+    render({ game }) {
+        const sc = game.scenario;
+        const own = sc.disclosure_default || 'members';
+        const chosen = sc.disclosure === own ? '' : sc.disclosure;
+        return html`<div class="field" data-testid="game-disclosure-live">
+            <label for="g-disclosure-live">${t('game.disclosure')}</label>
+            <select id="g-disclosure-live" data-testid="game-disclosure-select" value=${chosen}
+                onChange=${(e) => this.change(e.target.value)}>
+                <option value="">${t('game.disclosure_scenario', { value: t(`game.disclosure_${own}`) })}</option>
+                <option value="members">${t('game.disclosure_members')}</option>
+                <option value="leader">${t('game.disclosure_leader')}</option>
+            </select>
+            <small class="muted">${t('game.disclosure_hint')}</small></div>`;
+    }
+}
+
 class CreateGame extends Component {
     constructor(props) {
         super(props);
-        this.state = { name: '', source: '', teams: 'red, blue', minutes: '20', squads: '0', values: null, mods: [],
+        this.state = { name: '', source: '', teams: 'red, blue', minutes: '20', squads: '0', disclosure: '', values: null, mods: [],
                        teamInfo: {} };
     }
 
@@ -61,6 +86,10 @@ class CreateGame extends Component {
         const body = { name: this.state.name.trim(), teams, params: values,
                        duration_ms: Math.max(0, Math.round(parseFloat(this.state.minutes || '0') * 60000)),
                        squads: Math.max(0, Math.min(16, parseInt(this.state.squads || '0', 10) || 0)) };
+        // Who of a squad is told its scenario objectives (SQ-4): left out, the scenario's own.
+        if (mode.kind === 'scenario' && body.squads > 0 && this.state.disclosure) {
+            body.objective_disclosure = this.state.disclosure;
+        }
         // The boxes' screens take this console's language unless the field fixes one (Settings).
         body.console_lang = lang();
         const info = teamInfoBody(this.state.teamInfo, teams);
@@ -122,6 +151,15 @@ class CreateGame extends Component {
                 <input id="g-squads" data-testid="game-squads" type="number" min="0" max="16" step="1" value=${state.squads}
                     onInput=${(e) => this.setState({ squads: e.target.value })} />
                 <small class="muted">${t('game.squads_hint')}</small></div>
+            ${mode && mode.kind === 'scenario' && parseInt(state.squads || '0', 10) > 0 && html`<div class="field">
+                <label for="g-disclosure">${t('game.disclosure')}</label>
+                <select id="g-disclosure" data-testid="game-disclosure" value=${state.disclosure}
+                    onChange=${(e) => this.setState({ disclosure: e.target.value })}>
+                    <option value="">${t('game.disclosure_scenario_short')}</option>
+                    <option value="members">${t('game.disclosure_members')}</option>
+                    <option value="leader">${t('game.disclosure_leader')}</option>
+                </select>
+                <small class="muted">${t('game.disclosure_hint')}</small></div>`}
             ${mode && !preset && html`<${ModifierPicker} modes=${modes} main=${mode} selected=${state.mods} prefix="game"
                 onChange=${(mods) => this.setState({ mods, values: null })} />`}
             ${mode && html`<details open=${!preset}>
@@ -303,6 +341,7 @@ export class GameControl extends Component {
                 ${game.channel_hz && html`<dt>${t('radio.channel')}</dt><dd data-testid="game-channel">${mhz(game.channel_hz)} MHz</dd>`}
             </dl>
             <${GameSettings} app=${app} game=${game} review=${app.state.reviewSettings || 0} />
+            ${gm && s !== 'ended' && game.scenario && game.squads > 0 && html`<${DisclosureEditor} app=${app} game=${game} />`}
             ${game.joined && html`<p class="notice">${t('game.standby_notice')}</p>`}
             ${game.key_lost && html`<p class="notice" data-testid="game-key-lost">${t('game.key_lost_notice')}</p>`}
             ${s === 'ready' && !game.joined && html`<${StartCheck} game=${game} />`}

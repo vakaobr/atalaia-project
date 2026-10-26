@@ -18,6 +18,8 @@ What stays per controller is reading the manifest's text: the Pi with PyYAML, th
 | `protocol.lua` | The radio size of a scenario event, from the core's protocol tables |
 | `runtime.lua` | The scenario runtime: the code after `SCENARIO` in every compiled `field.lua` (GPL-3.0-or-later, decision M7-2) |
 
+Two optional top-level keys shape a squad's chain (decisions SQ-1 to SQ-10): `reveal: all | active` (with `active`, an objective that depends on others and gives no `visibility` is compiled as `hidden`, so the runtime reveals it when it opens) and `disclosure: members | leader` (copied to `mode.yaml`'s `scenario` block when given; the controllers route by it, nothing in `field.lua` changes).
+
 The build turns these files into a C file ([`../cmake/embed_scenario.cmake`](../cmake/embed_scenario.cmake)); `ATALAIA_SCENARIO=OFF` leaves the compiler out, and the Field Box's firmware never builds it. Each call runs in a Lua state of its own, with the base, string, table, math and utf8 libraries and no way to load other code, a memory limit (64 MB) and an instruction limit (200 million; the largest manifest that compiles takes about 4 MB and 14 million). A manifest past either limit is a problem, `too_complex` (decision PE24-113). The manifest is only ever data: no text of it becomes code, here or in `field.lua`.
 
 ## The data tree

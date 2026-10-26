@@ -250,6 +250,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   TeamBranding _teams = TeamBranding.none;
   BrandingSource? _source;
   String? _teamInfoSeen;
+  int _ordersSeen = 0;
   String? _brandEtagSeen;
 
   Future<void>? _brandLoading;
@@ -281,6 +282,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// when the game's teams change, and the field's branding when the
   /// stream says it changed.
   void _onFeed() {
+    // New orders (an objective revealed to this player, or their squad
+    // leader's): two short pulses, no sound, as for the field's boundary
+    // (SQ-5, MF-33): a tone could give a player's place away.
+    if (feed.ordersSeq > _ordersSeen) {
+      _ordersSeen = feed.ordersSeq;
+      unawaited(_services.device.vibrate(const [0, 250, 120, 250]));
+    }
     final info = feed.game?['team_info'];
     final key = jsonEncode(info);
     if (key != _teamInfoSeen) {
@@ -643,6 +651,13 @@ class PlayerView extends StatelessWidget {
                 style: TextStyle(color: Theme.of(context).hintColor),
               ),
             ),
+          if (feed.leaderOrders > 0)
+            ListTile(
+              key: const Key('player-leader-orders'),
+              dense: true,
+              leading: const Icon(Icons.campaign_outlined),
+              title: Text(s.t('player.leader_orders')),
+            ),
           if (feed.objectives.isNotEmpty)
             _ScenarioObjectives(feed: feed, teams: teams),
           if (feed.nodes.isNotEmpty) ...[
@@ -997,7 +1012,12 @@ String eventText(
   // A scenario objective this player knows is named (plan phase 8): its name
   // from the game's scenario, in the app's language.
   final objective = objectives[str('objective')];
-  final type = objective != null && e.type.startsWith('scenario.objective.')
+  // Orders for this player's squad leader alone (SQ-3): their squad is told so,
+  // not which.
+  final type =
+      d['leader_only'] == true && e.type == 'scenario.objective.revealed'
+      ? 'scenario.objective.revealed.leader'
+      : objective != null && e.type.startsWith('scenario.objective.')
       ? '${e.type}.named'
       : e.type;
   // An event that can come without a team has a text of its own for that

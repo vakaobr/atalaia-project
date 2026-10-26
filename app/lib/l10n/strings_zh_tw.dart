@@ -312,6 +312,8 @@ const Map<String, String> zhTwStrings = {
   'event.scenario.objective.failed.named.no_team': '失敗：{objective}',
   'event.scenario.objective.revealed.named': '{team}的新任務目標：{objective}',
   'event.scenario.objective.revealed.named.no_team': '新的任務目標：{objective}',
+  'event.scenario.objective.revealed.leader': '你的小隊長有新的任務',
+  'player.leader_orders': '給你小隊的任務：小隊長會通知大家',
 
   // GM
   'gm.intro': '場地控制器的 GM 控制台。輸入控制器的位址；控制台會要求存取碼。',

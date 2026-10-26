@@ -47,7 +47,7 @@ local function texts(entry, keys)
   return out
 end
 
-local function objective_meta(o)
+local function objective_meta(o, manifest)
   local assignee = or_map(py.get(o, "assignee"))
   local effect = or_map(py.get(o, "effect"))
   local meta = ordered("id", py.get(o, "id"), "type", py.get(o, "type"), "name", py.get(o, "name"))
@@ -64,7 +64,7 @@ local function objective_meta(o)
   if py.get(assignee, "squad") ~= nil then
     py.put(meta, "squad", py.get(assignee, "squad"))
   end
-  py.put(meta, "visibility", py.getd(o, "visibility", m.default_visibility(o)))
+  py.put(meta, "visibility", py.getd(o, "visibility", m.default_visibility(o, manifest)))
   if py.get(o, "target") ~= nil then
     py.put(meta, "target", py.get(o, "target"))
   end
@@ -139,26 +139,27 @@ function package.mode_yaml(manifest)
   local objectives = py.list({}, 0)
   local src = py.get(manifest, "objectives")
   for i = 1, src.n do
-    objectives[i] = objective_meta(src[i])
+    objectives[i] = objective_meta(src[i], manifest)
   end
   objectives.n = src.n
   local teams = py.getd(manifest, "teams", nil)
-  py.put(
-    doc,
-    "scenario",
-    ordered(
-      "lang",
-      py.getd(manifest, "lang", "pt"),
-      "teams",
-      teams ~= nil and copy_list(teams) or py.list({ "red", "blue" }, 2),
-      "squads",
-      py.getd(manifest, "squads", 0),
-      "nodes",
-      nodes,
-      "objectives",
-      objectives
-    )
+  local block = ordered(
+    "lang",
+    py.getd(manifest, "lang", "pt"),
+    "teams",
+    teams ~= nil and copy_list(teams) or py.list({ "red", "blue" }, 2),
+    "squads",
+    py.getd(manifest, "squads", 0)
   )
+  -- Only when the manifest says so: a scenario without them compiles as before.
+  for _, key in ipairs({ "reveal", "disclosure" }) do
+    if py.get(manifest, key) ~= nil then
+      py.put(block, key, py.get(manifest, key))
+    end
+  end
+  py.put(block, "nodes", nodes)
+  py.put(block, "objectives", objectives)
+  py.put(doc, "scenario", block)
   return HEAD .. yaml.dump(doc)
 end
 

@@ -421,6 +421,16 @@ INVALID = [
      "objectives:\n  - { id: hill, name: Hill, type: capture_and_hold, target: a }\n"
      "  - { id: vale, name: Vale, type: survive, assignee: { team: red }, params: { minimum_lives: 1 }, "
      "time_window: { end_min: 1 } }\n"),
+    ("The reveal and disclosure settings (SQ-1, SQ-3): wrong words, a number, a list",
+     "id: org.club.squad-words\nversion: 1\nname: Words\nreveal: later\ndisclosure: [leader]\nsquads: 1\n"
+     "nodes: { a: { role: objective }, b: { role: objective } }\nobjectives:\n"
+     "  - { id: a, name: A, type: capture_and_hold, target: a, assignee: { team: red, squad: 1 } }\n"
+     "  - { id: b, name: B, type: capture_and_hold, target: b, assignee: { team: red, squad: 1 }, "
+     "depends_on: [a] }\n"),
+    ("The reveal setting as a number",
+     "id: org.club.squad-number\nversion: 1\nname: Number\nreveal: 1\ndisclosure: members\n"
+     "nodes: { a: { role: objective } }\nobjectives:\n"
+     "  - { id: a, name: A, type: capture_and_hold, target: a }\n"),
     ("YAML 1.1 readings that are errors",
      "id: org.club.errors\nversion: 2026-10-23\nname: Errors\n"
      "teams: [red, no]\ndescription: 2026-10-23 10:00:00\nnodes:\n  yes: { role: objective }\n"

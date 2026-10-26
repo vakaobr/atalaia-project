@@ -219,6 +219,22 @@ class FieldFeed extends ChangeNotifier {
   /// Lives left by player or team, from player.respawn.
   final lives = <String, int>{};
 
+  /// How many new orders came on the live stream since the connection (SQ-5):
+  /// an objective revealed to this player, or the news that their squad
+  /// leader has orders. The player view buzzes when it grows; the list the
+  /// connection starts with does not count.
+  int ordersSeq = 0;
+
+  /// The reveals of orders for this player's squad leader alone (SQ-3): the
+  /// event comes without the objective, with `leader_only`.
+  int get leaderOrders => events
+      .where(
+        (e) =>
+            e.type == 'scenario.objective.revealed' &&
+            e.data['leader_only'] == true,
+      )
+      .length;
+
   /// What the objective events said of each objective (by id): the state,
   /// and the team that completed or failed it, and why.
   final _objectiveNews = <String, (ObjectiveState, String?, String?)>{};
@@ -353,7 +369,15 @@ class FieldFeed extends ChangeNotifier {
         }
       case 'event':
         final e = m['event'];
-        if (e is Map<String, Object?>) _onEvent(e);
+        if (e is Map<String, Object?>) {
+          _onEvent(e);
+          final d = e['data'];
+          if (e['type'] == 'scenario.objective.revealed' &&
+              d is Map &&
+              (d['objective'] is String || d['leader_only'] == true)) {
+            ordersSeq++;
+          }
+        }
       case 'checkin':
         final c = m['checkin'];
         if (c is Map && (me == null || c['player_id'] == me!['player_id'])) {

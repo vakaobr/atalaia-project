@@ -338,6 +338,10 @@ const Map<String, String> enStrings = {
       'A new objective for {team}: {objective}',
   'event.scenario.objective.revealed.named.no_team':
       'A new objective: {objective}',
+  'event.scenario.objective.revealed.leader':
+      'Your squad leader has new orders',
+  'player.leader_orders':
+      'Orders for your squad: your squad leader will pass them on',
 
   // GM
   'gm.intro':

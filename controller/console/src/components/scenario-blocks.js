@@ -113,6 +113,10 @@ export function blockDefinitions(tr) {
             [tr('scenario_id'), [text('ID', 'org.club.'), text('VERSION', '1')]],
             [tr('scenario_lang'), [{ type: 'field_dropdown', name: 'LANG', options: [[tr('lang_pt'), 'pt'], [tr('lang_en'), 'en']] },
                 num('SQUADS', 0)]],
+            [tr('scenario_rules'), [
+                { type: 'field_dropdown', name: 'REVEAL', options: [[tr('reveal_all'), 'all'], [tr('reveal_active'), 'active']] },
+                { type: 'field_dropdown', name: 'DISCLOSURE',
+                  options: [[tr('disclosure_members'), 'members'], [tr('disclosure_leader'), 'leader']] }]],
             [tr('scenario_texts'), [statement('INFO')]],
             [tr('scenario_teams'), [statement('TEAMS')]],
             [tr('scenario_params'), [statement('PARAMS')]],
@@ -241,10 +245,10 @@ export function manifestToState(m) {
         return undefined;
     };
     if (!isObject(m)) return { state: null, lost: [''] };
-    only(m, ['id', 'version', 'name', 'description', 'author', 'lang', 'teams', 'squads', 'params', 'i18n', 'nodes',
-        'objectives'], '');
+    only(m, ['id', 'version', 'name', 'description', 'author', 'lang', 'teams', 'squads', 'reveal', 'disclosure', 'params',
+        'i18n', 'nodes', 'objectives'], '');
 
-    const root = { ID: '', VERSION: '', NAME: '', LANG: 'pt', SQUADS: 0 };
+    const root = { ID: '', VERSION: '', NAME: '', LANG: 'pt', SQUADS: 0, REVEAL: 'all', DISCLOSURE: 'members' };
     if ('id' in m) root.ID = textOf(m, 'id', '') ?? '';
     if ('version' in m) {
         if (isText(m.version) || isNumber(m.version)) root.VERSION = String(m.version);
@@ -257,6 +261,12 @@ export function manifestToState(m) {
         else lost.push('lang');
     }
     if ('squads' in m) root.SQUADS = intOf(m, 'squads', '') ?? 0;
+    // A squad's chain and who is told (SQ-1, SQ-3); said as the default, the blocks would leave it out.
+    for (const [key, field, words] of [['reveal', 'REVEAL', ['all', 'active']], ['disclosure', 'DISCLOSURE', ['members', 'leader']]]) {
+        if (!(key in m)) continue;
+        if (words.includes(m[key]) && m[key] !== words[0]) root[field] = m[key];
+        else lost.push(key);
+    }
 
     const info = [];
     const description = textOf(m, 'description', '');
@@ -582,6 +592,8 @@ export function workspaceToManifest(ws) {
     m.teams = put('teams', placed(root, 'TEAMS').map((b) => field(b, 'TEAM')), root);
     const squads = Number(field(root, 'SQUADS'));
     if (squads !== 0) m.squads = put('squads', squads, root);
+    if (field(root, 'REVEAL') !== 'all') m.reveal = put('reveal', field(root, 'REVEAL'), root);
+    if (field(root, 'DISCLOSURE') !== 'members') m.disclosure = put('disclosure', field(root, 'DISCLOSURE'), root);
     const params = {};
     const labelsPt = {};
     for (const b of placed(root, 'PARAMS')) {
@@ -845,8 +857,8 @@ function emitMap(obj, indent, lines, first = null) {
     });
 }
 
-const TOP = ['id', 'version', 'name', 'author', 'description', 'lang', 'teams', 'squads', 'params', 'i18n', 'nodes',
-    'objectives'];
+const TOP = ['id', 'version', 'name', 'author', 'description', 'lang', 'teams', 'squads', 'reveal', 'disclosure', 'params',
+    'i18n', 'nodes', 'objectives'];
 const OBJECTIVE = ['id', 'name', 'description', 'i18n', 'type', 'target', 'assignee', 'params', 'visibility',
     'depends_on', 'time_window', 'effect'];
 

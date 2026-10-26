@@ -295,6 +295,11 @@ class ControllerApi {
       _route('GET', r'/api/v1/games', _viewer(_games)),
       _route('POST', r'/api/v1/games', _gm(_createGame)),
       _route('GET', r'/api/v1/games/([^/]+)', _viewer(_game)),
+      _route(
+        'PUT',
+        r'/api/v1/games/([^/]+)/objective-disclosure',
+        _gm(_objectiveDisclosure),
+      ),
       _route('POST', r'/api/v1/games/([^/]+)/start', _gm(_start)),
       _route('POST', r'/api/v1/games/([^/]+)/pause', _gm(_pause)),
       _route('POST', r'/api/v1/games/([^/]+)/resume', _gm(_resume)),
@@ -829,6 +834,9 @@ class ControllerApi {
     if (svc != null) out['pending_declarations'] = svc.pendingCount(id);
     return ApiResponse(200, out);
   }
+
+  ApiResponse _objectiveDisclosure(_Request r) =>
+      ApiResponse(200, engine.setObjectiveDisclosure(r.pathInt(1), r.json));
 
   ApiResponse _pause(_Request r) {
     final id = r.pathInt(1);

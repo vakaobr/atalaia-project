@@ -720,7 +720,9 @@ roadmap:
       und der App (der Szenario-Editor der Konsole listet jedes Problem schon beim Tippen und
       installiert das Szenario; die Boxen bekommen die Namen des Szenarios beim Beitritt; Spielende
       sehen in der App die Ziele, die für sie bestimmt sind, mit ihren Namen und ihrem Stand, ein
-      verdecktes erst, wenn es aufgedeckt ist), die Regeln von Zielfenster (ein Treffer, während die
+      verdecktes erst, wenn es aufgedeckt ist; jedes Squad kann seine eigene Kette haben, immer
+      ein Ziel auf einmal, das nächste wird aufgedeckt, wenn es erfüllt ist, gesagt dem ganzen
+      Squad oder nur dem Squad-Lead), die Regeln von Zielfenster (ein Treffer, während die
       Zielscheibe die Farbe eines Teams zeigt, punktet für dieses Team; das Ziel-Addon ist noch
       nicht gebaut), Geo-Funktionen im Kern (Entfernungen und Zonen für jedes Skript, auf jeder
       Plattform gleich) und der ATAK-Feed (die Boxen und Zonen auf ATAK-Karten über das WLAN des

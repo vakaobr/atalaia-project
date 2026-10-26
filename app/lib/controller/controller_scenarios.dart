@@ -41,6 +41,14 @@ import 'scenarios/scenario_package.dart';
 
 const scenarioManifestKey = 'scenario.manifest:';
 const scenarioNodesKey = 'scenario.nodes:';
+
+/// The GM's choice for one game of who of a squad is told its objectives
+/// (SQ-4).
+const scenarioDisclosureKey = 'scenario.disclosure:';
+
+/// Who of an objective's assignee is told it (SQ-3): every member, or only
+/// the squad leaders.
+const disclosures = ['members', 'leader'];
 const objectiveRevealed = 'scenario.objective.revealed';
 
 /// The scenario events whose objective decides who may read them.
@@ -106,6 +114,8 @@ final class ScenarioMeta {
     required this.squads,
     required this.nodes,
     required this.objectives,
+    this.reveal = 'all',
+    this.disclosure = 'members',
   });
 
   final String id;
@@ -119,6 +129,12 @@ final class ScenarioMeta {
 
   /// By id, in the manifest's order.
   final Map<String, Map<String, Object?>> objectives;
+
+  /// `active`: a dependent objective is known only when it opens (SQ-1).
+  final String reveal;
+
+  /// `leader`: only the assignee squad's leaders get the details (SQ-3).
+  final String disclosure;
 
   /// Null for a package that is not a compiled scenario.
   static ScenarioMeta? parse(String modeYaml) {
@@ -154,6 +170,8 @@ final class ScenarioMeta {
       squads: squads is int ? squads : 0,
       nodes: nodes,
       objectives: objectives,
+      reveal: block['reveal'] == 'active' ? 'active' : 'all',
+      disclosure: block['disclosure'] == 'leader' ? 'leader' : 'members',
     );
   }
 
@@ -180,29 +198,36 @@ final class ScenarioMeta {
     return out;
   }
 
-  /// Everything mode.yaml says (the console's Join tab and feed).
-  Map<String, Object?> staffView() => {
+  /// Everything mode.yaml says (the console's Join tab and feed);
+  /// [gameDisclosure] is the game's (the GM's choice or the manifest's),
+  /// `disclosure_default` the manifest's (SQ-4).
+  Map<String, Object?> staffView([String? gameDisclosure]) => {
     ...header(),
     'lang': lang,
     'teams': teams,
     'squads': squads,
+    'reveal': reveal,
+    'disclosure': gameDisclosure ?? disclosure,
+    'disclosure_default': disclosure,
     'nodes': nodes,
     'objectives': objectives.values.toList(),
   };
 
   /// The objectives this viewer may know (P4R24): a hidden one only once it
-  /// is revealed.
+  /// is revealed, and with [gameDisclosure] `leader` only a squad leader gets
+  /// the squad's (SQ-3).
   Map<String, Object?> playerView(
     ApiViewer? viewer,
     Map<String, Object?> game,
-    Set<String> revealed,
-  ) {
+    Set<String> revealed, [
+    String gameDisclosure = 'members',
+  ]) {
     final staff = viewer != null && viewer.isStaffOf(game['id'] as int?);
     return {
       ...header(),
       'objectives': [
         for (final o in objectives.values)
-          if (objectiveVisible(viewer, o, game) &&
+          if (objectiveVisible(viewer, o, game, gameDisclosure) &&
               (staff ||
                   o['visibility'] != 'hidden' ||
                   revealed.contains(o['id'])))
@@ -234,25 +259,50 @@ String? _playerTeam(ApiViewer? viewer, Map<String, Object?> game) {
       : null;
 }
 
-/// Whether a viewer may know this objective (visibility.py
-/// `objective_visible`).
-bool objectiveVisible(
+/// What a viewer gets of an objective (visibility.py `objective_access`):
+/// `full`, `notice` (a member of the squad whose leader alone is told: only
+/// that the leader has orders) or `none`.
+enum ObjectiveAccess { full, notice, none }
+
+ObjectiveAccess objectiveAccess(
   ApiViewer? viewer,
   Map<String, Object?> objective,
-  Map<String, Object?> game,
-) {
-  if (viewer != null && viewer.isStaffOf(game['id'] as int?)) return true;
+  Map<String, Object?> game, [
+  String disclosure = 'members',
+]) {
+  if (viewer != null && viewer.isStaffOf(game['id'] as int?)) {
+    return ObjectiveAccess.full;
+  }
   var vis = objective['visibility'] ?? 'public';
   final team = objective['team'], squad = objective['squad'];
   if (vis == 'hidden') {
     vis = squad != null ? 'squad' : (team != null ? 'team' : 'public');
   }
-  if (vis == 'public' || team == null) return true;
-  if (_playerTeam(viewer, game) != team) return false;
-  return vis == 'team' ||
-      squad == null ||
-      (viewer != null && pyStr(viewer.squad) == pyStr(squad));
+  if (vis == 'public' || team == null) return ObjectiveAccess.full;
+  if (viewer == null || _playerTeam(viewer, game) != team) {
+    return ObjectiveAccess.none;
+  }
+  if (vis == 'squad' && squad != null && pyStr(viewer.squad) != pyStr(squad)) {
+    return ObjectiveAccess.none;
+  }
+  if (disclosure == 'leader' &&
+      viewer.squad != 0 &&
+      viewer.role != 'squad_leader') {
+    return ObjectiveAccess.notice;
+  }
+  return ObjectiveAccess.full;
 }
+
+/// Whether a viewer may know this objective whole (visibility.py
+/// `objective_visible`).
+bool objectiveVisible(
+  ApiViewer? viewer,
+  Map<String, Object?> objective,
+  Map<String, Object?> game, [
+  String disclosure = 'members',
+]) =>
+    objectiveAccess(viewer, objective, game, disclosure) ==
+    ObjectiveAccess.full;
 
 /// An event as this viewer may see it (visibility.py `scenario_event`):
 /// whole for staff and, for a scenario objective's event, for the players
@@ -261,8 +311,9 @@ Map<String, Object?> scenarioEvent(
   ApiViewer? viewer,
   Map<String, Object?> ev,
   Map<String, Object?>? game,
-  Map<String, Map<String, Object?>>? objectives,
-) {
+  Map<String, Map<String, Object?>>? objectives, [
+  String disclosure = 'members',
+]) {
   if (viewer != null && viewer.isStaffOf(game?['id'] as int?)) return ev;
   final data = ev['data'];
   if (game != null &&
@@ -271,7 +322,22 @@ Map<String, Object?> scenarioEvent(
       objectiveEvents.contains(ev['type']) &&
       data is Map) {
     final o = objectives[data['objective']];
-    if (o != null && objectiveVisible(viewer, o, game)) return ev;
+    final access = o == null
+        ? ObjectiveAccess.none
+        : objectiveAccess(viewer, o, game, disclosure);
+    if (access == ObjectiveAccess.full) return ev;
+    if (access == ObjectiveAccess.notice && ev['type'] == objectiveRevealed) {
+      // The squad's leader has orders (SQ-3): this member is told so, not
+      // which.
+      final pub = publicEvent(ev);
+      return {
+        ...pub,
+        'data': {
+          ...(pub['data']! as Map<String, Object?>),
+          'leader_only': true,
+        },
+      };
+    }
   }
   return publicEvent(ev);
 }
@@ -487,6 +553,8 @@ class ControllerScenarios {
         'lang': m.lang,
         'teams': m.teams,
         'squads': m.squads,
+        'reveal': m.reveal,
+        'disclosure': m.disclosure,
         'nodes': [
           for (final e in m.nodes.entries)
             _node(e.key, e.value.cast<Object?, Object?>()),
@@ -558,6 +626,33 @@ class ControllerScenarios {
       jsonEncode({for (final k in ids) '$k': names[k]}),
     );
     return names;
+  }
+
+  /// Who of an objective's assignee is told it in this game (SQ-3, SQ-4): the
+  /// GM's choice for the game, else the manifest's, else everyone.
+  String disclosure(int gameId, ScenarioMeta? meta) {
+    final raw = engine.store.getSetting('$scenarioDisclosureKey$gameId');
+    if (raw != null && disclosures.contains(raw)) return raw;
+    return meta?.disclosure ?? 'members';
+  }
+
+  /// The GM's choice from a request: `members`, `leader`, or null to go back
+  /// to the manifest's.
+  static String? checkDisclosure(Object? value) {
+    if (value != null && !disclosures.contains(value)) {
+      throw ControllerError(
+        'disclosure: one of $disclosures, or null for the scenario\'s own',
+      );
+    }
+    return value as String?;
+  }
+
+  void storeDisclosure(int gameId, String? value) {
+    if (value == null) {
+      engine.store.deleteSetting('$scenarioDisclosureKey$gameId');
+    } else {
+      engine.store.setSetting('$scenarioDisclosureKey$gameId', value);
+    }
   }
 
   /// The objectives whose reveal is in the game's log.

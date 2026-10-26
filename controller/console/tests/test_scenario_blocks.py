@@ -187,7 +187,7 @@ class ScenarioBlocksTests(unittest.TestCase):
         page = self.console()
         self.blocks_view(page)  # loads Blockly and defines the blocks
         cases = examples()
-        self.assertEqual(len(cases), 9)  # with scenario.json's emoji as a surrogate pair (PE24-107)
+        self.assertEqual(len(cases), 10)  # with scenario.json's emoji as a surrogate pair (PE24-107)
         for name, text in cases:
             with self.subTest(name):
                 original = load(text)

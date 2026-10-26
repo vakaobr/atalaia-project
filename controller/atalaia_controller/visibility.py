@@ -75,28 +75,46 @@ def _player_team(viewer: Optional["Viewer"], game: dict[str, Any]) -> Optional[s
     return teams[viewer.team - 1] if 1 <= viewer.team <= len(teams) else None
 
 
-def objective_visible(viewer: Optional["Viewer"], objective: dict[str, Any], game: dict[str, Any]) -> bool:
-    """Whether a viewer may know this objective (its id, names and state; P4R24).
+DISCLOSURES = ("members", "leader")
+FULL, NOTICE, NONE = "full", "notice", "none"
+
+
+def objective_access(viewer: Optional["Viewer"], objective: dict[str, Any], game: dict[str, Any],
+                     disclosure: str = "members") -> str:
+    """What a viewer gets of this objective (its id, names and state; P4R24, SQ-3): ``full``, ``notice``
+    (a member of the squad whose leader alone is told: only that the leader has orders) or ``none``.
+    A squad leader is told of the objectives of their own squad and of their whole team; so is a
+    player who belongs to no squad, who has no leader to be told through.
 
     ``objective`` is one entry of a scenario package's ``scenario.objectives`` (M7-8): its
     ``visibility`` and its assignee's ``team`` and ``squad``. Whether a hidden one has been
     revealed yet is the caller's to know (the runtime never sends an event about it before).
     """
     if is_staff(viewer, game.get("id")):
-        return True
+        return FULL
     vis = objective.get("visibility", "public")
     team, squad = objective.get("team"), objective.get("squad")
     if vis == "hidden":
         vis = "squad" if squad is not None else "team" if team is not None else "public"
     if vis == "public" or team is None:
-        return True
-    if _player_team(viewer, game) != team:
-        return False
-    return vis == "team" or squad is None or (viewer is not None and str(viewer.squad) == str(squad))
+        return FULL
+    if viewer is None or _player_team(viewer, game) != team:
+        return NONE
+    if vis == "squad" and squad is not None and str(viewer.squad) != str(squad):
+        return NONE
+    if disclosure == "leader" and viewer.squad != 0 and viewer.role != "squad_leader":
+        return NOTICE
+    return FULL
+
+
+def objective_visible(viewer: Optional["Viewer"], objective: dict[str, Any], game: dict[str, Any],
+                      disclosure: str = "members") -> bool:
+    """Whether a viewer may know this objective whole (``objective_access`` is ``full``)."""
+    return objective_access(viewer, objective, game, disclosure) == FULL
 
 
 def scenario_event(viewer: Optional["Viewer"], ev: dict[str, Any], game: Optional[dict[str, Any]],
-                   objectives: Optional[dict[str, dict[str, Any]]]) -> dict[str, Any]:
+                   objectives: Optional[dict[str, dict[str, Any]]], disclosure: str = "members") -> dict[str, Any]:
     """An event as this viewer may see it: whole for staff and, for a scenario objective's event,
     for the players the objective is for (``objectives``: the game's scenario objectives by id);
     else without its gm_only data (``public_event``)."""
@@ -105,8 +123,12 @@ def scenario_event(viewer: Optional["Viewer"], ev: dict[str, Any], game: Optiona
     data = ev.get("data")
     if game is not None and objectives and ev.get("type") in OBJECTIVE_EVENTS and isinstance(data, dict):
         objective = objectives.get(data.get("objective"))  # type: ignore[arg-type]
-        if objective is not None and objective_visible(viewer, objective, game):
+        access = objective_access(viewer, objective, game, disclosure) if objective is not None else NONE
+        if access == FULL:
             return ev
+        if access == NOTICE and ev["type"] == "scenario.objective.revealed":
+            # The squad's leader has orders (SQ-3): this member is told so, not which.
+            return {**public_event(ev), "data": {**public_event(ev)["data"], "leader_only": True}}
     return public_event(ev)
 
 

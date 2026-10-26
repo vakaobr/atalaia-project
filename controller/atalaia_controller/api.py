@@ -24,6 +24,8 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/games                     every game
     POST /api/v1/games                     create a game from a mode or preset
     GET  /api/v1/games/{id}                one game
+    PUT  /api/v1/games/{id}/objective-disclosure   GM: who of a squad is told its scenario objectives
+                                           ({"disclosure": "members"|"leader"|null}, SQ-4)
     POST /api/v1/games/{id}/start|pause|resume|end   (start: {"force": true} starts without a node for
                                            every role the game needs; refused with start_check otherwise)
     GET  /api/v1/games/{id}/start-check    the roles the game needs, those joined, missing, warnings
@@ -455,6 +457,10 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     def game(game_id: int, v: Viewer = Depends(require_read)) -> dict[str, Any]:
         out = controller.get_game(game_id)
         return out if visibility.is_staff(v, game_id) else controller.players_game(out, v)
+
+    @app.put("/api/v1/games/{game_id}/objective-disclosure", dependencies=[Depends(require_gm)])
+    def objective_disclosure(game_id: int, body: Any = Body(None)) -> dict[str, Any]:
+        return controller.set_objective_disclosure(game_id, body)
 
     @app.post("/api/v1/games/{game_id}/start", dependencies=[Depends(require_gm)])
     def start(game_id: int, body: Any = Body(None)) -> dict[str, Any]:

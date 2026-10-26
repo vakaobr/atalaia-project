@@ -163,6 +163,8 @@ function Checker:run()
     squads = 0
   end
   self.squads = squads
+  self:check_choice("reveal", m.REVEALS, "bad_reveal", "when a dependent objective becomes known")
+  self:check_choice("disclosure", m.DISCLOSURES, "bad_disclosure", "who an objective is told to")
   self.params = self:check_params()
   self:check_i18n(py.get(mf, "i18n"), "i18n", { "name", "description", "params" })
   self.nodes, self.node_names = self:check_nodes()
@@ -844,9 +846,17 @@ function Checker:check_polygon(points, path)
   end
 end
 
+-- A top-level setting that is one of a few words (reveal, disclosure: SQ-1, SQ-3).
+function Checker:check_choice(key, choices, code, what)
+  local value = py.get(self.m, key)
+  if value ~= nil and not in_list(value, choices) then
+    self:err(key, code, what .. ": one of " .. join(choices))
+  end
+end
+
 function Checker:check_visibility(o, path, team)
   local _ = team
-  local vis = py.getd(o, "visibility", m.default_visibility(o))
+  local vis = py.getd(o, "visibility", m.default_visibility(o, self.m))
   local assignee = py.get(o, "assignee")
   if not py.is_map(assignee) then
     assignee = py.map()

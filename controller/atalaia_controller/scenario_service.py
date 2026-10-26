@@ -47,6 +47,7 @@ if TYPE_CHECKING:
 
 MANIFEST_KEY = "scenario.manifest:"
 NODES_KEY = "scenario.nodes:"
+DISCLOSURE_KEY = "scenario.disclosure:"  # the GM's choice for one game (SQ-4)
 REVEALED = "scenario.objective.revealed"
 # What a player's view of an objective carries: never its target, dependencies or reveals (the
 # ids of hidden objectives), and never a code or a destination (those are only in field.lua).
@@ -67,6 +68,8 @@ class Meta:
     squads: int
     nodes: dict[str, dict[str, Any]]
     objectives: dict[str, dict[str, Any]] = field(default_factory=dict)  # by id, in the manifest's order
+    reveal: str = "all"  # "active": a dependent objective is known only when it opens (SQ-1)
+    disclosure: str = "members"  # "leader": only the assignee squad's leaders get the details (SQ-3)
 
     @staticmethod
     def parse(mode_yaml: str) -> Optional["Meta"]:
@@ -84,7 +87,9 @@ class Meta:
         return Meta(id=str(doc.get("id")), name=str(doc.get("name", doc.get("id"))),
                     description=str(doc.get("description") or ""), i18n=dict(doc.get("i18n") or {}),
                     lang=str(block.get("lang", "pt")), teams=list(block.get("teams") or []),
-                    squads=int(block.get("squads") or 0), nodes=nodes, objectives=objectives)
+                    squads=int(block.get("squads") or 0), nodes=nodes, objectives=objectives,
+                    reveal="active" if block.get("reveal") == "active" else "all",
+                    disclosure="leader" if block.get("disclosure") == "leader" else "members")
 
     def box_nodes(self) -> dict[str, str]:
         """The boxes the GM names in the Join tab: name -> role (objective or bomb_site)."""
@@ -100,16 +105,21 @@ class Meta:
             out["i18n"] = {lang: t for lang, t in texts.items() if t}
         return out
 
-    def staff_view(self) -> dict[str, Any]:
-        """Everything mode.yaml says (the console's Join tab and feed)."""
+    def staff_view(self, disclosure: Optional[str] = None) -> dict[str, Any]:
+        """Everything mode.yaml says (the console's Join tab and feed); ``disclosure`` is the game's
+        (the GM's choice or the manifest's), ``disclosure_default`` the manifest's (SQ-4)."""
         return {**self.header(), "lang": self.lang, "teams": self.teams, "squads": self.squads,
+                "reveal": self.reveal, "disclosure": disclosure or self.disclosure,
+                "disclosure_default": self.disclosure,
                 "nodes": self.nodes, "objectives": list(self.objectives.values())}
 
-    def player_view(self, viewer: Optional["Viewer"], game: dict[str, Any], revealed: set[str]) -> dict[str, Any]:
-        """The objectives this viewer may know (P4R24): a hidden one only once it is revealed."""
+    def player_view(self, viewer: Optional["Viewer"], game: dict[str, Any], revealed: set[str],
+                    disclosure: str = "members") -> dict[str, Any]:
+        """The objectives this viewer may know (P4R24): a hidden one only once it is revealed, and
+        with ``disclosure`` "leader" only a squad leader gets the squad's (SQ-3)."""
         staff = visibility.is_staff(viewer, game.get("id"))
         objectives = [{k: o[k] for k in PLAYER_FIELDS if k in o} for o in self.objectives.values()
-                      if visibility.objective_visible(viewer, o, game)
+                      if visibility.objective_visible(viewer, o, game, disclosure)
                       and (staff or o.get("visibility") != "hidden" or o["id"] in revealed)]
         return {**self.header(), "objectives": objectives}
 
@@ -241,6 +251,7 @@ def describe(pkg: "ModePackage", has_manifest: bool) -> dict[str, Any]:
                            "params": pkg.mode.params, "manifest": has_manifest, "compiled": meta is not None}
     if meta is not None:
         out.update({"lang": meta.lang, "teams": meta.teams, "squads": meta.squads,
+                    "reveal": meta.reveal, "disclosure": meta.disclosure,
                     "nodes": [{"name": n, "role": s.get("role"), "player": bool(s.get("player")),
                                **({"level": s["level"]} if isinstance(s.get("level"), int) else {})}
                               for n, s in meta.nodes.items()],
@@ -289,3 +300,28 @@ def name_node(ctrl: "Controller", game_id: int, node_id: int, name: str) -> dict
 def revealed(ctrl: "Controller", game_id: int) -> set[str]:
     """The objectives whose reveal is in the game's log."""
     return {str((e.get("data") or {}).get("objective")) for e in ctrl.store.events(game_id, event_type=REVEALED)}
+
+
+def disclosure(ctrl: "Controller", game_id: int, meta: Optional[Meta]) -> str:
+    """Who of an objective's assignee is told it in this game (SQ-3, SQ-4): the GM's choice for the
+    game, else the manifest's, else everyone ("members")."""
+    raw = ctrl.store.get_setting(f"{DISCLOSURE_KEY}{game_id}")
+    if raw in visibility.DISCLOSURES:
+        return str(raw)
+    return meta.disclosure if meta is not None else "members"
+
+
+def check_disclosure(value: Any) -> Optional[str]:
+    """The GM's choice from a request: "members", "leader", or null to go back to the manifest's."""
+    from .engine import ControllerError  # noqa: PLC0415
+
+    if value is not None and value not in visibility.DISCLOSURES:
+        raise ControllerError(f"disclosure: one of {list(visibility.DISCLOSURES)}, or null for the scenario's own")
+    return value
+
+
+def store_disclosure(ctrl: "Controller", game_id: int, value: Optional[str]) -> None:
+    if value is None:
+        ctrl.store.delete_setting(f"{DISCLOSURE_KEY}{game_id}")
+    else:
+        ctrl.store.set_setting(f"{DISCLOSURE_KEY}{game_id}", value)

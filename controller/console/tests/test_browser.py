@@ -3474,6 +3474,45 @@ class ConsoleBrowserTests(unittest.TestCase):
         stored = self.field.bundle.store.checkin(game["id"], me["player_id"])
         self.assertEqual((stored["team"], stored["squad"]), (2, 2))
 
+    def test_who_of_a_squad_is_told_its_scenario_objectives(self):
+        """SQ-3, SQ-4: a scenario with squads offers who of a squad gets its objectives (every member,
+        or the squad leader only) when the game is made, and changes it for the live game; a game
+        of another mode or without squads offers nothing."""
+        text = (HERE.parents[1] / "tests" / "scenarios" / "squad_chains.yaml").read_text(encoding="utf-8")
+        self.assertEqual(self.field.http.post("/api/v1/scenarios", json={"manifest": text}).status_code, 201)
+        page = self.console()
+        page.get_by_test_id("game-name").fill("Cadeias")
+        page.get_by_test_id("game-source").select_option(f"mode:{DOMINATION}")
+        page.get_by_test_id("game-squads").fill("2")
+        expect(page.get_by_test_id("game-disclosure")).to_have_count(0)  # not a scenario
+        page.get_by_test_id("game-source").select_option("mode:org.club.squad-chains")
+        page.get_by_test_id("game-roles").locator('input[value="org.atalaia.objectives"]').check()
+        page.get_by_test_id("game-squads").fill("0")
+        expect(page.get_by_test_id("game-disclosure")).to_have_count(0)  # no squads
+        page.get_by_test_id("game-squads").fill("2")
+        select = page.get_by_test_id("game-disclosure")
+        expect(select).to_be_visible()
+        expect(select).to_have_value("")
+        select.select_option("members")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+        game = self.field.bundle.controller.game
+        self.assertEqual(game["mode_id"], "org.club.squad-chains+org.atalaia.objectives")
+        seen = self.field.http.get(f"/api/v1/games/{game['id']}").json()["scenario"]
+        self.assertEqual((seen["disclosure"], seen["disclosure_default"], seen["reveal"]),
+                         ("members", "leader", "active"))
+        # The live game's own selector shows the choice and changes it.
+        live = page.get_by_test_id("game-disclosure-select")
+        expect(live).to_have_value("members")
+        live.select_option("")
+        self.assertTrue(wait_for(lambda: self.field.http.get(f"/api/v1/games/{game['id']}").json()
+                                 ["scenario"]["disclosure"] == "leader", 5))
+        expect(live).to_have_value("")
+        expect(page.get_by_test_id("game-disclosure-live")).to_contain_text("Só o líder de squad")
+        live.select_option("members")
+        self.assertTrue(wait_for(lambda: self.field.http.get(f"/api/v1/games/{game['id']}").json()
+                                 ["scenario"]["disclosure"] == "members", 5))
+
     def test_poster_renders_a_qr_code_with_the_poster_text(self):
         if not ZBARIMG:
             self.skipTest("zbarimg is not installed")

@@ -682,7 +682,9 @@ roadmap:
       scenarios in the GM console and the app (the console's scenario editor lists every problem as
       the organiser types and installs the scenario; the boxes get the scenario's names when they
       join; players see in the app the objectives meant for them, with their names and how each
-      stands, a hidden one only once it is revealed), the rules of Target Windows (a hit while the
+      stands, a hidden one only once it is revealed; each squad can have its own chain, one
+      objective at a time with the next revealed when it is completed, told to the whole squad or to
+      the squad leader alone), the rules of Target Windows (a hit while the
       target shows a team's colour scores for that team; the target addon is not built yet), geo
       utilities in the core (distances and zones for every script, identical on every platform), and
       the ATAK feed (the boxes and zones on ATAK maps over the field Wi-Fi, in their owners'

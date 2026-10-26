@@ -1,0 +1,58 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Per-squad objective chains (decisions SQ-1 to SQ-8): every squad of red plays its own chain, one
+# objective at a time. `reveal: active` makes an objective that depends on another known to its
+# squad only when it opens; `disclosure: leader` tells the objective to the squad's leader alone
+# (the members hear that their leader has new orders). The GM may change the disclosure per game.
+#
+#   python3 -m atalaia_controller.scenarios check tests/scenarios/squad_chains.yaml
+id: org.club.squad-chains
+version: 1
+name: Squad chains
+lang: en
+teams: [red, blue]
+squads: 2
+reveal: active
+disclosure: leader
+i18n:
+  pt:
+    name: Cadeias por esquadra
+
+nodes:
+  bridge: { role: objective }
+  mill: { role: objective }
+  vault: { role: objective }
+  tower: { role: objective }
+
+objectives:
+  - id: alpha_1
+    name: Take the bridge
+    i18n: { pt: { name: Tomar a ponte } }
+    type: capture_and_hold
+    assignee: { team: red, squad: 1 }
+    target: bridge
+  - id: alpha_2
+    name: Open the vault
+    i18n: { pt: { name: Abrir o cofre } }
+    type: enter_code
+    assignee: { team: red, squad: 1 }
+    target: vault
+    params: { code: "4711" }
+    depends_on: [alpha_1]
+    effect: { points: 100 }
+  - id: bravo_1
+    name: Take the mill
+    i18n: { pt: { name: Tomar o moinho } }
+    type: capture_and_hold
+    assignee: { team: red, squad: 2 }
+    target: mill
+  - id: bravo_2
+    name: Hold the tower
+    i18n: { pt: { name: Manter a torre } }
+    type: capture_and_hold
+    assignee: { team: red, squad: 2 }
+    target: tower
+    depends_on: [bravo_1]
+    visibility: squad   # stays known from the start: an explicit visibility wins over `reveal`
+    effect: { win: true }

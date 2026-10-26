@@ -710,7 +710,9 @@ roadmap:
       da organização e na aplicação (o editor de cenários da consola mostra cada problema enquanto
       se escreve e instala o cenário; as caixas recebem os nomes do cenário ao juntar-se; na
       aplicação, quem joga vê os objetivos que são para si, com os nomes e o estado de cada um, e um
-      objetivo escondido só depois de revelado), as regras das Janelas de Alvo (um tiro enquanto o
+      objetivo escondido só depois de revelado; cada squad pode ter a sua cadeia, um objetivo de
+      cada vez, com o seguinte revelado quando este é cumprido, dito a todo o squad ou só ao líder
+      de squad), as regras das Janelas de Alvo (um tiro enquanto o
       alvo mostra a cor de uma equipa pontua para essa equipa; o módulo de alvo ainda não está
       feito), os utilitários geográficos no núcleo (distâncias e zonas para todos os scripts,
       idênticos em todas as plataformas) e o feed ATAK (as caixas e as zonas em mapas ATAK pelo

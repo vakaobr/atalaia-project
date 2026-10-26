@@ -63,6 +63,12 @@ m.LANGS = { "pt", "en" } -- the objectives package's screens (modes/objectives/n
 m.TRANSLATIONS = { "pt" } -- texts are in English, with i18n.pt (P4R8)
 m.NODE_ROLES = { "objective", "bomb_site" } -- org.atalaia.objectives' roles
 m.VISIBILITY = { "public", "team", "squad", "hidden" }
+-- When the objectives that depend on others become known (SQ-1): `all` at the start (unless hidden), `active`
+-- when each opens, so a squad knows only its current objective and the ones it has done.
+m.REVEALS = { "all", "active" }
+-- Who of an objective's assignee is told it (SQ-3): `members` all of them, `leader` only the squad leaders (the
+-- others are told their leader has orders).
+m.DISCLOSURES = { "members", "leader" }
 m.POLYGON_MAX = 32 -- ATALAIA_GEO_POLYGON_MAX (core/include/atalaia/geo.h)
 m.RADIUS_WARN_M = 10 -- a phone's GPS is rarely better than this
 m.CMD_PARAMS_MAX = 127 -- a box's CMD buffer (the simulator's field_controller.CMD_PARAMS_MAX)
@@ -135,6 +141,8 @@ m.TOP_KEYS = {
   "lang",
   "teams",
   "squads",
+  "reveal",
+  "disclosure",
   "params",
   "i18n",
   "nodes",
@@ -172,7 +180,14 @@ function m.translated(entry, lang, key)
 end
 
 -- An objective's visibility when the manifest gives none.
-function m.default_visibility(objective)
+function m.default_visibility(objective, manifest)
+  if
+    manifest ~= nil
+    and py.get(manifest, "reveal") == "active"
+    and py.truthy(py.get(objective, "depends_on"))
+  then
+    return "hidden"
+  end
   local assignee = py.get(objective, "assignee")
   if not py.truthy(assignee) then
     assignee = py.map()

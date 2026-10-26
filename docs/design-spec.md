@@ -960,7 +960,8 @@ Each objective has:
 - **conditions**: time windows, hold durations, codes;
 - an **effect**: points, a win or loss, or revealing information;
 - **visibility**: who sees it in the player app (one squad, one team, everyone);
-- optional **dependencies**: objective 2 unlocks only after objective 1 is done.
+- optional **dependencies**: objective 2 unlocks only after objective 1 is done;
+- per scenario, **chains and disclosure** (decisions SQ-1 to SQ-8): with `reveal: active` a squad is sent only its active objective and the next when it is completed; with `disclosure: leader` only the squad leader gets it and the members hear that their leader has new orders (the GM can change it per game).
 
 The console compiles a scenario into a field script, so it runs, syncs and survives controller failover like any mode. Scenarios save as presets and can be shared in the registry. The scenario builder arrives in phase 4; the visual editor in phase 5 covers what the blocks cannot express.
 

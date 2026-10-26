@@ -529,7 +529,7 @@ class Controller:
         meta = self.scenario_meta(game.get("mode_id"))
         if meta is not None:
             # The staff's view: every objective, and the boxes the GM named (Join tab).
-            out["scenario"] = meta.staff_view()
+            out["scenario"] = meta.staff_view(scenarios.disclosure(self, game["id"], meta))
             names = self.scenario_names if live else scenarios.node_names(self, game["id"])
             out["scenario_nodes"] = {str(k): v for k, v in sorted(names.items())}
         if live and self.fc is not None:
@@ -550,7 +550,8 @@ class Controller:
         out.pop("scenario_nodes", None)
         meta = self.scenario_meta(game.get("mode_id"))
         if meta is not None:
-            out["scenario"] = meta.player_view(viewer, game, scenarios.revealed(self, game["id"]))
+            out["scenario"] = meta.player_view(viewer, game, scenarios.revealed(self, game["id"]),
+                                               scenarios.disclosure(self, game["id"], meta))
         return out
 
     def scenario_meta(self, mode_id: Any) -> Optional[scenarios.Meta]:
@@ -579,7 +580,8 @@ class Controller:
             return visibility.public_event(ev)
         game = self.game if self.game is not None and self.game["id"] == game_id else self.store.game(game_id)
         meta = self.scenario_meta(game.get("mode_id")) if game is not None else None
-        return visibility.scenario_event(viewer, ev, game, meta.objectives if meta else None)
+        return visibility.scenario_event(viewer, ev, game, meta.objectives if meta else None,
+                                         scenarios.disclosure(self, game_id, meta))
 
     def list_games(self) -> list[dict[str, Any]]:
         return [self.public_game(g) for g in self.store.games()]
@@ -650,6 +652,10 @@ class Controller:
             # Squads are sub-groups inside each team, only in games that have them (milsims,
             # big games): 0, the default, is a game with teams only (decision PE25).
             squads = _int(spec.get("squads", 0), "squads")
+            # Who of a squad is told its scenario objectives: the GM's choice, else the scenario's (SQ-4).
+            disclosure = scenarios.check_disclosure(spec.get("objective_disclosure"))
+            if disclosure is not None and self.scenario_meta(pkg.id) is None:
+                raise ControllerError("objective_disclosure: only a scenario's game has objectives to disclose")
             if not 0 <= squads <= SQUADS_MAX:
                 raise ControllerError(f"squads: 0 (none) to {SQUADS_MAX} per team")
             # Team branding (decisions BR12-BR15): display names and crests next to the colours,
@@ -684,7 +690,29 @@ class Controller:
             self.store.create_game(game, key if self.cfg.persist_game_key else None)
             if box_lang is not None:
                 self.store.set_setting(f"box_lang:{game_id}", box_lang)
+            if disclosure is not None:
+                scenarios.store_disclosure(self, game_id, disclosure)
             self._activate(self.store.game(game_id) or game, key, 1)
+            out = self.get_game(game_id)
+            self._emit({"type": "game", "game": out})
+            return out
+
+    def set_objective_disclosure(self, game_id: int, spec: Any) -> dict[str, Any]:
+        """PUT /api/v1/games/{id}/objective-disclosure {"disclosure": "members"|"leader"|null}: who of
+        a squad is told its scenario objectives, until the game ends (SQ-4). The players' apps get
+        the game again, so a change shows at once."""
+        with self._lock:
+            game = self.store.game(game_id)
+            if game is None:
+                raise NotFound(f"no game {game_id}")
+            if game.get("state") == "ended":
+                raise Conflict(f"game {game_id} has ended")
+            meta = self.scenario_meta(game.get("mode_id"))
+            if meta is None:
+                raise ControllerError("this game has no scenario, so no objectives to disclose")
+            if not isinstance(spec, dict) or set(spec) != {"disclosure"}:
+                raise ControllerError('the body is {"disclosure": "members" | "leader" | null}')
+            scenarios.store_disclosure(self, game_id, scenarios.check_disclosure(spec.get("disclosure")))
             out = self.get_game(game_id)
             self._emit({"type": "game", "game": out})
             return out

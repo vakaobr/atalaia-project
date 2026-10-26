@@ -283,7 +283,7 @@ function luagen.objective_data(o, manifest)
     "squad",
     squad ~= nil and py.str(squad) or nil, -- the events' squad is text (data key 2)
     "hidden",
-    py.getd(o, "visibility", m.default_visibility(o)) == "hidden",
+    py.getd(o, "visibility", m.default_visibility(o, manifest)) == "hidden",
     "depends_on",
     copy_list(py.truthy(py.get(o, "depends_on")) and py.get(o, "depends_on") or nil),
     "reveals",

@@ -358,6 +358,10 @@ const Map<String, String> deStrings = {
       'Ein neues Ziel für Team {team}: {objective}',
   'event.scenario.objective.revealed.named.no_team':
       'Ein neues Ziel: {objective}',
+  'event.scenario.objective.revealed.leader':
+      'Dein Squad-Lead hat neue Befehle',
+  'player.leader_orders':
+      'Befehle für dein Squad: Dein Squad-Lead gibt sie weiter',
 
   // GM
   'gm.intro':

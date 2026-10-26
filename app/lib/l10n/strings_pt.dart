@@ -346,6 +346,9 @@ const Map<String, String> ptStrings = {
       'Novo objetivo para a equipa {team}: {objective}',
   'event.scenario.objective.revealed.named.no_team':
       'Novo objetivo: {objective}',
+  'event.scenario.objective.revealed.leader':
+      'O teu líder de squad tem novas ordens',
+  'player.leader_orders': 'Ordens para o teu squad: o líder de squad passa-as',
   'event.chrono.violation': 'Réplica acima do limite',
   'event.node.tamper': 'Alguém mexeu numa caixa ({reason})',
 
