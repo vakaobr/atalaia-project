@@ -78,6 +78,20 @@ They cover the Python event codec ([`codec.py`](atalaia_sim/codec.py), checked a
 
 The mode editor's browser tests (`editor_tests/`: the Lua generator's unit tests (geo, GM commands, roles, kinds, screens), the three examples' round trip through the hand-written modes' tests, the page in both languages, save, open and the draft; the *Test* button playing Hold-All in the simulator's page, errors back on their blocks, every generated line mapped to its block; the package byte for byte the Python packer's for the shared vectors, every built-in mode and the examples, and signed and verified with the commands it shows) run in headless Chromium: `python tools/docker_editor.py` from the repository root (CI's `editor` job).
 
+## Measure the relay flood
+
+[`relay_study.py`](atalaia_sim/relay_study.py) (with [`relay_traces.py`](atalaia_sim/relay_traces.py) and [`relay_report.py`](atalaia_sim/relay_report.py); decisions SL-7 to SL-20) is a packet-level model of one field's shared radio channel for 5-30 boxes and a controller: the firmware's relay rules (every authenticated frame once, `hop_limit` 2, the 4-slot relay table, the 64-entry dedupe, the same 10-50 ms jitter for every box), the radio task's 8-deep queue and its dropping of what the duty-cycle limit refuses, the core's 60-bucket budget, frames that occupy the channel and collide, half-duplex radios, the controller's ACKs and TIME, resends of events, and three layouts (everyone in range, a long field, CQB with walls) in both regions. The games' traffic comes from the real core: Domination's and the Foxhound scenario's scripts run through `Simulation`, and their events, sizes and commands feed the model. It needs the core's shared library, as the mode tests do (`ATALAIA_CORE_LIB`), and nothing beyond the Python standard library.
+
+```sh
+cd simulator
+python -m atalaia_sim.relay_study --games domination --sizes 20 --layouts all_in_range --regions eu868 \
+    --policies firmware,A_backoff --seeds 1,2,3 --minutes 90      # a table, a few seconds a run
+python -m atalaia_sim.relay_study --list-policies                  # the rules compared
+python -m atalaia_sim.relay_report --out relay-study-results.md   # everything the decisions quote (about 10 minutes on 32 cores)
+```
+
+`docs/review/relay-study-results.md` is that report's output. Every number is a model's: the link budget and the capture effect are assumptions (decision SL-18 lists them and the sensitivity runs), so use it to compare rules and for the order of magnitude, not for a field's last percent. `tests/test_relay_study.py` checks the model against the rules it ports: the C core's jitter values, the relay count of a full mesh, a chain's three-hop reach, the budget refusing and dropping a frame, the table sizes, SL-4's arithmetic on an ideal channel.
+
 ## Status
 
 | Feature | Status |
@@ -88,6 +102,7 @@ The mode editor's browser tests (`editor_tests/`: the Lua generator's unit tests
 | Web view of screens, outputs, sounds and events | Done (`serve`) |
 | Packet codec (header, payloads, AES-CCM) | Done (Phase 2A) |
 | RadioModel (lossy delivery, partition, dedupe) | Done (Phase 2B) |
+| Relay study: the field's relay flood, duty cycle and delivery, 5-30 boxes (`relay_study.py`) | Done (decisions SL-7 to SL-20, 2026-10-26); a model, not a measurement |
 | FieldController (game lifecycle, TIME, scores) | Done (Phase 2B); ACKs, event log, transports (Phase 2D); node health events `node.online`, `node.offline`, `battery.low` (phase 4 follow-up, decisions FU1-1 to FU1-4; off unless the host sets `node_offline_ms` and `battery_low_pct`, as the field controller does) |
 | CLAIM election and failover | Done (Phase 2D), shared with the field controller |
 | `field.*` and `state.field` from Python (ctypes `field_ops`) | Done (Phase 2D) |
