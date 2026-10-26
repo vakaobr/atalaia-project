@@ -783,6 +783,10 @@ class ControllerEngine {
       );
     }
     final boxLang = _boxLangFor(spec['console_lang']);
+    // A `lang` parameter left empty (Medic Kit, Hacking Terminal, VIP /
+    // Payload) is the game's language, English when it has none (as the
+    // Pi controller does: a script cannot read the box's language, P5H-23).
+    fillLangParam(mode.params['lang']?['type'] == 'string', params, boxLang);
     final used = store.gameIds();
     final free = [
       for (var g = 1; g < 0xffff && g <= 4096 + used.length; g++)

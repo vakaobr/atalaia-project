@@ -263,6 +263,29 @@ Map<String, Object?> resolvePresetParams(
   return mode.resolveParams(o, t);
 }
 
+/// The language a game's boxes show for a join's language code ("pt",
+/// "pt-br", "de", "zh-tw", "zh-hant", null...): one of pt, en, de, zh-tw
+/// (English for any other or none), as the Field Box reads it.
+String gameLangCode(String? code) {
+  final c = (code ?? '').toLowerCase();
+  final primary = c.split('-').first;
+  if (primary == 'pt' || primary == 'de') return primary;
+  final subs = c.split('-').skip(1);
+  if (primary == 'zh' && (subs.contains('tw') || subs.contains('hant'))) {
+    return 'zh-tw';
+  }
+  return 'en';
+}
+
+/// A string parameter `lang` ([declared]: the mode has one) left empty
+/// becomes the game's language ([code], English when null), in [params]
+/// (decision P5H-23).
+void fillLangParam(bool declared, Map<String, Object?> params, String? code) {
+  if (declared && params['lang'] == '') {
+    params['lang'] = gameLangCode(code);
+  }
+}
+
 /// The optional parts of a manifest: kind, commands and i18n
 /// (atalaia_sim.mode `check_manifest`).
 void checkManifest(Map<String, Object?> manifest, String where) {

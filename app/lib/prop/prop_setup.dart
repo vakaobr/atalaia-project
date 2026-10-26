@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app.dart';
+import '../controller/controller_modes.dart';
 import '../l10n/strings.dart';
 import '../modes/mode_catalog.dart';
 import '../platform/services.dart';
@@ -131,6 +132,11 @@ class _PropSetupScreenState extends State<PropSetupScreen> {
       setState(() => _error = e.message);
       return;
     }
+    fillLangParam(
+      mode.params.any((p) => p.name == 'lang' && p.type == 'string'),
+      params,
+      join?.lang,
+    );
     final minutes = int.tryParse(_durationCtl.text) ?? 0;
     final setup = PropSetup(
       mode: mode,

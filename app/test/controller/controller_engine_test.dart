@@ -12,6 +12,7 @@ import 'dart:io';
 
 import 'package:atalaia_app/controller/controller_api.dart';
 import 'package:atalaia_app/controller/controller_engine.dart';
+import 'package:atalaia_app/controller/controller_modes.dart';
 import 'package:atalaia_app/core/node_types.dart';
 import 'package:atalaia_app/ffi/bindings.dart';
 import 'package:atalaia_app/modes/builtin_modes.g.dart';
@@ -187,6 +188,68 @@ void main() {
     expect(engine.liveGame, isNull);
     expect(engine.gameKey, isEmpty);
     engine.close();
+  });
+
+  test("an empty `lang` parameter is the game's language (P5H-23)", () {
+    final engine = ControllerEngine(core: core);
+    for (final mode in [
+      'org.atalaia.medic',
+      'org.atalaia.hacking_terminal',
+      'org.atalaia.vip_payload',
+    ]) {
+      for (final (console, want) in [
+        ('pt', 'pt'),
+        ('de', 'de'),
+        ('zh-tw', 'zh-tw'),
+        ('en', 'en'),
+        (null, 'en'),
+      ]) {
+        final game = engine.createGame({
+          'name': 'x',
+          'mode_id': mode,
+          'console_lang': ?console,
+        });
+        expect((game['params'] as Map)['lang'], want, reason: '$mode $console');
+        engine.endGame(game['id'] as int);
+      }
+      // The GM's own choice stays.
+      final own = engine.createGame({
+        'name': 'x',
+        'mode_id': mode,
+        'console_lang': 'de',
+        'params': {'lang': 'pt'},
+      });
+      expect((own['params'] as Map)['lang'], 'pt');
+      engine.endGame(own['id'] as int);
+    }
+    // A mode with no such parameter gets none.
+    final dom = engine.createGame({
+      'name': 'x',
+      'mode_id': 'org.atalaia.domination',
+      'console_lang': 'pt',
+    });
+    expect((dom['params'] as Map).containsKey('lang'), isFalse);
+    engine.close();
+  });
+
+  test('the language a join carries, as a game language (props)', () {
+    expect(gameLangCode(null), 'en');
+    expect(gameLangCode(''), 'en');
+    expect(gameLangCode('pt'), 'pt');
+    expect(gameLangCode('pt-BR'), 'pt');
+    expect(gameLangCode('de'), 'de');
+    expect(gameLangCode('zh-tw'), 'zh-tw');
+    expect(gameLangCode('zh-Hant-TW'), 'zh-tw');
+    expect(gameLangCode('zh-cn'), 'en');
+    expect(gameLangCode('fr'), 'en');
+    final p = <String, Object?>{'lang': ''};
+    fillLangParam(true, p, 'de');
+    expect(p['lang'], 'de');
+    fillLangParam(true, p, 'pt'); // already filled: stays
+    expect(p['lang'], 'de');
+    final none = <String, Object?>{'x': 1};
+    fillLangParam(false, none, 'pt');
+    expect(none, {'x': 1});
   });
 
   test('the game key: 16 random bytes per game, never in the API', () {
