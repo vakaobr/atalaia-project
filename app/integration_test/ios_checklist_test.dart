@@ -472,8 +472,9 @@ void main() {
       expect(note, findsOneWidget);
     } else {
       // Android (CI's emulator) keeps both, and has no such note.
-      await reveal(tester, find.byKey(const Key('role-controller')));
+      await reveal(tester, find.byKey(const Key('role-prop')));
       expect(find.byKey(const Key('role-prop')), findsOneWidget);
+      await reveal(tester, find.byKey(const Key('role-controller')));
       expect(find.byKey(const Key('role-controller')), findsOneWidget);
       expect(note, findsNothing);
     }

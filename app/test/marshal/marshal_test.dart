@@ -303,7 +303,10 @@ void main() {
       expect(back.joinKey, hasLength(32));
       expect(back.checkPin('2468'), isTrue);
       expect(back.checkPin('1357'), isFalse);
-      expect(back.pinHash, isNot(contains('2468')));
+      // Stored hashed, never as typed: a salted hash's hex can hold "2468" by
+      // chance (about one run in a thousand), so compare the whole value.
+      expect(back.pinHash, isNot('2468'));
+      expect(back.pinHash!.length, greaterThan(32));
       expect((await store.loadList('replicas')).single['class'], 'rifle');
       expect(dir.listSync().where((f) => f.path.endsWith('.tmp')), isEmpty);
       await File('${dir.path}/settings.json').writeAsString('{broken');
