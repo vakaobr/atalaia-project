@@ -97,6 +97,8 @@ python3 -m atalaia_controller sync-key --resend --config ../controller.toml  # a
 
 ## Node health events
 
+Scores from boxes arrive with each box's STATE (every 15 s, and at once after a capture, a pause, a resume and the end), so a box's points on the stream trail its own screen by up to about 15 s plus the relay; a `field.lua`'s points are the controller's own (decisions SL-1 to SL-5).
+
 The controller in charge logs three events about the boxes (decisions FU1-1 to FU1-6), which go to the log, the console, MQTT and, with the sync on, to the site server's device health; their node is the box's id, they have no epoch (they never go on air) and their seq is the controller's own count, carried over a restart:
 
 - `node.online` (`fw`, `tier` from the box's HELLO) when it first hears a box in a game, or hears it again after `node.offline`;

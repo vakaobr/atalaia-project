@@ -47,6 +47,8 @@ Ideas from public community requests (design specification sections 2 and 15); t
 
 On a box without a controller (picked from the box's own preset list), Hold-All and Last Stand boxes only capture: their scoring and countdown live in `field.lua`.
 
+**How late a score is:** points a box makes itself (Domination, King of the Hill, Money Factory) reach the controller, the console and the app with the box's periodic STATE, every 15 s, so they trail the box's own screen by up to about 15 s plus the relay; a capture is sent at once. Points a `field.lua` makes (Hold-All, Master and Satellites) are the controller's own and current (decision SL-1 to SL-5).
+
 ## Master and Satellites (phase 4)
 
 Design specification section 15; decisions P4R2, P4R3 and M1-1 to M1-5 in `docs/review/decisions-to-review.md`.
