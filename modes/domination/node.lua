@@ -18,17 +18,37 @@ end
 
 on("game.start", show)
 
+local function capture(team, squad)
+  local previous = s.owner
+  s.owner = team
+  s.since = math.floor(game.time())
+  cap("team_display"):show(team)
+  audio.play("captured")
+  emit("zone.captured", { team = team, squad = squad, previous_team = previous })
+  show()
+end
+
 on("team_input.hold", function(e)
   if e.team == s.owner or e.ms < params.capture_hold_ms then
     return
   end
-  local previous = s.owner
-  s.owner = e.team
-  s.since = math.floor(game.time())
-  cap("team_display"):show(e.team)
-  audio.play("captured")
-  emit("zone.captured", { team = e.team, squad = e.squad, previous_team = previous })
-  show()
+  capture(e.team, e.squad)
+end)
+
+-- The GM's owner override from the console (decision E7): a team, or none to
+-- free the box. Same as Hold-All and Last Stand; scoring follows the owner.
+on("cmd.set_owner", function(e)
+  if e.team == s.owner then
+    return
+  end
+  if e.team == nil or e.team == "" or e.team == "none" then
+    emit("zone.neutralized", { previous_team = s.owner })
+    s.owner = nil
+    cap("team_display"):show("none")
+    show()
+  else
+    capture(e.team)
+  end
 end)
 
 every(params.tick_s, function()

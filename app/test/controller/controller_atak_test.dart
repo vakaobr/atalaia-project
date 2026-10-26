@@ -312,6 +312,21 @@ void main() {
       expect(pyFixed(-0.0, 7), '-0.0000000');
     });
 
+    test('a box\'s remarks, with "active" (PD-MODE-16)', () {
+      for (final c in _vectors['node_remarks']! as List) {
+        final l = c as List;
+        expect(
+          nodeRemarks(
+            l[0]! as String,
+            levelLabel: l[1] as String?,
+            active: l[2]! as bool,
+          ),
+          l[3],
+          reason: '$l',
+        );
+      }
+    });
+
     test('colours and ATAK teams', () {
       final c = _map(_vectors['colours']);
       final teams = (c['teams']! as List).cast<String>();
@@ -956,6 +971,42 @@ void main() {
         );
       },
     );
+
+    test('the active box says so in its remarks (PD-MODE-16)', () async {
+      await rig();
+      putImageAndCorners();
+      final gid = runningGame();
+      place(gid, 4, 0.5, 0.5);
+      place(gid, 5, 0.2, 0.2);
+      await emitter.cycle(full: true);
+      await udp.drain();
+      void say(String type, String zone) => emitter.onControllerMessage({
+        'type': 'event',
+        'event': {
+          'type': type,
+          'node': 0,
+          'data': {'zone': zone},
+        },
+      });
+      say('progressive.activated', 'node-4');
+      expect((await emitter.cycle(full: false))['udp'], 2); // all of them
+      var got = byUid(await udp.drain());
+      expect(
+        find(got['atalaia.field.node.4']!, 'detail/remarks')!.text,
+        'Atalaia: -, active',
+      );
+      expect(
+        find(got['atalaia.field.node.5']!, 'detail/remarks')!.text,
+        'Atalaia: -',
+      );
+      say('progressive.completed', 'node-4');
+      await emitter.cycle(full: false);
+      got = byUid(await udp.drain());
+      expect(
+        find(got['atalaia.field.node.4']!, 'detail/remarks')!.text,
+        'Atalaia: -',
+      );
+    });
 
     test('stop closes the socket', () async {
       await rig();

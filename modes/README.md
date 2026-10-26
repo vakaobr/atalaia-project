@@ -15,7 +15,7 @@ The GM console builds its settings form from `params` in `mode.yaml`, so GMs nev
 
 | Mode | Kind | Runs on | Status |
 | --- | --- | --- | --- |
-| [Domination](domination/) | main mode | boxes | Runs in the simulator and on the Field Box; its screens are YAML templates since phase 3; 6 tests |
+| [Domination](domination/) | main mode | boxes | Runs in the simulator and on the Field Box; its screens are YAML templates since phase 3; the GM's owner override works (E7); 7 tests |
 | [Bomb / Rush](bomb/) | main mode | boxes | Runs in the simulator and on the Field Box (played on a Heltec V4.3, 2026-10-20); per-team keypad codes since the mode pack; its screens are YAML templates since phase 3, with the arm and defuse holds filling a bar; 11 tests |
 | [Hold-All Domination](holdall/) | main mode | boxes + controller (`field.lua`) | Mode pack (phase 2); 5 tests, plus simulator, controller and host-box tests |
 | [Last Stand](laststand/) | main mode | boxes + controller (`field.lua`) | Mode pack (phase 2); 5 tests, plus simulator and controller tests |
@@ -241,7 +241,7 @@ Modes react to semantic capabilities, so the same script works on a box with tea
 | `keypad.key` | `key` (`0`-`9`, `*`, `#`) | A keypad key is pressed |
 | `hit.hit` | `strength` (0-255) | A hit sensor (the target addon's plate) is hit while armed (`cap("hit"):arm()`; draft RFC 0000 Amendment 1) |
 | `nfc.tag` | `uid`, `valid`, then `player` and `team` (valid) or `reason` | A tag is read, checked against the game's key first ([nfc-tag.md](../protocol/nfc-tag.md)): `reason` is `unsigned`, `no_game`, `format`, `version`, `game`, `mac` or `team` |
-| `cmd.set_owner` | `team` (or `none`) | The GM's owner override from the console (decision E7); Hold-All and Last Stand handle it |
+| `cmd.set_owner` | `team` (or `none`) | The GM's owner override from the console (decision E7); handled by Domination, Hold-All, Last Stand, Progressive Domination (the active box only), Master and Satellites, Hacking Terminal, Objectives (captures), VIP / Payload (checkpoints) and Money Factory; Target Windows ignores it, and Bomb does not handle it (the bomb has no owner, so the override has no clear meaning there) |
 | `cmd.mode` | `name`, then the command's own params | A mode command from the GM (a manifest's `commands`) or the field script (CMD opcode 8); the Medic Kit's `refill` and `heals` |
 | `gm.message` | `text` | A message from the GM |
 | `gps.fix` | `lat`, `lon`, `acc` (metres), or nothing before the first fix | A prop's own GPS (an Android prop whose role uses `gps`, every 2 s while the game runs); it stays on the phone (decision P4R6) |

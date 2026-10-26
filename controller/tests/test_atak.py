@@ -456,6 +456,41 @@ class EmitterTests(AtakCase):
         self.assertEqual(mid.get("start"), mid.get("time"))
         self.assertEqual(mid.get("stale"), atak.cot_time(self.now + 60))  # 2 x interval_s
 
+    def test_the_active_box_says_so_in_its_remarks(self):
+        """Decision PD-MODE-16: Progressive Domination's active box shows "active" in ATAK."""
+        self.put_image_and_corners()
+        gid = self.running_game()
+        self.place(gid, 4, 0.5, 0.5)
+        self.place(gid, 5, 0.2, 0.2)
+        self.emitter.cycle(full=True)
+        got = self.events_by_uid(self.udp.drain())
+        name4 = got["atalaia.field.node.4"].find("detail/contact").get("callsign")
+        self.assertNotIn("active", got["atalaia.field.node.4"].find("detail/remarks").text)
+
+        def say(kind: str, zone: str) -> None:
+            self.emitter.on_controller_message({"type": "event", "event": {
+                "type": kind, "node": 0, "data": {"zone": zone}}})
+
+        say("progressive.activated", name4)
+        self.assertEqual(self.emitter.cycle(full=False)["udp"], 2)  # the old and the new, so all
+        got = self.events_by_uid(self.udp.drain())
+        self.assertEqual(got["atalaia.field.node.4"].find("detail/remarks").text, "Atalaia: -, active")
+        self.assertEqual(got["atalaia.field.node.5"].find("detail/remarks").text, "Atalaia: -")
+        say("progressive.completed", name4)
+        self.emitter.cycle(full=False)
+        got = self.events_by_uid(self.udp.drain())
+        self.assertEqual(got["atalaia.field.node.4"].find("detail/remarks").text, "Atalaia: -")
+        say("progressive.activated", name4)
+        self.emitter.on_controller_message({"type": "game", "game": {"id": gid, "state": "ended"}})
+        self.emitter.cycle(full=False)
+        self.udp.drain()
+        self.assertIsNone(self.emitter._active)  # a game that ended forgets it
+
+    def test_node_remarks(self):
+        self.assertEqual(atak.node_remarks(""), "Atalaia: -")
+        self.assertEqual(atak.node_remarks("red", None, True), "Atalaia: red, active")
+        self.assertEqual(atak.node_remarks("", "Cave", True), "Atalaia: -, active, Cave")
+
     def test_owner_colour_and_a_capture_sent_at_once(self):
         self.put_image_and_corners()
         gid = self.running_game()

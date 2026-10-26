@@ -547,6 +547,20 @@ String eventXml({
   return cotXmlDecl + ev.toString();
 }
 
+/// A box's remarks (atak.py `node_remarks`): its owner (`-` for none),
+/// `active` while the mode has made it the box to take (Progressive
+/// Domination, decision PD-MODE-16), then its level's name.
+String nodeRemarks(
+  String ownerDisplay, {
+  String? levelLabel,
+  bool active = false,
+}) {
+  var out = ownerDisplay.isNotEmpty ? 'Atalaia: $ownerDisplay' : 'Atalaia: -';
+  if (active) out += ', active';
+  if (levelLabel != null) out += ', $levelLabel';
+  return out;
+}
+
 /// A spot marker's details (takcot/examples "Marker - Spot.cot"): the
 /// owner's colour, and its ATAK team when it is named after one (M9-5).
 List<CotElement> markerDetail(
@@ -1090,6 +1104,8 @@ class AtakEmitter {
   var _all = true;
   int? _end;
   final _ownerHint = <int, String?>{};
+  String? _active; // the box a mode has made active, by name (PD-MODE-16)
+  Object? _activeGame;
   final _sentOwner = <int, String?>{};
   final _markers = <String, _Marker>{};
   final _staffMarkers = <String, _Marker>{};
@@ -1233,6 +1249,16 @@ class AtakEmitter {
             ? team
             : null;
         _dirty.add(node);
+      } else if (type == 'progressive.activated' ||
+          type == 'progressive.completed') {
+        // The old and the new marker both change: all of them again.
+        final data = (ev! as Map)['data'];
+        final zone = data is Map ? data['zone'] : null;
+        _active =
+            type == 'progressive.activated' && zone is String && zone.isNotEmpty
+            ? zone
+            : null;
+        _all = true;
       } else {
         wake = false;
       }
@@ -1243,6 +1269,11 @@ class AtakEmitter {
       if (game is Map && game['state'] == 'ended' && game['id'] is int) {
         _end = game['id'] as int;
       }
+      if (game is Map &&
+          (game['state'] == 'ended' || game['id'] != _activeGame)) {
+        _active = null;
+      }
+      _activeGame = game is Map ? game['id'] : null;
       _all = true;
     } else if (const [
       'field_georef',
@@ -1286,6 +1317,7 @@ class AtakEmitter {
     final ended = _end;
     _end = null;
     final hints = Map.of(_ownerHint);
+    final active = _active;
     final now = _wall();
     final udpOut = <String>[], tcpOut = <String>[], remoteOut = <String>[];
     if (ended != null) {
@@ -1311,6 +1343,7 @@ class AtakEmitter {
         now,
         hints,
         everything ? null : dirty,
+        active,
       );
       udpOut.addAll(props);
       tcpOut.addAll(props);
@@ -1471,6 +1504,7 @@ class AtakEmitter {
     double now,
     Map<int, String?> hints,
     Set<int>? only,
+    String? active,
   ) {
     final stale = now + 2 * config.intervalS;
     final teams = _teams(game);
@@ -1501,10 +1535,11 @@ class AtakEmitter {
       final uid = _uid(['node', nid]);
       final rawName = node['name'];
       final name = rawName is String && rawName.isNotEmpty ? rawName : '$nid';
-      var remarks = owner != null && owner.isNotEmpty
-          ? 'Atalaia: ${_display(game, owner)}'
-          : 'Atalaia: -';
-      if (levelsOn) remarks += ', ${_label(levels, level)}';
+      final remarks = nodeRemarks(
+        owner != null && owner.isNotEmpty ? _display(game, owner) : '',
+        levelLabel: levelsOn ? _label(levels, level) : null,
+        active: active != null && name == active,
+      );
       final battery = node['battery_pct'];
       out.add(
         eventXml(

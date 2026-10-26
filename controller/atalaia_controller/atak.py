@@ -259,6 +259,17 @@ def _el(tag: str, attrs: Optional[dict[str, str]] = None, text: Optional[str] = 
     return el
 
 
+def node_remarks(owner_display: str, level_label: Optional[str] = None, active: bool = False) -> str:
+    """A box's remarks: its owner (``-`` for none), ``active`` while the mode has made it the box to
+    take (Progressive Domination, decision PD-MODE-16), then its level's name on a multi-story field."""
+    out = f"Atalaia: {owner_display}" if owner_display else "Atalaia: -"
+    if active:
+        out += ", active"
+    if level_label is not None:
+        out += f", {level_label}"
+    return out
+
+
 def marker_detail(callsign: str, remarks: str, argb: int, battery: Optional[int] = None,
                   group: Optional[str] = None) -> list[ET.Element]:
     """A spot marker's details, as in takcot/examples "Marker - Spot.cot": the colour is the owner's
@@ -449,6 +460,8 @@ class AtakEmitter:
         self._all = True
         self._end: Optional[int] = None          # a game that ended: drop its markers
         self._owner_hint: dict[int, Optional[str]] = {}
+        self._active_game: Any = None
+        self._active: Optional[str] = None       # the box a mode has made active, by name (PD-MODE-16)
         self._sent_owner: dict[int, Optional[str]] = {}
         self._markers: dict[str, tuple[str, float, float]] = {}  # uid -> (type, lat, lon), on UDP
         self._staff_markers: dict[str, tuple[str, float, float]] = {}
@@ -530,6 +543,12 @@ class AtakEmitter:
                     # Sent at once with the event's team: the box's next STATE confirms it.
                     self._owner_hint[ev["node"]] = ev.get("team") if ev["type"] == "zone.captured" else None
                     self._dirty.add(ev["node"])
+                elif ev.get("type") in ("progressive.activated", "progressive.completed"):
+                    # The active box changes: the old and the new marker both, so all of them again.
+                    zone = (ev.get("data") or {}).get("zone")
+                    self._active = zone if ev["type"] == "progressive.activated" and isinstance(zone, str) \
+                        and zone else None
+                    self._all = True
                 else:
                     wake = False
             elif kind == "position" and isinstance(msg.get("node_id"), int):
@@ -538,6 +557,9 @@ class AtakEmitter:
                 game = msg.get("game") or {}
                 if game.get("state") == "ended" and isinstance(game.get("id"), int):
                     self._end = game["id"]
+                if game.get("state") == "ended" or game.get("id") != self._active_game:
+                    self._active = None
+                self._active_game = game.get("id")
                 self._all = True
             elif kind in ("field_georef", "field_image", "field_levels", "map_features"):
                 self._all = True
@@ -569,6 +591,7 @@ class AtakEmitter:
             self._all = False
             ended, self._end = self._end, None
             hints = dict(self._owner_hint)
+            active = self._active
         now = self._wall()
         udp_out: list[bytes] = []
         tcp_out: list[bytes] = []
@@ -583,7 +606,7 @@ class AtakEmitter:
             if game is not None else {}
         self.stats["no_georef"] = game is not None and not any(geos.values())
         if game is not None and any(geos.values()):
-            props = self._props(game, geos, levels, now, hints, None if everything else dirty)
+            props = self._props(game, geos, levels, now, hints, None if everything else dirty, active)
             udp_out += props
             tcp_out += props
             if self.remote is not None:
@@ -663,7 +686,8 @@ class AtakEmitter:
         return f"{name} ({team})" if isinstance(name, str) and name else team
 
     def _props(self, game: dict[str, Any], geos: dict[int, Optional[georefmod.Georef]], levels: dict[str, Any],
-               now: float, hints: dict[int, Optional[str]], only: Optional[set[int]]) -> list[bytes]:
+               now: float, hints: dict[int, Optional[str]], only: Optional[set[int]],
+               active: Optional[str] = None) -> list[bytes]:
         """Each placed box on the map by its level's georeference (its own, else level 0's: ML-6); on a
         multi-story field the remarks name its level (ML-7)."""
         stale = now + 2 * self.cfg.atak_interval_s  # ADR-P4-7: start + 2 x the update interval
@@ -686,9 +710,9 @@ class AtakEmitter:
             lat, lon = geo.to_latlon(place["x"], place["y"])
             uid = self._uid("node", nid)
             name = node.get("name") or f"{nid}"
-            remarks = f"Atalaia: {self._display(game, owner)}" if owner else "Atalaia: -"
-            if levels["enabled"]:
-                remarks += f", {levelsmod.label(levels, level)}"
+            remarks = node_remarks(self._display(game, owner) if owner else "",
+                                   levelsmod.label(levels, level) if levels["enabled"] else None,
+                                   active is not None and name == active)
             data = event_xml(uid=uid, cot_type=TYPE_PROP, how=HOW_IMAGE, lat=lat, lon=lon, now=now, start=now,
                              stale=stale, detail=marker_detail(name, remarks, team_colour(owner, teams),
                                                                node.get("battery_pct"), atak_team(owner)))
