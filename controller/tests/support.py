@@ -77,7 +77,7 @@ if not MOSQUITTO:
 def config(tmp: str, **overrides) -> Config:
     cfg = Config(db_path=os.path.join(tmp, "controller.db"), gm_token="gm-secret",
                  read_token="read-secret", mqtt_enabled=False, tick_interval_s=0.02,
-                 ping_interval_s=0.2)
+                 ping_interval_s=0.2, controller_pace_ms=0)  # SL-13: the older tests send in bursts; test_tx_pacing.py and the contract cases set it
     for k, v in overrides.items():
         setattr(cfg, k, v)
     cfg.validate()

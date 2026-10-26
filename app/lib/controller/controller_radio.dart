@@ -16,6 +16,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:math' show max;
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
@@ -230,9 +231,28 @@ int nextTxEpoch(ControllerStore store, List<int> key) {
   return epoch;
 }
 
-/// The controller's own packets for one game, as TX frames to the modem
-/// (engine.py `ModemTransport`). [wifi] also hands TIME beacons and
-/// commands to the Android props linked over Wi-Fi (slice S4's prop links).
+/// The controller's TX queue: as many frames as the modem's own queue
+/// (RADIO_TX_QUEUE_LEN, the relay study's TX_QUEUE) and no more.
+const paceQueueMax = 8;
+
+/// The controller's own frames for one game on a modem (engine.py's
+/// ModemTransport).
+///
+/// TX pacing (decision SL-13; the relay study's `H_paced`): with [paceMs]
+/// above 0 the controller's frames, whatever they are (ACKs, TIME beacons,
+/// CMDs), wait in one FIFO and leave one at a time, [paceMs] after the
+/// previous one was on the air (the modem's TX_ACK says so; without it,
+/// [paceMs] after it was handed to the modem), so the relays of one frame are
+/// not on top of the next. The queue holds [queueMax] frames; a frame sent to
+/// a full queue is dropped and counted ([queueDropped]). A frame's seq is
+/// taken when it is queued, so the order on the air is the order of the
+/// seqs. The modem's listen-before-talk and its duty-cycle guard (`duty_cycle`
+/// in a TX_ACK) are below this and unchanged. When the game ends [discard]
+/// drops the waiting CMDs and TIMEs (stale; the ACKs stay, a box leaves a
+/// finished game once its last events are acknowledged) and [flush] hands
+/// the ACKs over at once, then the end's CMD and TIME are queued and [flush]
+/// hands them over at once too, in order.
+/// [paceMs] 0: no queue.
 class RadioTransport implements FieldTransport {
   RadioTransport({
     required this.modem,
@@ -243,7 +263,11 @@ class RadioTransport implements FieldTransport {
     required this.channelHz,
     required Uint8List key,
     this.wifi,
-  }) : _key = key {
+    this.paceMs = 0,
+    this.queueMax = paceQueueMax,
+    int Function()? nowMs,
+  }) : _key = key,
+       _nowMs = nowMs ?? (() => 0) {
     epoch = nextTxEpoch(store, key);
     configureModem();
   }
@@ -256,16 +280,34 @@ class RadioTransport implements FieldTransport {
   final int channelHz;
   final Uint8List _key;
 
+  /// The gap between the controller's own frames, ms (0: none) and the
+  /// queue's length.
+  final int paceMs;
+  final int queueMax;
+  final int Function() _nowMs;
+
   /// Android props on Wi-Fi: true when one of them took the message.
   bool Function(int type, Uint8List payload)? wifi;
 
   /// The epoch of this run's packets.
   late int epoch;
-  var _next = 0;
+
+  /// The next seq to take (a test sets it near the wrap at 0xffff).
+  var nextSeq = 0;
 
   /// The last seq sent, and the packets nothing could send.
   var seq = 0;
   var refused = 0;
+
+  /// Frames dropped because the queue was full.
+  var queueDropped = 0;
+
+  final _queue = <(RfHeader, Uint8List)>[];
+  var _nextOkMs = 0;
+  int? _handedSeq; // the frame whose TX_ACK moves the gap
+
+  /// Frames waiting for their gap.
+  int get queued => _queue.length;
 
   @override
   String get state => modem?.state ?? 'none';
@@ -293,13 +335,20 @@ class RadioTransport implements FieldTransport {
       refused++;
       return onWifi ? seq : null;
     }
-    if (_next > 0xffff) {
-      // Every seq of this epoch is spent: a new one, stored before use.
+    if (nextSeq > 0xffff) {
+      // Every seq of this epoch is spent: the old epoch's frames go before
+      // the modem is told the new one, then a new epoch, stored before use.
+      flush();
       epoch = nextTxEpoch(store, _key);
-      _next = 0;
+      nextSeq = 0;
       configureModem();
     }
-    final s = _next;
+    if (paceMs > 0 && _queue.length >= queueMax) {
+      queueDropped++;
+      refused++;
+      return onWifi ? seq : null;
+    }
+    final s = nextSeq;
     final header = RfHeader(
       // Version 1, the priority, the ACK request and the encrypted bit.
       versionFlags: 1 << 5 | (prio & 3) << 3 | (ack ? 1 << 2 : 0) | 1 << 1,
@@ -309,12 +358,64 @@ class RadioTransport implements FieldTransport {
       hopLimit: hopLimit,
       type: type,
     );
-    if (!m.sendPacket(header, payload)) {
-      refused++;
-      return null;
+    if (paceMs <= 0) {
+      if (!m.sendPacket(header, payload)) {
+        refused++;
+        return null;
+      }
+    } else {
+      _queue.add((header, payload));
     }
-    _next = s + 1;
+    nextSeq = s + 1;
     seq = s;
+    if (paceMs > 0) pump(_nowMs());
     return s;
+  }
+
+  /// Hands the next frame to the modem if its gap has passed (the
+  /// controller's tick).
+  void pump(int nowMs) {
+    while (_queue.isNotEmpty && nowMs >= _nextOkMs) {
+      final (header, payload) = _queue.removeAt(0);
+      if (modem?.sendPacket(header, payload) ?? false) {
+        _nextOkMs = nowMs + paceMs;
+        _handedSeq = header.seq;
+        return;
+      }
+      refused++; // the link went down while it waited: nothing was on the air
+    }
+  }
+
+  /// The modem's TX_ACK for a frame: the gap runs from the end of its air
+  /// time.
+  void txDone(int seq, int nowMs) {
+    if (seq == _handedSeq) _nextOkMs = max(_nextOkMs, nowMs + paceMs);
+  }
+
+  /// Drops the waiting frames that are stale now that the game is ending,
+  /// counted with the dropped ones: every one but the ACKs, which a box needs
+  /// to leave a finished game (it waits for its last events to be
+  /// acknowledged); how many.
+  int discard() {
+    final before = _queue.length;
+    _queue.removeWhere((f) => f.$1.type != RfType.ack);
+    final n = before - _queue.length;
+    queueDropped += n;
+    return n;
+  }
+
+  /// Hands every waiting frame to the modem now, in order (the game is
+  /// over); how many it took.
+  int flush() {
+    var n = 0;
+    while (_queue.isNotEmpty) {
+      final (header, payload) = _queue.removeAt(0);
+      if (modem?.sendPacket(header, payload) ?? false) {
+        n++;
+      } else {
+        refused++;
+      }
+    }
+    return n;
   }
 }

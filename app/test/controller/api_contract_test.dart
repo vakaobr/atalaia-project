@@ -337,6 +337,7 @@ void main() {
       final dir = Directory.systemTemp.createTempSync('atalaia-contract-');
       final config = ControllerConfig(
         persistGameKey: (c['persist_game_key'] as bool?) ?? true,
+        controllerPaceMs: (c['controller_pace_ms'] as int?) ?? 0,
         failoverMode: (c['failover_mode'] as String?) ?? 'manual',
       );
       final radio = RecordingModem();

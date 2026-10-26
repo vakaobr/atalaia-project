@@ -33,6 +33,13 @@ region = "eu868"
 # must fit in one sub-band: 869.4625-869.5875 MHz there (RFC 0001 Amendment 3).
 channel_hz = 869525000
 max_hops = 2
+# The gap the controller leaves between its own frames (ACKs, TIME beacons, CMDs): one at a time,
+# this long after the previous one was on the air, so the relays of one are not on top of the next
+# (decision SL-13; the relay study's H_paced). The modem's listen-before-talk and its duty-cycle
+# guard are below it and unchanged. 0 (the default) means no pacing. 800 is the relay study's
+# H_paced and the value to try in the 20-box field test (docs/runbooks/radio-field-test.md): it
+# helps the setup CMDs by 0-22 points in the model and costs some of the controller's ACKs.
+controller_pace_ms = 0
 scan_dwell_s = 60.0               # "find a quiet channel": listening time, split across channels
 quiet_threshold_dbm = -105        # quiet: 90% of the noise readings at or below this
 

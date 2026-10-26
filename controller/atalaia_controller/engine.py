@@ -35,7 +35,7 @@ import random
 import re
 import threading
 import time
-from collections import Counter
+from collections import Counter, deque
 from typing import Any, Callable, Optional
 
 from atalaia_sim import join as joinfmt
@@ -56,6 +56,7 @@ from atalaia_sim.field_controller import (
 )
 from atalaia_sim.mode import COMMAND_NAME, SEPARATOR, ModeError
 from atalaia_sim.packet import Header, vf_make
+from atalaia_sim.protocol import MESSAGE_TYPES
 
 from . import channels, radio_modem, radio_region, visibility
 from . import scenario_service as scenarios
@@ -104,6 +105,12 @@ class StartBlocked(Conflict):
         self.check = check
 
 
+# The controller's TX queue (RFC 0001 TX pacing, SL-13): as many frames as the modem's own queue
+# (RADIO_TX_QUEUE_LEN, relay study TX_QUEUE) and no more, so a burst never hides behind a longer
+# queue than the modem would have taken.
+PACE_QUEUE_MAX = 8
+
+
 class ModemTransport:
     """The controller's own packets, as TX frames to the modem.
 
@@ -111,11 +118,24 @@ class ModemTransport:
     is stored +1 before the first packet of every run, and again when seq
     wraps, so a nonce is never reused; the modem also refuses any (epoch,
     seq) that is not above the last one it sent.
+
+    TX pacing (decision SL-13; the relay study's ``H_paced``): with ``pace_ms`` above 0 the
+    controller's frames, whatever they are (ACKs, TIME beacons, CMDs), wait in one FIFO and
+    leave one at a time, ``pace_ms`` after the previous one was on the air (the modem's TX_ACK
+    says so; without it, ``pace_ms`` after it was handed to the modem), so the relays of one
+    frame are not on top of the next. The queue holds ``queue_max`` frames; a frame sent to a full
+    queue is dropped and counted (``queue_dropped``). A frame's seq is taken when it is queued, so
+    the order on the air is the order of the seqs. The modem's listen-before-talk and its duty-cycle
+    guard (``duty_cycle`` in a TX_ACK) are below this and unchanged. When the game ends ``discard``
+    drops the waiting CMDs and TIMEs (stale; the ACKs stay, a box leaves a finished game once its
+    last events are acknowledged) and ``flush`` hands the ACKs over at once, then the end's CMD and
+    TIME are queued and ``flush`` hands them over at once too, in order. ``pace_ms`` 0: no queue.
     """
 
     def __init__(self, modem: Optional[radio_modem.RadioModem], store: Store, game_id: int,
                  node_id: int, max_hops: int, channel_hz: int, key: bytes,
-                 wifi: Optional[Callable[[int, bytes], bool]] = None, resuming: bool = False) -> None:
+                 wifi: Optional[Callable[[int, bytes], bool]] = None, resuming: bool = False,
+                 pace_ms: int = 0, queue_max: int = PACE_QUEUE_MAX) -> None:
         self.modem = modem
         # Android props linked over Wi-Fi get the TIME beacons and commands too (prop_link.py).
         self.wifi = wifi
@@ -130,6 +150,13 @@ class ModemTransport:
         self._next = 0
         self.seq = 0  # last seq sent (FieldController.seq)
         self.refused = 0
+        self.pace_ms = max(0, int(pace_ms))
+        self.queue_max = queue_max
+        self.queue_dropped = 0
+        self._lock = threading.RLock()  # the tick, the API and the modem's reader all come here
+        self._q: deque[tuple[Header, bytes]] = deque()
+        self._next_ok_ms = 0
+        self._handed_seq: Optional[int] = None  # the frame whose TX_ACK moves the gap
         self.configure_modem()
 
     def configure_modem(self) -> None:
@@ -137,25 +164,87 @@ class ModemTransport:
             self.modem.configure(self.game_id, self.node_id, self.epoch, self.max_hops,
                                  self.channel_hz, self.key)
 
+    @property
+    def queued(self) -> int:
+        return len(self._q)
+
     def send(self, msg_type: int, payload: bytes, *, priority: int, ack_req: bool,
              hop_limit: int, now_ms: int) -> Optional[int]:
         on_wifi = self.wifi(msg_type, payload) if self.wifi is not None else False
         if self.modem is None or not self.modem.is_up:
             self.refused += 1
             return self.seq if on_wifi else None
-        if self._next > 0xFFFF:
-            self.epoch = self.store.next_tx_epoch(self.key)  # persisted before the first packet with it
-            self._next = 0
-            self.configure_modem()
-        seq = self._next
-        header = Header(vf_make(1, priority, ack_req, True), self.game_id, self.node_id, seq,
-                        hop_limit, msg_type)
-        if not self.modem.send_packet(header, payload):
-            self.refused += 1
-            return None
-        self._next = seq + 1
-        self.seq = seq
-        return seq
+        with self._lock:
+            if self._next > 0xFFFF:
+                self._flush_locked()  # the old epoch's frames go before the modem is told the new one
+                self.epoch = self.store.next_tx_epoch(self.key)  # persisted before the first packet with it
+                self._next = 0
+                self.configure_modem()
+            if self.pace_ms > 0 and len(self._q) >= self.queue_max:
+                self.queue_dropped += 1
+                self.refused += 1
+                log.warning("TX queue full (%d): frame type %d dropped", self.queue_max, msg_type)
+                return self.seq if on_wifi else None
+            seq = self._next
+            header = Header(vf_make(1, priority, ack_req, True), self.game_id, self.node_id, seq,
+                            hop_limit, msg_type)
+            if self.pace_ms <= 0:
+                if not self.modem.send_packet(header, payload):
+                    self.refused += 1
+                    return None
+            else:
+                self._q.append((header, payload))
+            self._next = seq + 1
+            self.seq = seq
+            if self.pace_ms > 0:
+                self._pump_locked(now_ms)
+            return seq
+
+    def pump(self, now_ms: int) -> None:
+        """Hands the next frame to the modem if its gap has passed (the controller's tick)."""
+        with self._lock:
+            self._pump_locked(now_ms)
+
+    def _pump_locked(self, now_ms: int) -> None:
+        while self._q and now_ms >= self._next_ok_ms:
+            header, payload = self._q.popleft()
+            if self.modem is not None and self.modem.send_packet(header, payload):
+                self._next_ok_ms = now_ms + self.pace_ms
+                self._handed_seq = header.seq
+                return
+            self.refused += 1  # the link went down while it waited: nothing was on the air
+
+    def tx_done(self, seq: int, now_ms: int) -> None:
+        """The modem's TX_ACK for a frame: the gap runs from the end of its air time."""
+        with self._lock:
+            if seq == self._handed_seq:
+                self._next_ok_ms = max(self._next_ok_ms, now_ms + self.pace_ms)
+
+    def discard(self) -> int:
+        """Drops the waiting frames that are stale now that the game is ending, counted with the dropped
+        ones: every one but the ACKs, which a box needs to leave a finished game (it waits for its last
+        events to be acknowledged)."""
+        with self._lock:
+            keep = deque(f for f in self._q if f[0].type == MESSAGE_TYPES["ACK"])
+            n = len(self._q) - len(keep)
+            self._q = keep
+            self.queue_dropped += n
+            return n
+
+    def flush(self) -> int:
+        """Hands every waiting frame to the modem now, in order (the game is over); the count."""
+        with self._lock:
+            return self._flush_locked()
+
+    def _flush_locked(self) -> int:
+        n = 0
+        while self._q:
+            header, payload = self._q.popleft()
+            if self.modem is not None and self.modem.send_packet(header, payload):
+                n += 1
+            else:
+                self.refused += 1
+        return n
 
 
 class FieldScript:
@@ -407,7 +496,8 @@ class Controller:
             election.term = max(election.term, int(term or 0))
             election.follow(self.now_ms())
         self.transport = ModemTransport(self.modem, self.store, game["id"], node_id, max_hops,
-                                        channel, key, wifi=self._to_wifi, resuming=resuming)
+                                        channel, key, wifi=self._to_wifi, resuming=resuming,
+                                        pace_ms=self.cfg.controller_pace_ms)
         fc = FieldController(transport=self.transport, game_id=game["id"], teams=game["teams"],
                              node_id=node_id, election=election, max_hops=max_hops)
         fc.duration_ms = game["duration_ms"]
@@ -511,6 +601,8 @@ class Controller:
             self.field.close()
             self.field = None
         self._field_scores = {}
+        if self.transport is not None:
+            self.transport.flush()  # frames still waiting for their gap go now: the key goes next
         if self.modem is not None:
             self.modem.clear()  # the modem forgets the key
         self.fc = None
@@ -1367,6 +1459,9 @@ class Controller:
                 return self._leave_standby(game_id, reason or "left")
             if not self.key_lost:
                 fc = self._live(game_id)
+                if self.transport is not None:
+                    self.transport.discard()  # stale CMDs and TIMEs go; the ACKs stay (boxes leave on them)
+                    self.transport.flush()  # and go now, so a full queue cannot take the end's CMD and TIME
                 fc.end_game(now_ms=self.now_ms(), reason=reason or None)
                 data = {"reason": reason} if reason else {}
                 if winner not in fc.teams:
@@ -1566,6 +1661,8 @@ class Controller:
                     "reconnects": self.modem.reconnects if self.modem else 0,
                 },
                 "tx_epoch": self.transport.epoch if self.transport else None,
+                "tx_queue": ({"queued": self.transport.queued, "dropped": self.transport.queue_dropped,
+                              "pace_ms": self.transport.pace_ms} if self.transport else None),
                 "tx_status": dict(self.tx_status),
                 "field_channel_hz": self.field_channel,
                 "channel_confirmed": self.store.get_setting("radio.channel_confirmed") == "1",
@@ -1598,6 +1695,8 @@ class Controller:
             if fc is None:
                 return
             now = self.now_ms()
+            if self.transport is not None:
+                self.transport.pump(now)  # the next paced frame, if its gap has passed
             fc.tick(now)
             if self.positions is not None:
                 self.positions.tick()
@@ -1653,6 +1752,9 @@ class Controller:
 
     def _on_tx_ack(self, seq: int, status: str) -> None:
         self.tx_status[status] += 1
+        transport = self.transport
+        if transport is not None:
+            transport.tx_done(seq, self.now_ms())
         if status != "ok":
             log.warning("TX seq %d: %s", seq, status)
             self._emit({"type": "system", "kind": "tx.failed", "seq": seq, "status": status})

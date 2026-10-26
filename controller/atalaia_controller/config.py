@@ -22,6 +22,10 @@
                                 # inside one of the region's sub-bands; left out: the region's
                                 # default (869525000, or 921500000 in AS923-TW)
     max_hops = 2
+    controller_pace_ms = 0      # the gap the controller leaves between its own frames (ACKs, TIME,
+                                # CMDs), after the previous one was on the air; 0 = no pacing (the
+                                # default until the field test decides; 800 is the relay study's
+                                # H_paced, decision SL-13)
     scan_dwell_s = 60.0         # "find a quiet channel": total listening time, split across
                                 # the candidates (at most 10 s each)
     quiet_threshold_dbm = -105  # a channel whose 90th-percentile noise is at or below this
@@ -165,7 +169,7 @@ from . import REPO_ROOT
 SECTIONS = {
     "controller": ("node_id", "db_path", "modes_dirs", "failover_mode", "power_source",
                    "battery_pct", "storage_ok", "persist_game_key", "tick_interval_s"),
-    "radio": ("region", "channel_hz", "max_hops", "scan_dwell_s", "quiet_threshold_dbm"),
+    "radio": ("region", "channel_hz", "max_hops", "controller_pace_ms", "scan_dwell_s", "quiet_threshold_dbm"),
     "health": ("node_offline_s", "battery_low_pct"),
     "modem": ("port", "baudrate", "ping_interval_s"),
     "api": ("host", "port", "gm_token", "read_token", "tls_port", "tls_dir", "tls_names"),
@@ -204,6 +208,7 @@ class Config:
     region: str = regions.DEFAULT.code
     channel_hz: int = eu868.DEFAULT_CHANNEL_HZ
     max_hops: int = 2
+    controller_pace_ms: int = 0  # decision SL-13: off; 800 is H_paced's gap between the controller's own frames
     scan_dwell_s: float = 60.0
     quiet_threshold_dbm: int = -105
     # [health]
@@ -288,6 +293,8 @@ class Config:
             raise ConfigError("controller.failover_mode must be 'manual' or 'auto'")
         if not 1 <= self.max_hops <= 3:
             raise ConfigError("radio.max_hops must be 1-3 (ADR-P2-6)")
+        if not 0 <= self.controller_pace_ms <= 10_000:
+            raise ConfigError("radio.controller_pace_ms must be 0-10000 (0 = no pacing)")
         if self.region not in regions.BY_CODE:
             raise ConfigError(f"radio.region = {self.region!r}: one of {', '.join(regions.BY_CODE)}")
         region = regions.get(self.region)

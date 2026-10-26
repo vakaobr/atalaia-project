@@ -149,6 +149,7 @@ class ControllerConfig {
     this.healthNodeOfflineS = 120,
     this.healthBatteryLowPct = 20,
     this.persistGameKey = true,
+    this.controllerPaceMs = 0,
   });
 
   /// This controller's short id on the radio.
@@ -171,6 +172,12 @@ class ControllerConfig {
   /// Keep the live game's key in the store, so that the game survives a
   /// restart (ADR-P2-4; decision OT-7: on by default, as on the Pi).
   final bool persistGameKey;
+
+  /// The gap the controller leaves between its own frames (ACKs, TIME, CMDs),
+  /// after the previous one was on the air; 0 (the default until the field
+  /// test decides): no pacing; 800 is the relay study's H_paced (decision
+  /// SL-13; the Pi's `[radio] controller_pace_ms`).
+  final int controllerPaceMs;
 
   /// ADR-P2-8's priority score, as the Pi computes it (a link of 100).
   int get priority => priorityScore(powerSource, batteryPct, storageOk, 100);
@@ -382,6 +389,10 @@ class ControllerEngine {
   /// the props without a modem, as on a Pi without one).
   final FieldTransport? transport;
   RadioTransport? _radio;
+
+  /// The live game's radio transport (null without a game, or with a test's
+  /// [transport]): its queue, for the status and the tests.
+  RadioTransport? get radioTransport => _radio;
   final _txStatus = <String, int>{};
   final double Function() _wall;
   final Random _random;
@@ -842,6 +853,8 @@ class ControllerEngine {
             channelHz: (game['channel_hz'] as int?) ?? fieldChannel,
             key: key,
             wifi: _toWifi,
+            paceMs: config.controllerPaceMs,
+            nowMs: nowMs,
           );
     // The key's tag (not secret) outlives the key, so a GAME_OVER can still
     // name this game after a restart without the key (decision OT-13; sent
@@ -886,6 +899,8 @@ class ControllerEngine {
     _field?.close();
     _field = null;
     _fieldScores = {};
+    _radio
+        ?.flush(); // frames still waiting for their gap go now: the key goes next
     modem?.clear(); // the modem forgets the key
     _radio = null;
     _fc = null;
@@ -1263,6 +1278,9 @@ class ControllerEngine {
     }
     if (!_keyLost) {
       final fc = _live(id);
+      _radio
+        ?..discard() // stale CMDs and TIMEs go; the ACKs stay (boxes leave on them)
+        ..flush(); // and go now, so a full queue cannot take the end's CMD and TIME
       fc.endGame(nowMs: nowMs(), reason: reason.isEmpty ? null : reason);
       final data = <String, Object?>{if (reason.isNotEmpty) 'reason': reason};
       final win = fc.teams.contains(winner)
@@ -1821,6 +1839,13 @@ class ControllerEngine {
         'reconnects': modem?.reconnects ?? 0,
       },
       'tx_epoch': _radio?.epoch,
+      'tx_queue': _radio == null
+          ? null
+          : {
+              'queued': _radio!.queued,
+              'dropped': _radio!.queueDropped,
+              'pace_ms': _radio!.paceMs,
+            },
       'tx_status': Map.of(_txStatus),
       'field_channel_hz': fieldChannel,
       'channel_confirmed': store.getSetting('radio.channel_confirmed') == '1',
@@ -2049,6 +2074,7 @@ class ControllerEngine {
     branding?.purge(); // crests nothing refers to, at most every 10 minutes
     final fc = _fc;
     if (fc == null) return;
+    _radio?.pump(nowMs()); // the next paced frame, if its gap has passed
     fc.tick(nowMs());
     positions?.tick();
     final field = _field;
@@ -2094,6 +2120,7 @@ class ControllerEngine {
 
   void _onTxAck(int seq, String status) {
     _txStatus[status] = (_txStatus[status] ?? 0) + 1;
+    _radio?.txDone(seq, nowMs());
     if (status != 'ok') {
       _emit({
         'type': 'system',

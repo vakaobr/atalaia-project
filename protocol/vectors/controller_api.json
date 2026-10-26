@@ -859,6 +859,72 @@
       ]
     },
     {
+      "name": "TX pacing: the controller's own frames leave one at a time, a gap apart; the game's end drops waiting CMDs and TIMEs, not ACKs (SL-13, H_paced)",
+      "controller_pace_ms": 800,
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination", "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"tx": [{"kind": "configure", "game_id": "${gid}"}]},
+        {"rx": {"source": 4, "seq": 0, "epoch": 1, "ack": true, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"rx": {"source": 4, "seq": 1, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 1, "t": 0, "type": "zone.captured", "team": 1}}},
+        {"rx": {"source": 4, "seq": 2, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 2, "t": 0, "type": "zone.neutralized", "team": 1}}},
+        {"tx": [{"kind": "ACK", "seq": 0, "fields": {"ack_node": 4, "ack_seq": 0}}]},
+        {"advance_ms": 700},
+        {"tx": []},
+        {"advance_ms": 200},
+        {"tx": [{"kind": "ACK", "seq": 1, "fields": {"ack_node": 4, "ack_seq": 1}}]},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 200},
+        {"tx": []},
+        {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"tx_queue": {"queued": 3, "dropped": 0, "pace_ms": 800}}},
+        {"advance_ms": 700},
+        {"tx": []},
+        {"advance_ms": 200},
+        {"tx": [{"kind": "ACK", "seq": 2}]},
+        {"advance_ms": 400},
+        {"tx": []},
+        {"tx_ack": {"seq": 2, "status": "ok"}},
+        {"advance_ms": 500},
+        {"tx": []},
+        {"advance_ms": 400},
+        {"tx": [{"kind": "CMD", "seq": 3, "fields": {"cmd": 0}}]},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
+        {"tx": [
+          {"kind": "CMD", "seq": 5, "fields": {"cmd": 3}},
+          {"kind": "TIME", "seq": 6, "fields": {"game_state": 3}},
+          {"kind": "clear"}
+        ]}
+      ]
+    },
+    {
+      "name": "TX pacing: a full queue (8 frames) drops the new frame, and the end of the game still goes out, and the ACKs that waited with it",
+      "controller_pace_ms": 800,
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination", "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"tx": [{"kind": "configure"}]},
+        {"rx": {"source": 4, "seq": 1, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 1, "t": 0, "type": "zone.captured", "team": 1}}},
+        {"rx": {"source": 4, "seq": 2, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 2, "t": 0, "type": "zone.neutralized", "team": 1}}},
+        {"rx": {"source": 4, "seq": 3, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 3, "t": 0, "type": "zone.captured", "team": 1}}},
+        {"rx": {"source": 4, "seq": 4, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 4, "t": 0, "type": "zone.neutralized", "team": 1}}},
+        {"rx": {"source": 4, "seq": 5, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 5, "t": 0, "type": "zone.captured", "team": 1}}},
+        {"rx": {"source": 4, "seq": 6, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 6, "t": 0, "type": "zone.neutralized", "team": 1}}},
+        {"rx": {"source": 4, "seq": 7, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 7, "t": 0, "type": "zone.captured", "team": 1}}},
+        {"rx": {"source": 4, "seq": 8, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 8, "t": 0, "type": "zone.neutralized", "team": 1}}},
+        {"rx": {"source": 4, "seq": 9, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 9, "t": 0, "type": "zone.captured", "team": 1}}},
+        {"rx": {"source": 4, "seq": 10, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 10, "t": 0, "type": "zone.neutralized", "team": 1}}},
+        {"rx": {"source": 4, "seq": 11, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 11, "t": 0, "type": "zone.captured", "team": 1}}},
+        {"rx": {"source": 4, "seq": 12, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 12, "t": 0, "type": "zone.neutralized", "team": 1}}},
+        {"tx": [{"kind": "ACK", "seq": 0}]},
+        {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"tx_queue": {"queued": 8, "dropped": 3, "pace_ms": 800}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
+        {"tx": [
+          {"kind": "ACK", "seq": 1}, {"kind": "ACK", "seq": 2}, {"kind": "ACK", "seq": 3}, {"kind": "ACK", "seq": 4},
+          {"kind": "ACK", "seq": 5}, {"kind": "ACK", "seq": 6}, {"kind": "ACK", "seq": 7}, {"kind": "ACK", "seq": 8},
+          {"kind": "CMD", "seq": 9, "fields": {"cmd": 3}},
+          {"kind": "TIME", "seq": 10, "fields": {"game_state": 3}},
+          {"kind": "clear"}
+        ]}
+      ]
+    },
+    {
       "name": "the radio after a restart: a new epoch under the same game key",
       "steps": [
         {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination"}}, "status": 201, "save": {"gid": "id"}},

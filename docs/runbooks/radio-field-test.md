@@ -101,6 +101,14 @@ What would be a result: **the STATEs the controller hears** and **the capture la
 
 **AS923-TW boxes.** The CAD's detection peak there (29 at SF9/500 kHz) was measured on the bench with that modulation on 868.3 MHz (Semtech's 23 gave 17.8 % false busy; decision SL-38), not on 921.5 MHz: run the bench gate ([lbt-bench-gate.md](lbt-bench-gate.md): on an AS923-TW image, or in Europe with the same modulation on 868.3 MHz, `@lbt ... proxy=as923`) before trusting a Taiwanese field's LBT numbers, or build that field with `--lbt=off`.
 
+## The controller's TX pacing, on and off
+
+The controller can leave a gap between its own frames (ACKs, TIME beacons, CMDs): `[radio] controller_pace_ms` on the Pi, `ControllerConfig.controllerPaceMs` on the phone ([RFC 0001 Amendment 15](../rfcs/0001-skirmesh-rf-wire-format.md), decisions SL-13 and SL-39). **It ships off (0)**: the model says 800 ms adds 0-22 points to the setup CMDs that reach their box, but it also costs some of the controller's ACKs (section 7 of [the study's results](../review/relay-study-results.md): for example 55.7 to 48.0 % heard in a mesh of 30, 83.3 to 68.2 % in a long field of 10, and more in other cells). The maintainer decides from this test: **the same field, the same game, once with 0 and once with 800** (alternate the order between days, as for listen before talk), with a scenario that sets its boxes up by CMD (Foxhound's `setup`).
+
+**Switching it.** In `controller.toml` (`controller_pace_ms = 800`, or the environment's `ATALAIA_RADIO_CONTROLLER_PACE_MS`) and restart the controller; on a phone controller it is a build constant for now (`ControllerConfig`), so run the comparison on the Pi.
+
+**What to read.** `GET /api/v1/controller` shows `tx_queue` (`queued`, `dropped`, `pace_ms`): note `dropped` at the end of each run (the model expects 0) and `tx_status` (any `duty_cycle` or `queue_full`). Then, per run: **CMD reach**, how many of the scenario's setup CMDs each box acted on (the box's log: the mode or `node.` event it was told to start; or the controller's `tx` log against the boxes' `cmds` counter in `radio_stats`), against the model's 0-22 points; and **ACK delivery**, the boxes' `retries` and `acked` in `radio_stats` (more retries per event with 800 means the ACKs arrive late or not at all) and the time from a capture to its ACK. Choose 800 only if CMD reach goes up and retries and ACK latency do not get worse; otherwise leave 0.
+
 ## When something looks wrong
 
 - No `radio_stats` line after a minute in a game: the box is not in a game (a joined box that is idle still logs; a box in the lobby does not), or its firmware predates this change (check the boot log's version).

@@ -321,6 +321,18 @@ def run_all(lib: Optional[str] = None, seeds: Optional[list[int]] = None, minute
     return out
 
 
+PACE_NOTE = (
+    "\n`H_paced` is the controller's TX pacing as built (decision SL-39, RFC 0001 Amendment 15): one FIFO for "
+    "every frame the controller sends, 800 ms from the end of one frame's air time to the start of the next, a "
+    "queue of 8, the gap counted from the modem's TX_ACK. The model's parameters and the built ones are the "
+    "same, so the rows above are the built behaviour's numbers (the run was repeated on the built parameters, "
+    "five seeds, and gave the same table). The pacing is not free for the controller's ACKs, which wait in the "
+    "same queue: in some cells fewer of them are heard by their box and in others more (a box resends an "
+    "unacknowledged EVENT or HELLO after 3 s and then at longer gaps, so a late ACK is mostly still in time), "
+    "and no frame was dropped by the queue in any run:\n\n"
+)
+
+
 def _cmd_table(results: list[Result]) -> str:
     g = group(results)
     rows = []
@@ -332,6 +344,26 @@ def _cmd_table(results: list[Result]) -> str:
                 row.append(med(grp, "cmds.delivered_pct") if grp else None)
             rows.append(row)
     return table(["layout", "N"] + [f"{p}: CMDs reaching their box %" for p in CMD_RULES], rows)
+
+
+def _pace_table(results: list[Result]) -> str:
+    """What the built TX pacing (SL-13) costs and does, from the same runs as ``_cmd_table``: H_paced against
+    A_backoff, the median over the seeds."""
+    g = group(results)
+    rows = []
+    for layout in LAYOUT_NAMES:
+        for n in sorted({r["n"] for r in results}):
+            for pol in ("A_backoff", "H_paced"):
+                grp = g.get(("scenario", layout, n, "eu868", pol))
+                if not grp:
+                    continue
+                dropped = [x["controller"]["queue_dropped"] for x in grp]
+                rows.append([LAYOUT_NAMES[layout], n, pol, med(grp, "cmds.delivered_pct"),
+                             med(grp, "controller.airtime_pct"), med(grp, "controller.acks_heard_by_their_box_pct"),
+                             statistics.median(dropped), max(dropped)])
+    return table(["layout", "N", "rule", "CMDs reaching their box %", "controller air %",
+                  "controller ACKs heard by their box %", "controller frames dropped by its queue (median)",
+                  "(worst seed)"], rows)
 
 
 def render(results: list[Result]) -> str:
@@ -380,6 +412,8 @@ def render(results: list[Result]) -> str:
     if cmds:
         out.append("\n\n## 7. The controller's commands (the scenario's setup CMDs; EU868, five seeds)\n")
         out.append(_cmd_table(cmds))
+        out.append(PACE_NOTE)
+        out.append(_pace_table(cmds))
     out.append("\n\n## 8. Sensitivity to the model's assumptions\n")
     out.append(_sens_table(sens, sens_n))
     head = [r for r in big if r["game"] == "domination" and r["layout"] == "all_in_range" and r["n"] == max(sizes)

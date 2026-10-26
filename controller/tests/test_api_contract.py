@@ -236,6 +236,7 @@ class ContractCase(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, contextlib.ExitStack() as stack:
             cfg = config(tmp, gm_token=VECTORS["tokens"]["gm"], read_token=VECTORS["tokens"]["read"],
                          persist_game_key=case.get("persist_game_key", True), adopt_usb=False,
+                         controller_pace_ms=case.get("controller_pace_ms", 0),
                          failover_mode=case.get("failover_mode", "manual"),
                          firmware_release_keys=case.get("firmware_keys", []))
             env = SimpleNamespace(cfg=cfg, case=case, modem=RecordingModem(), mqtt=RecordingMqtt(), now=[0.0],

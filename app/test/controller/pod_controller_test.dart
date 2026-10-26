@@ -252,6 +252,19 @@ void main() {
         isTrue,
         reason: '${alpha.lines.reversed.take(8)}',
       );
+      // The first capture's ACK may have been waiting in the old phone's TX
+      // queue (SL-13's pacing) when it crashed: the box resends the event
+      // after its 3 s and the new phone acknowledges it. The box leaves a
+      // finished game only once its events are acknowledged, so end it
+      // after that.
+      expect(
+        await waitFor(
+          () async => (await alpha.status())['pending'] == 0,
+          timeout: const Duration(seconds: 10),
+        ),
+        isTrue,
+        reason: 'the box has an event the phone did not acknowledge',
+      );
       e.endGame(gid);
       expect(
         await waitFor(() async => (await alpha.status())['phase'] == 0),
