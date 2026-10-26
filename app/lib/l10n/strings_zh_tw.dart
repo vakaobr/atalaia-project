@@ -63,6 +63,8 @@ const Map<String, String> zhTwStrings = {
   'settings.pin_remove': '移除 PIN 碼',
   'settings.kiosk': 'Kiosk 模式',
   'settings.kiosk_hint': '遊戲進行中，手機會固定在 App 上。如果有人跳出，App 會發出警告。',
+  'settings.vibrate': '遊戲事件時震動',
+  'settings.vibrate_hint': '主辦訊息、己方據點被佔領或失守、遊戲開始與結束時短暫震動，沒有聲音。依手機本身的靜音設定。',
   'settings.about': '關於',
   'settings.version': 'Atalaia {version}',
   'settings.core': '遊戲核心 {version}',

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/// Settings: language, theme, the field join key a prop checks join
+/// Settings: language, theme, the vibration on game events, the field join key a prop checks join
 /// payloads with, the admin PIN that guards a prop, kiosk mode, the
 /// battery guide and what this app carries (versions, licence).
 library;
@@ -165,6 +165,14 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ],
+          SwitchListTile(
+            key: const Key('vibrate-on-events'),
+            secondary: const Icon(Icons.vibration),
+            title: Text(s.t('settings.vibrate')),
+            subtitle: Text(s.t('settings.vibrate_hint')),
+            value: st.vibrateOnEvents,
+            onChanged: (v) => app.update((x) => x.vibrateOnEvents = v),
+          ),
           SectionTitle(s.t('settings.about')),
           ListTile(
             title: Text(s.t('settings.version', {'version': appVersion})),

@@ -51,6 +51,7 @@ import '../prop/game_timer.dart';
 import '../site/site_screens.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'field_buzz.dart';
 import 'field_feed.dart';
 
 class PlayerStartScreen extends StatefulWidget {
@@ -226,10 +227,14 @@ class PlayerScreen extends StatefulWidget {
     required this.link,
     this.feed,
     this.onAssignment,
+    this.buzzNow,
     super.key,
   });
 
   final FieldLink link;
+
+  /// The clock the event buzzes' rate limit reads (tests).
+  final DateTime Function()? buzzNow;
 
   /// A new player token after the GM changed this player's team or role.
   final Future<String?> Function()? onAssignment;
@@ -424,6 +429,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (widget.feed == null) unawaited(feed.start());
     unawaited(_loadBranding());
     feed.addListener(_onFeed);
+    // The buzzes for key game events (VB-1 to VB-9): live events only.
+    final app = AppScope.read(context);
+    _buzzer = FieldBuzzer(
+      vibrate: (p) => unawaited(services.device.vibrate(p)),
+      enabled: () => app.settings.vibrateOnEvents,
+      team: () => (feed.me?['team'] ?? app.settings.myTeam) as String?,
+      role: () => feed.me?['role'] as String?,
+      now: widget.buzzNow,
+    );
+    _liveBuzz = feed.liveEvents.listen(_buzzer.onEvent);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _onFeed();
     });
@@ -477,9 +492,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (mounted) setState(() => _shareError = null);
   }
 
+  late final FieldBuzzer _buzzer;
+  StreamSubscription<FeedEvent>? _liveBuzz;
+
   @override
   void dispose() {
     _clock?.cancel();
+    unawaited(_liveBuzz?.cancel());
     feed.removeListener(_onFeed);
     if (_reporter?.running ?? false) {
       unawaited(_services.foreground.stop());

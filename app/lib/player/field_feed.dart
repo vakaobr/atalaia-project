@@ -225,6 +225,13 @@ class FieldFeed extends ChangeNotifier {
   /// connection starts with does not count.
   int ordersSeq = 0;
 
+  final _live = StreamController<FeedEvent>.broadcast(sync: true);
+
+  /// The events that arrive on the live stream, as they arrive (VB-4): not the
+  /// ones the connection's snapshot starts with, which is what happened before
+  /// (a reconnect's snapshot included). The player's buzzes follow this.
+  Stream<FeedEvent> get liveEvents => _live.stream;
+
   /// The reveals of orders for this player's squad leader alone (SQ-3): the
   /// event comes without the objective, with `leader_only`.
   int get leaderOrders => events
@@ -371,6 +378,7 @@ class FieldFeed extends ChangeNotifier {
         final e = m['event'];
         if (e is Map<String, Object?>) {
           _onEvent(e);
+          if (_live.hasListener) _live.add(events.first);
           final d = e['data'];
           if (e['type'] == 'scenario.objective.revealed' &&
               d is Map &&
@@ -529,6 +537,7 @@ class FieldFeed extends ChangeNotifier {
     _stopped = true;
     _retry?.cancel();
     unawaited(_socket?.close());
+    unawaited(_live.close());
     super.dispose();
   }
 }

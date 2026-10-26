@@ -60,6 +60,12 @@ final class AppSettings {
   /// The team the player view highlights.
   String? myTeam;
 
+  /// The player's phone vibrates on key game events (VB-1): a GM message, a
+  /// box of the player's team captured or lost, the game starting or ending.
+  /// On by default; the squad-orders buzz (SQ-5) and the boundary warning
+  /// (MF-33) are not affected.
+  bool vibrateOnEvents = true;
+
   /// Field check-in (ADR-P3-13): the name last used, and the version of each
   /// field's privacy notice the player has read (field id -> version).
   String? displayName;
@@ -137,6 +143,7 @@ final class AppSettings {
     'chrono_id': chronoId,
     'limit_template': limitTemplate,
     'my_team': myTeam,
+    'vibrate_on_events': vibrateOnEvents,
     'display_name': displayName,
     'notice_seen': noticeSeen,
     'share_position': sharePosition,
@@ -167,6 +174,7 @@ final class AppSettings {
       ..chronoId = str('chrono_id') ?? 'chrono-1'
       ..limitTemplate = str('limit_template') ?? 'portugal'
       ..myTeam = str('my_team')
+      ..vibrateOnEvents = j['vibrate_on_events'] != false
       ..displayName = str('display_name')
       ..noticeSeen = {
         for (final e in ((j['notice_seen'] as Map?) ?? const {}).entries)

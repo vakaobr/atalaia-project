@@ -266,8 +266,19 @@ At a field controller (a Pi's or an Android phone's, on its Wi-Fi):
     field's own certificate too: it is expected to **fail** in the web view
     (iOS does not trust the field CA there; see below), and to work in Safari
     after trusting the profile.
-11. The haptic buzz (a short vibration on events that ask for one) and the screen
-    staying awake while a game is shown.
+11. The haptic buzz and the screen staying awake while a game is shown. The
+    player view buzzes on a message from the GM (one longer tap), a box of the
+    player's team captured (one short tap) or lost (two), the game starting
+    (three quick taps) and ending (two medium taps), and on a squad's new
+    orders (two medium taps); Settings has a "Vibrate on game events" switch
+    (on by default; the squad-orders buzz and the out-of-bounds warning do not
+    follow it). Check, with a second phone or the console sending the messages,
+    that the five patterns can be told apart on the iPhone (VB-6: iOS cannot
+    set a buzz's length, so each pulse is a tap of the haptic engine, or the
+    system vibration for a long one), that nothing buzzes with the switch off,
+    and that the Vibrate on Ring/Silent settings and System Haptics are
+    respected. An iPhone without the haptic engine (6s) buzzes only for the
+    long pulses.
 
 Needs a paid account, or is not written yet, so expect it **not** to work:
 

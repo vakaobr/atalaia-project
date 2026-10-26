@@ -42,10 +42,37 @@ import UIKit
       UIApplication.shared.isIdleTimerDisabled = (args?["on"] as? Bool) ?? false
       result(nil)
     case "vibrate":
-      AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+      let args = call.arguments as? [String: Any]
+      let pattern = (args?["pattern"] as? [NSNumber])?.map { $0.intValue } ?? [0, 200]
+      vibrate(pattern)
       result(nil)
     default:
       result(FlutterMethodNotImplemented)
+    }
+  }
+
+  /// Plays an Android-style pattern (wait, buzz, pause, buzz... in
+  /// milliseconds; decision VB-6): each "on" part starts at its time. iOS
+  /// cannot shape a buzz's length: a part of 400 ms or more is the system
+  /// vibration (which follows the phone's Vibrate on Ring/Silent settings),
+  /// a shorter one is a tap of the haptic engine (light under 150 ms, medium
+  /// under 300, heavy above), so a double stays a double.
+  private static func vibrate(_ pattern: [Int]) {
+    var at = 0
+    for (index, ms) in pattern.enumerated() {
+      let length = max(ms, 0)
+      if index % 2 == 1 && length > 0 {
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(at)) {
+          if length >= 400 {
+            AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+          } else {
+            let style: UIImpactFeedbackGenerator.FeedbackStyle =
+              length < 150 ? .light : (length < 300 ? .medium : .heavy)
+            UIImpactFeedbackGenerator(style: style).impactOccurred()
+          }
+        }
+      }
+      at += length
     }
   }
 

@@ -71,6 +71,11 @@ const Map<String, String> ptStrings = {
   'settings.kiosk_hint':
       'Durante um jogo o telemóvel fica preso à app (fixação de ecrã). Se '
       'alguém sair, a app avisa.',
+  'settings.vibrate': 'Vibrar nos eventos do jogo',
+  'settings.vibrate_hint':
+      'Uma vibração curta para uma mensagem da organização, uma caixa da tua '
+      'equipa capturada ou perdida, e o início ou o fim do jogo. Sem som. '
+      'Valem as definições de silêncio do telemóvel.',
   'settings.about': 'Sobre',
   'settings.version': 'Atalaia {version}',
   'settings.core': 'Núcleo de jogo {version}',

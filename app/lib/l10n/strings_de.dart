@@ -71,6 +71,11 @@ const Map<String, String> deStrings = {
   'settings.kiosk_hint':
       'Während eines Spiels ist das Handy an die App gebunden. Verlässt jemand '
       'sie, warnt die App.',
+  'settings.vibrate': 'Bei Spielereignissen vibrieren',
+  'settings.vibrate_hint':
+      'Ein kurzes Brummen bei einer Nachricht der Spielleitung, wenn eine Box '
+      'deines Teams erobert oder verloren wird und wenn das Spiel beginnt '
+      'oder endet. Kein Ton. Die Stummschaltung des Handys gilt.',
   'settings.about': 'Über',
   'settings.version': 'Atalaia {version}',
   'settings.core': 'Spielkern {version}',

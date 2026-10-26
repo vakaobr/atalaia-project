@@ -66,6 +66,11 @@ const Map<String, String> enStrings = {
   'settings.kiosk_hint':
       'During a game the phone is pinned to the app. If someone gets out, the '
       'app warns.',
+  'settings.vibrate': 'Vibrate on game events',
+  'settings.vibrate_hint':
+      'A short buzz for a message from the game master, a box of your team '
+      'captured or lost, and the game starting or ending. No sound. The '
+      "phone's own silent settings apply.",
   'settings.about': 'About',
   'settings.version': 'Atalaia {version}',
   'settings.core': 'Game core {version}',
