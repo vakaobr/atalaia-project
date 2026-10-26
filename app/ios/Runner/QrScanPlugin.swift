@@ -73,7 +73,7 @@ final class QrScanPlugin: NSObject {
     case .authorized:
       present(hint: hint, cancel: cancel)
     case .notDetermined:
-      AVCaptureDevice.requestAccess(for: .video) { granted in
+      AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
         DispatchQueue.main.async { [weak self] in
           guard let self = self, self.pending != nil else { return }
           if granted {
@@ -303,7 +303,7 @@ final class QrScanViewController: UIViewController {
   }
 }
 
-extension QrScanViewController: @preconcurrency AVCaptureMetadataOutputObjectsDelegate {
+extension QrScanViewController: AVCaptureMetadataOutputObjectsDelegate {
   func metadataOutput(
     _ output: AVCaptureMetadataOutput,
     didOutput metadataObjects: [AVMetadataObject],

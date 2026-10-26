@@ -75,6 +75,12 @@ final class LocationPlugin: NSObject {
   private var sink: FlutterEventSink?
   private var interval: TimeInterval = 10
   private var lastSent: TimeInterval?  // ProcessInfo.systemUptime of the last fix sent
+  // CoreLocation reports only when the position changes: a player standing
+  // still would stop reporting after the first fix (found in the simulator,
+  // 2026-10-26). While listened to, this sends the last known position again
+  // once an interval has gone by with nothing sent, with its own `t`, so the
+  // controller sees how old it is, as Android's periodic updates keep going.
+  private var ticker: Timer?
   private var waiting: [(Bool) -> Void] = []
 
   private init(messenger: FlutterBinaryMessenger) {
@@ -177,7 +183,29 @@ final class LocationPlugin: NSObject {
     sink(LocationPlugin.fix(loc))
   }
 
+  private func tick() {
+    guard sink != nil else { return }
+    let now = ProcessInfo.processInfo.systemUptime
+    if let last = lastSent, now - last < interval - 0.5 { return }
+    guard let loc = manager.location, loc.horizontalAccuracy >= 0 else { return }
+    lastSent = now
+    sink?(LocationPlugin.fix(loc))
+  }
+
+  private func startTicker() {
+    ticker?.invalidate()
+    ticker = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+      Task { @MainActor in self?.tick() }
+    }
+  }
+
+  private func stopTicker() {
+    ticker?.invalidate()
+    ticker = nil
+  }
+
   private func fail() {
+    stopTicker()
     manager.stopUpdatingLocation()
     sink?(
       FlutterError(
@@ -220,10 +248,12 @@ extension LocationPlugin: @preconcurrency FlutterStreamHandler {
       events(LocationPlugin.fix(known))
     }
     manager.startUpdatingLocation()
+    startTicker()
     return nil
   }
 
   func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    stopTicker()
     manager.stopUpdatingLocation()
     sink = nil
     lastSent = nil

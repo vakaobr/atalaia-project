@@ -88,7 +88,7 @@ extension LinkPlugin: @preconcurrency FlutterSceneLifeCycleDelegate {
   @objc(scene:willConnectToSession:options:)
   func scene(
     _ scene: UIScene,
-    willConnectToSession session: UISceneSession,
+    willConnectTo session: UISceneSession,
     options connectionOptions: UIScene.ConnectionOptions?
   ) -> Bool {
     var handled = false
