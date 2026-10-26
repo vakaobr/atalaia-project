@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "atalaia/duty_cycle.h"
+#include "../../radio/channel_busy.h"
 #include "hal_stub.h"
 
 /* ---- Test-assertion state ------------------------------------------------ */
@@ -39,6 +40,18 @@ int hal_stub_radio_noise_dbm = -118;
 atalaia_region_t hal_stub_radio_region = RADIO_REGION;
 int hal_stub_radio_measure_calls;
 
+/* The listen-before-talk test (channel_busy): the IRQ status the receiver "has" while armed, what a
+ * CAD would find, the clock, and what the stub did. */
+uint16_t hal_stub_radio_irq;
+bool hal_stub_radio_cad_detects;
+bool hal_stub_radio_cad_fails;
+int64_t hal_stub_radio_now_us;
+int hal_stub_radio_cad_calls;
+int hal_stub_radio_rx_rearms;
+int64_t hal_stub_radio_rx_done_us;
+static cb_track_t busy_track;
+static uint32_t irq_epoch;
+
 void hal_stub_radio_reset(void)
 {
     hal_stub_radio_tx_count = 0;
@@ -53,6 +66,15 @@ void hal_stub_radio_reset(void)
     hal_stub_radio_noise_dbm = -118;
     hal_stub_radio_region = RADIO_REGION;
     hal_stub_radio_measure_calls = 0;
+    hal_stub_radio_irq = 0;
+    hal_stub_radio_cad_detects = false;
+    hal_stub_radio_cad_fails = false;
+    hal_stub_radio_now_us = 0;
+    hal_stub_radio_cad_calls = 0;
+    hal_stub_radio_rx_rearms = 0;
+    hal_stub_radio_rx_done_us = 0;
+    memset(&busy_track, 0, sizeof(busy_track));
+    irq_epoch = 0;
 }
 
 /* ---- Stub ops ------------------------------------------------------------ */
@@ -100,6 +122,10 @@ static int stub_radio_set_channel(uint32_t freq_hz)
 static int stub_radio_set_mode(hal_radio_mode_t mode)
 {
     hal_stub_radio_mode = mode;
+    if (mode == HAL_RADIO_MODE_RX) {
+        hal_stub_radio_irq = 0;
+        irq_epoch++;
+    }
     return 0;
 }
 
@@ -127,6 +153,48 @@ static int stub_radio_measure(uint32_t freq_hz, uint32_t dwell_ms, bool cad, noi
     return noise_acc_finish(&acc, freq_hz, (uint16_t)dwell_ms, out) ? 0 : -1;
 }
 
+/* The same steps as the SX1262 HAL's channel_busy(), on the injected IRQ status and CAD result. */
+static int stub_radio_channel_busy(hal_radio_busy_t *info)
+{
+    hal_radio_busy_t local;
+    if (info == NULL) info = &local;
+    info->why = HAL_BUSY_FREE;
+    info->cad_us = 0;
+    info->rearm_us = 0;
+    info->sample_us = hal_stub_radio_now_us;
+    if (hal_stub_radio_mode == HAL_RADIO_MODE_RX) {
+        bool clear = false;
+        hal_busy_why_t why =
+            cb_rx_state(&busy_track, hal_stub_radio_irq, irq_epoch, hal_stub_radio_now_us,
+                        atalaia_region_airtime_us(hal_stub_radio_region, 255) / 4 * 5, &clear);
+        if (clear) {
+            hal_stub_radio_irq &= (uint16_t)~CB_IRQ_FLAGS;
+            irq_epoch++;
+        }
+        info->why = why;
+        if (why == HAL_BUSY_PREAMBLE || why == HAL_BUSY_HEADER) return 1;
+        if (why == HAL_BUSY_RX_DONE) return 0;
+    }
+    hal_stub_radio_cad_calls++;
+    hal_stub_radio_irq = 0;
+    irq_epoch++;
+    info->cad_us = 3000;
+    hal_stub_radio_mode = HAL_RADIO_MODE_RX; /* re-armed */
+    hal_stub_radio_rx_rearms++;
+    info->rearm_us = 200;
+    if (hal_stub_radio_cad_fails) {
+        info->why = HAL_BUSY_ERROR;
+        return -1;
+    }
+    info->why = hal_stub_radio_cad_detects ? HAL_BUSY_CAD : HAL_BUSY_FREE;
+    return hal_stub_radio_cad_detects ? 1 : 0;
+}
+
+static int64_t stub_radio_last_rx_done_us(void)
+{
+    return hal_stub_radio_rx_done_us;
+}
+
 static void stub_radio_deinit(void)
 {
     hal_stub_radio_reset();
@@ -141,5 +209,7 @@ const hal_radio_ops_t hal_stub_radio_ops = {
     .rssi = stub_radio_rssi,
     .duty_cycle_remaining_ms = stub_radio_duty_cycle_remaining_ms,
     .measure = stub_radio_measure,
+    .channel_busy = stub_radio_channel_busy,
+    .last_rx_done_us = stub_radio_last_rx_done_us,
     .deinit = stub_radio_deinit,
 };

@@ -50,6 +50,7 @@ add_executable(box_host
     ${MAIN_DIR}/radio/time_sync.c
     ${MAIN_DIR}/radio/noise_stats.c
     ${MAIN_DIR}/radio/radio_stats.c
+    ${MAIN_DIR}/radio/channel_busy.c
     ${MAIN_DIR}/hal/stub/hal_stub.c
     ${MAIN_DIR}/hal/stub/hal_radio_stub.c
     ${MAIN_DIR}/fw_update.c

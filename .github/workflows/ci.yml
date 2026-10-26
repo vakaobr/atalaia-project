@@ -390,6 +390,8 @@ jobs:
         run: python tools/build_site.py --check
       - name: The wiring diagrams match the firmware's pin defaults
         run: python tools/check_wiring.py
+      - name: The listen-before-talk bench gate's report tool passes its self-test
+        run: python tools/bench_lbt_gate.py --selftest
       - name: The JSON Schema accepts the examples and rejects the invalid ones
         working-directory: protocol/json
         run: |

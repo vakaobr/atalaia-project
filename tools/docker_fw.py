@@ -7,7 +7,9 @@
     python tools/docker_fw.py wokwi            Wokwi emulator variant -> firmware/esp32/build-wokwi/
     python tools/docker_fw.py modem            USB radio modem variant -> firmware/esp32/build-modem/
     python tools/docker_fw.py pod              I/O pod variant -> firmware/esp32/build-pod/
-    python tools/docker_fw.py bench            bare board on the desk (serial keys, no setup portal)
+    python tools/docker_fw.py bench            bare board on the desk (serial keys, no setup portal;
+                                               also the "@lbt" listen-before-talk bench test, SL-25,
+                                               docs/runbooks/lbt-bench-gate.md)
                                                -> firmware/esp32/build-bench/
     python tools/docker_fw.py test             host tests and screen reference images (as CI)
     python tools/docker_fw.py test --update-screens

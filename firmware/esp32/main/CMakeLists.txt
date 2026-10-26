@@ -29,6 +29,7 @@ if(CONFIG_ATALAIA_MODEM_MODE)
         "radio/radio_limits.c"
         "radio/noise_stats.c"
         "radio/radio_stats.c"
+        "radio/channel_busy.c"
     )
     set(ATALAIA_EMBED)
 elseif(CONFIG_ATALAIA_POD_MODE)
@@ -61,6 +62,7 @@ elseif(CONFIG_ATALAIA_POD_MODE)
         "radio/radio_limits.c"
         "radio/noise_stats.c"
         "radio/radio_stats.c"
+        "radio/channel_busy.c"
     )
     if(CONFIG_ATALAIA_POD_BLE)
         list(APPEND ATALAIA_SRCS "pod/pod_ble_nimble.c")
@@ -114,6 +116,8 @@ else()
         "radio/radio_limits.c"
         "radio/noise_stats.c"
         "radio/radio_stats.c"
+        "radio/channel_busy.c"
+        "radio/lbt_stats.c"
         "radio/field_link.c"
         "box_game.c"
         "box_lobby.c"
@@ -132,6 +136,10 @@ else()
         "target_addon.c"
     )
     set(ATALAIA_EMBED EMBED_FILES "wifi_setup.html")
+    # Decision SL-25's bench test of listen-before-talk: the bench variant only.
+    if(CONFIG_ATALAIA_LBT_BENCH)
+        list(APPEND ATALAIA_SRCS "radio/lbt_bench.c")
+    endif()
 endif()
 
 set(ATALAIA_REQUIRES

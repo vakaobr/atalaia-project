@@ -14,8 +14,15 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
+#include "sdkconfig.h"
 
 static const char *TAG = "radio_task";
+
+#if CONFIG_ATALAIA_LBT_BENCH
+static radio_task_bench_fn volatile bench_fn;
+static volatile bool bench_running;
+static volatile bool bench_stop;
+#endif
 
 static QueueHandle_t tx_queue;
 static QueueHandle_t rx_queue;
@@ -52,6 +59,19 @@ static void radio_task_loop(void *arg)
             }
         }
         duty_remaining_ms = radio_hal->radio->duty_cycle_remaining_ms();
+
+#if CONFIG_ATALAIA_LBT_BENCH
+        /* The listen-before-talk bench test takes the radio until it returns. */
+        if (bench_fn != NULL) {
+            radio_task_bench_fn fn = bench_fn;
+            bench_fn = NULL;
+            bench_running = true;
+            fn(radio_hal->radio);
+            bench_running = false;
+            bench_stop = false;
+            continue;
+        }
+#endif
 
         /* A noise measurement (USB modem MEASURE): listens only, then back
          * to the game channel inside the HAL. */
@@ -129,7 +149,13 @@ void radio_task_start(const hal_t *hal)
     measure_queue = xQueueCreate(1, sizeof(measure_req_t));
     measure_done = xQueueCreate(1, sizeof(measure_out_t));
     duty_remaining_ms = radio_hal->radio->duty_cycle_remaining_ms();
-    xTaskCreatePinnedToCore(radio_task_loop, "radio", 4096, NULL, 3, NULL, 0);
+#if CONFIG_ATALAIA_LBT_BENCH
+    /* The bench test of listen-before-talk formats its log lines on this task's stack. */
+    const uint32_t stack = 8192;
+#else
+    const uint32_t stack = 4096;
+#endif
+    xTaskCreatePinnedToCore(radio_task_loop, "radio", stack, NULL, 3, NULL, 0);
 }
 
 static bool enqueue(const uint8_t *data, size_t len, uint32_t tag)
@@ -194,6 +220,31 @@ bool radio_task_measure_result(noise_result_t *out, int *rc)
     *rc = got.rc;
     return true;
 }
+
+#if CONFIG_ATALAIA_LBT_BENCH
+bool radio_task_bench_start(radio_task_bench_fn fn)
+{
+    if (radio_hal == NULL || fn == NULL || bench_running || bench_fn != NULL) return false;
+    bench_stop = false;
+    bench_fn = fn;
+    return true;
+}
+
+bool radio_task_bench_running(void)
+{
+    return bench_running || bench_fn != NULL;
+}
+
+void radio_task_bench_request_stop(void)
+{
+    bench_stop = true;
+}
+
+bool radio_task_bench_stop_requested(void)
+{
+    return bench_stop;
+}
+#endif
 
 bool radio_task_recv(radio_rx_msg_t *msg)
 {

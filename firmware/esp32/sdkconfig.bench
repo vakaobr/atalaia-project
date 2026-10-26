@@ -12,3 +12,6 @@
 CONFIG_ATALAIA_SERIAL_KEYS=y
 CONFIG_ATALAIA_SKIP_SETUP=y
 CONFIG_ATALAIA_RADIO_LOG_PACKETS=y
+# Decision SL-25's bench gate: "@lbt tx" / "@lbt probe" on the serial console
+# (docs/runbooks/lbt-bench-gate.md). Inert until a command is typed.
+CONFIG_ATALAIA_LBT_BENCH=y

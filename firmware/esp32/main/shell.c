@@ -49,6 +49,9 @@
 #include "radio/event_log.h"
 #include "radio/radio_stats.h"
 #include "radio/radio_task.h"
+#if CONFIG_ATALAIA_LBT_BENCH
+#include "radio/lbt_bench.h"
+#endif
 #include "serial_console.h"
 #include "wifi_setup.h"
 
@@ -282,6 +285,13 @@ static void serial_command(const char *cmd)
             return;
         }
     }
+#if CONFIG_ATALAIA_LBT_BENCH
+    /* Decision SL-25's bench test of listen-before-talk: "@lbt tx", "@lbt probe", ... */
+    if (strcmp(cmd, "lbt") == 0 || strncmp(cmd, "lbt ", 4) == 0) {
+        lbt_bench_command(cmd[3] ? cmd + 4 : "");
+        return;
+    }
+#endif
     bool adopt_cmd =
         SERIAL_ADOPT_ON && (strcmp(cmd, "adopt-info") == 0 || strncmp(cmd, "adopt ", 6) == 0);
     bool joinkey_cmd = SERIAL_JOIN_ON && strncmp(cmd, "joinkey ", 8) == 0;

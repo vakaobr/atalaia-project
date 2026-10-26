@@ -883,6 +883,20 @@ menu "Atalaia Field Box Configuration"
                 For the Wokwi emulator, which cannot host a SoftAP. Leave off
                 on real Field Boxes.
 
+        config ATALAIA_LBT_BENCH
+            bool "Bench test of listen-before-talk (\"@lbt\" console commands)"
+            default n
+            help
+                Decision SL-25: the gain of a CAD before every transmission holds
+                only if the radio's busy test also covers a frame already being
+                received. With this on, "@lbt tx" makes a board send frames of a
+                STATE's length at random gaps and "@lbt probe" makes another call
+                the HAL's channel_busy() every few milliseconds, receive them and
+                print what it found ("LBT," lines, read by tools/bench_lbt_gate.py).
+                Nothing runs until a command is typed; the radio is the test's
+                until it ends. On in the bench variant (sdkconfig.bench) only:
+                never for a box in a game. docs/runbooks/lbt-bench-gate.md.
+
         config ATALAIA_SERIAL_KEYS
             bool "Accept keypad keys from the serial console"
             default n

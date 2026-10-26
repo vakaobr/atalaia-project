@@ -32,6 +32,8 @@ python3 tools/i18n_check.py
 # The box's fonts carry exactly the letters of its texts, Chinese included (P5K-3).
 python3 tools/gen_box_fonts.py --check
 python3 tools/check_wiring.py
+# The listen-before-talk bench gate's report tool, on a made-up log (decision SL-25).
+python3 tools/bench_lbt_gate.py --selftest
 if command -v clang-format > /dev/null 2>&1 && command -v stylua > /dev/null 2>&1; then
     sh tools/format.sh --check
 else

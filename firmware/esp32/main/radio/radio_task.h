@@ -14,6 +14,10 @@
 
 #include "hal/hal.h"
 
+#ifdef ESP_PLATFORM
+#include "sdkconfig.h"
+#endif
+
 #define RADIO_TX_QUEUE_LEN 8
 #define RADIO_RX_QUEUE_LEN 8
 #define RADIO_MAX_PKT_LEN  255
@@ -98,5 +102,19 @@ bool radio_task_measure_result(noise_result_t *out, int *rc);
  * Thread-safe (called from game_task).
  */
 bool radio_task_recv(radio_rx_msg_t *msg);
+
+#if CONFIG_ATALAIA_LBT_BENCH
+/*
+ * The bench test of listen-before-talk (radio/lbt_bench.c, docs/runbooks/lbt-bench-gate.md): runs
+ * fn in the radio task, in place of its loop (nothing is sent or received for the game meanwhile:
+ * the task owns the SPI bus), until fn returns. False if the task is not running or a bench test
+ * already is. fn polls radio_task_bench_stop_requested().
+ */
+typedef void (*radio_task_bench_fn)(const hal_radio_ops_t *radio);
+bool radio_task_bench_start(radio_task_bench_fn fn);
+bool radio_task_bench_running(void);
+void radio_task_bench_request_stop(void);
+bool radio_task_bench_stop_requested(void);
+#endif
 
 #endif /* ATALAIA_RADIO_TASK_H */

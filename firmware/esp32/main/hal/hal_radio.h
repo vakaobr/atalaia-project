@@ -21,6 +21,29 @@ typedef enum {
     HAL_RADIO_MODE_TX,
 } hal_radio_mode_t;
 
+/*
+ * Why channel_busy() answered as it did (SL-25 step 1, docs/review/decisions-to-review.md).
+ * A CAD alone sees only a frame's preamble (about 12.5 ms of a 92 ms frame at SF7/125 kHz); the
+ * receiver's own state covers the rest: the SX1262 flags "preamble detected" and "header valid"
+ * while it receives a frame.
+ */
+typedef enum {
+    HAL_BUSY_FREE = 0,     /* nothing heard: no flag, and the CAD saw no activity */
+    HAL_BUSY_CAD = 1,      /* the CAD detected a LoRa preamble */
+    HAL_BUSY_PREAMBLE = 2, /* the receiver is on a preamble it detected (no CAD was run) */
+    HAL_BUSY_HEADER = 3,   /* the receiver decoded a valid header: a frame is on air (no CAD) */
+    HAL_BUSY_RX_DONE = 4,  /* a frame has just ended and waits to be read: not busy (no CAD) */
+    HAL_BUSY_ERROR = 5,    /* the radio did not answer */
+} hal_busy_why_t;
+
+/* What one channel_busy() call measured (the bench test, docs/runbooks/lbt-bench-gate.md). */
+typedef struct {
+    hal_busy_why_t why;
+    int64_t sample_us; /* esp_timer time at which the channel was looked at (the CAD's middle) */
+    uint32_t cad_us;   /* the whole CAD, standby to its result; 0 when none was run */
+    uint32_t rearm_us; /* putting the radio back in receive; 0 when none was needed */
+} hal_radio_busy_t;
+
 typedef struct {
     /*
      * Initialise the radio hardware (SPI, GPIOs, probe the chip).
@@ -70,7 +93,36 @@ typedef struct {
      */
     int (*measure)(uint32_t freq_hz, uint32_t dwell_ms, bool cad, noise_result_t *out);
 
+    /*
+     * Listen-before-talk test (SL-25 step 1): is a frame on air right now? First the receiver's
+     * state (a preamble detected or a header valid: a frame is being received, so the radio is
+     * left alone: a CAD would abort that reception), then, if nothing is flagged, one CAD, then
+     * back to receive. Returns 1 if busy, 0 if free, -1 on a radio error. *info (may be NULL)
+     * says why and how long it took. May be NULL (the radio cannot test: the channel is free).
+     * Not for the radio task's normal loop yet: only the bench test calls it.
+     */
+    int (*channel_busy)(hal_radio_busy_t *info);
+
+    /*
+     * The esp_timer time (microseconds) of the DIO1 edge behind the last frame recv() returned:
+     * when the chip finished receiving it. 0 if the HAL does not keep it. May be NULL.
+     */
+    int64_t (*last_rx_done_us)(void);
+
     void (*deinit)(void);
 } hal_radio_ops_t;
+
+/* channel_busy() through the ops, true when busy; an error or a HAL without the test is "free". */
+static inline bool hal_radio_channel_busy(const hal_radio_ops_t *radio, hal_radio_busy_t *info)
+{
+    if (info != NULL) {
+        info->why = HAL_BUSY_FREE;
+        info->sample_us = 0;
+        info->cad_us = 0;
+        info->rearm_us = 0;
+    }
+    if (radio == NULL || radio->channel_busy == NULL) return false;
+    return radio->channel_busy(info) == 1;
+}
 
 #endif /* HAL_RADIO_H */

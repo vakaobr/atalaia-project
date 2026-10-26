@@ -29,6 +29,7 @@
 
 #include "../board_fem.h"
 #include "../hal_radio.h"
+#include "../../radio/channel_busy.h"
 #include "../../radio/noise_stats.h"
 #include "../../radio/radio_limits.h"
 
@@ -40,6 +41,7 @@
 #include "driver/spi_master.h"
 #include "esp_rom_sys.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -182,6 +184,16 @@ static const atalaia_region_info_t *region_info(void)
 static spi_device_handle_t spi_handle;
 static SemaphoreHandle_t dio1_sem;
 
+/* When DIO1 last rose (esp_timer, microseconds): for a received frame, the end of its time on air
+ * (the bench test of listen-before-talk, SL-25). */
+static volatile int64_t dio1_edge_us;
+/* The DIO1 edge behind the frame recv() last returned. */
+static int64_t rx_done_us;
+/* How many times the chip's IRQ status was cleared: a receiver flag seen after a clear belongs to a
+ * new frame (channel_busy.h). */
+static uint32_t irq_epoch;
+static cb_track_t busy_track;
+
 /* The channel in use, its sub-band's TX power and the per-sub-band airtime
  * of the last hour (60-bucket sliding window, core duty_cycle.c). */
 static radio_limits_t limits;
@@ -241,6 +253,7 @@ static int sx_read_reg(uint16_t addr, uint8_t *value)
 static void IRAM_ATTR dio1_isr(void *arg)
 {
     (void)arg;
+    dio1_edge_us = esp_timer_get_time();
     BaseType_t higher;
     xSemaphoreGiveFromISR(dio1_sem, &higher);
     if (higher) portYIELD_FROM_ISR();
@@ -588,6 +601,7 @@ static int sx_start_rx(void)
     uint8_t clr_cmd[] = {SX_CMD_CLR_IRQ_STATUS, 0xFF, 0xFF};
     uint8_t rx_cmd[] = {SX_CMD_SET_RX, 0xFF, 0xFF, 0xFF}; /* continuous */
     rx_armed = false;
+    irq_epoch++;
     if (sx_cmd(pkt_cmd, sizeof(pkt_cmd), NULL, 0) != 0 ||
         sx_cmd(clr_cmd, sizeof(clr_cmd), NULL, 0) != 0) {
         return -1;
@@ -640,6 +654,7 @@ static int esp_radio_send(const uint8_t *data, size_t len)
 
     /* Clear IRQ and transmit (no timeout). */
     uint8_t clr_cmd[] = {SX_CMD_CLR_IRQ_STATUS, 0xFF, 0xFF};
+    irq_epoch++;
     if (sx_cmd(clr_cmd, sizeof(clr_cmd), NULL, 0) != 0) return -1;
     xSemaphoreTake(dio1_sem, 0); /* a packet received before standby is not TX_DONE */
 
@@ -679,6 +694,7 @@ static size_t esp_radio_recv(uint8_t *buf, size_t max_len, int8_t *rssi)
     uint16_t irq = ((uint16_t)irq_resp[0] << 8) | irq_resp[1];
     /* Clear at once: DIO1 falls, so the next packet raises a new edge. */
     uint8_t clr_cmd[] = {SX_CMD_CLR_IRQ_STATUS, 0xFF, 0xFF};
+    irq_epoch++;
     if (sx_cmd(clr_cmd, sizeof(clr_cmd), NULL, 0) != 0) {
         rx_armed = false;
         return 0;
@@ -687,6 +703,7 @@ static size_t esp_radio_recv(uint8_t *buf, size_t max_len, int8_t *rssi)
     if (!(irq & SX_IRQ_RX_DONE) || (irq & (SX_IRQ_CRC_ERR | SX_IRQ_HEADER_ERR))) {
         return 0; /* a damaged packet; the chip is still listening */
     }
+    rx_done_us = dio1_edge_us;
 
     /* Get RX buffer status: payload length and start offset. */
     uint8_t rxbuf_cmd[] = {SX_CMD_GET_RX_BUFFER_STATUS, 0x00};
@@ -789,6 +806,8 @@ static uint32_t esp_radio_duty_cycle_remaining_ms(void)
  * preamble was seen. Two symbols, with the detection peak Semtech's CAD
  * application note (AN1200.48) gives for the spreading factor (22 at SF7, 23
  * at SF9) and a minimum of 10. *ok is false on a radio error. */
+static int64_t cad_started_us; /* when SetCad was sent (channel_busy's sample time) */
+
 static bool sx_cad_once(bool *ok)
 {
     uint8_t stby[] = {SX_CMD_SET_STANDBY, 0x00};
@@ -805,11 +824,13 @@ static bool sx_cad_once(bool *ok)
     uint8_t cad[] = {SX_CMD_SET_CAD};
     *ok = false;
     rx_armed = false; /* the caller listens again with sx_start_rx() */
+    irq_epoch++;
     if (sx_cmd(stby, sizeof(stby), NULL, 0) != 0 || sx_cmd(params, sizeof(params), NULL, 0) != 0 ||
         sx_cmd(clr, sizeof(clr), NULL, 0) != 0) {
         return false;
     }
     xSemaphoreTake(dio1_sem, 0); /* drop a stale DIO1 edge */
+    cad_started_us = esp_timer_get_time();
     if (sx_cmd(cad, sizeof(cad), NULL, 0) != 0) return false;
     if (xSemaphoreTake(dio1_sem, pdMS_TO_TICKS(50)) != pdTRUE) return false;
     uint8_t irq_cmd[] = {SX_CMD_GET_IRQ_STATUS, 0x00};
@@ -859,6 +880,80 @@ static int esp_radio_measure(uint32_t freq_hz, uint32_t dwell_ms, bool cad, nois
     return noise_acc_finish(&acc, freq_hz, (uint16_t)dwell_ms, out) ? 0 : -1;
 }
 
+/* ---- Listen-before-talk test (decision SL-25, step 1) -------------------------------- */
+
+/* The longest a frame can take on this region's channel (255 bytes), with a quarter more: how long
+ * a receiver flag is believed (channel_busy.h). */
+static uint32_t max_frame_us(void)
+{
+    return atalaia_region_airtime_us(RADIO_REGION, 255) / 4 * 5;
+}
+
+/*
+ * Busy if a frame is on air. While the receiver is on a frame (a preamble detected or a header
+ * valid) the radio is not touched: a CAD takes the chip out of receive and would lose the frame.
+ * Otherwise one CAD, then receive again. A frame that has just ended (RxDone pending) is not busy
+ * and not disturbed either: the caller reads it with recv().
+ */
+static int esp_radio_channel_busy(hal_radio_busy_t *info)
+{
+    hal_radio_busy_t local;
+    if (info == NULL) info = &local;
+    info->why = HAL_BUSY_FREE;
+    info->cad_us = 0;
+    info->rearm_us = 0;
+    int64_t t0 = esp_timer_get_time();
+    info->sample_us = t0;
+
+    if (rx_armed) {
+        uint8_t irq_cmd[] = {SX_CMD_GET_IRQ_STATUS, 0x00};
+        uint8_t irq_resp[2];
+        if (sx_cmd(irq_cmd, sizeof(irq_cmd), irq_resp, 2) != 0) {
+            info->why = HAL_BUSY_ERROR;
+            return -1;
+        }
+        uint16_t irq = ((uint16_t)irq_resp[0] << 8) | irq_resp[1];
+        info->sample_us = esp_timer_get_time();
+        bool clear = false;
+        hal_busy_why_t why =
+            cb_rx_state(&busy_track, irq, irq_epoch, info->sample_us, max_frame_us(), &clear);
+        if (clear) {
+            uint8_t clr[] = {SX_CMD_CLR_IRQ_STATUS, 0x00, CB_IRQ_FLAGS};
+            irq_epoch++;
+            if (sx_cmd(clr, sizeof(clr), NULL, 0) != 0) {
+                info->why = HAL_BUSY_ERROR;
+                return -1;
+            }
+        }
+        info->why = why;
+        if (why == HAL_BUSY_PREAMBLE || why == HAL_BUSY_HEADER) return 1;
+        if (why == HAL_BUSY_RX_DONE) return 0;
+    }
+
+    bool ok = false;
+    cad_started_us = 0;
+    int64_t c0 = esp_timer_get_time();
+    bool seen = sx_cad_once(&ok);
+    int64_t c1 = esp_timer_get_time();
+    info->cad_us = (uint32_t)(c1 - c0);
+    /* The chip looks at the channel between SetCad and its result: the middle of that. */
+    info->sample_us = (cad_started_us != 0 ? cad_started_us + c1 : c0 + c1) / 2;
+    int64_t r0 = esp_timer_get_time();
+    int rearm = sx_start_rx();
+    info->rearm_us = (uint32_t)(esp_timer_get_time() - r0);
+    if (!ok || rearm != 0) {
+        info->why = HAL_BUSY_ERROR;
+        return -1;
+    }
+    info->why = seen ? HAL_BUSY_CAD : HAL_BUSY_FREE;
+    return seen ? 1 : 0;
+}
+
+static int64_t esp_radio_last_rx_done_us(void)
+{
+    return rx_done_us;
+}
+
 static void esp_radio_deinit(void)
 {
     if (spi_handle) {
@@ -886,6 +981,8 @@ const hal_radio_ops_t hal_esp_radio_ops = {
     .rssi = esp_radio_rssi,
     .duty_cycle_remaining_ms = esp_radio_duty_cycle_remaining_ms,
     .measure = esp_radio_measure,
+    .channel_busy = esp_radio_channel_busy,
+    .last_rx_done_us = esp_radio_last_rx_done_us,
     .deinit = esp_radio_deinit,
 };
 

@@ -35,11 +35,22 @@ extern size_t hal_stub_radio_rx_len;
 extern int8_t hal_stub_radio_rx_rssi;
 extern bool hal_stub_radio_rx_pending;
 extern uint32_t hal_stub_radio_channel_hz;
+extern hal_radio_mode_t hal_stub_radio_mode;
 extern uint32_t hal_stub_radio_dc_remaining_ms;
 extern int hal_stub_radio_noise_dbm;
 /* The region the stub radio checks channels against (the build's, RADIO_REGION, after reset). */
 extern atalaia_region_t hal_stub_radio_region;
 extern int hal_stub_radio_measure_calls;
+/* channel_busy(): the receiver's IRQ status while in RX (channel_busy.h's CB_IRQ_*), what a CAD
+ * finds (or a radio error), the clock it reads, the CADs run and the times the receiver was
+ * re-armed. */
+extern uint16_t hal_stub_radio_irq;
+extern bool hal_stub_radio_cad_detects;
+extern bool hal_stub_radio_cad_fails;
+extern int64_t hal_stub_radio_now_us;
+extern int hal_stub_radio_cad_calls;
+extern int hal_stub_radio_rx_rearms;
+extern int64_t hal_stub_radio_rx_done_us;
 
 void hal_stub_radio_reset(void);
 
