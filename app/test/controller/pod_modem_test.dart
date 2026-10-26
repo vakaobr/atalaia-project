@@ -5,7 +5,12 @@
 // against a scripted pod link, for what the end-to-end tests with the host
 // pod (pod_controller_test.dart) do not reach: missed pings, a pod that
 // says who it is again (it lost the key) or has no radio, and each RADIO_*
-// frame's fields. The ping interval is short, the time real.
+// frame's fields. The time is real: the ping interval is short only in the
+// test that is about pings, and what a test waits for it polls with a
+// deadline from that interval, not a fixed sleep (a loaded machine runs the
+// timers late, never early).
+@Timeout(Duration(minutes: 3))
+library;
 
 import 'dart:async';
 import 'dart:convert';
@@ -78,40 +83,76 @@ class ScriptedPod implements PodTransport {
 Future<void> settle([int ms = 20]) =>
     Future<void>.delayed(Duration(milliseconds: ms));
 
+/// Room for a machine under load (several Docker suites at once): timers run
+/// late, never early, so a wait for a state that a timer brings adds this.
+const loadSlack = Duration(seconds: 30);
+
+/// Waits until [ok], polling; on the deadline the failure says what the
+/// phone had sent and the states seen.
+Future<void> until(
+  bool Function() ok,
+  String what,
+  ScriptedPod link,
+  List<String> states, {
+  Duration timeout = loadSlack,
+}) async {
+  final end = DateTime.now().add(timeout);
+  while (!ok()) {
+    if (DateTime.now().isAfter(end)) {
+      throw TimeoutException(
+        'no $what after $timeout; states $states; the phone sent '
+        '${[for (final c in link.commands.reversed.take(8)) c.$1]} (latest first)',
+      );
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+}
+
 void main() {
   late ScriptedPod link;
   late PodModem modem;
   late List<String> states;
 
-  setUp(() async {
+  /// The modem on a fresh pod link. Only the test about missed pings wants
+  /// a short interval; the others must not see a ping come due between
+  /// their steps, however late a loaded machine runs them.
+  Future<void> open({Duration ping = const Duration(seconds: 30)}) async {
     link = ScriptedPod();
-    modem = PodModem(
-      PodClient(link),
-      pingInterval: const Duration(milliseconds: 50),
-    );
+    modem = PodModem(PodClient(link), pingInterval: ping);
     states = [];
     modem.onState = states.add;
     await modem.start();
-  });
+  }
+
+  setUp(open);
 
   tearDown(() async => modem.close());
 
   test('up after the IDENT and a PING answered; down after 3 missed', () async {
+    // Replaces the modem of setUp: 200 ms pings, so 3 missed take 600 ms,
+    // and the wait for DOWN is that plus slack.
+    await modem.close();
+    const ping = Duration(milliseconds: 200);
+    await open(ping: ping);
     expect(modem.state, ModemState.connecting);
     expect(link.commands.first.$1, RadioOp.ident);
     link.ident();
     await settle();
     expect(link.commands.last.$1, RadioOp.ping);
     link.pong();
-    await settle();
-    expect(modem.state, ModemState.up);
+    await until(() => modem.state == ModemState.up, 'UP', link, states);
     expect(modem.ident, containsPair('has_radio', true));
-    // Nobody answers now: down after three missed pings, up again on a reply.
-    await settle(260);
-    expect(modem.state, ModemState.down);
+    // Nobody answers now: down after three missed pings (the 4th tick sees
+    // the 3rd unanswered), up again on a reply.
+    await until(
+      () => modem.state == ModemState.down,
+      'DOWN',
+      link,
+      states,
+      timeout: ping * 4 + loadSlack,
+    );
     link.pong();
-    await settle();
-    expect(modem.state, ModemState.up);
+    await until(() => modem.state == ModemState.up, 'UP again', link, states);
     expect(states, [ModemState.up, ModemState.down, ModemState.up]);
   });
 

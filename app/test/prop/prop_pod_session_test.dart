@@ -227,6 +227,7 @@ void main() {
 
       // Someone opens the pod: node.tamper (critical) with reason pod_opened.
       final mark2 = ctl.frames.length;
+      await pod.caseArmed();
       pod.send('case open');
       await until(() => s.podOpened);
       final tamper = await ctl.wait(

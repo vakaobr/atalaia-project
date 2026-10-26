@@ -8,6 +8,9 @@
 // inputs (with a player tag signed for the game), the enclosure switch, over
 // the USB link and the Bluetooth link (frames cut to the MTU both ways).
 
+@Timeout(Duration(minutes: 3))
+library;
+
 import 'package:atalaia_app/pod/pod_client.dart';
 import 'package:atalaia_app/pod/pod_codec.dart';
 import 'package:atalaia_app/security/bytes.dart';
@@ -19,7 +22,7 @@ import '../support/pod_host.dart';
 Future<PodIdent> identified(PodClient c) async {
   final got = c.events
       .firstWhere((e) => e is PodIdentified)
-      .timeout(const Duration(seconds: 5));
+      .timeout(hostDeadline);
   await c.start();
   return ((await got) as PodIdentified).ident;
 }
@@ -33,7 +36,7 @@ Future<ProxyMessage> next(PodClient c, {String? capId, String? name}) async {
             (capId == null || e.message.capId == capId) &&
             (name == null || e.message.name == name),
       )
-      .timeout(const Duration(seconds: 5));
+      .timeout(hostDeadline);
   return (e as PodCapabilityEvent).message;
 }
 
@@ -163,6 +166,7 @@ void main() {
     expect((key7.$1, key7.$2['key']), ('keypad.key', '7'));
 
     // The enclosure opened.
+    await pod.caseArmed();
     pod.send('case open');
     final opened = await next(client, capId: 'case', name: 'opened');
     expect(inputs.caseOpened(opened), isTrue);
@@ -193,8 +197,18 @@ void main() {
     final st = await pod.status();
     expect((st['ble'], st['usb'], st['pending']), (true, false, 0));
     await client.close();
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    expect((await pod.status())['ble'], false);
+    // The pod notices the link gone when its own loop reads the close.
+    var bleUp = true;
+    final end = DateTime.now().add(hostDeadline);
+    while (bleUp && DateTime.now().isBefore(end)) {
+      bleUp = (await pod.status())['ble'] == true;
+      if (bleUp) await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+    expect(
+      bleUp,
+      false,
+      reason: 'the pod kept the link ${pod.lines.reversed.take(6)}',
+    );
   });
 
   test('a phone that goes silent: the pod gives the link up', () async {
@@ -204,13 +218,33 @@ void main() {
     final dec = FrameDecoder();
     usb.incoming.listen((d) => frames.addAll(dec.feed(d)));
     await usb.send(encodeFrame(FrameType.radioCmd, [RadioOp.ident]));
-    await Future<void>.delayed(const Duration(milliseconds: 100));
+    // The pod has the link when it answers with its IDENT; only then does an
+    // EVT go to it.
+    await eventually(
+      () => frames.any((f) => f.type == FrameType.ident),
+      'IDENT',
+      detail: () => '${pod.lines.reversed.take(6)}',
+    );
+    await pod.caseArmed();
     pod.send('case open'); // one EVT ("opened"), never acknowledged
-    await Future<void>.delayed(const Duration(milliseconds: 2400));
+    // It is sent, then again 3 times 500 ms apart, then the link is given up
+    // (the pod's own timers): wait for that end state, with all 4 EVTs
+    // heard, not for a time.
+    var st = await pod.status();
+    final end = DateTime.now().add(hostDeadline);
+    while (st['links_broken'] != 1 && DateTime.now().isBefore(end)) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      st = await pod.status();
+    }
+    await eventually(
+      () => frames.where((f) => f.type == FrameType.evt).length >= 4,
+      'the 4 EVTs',
+      detail: () => '$st ${pod.lines.reversed.take(6)}',
+    );
     final evts = frames.where((f) => f.type == FrameType.evt).toList();
     expect(evts, hasLength(4)); // sent, then again 3 times, 500 ms apart
     expect(evts.map((f) => hexEncode(f.payload)).toSet(), hasLength(1));
-    final st = await pod.status();
+    st = await pod.status();
     expect((st['usb'], st['links_broken'], st['evt_lost']), (false, 1, 1));
     await usb.close();
   });

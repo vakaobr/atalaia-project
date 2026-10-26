@@ -21,6 +21,30 @@ import 'dart:typed_data';
 import 'package:atalaia_app/pod/pod_client.dart';
 import 'package:atalaia_app/pod/pod_codec.dart';
 
+/// How long a test waits for a host program (the pod, the modem) to do what
+/// it was asked: a program that is working answers in milliseconds, but one
+/// that shares the machine with several Docker suites is scheduled seconds
+/// late, never early. A wait that ends is a real failure, so the deadline
+/// costs nothing when all is well.
+const hostDeadline = Duration(seconds: 60);
+
+/// Waits until [ok], polling, for [timeout]; the failure names [what] and
+/// shows [detail] (the host program's latest lines, say).
+Future<void> eventually(
+  bool Function() ok,
+  String what, {
+  Duration timeout = hostDeadline,
+  String Function()? detail,
+}) async {
+  final end = DateTime.now().add(timeout);
+  while (!ok()) {
+    if (DateTime.now().isAfter(end)) {
+      throw TimeoutException('no $what after $timeout ${detail?.call() ?? ''}');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+}
+
 String _program(String variable) {
   final env = Platform.environment[variable];
   if (env == null || env.isEmpty || !File(env).existsSync()) {
@@ -152,7 +176,7 @@ class _Lines {
   Future<String> wait(
     String prefix, {
     int from = 0,
-    Duration timeout = const Duration(seconds: 5),
+    Duration timeout = hostDeadline,
   }) async {
     final end = DateTime.now().add(timeout);
     while (true) {
@@ -203,11 +227,21 @@ class HostPod {
   void send(String line) => process.stdin.writeln(line);
 
   Future<String> wait(String prefix, {int? from, Duration? timeout}) =>
-      _out.wait(
-        prefix,
-        from: from ?? 0,
-        timeout: timeout ?? const Duration(seconds: 5),
-      );
+      _out.wait(prefix, from: from ?? 0, timeout: timeout ?? hostDeadline);
+
+  /// The pod's enclosure switch is armed once it has read the case closed
+  /// for POD_TAMPER_DEBOUNCE_MS (50 ms on its own clock, main/pod/pod_caps.h):
+  /// a `case open` before that is a pod that booted open, and is not
+  /// reported. The pod's clock is not seen from here, so this runs STATUS
+  /// round trips (each one is a turn of the pod's loop, which also polls its
+  /// switch) over three times that debounce, then one more.
+  Future<void> caseArmed() async {
+    final since = Stopwatch()..start();
+    do {
+      await status();
+    } while (since.elapsed < const Duration(milliseconds: 3 * 50));
+    await status();
+  }
 
   /// The next line with [prefix] after the lines so far.
   int get mark => _out.lines.length;
@@ -222,7 +256,7 @@ class HostPod {
   Future<void> stop() async {
     send('quit');
     await process.exitCode.timeout(
-      const Duration(seconds: 5),
+      hostDeadline,
       onTimeout: () {
         process.kill();
         return -1;
@@ -407,7 +441,7 @@ class ModemLink {
     int type, {
     bool Function(Uint8List payload)? match,
     int from = 0,
-    Duration timeout = const Duration(seconds: 5),
+    Duration timeout = hostDeadline,
   }) async {
     final end = DateTime.now().add(timeout);
     while (true) {
@@ -417,7 +451,10 @@ class ModemLink {
       }
       final left = end.difference(DateTime.now());
       if (left.isNegative) {
-        throw TimeoutException('no modem frame of type $type');
+        throw TimeoutException(
+          'no modem frame of type $type after $timeout; the frames are '
+          '${[for (final f in frames.reversed.take(8)) f.type]} (latest first)',
+        );
       }
       await _changed.stream.first.timeout(left, onTimeout: () {});
     }

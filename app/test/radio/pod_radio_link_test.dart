@@ -11,6 +11,14 @@
 // controller's TIME and commands come back as link messages, STATE keeps
 // to its interval, each new link has a new epoch, and closing forgets the
 // key. Then the Wi-Fi link and the radio together ([DualLink]).
+//
+// The time is real and the pod and the modem are host processes: on a
+// loaded machine (several Docker suites at once) they run late, never
+// early. So every wait is for the end state, with a deadline from the
+// product's own timers plus [loadSlack] (never a bare few seconds), and a
+// failure says what the pod had logged. A test has 3 minutes.
+@Timeout(Duration(minutes: 3))
+library;
 
 import 'dart:async';
 import 'dart:convert';
@@ -29,6 +37,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/core_libs.dart';
 import '../support/pod_host.dart';
+
+/// PodRadioLink's own wait for the pod's answer to CONFIGURE before it
+/// sends it again (reconfigureAfter, 5 s by default): a link can take that
+/// long to come up, twice if the second try is also late.
+const reconfigureAfter = Duration(seconds: 5);
+
+/// Room for a machine under load: the host pod, the host modem and the test
+/// are scheduled late, never early.
+const loadSlack = Duration(seconds: 40);
+
+/// How long the radio takes to link, at worst.
+const linkDeadline = Duration(seconds: 2 * 5 + 40);
 
 final gameKey = Uint8List.fromList(List.generate(16, (i) => 0x40 + i));
 
@@ -50,6 +70,7 @@ JoinPayload join({List<String>? urls}) => JoinPayload(
 );
 
 late AtalaiaCore core;
+late Field field;
 
 Uint8List? encodeWithCore({
   required int node,
@@ -109,7 +130,7 @@ class Field {
     client = PodClient(await SocketPodTransport.usb(pod));
     final ident = client.events.firstWhere((e) => e is PodIdentified);
     await client.start();
-    await ident.timeout(const Duration(seconds: 5));
+    await ident.timeout(hostDeadline);
   }
 
   /// The controller transmits a packet (through its modem).
@@ -139,23 +160,24 @@ class Field {
     return (h, plain, ctl.frames.indexOf(f) + 1);
   }
 
-  PodRadioLink radio({EpochStore? epochs}) => PodRadioLink(
-    pod: client,
-    join: join(),
-    epochs: epochs ?? MemoryEpochStore(),
-    encodeEvent: encodeWithCore,
-    hello: {
-      'node_name': 'phone-7',
-      'fw_version': 'app-test',
-      'core_version': core.version,
-      'tier': 0,
-      'capabilities': const <int>[],
-      'transports': RfTransport.lora | RfTransport.wifi,
-    },
-    retryAfter: const Duration(milliseconds: 400),
-    stateEvery: const Duration(seconds: 1),
-    tick: const Duration(milliseconds: 20),
-  );
+  PodRadioLink radio({EpochStore? epochs, Duration? stateEvery}) =>
+      PodRadioLink(
+        pod: client,
+        join: join(),
+        epochs: epochs ?? MemoryEpochStore(),
+        encodeEvent: encodeWithCore,
+        hello: {
+          'node_name': 'phone-7',
+          'fw_version': 'app-test',
+          'core_version': core.version,
+          'tier': 0,
+          'capabilities': const <int>[],
+          'transports': RfTransport.lora | RfTransport.wifi,
+        },
+        retryAfter: const Duration(milliseconds: 400),
+        stateEvery: stateEvery ?? const Duration(seconds: 1),
+        tick: const Duration(milliseconds: 20),
+      );
 
   Future<void> stop() async {
     await client.close();
@@ -166,18 +188,32 @@ class Field {
   }
 }
 
-Future<void> until(bool Function() ok, {int ms = 5000}) async {
-  final end = DateTime.now().add(Duration(milliseconds: ms));
+/// Waits until [ok], polling (no fixed sleep), for [timeout]; the failure
+/// names [what] and shows the host pod's latest lines.
+Future<void> until(
+  bool Function() ok,
+  String what, {
+  Duration timeout = linkDeadline,
+}) async {
+  final end = DateTime.now().add(timeout);
   while (!ok()) {
-    if (DateTime.now().isAfter(end)) throw TimeoutException('condition');
+    if (DateTime.now().isAfter(end)) {
+      throw TimeoutException(
+        'no $what after $timeout\n'
+        'pod: ${_tail(field.pod.lines)}\n'
+        'the controller\'s modem reported ${field.ctl.frames.length} frames',
+      );
+    }
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
 }
 
+List<String> _tail(List<String> lines) =>
+    lines.length > 12 ? lines.sublist(lines.length - 12) : lines;
+
 void main() {
   setUpAll(() => core = AtalaiaCore.open(coreLibraryPath()));
 
-  late Field field;
   setUp(() async {
     field = Field();
     await field.start();
@@ -185,11 +221,14 @@ void main() {
   tearDown(() async => field.stop());
 
   test('HELLO, events with ACKs, TIME and commands, STATE', () async {
-    final radio = field.radio();
+    // The STATE interval is 30 s here: the test keeps its second STATE held
+    // for 300 ms, and a machine that runs that over a second late must not
+    // let it go.
+    final radio = field.radio(stateEvery: const Duration(seconds: 30));
     final messages = <LinkMessage>[];
     radio.messages.listen(messages.add);
     radio.start();
-    await until(() => radio.linked);
+    await until(() => radio.linked, 'the radio linked');
     expect(radio.epoch, 1);
 
     // HELLO reaches the controller, decrypted by its modem.
@@ -200,7 +239,7 @@ void main() {
     expect((hh.prio, hh.ackRequested, hh.encrypted), (2, true, true));
     expect(radio.heard, isFalse);
     field.controllerSends(RfType.ack, RfAck(node: 7, seq: hh.seq).encode());
-    await until(() => radio.heard);
+    await until(() => radio.heard, 'the HELLO acknowledged');
 
     // A capture, encoded by the core as a box would; no ACK: a new packet.
     radio.sendEvent(
@@ -234,7 +273,7 @@ void main() {
       RfType.ack,
       RfAck(node: 7, seq: e2.seq).encode(), // contiguous up to e2: both covered
     );
-    await until(() => radio.pending == 0);
+    await until(() => radio.pending == 0, 'the ACK to clear the event');
 
     // The controller's TIME and its commands.
     field.controllerSends(
@@ -255,7 +294,7 @@ void main() {
       RfType.cmd,
       const RfCmd(cmd: 3, params: {'reason': 'gm'}, dest: 7).encode(),
     );
-    await until(() => messages.length >= 2);
+    await until(() => messages.length >= 2, 'the TIME and the command');
     final time = messages.whereType<LinkTime>().single;
     expect(
       (time.state, time.gameTimeMs, time.durationMs),
@@ -299,11 +338,16 @@ void main() {
     expect((await field.pod.status())['radio_configured'], isTrue);
     await radio.close();
     var configured = true;
-    for (var i = 0; i < 50 && configured; i++) {
+    final end = DateTime.now().add(loadSlack);
+    while (configured && DateTime.now().isBefore(end)) {
       await Future<void>.delayed(const Duration(milliseconds: 20));
       configured = (await field.pod.status())['radio_configured'] == true;
     }
-    expect(configured, isFalse);
+    expect(
+      configured,
+      isFalse,
+      reason: 'the pod forgot the key ${_tail(field.pod.lines)}',
+    );
   });
 
   test(
@@ -312,14 +356,14 @@ void main() {
       final store = AppEpochStore(MemoryAppStore());
       final first = field.radio(epochs: store);
       first.start();
-      await until(() => first.linked);
+      await until(() => first.linked, 'the first link');
       expect(first.epoch, 1);
       final (h1, _, after) = await field.heard(RfType.hello);
       await first.close();
 
       final second = field.radio(epochs: store);
       second.start();
-      await until(() => second.linked);
+      await until(() => second.linked, 'the second link');
       expect(second.epoch, 2);
       final (h2, p2, _) = await field.heard(RfType.hello, from: after);
       expect(RfHello.decode(p2).epoch, 2);
@@ -354,7 +398,11 @@ void main() {
         reconfigureAfter: const Duration(seconds: 30),
       );
       radio.start();
-      await until(() => radio.state == RadioLinkState.offline);
+      await until(
+        () => radio.state == RadioLinkState.offline,
+        'the radio offline (channel refused)',
+        timeout: reconfigureAfter + loadSlack,
+      );
       expect(radio.linked, isFalse);
       radio.sendEvent(seq: 1, tMs: 1, type: 'zone.captured', team: 1);
       await Future<void>.delayed(const Duration(milliseconds: 200));
@@ -379,10 +427,10 @@ void main() {
     final messages = <LinkMessage>[];
     dual.messages.listen(messages.add);
     dual.start();
-    await until(() => wifi.linked);
+    await until(() => wifi.linked, 'the Wi-Fi link');
     final radio = field.radio();
     await dual.attachRadio(radio);
-    await until(() => radio.linked);
+    await until(() => radio.linked, 'the radio linked');
     // Both HELLOs say lora and wifi.
     expect(dual.transports, RfTransport.lora | RfTransport.wifi);
     expect(
@@ -394,7 +442,10 @@ void main() {
 
     // Wi-Fi up: the event goes on Wi-Fi only; the radio's TIME is not taken.
     dual.sendEvent(seq: 1, tMs: 100, type: 'zone.captured', team: 1);
-    await until(() => sockets.last.got.any((m) => m['type'] == 'event'));
+    await until(
+      () => sockets.last.got.any((m) => m['type'] == 'event'),
+      'the event on Wi-Fi',
+    );
     field.controllerSends(
       RfType.time,
       const RfTime(
@@ -426,7 +477,7 @@ void main() {
     // TIME and commands are taken.
     wifiReachable = false;
     await sockets.last.drop();
-    await until(() => !wifi.linked);
+    await until(() => !wifi.linked, 'the Wi-Fi link down');
     expect(dual.linked, isTrue); // the radio
     dual.sendEvent(seq: 2, tMs: 200, type: 'zone.captured', team: 2);
     final (_, ep, _) = await field.heard(RfType.event, from: afterHello);
@@ -447,7 +498,10 @@ void main() {
       RfType.cmd,
       const RfCmd(cmd: 1, params: {'reason': 'gm'}).encode(),
     );
-    await until(() => messages.whereType<LinkCommand>().isNotEmpty);
+    await until(
+      () => messages.whereType<LinkCommand>().isNotEmpty,
+      'the radio command',
+    );
     expect(messages.whereType<LinkCommand>().single.cmd, 'pause');
     // The Wi-Fi link keeps the event for when it is back (the controller logs it once).
     expect(wifi.unacked, 2);
