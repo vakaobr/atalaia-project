@@ -54,10 +54,11 @@ the registry's index; once the project has reviewed it, it carries the
 How the registry works, its review checklist, keys and moderation:
 [`docs/community/`](docs/community/README.md).
 
-> The registry repository does not exist yet (decision P5R-9): the maintainer
-> creates it from [`registry/template/`](registry/template/). Until then you can
-> run every step below against a copy of the template, and share ideas with the
-> *Game mode idea* issue template.
+> The registry is live: [github.com/vakaobr/atalaia-modes](https://github.com/vakaobr/atalaia-modes),
+> with its page at [vakaobr.github.io/atalaia-modes](https://vakaobr.github.io/atalaia-modes/).
+> It has no modes yet: yours can be the first. You can also run every step below
+> against a copy of [`registry/template/`](registry/template/), and share ideas
+> with the *Game mode idea* issue template.
 
 1. **Write the mode.** Build it in the visual mode editor (in `simulator/`: `python3 -m atalaia_sim serve ../modes/domination`,
    then `http://localhost:8000/editor/`; *Test in the simulator* plays it, and

@@ -29,7 +29,8 @@ Protocol changes go through the RFC process in [`rfcs/`](rfcs/).
 
 ## Community modes
 
-Sharing game modes through the community mode registry: how it works, the
+Sharing game modes through the community mode registry ([live page](https://vakaobr.github.io/atalaia-modes/),
+[repository](https://github.com/vakaobr/atalaia-modes)): how it works, the
 review checklist and the verified badge, mode keys and their revocation, and
 moderation, in [`community/`](community/README.md). Authors start at
 [Submitting a community mode](../CONTRIBUTING.md#submitting-a-community-mode).

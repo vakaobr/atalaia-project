@@ -9,9 +9,13 @@ Community game modes are shared through a registry: a Git repository,
 `atalaia-modes`, whose index a field controller imports signed packages from
 (ADR-P5-3 and P5-8 as amended, phase 5 plan phases 8 and 9, decisions P5G-1
 onwards in [`../review/decisions-to-review.md`](../review/decisions-to-review.md)).
-The repository does not exist yet: the maintainer creates it from
-[`registry/template/`](../../registry/template/) (decision P5R-9). Until then
-everything below can be tried locally against the template.
+The repository is live at
+[github.com/vakaobr/atalaia-modes](https://github.com/vakaobr/atalaia-modes),
+created from [`registry/template/`](../../registry/template/) (decision P5R-9),
+and its page and `index.json` are at
+[vakaobr.github.io/atalaia-modes](https://vakaobr.github.io/atalaia-modes/). It
+has no modes yet, and the project's signing key is still to be added; everything
+below can also be tried locally against the template.
 
 | Document | For | What |
 | --- | --- | --- |

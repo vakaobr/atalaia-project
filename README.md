@@ -24,7 +24,7 @@ Atalaia is an open, local-first platform for airsoft, paintball and milsim game 
 > - Phase 0 (foundations) is complete.
 > - Phases 1 and 2 are done in software; real Heltec V4.3 boards already play whole games with the field controller on the bench. The gates wait for built boxes and field tests.
 > - Phase 3 (Android and players) is done in software, the iOS app included (it has passed its checklist on an iPhone); no real phone or I/O pod has been in a field yet.
-> - Phases 4 and 5: every software step is built; they wait for hardware, a real server and the registry's repository.
+> - Phases 4 and 5: every software step is built; the [mode registry](https://vakaobr.github.io/atalaia-modes/) is live (no modes yet); they wait for hardware, a real server and the registry's signing key.
 >
 > The [roadmap](#roadmap) below and the [roadmap page](https://atalaia-project.link/en/roadmap/) list what is done and what is next, phase by phase. Ideas, reviews and early contributors are very welcome.
 
@@ -145,7 +145,7 @@ See [LICENSING.md](LICENSING.md) for the details.
 | [2 · Field network](https://atalaia-project.link/en/roadmap/#phase-2) · [status](docs/phase-2-field-network/STATUS.md) | Skirmesh-RF over LoRa, field controller, GM console, mode pack | Software done; two bench boards play with the controller; boxes listen before they talk (simulator: 89 % of updates heard at 20 boxes, from 65 %) | 5 boxes on a CQB site and an outdoor field, zero lost captures |
 | [3 · Android and players](https://atalaia-project.link/en/roadmap/#phase-3) · [status](docs/phase-3-android-players/STATUS.md) | Android props, I/O pod, player app, modes that need phones | Software done, iOS checked on an iPhone; no real phone or pod in the field yet | One game mixes ESP32 and Android props without issues |
 | [4 · Site server and advanced play](https://atalaia-project.link/en/roadmap/#phase-4) · [status](docs/phase-4-site-server/STATUS.md) | Site server, custom scenarios, advanced modes, ATAK | Software done; no real server or hardware yet | A weekend milsim runs on Atalaia end to end |
-| [5 · Community](https://atalaia-project.link/en/roadmap/#phase-5) · [status](docs/phase-5-community/STATUS.md) | Mode editor and registry, translations, build guides, carrier PCB | Software done; the registry repository and the hardware are left | Ongoing |
+| [5 · Community](https://atalaia-project.link/en/roadmap/#phase-5) · [status](docs/phase-5-community/STATUS.md) | Mode editor and registry, translations, build guides, carrier PCB | Software done; the [mode registry](https://vakaobr.github.io/atalaia-modes/) is live; its signing key and the hardware are left | Ongoing |
 
 What each phase has done, what is next and what it waits for is on the [roadmap page](https://atalaia-project.link/en/roadmap/), as short lists, and in each phase's `STATUS.md`.
 
