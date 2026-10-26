@@ -81,6 +81,9 @@ final class LocationPlugin: NSObject {
   // once an interval has gone by with nothing sent, with its own `t`, so the
   // controller sees how old it is, as Android's periodic updates keep going.
   private var ticker: Timer?
+  // The last position sent: manager.location can lag the one just given to
+  // the delegate, and a fix sent again must not go back in time.
+  private var lastFix: CLLocation?
   private var waiting: [(Bool) -> Void] = []
 
   private init(messenger: FlutterBinaryMessenger) {
@@ -180,6 +183,7 @@ final class LocationPlugin: NSObject {
     if let last = lastSent, now - last < interval - 0.5 { return }
     guard let loc = locations.last(where: { $0.horizontalAccuracy >= 0 }) else { return }
     lastSent = now
+    lastFix = loc
     sink(LocationPlugin.fix(loc))
   }
 
@@ -187,8 +191,12 @@ final class LocationPlugin: NSObject {
     guard sink != nil else { return }
     let now = ProcessInfo.processInfo.systemUptime
     if let last = lastSent, now - last < interval - 0.5 { return }
-    guard let loc = manager.location, loc.horizontalAccuracy >= 0 else { return }
+    let known = manager.location.flatMap { $0.horizontalAccuracy >= 0 ? $0 : nil }
+    // The newer of the phone's last known position and the last one sent.
+    guard let loc = [known, lastFix].compactMap({ $0 }).max(by: { $0.timestamp < $1.timestamp })
+    else { return }
     lastSent = now
+    lastFix = loc
     sink?(LocationPlugin.fix(loc))
   }
 
@@ -245,6 +253,7 @@ extension LocationPlugin: @preconcurrency FlutterStreamHandler {
       -known.timestamp.timeIntervalSinceNow <= LocationPlugin.lastKnownMaxAge
     {
       lastSent = ProcessInfo.processInfo.systemUptime
+      lastFix = known
       events(LocationPlugin.fix(known))
     }
     manager.startUpdatingLocation()
@@ -257,6 +266,7 @@ extension LocationPlugin: @preconcurrency FlutterStreamHandler {
     manager.stopUpdatingLocation()
     sink = nil
     lastSent = nil
+    lastFix = nil
     return nil
   }
 }
