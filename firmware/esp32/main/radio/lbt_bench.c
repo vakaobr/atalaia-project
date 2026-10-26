@@ -26,11 +26,13 @@
 #include <string.h>
 
 #include "atalaia/duty_cycle.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_rom_sys.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "lbt_profile.h"
@@ -71,10 +73,12 @@ static void printer_task(void *arg)
 static bool log_start(void)
 {
     if (line_q != NULL) return true;
-    line_q = xQueueCreate(160, sizeof(line_t));
+    /* 160 lines of 224 bytes are 35 KB: more than the largest free block of internal RAM
+     * on a running box (about 31 KB), so the queue lives in PSRAM. */
+    line_q = xQueueCreateWithCaps(160, sizeof(line_t), MALLOC_CAP_SPIRAM);
     if (line_q == NULL) return false;
     if (xTaskCreatePinnedToCore(printer_task, "lbt_log", 3072, NULL, 1, NULL, 1) != pdPASS) {
-        vQueueDelete(line_q);
+        vQueueDeleteWithCaps(line_q);
         line_q = NULL;
         return false;
     }
