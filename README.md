@@ -113,7 +113,7 @@ The diagrams are built in English and Portuguese, for wide and narrow screens, f
 | [`protocol/`](protocol/) | Skirmesh-RF message and event schemas; [usb-modem.md](protocol/usb-modem.md) (modem framing); [join.md](protocol/join.md) (join payload) | GPL-3.0-or-later |
 | [`modes/`](modes/) | Built-in game modes (Lua + manifest) | GPL-3.0-or-later |
 | [`firmware/`](firmware/) | ESP32 firmware (ESP-IDF) and Arduino thin-node firmware | GPL-3.0-or-later |
-| [`app/`](app/) | Flutter app for Android and iOS: props, controller, player roles | GPL-3.0-or-later + app-store permission |
+| [`app/`](app/) | Flutter app: props and the phone controller (Android), player, marshal and GM roles (Android; iOS project in place, built by CI, not yet run on an iPhone: [guide](app/docs/ios-on-a-mac.md)) | GPL-3.0-or-later + app-store permission |
 | [`controller/`](controller/) | Field controller (`atalaia_controller`) and GM console ([`controller/console/`](controller/console/), served at `/console/`) | AGPL-3.0-or-later |
 | [`server/`](server/) | Optional site server | AGPL-3.0-or-later |
 | [`simulator/`](simulator/) | Desktop simulator with virtual nodes and a web view; the mode editor (blocks to Lua) at `/editor/` | GPL-3.0-or-later |

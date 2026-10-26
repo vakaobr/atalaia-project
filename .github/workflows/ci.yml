@@ -264,6 +264,39 @@ jobs:
             ghcr.io/cirruslabs/flutter:3.44.0@sha256:46691e311715845de03a3ba4753a475476936805b29431b1f00f1816981033f8 \
             sh /src/app/tool/check.sh apk
 
+  ios-build:
+    name: iOS app (flutter build ios, unsigned)
+    # `flutter build ios --release --no-codesign` on GitHub's macOS runner: the
+    # only place the repository's Swift, Info.plist and Xcode project (app/ios/)
+    # are compiled, since the maintainer's toolchain is Docker on Windows or
+    # Linux (decisions PD10, iOS-1 to iOS-7). It proves the project builds; it
+    # makes no IPA to install (that needs signing, app/docs/ios-on-a-mac.md).
+    # The core is not built: the app's game loop does not run on iOS (no prop,
+    # no phone controller there), so there is no dylib to link. Flutter 3.44.0,
+    # the same as the Docker image, from the action pinned by commit as above.
+    # Only on pushes to main, not on every pull request: macOS minutes cost ten
+    # times Linux's on a private repository (free on a public one, as now), and
+    # Dart changes cannot break iOS without flutter-test seeing it. Make it run
+    # on pull requests too by dropping the `if`.
+    if: github.event_name == 'push'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.44.0
+          channel: stable
+      - name: The GM console and the check-in notices into the app's assets (PE24-61)
+        working-directory: app
+        run: dart tool/sync_console.dart
+      - name: Packages from the lockfile
+        working-directory: app
+        run: flutter pub get --enforce-lockfile
+      - name: Build for iOS without signing
+        working-directory: app
+        run: flutter build ios --release --no-codesign
+
   flutter-integration:
     name: The app on an Android emulator (integration tests)
     # The emulator needs hardware acceleration (KVM), which GitHub's Ubuntu

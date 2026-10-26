@@ -1,0 +1,8 @@
+/* SPDX-FileCopyrightText: 2026 The Atalaia contributors */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+
+"CFBundleDisplayName" = "Atalaia";
+"NFCReaderUsageDescription" = "Atalaia 會讀取 NFC 標籤，讓你加入遊戲並檢查玩家的標籤。";
+"NSCameraUsageDescription" = "Atalaia 只用相機掃描加入卡與場地海報上的 QR Code。";
+"NSLocalNetworkUsageDescription" = "Atalaia 會透過場地的 Wi-Fi 與場地控制器通訊：遊戲動態、GM 控制台與報到。";
+"NSLocationWhenInUseUsageDescription" = "只有在你處於遊戲中並選擇與主辦方分享位置時，Atalaia 才會使用你的位置。";

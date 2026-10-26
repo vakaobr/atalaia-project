@@ -1,0 +1,8 @@
+/* SPDX-FileCopyrightText: 2026 The Atalaia contributors */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+
+"CFBundleDisplayName" = "Atalaia";
+"NFCReaderUsageDescription" = "Atalaia liest NFC-Tags, damit du einem Spiel beitreten kannst und um die Tags der Spielenden zu prüfen.";
+"NSCameraUsageDescription" = "Atalaia verwendet die Kamera nur, um die QR-Codes von Beitrittskarten und Feldplakaten zu lesen.";
+"NSLocalNetworkUsageDescription" = "Atalaia spricht über das WLAN des Spielfelds mit dem Feld-Controller: Spiel-Feed, GM-Konsole und Check-in.";
+"NSLocationWhenInUseUsageDescription" = "Atalaia verwendet deinen Standort nur, solange du in einem Spiel bist und deine Position mit der Spielleitung teilen möchtest.";

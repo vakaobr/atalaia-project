@@ -1,0 +1,8 @@
+/* SPDX-FileCopyrightText: 2026 The Atalaia contributors */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+
+"CFBundleDisplayName" = "Atalaia";
+"NFCReaderUsageDescription" = "A Atalaia lê etiquetas NFC para entrares num jogo e para verificar as etiquetas de quem joga.";
+"NSCameraUsageDescription" = "A Atalaia usa a câmara só para ler os códigos QR dos cartões de entrada e dos cartazes do campo.";
+"NSLocalNetworkUsageDescription" = "A Atalaia comunica com o controlador do campo pela rede Wi-Fi do campo: o feed do jogo, a consola do GM e o check-in.";
+"NSLocationWhenInUseUsageDescription" = "A Atalaia usa a tua localização só enquanto estás num jogo e escolheste partilhar a tua posição com a organização.";

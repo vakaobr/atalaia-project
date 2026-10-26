@@ -681,8 +681,7 @@ roadmap:
       einer Feldkarte, die das Handy per NFC schreibt, und Firmware-Updates zwischen Spielen (mit
       dem USB-Funkmodem des Pi am Handy: der I/O-Pod reicht diese Nachrichten noch nicht weiter); und Presets, hochgeladene Modi und signierte Moduspakete, die an Boxen geschickt werden, denen sie fehlen, auf dem Handy kompilierte Szenarien, Rollenpakete in einem Spiel sowie Teamnamen und Wappen;
       nach dem Feldtest: der Wechsel zwischen einem Handy und einem
-      Pi und der Rest dessen, was der Pi kann) und die iOS-Version (nicht gebaut: sie braucht einen
-      Mac). Planphase G, der Feldtest mit echten Handys und Pods, wartet auf die Hardware: Bisher
+      Pi und der Rest dessen, was der Pi kann) und die iOS-Version (ihr Projekt liegt im Repository und die CI baut es auf einem Mac, aber es lief noch nicht auf einem iPhone; der Prop und das Handy als Feld-Controller bleiben nur Android). Planphase G, der Feldtest mit echten Handys und Pods, wartet auf die Hardware: Bisher
       lief die App nur auf Android-Emulatoren und die Pod-Firmware nur als eigener Code auf einem
       Computer.
     gate: "Gate: Ein Spiel mischt ESP32- und Android-Props ohne Probleme."
