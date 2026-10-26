@@ -26,6 +26,7 @@ import '../chrono/limit_template.dart';
 import '../chrono/reading.dart';
 import '../chrono/replica.dart';
 import '../l10n/strings.dart';
+import '../ui/code_kind.dart';
 import '../ui/widgets.dart';
 import 'marshal_records.dart';
 
@@ -201,6 +202,11 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
       cancel: s.t('common.cancel'),
     );
     if (text == null || !mounted) return;
+    final wrong = classifyCode(text)?.messageKey;
+    if (wrong != null) {
+      setState(() => _error = s.t(wrong));
+      return;
+    }
     final replica = _records?.byTag(text.trim());
     final rid = replica?.replicaId;
     final found = _players.any(

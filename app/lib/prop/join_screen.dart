@@ -18,6 +18,7 @@ import '../l10n/strings.dart';
 import '../platform/services.dart';
 import '../protocol/join_payload.dart';
 import '../security/ndef.dart';
+import '../ui/code_kind.dart';
 import '../ui/settings_screen.dart';
 import '../ui/widgets.dart';
 
@@ -95,6 +96,13 @@ class _JoinScreenState extends State<JoinScreen> {
   }
 
   void _try({String? text, List<int>? ndef}) {
+    final wrong = text == null
+        ? null
+        : wrongCodeMessage(text, CodeKind.joinCard);
+    if (wrong != null) {
+      setState(() => _error = wrong);
+      return;
+    }
     final key = AppScope.read(context).settings.joinKey;
     final (j, err) = readJoin(text: text, ndef: ndef, joinKey: key);
     if (j != null) {

@@ -14,6 +14,7 @@ import '../app.dart';
 import '../l10n/strings.dart';
 import '../marshal/marshal_records.dart';
 import '../platform/services.dart';
+import '../ui/code_kind.dart';
 import '../ui/widgets.dart';
 import 'chrono_ui.dart';
 import 'limit_template.dart';
@@ -130,12 +131,17 @@ class _ReplicaFormScreenState extends State<ReplicaFormScreen> {
       hint: s.t('replica.scan_hint'),
       cancel: s.t('common.cancel'),
     );
-    if (text != null && mounted) {
-      setState(() {
-        _tagType = TagType.qr;
-        _tagUid = text.trim();
-      });
+    if (text == null || !mounted) return;
+    final wrong = classifyCode(text)?.messageKey;
+    if (wrong != null) {
+      setState(() => _error = wrong);
+      return;
     }
+    setState(() {
+      _error = null;
+      _tagType = TagType.qr;
+      _tagUid = text.trim();
+    });
   }
 
   Future<void> _save() async {
@@ -174,7 +180,9 @@ class _ReplicaFormScreenState extends State<ReplicaFormScreen> {
         children: [
           if (_error != null)
             Notice(
-              _error!.startsWith('replica.') ? s.t(_error!) : _error!,
+              _error!.startsWith('replica.') || _error!.startsWith('code.')
+                  ? s.t(_error!)
+                  : _error!,
               kind: NoticeKind.error,
             ),
           TextField(
@@ -223,6 +231,7 @@ class _ReplicaFormScreenState extends State<ReplicaFormScreen> {
             Text(_nfcOn ? s.t('replica.tap_tag') : s.t('nfc.none')),
           const SizedBox(height: 8),
           OutlinedButton.icon(
+            key: const Key('replica-scan'),
             icon: const Icon(Icons.qr_code_scanner),
             label: Text(s.t('replica.scan')),
             onPressed: _scan,

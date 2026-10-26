@@ -26,6 +26,7 @@ import '../player/field_feed.dart';
 import '../player/player_screens.dart';
 import '../protocol/checkin_poster.dart';
 import '../site/site_api.dart';
+import '../ui/code_kind.dart';
 import '../ui/widgets.dart';
 import 'checkin_client.dart';
 import 'declare_replicas_screen.dart';
@@ -120,7 +121,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
     try {
       poster = parsePoster(text);
     } on PosterException {
-      _fail(isPosterText(text) ? 'checkin.bad_poster' : 'checkin.not_poster');
+      _fail(
+        isPosterText(text)
+            ? 'checkin.bad_poster'
+            : wrongCodeMessage(text, CodeKind.poster) ?? 'checkin.not_poster',
+      );
       return;
     }
     setState(() {

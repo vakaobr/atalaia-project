@@ -261,6 +261,18 @@ const Map<String, String> ptStrings = {
   'player.address': 'Endereço do controlador',
   'player.code': 'Código de acesso',
   'player.connect': 'Ligar',
+  'code.is_poster':
+      'Isto é o cartaz de check-in de um campo. Usa-o em Participante > '
+      'Check-in no campo.',
+  'code.is_join_card':
+      'Isto é um código de entrada para um dispositivo de jogo. Usa-o em '
+      'Dispositivo de jogo > Entrar num jogo.',
+  'code.is_site_link':
+      'Isto é uma ligação às inscrições online de um campo. Usa-a em '
+      'Participante > Inscrições online.',
+  'code.is_scoreboard':
+      'Isto é a ligação do marcador de um jogo. Usa-a em Participante > '
+      'Seguir um jogo sem check-in.',
   'player.bad_link': 'Falta o endereço ou o código de acesso.',
   'player.connecting': 'A ligar ao controlador de campo…',
   'player.offline': 'Sem ligação. A voltar a ligar…',

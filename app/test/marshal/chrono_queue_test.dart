@@ -15,6 +15,7 @@ import 'package:atalaia_app/checkin/field_trust.dart';
 import 'package:atalaia_app/checkin/my_replicas.dart';
 import 'package:atalaia_app/chrono/limit_template.dart';
 import 'package:atalaia_app/chrono/record_signer.dart';
+import 'package:atalaia_app/l10n/strings_pt.dart';
 import 'package:atalaia_app/marshal/chrono_queue.dart';
 import 'package:atalaia_app/marshal/marshal_records.dart';
 import 'package:atalaia_app/security/bytes.dart';
@@ -24,6 +25,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_harness.dart';
 import '../support/fake_field.dart';
+import '../support/fakes.dart';
 import '../support/marshal_trust.dart';
 
 final templates = [
@@ -173,6 +175,27 @@ void main() {
     );
     expect(find.byType(ChronoStateChip), findsOneWidget);
     expect(find.text('aprovada'), findsOneWidget);
+  });
+
+  testWidgets('a poster scanned in the list is not a replica label', (
+    tester,
+  ) async {
+    final h = harness(fieldHttp: field.http, qr: FakeQr(field.posterText()));
+    final r = await records(h.store, h.settings);
+    await tester.pumpWidget(
+      h.app(
+        home: ChronoQueueScreen(
+          checkin: marshal,
+          field: pinned,
+          records: r,
+          templates: templates,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'queue-scan');
+    expect(find.text(ptStrings['code.is_poster']!), findsOneWidget);
+    expect(find.text(ptStrings['queue.not_found']!), findsNothing);
   });
 
   testWidgets('out of reach: the series waits on the phone, then goes', (

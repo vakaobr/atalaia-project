@@ -23,6 +23,7 @@ import '../checkin/declare_replicas_screen.dart' show NewReplicaDialog;
 import '../checkin/field_identity.dart';
 import '../checkin/my_replicas.dart';
 import '../l10n/strings.dart';
+import '../ui/code_kind.dart';
 import '../ui/qr_painter.dart';
 import '../ui/widgets.dart';
 import 'site_api.dart';
@@ -268,7 +269,8 @@ class _SiteScreenState extends State<SiteScreen> {
       onPressed: () {
         final link = SiteGameLink.parse(_address.text);
         if (link == null) {
-          setState(() => _error = s.t('site.bad_address'));
+          final wrong = wrongCodeMessage(_address.text, CodeKind.siteLink);
+          setState(() => _error = s.t(wrong ?? 'site.bad_address'));
           return;
         }
         unawaited(_use(link));

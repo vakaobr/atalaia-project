@@ -50,6 +50,7 @@ import '../position/field_bounds.dart';
 import '../position/position_reporter.dart';
 import '../prop/game_timer.dart';
 import '../site/site_screens.dart';
+import '../ui/code_kind.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'field_buzz.dart';
@@ -82,11 +83,36 @@ class _PlayerStartScreenState extends State<PlayerStartScreen> {
     super.dispose();
   }
 
-  Future<void> _go(FieldLink? link) async {
-    if (link == null) {
-      setState(() => _error = 'player.bad_link');
-      return;
+  /// What a scan or the typed [texts] give: a scoreboard link goes on; a
+  /// check-in poster opens the check-in with it (as "Read the poster"
+  /// would); another code of ours is named with where to use it; anything
+  /// else is a bad link.
+  Future<void> _use(List<String> texts) async {
+    final link = FieldLink.parse(
+      texts.first,
+      texts.length > 1 ? texts[1] : null,
+    );
+    if (link != null) return _go(link);
+    for (final t in texts) {
+      final kind = classifyCode(t);
+      if (kind == CodeKind.poster) {
+        setState(() => _error = null);
+        await Navigator.push(
+          context,
+          MaterialPageRoute<void>(builder: (_) => CheckinScreen(posterText: t)),
+        );
+        return;
+      }
+      if (kind != null && kind != CodeKind.scoreboard) {
+        setState(() => _error = kind.messageKey);
+        return;
+      }
     }
+    setState(() => _error = 'player.bad_link');
+  }
+
+  Future<void> _go(FieldLink link) async {
+    setState(() => _error = null);
     final app = AppScope.read(context);
     await app.update((x) {
       x.controllerUrl = link.base.toString();
@@ -110,7 +136,7 @@ class _PlayerStartScreenState extends State<PlayerStartScreen> {
       hint: s.t('player.scan_hint'),
       cancel: s.t('common.cancel'),
     );
-    if (text != null && mounted) await _go(FieldLink.parse(text));
+    if (text != null && mounted) await _use([text]);
   }
 
   @override
@@ -168,7 +194,7 @@ class _PlayerStartScreenState extends State<PlayerStartScreen> {
           const SizedBox(height: 12),
           FilledButton(
             key: const Key('player-connect'),
-            onPressed: () => _go(FieldLink.parse(_address.text, _code.text)),
+            onPressed: () => _use([_address.text, _code.text]),
             child: Text(s.t('player.connect')),
           ),
         ],

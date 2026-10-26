@@ -253,6 +253,18 @@ const Map<String, String> enStrings = {
   'player.address': "Controller's address",
   'player.code': 'Access code',
   'player.connect': 'Connect',
+  'code.is_poster':
+      "This is a field's check-in poster. Use it under Player > Check in at "
+      'the field.',
+  'code.is_join_card':
+      'This is a join code for a game prop. Use it under Game prop > Join a '
+      'game.',
+  'code.is_site_link':
+      "This is a link to a field's online registration. Use it under Player "
+      '> Online registration.',
+  'code.is_scoreboard':
+      "This is a game scoreboard's link. Use it under Player > Follow a game "
+      'without checking in.',
   'player.bad_link': 'The address or the access code is missing.',
   'player.connecting': 'Connecting to the field controller…',
   'player.offline': 'Offline. Reconnecting…',

@@ -268,6 +268,18 @@ const Map<String, String> deStrings = {
   'player.address': 'Adresse des Controllers',
   'player.code': 'Zugangscode',
   'player.connect': 'Verbinden',
+  'code.is_poster':
+      'Das ist das Check-in-Plakat eines Felds. Nutze es unter Spielen > Am '
+      'Feld einchecken.',
+  'code.is_join_card':
+      'Das ist ein Beitrittscode für ein Spielprop. Nutze ihn unter Spielprop '
+      '> Einem Spiel beitreten.',
+  'code.is_site_link':
+      'Das ist ein Link zur Online-Anmeldung eines Felds. Nutze ihn unter '
+      'Spielen > Online-Anmeldung.',
+  'code.is_scoreboard':
+      'Das ist der Link zur Anzeigetafel eines Spiels. Nutze ihn unter '
+      'Spielen > Ein Spiel ohne Check-in verfolgen.',
   'player.bad_link': 'Adresse oder Zugangscode fehlt.',
   'player.connecting': 'Verbindung zum Feld-Controller…',
   'player.offline': 'Offline. Verbindung wird wiederhergestellt…',

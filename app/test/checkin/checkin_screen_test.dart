@@ -216,6 +216,12 @@ void main() {
       );
       await tapKey(tester, 'checkin-use-text');
       expect(
+        find.textContaining('Isto é um código de entrada para um dispositivo'),
+        findsOneWidget,
+      );
+      await tester.enterText(find.byKey(const Key('checkin-text')), 'ola');
+      await tapKey(tester, 'checkin-use-text');
+      expect(
         find.text('Isto não é um cartaz de check-in do Atalaia.'),
         findsOneWidget,
       );
