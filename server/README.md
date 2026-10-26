@@ -51,7 +51,7 @@ Phase 4 plan phases 10 to 22 are built, and tested on a computer only. Plan phas
 | [`tests_browser/`](tests_browser/) | The staff pages in headless Chromium against the real API (`python3 tools/docker_server.py browser`) |
 | [`atalaia_server/feeds/`](atalaia_server/feeds/) | The iCalendar writer (`ical.py`) and the JSON feed (`json_feed.py`); plain Python, no database |
 | [`schemas/games-feed-v1.schema.json`](schemas/games-feed-v1.schema.json), [`docs/feeds.md`](docs/feeds.md) | The JSON feed's schema, and the pages and feeds described for fields and for whoever reads them |
-| [`atalaia_server/cli.py`](atalaia_server/cli.py) | `python -m atalaia_server create-admin`, `purge`, `hosted ...` and `import-field` |
+| [`atalaia_server/cli.py`](atalaia_server/cli.py) | `python -m atalaia_server create-admin`, `reset-totp`, `purge`, `hosted ...` and `import-field` |
 | [`atalaia_server/tenancy.py`](atalaia_server/tenancy.py) | Hosted mode at run time: the field from the host name, sessions scoped to its schema, the start-up check of the server's database role |
 | [`atalaia_server/hosted.py`](atalaia_server/hosted.py) | The hub operator's commands: the registry, a field's schema with its migrations, grants and row-level security, the isolation check, export, import into a single-field server, suspension, deletion |
 | [`atalaia_server/atak_relay.py`](atalaia_server/atak_relay.py), [`atak_pki.py`](atalaia_server/atak_pki.py), [`atak_models.py`](atalaia_server/atak_models.py), [`services/atak.py`](atalaia_server/services/atak.py), [`api/atak.py`](atalaia_server/api/atak.py) | The remote ATAK relay (Phase 4 follow-up FU5): the TLS listener with client certificates, the fields' CAs and the data packages, the certificates' table, issuing and revoking, the enrolment API |
@@ -354,6 +354,10 @@ Positions never reach the site server (decision P4R25).
 ## The first administrator
 
 The first administrator is made from the command line, in the server's container: `docker compose exec server python -m atalaia_server create-admin --username NAME [--email ADDRESS]` asks for the password twice, shows a TOTP secret and its `otpauth://` URI for an authenticator app, and creates the account once a code from the app is typed back (`--password-stdin` reads the password, then the code, from standard input).
+
+### An administrator who lost their authenticator
+
+`docker compose exec server python -m atalaia_server reset-totp --username NAME --reason "lost phone, identity checked by ..." [--yes] [--field SLUG]` (decision S11-7; run as the operator, in the server's container; `--field` in hosted mode only). It clears the account's TOTP secret and enrolment, revokes every session of the account (access tokens stop working at once and a login half-way through the TOTP step is refused), and writes a `totp_reset` row to the audit log (the account, the operator's system user, the reason, how many sessions were revoked, `via: cli`). The password is not changed. Unless `--yes` is given it asks for the username to be typed again; an unknown account, or one with no TOTP enrolment, is refused with a message and nothing changes. The server keeps no recovery codes and no remembered devices, so there is nothing else to clear. At the next login the account gets a session that has not passed TOTP (for an administrator or a privileged role that means no administrator powers) and enrols a new secret with `POST /api/v1/auth/totp/enrol` (password) and `/auth/totp/confirm` (a code); the roles work again from the confirmed session. Check who the person is before running it: the command is the only protection that TOTP gives against someone who knows the password.
 
 ## Preview deployment
 

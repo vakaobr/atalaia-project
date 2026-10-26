@@ -4,6 +4,7 @@
 
     python -m atalaia_server create-admin --username NAME [--email EMAIL] [--password-stdin] [--field SLUG]
     python -m atalaia_server create-admin --username NAME --generate FILE
+    python -m atalaia_server reset-totp --username NAME --reason TEXT [--yes] [--field SLUG]
     python -m atalaia_server demo load|reset
     python -m atalaia_server demo reviewer --username NAME --out FILE
     python -m atalaia_server feedback list [--status new|seen|done|all] [--json]
@@ -27,6 +28,16 @@ It needs ATALAIA_DATABASE_URL and ATALAIA_SECRET_KEY, as the server does.
 TOTP secret, creates the administrator and writes the username, password, secret and ``otpauth://`` URI to FILE
 (mode 0600, which must not exist); nothing secret is printed. ``demo`` loads, resets or adds a test account to the
 demo data (``demo_data.py``); ``feedback list`` prints a preview server's feedback.
+
+``reset-totp`` is the recovery for an account that lost its authenticator (decision S11-7): it
+clears the account's TOTP secret, enrolment and last-used step, revokes every session of the account (a
+session's access token stops working at once, and a login half-way through the TOTP step is refused), and writes
+``totp_reset`` to the audit log (the account, the operator's system user, the ``--reason`` and ``via: cli``). The
+password is not touched: at the next login the account gets a session that has not passed TOTP (an administrator's
+and the privileged roles' powers wait for it) and enrols a new secret (``/auth/totp/enrol``, then ``confirm``). It
+asks for the username to be typed again unless ``--yes`` is given, and refuses an unknown account, or one with no
+TOTP to clear. The server keeps no recovery codes and no remembered devices: the secret is all there is. In hosted
+mode it needs ``--field SLUG``, as ``create-admin`` does.
 
 ``purge`` runs the retention purge (ADR-P4-8) once and prints what it
 deleted (``--dry-run``: what it would delete). The server runs it by itself
@@ -63,7 +74,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional, TextIO
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from . import atak_pki, demo_data, hosted, passwords, personal_data, tenancy, totp
@@ -71,7 +82,7 @@ from .api.auth import EMAIL, username_problem
 from .audit import record
 from .config import ConfigError, Settings, database_url_from_env
 from .db import make_engine, make_sessionmaker
-from .models import Field, User
+from .models import Field, User, UserSession
 from .services import atak as enrolment
 from .tokens import Keys
 from .totp import SeedBox
@@ -157,6 +168,57 @@ async def _create_admin(settings: Settings, engine: Any, username: str, email: O
         await db.commit()
         print(f"Server administrator {username!r} created ({user.id}).", file=out)
         return user.id
+
+
+async def reset_totp(settings: Settings, username: str, reason: str, assume_yes: bool,
+                     confirm: Callable[[str], str], out: TextIO, field: Optional[str] = None,
+                     actor: Optional[str] = None) -> uuid.UUID:
+    """Clears an account's TOTP enrolment, revokes its sessions and audits it (decision S11-7); returns its id.
+    Asks for the username again unless ``assume_yes``. In hosted mode ``field`` is required."""
+    if settings.hosted != (field is not None):
+        raise CommandError("--field SLUG names the field in hosted mode (ATALAIA_HOSTED=on) and only there")
+    username = username.strip().lower()
+    reason = reason.strip()
+    if not reason:
+        raise CommandError("--reason says why (it goes in the audit log)")
+    engine = make_engine(settings)
+    try:
+        tenant = None
+        if field is not None:
+            tenant = await tenancy.lookup(engine, tenancy.check_slug(field))
+            if tenant is None:
+                raise CommandError(f"no field {field!r} on this hub")
+        with tenancy.use(tenant):
+            async with make_sessionmaker(engine, hosted=settings.hosted)() as db:
+                user = await db.scalar(select(User).where(User.username == username).with_for_update())
+                if user is None:
+                    raise CommandError(f"no account named {username!r}")
+                if not user.totp_enabled and user.totp_secret_enc is None:
+                    raise CommandError(f"{username!r} has no TOTP enrolment to clear")
+                if not assume_yes:
+                    print(f"This clears {username!r}'s TOTP enrolment and signs the account out everywhere; "
+                          f"it enrols again at the next login.", file=out)
+                    if confirm("Type the username to confirm: ").strip().lower() != username:
+                        raise CommandError("not confirmed: nothing was changed")
+                was_enabled = user.totp_enabled
+                user.totp_enabled = False
+                user.totp_secret_enc = None
+                user.totp_last_step = None
+                revoked = (await db.execute(update(UserSession).where(
+                    UserSession.user_id == user.id, UserSession.revoked_at.is_(None))
+                    .values(revoked_at=func.now(), mfa=False))).rowcount
+                record(db, "totp_reset", None, user_id=user.id, resource="user", resource_id=user.id,
+                       details={"via": "cli", "actor": actor or hosted.default_actor(), "reason": reason,
+                                "was_enabled": was_enabled, "sessions_revoked": revoked,
+                                "server_admin": user.server_admin})
+                await db.commit()
+                print(f"TOTP cleared for {username!r} ({user.id}); {revoked} session(s) revoked. "
+                      f"It enrols a new secret at the next login.", file=out)
+                return user.id
+    except tenancy.TenantError as e:
+        raise CommandError(str(e)) from None
+    finally:
+        await engine.dispose()
 
 
 async def run_purge(settings: Settings, dry_run: bool, out: TextIO) -> dict[str, int]:
@@ -353,6 +415,11 @@ def _parser() -> argparse.ArgumentParser:
     admin.add_argument("--field", help="hosted mode: the field (slug) the administrator belongs to")
     admin.add_argument("--generate", metavar="FILE",
                        help="ask nothing: make a password and TOTP secret and write them to FILE (mode 0600)")
+    rt = sub.add_parser("reset-totp", help="clear an account's TOTP enrolment, sign it out, enrol again at next login")
+    rt.add_argument("--username", required=True)
+    rt.add_argument("--reason", required=True, help="why (goes in the audit log)")
+    rt.add_argument("--yes", action="store_true", help="do not ask for the username to be typed again")
+    rt.add_argument("--field", help="hosted mode: the field (slug) the account belongs to")
     demo = sub.add_parser("demo", help="the preview deployment's demo data (decisions PV-*)")
     dsub = demo.add_subparsers(dest="action", required=True)
     dsub.add_parser("load", help="make the demo data or bring it up to date (idempotent)")
@@ -466,7 +533,8 @@ def run_hosted(args: argparse.Namespace, url: str, out: TextIO) -> None:
 
 
 def main(argv: Optional[list[str]] = None, stdin: TextIO = sys.stdin, out: TextIO = sys.stdout,
-         err: TextIO = sys.stderr, ask: Callable[[str], str] = getpass.getpass) -> int:
+         err: TextIO = sys.stderr, ask: Callable[[str], str] = getpass.getpass,
+         confirm: Callable[[str], str] = input) -> int:
     args = _parser().parse_args(argv)
     if args.command in ("hosted", "import-field"):
         try:
@@ -495,6 +563,13 @@ def main(argv: Optional[list[str]] = None, stdin: TextIO = sys.stdin, out: TextI
             asyncio.run(run_demo(settings, args, out))
         except CommandError as e:
             print(f"atalaia_server: {e}", file=err)
+            return 1
+        return 0
+    if args.command == "reset-totp":
+        try:
+            asyncio.run(reset_totp(settings, args.username, args.reason, args.yes, confirm, out, field=args.field))
+        except (CommandError, EOFError) as e:
+            print(f"atalaia_server: {e or 'not confirmed: nothing was changed'}", file=err)
             return 1
         return 0
     if args.command == "feedback":

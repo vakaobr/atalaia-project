@@ -78,6 +78,7 @@ The feedback is the part worth keeping: before any destructive step run `preview
 
 ## Rotating secrets
 
+- **Administrator's TOTP only (a lost authenticator, password still known):** `exec server python -m atalaia_server reset-totp --username admin --reason "..."` in the same Compose project clears the secret and signs the account out; log in with the password, enrol a new secret at `/api/v1/auth/totp/enrol`, `confirm` it with a code. `admin-login.txt` then holds a stale TOTP secret: replace or delete it.
 - **Administrator's password or TOTP:** delete the account and make it again: `docker compose -p atalaia-preview --env-file ~/atalaia-preview/preview.env -f src/server/docker-compose.yml -f src/server/docker-compose.preview.yml exec postgres psql -U atalaia -d atalaia -c "DELETE FROM users WHERE username = 'admin'"`, `rm ~/atalaia-preview/admin-login.txt`, `preview.sh admin`.
 - **`ATALAIA_METRICS_TOKEN`, `ATALAIA_BACKUP_KEY`:** edit `preview.env` and `preview.sh up` (an old backup needs the old key: keep it with the backup).
 - **`ATALAIA_SECRET_KEY`:** edit `preview.env` and `preview.sh up`. Everybody is logged out and every TOTP secret becomes unreadable, so also delete the accounts and make the administrator and the reviewers again.

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
 import os
 import subprocess
 import sys
@@ -77,6 +78,92 @@ class CreateAdminTests(AppTestCase):
             os.environ.update(saved)
         self.assertEqual(code, 2)
         self.assertIn("ATALAIA_DATABASE_URL", err.getvalue())
+
+
+class ResetTotpTests(AppTestCase):
+    async def reset(self, username: str, yes: bool = True, typed: str = "", reason: str = "lost phone") -> uuid.UUID:
+        return await cli.reset_totp(self.settings(), username, reason, yes, lambda prompt: typed, io.StringIO(),
+                                    actor="system:operator")
+
+    async def test_reset_clears_totp_ends_sessions_and_is_audited(self) -> None:
+        _, name, secret = await self.make_user("chefe", server_admin=True)
+        headers = await self.auth(name, secret=secret)
+        self.assertEqual((await self.client.get("/api/v1/me", headers=headers)).status_code, 200)
+        other = await self.make_user("outra", with_totp=True)
+        user_id = await self.reset("Chefe")
+        row = (await self.fetch("SELECT * FROM users WHERE id = $1", user_id))[0]
+        self.assertEqual((row["totp_enabled"], row["totp_secret_enc"], row["totp_last_step"], row["server_admin"]),
+                         (False, None, None, True))
+        self.assertEqual((await self.client.get("/api/v1/me", headers=headers)).status_code, 401)
+        self.assertEqual((await self.fetch("SELECT count(*) FROM sessions WHERE user_id = $1 AND revoked_at IS NULL",
+                                           user_id))[0][0], 0)
+        self.assertTrue((await self.fetch("SELECT totp_enabled FROM users WHERE id = $1", other[0]))[0][0])
+        audit = await self.fetch("SELECT user_id, resource, details FROM audit_log WHERE action = 'totp_reset'")
+        self.assertEqual(len(audit), 1)
+        self.assertEqual(audit[0]["user_id"], user_id)
+        details = json.loads(audit[0]["details"])
+        self.assertEqual((details["via"], details["actor"], details["reason"], details["sessions_revoked"]),
+                         ("cli", "system:operator", "lost phone", 1))
+
+    async def test_the_account_enrols_again_at_next_login(self) -> None:
+        _, name, secret = await self.make_user("chefe", server_admin=True)
+        await self.reset("chefe")
+        r = await self.client.post("/api/v1/auth/login", json={"username": name, "password": PASSWORD})
+        self.assertNotIn("totp_required", r.json())
+        self.assertEqual((r.json()["mfa"], r.json()["user"]["totp_enabled"]), (False, False))
+        headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        self.assertEqual((await self.client.get("/api/v1/metrics", headers=headers)).status_code, 403)
+        r = await self.client.post("/api/v1/auth/totp/enrol", json={"password": PASSWORD}, headers=headers)
+        self.assertEqual(r.status_code, 200)
+        self.assertNotEqual(r.json()["secret"], secret)
+        r = await self.client.post("/api/v1/auth/totp/confirm", json={"code": self.code(r.json()["secret"])},
+                                   headers=headers)
+        self.assertEqual(r.status_code, 204)
+        self.assertTrue((await self.client.get("/api/v1/me", headers=headers)).json()["server_admin"])
+
+    async def test_refusals_change_nothing(self) -> None:
+        await self.make_user("chefe", server_admin=True)
+        await self.make_user("semtotp")
+        for username, yes, typed, reason, message in (
+                ("ninguem", True, "", "x", "no account named 'ninguem'"),
+                ("semtotp", True, "", "x", "no TOTP enrolment"),
+                ("chefe", False, "outro", "x", "not confirmed"),
+                ("chefe", True, "", "  ", "--reason")):
+            with self.subTest(username=username, message=message):
+                with self.assertRaisesRegex(cli.CommandError, message):
+                    await self.reset(username, yes, typed, reason)
+        self.assertTrue((await self.fetch("SELECT totp_enabled FROM users WHERE username = 'chefe'"))[0][0])
+        self.assertEqual((await self.fetch("SELECT count(*) FROM audit_log WHERE action = 'totp_reset'"))[0][0], 0)
+
+    async def test_typing_the_username_confirms(self) -> None:
+        await self.make_user("chefe", server_admin=True)
+        await self.reset("chefe", yes=False, typed=" Chefe ")
+        self.assertFalse((await self.fetch("SELECT totp_enabled FROM users WHERE username = 'chefe'"))[0][0])
+
+    async def test_the_command(self) -> None:
+        await self.make_user("chefe", server_admin=True)
+        saved = {k: os.environ.get(k) for k in ("ATALAIA_DATABASE_URL", "ATALAIA_SECRET_KEY")}
+        os.environ.update({"ATALAIA_DATABASE_URL": self.database_url, "ATALAIA_SECRET_KEY": SECRET_KEY})
+        try:
+            runs = []
+            for argv in (["reset-totp", "--username", "nobody", "--reason", "x", "--yes"],
+                         ["reset-totp", "--username", "chefe", "--reason", "lost phone"],
+                         ["reset-totp", "--username", "chefe", "--reason", "lost phone", "--yes"]):
+                out, err = io.StringIO(), io.StringIO()
+                code = await asyncio.to_thread(cli.main, argv, io.StringIO(), out, err, confirm=lambda p: "no")
+                runs.append((code, out.getvalue(), err.getvalue()))
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        self.assertEqual(runs[0][0], 1)
+        self.assertIn("no account named 'nobody'", runs[0][2])
+        self.assertEqual(runs[1][0], 1)
+        self.assertIn("not confirmed", runs[1][2])
+        self.assertEqual(runs[2][0], 0)
+        self.assertIn("TOTP cleared for 'chefe'", runs[2][1])
 
 
 def _run_create_admin(env: dict[str, str]) -> dict[str, Any]:
