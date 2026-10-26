@@ -3,7 +3,8 @@
 
 /// The player's phone buzzes on key game events (decisions VB-1 to VB-9, the
 /// maintainer's answer of 2026-10-26): a message from the GM, a box of the
-/// player's team captured or lost, the game starting and ending. Short
+/// player's team captured or lost, the game starting and ending, and (PD-MODE-21)
+/// Progressive Domination's next box becoming active. Short
 /// patterns, no sound (MF-33: a tone could give a player's place away),
 /// through the same device channel as the squad orders' buzz (SQ-5) and the
 /// boundary warning.
@@ -30,7 +31,11 @@ enum Buzz {
   gameStart([0, 70, 60, 70, 60, 70]),
 
   /// The game ends: two medium pulses.
-  gameEnd([0, 180, 100, 180]);
+  gameEnd([0, 180, 100, 180]),
+
+  /// Progressive Domination: a box became the active one, for both teams
+  /// (PD-MODE-21): a long pulse then a short one, unlike every other pattern.
+  boxActivated([0, 300, 80, 100]);
 
   const Buzz(this.pattern);
 
@@ -92,6 +97,14 @@ final class FieldBuzzer {
         return mine != null && e.data['previous_team'] == mine
             ? Buzz.lost
             : null;
+      case 'progressive.activated':
+        // both teams are told, whoever the player is
+        return Buzz.boxActivated;
+      case 'progressive.completed':
+        // the player's team completed it: as a capture; another team did: as
+        // a loss (PD-MODE-21)
+        if (mine == null || e.team == null) return null;
+        return e.team == mine ? Buzz.captured : Buzz.lost;
     }
     return null;
   }

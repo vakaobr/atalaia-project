@@ -3,7 +3,7 @@
 
 // The player's buzzes on key game events (decisions VB-1 to VB-9): which
 // events buzz (a GM message, a box of the player's team captured or lost, the
-// game starting and ending), the setting that turns them off, one buzz for a
+// game starting and ending, and Progressive Domination's next box), the setting that turns them off, one buzz for a
 // burst, and none for what a connection starts with (a reconnect's snapshot).
 
 import 'package:atalaia_app/l10n/strings.dart';
@@ -73,7 +73,7 @@ void main() {
       expect(played.length, 6);
       // distinct patterns, short; the GM's is the longest single pulse of the
       // routine ones
-      expect({for (final b in Buzz.values) b.pattern.join(',')}.length, 5);
+      expect({for (final b in Buzz.values) b.pattern.join(',')}.length, 6);
       for (final b in Buzz.values) {
         expect(b.pattern.first, 0);
         expect(b.pattern.fold(0, (a, x) => a + x), lessThan(600));
@@ -82,6 +82,74 @@ void main() {
       expect(Buzz.gmMessage.pattern[1], greaterThan(Buzz.lost.pattern[1]));
       expect(Buzz.gmMessage.pattern[1], greaterThan(Buzz.gameStart.pattern[1]));
     });
+
+    test(
+      'Progressive Domination: the next box buzzes both teams (PD-MODE-21)',
+      () {
+        final b = make();
+        void at(FeedEvent e, Buzz? expected) {
+          clock = clock.add(const Duration(seconds: 5));
+          expect(b.onEvent(e), expected, reason: e.type);
+        }
+
+        // activation: no team in the event, felt by every team, and by a phone
+        // that does not know its team yet
+        at(
+          _ev('progressive.activated', data: {'zone': 'A', 'step': 1}),
+          Buzz.boxActivated,
+        );
+        team = null;
+        at(
+          _ev('progressive.activated', data: {'zone': 'B', 'step': 2}),
+          Buzz.boxActivated,
+        );
+        team = 'red';
+        // completed by the player's own team: a capture; by the other: a loss
+        at(
+          _ev('progressive.completed', team: 'red', data: {'zone': 'A'}),
+          Buzz.captured,
+        );
+        at(
+          _ev('progressive.completed', team: 'blue', data: {'zone': 'B'}),
+          Buzz.lost,
+        );
+        // no team known, or no team in the event: nothing to say
+        at(_ev('progressive.completed', data: {'zone': 'C'}), null);
+        team = null;
+        at(_ev('progressive.completed', team: 'red'), null);
+        expect(played, [
+          Buzz.boxActivated.pattern,
+          Buzz.boxActivated.pattern,
+          Buzz.captured.pattern,
+          Buzz.lost.pattern,
+        ]);
+        expect(Buzz.boxActivated.pattern, isNot(Buzz.gameEnd.pattern));
+      },
+    );
+
+    test(
+      'the activation buzz follows the setting, the spectator rule and the rate limit',
+      () {
+        on = false;
+        final off = make();
+        expect(off.onEvent(_ev('progressive.activated')), isNull);
+        on = true;
+        expect(
+          make(role: 'spectator').onEvent(_ev('progressive.activated')),
+          isNull,
+        );
+        final b = make();
+        // activation right after a completion of the player's team: one buzz
+        expect(
+          b.onEvent(_ev('progressive.completed', team: 'red')),
+          Buzz.captured,
+        );
+        expect(b.onEvent(_ev('progressive.activated')), isNull);
+        clock = clock.add(const Duration(seconds: 2));
+        expect(b.onEvent(_ev('progressive.activated')), Buzz.boxActivated);
+        expect(played, [Buzz.captured.pattern, Buzz.boxActivated.pattern]);
+      },
+    );
 
     test('events that do not buzz', () {
       final b = make();
