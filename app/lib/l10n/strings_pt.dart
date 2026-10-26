@@ -74,8 +74,10 @@ const Map<String, String> ptStrings = {
   'settings.vibrate': 'Vibrar nos eventos do jogo',
   'settings.vibrate_hint':
       'Uma vibração curta para uma mensagem da organização, uma caixa da tua '
-      'equipa capturada ou perdida, e o início ou o fim do jogo. Sem som. '
-      'Valem as definições de silêncio do telemóvel.',
+      'equipa capturada ou perdida, o início ou o fim do jogo, a caixa '
+      'seguinte a ficar ativa na Dominação Progressiva e novas ordens (um '
+      'objetivo ou as do teu líder de squad). Sem som. Valem as definições '
+      'de silêncio do telemóvel.',
   'settings.about': 'Sobre',
   'settings.version': 'Atalaia {version}',
   'settings.core': 'Núcleo de jogo {version}',
@@ -387,8 +389,10 @@ const Map<String, String> ptStrings = {
 
   // Marshal
   'marshal.no_identity':
-      'Antes de registar medições, indica o teu nome e identificador e cria a '
-      'tua chave de marshal (mais abaixo, em «Quem és»).',
+      'Para registar medições, o controlador do campo tem de te confirmar '
+      'como marshal: faz o check-in no campo com o cartaz e a organização '
+      'põe-te na lista. O teu nome e identificador vêm dessa lista e a chave '
+      'de assinatura é criada automaticamente.',
   'marshal.identity': 'Quem és',
   'marshal.name': 'Nome do marshal',
   'marshal.id': 'Identificador do marshal',
@@ -397,7 +401,6 @@ const Map<String, String> ptStrings = {
   'marshal.key': 'Chave de assinatura',
   'marshal.no_key': 'Ainda não tens chave: as medições têm de ser assinadas.',
   'marshal.key_id': 'Chave pública {id}…',
-  'marshal.make_key': 'Criar',
   'marshal.new_key': 'Nova chave',
   'marshal.new_key_body':
       'As medições antigas continuam assinadas com a chave antiga; as novas '
@@ -429,13 +432,30 @@ const Map<String, String> ptStrings = {
   // Cronógrafo
   'chrono.title': 'Cronógrafo',
   'chrono.hint':
-      'Entrada e verificações durante o jogo, com o limite do campo.',
+      'Check-in e verificações durante o jogo, com o limite do campo.',
   'chrono.template': 'Limites do campo',
+  'chrono.template_set': 'Definidos pelo controlador do campo.',
+  'chrono.template_local':
+      'O controlador do campo julga com a sua própria lista, e é o veredicto '
+      'dele que conta. Esta lista serve só para a pré-visualização neste '
+      'telemóvel.',
+  'chrono.template_unknown':
+      'O controlador do campo usa os limites «{name}», que esta app não tem. '
+      'O veredicto dele é o que conta; os valores aqui são só uma indicação.',
+  'limits.portugal': 'Portugal',
+  'limits.uk': 'Reino Unido',
+  'limits.germany': 'Alemanha',
+  'limits.generic_cqb': 'CQB genérico',
+  'replica.class_rifle': 'Espingarda',
+  'replica.class_dmr': 'DMR',
+  'replica.class_sniper': 'Sniper',
+  'replica.class_cqb': 'CQB',
+  'replica.class_semi': 'Semiautomática',
   'chrono.unverified':
       'Os limites «{name}» não estão verificados: vêm da pesquisa do '
       'projeto, não de uma fonte oficial. Confirma-os com as regras atuais '
       'antes de os usares.',
-  'chrono.checkin': 'Entrada',
+  'chrono.checkin': 'Check-in',
   'chrono.spotcheck': 'Verificação',
   'chrono.replica': 'Réplica',
   'chrono.replica_nfc': 'Ou encosta a etiqueta da réplica.',
@@ -632,7 +652,7 @@ const Map<String, String> ptStrings = {
   'player.positions': 'Posições que vês: {n}',
   'player.share': 'Partilhar a minha posição',
   'player.share_hint':
-      'Só durante o jogo; o controlador decide quem a vê (a organização e os marshals).',
+      'Só durante o jogo; o controlador decide quem a vê. A organização e os marshals veem-na nos seus dispositivos ATAK.',
   'player.share_on': 'A partilhar: {n} posição(ões) enviada(s)',
   'player.share_stopped':
       'A partilha parou: o jogo terminou ou o check-in mudou.',
@@ -660,7 +680,7 @@ const Map<String, String> ptStrings = {
   'prop.radio.closed': 'O rádio do módulo está desligado',
   'prop.gm_message': 'Organização: {text}',
   'player.share_hint_squads':
-      'Só durante o jogo; o controlador decide quem a vê (a tua squad, se o jogo o permitir, a organização e os marshals).',
+      'Só durante o jogo; o controlador decide quem a vê: o teu squad, se o jogo o permitir, e a organização e os marshals nos seus dispositivos ATAK.',
   'checkin.team_squad': '{team} › squad {squad}',
   'branding.logo': 'Logótipo de {name}',
   // Inscrições online no servidor do campo (decisão S16-13)

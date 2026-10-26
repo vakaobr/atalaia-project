@@ -316,7 +316,7 @@ class LoginAndHistoryTests(BrowserCase):
         await page.fill("#username", name)
         await page.fill("#password", "not the password at all")
         await page.click("#login-form button[type=submit]")
-        await expect(page.locator("#status")).to_have_text("Nome da conta ou palavra-passe errados.")
+        await expect(page.locator("#status")).to_have_text("Nome de utilizador ou palavra-passe errados.")
         await page.fill("#password", PASSWORD)
         await page.click("#login-form button[type=submit]")
         await expect(page.locator("#code")).to_be_visible()

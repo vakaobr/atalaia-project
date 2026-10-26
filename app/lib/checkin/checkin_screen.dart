@@ -518,7 +518,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
                 () => v == true ? _picked.add(r.id) : _picked.remove(r.id),
               ),
               title: Text(replicaLabel(s, r.type, r.makeModel)),
-              subtitle: Text(r.replicaClass),
+              subtitle: Text(s.replicaClass(r.replicaClass)),
             ),
         ],
         const SizedBox(height: 12),
@@ -787,7 +787,7 @@ class _CheckinStatusScreenState extends State<CheckinStatusScreen> {
               ListTile(
                 key: Key('checkin-decl-${d.declarationId}'),
                 title: Text(replicaLabel(s, d.type, d.makeModel)),
-                subtitle: Text(d.replicaClass),
+                subtitle: Text(s.replicaClass(d.replicaClass)),
                 trailing: ChronoStateChip(
                   d.state,
                   refusedToday: d.refusedToday,

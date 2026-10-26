@@ -69,8 +69,9 @@ const Map<String, String> enStrings = {
   'settings.vibrate': 'Vibrate on game events',
   'settings.vibrate_hint':
       'A short buzz for a message from the game master, a box of your team '
-      'captured or lost, and the game starting or ending. No sound. The '
-      "phone's own silent settings apply.",
+      'captured or lost, the game starting or ending, the next box becoming '
+      'active in Progressive Domination, and new orders (an objective or '
+      "your squad leader's). No sound. The phone's own silent settings apply.",
   'settings.about': 'About',
   'settings.version': 'Atalaia {version}',
   'settings.core': 'Game core {version}',
@@ -377,8 +378,10 @@ const Map<String, String> enStrings = {
 
   // Marshal
   'marshal.no_identity':
-      'Before recording readings, give your name and id and make your marshal '
-      'key (below, under "Who you are").',
+      'To record readings the field controller must confirm you as a marshal: '
+      'check in at the field with the poster, and the organisers put you on '
+      'their list. Your name and id come from that list, and your signing '
+      'key is made for you.',
   'marshal.identity': 'Who you are',
   'marshal.name': "Marshal's name",
   'marshal.id': "Marshal's id",
@@ -387,7 +390,6 @@ const Map<String, String> enStrings = {
   'marshal.key': 'Signing key',
   'marshal.no_key': 'No key yet: readings must be signed.',
   'marshal.key_id': 'Public key {id}…',
-  'marshal.make_key': 'Make one',
   'marshal.new_key': 'New key',
   'marshal.new_key_body':
       'Old readings stay signed with the old key; new ones are signed with '
@@ -419,6 +421,23 @@ const Map<String, String> enStrings = {
   'chrono.title': 'Chronograph',
   'chrono.hint': "Check-in and spot checks, against the field's limit.",
   'chrono.template': "Field's limits",
+  'chrono.template_set': 'Set by the field controller.',
+  'chrono.template_local':
+      'The field controller judges with its own list, and its verdict is the '
+      'one that counts. This list is only for the preview on this phone.',
+  'chrono.template_unknown':
+      'The field controller uses the limits "{name}", which this app does '
+      'not have. Its verdict is the one that counts; the figures here are '
+      'only a guide.',
+  'limits.portugal': 'Portugal',
+  'limits.uk': 'United Kingdom',
+  'limits.germany': 'Germany',
+  'limits.generic_cqb': 'Generic CQB',
+  'replica.class_rifle': 'Rifle',
+  'replica.class_dmr': 'DMR',
+  'replica.class_sniper': 'Sniper',
+  'replica.class_cqb': 'CQB',
+  'replica.class_semi': 'Semi-auto',
   'chrono.unverified':
       'The "{name}" limits are unverified: they come from the project\'s '
       'research, not an official source. Check them against current rules '
@@ -622,7 +641,7 @@ const Map<String, String> enStrings = {
   'player.positions': 'Positions you see: {n}',
   'player.share': 'Share my position',
   'player.share_hint':
-      'Only during the game; the controller decides who sees it (the organisers and the marshals).',
+      'Only during the game; the controller decides who sees it. The organisers and the marshals see it on their ATAK devices.',
   'player.share_on': 'Sharing: {n} position(s) sent',
   'player.share_stopped':
       'Sharing stopped: the game ended or the check-in changed.',
@@ -649,9 +668,9 @@ const Map<String, String> enStrings = {
   'prop.radio.heard': 'Linked to the controller over the pod\'s radio',
   'prop.radio.offline': 'The pod\'s radio is not answering: trying again…',
   'prop.radio.closed': 'The pod\'s radio is off',
-  'prop.gm_message': 'Organisers: {text}',
+  'prop.gm_message': 'Game master: {text}',
   'player.share_hint_squads':
-      'Only during the game; the controller decides who sees it (your squad if the game allows it, the organisers and the marshals).',
+      'Only during the game; the controller decides who sees it: your squad if the game allows it, and the organisers and the marshals on their ATAK devices.',
   'checkin.team_squad': '{team} › squad {squad}',
   'branding.logo': 'Logo of {name}',
   // Online registration on the field's site server (decision S16-13)

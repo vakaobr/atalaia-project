@@ -83,6 +83,14 @@ class Strings {
   /// names it.
   String team(String name) => tOr('team.$name', name);
 
+  /// A replica class's name to show (rifle: Espingarda), the class as the
+  /// limit template names it when it has no text.
+  String replicaClass(String name) => tOr('replica.class_$name', name);
+
+  /// A limit template's name to show in this language (portugal: Portugal),
+  /// [name] (the template's own, English) when it has no text.
+  String limitsName(String id, String name) => tOr('limits.$id', name);
+
   /// [v] with [decimals] decimals, with a decimal comma in Portuguese and
   /// German (English and Chinese write a point).
   String number(double v, int decimals) {

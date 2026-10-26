@@ -181,6 +181,7 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
         builder: (_) => ChronoScreen(
           records: records,
           templates: widget.templates,
+          fieldInfo: _client.info,
           replica: replica,
           upload: ChronoUpload(
             client: _client,
@@ -388,8 +389,8 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
                 title: Text(replicaLabel(s, d.type, d.makeModel)),
                 subtitle: Text(
                   d.replicaId == null
-                      ? '${d.replicaClass} · ${s.t('queue.unregistered')}'
-                      : d.replicaClass,
+                      ? '${s.replicaClass(d.replicaClass)} · ${s.t('queue.unregistered')}'
+                      : s.replicaClass(d.replicaClass),
                 ),
                 trailing: ChronoStateChip(
                   d.state,

@@ -56,7 +56,7 @@ class ReplicaRegistryScreen extends StatelessWidget {
                         '${r.ownerPlayerId} · ${r.makeModel ?? s.t('replica.type_${r.type.wire}')}',
                       ),
                       subtitle: Text(
-                        '${s.t('replica.type_${r.type.wire}')} · ${r.replicaClass} · ${r.tagUid}',
+                        '${s.t('replica.type_${r.type.wire}')} · ${s.replicaClass(r.replicaClass)} · ${r.tagUid}',
                       ),
                     ),
                 ],
@@ -213,7 +213,7 @@ class _ReplicaFormScreenState extends State<ReplicaFormScreen> {
             decoration: InputDecoration(labelText: s.t('replica.class')),
             items: [
               for (final c in _classes)
-                DropdownMenuItem(value: c, child: Text(c)),
+                DropdownMenuItem(value: c, child: Text(s.replicaClass(c))),
             ],
             onChanged: (c) => setState(() => _class = c),
           ),

@@ -88,6 +88,11 @@ void main() {
       for (final p in PropPhase.values) 'prop.phase_${p.name}',
       for (final t in ReplicaType.values) 'replica.type_${t.wire}',
       for (final t in teamColourNames) 'team.$t',
+      // The limit templates' names and the replica classes they define.
+      for (final id in ['portugal', 'uk', 'germany', 'generic_cqb'])
+        'limits.$id',
+      for (final c in ['rifle', 'dmr', 'sniper', 'cqb', 'semi'])
+        'replica.class_$c',
       for (final s in ['ready', 'running', 'paused', 'ended']) 'state.$s',
       for (final c in [
         'team_input', 'keypad', 'display', 'team_display', 'led', 'audio', //
@@ -150,6 +155,30 @@ void main() {
     ];
     for (final k in keys) {
       expect(ptStrings.containsKey(k), isTrue, reason: k);
+    }
+  });
+
+  test('the marshal and chrono words agree across the app', () {
+    const pt = Strings(AppLanguage.pt);
+    const en = Strings(AppLanguage.en);
+    expect(ptStrings.containsKey('marshal.make_key'), isFalse);
+    // the key is made for the marshal: the notice must not ask for it
+    expect(pt.t('marshal.no_identity'), isNot(contains('cria a tua chave')));
+    expect(en.t('marshal.no_identity'), contains('made for you'));
+    expect(pt.t('chrono.checkin'), 'Check-in');
+    for (final l in AppLanguage.values) {
+      expect(Strings(l).t('player.message'), isNot(contains('Organisers')));
+    }
+    expect(en.t('prop.gm_message'), startsWith('Game master'));
+    expect(ptStrings.values.where((v) => v.contains('a tua squad')), isEmpty);
+    expect(pt.replicaClass('rifle'), 'Espingarda');
+    expect(pt.replicaClass('my_class'), 'my_class');
+    expect(pt.limitsName('uk', 'United Kingdom'), 'Reino Unido');
+    // positions reach the staff on ATAK devices, not in the console
+    for (final k in ['player.share_hint', 'player.share_hint_squads']) {
+      for (final l in AppLanguage.values) {
+        expect(Strings(l).t(k), contains('ATAK'), reason: '$k ${l.code}');
+      }
     }
   });
 

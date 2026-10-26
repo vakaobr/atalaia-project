@@ -74,8 +74,10 @@ const Map<String, String> deStrings = {
   'settings.vibrate': 'Bei Spielereignissen vibrieren',
   'settings.vibrate_hint':
       'Ein kurzes Brummen bei einer Nachricht der Spielleitung, wenn eine Box '
-      'deines Teams erobert oder verloren wird und wenn das Spiel beginnt '
-      'oder endet. Kein Ton. Die Stummschaltung des Handys gilt.',
+      'deines Teams erobert oder verloren wird, wenn das Spiel beginnt oder '
+      'endet, wenn bei Progressive Domination die nächste Box aktiv wird und '
+      'bei neuen Befehlen (ein Ziel oder die deines Squad-Leads). Kein '
+      'Ton. Die Stummschaltung des Handys gilt.',
   'settings.about': 'Über',
   'settings.version': 'Atalaia {version}',
   'settings.core': 'Spielkern {version}',
@@ -398,8 +400,10 @@ const Map<String, String> deStrings = {
 
   // Marshal
   'marshal.no_identity':
-      'Bevor du Messwerte aufzeichnest, gib Namen und ID an und erstelle '
-      'deinen Marshal-Schlüssel (unten, unter „Wer du bist").',
+      'Um Messwerte aufzuzeichnen, muss der Controller des Felds dich als '
+      'Marshal bestätigen: Check-in am Feld mit dem Plakat, dann nimmt die '
+      'Orga dich in ihre Liste auf. Name und ID kommen aus dieser Liste, der '
+      'Signaturschlüssel wird automatisch erstellt.',
   'marshal.identity': 'Wer du bist',
   'marshal.name': 'Name des Marshals',
   'marshal.id': 'ID des Marshals',
@@ -408,7 +412,6 @@ const Map<String, String> deStrings = {
   'marshal.key': 'Signaturschlüssel',
   'marshal.no_key': 'Noch kein Schlüssel: Messwerte müssen signiert sein.',
   'marshal.key_id': 'Öffentlicher Schlüssel {id}…',
-  'marshal.make_key': 'Erstellen',
   'marshal.new_key': 'Neuer Schlüssel',
   'marshal.new_key_body':
       'Alte Messwerte bleiben mit dem alten Schlüssel signiert; neue werden '
@@ -441,6 +444,22 @@ const Map<String, String> deStrings = {
   'chrono.title': 'Chrono',
   'chrono.hint': 'Check-in und Stichproben, gegen das Limit des Felds.',
   'chrono.template': 'Limits des Felds',
+  'chrono.template_set': 'Vom Controller des Felds festgelegt.',
+  'chrono.template_local':
+      'Der Controller des Felds urteilt mit seiner eigenen Liste, und sein '
+      'Urteil zählt. Diese Liste dient nur der Vorschau auf diesem Handy.',
+  'chrono.template_unknown':
+      'Der Controller des Felds nutzt die Limits „{name}", die diese App '
+      'nicht hat. Sein Urteil zählt; die Werte hier sind nur ein Anhaltspunkt.',
+  'limits.portugal': 'Portugal',
+  'limits.uk': 'Vereinigtes Königreich',
+  'limits.germany': 'Deutschland',
+  'limits.generic_cqb': 'Allgemein CQB',
+  'replica.class_rifle': 'Gewehr',
+  'replica.class_dmr': 'DMR',
+  'replica.class_sniper': 'Sniper',
+  'replica.class_cqb': 'CQB',
+  'replica.class_semi': 'Halbautomat',
   'chrono.unverified':
       'Die Limits „{name}" sind nicht geprüft: Sie stammen aus der Recherche '
       'des Projekts, nicht aus einer offiziellen Quelle. Prüfe sie vor dem '
@@ -645,7 +664,7 @@ const Map<String, String> deStrings = {
   'player.positions': 'Sichtbare Positionen: {n}',
   'player.share': 'Meine Position teilen',
   'player.share_hint':
-      'Nur während des Spiels; der Controller entscheidet, wer sie sieht (die Orga und die Marshals).',
+      'Nur während des Spiels; der Controller entscheidet, wer sie sieht. Die Orga und die Marshals sehen sie auf ihren ATAK-Geräten.',
   'player.share_on': 'Wird geteilt: {n} Position(en) gesendet',
   'player.share_stopped':
       'Teilen beendet: Das Spiel ist vorbei oder der Check-in hat sich geändert.',
@@ -674,9 +693,9 @@ const Map<String, String> deStrings = {
   'prop.radio.heard': 'Über den Funk des Pods mit dem Controller verbunden',
   'prop.radio.offline': 'Der Funk des Pods antwortet nicht: neuer Versuch…',
   'prop.radio.closed': 'Der Funk des Pods ist aus',
-  'prop.gm_message': 'Orga: {text}',
+  'prop.gm_message': 'Spielleitung: {text}',
   'player.share_hint_squads':
-      'Nur während des Spiels; der Controller entscheidet, wer sie sieht (dein Squad, wenn das Spiel es erlaubt, die Orga und die Marshals).',
+      'Nur während des Spiels; der Controller entscheidet, wer sie sieht: dein Squad, wenn das Spiel es erlaubt, und die Orga und die Marshals auf ihren ATAK-Geräten.',
   'checkin.team_squad': '{team} › Squad {squad}',
   'branding.logo': 'Logo von {name}',
   // Online registration on the field's site server (decision S16-13)

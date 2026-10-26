@@ -306,6 +306,11 @@ final class FieldInfo {
   int get maxReplicas => (settings['max_replicas'] as int?) ?? 5;
   String get confirm => (settings['confirm'] as String?) ?? 'auto';
 
+  /// The id of the limit template the controller judges with (its
+  /// `[checkin] limit_template`), and its name; null from an older one.
+  String? get limitsId => (json['limits'] as Map?)?['id'] as String?;
+  String? get limitsName => (json['limits'] as Map?)?['name'] as String?;
+
   List<String> get classes => [
     for (final c in ((json['limits'] as Map?)?['classes'] as List?) ?? const [])
       '$c',

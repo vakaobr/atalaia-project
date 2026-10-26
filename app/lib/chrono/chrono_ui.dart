@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app.dart';
+import '../checkin/checkin_client.dart' show FieldInfo;
 import '../l10n/strings.dart';
 import '../marshal/chrono_queue.dart' show ChronoUpload;
 import '../marshal/marshal_records.dart';
@@ -73,6 +74,7 @@ class ChronoScreen extends StatefulWidget {
     this.templates,
     this.replica,
     this.upload,
+    this.fieldInfo,
     super.key,
   });
 
@@ -84,6 +86,11 @@ class ChronoScreen extends StatefulWidget {
   /// Where a judged series goes: the field controller (plan phase E).
   final ChronoUpload? upload;
 
+  /// Asks the field controller which limits it judges with (GET
+  /// /api/v1/checkin). With it the screen uses that template and says so;
+  /// without (or when it cannot answer) the marshal's pick is a preview only.
+  final Future<FieldInfo> Function()? fieldInfo;
+
   /// The limit templates (tests give them; the app loads its assets).
   final List<LimitTemplate>? templates;
 
@@ -94,6 +101,11 @@ class ChronoScreen extends StatefulWidget {
 class _ChronoScreenState extends State<ChronoScreen> {
   List<LimitTemplate> _templates = const [];
   LimitTemplate? _template;
+
+  /// The controller's own limits, once it has answered: its template is the
+  /// one in use ([_locked]), or one this app does not have ([_unknownLimits]).
+  bool _locked = false;
+  String? _unknownLimits;
   late Replica? _replica = widget.replica;
   ReadingType _type = ReadingType.checkin;
   String? _sent;
@@ -123,11 +135,39 @@ class _ChronoScreenState extends State<ChronoScreen> {
       _templates = ts;
       _template = ts.firstWhere((t) => t.id == want, orElse: () => ts.first);
     });
+    await _askController();
     if (await _nfc.state() == NfcState.ready) {
       _tags = _nfc.reads.listen(_onTag);
       await _nfc.startReading();
       _nfcOn = true;
     }
+  }
+
+  /// The controller judges with its own `[checkin] limit_template`: when it
+  /// says which, that template is used here (the marshal cannot pick another
+  /// one); when it is not one this app has, the marshal is told.
+  Future<void> _askController() async {
+    final ask = widget.fieldInfo;
+    if (ask == null) return;
+    final FieldInfo info;
+    try {
+      info = await ask();
+    } on Object {
+      return; // offline: the preview list stays, said as such
+    }
+    if (!mounted) return;
+    final id = info.limitsId;
+    if (id == null) return;
+    final match = _templates.where((t) => t.id == id).firstOrNull;
+    setState(() {
+      if (match != null) {
+        _template = match;
+        _locked = true;
+      } else {
+        _unknownLimits = info.limitsName ?? id;
+      }
+      _series.clear();
+    });
   }
 
   void _onTag(NfcRead r) {
@@ -230,21 +270,41 @@ class _ChronoScreenState extends State<ChronoScreen> {
                   : _error!,
               kind: NoticeKind.error,
             ),
+          if (_unknownLimits != null)
+            Notice(
+              s.t('chrono.template_unknown', {'name': _unknownLimits}),
+              kind: NoticeKind.warning,
+              key: const Key('chrono-limits-unknown'),
+            ),
           DropdownButtonFormField<LimitTemplate>(
+            key: const Key('chrono-template'),
             initialValue: template,
-            decoration: InputDecoration(labelText: s.t('chrono.template')),
+            decoration: InputDecoration(
+              labelText: s.t('chrono.template'),
+              helperText: _locked
+                  ? s.t('chrono.template_set')
+                  : s.t('chrono.template_local'),
+              helperMaxLines: 3,
+            ),
             items: [
               for (final t in _templates)
-                DropdownMenuItem(value: t, child: Text(t.name)),
+                DropdownMenuItem(
+                  value: t,
+                  child: Text(s.limitsName(t.id, t.name)),
+                ),
             ],
-            onChanged: (t) {
-              setState(() => _template = t);
-              if (t != null) {
-                unawaited(
-                  AppScope.read(context).update((x) => x.limitTemplate = t.id),
-                );
-              }
-            },
+            onChanged: _locked
+                ? null
+                : (t) {
+                    setState(() => _template = t);
+                    if (t != null) {
+                      unawaited(
+                        AppScope.read(
+                          context,
+                        ).update((x) => x.limitTemplate = t.id),
+                      );
+                    }
+                  },
           ),
           const SizedBox(height: 12),
           SegmentedButton<ReadingType>(
@@ -279,7 +339,7 @@ class _ChronoScreenState extends State<ChronoScreen> {
                 DropdownMenuItem(
                   value: r,
                   child: Text(
-                    '${r.ownerPlayerId} · ${r.makeModel ?? s.t('replica.type_${r.type.wire}')} · ${r.replicaClass}',
+                    '${r.ownerPlayerId} · ${r.makeModel ?? s.t('replica.type_${r.type.wire}')} · ${s.replicaClass(r.replicaClass)}',
                   ),
                 ),
             ],
@@ -290,7 +350,9 @@ class _ChronoScreenState extends State<ChronoScreen> {
           ),
           if (_replica != null && limit == null)
             Notice(
-              s.t('chrono.no_class', {'class': _replica!.replicaClass}),
+              s.t('chrono.no_class', {
+                'class': s.replicaClass(_replica!.replicaClass),
+              }),
               kind: NoticeKind.error,
             ),
           if (limit != null)

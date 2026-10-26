@@ -10,7 +10,7 @@
 ///
 /// The tools open only once the field controller has confirmed this phone as
 /// a marshal on the GM's list (decisions MR-1 to MR-14, marshal_access.dart):
-/// asked on every opening, and remembered for a day when the controller
+/// asked on every opening, and remembered for two hours when the controller
 /// cannot be reached.
 library;
 
@@ -124,6 +124,21 @@ class _MarshalHomeScreenState extends State<MarshalHomeScreen> {
     final field = _field;
     if (c == null || field == null || !access.allowed) return;
     _go(ChronoQueueScreen(checkin: c, field: field, records: records));
+  }
+
+  /// The chrono screen, asking the field controller which limits it judges
+  /// with when this phone knows the field.
+  void _chrono() {
+    final field = _field;
+    final services = context.services;
+    _go(
+      ChronoScreen(
+        records: records,
+        fieldInfo: field == null
+            ? null
+            : () => CheckinClient(services.fieldHttp(field)).info(),
+      ),
+    );
   }
 
   String _when(int ms) {
@@ -258,7 +273,7 @@ class _MarshalHomeScreenState extends State<MarshalHomeScreen> {
                     leading: const Icon(Icons.speed, size: 32),
                     title: Text(s.t('chrono.title')),
                     subtitle: Text(s.t('chrono.hint')),
-                    onTap: () => _go(ChronoScreen(records: records)),
+                    onTap: _chrono,
                   ),
                 ),
                 Card(

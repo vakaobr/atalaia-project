@@ -268,6 +268,9 @@ class StaffScriptTests(AppTestCase):
 
     async def test_portuguese_is_inclusive(self) -> None:
         text = " ".join(STRINGS["pt"].values()).lower()
+        # "Nome de utilizador" is the app's label for the account name (as the app says it), a field, not a
+        # person: allowed, while "utilizador" for a person stays out.
+        text = text.replace("nome de utilizador", "nome da conta")
         # "GM remoto" is the maintainer's term (decision FU2-11): the role, not a person.
         for word in ("utilizador", "jogadores", "administrador ", " o gm ", " um gm ", "marshall",
                      "esquadra", "time "):

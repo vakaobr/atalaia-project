@@ -410,6 +410,8 @@ void main() {
       expect(tile, findsOneWidget);
       expect(find.text('Vibrate on game events'), findsOneWidget);
       expect(tester.widget<SwitchListTile>(tile).value, isTrue);
+      await tester.ensureVisible(tile);
+      await tester.pumpAndSettle();
       await tester.tap(tile);
       await tester.pumpAndSettle();
       expect(tester.widget<SwitchListTile>(tile).value, isFalse);

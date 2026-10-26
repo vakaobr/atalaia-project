@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:atalaia_app/checkin/checkin_client.dart' show FieldInfo;
 import 'package:atalaia_app/chrono/limit_template.dart';
 import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/chrono/reading.dart';
@@ -380,6 +381,85 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chrono-result-pass')), findsOneWidget);
     expect(records.readings.single.velocityMps, 95.5);
+  });
+
+  group("the chrono screen and the field controller's limits", () {
+    List<LimitTemplate> templates() => [
+      for (final n in ['portugal', 'uk'])
+        LimitTemplate.parse(
+          File('lib/chrono/limit_templates/$n.yaml').readAsStringSync(),
+        ),
+    ];
+
+    Future<void> open(
+      WidgetTester tester,
+      Future<FieldInfo> Function()? info,
+    ) async {
+      await phone(tester);
+      final h = harness();
+      final records = MarshalRecords(h.store, h.settings);
+      await tester.pumpWidget(
+        h.app(
+          home: ChronoScreen(
+            records: records,
+            templates: templates(),
+            fieldInfo: info,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('not connected: the list is a preview and says so', (
+      tester,
+    ) async {
+      await open(tester, null);
+      expect(find.textContaining('veredicto'), findsOneWidget);
+      // the template's name in the app's language, not the file's English
+      expect(find.text('Portugal'), findsWidgets);
+      final dd = tester.widget<DropdownButtonFormField<LimitTemplate>>(
+        find.byKey(const Key('chrono-template')),
+      );
+      expect(dd.onChanged, isNotNull);
+    });
+
+    testWidgets("connected: the controller's template is used, locked", (
+      tester,
+    ) async {
+      await open(
+        tester,
+        () async => FieldInfo({
+          'limits': {'id': 'uk', 'name': 'United Kingdom'},
+        }),
+      );
+      expect(find.text('Reino Unido'), findsOneWidget);
+      expect(find.text('Definidos pelo controlador do campo.'), findsOneWidget);
+      final dd = tester.widget<DropdownButtonFormField<LimitTemplate>>(
+        find.byKey(const Key('chrono-template')),
+      );
+      expect(dd.onChanged, isNull);
+    });
+
+    testWidgets("connected, limits this app lacks: the controller's counts", (
+      tester,
+    ) async {
+      await open(
+        tester,
+        () async => FieldInfo({
+          'limits': {'id': 'my_field', 'name': 'My field'},
+        }),
+      );
+      expect(find.byKey(const Key('chrono-limits-unknown')), findsOneWidget);
+      expect(find.textContaining('My field'), findsOneWidget);
+    });
+
+    testWidgets('the controller cannot be reached: the preview stays', (
+      tester,
+    ) async {
+      await open(tester, () async => throw const SocketException('down'));
+      expect(find.byKey(const Key('chrono-limits-unknown')), findsNothing);
+      expect(find.textContaining('veredicto'), findsOneWidget);
+    });
   });
 
   testWidgets('the marshal home: no check-in, no marshal tools', (

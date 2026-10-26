@@ -150,7 +150,7 @@ class _DeclareReplicasScreenState extends State<DeclareReplicasScreen> {
                         }
                       }),
                 title: Text(replicaLabel(s, r.type, r.makeModel)),
-                subtitle: Text(r.replicaClass),
+                subtitle: Text(s.replicaClass(r.replicaClass)),
                 secondary: _stateOf(r.id) == null
                     ? null
                     : ChronoStateChip(
@@ -229,7 +229,7 @@ class _NewReplicaDialogState extends State<NewReplicaDialog> {
               decoration: InputDecoration(labelText: s.t('declare.class')),
               items: [
                 for (final c in widget.classes)
-                  DropdownMenuItem(value: c, child: Text(c)),
+                  DropdownMenuItem(value: c, child: Text(s.replicaClass(c))),
               ],
               onChanged: (v) => setState(() => _class = v ?? _class),
             ),

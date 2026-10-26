@@ -64,7 +64,8 @@ const Map<String, String> zhTwStrings = {
   'settings.kiosk': 'Kiosk 模式',
   'settings.kiosk_hint': '遊戲進行中，手機會固定在 App 上。如果有人跳出，App 會發出警告。',
   'settings.vibrate': '遊戲事件時震動',
-  'settings.vibrate_hint': '主辦訊息、己方據點被佔領或失守、遊戲開始與結束時短暫震動，沒有聲音。依手機本身的靜音設定。',
+  'settings.vibrate_hint':
+      '主辦訊息、己方據點被佔領或失守、遊戲開始與結束、漸進佔領的下一個據點啟用、以及新命令（目標或小隊長的命令）時短暫震動，沒有聲音。依手機本身的靜音設定。',
   'settings.about': '關於',
   'settings.version': 'Atalaia {version}',
   'settings.core': '遊戲核心 {version}',
@@ -335,8 +336,8 @@ const Map<String, String> zhTwStrings = {
 
   // Marshal
   'marshal.no_identity':
-      '記錄測速值之前，請先填寫你的名字和編號，並產生你的裁判金鑰'
-      '（在下方「你是誰」）。',
+      '要記錄測速值，場地控制器必須先確認你是裁判：用海報在場地報到，再由主辦把你加進名單。'
+      '名字和編號來自該名單，簽署金鑰會自動產生。',
   'marshal.identity': '你是誰',
   'marshal.name': '裁判名字',
   'marshal.id': '裁判編號',
@@ -345,7 +346,6 @@ const Map<String, String> zhTwStrings = {
   'marshal.key': '簽署金鑰',
   'marshal.no_key': '還沒有金鑰：測速值必須簽署。',
   'marshal.key_id': '公開金鑰 {id}…',
-  'marshal.make_key': '產生金鑰',
   'marshal.new_key': '新金鑰',
   'marshal.new_key_body': '舊的測速值仍由舊金鑰簽署；新的測速值由新金鑰簽署。',
   'marshal.records': '已儲存的測速值',
@@ -369,6 +369,18 @@ const Map<String, String> zhTwStrings = {
   'chrono.title': '測速器',
   'chrono.hint': '報到測速與抽查，依場地的限制判定。',
   'chrono.template': '場地限制',
+  'chrono.template_set': '由場地控制器設定。',
+  'chrono.template_local': '場地控制器用它自己的名單判定，以它的判定為準。這份名單只用於這支手機上的預覽。',
+  'chrono.template_unknown': '場地控制器使用的限制「{name}」不在這個 App 裡。以它的判定為準；這裡的數值僅供參考。',
+  'limits.portugal': '葡萄牙',
+  'limits.uk': '英國',
+  'limits.germany': '德國',
+  'limits.generic_cqb': '通用 CQB',
+  'replica.class_rifle': '步槍',
+  'replica.class_dmr': 'DMR',
+  'replica.class_sniper': 'Sniper',
+  'replica.class_cqb': 'CQB',
+  'replica.class_semi': '半自動',
   'chrono.unverified':
       '「{name}」的限制未經查證：它們來自本專案的研究，不是官方來源。使用前請對照'
       '目前的規定。',
@@ -550,7 +562,7 @@ const Map<String, String> zhTwStrings = {
   'player.no_team': '還沒有隊伍',
   'player.positions': '你看得到的位置：{n}',
   'player.share': '分享我的位置',
-  'player.share_hint': '只在遊戲進行中；由控制器決定誰看得到（主辦和裁判）。',
+  'player.share_hint': '只在遊戲進行中；由控制器決定誰看得到。主辦和裁判在他們的 ATAK 裝置上看得到。',
   'player.share_on': '分享中：已傳送 {n} 個位置',
   'player.share_stopped': '已停止分享：遊戲結束或報到有變更。',
   'player.no_location': '這支手機沒有定位功能。',
@@ -576,7 +588,8 @@ const Map<String, String> zhTwStrings = {
   'prop.radio.offline': '模組的無線電沒有回應：正在重試…',
   'prop.radio.closed': '模組的無線電已關閉',
   'prop.gm_message': '主辦：{text}',
-  'player.share_hint_squads': '只在遊戲進行中；由控制器決定誰看得到（遊戲允許時你的小隊、主辦和裁判）。',
+  'player.share_hint_squads':
+      '只在遊戲進行中；由控制器決定誰看得到：遊戲允許時是你的小隊，以及主辦和裁判（在他們的 ATAK 裝置上）。',
   'checkin.team_squad': '{team} › 小隊 {squad}',
   'branding.logo': '{name} 的標誌',
   // Online registration on the field's site server (decision S16-13)
