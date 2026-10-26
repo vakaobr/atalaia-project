@@ -574,6 +574,23 @@ void main() {
       )) {
         return;
       }
+      // The feed shows a game only when the controller has one: say so
+      // rather than wait for a game that is not there.
+      final http = HttpClient();
+      addTearDown(() => http.close(force: true));
+      final (status, body) = await _api(
+        http,
+        'GET',
+        '/api/v1/controller',
+        token: _readToken,
+      );
+      if (status == 200 && body is Map && body['live_game'] == null) {
+        markTestSkipped(
+          'no game running on the controller (start one, or pass '
+          'ATALAIA_TEST_GAME)',
+        );
+        return;
+      }
       await tester.pumpWidget(deviceApp());
       await waitFor(tester, find.byKey(const Key('role-player')));
       await tapVisible(tester, find.byKey(const Key('role-player')));
