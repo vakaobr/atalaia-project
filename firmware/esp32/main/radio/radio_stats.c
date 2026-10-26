@@ -25,6 +25,7 @@ size_t radio_stats_box_line(char *buf, size_t cap, uint32_t t_s, unsigned game, 
                  "\"relay_cancelled\":%lu,\"relay_no_slot\":%lu,\"dup\":%lu,"
                  "\"tx_refused\":%lu,\"duty_remaining_ms\":%ld,\"neighbours\":%lu,"
                  "\"rx\":%lu,\"rx_rejected\":%lu,\"states\":%lu,\"hellos\":%lu,"
+                 "\"lbt_cads\":%lu,\"lbt_deferrals\":%lu,\"lbt_gave_up\":%lu,"
                  "\"final\":%d}",
                  (unsigned long)t_s, game, node, (unsigned long)s->sent, (unsigned long)s->retries,
                  (unsigned long)s->acked, (unsigned long)s->expired, (unsigned long)s->relayed,
@@ -32,7 +33,8 @@ size_t radio_stats_box_line(char *buf, size_t cap, uint32_t t_s, unsigned game, 
                  (unsigned long)s->relay_no_slot, (unsigned long)s->dup,
                  (unsigned long)s->tx_refused, duty_json(duty_remaining_ms),
                  (unsigned long)s->neighbours, (unsigned long)s->rx, (unsigned long)s->rx_rejected,
-                 (unsigned long)s->states, (unsigned long)s->hellos, final ? 1 : 0);
+                 (unsigned long)s->states, (unsigned long)s->hellos, (unsigned long)s->lbt_cads,
+                 (unsigned long)s->lbt_deferrals, (unsigned long)s->lbt_gave_up, final ? 1 : 0);
     if (n < 0 || (size_t)n >= cap) {
         buf[0] = '\0';
         return 0;
@@ -48,12 +50,14 @@ size_t radio_stats_modem_line(char *buf, size_t cap, uint32_t t_s, unsigned game
                      "{\"role\":\"modem\",\"t_s\":%lu,\"game\":%u,\"node\":%u,\"rx_ok\":%lu,"
                      "\"rx_dropped\":%lu,\"rx_auth_fail\":%lu,\"rx_dupes\":%lu,\"tx_ok\":%lu,"
                      "\"tx_fail\":%lu,\"field_rx\":%lu,\"field_tx\":%lu,"
-                     "\"duty_remaining_ms\":%ld}",
+                     "\"duty_remaining_ms\":%ld,\"lbt_cads\":%lu,\"lbt_deferrals\":%lu,"
+                     "\"lbt_gave_up\":%lu}",
                      (unsigned long)t_s, game, node, (unsigned long)s->rx_ok,
                      (unsigned long)s->rx_dropped, (unsigned long)s->rx_auth_fail,
                      (unsigned long)s->rx_dupes, (unsigned long)s->tx_ok, (unsigned long)s->tx_fail,
                      (unsigned long)s->field_rx, (unsigned long)s->field_tx,
-                     duty_json(duty_remaining_ms));
+                     duty_json(duty_remaining_ms), (unsigned long)s->lbt_cads,
+                     (unsigned long)s->lbt_deferrals, (unsigned long)s->lbt_gave_up);
     if (n < 0 || (size_t)n >= cap) {
         buf[0] = '\0';
         return 0;

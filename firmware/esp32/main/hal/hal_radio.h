@@ -99,7 +99,8 @@ typedef struct {
      * left alone: a CAD would abort that reception), then, if nothing is flagged, one CAD, then
      * back to receive. Returns 1 if busy, 0 if free, -1 on a radio error. *info (may be NULL)
      * says why and how long it took. May be NULL (the radio cannot test: the channel is free).
-     * Not for the radio task's normal loop yet: only the bench test calls it.
+     * The radio task calls it before every transmission when listen before talk is on
+     * (radio/radio_lbt.c, RFC 0001 Amendment 14); the bench test calls it too.
      */
     int (*channel_busy)(hal_radio_busy_t *info);
 
@@ -108,6 +109,13 @@ typedef struct {
      * when the chip finished receiving it. 0 if the HAL does not keep it. May be NULL.
      */
     int64_t (*last_rx_done_us)(void);
+
+    /*
+     * How long recv() waits for a frame when none has arrived, in milliseconds (the default is 50).
+     * With listen before talk on, the radio task shortens it so that a frame's wait is honoured to
+     * about 10 ms rather than 60. May be NULL (the wait stays what it is).
+     */
+    void (*set_recv_wait_ms)(uint32_t ms);
 
     void (*deinit)(void);
 } hal_radio_ops_t;

@@ -185,6 +185,8 @@ static void log_radio_stats(uint32_t t_ms)
 {
     if (!modem.configured) return;
     const modem_counters_t *c = &modem.count;
+    radio_lbt_stats_t lbt;
+    radio_task_lbt_stats(&lbt);
     radio_stats_modem_t s = {.rx_ok = c->rx_ok,
                              .rx_dropped = c->rx_dropped,
                              .rx_auth_fail = c->rx_auth_fail,
@@ -192,7 +194,10 @@ static void log_radio_stats(uint32_t t_ms)
                              .tx_ok = c->tx_ok,
                              .tx_fail = c->tx_fail,
                              .field_rx = c->field_rx,
-                             .field_tx = c->field_tx};
+                             .field_tx = c->field_tx,
+                             .lbt_cads = lbt.cads,
+                             .lbt_deferrals = lbt.deferrals,
+                             .lbt_gave_up = lbt.gave_up};
     char line[RADIO_STATS_LINE_MAX];
     if (radio_stats_modem_line(line, sizeof(line), t_ms / 1000u, modem.game_id, modem.node_id, &s,
                                modem.radio_present ? radio_task_duty_remaining_ms()

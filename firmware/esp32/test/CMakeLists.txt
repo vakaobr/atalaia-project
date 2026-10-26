@@ -48,6 +48,7 @@ set(CORE_SOURCES
     ${CORE_DIR}/src/node.c
     ${CORE_DIR}/src/packet.c
     ${CORE_DIR}/src/flood.c
+    ${CORE_DIR}/src/lbt.c
     ${CORE_DIR}/src/ack.c
     ${CORE_DIR}/src/duty_cycle.c
     ${CORE_DIR}/src/msg_codec.c
@@ -155,6 +156,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/builtin_presets.c
     ${SHELL_DIR}/key_filter.c
     ${SHELL_DIR}/radio/radio_task.c
+    ${SHELL_DIR}/radio/radio_lbt.c
     ${SHELL_DIR}/radio/event_log.c
     ${SHELL_DIR}/radio/time_sync.c
     ${SHELL_DIR}/radio/radio_protocol.c
@@ -219,6 +221,7 @@ set(TEST_SOURCES
     test_radio_limits.c
     test_radio_stats.c
     test_lbt.c
+    test_radio_lbt.c
     test_modem_framing.c
     test_modem.c
     test_field_link.c

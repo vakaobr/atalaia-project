@@ -49,6 +49,13 @@ class _Relay(ctypes.Structure):
                 ("paths", _Path * PATHS), ("slots", _Slot * SLOTS)]
 
 
+class _Lbt(ctypes.Structure):
+    # Must match atalaia_lbt_t (core/include/atalaia/lbt.h) field for field.
+    _fields_ = [("rand", _RAND_FN), ("rand_ctx", ctypes.c_void_p), ("tries", ctypes.c_uint8)]
+
+
+LBT_SEND, LBT_WAIT, LBT_SEND_ANYWAY = 0, 1, 2
+
 _LIBS: dict[str, ctypes.CDLL] = {}
 
 
@@ -75,6 +82,15 @@ def load(lib: Optional[str] = None) -> ctypes.CDLL:
         d.atalaia_relay_pending.restype = ctypes.c_size_t
         d.atalaia_retry_gap_ms.argtypes = [ctypes.c_uint, ctypes.c_uint32]
         d.atalaia_retry_gap_ms.restype = ctypes.c_uint32
+        lb = ctypes.POINTER(_Lbt)
+        d.atalaia_lbt_init.argtypes = [lb, _RAND_FN, ctypes.c_void_p]
+        d.atalaia_lbt_init.restype = None
+        d.atalaia_lbt_should_listen.argtypes = [lb]
+        d.atalaia_lbt_should_listen.restype = ctypes.c_bool
+        d.atalaia_lbt_decide.argtypes = [lb, ctypes.c_bool, ctypes.POINTER(ctypes.c_uint32)]
+        d.atalaia_lbt_decide.restype = ctypes.c_int
+        d.atalaia_lbt_reset.argtypes = [lb]
+        d.atalaia_lbt_reset.restype = None
         _LIBS[path] = d
     return _LIBS[path]
 
@@ -122,3 +138,24 @@ class CoreRelay:
 
     def retry_gap_ms(self, sends_so_far: int) -> int:
         return self._lib.atalaia_retry_gap_ms(sends_so_far, self._rng.getrandbits(32))
+
+
+class CoreLbt:
+    """One box's listen-before-talk state, in the core's own struct (RFC 0001 Amendment 14): the tries
+    and the 20-200 ms wait are the shipped code's, the channel check is the harness's."""
+
+    def __init__(self, rng: random.Random, lib: Optional[str] = None) -> None:
+        self._lib = load(lib)
+        self._rng = rng
+        self._cb = _RAND_FN(lambda _ctx: self._rng.getrandbits(32))
+        self.state = _Lbt()
+        self._lib.atalaia_lbt_init(ctypes.byref(self.state), self._cb, None)
+
+    def should_listen(self) -> bool:
+        return bool(self._lib.atalaia_lbt_should_listen(ctypes.byref(self.state)))
+
+    def decide(self, busy: bool) -> tuple[int, int]:
+        """(verdict, wait_ms): LBT_SEND, LBT_WAIT (wait_ms set) or LBT_SEND_ANYWAY."""
+        wait = ctypes.c_uint32(0)
+        v = self._lib.atalaia_lbt_decide(ctypes.byref(self.state), busy, ctypes.byref(wait))
+        return v, wait.value

@@ -100,6 +100,31 @@ class CoreRelayTests(unittest.TestCase):
 
 
 @unittest.skipIf(LIB is None, "the shared core is not built")
+class CoreLbtTests(unittest.TestCase):
+    """The core's listen-before-talk rule (RFC 0001 Amendment 14) through ctypes: the same eight tries
+    and 20-200 ms wait as core/tests/test_lbt.c checks in C."""
+
+    def test_eight_waits_then_send_anyway(self) -> None:
+        lbt = relay_core.CoreLbt(random.Random(4), LIB)
+        for _ in range(8):
+            self.assertTrue(lbt.should_listen())
+            v, wait = lbt.decide(True)
+            self.assertEqual(v, relay_core.LBT_WAIT)
+            self.assertTrue(20 <= wait <= 200, wait)
+        self.assertFalse(lbt.should_listen())
+        self.assertEqual(lbt.decide(True)[0], relay_core.LBT_SEND_ANYWAY)
+        self.assertTrue(lbt.should_listen())  # the next frame starts again
+        self.assertEqual(lbt.decide(False)[0], relay_core.LBT_SEND)
+
+    def test_the_hardware_policy_runs_the_core_rule(self) -> None:
+        res = run_one("domination", 12, "all_in_range", "eu868", "A_backoff_core_lbt_hw", minutes=6, seed=1,
+                      lib=LIB)
+        self.assertGreater(res["lbt_deferred"], 0)
+        self.assertGreater(res["lbt_cads_per_box_hour"], 100)
+        self.assertEqual(res["dc_dropped"]["total"], 0)
+
+
+@unittest.skipIf(LIB is None, "the shared core is not built")
 class HarnessOnTheCoreTests(unittest.TestCase):
     """The study's harness, with every box running the core's rules, against its own model of them."""
 

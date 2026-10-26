@@ -20,7 +20,7 @@
  *            [--join-key HEX] [--state-ms N] [--name NAME]
  *            [--as-box VERSION] [--release-keys HEX] [--admin-pin PIN] [--mac MAC] [--pair]
  *            [--announce-ms N] [--no-wifi] [--mode-keys HEX] [--mode-source DIR]
- *            [--region eu868|as923-tw]
+ *            [--region eu868|as923-tw] [--no-lbt]
  *
  * Without --join-key (and no key stored in DIR) the box is unadopted
  * (main/adoption.c, protocol/adoption.md); --admin-pin (1234) and --mac
@@ -33,6 +33,9 @@
  * --region: a box built for that radio region (Kconfig ATALAIA_RADIO_REGION; EU868 by
  * default): it pairs on the region's default channel, tunes only to the region's channels
  * and refuses another region's joins (join key 18).
+ * --no-lbt: no listen before talk (the build with Kconfig ATALAIA_LBT off); by default every
+ * frame goes through the radio task's transmit stage (radio/radio_lbt.c, RFC 0001 Amendment 14)
+ * with a fake channel: free, unless "lbtbusy N" (below) says otherwise.
  * The box's device id is the file device_id in --state-dir (made at the first start).
  *
  * --as-box VERSION: HELLO says a Field Box (esp32s3, full tier) running VERSION, so
@@ -62,6 +65,7 @@
  *   hold <button 1-4> <ms>      hold a team button for ms, then release it
  *   keys <0-9*#...>             keypad presses (keypad.key events to the mode)
  *   battery <0-100|-1>          the battery gauge's reading (-1: no gauge); 87 at the start
+ *   lbtbusy N                   the next N channel checks answer "busy" (-1: every one, 0: none)
  *   status                      print one STATUS line (JSON): the game, the link, and between
  *                               games the device id and whether the box takes an invite
  *   quit
@@ -92,6 +96,7 @@
 #include "builtin_presets.h"
 #include "button_tracker.h"
 #include "fw_update.h"
+#include "radio/radio_lbt.h"
 #include "mode_fetch.h"
 #include "mode_store.h"
 #include "hal/stub/hal_stub.h"
@@ -321,6 +326,74 @@ static bool air_send(void *user, const uint8_t *pkt, size_t len)
     if (!have_peer) return false;
     return sendto(air_sock, pkt, len, 0, (const struct sockaddr *)&air_peer, sizeof(air_peer)) ==
            (ssize_t)len;
+}
+
+/* ---- Listen before talk: the radio task's transmit stage on a fake channel ---------------- */
+
+#define TXQ_LEN 8
+static radio_txs_t txs;
+static radio_tx_msg_t txq[TXQ_LEN];
+static int txq_head, txq_count;
+static int lbt_busy_left; /* "lbtbusy N": the next N checks answer busy; -1: always */
+static bool lbt_enabled = true;
+
+static int fake_channel_busy(hal_radio_busy_t *info)
+{
+    info->why = HAL_BUSY_FREE;
+    info->sample_us = 0;
+    info->cad_us = 8000; /* a CAD took 8 ms on the bench (SL-25 gate) */
+    info->rearm_us = 0;
+    if (lbt_busy_left == 0) return 0;
+    if (lbt_busy_left > 0) lbt_busy_left--;
+    info->why = HAL_BUSY_CAD;
+    return 1;
+}
+
+static int fake_send(const uint8_t *data, size_t len)
+{
+    return air_send(NULL, data, len) ? 0 : -1;
+}
+
+static uint32_t fake_duty(void)
+{
+    return 360000;
+}
+
+static const hal_radio_ops_t fake_radio = {
+    .send = fake_send, .duty_cycle_remaining_ms = fake_duty, .channel_busy = fake_channel_busy};
+
+static uint32_t lbt_rand(void *ctx)
+{
+    (void)ctx;
+    uint32_t v;
+    shell_random(NULL, (uint8_t *)&v, sizeof(v));
+    return v;
+}
+
+/* radio_task_send(): a queue of 8 in front of the stage, as the radio task has. */
+static bool lbt_send(void *user, const uint8_t *pkt, size_t len)
+{
+    (void)user;
+    if (len == 0 || len > RADIO_MAX_PKT_LEN || txq_count >= TXQ_LEN) return false;
+    radio_tx_msg_t *m = &txq[(txq_head + txq_count) % TXQ_LEN];
+    memcpy(m->data, pkt, len);
+    m->len = len;
+    m->tag = 0;
+    txq_count++;
+    return true;
+}
+
+/* One turn of the radio task's loop (every 10 ms here). */
+static void lbt_pump(uint32_t now)
+{
+    if (!radio_txs_busy(&txs) && txq_count > 0) {
+        radio_txs_load(&txs, &txq[txq_head], now);
+        txq_head = (txq_head + 1) % TXQ_LEN;
+        txq_count--;
+    }
+    uint32_t tag;
+    radio_tx_status_t status;
+    radio_txs_step(&txs, now, &tag, &status);
 }
 
 static void shell_screen(void *user, const char *tmpl, const char *json)
@@ -632,7 +705,8 @@ static void print_status(void)
         "\"term\":%lu,\"events_sent\":%lu,\"retries\":%lu,\"acked\":%lu,\"cmds\":%lu,"
         "\"times\":%lu,\"states\":%lu,\"rx_ok\":%lu,\"rx_rejected\":%lu,\"relayed\":%lu,"
         "\"have_key\":%s,\"device_id\":\"%s\",\"available\":%s,\"invites_accepted\":%lu,"
-        "\"invites_refused\":%lu,\"last_game\":%u,\"lang\":\"%s\"}",
+        "\"invites_refused\":%lu,\"last_game\":%u,\"lang\":\"%s\","
+        "\"lbt_cads\":%lu,\"lbt_deferrals\":%lu,\"lbt_gave_up\":%lu}",
         (int)game.phase, game.paused ? "true" : "false", game.join.game_id, game.join.node_id,
         game.link.proto.epoch, (unsigned long)runner.game_time_ms, game.owner_team, scores,
         (unsigned)field_link_pending(&game.link), game.link.leader, (unsigned long)game.link.term,
@@ -642,7 +716,8 @@ static void print_status(void)
         game.link.proto.has_key ? "true" : "false", device,
         box_lobby_available(&game) ? "true" : "false", (unsigned long)game.lobby.invites_accepted,
         (unsigned long)game.lobby.invites_refused, game.lobby.last_game,
-        box_lang_given() ? box_lang_code(box_lang()) : "");
+        box_lang_given() ? box_lang_code(box_lang()) : "", (unsigned long)txs.stats.cads,
+        (unsigned long)txs.stats.deferrals, (unsigned long)txs.stats.gave_up);
 }
 
 int main(int argc, char **argv)
@@ -700,6 +775,8 @@ int main(int argc, char **argv)
             mode_source = argv[++i];
         } else if (strcmp(argv[i], "--no-wifi") == 0) {
             no_wifi = true;
+        } else if (strcmp(argv[i], "--no-lbt") == 0) {
+            lbt_enabled = false;
         } else if (strcmp(argv[i], "--release-keys") == 0 && i + 1 < argc) {
             release_key_count = fw_keys_parse(argv[++i], release_keys, FW_KEYS_MAX);
             if (release_key_count < 0) {
@@ -717,6 +794,7 @@ int main(int argc, char **argv)
     }
     signal(SIGPIPE, SIG_IGN);
     mkdir(dir, 0700);
+    radio_txs_init(&txs, &fake_radio, lbt_enabled, lbt_rand, NULL);
 
     air_sock = bind_udp((uint16_t)air_port);
     if (air_sock < 0) {
@@ -808,7 +886,7 @@ int main(int argc, char **argv)
                              .reboot = NULL,
                              .set_channel = shell_set_channel,
                              .battery_pct = shell_battery,
-                             .radio_send = air_send,
+                             .radio_send = lbt_send,
                              .update = shell_update,
                              .random = shell_random,
                              .fetch_modes = mode_key_count > 0 ? shell_fetch_modes : NULL,
@@ -835,7 +913,7 @@ int main(int argc, char **argv)
     }
     game.state_interval_ms = (uint32_t)state_ms;
     static box_pair_t pairing;
-    box_pair_ops_t pops = {air_send, shell_random, shell_screen, shell_log, NULL};
+    box_pair_ops_t pops = {lbt_send, shell_random, shell_screen, shell_log, NULL};
     box_pair_init(&pairing, &pops, &adopt, &atalaia_crypto_mbedtls, name, 0,
                   radio_region_default_channel_hz(host_region));
 
@@ -949,6 +1027,8 @@ int main(int argc, char **argv)
                         if (!adoption_tap(&adopt, mem, n, now, &r)) out("LOG card: no field card");
                     } else if (sscanf(line, "battery %d", &b) == 1) {
                         battery = b < 0 ? -1 : b > 100 ? 100 : b;
+                    } else if (sscanf(line, "lbtbusy %d", &b) == 1) {
+                        lbt_busy_left = b;
                     } else if (strcmp(line, "status") == 0) {
                         print_status();
                     } else if (strcmp(line, "quit") == 0) {
@@ -973,6 +1053,7 @@ int main(int argc, char **argv)
             run_fetch();
         }
         box_game_tick(&game, delta, now);
+        lbt_pump(now);
         adoption_tick(&adopt, now);
         box_pair_tick(&pairing, now);
         for (int i = 0; i < runner.queues.screen_count; i++) {

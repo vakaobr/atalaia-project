@@ -35,6 +35,10 @@ static void say(box_game_t *g, const char *fmt, ...)
 static void radio_report(box_game_t *g, bool final)
 {
     if (g->shell.radio_stats == NULL) return;
+    if (g->shell.lbt_stats != NULL) {
+        field_link_stats_t *w = &g->link.stats;
+        g->shell.lbt_stats(g->shell.user, &w->lbt_cads, &w->lbt_deferrals, &w->lbt_gave_up);
+    }
     const field_link_stats_t *s = &g->link.stats;
     radio_stats_box_t r = {.sent = s->events_sent,
                            .retries = s->retries,
@@ -50,6 +54,9 @@ static void radio_report(box_game_t *g, bool final)
                            .rx_rejected = s->rx_rejected,
                            .states = s->states_sent,
                            .hellos = s->hellos_sent,
+                           .lbt_cads = s->lbt_cads,
+                           .lbt_deferrals = s->lbt_deferrals,
+                           .lbt_gave_up = s->lbt_gave_up,
                            .neighbours = atalaia_relay_neighbours(&g->link.relay, g->now_ms)};
     uint32_t duty = g->shell.duty_remaining_ms != NULL ? g->shell.duty_remaining_ms(g->shell.user)
                                                        : RADIO_STATS_DUTY_UNKNOWN;

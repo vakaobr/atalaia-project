@@ -46,6 +46,7 @@ add_executable(box_host
     ${MAIN_DIR}/radio/field_link.c
     ${MAIN_DIR}/radio/radio_protocol.c
     ${MAIN_DIR}/radio/radio_task.c
+    ${MAIN_DIR}/radio/radio_lbt.c
     ${MAIN_DIR}/radio/event_log.c
     ${MAIN_DIR}/radio/time_sync.c
     ${MAIN_DIR}/radio/noise_stats.c

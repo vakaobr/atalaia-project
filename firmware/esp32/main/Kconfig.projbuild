@@ -883,6 +883,21 @@ menu "Atalaia Field Box Configuration"
                 For the Wokwi emulator, which cannot host a SoftAP. Leave off
                 on real Field Boxes.
 
+        config ATALAIA_LBT
+            bool "Listen before talk (a CAD and the receiver's state before every transmission)"
+            default y
+            help
+                RFC 0001 Amendment 14, decision SL-25. Before a frame goes on air
+                the radio task asks the radio whether the channel is busy (a frame
+                being received, or one CAD). If it is, the frame waits a random
+                20-200 ms and the radio is asked again, up to 8 times; then it is
+                sent anyway. Collision avoidance only: the duty-cycle budget
+                (10 % on the game's sub-band) is spent by the real send and is not
+                changed by it. Applies to every image that transmits: the Field
+                Box, the USB modem and the I/O pod. With it off the radio task is
+                what it was (a frame goes at once). For a field test that compares
+                the two, build the same commit twice: docs/runbooks/radio-field-test.md.
+
         config ATALAIA_LBT_BENCH
             bool "Bench test of listen-before-talk (\"@lbt\" console commands)"
             default n

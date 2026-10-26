@@ -429,6 +429,50 @@ class FieldTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: self.score(gid, "blue") >= 5, 8))
         self.assertNotEqual(n_near, n_far)
 
+    def test_listen_before_talk_holds_a_frame_and_then_sends_it(self):
+        """RFC 0001 Amendment 14: a box whose channel is busy holds its frame (20-200 ms, up to 8
+        times) and then sends it; the capture still reaches the controller and is acknowledged."""
+        gid = self.game()
+        box = self.box("lbt")
+        nid = self.join(box)
+        self.assertTrue(wait_for(lambda: box.status()["acked"] >= 1, 5))
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        base = box.status()
+        self.assertGreater(base["lbt_cads"], 0)  # every frame was looked at (free channel)
+        self.assertEqual((base["lbt_deferrals"], base["lbt_gave_up"]), (0, 0))
+
+        # Busy for the next 3 checks: the frames wait, then go.
+        box.send("lbtbusy 3")
+        box.hold(1, 1300)
+        self.assertTrue(wait_for(lambda: "zone.captured" in self.log_types(gid, nid), 8))
+        self.assertTrue(wait_for(lambda: box.status()["pending"] == 0, 8))
+        st = box.status()
+        self.assertGreaterEqual(st["lbt_deferrals"] - base["lbt_deferrals"], 3)
+        self.assertEqual(st["lbt_gave_up"], 0)
+
+        # Busy for ever: every frame waits 8 times and is sent anyway (about 1 s each).
+        box.send("lbtbusy -1")
+        box.hold(2, 1300)
+        self.assertTrue(wait_for(lambda: self.log_types(gid, nid).count("zone.captured") == 2, 15))
+        st2 = box.status()
+        self.assertGreaterEqual(st2["lbt_gave_up"], 1)
+        self.assertGreaterEqual(st2["lbt_deferrals"], 8 * st2["lbt_gave_up"])
+        box.send("lbtbusy 0")
+
+    def test_without_listen_before_talk_a_busy_channel_changes_nothing(self):
+        gid = self.game()
+        box = self.box("nolbt", "--no-lbt")
+        nid = self.join(box)
+        self.assertTrue(wait_for(lambda: box.status()["acked"] >= 1, 5))
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        box.send("lbtbusy -1")
+        box.hold(1, 1300)
+        self.assertTrue(wait_for(lambda: "zone.captured" in self.log_types(gid, nid), 6))
+        st = box.status()
+        self.assertEqual((st["lbt_cads"], st["lbt_deferrals"], st["lbt_gave_up"]), (0, 0, 0))
+
     def test_hold_all_scores_from_the_controller(self):
         """Hold-All Domination: two boxes, the controller's field.lua scores while red holds both."""
         r = self.client.post("/api/v1/games", headers=GM, json={

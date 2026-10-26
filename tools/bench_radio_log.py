@@ -52,8 +52,15 @@ SL4_PCT_PER_BOX_EU868 = 0.68
 
 DELTAS = (
     "sent", "retries", "acked", "expired", "relayed", "relay_skipped", "relay_cancelled",
-    "relay_no_slot", "dup", "tx_refused",
+    "relay_no_slot", "dup", "tx_refused", "lbt_cads", "lbt_deferrals", "lbt_gave_up",
 )  # fmt: skip
+
+# What the study says listen before talk does in a field (docs/review/relay-study-results.md section 13, decision
+# SL-37; Domination, 90 minutes, 10-30 boxes, every layout): a box makes 850 to 1 500 CADs an hour (one per frame
+# sent, a few more when it finds the air busy: a frame the receiver is already receiving costs none), a CAD takes
+# 8 ms on the bench, and frames sent anyway after 8 busy answers in a row are from 0.5 to 254 per box-hour by field
+# size and layout (84 at 20 boxes all in range).
+LBT_CADS_PER_H = (850, 1500)
 
 
 def parse(text: str) -> list[dict]:
@@ -107,7 +114,8 @@ def box_report(key: tuple, rows: list[dict], boxes: int | None) -> str:
     lines = [f"== box node {node}, game {game}: {len(rows)} lines, t_s {rows[0]['t_s']}..{rows[-1]['t_s']}"]
     head = (
         f"{'min':>4} {'t_s':>6} {'sent':>5} {'retry':>5} {'acked':>5} {'exp':>4} {'relay':>6} "
-        f"{'skip':>5} {'canc':>5} {'noslot':>6} {'dup':>5} {'refus':>5} {'duty s':>7} {'nbr':>3}"
+        f"{'skip':>5} {'canc':>5} {'noslot':>6} {'dup':>5} {'refus':>5} {'cad':>5} {'defer':>5} {'gaveup':>6} "
+        f"{'duty s':>7} {'nbr':>3}"
     )
     lines.append(head)
     prev = dict.fromkeys(DELTAS, 0)
@@ -121,7 +129,8 @@ def box_report(key: tuple, rows: list[dict], boxes: int | None) -> str:
         lines.append(
             f"{(r['t_s'] - t0) / 60:>4.0f} {r['t_s']:>6} {d['sent']:>5} {d['retries']:>5} {d['acked']:>5} "
             f"{d['expired']:>4} {d['relayed']:>6} {d['relay_skipped']:>5} {d['relay_cancelled']:>5} "
-            f"{d['relay_no_slot']:>6} {d['dup']:>5} {d['tx_refused']:>5} {duty_s:>7} "
+            f"{d['relay_no_slot']:>6} {d['dup']:>5} {d['tx_refused']:>5} {d['lbt_cads']:>5} "
+            f"{d['lbt_deferrals']:>5} {d['lbt_gave_up']:>6} {duty_s:>7} "
             f"{r.get('neighbours', 0):>3}{mark}"
         )
     lines.append("(per-minute deltas; * = the closing line of the game)")
@@ -143,6 +152,7 @@ def box_report(key: tuple, rows: list[dict], boxes: int | None) -> str:
         f"neighbours {last.get('neighbours', 0)}"
     )
     lines.append(f"refusals by the duty-cycle budget (tx_refused): {last.get('tx_refused', 0)}")
+    lines.extend(lbt_summary(rows))
     duty = [r["duty_remaining_ms"] for r in rows if r.get("duty_remaining_ms", -1) >= 0]
     slope = slope_ms_per_min(rows)
     if duty:
@@ -169,6 +179,33 @@ def box_report(key: tuple, rows: list[dict], boxes: int | None) -> str:
         lines.append("duty budget: not reported (duty_remaining_ms -1)")
     lines.extend(expectation(boxes, last, slope))
     return "\n".join(lines)
+
+
+def lbt_summary(rows: list[dict]) -> list[str]:
+    """Listen before talk's counters (RFC 0001 Amendment 14): CADs, deferrals, frames sent after 8 tries."""
+    last = rows[-1]
+    if "lbt_cads" not in last:
+        return ["listen before talk: not reported (a firmware before Amendment 14)"]
+    cads, defer, gave = last.get("lbt_cads", 0), last.get("lbt_deferrals", 0), last.get("lbt_gave_up", 0)
+    if not (cads or defer or gave):
+        return ["listen before talk: no CAD, no deferral (switched off in this build, or nothing sent yet)"]
+    span_h = (rows[-1]["t_s"] - rows[0]["t_s"]) / 3600.0
+    # Frames that went on air: the box's own plus the relays (every one is looked at first).
+    frames = last.get("sent", 0) + last.get("states", 0) + last.get("hellos", 0) + last.get("retries", 0)
+    frames += last.get("relayed", 0)
+    text = f"listen before talk: {cads} CADs, {defer} deferrals, {gave} frames sent after 8 tries"
+    if frames:
+        text += f"; {defer / frames:.2f} waits per frame sent ({frames} frames)"
+    lines = [text]
+    if span_h > 0.05:
+        rate = cads / span_h
+        lo, hi = LBT_CADS_PER_H
+        verdict = "inside" if lo <= rate <= hi else "outside"
+        lines.append(
+            f"  CADs per hour {rate:.0f} ({verdict} the study's {lo}-{hi} a box-hour in a field of 10-30; "
+            f"a CAD is 8 ms on the bench, so {100.0 * rate * 0.008 / 3600.0:.2f} % of the hour listening)"
+        )
+    return lines
 
 
 def expectation(boxes: int | None, last: dict, slope: float | None) -> list[str]:
@@ -225,6 +262,11 @@ def modem_report(key: tuple, rows: list[dict]) -> str:
         f"budget); rx {last.get('rx_ok', 0)} forwarded, {last.get('rx_dupes', 0)} copies, "
         f"{last.get('rx_auth_fail', 0)} failed authentication"
     )
+    if "lbt_cads" in last:
+        lines.append(
+            f"listen before talk: {last['lbt_cads']} CADs, {last.get('lbt_deferrals', 0)} deferrals, "
+            f"{last.get('lbt_gave_up', 0)} frames sent after 8 tries"
+        )
     if slope is not None:
         lines.append(f"duty budget slope {slope / 1000:+.2f} s/min")
     lines.append("(the modem is the controller's radio: its model figure is the controller's share, not a box's)")

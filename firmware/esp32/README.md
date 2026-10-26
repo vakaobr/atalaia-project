@@ -36,8 +36,10 @@ app_main
   |     +-- screen_render() (the mode's YAML template, else the C screen)
   |     +-- lv_timer_handler()
   +-- radio_task (core 0, priority 3)
-  |     +-- TX queue drain (radio_task_send)
-  |     +-- RX poll (50 ms timeout via DIO1 ISR)
+  |     +-- TX queue drain (radio_task_send), one frame at a time through the
+  |     |   listen-before-talk stage (radio_lbt.c): a busy channel holds the frame
+  |     |   20-200 ms and the loop goes on receiving
+  |     +-- RX poll (DIO1 ISR; 10 ms timeout with listen before talk, 50 ms without)
   |     +-- single shared game channel (default 869.525 MHz, g2)
   +-- audio_task (core 0, priority 3)
   +-- wifi_task  (core 0, priority 2)
@@ -430,6 +432,7 @@ Radio-specific Kconfig options (under "Atalaia Field Box Configuration > Radio")
 - `ATALAIA_RADIO_FEM_GAIN_DB` -- FEM gain for TX power calculation (default 14)
 - `ATALAIA_RADIO_ANTENNA_GAIN_DBI` -- antenna gain in dBi (default 2)
 - `ATALAIA_RADIO_REGION` -- the radio region the image is built for: EU868 (default) or AS923-TW (Taiwan, 920-925 MHz, SF9 at 500 kHz, 0.5 W at the antenna port; RFC 0001 Amendment 12). The firmware knows only that region: a join, a CONFIGURE or a MEASURE on another region's channel is refused. `python3 tools/docker_fw.py build|bench|modem|pod --region=as923-tw` builds a Taiwanese image (fit a 915-925 MHz antenna; not certified, decisions RF-AS923-3 and RF-AS923-13)
+- `ATALAIA_LBT` -- listen before talk (default on; RFC 0001 Amendment 14): a CAD and the receiver's state before every transmission, in the Field Box, the modem and the pod. `python3 tools/docker_fw.py build|bench|modem|pod|wokwi --lbt=off` builds the same firmware without it, for the field test that compares the two (`docs/runbooks/radio-field-test.md`)
 - `ATALAIA_RADIO_DISABLE` -- skip radio init (kept for debugging; the Wokwi build runs with the radio enabled)
 
 Field game options (under "Field network games"):
@@ -766,6 +769,26 @@ controller's game.
   this box relayed in the last 30 s; every other frame is relayed with probability
   min(1, 3 / boxes heard in 10 minutes) after 20-600 ms; 8 relay slots. A frame
   over the duty-cycle budget is dropped, not queued (RFC 0001 section 8).
+- **Listen before talk** -- (RFC 0001 Amendment 14, decisions SL-25 to SL-31; Kconfig
+  `ATALAIA_LBT`, on by default, in every image that transmits: the Field Box, the USB modem
+  and the I/O pod) before each transmission the radio task asks the radio whether the
+  channel is busy (`hal_radio_channel_busy()`: the receiver's own preamble-detected and
+  header-valid flags first, which cost nothing and cover the whole of a frame being
+  received, then one CAD if nothing is flagged: SL-26). A busy channel holds the popped
+  frame in the task's one transmit slot (`main/radio/radio_lbt.[ch]`, no blocking: the
+  task keeps receiving) and asks again after the core's random 20-200 ms
+  (`atalaia_lbt_*`, `core/src/lbt.c`, the wait drawn from the box's own entropy); after
+  8 busy answers in a row the frame is sent anyway. The duty-cycle budget is spent by the
+  real send, after the wait: a CAD is not time on air. With LBT on the loop turns every
+  ~10 ms (`recv()` waits 10 ms, set through `hal_radio_ops_t.set_recv_wait_ms`, then one
+  tick) so a wait is honoured to about that; without it the loop is what it was (50 + 10 ms).
+  The CAD's settings are the region's (core `atalaia_region_info()->cad`: 2 symbols, detection
+  peak 22 at SF7/125 kHz, 23 at SF9/500 kHz, minimum 10; the EU868 peak was measured on the
+  bench, **the AS923-TW one is Semtech's figure and unproven** until the bench gate has run on an
+  AS923-TW image). Counters: `lbt_cads`, `lbt_deferrals`, `lbt_gave_up` (below). The switch is
+  Kconfig only (`python3 tools/docker_fw.py build --lbt=off`): the controller cannot push it
+  without a wire change (a new join key), so a field test that compares the two builds the
+  same commit twice ([radio-field-test runbook](../../docs/runbooks/radio-field-test.md)).
 - **Battery** -- with a MAX17048 gauge, HELLO and STATE carry its level, and
   in a joined game the box reads it every 10 s and sends one `battery.low`
   (telemetry: one packet, no ACK, the level in `percent`) when it falls below
@@ -782,9 +805,12 @@ controller's game.
   `radio_stats`: `I (123456) radio_stats: {"t_s":120,"game":4243,"node":7,"sent":9,"retries":31,
   "acked":2,"expired":1,"relayed":140,"relay_skipped":12,"relay_cancelled":3,"relay_no_slot":4,
   "dup":77,"tx_refused":5,"duty_remaining_ms":359900,"neighbours":4,"rx":..,"rx_rejected":..,
-  "states":..,"hellos":..,"final":0}` (one line; counters cumulative since the join; `final` 1 on the
-  game's last line; `duty_remaining_ms` -1 if unknown). `main/radio/radio_stats.[ch]` makes it from
-  `field_link_stats_t` and `radio_task_duty_remaining_ms()` in a 512-byte stack buffer, called from
+  "states":..,"hellos":..,"lbt_cads":210,"lbt_deferrals":35,"lbt_gave_up":2,"final":0}` (one line;
+  counters cumulative since the join; `final` 1 on the game's last line; `duty_remaining_ms` -1 if
+  unknown; the three `lbt_` counters are listen before talk's: CADs run, frames that waited for a
+  busy channel, frames sent after the eighth busy answer in a row). `main/radio/radio_stats.[ch]`
+  makes it from `field_link_stats_t` (the `lbt_` counters are copied in from the radio task's) and
+  `radio_task_duty_remaining_ms()` in a 544-byte stack buffer, called from
   `box_game_tick` and `end_game`: it reads, it never changes what the radio does
   (`test/test_radio_stats.c` pins the format, `test/test_box_game.c` the timing).
   `tools/bench_radio_log.py` reads the lines; the runbook is

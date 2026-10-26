@@ -8,9 +8,12 @@
 
 #include <string.h>
 
+#include "radio_lbt.h"
+
 #ifdef ESP_PLATFORM
 
 #include "esp_log.h"
+#include "esp_random.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
@@ -44,6 +47,39 @@ typedef struct {
 } measure_out_t;
 static volatile uint32_t duty_remaining_ms;
 static const hal_t *radio_hal;
+
+/* The transmit stage with listen before talk (radio_lbt.h, RFC 0001 Amendment 14). */
+#ifdef CONFIG_ATALAIA_LBT
+#define LBT_ENABLED true
+#else
+#define LBT_ENABLED false
+#endif
+static radio_txs_t txs;
+static radio_task_random_fn random_fn;
+static void *random_ctx;
+
+void radio_task_set_random(radio_task_random_fn fn, void *ctx)
+{
+    random_fn = fn;
+    random_ctx = ctx;
+}
+
+static uint32_t lbt_rand(void *ctx)
+{
+    (void)ctx;
+    uint32_t v;
+    if (random_fn != NULL) {
+        random_fn(random_ctx, (uint8_t *)&v, sizeof(v));
+    } else {
+        esp_fill_random(&v, sizeof(v));
+    }
+    return v;
+}
+
+static uint32_t now_ms(void)
+{
+    return (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
+}
 
 static void radio_task_loop(void *arg)
 {
@@ -84,35 +120,35 @@ static void radio_task_loop(void *arg)
             measuring = false;
         }
 
-        /* Check for outbound packets. */
-        radio_tx_msg_t tx_msg;
-        if (xQueueReceive(tx_queue, &tx_msg, 0) == pdTRUE) {
+        /* Outbound: take a frame into the transmit stage when it is empty, then give it its turn.
+         * A busy channel (listen before talk) holds the frame there and the loop goes on: the
+         * task keeps receiving while it waits. */
+        if (!radio_txs_busy(&txs)) {
+            radio_tx_msg_t tx_msg;
+            if (xQueueReceive(tx_queue, &tx_msg, 0) == pdTRUE) {
+                radio_txs_load(&txs, &tx_msg, now_ms());
+            }
+        }
+        if (radio_txs_busy(&txs)) {
+            uint32_t tag = 0;
             radio_tx_status_t status = RADIO_TX_RESULT_OK;
-            if (radio_hal->radio->duty_cycle_remaining_ms() > 0) {
-                int rc = radio_hal->radio->send(tx_msg.data, tx_msg.len);
-                if (rc == -3) {
-                    /* This packet's time on air does not fit in what is left. */
-                    ESP_LOGW(TAG, "TX skipped: duty-cycle budget too small for %u bytes",
-                             (unsigned)tx_msg.len);
-                    status = RADIO_TX_RESULT_DUTY_CYCLE;
-                } else if (rc != 0) {
-                    ESP_LOGW(TAG, "TX failed (%d)", rc);
-                    status = RADIO_TX_RESULT_ERROR;
+            if (radio_txs_step(&txs, now_ms(), &tag, &status) == RADIO_TXS_DONE) {
+                if (status == RADIO_TX_RESULT_DUTY_CYCLE) {
+                    ESP_LOGW(TAG, "TX skipped: duty-cycle budget too small or exhausted");
+                } else if (status != RADIO_TX_RESULT_OK) {
+                    ESP_LOGW(TAG, "TX failed");
                 }
 #if CONFIG_ATALAIA_RADIO_LOG_PACKETS
                 else {
-                    ESP_LOGI(TAG, "TX %u bytes, %lu ms budget left", (unsigned)tx_msg.len,
+                    ESP_LOGI(TAG, "TX %u bytes, %lu ms budget left", (unsigned)txs.msg.len,
                              (unsigned long)radio_hal->radio->duty_cycle_remaining_ms());
                 }
 #endif
-            } else {
-                ESP_LOGW(TAG, "TX skipped: duty-cycle exhausted");
-                status = RADIO_TX_RESULT_DUTY_CYCLE;
-            }
-            if (tx_msg.tag != 0) {
-                radio_tx_result_t result = {.tag = tx_msg.tag, .status = status};
-                if (xQueueSend(result_queue, &result, 0) != pdTRUE) {
-                    ESP_LOGW(TAG, "TX result queue full, result dropped");
+                if (tag != 0) {
+                    radio_tx_result_t result = {.tag = tag, .status = status};
+                    if (xQueueSend(result_queue, &result, 0) != pdTRUE) {
+                        ESP_LOGW(TAG, "TX result queue full, result dropped");
+                    }
                 }
             }
         }
@@ -135,7 +171,10 @@ static void radio_task_loop(void *arg)
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        /* With listen before talk the loop turns every ~10 ms (recv waits 10 ms at most, then one
+         * tick), so a held frame's wait is honoured to about that; without it, as it always was
+         * (recv up to 50 ms, then 10 ms). */
+        vTaskDelay(LBT_ENABLED ? 1 : pdMS_TO_TICKS(10));
     }
 }
 
@@ -149,6 +188,10 @@ void radio_task_start(const hal_t *hal)
     measure_queue = xQueueCreate(1, sizeof(measure_req_t));
     measure_done = xQueueCreate(1, sizeof(measure_out_t));
     duty_remaining_ms = radio_hal->radio->duty_cycle_remaining_ms();
+    radio_txs_init(&txs, radio_hal->radio, LBT_ENABLED, lbt_rand, NULL);
+    if (LBT_ENABLED && radio_hal->radio->set_recv_wait_ms != NULL) {
+        radio_hal->radio->set_recv_wait_ms(10);
+    }
 #if CONFIG_ATALAIA_LBT_BENCH
     /* The bench test of listen-before-talk formats its log lines on this task's stack. */
     const uint32_t stack = 8192;
@@ -194,6 +237,11 @@ bool radio_task_set_channel(uint32_t freq_hz)
 uint32_t radio_task_duty_remaining_ms(void)
 {
     return duty_remaining_ms;
+}
+
+void radio_task_lbt_stats(radio_lbt_stats_t *out)
+{
+    if (out != NULL) *out = txs.stats;
 }
 
 bool radio_task_measure_start(uint32_t freq_hz, uint16_t dwell_ms, bool cad)
@@ -254,6 +302,17 @@ bool radio_task_recv(radio_rx_msg_t *msg)
 
 #else
 /* ---- Stub build (no FreeRTOS) ------------------------------------------- */
+
+void radio_task_set_random(radio_task_random_fn fn, void *ctx)
+{
+    (void)fn;
+    (void)ctx;
+}
+
+void radio_task_lbt_stats(radio_lbt_stats_t *out)
+{
+    if (out != NULL) memset(out, 0, sizeof(*out));
+}
 
 void radio_task_start(const hal_t *hal)
 {

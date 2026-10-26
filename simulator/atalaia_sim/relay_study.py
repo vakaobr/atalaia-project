@@ -351,7 +351,15 @@ class Policy:
     ack_gap_horizon: int = 0  # >0: the controller skips an ACK hole once the box is this many seqs past it (SL-8)
     lbt: bool = False  # listen before talk: a frame waits (random backoff) while the channel is heard busy
     lbt_backoff_ms: tuple[int, int] = (20, 200)
-    lbt_tries: int = 8  # then it goes anyway (RFC 0001 section 8 does not use LBT today)
+    lbt_tries: int = 8  # then it goes anyway (the built rule: RFC 0001 Amendment 14; core atalaia_lbt_*)
+    # The built transmit path (SL-30): 0 keeps the study's ideal CAD (instant, counted on every look).
+    # >0 models the firmware: a frame the receiver already hears (a frame older than two symbols: the
+    # preamble and header flags) is busy with no CAD; otherwise one CAD of this many ms, deaf meanwhile,
+    # looked at in its middle, and a free answer sends at its end (a frame that starts in between is
+    # collided with, the hidden window the ideal model does not have).
+    lbt_cad_ms: float = 0.0
+    lbt_core: bool = False  # the tries and the 20-200 ms wait are the core's atalaia_lbt_* (relay_core.CoreLbt)
+    radio_loop_ms: int = 0  # >0: the radio task's loop grid (11 with LBT: recv waits 10 ms; 60 without: 50 + 10)
     core_rules: bool = False  # every box runs the core's own relay rules (core/src/flood.c, ack.c; relay_core.py)
                               # instead of this file's model of them: RFC 0001 Amendment 13, the shipped code
 
@@ -439,6 +447,17 @@ POLICIES: dict[str, Policy] = {
                                   relay_slots=8, density_c=3.0, ack_cancel=True, ack_relay_path=True,
                                   retry_backoff=True, core_rules=True, lbt=True,
                                   summary="A_backoff_core (the core's rules) plus a simulator-side CAD before TX"),
+    # SL-30: the built transmit path, on the hardware's own timing (an 8 ms CAD, a receiver-flag check that
+    # costs none, the radio task's real loop: 11 ms with LBT, up to 60 ms without it)
+    "A_backoff_core_hw": replace(FIRMWARE, name="A_backoff_core_hw", jitter_mode="uniform", jitter_ms=(20, 600),
+                                 relay_slots=8, density_c=3.0, ack_cancel=True, ack_relay_path=True,
+                                 retry_backoff=True, core_rules=True, radio_loop_ms=60,
+                                 summary="A_backoff_core with the radio task's real 60 ms loop (no LBT)"),
+    "A_backoff_core_lbt_hw": replace(FIRMWARE, name="A_backoff_core_lbt_hw", jitter_mode="uniform",
+                                     jitter_ms=(20, 600), relay_slots=8, density_c=3.0, ack_cancel=True,
+                                     ack_relay_path=True, retry_backoff=True, core_rules=True, lbt=True,
+                                     lbt_cad_ms=8.0, lbt_core=True, radio_loop_ms=11,
+                                     summary="A_backoff_core plus the built LBT: 8 ms CAD, flags first, 11 ms loop"),
     "D_lbt": replace(FIRMWARE, name="D_lbt", jitter_mode="uniform", jitter_ms=(20, 600), relay_slots=8,
                      density_c=3.0, ack_cancel=True, ack_relay_path=True, state_period_ms=_adaptive_period,
                      retry_backoff=True, lbt=True, summary="D plus listen-before-talk"),
@@ -490,6 +509,7 @@ class Stats:
         self.relay_cancelled = 0
         self.relay_skipped = 0  # the policy decided not to relay at all
         self.lbt_deferred = 0
+        self.lbt_gave_up = 0  # frames sent after the last allowed wait (the firmware's lbt_gave_up counter)
         self.lbt_cads = 0  # channel-activity detections made before a transmission (the energy cost, SL-25)
         self.relayed = 0
         self.rx_ok = 0
@@ -518,7 +538,13 @@ class Node:
         self.lbt_waits = 0
         self.next_ok_us = 0  # the controller's pacing: no frame of its own before this
         self.tick_phase = eng.rng.randrange(TICK_MS * 1000)
-        self.radio_phase = eng.rng.randrange(RADIO_LOOP_MS * 1000)
+        self.loop_ms = eng.policy.radio_loop_ms or RADIO_LOOP_MS
+        self.radio_phase = eng.rng.randrange(self.loop_ms * 1000)
+        self.cad_win = (0, 0)  # the last CAD's [start, end) in us: deaf to a frame that begins in it
+        self.core_lbt = None
+        if eng.policy.lbt_core:
+            from .relay_core import CoreLbt
+            self.core_lbt = CoreLbt(eng.rng, eng.lib)
         # a crystal's error: periodic timers (STATE, retries, TIME) run this much fast or slow
         self.drift = 1.0 + eng.rng.gauss(0.0, eng.drift_ppm * 1e-6)
         self.seq = 0
@@ -535,7 +561,7 @@ class Node:
         return ((t_us - self.tick_phase + g - 1) // g) * g + self.tick_phase
 
     def radio_at(self, t_us: int) -> int:
-        g = RADIO_LOOP_MS * 1000
+        g = self.loop_ms * 1000
         return ((t_us - self.radio_phase + g - 1) // g) * g + self.radio_phase
 
     # --- transmit path: the radio task ---
@@ -573,12 +599,51 @@ class Node:
             return
         # The CAD is a simulator-side wrapper around the TX decision: the core has no CAD (SL-25), so with
         # lbt the harness asks the channel before handing the frame to the radio, for either rule set.
-        if pol.lbt and self.lbt_waits < pol.lbt_tries and self._cad(t_us):
+        if pol.lbt and self.core_lbt is not None and not self.core_lbt.should_listen():
+            self.core_lbt.decide(True)  # eight waits spent: SEND_ANYWAY, with no look at the channel
+            self.stats.lbt_gave_up += 1
+        elif pol.lbt and (self.core_lbt is not None or self.lbt_waits < pol.lbt_tries):
+            if pol.lbt_cad_ms <= 0:
+                if self._cad(t_us):
+                    self._defer(t_us)
+                    return
+            elif self.eng.chan.busy_for(self.idx, t_us):
+                self._defer(t_us)  # the receiver's flags say a frame is on air: busy, no CAD
+                return
+            else:
+                # one CAD: deaf for its length, looked at in the middle, the answer at its end
+                self.stats.lbt_cads += 1
+                cad_us = int(pol.lbt_cad_ms * 1000)
+                self.cad_win = (t_us, t_us + cad_us)
+                self.pop_scheduled = True
+                self.eng.at(t_us + cad_us, lambda t, t0=t_us, c=cad_us: self._after_cad(t, t0 + c // 2))
+                return
+        self._send_head(t_us)
+
+    def _defer(self, t_us: int) -> None:
+        pol = self.eng.policy
+        if self.core_lbt is not None:
+            _verdict, wait_ms = self.core_lbt.decide(True)  # WAIT: the core's draw in 20-200 ms
+        else:
             self.lbt_waits += 1
-            self.stats.lbt_deferred += 1
-            self.pop_scheduled = True
-            self.eng.at(self.radio_at(t_us + self.eng.rng.randint(*pol.lbt_backoff_ms) * 1000), self.pop)
+            wait_ms = self.eng.rng.randint(*pol.lbt_backoff_ms)
+        self.stats.lbt_deferred += 1
+        self.pop_scheduled = True
+        self.eng.at(self.radio_at(t_us + wait_ms * 1000), self.pop)
+
+    def _after_cad(self, t_us: int, looked_us: int) -> None:
+        """The CAD's answer: busy if a frame it could hear had been on air two symbols when it looked."""
+        self.pop_scheduled = False
+        if self.tx_busy or not self.txq:
             return
+        if self.eng.chan.busy_for(self.idx, looked_us):
+            self._defer(t_us)
+            return
+        if self.core_lbt is not None:
+            self.core_lbt.decide(False)  # SEND: the count starts again
+        self._send_head(t_us)
+
+    def _send_head(self, t_us: int) -> None:
         self.lbt_waits = 0
         frame, kind = self.txq.popleft()
         a = air_us(self.eng.region, frame.nbytes)
@@ -666,6 +731,10 @@ class Channel:
         floor = SENS_DBM - 3.0
         R, cap, nodes = self.R, self.capture_db, self.eng.nodes
         for r in self.hears[s]:
+            cw = nodes[r].cad_win
+            if cw[0] <= tx.start < cw[1]:  # the receiver was in its CAD when this frame began
+                nodes[r].stats.rx_halfduplex += 1
+                continue
             if others:
                 if r in senders:
                     nodes[r].stats.rx_halfduplex += 1
@@ -1196,6 +1265,7 @@ class Engine:
         res["relay_cancelled"] = sum(b.stats.relay_cancelled for b in boxes)
         res["relay_skipped"] = sum(b.stats.relay_skipped for b in boxes)
         res["lbt_deferred"] = sum(b.stats.lbt_deferred for b in boxes)
+        res["lbt_gave_up_per_box_hour"] = round(sum(b.stats.lbt_gave_up for b in boxes) / n / (dur_s / 3600.0), 2)
         res["lbt_cads_per_box_hour"] = round(sum(b.stats.lbt_cads for b in boxes) / n / (dur_s / 3600.0), 1)
         res["relays_sent"] = sum(b.stats.relayed for b in boxes)
         res["dedupe_evictions"] = sum(b.stats.dedupe_evictions for b in boxes)

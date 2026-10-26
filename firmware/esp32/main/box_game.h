@@ -83,6 +83,9 @@ typedef struct {
      * both may be NULL (no line is made without radio_stats). */
     uint32_t (*duty_remaining_ms)(void *user);
     void (*radio_stats)(void *user, const char *json_line);
+    /* Listen before talk's counters (the radio task's; Amendment 14): CADs run, frames that
+     * waited, frames sent after 8 busy answers. May be NULL (the line then carries zeros). */
+    void (*lbt_stats)(void *user, uint32_t *cads, uint32_t *deferrals, uint32_t *gave_up);
     void *user;
 } box_shell_ops_t;
 

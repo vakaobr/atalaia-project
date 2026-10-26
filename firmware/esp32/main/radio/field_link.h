@@ -123,6 +123,10 @@ typedef struct {
     uint32_t rx_ok, rx_rejected, rx_duplicates, relayed;
     uint32_t relay_skipped, relay_cancelled, relay_no_slot; /* Amendment 13's rules at work */
     uint32_t cmds, times, states_sent, hellos_sent, tx_refused;
+    /* Listen before talk (RFC 0001 Amendment 14), copied from the radio task's counters when the
+     * radio report is made (box_game.c; the link itself never sees the radio): CADs run, frames
+     * that waited for a busy channel, frames sent after the eighth busy answer in a row. */
+    uint32_t lbt_cads, lbt_deferrals, lbt_gave_up;
 } field_link_stats_t;
 
 typedef struct {

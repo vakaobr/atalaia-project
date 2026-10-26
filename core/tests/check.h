@@ -24,6 +24,7 @@ void run_node_tests(void);
 void run_codec_tests(void);
 void run_packet_tests(void);
 void run_flood_tests(void);
+void run_lbt_tests(void);
 void run_ack_tests(void);
 void run_duty_cycle_tests(void);
 void run_msg_codec_tests(void);

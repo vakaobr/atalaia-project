@@ -23,6 +23,7 @@ FIRMWARE_LINE = (
     '"expired":1,"relayed":140,"relay_skipped":12,"relay_cancelled":3,'
     '"relay_no_slot":4,"dup":77,"tx_refused":5,"duty_remaining_ms":359900,'
     '"neighbours":4,"rx":300,"rx_rejected":6,"states":40,"hellos":8,'
+    '"lbt_cads":210,"lbt_deferrals":35,"lbt_gave_up":2,'
     '"final":0}'
 )
 
@@ -68,11 +69,36 @@ class BenchRadioLogTest(unittest.TestCase):
         modem = (
             'I (5) radio_stats: {"role":"modem","t_s":60,"game":4243,"node":0,"rx_ok":50,'
             '"rx_dropped":4,"rx_auth_fail":1,"rx_dupes":30,"tx_ok":20,"tx_fail":2,'
-            '"field_rx":45,"field_tx":19,"duty_remaining_ms":300000}\n'
+            '"field_rx":45,"field_tx":19,"duty_remaining_ms":300000,'
+            '"lbt_cads":120,"lbt_deferrals":17,"lbt_gave_up":1}\n'
         )
         out = tool.report(modem + line(1))
         self.assertIn("== modem", out)
         self.assertIn("tx 20 ok / 2 failed", out)
+        self.assertIn("listen before talk: 120 CADs, 17 deferrals, 1 frames sent after 8 tries", out)
+
+    def test_listen_before_talk_counters(self):
+        """RFC 0001 Amendment 14: CADs, deferrals and frames sent after 8 tries, per minute and in the summary."""
+        text = "".join(
+            line(m * 10, sent=m * 10, acked=m * 10, lbt_cads=m * 150, lbt_deferrals=m * 30, lbt_gave_up=m // 2)
+            for m in range(1, 7)
+        )
+        out = tool.report(text)
+        self.assertIn("cad defer gaveup", out)
+        self.assertIn("listen before talk: 900 CADs, 180 deferrals, 3 frames sent after 8 tries", out)
+        self.assertIn("CADs per hour", out)
+        self.assertIn("inside the study's 850-1500", out)
+
+    def test_a_firmware_before_amendment_14_says_so(self):
+        rec = json.loads(FIRMWARE_LINE)
+        for k in ("lbt_cads", "lbt_deferrals", "lbt_gave_up"):
+            del rec[k]
+        text = "".join(f"I (1) radio_stats: {json.dumps({**rec, 't_s': m * 60})}\n" for m in range(1, 4))
+        self.assertIn("not reported (a firmware before Amendment 14)", tool.report(text))
+
+    def test_listen_before_talk_off_in_the_build(self):
+        text = "".join(line(m, lbt_cads=0, lbt_deferrals=0, lbt_gave_up=0) for m in range(1, 4))
+        self.assertIn("switched off in this build", tool.report(text))
 
     def test_no_lines(self):
         self.assertIn("no radio_stats lines", tool.report("nothing\n"))

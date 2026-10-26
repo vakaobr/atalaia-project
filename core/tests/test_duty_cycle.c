@@ -196,6 +196,12 @@ static void test_regions(void)
     CHECK(eu->default_channel_hz == 869525000u && eu->band_count == ATALAIA_BAND_COUNT);
     CHECK(strcmp(tw->code, "as923-tw") == 0 && tw->sf == 9 && tw->bw_hz == 500000u);
     CHECK(tw->default_channel_hz == 921500000u && tw->band_count == 1);
+    /* The CAD settings (Amendment 14): two symbols, peak 22 at SF7/125 and 23 at SF9/500, minimum
+     * 10; only the EU868 peak has been measured on a board. */
+    CHECK(eu->cad.symbols == 2 && eu->cad.det_peak == 22 && eu->cad.det_min == 10);
+    CHECK(eu->cad.det_peak_bench_proven);
+    CHECK(tw->cad.symbols == 2 && tw->cad.det_peak == 23 && tw->cad.det_min == 10);
+    CHECK(!tw->cad.det_peak_bench_proven);
     CHECK(atalaia_region_from_code("eu868") == ATALAIA_REGION_EU868);
     CHECK(atalaia_region_from_code("as923-tw") == ATALAIA_REGION_AS923_TW);
     CHECK(atalaia_region_from_code("us915") == ATALAIA_REGION_COUNT);

@@ -47,6 +47,12 @@ All three apply to that build folder only, and are reset when left out.
                                                AS923 as Taiwan uses it (920-925 MHz). The
                                                firmware refuses every other region's channel.
                                                Applies to that build folder; EU868 when left out.
+    --lbt=on | --lbt=off                       listen before talk (Kconfig ATALAIA_LBT, RFC 0001
+                                               Amendment 14, decision SL-25): a CAD and the
+                                               receiver's state before every transmission. On by
+                                               default; the 20-box field test builds the same commit
+                                               with both (docs/runbooks/radio-field-test.md).
+                                               Applies to that build folder; on when left out.
 
 Works from any folder and any shell (cmd, PowerShell, bash). Docker must be
 running. `build`, `wokwi`, `modem`, `pod` and `bench` use the espressif/idf:v5.3.2 image, the same as
@@ -276,6 +282,19 @@ def region_options(build_dir: str) -> tuple[str, ...]:
     return (f"{build_dir}/sdkconfig.region",)
 
 
+def lbt_options(build_dir: str) -> tuple[str, ...]:
+    """Listen before talk (--lbt, on when not given): a defaults file in the build folder, written
+    in both cases and only when it changes, so that a switch rebuilds the sdkconfig."""
+    on = FW_OPTIONS.get("lbt", "on") == "on"
+    lbt_file = FW / build_dir / "sdkconfig.lbt"
+    text = ("# Written by tools/docker_fw.py (--lbt): listen before talk in this build.\n"
+            + ("CONFIG_ATALAIA_LBT=y\n" if on else "# CONFIG_ATALAIA_LBT is not set\n"))
+    lbt_file.parent.mkdir(parents=True, exist_ok=True)
+    if not lbt_file.exists() or lbt_file.read_text() != text:
+        lbt_file.write_text(text)
+    return (f"{build_dir}/sdkconfig.lbt",)
+
+
 def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
     """Builds a variant (defaults applied on top of sdkconfig.defaults) into build_dir, with the
     firmware's version (a CMake cache value, set on every build so that it never sticks)."""
@@ -285,8 +304,9 @@ def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
                     f"{FW_VERSION_LEN} characters; give one with --fw-version=")
     print(f"docker_fw: firmware version {version}", flush=True)
     cmake_args = [f"-D ATALAIA_FW_VERSION={version}"]
-    defaults = defaults + field_box_options(build_dir) + region_options(build_dir)
-    print(f"docker_fw: radio region {FW_OPTIONS.get('region', 'eu868')}", flush=True)
+    defaults = defaults + field_box_options(build_dir) + region_options(build_dir) + lbt_options(build_dir)
+    print(f"docker_fw: radio region {FW_OPTIONS.get('region', 'eu868')}, "
+          f"listen before talk {FW_OPTIONS.get('lbt', 'on')}", flush=True)
     # The variant's sdkconfig lives in its build folder. Regenerate it when
     # the defaults change, so edits to them always take effect.
     sdkconfig = FW / build_dir / "sdkconfig"
@@ -396,8 +416,9 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 1
     command, options = argv[0], argv[1:]
-    box = ["--fw-version=", "--release-keys=", "--mode-keys=", "--region="]
-    known = {"build": box, "wokwi": box, "modem": ["--region="], "pod": ["--region="], "bench": box,
+    box = ["--fw-version=", "--release-keys=", "--mode-keys=", "--region=", "--lbt="]
+    known = {"build": box, "wokwi": box, "modem": ["--region=", "--lbt="], "pod": ["--region=", "--lbt="],
+             "bench": box,
              "test": ["--update-screens"], "clean": [], "version": []}
     if command not in known:
         return fail(f"unknown command {command!r}; run with --help")
@@ -420,6 +441,11 @@ def main(argv: list[str]) -> int:
             if value not in REGIONS:
                 return fail(f"--region: one of {', '.join(REGIONS)}")
             FW_OPTIONS["region"] = value
+        elif name == "--lbt=":
+            value = option.split("=", 1)[1]
+            if value not in ("on", "off"):
+                return fail("--lbt: on or off")
+            FW_OPTIONS["lbt"] = value
         elif name == "--mode-keys=":
             keys = release_keys_hex(option.split("=", 1)[1])
             if keys is None:

@@ -146,16 +146,20 @@ def decision_tables(results: list[Result]) -> str:
 # the datasheet's +14 dBm, 45 mA (DC-DC). The front-end module's own current (LNA on receive, PA on
 # transmit) is excluded from both: it is board-level and to be measured.
 CAD_MS = 4.0
+# Measured on the bench (SL-25 gate, 2026-10-26): 8.0 ms average, p95 8.9 ms. The rows of the built transmit
+# path (the "_hw" policies, SL-30) are priced with it; the earlier rows keep the 4 ms they were run with.
+CAD_MS_BENCH = 8.0
 CAD_MA = 6.0
 TX_MA = 45.0
 RX_MA = 4.6
 
-LBT_RULES = [("A_backoff", "A_backoff_lbt"), ("A_backoff_core", "A_backoff_core_lbt")]
+LBT_RULES = [("A_backoff", "A_backoff_lbt"), ("A_backoff_core", "A_backoff_core_lbt"),
+             ("A_backoff_core_hw", "A_backoff_core_lbt_hw")]
 
 
-def lbt_energy(cads_per_hour: float, air_pct: float) -> tuple[float, float]:
+def lbt_energy(cads_per_hour: float, air_pct: float, cad_ms: float = CAD_MS) -> tuple[float, float]:
     """(CAD mC per hour, TX mC per hour) of one box."""
-    return cads_per_hour * CAD_MS / 1000.0 * CAD_MA, air_pct / 100.0 * 3600.0 * TX_MA
+    return cads_per_hour * cad_ms / 1000.0 * CAD_MA, air_pct / 100.0 * 3600.0 * TX_MA
 
 
 def lbt_table(results: list[Result], game: str, region: str) -> str:
@@ -174,17 +178,18 @@ def lbt_table(results: list[Result], game: str, region: str) -> str:
                         continue
                     cads = med(grp, "lbt_cads_per_box_hour") or 0.0
                     air = med(grp, "airtime_pct.mean") or 0.0
-                    cad_mc, tx_mc = lbt_energy(cads, air)
+                    cad_mc, tx_mc = lbt_energy(cads, air, CAD_MS_BENCH if pol.endswith("_hw") else CAD_MS)
                     rows.append([LAYOUT_NAMES.get(layout, layout), n, pol, med(grp, "airtime_pct.mean"),
                                  med(grp, "airtime_pct.max"), med(grp, ev + ".delivered_pct"),
                                  med(grp, ev + ".acked_pct"), med(grp, ev + ".latency_p50_s"),
                                  med(grp, ev + ".latency_p95_s"), med(grp, "states.heard_pct"),
                                  med(grp, "dc_dropped.per_box_mean"), cads if cads else "-",
+                                 med(grp, "lbt_gave_up_per_box_hour") if cads else "-",
                                  round(cad_mc / 3.6, 2) if cads else "-", round(tx_mc / 3.6, 0),
                                  round(100.0 * cad_mc / tx_mc, 2) if cads and tx_mc else "-"])
     return table(["layout", "N", "rule", "air % mean", "air % worst box", "captures delivered %",
                   "captures ACKed %", "capture lat p50 s", "p95 s", "STATE heard %", "frames refused/box",
-                  "CADs/box/h", "CAD uAh/h", "TX uAh/h", "CAD as % of TX energy"], rows)
+                  "CADs/box/h", "sent after 8 tries/box/h", "CAD uAh/h", "TX uAh/h", "CAD as % of TX energy"], rows)
 
 
 def lbt_section(results: list[Result]) -> str:

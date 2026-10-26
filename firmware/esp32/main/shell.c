@@ -477,6 +477,16 @@ static uint32_t box_duty_remaining(void *user)
     return radio_task_duty_remaining_ms();
 }
 
+static void box_lbt_stats(void *user, uint32_t *cads, uint32_t *deferrals, uint32_t *gave_up)
+{
+    (void)user;
+    radio_lbt_stats_t s;
+    radio_task_lbt_stats(&s);
+    *cads = s.cads;
+    *deferrals = s.deferrals;
+    *gave_up = s.gave_up;
+}
+
 static void box_radio_stats(void *user, const char *line)
 {
     (void)user;
@@ -760,6 +770,7 @@ static void box_start(const char *tier)
                            .random = box_random,
                            .duty_remaining_ms = box_duty_remaining,
                            .radio_stats = box_radio_stats,
+                           .lbt_stats = box_lbt_stats,
                            .user = NULL};
     box_game_init(&box, &runner, &game_preset, nvs ? atalaia_box_store_esp() : &no_store, &ops,
                   &atalaia_crypto_mbedtls, nvs, &game_log, &hello);
@@ -1248,6 +1259,10 @@ void app_main(void)
     /* The radio task (core 0, priority 3), only if the radio HAL init succeeded,
      * then the field game: its storage, its key, and a stored game to rejoin. */
     if (hal.radio != NULL) {
+        /* The listen-before-talk wait comes from the box's own entropy, as the relay's delay does
+         * (random_ctr is not atomic: two tasks may draw the same counter, and the fresh
+         * esp_fill_random bytes in every draw keep their outputs apart; timing spread only). */
+        radio_task_set_random(box_random, NULL);
         radio_task_start(&hal);
     }
     box_start(tier);

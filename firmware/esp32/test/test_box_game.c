@@ -174,6 +174,13 @@ static uint32_t sh_duty(void *user)
     (void)user;
     return 123456u;
 }
+static void sh_lbt(void *user, uint32_t *cads, uint32_t *deferrals, uint32_t *gave_up)
+{
+    (void)user;
+    *cads = 41;
+    *deferrals = 9;
+    *gave_up = 1;
+}
 static void sh_stats(void *user, const char *line)
 {
     shell_t *s = (shell_t *)user;
@@ -274,6 +281,7 @@ static void fixture(bool keep_flash)
                           .radio_send = sh_send,
                           .duty_remaining_ms = sh_duty,
                           .radio_stats = sh_stats,
+                          .lbt_stats = sh_lbt,
                           .user = &shell};
     atalaia_hello_t hello;
     memset(&hello, 0, sizeof(hello));
@@ -1181,6 +1189,8 @@ static void test_radio_report(void)
     CHECK(shell.stats_count == 1);
     CHECK(strstr(shell.stats[0], "\"game\":3054,\"node\":12,") != NULL);
     CHECK(strstr(shell.stats[0], "\"duty_remaining_ms\":123456,") != NULL);
+    CHECK(strstr(shell.stats[0], "\"lbt_cads\":41,\"lbt_deferrals\":9,\"lbt_gave_up\":1,") != NULL);
+    CHECK(game.link.stats.lbt_cads == 41); /* in field_link_stats_t too */
     CHECK(strstr(shell.stats[0], "\"final\":0}") != NULL);
     CHECK(strchr(shell.stats[0], '\n') == NULL);
     run_ms(&now, 60000);

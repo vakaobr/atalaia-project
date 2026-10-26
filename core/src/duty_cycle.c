@@ -34,8 +34,9 @@ static const atalaia_band_info_t as923_tw_bands[1] = {
  * default channel, 921.5 MHz, keeps clear of LoRaWAN's 923.2 and 923.4 MHz
  * and Meshtastic's TW default (923.875 MHz) (decision RF-AS923-5). */
 static const atalaia_region_info_t region_table[ATALAIA_REGION_COUNT] = {
-    {"eu868", 7, 125000u, 869525000u, 0, ATALAIA_BAND_COUNT, eu868_bands},
-    {"as923-tw", 9, 500000u, 921500000u, 0, 1, as923_tw_bands},
+    {"eu868", 7, 125000u, 869525000u, 0, ATALAIA_BAND_COUNT, eu868_bands, {2, 22, 10, true}},
+    /* det_peak 23 at SF9/500 kHz is AN1200.48's figure, not yet measured on a board. */
+    {"as923-tw", 9, 500000u, 921500000u, 0, 1, as923_tw_bands, {2, 23, 10, false}},
 };
 
 const atalaia_region_info_t *atalaia_region_info(atalaia_region_t region)

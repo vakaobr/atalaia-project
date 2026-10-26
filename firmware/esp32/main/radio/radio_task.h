@@ -49,6 +49,22 @@ typedef struct {
     uint32_t timestamp_ms;
 } radio_rx_msg_t;
 
+/* Listen before talk's counters (RFC 0001 Amendment 14; radio_lbt.h): CADs run, frames that
+ * waited for a busy channel, frames sent after the eighth busy answer in a row. */
+typedef struct {
+    uint32_t cads;
+    uint32_t deferrals;
+    uint32_t gave_up;
+} radio_lbt_stats_t;
+
+/*
+ * The random source the listen-before-talk wait is drawn from (the box's shell.random; timing
+ * spread, never a nonce). Call before radio_task_start(); without it the task uses the ESP32's
+ * esp_fill_random. Whatever it is, it is called from the radio task.
+ */
+typedef void (*radio_task_random_fn)(void *ctx, uint8_t *buf, size_t len);
+void radio_task_set_random(radio_task_random_fn fn, void *ctx);
+
 /*
  * Start the radio task. Creates TX/RX queues and the FreeRTOS task.
  * On non-ESP builds this is a no-op.
@@ -81,6 +97,9 @@ bool radio_task_set_channel(uint32_t freq_hz);
 
 /* The duty-cycle budget left, as last read by the radio task (ms). */
 uint32_t radio_task_duty_remaining_ms(void);
+
+/* Listen before talk's counters since the task started (zeros when it is off or not running). */
+void radio_task_lbt_stats(radio_lbt_stats_t *out);
 
 /*
  * Asks the radio task to measure the noise on freq_hz for dwell_ms (the

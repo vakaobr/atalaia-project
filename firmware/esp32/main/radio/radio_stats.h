@@ -19,7 +19,7 @@
 #include <stdint.h>
 
 #define RADIO_STATS_TAG       "radio_stats"
-#define RADIO_STATS_LINE_MAX  512
+#define RADIO_STATS_LINE_MAX  544
 #define RADIO_STATS_PERIOD_MS 60000u
 /* duty_remaining_ms when the shell cannot say (the line then carries -1). */
 #define RADIO_STATS_DUTY_UNKNOWN 0xFFFFFFFFu
@@ -30,19 +30,22 @@ typedef struct {
     uint32_t relayed, relay_skipped, relay_cancelled, relay_no_slot;
     uint32_t dup, tx_refused; /* duplicates heard, duty-cycle refusals */
     uint32_t rx, rx_rejected, states, hellos;
-    uint32_t neighbours; /* boxes heard in the last 10 minutes */
+    uint32_t neighbours;                           /* boxes heard in the last 10 minutes */
+    uint32_t lbt_cads, lbt_deferrals, lbt_gave_up; /* listen before talk (Amendment 14) */
 } radio_stats_box_t;
 
 /* The modem's counters (modem_counters_t). */
 typedef struct {
     uint32_t rx_ok, rx_dropped, rx_auth_fail, rx_dupes;
     uint32_t tx_ok, tx_fail, field_rx, field_tx;
+    uint32_t lbt_cads, lbt_deferrals, lbt_gave_up; /* listen before talk (Amendment 14) */
 } radio_stats_modem_t;
 
 /*
  * Writes one box line (no newline) to buf: {"t_s","game","node","sent","retries","acked",
  * "expired","relayed","relay_skipped","relay_cancelled","relay_no_slot","dup","tx_refused",
- * "duty_remaining_ms","neighbours","rx","rx_rejected","states","hellos","final"}. t_s is the
+ * "duty_remaining_ms","neighbours","rx","rx_rejected","states","hellos","lbt_cads",
+ * "lbt_deferrals","lbt_gave_up","final"}. t_s is the
  * box's uptime in seconds; final is 1 on the line that closes a game. Returns the length, or 0
  * if cap is too small (buf then holds an empty string).
  */
@@ -50,7 +53,8 @@ size_t radio_stats_box_line(char *buf, size_t cap, uint32_t t_s, unsigned game, 
                             const radio_stats_box_t *s, uint32_t duty_remaining_ms, int final);
 
 /* Writes one modem line: {"role":"modem","t_s","game","node","rx_ok","rx_dropped",
- * "rx_auth_fail","rx_dupes","tx_ok","tx_fail","field_rx","field_tx","duty_remaining_ms"}. */
+ * "rx_auth_fail","rx_dupes","tx_ok","tx_fail","field_rx","field_tx","duty_remaining_ms",
+ * "lbt_cads","lbt_deferrals","lbt_gave_up"}. */
 size_t radio_stats_modem_line(char *buf, size_t cap, uint32_t t_s, unsigned game, unsigned node,
                               const radio_stats_modem_t *s, uint32_t duty_remaining_ms);
 

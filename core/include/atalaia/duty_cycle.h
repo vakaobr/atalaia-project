@@ -82,6 +82,21 @@ typedef enum {
     ATALAIA_REGION_COUNT
 } atalaia_region_t;
 
+/*
+ * The radio's channel-activity-detection settings for the region's SF and bandwidth (listen
+ * before talk, RFC 0001 Amendment 14, decision SL-25): SetCadParams' number of symbols,
+ * detection peak and minimum. det_peak is Semtech's (AN1200.48): 22 at SF7/125 kHz, 23 at
+ * SF9/500 kHz. det_peak_bench_proven says whether it was measured on a board: the EU868 value was
+ * (the bench gate of 2026-10-26), the AS923-TW one has not been (the gate ran on EU868 only), so
+ * it is Semtech's figure and nothing more until the same gate has run on an AS923-TW image.
+ */
+typedef struct {
+    uint8_t symbols;  /* cadSymbolNum, in symbols (2) */
+    uint8_t det_peak; /* cadDetPeak */
+    uint8_t det_min;  /* cadDetMin */
+    bool det_peak_bench_proven;
+} atalaia_cad_params_t;
+
 typedef struct {
     const char *code;            /* "eu868", "as923-tw": the API's and the config's name */
     uint8_t sf;                  /* LoRa spreading factor of every game packet */
@@ -90,6 +105,7 @@ typedef struct {
     uint32_t max_dwell_ms;       /* longest single transmission (0: no rule) */
     uint8_t band_count;          /* sub-bands, at most ATALAIA_BAND_COUNT */
     const atalaia_band_info_t *bands;
+    atalaia_cad_params_t cad;
 } atalaia_region_info_t;
 
 /* The region's table entry (NULL when out of range). */

@@ -314,6 +314,21 @@ class RelayBehaviourTests(unittest.TestCase):
         self.assertGreater(res["lbt_cads_per_box_hour"], 100)
         self.assertEqual(res["dc_dropped"]["total"], 0)
 
+    def test_the_built_transmit_path_looks_at_flags_first_and_runs_an_8_ms_cad(self):
+        """SL-30: the hardware's own timing (RFC 0001 Amendment 14): the receiver's flags (a frame on air)
+        defer with no CAD, an 8 ms CAD looks only when none is set, the loop is 11 ms with LBT, 60 without."""
+        lbt, plain = POLICIES["A_backoff_core_lbt_hw"], POLICIES["A_backoff_core_hw"]
+        self.assertTrue(lbt.lbt and lbt.core_rules and lbt.lbt_cad_ms == 8.0 and lbt.radio_loop_ms == 11)
+        self.assertTrue(not plain.lbt and plain.radio_loop_ms == 60)
+        for name in ("jitter_ms", "relay_slots", "density_c", "ack_cancel", "ack_relay_path", "retry_backoff"):
+            self.assertEqual(getattr(lbt, name), getattr(plain, name))
+        a = run_one("domination", 20, "all_in_range", "eu868", "A_backoff_core_hw", 6, 1, LIB, trace=_empty(20, 6))
+        b = run_one("domination", 20, "all_in_range", "eu868", "A_backoff_core_lbt_hw", 6, 1, LIB, trace=_empty(20, 6))
+        self.assertEqual(a["lbt_cads_per_box_hour"], 0)
+        self.assertGreater(b["lbt_cads_per_box_hour"], 100)  # a CAD for every frame that finds the air quiet
+        self.assertGreater(b["lbt_deferred"], 0)
+        self.assertEqual(b["dc_dropped"]["total"], 0)
+
     def test_the_run_is_deterministic_per_seed(self):
         a = run_one("domination", 8, "cqb", "eu868", "firmware", 4, 5, LIB, trace=_empty(8, 4))
         b = run_one("domination", 8, "cqb", "eu868", "firmware", 4, 5, LIB, trace=_empty(8, 4))

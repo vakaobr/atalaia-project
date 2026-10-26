@@ -26,7 +26,10 @@ static void test_box_line(void)
                            .rx_rejected = 6,
                            .states = 40,
                            .hellos = 8,
-                           .neighbours = 4};
+                           .neighbours = 4,
+                           .lbt_cads = 210,
+                           .lbt_deferrals = 35,
+                           .lbt_gave_up = 2};
     char line[RADIO_STATS_LINE_MAX];
     size_t n = radio_stats_box_line(line, sizeof(line), 120, 4243, 7, &s, 359900, 0);
     CHECK(n == strlen(line) && n > 0);
@@ -35,6 +38,7 @@ static void test_box_line(void)
                  "\"expired\":1,\"relayed\":140,\"relay_skipped\":12,\"relay_cancelled\":3,"
                  "\"relay_no_slot\":4,\"dup\":77,\"tx_refused\":5,\"duty_remaining_ms\":359900,"
                  "\"neighbours\":4,\"rx\":300,\"rx_rejected\":6,\"states\":40,\"hellos\":8,"
+                 "\"lbt_cads\":210,\"lbt_deferrals\":35,\"lbt_gave_up\":2,"
                  "\"final\":0}") == 0);
     CHECK(strchr(line, '\n') == NULL);
     /* The last line of a game, and a budget the shell cannot read. */
@@ -77,13 +81,17 @@ static void test_modem_line(void)
                              .tx_ok = 20,
                              .tx_fail = 2,
                              .field_rx = 45,
-                             .field_tx = 19};
+                             .field_tx = 19,
+                             .lbt_cads = 120,
+                             .lbt_deferrals = 17,
+                             .lbt_gave_up = 1};
     char line[RADIO_STATS_LINE_MAX];
     CHECK(radio_stats_modem_line(line, sizeof(line), 60, 4243, 0, &m, 300000) > 0);
     CHECK(strcmp(line,
                  "{\"role\":\"modem\",\"t_s\":60,\"game\":4243,\"node\":0,\"rx_ok\":50,"
                  "\"rx_dropped\":4,\"rx_auth_fail\":1,\"rx_dupes\":30,\"tx_ok\":20,\"tx_fail\":2,"
-                 "\"field_rx\":45,\"field_tx\":19,\"duty_remaining_ms\":300000}") == 0);
+                 "\"field_rx\":45,\"field_tx\":19,\"duty_remaining_ms\":300000,\"lbt_cads\":120,"
+                 "\"lbt_deferrals\":17,\"lbt_gave_up\":1}") == 0);
 }
 
 void run_radio_stats_tests(void)

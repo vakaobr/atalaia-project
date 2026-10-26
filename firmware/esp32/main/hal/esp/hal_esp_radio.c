@@ -680,13 +680,21 @@ static int esp_radio_send(const uint8_t *data, size_t len)
     return 0;
 }
 
+/* How long recv() waits for a frame (set_recv_wait_ms). */
+static volatile uint32_t recv_wait_ms = 50;
+
+static void esp_radio_set_recv_wait_ms(uint32_t ms)
+{
+    recv_wait_ms = ms < 1 ? 1 : (ms > 50 ? 50 : ms);
+}
+
 static size_t esp_radio_recv(uint8_t *buf, size_t max_len, int8_t *rssi)
 {
     if (!rx_armed && sx_start_rx() != 0) return 0;
 
-    /* Up to 50 ms for a finished packet; the chip keeps listening meanwhile, so
-     * returning empty-handed loses nothing (a long packet completes later). */
-    if (xSemaphoreTake(dio1_sem, pdMS_TO_TICKS(50)) != pdTRUE) return 0;
+    /* Up to recv_wait_ms (50 by default) for a finished packet; the chip keeps listening
+     * meanwhile, so returning empty-handed loses nothing (a long packet completes later). */
+    if (xSemaphoreTake(dio1_sem, pdMS_TO_TICKS(recv_wait_ms)) != pdTRUE) return 0;
 
     uint8_t irq_cmd[] = {SX_CMD_GET_IRQ_STATUS, 0x00};
     uint8_t irq_resp[2];
@@ -803,23 +811,24 @@ static uint32_t esp_radio_duty_cycle_remaining_ms(void)
 /* ---- Noise measurement (USB modem MEASURE) -------------------------------- */
 
 /* One channel-activity detection on the current frequency: true if a LoRa
- * preamble was seen. Two symbols, with the detection peak Semtech's CAD
- * application note (AN1200.48) gives for the spreading factor (22 at SF7, 23
- * at SF9) and a minimum of 10. *ok is false on a radio error. */
+ * preamble was seen. The region's settings: two symbols, the detection peak
+ * Semtech's CAD application note (AN1200.48) gives for the spreading factor
+ * (22 at SF7/125 kHz, bench-proven; 23 at SF9/500 kHz, not yet) and a minimum
+ * of 10. *ok is false on a radio error. */
 static int64_t cad_started_us; /* when SetCad was sent (channel_busy's sample time) */
 
 static bool sx_cad_once(bool *ok)
 {
     uint8_t stby[] = {SX_CMD_SET_STANDBY, 0x00};
-    uint8_t det_peak = region_info()->sf >= 9 ? 23 : 22;
-    uint8_t params[] = {SX_CMD_SET_CAD_PARAMS,
-                        0x01 /* 2 symbols */,
-                        det_peak,
-                        10,
-                        0x00 /* CAD only */,
-                        0x00,
-                        0x00,
-                        0x00};
+    /* The region's CAD settings (core duty_cycle.c, RFC 0001 Amendment 14). */
+    const atalaia_cad_params_t *cp = &region_info()->cad;
+    uint8_t sym = cp->symbols >= 16  ? 0x04
+                  : cp->symbols >= 8 ? 0x03
+                  : cp->symbols >= 4 ? 0x02
+                  : cp->symbols >= 2 ? 0x01
+                                     : 0x00; /* cadSymbolNum: 1, 2, 4, 8, 16 symbols */
+    uint8_t params[] = {SX_CMD_SET_CAD_PARAMS, sym,  cp->det_peak, cp->det_min,
+                        0x00 /* CAD only */,   0x00, 0x00,         0x00};
     uint8_t clr[] = {SX_CMD_CLR_IRQ_STATUS, 0xFF, 0xFF};
     uint8_t cad[] = {SX_CMD_SET_CAD};
     *ok = false;
@@ -983,6 +992,7 @@ const hal_radio_ops_t hal_esp_radio_ops = {
     .measure = esp_radio_measure,
     .channel_busy = esp_radio_channel_busy,
     .last_rx_done_us = esp_radio_last_rx_done_us,
+    .set_recv_wait_ms = esp_radio_set_recv_wait_ms,
     .deinit = esp_radio_deinit,
 };
 
