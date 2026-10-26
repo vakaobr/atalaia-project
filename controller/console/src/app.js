@@ -311,6 +311,9 @@ class App extends Component {
         case 'field_georef':
             this.setState((s) => ({ georefVersion: (s.georefVersion || 0) + 1 }));
             break;
+        case 'field_grid': // a level's grid (MF-87): the field view reads the levels again
+            this.setState((s) => ({ gridVersion: (s.gridVersion || 0) + 1 }));
+            break;
         case 'map_features': // what this token may see (MF-10)
             this.setState({ mapFeatures: msg.features || [] });
             break;

@@ -101,6 +101,7 @@ process.
 | airtime | tempo de emissão | Sendezeit | 發射時間 | "Duty Cycle" kept; zh-tw: Duty Cycle 照用 |
 | map features | marcações no mapa | Kartenelemente | 地圖標記 | Safe Zone, HQ kept in English; zh-tw: Safe Zone、HQ 照用英文 |
 | floor plan / level | planta / piso | Grundriss / Ebene | 平面圖 / 樓層 | |
+| map grid / grid square ("C4") | quadrícula / quadrícula C4 | Gitter / Planquadrat C4 | 方格 / 方格 C4 | rows are letters (zh-tw: 列), columns numbers (欄); "grelha" stays the boxes' plain placeholder grid (MF-91) |
 | crest | emblema | Wappen | 隊徽 | |
 | federation number | número de federado | Verbandsnummer | 協會會員編號 | |
 | callsign | alcunha | Callsign | 呼號 | |

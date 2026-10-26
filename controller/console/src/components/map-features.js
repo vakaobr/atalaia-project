@@ -21,6 +21,7 @@
 // outline drawn dashed. It is drawn here by hand, or loaded with the plan from a map (field-map.js).
 
 import { html, Component, t, teamColour, ConfirmButton } from '../ui.js';
+import { gridCell, gridSpan } from './field-grid.js';
 
 export const FEATURE_TYPES = ['safe_zone', 'respawn', 'hq', 'parking', 'first_aid', 'objective', 'other', 'boundary'];
 export const BOUNDARY = 'boundary';
@@ -246,6 +247,13 @@ export class MapFeatures extends Component {
         return this.props.features.some((f) => f.level === this.props.level && f.type === BOUNDARY && f.id !== exceptId);
     }
 
+    /** MF-90: where a feature is on the field grid: a pin's or a circle's cell, an area's span ("B2–D5"). */
+    where(f) {
+        const grid = this.props.grid;
+        if (f.shape === 'polygon') return gridSpan(grid, f.points);
+        return typeof f.x === 'number' ? gridCell(grid, f.x, f.y) : '';
+    }
+
     renderList(here) {
         const { canEdit, teams } = this.props;
         if (!here.length) return html`<p class="muted small" data-testid="mf-none">${t('features.none')}</p>`;
@@ -255,7 +263,8 @@ export class MapFeatures extends Component {
             <span class="mf-what"><strong>${featureName(f)}</strong>
                 <span class="muted small">${t(`features.types.${f.type}`)} · ${t(`features.shapes.${f.shape}`)}${
                     f.shape === 'circle' ? ` ${f.radius_m} m` : ''} · ${
-                    f.visibility === 'team' ? t('features.only_team', { team: f.team }) : t(`features.vis.${f.visibility}`)}</span>
+                    f.visibility === 'team' ? t('features.only_team', { team: f.team }) : t(`features.vis.${f.visibility}`)}${
+                    this.where(f) ? html` · <span data-testid=${`mf-cell-${f.id}`}>${t('grid.cell', { cell: this.where(f) })}</span>` : ''}</span>
                 ${f.note && html`<span class="small">${f.note}</span>`}</span>
             ${canEdit && html`<span class="mf-actions">
                 <button type="button" data-testid=${`mf-edit-${f.id}`} onClick=${() => this.edit(f)}>${t('features.edit')}</button>

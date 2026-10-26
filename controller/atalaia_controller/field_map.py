@@ -16,10 +16,12 @@ with everything, checked here before anything is written:
   position set from the corners is exact by construction (no projection error);
 - ``outline``: the field's outline, 3 to ``map_features.POLYGON_MAX`` corners ``{lat, lon}`` inside the
   bounds, which becomes the level's field boundary (``boundary``), in the image's coordinates;
-- ``label`` (optional): the boundary's name.
+- ``label`` (optional): the boundary's name;
+- ``grid`` (optional, MF-87): the level's grid as PUT .../grid takes it (``{"enabled", "rows", "cols"}``;
+  rows or columns not given are 8); without it the level's grid stays as it is.
 
-The level's plan, its own map position (``field.georef`` or ``field.georef.<n>``) and its boundary are
-then written in one SQLite transaction (store.set_field_from_map): all or nothing (MF-26).
+The level's plan, its own map position (``field.georef`` or ``field.georef.<n>``), its boundary and the
+grid, if given, are then written in one SQLite transaction (store.set_field_from_map): all or nothing (MF-26).
 """
 
 from __future__ import annotations
@@ -29,12 +31,13 @@ import binascii
 import math
 from typing import Any
 
+from . import field_grid as gridmod
 from . import georef as georefmod
 from . import map_features as mapmod
 from .engine import ControllerError
 from .store import FIELD_IMAGE_MAX
 
-FIELDS = {"content_type", "image", "bounds", "outline", "label"}
+FIELDS = {"content_type", "image", "bounds", "outline", "label", "grid"}
 MAGIC = {"image/png": b"\x89PNG\r\n\x1a\n", "image/jpeg": b"\xff\xd8\xff"}
 B64_MAX = 4 * ((FIELD_IMAGE_MAX + 2) // 3)
 EDGE_TOLERANCE = 1e-6  # an outline corner on the image's edge, after rounding
@@ -47,10 +50,10 @@ def _degrees(v: Any, where: str, limit: float) -> float:
 
 
 def check(body: Any, meta: dict[str, Any], level: int) -> dict[str, Any]:
-    """The request, checked: ``{content_type, data, georef, boundary}`` (``boundary`` as map_features.check
-    gives it, its level included). Raises ControllerError with what to change."""
+    """The request, checked: ``{content_type, data, georef, boundary, grid}`` (``boundary`` as map_features.check
+    gives it, its level included; ``grid`` None when not given). Raises ControllerError with what to change."""
     if not isinstance(body, dict):
-        raise ControllerError('the body is {"content_type", "image", "bounds", "outline", "label"?}')
+        raise ControllerError('the body is {"content_type", "image", "bounds", "outline", "label"?, "grid"?}')
     unknown = set(body) - FIELDS
     if unknown:
         raise ControllerError(f"unknown fields {sorted(unknown)}")
@@ -101,4 +104,10 @@ def check(body: Any, meta: dict[str, Any], level: int) -> dict[str, Any]:
         plan.append({"x": round(min(1.0, max(0.0, x)), 7), "y": round(min(1.0, max(0.0, y)), 7)})
     boundary = mapmod.check({"level": level, "type": mapmod.BOUNDARY, "label": body.get("label"),
                              "shape": "polygon", "points": plan, "visibility": "everyone"}, meta)
-    return {"content_type": ctype, "data": data, "georef": geo, "boundary": boundary}
+    grid = None
+    if "grid" in body:
+        try:
+            grid = gridmod.check(body["grid"], gridmod.DEFAULT)
+        except ControllerError as exc:
+            raise ControllerError(f"grid: {exc}") from None
+    return {"content_type": ctype, "data": data, "georef": geo, "boundary": boundary, "grid": grid}

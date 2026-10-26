@@ -20,12 +20,16 @@
 //
 // *Load the field from a map* (field-map.js, decisions MF-19 to MF-30) is its own page, the only one
 // of the console allowed to reach the internet; it comes back here (#field) when done.
+//
+// The field grid (field-grid.js, decisions MF-81 to MF-93): lettered rows and numbered columns over
+// the shown level's plan, set by the GM under the plan; any viewer may hide it in this browser.
 
 import { html, Component, createRef, t, teamColour, OFFLINE_MS } from '../ui.js';
 import { linkBars } from './node-list.js';
 import { GeorefPanel, georefPins } from './georef-panel.js';
 import { LevelSettings, LevelTabs, levelName, levelsInUse, shownLevel, takeLoaded } from './field-levels.js';
 import { MapFeatures, featurePins, featureShapes, planScale } from './map-features.js';
+import { GridLayer, GridSettings, GridToggle, gridCell, gridHidden, levelGrid } from './field-grid.js';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const NO_LEVELS = { enabled: false, count: 1, names: [''], levels: [] };
@@ -44,6 +48,7 @@ export class FieldView extends Component {
         this.state = {
             imageUrl: null, version: -1, geoVersion: -1, georef: null, ownGeoref: true, drag: null,
             noImage: false, levels: NO_LEVELS, level: 0, draft: null, loadedNote: false,
+            gridVersion: 0, gridHidden: gridHidden(), imageAspect: null,
         };
         // MF-63: back from *Load the field from a map* after saving: that level, and a note saying so.
         this.loaded = takeLoaded();
@@ -63,6 +68,22 @@ export class FieldView extends Component {
         const v = this.props.app.state.imageVersion || 0;
         if (v !== this.state.version) this.loadImage();
         else if ((this.props.app.state.georefVersion || 0) !== this.state.geoVersion) this.loadGeoref();
+        else if ((this.props.app.state.gridVersion || 0) !== this.state.gridVersion) this.loadGrids();
+    }
+
+    /** MF-87: a grid changed (the stream's field_grid): the levels again, which carry each level's grid. */
+    async loadGrids() {
+        const app = this.props.app;
+        this.setState({ gridVersion: app.state.gridVersion || 0 });
+        const levels = await app.call('GET', '/field/levels');
+        if (levels) this.setState({ levels });
+    }
+
+    /** The GM saved the shown level's grid: shown at once (the stream's message follows). */
+    setGrid(level, grid) {
+        const levels = this.state.levels;
+        const list = (levels.levels || []).map((lv) => (lv.level === level ? { ...lv, grid } : lv));
+        this.setState({ levels: { ...levels, levels: list } });
     }
 
     componentWillUnmount() {
@@ -75,7 +96,8 @@ export class FieldView extends Component {
         const version = app.state.imageVersion || 0;
         this.loads += 1;
         const mine = this.loads;
-        this.setState({ version });
+        const gridVersion = app.state.gridVersion || 0;
+        this.setState({ version, gridVersion });
         let url = null;
         // Ask first, so a field without an image does not cost a 404.
         const info = await app.call('GET', '/field');
@@ -91,7 +113,9 @@ export class FieldView extends Component {
             return;
         }
         if (this.state.imageUrl) URL.revokeObjectURL(this.state.imageUrl);
-        this.setState({ imageUrl: url, noImage: !url, levels, level: shown });
+        this.setState({ imageUrl: url, noImage: !url, levels, level: shown, imageAspect: null });
+        // A grid changed while this load ran: its levels may be older than that (MF-87).
+        if ((app.state.gridVersion || 0) !== gridVersion) this.loadGrids();
         if (url) this.loadGeoref(shown);
         else this.setState({ georef: null, geoVersion: app.state.georefVersion || 0 });
     }
@@ -247,11 +271,14 @@ export class FieldView extends Component {
         return role === 'gm' && game;
     }
 
-    marker(node, i, count, teams) {
+    marker(node, i, count, teams, grid) {
         const { seen, now } = this.props.app.state;
         const p = this.where(node, i, count);
         const offline = seen[node.node_id] !== undefined && now - seen[node.node_id] > OFFLINE_MS;
-        const label = t('field.marker', { node: node.node_id, owner: node.owner || t('nodes.no_owner') });
+        // MF-90: with a grid, the box's cell too ("Box 7, owner: red, grid C4").
+        const cell = gridCell(grid, p.x, p.y);
+        const label = t('field.marker', { node: node.node_id, owner: node.owner || t('nodes.no_owner') })
+            + (cell ? `, ${t('grid.cell', { cell })}` : '');
         return html`<button type="button" class=${`marker ${offline ? 'offline' : ''}`} aria-label=${label}
             data-node=${node.node_id} title=${label}
             ref=${(el) => {
@@ -301,6 +328,11 @@ export class FieldView extends Component {
         const features = this.shownFeatures();
         const scale = planScale(state.georef);
         const placing = state.draft && state.draft.placing;
+        const grid = levelGrid(state.levels, state.level);
+        const showGrid = grid.enabled && !state.gridHidden;
+        // The plan's shape for square cells (MF-86): on the ground when it has a map position, else the
+        // image's, else the placeholder's 3:2.
+        const aspect = scale ? scale.w / scale.h : state.imageAspect || 1.5;
         return html`<section class="card" aria-labelledby="field-h">
             <h2 id="field-h">${t('field.title')}</h2>
             ${this.loaded !== null && html`<p class=${state.loadedNote ? 'notice' : ''} role="status"
@@ -320,25 +352,31 @@ export class FieldView extends Component {
                 ${state.imageUrl && html`<button type="button" data-testid="field-remove"
                     onClick=${() => this.removeImage()}>${multi ? t('levels.remove') : t('field.remove')}</button>`}
             </div>`}
-            <div class=${`field-area ${state.imageUrl ? 'with-image' : 'grid'}${placing ? ' placing' : ''}`} ref=${this.area}
+            <div class=${`field-area ${state.imageUrl ? 'with-image' : 'grid'}${placing ? ' placing' : ''}${
+                showGrid ? ' with-field-grid' : ''}`} ref=${this.area}
                 data-testid="field-area" data-level=${state.level}
                 onPointerDown=${(e) => this.areaDown(e)} onPointerMove=${(e) => this.areaMove(e)}
                 onPointerUp=${() => this.areaUp()} onPointerCancel=${() => this.areaUp()}>
                 ${state.imageUrl && html`<img src=${state.imageUrl} draggable="false"
-                    alt=${multi ? t('levels.image_alt', { name }) : t('field.image_alt')} />`}
+                    alt=${multi ? t('levels.image_alt', { name }) : t('field.image_alt')}
+                    onLoad=${(e) => this.setState({ imageAspect: e.target.naturalWidth / e.target.naturalHeight || null })} />`}
                 ${state.imageUrl && georefPins(state.georef)}
                 ${featureShapes(features, featureTeams, scale)}
+                ${showGrid && html`<${GridLayer} grid=${grid} />`}
                 ${featurePins(features, featureTeams, (f) => this.editFeature(f))}
-                ${here.map((n) => this.marker(n, list.indexOf(n), list.length, teams))}
+                ${here.map((n) => this.marker(n, list.indexOf(n), list.length, teams, grid))}
             </div>
+            <${GridToggle} grid=${grid} hidden=${state.gridHidden} onChange=${(h) => this.setState({ gridHidden: h })} />
             <p class="muted small">${state.noImage ? t(multi ? 'levels.no_image' : 'field.no_image', { name }) : ''}
                 ${' '}${role === 'gm' && game ? t('field.drag_hint') : ''}</p>
             ${list.length === 0 && html`<p class="muted">${t('nodes.none')}</p>`}
             ${this.renderNodeLevels(list)}
+            ${role === 'gm' && html`<${GridSettings} app=${app} level=${state.level} grid=${grid} aspect=${aspect}
+                scale=${scale} onChange=${(g) => this.setGrid(state.level, g)} />`}
             </div>
         </section>
         <${MapFeatures} app=${app} features=${app.state.mapFeatures || []} level=${state.level} teams=${featureTeams}
-            canEdit=${role === 'gm'} draft=${state.draft} scale=${scale}
+            canEdit=${role === 'gm'} draft=${state.draft} scale=${scale} grid=${grid}
             onDraft=${(d) => this.setDraft(d)} onPlace=${(p) => this.placeDraft(p)} />
         ${state.imageUrl && html`<${GeorefPanel} app=${app} georef=${state.georef} level=${state.level}
             own=${state.ownGeoref} levelName=${multi ? name : null} groundName=${levelName(state.levels, 0)}

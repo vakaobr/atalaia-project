@@ -885,10 +885,12 @@ class Store:
         return self._exec("DELETE FROM map_features WHERE id = ?", (feature_id,)).rowcount == 1
 
     def set_field_from_map(self, level: int, content_type: str, data: bytes, georef_key: str, georef_value: str,
-                           boundary: dict[str, Any]) -> tuple[int, bool]:
+                           boundary: dict[str, Any], more_settings: tuple[tuple[str, str], ...] = ()
+                           ) -> tuple[int, bool]:
         """A level's plan, its own map position and its field boundary, loaded from a map (field_map.py,
-        MF-26), in one transaction: all three or nothing. The level's boundary is replaced if it has one
-        (MF-20). Returns (the boundary's id, whether it was new)."""
+        MF-26), in one transaction: all three or nothing; with them ``more_settings`` (the level's grid,
+        MF-87). The level's boundary is replaced if it has one (MF-20). Returns (the boundary's id,
+        whether it was new)."""
         if len(data) > FIELD_IMAGE_MAX:
             raise ValueError(f"the field image is over {FIELD_IMAGE_MAX} bytes")
         if not 0 <= level < FIELD_LEVELS_MAX:
@@ -904,6 +906,9 @@ class Store:
                     "data = excluded.data, updated_at = excluded.updated_at", (level, content_type, data, now))
                 self._db.execute("INSERT INTO settings (key, value) VALUES (?, ?) "
                                  "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (georef_key, georef_value))
+                for key, value in more_settings:
+                    self._db.execute("INSERT INTO settings (key, value) VALUES (?, ?) "
+                                     "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
                 old = None
                 for r in self._db.execute("SELECT id, data_json FROM map_features WHERE level = ? ORDER BY id",
                                           (level,)).fetchall():

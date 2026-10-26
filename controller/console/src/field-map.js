@@ -22,7 +22,8 @@
 //    MF-59: the preview then scrolls into view with the focus on its heading; MF-60: leaving the page
 //    with a drawn image not yet used asks first;
 // 4. *Use as the field*: one request to the controller (POST /api/v1/field/levels/{n}/from-map) sets
-//    the level's plan, its map position (from the image's edges) and its field boundary together.
+//    the level's plan, its map position (from the image's edges) and its field boundary together, and
+//    the level's grid if the GM put one over the preview (field-grid.js, MF-81 to MF-93).
 //
 // The controller needs no internet for any of it; the rest of the console works offline as before.
 
@@ -34,6 +35,7 @@ import { sourceAt, sourcesFor, tileSource } from './components/ortho-sources.js'
 import { parseLatLon, formatLatLon } from './components/georef-panel.js';
 import { levelName, levelsInUse, LOADED_KEY } from './components/field-levels.js';
 import { PlaceSearch, SearchError, locate, locationGranted } from './components/place-search.js';
+import { GridLayer, COLS_MAX, ROWS_MAX, cellSize, levelGrid, rowLabel, suggestGrid } from './components/field-grid.js';
 
 const CORNERS_MAX = 12; // map_features.POLYGON_MAX
 const FIELD_ZOOM = 17;
@@ -114,6 +116,7 @@ class FieldMap extends Component {
             corner: '', go: '', label: '', ortho: null, busy: '', result: null, done: null,
             online: navigator.onLine !== false, finding: '', places: null, placeStatus: '',
             layer: savedLayer(), orthoHere: null, wait: null, osmTry: null, orthoName: '',
+            grid: null, // MF-87: the grid form over the preview (null: the level's grid, else a suggestion)
         };
         this.osmAbort = null;
         this.mapEl = createRef();
@@ -421,7 +424,53 @@ class FieldMap extends Component {
     changeLevel(level) {
         saveOutline(this.state.level, []);
         saveOutline(level, this.state.outline);
-        this.setState({ level });
+        this.setState({ level, grid: null });
+    }
+
+    /** MF-87: the grid over the preview: the GM's form, else the level's grid if it is on, else off with
+     * cells about square on this image (its pixels are square on the ground, MF-24). */
+    previewGrid() {
+        if (this.state.grid) return this.state.grid;
+        const now = levelGrid(this.state.levels, this.state.level);
+        if (now.enabled) return { ...now };
+        const r = this.state.result;
+        return { enabled: false, ...suggestGrid(r ? r.width / r.height : 1) };
+    }
+
+    setGrid(change) {
+        this.setState({ grid: { ...this.previewGrid(), ...change } });
+    }
+
+    /** The grid for the request: whole numbers in range, or null (the form says what is wrong). */
+    gridBody() {
+        const g = this.previewGrid();
+        const ok = (v, top) => Number.isInteger(Number(v)) && Number(v) >= 1 && Number(v) <= top;
+        if (!ok(g.rows, ROWS_MAX) || !ok(g.cols, COLS_MAX)) return null;
+        return { enabled: Boolean(g.enabled), rows: Number(g.rows), cols: Number(g.cols) };
+    }
+
+    renderGrid(r) {
+        const g = this.previewGrid();
+        const body = this.gridBody();
+        const size = body ? cellSize(body, { w: r.width * r.mpp, h: r.height * r.mpp }) : '';
+        return html`<div class="grid-settings" data-testid="fm-grid-settings">
+            <label class="check"><input type="checkbox" data-testid="fm-grid-toggle" checked=${g.enabled}
+                onChange=${(e) => this.setGrid({ enabled: e.target.checked })} /> ${t('grid.fm_toggle')}</label>
+            <p class="muted small">${t('grid.fm_hint')}</p>
+            ${g.enabled && html`<div class="form grid-form"><div class="params">
+                <div class="field"><label for="fm-grid-rows">${t('grid.rows', { max: ROWS_MAX })}</label>
+                    <input id="fm-grid-rows" data-testid="fm-grid-rows" type="number" inputmode="numeric" min="1"
+                        max=${ROWS_MAX} value=${g.rows} aria-describedby="fm-grid-rows-note"
+                        onInput=${(e) => this.setGrid({ rows: e.target.value })} />
+                    <span class="muted small" id="fm-grid-rows-note">${body ? t('grid.rows_note', { last: rowLabel(body.rows - 1) }) : ''}</span></div>
+                <div class="field"><label for="fm-grid-cols">${t('grid.cols', { max: COLS_MAX })}</label>
+                    <input id="fm-grid-cols" data-testid="fm-grid-cols" type="number" inputmode="numeric" min="1"
+                        max=${COLS_MAX} value=${g.cols} onInput=${(e) => this.setGrid({ cols: e.target.value })} /></div>
+            </div>
+            ${size && html`<p class="muted small" data-testid="fm-grid-size">${t('grid.size', { size })}</p>`}
+            ${!body && html`<p class="error" role="alert" data-testid="fm-grid-error">${
+                t('grid.bad', { rows: ROWS_MAX, cols: COLS_MAX })}</p>`}</div>`}
+        </div>`;
     }
 
     /** MF-59: the drawn image is easy to miss below the fold: bring it into view and put the keyboard (and
@@ -468,10 +517,15 @@ class FieldMap extends Component {
 
     async upload() {
         const { result, outline, label, level } = this.state;
+        const grid = this.gridBody();
+        if (!grid) {
+            this.setState({ error: t('grid.bad', { rows: ROWS_MAX, cols: COLS_MAX }) });
+            return;
+        }
         this.setState({ busy: 'upload', error: '' });
         try {
             const body = { content_type: result.type, image: await base64(result.blob), bounds: result.bounds, outline,
-                           label: label.trim() };
+                           label: label.trim(), grid };
             const done = await api(savedToken(), 'POST', `/field/levels/${level}/from-map`, body);
             saveOutline(level, []);
             this.setState({ busy: '', done }, () => this.showHeading('fm-done-h'));
@@ -513,10 +567,12 @@ class FieldMap extends Component {
                     onClick=${() => this.setState({ result: this.dropResult() })}>${t('fieldmap.change')}</button>
                 ${this.state.busy === 'upload' && html`<span class="muted small" role="status">${t('fieldmap.busy.upload')}</span>`}
             </div>
+            ${this.renderGrid(r)}
             <div class="fm-preview">
                 <img src=${r.url} alt=${t('fieldmap.preview_alt')} data-testid="fm-image" />
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                     <polygon class="fm-outline" points=${pts} vector-effect="non-scaling-stroke" /></svg>
+                ${this.gridBody() && this.gridBody().enabled && html`<${GridLayer} grid=${this.gridBody()} testid="fm-grid" />`}
             </div>
             <p class="muted small" data-testid="fm-size">${t('fieldmap.size', {
                 width: r.width, height: r.height, mpp: r.mpp.toFixed(2), kb: Math.round(r.blob.size / 1024) })}

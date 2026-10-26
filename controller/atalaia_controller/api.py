@@ -51,6 +51,8 @@ which browsers cannot give headers, also takes ``?token=``.
     GET|PUT|DELETE /api/v1/field/levels/{n}/image   level n's floor plan (level 0: the field image)
     GET|PUT|DELETE /api/v1/field/levels/{n}/georef  level n's own control points (else level 0's)
     POST /api/v1/field/levels/{n}/from-map GM: plan, map position and field boundary drawn from a map, at once
+    GET|PUT /api/v1/field/grid             the plan's grid: lettered rows, numbered columns (PUT: GM; field_grid.py)
+    GET|PUT /api/v1/field/levels/{n}/grid  level n's grid (decisions MF-81 to MF-93)
     GET  /api/v1/field/features            the map features this token may see (safe zones, respawns, HQs...)
     POST /api/v1/field/features            GM: mark one {"type", "shape", "x", "y" | "points", "radius_m"?, ...}
     PUT|DELETE /api/v1/field/features/{id} GM: change or delete one (map_features.py, decisions MF-*)
@@ -141,6 +143,7 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__
 from . import checkin as checkinmod
 from . import schedule as schedulemod
+from . import field_grid as gridmod
 from . import field_levels as levelsmod
 from . import field_map as fieldmapmod
 from . import georef as georefmod
@@ -777,14 +780,49 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
             raise HTTPException(409, f"the field has {mapmod.FEATURES_MAX} map features: delete one first")
         geo = spec["georef"]
         points = json.dumps([p.to_json() for p in geo.points], separators=(",", ":"))
+        grid = spec["grid"]
+        more = ((gridmod.setting(level), gridmod.dump(grid)),) if grid is not None else ()
         fid, new = controller.store.set_field_from_map(level, spec["content_type"], spec["data"],
-                                                       georefmod.setting(level), points, boundary)
+                                                       georefmod.setting(level), points, boundary, more)
         out = geo.to_api()
         controller._emit({"type": "field_image", "level": level})
         controller._emit({"type": "field_georef", "level": level, "georef": out})
+        if grid is not None:
+            controller._emit({"type": "field_grid", "level": level, "grid": grid})
         controller._emit(FEATURES_CHANGED)
         return {"level": level, "content_type": spec["content_type"], "bytes": len(spec["data"]), "georef": out,
-                "boundary": mapmod.view(feature_or_404(fid)), "boundary_new": new}
+                "boundary": mapmod.view(feature_or_404(fid)), "boundary_new": new,
+                "grid": gridmod.load(controller.store, level)}
+
+    # --- the field grid (field_grid.py, decisions MF-81 to MF-93) ----------------
+
+    def get_grid(level: int) -> dict[str, Any]:
+        level_or_404(level)
+        return {"level": level, "grid": gridmod.load(controller.store, level)}
+
+    def put_grid(level: int, body: Any) -> dict[str, Any]:
+        """On or off, rows (A, B, ...) and columns (1, 2, ...); any token reads it, the GM sets it."""
+        level_or_404(level, write=True)
+        grid = gridmod.check(body, gridmod.load(controller.store, level))
+        gridmod.save(controller.store, level, grid)
+        controller._emit({"type": "field_grid", "level": level, "grid": grid})
+        return {"level": level, "grid": grid}
+
+    @app.get("/api/v1/field/grid", dependencies=[Depends(require_read)])
+    def field_grid() -> dict[str, Any]:
+        return get_grid(0)
+
+    @app.put("/api/v1/field/grid", dependencies=[Depends(require_gm)])
+    def put_field_grid(body: Any = Body(None)) -> dict[str, Any]:
+        return put_grid(0, body)
+
+    @app.get("/api/v1/field/levels/{level}/grid", dependencies=[Depends(require_read)])
+    def level_grid(level: int) -> dict[str, Any]:
+        return get_grid(level)
+
+    @app.put("/api/v1/field/levels/{level}/grid", dependencies=[Depends(require_gm)])
+    def put_level_grid(level: int, body: Any = Body(None)) -> dict[str, Any]:
+        return put_grid(level, body)
 
     # --- map features (map_features.py, decisions MF-0 to MF-16) ----------------
 

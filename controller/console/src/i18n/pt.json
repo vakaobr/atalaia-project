@@ -282,6 +282,22 @@
     "georef_title": "Posição no mapa (ATAK): {name}",
     "georef_shared": "Este piso usa a posição no mapa de {ground}: as plantas estão desenhadas à mesma escala e com o mesmo enquadramento. Dá-lhe dois cantos só se a planta for diferente."
   },
+  "grid": {
+    "toggle": "Quadrícula no mapa",
+    "hint_off": "Liga-a para dividir a imagem do campo em quadrados, com letras nas linhas (A, B, …) e números nas colunas (1, 2, …), para dizer posições pelo rádio («estou em C4»).",
+    "hint_on": "A quadrícula divide a imagem em partes iguais e é desenhada por cima dela, para quem vê o mapa (cada pessoa a pode esconder no seu ecrã). Muda as linhas e as colunas e guarda.",
+    "rows": "Linhas (letras, até {max})",
+    "rows_note": "De A a {last}",
+    "cols": "Colunas (números, até {max})",
+    "size": "Cada quadrado tem cerca de {size} no terreno.",
+    "save": "Guardar a quadrícula",
+    "square": "Ajustar a quadrados",
+    "bad": "As linhas vão de 1 a {rows} e as colunas de 1 a {cols}.",
+    "show": "Mostrar a quadrícula ({rows}, {cols})",
+    "cell": "quadrícula {cell}",
+    "fm_toggle": "Pôr uma quadrícula sobre o mapa",
+    "fm_hint": "Letras nas linhas e números nas colunas, para dizer posições pelo rádio. Fica guardada com o campo; podes mudá-la depois no separador Campo."
+  },
   "features": {
     "title": "Marcações no mapa",
     "intro": "Marca na planta as zonas seguras, os respawns, as bases, o estacionamento, os primeiros socorros e os objetivos, cada um como ponto, círculo ou área. Cada marcação diz quem a pode ver: todos, uma equipa ou só a organização.",

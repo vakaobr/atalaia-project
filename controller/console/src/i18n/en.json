@@ -282,6 +282,22 @@
     "georef_title": "Map position (ATAK): {name}",
     "georef_shared": "This level uses the map position of {ground}: the plans are drawn to the same scale and frame. Give it two corners only if its plan differs."
   },
+  "grid": {
+    "toggle": "Grid on the map",
+    "hint_off": "Turn it on to divide the field image into squares, with letters on the rows (A, B, …) and numbers on the columns (1, 2, …), for calling positions on the radio (“I'm in C4”).",
+    "hint_on": "The grid divides the image into equal parts and is drawn over it for everyone who sees the map (each viewer can hide it on their screen). Change the rows and columns and save.",
+    "rows": "Rows (letters, up to {max})",
+    "rows_note": "A to {last}",
+    "cols": "Columns (numbers, up to {max})",
+    "size": "Each square is about {size} on the ground.",
+    "save": "Save grid",
+    "square": "Fit square cells",
+    "bad": "Rows go from 1 to {rows} and columns from 1 to {cols}.",
+    "show": "Show the grid ({rows}, {cols})",
+    "cell": "grid {cell}",
+    "fm_toggle": "Put a grid over the map",
+    "fm_hint": "Letters on the rows and numbers on the columns, for calling positions on the radio. It is saved with the field; you can change it later on the Field tab."
+  },
   "features": {
     "title": "Map features",
     "intro": "Mark safe zones, respawns, HQs, the car park, first aid and objectives on the plan, each as a pin, a circle or an area. Each one says who may see it: everyone, one team, or only the organisers.",

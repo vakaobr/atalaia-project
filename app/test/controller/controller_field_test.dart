@@ -225,8 +225,79 @@ void main() {
             'updated_at': isA<double>(),
           },
           'own_georef': false,
+          'grid': {'enabled': false, 'rows': 8, 'cols': 8},
         },
       ]);
+    });
+
+    test('the field grid (MF-81 to MF-93): kept, and all or nothing with '
+        'the field from a map', () {
+      final store = FailingStore(Directory('${tmp.path}/store'));
+      var (engine, field) = open(store);
+      expect(field.putGrid(0, {'enabled': true, 'rows': 3, 'cols': 4}), {
+        'level': 0,
+        'grid': {'enabled': true, 'rows': 3, 'cols': 4},
+      });
+      final heard = <Map<String, Object?>>[];
+      engine.addListener(heard.add);
+      store.failField = true;
+      final body = {
+        'content_type': 'image/png',
+        'image': base64.encode(png),
+        'bounds': {'north': 38.73, 'south': 38.70, 'west': -9.2, 'east': -9.1},
+        'outline': [
+          {'lat': 38.72, 'lon': -9.19},
+          {'lat': 38.72, 'lon': -9.11},
+          {'lat': 38.71, 'lon': -9.11},
+        ],
+        'grid': {'enabled': true, 'rows': 26, 'cols': 30},
+      };
+      expect(() => field.fromMap(0, body), throwsA(isA<FileSystemException>()));
+      expect(
+        () => field.putGrid(0, {'enabled': false}),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(heard, isEmpty);
+      expect(field.grid(0), {'enabled': true, 'rows': 3, 'cols': 4});
+      store.failField = false;
+      (engine, field) = open(store);
+      expect(field.fromMap(0, body)['grid'], {
+        'enabled': true,
+        'rows': 26,
+        'cols': 30,
+      });
+      (_, field) = open(store);
+      expect(field.levelGrid(0)['grid'], {
+        'enabled': true,
+        'rows': 26,
+        'cols': 30,
+      });
+    });
+  });
+
+  test("the grid's check refuses what the Pi's refuses", () {
+    for (final bad in <Object?>[
+      null,
+      <Object?>[],
+      <String, Object?>{},
+      {'enabled': 'yes'},
+      {'enabled': true, 'rows': 0},
+      {'enabled': true, 'rows': 53},
+      {'enabled': true, 'cols': 2.5},
+      {'enabled': true, 'cols': true},
+      {'enabled': true, 'cols': '4'},
+      {'enabled': true, 'size': 4},
+    ]) {
+      expect(
+        () => checkGrid(bad, gridDefault),
+        throwsA(isA<ControllerError>()),
+        reason: '$bad',
+      );
+    }
+    expect(checkGrid({'enabled': false}, {'rows': 2, 'cols': 52}), {
+      'enabled': false,
+      'rows': 2,
+      'cols': 52,
     });
   });
 

@@ -2069,6 +2069,156 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertEqual((levels["count"], levels["names"]), (2, ["Ground floor", "Mezzanine"]))
         self.assertIsNone(self.field.bundle.controller.store.field_image(2))
 
+    # --- the field grid (decisions MF-81 to MF-93) -----------------------------------
+
+    def test_field_grid_helpers(self):
+        """MF-83, MF-90: row letters after Z, a place's cell and an area's span, square cells (field-grid.js)."""
+        page = self.console()
+        got = page.evaluate("""() => import('./components/field-grid.js').then((m) => {
+            const g = { enabled: true, rows: 8, cols: 10 };
+            return [[0, 1, 25, 26, 27, 51].map(m.rowLabel),
+                    m.gridCell(g, 0, 0), m.gridCell(g, 0.35, 0.3), m.gridCell(g, 1, 1), m.gridCell(g, 0.0999, 0.125),
+                    m.gridCell({ enabled: true, rows: 30, cols: 52 }, 0.999, 0.89),
+                    m.gridCell({ ...g, enabled: false }, 0.5, 0.5), m.gridCell(g, 1.2, 0.5),
+                    m.gridSpan(g, [{ x: 0.12, y: 0.2 }, { x: 0.38, y: 0.6 }, { x: 0.2, y: 0.4 }]),
+                    m.gridSpan(g, [{ x: 0.31, y: 0.26 }, { x: 0.33, y: 0.3 }]),
+                    m.suggestGrid(2), m.suggestGrid(0.5), m.suggestGrid(1), m.suggestGrid(20),
+                    m.cellSize(g, { w: 400, h: 200 }), m.cellSize({ rows: 3, cols: 4 }, { w: 30, h: 20 })];
+        })""")
+        self.assertEqual(got, [["A", "B", "Z", "AA", "AB", "AZ"], "A1", "C4", "H10", "B1", "AA52", "", "",
+                               "B2–E4", "C4", {"rows": 4, "cols": 8}, {"rows": 8, "cols": 4},
+                               {"rows": 8, "cols": 8}, {"rows": 1, "cols": 8}, "40 × 25 m", "7.5 × 6.7 m"])
+
+    def test_field_grid_over_the_plan(self):
+        """The maintainer's request (MF-81): a grid over the field image, lettered rows on the left and numbered
+        columns on the top; set by the GM, live on every console, hidden by any viewer in their own browser; the
+        boxes and map features say their cell; legible over the image; at phone width with 52 columns."""
+        game = self.field.create_game(start=True)
+        self.field.box_hello()
+        self.field.http.put("/api/v1/field/image", headers={"Content-Type": "image/png"}, content=ICON.read_bytes())
+        # About 870 m across and 445 m down: cells about square are 4 rows by 8 columns (MF-86).
+        self.field.http.put("/api/v1/field/georef", json={"points": [
+            {"x": 0, "y": 0, "lat": 38.7240, "lon": -9.1420}, {"x": 1, "y": 1, "lat": 38.7200, "lon": -9.1320}]})
+        self.field.http.put(f"/api/v1/games/{game['id']}/positions/{BOX}", json={"x": 0.35, "y": 0.3})
+        r = self.field.http.post("/api/v1/field/features", json={"type": "first_aid", "shape": "point", "x": 0.9,
+                                                                 "y": 0.95, "label": "Posto"})
+        self.assertEqual(r.status_code, 201, r.text)
+        page = self.console()
+        page.get_by_test_id("tab-field").click()
+        expect(page.locator("[data-testid=field-area] img")).to_be_visible()
+        expect(page.get_by_test_id("field-grid")).to_have_count(0)  # off until the GM turns it on
+        expect(page.get_by_test_id("grid-show")).to_have_count(0)
+        viewer = self.console(READ)
+        viewer.get_by_test_id("tab-field").click()
+        expect(viewer.get_by_test_id("grid-settings")).to_have_count(0)  # the GM's alone
+
+        page.get_by_test_id("grid-toggle").click()  # checked once the controller has it
+        grid = page.get_by_test_id("field-grid")
+        expect(grid).to_have_attribute("data-rows", "4")
+        expect(grid).to_have_attribute("data-cols", "8")
+        self.assertEqual(self.field.http.get("/api/v1/field/grid").json()["grid"], {"enabled": True, "rows": 4, "cols": 8})
+        expect(page.get_by_test_id("grid-size")).to_have_text("Cada quadrado tem cerca de 108 × 111 m no terreno.")
+        expect(page.locator("#grid-rows-note")).to_have_text("De A a D")
+        expect(grid.locator(".fg-row")).to_have_text(["A", "B", "C", "D"])
+        expect(grid.locator(".fg-col")).to_have_text([str(c) for c in range(1, 9)])
+        # Live on the other console (the stream's field_grid), with the cells said: the box, and the feature.
+        expect(viewer.get_by_test_id("field-grid")).to_have_attribute("data-cols", "8")
+        marker = viewer.locator(f'[data-testid=field-area] .marker[data-node="{BOX}"]')
+        expect(marker).to_have_attribute("aria-label", re.compile(r", quadrícula B3$"))
+        fid = r.json()["id"]
+        expect(viewer.get_by_test_id(f"mf-cell-{fid}")).to_have_text("quadrícula D8")
+        # Legible on light and dark imagery: white labels and lines on a dark halo; nothing to press.
+        style = page.locator(".fg-row").first.evaluate(
+            "(e) => { const s = getComputedStyle(e); return [s.color, s.textShadow, s.pointerEvents]; }")
+        self.assertEqual(style[0], "rgb(255, 255, 255)")
+        self.assertIn("rgb(0, 0, 0)", style[1])
+        self.assertEqual(style[2], "none")
+        strokes = grid.locator("path").evaluate_all("(ps) => ps.map((p) => getComputedStyle(p).stroke)")
+        self.assertEqual(strokes, ["rgba(0, 0, 0, 0.55)", "rgba(255, 255, 255, 0.9)"])
+        # The GM's numbers: refused out of range in the page; saved; square cells keep the columns.
+        page.get_by_test_id("grid-rows").fill("53")
+        page.get_by_test_id("grid-save").click()
+        expect(page.get_by_test_id("grid-error")).to_have_text("As linhas vão de 1 a 52 e as colunas de 1 a 52.")
+        page.get_by_test_id("grid-rows").fill("6")
+        page.get_by_test_id("grid-cols").fill("10")
+        page.get_by_test_id("grid-save").click()
+        expect(viewer.get_by_test_id("field-grid")).to_have_attribute("data-rows", "6")
+        expect(viewer.get_by_test_id(f"mf-cell-{fid}")).to_have_text("quadrícula F10")
+        self.assertEqual(self.field.http.get("/api/v1/field/grid").json()["grid"], {"enabled": True, "rows": 6, "cols": 10})
+        page.get_by_test_id("grid-square").click()
+        expect(page.get_by_test_id("grid-rows")).to_have_value("5")
+        expect(page.get_by_test_id("grid-cols")).to_have_value("10")
+        # The viewer hides it in their own browser (kept across a reload); the GM's console still shows it.
+        expect(viewer.get_by_test_id("grid-show-label")).to_have_text(re.compile(r"Mostrar a quadrícula \(A–F, 1–10\)"))
+        viewer.get_by_test_id("grid-show").uncheck()
+        expect(viewer.get_by_test_id("field-grid")).to_have_count(0)
+        viewer.reload()
+        viewer.get_by_test_id("tab-field").click()
+        expect(viewer.locator("[data-testid=field-area] img")).to_be_visible()
+        expect(viewer.get_by_test_id("grid-show")).not_to_be_checked()
+        expect(viewer.get_by_test_id("field-grid")).to_have_count(0)
+        expect(page.get_by_test_id("field-grid")).to_have_count(1)
+        # At phone width, in English, with 52 columns: the numbers are thinned out to fit, the page does not
+        # scroll sideways; turned off, it is gone everywhere.
+        self.field.http.put("/api/v1/field/grid", json={"enabled": True, "rows": 52, "cols": 52})
+        phone = self.console(width=390, height=844)
+        phone.get_by_test_id("lang").select_option("en")
+        phone.get_by_test_id("tab-field").click()
+        small = phone.get_by_test_id("field-grid")
+        expect(small).to_have_attribute("data-cols", "52")
+        expect(phone.get_by_test_id("grid-size")).to_have_text("Each square is about 17 × 8.6 m on the ground.")
+        cols = small.locator(".fg-col").count()
+        self.assertLess(cols, 52)
+        self.assertGreater(cols, 4)
+        self.assertNotEqual(small.locator(".fg-col").first.inner_text(), "1")  # the corner is the row letter's
+        expect(small.locator(".fg-row").first).to_have_text("A")
+        self.no_horizontal_scroll(phone)
+        page.get_by_test_id("grid-toggle").click()
+        expect(phone.get_by_test_id("field-grid")).to_have_count(0)
+        expect(page.get_by_test_id("field-grid")).to_have_count(0)
+        self.assertEqual(self.field.http.get("/api/v1/field/grid").json()["grid"],
+                         {"enabled": False, "rows": 52, "cols": 52})
+
+    def test_field_map_grid_over_the_preview(self):
+        """MF-87: a grid put over the drawn image on *Load the field from a map*, saved with the field in the same
+        request, then shown on the console's plan; a level's grid comes back on the page."""
+        page = self.console(service_workers="block")
+        seen = self.map_routes(page)
+        page.goto(self.field.base + "/console/field-map.html")
+        expect(page.get_by_test_id("tm")).to_be_visible()
+        self.type_outline(page)
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        expect(page.get_by_test_id("fm-grid-toggle")).not_to_be_checked()
+        expect(page.get_by_test_id("fm-grid")).to_have_count(0)
+        page.get_by_test_id("fm-grid-toggle").check()
+        # Cells about square on this image (its pixels are square on the ground): 8 along the longer side.
+        size = page.get_by_test_id("fm-image").evaluate("(i) => [i.naturalWidth, i.naturalHeight]")
+        wide = size[0] >= size[1]
+        expect(page.get_by_test_id("fm-grid-cols" if wide else "fm-grid-rows")).to_have_value("8")
+        page.get_by_test_id("fm-grid-rows").fill("0")
+        expect(page.get_by_test_id("fm-grid-error")).to_be_visible()
+        page.get_by_test_id("fm-grid-rows").fill("5")
+        page.get_by_test_id("fm-grid-cols").fill("7")
+        expect(page.get_by_test_id("fm-grid")).to_have_attribute("data-rows", "5")
+        expect(page.get_by_test_id("fm-grid").locator(".fg-col")).to_have_count(7)
+        expect(page.get_by_test_id("fm-grid-size")).to_contain_text(" m no terreno.")
+        expect(page.locator("#fm-preview-h")).to_be_in_viewport()
+        self.no_horizontal_scroll(page)
+        page.get_by_test_id("fm-upload").click()
+        expect(page).to_have_url(re.compile(r"/console/#field$"))
+        self.assertEqual(self.field.http.get("/api/v1/field/grid").json()["grid"], {"enabled": True, "rows": 5, "cols": 7})
+        expect(page.get_by_test_id("field-grid")).to_have_attribute("data-cols", "7")
+        self.check_loaded(0, seen["wms"][0])
+        # Opened again, the page starts from the level's grid.
+        page.goto(self.field.base + "/console/field-map.html")
+        expect(page.get_by_test_id("tm")).to_be_visible()
+        self.type_outline(page)
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-grid-toggle")).to_be_checked()
+        expect(page.get_by_test_id("fm-grid-rows")).to_have_value("5")
+        self.assertEqual(seen["other"], [])
+
     # --- map features (decisions MF-0 to MF-16) ------------------------------------
 
     def features(self) -> list:

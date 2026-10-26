@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 from typing import Any, Optional
 
+from . import field_grid as gridmod
 from . import georef as georefmod
 from .engine import ControllerError
 from .store import FIELD_LEVELS_MAX
@@ -101,12 +102,15 @@ def check(body: Any, current: dict[str, Any]) -> dict[str, Any]:
 
 def save(store: Any, meta: dict[str, Any]) -> list[int]:
     """Stores the settings; the levels that went (their plans, own points and boxes' levels) are
-    removed, and so are the map features drawn on their plans (decision MF-8). Returns those levels."""
+    removed, and so are the map features drawn on their plans (decision MF-8) and their grids (MF-82).
+    Returns those levels."""
     removed = []
     featured = {f["level"] for f in store.map_features()}
     for level in range(meta["count"], LEVELS_MAX):
         plan = store.delete_field_image(level)
         points = georefmod.clear(store, level) if level else False
+        if level:
+            gridmod.clear(store, level)
         if plan or points or level in featured:
             removed.append(level)
     store.move_positions_to_level0(meta["count"])
@@ -116,8 +120,8 @@ def save(store: Any, meta: dict[str, Any]) -> list[int]:
 
 
 def view(store: Any) -> dict[str, Any]:
-    """The levels for the API and the console: the settings and, per level, its plan and whether it
-    has its own control points."""
+    """The levels for the API and the console: the settings and, per level, its plan, whether it
+    has its own control points and its grid (field_grid.py)."""
     meta = load(store)
     images = store.field_images()
     levels = []
@@ -125,7 +129,8 @@ def view(store: Any) -> dict[str, Any]:
         img = images.get(level)
         levels.append({"level": level, "name": meta["names"][level],
                        "image": {"content_type": img[0], "bytes": img[1], "updated_at": img[2]} if img else None,
-                       "own_georef": georefmod.load(store, level) is not None})
+                       "own_georef": georefmod.load(store, level) is not None,
+                       "grid": gridmod.load(store, level)})
     return {**meta, "in_use": in_use(meta), "levels": levels}
 
 

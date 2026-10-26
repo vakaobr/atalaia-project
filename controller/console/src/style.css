@@ -941,6 +941,83 @@ tr.offline td {
     stroke-dasharray: 8 4;
 }
 
+/* the field grid (field-grid.js, MF-81 to MF-93): over the plan, not in it; white lines and labels on a
+ * dark halo, legible on light and dark imagery alike, so the same in the light and dark themes */
+.fg-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.fg-layer svg.fg-lines {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.fg-halo {
+    fill: none;
+    stroke: rgba(0, 0, 0, 0.55);
+    stroke-width: 3;
+}
+
+.fg-line {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.9);
+    stroke-width: 1;
+}
+
+.fg-label {
+    position: absolute;
+    font: 700 0.75rem/1 system-ui, sans-serif;
+    color: #fff;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    text-shadow: 0 0 2px #000, 0 0 2px #000, 1px 1px 1px #000, -1px -1px 1px #000, 1px -1px 1px #000,
+        -1px 1px 1px #000;
+}
+
+.fg-col {
+    top: 3px;
+    transform: translateX(-50%);
+}
+
+.fg-row {
+    left: 4px;
+    transform: translateY(-50%);
+}
+
+/* the boxes' placeholder grid gives way to the field grid */
+.field-area.grid.with-field-grid {
+    background-image: none;
+}
+
+.grid-settings {
+    margin: 0.6rem 0 0;
+}
+
+.grid-form .params {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+}
+
+.grid-form .field {
+    flex: 0 1 10rem;
+    min-width: 0;
+}
+
+.grid-form input[type='number'] {
+    width: 6rem;
+    max-width: 100%;
+}
+
+.fg-toggle {
+    margin: 0.3rem 0;
+}
+
 /* load the field from a map (field-map.js, MF-19 to MF-30) */
 .fm-map {
     margin: 0.4rem 0;

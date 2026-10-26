@@ -27,12 +27,17 @@
 ///     position from its edges and the boundary, written together or not
 ///     at all;
 ///   - the boxes' places (`/api/v1/games/{id}/positions`, MF-14), with
-///     their level.
+///     their level;
+///   - the field grid (field_grid.py, decisions MF-81 to MF-93): lettered
+///     rows and numbered columns over each level's plan, off by default,
+///     set by the GM and sent with the field from a map; fewer levels take
+///     the grids of the levels that go.
 ///
 /// Storage (decision PE24-75): one store document, `field` (the levels, the
-/// map positions' points, the plans' types and sizes, the features), and
-/// each plan's bytes in a file of [ControllerField.dir] (the controller's
-/// folder in the app's private storage), named with a serial number. A new
+/// map positions' points, the plans' types and sizes, the features, the
+/// grids), and each plan's bytes in a file of [ControllerField.dir] (the
+/// controller's folder in the app's private storage), named with a serial
+/// number. A new
 /// plan is written to a new file first and becomes the plan only when the
 /// document naming it is replaced (the store renames it over the old one),
 /// so the field from a map is all or nothing as the Pi's SQLite transaction
@@ -476,6 +481,49 @@ Map<String, Object?> checkLevels(Object? body, Map<String, Object?> current) {
   return {'enabled': enabled, 'count': count, 'names': padded};
 }
 
+// --- the field grid (field_grid.py) ------------------------------------------
+
+/// Rows (A to Z, then AA to AZ) and columns of a level's grid (MF-83).
+const gridRowsMax = 52, gridColsMax = 52;
+
+/// A level's grid when the GM never set one: off, 8 by 8.
+const gridDefault = <String, Object?>{'enabled': false, 'rows': 8, 'cols': 8};
+
+int _gridCount(Object? v, String where, int top) {
+  if (v is! int || v < 1 || v > top) {
+    throw ControllerError('$where: a whole number from 1 to $top');
+  }
+  return v;
+}
+
+/// The GM's `{"enabled", "rows"?, "cols"?}`, checked (field_grid.py
+/// `check`): rows and columns not given stay as [current] has them.
+Map<String, Object?> checkGrid(Object? body, Map<String, Object?> current) {
+  if (body is! Map || body['enabled'] is! bool) {
+    throw ControllerError(
+      'the body is {"enabled": true|false, "rows": 1-$gridRowsMax, '
+      '"cols": 1-$gridColsMax}',
+    );
+  }
+  final unknown = body.keys.toSet().difference({'enabled', 'rows', 'cols'});
+  if (unknown.isNotEmpty) {
+    throw ControllerError('unknown fields ${(unknown.toList()..sort())}');
+  }
+  return {
+    'enabled': body['enabled'],
+    'rows': _gridCount(
+      body.containsKey('rows') ? body['rows'] : current['rows'],
+      'rows',
+      gridRowsMax,
+    ),
+    'cols': _gridCount(
+      body.containsKey('cols') ? body['cols'] : current['cols'],
+      'cols',
+      gridColsMax,
+    ),
+  };
+}
+
 // --- map features (map_features.py) -----------------------------------------
 
 const mapFeatureTypes = [
@@ -679,11 +727,13 @@ double _round7(double x) => double.parse(x.toStringAsFixed(7));
   Uint8List data,
   Georef georef,
   Map<String, Object?> boundary,
+  Map<String, Object?>? grid,
 })
 checkFromMap(Object? body, Map<String, Object?> meta, int level) {
   if (body is! Map) {
     throw ControllerError(
-      'the body is {"content_type", "image", "bounds", "outline", "label"?}',
+      'the body is {"content_type", "image", "bounds", "outline", "label"?, '
+      '"grid"?}',
     );
   }
   final unknown = body.keys.toSet().difference({
@@ -692,6 +742,7 @@ checkFromMap(Object? body, Map<String, Object?> meta, int level) {
     'bounds',
     'outline',
     'label',
+    'grid',
   });
   if (unknown.isNotEmpty) {
     throw ControllerError('unknown fields ${(unknown.toList()..sort())}');
@@ -796,7 +847,21 @@ checkFromMap(Object? body, Map<String, Object?> meta, int level) {
     'points': plan,
     'visibility': 'everyone',
   }, meta);
-  return (contentType: ctype, data: data, georef: geo, boundary: boundary);
+  Map<String, Object?>? grid;
+  if (body.containsKey('grid')) {
+    try {
+      grid = checkGrid(body['grid'], gridDefault);
+    } on ControllerError catch (e) {
+      throw ControllerError('grid: ${e.message}');
+    }
+  }
+  return (
+    contentType: ctype,
+    data: data,
+    georef: geo,
+    boundary: boundary,
+    grid: grid,
+  );
 }
 
 // --- the service --------------------------------------------------------------
@@ -873,9 +938,45 @@ class ControllerField {
             'name': (meta['names']! as List)[level],
             'image': _imageInfo(images['$level']),
             'own_georef': _loadGeoref(level) != null,
+            'grid': grid(level),
           },
       ],
     };
+  }
+
+  // --- the field grid (MF-81 to MF-93) ----------------------------------------
+
+  /// A level's grid: off, 8 by 8, when never set.
+  Map<String, Object?> grid(int level) {
+    final raw = ((_state['grids'] as Map?) ?? const {})['$level'];
+    if (raw is Map) {
+      try {
+        return checkGrid(raw, gridDefault);
+      } on ControllerError {
+        // unreadable: the default
+      }
+    }
+    return Map.of(gridDefault);
+  }
+
+  /// GET /api/v1/field/grid and .../levels/{n}/grid.
+  Map<String, Object?> levelGrid(int level) {
+    _levelOr404(level);
+    return {'level': level, 'grid': grid(level)};
+  }
+
+  /// PUT .../grid: `{"enabled", "rows"?, "cols"?}`.
+  Map<String, Object?> putGrid(int level, Object? body) {
+    _levelOr404(level, write: true);
+    final out = checkGrid(body, grid(level));
+    final state = Map<String, Object?>.of(_state);
+    state['grids'] = {
+      ...((state['grids'] as Map?) ?? const {}).cast<String, Object?>(),
+      '$level': out,
+    };
+    _save(state);
+    _emit({'type': 'field_grid', 'level': level, 'grid': out});
+    return {'level': level, 'grid': out};
   }
 
   static Map<String, Object?>? _imageInfo(Object? img) => img is Map
@@ -897,9 +998,13 @@ class ControllerField {
     );
     final features = _features;
     final featured = {for (final f in features) f['level']};
+    final grids = Map<String, Object?>.of(
+      ((state['grids'] as Map?) ?? const {}).cast<String, Object?>(),
+    );
     final removed = <int>[];
     final gone = <String>[];
     for (var level = count; level < fieldLevelsMax; level++) {
+      if (level != 0) grids.remove('$level');
       final plan = images.remove('$level');
       if (plan is Map) gone.add(plan['file']! as String);
       final points = level != 0 && georef.remove('$level') != null;
@@ -911,6 +1016,7 @@ class ControllerField {
       ..['levels'] = meta
       ..['images'] = images
       ..['georef'] = georef
+      ..['grids'] = grids
       ..['features'] = [
         for (final f in features)
           if ((f['level']! as int) < count) f,
@@ -1209,11 +1315,23 @@ class ControllerField {
       features[i] = {...features[i], 'data': boundary, 'updated_at': now};
     }
     state['features'] = features;
-    _save(state); // the one write that makes all three the field's
+    final newGrid = spec.grid;
+    if (newGrid != null) {
+      state['grids'] = {
+        ...((state['grids'] as Map?) ?? const {}).cast<String, Object?>(),
+        '$level': newGrid,
+      };
+    }
+    _save(
+      state,
+    ); // the one write that makes all three (and the grid) the field's
     if (old != null) _dropFile(old);
     final out = spec.georef.toApi();
     _emit({'type': 'field_image', 'level': level});
     _emit({'type': 'field_georef', 'level': level, 'georef': out});
+    if (newGrid != null) {
+      _emit({'type': 'field_grid', 'level': level, 'grid': newGrid});
+    }
     _emit(featuresChanged);
     return {
       'level': level,
@@ -1222,6 +1340,7 @@ class ControllerField {
       'georef': out,
       'boundary': _view(_feature(fid)!),
       'boundary_new': existing == null,
+      'grid': grid(level),
     };
   }
 

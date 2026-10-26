@@ -32,6 +32,7 @@ const SHELL = [
     'components/box-language-settings.js',
     'components/branding-settings.js',
     'components/checkin-panel.js',
+    'components/field-grid.js',
     'components/field-levels.js',
     'components/fetched-modes.js',
     'components/field-render.js',

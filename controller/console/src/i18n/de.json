@@ -282,6 +282,22 @@
     "georef_title": "Kartenposition (ATAK): {name}",
     "georef_shared": "Diese Ebene nutzt die Kartenposition von {ground}: Die Pläne sind im selben Maßstab und Ausschnitt gezeichnet. Gib ihr nur dann zwei Ecken, wenn ihr Plan abweicht."
   },
+  "grid": {
+    "toggle": "Gitter über der Karte",
+    "hint_off": "Schalte es ein, um das Feldbild in Planquadrate zu teilen, mit Buchstaben für die Zeilen (A, B, …) und Zahlen für die Spalten (1, 2, …), damit du Positionen über Funk durchgeben kannst („bin in C4“).",
+    "hint_on": "Das Gitter teilt das Bild in gleiche Teile und wird für alle, die die Karte sehen, darüber gezeichnet (jede Person kann es auf ihrem Bildschirm ausblenden). Ändere Zeilen und Spalten und speichere.",
+    "rows": "Zeilen (Buchstaben, bis {max})",
+    "rows_note": "A bis {last}",
+    "cols": "Spalten (Zahlen, bis {max})",
+    "size": "Ein Planquadrat ist im Gelände etwa {size} groß.",
+    "save": "Gitter speichern",
+    "square": "Quadratisch anpassen",
+    "bad": "Zeilen gehen von 1 bis {rows}, Spalten von 1 bis {cols}.",
+    "show": "Gitter zeigen ({rows}, {cols})",
+    "cell": "Planquadrat {cell}",
+    "fm_toggle": "Ein Gitter über die Karte legen",
+    "fm_hint": "Buchstaben für die Zeilen und Zahlen für die Spalten, um Positionen über Funk durchzugeben. Es wird mit dem Feld gespeichert; du kannst es später im Tab Feld ändern."
+  },
   "features": {
     "title": "Kartenelemente",
     "intro": "Markiere Safe Zones, Respawns, HQs, den Parkplatz, Erste Hilfe und Ziele auf dem Plan, jeweils als Pin, Kreis oder Fläche. Jedes Element legt fest, wer es sehen darf: alle, ein Team oder nur die Orga.",

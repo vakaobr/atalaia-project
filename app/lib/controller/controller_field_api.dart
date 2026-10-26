@@ -14,6 +14,8 @@ part of 'controller_api.dart';
 //     GET|PUT|DELETE /api/v1/field/levels/{n}/image   level n's plan
 //     GET|PUT|DELETE /api/v1/field/levels/{n}/georef  level n's own map position
 //     POST /api/v1/field/levels/{n}/from-map GM: plan, map position and boundary at once
+//     GET|PUT /api/v1/field/grid             the plan's grid: lettered rows, numbered columns
+//     GET|PUT /api/v1/field/levels/{n}/grid  level n's grid (MF-81 to MF-93)
 //     GET  /api/v1/field/features            the map features this token may see
 //     POST /api/v1/field/features            GM: add one
 //     PUT|DELETE /api/v1/field/features/{id} GM: change or delete one
@@ -139,6 +141,26 @@ extension on ControllerApi {
       'POST',
       r'/api/v1/field/levels/([^/]+)/from-map',
       _gm((r) => ApiResponse(200, _field.fromMap(r.pathInt(1), r.json))),
+    ),
+    ControllerApi._route(
+      'GET',
+      r'/api/v1/field/grid',
+      _viewer((r, v) => ApiResponse(200, _field.levelGrid(0))),
+    ),
+    ControllerApi._route(
+      'PUT',
+      r'/api/v1/field/grid',
+      _gm((r) => ApiResponse(200, _field.putGrid(0, r.json))),
+    ),
+    ControllerApi._route(
+      'GET',
+      r'/api/v1/field/levels/([^/]+)/grid',
+      _viewer((r, v) => ApiResponse(200, _field.levelGrid(r.pathInt(1)))),
+    ),
+    ControllerApi._route(
+      'PUT',
+      r'/api/v1/field/levels/([^/]+)/grid',
+      _gm((r) => ApiResponse(200, _field.putGrid(r.pathInt(1), r.json))),
     ),
     ControllerApi._route(
       'GET',
