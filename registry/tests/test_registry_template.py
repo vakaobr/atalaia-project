@@ -210,6 +210,9 @@ class TemplateTests(unittest.TestCase):
             with self.subTest(step=step["id"]):
                 ws.run_step(self, job, step)
         self.assertEqual(json.loads((ws.dir / "_site" / "index.json").read_text())["modes"], [])
+        # A visitor gets a page next to it (registry/tests/test_registry_page.py), in every language.
+        for folder in ("", "pt/", "de/", "zh-tw/"):
+            self.assertIn("<!doctype html>", (ws.dir / "_site" / folder / "index.html").read_text(encoding="utf-8"))
 
     def test_a_sample_submission_listed_then_verified_passes_the_workflow(self):
         ws = Workspace(self)
@@ -241,6 +244,7 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual([k["public_key"] for k in keys["project"]], [ws.project])
         self.assertEqual([k["public_key"] for k in keys["authors"]], [ws.author])
         self.assertIn("verified 1.1.0", (site / "badges" / f"{SAMPLE_ID}.svg").read_text())
+        self.assertIn("King of the Hill", (site / "index.html").read_text(encoding="utf-8"))
         # A field controller that trusts only the project's key takes the published package.
         archive = site / "packages" / "org.example.hill-1.1.0.tar"
         for release, key in ((".verified.json", ws.project), (".release.json", ws.author)):

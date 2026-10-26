@@ -16,7 +16,7 @@ Point your field controller at this registry's index, in `controller.toml`:
 
 ```toml
 [modes]
-index = "https://<owner>.github.io/atalaia-modes/index.json"
+index = "https://vakaobr.github.io/atalaia-modes/index.json"
 keys = ["<the project's registry key, from keys.json>"]
 ```
 
@@ -25,6 +25,10 @@ author's key (also in the published `keys.json`) to install that author's modes
 that are not reviewed yet; the GM console marks them *not reviewed by the
 project*. A field without internet copies the published folder to a USB stick
 and sets `index` to the path of its `index.json`.
+
+The registry's page, <https://vakaobr.github.io/atalaia-modes/>, shows the same index to people (the
+modes, who made them, whether they are verified, a download link) in English, Portuguese, German
+and Traditional Chinese. Controllers keep using `index.json` at its own address.
 
 ## Sharing a mode
 
@@ -39,6 +43,7 @@ request adding `modes/<id>/`, its signed package in `packages/` and its line in
 | Path | What |
 | --- | --- |
 | `index.json` | Every version of every mode: its archive, signature, licence and whether it is verified |
+| `site/page.yaml` | The text of the public page, in every language; `tools/registry_page.py` (in the Atalaia repository, at `ATALAIA_REF`) builds the page from `index.json` and these texts when the registry is published |
 | `keys/` | Authors' and the project's public mode keys, and the revoked ones ([keys/README.md](keys/README.md)) |
 | `modes/<id>/` | The source of each mode's newest version, with its tests |
 | `packages/` | The signed archives, the authors' and the project's signatures |

@@ -68,6 +68,7 @@ header:
   roadmap: Roadmap
   build: Build
   hub: Community
+  registry: Registry
   glossary: Glossary
   language: Language
 
@@ -403,7 +404,8 @@ modes:
     title: Your mode
     text: >-
       Capture the flag, your club's own… Modes are short
-      scripts. Propose one with the game mode idea template.
+      scripts. Propose one with the game mode idea template, or share a finished one as a signed
+      package in the <a href="https://vakaobr.github.io/atalaia-modes/">mode registry</a>.
     link: Share a game mode idea
 
 # The animated pictures of the modes page (tools/gen_mode_gifs.py, tools/mode_gifs.yaml):
@@ -668,7 +670,7 @@ try:
 roadmap:
   title: Roadmap
   intro: >-
-    Six phases, each closed by a real field test: its gate. The software is ahead of the hardware: phases 1 to 3 are done in software (real boards play whole games on the bench, and the iOS app has passed its checklist on an iPhone); phases 4 and 5 are built in software. The gates wait for built boxes, field tests, a real server and the registry's repository.
+    Six phases, each closed by a real field test: its gate. The software is ahead of the hardware: phases 1 to 3 are done in software (real boards play whole games on the bench, and the iOS app has passed its checklist on an iPhone); phases 4 and 5 are built in software. The gates wait for built boxes, field tests, a real server and the project's registry key.
   more: The full roadmap, with what each phase holds and its gate →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code).
@@ -1008,10 +1010,13 @@ roadmap:
         console, the mode editor, the app, the Field Box's screens, the built-in modes and the site
         server's pages: AI drafts, not yet reviewed by players who speak them."
       - >-
+        The registry's repository exists (created 2026-10-26), and its <a href="https://vakaobr.github.io/atalaia-modes/">page</a> lists the
+        modes, with no modes in it yet.
+      - >-
         <a href="{{ page.to.build }}">Build guides</a> for the Satellite, the I/O pod and the
         target addon, as text. No box has been built from them yet.
     next:
-      - Creating the registry's repository from its template (the maintainer's task).
+      - The project's registry key, made offline, so the first modes can be verified (the maintainer's task).
       - "The review of the German and the Chinese: if you play in German or in Chinese, help us
         review them. Translations into other languages start at docs/translations."
       - "The hardware: the carrier PCB (a ready-made circuit board that makes builds easier) after
@@ -1340,7 +1345,9 @@ hub:
       link.
   browser:
     title: Mode and scenario browser
-    text: The mode registry, with descriptions, downloads and community ratings.
+    text: >-
+      The <a href="https://vakaobr.github.io/atalaia-modes/">mode registry</a> is live, with no modes in it yet: be the first. A browser
+      with descriptions and community ratings comes later.
   stats:
     title: Usage statistics
     text: Opt-in, anonymous totals of versions, platforms and modes played. Off by default.

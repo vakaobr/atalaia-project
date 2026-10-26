@@ -71,6 +71,7 @@ header:
   roadmap: Roadmap
   build: Montagem
   hub: Comunidade
+  registry: Registo
   glossary: Glossário
   language: Idioma
 
@@ -416,7 +417,8 @@ modes:
     title: O teu modo
     text: >-
       Capturar a bandeira, o modo do teu clube… Os
-      modos são pequenos scripts. Propõe o teu com o modelo de ideia de modo de jogo.
+      modos são pequenos scripts. Propõe o teu com o modelo de ideia de modo de jogo ou partilha um
+      modo acabado, como pacote assinado, no <a href="https://vakaobr.github.io/atalaia-modes/">registo de modos</a>.
     link: Partilha uma ideia de modo de jogo
 
 # The animated pictures of the modes page (tools/gen_mode_gifs.py, tools/mode_gifs.yaml):
@@ -686,7 +688,7 @@ roadmap:
   # "Roadmap" stays in English in Portuguese too, as it is known in Portugal (never "Roteiro").
   title: Roadmap
   intro: >-
-    Seis fases, cada uma fechada por um teste a sério no campo: a sua prova. O software vai à frente do hardware: as fases 1 a 3 estão prontas em software (placas a sério já jogam jogos inteiros na bancada e a app para iOS já passou a sua lista de verificação num iPhone); as fases 4 e 5 estão feitas em software. As provas esperam por caixas montadas, testes no campo, um servidor a sério e o repositório do registo.
+    Seis fases, cada uma fechada por um teste a sério no campo: a sua prova. O software vai à frente do hardware: as fases 1 a 3 estão prontas em software (placas a sério já jogam jogos inteiros na bancada e a app para iOS já passou a sua lista de verificação num iPhone); as fases 4 e 5 estão feitas em software. As provas esperam por caixas montadas, testes no campo, um servidor a sério e a chave do registo do projeto.
   more: O roadmap completo, com o que cada fase inclui e a sua prova →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code):
@@ -1044,10 +1046,13 @@ roadmap:
         páginas do servidor do site: rascunhos feitos com um modelo de IA, ainda não revistos por
         quem joga nessas línguas."
       - >-
+        O repositório do registo existe (criado a 26 de outubro de 2026) e a sua <a href="https://vakaobr.github.io/atalaia-modes/">página</a>
+        lista os modos, ainda sem nenhum.
+      - >-
         <a href="{{ page.to.build }}">Guias de montagem</a> da caixa satélite, do módulo de E/S e do
         módulo de alvo, em texto. Ainda não se montou nenhuma caixa com eles.
     next:
-      - Criar o repositório do registo a partir do modelo (tarefa de quem mantém o projeto).
+      - A chave do registo do projeto, feita offline, para que os primeiros modos possam ser verificados (tarefa de quem mantém o projeto).
       - "A revisão do alemão e do chinês: se jogas em alemão ou em chinês, ajuda-nos a revê-los. As
         traduções para outras línguas começam em docs/translations (em inglês)."
       - "O hardware: a placa de suporte (PCB), uma placa feita que facilita a montagem, depois das
@@ -1395,7 +1400,9 @@ hub:
       região, o tipo de espaço e um contacto.
   browser:
     title: Catálogo de modos e cenários
-    text: O registo de modos, com descrições, modos para descarregar e avaliações da comunidade.
+    text: >-
+      O <a href="https://vakaobr.github.io/atalaia-modes/">registo de modos</a> já existe, ainda sem modos: sê a primeira pessoa a
+      partilhar um. Um catálogo com descrições e avaliações da comunidade vem depois.
   stats:
     title: Estatísticas de utilização
     text: >-

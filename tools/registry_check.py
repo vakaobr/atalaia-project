@@ -20,7 +20,8 @@
         the verified badge: the project's registry key signs the same archive (or, with --remove,
         the badge is taken away and the author's signature listed again)
     python3 tools/registry_check.py site REGISTRY OUT
-        what the registry publishes: index.json, revoked.json, keys.json, packages/, badges/
+        what the registry publishes: index.json, revoked.json, keys.json, packages/, badges/, and
+        the human-readable page built from index.json (index.html, pt/, de/, zh-tw/; registry_page.py)
 
 The registry's layout, its review checklist and its processes are
 docs/community/ (the registry, the review, keys, moderation). The package
@@ -55,6 +56,11 @@ _spec = importlib.util.spec_from_file_location("mode_package_tool", REPO / "tool
 tool = importlib.util.module_from_spec(_spec)
 sys.modules["mode_package_tool"] = tool
 _spec.loader.exec_module(tool)  # type: ignore[union-attr]
+
+_spec = importlib.util.spec_from_file_location("registry_page_tool", REPO / "tools" / "registry_page.py")
+page = importlib.util.module_from_spec(_spec)
+sys.modules["registry_page_tool"] = page
+_spec.loader.exec_module(page)  # type: ignore[union-attr]
 
 RESERVED_PREFIX = "org.atalaia."     # the project's built-in modes (decision P5G-6)
 OWNER = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?")  # a GitHub handle
@@ -607,6 +613,7 @@ def cmd_site(args: argparse.Namespace) -> int:
     (out / "packages").mkdir(parents=True)
     (out / "badges").mkdir()
     shutil.copyfile(root / "index.json", out / "index.json")
+    page.build(root, out)  # index.html (English), pt/, de/, zh-tw/: what a visitor sees; index.json stays as is
     shutil.copyfile(root / "keys" / "revoked.json", out / "revoked.json")
     keys = {"project": [], "authors": []}
     for k in sorted(reg.keys.values(), key=lambda k: k.key_id):

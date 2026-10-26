@@ -15,7 +15,8 @@
 #                   simulator: the sandbox the registry relies on, at ATALAIA_REF
 #
 # A push to main that passes all three publishes the registry to GitHub Pages (index.json,
-# revoked.json, keys.json, packages/, badges/). Pull requests run without secrets
+# revoked.json, keys.json, packages/, badges/, and index.html, pt/, de/, zh-tw/: the human-readable page
+# that tools/registry_page.py builds from index.json, so a visitor sees a page; index.json keeps its URL). Pull requests run without secrets
 # (pull_request, never pull_request_target): submitted Lua only ever runs inside the sandbox.
 #
 # Steps whose id starts with "check-" are the commands that the Atalaia repository's test

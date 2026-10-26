@@ -1,0 +1,259 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+#
+# The text of the registry's public page (tools/registry_page.py renders it from index.json when the
+# registry is published). One page per language: English at the root, pt/, de/ and zh-tw/. The links
+# are the same in every language. Texts are plain text: the script escapes them, so no HTML here.
+# Every language has the same keys (registry/tests/test_registry_page.py); German and Traditional
+# Chinese are AI drafts like the project page's, and wait for a native speaker's review.
+links:
+  pages: https://vakaobr.github.io/atalaia-modes/        # where this registry is published
+  repository: https://github.com/vakaobr/atalaia-modes
+  contributing: https://github.com/vakaobr/atalaia-modes/blob/main/CONTRIBUTING.md
+  docs: https://github.com/vakaobr/atalaia-project/blob/main/docs/community/registry.md
+  keys_docs: https://github.com/vakaobr/atalaia-project/blob/main/docs/community/keys.md
+  project:
+    en: https://atalaia-project.link/en/
+    pt: https://atalaia-project.link/
+    de: https://atalaia-project.link/de/
+    zh-tw: https://atalaia-project.link/zh-tw/
+
+languages:
+  en:
+    html_lang: en
+    name: English
+    title: Atalaia community modes
+    description: The registry of signed community game modes for Atalaia, the open airsoft and milsim game system.
+    skip: Skip to content
+    project: Atalaia project page
+    language: Language
+    lead: >-
+      Game modes for Atalaia, the open airsoft and milsim game system, shared by the people who
+      wrote them.
+    what_title: What this is
+    what_text: >-
+      This registry is a Git repository of signed mode packages. Every mode arrives as a pull
+      request, is checked automatically (its signature, that its source is what was signed, its
+      licence, its tests in the simulator) and reviewed by a person. What you see below is built
+      from the registry's index.json when it is published.
+    modes_title: Modes
+    modes_empty: No modes yet. Be the first to share one.
+    modes_empty_link: How to submit a mode
+    by: by
+    unknown_author: unknown author
+    th_version: Version
+    th_status: Status
+    th_licence: Licence
+    th_download: Download
+    verified: verified
+    not_reviewed: not reviewed
+    download: package
+    signature: signature
+    kind_mode: mode
+    kind_modifier: modifier
+    kind_role: role
+    kind_scenario: scenario
+    submit_title: How to submit a mode
+    submit_text: >-
+      Build the mode in the project's visual editor (or by hand), write its tests, make your own
+      mode key, then open a pull request adding your mode's source, its signed package and its line
+      in index.json. The steps are in CONTRIBUTING.md; how the registry works, the review checklist,
+      keys and moderation are in the project's documentation.
+    submit_contributing: CONTRIBUTING.md
+    submit_docs: How the registry works
+    submit_keys: Mode keys
+    verified_title: What "verified" means
+    verified_text: >-
+      Every version carries its author's signature: it tells you who made it. A version the project
+      has reviewed also carries the project's signature, made with the project's registry key over
+      the same archive: that is the verified badge. Field Boxes have the project's key built into
+      their firmware, so they take verified modes only. A mode that is not reviewed can still be
+      installed on a field controller whose operator chose to trust its author's key, and the GM
+      console says so.
+    use_title: Using this registry on a field
+    use_text: >-
+      Point your field controller at the index in controller.toml, and list the project's registry
+      key (from keys.json) as trusted. The controller checks every package with its own keys: it
+      never has to trust this page or the index.
+    use_note: >-
+      With only the project's key, the controller offers verified modes only. Add an author's key to
+      install that author's modes that are not reviewed yet. A field without internet copies the
+      published folder to a USB stick and sets index to the path of its index.json.
+    index_label: The index
+    footer: >-
+      Built from index.json. The registry's data is CC0-1.0; every mode has its own licence.
+  pt:
+    html_lang: pt-PT
+    name: Português
+    title: Modos da comunidade Atalaia
+    description: O registo de modos de jogo da comunidade, assinados, para o Atalaia, o sistema de jogo aberto de airsoft e milsim.
+    skip: Saltar para o conteúdo
+    project: Página do projeto Atalaia
+    language: Idioma
+    lead: >-
+      Modos de jogo para o Atalaia, o sistema de jogo aberto de airsoft e milsim, partilhados por
+      quem os escreveu.
+    what_title: O que é isto
+    what_text: >-
+      Este registo é um repositório Git de pacotes de modos assinados. Cada modo chega num pedido de
+      integração, é verificado automaticamente (a assinatura, que o código-fonte é o que foi
+      assinado, a licença, os testes no simulador) e revisto por uma pessoa. O que vês abaixo é
+      gerado a partir do index.json do registo quando é publicado.
+    modes_title: Modos
+    modes_empty: Ainda não há modos. Sê a primeira pessoa a partilhar um.
+    modes_empty_link: Como submeter um modo
+    by: por
+    unknown_author: autoria desconhecida
+    th_version: Versão
+    th_status: Estado
+    th_licence: Licença
+    th_download: Descarregar
+    verified: verificado
+    not_reviewed: não revisto
+    download: pacote
+    signature: assinatura
+    kind_mode: modo
+    kind_modifier: modificador
+    kind_role: função
+    kind_scenario: cenário
+    submit_title: Como submeter um modo
+    submit_text: >-
+      Faz o modo no editor visual do projeto (ou à mão), escreve os testes, cria a tua chave de modo
+      e abre um pedido de integração com o código-fonte do modo, o pacote assinado e a linha no
+      index.json. Os passos estão no CONTRIBUTING.md; como o registo funciona, a lista de revisão, as
+      chaves e a moderação estão na documentação do projeto.
+    submit_contributing: CONTRIBUTING.md
+    submit_docs: Como o registo funciona
+    submit_keys: Chaves de modo
+    verified_title: O que quer dizer «verificado»
+    verified_text: >-
+      Cada versão leva a assinatura de quem a fez. Uma versão que o projeto reviu leva também a
+      assinatura do projeto, feita com a chave do registo do projeto sobre o mesmo arquivo: é o
+      selo de verificado. As Field Box têm a chave do projeto no firmware, por isso só aceitam
+      modos verificados. Um modo que não foi revisto pode ser instalado num controlador de campo cuja
+      organização escolheu confiar na chave da autoria, e a consola da organização di-lo.
+    use_title: Usar este registo num campo
+    use_text: >-
+      Aponta o controlador de campo para o índice no controller.toml e indica a chave do registo do
+      projeto (do keys.json) como de confiança. O controlador verifica cada pacote com as suas
+      próprias chaves: nunca precisa de confiar nesta página nem no índice.
+    use_note: >-
+      Só com a chave do projeto, o controlador oferece apenas modos verificados. Junta a chave de uma
+      autoria para instalar os modos dela que ainda não foram revistos. Um campo sem internet copia a
+      pasta publicada para uma pen USB e põe o index no caminho do seu index.json.
+    index_label: O índice
+    footer: >-
+      Gerado a partir do index.json. Os dados do registo são CC0-1.0; cada modo tem a sua licença.
+  de:
+    html_lang: de
+    name: Deutsch
+    title: Atalaia-Community-Modi
+    description: Die Registry signierter Community-Spielmodi für Atalaia, das offene Spielsystem für Airsoft und Milsim.
+    skip: Zum Inhalt springen
+    project: Atalaia-Projektseite
+    language: Sprache
+    lead: >-
+      Spielmodi für Atalaia, das offene Spielsystem für Airsoft und Milsim, geteilt von denen, die
+      sie geschrieben haben.
+    what_title: Was das ist
+    what_text: >-
+      Diese Registry ist ein Git-Repository signierter Modus-Pakete. Jeder Modus kommt als Pull
+      Request, wird automatisch geprüft (Signatur, ob der Quelltext dem Signierten entspricht,
+      Lizenz, Tests im Simulator) und von einem Menschen begutachtet. Was unten steht, wird beim
+      Veröffentlichen aus der index.json der Registry erzeugt.
+    modes_title: Modi
+    modes_empty: Noch keine Modi. Teile als Erste oder Erster einen.
+    modes_empty_link: So reichst du einen Modus ein
+    by: von
+    unknown_author: unbekannte Urheberschaft
+    th_version: Version
+    th_status: Status
+    th_licence: Lizenz
+    th_download: Download
+    verified: verifiziert
+    not_reviewed: nicht geprüft
+    download: Paket
+    signature: Signatur
+    kind_mode: Modus
+    kind_modifier: Modifikator
+    kind_role: Rolle
+    kind_scenario: Szenario
+    submit_title: So reichst du einen Modus ein
+    submit_text: >-
+      Baue den Modus im visuellen Editor des Projekts (oder von Hand), schreibe seine Tests, erzeuge
+      deinen eigenen Modus-Schlüssel und öffne einen Pull Request mit dem Quelltext des Modus, seinem
+      signierten Paket und seiner Zeile in der index.json. Die Schritte stehen in CONTRIBUTING.md;
+      wie die Registry funktioniert, die Prüfliste, Schlüssel und Moderation stehen in der
+      Dokumentation des Projekts.
+    submit_contributing: CONTRIBUTING.md
+    submit_docs: So funktioniert die Registry
+    submit_keys: Modus-Schlüssel
+    verified_title: Was „verifiziert“ bedeutet
+    verified_text: >-
+      Jede Version trägt die Signatur ihrer Urheberschaft. Eine Version, die das Projekt geprüft hat,
+      trägt zusätzlich die Signatur des Projekts, erstellt mit dem Registry-Schlüssel des Projekts
+      über dasselbe Archiv: das ist das Verifiziert-Siegel. Field Boxes haben den Schlüssel des
+      Projekts fest in der Firmware und nehmen deshalb nur verifizierte Modi. Ein nicht geprüfter
+      Modus kann auf einem Feld-Controller installiert werden, dessen Spielleitung dem Schlüssel
+      der Urheberschaft vertraut; die GM-Konsole weist darauf hin.
+    use_title: Diese Registry auf einem Spielfeld nutzen
+    use_text: >-
+      Richte den Feld-Controller in der controller.toml auf den Index aus und trage den
+      Registry-Schlüssel des Projekts (aus keys.json) als vertrauenswürdig ein. Der Controller prüft
+      jedes Paket mit seinen eigenen Schlüsseln: Er muss weder dieser Seite noch dem Index vertrauen.
+    use_note: >-
+      Nur mit dem Schlüssel des Projekts bietet der Controller ausschließlich verifizierte Modi an.
+      Füge den Schlüssel einer Urheberschaft hinzu, um deren noch nicht geprüfte Modi zu
+      installieren. Ein Spielfeld ohne Internet kopiert den veröffentlichten Ordner auf einen
+      USB-Stick und setzt index auf den Pfad seiner index.json.
+    index_label: Der Index
+    footer: >-
+      Erzeugt aus index.json. Die Daten der Registry stehen unter CC0-1.0; jeder Modus hat seine
+      eigene Lizenz.
+  zh-tw:
+    html_lang: zh-Hant-TW
+    name: 繁體中文
+    title: Atalaia 社群模式
+    description: Atalaia 的社群遊戲模式登錄庫，每個模式都經簽署。Atalaia 是開放的生存遊戲與 milsim 遊戲系統。
+    skip: 跳到內容
+    project: Atalaia 專案頁面
+    language: 語言
+    lead: >-
+      Atalaia 是開放的生存遊戲與 milsim 遊戲系統，這裡的遊戲模式由撰寫它們的人分享。
+    what_title: 這是什麼
+    what_text: >-
+      這個模式登錄庫是存放經簽署模式套件的 Git 儲存庫。每個模式都以 pull request 送來，經自動檢查（簽章、原始碼是否就是被簽署的內容、授權條款、在模擬器中的測試），再由人審閱。下方內容在發布時由登錄庫的 index.json 產生。
+    modes_title: 模式
+    modes_empty: 目前還沒有模式。來分享第一個吧。
+    modes_empty_link: 如何提交模式
+    by: 作者：
+    unknown_author: 作者不詳
+    th_version: 版本
+    th_status: 狀態
+    th_licence: 授權
+    th_download: 下載
+    verified: 已驗證
+    not_reviewed: 未審閱
+    download: 套件
+    signature: 簽章
+    kind_mode: 模式
+    kind_modifier: 修飾項
+    kind_role: 角色
+    kind_scenario: 劇本
+    submit_title: 如何提交模式
+    submit_text: >-
+      用專案的視覺化編輯器（或手寫）做出模式，寫好測試，產生你自己的模式金鑰，然後開一個 pull request，加入模式的原始碼、它的簽署套件，以及它在 index.json 中的一行。步驟寫在 CONTRIBUTING.md；登錄庫如何運作、審閱檢查清單、金鑰和管理規則都在專案文件中。
+    submit_contributing: CONTRIBUTING.md
+    submit_docs: 登錄庫如何運作
+    submit_keys: 模式金鑰
+    verified_title: 「已驗證」是什麼意思
+    verified_text: >-
+      每個版本都帶有作者的簽章，說明它是誰做的。專案審閱過的版本還帶有專案的簽章，由專案的登錄庫金鑰對同一個壓縮檔簽署，這就是已驗證徽章。Field Box 的韌體內建專案的金鑰，所以只接受已驗證的模式。未審閱的模式，只要主辦選擇信任作者的金鑰，仍可安裝在場地控制器上，GM 控制台會標示出來。
+    use_title: 在場地使用這個登錄庫
+    use_text: >-
+      在 controller.toml 中把場地控制器指向這個索引，並把專案的登錄庫金鑰（取自 keys.json）列為信任。控制器用自己的金鑰檢查每個套件，完全不需要信任這個頁面或索引。
+    use_note: >-
+      只信任專案金鑰時，控制器只提供已驗證的模式。加入某位作者的金鑰，就能安裝那位作者尚未審閱的模式。沒有網路的場地可把發布的資料夾複製到 USB 隨身碟，並把 index 設為其 index.json 的路徑。
+    index_label: 索引
+    footer: >-
+      由 index.json 產生。登錄庫的資料採用 CC0-1.0；每個模式有自己的授權。

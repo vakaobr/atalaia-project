@@ -73,6 +73,7 @@ header:
   roadmap: Roadmap
   build: Bauen
   hub: Community
+  registry: Registry
   glossary: Glossar
   language: Sprache
 
@@ -429,7 +430,8 @@ modes:
     title: Dein Modus
     text: >-
       Money Factory, Capture the Flag, der eigene Modus deines Clubs… Modi sind kurze Skripte. Schlag
-      einen mit der Vorlage für Spielmodus-Ideen vor.
+      einen mit der Vorlage für Spielmodus-Ideen vor oder teile einen fertigen als signiertes Paket
+      in der <a href="https://vakaobr.github.io/atalaia-modes/">Modus-Registry</a>.
     link: Eine Spielmodus-Idee teilen
 
 # The animated pictures of the modes page (tools/gen_mode_gifs.py, tools/mode_gifs.yaml):
@@ -704,7 +706,7 @@ try:
 roadmap:
   title: Roadmap
   intro: >-
-    Sechs Phasen, jede mit einem echten Feldtest als Abschluss: ihrem Gate. Die Software ist der Hardware voraus: Die Phasen 1 bis 3 sind in Software fertig (echte Boards spielen auf dem Labortisch ganze Spiele, und die iOS-App hat ihre Checkliste auf einem iPhone bestanden); die Phasen 4 und 5 sind in Software gebaut. Die Gates warten auf gebaute Boxen, Feldtests, einen echten Server und das Repository der Registry.
+    Sechs Phasen, jede mit einem echten Feldtest als Abschluss: ihrem Gate. Die Software ist der Hardware voraus: Die Phasen 1 bis 3 sind in Software fertig (echte Boards spielen auf dem Labortisch ganze Spiele, und die iOS-App hat ihre Checkliste auf einem iPhone bestanden); die Phasen 4 und 5 sind in Software gebaut. Die Gates warten auf gebaute Boxen, Feldtests, einen echten Server und den Registry-Schlüssel des Projekts.
   more: Die ganze Roadmap, mit dem Inhalt jeder Phase und ihrem Gate →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code).
@@ -1072,10 +1074,13 @@ roadmap:
         Box, in den eingebauten Modi und auf den Seiten des Site-Servers: KI-Entwürfe, noch nicht
         von Spielenden geprüft, die diese Sprachen sprechen."
       - >-
+        Das Repository der Registry gibt es (angelegt am 26. Oktober 2026), und seine
+        <a href="https://vakaobr.github.io/atalaia-modes/">Seite</a> listet die Modi, noch ohne Einträge.
+      - >-
         <a href="{{ page.to.build }}">Bauanleitungen</a> für Satellit, I/O-Pod und Ziel-Addon, als
         Text. Noch keine Box wurde danach gebaut.
     next:
-      - Das Registry-Repository aus seiner Vorlage anlegen (Aufgabe der Projektbetreuung).
+      - Den Registry-Schlüssel des Projekts offline erzeugen, damit die ersten Modi verifiziert werden können (Aufgabe der Projektbetreuung).
       - "Die Prüfung des Deutschen und des Chinesischen: Wenn du auf Deutsch oder Chinesisch
         spielst, hilf uns beim Prüfen. Übersetzungen in andere Sprachen beginnen in
         docs/translations (auf Englisch)."
@@ -1419,7 +1424,9 @@ hub:
       einem Kontakt-Link.
   browser:
     title: Modus- und Szenario-Browser
-    text: Die Modus-Registry, mit Beschreibungen, Downloads und Bewertungen der Community.
+    text: >-
+      Die <a href="https://vakaobr.github.io/atalaia-modes/">Modus-Registry</a> ist online, noch ohne Modi: Sei die oder der Erste.
+      Ein Browser mit Beschreibungen und Bewertungen der Community kommt später.
   stats:
     title: Nutzungsstatistik
     text: Freiwillige, anonyme Summen von Versionen, Plattformen und gespielten Modi. Standardmäßig aus.

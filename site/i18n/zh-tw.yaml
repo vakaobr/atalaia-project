@@ -68,6 +68,7 @@ header:
   roadmap: 路線圖
   build: 組裝
   hub: 社群
+  registry: 模式登錄庫
   glossary: 名詞解釋
   language: 語言
 
@@ -306,7 +307,7 @@ modes:
   yours:
     title: 你的模式
     text: >-
-      Money Factory、搶旗、你們社團自己的玩法……模式都是簡短的腳本。用遊戲模式點子範本提出你的想法。
+      Money Factory、搶旗、你們社團自己的玩法……模式都是簡短的腳本。用遊戲模式點子範本提出你的想法，或把做好的模式以經簽署的套件分享到<a href="https://vakaobr.github.io/atalaia-modes/">模式登錄庫</a>。
     link: 分享一個遊戲模式點子
 
 # The animated pictures of the modes page (tools/gen_mode_gifs.py, tools/mode_gifs.yaml):
@@ -492,7 +493,7 @@ try:
 roadmap:
   title: 路線圖
   intro: >-
-    六個階段，每個階段都以一次真實場地測試收尾，也就是它的「關卡」。軟體進度跑在硬體前面：第 1 到 3 階段的軟體已完成（真實開發板已在工作台上玩完整場遊戲，iOS App 已在 iPhone 上通過檢查清單）；第 4、5 階段的軟體已完成。關卡在等組裝好的盒子、場地測試、一台真正的伺服器和登錄庫的儲存庫。
+    六個階段，每個階段都以一次真實場地測試收尾，也就是它的「關卡」。軟體進度跑在硬體前面：第 1 到 3 階段的軟體已完成（真實開發板已在工作台上玩完整場遊戲，iOS App 已在 iPhone 上通過檢查清單）；第 4、5 階段的軟體已完成。關卡在等組裝好的盒子、場地測試、一台真正的伺服器和專案的登錄庫金鑰。
   more: 完整路線圖，看每個階段包含什麼和它的關卡 →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code).
@@ -688,9 +689,11 @@ roadmap:
       - <strong>模式登錄庫</strong>，已準備好作為範本：附經簽署模式的 pull request 會自動檢查（它的簽章、原始碼是否就是被簽署的內容、授權條款、在模擬器中的測試），專案審閱過的模式會得到已驗證徽章，也就是專案自己的簽章，有了它模式才能送到盒子上。如何提交模式、審閱檢查清單、金鑰和管理規則都已寫成文件。
       - <strong>德文和繁體中文</strong>（台灣使用的寫法）：本頁、GM 控制台、模式編輯器、App、Field Box 的畫面、內建模式和場地伺服器的頁面。都是 AI 草稿，還沒有經過說這些語言的玩家審閱。
       - >-
+        登錄庫的儲存庫已建立（2026 年 10 月 26 日），它的<a href="https://vakaobr.github.io/atalaia-modes/">頁面</a>會列出模式，目前還沒有任何模式。
+      - >-
         衛星盒、I/O 模組和標靶擴充模組的文字版<a href="{{ page.to.build }}">組裝指南</a>。目前還沒有任何盒子是依它們組裝的。
     next:
-      - 從範本建立登錄庫的儲存庫（維護者的工作）。
+      - 專案的登錄庫金鑰，離線產生，讓第一批模式可以被驗證（維護者的工作）。
       - 審閱德文和中文：如果你用德文或中文玩，請幫我們審閱。其他語言的翻譯從 docs/translations（英文）開始。
       - 硬體：載板 PCB（一塊做好的電路板，讓組裝更簡單）在第一批盒子組裝好之後做，還有實際組裝的照片和在場地上產生的社群內容。
     gate: 第一個正式版本發布後持續進行。
@@ -930,7 +933,8 @@ hub:
       自願加入的名單，列出使用 Atalaia 的場地和隊伍，附地區、場地類型和聯絡連結。
   browser:
     title: 模式與劇本瀏覽
-    text: 模式登錄庫，附說明、下載和社群評分。
+    text: >-
+      <a href="https://vakaobr.github.io/atalaia-modes/">模式登錄庫</a>已經上線，目前還沒有模式：來分享第一個吧。附說明和社群評分的瀏覽頁之後才會有。
   stats:
     title: 使用統計
     text: 自願加入的匿名統計，記錄版本、平台和玩過的模式總數。預設關閉。

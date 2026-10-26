@@ -229,7 +229,7 @@ section 16).
 | 6 | Signed packages in the controller | Software | **Built 2026-10-22** |
 | 13 | Missing modes from the GM console (P5R-8; built after 6) | Software (box side host-tested); real boxes: HW3 | Planned 2026-10-22 |
 | 7 | Scenario blocks in the console | Software | **Built 2026-10-22** |
-| 8 | Registry repository template | Software; publishing needs the maintainer | **Built 2026-10-22** (the repository itself waits for the maintainer) |
+| 8 | Registry repository template | Software; publishing needs the maintainer | **Built 2026-10-22**; the repository `atalaia-modes` was created 2026-10-26 (with its public page); the project's registry key is still the maintainer's |
 | 9 | Community processes | Software | **Built 2026-10-22** |
 | 10 | German | Software (after P5R-10) | **Built 2026-10-22** (AI-drafted, review pending) |
 | 11 | Traditional Chinese (Taiwan) | Software | **Built 2026-10-22** (AI-drafted, review pending) |
@@ -325,8 +325,9 @@ section 16).
    (refuse rather than rewrite; comments go once the blocks change the YAML)
    and P5F-5 (the block set, typed references) are for the maintainer. Plan
    phases 8 and 9 are built: creating `atalaia-modes` from
-   `registry/template/` waits for the maintainer (P5-3, P5R-9;
-   `docs/community/registry.md`, "Creating the repository"), as do P5G-2,
+   `registry/template/` was done on 2026-10-26 (P5-3, P5R-9; steps 1 to 3 and 5
+   of `docs/community/registry.md`, "Creating the repository"; step 4, the
+   project's registry key, waits for the maintainer), as do P5G-2,
    P5G-3, P5G-8, P5G-9, P5G-12 (accepting the RFC), P5G-13 and P5G-14.
 3. Left from plan phases 3-6, small (the editor making the package itself is
    built, P5I-1 to P5I-6, signing staying offline):

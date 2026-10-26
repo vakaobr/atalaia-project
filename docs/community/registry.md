@@ -133,7 +133,10 @@ the mode to copy when starting one; throwaway keys made at run time):
 
 ## Creating the repository (the maintainer)
 
-Not done yet (P5-3, P5R-9). When the maintainer decides to:
+Created on 2026-10-26 (P5-3, P5R-9): <https://github.com/vakaobr/atalaia-modes>, published at
+<https://vakaobr.github.io/atalaia-modes/>. Steps 1 to 3 and 5 are done; **step 4, the project's
+registry key, is still the maintainer's task** (until it is added, no mode can carry the verified
+badge). The steps, as they were:
 
 1. Create `atalaia-modes` (public) and copy the contents of
    `registry/template/` into it, `.github/` included.
@@ -147,5 +150,21 @@ Not done yet (P5-3, P5R-9). When the maintainer decides to:
    release.
 5. Turn on GitHub Pages with *GitHub Actions* as its source, and branch
    protection on `main` requiring the three checks and a code owner's review.
-6. Point the project page and `controller.toml.example` at the published index
-   (`https://<owner>.github.io/atalaia-modes/index.json`).
+6. Point the project page and `controller/controller.example.toml` at the published index
+   (`https://vakaobr.github.io/atalaia-modes/index.json`): done 2026-10-26, and the project page
+   has a "Registry" link in its menu, in every language.
+
+### The page a visitor sees
+
+GitHub Pages serves the registry's root, so the publish job also builds a page from `index.json`
+(`tools/registry_page.py`, called by `registry_check.py site`): `index.html` in English, `pt/`, `de/`
+and `zh-tw/` (one page per language, each linking the others; decision REG-PAGE-1, recorded here:
+separate pages rather than a switcher, so each one is plain static HTML that works from a USB stick
+and is indexed by language). It lists each mode (name, author, licence, each version with the verified
+badge and a link to the signed package and its signature), says how to submit one, what "verified"
+means and how a field controller uses the index, and links back to the project page. Its texts are
+`site/page.yaml` in the registry (English; the German and Traditional Chinese are AI drafts). Mode
+names, descriptions, authors and addresses come from pull requests, so they are untrusted: the script
+escapes every one and links only relative paths and `https://` addresses
+(`registry/tests/test_registry_page.py` renders hostile strings and checks that none becomes markup).
+`index.json` keeps its address and content type: `https://vakaobr.github.io/atalaia-modes/index.json`.
