@@ -351,20 +351,18 @@ class CheckinClient {
         body: {'status': 'checked_in'},
       );
 
+  /// The marshal's phone registers the key that signs its readings, for the
+  /// id the GM's list gave this player (decision MR-2): the controller
+  /// answers 403 when the player is not on the list.
   Future<Map<String, Object?>> registerMarshalKey(
     String token, {
-    required String marshalId,
-    required String name,
     required String publicKeyBase64,
+    String? marshalId,
   }) => _call(
     'PUT',
     '/checkin/me/marshal-key',
     token: token,
-    body: {
-      'marshal_id': marshalId,
-      'name': name,
-      'public_key': publicKeyBase64,
-    },
+    body: {'marshal_id': ?marshalId, 'public_key': publicKeyBase64},
   );
 
   /// One series of signed readings (protocol/checkin.md).

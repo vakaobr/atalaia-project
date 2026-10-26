@@ -6,7 +6,9 @@
 // poster, follows the check-ins as they arrive (names are shown here, to
 // staff, and nowhere else), confirms them, ticks "card seen" for a
 // federation number, gives teams, squads and roles, checks in a player
-// without the app, and works through the "replicas to chrono" list that
+// without the app, keeps the list of marshals (the only way to be one: the
+// controller gives each an id, the app shows it, decisions MR-1 to MR-14),
+// and works through the "replicas to chrono" list that
 // the marshals' signed readings fill in. With a site server (plan phase 16):
 // a game made from the schedule, its registered players as "expected"
 // until they arrive, a printed ticket scanned or pasted, and the counts of
@@ -50,6 +52,10 @@ export class CheckinPanel extends Component {
 
     componentDidMount() {
         this.load();
+        // A marshal's app registers its key without telling the stream: the list asks now and then.
+        this.marshalTimer = setInterval(() => {
+            if (this.props.app.state.role === 'gm' && this.state.marshals) this.loadMarshals();
+        }, 5000);
     }
 
     componentDidUpdate() {
@@ -74,10 +80,10 @@ export class CheckinPanel extends Component {
         if (app.state.role !== 'gm') return;
         // Only the latest load is shown: an earlier one (for no game, or the game before) can answer last.
         const seq = (this.loadSeq = (this.loadSeq || 0) + 1);
-        const [poster, info, schedule] = await Promise.all([app.call('GET', '/checkin/poster'), app.call('GET', '/checkin'),
-            app.serves('schedule') ? app.call('GET', '/schedule') : null]);
+        const [poster, info, schedule, marshals] = await Promise.all([app.call('GET', '/checkin/poster'), app.call('GET', '/checkin'),
+            app.serves('schedule') ? app.call('GET', '/schedule') : null, app.call('GET', '/marshals')]);
         if (seq !== this.loadSeq) return;
-        this.setState({ poster, classes: info ? info.limits.classes : [], schedule });
+        this.setState({ poster, classes: info ? info.limits.classes : [], schedule, marshals: marshals || [] });
         if (!g) {
             this.setState({ list: null, chrono: null });
             return;
@@ -128,6 +134,7 @@ export class CheckinPanel extends Component {
 
     componentWillUnmount() {
         clearTimeout(this.chronoTimer);
+        clearInterval(this.marshalTimer);
     }
 
     async setOpen(open) {
@@ -146,6 +153,42 @@ export class CheckinPanel extends Component {
         const g = this.game();
         await this.props.app.call('DELETE', `/games/${g.id}/checkins/${pid}`);
         this.load();
+    }
+
+    /** The marshal list (MR-1): the GM's, and the only way to be a marshal. */
+    async loadMarshals() {
+        const marshals = await this.props.app.call('GET', '/marshals');
+        // Only when something changed: a re-render would put back a name the GM is typing.
+        if (marshals && JSON.stringify(marshals) !== JSON.stringify(this.state.marshals)) this.setState({ marshals });
+    }
+
+    async addMarshal(e) {
+        e.preventDefault();
+        const a = this.state.addMarshal || { player: '', name: '', id: '' };
+        const body = {};
+        if (a.player) body.player_id = a.player;
+        if (a.name.trim()) body.name = a.name.trim();
+        if (a.id.trim()) body.marshal_id = a.id.trim();
+        const m = await this.props.app.call('POST', '/marshals', body);
+        if (m) {
+            this.setState({ addMarshal: { player: '', name: '', id: '' } });
+            this.props.app.showToast(t('checkin.marshals.added', { id: m.marshal_id }));
+            await this.loadMarshals();
+        }
+    }
+
+    async patchMarshal(id, body) {
+        const m = await this.props.app.call('PATCH', `/marshals/${encodeURIComponent(id)}`, body);
+        if (m) await this.loadMarshals();
+    }
+
+    async removeMarshal(m) {
+        if (!window.confirm(t('checkin.marshals.remove_confirm', { id: m.marshal_id, name: m.name }))) return;
+        const r = await this.props.app.call('DELETE', `/marshals/${encodeURIComponent(m.marshal_id)}`);
+        if (r) {
+            this.props.app.showToast(t('checkin.marshals.removed', { id: m.marshal_id }));
+            await this.loadMarshals();
+        }
     }
 
     async saveSettings(e) {
@@ -372,6 +415,63 @@ export class CheckinPanel extends Component {
         </form>`;
     }
 
+    /** Who may act as a marshal: ids the controller gives, a player each, and whether their app has registered its key. */
+    renderMarshals(g, list) {
+        const marshals = this.state.marshals;
+        if (!marshals) return null;
+        const here = list ? list.checkins.filter((r) => r.status === 'pending' || r.status === 'checked_in') : [];
+        const nameOf = (pid) => {
+            const row = list && list.checkins.find((r) => r.player_id === pid);
+            return row && row.display_name ? row.display_name : pid;
+        };
+        const taken = new Set(marshals.map((m) => m.player_id).filter(Boolean));
+        const add = this.state.addMarshal || { player: '', name: '', id: '' };
+        const setAdd = (k, v) => this.setState({ addMarshal: { ...add, [k]: v } });
+        return html`<section class="card" aria-labelledby="cm-h" data-testid="marshals">
+            <h2 id="cm-h">${t('checkin.marshals.title')}</h2>
+            <p class="muted">${t('checkin.marshals.intro')}</p>
+            ${marshals.length === 0 && html`<p class="muted" data-testid="marshals-empty">${t('checkin.marshals.empty')}</p>`}
+            ${marshals.length > 0 && html`<div class="table-wrap"><table class="table" data-testid="marshals-table">
+                <thead><tr><th>${t('checkin.marshals.id')}</th><th>${t('checkin.marshals.name')}</th>
+                    <th>${t('checkin.marshals.player')}</th><th>${t('checkin.marshals.key')}</th><th></th></tr></thead>
+                <tbody>${marshals.map((m) => html`<tr data-testid=${`marshal-row-${m.marshal_id}`}>
+                    <td><strong data-testid="marshal-id">${m.marshal_id}</strong></td>
+                    <td><input aria-label=${t('checkin.marshals.name')} data-testid="marshal-name" maxlength="64" value=${m.name}
+                        onChange=${(e) => e.target.value.trim() && e.target.value.trim() !== m.name
+                            && this.patchMarshal(m.marshal_id, { name: e.target.value.trim() })} /></td>
+                    <td><select aria-label=${t('checkin.marshals.player')} data-testid="marshal-player" value=${m.player_id || ''}
+                        onChange=${(e) => this.patchMarshal(m.marshal_id, { player_id: e.target.value || null })}>
+                        <option value="">${t('checkin.marshals.no_player')}</option>
+                        ${m.player_id && !here.some((r) => r.player_id === m.player_id)
+                            && html`<option value=${m.player_id}>${nameOf(m.player_id)}</option>`}
+                        ${here.filter((r) => !taken.has(r.player_id) || r.player_id === m.player_id).map((r) => html`<option
+                            value=${r.player_id}>${r.display_name || r.player_id}</option>`)}</select></td>
+                    <td><span class=${`badge ${m.key_registered ? 'status-checked_in' : 'status-pending'}`} data-testid="marshal-key">${
+                        t(m.key_registered ? 'checkin.marshals.key_ok' : 'checkin.marshals.key_waiting')}</span></td>
+                    <td><button type="button" class="link danger" data-testid="marshal-remove"
+                        onClick=${() => this.removeMarshal(m)}>${t('checkin.marshals.remove')}</button></td>
+                </tr>`)}</tbody>
+            </table></div>`}
+            <form class="form inline" data-testid="marshal-add-form" onSubmit=${(e) => this.addMarshal(e)}>
+                <h3>${t('checkin.marshals.add')}</h3>
+                <div class="field"><label for="cm-player">${t('checkin.marshals.add_player')}</label>
+                    <select id="cm-player" data-testid="marshal-add-player" value=${add.player}
+                        onChange=${(e) => setAdd('player', e.target.value)}>
+                        <option value="">–</option>
+                        ${here.filter((r) => !taken.has(r.player_id)).map((r) => html`<option
+                            value=${r.player_id}>${r.display_name || r.player_id}</option>`)}</select></div>
+                <div class="field"><label for="cm-mname">${t('checkin.marshals.add_name')}</label>
+                    <input id="cm-mname" data-testid="marshal-add-name" maxlength="64" value=${add.name}
+                        onInput=${(e) => setAdd('name', e.target.value)} /></div>
+                <div class="field"><label for="cm-mid">${t('checkin.marshals.add_id')}</label>
+                    <input id="cm-mid" data-testid="marshal-add-id" maxlength="64" pattern="[A-Za-z0-9._:\\-]+" value=${add.id}
+                        onInput=${(e) => setAdd('id', e.target.value)} /></div>
+                <button type="submit" class="primary" data-testid="marshal-add" disabled=${!add.player && !add.name.trim()}>${
+                    t('checkin.marshals.add')}</button>
+            </form>
+        </section>`;
+    }
+
     renderChrono() {
         const c = this.state.chrono;
         if (!c) return null;
@@ -453,6 +553,7 @@ export class CheckinPanel extends Component {
             ${this.renderSchedule()}
             ${g && list && this.renderHead(g, list)}
             ${g && list && this.renderList(g, list)}
+            ${this.renderMarshals(g, list)}
             ${g && this.renderChrono()}
             ${g && this.renderSettings()}
             ${this.renderPoster()}

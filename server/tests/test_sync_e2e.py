@@ -355,7 +355,7 @@ class SyncEndToEndTests(unittest.TestCase):
         # Ana's declared replica passes the chrono at the gate.
         key = Ed25519PrivateKey.generate()
         pub = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-        svc.register_marshal({"marshal_id": "m-ana", "name": "Marta", "public_key": base64.b64encode(pub).decode()})
+        svc.add_marshal({"marshal_id": "m-ana", "name": "Marta", "public_key": base64.b64encode(pub).decode()})  # the GM lists her (MR-1)
         replica = str(uuid.uuid4())
         rec = {"reading_id": str(uuid.uuid4()), "replica_id": replica, "player_id": ana_phone[0], "type": "checkin",
                "velocity_mps": 100.0, "bb_weight_g": 0.2, "energy_j": chrono.round_half_away(chrono.energy_j(0.2, 100.0), 3),

@@ -380,6 +380,23 @@ const Map<String, String> enStrings = {
       '{n} readings on this phone. They are kept for 365 days, then deleted.',
   'marshal.erase': "Erase someone's readings",
   'marshal.erase_do': 'Erase',
+  'marshal.checking': 'Asking the field controller…',
+  'marshal.you_are': 'You are marshal {id} ({name})',
+  'marshal.id_from_gm':
+      "The id and name come from the GM's marshal list; the field controller confirmed them.",
+  'marshal.not_listed':
+      'The field controller does not have you on its marshal list. Ask the GM to add you as a marshal.',
+  'marshal.revoked':
+      'The GM took you off the marshal list, so this phone is no longer a marshal here. The {n} series not yet sent stay on this phone and can be sent if the GM adds you again.',
+  'marshal.offline_never':
+      "The field controller cannot be reached, and this phone has not been confirmed as a marshal here yet. Join the field's network once and ask again.",
+  'marshal.offline_expired':
+      "The field controller cannot be reached, and its confirmation of {at} has run out. Join the field's network and ask again.",
+  'marshal.offline_ok':
+      "Offline: the field controller confirmed you as marshal {id} on {at}. That holds until {until}; after that, join the field's network to confirm again.",
+  'marshal.retry': 'Ask again',
+  'marshal.expired_now':
+      "The field controller's confirmation has run out: ask again before recording.",
 
   // Chrono
   'chrono.title': 'Chronograph',
@@ -559,6 +576,8 @@ const Map<String, String> enStrings = {
   'queue.manual_done': 'Checked in: {id}',
   'queue.send_pending': 'Send {n} series not sent yet',
   'queue.send_failed': '{n} series were not accepted; they stay on this phone.',
+  'queue.held':
+      '{n} series were not accepted because the controller does not have you on its marshal list; they stay on this phone.',
   'queue.waiting_confirmation': 'waiting for confirmation',
   'queue.unregistered': 'not registered yet',
   'chrono.send': 'Send to the controller',

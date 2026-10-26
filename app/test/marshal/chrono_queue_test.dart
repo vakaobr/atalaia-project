@@ -24,6 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_harness.dart';
 import '../support/fake_field.dart';
+import '../support/marshal_trust.dart';
 
 final templates = [
   LimitTemplate.parse(
@@ -80,13 +81,23 @@ void main() {
       'display_name': 'Rui',
       'notice_version': 1,
     }, null);
-    field.assign('p-marshalmarsh', role: 'marshal');
+    field.listMarshal('p-marshalmarsh', id: 'm-rui', name: 'Rui');
+    final marshalToken =
+        field
+                .handle(
+                  'POST',
+                  '/checkin/token',
+                  null,
+                  t.json['token'] as String,
+                )
+                .json['token']!
+            as String;
     marshal = FieldCheckin(
       fieldId: field.fieldId,
       gameId: 42,
       gameName: 'Domingo de manhã',
       playerId: 'p-marshalmarsh',
-      token: t.json['token']! as String,
+      token: marshalToken,
       exp: 4102444800,
       status: 'checked_in',
       role: 'marshal',
@@ -101,6 +112,9 @@ void main() {
     final r = MarshalRecords(store, settings);
     await r.load();
     await r.newKey();
+    trustMarshal(r);
+    // The controller holds the key it was told (MR-5).
+    field.marshalKeys['m-rui'] = r.publicKeyBase64!;
     return r;
   }
 

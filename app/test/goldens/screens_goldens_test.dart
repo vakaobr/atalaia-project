@@ -29,6 +29,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_harness.dart';
 import '../support/fakes.dart';
+import '../support/marshal_trust.dart';
 import '../support/scenario_feed.dart';
 
 Future<void> phone(WidgetTester tester) async {
@@ -229,6 +230,7 @@ void main() {
       await tester.runAsync(() async {
         await records.load();
         await records.newKey();
+        trustMarshal(records, at: DateTime.utc(2026, 10, 19, 9));
         await records.addReplica(replica);
       });
       final templates = [

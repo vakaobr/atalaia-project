@@ -401,6 +401,23 @@ const Map<String, String> deStrings = {
       'gelöscht.',
   'marshal.erase': 'Messwerte einer Person löschen',
   'marshal.erase_do': 'Löschen',
+  'marshal.checking': 'Frage den Feld-Controller …',
+  'marshal.you_are': 'Du bist Marshal {id} ({name})',
+  'marshal.id_from_gm':
+      'ID und Name stammen aus der Marshal-Liste der Spielleitung; der Feld-Controller hat sie bestätigt.',
+  'marshal.not_listed':
+      'Der Feld-Controller hat dich nicht auf seiner Marshal-Liste. Bitte die Spielleitung, dich als Marshal einzutragen.',
+  'marshal.revoked':
+      'Die Spielleitung hat dich von der Marshal-Liste genommen; dieses Handy ist hier kein Marshal mehr. Die {n} noch nicht gesendeten Serien bleiben auf diesem Handy und können gesendet werden, wenn die Spielleitung dich wieder einträgt.',
+  'marshal.offline_never':
+      'Der Feld-Controller ist nicht erreichbar, und dieses Handy wurde hier noch nicht als Marshal bestätigt. Verbinde dich einmal mit dem Netz des Felds und frag erneut.',
+  'marshal.offline_expired':
+      'Der Feld-Controller ist nicht erreichbar, und seine Bestätigung vom {at} ist abgelaufen. Verbinde dich mit dem Netz des Felds und frag erneut.',
+  'marshal.offline_ok':
+      'Offline: Der Feld-Controller hat dich am {at} als Marshal {id} bestätigt. Das gilt bis {until}; danach verbinde dich mit dem Netz des Felds, um erneut zu bestätigen.',
+  'marshal.retry': 'Erneut fragen',
+  'marshal.expired_now':
+      'Die Bestätigung des Feld-Controllers ist abgelaufen: Frag erneut, bevor du aufzeichnest.',
 
   // Chrono
   'chrono.title': 'Chrono',
@@ -581,6 +598,8 @@ const Map<String, String> deStrings = {
   'queue.send_pending': '{n} noch nicht gesendete Serien senden',
   'queue.send_failed':
       '{n} Serien wurden nicht angenommen; sie bleiben auf diesem Handy.',
+  'queue.held':
+      '{n} Serien wurden nicht angenommen, weil der Controller dich nicht auf seiner Marshal-Liste hat; sie bleiben auf diesem Handy.',
   'queue.waiting_confirmation': 'wartet auf Bestätigung',
   'queue.unregistered': 'noch nicht registriert',
   'chrono.send': 'An den Controller senden',

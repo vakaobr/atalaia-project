@@ -21,6 +21,7 @@ import '../branding/branded.dart';
 import '../branding/field_branding.dart';
 import '../l10n/strings.dart';
 import '../marshal/chrono_queue.dart';
+import '../marshal/marshal_access.dart';
 import '../player/field_feed.dart';
 import '../player/player_screens.dart';
 import '../protocol/checkin_poster.dart';
@@ -613,7 +614,7 @@ class _CheckinStatusScreenState extends State<CheckinStatusScreen> {
       c.role = '${me['role']}';
       c.team = me['team'] as String?;
       c.squad = (me['squad'] as int?) ?? 0;
-      await _registerMarshalKey();
+      await _confirmMarshal(me);
       if (mounted) {
         setState(() {
           _me = me;
@@ -635,27 +636,25 @@ class _CheckinStatusScreenState extends State<CheckinStatusScreen> {
   bool _expiresSoon() =>
       c.exp * 1000 - DateTime.now().millisecondsSinceEpoch < 15 * 60 * 1000;
 
-  /// A marshal's phone registers the key that signs its readings, once the
-  /// GM has given the marshal role (ADR-P3-13).
-  Future<void> _registerMarshalKey() async {
-    if (c.role != 'marshal') return;
-    final st = AppScope.read(context).settings;
-    final seed = st.marshalSeedHex;
-    if (seed == null || st.marshalId.isEmpty || st.marshalName.trim().isEmpty) {
+  /// A marshal's phone is confirmed on the field's marshal list and registers
+  /// the key that signs its readings, for the id the GM's list gave it
+  /// (decisions MR-2, MR-5; the id comes in [me], never from the marshal); a
+  /// marshal the GM took off the list loses the confirmation here too (MR-8).
+  Future<void> _confirmMarshal(Map<String, Object?> me) async {
+    final app = AppScope.read(context);
+    final st = app.settings;
+    if (c.role != 'marshal' && st.marshalValidation?.fieldId != c.fieldId) {
       return;
     }
     final records = await marshalRecordsFor(context);
-    final key = records.publicKeyBase64;
-    if (key == null) return;
     try {
-      await _client.registerMarshalKey(
-        c.token,
-        marshalId: st.marshalId,
-        name: st.marshalName.trim(),
-        publicKeyBase64: key,
-      );
+      await MarshalAccess(
+        settings: st,
+        records: records,
+        persist: () => app.update((_) {}),
+      ).applyMe(_client, c, me);
     } on CheckinException {
-      // Shown in the marshal's queue when a reading is refused.
+      // Shown by the marshal's screen, which asks again when it opens.
     }
   }
 

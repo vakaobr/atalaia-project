@@ -100,11 +100,19 @@ The **player token** is `protocol/player-token.md`'s, keyed with the controller'
 
 | Method | Path | |
 | --- | --- | --- |
-| GET | `/api/v1/checkin/me` | The check-in with its fields and the declaration with states; `stale_token` when the token no longer matches the row |
+| GET | `/api/v1/checkin/me` | The check-in with its fields and the declaration with states; `stale_token` when the token no longer matches the row; for the role `marshal`, also `marshal` (below) |
 | PUT | `/api/v1/checkin/me/replicas` | `{"replicas": [ <declarations> ]}` replaces the declaration |
 | DELETE | `/api/v1/checkin/me` | Leave the game: status `left`, the name, federation number and team preference erased, pending declarations withdrawn |
-| PUT | `/api/v1/checkin/me/marshal-key` | A marshal (role given by the GM) registers `{"marshal_id", "name", "public_key"}`, the Ed25519 key that signs their readings |
+| PUT | `/api/v1/checkin/me/marshal-key` | A marshal on the GM's list registers `{"public_key", "marshal_id"?}`, the Ed25519 key that signs their readings, for the id the list gave them (`marshal_id`, if sent, must be that one: 409; not on the list: 403) |
 | POST | `/api/v1/positions` | Player positions (ADR-P3-6), not check-in data |
+
+## Marshals: only from the GM's list
+
+A marshal is someone on **the marshal list**, which only the GM edits (decisions MR-1 to MR-14); the app never has a marshal type an id. Everything the controller already checked still holds (the GM token for `POST /api/v1/marshals`, the `marshal` role for the key, a registered key for every reading); the list adds who may register one and tells the app before it acts.
+
+- **Adding** (`POST /api/v1/marshals`): `player_id` is a player who has checked in at this field (404 otherwise) and gets the `marshal` role in every check-in that still counts; `marshal_id` is the controller's (the lowest free `M-01`, `M-02`...) unless the GM gives one (`A-Z a-z 0-9 . _ : -`, 1 to 64); `name` is the player's own display name unless given. A player is on the list once (409 for a second id). With no `player_id` the entry waits (a name for a phone that comes later, bound with PATCH); `public_key` (the GM registering a key for them) is still accepted. Answer: `{marshal_id, name, player_id, public_key, key_registered, registered_at, created_at}` (`public_key` and `registered_at` null until a key is registered).
+- **The app asks** (`GET /api/v1/checkin/me`): for a check-in with the role `marshal` the answer has `marshal`: `{"marshal_id", "name", "public_key", "valid_for_s"}`, or `null` when the player is not on the list (a role given by hand is not the list). `public_key` is the key the controller holds for the id (null before the app registered one); `valid_for_s` (86400) is how long the app may go on acting as this marshal offline after this answer (MR-4). The app takes its id and name from here, registers its key (`PUT .../me/marshal-key`) when `public_key` is not its own, and is a marshal only on a yes; a role other than `marshal`, or `marshal: null`, is a no, and what it had before is gone.
+- **Taking off** (`DELETE /api/v1/marshals/{id}`) and **rebinding** (`PATCH` with another `player_id`): the id's key stops verifying at once (it moves to the key history, so what it signed before still verifies on the site server), the player is a `player` again and their token loses the staff rights on its next request. Readings the removed marshal's phone had not sent are refused (`reason: "marshal"`, or 403 for the token) and stay on the phone; the GM adding the same player again (the same id when it is free, the same key) lets them go.
 
 ## Declarations
 
@@ -196,7 +204,8 @@ Version 1, at most 128 bytes with the version byte. All three keys are required.
 | POST | `/api/v1/games/{id}/checkin/open` · `/close` | GM token | Check-in is open from a game's creation until it ends, unless closed |
 | GET / PUT | `/api/v1/checkin/settings` | GM token | `confirm`, `federation`, `federation_label`, `max_replicas`, `max_players`, `chrono_valid_for` |
 | GET / PUT | `/api/v1/checkin/poster` | GM token | The poster's fields and text, `ca_short`, and why it cannot be made (`problem` in English, `problem_code` for the console: `https_off`, `no_address`, `too_long`, `invalid`); PUT `urls`, `wifi_ssid`, `game_id`, `field_name` |
-| GET / POST | `/api/v1/marshals` | GM token | Marshals' public keys / register one `{"marshal_id", "name", "public_key", "player_id"?}` (base64 or hex, 32 bytes) |
+| GET / POST | `/api/v1/marshals` | GM token | The marshal list / add to it `{"player_id"?, "name"?, "marshal_id"?, "public_key"?}` (below) |
+| PATCH / DELETE | `/api/v1/marshals/{id}` | GM token | Rename (`name`) or rebind (`player_id`, null unbinds) / take a marshal off the list |
 | GET / DELETE | `/api/v1/players/{player}/chrono` | GM token or the player's token | Their readings / erase them |
 | DELETE | `/api/v1/players/{player}` | GM token | Erase the field identity, check-ins and declarations (`?chrono=true`: the readings too) |
 
@@ -217,4 +226,4 @@ Kept: the field identity (id, hash of the secret), per check-in the display name
 
 ## Offline
 
-Nothing needs the internet. When the controller is out of reach, the app keeps its token and declaration and tries again; the marshal's app keeps signing readings and uploads them later. A standby controller that takes over has none of this (it never travels on the radio) and another token key: the apps check in again with their field identities and resend, and the marshals resend their readings (decision F9).
+Nothing needs the internet. When the controller is out of reach, the app keeps its token and declaration and tries again; the marshal's app keeps signing readings for as long as the controller's last yes holds (`valid_for_s`, two hours; no yes yet, or an old one, and it records nothing: MR-4) and uploads them later. A standby controller that takes over has none of this (it never travels on the radio) and another token key: the apps check in again with their field identities and resend, and the marshals resend their readings (decision F9).

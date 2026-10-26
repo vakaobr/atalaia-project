@@ -160,7 +160,10 @@ class P3Case(unittest.TestCase):
         m = marshal or Marshal()
         me = self.check_in(game_id, name=m.name)
         pid = me["player_id"]
-        self.gm_patch(game_id, pid, role="marshal")
+        # The GM's list is what makes a marshal (MR-1): adding the player gives them the role.
+        r = self.client.post("/api/v1/marshals", headers=GM,
+                             json={"marshal_id": m.marshal_id, "name": m.name, "player_id": pid})
+        self.assertEqual(r.status_code, 201, r.text)
         r = self.client.post("/api/v1/checkin/token", headers=bearer(me["token"]))
         self.assertEqual(r.status_code, 200, r.text)
         token = r.json()["token"]

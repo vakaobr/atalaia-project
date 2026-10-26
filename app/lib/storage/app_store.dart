@@ -22,6 +22,66 @@ import 'package:flutter/material.dart' show ThemeMode;
 import '../l10n/strings.dart';
 import '../security/bytes.dart';
 
+/// What the field controller last told this phone about its marshal id
+/// (decisions MR-2 to MR-5): the id and name come from the GM's list, never
+/// from the marshal; the phone acts as a marshal only while this is valid,
+/// for this key, on this field. Times are milliseconds since the epoch.
+final class MarshalValidation {
+  const MarshalValidation({
+    required this.marshalId,
+    required this.name,
+    required this.fieldId,
+    required this.publicKey,
+    required this.validatedAtMs,
+    required this.validUntilMs,
+  });
+
+  final String marshalId;
+  final String name;
+  final String fieldId;
+
+  /// The signing key the controller holds for [marshalId], standard base64.
+  final String publicKey;
+  final int validatedAtMs;
+  final int validUntilMs;
+
+  Map<String, Object?> toJson() => {
+    'marshal_id': marshalId,
+    'name': name,
+    'field_id': fieldId,
+    'public_key': publicKey,
+    'validated_at': validatedAtMs,
+    'valid_until': validUntilMs,
+  };
+
+  static MarshalValidation? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final j = raw.cast<String, Object?>();
+    final id = j['marshal_id'];
+    final name = j['name'];
+    final field = j['field_id'];
+    final key = j['public_key'];
+    final at = j['validated_at'];
+    final until = j['valid_until'];
+    if (id is! String ||
+        name is! String ||
+        field is! String ||
+        key is! String ||
+        at is! int ||
+        until is! int) {
+      return null;
+    }
+    return MarshalValidation(
+      marshalId: id,
+      name: name,
+      fieldId: field,
+      publicKey: key,
+      validatedAtMs: at,
+      validUntilMs: until,
+    );
+  }
+}
+
 final class AppSettings {
   AppSettings();
 
@@ -55,6 +115,10 @@ final class AppSettings {
   String? marshalSeedHex;
   String fieldId = 'field';
   String chronoId = 'chrono-1';
+
+  /// The field controller's confirmation that this phone is a marshal on its
+  /// list (MR-2); null until one came, and after the GM took the marshal off.
+  MarshalValidation? marshalValidation;
   String limitTemplate = 'portugal';
 
   /// The team the player view highlights.
@@ -139,6 +203,7 @@ final class AppSettings {
     'marshal_name': marshalName,
     'marshal_id': marshalId,
     'marshal_seed': marshalSeedHex,
+    'marshal_validation': marshalValidation?.toJson(),
     'field_id': fieldId,
     'chrono_id': chronoId,
     'limit_template': limitTemplate,
@@ -170,6 +235,7 @@ final class AppSettings {
       ..marshalName = str('marshal_name') ?? ''
       ..marshalId = str('marshal_id') ?? ''
       ..marshalSeedHex = str('marshal_seed')
+      ..marshalValidation = MarshalValidation.fromJson(j['marshal_validation'])
       ..fieldId = str('field_id') ?? 'field'
       ..chronoId = str('chrono_id') ?? 'chrono-1'
       ..limitTemplate = str('limit_template') ?? 'portugal'

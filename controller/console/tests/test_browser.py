@@ -3549,6 +3549,68 @@ class ConsoleBrowserTests(unittest.TestCase):
         read.get_by_test_id("tab-checkin").click()
         expect(read.locator("main.content")).not_to_contain_text("Coruja")
 
+    def test_marshal_list_in_the_checkin_tab(self):
+        """Decisions MR-1 to MR-14: the GM adds a checked-in player to the marshal list (the controller gives the
+        id and the role), sees when the player's app has registered its key, renames and removes."""
+        game = self.field.create_game()
+        page = self.console()
+        page.get_by_test_id("tab-checkin").click()
+        expect(page.get_by_test_id("marshals")).to_be_visible()
+        expect(page.get_by_test_id("marshals-empty")).to_be_visible()
+        expect(page.get_by_test_id("marshal-add")).to_be_disabled()
+        me = self.check_in(game["id"], "Coruja")
+        other = self.check_in(game["id"], "Gaivota")
+        add = page.get_by_test_id("marshal-add-player")
+        expect(add.locator("option")).to_have_count(3)  # none, and the two who checked in
+        add.select_option(label="Coruja")
+        page.get_by_test_id("marshal-add").click()
+        row = page.get_by_test_id("marshal-row-M-01")
+        expect(row).to_be_visible()
+        expect(row.get_by_test_id("marshal-id")).to_have_text("M-01")
+        expect(row.get_by_test_id("marshal-name")).to_have_value("Coruja")  # the player's own name
+        expect(row.get_by_test_id("marshal-key")).to_have_text("à espera da app")
+        entry = self.field.bundle.store.roster_entry("M-01")
+        self.assertEqual((entry["player_id"], entry["name"]), (me["player_id"], "Coruja"))
+        # The role follows the list, in the check-in table, live.
+        expect(page.get_by_test_id(f"checkin-row-{me['player_id']}").get_by_test_id("checkin-role")).to_have_value("marshal")
+        # The one added is no longer offered as a new marshal.
+        expect(page.get_by_test_id("marshal-add-player").locator("option")).to_have_count(2)
+        # The player's app learns its id and registers its key; the list shows it without a reload.
+        old = {"Authorization": f"Bearer {me['token']}"}
+        mine = httpx.get(self.field.base + "/api/v1/checkin/me", headers=old, timeout=10).json()
+        self.assertTrue(mine["stale_token"])  # made before the role: the app asks for a new one, as it does
+        self.assertEqual(mine["marshal"]["marshal_id"], "M-01")
+        fresh = httpx.post(self.field.base + "/api/v1/checkin/token", headers=old, timeout=10).json()["token"]
+        r = httpx.put(self.field.base + "/api/v1/checkin/me/marshal-key", headers={"Authorization": f"Bearer {fresh}"},
+                      json={"public_key": "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg="}, timeout=10)
+        self.assertEqual(r.status_code, 200, r.text)
+        expect(row.get_by_test_id("marshal-key")).to_have_text("registada", timeout=15000)
+        # A name only, no player yet (a marshal whose phone comes later), then tied to one.
+        page.get_by_test_id("marshal-add-name").fill("Posto da entrada")
+        page.get_by_test_id("marshal-add").click()
+        row2 = page.get_by_test_id("marshal-row-M-02")
+        expect(row2).to_be_visible()
+        expect(row2.get_by_test_id("marshal-player")).to_have_value("")
+        row2.get_by_test_id("marshal-player").select_option(label="Gaivota")
+        self.assertTrue(wait_for(lambda: self.field.bundle.store.roster_entry("M-02")["player_id"] == other["player_id"], 5))
+        # The list has been drawn again from the controller's answer (it would put back a name typed before).
+        expect(row2.get_by_test_id("marshal-player")).to_have_value(other["player_id"])
+        row2.get_by_test_id("marshal-name").fill("Gaivota (entrada)")
+        row2.get_by_test_id("marshal-name").press("Tab")
+        self.assertTrue(wait_for(lambda: self.field.bundle.store.roster_entry("M-02")["name"] == "Gaivota (entrada)", 5))
+        # Removing asks first, and revokes at once: the key stops, the role goes.
+        page.once("dialog", lambda d: d.accept())
+        row.get_by_test_id("marshal-remove").click()
+        expect(page.get_by_test_id("marshal-row-M-01")).to_have_count(0)
+        self.assertIsNone(self.field.bundle.store.roster_entry("M-01"))
+        self.assertIsNone(self.field.bundle.store.marshal("M-01"))
+        self.assertTrue(wait_for(lambda: self.field.bundle.store.checkin(game["id"], me["player_id"])["role"] == "player", 5))
+        expect(page.get_by_test_id(f"checkin-row-{me['player_id']}").get_by_test_id("checkin-role")).to_have_value("player")
+        # The read token has no list.
+        read = self.console(READ)
+        read.get_by_test_id("tab-checkin").click()
+        expect(read.get_by_test_id("marshals")).to_have_count(0)
+
     def test_a_game_from_the_schedule_and_its_registered_players(self):
         """Plan phase 16: the site server's schedule, a game made from it, the roster's players expected."""
         import hashlib

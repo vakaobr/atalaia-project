@@ -104,7 +104,8 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/games/{id}/chrono-list    staff: the "replicas to chrono" list
     POST /api/v1/games/{id}/checkin/open|close  GM
     POST /api/v1/chrono/readings           a marshal's signed series of readings
-    GET|POST /api/v1/marshals              GM: marshals' public keys
+    GET|POST /api/v1/marshals              GM: the marshal list (ids, names, the player each is bound to, keys)
+    PATCH|DELETE /api/v1/marshals/{id}     GM: rename or rebind / take a marshal off the list (revokes)
     GET|PUT /api/v1/checkin/settings       GM: confirm, federation, limits
     GET|PUT /api/v1/checkin/poster         GM: the check-in poster's text and fields
     POST /api/v1/games/{id}/checkins/ticket  staff: a registered player's printed ticket, scanned
@@ -1160,7 +1161,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     def checkin_marshal_key(v: Viewer = Depends(require_player), body: Any = Body(None)) -> dict[str, Any]:
         if v.role != "marshal":
             raise HTTPException(403, "only a marshal registers a signing key (the GM gives the role)")
-        return need_checkin().register_marshal(body_map(body), player_id=v.player_id)
+        return need_checkin().register_my_key(v, body_map(body))
 
     @app.get("/api/v1/games/{game_id}/checkins")
     def checkins_list(game_id: int, v: Viewer = Depends(require_read)) -> JSONResponse:
@@ -1222,7 +1223,15 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
 
     @app.post("/api/v1/marshals", status_code=201, dependencies=[Depends(require_gm)])
     def marshal_add(body: Any = Body(None)) -> dict[str, Any]:
-        return need_checkin().register_marshal(body_map(body))
+        return need_checkin().add_marshal(body_map(body))
+
+    @app.patch("/api/v1/marshals/{marshal_id}", dependencies=[Depends(require_gm)])
+    def marshal_patch(marshal_id: str, body: Any = Body(None)) -> dict[str, Any]:
+        return need_checkin().patch_marshal(marshal_id, body_map(body))
+
+    @app.delete("/api/v1/marshals/{marshal_id}", dependencies=[Depends(require_gm)])
+    def marshal_remove(marshal_id: str) -> dict[str, Any]:
+        return need_checkin().remove_marshal(marshal_id)
 
     @app.get("/api/v1/checkin/settings", dependencies=[Depends(require_gm)])
     def checkin_settings() -> dict[str, Any]:

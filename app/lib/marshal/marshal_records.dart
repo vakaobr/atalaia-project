@@ -22,6 +22,19 @@ import '../chrono/spot_check.dart';
 import '../security/bytes.dart';
 import '../storage/app_store.dart';
 
+/// How far a phone's clock may be behind the time the controller confirmed
+/// it, before the confirmation is not trusted (a clock put back to stretch it).
+const clockSlackMs = 5 * 60 * 1000;
+
+/// A reading was asked for while the field controller's confirmation of this
+/// phone as a marshal is missing, refused or run out (MR-2, MR-4).
+class MarshalNotAuthorised implements Exception {
+  const MarshalNotAuthorised();
+
+  @override
+  String toString() => 'MarshalNotAuthorised';
+}
+
 class MarshalRecords extends ChangeNotifier {
   MarshalRecords(
     this.store,
@@ -42,6 +55,8 @@ class MarshalRecords extends ChangeNotifier {
   /// The marshal's public key, once there is one.
   Uint8List? get publicKey => _key?.publicKey;
 
+  bool get hasKey => _key != null;
+
   /// [publicKey] in base64, as the controller registers it.
   String? get publicKeyBase64 =>
       _key == null ? null : base64.encode(publicKey!);
@@ -53,8 +68,22 @@ class MarshalRecords extends ChangeNotifier {
   /// declaration id): the next upload of their readings links them.
   final pendingLinks = <String, String>{};
 
+  /// Whether the field controller's confirmation of this phone as a marshal
+  /// is valid now (MR-2, MR-4): given for this id and this key, and not
+  /// run out. Readings are recorded only then; a phone whose clock was put
+  /// back is not trusted either.
+  bool get authorized {
+    final v = settings.marshalValidation;
+    if (v == null || _key == null) return false;
+    final now = _now().millisecondsSinceEpoch;
+    return v.marshalId == settings.marshalId &&
+        v.publicKey == publicKeyBase64 &&
+        now >= v.validatedAtMs - clockSlackMs &&
+        now < v.validUntilMs;
+  }
+
   bool get hasIdentity =>
-      _key != null &&
+      authorized &&
       settings.marshalName.trim().isNotEmpty &&
       settings.marshalId.isNotEmpty;
 
@@ -136,6 +165,7 @@ class MarshalRecords extends ChangeNotifier {
   }) async {
     final key = _key;
     if (key == null) throw StateError('the marshal has no key yet');
+    if (!hasIdentity) throw const MarshalNotAuthorised();
     final unsigned = ChronoReading.measure(
       replicaId: replica.replicaId,
       playerId: replica.ownerPlayerId,

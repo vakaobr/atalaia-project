@@ -247,25 +247,37 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
     final records = _records!;
     setState(() => _sending = true);
     var failed = 0;
+    var held = 0;
     for (final series in records.unsentSeries()) {
       try {
         await ChronoUpload(client: _client, checkin: c).send(records, series);
       } on CheckinException catch (e) {
-        if (e.status == 422) {
-          // Refused for good (another field, an unregistered key): kept here only.
+        // The controller does not have this marshal on its list (or the
+        // check-in is no longer a marshal's): the GM may add them again, so
+        // the series wait on this phone (MR-8); they are not given up.
+        final marshalRefused = e.reasons.any((r) => r['reason'] == 'marshal');
+        if (marshalRefused || e.status == 403) {
+          held++;
+        } else if (e.status == 422) {
+          // Refused for good (another field, a signature that does not
+          // verify): kept here only.
           await records.markUploaded(series.map((r) => r.readingId));
         }
         failed++;
       }
     }
+    // The list first: its own answer (or error) must not wipe what was said
+    // about the series that stayed on the phone.
+    await _load();
     if (!mounted) return;
     setState(() {
       _sending = false;
-      _error = failed == 0
-          ? null
-          : context.s.t('queue.send_failed', {'n': failed});
+      if (held > 0) {
+        _error = context.s.t('queue.held', {'n': held});
+      } else if (failed > 0) {
+        _error = context.s.t('queue.send_failed', {'n': failed});
+      }
     });
-    await _load();
   }
 
   @override

@@ -67,7 +67,8 @@
 ///     GET  /api/v1/games/{id}/chrono-list    staff: the "replicas to chrono" list
 ///     POST /api/v1/games/{id}/checkin/open|close  GM
 ///     POST /api/v1/chrono/readings           a marshal's signed series of readings
-///     GET|POST /api/v1/marshals              GM: marshals' public keys
+///     GET|POST /api/v1/marshals              GM: the marshal list (ids, names, the player each is bound to, keys)
+///     PATCH|DELETE /api/v1/marshals/{id}     GM: rename or rebind / take a marshal off the list (revokes)
 ///     GET|PUT /api/v1/checkin/settings       GM: confirm, federation, limits
 ///     GET|PUT /api/v1/checkin/poster         GM: the check-in poster's text and fields
 ///     GET|DELETE /api/v1/players/{player}/chrono  the GM or the player: their readings
@@ -966,10 +967,7 @@ class ControllerApi {
             'only a marshal registers a signing key (the GM gives the role)',
           );
         }
-        return ApiResponse(
-          200,
-          _svc().registerMarshal(r.body, playerId: v.playerId),
-        );
+        return ApiResponse(200, _svc().registerMyKey(v, r.body));
       }),
     ),
     _route(
@@ -1062,7 +1060,17 @@ class ControllerApi {
     _route(
       'POST',
       r'/api/v1/marshals',
-      _gm((r) => ApiResponse(201, _svc().registerMarshal(r.body))),
+      _gm((r) => ApiResponse(201, _svc().addMarshal(r.body))),
+    ),
+    _route(
+      'PATCH',
+      r'/api/v1/marshals/([^/]+)',
+      _gm((r) => ApiResponse(200, _svc().patchMarshal(r.pathText(1), r.body))),
+    ),
+    _route(
+      'DELETE',
+      r'/api/v1/marshals/([^/]+)',
+      _gm((r) => ApiResponse(200, _svc().removeMarshal(r.pathText(1)))),
     ),
     _route(
       'GET',

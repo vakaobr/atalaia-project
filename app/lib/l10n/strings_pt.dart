@@ -390,6 +390,23 @@ const Map<String, String> ptStrings = {
       'apagadas.',
   'marshal.erase': 'Apagar as medições de alguém',
   'marshal.erase_do': 'Apagar',
+  'marshal.checking': 'A perguntar ao controlador do campo…',
+  'marshal.you_are': 'O teu identificador de marshal é {id} ({name})',
+  'marshal.id_from_gm':
+      'O identificador e o nome vêm da lista de marshals da organização; o controlador do campo confirmou-os.',
+  'marshal.not_listed':
+      'O controlador do campo não te tem na lista de marshals. Pede à organização para te acrescentar como marshal.',
+  'marshal.revoked':
+      'A organização retirou-te da lista de marshals, por isso este telemóvel já não é de marshal neste campo. As {n} série(s) por enviar ficam neste telemóvel e podem ser enviadas se a organização te voltar a acrescentar.',
+  'marshal.offline_never':
+      'Sem ligação ao controlador do campo, e este telemóvel ainda não foi confirmado como marshal aqui. Liga-te uma vez à rede do campo e pergunta outra vez.',
+  'marshal.offline_expired':
+      'Sem ligação ao controlador do campo, e a confirmação de {at} caducou. Liga-te à rede do campo e pergunta outra vez.',
+  'marshal.offline_ok':
+      'Sem ligação: o controlador do campo confirmou-te como marshal {id} em {at}. Vale até {until}; depois disso, liga-te à rede do campo para confirmar outra vez.',
+  'marshal.retry': 'Perguntar outra vez',
+  'marshal.expired_now':
+      'A confirmação do controlador do campo caducou: pergunta outra vez antes de registar.',
 
   // Cronógrafo
   'chrono.title': 'Cronógrafo',
@@ -568,6 +585,8 @@ const Map<String, String> ptStrings = {
   'queue.manual_done': 'Check-in feito: {id}',
   'queue.send_pending': 'Enviar {n} série(s) por enviar',
   'queue.send_failed': '{n} série(s) não foram aceites; ficam neste telemóvel.',
+  'queue.held':
+      '{n} série(s) não foram aceites porque o controlador não te tem na lista de marshals; ficam neste telemóvel.',
   'queue.waiting_confirmation': 'à espera de confirmação',
   'queue.unregistered': 'ainda sem registo',
   'chrono.send': 'Enviar ao controlador',

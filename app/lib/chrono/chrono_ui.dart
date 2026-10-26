@@ -174,6 +174,9 @@ class _ChronoScreenState extends State<ChronoScreen> {
       });
     } on ChronoFormatException catch (e) {
       setState(() => _error = e.message);
+    } on MarshalNotAuthorised {
+      // The controller's confirmation ran out while the screen was open.
+      setState(() => _error = 'marshal.expired_now');
     }
   }
 
@@ -222,7 +225,9 @@ class _ChronoScreenState extends State<ChronoScreen> {
             ),
           if (_error != null)
             Notice(
-              _error!.startsWith('chrono.') ? s.t(_error!) : _error!,
+              _error!.startsWith('chrono.') || _error!.startsWith('marshal.')
+                  ? s.t(_error!)
+                  : _error!,
               kind: NoticeKind.error,
             ),
           DropdownButtonFormField<LimitTemplate>(

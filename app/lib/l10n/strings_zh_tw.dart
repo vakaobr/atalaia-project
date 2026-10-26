@@ -344,6 +344,18 @@ const Map<String, String> zhTwStrings = {
   'marshal.readings': '這支手機上有 {n} 筆測速值。保存 365 天後刪除。',
   'marshal.erase': '刪除某人的測速值',
   'marshal.erase_do': '刪除',
+  'marshal.checking': '正在詢問場地控制器…',
+  'marshal.you_are': '你是裁判 {id}（{name}）',
+  'marshal.id_from_gm': '編號和名字來自主辦的裁判名單，並已由場地控制器確認。',
+  'marshal.not_listed': '場地控制器的裁判名單上沒有你。請主辦把你加入名單成為裁判。',
+  'marshal.revoked':
+      '主辦已把你從裁判名單移除，這支手機在這個場地不再是裁判。尚未送出的 {n} 組測速會留在這支手機上；主辦再把你加入名單後即可送出。',
+  'marshal.offline_never': '連不上場地控制器，這支手機也還沒有在這裡被確認為裁判。請先連上場地的網路一次，再詢問一次。',
+  'marshal.offline_expired': '連不上場地控制器，{at} 的確認已經過期。請連上場地的網路，再詢問一次。',
+  'marshal.offline_ok':
+      '離線：場地控制器在 {at} 確認你是裁判 {id}。有效至 {until}；之後請連上場地的網路重新確認。',
+  'marshal.retry': '再詢問一次',
+  'marshal.expired_now': '場地控制器的確認已過期：請先再詢問一次，才能記錄。',
 
   // Chrono
   'chrono.title': '測速器',
@@ -504,6 +516,7 @@ const Map<String, String> zhTwStrings = {
   'queue.manual_done': '已報到：{id}',
   'queue.send_pending': '傳送 {n} 組尚未傳送的測速',
   'queue.send_failed': '{n} 組測速未被接受；它們會留在這支手機上。',
+  'queue.held': '{n} 組測速未被接受，因為控制器的裁判名單上沒有你；它們會留在這支手機上。',
   'queue.waiting_confirmation': '等待確認',
   'queue.unregistered': '尚未登錄',
   'chrono.send': '傳送到控制器',

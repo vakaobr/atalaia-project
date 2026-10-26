@@ -83,7 +83,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes, per level's plan
 FIELD_LEVELS_MAX = 10  # levels of a multi-story field (decision ML-1)
@@ -249,6 +249,12 @@ CREATE TABLE IF NOT EXISTS marshal_keys (
     public_key    BLOB NOT NULL,
     player_id     TEXT,
     registered_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS marshal_roster (
+    marshal_id TEXT PRIMARY KEY,                       -- schema 12 (MR-1): the GM's list of marshals;
+    name       TEXT NOT NULL,                          -- a marshal's key can only be registered for a listed id
+    player_id  TEXT,                                   -- the field identity the id is bound to (MR-3)
+    created_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS marshal_key_history (
     marshal_id    TEXT NOT NULL,                       -- schema 6: keys a marshal had before the current one
@@ -418,6 +424,9 @@ class Store:
                 if name not in have:
                     self._db.execute(f"ALTER TABLE modes ADD COLUMN {name} {decl}")
             self._upgrade_field_levels()
+            # Schema 12: a marshal registered before the list existed is on it.
+            self._db.execute("INSERT OR IGNORE INTO marshal_roster (marshal_id, name, player_id, created_at) "
+                             "SELECT marshal_id, name, player_id, registered_at FROM marshal_keys")
             self.set_setting("schema_version", str(SCHEMA_VERSION))
         if path != ":memory:":
             for name in (path, path + "-wal", path + "-shm"):
@@ -1264,6 +1273,14 @@ class Store:
             self._exec("UPDATE marshal_keys SET name = ?, player_id = ? WHERE marshal_id = ?",
                        (name, player_id, marshal_id))
             return
+        # A key taken back after a removal from the list (MR-8) is the same period again, not a second row
+        # for the same key: the site server takes one row per (marshal, key).
+        back = self._exec("SELECT MIN(registered_at) AS at FROM marshal_key_history WHERE marshal_id = ? "
+                          "AND public_key = ?", (marshal_id, public_key)).fetchone()
+        if back is not None and back["at"] is not None:
+            now = back["at"]
+            self._exec("DELETE FROM marshal_key_history WHERE marshal_id = ? AND public_key = ?",
+                       (marshal_id, public_key))
         self._exec("INSERT INTO marshal_keys (marshal_id, name, public_key, player_id, registered_at) "
                    "VALUES (?, ?, ?, ?, ?) ON CONFLICT(marshal_id) DO UPDATE SET name = excluded.name, "
                    "public_key = excluded.public_key, player_id = excluded.player_id, "
@@ -1279,6 +1296,53 @@ class Store:
     def marshals(self) -> list[dict[str, Any]]:
         rows = self._exec("SELECT marshal_id FROM marshal_keys ORDER BY marshal_id").fetchall()
         return [m for m in (self.marshal(r["marshal_id"]) for r in rows) if m]
+
+    # --- the GM's marshal list (schema 12, MR-1) -----------------------------------------------
+
+    def put_roster(self, marshal_id: str, name: str, player_id: Optional[str], now: float) -> None:
+        self._exec("INSERT INTO marshal_roster (marshal_id, name, player_id, created_at) VALUES (?, ?, ?, ?) "
+                   "ON CONFLICT(marshal_id) DO UPDATE SET name = excluded.name, player_id = excluded.player_id",
+                   (marshal_id, name, player_id, now))
+
+    def roster_entry(self, marshal_id: str) -> Optional[dict[str, Any]]:
+        row = self._exec("SELECT * FROM marshal_roster WHERE marshal_id = ?", (marshal_id,)).fetchone()
+        return {k: row[k] for k in row.keys()} if row else None
+
+    def roster_of_player(self, player_id: str) -> Optional[dict[str, Any]]:
+        row = self._exec("SELECT * FROM marshal_roster WHERE player_id = ? ORDER BY marshal_id",
+                         (player_id,)).fetchone()
+        return {k: row[k] for k in row.keys()} if row else None
+
+    def roster(self) -> list[dict[str, Any]]:
+        rows = self._exec("SELECT * FROM marshal_roster ORDER BY marshal_id").fetchall()
+        return [{k: r[k] for k in r.keys()} for r in rows]
+
+    def retire_marshal(self, marshal_id: str, now: float) -> None:
+        """Takes a marshal off the list: the key stops verifying new readings and moves to the history,
+        so what it signed before still verifies on the site server (MR-8)."""
+        with self._lock:
+            old = self.marshal(marshal_id)
+            if old is not None:
+                self._exec("INSERT INTO marshal_key_history (marshal_id, name, public_key, player_id, "
+                           "registered_at, replaced_at) VALUES (?, ?, ?, ?, ?, ?)",
+                           (marshal_id, old["name"], old["public_key"], old["player_id"], old["registered_at"], now))
+                self._exec("DELETE FROM marshal_keys WHERE marshal_id = ?", (marshal_id,))
+            self._exec("DELETE FROM marshal_roster WHERE marshal_id = ?", (marshal_id,))
+
+    def retire_marshal_key_only(self, marshal_id: str, now: float) -> None:
+        """The marshal's key leaves (to the history) but the id stays on the list."""
+        with self._lock:
+            entry = self.roster_entry(marshal_id)
+            self.retire_marshal(marshal_id, now)
+            if entry is not None:
+                self._exec("INSERT INTO marshal_roster (marshal_id, name, player_id, created_at) VALUES (?, ?, ?, ?)",
+                           (marshal_id, entry["name"], entry["player_id"], entry["created_at"]))
+
+    def active_checkins_of(self, player_id: str) -> list[dict[str, Any]]:
+        """The player's check-ins that still count (any game), for a role that follows the list."""
+        rows = self._exec("SELECT * FROM checkins WHERE player_id = ? AND status IN ('expected', 'pending', "
+                          "'checked_in') ORDER BY game_id", (player_id,)).fetchall()
+        return [self._checkin(r) for r in rows]
 
     def erase_player(self, player_id: str) -> None:
         """A player's field identity, check-ins and declarations (not the readings: chrono erasure)."""

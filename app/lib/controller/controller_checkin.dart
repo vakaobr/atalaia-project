@@ -96,6 +96,10 @@ const _rank = {
   'gm': 4,
 };
 const staffRoles = ['marshal', 'gm'];
+
+/// How long a phone may act as a marshal offline after the controller said
+/// yes (MR-4); `GET /api/v1/checkin/me` tells it as `valid_for_s`.
+const marshalValidForSeconds = 2 * 3600;
 const _nameMax = 32;
 const _federationMax = 32;
 const _seriesMax = 50;
@@ -367,6 +371,10 @@ class ControllerCheckin {
   var _declarations = <String, Map<String, Object?>>{};
   var _readings = <Map<String, Object?>>[];
   var _marshals = <String, Map<String, Object?>>{};
+
+  /// The GM's list of marshals (the Pi's `marshal_roster`, schema 12): the
+  /// keys above exist only for ids on it.
+  var _roster = <String, Map<String, Object?>>{};
   var _replicas = <String, Map<String, Object?>>{};
   var _tokenKeys = <String, String>{};
 
@@ -409,6 +417,19 @@ class ControllerCheckin {
     };
     _readings = _listOf(doc['readings']);
     _marshals = _mapOf(doc['marshals']);
+    _roster = _mapOf(doc['marshal_roster']);
+    // A marshal registered before the list existed is on it (the Pi's upgrade).
+    for (final m in _marshals.values) {
+      _roster.putIfAbsent(
+        m['marshal_id']! as String,
+        () => {
+          'marshal_id': m['marshal_id'],
+          'name': m['name'],
+          'player_id': m['player_id'],
+          'created_at': m['registered_at'],
+        },
+      );
+    }
     _replicas = _mapOf(doc['replicas']);
     _marshalHistory = _listOf(doc['marshal_history']);
     _tokenKeys = {
@@ -425,6 +446,7 @@ class ControllerCheckin {
     'declarations': _declarations.values.toList(),
     'readings': _readings,
     'marshals': _marshals,
+    'marshal_roster': _roster,
     'replicas': _replicas,
     'token_keys': _tokenKeys,
     'marshal_history': _marshalHistory,
@@ -1298,6 +1320,9 @@ class ControllerCheckin {
       throw ControllerError.notFound('no check-in');
     }
     final out = rowView(game, row)..['stale_token'] = viewer.stale;
+    if (!forHello && row['role'] == 'marshal') {
+      out['marshal'] = myMarshal(viewer);
+    }
     if (!forHello) {
       out['settings'] = {
         for (final e in settings().entries)
@@ -1965,74 +1990,315 @@ class ControllerCheckin {
     return raw;
   }
 
-  Map<String, Object?> registerMarshal(
-    Map<String, Object?> body, {
-    String? playerId,
-  }) {
-    const allowed = {'marshal_id', 'name', 'public_key', 'player_id'};
-    final unknown = body.keys.where((k) => !allowed.contains(k)).toList()
-      ..sort();
-    if (unknown.isNotEmpty) throw ControllerError('unknown fields $unknown');
-    final mid = body['marshal_id'];
-    if (mid is! String || !_marshalIdRe.hasMatch(mid)) {
-      throw ControllerError('marshal_id: 1-64 of A-Z a-z 0-9 . _ : -');
+  // The GM's marshal list (decisions MR-1 to MR-14, the Pi's `add_marshal` and the rest): a marshal
+  // exists only on it. The GM adds a checked-in player (the id, M-01, M-02..., is made here), the
+  // player's phone learns its id from GET /api/v1/checkin/me and registers its key for that id only.
+
+  Map<String, Object?> _marshalView(Map<String, Object?> e) {
+    final key = _marshals[e['marshal_id']];
+    return {
+      'marshal_id': e['marshal_id'],
+      'name': e['name'],
+      'player_id': e['player_id'],
+      'public_key': key?['public_key'],
+      'key_registered': key != null,
+      'registered_at': key?['registered_at'],
+      'created_at': e['created_at'],
+    };
+  }
+
+  Map<String, Object?>? _rosterOf(String? pid) {
+    if (pid == null) return null;
+    for (final k in _roster.keys.toList()..sort()) {
+      if (_roster[k]!['player_id'] == pid) return _roster[k];
     }
-    final name = _text('name', body['name'], 64)!;
-    final key = _publicKey(body['public_key']);
-    final pid = playerId ?? body['player_id'];
-    if (pid != null && pid is! String) {
-      throw ControllerError('player_id: text');
-    }
-    final existing = _marshals[mid];
-    if (existing != null &&
-        playerId != null &&
-        existing['player_id'] != null &&
-        existing['player_id'] != playerId) {
-      throw ControllerError.conflict("marshal id $mid is someone else's");
-    }
-    final b64 = base64.encode(key);
+    return null;
+  }
+
+  /// A player added to the list is a marshal in every check-in that still
+  /// counts; one taken off it is a player again (MR-9). A gm-role player
+  /// keeps their role.
+  void _followRole(String pid, String to) {
     final now = _wall();
-    // The same key registered again keeps the time it was first registered.
-    final same = existing != null && existing['public_key'] == b64;
-    if (existing != null && !same) {
-      // The old key goes to the history (store.py `put_marshal`).
+    final rows = [
+      for (final r in _checkins)
+        if (r['player_id'] == pid &&
+            const ['expected', 'pending', 'checked_in'].contains(r['status']))
+          r,
+    ]..sort((a, b) => (a['game_id']! as int).compareTo(b['game_id']! as int));
+    for (final row in rows) {
+      final role = row['role'];
+      if (to == 'marshal' && (role == 'marshal' || role == 'gm')) continue;
+      if (to != 'marshal' && role != 'marshal') continue;
+      row['role'] = to;
+      row['updated_at'] = now;
+      _notify(row['game_id']! as int, pid, assignment: true);
+    }
+  }
+
+  String _freeMarshalId() {
+    var n = 1;
+    while (_roster.containsKey('M-${n.toString().padLeft(2, '0')}')) {
+      n++;
+    }
+    return 'M-${n.toString().padLeft(2, '0')}';
+  }
+
+  String? _nameOf(String pid) {
+    final rows = [
+      for (final r in _checkins)
+        if (r['player_id'] == pid &&
+            const ['expected', 'pending', 'checked_in'].contains(r['status']))
+          r,
+    ]..sort((a, b) => (a['game_id']! as int).compareTo(b['game_id']! as int));
+    for (final r in rows.reversed) {
+      final n = r['display_name'];
+      if (n is String && n.isNotEmpty) return n;
+    }
+    return null;
+  }
+
+  String _checkPlayer(Object? pid) {
+    if (pid is! String || !_playerIdRe.hasMatch(pid)) {
+      throw ControllerError("player_id: a player's field id (p-...)");
+    }
+    if (_fieldPlayers[pid] == null) {
+      throw ControllerError.notFound('$pid has not checked in here');
+    }
+    return pid;
+  }
+
+  /// store.py `put_marshal`: a different key replaces the current one (which
+  /// goes to the history); a key taken back after a removal is the same
+  /// period again, not a second row.
+  void _putKey(String mid, String name, String b64, String? pid, double now) {
+    final old = _marshals[mid];
+    final same = old != null && old['public_key'] == b64;
+    if (old != null && !same) {
       _marshalHistory.add({
         'marshal_id': mid,
-        'name': existing['name'],
-        'public_key': existing['public_key'],
-        'player_id': existing['player_id'],
-        'registered_at': existing['registered_at'],
+        'name': old['name'],
+        'public_key': old['public_key'],
+        'player_id': old['player_id'],
+        'registered_at': old['registered_at'],
         'replaced_at': now,
       });
+    }
+    num at = same ? old['registered_at']! as num : now;
+    if (!same) {
+      final back = [
+        for (final h in _marshalHistory)
+          if (h['marshal_id'] == mid && h['public_key'] == b64)
+            h['registered_at']! as num,
+      ];
+      if (back.isNotEmpty) {
+        at = back.reduce((a, b) => a < b ? a : b);
+        _marshalHistory.removeWhere(
+          (h) => h['marshal_id'] == mid && h['public_key'] == b64,
+        );
+      }
     }
     _marshals[mid] = {
       'marshal_id': mid,
       'name': name,
       'public_key': b64,
       'player_id': pid,
-      'registered_at': same ? existing['registered_at'] : now,
+      'registered_at': at,
     };
+  }
+
+  /// store.py `retire_marshal`: the key leaves for the history, so what it
+  /// signed before still verifies on the site server (MR-8).
+  void _retire(String mid, double now) {
+    final old = _marshals.remove(mid);
+    if (old != null) {
+      _marshalHistory.add({
+        'marshal_id': mid,
+        'name': old['name'],
+        'public_key': old['public_key'],
+        'player_id': old['player_id'],
+        'registered_at': old['registered_at'],
+        'replaced_at': now,
+      });
+    }
+    _roster.remove(mid);
+  }
+
+  void _retireKeyOnly(String mid, double now) {
+    final entry = _roster[mid];
+    _retire(mid, now);
+    if (entry != null) _roster[mid] = entry;
+  }
+
+  /// POST /api/v1/marshals (GM): adds a marshal to the list, or changes the
+  /// id's name, player or key.
+  Map<String, Object?> addMarshal(Map<String, Object?> body) {
+    const allowed = {'marshal_id', 'name', 'public_key', 'player_id'};
+    final unknown = body.keys.where((k) => !allowed.contains(k)).toList()
+      ..sort();
+    if (unknown.isNotEmpty) throw ControllerError('unknown fields $unknown');
+    var mid = body['marshal_id'];
+    if (mid != null && (mid is! String || !_marshalIdRe.hasMatch(mid))) {
+      throw ControllerError('marshal_id: 1-64 of A-Z a-z 0-9 . _ : -');
+    }
+    final key = body['public_key'] != null
+        ? base64.encode(_publicKey(body['public_key']))
+        : null;
+    final pid = body['player_id'] != null
+        ? _checkPlayer(body['player_id'])
+        : null;
+    var before = mid == null ? null : _roster['$mid'];
+    final given =
+        body['name'] ??
+        (before != null ? before['name'] : (pid != null ? _nameOf(pid) : null));
+    final name = _text('name', given, 64)!;
+    if (pid != null) {
+      final other = _rosterOf(pid);
+      if (other != null && mid != null && other['marshal_id'] != mid) {
+        throw ControllerError.conflict(
+          '$pid is already marshal ${other['marshal_id']}',
+        );
+      }
+      if (other != null && mid == null) {
+        mid = other['marshal_id'];
+        before = other;
+      }
+    }
+    final id = (mid ?? _freeMarshalId()) as String;
+    final now = _wall();
+    _roster[id] = {
+      'marshal_id': id,
+      'name': name,
+      'player_id': pid,
+      'created_at': _roster[id]?['created_at'] ?? now,
+    };
+    if (before != null && before['player_id'] != pid) {
+      _retireKeyOnly(id, now); // another phone's key does not carry over (MR-6)
+      if (before['player_id'] != null) {
+        _followRole(before['player_id']! as String, 'player');
+      }
+    }
+    if (key != null) {
+      _putKey(id, name, key, pid, now);
+    } else if (_marshals[id] != null) {
+      _putKey(id, name, _marshals[id]!['public_key']! as String, pid, now);
+    }
+    if (pid != null) _followRole(pid, 'marshal');
+    _save();
+    return _marshalView(_roster[id]!);
+  }
+
+  /// PATCH /api/v1/marshals/{id} (GM): the name, or the player the id is
+  /// bound to (null unbinds).
+  Map<String, Object?> patchMarshal(String mid, Map<String, Object?> body) {
+    const allowed = {'name', 'player_id'};
+    final unknown = body.keys.where((k) => !allowed.contains(k)).toList()
+      ..sort();
+    if (unknown.isNotEmpty) throw ControllerError('unknown fields $unknown');
+    final entry = _roster[mid];
+    if (entry == null) {
+      throw ControllerError.notFound('$mid is not on the marshal list');
+    }
+    final name = body.containsKey('name')
+        ? _text('name', body['name'], 64)!
+        : entry['name']! as String;
+    var pid = entry['player_id'] as String?;
+    if (body.containsKey('player_id')) {
+      pid = body['player_id'] != null ? _checkPlayer(body['player_id']) : null;
+      final other = _rosterOf(pid);
+      if (other != null && other['marshal_id'] != mid) {
+        throw ControllerError.conflict(
+          '$pid is already marshal ${other['marshal_id']}',
+        );
+      }
+    }
+    final now = _wall();
+    _roster[mid] = {...entry, 'name': name, 'player_id': pid};
+    if (pid != entry['player_id']) {
+      _retireKeyOnly(mid, now); // the new phone registers its own key (MR-6)
+      if (entry['player_id'] != null) {
+        _followRole(entry['player_id']! as String, 'player');
+      }
+      if (pid != null) _followRole(pid, 'marshal');
+    } else if (_marshals[mid] != null) {
+      _putKey(mid, name, _marshals[mid]!['public_key']! as String, pid, now);
+    }
+    _save();
+    return _marshalView(_roster[mid]!);
+  }
+
+  /// DELETE /api/v1/marshals/{id} (GM): the marshal is revoked at once
+  /// (MR-8, MR-9).
+  Map<String, Object?> removeMarshal(String mid) {
+    final entry = _roster[mid];
+    if (entry == null) {
+      throw ControllerError.notFound('$mid is not on the marshal list');
+    }
+    _retire(mid, _wall());
+    if (entry['player_id'] != null) {
+      _followRole(entry['player_id']! as String, 'player');
+    }
+    _save();
+    return {'marshal_id': mid, 'removed': true};
+  }
+
+  /// What GET /api/v1/checkin/me says to a marshal's phone (MR-2): the id
+  /// the GM gave this player and the key held for it, or null when the
+  /// player is not on the list.
+  Map<String, Object?>? myMarshal(ApiViewer viewer) {
+    final entry = _rosterOf(viewer.playerId);
+    if (entry == null) return null;
+    final v = _marshalView(entry);
+    return {
+      'marshal_id': v['marshal_id'],
+      'name': v['name'],
+      'public_key': v['public_key'],
+      'valid_for_s': marshalValidForSeconds,
+    };
+  }
+
+  /// PUT /api/v1/checkin/me/marshal-key: the marshal's phone registers the
+  /// key that signs its readings, for the id the GM's list gave this player
+  /// (MR-2, MR-5).
+  Map<String, Object?> registerMyKey(
+    ApiViewer viewer,
+    Map<String, Object?> body,
+  ) {
+    const allowed = {'marshal_id', 'name', 'public_key'};
+    final unknown = body.keys.where((k) => !allowed.contains(k)).toList()
+      ..sort();
+    if (unknown.isNotEmpty) throw ControllerError('unknown fields $unknown');
+    final entry = _rosterOf(viewer.playerId);
+    if (entry == null) {
+      throw _forbidden(
+        "you are not on the field's marshal list: ask the GM to add you as a marshal",
+      );
+    }
+    final mid = body['marshal_id'];
+    if (mid != null && mid != entry['marshal_id']) {
+      throw ControllerError.conflict(
+        'your marshal id is ${entry['marshal_id']}, not $mid',
+      );
+    }
+    final b64 = base64.encode(_publicKey(body['public_key']));
+    _putKey(
+      entry['marshal_id']! as String,
+      entry['name']! as String,
+      b64,
+      viewer.playerId,
+      _wall(),
+    );
     _save();
     return {
-      'marshal_id': mid,
-      'name': name,
+      'marshal_id': entry['marshal_id'],
+      'name': entry['name'],
       'public_key': b64,
-      'player_id': pid,
+      'player_id': viewer.playerId,
     };
   }
 
   List<Map<String, Object?>> marshals() => [
-    for (final k in _marshals.keys.toList()..sort())
-      {
-        for (final f in [
-          'marshal_id',
-          'name',
-          'player_id',
-          'public_key',
-          'registered_at',
-        ])
-          f: _marshals[k]![f],
-      },
+    for (final k in _roster.keys.toList()..sort()) _marshalView(_roster[k]!),
   ];
 
   /// POST /api/v1/chrono/readings: one series of signed readings
@@ -2085,7 +2351,13 @@ class ControllerCheckin {
         reasons.add(_reason(i, rec, e.reason.name, e.message));
       } on _MarshalUnknown catch (e) {
         reasons.add(
-          _reason(i, rec, 'marshal', 'marshal ${e.id} is not registered here'),
+          _reason(
+            i,
+            rec,
+            'marshal',
+            "marshal ${e.id} is not on this field's marshal list "
+                '(never added, or removed by the GM)',
+          ),
         );
       } on _WrongField catch (e) {
         reasons.add(

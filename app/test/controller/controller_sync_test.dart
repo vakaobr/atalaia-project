@@ -690,14 +690,14 @@ void main() {
         'its period', () async {
       final k1 = await MarshalKey.fromSeed(List.filled(32, 7));
       final k2 = await MarshalKey.fromSeed(List.filled(32, 8));
-      checkin.registerMarshal({
+      checkin.addMarshal({
         'marshal_id': 'm-ana',
         'name': 'Ana',
         'public_key': base64.encode(k1.publicKey),
       });
       final first = await reading(k1, 'p-aaaaaaaaaaaa', 90);
       wall += 100;
-      checkin.registerMarshal({
+      checkin.addMarshal({
         'marshal_id': 'm-ana',
         'name': 'Ana',
         'public_key': base64.encode(k2.publicKey),

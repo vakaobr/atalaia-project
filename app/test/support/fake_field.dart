@@ -71,9 +71,19 @@ class FakeField {
   final rows = <String, Map<String, Object?>>{};
   final secrets = <String, String>{};
   final tokens = <String, String>{};
+
+  /// The role each token was made with: the controller's `effective_role`
+  /// is the lower of it and the row's, so a promotion needs a new token and a
+  /// demotion is immediate.
+  final tokenRoles = <String, String>{};
   final readings = <Map<String, Object?>>[];
   final positions = <Map<String, Object?>>[];
   final marshalKeys = <String, String>{};
+
+  /// The GM's marshal list (decisions MR-1 to MR-14): player id -> the id and
+  /// name the controller gave. Only a listed player's key is taken, and only
+  /// for that id.
+  final roster = <String, ({String id, String name})>{};
   final requests = <String>[];
   var caFetches = 0;
   var offline = false;
@@ -90,6 +100,7 @@ class FakeField {
   String _token(String pid) {
     final t = 'apt1.test-${++_tokenN}-$pid';
     tokens[t] = pid;
+    tokenRoles[t] = '${rows[pid]!['role']}';
     return t;
   }
 
@@ -112,6 +123,43 @@ class FakeField {
     if (role != null) rows[pid]!['role'] = role;
     if (team != null) rows[pid]!['team'] = team;
     if (squad != null) rows[pid]!['squad'] = squad;
+  }
+
+  static const _rank = {
+    'spectator': 0,
+    'player': 1,
+    'squad_leader': 2,
+    'vip': 2,
+    'marshal': 3,
+    'gm': 4,
+  };
+
+  /// The role [token] has now (the Pi's `effective_role`).
+  String _role(String token, String pid) {
+    final made = tokenRoles[token] ?? 'player';
+    final now = '${rows[pid]!['role']}';
+    return (_rank[made] ?? 1) <= (_rank[now] ?? 1) ? made : now;
+  }
+
+  /// The GM adds [pid] to the marshal list: the controller makes the id
+  /// (M-01, M-02...) and the player gets the marshal role.
+  String listMarshal(String pid, {String? id, String? name}) {
+    var n = 1;
+    String free() => 'M-${(n++).toString().padLeft(2, '0')}';
+    var mid = id ?? free();
+    while (id == null && roster.values.any((e) => e.id == mid)) {
+      mid = free();
+    }
+    roster[pid] = (id: mid, name: name ?? '${rows[pid]!['display_name']}');
+    rows[pid]!['role'] = 'marshal';
+    return mid;
+  }
+
+  /// The GM takes [pid] off the list: the key stops, the role goes.
+  void unlistMarshal(String pid) {
+    final e = roster.remove(pid);
+    if (e != null) marshalKeys.remove(e.id);
+    if (rows[pid]?['role'] == 'marshal') rows[pid]!['role'] = 'player';
   }
 
   /// A marshal's signed reading changing a declaration's state.
@@ -195,7 +243,21 @@ class FakeField {
           return err(401, 'no');
         }
         final r = rows[who]!;
-        return FieldResponse(200, {...r, 'stale_token': false, 'game_id': 42});
+        final listed = roster[who];
+        return FieldResponse(200, {
+          ...r,
+          'stale_token': tokenRoles[token] != r['role'],
+          'game_id': 42,
+          if (r['role'] == 'marshal')
+            'marshal': listed == null
+                ? null
+                : {
+                    'marshal_id': listed.id,
+                    'name': listed.name,
+                    'public_key': marshalKeys[listed.id],
+                    'valid_for_s': 7200, // 2 hours, as both controllers (MR-4)
+                  },
+        });
       case 'PUT /checkin/me/replicas':
         if (who == null) return err(401, 'no');
         _declare(rows[who]!, b['replicas']! as List);
@@ -207,13 +269,25 @@ class FakeField {
           ..['display_name'] = null;
         return FieldResponse(200, {'status': 'left'});
       case 'PUT /checkin/me/marshal-key':
-        if (who == null || rows[who]!['role'] != 'marshal') {
+        if (who == null || _role(token!, who) != 'marshal') {
           return err(403, 'marshals only');
         }
-        marshalKeys[b['marshal_id']! as String] = b['public_key']! as String;
-        return FieldResponse(200, b);
+        final listed = roster[who];
+        if (listed == null) {
+          return err(403, 'you are not on the field\'s marshal list');
+        }
+        if (b['marshal_id'] != null && b['marshal_id'] != listed.id) {
+          return err(409, 'your marshal id is ${listed.id}');
+        }
+        marshalKeys[listed.id] = b['public_key']! as String;
+        return FieldResponse(200, {
+          'marshal_id': listed.id,
+          'name': listed.name,
+          'public_key': b['public_key'],
+          'player_id': who,
+        });
       case 'GET /games/42/chrono-list':
-        if (who == null || rows[who]!['role'] != 'marshal') {
+        if (who == null || _role(token!, who) != 'marshal') {
           return err(403, 'staff only');
         }
         final players = [
@@ -240,10 +314,21 @@ class FakeField {
           'players': players,
         });
       case 'POST /chrono/readings':
-        if (who == null || rows[who]!['role'] != 'marshal') {
+        if (who == null || _role(token!, who) != 'marshal') {
           return err(403, 'marshals only');
         }
         final rs = (b['readings']! as List).cast<Map<String, Object?>>();
+        final live = {for (final k in marshalKeys.keys) k};
+        if (rs.any((r) => !live.contains(r['marshal_id']))) {
+          return FieldResponse(422, {
+            'detail': 'refused',
+            'reasons': [
+              for (var i = 0; i < rs.length; i++)
+                if (!live.contains(rs[i]['marshal_id']))
+                  {'index': i, 'reason': 'marshal'},
+            ],
+          });
+        }
         if (rs.any((r) => r['signature'] == null)) {
           return FieldResponse(422, {
             'detail': 'refused',

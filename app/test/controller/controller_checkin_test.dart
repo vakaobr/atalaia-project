@@ -194,7 +194,7 @@ void main() {
       ],
     );
     final key = await MarshalKey.fromSeed(List.filled(32, 7));
-    svc.registerMarshal({
+    svc.addMarshal({
       'marshal_id': 'm-ana',
       'name': 'Ana',
       'public_key': base64.encode(key.publicKey),

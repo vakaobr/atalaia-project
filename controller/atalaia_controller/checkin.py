@@ -78,6 +78,7 @@ STATES = ("pending", "passed", "refused", "withdrawn")
 NAME_MAX = 32
 FEDERATION_MAX = 32
 SERIES_MAX = 50
+MARSHAL_VALID_FOR_S = 2 * 3600  # how long a phone may act as a marshal offline after the controller said yes (MR-4)
 RANK = {"spectator": 0, "player": 1, "squad_leader": 2, "vip": 2, "marshal": 3, "gm": 4}
 STAFF_ROLES = ("marshal", "gm")
 LIMIT_TEMPLATES = REPO_ROOT / "app" / "lib" / "chrono" / "limit_templates"
@@ -721,6 +722,8 @@ class Checkin:
             raise NotFound("no check-in")
         out = self.row_view(game, row)
         out["stale_token"] = viewer.stale
+        if row["role"] == "marshal":
+            out["marshal"] = self.my_marshal(viewer)
         out["settings"] = {k: v for k, v in self.settings().items() if k != "max_players"}
         return out
 
@@ -1187,31 +1190,163 @@ class Checkin:
             raise ControllerError("public_key: not an Ed25519 public key") from None
         return raw
 
-    def register_marshal(self, body: dict[str, Any], player_id: Optional[str] = None) -> dict[str, Any]:
+    # The GM's marshal list (MR-1 to MR-14): a marshal exists only on it. The GM adds a checked-in
+    # player (the controller gives the id, M-01, M-02...), the player's phone learns its id from
+    # GET /api/v1/checkin/me and registers its signing key for that id and no other.
+
+    def _marshal_view(self, entry: dict[str, Any]) -> dict[str, Any]:
+        key = self.store.marshal(entry["marshal_id"])
+        return {"marshal_id": entry["marshal_id"], "name": entry["name"], "player_id": entry["player_id"],
+                "public_key": base64.b64encode(key["public_key"]).decode("ascii") if key else None,
+                "key_registered": key is not None, "registered_at": key["registered_at"] if key else None,
+                "created_at": entry["created_at"]}
+
+    def _follow_role(self, pid: str, to: str) -> None:
+        """A player added to the list is a marshal in every check-in that still counts; one taken off it
+        is a player again (MR-9). A gm-role player keeps their role."""
+        now = self._wall()
+        for row in self.store.active_checkins_of(pid):
+            if to == "marshal" and row["role"] in ("marshal", "gm"):
+                continue
+            if to != "marshal" and row["role"] != "marshal":
+                continue
+            self.store.update_checkin(row["game_id"], pid, role=to, updated_at=now)
+            self._notify(row["game_id"], pid, assignment=True)
+
+    def _free_marshal_id(self) -> str:
+        taken = {e["marshal_id"] for e in self.store.roster()}
+        n = 1
+        while f"M-{n:02d}" in taken:
+            n += 1
+        return f"M-{n:02d}"
+
+    def _name_of(self, pid: str) -> Optional[str]:
+        for row in reversed(self.store.active_checkins_of(pid)):
+            if row.get("display_name"):
+                return row["display_name"]
+        return None
+
+    def _check_player(self, pid: Any) -> str:
+        if not player_id_ok(pid):
+            raise ControllerError("player_id: a player's field id (p-...)")
+        if self.store.field_player(pid) is None:
+            raise NotFound(f"{pid} has not checked in here")
+        return pid
+
+    def add_marshal(self, body: dict[str, Any]) -> dict[str, Any]:
+        """POST /api/v1/marshals (GM): adds a marshal to the list, or changes the id's name, player or
+        key. ``player_id`` binds the id to a player who has checked in here (who then gets the marshal
+        role); ``marshal_id`` is made when not given; ``public_key`` is optional (the phone registers it)."""
         unknown = set(body) - {"marshal_id", "name", "public_key", "player_id"}
         if unknown:
             raise ControllerError(f"unknown fields {sorted(unknown)}")
         mid = body.get("marshal_id")
-        if not isinstance(mid, str) or not MARSHAL_ID_RE.fullmatch(mid):
+        if mid is not None and (not isinstance(mid, str) or not MARSHAL_ID_RE.fullmatch(mid)):
             raise ControllerError("marshal_id: 1-64 of A-Z a-z 0-9 . _ : -")
-        name = _text("name", body.get("name"), 64)
-        key = self._public_key(body.get("public_key"))
-        pid = player_id if player_id is not None else body.get("player_id")
-        if pid is not None and not isinstance(pid, str):
-            raise ControllerError("player_id: text")
+        key = self._public_key(body["public_key"]) if body.get("public_key") is not None else None
         with self._lock:
-            existing = self.store.marshal(mid)
-            if existing is not None and player_id is not None and existing["player_id"] not in (None, player_id):
-                raise Conflict(f"marshal id {mid} is someone else's")
-            self.store.put_marshal(mid, name, key, pid, self._wall())
-        log.info("marshal key registered: %s", mid)
-        return {"marshal_id": mid, "name": name, "public_key": base64.b64encode(key).decode("ascii"),
-                "player_id": pid}
+            pid = self._check_player(body["player_id"]) if body.get("player_id") is not None else None
+            before = self.store.roster_entry(mid) if mid is not None else None
+            name = body.get("name")
+            if name is None:
+                name = before["name"] if before is not None else (self._name_of(pid) if pid else None)
+            name = _text("name", name, 64)
+            if pid is not None:
+                other = self.store.roster_of_player(pid)
+                if other is not None and mid is not None and other["marshal_id"] != mid:
+                    raise Conflict(f"{pid} is already marshal {other['marshal_id']}")
+                if other is not None and mid is None:
+                    mid, before = other["marshal_id"], other
+            if mid is None:
+                mid = self._free_marshal_id()
+            now = self._wall()
+            self.store.put_roster(mid, name, pid, now)
+            if before is not None and before["player_id"] != pid:
+                self.store.retire_marshal_key_only(mid, now)  # another phone's key does not carry over (MR-6)
+                if before["player_id"] is not None:
+                    self._follow_role(before["player_id"], "player")
+            if key is not None:
+                self.store.put_marshal(mid, name, key, pid, now)
+            elif self.store.marshal(mid) is not None:
+                self.store.put_marshal(mid, name, self.store.marshal(mid)["public_key"], pid, now)
+            if pid is not None:
+                self._follow_role(pid, "marshal")
+            entry = self.store.roster_entry(mid)
+        log.info("marshal listed: %s", mid)
+        return self._marshal_view(entry)
+
+    def patch_marshal(self, mid: str, body: dict[str, Any]) -> dict[str, Any]:
+        """PATCH /api/v1/marshals/{id} (GM): the name, or the player the id is bound to (null unbinds)."""
+        unknown = set(body) - {"name", "player_id"}
+        if unknown:
+            raise ControllerError(f"unknown fields {sorted(unknown)}")
+        with self._lock:
+            entry = self.store.roster_entry(mid)
+            if entry is None:
+                raise NotFound(f"{mid} is not on the marshal list")
+            name = _text("name", body["name"], 64) if "name" in body else entry["name"]
+            pid = entry["player_id"]
+            if "player_id" in body:
+                pid = self._check_player(body["player_id"]) if body["player_id"] is not None else None
+                other = self.store.roster_of_player(pid) if pid else None
+                if other is not None and other["marshal_id"] != mid:
+                    raise Conflict(f"{pid} is already marshal {other['marshal_id']}")
+            now = self._wall()
+            self.store.put_roster(mid, name, pid, now)
+            if pid != entry["player_id"]:
+                self.store.retire_marshal_key_only(mid, now)  # the new phone registers its own key (MR-6)
+                if entry["player_id"] is not None:
+                    self._follow_role(entry["player_id"], "player")
+                if pid is not None:
+                    self._follow_role(pid, "marshal")
+            elif self.store.marshal(mid) is not None:
+                self.store.put_marshal(mid, name, self.store.marshal(mid)["public_key"], pid, now)
+            out = self._marshal_view(self.store.roster_entry(mid))
+        return out
+
+    def remove_marshal(self, mid: str) -> dict[str, Any]:
+        """DELETE /api/v1/marshals/{id} (GM): the marshal is revoked at once (MR-8, MR-9)."""
+        with self._lock:
+            entry = self.store.roster_entry(mid)
+            if entry is None:
+                raise NotFound(f"{mid} is not on the marshal list")
+            self.store.retire_marshal(mid, self._wall())
+            if entry["player_id"] is not None:
+                self._follow_role(entry["player_id"], "player")
+        log.info("marshal removed from the list: %s", mid)
+        return {"marshal_id": mid, "removed": True}
+
+    def my_marshal(self, viewer: Viewer) -> Optional[dict[str, Any]]:
+        """What GET /api/v1/checkin/me says to a marshal's phone (MR-2): the id the GM gave this
+        player, and the key the controller holds for it, or null when the player is not on the list."""
+        entry = self.store.roster_of_player(viewer.player_id) if viewer.player_id else None
+        if entry is None:
+            return None
+        view = self._marshal_view(entry)
+        return {"marshal_id": view["marshal_id"], "name": view["name"], "public_key": view["public_key"],
+                "valid_for_s": MARSHAL_VALID_FOR_S}
+
+    def register_my_key(self, viewer: Viewer, body: dict[str, Any]) -> dict[str, Any]:
+        """PUT /api/v1/checkin/me/marshal-key: the marshal's phone registers the key that signs its
+        readings, for the id the GM's list gave this player (MR-2, MR-5)."""
+        unknown = set(body) - {"marshal_id", "name", "public_key"}
+        if unknown:
+            raise ControllerError(f"unknown fields {sorted(unknown)}")
+        with self._lock:
+            entry = self.store.roster_of_player(viewer.player_id) if viewer.player_id else None
+            if entry is None:
+                raise Forbidden("you are not on the field's marshal list: ask the GM to add you as a marshal")
+            mid = body.get("marshal_id")
+            if mid is not None and mid != entry["marshal_id"]:
+                raise Conflict(f"your marshal id is {entry['marshal_id']}, not {mid}")
+            key = self._public_key(body.get("public_key"))
+            self.store.put_marshal(entry["marshal_id"], entry["name"], key, viewer.player_id, self._wall())
+        log.info("marshal key registered: %s", entry["marshal_id"])
+        return {"marshal_id": entry["marshal_id"], "name": entry["name"],
+                "public_key": base64.b64encode(key).decode("ascii"), "player_id": viewer.player_id}
 
     def marshals(self) -> list[dict[str, Any]]:
-        return [{"marshal_id": m["marshal_id"], "name": m["name"], "player_id": m["player_id"],
-                 "public_key": base64.b64encode(m["public_key"]).decode("ascii"),
-                 "registered_at": m["registered_at"]} for m in self.store.marshals()]
+        return [self._marshal_view(e) for e in self.store.roster()]
 
     def upload_readings(self, viewer: Viewer, body: dict[str, Any]) -> dict[str, Any]:
         """POST /api/v1/chrono/readings: one series of signed readings (protocol/checkin.md)."""
@@ -1232,7 +1367,8 @@ class Checkin:
                 if "signature" not in rec:
                     raise chrono.ChronoError("unsigned", "the record has no signature")
                 if m is None:
-                    raise chrono.ChronoError("marshal", f"marshal {fields['marshal_id']} is not registered here")
+                    raise chrono.ChronoError("marshal", f"marshal {fields['marshal_id']} is not on this field's "
+                                                         "marshal list (never added, or removed by the GM)")
                 fields = chrono.verify(rec, m["public_key"])
                 if fields["field_id"] != self.cfg.field_id:
                     raise chrono.ChronoError("field", f"the record is for field {fields['field_id']}")

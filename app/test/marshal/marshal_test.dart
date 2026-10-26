@@ -6,6 +6,7 @@
 // with, retention and erasure, the velocity keypad, and player tags that
 // read back as written. Plus the app's storage they live in.
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:atalaia_app/chrono/chrono_ui.dart';
@@ -21,6 +22,8 @@ import 'package:atalaia_app/security/ndef.dart';
 import 'package:atalaia_app/security/nfc_tag_signer.dart';
 import 'package:atalaia_app/storage/app_store.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../support/marshal_trust.dart';
 
 LimitTemplate portugal() => LimitTemplate.parse(
   File('lib/chrono/limit_templates/portugal.yaml').readAsStringSync(),
@@ -54,18 +57,93 @@ void main() {
     return r;
   }
 
-  test('no key, no identity; a new key makes one', () async {
-    final r = await records();
-    expect(r.hasIdentity, isFalse);
+  test(
+    'no key, no identity; a key alone is not the controller\'s yes',
+    () async {
+      final r = await records();
+      expect(r.hasIdentity, isFalse);
+      await r.newKey();
+      expect(r.publicKey, hasLength(32));
+      expect(r.settings.marshalSeedHex, hasLength(64));
+      // A typed name and id and a key are nothing without the field
+      // controller's confirmation (MR-2): nothing is recorded.
+      expect(r.hasIdentity, isFalse);
+      final rep = replica();
+      Future<void> shoot() => r.record(
+        replica: rep,
+        type: ReadingType.checkin,
+        velocityMps: 90,
+        bbWeightG: 0.2,
+      );
+      await expectLater(shoot(), throwsA(isA<MarshalNotAuthorised>()));
+      expect(r.readings, isEmpty);
+      trustMarshal(r, at: now);
+      expect(r.hasIdentity, isTrue);
+      await shoot();
+      expect(r.readings, hasLength(1));
+    },
+  );
+
+  test(
+    'the confirmation is for this id, this key and two hours (MR-2, MR-4)',
+    () async {
+      final r = await records();
+      await r.newKey();
+      trustMarshal(r, at: now);
+      expect(r.authorized, isTrue);
+      // Another id typed in is not the confirmed one.
+      r.settings.marshalId = 'm-2';
+      expect(r.authorized, isFalse);
+      r.settings.marshalId = 'm-1';
+      expect(r.authorized, isTrue);
+      // A new key is not the key the controller holds.
+      final before = r.settings.marshalValidation!;
+      await r.newKey();
+      expect(r.authorized, isFalse);
+      r.settings.marshalValidation = before;
+      expect(r.authorized, isFalse);
+      trustMarshal(r, at: now);
+      expect(r.authorized, isTrue);
+      // It runs out after the time the controller gave...
+      now = now.add(const Duration(hours: 2));
+      expect(r.authorized, isFalse);
+      now = now.subtract(const Duration(minutes: 1));
+      expect(r.authorized, isTrue);
+      // ...and a clock put back before the confirmation does not stretch it.
+      now = DateTime.utc(2026, 10, 19, 8, 30);
+      expect(r.authorized, isFalse);
+      // Taken off the list: nothing.
+      now = DateTime.utc(2026, 10, 19, 9, 30);
+      expect(r.authorized, isTrue);
+      r.settings.marshalValidation = null;
+      expect(r.authorized, isFalse);
+    },
+  );
+
+  test('the confirmation is kept with the settings', () async {
+    final r = await records(MemoryAppStore());
     await r.newKey();
-    expect(r.hasIdentity, isTrue);
-    expect(r.publicKey, hasLength(32));
-    expect(r.settings.marshalSeedHex, hasLength(64));
+    trustMarshal(r, at: now);
+    final back = AppSettings.fromJson(
+      jsonDecode(jsonEncode(r.settings.toJson())) as Map<String, Object?>,
+    );
+    final v = back.marshalValidation!;
+    expect(v.marshalId, 'm-1');
+    expect(v.publicKey, r.publicKeyBase64);
+    expect(
+      v.validUntilMs - v.validatedAtMs,
+      const Duration(hours: 2).inMilliseconds,
+    );
+    final broken = AppSettings.fromJson({
+      'marshal_validation': {'marshal_id': 1},
+    });
+    expect(broken.marshalValidation, isNull);
   });
 
   test('each shot is a signed record the public key verifies', () async {
     final r = await records();
     await r.newKey();
+    trustMarshal(r, at: now);
     final rep = replica();
     await r.addReplica(rep);
     final reading = await r.record(
@@ -85,6 +163,7 @@ void main() {
   test('a spot check against the last check-in: PASS, WARN, FAIL', () async {
     final r = await records();
     await r.newKey();
+    trustMarshal(r, at: now);
     final rep = replica();
     final limit = portugal().limitFor('rifle')!; // 1.14 J
     final checkin = [
@@ -100,6 +179,9 @@ void main() {
       CheckResult.pass,
     );
     now = now.add(const Duration(hours: 3));
+    // Hours later: the open marshal screens have asked the controller again
+    // (every 10 minutes, MR-4), so the confirmation is a fresh one.
+    trustMarshal(r, at: now);
     Future<CheckResult> spot(double v) async => r
         .judge(
           [
@@ -127,6 +209,7 @@ void main() {
     final store = MemoryAppStore();
     var r = await records(store);
     await r.newKey();
+    trustMarshal(r, at: now);
     await r.addReplica(replica());
     final a = replica(owner: 'p-1');
     final b = replica(owner: 'p-2');

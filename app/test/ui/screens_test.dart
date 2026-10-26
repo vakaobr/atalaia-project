@@ -32,6 +32,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_harness.dart';
 import '../support/fakes.dart';
+import '../support/marshal_trust.dart';
 
 class ScriptedSocket implements FeedSocket {
   ScriptedSocket(this.lines);
@@ -284,6 +285,7 @@ void main() {
     await tester.runAsync(() async {
       await records.load();
       await records.newKey();
+      trustMarshal(records);
       await records.addReplica(
         Replica(
           replicaId: newUuid(),
@@ -336,15 +338,20 @@ void main() {
     expect(records.readings.single.velocityMps, 95.5);
   });
 
-  testWidgets('the marshal home: identity and tools', (tester) async {
+  testWidgets('the marshal home: no check-in, no marshal tools', (
+    tester,
+  ) async {
     await phone(tester);
     final h = harness();
     final records = MarshalRecords(h.store, h.settings);
     await tester.pumpWidget(h.app(home: MarshalHomeScreen(records: records)));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Antes de registar medições'), findsWidgets);
-    expect(find.byKey(const Key('marshal-chrono')), findsOneWidget);
-    expect(find.byKey(const Key('marshal-tags')), findsOneWidget);
+    // No controller to ask (MR-2): the tools stay shut, whatever was typed.
+    expect(find.textContaining('Primeiro faz o check-in'), findsOneWidget);
+    expect(find.byKey(const Key('queue-go-checkin')), findsOneWidget);
+    expect(find.byKey(const Key('marshal-chrono')), findsNothing);
+    expect(find.byKey(const Key('marshal-tags')), findsNothing);
+    expect(find.byKey(const Key('marshal-id')), findsNothing);
   });
 
   testWidgets("writing a player's tag for a game", (tester) async {
