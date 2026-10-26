@@ -89,3 +89,23 @@ table.scores { width: 100%; border-collapse: collapse; margin: 1rem 0; }
 table.scores th, table.scores td { border-top: 1px solid var(--line); padding: 0.6rem 0; text-align: left; }
 table.scores td.score { text-align: right; font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 table.scores tr.winner th { color: var(--accent); }
+/* A preview server (ATALAIA_PREVIEW=on, decision PV-3): the banner on every page and the feedback form. */
+.preview-banner { background: #fff1b8; color: #4a3600; border-bottom: 2px solid #c9a100; padding: 0.5rem 1rem;
+                  text-align: center; font-size: 0.95rem; }
+.preview-banner a { color: #4a3600; font-weight: 700; white-space: nowrap; }
+@media (prefers-color-scheme: dark) {
+  .preview-banner { background: #4a3d00; color: #ffefa8; border-bottom-color: #c9a100; }
+  .preview-banner a { color: #ffefa8; }
+}
+form.feedback fieldset { border: 1px solid var(--line); border-radius: 0.3rem; padding: 0.5rem 1rem; }
+form.feedback label { display: block; margin: 0.25rem 0; }
+form.feedback > label { margin-top: 1rem; font-weight: 600; }
+form.feedback textarea, form.feedback input[type="text"], form.feedback select {
+  width: 100%; font: inherit; color: inherit; background: transparent; border: 1px solid var(--line);
+  border-radius: 0.3rem; padding: 0.5rem; }
+form.feedback select option { color: initial; }
+form.feedback textarea { min-height: 8rem; }
+form.feedback button { margin-top: 1rem; padding: 0.5rem 1.25rem; border: 0; border-radius: 0.3rem;
+                       background: var(--accent); color: var(--ground); font: inherit; font-weight: 600; }
+form.feedback .hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+ul.preview-list li { padding: 0.6rem 0; }

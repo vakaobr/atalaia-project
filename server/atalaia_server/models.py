@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """ORM models (ADR-P4-1; migrations 0001_base, 0002_accounts, 0003_personal_data, 0004_sync, 0005_chrono,
 0006_scheduling, 0007_registration, 0008_integrations, 0009_clubs, 0010_firmware; 0011_history in
-``history_models``; 0012_atak in ``atak_models``).
+``history_models``; 0012_atak in ``atak_models``; 0013_preview_feedback in ``preview_models``).
 
 Fields, users, roles, per-field roles, sessions and the audit log, as
 ADR-P4-1 defines them, with plan phase 11's additions for accounts: the
@@ -901,3 +901,5 @@ class FirmwareRelease(Base):
 from . import history_models  # noqa: E402,F401  (after Base and the tables it points at)
 # The remote ATAK relay's certificates (Phase 4 follow-up FU5, migration 0012_atak).
 from . import atak_models  # noqa: E402,F401
+# The preview deployment's feedback form (decisions PV-*, migration 0013_preview_feedback).
+from . import preview_models  # noqa: E402,F401

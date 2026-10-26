@@ -4,7 +4,7 @@
 // The fields the account has a role on (GET /api/v1/fields; every field for a server admin), each
 // with the sections its roles reach in this session.
 
-import { $, api, boot, clear, effectiveRoles, el, errorText, link, roleName, sectionAllowed, status, t } from './staff.js';
+import { $, api, boot, clear, effectiveRoles, el, errorText, link, page, roleName, sectionAllowed, status, t } from './staff.js';
 
 const SECTIONS = [
     ['history', '/history', 'nav_history'], ['scenarios', '/scenarios', 'nav_scenarios'],
@@ -16,6 +16,10 @@ async function main() {
     const ctx = await boot();
     if (!ctx) return;
     const list = $('fields');
+    if (page.preview === '1' && ctx.session.user.server_admin) {  // a preview server's feedback (PV-8)
+        $('feedback-link').hidden = false;
+        $('feedback-link').firstChild.setAttribute('href', link('/staff/feedback'));
+    }
     let fields;
     try {
         fields = await api('GET', '/api/v1/fields');

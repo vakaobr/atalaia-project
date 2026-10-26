@@ -13,6 +13,7 @@
     python3 tools/docker_server.py down                       stop it and delete its database
     python3 tools/docker_server.py deploy                     the deployment test (setup, Caddy, backup, restore)
     python3 tools/docker_server.py deploy-hosted              the same for a hosted hub (on-demand TLS, two fields)
+    python3 tools/docker_server.py preview-check              the preview deployment's Compose files keep their promises
 
 Works from any folder; Docker with the Compose plugin must be running. `test`
 and `migrations` build the test image (server/Dockerfile, target test) and
@@ -36,7 +37,11 @@ and runs tools/server_deploy_hosted.py: setup.sh --hosted, the hub behind
 Caddy's on-demand TLS with two fields made by the operator's commands, the
 ask endpoint, the isolation, backup.sh and restore.sh's hosted paths into a
 fresh hub (Phase 4 follow-up). ATALAIA_VOLUME_SUFFIX keeps the Compose projects and images of two checkouts
-(e.g. a git worktree) apart.
+(e.g. a git worktree) apart. `preview-check` resolves the preview deployment's Compose files
+(server/docker-compose.preview.yml, run through server/preview/preview.sh; decisions PV-*) and checks, with
+tools/server_preview_check.py, that only 127.0.0.1:8000 is published, Caddy is off, every service restarts
+unless stopped, the images are pinned and the server has no way out; its tests are the `test` command's
+tests.test_preview and the `browser` command's tests_browser.test_preview_browser.
 """
 
 from __future__ import annotations
@@ -168,8 +173,9 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 2
     what, args = argv[0], argv[1:]
-    if what not in ("test", "migrations", "browser", "build", "up", "down", "deploy", "deploy-hosted"):
-        return fail(f"unknown command '{what}' (test, migrations, browser, build, up, down, deploy, deploy-hosted)")
+    if what not in ("test", "migrations", "browser", "build", "up", "down", "deploy", "deploy-hosted", "preview-check"):
+        return fail(f"unknown command '{what}' (test, migrations, browser, build, up, down, deploy, deploy-hosted, "
+                    "preview-check)")
     if what not in ("test", "browser") and args:
         return fail(f"'{what}' takes no arguments")
     try:
@@ -179,6 +185,11 @@ def main(argv: list[str]) -> int:
             return fail("the Docker Compose plugin is missing (docker compose version)")
     except FileNotFoundError:
         return fail("the docker command was not found; install Docker")
+    if what == "preview-check":
+        sys.path.insert(0, str(REPO / "tools"))
+        import server_preview_check
+
+        return server_preview_check.main()
     if what in ("test", "migrations", "browser"):
         return in_tests_image(what, args)
     if what in ("deploy", "deploy-hosted"):

@@ -52,7 +52,7 @@ from ..feeds import FeedField, ical, json_feed
 from ..models import Field, ScheduledGame
 from ..services import registration, scheduling as svc
 from ..api.fields import SLUG
-from . import i18n
+from . import i18n, preview_texts
 
 router = APIRouter(include_in_schema=False)
 
@@ -156,8 +156,7 @@ class Page:
     """One rendering: the language and how links keep it."""
 
     def __init__(self, request: Request) -> None:
-        self.lang, self.explicit = i18n.choose(request.query_params.get("lang"),
-                                               request.headers.get("accept-language"))
+        self.lang, self.explicit, self.remember = i18n.for_request(request)
         self.t = i18n.STRINGS[self.lang]
         self.path = request.url.path
 
@@ -173,8 +172,13 @@ class Page:
         body = TEMPLATES["page"].substitute(
             lang=tag, title=esc(title), head=head, language_label=esc(self.t["language"]),
             languages=self.languages(), content=content, footer=esc(footer or self.t["footer"]))
-        return answer(request, body, HTML_TYPE, modified, CACHE_PAGE, status_code=status_code,
-                      extra={"Content-Language": tag, "Vary": "Accept-Language"})
+        body = preview_texts.inject_banner(request, body, self.lang)  # a preview server's banner (PV-3)
+        vary = "Accept-Language" if request.app.state.settings.lang_from_browser else "Cookie"
+        response = answer(request, body, HTML_TYPE, modified, CACHE_PAGE, status_code=status_code,
+                          extra={"Content-Language": tag, "Vary": vary})
+        if self.remember:  # the visitor chose a language: keep it while they browse (decision PV-9)
+            i18n.remember(response, self.lang)
+        return response
 
     def not_found(self, request: Request) -> Response:
         content = TEMPLATES["not_found"].substitute(heading=esc(self.t["not_found_title"]),

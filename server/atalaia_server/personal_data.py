@@ -36,6 +36,7 @@ What holds personal data now (plan phases 10-12):
 | ``firmware_releases`` (plan phase 19) | (the server's catalogue: no person in it; who added a release is ``added_by``, unlinked at erasure) | ``added_by`` cleared | (kept: withdrawn releases stay, marked) |
 | the remote GM's audit rows (plan phase 19: ``remote_gm_command``, ``remote_gm_denied``) | in the audit log as every other action | as every other audit row: kept without the person's addresses | 36 months, as the audit log |
 | ``atak_certs`` (Phase 4 follow-up FU5) | the ATAK certificates the person holds: device, field, dates, whether positions, last connection (``atak_certificates.json``; never a key) | revoked (``erasure``), the device's name replaced and the account unlinked (holder, issuer, revoker) | 30 days after the certificate expired |
+| ``preview_feedback`` (decisions PV-*; only a preview server writes it) | (no account, no address: what a visitor typed, which no one can be matched to; the administrators answer a request to see or delete one by hand: ``DELETE /api/v1/admin/feedback/{id}``) | | the optional contact after 90 days, the row after 12 months |
 | ``atak_cas`` and the relay's audit rows (FU5: ``atak_cert_issued``, ``atak_cert_revoked``, ``atak_connect`` with the device's address, ``atak_refused``) | (a CA is the field's: no person in it) / in the audit log | / as every other audit row, and their details as the certificate's row (FU5-18): the person's devices' names replaced, the account's id taken out of ``holder_id`` and ``issued_by`` | / 36 months, as the audit log |
 
 The synced games (plan phase 13) come from field controllers and hold no
@@ -98,6 +99,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from . import chrono_registry, tenancy
 from .atak_models import AtakCert
+from .preview_models import CONTACT_RETENTION, RETENTION as FEEDBACK_RETENTION, PreviewFeedback
 from .audit import record
 from .models import (ROLE_BY_ID, AuditLog, ChronoReading, ChronoReject, Club, ClubMember, ClubReport, Consent, Field,
                      FieldPlayerId, FirmwareRelease, Game, GameRegistration, MarshalKey, PlayerIdClaim, RegistrationReplica, Replica,
@@ -482,6 +484,13 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
     counts["branding_images"] = await branding.purge_images(db, now)
     atak = await db.execute(delete(AtakCert).where(AtakCert.not_after < now - ATAK_CERT_RETENTION))
     counts["atak_certificates"] = atak.rowcount or 0
+    # A preview server's feedback (decisions PV-*): the contact is erased after 90 days, the row after a year.
+    contacts = await db.execute(update(PreviewFeedback).where(
+        PreviewFeedback.contact.is_not(None), PreviewFeedback.created_at < now - CONTACT_RETENTION)
+        .values(contact=None, updated_at=now).execution_options(synchronize_session=False))
+    counts["feedback_contacts"] = contacts.rowcount or 0
+    feedback = await db.execute(delete(PreviewFeedback).where(PreviewFeedback.created_at < now - FEEDBACK_RETENTION))
+    counts["preview_feedback"] = feedback.rowcount or 0
     if dry_run:
         await db.rollback()
         return counts

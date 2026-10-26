@@ -74,4 +74,5 @@ Each implementation phase has its own folder with `RESEARCH.md`, `ADR.md`,
 | Document | What it covers |
 | --- | --- |
 | [`../firmware/esp32/docs/BRING_UP.md`](../firmware/esp32/docs/BRING_UP.md) | Hardware bring-up runbook: first-boot smoke test through the 2-hour stability gate |
+| [`runbooks/preview-server.md`](runbooks/preview-server.md) | Runbook for the preview server at tests.atalaia-project.link: start, stop, reset, update, backup, logs, rotating secrets, taking it down |
 | [`../firmware/esp32/docs/WOKWI.md`](../firmware/esp32/docs/WOKWI.md) | Running the Field Box firmware in the Wokwi emulator, without hardware |

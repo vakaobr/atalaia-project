@@ -51,7 +51,7 @@ from fastapi.responses import RedirectResponse, Response
 
 from ..history_models import DEFAULT_RETENTION_DAYS, MAX_DELAY_S, MIN_RETENTION_DAYS
 from ..services import devices
-from . import i18n
+from . import i18n, preview_texts
 from .field_pages import GET_HEAD, HERE, HTML_TYPE, STARTED, answer, esc, switcher
 from .staff_i18n import STRINGS
 
@@ -90,8 +90,7 @@ class StaffPage:
     """One staff page: its language, its texts, its links."""
 
     def __init__(self, request: Request) -> None:
-        self.lang, self.explicit = i18n.choose(request.query_params.get("lang"),
-                                               request.headers.get("accept-language"))
+        self.lang, self.explicit, self.remember = i18n.for_request(request)
         self.t = STRINGS[self.lang]
         self.path = request.url.path
 
@@ -132,9 +131,13 @@ class StaffPage:
             home=esc(self.link("/staff/")), sections=self.sections(field, section),
             language_label=esc(i18n.STRINGS[self.lang]["language"]), languages=self.languages(),
             content=content, strings=strings_block(self.t))
-        return answer(request, body, HTML_TYPE, datetime.now(timezone.utc), NO_STORE, status_code=status_code,
-                      extra={"Content-Language": i18n.TAGS[self.lang], "Vary": "Accept-Language",
-                             "X-Robots-Tag": "noindex"})
+        body = preview_texts.inject_banner(request, body, self.lang)  # a preview server's banner (PV-3)
+        response = answer(request, body, HTML_TYPE, datetime.now(timezone.utc), NO_STORE, status_code=status_code,
+                          extra={"Content-Language": i18n.TAGS[self.lang], "Vary": "Accept-Language, Cookie",
+                                 "X-Robots-Tag": "noindex"})
+        if self.remember:  # the visitor chose a language: keep it while they browse (decision PV-9)
+            i18n.remember(response, self.lang)
+        return response
 
     def not_found(self, request: Request) -> Response:
         content = f'<h1>{esc(self.t["err_not_found"])}</h1>\n'
@@ -181,7 +184,8 @@ async def staff_redirect(request: Request) -> Response:
 async def home(request: Request) -> Response:
     p = StaffPage(request)
     content = TEMPLATES["home"].substitute(p.texts())
-    return p.render(request, "home", p.t["home_title"], content, section="fields")
+    preview = {"preview": "1"} if request.app.state.settings.preview else None  # the feedback link (PV-8)
+    return p.render(request, "home", p.t["home_title"], content, section="fields", data=preview)
 
 
 @router.api_route("/staff/login", methods=GET_HEAD)

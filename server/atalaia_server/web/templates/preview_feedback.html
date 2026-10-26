@@ -1,0 +1,23 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$heading</h1>
+<p>$intro</p>
+$notice<form class="feedback" method="post" action="$action" accept-charset="utf-8">
+<input type="hidden" name="t" value="$token">
+<input type="hidden" name="lang" value="$lang">
+<input type="hidden" name="from" value="$came_from">
+<fieldset>
+<legend>$kind_legend</legend>
+$kinds</fieldset>
+<label for="who">$who_label</label>
+<select id="who" name="who">$who_options</select>
+<label for="message">$message_label</label>
+<textarea id="message" name="message" rows="8" maxlength="$message_max" required aria-describedby="message-hint">$message</textarea>
+<p id="message-hint" class="address">$message_hint</p>
+<label for="contact">$contact_label</label>
+<input id="contact" name="contact" type="text" maxlength="$contact_max" autocomplete="off" value="$contact" aria-describedby="contact-hint">
+<p id="contact-hint" class="address">$contact_hint</p>
+<div class="hp" aria-hidden="true"><label>$honeypot <input type="text" name="website" value="" tabindex="-1" autocomplete="off"></label></div>
+<button type="submit">$send</button>
+</form>
+<p class="address">$privacy</p>

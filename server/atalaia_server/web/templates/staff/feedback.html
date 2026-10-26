@@ -1,0 +1,23 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$feedback_title</h1>
+<p>$feedback_intro</p>
+<form id="filters" class="staff-form inline" method="post" novalidate>
+<fieldset disabled>
+<label for="f-status">$feedback_show</label>
+<select id="f-status" name="status">
+<option value="new">$fb_status_new</option>
+<option value="seen">$fb_status_seen</option>
+<option value="done">$fb_status_done</option>
+<option value="all">$fb_status_all</option>
+</select>
+</fieldset>
+</form>
+<p id="feedback-counts" class="when"></p>
+<div class="table-wrap">
+<table id="feedback" class="data" hidden>
+<thead><tr><th scope="col">$fb_col_when</th><th scope="col">$fb_col_kind</th><th scope="col">$fb_col_who</th><th scope="col">$fb_col_message</th><th scope="col">$fb_col_contact</th><th scope="col">$fb_col_page</th><th scope="col">$fb_col_status</th><th scope="col"><span class="visually-hidden">$delete</span></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="feedback-none" hidden>$feedback_none</p>

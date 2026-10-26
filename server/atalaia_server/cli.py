@@ -3,6 +3,10 @@
 """The site server's commands: ``python -m atalaia_server <command>``.
 
     python -m atalaia_server create-admin --username NAME [--email EMAIL] [--password-stdin] [--field SLUG]
+    python -m atalaia_server create-admin --username NAME --generate FILE
+    python -m atalaia_server demo load|reset
+    python -m atalaia_server demo reviewer --username NAME --out FILE
+    python -m atalaia_server feedback list [--status new|seen|done|all] [--json]
     python -m atalaia_server purge [--dry-run]
     python -m atalaia_server hosted init|create|list|migrate|check|suspend|resume|export|delete ...
     python -m atalaia_server import-field FILE.zip
@@ -18,6 +22,11 @@ the account only after a code from that app is typed back, since an
 administrator cannot log in without TOTP. In the deployed Compose project:
 ``docker compose exec server python -m atalaia_server create-admin --username ...``.
 It needs ATALAIA_DATABASE_URL and ATALAIA_SECRET_KEY, as the server does.
+
+``create-admin --generate FILE`` (preview deployments, decisions PV-*) asks nothing: it makes a strong password and a
+TOTP secret, creates the administrator and writes the username, password, secret and ``otpauth://`` URI to FILE
+(mode 0600, which must not exist); nothing secret is printed. ``demo`` loads, resets or adds a test account to the
+demo data (``demo_data.py``); ``feedback list`` prints a preview server's feedback.
 
 ``purge`` runs the retention purge (ADR-P4-8) once and prints what it
 deleted (``--dry-run``: what it would delete). The server runs it by itself
@@ -57,7 +66,7 @@ from typing import Any, Callable, Optional, TextIO
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from . import atak_pki, hosted, passwords, personal_data, tenancy, totp
+from . import atak_pki, demo_data, hosted, passwords, personal_data, tenancy, totp
 from .api.auth import EMAIL, username_problem
 from .audit import record
 from .config import ConfigError, Settings, database_url_from_env
@@ -238,6 +247,101 @@ async def run_atak(settings: Settings, args: argparse.Namespace, out: TextIO) ->
         await engine.dispose()
 
 
+def write_credentials(path: Path, username: str, password: str, secret: str, what: str) -> None:
+    """Writes a generated account's login to ``path`` (mode 0600, must not exist); never printed."""
+    if path.exists():
+        raise CommandError(f"{path} exists")
+    text = (f"{what}\nusername: {username}\npassword: {password}\ntotp_secret: {secret}\n"
+            f"totp_uri: {totp.provisioning_uri(secret, username)}\n"
+            "Add the TOTP secret (or the URI as a QR code) to an authenticator app; the password is for the login page.\n")
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+
+
+async def generate_admin(settings: Settings, username: str, email: Optional[str], out_path: Path, out: TextIO,
+                         clock: Callable[[], float] = time.time) -> uuid.UUID:
+    """``create-admin --generate``: a password and TOTP secret made here, the account created, the login written
+    to ``out_path`` before anything is made (so a failure leaves no account nobody can enter)."""
+    password = demo_data.new_password()
+    secret_box: dict[str, str] = {}
+
+    def read_code(uri: str, secret: str) -> str:
+        secret_box["secret"] = secret
+        # The code of the step before this one: the account's last step is then older than the current code.
+        return totp.code_at(secret, clock() - totp.PERIOD_S)
+
+    class _Quiet:  # create_admin prints the secret: not here
+        def write(self, text: str) -> int:
+            return len(text)
+
+        def flush(self) -> None:
+            return None
+
+    if out_path.exists():
+        raise CommandError(f"{out_path} exists")
+    user_id = await create_admin(settings, username, email, password, read_code, _Quiet(), clock)  # type: ignore[arg-type]
+    write_credentials(out_path, username.strip().lower(), password, secret_box["secret"], "Atalaia server administrator")
+    print(f"Server administrator {username!r} created ({user_id}); its login is in {out_path} (mode 0600).", file=out)
+    return user_id
+
+
+async def run_demo(settings: Settings, args: argparse.Namespace, out: TextIO) -> None:
+    engine = make_engine(settings)
+    try:
+        maker = make_sessionmaker(engine, hosted=False)
+        async with maker() as db:
+            if args.action == "load":
+                print("Demo data:", demo_data.json_summary(await demo_data.load(db)), file=out)
+            elif args.action == "reset":
+                print("Demo data reset:", demo_data.json_summary(await demo_data.reset(db)), file=out)
+            else:
+                username = args.username.strip().lower()
+                if username_problem(username):
+                    raise CommandError("the username must be 3-64 characters: letters, digits, '.', '_' or '-'")
+                if await demo_data.username_taken(db, username):
+                    raise CommandError(f"an account named {username!r} already exists")
+                if await db.get(Field, demo_data.demo_id("field")) is None:
+                    raise CommandError("there is no demo field: run `demo load` first")
+                path = Path(args.out)
+                if path.exists():
+                    raise CommandError(f"{path} exists")
+                password, secret = demo_data.new_password(), totp.new_secret()
+                await demo_data.make_account(db, Keys(settings.secret_key), settings.privacy_notice_version, username,
+                                             password, secret, role="gm")
+                write_credentials(path, username, password, secret, "Atalaia preview test account (GM on the demo field)")
+                await db.commit()
+                print(f"Test account {username!r} (GM on the demo field) created; its login is in {path} (mode 0600).",
+                      file=out)
+    finally:
+        await engine.dispose()
+
+
+async def run_feedback(settings: Settings, args: argparse.Namespace, out: TextIO) -> None:
+    import json  # noqa: PLC0415
+
+    from .api.feedback import list_feedback  # noqa: PLC0415
+
+    engine = make_engine(settings)
+    try:
+        async with make_sessionmaker(engine, hosted=False)() as db:
+            body = await list_feedback(db, args.status, 500)
+    finally:
+        await engine.dispose()
+    if args.json:
+        print(json.dumps(body, ensure_ascii=False, indent=2), file=out)
+        return
+    c = body["counts"]
+    print(f"{c['new']} new, {c['seen']} seen, {c['done']} done; showing {args.status}:", file=out)
+    for f in body["feedback"]:
+        who = f" ({f['who']})" if f["who"] else ""
+        print(f"\n[{f['created_at'][:16]}] {f['kind']}{who} lang={f['lang']} page={f['page'] or '-'} "
+              f"state={f['status']} id={f['id']}", file=out)
+        print(f"  {f['message']}", file=out)
+        if f["contact"]:
+            print(f"  contact: {f['contact']}", file=out)
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m atalaia_server", description="Atalaia site server commands")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -247,6 +351,20 @@ def _parser() -> argparse.ArgumentParser:
     admin.add_argument("--password-stdin", action="store_true",
                        help="read the password from the first line of standard input, the TOTP code from the next")
     admin.add_argument("--field", help="hosted mode: the field (slug) the administrator belongs to")
+    admin.add_argument("--generate", metavar="FILE",
+                       help="ask nothing: make a password and TOTP secret and write them to FILE (mode 0600)")
+    demo = sub.add_parser("demo", help="the preview deployment's demo data (decisions PV-*)")
+    dsub = demo.add_subparsers(dest="action", required=True)
+    dsub.add_parser("load", help="make the demo data or bring it up to date (idempotent)")
+    dsub.add_parser("reset", help="delete the demo field and clubs, then load again")
+    p = dsub.add_parser("reviewer", help="a test account with the GM role on the demo field")
+    p.add_argument("--username", required=True)
+    p.add_argument("--out", required=True, help="where to write its login (mode 0600; must not exist)")
+    fb = sub.add_parser("feedback", help="a preview server's feedback")
+    fsub = fb.add_subparsers(dest="action", required=True)
+    p = fsub.add_parser("list", help="print the feedback, newest first")
+    p.add_argument("--status", default="new", choices=("new", "seen", "done", "all"))
+    p.add_argument("--json", action="store_true")
     purge = sub.add_parser("purge", help="delete what is past its retention period (ADR-P4-8), once")
     purge.add_argument("--dry-run", action="store_true", help="count, delete nothing")
     imp = sub.add_parser("import-field", help="load a hosted field's export into this single-field server")
@@ -369,6 +487,23 @@ def main(argv: Optional[list[str]] = None, stdin: TextIO = sys.stdin, out: TextI
         try:
             asyncio.run(run_atak(settings, args, out))
         except (CommandError, tenancy.TenantError) as e:
+            print(f"atalaia_server: {e}", file=err)
+            return 1
+        return 0
+    if args.command == "demo":
+        try:
+            asyncio.run(run_demo(settings, args, out))
+        except CommandError as e:
+            print(f"atalaia_server: {e}", file=err)
+            return 1
+        return 0
+    if args.command == "feedback":
+        asyncio.run(run_feedback(settings, args, out))
+        return 0
+    if args.generate:
+        try:
+            asyncio.run(generate_admin(settings, args.username, args.email, Path(args.generate), out))
+        except CommandError as e:
             print(f"atalaia_server: {e}", file=err)
             return 1
         return 0

@@ -84,3 +84,4 @@ ul.compact li { margin: 0.15rem 0; overflow-wrap: anywhere; }
   header.staff-top .account { margin-left: 0; }
   .staff-form.inline .row { display: block; margin-right: 0; }
 }
+.message { white-space: pre-wrap; overflow-wrap: anywhere; display: block; max-width: 32rem; }

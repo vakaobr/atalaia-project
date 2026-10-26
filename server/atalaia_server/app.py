@@ -23,6 +23,9 @@ In hosted mode (``ATALAIA_HOSTED=on``, plan phase 21) ``tenancy.TenantMiddleware
 picks each request's field from its host name, the app refuses to start when
 its database role could bypass the isolation (``tenancy.check_app_role``) and
 the daily purge runs once per field.
+
+With ``ATALAIA_PREVIEW=on`` (decisions PV-*) the app is a preview deployment: ``web/preview.py`` adds a landing
+page, a feedback form, ``robots.txt`` and a banner on every page, and ``X-Robots-Tag: noindex`` on every answer.
 """
 
 from __future__ import annotations
@@ -39,7 +42,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from . import __version__, atak_pki, integrations, personal_data, tenancy
-from .api import (atak, auth, branding, chrono, clubs, devices, fields, firmware, games, health, history,
+from .api import (atak, auth, branding, chrono, clubs, devices, feedback, fields, firmware, games, health, history,
                   integrations as integrations_api, me, registration_import, registrations, remote_gm, scenarios,
                   scheduling, sync)
 from .atak_relay import AtakRelay
@@ -50,7 +53,7 @@ from .remote_gm import RemoteHub
 from .security_headers import SecurityHeadersMiddleware
 from .tokens import Keys, UsedTokens
 from .totp import SeedBox
-from .web import club_pages, field_pages, scoreboard, staff_pages
+from .web import club_pages, field_pages, preview, scoreboard, staff_pages
 
 log = logging.getLogger("atalaia.server")
 
@@ -117,6 +120,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.add_middleware(RequestLimitMiddleware, get_limits=lambda: app.state.limits)
     app.add_middleware(tenancy.TenantMiddleware, get_state=lambda: app.state)
     app.add_middleware(SecurityHeadersMiddleware)
+    if settings.preview:  # a preview deployment (decisions PV-*): noindex everywhere, the landing page, the form
+        app.add_middleware(preview.PreviewHeadersMiddleware)
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(fields.router)
@@ -140,6 +145,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(scenarios.router)
     app.include_router(scoreboard.router)
     app.include_router(staff_pages.router)  # the field staff's pages (Phase 4 follow-up, FU2-1)
+    if settings.preview:
+        app.include_router(feedback.router)  # the administrators' side of the feedback form (PV-8)
+        app.include_router(preview.router)  # /, /feedback, /robots.txt, /staff/feedback
     return app
 
 

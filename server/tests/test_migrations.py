@@ -34,7 +34,7 @@ TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log
           "scheduled_games", "game_registrations", "registration_replicas", "player_id_claims",
           "platform_links", "external_game_links", "branding_images", "clubs", "club_members", "club_reports",
           "field_teams", "firmware_releases", "field_history_settings", "game_score_samples", "field_scenarios",
-          "field_scenario_revisions", "field_presets", "atak_cas", "atak_certs"}
+          "field_scenario_revisions", "field_presets", "atak_cas", "atak_certs", "preview_feedback"}
 
 SCHEMA_SQL = (
     ("columns", "SELECT table_name, column_name, data_type, is_nullable, column_default, character_maximum_length "
@@ -425,6 +425,24 @@ class MigrationTests(unittest.TestCase):
         command.downgrade(self.cfg, "0011_history")
         for table in ("atak_cas", "atak_certs"):
             self.assertNotIn(table, self.tables())
+
+    def test_0013_with_data(self) -> None:
+        """0013_preview_feedback: the checks on kind, role, state and the message's length, the defaults, and
+        back down."""
+        command.upgrade(self.cfg, "0013_preview_feedback")
+        insert = "INSERT INTO preview_feedback (kind, who, message, lang) VALUES ($1, $2, $3, 'en') RETURNING status"
+        self.assertEqual(self.db.fetch(insert, "good", None, "Nice")[0][0], "new")
+        self.assertEqual(self.db.fetch(insert, "bug", "staff", "x" * 2000)[0][0], "new")
+        for check, args in (("ck_preview_feedback_kind", ("praise", None, "x")),
+                            ("ck_preview_feedback_who", ("good", "robot", "x")),
+                            ("ck_preview_feedback_message", ("good", None, "")),
+                            ("ck_preview_feedback_message", ("good", None, "x" * 2001))):
+            with self.subTest(check=check), self.assertRaisesRegex(Exception, check):
+                self.db.fetch(insert, *args)
+        with self.assertRaisesRegex(Exception, "ck_preview_feedback_status"):
+            self.db.fetch("UPDATE preview_feedback SET status = 'lost'")
+        command.downgrade(self.cfg, "0012_atak")
+        self.assertNotIn("preview_feedback", self.tables())
 
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)

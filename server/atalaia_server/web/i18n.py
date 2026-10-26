@@ -17,7 +17,7 @@ punctuation after Han and a half-width space between Han and Latin letters or di
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 LANGUAGES = ("pt", "en", "de", "zh-tw")
@@ -363,6 +363,34 @@ def choose(query: Optional[str], accept_language: Optional[str]) -> tuple[str, b
         if language is not None and q > 0 and (q, -index) > (best[0], best[1]):
             best = (q, -index, language)
     return best[2], False
+
+
+COOKIE = "lang"
+COOKIE_MAX_AGE = 365 * 24 * 3600
+
+
+def for_request(request: Any, languages: tuple[str, ...] = LANGUAGES,
+                auto: Optional[Any] = None) -> tuple[str, bool, bool]:
+    """The language of this request, whether it was asked for (so links keep ``?lang=``) and whether to remember it
+    in the ``lang`` cookie. With ``ATALAIA_LANG_FROM_BROWSER`` on (the default) it is ``auto`` (``choose``: ``?lang=``,
+    else ``Accept-Language``, else pt) and nothing is remembered. Off, only an explicit choice counts: ``?lang=``
+    (remembered, so the language switcher is used once), else the cookie, else ``ATALAIA_DEFAULT_LANG``."""
+    settings = request.app.state.settings
+    query = request.query_params.get("lang")
+    if settings.lang_from_browser:
+        lang, explicit = (auto or choose)(query, request.headers.get("accept-language"))
+        return lang, explicit, False
+    if query in languages:
+        return query, True, True
+    cookie = request.cookies.get(COOKIE)
+    if cookie in languages:
+        return cookie, True, False
+    return (settings.default_lang if settings.default_lang in languages else languages[0]), False, False
+
+
+def remember(response: Any, lang: str) -> None:
+    """The ``lang`` cookie: the language alone, a year, same-site, secure; nothing identifies anyone."""
+    response.set_cookie(COOKIE, lang, max_age=COOKIE_MAX_AGE, path="/", secure=True, samesite="lax", httponly=True)
 
 
 def date(value: datetime, zone: str, lang: str) -> str:

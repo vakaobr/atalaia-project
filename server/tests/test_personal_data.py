@@ -28,7 +28,8 @@ from .base import PASSWORD, SECRET_KEY, AppTestCase
 # Plan phase 14's to 18's counts.
 NO_CHRONO = {"chrono_readings": 0, "chrono_rejects": 0, "replicas": 0, "marshal_keys": 0, "scheduled_games": 0,
              "federation_numbers": 0, "player_id_claims": 0, "imported_registrations": 0, "club_invitations": 0,
-             "club_reports": 0, "branding_images": 0, "atak_certificates": 0}
+             "club_reports": 0, "branding_images": 0, "atak_certificates": 0, "feedback_contacts": 0,
+             "preview_feedback": 0}
 
 NEW_PASSWORD = "a different long passphrase 7"
 
@@ -382,7 +383,8 @@ class PurgeTests(PersonalDataTestCase):
         rest = (", 0 chrono readings rows, 0 chrono rejects rows, 0 replicas rows, 0 marshal keys rows, "
                 "0 scheduled games rows, 0 federation numbers rows, 0 player id claims rows, "
                 "0 imported registrations rows, 0 club invitations rows, 0 club reports rows, "
-                "0 branding images rows, 0 atak certificates rows\n")
+                "0 branding images rows, 0 atak certificates rows, 0 feedback contacts rows, "
+                "0 preview feedback rows\n")
         self.assertEqual(outputs, ["Retention purge would delete: 1 sessions rows, 0 audit log rows, 0 games rows" + rest,
                                    "Retention purge deleted: 1 sessions rows, 0 audit log rows, 0 games rows" + rest])
         self.assertEqual((await self.fetch("SELECT count(*) FROM sessions"))[0][0], 0)

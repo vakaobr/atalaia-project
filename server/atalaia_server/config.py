@@ -30,6 +30,15 @@
                             "off" by default: a club's own single-field server, as before
     ATALAIA_HOSTED_DOMAIN   hosted mode only, and required there: the hub's domain (hub.example.pt);
                             ATALAIA_PUBLIC_URL must then be unset (each field has its own address)
+    ATALAIA_LANG_FROM_BROWSER
+                            "on" (default): the pages' language is ?lang=, else the browser's Accept-Language,
+                            else the default; "off": only an explicit choice (?lang= or the language switcher,
+                            remembered in a ``lang`` cookie) changes it, else the default (a preview, PV-9)
+    ATALAIA_DEFAULT_LANG    "pt" (default) or "en": the language when nothing says otherwise
+    ATALAIA_PREVIEW         "on": a preview instance (decision PV-3): a "Preview, not for real games" banner
+                            on every page, the landing page, the feedback form (/feedback, stored in the
+                            database, read by the server administrators), /robots.txt and
+                            X-Robots-Tag: noindex everywhere; "off" by default: nothing changes
     ATALAIA_ATAK_RELAY      "on": the remote ATAK relay (Phase 4 follow-up FU5, atak_relay.py): a TLS
                             listener for the fields' enrolled ATAK devices, client certificates
                             required; "off" by default (no listener, no certificate can be issued)
@@ -165,9 +174,11 @@ def _purge_hour(env: Mapping[str, str]) -> Optional[int]:
     return int(_number(env, "ATALAIA_PURGE_HOUR", 3, 0, 23, int))
 
 
-def _on_off(env: Mapping[str, str], name: str) -> bool:
+def _on_off(env: Mapping[str, str], name: str, default: bool = False) -> bool:
     raw = env.get(name, "").strip().lower()
-    if raw in ("", "off"):
+    if raw == "":
+        return default
+    if raw == "off":
         return False
     if raw == "on":
         return True
@@ -191,6 +202,9 @@ class Settings:
     hosted: bool = False
     hosted_domain: Optional[str] = None
     atak_relay: bool = False
+    preview: bool = False
+    lang_from_browser: bool = True
+    default_lang: str = "pt"
     atak_relay_port: int = DEFAULT_ATAK_PORT       # 0: any free port (the tests)
     atak_relay_host: Optional[str] = None
     atak_relay_public_port: Optional[int] = None
@@ -227,6 +241,10 @@ class Settings:
                                   "https://<slug>.<ATALAIA_HOSTED_DOMAIN>")
         elif self.hosted_domain is not None:
             raise ConfigError("ATALAIA_HOSTED_DOMAIN is only for hosted mode (ATALAIA_HOSTED=on)")
+        if self.default_lang not in ("pt", "en"):
+            raise ConfigError("ATALAIA_DEFAULT_LANG must be pt or en")
+        if self.preview and self.hosted:
+            raise ConfigError("ATALAIA_PREVIEW=on is for a single-field preview server, not a hosted hub")
         self._check_atak()
 
     def _check_atak(self) -> None:
@@ -266,7 +284,8 @@ class Settings:
                 f"purge_hour={self.purge_hour!r}, privacy_notice_version={self.privacy_notice_version!r}, "
                 f"public_url={self.public_url!r}, test_adapter={self.test_adapter!r}, "
                 f"firmware_keys={len(self.firmware_keys)}, hosted={self.hosted!r}, "
-                f"hosted_domain={self.hosted_domain!r}, atak_relay={self.atak_relay!r}, "
+                f"hosted_domain={self.hosted_domain!r}, atak_relay={self.atak_relay!r}, preview={self.preview!r}, "
+                f"lang_from_browser={self.lang_from_browser!r}, default_lang={self.default_lang!r}, "
                 f"atak_relay_port={self.atak_relay_port}, atak_relay_host={self.atak_relay_host!r}, "
                 f"atak_relay_public_port={self.atak_relay_public_port!r})")
 
@@ -293,6 +312,9 @@ class Settings:
             hosted=_on_off(env, "ATALAIA_HOSTED"),
             hosted_domain=env.get("ATALAIA_HOSTED_DOMAIN", "").strip() or None,
             atak_relay=_on_off(env, "ATALAIA_ATAK_RELAY"),
+            preview=_on_off(env, "ATALAIA_PREVIEW"),
+            lang_from_browser=_on_off(env, "ATALAIA_LANG_FROM_BROWSER", default=True),
+            default_lang=env.get("ATALAIA_DEFAULT_LANG", "").strip().lower() or "pt",
             atak_relay_port=int(_number(env, "ATALAIA_ATAK_RELAY_PORT", DEFAULT_ATAK_PORT, 1, 65535, int)),
             atak_relay_host=env.get("ATALAIA_ATAK_RELAY_HOST", "").strip() or None,
             atak_relay_public_port=(int(_number(env, "ATALAIA_ATAK_RELAY_PUBLIC_PORT", 0, 1, 65535, int))

@@ -66,6 +66,7 @@ class Keys:
         self.totp_step = _derive(secret_key, "totp login step")
         self.totp_seed = base64.urlsafe_b64encode(_derive(secret_key, "totp seed"))  # a Fernet key
         self.platform_config = base64.urlsafe_b64encode(_derive(secret_key, "platform config"))  # a Fernet key
+        self.feedback_form = _derive(secret_key, "preview feedback form")  # signs the preview feedback form's token
 
     def __repr__(self) -> str:
         return "Keys(...)"
