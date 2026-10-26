@@ -627,7 +627,12 @@ or erased box and every Wokwi run get all fifteen, in that order; a box
 updated to a firmware with more modes gets the new ones in free slots), and
 replaces the stored script of a built-in mode when the image has a
 different one (`main/builtin_presets.c`). A Field Box has no default admin
-PIN: the setup portal sets it and refuses 1234 and other easy ones; bench
+PIN: the setup portal sets it and refuses 1234 and other easy ones; to open the portal again on
+a box that was set up, the picker's last entry, **Wi-Fi setup** (after the games, behind the admin PIN,
+with a confirmation), or `@setup <PIN>` on the USB console, clears its "configured" flag and restarts it
+into the portal (adoption, join key and games are kept; no portal on bench builds); the portal is a
+captive portal (a DNS responder on the AP, every other address redirects to the page) in English,
+Portuguese, German or Traditional Chinese (the box's language, else the browser's); bench
 and Wokwi builds use 1234 when none is stored (`main/admin_pin.c`, decisions
 AD-28 to AD-31: wrong PINs counted in NVS, waits of 1, 2, 4 ... 60 minutes
 after five in a row, `@admin-pin` on the USB console). The keypad picker shows nine presets a

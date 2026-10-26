@@ -207,7 +207,7 @@ void main() {
       'charges': 5,
       'max_heals_per_player': 2,
       'cooldown_s': 0,
-      'lang': 'pt',
+      'lang': '',
     });
     expect(
       kit.resolveParams({'team': 'blue'}, const ['red', 'blue'])['team'],

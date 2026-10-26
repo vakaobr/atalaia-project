@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "box_text.h"
 #include "screen_template.h"
 #include "state_persist.h"
 
@@ -120,7 +121,10 @@ bool node_runner_start(node_runner_t *r, const preset_t *preset, const char *con
     r->persist_accum_ms = 0;
     r->team_count = team_count;
     node_runner_set_mode(r, preset->mode_id);
-    announce_mode(r, preset->params_json);
+    /* A mode's `lang` parameter left empty follows the game's language (box_text.h). */
+    static char filled[PRESET_PARAMS_MAX + 8];
+    const char *params = box_text_fill_lang(preset->params_json, filled, sizeof(filled));
+    announce_mode(r, params);
 
     /* Create the node. */
     atalaia_node_config_t cfg = {0};
@@ -144,8 +148,8 @@ bool node_runner_start(node_runner_t *r, const preset_t *preset, const char *con
     }
 
     /* Set params. */
-    if (preset->params_json[0]) {
-        atalaia_node_set_params(r->node, preset->params_json);
+    if (params[0]) {
+        atalaia_node_set_params(r->node, params);
     }
 
     /* Load mode source. */
@@ -187,6 +191,8 @@ bool node_runner_resume(node_runner_t *r, const state_persist_data_t *saved, con
     r->team_count = team_count;
     r->preset_index = saved->preset_index;
     if (restore_mode_state && saved->game_seed != 0) r->game_seed = saved->game_seed;
+    static char filled[PRESET_PARAMS_MAX + 8];
+    params_json = box_text_fill_lang(params_json, filled, sizeof(filled));
     announce_mode(r, params_json);
 
     /* Create the node. */

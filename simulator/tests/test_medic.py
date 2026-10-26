@@ -46,7 +46,7 @@ class RolePackageComposeTests(unittest.TestCase):
         self.assertEqual(self.medic.i18n["pt"]["name"], "Ligaduras")
         self.assertEqual(self.medic.i18n["pt"]["commands"], {"refill": "Repor as ligaduras"})
         self.assertEqual(self.medic.resolve_params({}, TEAMS), {
-            "heal_hold_s": 10, "charges": 5, "max_heals_per_player": 2, "cooldown_s": 0, "lang": "pt"})
+            "heal_hold_s": 10, "charges": 5, "max_heals_per_player": 2, "cooldown_s": 0, "lang": ""})
 
     def test_each_role_runs_its_own_part(self):
         game = compose(self.dom, [self.codes, self.medic])

@@ -22,6 +22,7 @@
 #define ATALAIA_BOX_TEXT_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 typedef enum {
     BOX_LANG_EN = 0,
@@ -149,6 +150,11 @@ typedef enum {
     TX_TRY_IN_MIN,    /* "%lu": minutes */
     TX_NO_ADMIN_PIN,  /* a Field Box with no admin PIN set (AD-29) */
     TX_SET_ADMIN_PIN, /* how to set one */
+    /* the picker's "Wi-Fi setup" entry: back into the setup portal (preset_ui.h) */
+    TX_SETUP_ITEM,
+    TX_SETUP_AGAIN_UP,
+    TX_SETUP_WARNING,
+    TX_KEYS_SETUP,
     /* the keypad screen's headers a mode's script sends in English (box_text_title) */
     TX_TITLE_ARM,
     TX_TITLE_DEFUSE,
@@ -178,6 +184,8 @@ typedef enum {
     TXO_AGAIN_IN_MIN, /* "%lu": minutes */
     TXO_NO_PIN,
     TXO_SET_PIN,
+    TXO_SETUP_Q,
+    TXO_KEYS_SETUP,
     TXO_POINTS,   /* "%ld": a team's points on this box (the captured screen's header) */
     TXO_HELD_FOR, /* %s: how long the team has held the zone (game time since its capture) */
     /* the built-in modes' names in the OLED's header (box_text_mode_name) */
@@ -239,5 +247,15 @@ const char *box_text_title(const char *title);
  * capitals (oled_mode_title). */
 const char *box_text_mode_name(const char *mode_upper);
 const char *box_text_screen_name(const char *template_name);
+
+/*
+ * A game's parameters (JSON) with an empty "lang" filled in with the box's language ("en",
+ * "pt", "de" or "zh-tw"; English when no game gave one): the Medic Kit, the Hacking Terminal
+ * and VIP / Payload take their screens' and their script's language from a parameter `lang`,
+ * and a script cannot read the box's language (decision P5H-20), so the box fills it in. A
+ * `lang` that has a value, or no `lang` at all, is left as it is. Returns params_json itself
+ * when nothing changed, otherwise out (cap bytes, always terminated).
+ */
+const char *box_text_fill_lang(const char *params_json, char *out, size_t cap);
 
 #endif /* ATALAIA_BOX_TEXT_H */

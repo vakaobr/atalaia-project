@@ -19,50 +19,59 @@ input:focus,select:focus{outline:none;border-color:#00d4ff}
 button{padding:12px;background:#00d4ff;color:#1a1a2e;border:none;border-radius:6px;font-size:1rem;font-weight:700;cursor:pointer}
 button:active{background:#00a0cc}
 .note{font-size:0.75rem;color:#888;text-align:center;margin-top:12px}
+a{color:#00d4ff}
 </style>
 </head>
 <body>
-<h1>Atalaia Node Setup</h1>
+<h1 data-i="h1">Atalaia Node Setup</h1>
 <form method="POST" action="/config">
 
-<label for="name">Node Name</label>
+<label for="name" data-i="name">Node Name</label>
 <input type="text" id="name" name="name" required maxlength="32" placeholder="field-box-01">
 
-<label for="region">Radio Region</label>
+<label for="region" data-i="region">Radio Region</label>
 <select id="region" name="region" required>
-<option value="">-- select --</option>
+<option value="" data-i="pick">-- select --</option>
 <option value="EU868">EU868 (Europe, 868 MHz)</option>
 <option value="AS923-TW">AS923-TW (Taiwan, 920-925 MHz)</option>
 </select>
-<p><small>Only the region this box's firmware is built for is accepted.</small></p>
+<p><small data-i="regionnote">Only the region this box's firmware is built for is accepted.</small></p>
 
-<label for="teams">Number of Teams</label>
+<label for="teams" data-i="teams">Number of Teams</label>
 <select id="teams" name="teams">
 <option value="2" selected>2</option>
 <option value="3">3</option>
 <option value="4">4</option>
 </select>
 
-<label for="pin">Admin PIN (4-8 digits; not 1234, 0000, a sequence or a repeated pair: there is no default)</label>
+<label for="pin" data-i="pin">Admin PIN (4-8 digits; not 1234, 0000, a sequence or a repeated pair: there is no default)</label>
 <input type="password" id="pin" name="pin" required pattern="[0-9]{4,8}" minlength="4" maxlength="8" inputmode="numeric" autocomplete="new-password">
 
-<label for="brightness">Display Brightness</label>
+<label for="brightness" data-i="bri">Display Brightness</label>
 <input type="range" id="brightness" name="brightness" min="10" max="100" value="80">
 
-<label for="volume">Audio Volume</label>
+<label for="volume" data-i="vol">Audio Volume</label>
 <input type="range" id="volume" name="volume" min="0" max="100" value="70">
 
-<label for="joinkey">Field join key (optional, 64 hex digits)</label>
+<label for="joinkey" data-i="key">Field join key (optional, 64 hex digits)</label>
 <input type="text" id="joinkey" name="joinkey" pattern="[0-9a-fA-F]{64}" maxlength="64" autocomplete="off" spellcheck="false" placeholder="python -m atalaia_controller join-key">
 
-<label for="wifissid">Field Wi-Fi name (optional: firmware updates)</label>
+<label for="wifissid" data-i="ssid">Field Wi-Fi name (optional: firmware updates)</label>
 <input type="text" id="wifissid" name="wifissid" maxlength="32" autocomplete="off" spellcheck="false">
 
-<label for="wifipass">Field Wi-Fi password (8-64 characters, or none for an open network)</label>
+<label for="wifipass" data-i="pass">Field Wi-Fi password (8-64 characters, or none for an open network)</label>
 <input type="password" id="wifipass" name="wifipass" maxlength="64" autocomplete="off">
 
-<button type="submit">Save &amp; Reboot</button>
+<button type="submit" data-i="save">Save &amp; Reboot</button>
 </form>
-<p class="note">Connect to the node Wi-Fi and visit this page to configure.</p>
+<p class="note" data-i="foot">Connect to the node Wi-Fi and visit this page to configure.</p>
+<p class="note"><a href="/?lang=en">English</a> · <a href="/?lang=pt">Português</a> · <a href="/?lang=de">Deutsch</a> · <a href="/?lang=zh-tw">繁體中文</a></p>
+<script>
+(function(){var D={
+pt:{t:"Configuração Atalaia",h1:"Configuração da caixa Atalaia",name:"Nome da caixa",region:"Região de rádio",pick:"-- escolher --",regionnote:"Só é aceite a região para a qual o firmware desta caixa foi feito.",teams:"Número de equipas",pin:"PIN de administração (4 a 8 algarismos; não 1234, 0000, uma sequência ou um par repetido: não há PIN por defeito)",bri:"Brilho do ecrã",vol:"Volume do som",key:"Chave de ligação ao campo (opcional, 64 algarismos hexadecimais)",ssid:"Nome do Wi-Fi do campo (opcional: atualizações do firmware)",pass:"Palavra-passe do Wi-Fi do campo (8 a 64 caracteres, ou nenhuma numa rede aberta)",save:"Guardar e reiniciar",foot:"Liga-te ao Wi-Fi da caixa e abre esta página para a configurar."},
+de:{t:"Atalaia-Einrichtung",h1:"Atalaia-Box einrichten",name:"Name der Box",region:"Funkregion",pick:"-- wählen --",regionnote:"Nur die Region, für die die Firmware dieser Box gebaut ist, wird angenommen.",teams:"Anzahl der Teams",pin:"Admin-PIN (4-8 Ziffern; nicht 1234, 0000, eine Zahlenfolge oder ein wiederholtes Paar: es gibt keine Standard-PIN)",bri:"Helligkeit des Displays",vol:"Lautstärke",key:"Feld-Join-Schlüssel (optional, 64 Hex-Ziffern)",ssid:"WLAN-Name des Felds (optional: Firmware-Updates)",pass:"WLAN-Passwort des Felds (8-64 Zeichen, oder keins bei offenem Netz)",save:"Speichern und neu starten",foot:"Verbinde dich mit dem WLAN der Box und öffne diese Seite, um sie einzurichten."},
+"zh-tw":{t:"Atalaia 設定",h1:"Atalaia 盒子設定",name:"盒子名稱",region:"無線電區域",pick:"-- 請選擇 --",regionnote:"只接受這個盒子的韌體所支援的區域。",teams:"隊伍數量",pin:"管理 PIN 碼（4 到 8 位數字；不可用 1234、0000、連號數字或重複的兩位數：沒有預設 PIN 碼）",bri:"螢幕亮度",vol:"音量",key:"場地加入金鑰（選填，64 位十六進位數字）",ssid:"場地 Wi-Fi 名稱（選填：用於韌體更新）",pass:"場地 Wi-Fi 密碼（8 到 64 個字元；開放網路可留空）",save:"儲存並重新啟動",foot:"連上盒子的 Wi-Fi，開啟這個頁面即可設定。"}
+},L="@LANG@",d=D[L];if(!d)return;document.documentElement.lang=L;document.title=d.t;var e=document.querySelectorAll("[data-i]");for(var i=0;i<e.length;i++){var k=e[i].getAttribute("data-i");if(d[k])e[i].textContent=d[k]}})();
+</script>
 </body>
 </html>

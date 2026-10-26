@@ -184,6 +184,34 @@ class BoxLanguageTests(unittest.TestCase):
         self.game()
         self.assertIsNone(self.lang_of())
 
+    def test_a_lang_parameter_left_empty_is_the_games_language(self):
+        """The Medic Kit, the Hacking Terminal and VIP / Payload take their screens' language from
+        a `lang` parameter (their scripts cannot read the box's): empty, it is the game's."""
+        c = self.a.client
+        for mode, role in (("org.atalaia.medic", "medic"), ("org.atalaia.hacking_terminal", "terminal"),
+                           ("org.atalaia.vip_payload", "checkpoint")):
+            for console_lang, want in (("pt", "pt"), ("de", "de"), ("zh-tw", "zh-tw"), ("en", "en"), (None, "en")):
+                spec = {"name": "x", "mode_id": mode, "teams": ["red", "blue"]}
+                if console_lang:
+                    spec["console_lang"] = console_lang
+                r = c.post("/api/v1/games", headers=GM, json=spec)
+                self.assertEqual(r.status_code, 201, r.text)
+                self.assertEqual(r.json()["params"]["lang"], want, (mode, console_lang))
+                # The boxes get it in their join's parameters, as the nodes run with it.
+                j = c.post("/api/v1/join", headers=GM, json={"role": role})
+                self.assertEqual(j.status_code, 200, j.text)
+                self.assertEqual(join.decode(bytes.fromhex(j.json()["payload_hex"]), JOIN_KEY)["params"]["lang"], want)
+                self.end(r.json()["id"])
+            # The GM's own choice, in the game or in a preset's parameters, stays.
+            r = c.post("/api/v1/games", headers=GM, json={"name": "x", "mode_id": mode, "teams": ["red", "blue"],
+                                                          "console_lang": "de", "params": {"lang": "pt"}})
+            self.assertEqual((r.status_code, r.json()["params"]["lang"]), (201, "pt"), r.text)
+            self.end(r.json()["id"])
+        # A mode with no such parameter gets none.
+        gid = self.game(console_lang="pt")
+        self.assertNotIn("lang", c.get(f"/api/v1/games/{gid}", headers=READ).json()["params"])
+        self.end(gid)
+
     def test_a_fixed_setting_wins_and_a_game_keeps_its_language(self):
         c = self.a.client
         self.assertEqual(c.put("/api/v1/settings/box-language", headers=READ,

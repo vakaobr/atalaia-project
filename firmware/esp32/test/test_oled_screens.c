@@ -74,6 +74,7 @@ static const oled_case_t cases[] = {
      "\"selected\":3,\"page\":1,\"pages\":2}"},
     {"timer_adjust", NULL, "timer_adjust", "{\"timer_s\":600}"},
     {"start_confirm", NULL, "start_confirm", "{\"label\":\"Bomb\",\"timer_s\":600}"},
+    {"start_confirm_setup", NULL, "start_confirm", "{\"setup\":true}"},
     {"status", NULL, "status", "{\"title\":\"Game on\",\"mode\":\"Bomb\",\"timer_s\":600}"},
     /* A game's life (decisions BN-10, BN-12, BN-13): invited or joined and waiting, started,
      * a zone nobody holds and one a team holds (BN-11), over, and ready for the next game. */
@@ -103,6 +104,7 @@ static const oled_case_t cases[] = {
     {"preset_select_pt", NULL, "preset_select",
      "{\"presets\":[\"Bomba\",\"Domínio\"],\"selected\":2,\"page\":1,\"pages\":2}"},
     {"start_confirm_pt", NULL, "start_confirm", "{\"label\":\"Bomba\",\"timer_s\":600}"},
+    {"start_confirm_setup_pt", NULL, "start_confirm", "{\"setup\":true}"},
     /* German (P5H-4). */
     {"pin_entry_locked_de", NULL, "pin_entry", "{\"digits\":0,\"error\":false,\"locked_min\":60}"},
     {"pin_entry_no_pin_de", NULL, "pin_entry", "{\"digits\":0,\"error\":false,\"no_pin\":true}"},
@@ -120,6 +122,7 @@ static const oled_case_t cases[] = {
      "{\"presets\":[\"Bombe\",\"Domination\"],\"selected\":2,\"page\":1,\"pages\":2}"},
     {"timer_adjust_de", NULL, "timer_adjust", "{\"timer_s\":600}"},
     {"start_confirm_de", NULL, "start_confirm", "{\"label\":\"Bombe\",\"timer_s\":600}"},
+    {"start_confirm_setup_de", NULL, "start_confirm", "{\"setup\":true}"},
     /* Traditional Chinese (P5K-2): the box's preset names stay English (builtin_presets.c). */
     {"pin_entry_zh-tw", NULL, "pin_entry", "{\"digits\":2,\"error\":false}"},
     {"pin_entry_locked_zh-tw", NULL, "pin_entry",
@@ -142,6 +145,7 @@ static const oled_case_t cases[] = {
      "{\"presets\":[\"Bomb\",\"Domination\"],\"selected\":1,\"page\":1,\"pages\":1}"},
     {"timer_adjust_zh-tw", NULL, "timer_adjust", "{\"timer_s\":600}"},
     {"start_confirm_zh-tw", NULL, "start_confirm", "{\"label\":\"Bomb\",\"timer_s\":600}"},
+    {"start_confirm_setup_zh-tw", NULL, "start_confirm", "{\"setup\":true}"},
     {"wifi_setup_zh-tw", NULL, "wifi_setup", "{\"ssid\":\"atalaia-3F2A\"}"},
     {"paused_zh-tw", DOM, "paused", "{}"},
     {"status_pair_locked", NULL, "status",

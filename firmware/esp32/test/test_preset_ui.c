@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "box_text.h"
 #include "check.h"
 #include "preset_ui.h"
 
@@ -190,8 +191,96 @@ static void test_one_page_ignores_zero(void)
     CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_PRESET_LIST);
 }
 
+/* The list's last entry, "Wi-Fi setup" (with the admin PIN as for any game): '#' asks, '#'
+ * again confirms, '*' goes back; off unless the box has a setup portal. */
+static void test_setup_entry(void)
+{
+    static const char *const labels[] = {"Bomb", "Domination"};
+    preset_ui_t ui;
+    screen_update_t su;
+
+    /* Off: the list is the games, and a pick past them selects nothing. */
+    preset_ui_init(&ui, "4711", 2);
+    enter_keys(&ui, "4711#3");
+    CHECK(preset_ui_selected_preset(&ui) == 1);
+    CHECK(preset_ui_screen(&ui, labels, 2, &su));
+    CHECK(strstr(su.data_json, "setup") == NULL && strstr(su.data_json, "Wi-Fi") == NULL);
+
+    /* On: the entry follows the games, in the box's language. */
+    preset_ui_init(&ui, "4711", 2);
+    preset_ui_enable_setup(&ui, true);
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_PIN_ENTRY); /* behind the PIN */
+    enter_keys(&ui, "4711#");
+    CHECK(preset_ui_screen(&ui, labels, 2, &su));
+    CHECK(strcmp(su.template_name, "preset_select") == 0);
+    CHECK(strcmp(su.data_json,
+                 "{\"presets\":[\"Bomb\",\"Domination\",\"Wi-Fi setup\"],\"selected\":1}") == 0);
+    box_lang_set(BOX_LANG_PT);
+    CHECK(preset_ui_screen(&ui, labels, 2, &su));
+    CHECK(strstr(su.data_json, "\"Configurar o Wi-Fi\"") != NULL);
+    box_lang_set(BOX_LANG_EN);
+
+    /* '3' selects it; '#' asks, with its own screen. */
+    enter_keys(&ui, "3");
+    CHECK(preset_ui_selected_preset(&ui) == 3);
+    enter_keys(&ui, "#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_SETUP_CONFIRM);
+    CHECK(preset_ui_screen(&ui, labels, 2, &su));
+    CHECK(strcmp(su.template_name, "start_confirm") == 0);
+    CHECK(strcmp(su.data_json, "{\"setup\":true}") == 0);
+
+    /* '*' goes back to the list with the entry still selected; a game's '#' is the timer. */
+    enter_keys(&ui, "*");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_PRESET_LIST);
+    CHECK(preset_ui_selected_preset(&ui) == 3);
+    enter_keys(&ui, "2#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_TIMER_ADJUST);
+
+    /* Not confirmed by anything but '#' on the confirmation. */
+    preset_ui_handle_key(&ui, '*');
+    enter_keys(&ui, "3#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_SETUP_CONFIRM);
+    CHECK(!preset_ui_handle_key(&ui, '5'));
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_SETUP_CONFIRM);
+    enter_keys(&ui, "#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_SETUP_REQUESTED);
+    CHECK(!preset_ui_screen(&ui, labels, 2, &su));
+    CHECK(!preset_ui_handle_key(&ui, '#'));
+}
+
+/* With no games at all the entry is the whole list; and past nine entries it goes on the last
+ * page. */
+static void test_setup_entry_pages(void)
+{
+    preset_ui_t ui;
+    preset_ui_init(&ui, "4711", 0);
+    preset_ui_enable_setup(&ui, true);
+    enter_keys(&ui, "4711#");
+    enter_keys(&ui, "#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_SETUP_CONFIRM);
+
+    /* Nine games and the entry: two pages, the entry alone on the second. */
+    preset_ui_init(&ui, "4711", 9);
+    preset_ui_enable_setup(&ui, true);
+    enter_keys(&ui, "4711#");
+    enter_keys(&ui, "0");
+    CHECK(ui.page == 1);
+    CHECK(preset_ui_selected_preset(&ui) == 10);
+    enter_keys(&ui, "2");
+    CHECK(preset_ui_selected_preset(&ui) == 10); /* nothing there */
+    enter_keys(&ui, "##");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_SETUP_REQUESTED);
+
+    /* Nine games with the entry off stay one page. */
+    preset_ui_init(&ui, "4711", 9);
+    enter_keys(&ui, "4711#0");
+    CHECK(ui.page == 0);
+}
+
 void run_preset_ui_tests(void)
 {
+    test_setup_entry();
+    test_setup_entry_pages();
     test_correct_pin_accepted();
     test_wrong_pin_rejected();
     test_preset_selection();

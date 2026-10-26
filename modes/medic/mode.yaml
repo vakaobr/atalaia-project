@@ -22,7 +22,7 @@ params:
   max_heals_per_player: { type: int, min: 0, max: 100, default: 2, label: "Heals per player in the game, at every kit (0: no limit)" }
   cooldown_s:           { type: int, min: 0, max: 3600, default: 0, label: "Seconds a player waits between two heals (0: no wait)" }
   team:                 { type: team, optional: true, label: "Team the kit serves (empty: every team)" }
-  lang:                 { type: string, default: pt, max: 5, label: "Language of the kit's screen: pt, en, de or zh-tw" }
+  lang:                 { type: string, default: "", max: 5, label: "Language of the kit's screen: pt, en, de or zh-tw (empty: the game's language)" }
 commands:
   refill: { roles: [medic], label: "Refill the kit" }
 i18n:
@@ -41,7 +41,7 @@ i18n:
       max_heals_per_player: "Tratamentos por pessoa no jogo, em todos os kits (0: sem limite)"
       cooldown_s: "Segundos de espera entre dois tratamentos da mesma pessoa (0: sem espera)"
       team: "Equipa que o kit serve (vazio: todas)"
-      lang: "Língua do ecrã do kit: pt, en, de ou zh-tw"
+      lang: "Língua do ecrã do kit: pt, en, de ou zh-tw (vazio: a língua do jogo)"
     commands:
       refill: Repor as ligaduras
   de:
@@ -59,7 +59,7 @@ i18n:
       max_heals_per_player: "Behandlungen pro Person im Spiel, an allen Kits (0: kein Limit)"
       cooldown_s: "Sekunden Wartezeit zwischen zwei Behandlungen (0: keine)"
       team: "Team, dem das Kit dient (leer: alle Teams)"
-      lang: "Sprache des Kit-Bildschirms: pt, en, de oder zh-tw"
+      lang: "Sprache des Kit-Bildschirms: pt, en, de oder zh-tw (leer: die Sprache des Spiels)"
     commands:
       refill: Kit auffüllen
   zh-tw:
@@ -71,6 +71,6 @@ i18n:
       max_heals_per_player: 每位玩家每場遊戲的治療次數，所有醫護包合計（0：不限）
       cooldown_s: 兩次治療之間需等待的秒數（0：不用等）
       team: 醫護包服務的隊伍（空白：所有隊伍）
-      lang: 醫護包畫面的語言：pt、en、de 或 zh-tw
+      lang: 醫護包畫面的語言：pt、en、de 或 zh-tw（留空：使用遊戲的語言）
     commands:
       refill: 補充醫護包

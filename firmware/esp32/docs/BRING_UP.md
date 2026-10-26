@@ -111,7 +111,7 @@ Box firmware with keys from the USB serial console and no setup portal
 (firmware/esp32/README.md, Build). An adopted board boots to **READY /
 next game** (decision BN-10): any key brings the game picker; an unadopted
 one shows its pairing code first (`*` gives the picker). In a serial monitor
-type a key, then `1234#` (the bench build's admin PIN; a Field Box has none until its setup), then `1`, `#`, `#` for Bomb; the
+type a key, then `1234#` (the bench build's admin PIN; a Field Box has none until its setup), then `1`, `#`, `#`, `#` for Bomb (game 1, the timer, the confirmation, start); the
 board's own OLED shows each step. Buttons must be soldered to the header (or to pins soldered there):
 a Dupont pin pushed into a bare hole loses contact while it is held, and
 any release, even 0.1 s, starts a hold again (seen on the first V4.3 board,
@@ -207,7 +207,7 @@ firmware no longer reads a button there.
    then `button 4 (P7) pressed`); it needs the keypad expander (step 5).
    With button 3 on GPIO 44 the log says `no console input on UART0`:
    expected, the USB console still takes input.
-2. Start a Bomb game (a key from Ready, the admin PIN, game 1, `#`, `#`). Press each team
+2. Start a Bomb game (a key from Ready, the admin PIN and `#`, game `1`, then `#` for the timer, `#` to confirm, `#` to start). Press each team
    button (GPIO 4, 48; GPIO 44 and P7 for teams 3 and 4). While red holds, the
    screen and the OLED show the arming bar filling.
 3. Hold the red button for 5 s: the log shows `game: event bomb.armed`
@@ -605,21 +605,43 @@ is in [README.md](../README.md#the-modems-oled).
 
 ## Step 11: Wi-Fi Setup Portal
 
-1. Reset configuration: hold reset during boot or enter admin PIN
-   and select "Setup" from the admin menu. (A Field Box build only: bench and Wokwi
-   builds skip the portal and use the admin PIN 1234, which they say in the log.)
+1. A box that was never set up opens the portal by itself at power-up. To go back into it
+   on a box that was set up, either:
+   - on the keypad: a key from Ready (or at the game picker), the admin PIN and `#`, then pick
+     the list's last entry, **Wi-Fi setup** (it comes after the games: on a box with the
+     fifteen built-in games it is entry 16 on the second page, `0` and then `7`), and `#`. The screen asks
+     **SET UP AGAIN?**: `#` confirms, `*` goes back to the list. Holding reset does nothing
+     of the kind, and there is no other admin menu; or
+   - on the USB console: `@setup <PIN>` (the admin PIN, counted and made to wait like any
+     other; `@setup` alone while the box has no admin PIN set).
+
+   Both clear the box's "configured" flag, show *Restarting* and restart it into the portal
+   (`Wi-Fi setup again (picker|console): restarting into the setup portal` in the log). Neither
+   works during a game (the picker is not there, the console says `setup: not in a game`),
+   and a bench or Wokwi build (`CONFIG_ATALAIA_SKIP_SETUP`) has no portal, so neither the
+   entry nor the command: they skip it and use the admin PIN 1234, which they say in the log.
+   What the portal does not ask is kept: the field join key and the adoption, the stored
+   games, the radio's state. What it asks it replaces when saved (name, admin PIN, ...), and
+   until then the old admin PIN stays; a box switched off inside the portal opens it again at
+   its next power-up.
 2. Connect to `atalaia-XXXX` AP from a phone (the 2.4 GHz antenna
    must be connected).
-3. Verify: captive portal page loads automatically.
-4. Fill in config and submit. The admin PIN has no default (decision AD-29): 1234, 0000,
+3. Verify: the phone offers to sign in to the network and opens the page by itself. The box
+   offers itself as the DNS server in DHCP and runs a small DNS responder on the AP (every name answers 192.168.4.1) and the HTTP server
+   sends every other address, the operating systems' connectivity checks (`/generate_204`,
+   `/hotspot-detect.html`, `/connecttest.txt`), to the page. If a phone does not open it (a
+   private DNS setting, mobile data that stays on), browse to `http://192.168.4.1`. The
+   screen's text, *Phones usually open it by themselves*, says as much.
+4. The page is in the box's language: the language of the last game it joined (English before
+   any), else the browser's (`Accept-Language`: English, Portuguese, German or Traditional
+   Chinese, English for any other); the links at the foot (`/?lang=pt`) choose one. The
+   server's answers to a form it cannot save are in that language too.
+5. Fill in config and submit. The admin PIN has no default (decision AD-29): 1234, 0000,
    a sequence (9876, 7890) or a repeated pair (1212) is refused with *Choose another admin
    PIN*; until a PIN is set the keypad picker shows *No admin PIN set* and adoption to
    another field answers `no_pin`. A box set up before has none if its PIN was one of those:
    type `@admin-pin <PIN>` on its USB console (`@admin-pin <PIN> <new PIN>` changes it).
-5. Verify: node reboots into normal mode.
-6. The page sets the node up, but there is no DNS redirect yet: if the
-   phone does not open the page by itself, browse to
-   `http://192.168.4.1`.
+6. Verify: node reboots into normal mode.
 
 ## Step 12: Full Game Test (2 Hours) -- Phase 1 Gate
 

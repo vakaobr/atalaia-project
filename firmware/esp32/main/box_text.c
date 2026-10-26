@@ -20,6 +20,7 @@
 #include "box_text.h"
 
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 #include <strings.h>
 
@@ -213,12 +214,21 @@ static const char *const texts[TX_COUNT][BOX_LANG_COUNT] = {
     [TX_MODES_FETCHING] = {"Getting modes", "A obter modos", "Lade Modi", "正在取得模式"},
     [TX_MODES_FAILED] = {"Modes refused", "Modos recusados", "Modi abgelehnt", "模式被拒絕"},
     [TX_PIN_LOCKED] = {"PIN locked", "PIN bloqueado", "PIN gesperrt", "PIN 碼已鎖定"},
-    [TX_TRY_IN_MIN] = {"Try again in %lu min", "Tente daqui a %lu min", "Erneut in %lu min",
+    [TX_TRY_IN_MIN] = {"Try again in %lu min", "Tenta daqui a %lu min", "Erneut in %lu min",
                        "%lu 分鐘後再試"},
     [TX_NO_ADMIN_PIN] = {"No admin PIN set", "Sem PIN de administração", "Keine Admin-PIN",
                          "尚未設定管理 PIN 碼"},
     [TX_SET_ADMIN_PIN] = {"USB console: @admin-pin", "Consola USB: @admin-pin",
                           "USB-Konsole: @admin-pin", "USB 主控台：@admin-pin"},
+    /* The picker's last entry, and its confirmation: the box restarts into its setup portal. */
+    [TX_SETUP_ITEM] = {"Wi-Fi setup", "Configurar o Wi-Fi", "WLAN einrichten", "Wi-Fi 設定"},
+    [TX_SETUP_AGAIN_UP] = {"SET UP AGAIN?", "CONFIGURAR DE NOVO?", "NEU EINRICHTEN?", "重新設定？"},
+    [TX_SETUP_WARNING] = {"The box restarts and opens its Wi-Fi setup",
+                          "A caixa reinicia e abre a configuração Wi-Fi",
+                          "Die Box startet neu und öffnet die WLAN-Einrichtung",
+                          "盒子會重新啟動，開啟設定"},
+    [TX_KEYS_SETUP] = {"#  set up      *  back", "#  configurar      *  voltar",
+                       "#  einrichten      *  zurück", "#  設定      *  返回"},
     [TX_TITLE_ARM] = {"ARM", "ARMAR", "SCHÄRFEN", "啟動"},
     [TX_TITLE_DEFUSE] = {"DEFUSE", "DESARMAR", "ENTSCHÄRFEN", "拆除"},
     [TXO_ADMIN_PIN] = {"ADMIN PIN", "PIN ADMIN", "ADMIN-PIN", "管理 PIN"},
@@ -251,6 +261,8 @@ static const char *const texts[TX_COUNT][BOX_LANG_COUNT] = {
     [TXO_AGAIN_IN_MIN] = {"again in %lu min", "daqui a %lu min", "Warte %lu min", "%lu 分鐘後再試"},
     [TXO_NO_PIN] = {"NO PIN", "SEM PIN", "KEINE PIN", "無 PIN 碼"},
     [TXO_SET_PIN] = {"@admin-pin", "@admin-pin", "@admin-pin", "@admin-pin"},
+    [TXO_SETUP_Q] = {"Set up again?", "Reconfigurar?", "Neu einrichten?", "重新設定？"},
+    [TXO_KEYS_SETUP] = {"# ok  * back", "# ok  * voltar", "# ok  * zurück", "# 確認  * 返回"},
     [TXO_POINTS] = {"%ld pts", "%ld pts", "%ld Pkt.", "%ld 分"},
     /* A duration, not the game time of the capture (the TFT's TX_HELD_SINCE). */
     [TXO_HELD_FOR] = {"held for %s", "ocupada %s", "gehalten %s", "已佔領 %s"},
@@ -395,4 +407,26 @@ const char *box_text_in(box_lang_t lang, box_text_id_t id)
 const char *box_text(box_text_id_t id)
 {
     return box_text_in(box_lang(), id);
+}
+
+const char *box_text_fill_lang(const char *params_json, char *out, size_t cap)
+{
+    if (params_json == NULL || out == NULL || cap == 0) return params_json;
+    /* "lang" : "" with any spaces around the colon; the key may not be the end of a longer one
+     * (the quote before it) or inside a string (a quote there is escaped, so a backslash). */
+    for (const char *p = strstr(params_json, "\"lang\""); p != NULL;
+         p = strstr(p + 1, "\"lang\"")) {
+        if (p > params_json && p[-1] == '\\') continue;
+        const char *q = p + 6;
+        while (*q == ' ') q++;
+        if (*q != ':') continue;
+        q++;
+        while (*q == ' ') q++;
+        if (q[0] != '"' || q[1] != '"') return params_json;
+        const char *code = box_lang_code(box_lang());
+        size_t head = (size_t)(q + 1 - params_json); /* up to and with the opening quote */
+        int n = snprintf(out, cap, "%.*s%s%s", (int)head, params_json, code, q + 1);
+        return n > 0 && (size_t)n < cap ? out : params_json;
+    }
+    return params_json;
 }

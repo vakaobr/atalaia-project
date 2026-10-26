@@ -195,3 +195,39 @@ bool admin_pin_command(admin_pin_t *a, const char *cmd, char *reply, size_t cap)
     memset(second, 0, sizeof(second));
     return true;
 }
+
+bool admin_pin_setup_command(admin_pin_t *a, const char *cmd, char *reply, size_t cap, bool *go)
+{
+    static const char name[] = "setup";
+    size_t nl = sizeof(name) - 1;
+    *go = false;
+    if (strncmp(cmd, name, nl) != 0 || (cmd[nl] != ' ' && cmd[nl] != '\0')) return false;
+    const char *p = cmd + nl;
+    while (*p == ' ') p++;
+    size_t n = strcspn(p, " ");
+    const char *rest = p + n;
+    while (*rest == ' ') rest++;
+    char typed[ADMIN_PIN_MAX + 2];
+    snprintf(typed, sizeof(typed), "%.*s", (int)(n < ADMIN_PIN_MAX + 1 ? n : ADMIN_PIN_MAX + 1), p);
+    if (*rest != '\0') {
+        snprintf(reply, cap, "setup: \"@setup <PIN>\" (\"@setup\" while no admin PIN is set)");
+    } else if (!admin_pin_is_set(a)) {
+        *go = true;
+        snprintf(reply, cap, "setup: no admin PIN is set; restarting into the Wi-Fi setup portal");
+    } else if (n == 0) {
+        snprintf(reply, cap, "setup: needs the admin PIN: \"@setup <PIN>\"");
+    } else {
+        admin_pin_result_t r = admin_pin_check(a, typed);
+        if (r == ADMIN_PIN_OK) {
+            *go = true;
+            snprintf(reply, cap, "setup: restarting into the Wi-Fi setup portal");
+        } else if (r == ADMIN_PIN_LOCKED) {
+            snprintf(reply, cap, "setup: locked, try again in %lu min",
+                     (unsigned long)admin_pin_wait_min(a));
+        } else {
+            snprintf(reply, cap, "setup: refused (%s)", admin_pin_result_name(r));
+        }
+    }
+    memset(typed, 0, sizeof(typed));
+    return true;
+}

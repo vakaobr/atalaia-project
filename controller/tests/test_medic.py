@@ -93,8 +93,9 @@ class MedicKitControllerTests(unittest.TestCase):
 
         kit = joined(role="medic")
         self.assertEqual((kit["mode_id"], kit["role"]), (MEDIC, "medic"))
+        # The game has no language (no console made it), so the kit's `lang` is English.
         self.assertEqual(kit["params"], {"heal_hold_s": 10, "charges": 5, "max_heals_per_player": 2,
-                                         "cooldown_s": 0, "team": "blue", "lang": "pt"})
+                                         "cooldown_s": 0, "team": "blue", "lang": "en"})
         zone = joined(role="zone")
         self.assertEqual((zone["mode_id"], zone["params"]),
                          (DOMINATION, {"capture_hold_ms": 3000, "tick_s": 5, "points_per_tick": 1}))

@@ -267,8 +267,44 @@ static void test_admin_pin_command(void)
     CHECK(strstr(reply, "\"@admin-pin <new PIN>\"") != NULL);
 }
 
+/* "@setup": back into the Wi-Fi setup portal, with the admin PIN as every other place that asks
+ * for it; with no PIN set there is nothing to ask. */
+static void test_setup_command(void)
+{
+    admin_pin_t a;
+    char reply[160];
+    bool go = true;
+    memset(&nvs, 0, sizeof(nvs));
+    boot(&a, "4711");
+    CHECK(!admin_pin_setup_command(&a, "adopt-info", reply, sizeof(reply), &go) && !go);
+    CHECK(!admin_pin_setup_command(&a, "setups", reply, sizeof(reply), &go) && !go);
+    /* Set: no PIN, a wrong one (counted) and too many words go nowhere. */
+    CHECK(admin_pin_setup_command(&a, "setup", reply, sizeof(reply), &go) && !go);
+    CHECK(strstr(reply, "needs the admin PIN") != NULL);
+    CHECK(admin_pin_setup_command(&a, "setup 0000", reply, sizeof(reply), &go) && !go);
+    CHECK(strcmp(reply, "setup: refused (wrong)") == 0 && nvs.failures == 1);
+    CHECK(admin_pin_setup_command(&a, "setup 4711 now", reply, sizeof(reply), &go) && !go);
+    CHECK(strstr(reply, "@setup <PIN>") != NULL && nvs.failures == 1);
+    /* The right PIN: go, and the count is back to 0. */
+    CHECK(admin_pin_setup_command(&a, "setup 4711", reply, sizeof(reply), &go) && go);
+    CHECK(strstr(reply, "restarting into the Wi-Fi setup portal") != NULL && nvs.failures == 0);
+    /* Five wrong PINs in a row start the waits: even the right one is then refused, unseen. */
+    for (int i = 0; i < ADMIN_PIN_FREE_TRIES; i++) {
+        CHECK(admin_pin_setup_command(&a, "setup 0000", reply, sizeof(reply), &go) && !go);
+    }
+    CHECK(admin_pin_setup_command(&a, "setup 4711", reply, sizeof(reply), &go) && !go);
+    CHECK(strstr(reply, "locked, try again in") != NULL);
+
+    /* No PIN set: "@setup" is enough, as "@admin-pin" is. */
+    memset(&nvs, 0, sizeof(nvs));
+    boot(&a, "");
+    CHECK(admin_pin_setup_command(&a, "setup", reply, sizeof(reply), &go) && go);
+    CHECK(strstr(reply, "no admin PIN is set") != NULL);
+}
+
 void run_admin_pin_tests(void)
 {
+    test_setup_command();
     test_weak_pins();
     test_no_default_pin();
     test_backoff_and_reboot();

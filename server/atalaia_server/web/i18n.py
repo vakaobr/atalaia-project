@@ -61,7 +61,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "register_title": "Inscrição: {game}",
         "back_game": "Voltar a {game}",
         "reg_intro": "A inscrição faz-se com uma conta neste site, na app Atalaia.",
-        "reg_step_account": "Criar uma conta neste site (ou entrar com a que já existe).",
+        "reg_step_account": "É preciso uma conta neste site. A app e esta página ainda não a criam: pedir à "
+                            "organização do campo ou a quem administra o site. Quem já tem conta entra com ela.",
         "reg_step_app": "Na app Atalaia, abrir este jogo com o botão abaixo (ou colar o endereço desta página em "
                         "Participante › Inscrições online), entrar com a conta e fazer a inscrição, com as réplicas "
                         "que vão ser usadas, se o jogo as pedir.",
@@ -130,7 +131,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "register_title": "Register: {game}",
         "back_game": "Back to {game}",
         "reg_intro": "You register with an account on this site, in the Atalaia app.",
-        "reg_step_account": "Make an account on this site (or log in with the one you have).",
+        "reg_step_account": "You need an account on this site. The app and this page cannot make one yet: ask the "
+                            "field's organisers or the site's administrator. If you already have one, log in with it.",
         "reg_step_app": "In the Atalaia app, open this game with the button below (or paste this page's address in "
                         "Player › Online registration), log in with your account and register, with the replicas you "
                         "will use, if the game asks for them.",
@@ -200,7 +202,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "register_title": "Anmeldung: {game}",
         "back_game": "Zurück zu {game}",
         "reg_intro": "Du meldest dich mit einem Konto auf dieser Website an, in der Atalaia-App.",
-        "reg_step_account": "Leg ein Konto auf dieser Website an (oder nimm das, das du schon hast).",
+        "reg_step_account": "Du brauchst ein Konto auf dieser Website. Die App und diese Seite können noch keins "
+                            "anlegen: Frag die Orga des Spielfelds oder die Administration der Website. Hast du "
+                            "schon eins, logg dich damit ein.",
         "reg_step_app": "Öffne dieses Spiel in der Atalaia-App mit dem Button unten (oder füge die Adresse dieser "
                         "Seite unter Spielen › Online-Anmeldung ein), logge dich mit deinem Konto ein und melde dich "
                         "für das Spiel an, mit den Repliken, die du nutzen wirst, falls das Spiel danach fragt.",
@@ -271,7 +275,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "register_title": "報名：{game}",
         "back_game": "回到 {game}",
         "reg_intro": "報名要用這個網站的帳號，在 Atalaia App 中完成。",
-        "reg_step_account": "在這個網站建立帳號（或用你已經有的帳號登入）。",
+        "reg_step_account": "你需要這個網站的帳號。App 和這個頁面目前還不能建立帳號：請向場地主辦或網站管理員索取。"
+                            "如果你已經有帳號，就用它登入。",
         "reg_step_app": "在 Atalaia App 中，用下方的按鈕開啟這場遊戲（或把這個頁面的網址貼到「玩家 › 線上報名」），"
                         "用你的帳號登入並報名；如果這場遊戲有要求，也要登記你會使用的槍。",
         "reg_open_app": "在 Atalaia App 中開啟",

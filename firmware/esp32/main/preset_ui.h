@@ -6,6 +6,12 @@
  * PIN, picks a preset, adjusts the timer and starts the game. With a check
  * set (preset_ui_set_guard, as the box does) the PIN goes through
  * admin_pin.h: its failure count, its waits, and no PIN set on a Field Box.
+ *
+ * With the setup entry on (preset_ui_enable_setup, a Field Box that has a setup portal), the
+ * list ends with one more entry after the games, "Wi-Fi setup": '#' on it asks once more
+ * ('#' again confirms, '*' goes back) and then the state is PRESET_UI_STATE_SETUP_REQUESTED,
+ * which the shell answers by clearing the "configured" flag and restarting into the portal.
+ * It sits behind the same admin PIN as every game.
  */
 #ifndef ATALAIA_PRESET_UI_H
 #define ATALAIA_PRESET_UI_H
@@ -26,6 +32,8 @@ typedef enum {
     PRESET_UI_STATE_TIMER_ADJUST,
     PRESET_UI_STATE_CONFIRM,
     PRESET_UI_STATE_GAME_STARTED,
+    PRESET_UI_STATE_SETUP_CONFIRM,   /* "Set up again?" */
+    PRESET_UI_STATE_SETUP_REQUESTED, /* confirmed: the shell restarts the box into the portal */
 } preset_ui_state_t;
 
 typedef struct {
@@ -42,7 +50,11 @@ typedef struct {
     admin_pin_t *guard;  /* NULL: admin_pin compared as it is (host tests) */
     uint32_t locked_min; /* the last '#' met a wait of this many minutes (0: none) */
     bool no_pin;         /* the last '#' met a box with no admin PIN set */
+    bool setup_entry;    /* the list ends with "Wi-Fi setup" (entry preset_count + 1) */
 } preset_ui_t;
+
+/* Adds (or removes) the list's last entry, "Wi-Fi setup". Off by default. */
+void preset_ui_enable_setup(preset_ui_t *ui, bool on);
 
 /* The box's admin PIN check (admin_pin.h), shared with adoption. */
 void preset_ui_set_guard(preset_ui_t *ui, admin_pin_t *guard);
@@ -76,7 +88,9 @@ uint32_t preset_ui_timer_duration(const preset_ui_t *ui);
  * label of list entry i + 1; labels may be NULL when label_count is 0. The
  * list screen holds the current page only, with "page" and "pages" when there
  * is more than one.
- * Returns false in PRESET_UI_STATE_GAME_STARTED, which has no picker screen.
+ * Returns false in PRESET_UI_STATE_GAME_STARTED and PRESET_UI_STATE_SETUP_REQUESTED, which
+ * have no picker screen. PRESET_UI_STATE_SETUP_CONFIRM is the "start_confirm" template with
+ * "setup":true.
  */
 bool preset_ui_screen(const preset_ui_t *ui, const char *const *labels, int label_count,
                       screen_update_t *out);

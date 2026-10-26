@@ -770,6 +770,13 @@ class Controller:
             # The language of the boxes' screens (join key 15, RFC 0001 Amendment 10): the field's
             # setting, or with "auto" the language of the console the GM created the game in.
             box_lang = self._box_lang_for(spec.get("console_lang"))
+            # A mode with a `lang` parameter (Medic Kit, Hacking Terminal, VIP / Payload) takes its
+            # screens' and its script's language from it, and a script cannot read the box's
+            # language (decision P5H-20): left empty, the parameter is the game's language (what
+            # the boxes show: English when the game has none), so those screens follow the box
+            # language like the Bomb's. A language the GM set stays.
+            if pkg.mode.params.get("lang", {}).get("type") == "string" and params.get("lang") == "":
+                params["lang"] = box_lang or "en"
 
             used = self.store.game_ids()
             game_id = random.SystemRandom().choice([g for g in range(1, 0xFFFF) if g not in used][:4096])

@@ -181,8 +181,42 @@ static void test_names(void)
     box_lang_set(BOX_LANG_EN);
 }
 
+/* An empty "lang" parameter takes the box's language; anything else is left alone. */
+static void test_fill_lang(void)
+{
+    char out[96];
+    box_lang_set_code("pt");
+    CHECK(strcmp(box_text_fill_lang("{\"lang\":\"\"}", out, sizeof(out)), "{\"lang\":\"pt\"}") ==
+          0);
+    CHECK(strcmp(box_text_fill_lang("{\"a\":1,\"lang\": \"\" ,\"b\":2}", out, sizeof(out)),
+                 "{\"a\":1,\"lang\": \"pt\" ,\"b\":2}") == 0);
+    box_lang_set_code("zh-tw");
+    CHECK(strcmp(box_text_fill_lang("{\"lang\":\"\",\"x\":true}", out, sizeof(out)),
+                 "{\"lang\":\"zh-tw\",\"x\":true}") == 0);
+    box_lang_set_code(""); /* no game language: English */
+    CHECK(strcmp(box_text_fill_lang("{\"lang\":\"\"}", out, sizeof(out)), "{\"lang\":\"en\"}") ==
+          0);
+    box_lang_set_code("de");
+    /* Left as it is: a value, no key, another key, a quoted key inside a string, no JSON. */
+    const char *same[] = {"{\"lang\":\"pt\"}",
+                          "{}",
+                          "",
+                          "{\"language\":\"\"}",
+                          "{\"codes\":\"\\\"lang\\\":\\\"\\\"\"}",
+                          "{\"lang\":5}"};
+    for (size_t i = 0; i < sizeof(same) / sizeof(same[0]); i++) {
+        CHECK(box_text_fill_lang(same[i], out, sizeof(out)) == same[i]);
+    }
+    /* Too small a buffer: the parameters unchanged, never cut. */
+    const char *tiny = "{\"lang\":\"\"}";
+    CHECK(box_text_fill_lang(tiny, out, 12) == tiny);
+    CHECK(box_text_fill_lang(NULL, out, sizeof(out)) == NULL);
+    box_lang_set_code("");
+}
+
 void run_box_text_tests(void)
 {
+    test_fill_lang();
     test_every_text();
     test_names();
     test_chinese_punctuation();

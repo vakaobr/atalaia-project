@@ -157,6 +157,7 @@ set(ATALAIA_REQUIRES
     esp_http_server
     esp_event
     esp_netif
+    lwip
     mbedtls
     # bootloader_random_enable() for the boot entropy of the field frames' tokens (RJ-15).
     bootloader_support

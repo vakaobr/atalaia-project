@@ -105,4 +105,14 @@ admin_pin_result_t admin_pin_check(admin_pin_t *a, const char *typed);
  */
 bool admin_pin_command(admin_pin_t *a, const char *cmd, char *reply, size_t cap);
 
+/*
+ * "@setup <PIN>": back into the Wi-Fi setup portal from the USB console, as the picker's
+ * "Wi-Fi setup" entry does from the keypad. The PIN is checked as any other (counted, with its
+ * waits); while no PIN is set there is nothing to check, so "@setup" alone is enough (the
+ * portal asks for a new PIN). cmd is the line without the '@'. Returns false if it is not that
+ * command; otherwise *reply holds one line for the console and *go says whether the box is to
+ * clear its "configured" flag and restart into the portal.
+ */
+bool admin_pin_setup_command(admin_pin_t *a, const char *cmd, char *reply, size_t cap, bool *go);
+
 #endif /* ATALAIA_ADMIN_PIN_H */

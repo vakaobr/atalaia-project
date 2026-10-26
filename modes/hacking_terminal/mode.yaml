@@ -20,7 +20,7 @@ params:
   reveal_code: { type: string, optional: true, max: 16, gm_only: true, label: "Code shown and sent when it is solved (empty: none)" }
   capture:     { type: bool, default: false, label: "Solving captures the terminal; another team can hack it back" }
   team:        { type: team, optional: true, label: "Team credited when nobody pressed a team button first (empty: none)" }
-  lang:        { type: string, default: pt, max: 5, label: "Language of the terminal's screen: pt, en, de or zh-tw" }
+  lang:        { type: string, default: "", max: 5, label: "Language of the terminal's screen: pt, en, de or zh-tw (empty: the game's language)" }
 commands:
   reset: { roles: [terminal], label: "New puzzle" }
 i18n:
@@ -39,7 +39,7 @@ i18n:
       reveal_code: "Código mostrado e enviado quando é resolvido (vazio: nenhum)"
       capture: Resolver captura o terminal; outra equipa pode voltar a hackeá-lo
       team: "Equipa creditada quando ninguém premiu primeiro um botão de equipa (vazio: nenhuma)"
-      lang: "Língua do ecrã do terminal: pt, en, de ou zh-tw"
+      lang: "Língua do ecrã do terminal: pt, en, de ou zh-tw (vazio: a língua do jogo)"
     commands:
       reset: Novo enigma
   de:
@@ -58,7 +58,7 @@ i18n:
       reveal_code: "Code, der beim Lösen gezeigt und gesendet wird (leer: keiner)"
       capture: Lösen nimmt das Terminal ein; ein anderes Team kann es zurückhacken
       team: "Team, das zählt, wenn niemand zuerst einen Teamknopf gedrückt hat (leer: keins)"
-      lang: "Sprache des Terminal-Bildschirms: pt, en, de oder zh-tw"
+      lang: "Sprache des Terminal-Bildschirms: pt, en, de oder zh-tw (leer: die Sprache des Spiels)"
     commands:
       reset: Neues Rätsel
   zh-tw:
@@ -72,6 +72,6 @@ i18n:
       reveal_code: 解開時顯示並送出的密碼（空白：無）
       capture: 解開即佔領終端；別隊可以再駭回去
       team: 沒有人先按隊伍按鈕時計分的隊伍（空白：無）
-      lang: 終端畫面的語言：pt、en、de 或 zh-tw
+      lang: 終端畫面的語言：pt、en、de 或 zh-tw（留空：使用遊戲的語言）
     commands:
       reset: 新謎題

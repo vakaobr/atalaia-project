@@ -172,6 +172,12 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
         return true;
     }
     if (strcmp(t, "start_confirm") == 0) {
+        if (screen_json_true(data, "setup")) { /* the picker's "Wi-Fi setup" entry asks first */
+            set_text(out->head, sizeof(out->head), TXO_WIFI_SETUP);
+            set_text(out->big, sizeof(out->big), TXO_SETUP_Q);
+            set_text(out->foot, sizeof(out->foot), TXO_KEYS_SETUP);
+            return true;
+        }
         set_text(out->head, sizeof(out->head), TXO_START_Q);
         if (screen_json_str(data, "label", s, sizeof(s)) && s[0]) {
             set(out->big, sizeof(out->big), s);

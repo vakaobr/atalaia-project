@@ -35,7 +35,7 @@ static const struct {
     /* A role package: on its own, a kit for games without a controller (tags need one). */
     {"Medic Kit", "org.atalaia.medic",
      "{\"heal_hold_s\":10,\"charges\":5,\"max_heals_per_player\":2,\"cooldown_s\":0,"
-     "\"lang\":\"pt\"}"},
+     "\"lang\":\"\"}"},
     /* Scores from the controller's field.lua; on its own a box only captures. */
     {"Master and Satellites", "org.atalaia.master_satellites",
      "{\"capture_hold_ms\":3000,\"tick_s\":10,\"points_per_tick\":2,\"satellite_bonus_pct\":50,"
@@ -43,12 +43,12 @@ static const struct {
     /* The keypad alone; on its own a box credits the team that pressed its button. */
     {"Hacking Terminal", "org.atalaia.hacking_terminal",
      "{\"puzzle\":\"code\",\"digits\":4,\"lockout_s\":10,\"points\":10,\"capture\":false,"
-     "\"lang\":\"pt\"}"},
+     "\"lang\":\"\"}"},
     /* A checkpoint (the payload role needs GPS, an Android prop's); the controller's field.lua
      * scores checkpoints and extracts the VIP, so on its own a box only captures. */
     {"VIP", "org.atalaia.vip_payload",
      "{\"vip_team\":\"red\",\"radius_m\":25,\"vip_points\":100,\"end_on_extract\":true,"
-     "\"checkpoint_points\":1,\"tick_s\":10,\"capture_hold_ms\":3000,\"lang\":\"pt\"}"},
+     "\"checkpoint_points\":1,\"tick_s\":10,\"capture_hold_ms\":3000,\"lang\":\"\"}"},
     /* A role package for custom scenarios (decision P4R7): the scenario's field.lua on the
      * controller tells the box what it is for ("setup"), so a box needs it to join; picked on
      * its own, a box waits for a scenario. */

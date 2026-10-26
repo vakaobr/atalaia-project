@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "box_text.h"
 #include "check.h"
 #include "node_runner.h"
 #include "hal/hal.h"
@@ -217,8 +218,59 @@ static void test_memory_warning_on_a_reduced_box(void)
     CHECK(flagged);
 }
 
+/* A mode's `lang` parameter left empty follows the game's language: the script sees it in
+ * params.lang and the templates in the "@mode" message (box_text_fill_lang); one that has a
+ * value keeps it. */
+static void test_lang_param_follows_the_game(void)
+{
+    setup_runner_env();
+    static const char src[] =
+        "on('game.start', function() ui.screen('lang_seen', { lang = params.lang }) end)\n";
+    static const char *const teams[] = {"red", "blue"};
+    static const struct {
+        const char *params;
+        const char *game_lang;
+        const char *seen;
+    } cases[] = {
+        {"{\"lang\":\"\"}", "de", "de"},
+        {"{\"k\":1,\"lang\":\"\"}", "pt", "pt"},
+        {"{\"lang\":\"\"}", "", "en"},     /* no game language: the box's English */
+        {"{\"lang\":\"en\"}", "pt", "en"}, /* the GM's own choice stays */
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        box_lang_set_code(cases[i].game_lang);
+        hal_t hal;
+        hal_stub_init(&hal);
+        node_runner_t r;
+        node_runner_init(&r, &hal, 0);
+        preset_t p = {0};
+        snprintf(p.mode_id, sizeof(p.mode_id), "org.atalaia.test_lang");
+        snprintf(p.params_json, sizeof(p.params_json), "%s", cases[i].params);
+        memcpy(p.source, src, sizeof(src) - 1);
+        p.source_len = sizeof(src) - 1;
+        CHECK(node_runner_start(&r, &p, teams, 2));
+        char want[32];
+        snprintf(want, sizeof(want), "\"lang\":\"%s\"", cases[i].seen);
+        /* The templates' message ... */
+        CHECK(r.queues.screen_count > 0);
+        CHECK(strcmp(r.queues.screens[0].template_name, "@mode") == 0);
+        CHECK(strstr(r.queues.screens[0].data_json, want) != NULL);
+        /* ... and the script's params. */
+        bool seen = false;
+        for (int j = 0; j < r.queues.screen_count; j++) {
+            if (strcmp(r.queues.screens[j].template_name, "lang_seen") == 0) {
+                seen = strstr(r.queues.screens[j].data_json, want) != NULL;
+            }
+        }
+        CHECK(seen);
+        node_runner_stop(&r);
+    }
+    box_lang_set_code("");
+}
+
 void run_node_runner_tests(void)
 {
+    test_lang_param_follows_the_game();
     test_memory_warning_on_a_reduced_box();
     test_load_and_start();
     test_event_processing();

@@ -206,6 +206,29 @@ static void show_picker(void)
     xQueueSend(screen_queue, &su, 0);
 }
 
+/* The Wi-Fi setup portal opens only on a box that is not configured; bench builds
+ * (CONFIG_ATALAIA_SKIP_SETUP) have none. */
+#if CONFIG_ATALAIA_SKIP_SETUP
+#define HAS_SETUP_PORTAL 0
+#else
+#define HAS_SETUP_PORTAL 1
+#endif
+
+/* Back into the Wi-Fi setup (the picker's "Wi-Fi setup" entry, "@setup <PIN>"): clears the
+ * "configured" flag, so that the next start opens the portal, and restarts. The field join
+ * key, the adoption, the presets and the radio's state are kept; the portal asks for the rest
+ * again (name, admin PIN, ...), and a box turned off before it saves opens it again. */
+static void setup_again(const char *how)
+{
+    ESP_LOGW(TAG, "Wi-Fi setup again (%s): restarting into the setup portal", how);
+    config_store_set_configured(false);
+    char data[96];
+    snprintf(data, sizeof(data), "{\"title\":\"%s\",\"mode\":\"Wi-Fi\"}", box_text(TX_RESTARTING));
+    send_screen("status", data);
+    vTaskDelay(pdMS_TO_TICKS(1200)); /* the screen, and the log, get out first */
+    esp_restart();
+}
+
 static void load_preset_list(void)
 {
     preset_count = preset_store_list(presets, PRESET_MAX_SLOTS);
@@ -217,6 +240,7 @@ static void start_picker(void)
 {
     preset_ui_init(&preset_ui, NULL, preset_count);
     preset_ui_set_guard(&preset_ui, &admin_guard);
+    preset_ui_enable_setup(&preset_ui, HAS_SETUP_PORTAL);
     /* A wait still running, or no PIN set: said at once (decisions AD-28, AD-29). */
     preset_ui.locked_min = admin_pin_wait_min(&admin_guard);
     preset_ui.no_pin = !admin_pin_is_set(&admin_guard);
@@ -259,6 +283,7 @@ static void serial_input_init(void)
 #if CONFIG_ATALAIA_SERIAL_JOIN
     ESP_LOGI(TAG, "serial join on: \"@join atalaia:join:...\", \"@joinkey <hex>\", "
                   "\"@tag <uid> [<tag>]\", \"@wifi <ssid> <password>\", "
+                  "\"@setup <PIN>\", "
                   "\"@update <version> <release id>\", \"@modes\", \"@forgetmodes\" "
                   "or \"@lobby\" on the console");
 #endif
@@ -282,6 +307,25 @@ static void serial_command(const char *cmd)
         static char pin_reply[160];
         if (admin_pin_command(&admin_guard, cmd, pin_reply, sizeof(pin_reply))) {
             ESP_LOGI(TAG, "%s", pin_reply);
+            return;
+        }
+    }
+    if (SERIAL_ADOPT_ON || SERIAL_JOIN_ON) {
+        /* "@setup <PIN>" ("@setup" while none is set): back into the Wi-Fi setup portal. */
+        static char setup_reply[160];
+        bool go = false;
+        if (admin_pin_setup_command(&admin_guard, cmd, setup_reply, sizeof(setup_reply), &go)) {
+            if (go && !HAS_SETUP_PORTAL) {
+                ESP_LOGW(TAG,
+                         "setup: a bench build has no setup portal (CONFIG_ATALAIA_SKIP_SETUP)");
+            } else if (go && (box_game_active(&box) || runner.running)) {
+                ESP_LOGW(TAG, "setup: not in a game");
+            } else if (go) {
+                ESP_LOGI(TAG, "%s", setup_reply);
+                setup_again("console");
+            } else {
+                ESP_LOGI(TAG, "%s", setup_reply);
+            }
             return;
         }
     }
@@ -960,6 +1004,9 @@ static void task_game(void *arg)
         if (key != HAL_KEY_NONE) {
             if (picker_active) {
                 preset_ui_handle_key(&preset_ui, key);
+                if (preset_ui_get_state(&preset_ui) == PRESET_UI_STATE_SETUP_REQUESTED) {
+                    setup_again("picker"); /* does not return */
+                }
                 show_picker();
             } else if (runner.running) {
                 char json[64];

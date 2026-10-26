@@ -821,15 +821,29 @@ static void update_timer_adjust(const char *data)
 static void build_start_confirm(lv_obj_t *scr)
 {
     set_bg(scr, COLOR_BG);
-    lv_label_set_text(header(scr, COLOR_ACCENT), box_text(TX_START_GAME_UP));
+    slot[2] = header(scr, COLOR_ACCENT);
+    lv_label_set_text(slot[2], box_text(TX_START_GAME_UP));
     slot[0] = label(scr, &lv_font_atalaia_28, COLOR_TEXT, -24);
     one_line(slot[0], SCREEN_W - 32);
     slot[1] = label(scr, &lv_font_atalaia_20, COLOR_MUTED, 22);
-    footer(scr, box_text(TX_KEYS_START));
+    slot[3] = footer(scr, box_text(TX_KEYS_START));
 }
 
 static void update_start_confirm(const char *data)
 {
+    /* "setup": the picker's "Wi-Fi setup" entry asks before the box restarts into the setup
+     * portal (preset_ui.h): the same screen, with its own words. */
+    if (screen_json_true(data, "setup")) {
+        lv_label_set_text(slot[2], box_text(TX_SETUP_AGAIN_UP));
+        lv_label_set_text(slot[0], box_text(TX_SETUP_ITEM));
+        lv_obj_set_width(slot[1], SCREEN_W - 20); /* two lines in Portuguese and German */
+        lv_label_set_text(slot[1], box_text(TX_SETUP_WARNING));
+        lv_label_set_text(slot[3], box_text(TX_KEYS_SETUP));
+        return;
+    }
+    lv_obj_set_width(slot[1], LV_SIZE_CONTENT);
+    lv_label_set_text(slot[2], box_text(TX_START_GAME_UP));
+    lv_label_set_text(slot[3], box_text(TX_KEYS_START));
     char name[LIST_ITEM_MAX];
     if (!screen_json_str(data, "label", name, sizeof(name)) || !name[0]) {
         snprintf(name, sizeof(name), "%s", box_text(TX_GAME));

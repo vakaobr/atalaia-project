@@ -265,6 +265,9 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(firmware_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
+# test_wifi_setup.c reads the setup page to check its texts.
+target_compile_definitions(firmware_test PRIVATE "WIFI_SETUP_HTML=\"${SHELL_DIR}/wifi_setup.html\"")
+
 # MODES_DIR is needed by test_game_loop.c to find the real mode scripts.
 if(MODES_DIR)
     target_compile_definitions(firmware_test PRIVATE "MODES_DIR=\"${MODES_DIR}\"")
