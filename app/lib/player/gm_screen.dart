@@ -103,14 +103,12 @@ class _GmScreenState extends State<GmScreen> {
                 Text(s.t('gm.intro')),
                 const SizedBox(height: 12),
                 if (_bad) Notice(s.t('gm.bad_url'), kind: NoticeKind.error),
-                TextField(
-                  key: const Key('gm-url'),
+                AddressField(
+                  fieldKey: const Key('gm-url'),
+                  clearKey: const Key('gm-url-clear'),
                   controller: _url,
-                  keyboardType: TextInputType.url,
-                  decoration: InputDecoration(
-                    labelText: s.t('gm.address'),
-                    hintText: 'http://192.168.4.1:8080/console/',
-                  ),
+                  label: s.t('gm.address'),
+                  hint: 'http://192.168.4.1:8080/console/',
                   onSubmitted: (_) => _go(),
                 ),
                 const SizedBox(height: 12),

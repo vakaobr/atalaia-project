@@ -9,6 +9,7 @@ const Map<String, String> deStrings = {
   // Common
   'common.cancel': 'Abbrechen',
   'common.close': 'Schließen',
+  'common.clear': 'Text löschen',
   'common.ok': 'OK',
   'common.save': 'Speichern',
 

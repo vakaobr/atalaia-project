@@ -17,6 +17,7 @@ import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/marshal/marshal_records.dart';
 import 'package:atalaia_app/modes/mode_catalog.dart';
 import 'package:atalaia_app/player/field_feed.dart';
+import 'package:atalaia_app/player/gm_screen.dart';
 import 'package:atalaia_app/player/player_screens.dart';
 import 'package:atalaia_app/prop/prop_game.dart';
 import 'package:atalaia_app/prop/prop_session.dart';
@@ -49,6 +50,31 @@ void main() {
       await tester.pumpWidget(harness(language: lang).app());
       await tester.pumpAndSettle();
       await snap(tester, 'home', lang);
+    });
+
+    testWidgets('player start with a prefilled address (${lang.code})', (
+      tester,
+    ) async {
+      await phone(tester);
+      final h = harness(
+        language: lang,
+        settings: AppSettings()..controllerUrl = 'http://192.168.4.1:8080',
+      );
+      await tester.pumpWidget(h.app(home: const PlayerStartScreen()));
+      await tester.pumpAndSettle();
+      await snap(tester, 'player_start', lang);
+    });
+
+    testWidgets('GM console address, prefilled (${lang.code})', (tester) async {
+      await phone(tester);
+      final h = harness(
+        language: lang,
+        settings: AppSettings()
+          ..consoleUrl = 'http://192.168.4.1:8080/console/',
+      );
+      await tester.pumpWidget(h.app(home: const GmScreen()));
+      await tester.pumpAndSettle();
+      await snap(tester, 'gm_address', lang);
     });
 
     testWidgets('settings (${lang.code})', (tester) async {

@@ -255,14 +255,12 @@ class _SiteScreenState extends State<SiteScreen> {
   List<Widget> _addressStep(Strings s) => [
     Text(s.t('site.intro')),
     const SizedBox(height: 12),
-    TextField(
-      key: const Key('site-address'),
+    AddressField(
+      fieldKey: const Key('site-address'),
+      clearKey: const Key('site-address-clear'),
       controller: _address,
-      keyboardType: TextInputType.url,
-      decoration: InputDecoration(
-        labelText: s.t('site.address'),
-        hintText: 'https://campo.example.pt/f/campo',
-      ),
+      label: s.t('site.address'),
+      hint: 'https://campo.example.pt/f/campo',
     ),
     const SizedBox(height: 8),
     FilledButton(

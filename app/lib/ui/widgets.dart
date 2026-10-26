@@ -5,6 +5,7 @@
 /// confirmation, a team's colour dot.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -332,3 +333,97 @@ class _TextPromptState extends State<_TextPrompt> {
 
 void showMessage(BuildContext context, String text) =>
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+
+/// A text field for an address the person types or edits (a console's, a
+/// controller's, a site's), often prefilled with the last one used.
+///
+/// - A clear button (an x) shows while there is text; it empties the field
+///   and keeps the focus, so the new address can be typed at once.
+/// - On iOS the first focus selects the whole text, so typing replaces it:
+///   a tap in a URL there puts the cursor at the word's edge (a URL is one
+///   word), which makes a prefilled address awkward to edit. Later taps
+///   place the cursor as usual. Android puts the cursor where the finger is,
+///   so it keeps that.
+class AddressField extends StatefulWidget {
+  const AddressField({
+    required this.controller,
+    required this.label,
+    this.hint,
+    this.fieldKey,
+    this.clearKey,
+    this.onSubmitted,
+    super.key,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String? hint;
+
+  /// The key of the text field itself (the tests type into it).
+  final Key? fieldKey;
+
+  /// The key of the clear button.
+  final Key? clearKey;
+  final ValueChanged<String>? onSubmitted;
+
+  @override
+  State<AddressField> createState() => _AddressFieldState();
+}
+
+class _AddressFieldState extends State<AddressField> {
+  final _focus = FocusNode();
+  bool _focusedOnce = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_onFocus);
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _onFocus() {
+    if (!_focus.hasFocus || _focusedOnce) return;
+    _focusedOnce = true;
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
+    // After the tap's own selection, which would otherwise win.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final c = widget.controller;
+      if (!mounted || !_focus.hasFocus || c.text.isEmpty) return;
+      c.selection = TextSelection(baseOffset: 0, extentOffset: c.text.length);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: widget.controller,
+    builder: (context, _) => TextField(
+      key: widget.fieldKey,
+      controller: widget.controller,
+      focusNode: _focus,
+      keyboardType: TextInputType.url,
+      autocorrect: false,
+      enableSuggestions: false,
+      decoration: InputDecoration(
+        labelText: widget.label,
+        hintText: widget.hint,
+        suffixIcon: widget.controller.text.isEmpty
+            ? null
+            : IconButton(
+                key: widget.clearKey,
+                tooltip: context.s.t('common.clear'),
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  widget.controller.clear();
+                  _focus.requestFocus();
+                },
+              ),
+      ),
+      onSubmitted: widget.onSubmitted,
+    ),
+  );
+}

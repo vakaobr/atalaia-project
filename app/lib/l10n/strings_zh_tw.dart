@@ -12,6 +12,7 @@ const Map<String, String> zhTwStrings = {
   // Common
   'common.cancel': '取消',
   'common.close': '關閉',
+  'common.clear': '清除文字',
   'common.ok': '確定',
   'common.save': '儲存',
 

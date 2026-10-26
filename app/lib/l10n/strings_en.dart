@@ -8,6 +8,7 @@ const Map<String, String> enStrings = {
   // Common
   'common.cancel': 'Cancel',
   'common.close': 'Close',
+  'common.clear': 'Clear the text',
   'common.ok': 'OK',
   'common.save': 'Save',
 

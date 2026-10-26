@@ -8,6 +8,7 @@ const Map<String, String> ptStrings = {
   // Comum
   'common.cancel': 'Cancelar',
   'common.close': 'Fechar',
+  'common.clear': 'Apagar o texto',
   'common.ok': 'OK',
   'common.save': 'Guardar',
 

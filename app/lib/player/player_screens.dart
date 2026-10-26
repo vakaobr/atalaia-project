@@ -150,14 +150,12 @@ class _PlayerStartScreenState extends State<PlayerStartScreen> {
             onPressed: _scan,
           ),
           SectionTitle(s.t('player.by_hand')),
-          TextField(
-            key: const Key('player-address'),
+          AddressField(
+            fieldKey: const Key('player-address'),
+            clearKey: const Key('player-address-clear'),
             controller: _address,
-            keyboardType: TextInputType.url,
-            decoration: InputDecoration(
-              labelText: s.t('player.address'),
-              hintText: '192.168.4.1:8080',
-            ),
+            label: s.t('player.address'),
+            hint: '192.168.4.1:8080',
           ),
           const SizedBox(height: 12),
           TextField(
