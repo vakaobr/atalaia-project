@@ -686,13 +686,7 @@ roadmap:
   # "Roadmap" stays in English in Portuguese too, as it is known in Portugal (never "Roteiro").
   title: Roadmap
   intro: >-
-    Seis fases, cada uma fechada por um teste a sério no campo, a sua prova. O software foi à frente
-    do hardware: as fases 1 e 2 estão prontas em software, placas a sério já jogam jogos inteiros
-    com o controlador de campo na bancada e as provas esperam por caixas montadas e testes no campo;
-    a fase 3 está pronta em software, incluindo a app para iOS (já passou a sua lista de verificação
-    num iPhone), e todos os passos de software das fases 4 e 5 estão feitos, à espera de hardware, de
-    um servidor a sério e do repositório do registo.
-  # The main page shows each phase's title and short line, then this link to the roadmap page.
+    Seis fases, cada uma fechada por um teste a sério no campo: a sua prova. O software vai à frente do hardware: as fases 1 a 3 estão prontas em software (placas a sério já jogam jogos inteiros na bancada e a app para iOS já passou a sua lista de verificação num iPhone); as fases 4 e 5 estão feitas em software. As provas esperam por caixas montadas, testes no campo, um servidor a sério e o repositório do registo.
   more: O roadmap completo, com o que cada fase inclui e a sua prova →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code):

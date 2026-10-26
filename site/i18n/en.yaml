@@ -668,13 +668,7 @@ try:
 roadmap:
   title: Roadmap
   intro: >-
-    Six phases, each closed by a real field test, its gate. The software has gone ahead of the
-    hardware: phases 1 and 2 are done in software, real boards already play whole games with the
-    field controller on the bench, and the gates wait for built boxes and field tests; phase 3 is
-    done in software, the iOS app included (it has passed its checklist on an iPhone), and every
-    software step of phases 4 and 5 is built, waiting for hardware, a real server and the registry's
-    repository.
-  # The main page shows each phase's title and short line, then this link to the roadmap page.
+    Six phases, each closed by a real field test: its gate. The software is ahead of the hardware: phases 1 to 3 are done in software (real boards play whole games on the bench, and the iOS app has passed its checklist on an iPhone); phases 4 and 5 are built in software. The gates wait for built boxes, field tests, a real server and the registry's repository.
   more: The full roadmap, with what each phase holds and its gate →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code).
