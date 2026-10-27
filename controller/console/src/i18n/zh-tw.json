@@ -679,6 +679,7 @@
     "squad": "小隊",
     "role": "角色",
     "replicas": "槍",
+    "actions": "動作",
     "erased": "（已清除）",
     "by_hand": "手動",
     "prefers": "想加入 {team}",

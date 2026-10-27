@@ -3680,7 +3680,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v9').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v10').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js"):
@@ -3899,6 +3899,39 @@ class ConsoleBrowserTests(unittest.TestCase):
                                  == "squad_leader", 5))
         stored = self.field.bundle.store.checkin(game["id"], me["player_id"])
         self.assertEqual((stored["team"], stored["squad"]), (2, 2))
+
+    def test_console_tabs_with_rows_fit_a_375_px_phone(self):
+        """The check-in table (squads, federation numbers, replicas, a long name) and the marshal list stack
+        into cards on a phone instead of scrolling the page sideways; every other tab with data fits too."""
+        game = self.field.create_game("Sábado", squads=2)
+        self.field.http.put("/api/v1/checkin/settings", json={"confirm": "staff", "federation": "optional"})
+        replicas = [{"declaration_id": "6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b", "type": "aeg", "class": "rifle"},
+                    {"declaration_id": "0a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3d", "type": "bolt_action",
+                     "class": "sniper", "make_model": "Well MB4402"}]
+        me = self.check_in(game["id"], "Coruja Comprida Do Monte Alto", federation_number="FPA-77",
+                           replicas=replicas)
+        self.check_in(game["id"], "Gaivota")
+        self.field.box_hello()
+        page = self.console(width=375, height=800)
+        page.get_by_test_id("tab-checkin").click()
+        row = page.get_by_test_id(f"checkin-row-{me['player_id']}")
+        expect(row).to_be_visible()
+        row.get_by_test_id("checkin-confirm").click()
+        row.get_by_test_id("checkin-team").select_option("blue")
+        expect(row.get_by_test_id("checkin-squad")).to_be_visible()
+        page.get_by_test_id("marshal-add-player").select_option(label="Gaivota")
+        page.get_by_test_id("marshal-add").click()
+        expect(page.get_by_test_id("marshal-row-M-01")).to_be_visible()
+        self.no_horizontal_scroll(page)
+        # Stacked: the table itself does not scroll, and the controls stay reachable by keyboard in order.
+        for testid in ("checkin-table", "marshals-table"):
+            box = page.get_by_test_id(testid).bounding_box()
+            self.assertLessEqual(box["x"] + box["width"], 375.5, testid)
+        self.assertEqual(page.get_by_test_id("checkin-table").get_attribute("role"), "table")
+        self.assertEqual(page.get_by_test_id("checkin-table").locator("[role=columnheader]").count(), 7)
+        for tab in page.locator("nav.tabs button").all():
+            tab.click()
+            self.no_horizontal_scroll(page)
 
     def test_who_of_a_squad_is_told_its_scenario_objectives(self):
         """SQ-3, SQ-4: a scenario with squads offers who of a squad gets its objectives (every member,

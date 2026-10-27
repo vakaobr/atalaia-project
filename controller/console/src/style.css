@@ -321,6 +321,13 @@ textarea {
     gap: 1rem;
     max-width: 72rem;
     margin: 0 auto;
+    /* A grid track is as wide as its widest content unless told otherwise: without this a wide table
+     * in a panel's root <div> stretched the track (and the page) instead of scrolling in .table-wrap. */
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.content > * {
+    min-width: 0;
 }
 
 .card {
@@ -509,6 +516,59 @@ progress {
 
 .table select {
     min-width: 7rem;
+}
+
+/* A table of controls (check-in, marshals) stacks into one card per row on a phone: no sideways
+ * scrolling to reach a button. The elements carry their ARIA table roles in the markup so the table is
+ * still announced as one after display:block, and the label above each value comes from data-label.
+ * DOM order, hence keyboard order, is unchanged. */
+@media (max-width: 39.99rem) {
+    .table.stack,
+    .table.stack tbody,
+    .table.stack tr,
+    .table.stack td {
+        display: block;
+    }
+
+    .table.stack thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .table.stack tr {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        margin-bottom: 0.6rem;
+        padding: 0.2rem 0;
+    }
+
+    .table.stack td {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        border-bottom: 0;
+        padding: 0.25rem 0.6rem;
+    }
+
+    .table.stack td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 0.75rem;
+        color: var(--muted);
+    }
+
+    .table.stack td:empty {
+        display: none;
+    }
+
+    .table.stack select,
+    .table.stack input:not([type="checkbox"]) {
+        max-width: 100%;
+        box-sizing: border-box;
+    }
 }
 
 tr.offline td {

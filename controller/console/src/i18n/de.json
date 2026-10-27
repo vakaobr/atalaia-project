@@ -679,6 +679,7 @@
     "squad": "Squad",
     "role": "Rolle",
     "replicas": "Repliken",
+    "actions": "Aktionen",
     "erased": "(gelöscht)",
     "by_hand": "von Hand",
     "prefers": "bevorzugt {team}",

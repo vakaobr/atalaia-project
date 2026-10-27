@@ -364,12 +364,12 @@ export class CheckinPanel extends Component {
         return html`<section class="card" aria-labelledby="cil-h">
             <h2 id="cil-h">${t('checkin.list')}</h2>
             ${rows.length === 0 && html`<p class="muted" data-testid="checkin-empty">${t('checkin.empty')}</p>`}
-            ${rows.length > 0 && html`<div class="table-wrap"><table class="table" data-testid="checkin-table">
-                <thead><tr><th>${t('checkin.name')}</th><th>${t('checkin.status')}</th>
-                    <th>${squadsOf(g) ? t('checkin.team_squad') : t('checkin.team')}</th><th>${t('checkin.role')}</th>
-                    ${s.federation !== 'off' && html`<th>${s.federation_label}</th>`}
-                    <th>${t('checkin.replicas')}</th><th></th></tr></thead>
-                <tbody>${rows.map((r) => this.renderRow(g, s, r))}</tbody>
+            ${rows.length > 0 && html`<div class="table-wrap"><table class="table stack" role="table" data-testid="checkin-table">
+                <thead role="rowgroup"><tr role="row"><th role="columnheader">${t('checkin.name')}</th><th role="columnheader">${t('checkin.status')}</th>
+                    <th role="columnheader">${squadsOf(g) ? t('checkin.team_squad') : t('checkin.team')}</th><th role="columnheader">${t('checkin.role')}</th>
+                    ${s.federation !== 'off' && html`<th role="columnheader">${s.federation_label}</th>`}
+                    <th role="columnheader">${t('checkin.replicas')}</th><th role="columnheader"><span class="sr-only">${t('checkin.actions')}</span></th></tr></thead>
+                <tbody role="rowgroup">${rows.map((r) => this.renderRow(g, s, r))}</tbody>
             </table></div>`}
             ${this.renderManual(g, s)}
             ${this.renderTicket(g)}
@@ -381,17 +381,17 @@ export class CheckinPanel extends Component {
         const decls = (r.declarations || []).filter((d) => d.state !== 'withdrawn');
         const counts = {};
         for (const d of decls) counts[d.state] = (counts[d.state] || 0) + 1;
-        return html`<tr data-testid=${`checkin-row-${r.player_id}`} class=${active ? '' : 'muted'}>
-            <td><strong data-testid="checkin-name">${r.display_name || t('checkin.erased')}</strong>
+        return html`<tr role="row" data-testid=${`checkin-row-${r.player_id}`} class=${active ? '' : 'muted'}>
+            <td role="cell"><strong data-testid="checkin-name">${r.display_name || t('checkin.erased')}</strong>
                 ${r.manual && html` <span class="badge">${t('checkin.by_hand')}</span>`}
                 ${r.registered && html` <span class="badge" data-testid="checkin-registered-badge">${t('checkin.registered_badge')}</span>`}
                 <div class="small muted">${r.player_id}${r.team_preference ? ` · ${t('checkin.prefers', { team: r.team_preference })}` : ''}</div></td>
-            <td><span class=${`badge status-${r.status}`}>${t(`checkin.statuses.${r.status}`)}</span>
+            <td role="cell" data-label=${t('checkin.status')}><span class=${`badge status-${r.status}`}>${t(`checkin.statuses.${r.status}`)}</span>
                 ${r.status === 'pending' && html` <button type="button" class="primary" data-testid="checkin-confirm"
                     onClick=${() => this.patch(r.player_id, { status: 'checked_in' })}>${t('checkin.confirm')}</button>`}
                 ${r.status === 'expected' && html` <button type="button" class="primary" data-testid="checkin-arrived"
                     onClick=${() => this.patch(r.player_id, { status: 'checked_in' })}>${t('checkin.arrived')}</button>`}</td>
-            <td>${active ? html`<select aria-label=${t('checkin.team')} data-testid="checkin-team" value=${r.team || ''}
+            <td role="cell" data-label=${squadsOf(g) ? t('checkin.team_squad') : t('checkin.team')}>${active ? html`<select aria-label=${t('checkin.team')} data-testid="checkin-team" value=${r.team || ''}
                     onChange=${(e) => this.patch(r.player_id, { team: e.target.value || null, squad: 0 })}>
                     <option value="">–</option>${g.teams.map((tm) => html`<option value=${tm}>${tm}</option>`)}</select>${
                     squadsOf(g) && r.team ? html` › <select aria-label=${t('checkin.squad')} data-testid="checkin-squad"
@@ -399,18 +399,18 @@ export class CheckinPanel extends Component {
                         <option value="0">${t('checkin.no_squad')}</option>
                         ${Array.from({ length: squadsOf(g) }, (_, i) => html`<option value=${String(i + 1)}>${
                             t('checkin.squad_n', { n: i + 1 })}</option>`)}</select>` : ''}` : where(r.team, r.squad)}</td>
-            <td>${active ? html`<select aria-label=${t('checkin.role')} data-testid="checkin-role" value=${r.role}
+            <td role="cell" data-label=${t('checkin.role')}>${active ? html`<select aria-label=${t('checkin.role')} data-testid="checkin-role" value=${r.role}
                     onChange=${(e) => this.patch(r.player_id, { role: e.target.value })}>
                     ${ROLES.filter((ro) => ro !== 'squad_leader' || squadsOf(g) || r.role === ro)
         .map((ro) => html`<option value=${ro}>${t(`checkin.roles.${ro}`)}</option>`)}</select>` : t(`checkin.roles.${r.role}`)}</td>
-            ${s.federation !== 'off' && html`<td>${r.federation_number || '–'}
+            ${s.federation !== 'off' && html`<td role="cell" data-label=${s.federation_label}>${r.federation_number || '–'}
                 ${r.federation_number && html`<label class="check small"><input type="checkbox" data-testid="checkin-card-seen"
                     checked=${r.federation_seen} disabled=${!active}
                     onChange=${(e) => this.patch(r.player_id, { federation_seen: e.target.checked })} /> ${
                     r.federation_seen ? t('checkin.card_seen') : t('checkin.not_checked')}</label>`}</td>`}
-            <td data-testid="checkin-replicas">${decls.length}${decls.length ? ` (${Object.entries(counts)
+            <td role="cell" data-label=${t('checkin.replicas')} data-testid="checkin-replicas">${decls.length}${decls.length ? ` (${Object.entries(counts)
                 .map(([k, v]) => `${t(`checkin.states.${k}`)} ${v}`).join(', ')})` : ''}</td>
-            <td>${active && html`<button type="button" class="link danger" data-testid="checkin-remove"
+            <td role="cell">${active && html`<button type="button" class="link danger" data-testid="checkin-remove"
                 onClick=${() => this.remove(r.player_id)}>${t('checkin.remove')}</button>`}</td>
         </tr>`;
     }
@@ -475,25 +475,25 @@ export class CheckinPanel extends Component {
             <h2 id="cm-h">${t('checkin.marshals.title')}</h2>
             <p class="muted">${t('checkin.marshals.intro')}</p>
             ${marshals.length === 0 && html`<p class="muted" data-testid="marshals-empty">${t('checkin.marshals.empty')}</p>`}
-            ${marshals.length > 0 && html`<div class="table-wrap"><table class="table" data-testid="marshals-table">
-                <thead><tr><th>${t('checkin.marshals.id')}</th><th>${t('checkin.marshals.name')}</th>
-                    <th>${t('checkin.marshals.player')}</th><th>${t('checkin.marshals.key')}</th><th></th></tr></thead>
-                <tbody>${marshals.map((m) => html`<tr data-testid=${`marshal-row-${m.marshal_id}`}>
-                    <td><strong data-testid="marshal-id">${m.marshal_id}</strong></td>
-                    <td><input aria-label=${t('checkin.marshals.name')} data-testid="marshal-name" maxlength="64"
+            ${marshals.length > 0 && html`<div class="table-wrap"><table class="table stack" role="table" data-testid="marshals-table">
+                <thead role="rowgroup"><tr role="row"><th role="columnheader">${t('checkin.marshals.id')}</th><th role="columnheader">${t('checkin.marshals.name')}</th>
+                    <th role="columnheader">${t('checkin.marshals.player')}</th><th role="columnheader">${t('checkin.marshals.key')}</th><th role="columnheader"><span class="sr-only">${t('checkin.actions')}</span></th></tr></thead>
+                <tbody role="rowgroup">${marshals.map((m) => html`<tr role="row" data-testid=${`marshal-row-${m.marshal_id}`}>
+                    <td role="cell" data-label=${t('checkin.marshals.id')}><strong data-testid="marshal-id">${m.marshal_id}</strong></td>
+                    <td role="cell" data-label=${t('checkin.marshals.name')}><input aria-label=${t('checkin.marshals.name')} data-testid="marshal-name" maxlength="64"
                         value=${edits[m.marshal_id] !== undefined ? edits[m.marshal_id] : m.name}
                         onInput=${(e) => this.setState({ nameEdits: { ...edits, [m.marshal_id]: e.target.value } })}
                         onChange=${(e) => this.saveMarshalName(m, e.target.value)} /></td>
-                    <td><select aria-label=${t('checkin.marshals.player')} data-testid="marshal-player" value=${m.player_id || ''}
+                    <td role="cell" data-label=${t('checkin.marshals.player')}><select aria-label=${t('checkin.marshals.player')} data-testid="marshal-player" value=${m.player_id || ''}
                         onChange=${(e) => this.patchMarshal(m.marshal_id, { player_id: e.target.value || null })}>
                         <option value="">${t('checkin.marshals.no_player')}</option>
                         ${m.player_id && !here.some((r) => r.player_id === m.player_id)
                             && html`<option value=${m.player_id}>${nameOf(m.player_id)}</option>`}
                         ${here.filter((r) => !taken.has(r.player_id) || r.player_id === m.player_id).map((r) => html`<option
                             value=${r.player_id}>${r.display_name || r.player_id}</option>`)}</select></td>
-                    <td><span class=${`badge ${m.key_registered ? 'status-checked_in' : 'status-pending'}`} data-testid="marshal-key">${
+                    <td role="cell" data-label=${t('checkin.marshals.key')}><span class=${`badge ${m.key_registered ? 'status-checked_in' : 'status-pending'}`} data-testid="marshal-key">${
                         t(m.key_registered ? 'checkin.marshals.key_ok' : 'checkin.marshals.key_waiting')}</span></td>
-                    <td><button type="button" class="link danger" data-testid="marshal-remove"
+                    <td role="cell"><button type="button" class="link danger" data-testid="marshal-remove"
                         onClick=${() => this.removeMarshal(m)}>${t('checkin.marshals.remove')}</button></td>
                 </tr>`)}</tbody>
             </table></div>`}

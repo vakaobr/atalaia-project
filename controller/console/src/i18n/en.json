@@ -679,6 +679,7 @@
     "squad": "Squad",
     "role": "Role",
     "replicas": "Replicas",
+    "actions": "Actions",
     "erased": "(erased)",
     "by_hand": "by hand",
     "prefers": "prefers {team}",
