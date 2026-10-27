@@ -277,10 +277,20 @@ Open **Check-in**. Check-in is open from the moment a game is created. **Close c
 3. Give each player a **Team**, and a **Squad** if the game has squads, with the drop-downs. Set the **Role**: **player**, **squad leader**, **VIP**, **marshal**, **GM** or **spectator**. A change takes effect at once. The player's app picks the change up by itself.
 4. Tick **card seen** once you have seen a player's federation card.
 5. **Remove** takes a player out of the game.
-6. **Check in by hand**: for a player without the app. Type a name, a team preference and replicas. The controller makes an id, which can be written to a player tag.
+6. **Check in by hand**: for a player without the app. Type a name, a team preference and replicas. The controller makes an id, which can be written to a player tag (see [Players' tags](#players-tags)).
 7. **Export CSV** saves the list. Open the console in a computer's browser for this. The app's built-in console cannot save it.
 
 Names are shown only here and to marshals. Nothing about a player's name goes in events, the scoreboard or the players' views.
+
+### Players' tags
+
+Some modes (Kill Confirmed, Respawn and Lives, Player Check-in, Medic Kit, Money Factory) need an NFC tag for each player. The controller signs every tag with the game's key. The key never leaves the controller, so nobody needs the field join key to write tags. A tag works only in the game it was made for; every new game needs new tags. Use blank NTAG213, NTAG215 or NTAG216 tags. Three ways to write one:
+
+1. **In the console**: under **Check-in**, the **Players' tags** card. Pick the **Player's id** from the players who have checked in (or type an id, 1 to 32 letters, digits, `-`, `_` or `.`; each player's id is under their name in the list). Pick the **Team**, or **No team**. Tap **Make the tag**. If your browser can write NFC (Chrome on an Android phone, with the console opened over HTTPS), tap **Write it with this device's NFC** and hold a blank tag to the back of the phone. If not, the console says so and shows the **NDEF record (hex)**, with **Download the NDEF file**. Write it with the Atalaia app on a phone (the marshal's screen, or the controller's own screen below) or with an NFC app that can write a raw NDEF record from hex.
+2. **On a phone controller**: on the controller's screen, under **Players' tags**, tap **Write players' tags** while a game runs. The form is the marshal's. The phone writes the tag with its own NFC and asks its own controller for it.
+3. **A marshal**: the marshal's app asks the controller for each tag (see the [marshal manual](marshal.md#7-write-players-tags)). The marshal must be on the field's Wi-Fi and on your marshal list. Marshals no longer need the field join key for this.
+
+If the console says a tag cannot be made because the game is not running, create the game first: an ended game has no key.
 
 ### Marshals
 

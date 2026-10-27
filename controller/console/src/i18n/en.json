@@ -1420,5 +1420,28 @@
     "partly": "The controller's addresses changed since the poster was printed (gone: {gone}; new: {now}): the printed one still works through the addresses it shares.",
     "print": "Print the poster again",
     "alert": "The check-in poster changed, print it again. {what}"
+  },
+  "tags": {
+    "title": "Players' tags",
+    "intro": "Some modes need an NFC tag for each player. The controller signs each tag with this game's key, which never leaves it, so the tag works only in this game and only its boxes accept it.",
+    "game": "Game {game}: a new game needs new tags.",
+    "player": "Player's id",
+    "player_hint": "Letters, digits, - _ and . (up to 32), e.g. p-17. Pick a player who has checked in, or type an id.",
+    "team": "Team",
+    "no_team": "No team",
+    "make": "Make the tag",
+    "for": "Tag for {player}, team {team}",
+    "for_no_team": "Tag for {player}, no team",
+    "bytes": "{n} bytes",
+    "nfc_write": "Write it with this device's NFC",
+    "nfc_hold": "Hold a blank tag to the back of this device…",
+    "nfc_done": "Written to the tag.",
+    "nfc_failed": "Writing failed: {error}",
+    "nfc_unsupported": "This browser cannot write NFC tags (Web NFC needs Chrome on Android, over HTTPS). Write the bytes below with the Atalaia app (Marshal, Players' tags; on a phone controller, its own screen), or with an NFC app that can write a raw NDEF record from hex.",
+    "ndef": "NDEF record (hex)",
+    "memory": "Tag memory from page 4 (hex)",
+    "download": "Download the NDEF file",
+    "hide": "Hide",
+    "no_game": "Make a game first: tags are signed with the running game's key."
   }
 }

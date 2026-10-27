@@ -104,7 +104,8 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/games/{id}/chrono-list    staff: the "replicas to chrono" list
     POST /api/v1/games/{id}/checkin/open|close  GM
     POST /api/v1/chrono/readings           a marshal's signed series of readings
-    GET|POST /api/v1/marshals              GM: the marshal list (ids, names, the player each is bound to, keys)
+    POST /api/v1/games/{id}/tags           staff: one signed player tag's NDEF bytes (the game key stays here)
+    GET|POST /api/v1/marshals             GM: the marshal list (ids, names, the player each is bound to, keys)
     PATCH|DELETE /api/v1/marshals/{id}     GM: rename or rebind / take a marshal off the list (revokes)
     GET|PUT /api/v1/checkin/settings       GM: confirm, federation, limits
     GET|PUT /api/v1/checkin/poster         GM: the check-in poster's text and fields
@@ -149,7 +150,7 @@ from . import field_levels as levelsmod
 from . import field_map as fieldmapmod
 from . import georef as georefmod
 from . import map_features as mapmod
-from . import images, visibility
+from . import images, player_tags, visibility
 from . import scenario_service as scenarios
 from .branding import SLOTS, Branding, etag
 from .addresses import url_host
@@ -1213,6 +1214,10 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.post("/api/v1/games/{game_id}/checkin/close", dependencies=[Depends(require_gm)])
     def checkin_close(game_id: int) -> dict[str, Any]:
         return need_checkin().set_open(game_id, False)
+
+    @app.post("/api/v1/games/{game_id}/tags")
+    def player_tag(game_id: int, v: Viewer = Depends(require_read), body: Any = Body(None)) -> JSONResponse:
+        return JSONResponse(player_tags.issue(controller, v, game_id, body_map(body)), headers=NO_STORE)
 
     @app.post("/api/v1/chrono/readings")
     def chrono_readings(v: Viewer = Depends(require_read), body: Any = Body(None)) -> dict[str, Any]:

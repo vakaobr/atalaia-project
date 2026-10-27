@@ -654,6 +654,7 @@ Reading needs a read token, which can be printed as a QR code for spectators and
 | WS | `/api/v1/stream` | Live event stream |
 | GET / POST | `/api/v1/checkin` | Field check-in from the printed poster; a player token in return (phase 3) |
 | GET | `/api/v1/games/{id}/chrono-list` | Declared replicas and their chrono state, for marshals and the GM (phase 3) |
+| POST | `/api/v1/games/{id}/tags` | One signed player tag for the GM or a marshal to write; the game key stays on the controller |
 
 The REST API is described in an OpenAPI file and MQTT in an AsyncAPI file, both versioned in the repo.
 

@@ -16,7 +16,7 @@ Para os marshals de um campo: quem faz a cronografagem à entrada e as verifica�
 - Um telemóvel Android (Android 8.0 ou mais recente) com a app Atalaia. Um iPhone serve para o cronógrafo, mas **não tem NFC**: não lê nem grava etiquetas NFC. Para instalar a app, vê o [manual de quem joga](player.md#1-instala-a-app).
 - Um cronógrafo, e uma maneira de ver a velocidade da réplica.
 - A rede Wi-Fi do campo, pelo menos uma vez, para o controlador te confirmar.
-- Para as etiquetas de quem joga: um telemóvel Android com NFC, etiquetas NFC virgens e a **chave de entrada do campo** (vê a [secção 7](#7-grava-as-etiquetas-de-quem-joga)).
+- Para as etiquetas de quem joga: um telemóvel Android com NFC, etiquetas NFC virgens e o Wi-Fi do campo (vê a [secção 7](#7-grava-as-etiquetas-de-quem-joga)). Não precisas da chave de entrada do campo: o controlador do campo assina as etiquetas.
 
 ## 1. Passa a ser marshal
 
@@ -105,14 +105,15 @@ Uma réplica que cronografas a partir da lista fica registada automaticamente. O
 
 Alguns modos (Baixa Confirmada, Reentradas e Vidas, Registo de Presença, Ligaduras, Fábrica de Dinheiro) precisam de que cada pessoa leve uma etiqueta NFC. Gravas as etiquetas no teu telemóvel. Isto precisa de um telemóvel Android com NFC. Ainda não testado num campo.
 
-1. Pede à organização a **chave de entrada do campo** (64 algarismos e letras). Na app, abre a roda dentada (**Definições**) e em **Campo** toca em **Chave de entrada do campo**. Escreve-a e toca em **Guardar**. Mantém-na privada: é o segredo-mestre do campo.
-2. Pede à organização que abra o separador **Juntar** da consola para o jogo e mostre um **código QR** ou um **Texto de entrada**.
-3. Toca em **Etiquetas de quem joga** e depois em **Escolher o jogo**. Lê o código QR, encosta um cartão de entrada ao telemóvel, ou cola o texto e toca em **Usar este texto**. O ecrã mostra **Jogo 17 (org.atalaia.domination)**.
-4. Escreve o **Identificador de quem joga** (aparece na página **O meu check-in** da pessoa, por exemplo *p-17*). Escolhe a equipa, ou **Sem equipa**.
-5. Toca em **Escrever a etiqueta**. Quando disser **Encosta a etiqueta às costas do telemóvel…**, mantém-na quieta até ficar escrita. Aparece depois em **Escritas agora**.
-6. Repete para cada pessoa.
+O **controlador do campo assina cada etiqueta** com a chave do jogo e o teu telemóvel grava o que recebe. O teu telemóvel nunca guarda a chave de entrada do campo nem a chave do jogo. O preço é que tens de estar no Wi-Fi do campo para cada etiqueta: não há maneira de gravar etiquetas sem o controlador.
 
-Uma etiqueta só funciona no jogo para que foi gravada. Cada jogo novo precisa de etiquetas novas.
+1. Liga-te ao Wi-Fi do campo e abre **Marshal**.
+2. Toca em **Etiquetas de quem joga**. O ecrã mostra **Jogo: ** e o nome do jogo em que fizeste o check-in.
+3. Escreve o **Identificador de quem joga** (aparece na página **O meu check-in** da pessoa, por exemplo *p-17*, e por baixo do nome dela na lista de check-ins da consola). Escolhe a equipa, ou **Sem equipa**.
+4. Toca em **Escrever a etiqueta**. A app pede a etiqueta ao controlador. Quando disser **Encosta a etiqueta às costas do telemóvel…**, mantém-na quieta até ficar escrita. Aparece depois em **Escritas agora**.
+5. Repete para cada pessoa.
+
+Uma etiqueta só funciona no jogo para que foi gravada. Cada jogo novo precisa de etiquetas novas. A organização também pode gravar etiquetas a partir da consola ou do ecrã de um controlador no telemóvel (vê o [manual da organização](game-master.md#etiquetas-de-quem-joga)).
 
 ## 8. Limites sem ligação
 
@@ -139,6 +140,10 @@ Conta voltar ao Wi-Fi do campo de duas em duas horas.
 | **n série(s) não foram aceites porque o controlador não te tem na lista de marshals** | Pede à organização que te volte a acrescentar. As séries esperam no teu telemóvel. |
 | **Esta réplica não está declarada neste jogo** | Escolhe a declaração da pessoa na lista. Ela tem de declarar primeiro a réplica. |
 | A etiqueta NFC não grava | **Esta etiqueta está bloqueada**, **é pequena demais** ou **não aceita dados NDEF**: usa uma etiqueta NTAG nova. Mantém a etiqueta quieta. Num iPhone não podes gravar etiquetas. |
-| **Primeiro define a chave de entrada do campo nas definições.** | Escreve a chave de entrada do campo em **Definições › Chave de entrada do campo**. |
+| **Não é possível falar com o controlador do campo: liga-te ao Wi-Fi do campo e tenta outra vez.** | As etiquetas de quem joga precisam do controlador para cada etiqueta. Liga-te ao Wi-Fi do campo e tenta outra vez. |
+| **O controlador do campo diz que não és marshal aqui: fala com a organização.** | A organização tem de te acrescentar à lista de marshals. |
+| **O teu check-in expirou: faz o check-in outra vez.** | Abre a página do check-in e faz o check-in outra vez. |
+| **O jogo não está a decorrer no controlador (terminou, ou perdeu a chave do jogo), por isso não pode assinar etiquetas.** | Só se fazem etiquetas para o jogo que está a decorrer. Fala com a organização. |
+| **O controlador do campo recusou a etiqueta:** … | O controlador diz porquê, por exemplo que o identificador tem um espaço. Corrige o identificador. |
 
 Mais ajuda: pergunta à organização, ou nas [Discussões](https://github.com/vakaobr/atalaia-project/discussions) do projeto.

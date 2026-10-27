@@ -489,11 +489,24 @@ const Map<String, String> enStrings = {
   'tags.title': "Players' tags",
   'tags.hint': 'Write the signed NFC tags for a game.',
   'tags.intro':
-      "Tags are signed with the game's key, so every game has its own. Pick "
-      'the game with its join card or QR code.',
-  'tags.game': 'Pick the game',
-  'tags.for_game': 'Game {game} ({mode})',
-  'tags.other_game': 'Another game',
+      "Tags are signed by the field controller, which keeps the game's key: "
+      "you never need the field join key. Be on the field's Wi-Fi, type a "
+      'player and hold a blank tag to the phone.',
+  'tags.for_game': 'Game: {game}',
+  'tags.loading': 'Asking the field controller…',
+  'tags.offline':
+      "The field controller cannot be reached: join the field's Wi-Fi and try "
+      'again.',
+  'tags.not_marshal':
+      'The field controller says you are not a marshal here: ask the game '
+      'master.',
+  'tags.session': 'Your check-in has run out: check in again.',
+  'tags.no_key':
+      'The game is not running on the controller (it ended, or it lost the '
+      "game's key), so it cannot sign tags.",
+  'tags.refused': 'The field controller refused the tag: {error}',
+  'tags.bad_answer':
+      "The controller's answer is not a valid tag for this player.",
   'tags.player': "Player's id",
   'tags.player_hint': 'Letters, digits, - _ and . (up to 32), e.g. p-17',
   'tags.bad_player': 'The id is 1 to 32 letters, digits, -, _ or .',
@@ -918,6 +931,13 @@ const Map<String, String> enStrings = {
   'ctl.card_write_go': 'Write the card',
   'ctl.card_done': 'Field card written (field {fingerprint}).',
   'ctl.card_failed': 'The field card could not be made: try again.',
+  'ctl.tags': "Players' tags",
+  'ctl.tags_hint':
+      "Write the running game's signed NFC tags with this phone's NFC. The "
+      'game key stays on this phone.',
+  'ctl.tags_none':
+      "Start a game first: tags are signed with the running game's key.",
+  'ctl.tags_open': "Write players' tags",
   'ctl.firmware': 'Firmware updates',
   'ctl.fw_keys': 'Firmware release keys',
   'ctl.fw_keys_none':

@@ -26,6 +26,10 @@ request and ``ws_connect`` steps may give a player token (``bearer``), and
 ``body_base64``) and the noise scan's steps (``noise``, ``hold_measure``,
 ``scan_wait``) on the recording modem.
 
+A ``tag_check`` step (decision TW-1) checks a player tag the controller made with
+``POST /games/{id}/tags``: its NDEF record and memory hold the payload, which decodes
+with the live game's key to the player, team and game asked for.
+
 Slice S7 (failover, the vectors' ``s7`` block): a case may set ``failover_mode``
 (manual when not given); ``rx`` steps may be another controller's TIME or CLAIM (their
 fields by name); ``join_encode`` seals a join payload with the case's join key and saves
@@ -89,6 +93,7 @@ from atalaia_controller.ws import Hub
 from atalaia_sim import codec, cpace, packet
 from atalaia_sim import field_frame as ff
 from atalaia_sim import join as joinfmt
+from atalaia_sim import tag as tagfmt
 from atalaia_sim import pair_frame as pf
 from atalaia_sim.packet import hello_encode, state_encode
 from atalaia_sim.protocol import MESSAGE_TYPES
@@ -344,6 +349,18 @@ class ContractCase(unittest.TestCase):
                 raise ValueError(f"unknown rx type {kind}")
             env.modem.rx(rx["source"], rx["seq"], kind, payload, game_id=game_id, epoch=rx.get("epoch", 0),
                          ack=rx.get("ack", False))
+            return
+        if "tag_check" in step:
+            # A player tag the controller made (POST /games/{id}/tags): its NDEF bytes, memory and
+            # payload agree, and the payload decodes with the live game's key to what was asked.
+            spec = substitute(step["tag_check"], env.saved)
+            game_id = spec["game_id"]
+            payload = bytes.fromhex(spec["payload"])
+            self.assertEqual(spec["ndef"], joinfmt.ndef_record(payload, tagfmt.NDEF_TYPE).hex(), "the NDEF record")
+            self.assertEqual(spec["memory"], tagfmt.to_ndef_tag(payload).hex(), "the Type 2 memory")
+            self.assertEqual(tagfmt.from_ndef_tag(bytes.fromhex(spec["memory"])), payload, "memory reads back")
+            read = tagfmt.decode(payload, game_id, env.ctrl.game_key(game_id), spec["teams"])
+            self.assertEqual(read, {"player": spec["player"], "team": spec["team"], "game_id": game_id})
             return
         if "radio_state" in step:
             # The modem's link went down or came back.

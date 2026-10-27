@@ -67,6 +67,7 @@
 ///     GET  /api/v1/games/{id}/chrono-list    staff: the "replicas to chrono" list
 ///     POST /api/v1/games/{id}/checkin/open|close  GM
 ///     POST /api/v1/chrono/readings           a marshal's signed series of readings
+///     POST /api/v1/games/{id}/tags           staff: one signed player tag's NDEF bytes (the game key stays here)
 ///     GET|POST /api/v1/marshals              GM: the marshal list (ids, names, the player each is bound to, keys)
 ///     PATCH|DELETE /api/v1/marshals/{id}     GM: rename or rebind / take a marshal off the list (revokes)
 ///     GET|PUT /api/v1/checkin/settings       GM: confirm, federation, limits
@@ -122,6 +123,7 @@ import 'controller_props.dart';
 import 'controller_scenarios.dart';
 import 'controller_signed_modes.dart';
 import 'controller_stream.dart';
+import 'controller_tags.dart';
 import 'console_files.dart';
 import 'controller_adoption.dart' show ControllerAdoption;
 import 'controller_boxes.dart' show ControllerBoxes;
@@ -1044,6 +1046,17 @@ class ControllerApi {
       'POST',
       r'/api/v1/games/([^/]+)/checkin/close',
       _gm((r) => ApiResponse(200, _svc().setOpen(r.pathInt(1), false))),
+    ),
+    _route(
+      'POST',
+      r'/api/v1/games/([^/]+)/tags',
+      _viewer(
+        (r, v) => ApiResponse(
+          200,
+          issuePlayerTag(engine, v, r.pathInt(1), r.body),
+          _noStore,
+        ),
+      ),
     ),
     _route(
       'POST',

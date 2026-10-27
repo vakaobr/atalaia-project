@@ -34,7 +34,9 @@
 // 'headers' are matched. Slice S7 (the vectors' s7 block): a case's
 // failover_mode, rx steps of another controller's TIME and CLAIM, and
 // join_encode, which seals a join payload with the case's join key (a
-// standby's join, as the leading controller makes it).
+// standby's join, as the leading controller makes it). A tag_check step
+// (decision TW-1) checks a player tag the controller made: its NDEF record
+// and memory hold the payload, which decodes with the live game's key.
 
 import 'dart:async';
 import 'dart:collection';
@@ -65,6 +67,9 @@ import 'package:atalaia_app/protocol/field_frame.dart';
 import 'package:atalaia_app/protocol/join_payload.dart';
 import 'package:atalaia_app/protocol/pair_frame.dart';
 import 'package:atalaia_app/radio/rf_codec.dart';
+import 'package:atalaia_app/security/bytes.dart';
+import 'package:atalaia_app/security/ndef.dart';
+import 'package:atalaia_app/security/nfc_tag_signer.dart';
 import 'package:atalaia_app/security/cpace.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -549,6 +554,46 @@ void main() {
           if (step.containsKey('advance_ms')) {
             now += step['advance_ms'] as int;
             engine.tick();
+            continue;
+          }
+          if (step.containsKey('tag_check')) {
+            // A player tag the controller made (decision TW-1): its NDEF
+            // record and memory hold the payload, which decodes with the live
+            // game's key to what was asked for.
+            final t = (substitute(step['tag_check'], saved)! as Map)
+                .cast<String, Object?>();
+            final gameId = t['game_id']! as int;
+            final payload = _unhex(t['payload']! as String);
+            expect(
+              t['ndef'],
+              hexEncode(ndefMimeRecord(payload, tagNdefType)),
+              reason: 'step $i: the NDEF record',
+            );
+            expect(
+              t['memory'],
+              hexEncode(tagToNdefMemory(payload)),
+              reason: 'step $i: the Type 2 memory',
+            );
+            expect(
+              tagFromNdefMemory(_unhex(t['memory']! as String)),
+              payload,
+              reason: 'step $i: memory reads back',
+            );
+            final read = decodeTag(
+              payload,
+              gameId: gameId,
+              gameKey: engine.gameKey,
+              teamCount: t['teams']! as int,
+            );
+            expect(
+              read,
+              PlayerTag(
+                player: t['player']! as String,
+                team: t['team']! as int,
+                gameId: gameId,
+              ),
+              reason: 'step $i',
+            );
             continue;
           }
           if (step.containsKey('ws_connect')) {

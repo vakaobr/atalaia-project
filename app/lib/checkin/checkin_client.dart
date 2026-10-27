@@ -425,6 +425,25 @@ class CheckinClient {
   Future<Map<String, Object?>> chronoList(String token, int gameId) =>
       _call('GET', '/games/$gameId/chrono-list', token: token);
 
+  /// A game as staff see it (its `teams`, `mode_id` and `state`).
+  Future<Map<String, Object?>> game(String token, int gameId) =>
+      _call('GET', '/games/$gameId', token: token);
+
+  /// One signed player tag (decision TW-1, protocol/nfc-tag.md): the
+  /// controller signs it with the game's key, which never leaves it; the
+  /// answer's `ndef` (hex) is the record to write. Staff only.
+  Future<Map<String, Object?>> playerTag(
+    String token,
+    int gameId, {
+    required String player,
+    String? team,
+  }) => _call(
+    'POST',
+    '/games/$gameId/tags',
+    token: token,
+    body: {'player': player, 'team': ?team},
+  );
+
   Future<Map<String, Object?>> manualCheckin(
     String token,
     int gameId,

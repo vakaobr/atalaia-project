@@ -29,6 +29,7 @@ import '../ui/qr_painter.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'controller_boxes_screen.dart';
+import 'controller_tags_screen.dart';
 import 'controller_shell.dart';
 import 'controller_signed_modes.dart';
 
@@ -266,12 +267,57 @@ class _ControllerScreenState extends State<ControllerScreen> {
                 ),
               ),
             ],
+            // Decision TW-1: players' tags, signed by the running controller
+            // and written by this phone's NFC.
+            if (_shell.running && _shell.status?.httpPort != null) ...[
+              SectionTitle(s.t('ctl.tags')),
+              ..._tags(context, s),
+            ],
             SectionTitle(s.t('ctl.firmware')),
             FirmwareKeysTile(onChanged: _firmwareKeysChanged),
           ],
         ),
       ),
     );
+  }
+
+  List<Widget> _tags(BuildContext context, Strings s) {
+    final st = _shell.status!;
+    final game = st.game;
+    final teams = game?['teams'];
+    if (game == null || teams is! List || game['key_lost'] == true) {
+      return [Text(s.t('ctl.tags_none'), key: const Key('ctl-tags-none'))];
+    }
+    final id = game['id']! as int;
+    return [
+      Text(s.t('ctl.tags_hint')),
+      const SizedBox(height: 8),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          key: const Key('ctl-tags'),
+          icon: const Icon(Icons.nfc),
+          label: Text(s.t('ctl.tags_open')),
+          onPressed: () => Navigator.push<void>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ControllerTagsScreen(
+                gameId: id,
+                gameName: '${game['name']}',
+                teams: [for (final t in teams) '$t'],
+                request: (player, team) => requestPlayerTag(
+                  st.httpPort!,
+                  st.gmToken,
+                  id,
+                  player: player,
+                  team: team,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ];
   }
 
   List<Widget> _errors(Strings s) {

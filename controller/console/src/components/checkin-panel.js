@@ -12,9 +12,11 @@
 // the marshals' signed readings fill in. With a site server (plan phase 16):
 // a game made from the schedule, its registered players as "expected"
 // until they arrive, a printed ticket scanned or pasted, and the counts of
-// registered players and walk-ins.
+// registered players and walk-ins. Players' NFC tags, signed by the controller, are made and written
+// in the card of components/tag-writer.js.
 
 import { html, Component, t, posterProblem, inWebView } from '../ui.js';
+import { TagWriter } from './tag-writer.js';
 
 const STATUSES = ['expected', 'pending', 'checked_in', 'left', 'removed'];
 const ROLES = ['player', 'squad_leader', 'vip', 'marshal', 'gm', 'spectator'];
@@ -602,6 +604,7 @@ export class CheckinPanel extends Component {
             ${this.renderSchedule()}
             ${g && list && this.renderHead(g, list)}
             ${g && list && this.renderList(g, list)}
+            ${g && list && html`<${TagWriter} app=${props.app} game=${g} players=${list.checkins} />`}
             ${this.renderMarshals(g, list)}
             ${g && this.renderChrono()}
             ${g && this.renderSettings()}

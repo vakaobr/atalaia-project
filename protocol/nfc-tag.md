@@ -41,4 +41,14 @@ On a Field Box the NFC reader is polled every 300 ms while a game runs; each car
 
 ## Writing tags
 
-Whoever holds the game key can write tags: the field controller, or the GM's phone. The app's marshal role writes them for a game picked with its join card or code (`app/lib/marshal/tag_writer.dart`, `lib/security/nfc_tag_signer.dart`); writing them from the GM console is not built yet (a follow-up for the controller); `atalaia_tag_encode()` and `atalaia_tag_to_ndef_tag()` (C), and `tag.encode()` and `tag.to_ndef_tag()` (Python), make the bytes.
+Whoever holds the game key makes the bytes: the field controller (the Pi, or the phone running as the controller). It signs a tag on request and nobody else needs the key:
+
+```
+POST /api/v1/games/{id}/tags     {"player": "p-17", "team": "blue"}
+{"game_id": 17, "player": "p-17", "team": "blue", "team_id": 2, "mime": "application/vnd.atalaia.tag",
+ "payload": "<hex>", "ndef": "<hex>", "memory": "<hex>"}
+```
+
+`payload` is the tag above, `ndef` the one NDEF record that holds it (what a phone or Web NFC writes to a tag) and `memory` the same record as the memory of a Type 2 tag from page 4 (what a writer of raw pages writes). The request needs the GM token, or the token of a marshal checked in to that game; the read token and other games' marshals are refused (403); a bad id or a team the game does not have is 400; a game that is not live on this controller has no key (409). The answer is never cached. The shared contract cases (`protocol/vectors/controller_api.json`, "player tags") check both controllers, and the vectors above check the codecs.
+
+Three writers ask for it (decision TW-1): the GM console's Check-in tab (Web NFC where the browser has it, otherwise the bytes as hex and a file, and which app writes them), the phone controller's own screen (its NFC, asking its own controller on the loopback address), and the app's marshal role (`app/lib/marshal/tag_writer.dart`), which asks the field controller over the field's network, so a marshal's phone holds neither the field join key nor the game key for tags and needs the controller for every tag. The app checks that what it got is the tag it asked for (the record, the id, the team, the game) before it writes it; the MAC can only be checked by whoever has the key, and the boxes do. `atalaia_tag_encode()` and `atalaia_tag_to_ndef_tag()` (C), `tag.encode()` and `tag.to_ndef_tag()` (Python) and `encodeTag()` (Dart, which a prop checks tags with) make the bytes.

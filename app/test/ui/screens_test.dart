@@ -3,7 +3,7 @@
 
 // The other roles' screens: the settings (language, join key, PIN), the
 // player's view following a live feed, the GM console's address, the
-// marshal's chrono check-in and the tag writer.
+// marshal's chrono check-in.
 
 import 'dart:async';
 import 'dart:convert';
@@ -18,14 +18,10 @@ import 'package:atalaia_app/chrono/replica.dart';
 import 'package:atalaia_app/chrono/chrono_ui.dart';
 import 'package:atalaia_app/marshal/marshal_home.dart';
 import 'package:atalaia_app/marshal/marshal_records.dart';
-import 'package:atalaia_app/marshal/tag_writer.dart';
 import 'package:atalaia_app/player/field_feed.dart';
 import 'package:atalaia_app/player/gm_screen.dart';
 import 'package:atalaia_app/platform/services.dart';
 import 'package:atalaia_app/player/player_screens.dart';
-import 'package:atalaia_app/protocol/join_payload.dart';
-import 'package:atalaia_app/security/ndef.dart';
-import 'package:atalaia_app/security/nfc_tag_signer.dart';
 import 'package:atalaia_app/storage/app_store.dart';
 import 'package:atalaia_app/ui/settings_screen.dart';
 import 'package:flutter/material.dart';
@@ -476,44 +472,5 @@ void main() {
     expect(find.byKey(const Key('marshal-chrono')), findsNothing);
     expect(find.byKey(const Key('marshal-tags')), findsNothing);
     expect(find.byKey(const Key('marshal-id')), findsNothing);
-  });
-
-  testWidgets("writing a player's tag for a game", (tester) async {
-    await phone(tester);
-    final h = harness();
-    final key = List<int>.generate(16, (i) => i);
-    final game = JoinPayload(
-      gameId: 4242,
-      gameKey: Uint8List.fromList(key),
-      nodeId: 9,
-      controllerId: 0,
-      channelHz: 869525000,
-      maxHops: 2,
-      teams: const ['red', 'blue'],
-      modeId: 'org.atalaia.respawn',
-      role: 'respawn',
-      gameSeed: 1,
-      params: null,
-      kind: JoinKind.node,
-    );
-    await tester.pumpWidget(h.app(home: TagWriterScreen(game: game)));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('tags-player')), 'bad id!');
-    await tester.tap(find.byKey(const Key('tags-write')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('tags-error')), findsOneWidget);
-    await tester.enterText(find.byKey(const Key('tags-player')), 'b3');
-    await tester.tap(find.byKey(const Key('tags-team-blue')));
-    await tester.tap(find.byKey(const Key('tags-write')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('tags-waiting')), findsOneWidget);
-    h.nfc.tapToWrite(Uint8List.fromList([4, 0xab, 0xcd]));
-    await tester.pumpAndSettle();
-    expect(find.text('04abcd'), findsOneWidget);
-    final payload = payloadFromNdefMessage(h.nfc.written.single, tagNdefType)!;
-    expect(
-      decodeTag(payload, gameId: 4242, gameKey: key, teamCount: 2),
-      const PlayerTag(player: 'b3', team: 2, gameId: 4242),
-    );
   });
 }

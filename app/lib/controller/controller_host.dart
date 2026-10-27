@@ -558,6 +558,7 @@ class ControllerHost {
         'id': view['id'],
         'name': view['name'],
         'mode_id': view['mode_id'],
+        'teams': view['teams'],
         'state': view['state'],
         'game_time_ms': view['game_time_ms'],
         'duration_ms': view['duration_ms'],

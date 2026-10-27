@@ -1239,6 +1239,14 @@ version byte goes first, the team is the 1-based team id (0 for none), and
 the record is an NDEF MIME record `application/vnd.atalaia.tag` (decision
 A3). The host checks the tag and the script gets `nfc.tag` (decision A4).
 
+**Amended 2026-10-27 (decision TW-1):** tags are signed by the field
+controller, which holds the game key, and written by whoever asks it
+(`POST /api/v1/games/{id}/tags`: the console, the phone controller's own
+screen, the marshal's app). A marshal's phone no longer needs the field join
+key, or the game key, to write tags: a tag is made with a request the
+controller checks (GM token, or a marshal's for that game), and only the
+tag's own MAC, which a box checks, leaves it.
+
 #### Kiosk tamper detection
 
 When the app is in kiosk mode (lock-task):

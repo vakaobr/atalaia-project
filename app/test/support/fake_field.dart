@@ -15,6 +15,9 @@ import 'dart:typed_data';
 import 'package:atalaia_app/checkin/checkin_client.dart';
 import 'package:atalaia_app/checkin/field_trust.dart';
 import 'package:atalaia_app/protocol/checkin_poster.dart';
+import 'package:atalaia_app/security/bytes.dart';
+import 'package:atalaia_app/security/ndef.dart';
+import 'package:atalaia_app/security/nfc_tag_signer.dart';
 import 'package:crypto/crypto.dart';
 
 class FakeField {
@@ -85,6 +88,12 @@ class FakeField {
   /// for that id.
   final roster = <String, ({String id, String name})>{};
   final requests = <String>[];
+
+  /// The game's key (only this fake knows it) and whether the game is live
+  /// on it; the tag requests it got.
+  final gameKey = List<int>.generate(16, (i) => 7 * i + 1);
+  var tagsLive = true;
+  final tagRequests = <Map<String, Object?>>[];
   var caFetches = 0;
   var offline = false;
   var _tokenN = 0;
@@ -285,6 +294,42 @@ class FakeField {
           'name': listed.name,
           'public_key': b['public_key'],
           'player_id': who,
+        });
+      case 'GET /games/42':
+        if (who == null || _role(token!, who) != 'marshal') {
+          return err(403, 'staff only');
+        }
+        return FieldResponse(200, {
+          'id': 42,
+          'name': games.first['name'],
+          'state': games.first['state'],
+          'teams': games.first['teams'],
+          'mode_id': 'org.atalaia.respawn',
+        });
+      case 'POST /games/42/tags':
+        // The controller signs with the game's key, which only it holds
+        // (decision TW-1); the app gets the NDEF record and nothing else.
+        if (who == null || _role(token!, who) != 'marshal') {
+          return err(403, 'staff only: the GM token or a marshal\'s token');
+        }
+        tagRequests.add(b);
+        final teams = (games.first['teams']! as List).cast<String>();
+        final name = b['team'] as String?;
+        final team = name == null ? 0 : teams.indexOf(name) + 1;
+        if (name != null && team == 0) return err(400, 'team: unknown');
+        if (!tagsLive) return err(409, 'no key: the game is not live here');
+        final payload = encodeTag(
+          PlayerTag(player: b['player']! as String, team: team, gameId: 42),
+          gameKey,
+        );
+        return FieldResponse(200, {
+          'game_id': 42,
+          'player': b['player'],
+          'team': name,
+          'team_id': team,
+          'payload': hexEncode(payload),
+          'ndef': hexEncode(ndefMimeRecord(payload, tagNdefType)),
+          'memory': hexEncode(tagToNdefMemory(payload)),
         });
       case 'GET /games/42/chrono-list':
         if (who == null || _role(token!, who) != 'marshal') {

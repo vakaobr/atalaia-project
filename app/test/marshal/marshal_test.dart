@@ -3,8 +3,8 @@
 
 // The marshal's view models: records signed as they are taken and verified
 // with the marshal's public key, the last check-in a spot check compares
-// with, retention and erasure, the velocity keypad, and player tags that
-// read back as written. Plus the app's storage they live in.
+// with, retention and erasure, the velocity keypad, and the player tags the
+// controller signs, checked before they are written. Plus the app's storage they live in.
 
 import 'dart:convert';
 import 'dart:io';
@@ -18,6 +18,7 @@ import 'package:atalaia_app/chrono/retention.dart';
 import 'package:atalaia_app/chrono/spot_check.dart';
 import 'package:atalaia_app/marshal/marshal_records.dart';
 import 'package:atalaia_app/marshal/tag_writer.dart';
+import 'package:atalaia_app/security/bytes.dart';
 import 'package:atalaia_app/security/ndef.dart';
 import 'package:atalaia_app/security/nfc_tag_signer.dart';
 import 'package:atalaia_app/storage/app_store.dart';
@@ -267,21 +268,54 @@ void main() {
     expect(e.value, isNull);
   });
 
-  test("a player's tag is one NDEF record that reads back as written", () {
+  test("a player's tag from the controller is checked before it is written", () {
     final key = List<int>.generate(16, (i) => 200 - i);
     const tag = PlayerTag(player: 'b3', team: 2, gameId: 4242);
-    final message = playerTagMessage(tag, key, 2);
-    final payload = payloadFromNdefMessage(message, tagNdefType)!;
-    expect(decodeTag(payload, gameId: 4242, gameKey: key, teamCount: 2), tag);
+    final payload = encodeTag(tag, key);
+    final answer = {'ndef': hexEncode(ndefMimeRecord(payload, tagNdefType))};
+    final message = checkedTagMessage(
+      answer,
+      player: 'b3',
+      team: 2,
+      gameId: 4242,
+    );
+    final back = payloadFromNdefMessage(message, tagNdefType)!;
+    expect(decodeTag(back, gameId: 4242, gameKey: key, teamCount: 2), tag);
     expect(
       tagEventData(
         uid: [4, 1],
-        payload: payload,
+        payload: back,
         gameId: 4242,
         gameKey: key,
         teams: const ['red', 'blue'],
       )['team'],
       'blue',
+    );
+    // Not the tag asked for, or not a tag at all: refused before it is written.
+    for (final (player, team, game) in [
+      ('b4', 2, 4242),
+      ('b3', 1, 4242),
+      ('b3', 2, 4243),
+    ]) {
+      expect(
+        () =>
+            checkedTagMessage(answer, player: player, team: team, gameId: game),
+        throwsFormatException,
+        reason: '$player $team $game',
+      );
+    }
+    expect(
+      () => checkedTagMessage({}, player: 'b3', team: 2, gameId: 4242),
+      throwsFormatException,
+    );
+    expect(
+      () => checkedTagMessage(
+        {'ndef': hexEncode(ndefMimeRecord(payload, 'text/plain'))},
+        player: 'b3',
+        team: 2,
+        gameId: 4242,
+      ),
+      throwsFormatException,
     );
   });
 

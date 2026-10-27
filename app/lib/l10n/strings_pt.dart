@@ -501,11 +501,25 @@ const Map<String, String> ptStrings = {
   'tags.title': 'Etiquetas de quem joga',
   'tags.hint': 'Escrever as etiquetas NFC assinadas para um jogo.',
   'tags.intro':
-      'As etiquetas são assinadas com a chave do jogo, por isso cada jogo '
-      'tem as suas. Escolhe o jogo com o cartão ou o código QR de entrada.',
-  'tags.game': 'Escolher o jogo',
-  'tags.for_game': 'Jogo {game} ({mode})',
-  'tags.other_game': 'Outro jogo',
+      'As etiquetas são assinadas pelo controlador do campo, que guarda a '
+      'chave do jogo: nunca precisas da chave de entrada do campo. Liga-te '
+      'ao Wi-Fi do campo, escreve quem joga e encosta uma etiqueta virgem ao '
+      'telemóvel.',
+  'tags.for_game': 'Jogo: {game}',
+  'tags.loading': 'A perguntar ao controlador do campo…',
+  'tags.offline':
+      'Não é possível falar com o controlador do campo: liga-te ao Wi-Fi do '
+      'campo e tenta outra vez.',
+  'tags.not_marshal':
+      'O controlador do campo diz que não és marshal aqui: fala com a '
+      'organização.',
+  'tags.session': 'O teu check-in expirou: faz o check-in outra vez.',
+  'tags.no_key':
+      'O jogo não está a decorrer no controlador (terminou, ou perdeu a chave '
+      'do jogo), por isso não pode assinar etiquetas.',
+  'tags.refused': 'O controlador do campo recusou a etiqueta: {error}',
+  'tags.bad_answer':
+      'A resposta do controlador não é uma etiqueta válida para este jogador.',
   'tags.player': 'Identificador de quem joga',
   'tags.player_hint': 'Letras, algarismos, - _ e . (até 32), ex.: p-17',
   'tags.bad_player': 'O identificador tem 1 a 32 letras, algarismos, -, _ ou .',
@@ -933,6 +947,14 @@ const Map<String, String> ptStrings = {
   'ctl.card_write_go': 'Escrever o cartão',
   'ctl.card_done': 'Cartão de campo escrito (campo {fingerprint}).',
   'ctl.card_failed': 'Não foi possível fazer o cartão de campo: tenta de novo.',
+  'ctl.tags': 'Etiquetas de quem joga',
+  'ctl.tags_hint':
+      'Escreve as etiquetas NFC assinadas do jogo em curso com o NFC deste '
+      'telemóvel. A chave do jogo fica neste telemóvel.',
+  'ctl.tags_none':
+      'Começa primeiro um jogo: as etiquetas são assinadas com a chave do '
+      'jogo em curso.',
+  'ctl.tags_open': 'Escrever etiquetas de quem joga',
   'ctl.firmware': 'Atualizações de firmware',
   'ctl.fw_keys': 'Chaves das versões de firmware',
   'ctl.fw_keys_none':

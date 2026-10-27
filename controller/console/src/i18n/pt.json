@@ -1420,5 +1420,28 @@
     "partly": "Os endereços do controlador mudaram desde que o cartaz foi impresso (saíram: {gone}; novos: {now}): o impresso ainda funciona pelos endereços que partilha.",
     "print": "Imprimir o cartaz de novo",
     "alert": "O cartaz de check-in mudou: imprime-o de novo. {what}"
+  },
+  "tags": {
+    "title": "Etiquetas de quem joga",
+    "intro": "Alguns modos precisam de uma etiqueta NFC por pessoa. O controlador assina cada etiqueta com a chave deste jogo, que nunca sai dele: a etiqueta só vale neste jogo e só as caixas dele a aceitam.",
+    "game": "Jogo {game}: um jogo novo precisa de etiquetas novas.",
+    "player": "Identificador de quem joga",
+    "player_hint": "Letras, algarismos, - _ e . (até 32), ex.: p-17. Escolhe alguém que já fez o check-in, ou escreve um identificador.",
+    "team": "Equipa",
+    "no_team": "Sem equipa",
+    "make": "Fazer a etiqueta",
+    "for": "Etiqueta de {player}, equipa {team}",
+    "for_no_team": "Etiqueta de {player}, sem equipa",
+    "bytes": "{n} bytes",
+    "nfc_write": "Escrever com o NFC deste aparelho",
+    "nfc_hold": "Encosta uma etiqueta virgem às costas deste aparelho…",
+    "nfc_done": "Escrita na etiqueta.",
+    "nfc_failed": "A escrita falhou: {error}",
+    "nfc_unsupported": "Este navegador não escreve etiquetas NFC (o Web NFC pede o Chrome no Android, por HTTPS). Escreve os bytes abaixo com a app Atalaia (Marshal, Etiquetas de quem joga; num controlador no telemóvel, o ecrã do próprio controlador) ou com uma app NFC que escreva um registo NDEF em bruto a partir de hex.",
+    "ndef": "Registo NDEF (hex)",
+    "memory": "Memória da etiqueta a partir da página 4 (hex)",
+    "download": "Descarregar o ficheiro NDEF",
+    "hide": "Esconder",
+    "no_game": "Cria primeiro um jogo: as etiquetas são assinadas com a chave do jogo em curso."
   }
 }

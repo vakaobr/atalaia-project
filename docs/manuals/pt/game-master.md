@@ -277,10 +277,20 @@ Abre **Check-in**. O check-in está aberto desde o momento em que um jogo é cri
 3. Dá a cada pessoa uma **Equipa**, e um **Squad** se o jogo tiver squads, com as listas. Define o **Papel**: **jogador/a**, **líder de squad**, **VIP**, **marshal**, **organização** ou **espectador/a**. A mudança vale logo. A app da pessoa apanha a mudança sozinha.
 4. Marca **cartão visto** quando tiveres visto o cartão de federado.
 5. **Retirar** tira uma pessoa do jogo.
-6. **Check-in à mão**: para quem não tem a app. Escreve um nome, uma preferência de equipa e réplicas. O controlador cria um identificador, que se pode gravar numa etiqueta.
+6. **Check-in à mão**: para quem não tem a app. Escreve um nome, uma preferência de equipa e réplicas. O controlador cria um identificador, que se pode gravar numa etiqueta (vê [Etiquetas de quem joga](#etiquetas-de-quem-joga)).
 7. **Exportar CSV** guarda a lista. Para isto abre a consola no browser de um computador. A consola dentro da app não consegue guardá-lo.
 
 Os nomes só aparecem aqui e aos marshals. Nada do nome de uma pessoa vai para os acontecimentos, o marcador nem as vistas de quem joga.
+
+### Etiquetas de quem joga
+
+Alguns modos (Baixa Confirmada, Reentradas e Vidas, Registo de Presença, Ligaduras, Fábrica de Dinheiro) precisam de uma etiqueta NFC por pessoa. O controlador assina cada etiqueta com a chave do jogo. A chave nunca sai do controlador, por isso ninguém precisa da chave de entrada do campo para gravar etiquetas. Uma etiqueta só funciona no jogo para que foi feita; cada jogo novo precisa de etiquetas novas. Usa etiquetas NTAG213, NTAG215 ou NTAG216 virgens. Há três maneiras de gravar uma:
+
+1. **Na consola**: em **Check-in**, o cartão **Etiquetas de quem joga**. Escolhe o **Identificador de quem joga** entre quem já fez o check-in (ou escreve um identificador, de 1 a 32 letras, algarismos, `-`, `_` ou `.`; o identificador de cada pessoa está por baixo do nome dela na lista). Escolhe a **Equipa**, ou **Sem equipa**. Toca em **Fazer a etiqueta**. Se o teu navegador escrever NFC (o Chrome num telemóvel Android, com a consola aberta por HTTPS), toca em **Escrever com o NFC deste aparelho** e encosta uma etiqueta virgem às costas do telemóvel. Se não, a consola diz que não e mostra o **Registo NDEF (hex)**, com **Descarregar o ficheiro NDEF**. Grava-o com a app Atalaia num telemóvel (o ecrã do marshal, ou o ecrã do controlador abaixo) ou com uma app NFC que escreva um registo NDEF em bruto a partir de hex.
+2. **Num controlador no telemóvel**: no ecrã do controlador, em **Etiquetas de quem joga**, toca em **Escrever etiquetas de quem joga** enquanto um jogo decorre. O formulário é o do marshal. O telemóvel grava a etiqueta com o NFC dele e pede-a ao próprio controlador.
+3. **Um marshal**: a app do marshal pede cada etiqueta ao controlador (vê o [manual do marshal](marshal.md#7-grava-as-etiquetas-de-quem-joga)). O marshal tem de estar no Wi-Fi do campo e na tua lista de marshals. Já não precisa da chave de entrada do campo para isto.
+
+Se a consola disser que não se pode fazer uma etiqueta porque o jogo não está a decorrer, cria primeiro o jogo: um jogo terminado não tem chave.
 
 ### Marshals
 

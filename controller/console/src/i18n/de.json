@@ -1420,5 +1420,28 @@
     "partly": "Die Adressen des Controllers haben sich seit dem Druck des Plakats geändert (weggefallen: {gone}; neu: {now}): Das gedruckte funktioniert noch über die gemeinsamen Adressen.",
     "print": "Plakat erneut drucken",
     "alert": "Das Check-in-Plakat hat sich geändert, drucke es neu. {what}"
+  },
+  "tags": {
+    "title": "Tags der Spielenden",
+    "intro": "Manche Modi brauchen für jede spielende Person einen NFC-Tag. Der Controller signiert jeden Tag mit dem Schlüssel dieses Spiels, der ihn nie verlässt: Der Tag gilt nur in diesem Spiel und nur dessen Boxen nehmen ihn an.",
+    "game": "Spiel {game}: Ein neues Spiel braucht neue Tags.",
+    "player": "ID der spielenden Person",
+    "player_hint": "Buchstaben, Ziffern, - _ und . (bis zu 32), z. B. p-17. Wähle jemanden, der eingecheckt hat, oder tippe eine ID.",
+    "team": "Team",
+    "no_team": "Kein Team",
+    "make": "Tag erzeugen",
+    "for": "Tag für {player}, Team {team}",
+    "for_no_team": "Tag für {player}, kein Team",
+    "bytes": "{n} Bytes",
+    "nfc_write": "Mit dem NFC dieses Geräts schreiben",
+    "nfc_hold": "Halte einen leeren Tag an die Rückseite dieses Geräts…",
+    "nfc_done": "Auf den Tag geschrieben.",
+    "nfc_failed": "Schreiben fehlgeschlagen: {error}",
+    "nfc_unsupported": "Dieser Browser kann keine NFC-Tags schreiben (Web NFC braucht Chrome auf Android über HTTPS). Schreibe die Bytes unten mit der Atalaia-App (Marshal, Tags der Spielenden; bei einem Handy-Controller sein eigener Bildschirm) oder mit einer NFC-App, die einen rohen NDEF-Eintrag aus Hex schreiben kann.",
+    "ndef": "NDEF-Eintrag (Hex)",
+    "memory": "Tag-Speicher ab Seite 4 (Hex)",
+    "download": "NDEF-Datei herunterladen",
+    "hide": "Ausblenden",
+    "no_game": "Erstelle zuerst ein Spiel: Tags werden mit dem Schlüssel des laufenden Spiels signiert."
   }
 }

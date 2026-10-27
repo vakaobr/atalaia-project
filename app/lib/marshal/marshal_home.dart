@@ -126,6 +126,14 @@ class _MarshalHomeScreenState extends State<MarshalHomeScreen> {
     _go(ChronoQueueScreen(checkin: c, field: field, records: records));
   }
 
+  /// Players' tags: the field controller signs them for this phone to write.
+  void _tags() {
+    final c = _checkin;
+    final field = _field;
+    if (c == null || field == null || !access.allowed) return;
+    _go(TagWriterScreen(checkin: c, field: field));
+  }
+
   /// The chrono screen, asking the field controller which limits it judges
   /// with when this phone knows the field.
   void _chrono() {
@@ -293,7 +301,7 @@ class _MarshalHomeScreenState extends State<MarshalHomeScreen> {
                     leading: const Icon(Icons.nfc, size: 32),
                     title: Text(s.t('tags.title')),
                     subtitle: Text(s.t('tags.hint')),
-                    onTap: () => _go(const TagWriterScreen()),
+                    onTap: _tags,
                   ),
                 ),
                 SectionTitle(s.t('marshal.identity')),

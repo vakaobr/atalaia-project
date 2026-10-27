@@ -511,12 +511,25 @@ const Map<String, String> deStrings = {
   'tags.title': 'Tags der Spielenden',
   'tags.hint': 'Die signierten NFC-Tags für ein Spiel schreiben.',
   'tags.intro':
-      'Tags werden mit dem Schlüssel des Spiels signiert, also hat jedes Spiel '
-      'seine eigenen. Wähle das Spiel mit seiner Beitrittskarte oder seinem '
-      'QR-Code.',
-  'tags.game': 'Spiel wählen',
-  'tags.for_game': 'Spiel {game} ({mode})',
-  'tags.other_game': 'Anderes Spiel',
+      'Tags werden vom Feldcontroller signiert, der den Schlüssel des Spiels '
+      'verwahrt: Du brauchst nie den Beitrittsschlüssel des Felds. Sei im '
+      'WLAN des Felds, tippe eine spielende Person ein und halte einen '
+      'leeren Tag ans Handy.',
+  'tags.for_game': 'Spiel: {game}',
+  'tags.loading': 'Frage den Feldcontroller…',
+  'tags.offline':
+      'Der Feldcontroller ist nicht erreichbar: Verbinde dich mit dem WLAN '
+      'des Felds und versuch es nochmal.',
+  'tags.not_marshal':
+      'Der Feldcontroller sagt, du bist hier kein Marshal: Frag die '
+      'Spielleitung.',
+  'tags.session': 'Dein Check-in ist abgelaufen: Check erneut ein.',
+  'tags.no_key':
+      'Das Spiel läuft nicht auf dem Controller (es ist beendet oder hat '
+      'seinen Schlüssel verloren), also kann er keine Tags signieren.',
+  'tags.refused': 'Der Feldcontroller hat den Tag abgelehnt: {error}',
+  'tags.bad_answer':
+      'Die Antwort des Controllers ist kein gültiger Tag für diese Person.',
   'tags.player': 'ID der spielenden Person',
   'tags.player_hint': 'Buchstaben, Ziffern, - _ und . (bis zu 32), z. B. p-17',
   'tags.bad_player': 'Die ID hat 1 bis 32 Buchstaben, Ziffern, -, _ oder .',
@@ -960,6 +973,14 @@ const Map<String, String> deStrings = {
   'ctl.card_done': 'Feldkarte geschrieben (Feld {fingerprint}).',
   'ctl.card_failed':
       'Die Feldkarte konnte nicht erstellt werden: versuch es noch einmal.',
+  'ctl.tags': 'Tags der Spielenden',
+  'ctl.tags_hint':
+      'Schreibe die signierten NFC-Tags des laufenden Spiels mit dem NFC '
+      'dieses Handys. Der Spielschlüssel bleibt auf diesem Handy.',
+  'ctl.tags_none':
+      'Starte zuerst ein Spiel: Tags werden mit dem Schlüssel des laufenden '
+      'Spiels signiert.',
+  'ctl.tags_open': 'Tags der Spielenden schreiben',
   'ctl.firmware': 'Firmware-Updates',
   'ctl.fw_keys': 'Firmware-Release-Schlüssel',
   'ctl.fw_keys_none':

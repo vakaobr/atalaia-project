@@ -1745,6 +1745,111 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("checkin-open")).to_contain_text("Domingo")
         expect(page.get_by_test_id("checkin-empty")).to_be_visible()
 
+    def test_players_tags_signed_by_the_controller(self):
+        """Players' NFC tags (decision TW-1) in the Check-in tab: the controller signs a tag for a checked-in
+        player and a team with the game's key (the key is never on the page); without Web NFC the page shows
+        the bytes, a download and the app that writes them; with Web NFC it writes the tag's record itself,
+        and says when the writing fails; in every language."""
+        from atalaia_sim import tag as tagfmt  # noqa: PLC0415
+
+        game = self.field.create_game("Sábado")
+        me = self.check_in(game["id"], "Coruja")
+        key = self.field.bundle.controller.game_key(game["id"])
+        page = self.console()
+        page.get_by_test_id("tab-checkin").click()
+        card = page.get_by_test_id("tags")
+        expect(card).to_contain_text("Etiquetas de quem joga")
+        expect(page.get_by_test_id("tags-game")).to_contain_text("Sábado")
+        expect(page.get_by_test_id("tag-result")).to_have_count(0)
+
+        # The checked-in players are offered, and a team is picked for the tag.
+        self.assertEqual(page.locator("#tag-players option").first.get_attribute("value"), me["player_id"])
+        page.get_by_test_id("tag-player").fill(me["player_id"])
+        page.get_by_test_id("tag-team").select_option("blue")
+        page.get_by_test_id("tag-make").click()
+        expect(page.get_by_test_id("tag-for")).to_have_text(f"Etiqueta de {me['player_id']}, equipa blue")
+        ndef = bytes.fromhex(page.get_by_test_id("tag-ndef").inner_text().strip())
+        mime = tagfmt.NDEF_TYPE
+        payload = ndef[3 + len(mime):]
+        self.assertEqual(ndef[:3 + len(mime)], bytes([0xD2, len(mime), len(payload)]) + mime)  # MB ME SR, MIME
+        self.assertEqual(tagfmt.decode(payload, game["id"], key, 2),
+                         {"player": me["player_id"], "team": 2, "game_id": game["id"]})
+        memory = bytes.fromhex(page.get_by_test_id("tag-memory").text_content().strip())
+        self.assertEqual(tagfmt.from_ndef_tag(memory), payload)
+        # The page never holds the game key, in what it shows or in its scripts' data.
+        self.assertNotIn(key.hex(), page.content())
+
+        # This browser has no Web NFC: the bytes, a file, and which app writes them.
+        expect(page.get_by_test_id("tag-nfc-write")).to_have_count(0)
+        expect(page.get_by_test_id("tag-nfc-unsupported")).to_contain_text("app Atalaia")
+        with page.expect_download() as dl:
+            page.get_by_test_id("tag-download").click()
+        self.assertEqual(Path(dl.value.path()).read_bytes(), ndef)
+        self.assertEqual(dl.value.suggested_filename, f"atalaia-tag-{me['player_id']}.ndef")
+
+        # With Web NFC the page writes the one record itself.
+        page.evaluate("""() => {
+            window.__nfc = [];
+            window.NDEFReader = class { async write(message, options) {
+                window.__nfc.push({ message: { records: message.records.map((r) => ({ recordType: r.recordType,
+                    mediaType: r.mediaType, data: Array.from(r.data) })) }, signal: !!(options && options.signal) });
+            } };
+        }""")
+        page.get_by_test_id("tag-hide").click()
+        expect(page.get_by_test_id("tag-result")).to_have_count(0)
+        page.get_by_test_id("tag-team").select_option("")
+        page.get_by_test_id("tag-make").click()
+        expect(page.get_by_test_id("tag-for")).to_have_text(f"Etiqueta de {me['player_id']}, sem equipa")
+        page.get_by_test_id("tag-nfc-write").click()
+        expect(page.get_by_test_id("tag-nfc-done")).to_be_visible()
+        written = page.evaluate("window.__nfc")
+        self.assertEqual(len(written), 1)
+        record = written[0]["message"]["records"][0]
+        self.assertEqual((record["recordType"], record["mediaType"]), ("mime", "application/vnd.atalaia.tag"))
+        self.assertEqual(tagfmt.decode(bytes(record["data"]), game["id"], key, 2),
+                         {"player": me["player_id"], "team": 0, "game_id": game["id"]})
+        expect(page.get_by_test_id("tag-nfc-unsupported")).to_have_count(0)
+
+        # A tag that cannot be written is said, and the bytes stay.
+        page.evaluate("""() => { window.NDEFReader = class { async write() {
+            throw new DOMException('Not allowed', 'NotAllowedError'); } }; }""")
+        page.get_by_test_id("tag-nfc-write").click()
+        expect(page.get_by_test_id("tag-nfc-failed")).to_contain_text("Not allowed")
+        expect(page.get_by_test_id("tag-ndef")).to_be_visible()
+
+        # The controller refuses an id the form does not (a tag is 1 to 32 letters, digits, - _ .).
+        r = httpx.post(self.field.base + f"/api/v1/games/{game['id']}/tags", json={"player": "no spaces"},
+                       headers={"Authorization": f"Bearer {GM}"}, timeout=10)
+        self.assertEqual(r.status_code, 400)
+
+        for lang, title, make in (("en", "Players' tags", "Make the tag"), ("de", "Tags der Spielenden", "Tag erzeugen"),
+                                  ("zh-tw", "玩家標籤", "產生標籤")):
+            page.get_by_test_id("lang").first.select_option(lang)
+            expect(card.locator("h2")).to_have_text(title)
+            expect(page.get_by_test_id("tag-make")).to_have_text(make)
+        page.get_by_test_id("lang").first.select_option("pt")
+
+        # Gone with the game: nothing to sign with.
+        self.field.http.post(f"/api/v1/games/{game['id']}/end", json={})
+        expect(page.get_by_test_id("tags")).to_have_count(0)
+
+        # The next game's card (no check-ins yet, so no table to widen the page) fits a phone.
+        game2 = self.field.create_game("Domingo")
+        expect(page.get_by_test_id("tags-game")).to_contain_text("Domingo")
+        page.set_viewport_size({"width": 375, "height": 800})
+        page.get_by_test_id("tag-player").fill("p-17")
+        page.get_by_test_id("tag-make").click()
+        expect(page.get_by_test_id("tag-ndef")).to_be_visible()
+        self.no_horizontal_scroll(page)
+
+        # A read token never sees the card (the controller refuses it too).
+        read = self.console(READ)
+        read.get_by_test_id("tab-checkin").click()
+        expect(read.get_by_test_id("tags")).to_have_count(0)
+        r = httpx.post(self.field.base + f"/api/v1/games/{game2['id']}/tags", json={"player": "p-1"},
+                       headers={"Authorization": f"Bearer {READ}"}, timeout=10)
+        self.assertEqual(r.status_code, 403)
+
     # --- the field's radio channel (Settings) ------------------------------------
 
     def test_channel_first_setup_default_and_manual(self):
@@ -3575,7 +3680,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v8').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v9').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js"):

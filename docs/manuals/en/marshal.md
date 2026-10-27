@@ -16,7 +16,7 @@ For the marshals of a field: the people who run the *chrono* (chronograph) at ch
 - An Android phone (Android 8.0 or later) with the Atalaia app. An iPhone works for the chrono, but it has **no NFC**: no NFC tags and no tag writing. See the [player manual](player.md#1-install-the-app) to install the app.
 - A chronograph, and a way to see the replica's velocity.
 - The field's Wi-Fi network, at least once, so the controller can confirm you.
-- For player tags: an Android phone with NFC and blank NFC tags, and the **field join key** (see [section 7](#7-write-players-tags)).
+- For player tags: an Android phone with NFC and blank NFC tags, and the field's Wi-Fi (see [section 7](#7-write-players-tags)). You do not need the field join key: the field controller signs the tags.
 
 ## 1. Become a marshal
 
@@ -105,14 +105,15 @@ A replica you chrono from the queue is registered automatically. The registry sh
 
 Some modes (Kill Confirmed, Respawn and Lives, Player Check-in, Medic Kit, Money Factory) need each player to carry an NFC tag. You write them on your phone. This needs an Android phone with NFC. Not yet tested on a field.
 
-1. Ask the organisers for the **field join key** (64 digits and letters). In the app, open the gear icon (**Settings**) and under **Field** tap **Field join key**. Type it and tap **Save**. Keep it private: it is the field's master secret.
-2. Ask the organisers to open the console's **Join** tab for the game and show a **QR code** or a **Join text**.
-3. Tap **Players' tags**, then **Pick the game**. Scan the QR code, hold a join card to the phone, or paste the text and tap **Use this text**. The screen shows **Game 17 (org.atalaia.domination)**.
-4. Type the **Player's id** (shown on the player's **My check-in** page, for example *p-17*). Pick the team, or **No team**.
-5. Tap **Write the tag**. When it says **Hold the tag to the back of the phone…**, hold it still until it is written. It then appears under **Written just now**.
-6. Repeat for each player.
+The **field controller signs each tag** with the game's key and your phone writes what it gets. Your phone never holds the field join key or the game key. The price is that you must be on the field's Wi-Fi for every tag: there is no way to write tags without the controller.
 
-A tag works only in the game it was written for. Every new game needs new tags.
+1. Join the field's Wi-Fi and open **Marshal**.
+2. Tap **Players' tags**. The screen shows **Game: ** and the name of the game you checked in to.
+3. Type the **Player's id** (shown on the player's **My check-in** page, for example *p-17*, and under their name in the console's check-in list). Pick the team, or **No team**.
+4. Tap **Write the tag**. The app asks the controller for the tag. When it says **Hold the tag to the back of the phone…**, hold it still until it is written. It then appears under **Written just now**.
+5. Repeat for each player.
+
+A tag works only in the game it was written for. Every new game needs new tags. The game master can also write tags from the console or from a phone controller's own screen (see the [game master manual](game-master.md#players-tags)).
 
 ## 8. Offline limits
 
@@ -139,6 +140,10 @@ Plan to be back on the field's Wi-Fi every couple of hours.
 | **n series were not accepted because the controller does not have you on its marshal list** | Ask the organisers to add you again. The series wait on your phone. |
 | **This replica is not declared in this game** | Pick the player's declaration in the list. The player must declare the replica first. |
 | The NFC tag does not write | **This tag is locked**, **too small** or **does not take NDEF data**: use a new NTAG tag. Keep the tag still. On an iPhone you cannot write tags. |
-| **First set the field join key in the settings.** | Type the field join key under **Settings › Field join key**. |
+| **The field controller cannot be reached: join the field's Wi-Fi and try again.** | Players' tags need the controller for every tag. Join the field's Wi-Fi and try again. |
+| **The field controller says you are not a marshal here: ask the game master.** | The game master must add you to the marshal list. |
+| **Your check-in has run out: check in again.** | Open the check-in page and check in again. |
+| **The game is not running on the controller (it ended, or it lost the game's key), so it cannot sign tags.** | Tags can only be made for the game that is running. Ask the game master. |
+| **The field controller refused the tag:** … | The controller says why, for example that the id has a space in it. Fix the id. |
 
 More help: ask the organisers, or the project's [Discussions](https://github.com/vakaobr/atalaia-project/discussions).
