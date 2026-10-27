@@ -16,6 +16,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import uuid
 import zipfile
 from datetime import datetime, timedelta, timezone
@@ -335,7 +336,12 @@ class GameDaySyncTests(RegistrationCase):
             "team_preference": "red", "ticket_sha256": hashlib.sha256(ticket).hexdigest(),
             "replicas": [{"declaration_id": reg["replicas"][0]["declaration_id"], "type": "aeg", "class": "rifle",
                           "make_model": "M4"}]}])  # no federation number: the game asks for none
-        text = json.dumps(answer)
+        # The random ids and the hash can hold "rui" by chance (p-fwfrui4yfcxl did): search the rest.
+        ids = ("registration_id", "player_id", "declaration_id", "ticket_sha256", "scheduled_game_id")
+        text = json.dumps(answer, default=str)
+        for k in ids:
+            for value in re.findall(rf'"{k}": "([^"]*)"', text):
+                text = text.replace(value, "")
         for private in ("joana", "rui", reg["ticket"]):
             self.assertNotIn(private, text)
         other, other_key = await self.make_field("arena")
