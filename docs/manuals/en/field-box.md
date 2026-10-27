@@ -139,6 +139,8 @@ Other modes have their own screens: *Kill Confirmed* (**press your button, then 
 
 On the small OLED you see the mode on top, one big value (the phase, the timer or the team) and a hint under it. While a team holds its button, the OLED shows a bar that fills.
 
+In a game with a time limit that you started on the box, the big screen has a thin bar along its bottom edge that shows how much of the game is left (it turns red in the last minute), and the OLED shows the time left, as minutes and seconds, at the right of its top line. A game with **No limit** has neither. A game that the field controller runs ends when the game master ends it, so it has no bar.
+
 *Medic Kit*, *Hacking Terminal* and *VIP / Payload* do not follow the box language. Each takes its screen language from its own **Language** setting in the game, and that is Portuguese by default. Ask the organisers to set it.
 
 ## 7. What the lights and screens tell you

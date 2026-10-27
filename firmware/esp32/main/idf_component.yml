@@ -4,7 +4,6 @@
 # All versions pinned to releases that build cleanly with IDF v5.3.2.
 # Commit firmware/esp32/dependencies.lock alongside this file.
 dependencies:
-  espressif/esp_lvgl_port: "~2.4.0"
   espressif/led_strip: "~2.5.0"
   lvgl/lvgl: "~9.2.0"
   joltwallet/littlefs: "~1.14.0"

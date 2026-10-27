@@ -38,6 +38,18 @@
  */
 bool screen_render(const char *template_name, const char *data_json);
 
+/*
+ * The game timer's bar (ADR-P1-3): a strip along the bottom edge of the display, drawn over
+ * every screen, filled by the share of the game left (red in the last minute). The shell
+ * calls it from the display task once a second while a timed stand-alone game runs;
+ * total_s <= 0 or left_s < 0 hides it (no timer, no game, game over). A call that changes
+ * nothing draws nothing.
+ */
+void screen_timer_bar(long left_s, long total_s);
+
+/* Test inspection: the seconds the bar shows as left, -1 when it is hidden. */
+long screen_timer_bar_left(void);
+
 /* Reset the renderer state (for tests). */
 void screen_renderer_reset(void);
 

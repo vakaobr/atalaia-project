@@ -52,8 +52,9 @@ code was never compiled) or initialise Wi-Fi.
 
 - **Image size:** 13% of the OTA slot is left. Grow the OTA slots
   (ADR-P1-4) or trim fonts before phase 2 adds code.
-- **Game-timer bar (ADR-P1-3)** and the captive portal's DNS redirect are
-  not implemented.
+- The game-timer bar (ADR-P1-3) and the captive portal's DNS redirect are
+  built (2026-10-27); a real panel and a phone's captive-portal sheet are
+  still to be seen at bring-up.
 - **Vext (GPIO 36)** is not switched by the firmware; check the polarity
   at bring-up.
 

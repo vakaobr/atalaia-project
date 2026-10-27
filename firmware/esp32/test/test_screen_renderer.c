@@ -161,8 +161,31 @@ static void test_render_sequential_calls(void)
 
 /* ---- entry point ---- */
 
+/* The game timer's bar (ADR-P1-3): shown with the seconds left, hidden without a timer. */
+static void test_timer_bar(void)
+{
+    screen_renderer_reset();
+    CHECK(screen_timer_bar_left() == -1);
+    screen_timer_bar(600, 1800);
+    CHECK(screen_timer_bar_left() == 600);
+    screen_timer_bar(599, 1800);
+    CHECK(screen_timer_bar_left() == 599);
+    screen_timer_bar(5000, 1800); /* never more than the game */
+    CHECK(screen_timer_bar_left() == 1800);
+    screen_timer_bar(0, 1800); /* the last second, still shown (empty) */
+    CHECK(screen_timer_bar_left() == 0);
+    screen_timer_bar(-1, 0); /* no timed game */
+    CHECK(screen_timer_bar_left() == -1);
+    screen_timer_bar(10, 0); /* no limit: no bar */
+    CHECK(screen_timer_bar_left() == -1);
+    screen_timer_bar(10, 60);
+    screen_renderer_reset(); /* a new test starts without it */
+    CHECK(screen_timer_bar_left() == -1);
+}
+
 void run_screen_renderer_tests(void)
 {
+    test_timer_bar();
     test_render_standby();
     test_render_countdown();
     test_render_defused();

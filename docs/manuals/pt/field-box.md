@@ -139,6 +139,8 @@ Os outros modos têm ecrãs próprios: *Baixa Confirmada* (**carrega no botão e
 
 No OLED pequeno vês o modo em cima, um valor grande (a fase, o tempo ou a equipa) e uma dica por baixo. Enquanto uma equipa mantém premido o botão, o OLED mostra uma barra que enche.
 
+Num jogo com limite de tempo que começou na própria caixa, o ecrã grande tem uma barra fina ao longo da margem de baixo que mostra quanto falta do jogo (fica vermelha no último minuto), e o OLED mostra o tempo que falta, em minutos e segundos, à direita da linha de cima. Um jogo **Sem limite** não tem nenhuma das duas. Um jogo conduzido pelo controlador do campo acaba quando a organização o termina, por isso não tem barra.
+
 As *Ligaduras*, o *Hackeia o terminal* e o *VIP / Carga* não seguem a língua da caixa. Cada um usa a língua do ecrã da sua própria definição **Língua** no jogo, e por omissão é o português. Pede à organização que a defina.
 
 ## 7. O que te dizem as luzes e os ecrãs

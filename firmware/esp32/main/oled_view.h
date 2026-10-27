@@ -69,6 +69,13 @@ bool oled_text_for(const char *mode_title, const char *template_name, const char
 bool oled_text_held(oled_text_t *t, long game_s);
 
 /*
+ * The game timer's time left (ADR-P1-3): left_s seconds as a clock in the header's right, when
+ * the screen has nothing there (the captured screen's points keep it) and left_s is not
+ * negative (-1: no timed game runs). Returns true when it changed the header.
+ */
+bool oled_text_timer(oled_text_t *t, long left_s);
+
+/*
  * A zone's screen while a team holds its button (BN-26): the bar, filled by
  * how long the team has held it out of hold_ms (in steps of a hold event,
  * 250 ms), and that team's name beside it in the footer. Only on neutral and
@@ -129,6 +136,10 @@ void oled_view_set_game_clock(uint32_t (*game_ms)(void));
  * holds with the buttons held down now, returns how many (at most max).
  * oled_view_poll() draws a zone's hold bar from them (oled_text_hold). */
 void oled_view_set_hold_reader(int (*read)(oled_hold_t *holds, int max));
+
+/* The game timer's seconds left for the header's right (read from the display task; NULL: none;
+ * the reader returns -1 when no timed game runs): oled_text_timer(), redrawn once a second. */
+void oled_view_set_timer_reader(long (*left_s)(void));
 
 /* Draws t on scr (the three-line layout; builds it on first use). */
 void oled_view_draw(lv_obj_t *scr, const oled_text_t *t);

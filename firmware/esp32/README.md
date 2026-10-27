@@ -219,7 +219,17 @@ message). While a team holds its button the footer turns into a progress bar
 templates map too: a countdown when the data has `left`, else the screen's
 name, with a team, owner or message below. The TFT keeps the full screen; a
 bare board without one can be set up and played on the OLED alone, and on a
-full box it is a status line for staff.
+full box it is a status line for staff. While a stand-alone game with a time
+limit runs, the header's right shows the game timer's time left
+(`oled_text_timer`, from the shell's `game_timer_left_s`, once a second) where
+the screen has nothing else there.
+
+The TFT has the game timer's bar (ADR-P1-3): `screen_timer_bar()` draws a 6 px
+strip along the bottom edge on LVGL's top layer, so every screen and every mode
+template keeps it, filled by the share of the game left and red in the last
+minute. The LVGL task calls it each pass from the runner's timer; no timer (no
+limit, no game, a field game, game over) hides it. Reference images:
+`test/screens/timer_bar_*.png`.
 
 It is a second LVGL display, rendered in RGB565 and packed to one bit per
 pixel on flush (`oled_pack`); only the 128-byte pages that changed go over
@@ -590,9 +600,8 @@ tests; not yet run on a real board.
 
 Listed in `main/idf_component.yml`:
 
-- `espressif/esp_lvgl_port` -- listed but not used: the display port in
-  `main/display_port.c` drives LVGL through the HAL display driver
-- `lvgl/lvgl` -- v9.2 display toolkit, configured by `lvgl_conf/lv_conf.h`
+- `lvgl/lvgl` -- v9.2 display toolkit, configured by `lvgl_conf/lv_conf.h`; the display port in
+  `main/display_port.c` drives it through the HAL display driver (`esp_lvgl_port` is not used)
 - `espressif/led_strip` -- WS2812B RMT driver
 - `joltwallet/littlefs` -- LittleFS VFS
 

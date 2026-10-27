@@ -34,6 +34,8 @@
 static char last_template[SCREEN_TEMPLATE_MAX];
 static char last_data[SCREEN_DATA_MAX];
 static int call_count;
+static bool timer_bar_on;
+static long timer_bar_left = -1;
 
 /* Known templates. Mode templates first, then the shell's own screens. */
 static const char *known_templates[] = {
@@ -980,6 +982,29 @@ static void lvgl_forget(void)
     shown_template[0] = '\0';
 }
 
+/* The game timer's bar (ADR-P1-3): a strip along the bottom edge on the display's top layer,
+ * so every screen (the C ones, the modes' templates) keeps it and clean_screen() leaves it.
+ * It sits below the footers (the lowest text ends at y = 230). */
+#define TIMER_BAR_H    6
+#define TIMER_BAR_LAST 60 /* the last minute is red */
+static lv_obj_t *timer_track, *timer_fill;
+
+static void lvgl_timer_bar(bool visible, long left_s, long total_s)
+{
+    if (!lv_is_initialized() || !lv_display_get_default()) return;
+    if (!timer_track) {
+        lv_obj_t *top = lv_display_get_layer_top(lv_display_get_default());
+        timer_track = box(top, SCREEN_W, TIMER_BAR_H, COLOR_PANEL);
+        lv_obj_align(timer_track, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+        timer_fill = box(timer_track, SCREEN_W, TIMER_BAR_H, COLOR_ACCENT);
+        lv_obj_align(timer_fill, LV_ALIGN_LEFT_MID, 0, 0);
+    }
+    show(timer_track, visible);
+    if (!visible) return;
+    lv_obj_set_width(timer_fill, (int32_t)((int64_t)SCREEN_W * left_s / total_s));
+    set_bg(timer_fill, left_s <= TIMER_BAR_LAST ? COLOR_DANGER : COLOR_ACCENT);
+}
+
 #endif /* ATALAIA_SCREEN_LVGL */
 
 /* ------------------------------------------------------------------ */
@@ -1025,11 +1050,29 @@ bool screen_render(const char *template_name, const char *data_json)
     return true;
 }
 
+void screen_timer_bar(long left_s, long total_s)
+{
+    bool visible = total_s > 0 && left_s >= 0;
+    if (visible && left_s > total_s) left_s = total_s;
+    if (visible == timer_bar_on && (!visible || left_s == timer_bar_left)) return;
+    timer_bar_on = visible;
+    timer_bar_left = visible ? left_s : -1;
+#if ATALAIA_SCREEN_LVGL
+    lvgl_timer_bar(visible, left_s, total_s);
+#endif
+}
+
+long screen_timer_bar_left(void)
+{
+    return timer_bar_on ? timer_bar_left : -1;
+}
+
 void screen_renderer_reset(void)
 {
     last_template[0] = '\0';
     last_data[0] = '\0';
     call_count = 0;
+    screen_timer_bar(-1, 0);
     screen_template_reset();
 #if ATALAIA_SCREEN_LVGL
     lvgl_forget();

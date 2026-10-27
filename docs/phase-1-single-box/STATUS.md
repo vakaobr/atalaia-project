@@ -100,16 +100,21 @@ BRING_UP.md steps 2-14, and the 2-hour game.
 
 ## Not done (software)
 
-- The persistent game-timer bar from ADR-P1-3: during Domination the
-  screen shows the `status` screen (game, timer length) until the game
-  ends.
-- A DNS server for the captive portal: phones may not open the setup page
-  by themselves; `http://192.168.4.1` works.
-- `espressif/esp_lvgl_port` is still a dependency but unused.
-- The firmware image fills 87% of its 1.5 MB OTA slot (mostly the Wi-Fi
-  stack, LVGL and its fonts). Before phase 2 adds LoRa and crypto, grow the
-  OTA slots (the 16 MB flash has about 10 MB unpartitioned; see ADR-P1-4)
-  or trim fonts.
+- The firmware image fills 93% of its 2 MB OTA slot (the Field Box build
+  with the radio; mostly the Wi-Fi stack, LVGL and its fonts). The slots were
+  already grown from 1.5 MB to 2 MB (`partitions.csv`); the 16 MB flash
+  still has about 10 MB unpartitioned (ADR-P1-4), so a further growth is a
+  partition-table change, which a box takes by USB only (the OTA slots move).
+
+Done since this list was written (2026-10-27):
+
+- The persistent game-timer bar from ADR-P1-3: a stand-alone game with a
+  time limit shows a 6 px bar along the bottom of the TFT on every screen
+  (red in the last minute) and the time left in the OLED's header. A field
+  game is ended by its controller, so it has no bar.
+- The DNS server for the captive portal (decision WS-3): a DNS responder
+  and the HTTP redirects were built after this list was written.
+- The unused `espressif/esp_lvgl_port` dependency is removed.
 
 ## Blocked on hardware
 

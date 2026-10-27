@@ -47,6 +47,19 @@ typedef struct {
     const char *mode;
 } screen_case_t;
 
+/* Cases drawn with the game timer's bar (screen_timer_bar): seconds left of the game's seconds. */
+typedef struct {
+    const char *name;
+    long left, total;
+} timer_bar_case_t;
+
+static const timer_bar_case_t timer_bars[] = {
+    {"timer_bar_status", 400, 600},
+    {"timer_bar_neutral", 3600, 7200},
+    {"timer_bar_yaml_domination", 3600, 7200},
+    {"timer_bar_last_minute", 47, 1800},
+};
+
 #define BOMB     "org.atalaia.bomb {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
 #define DOM      "org.atalaia.domination {\"capture_hold_ms\":3000,\"tick_s\":10}"
 #define KILL     "org.atalaia.kill_confirmed {\"turn_in_s\":20}"
@@ -509,6 +522,13 @@ static const screen_case_t cases[] = {
      CHECKIN},
     {"yaml_checkin_zh-tw", "checkin", "{\"total\":5,\"counts\":\"RED 3  BLUE 2\",\"team\":\"red\"}",
      CHECKIN},
+    /* The game timer's bar along the bottom edge (ADR-P1-3), over a C screen and a mode's own
+     * template: a game two thirds left, half left, and in its last minute (red). */
+    {"timer_bar_status", "status",
+     "{\"title\":\"Game on\",\"mode\":\"Domination\",\"timer_s\":600}", NULL},
+    {"timer_bar_neutral", "neutral", "{\"hold_s\":3}", NULL},
+    {"timer_bar_yaml_domination", "neutral", "{\"hold_s\":3}", DOM},
+    {"timer_bar_last_minute", "countdown", "{\"left\":47}", NULL},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 
@@ -601,6 +621,11 @@ static void render(const screen_case_t *c)
     if (c->mode) screen_render(SCREEN_MODE_MESSAGE, c->mode);
     if (!screen_render(c->template_name, c->data)) fail(c->name, "template not recognised");
     if (c->mode && !screen_template_widget_count()) fail(c->name, "not drawn from its template");
+    for (size_t i = 0; i < sizeof(timer_bars) / sizeof(timer_bars[0]); i++) {
+        if (strcmp(timer_bars[i].name, c->name) != 0) continue;
+        screen_timer_bar(timer_bars[i].left, timer_bars[i].total);
+        if (screen_timer_bar_left() != timer_bars[i].left) fail(c->name, "the timer bar is not shown");
+    }
     test_display_render();
     test_display_rgb888(rendered);
 }

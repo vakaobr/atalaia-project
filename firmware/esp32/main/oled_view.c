@@ -352,6 +352,13 @@ bool oled_text_held(oled_text_t *t, long game_s)
     return true;
 }
 
+bool oled_text_timer(oled_text_t *t, long left_s)
+{
+    if (left_s < 0 || t->head_right[0]) return false;
+    clock_text(left_s, t->head_right, sizeof(t->head_right));
+    return true;
+}
+
 bool oled_text_hold(oled_text_t *t, const oled_hold_t *holds, int n, uint32_t hold_ms)
 {
     if (!t->zone || t->bar >= 0 || hold_ms == 0 || !holds) return false;
@@ -482,6 +489,7 @@ static oled_text_t base, drawn;
 static bool base_on;
 static uint32_t (*game_clock)(void);
 static int (*hold_reader)(oled_hold_t *holds, int max);
+static long (*timer_reader)(void);
 static uint32_t hold_ms; /* the mode's hold time to take a zone ("@mode"); 0 none */
 
 /* One line of text: too long ends in "...", never wraps. */
@@ -662,6 +670,11 @@ void oled_view_set_hold_reader(int (*read)(oled_hold_t *holds, int max))
     hold_reader = read;
 }
 
+void oled_view_set_timer_reader(long (*left_s)(void))
+{
+    timer_reader = left_s;
+}
+
 /* base as it shows now: a team holding its button on a zone (the bar and the team), else
  * the held time. Only the footer and the bar differ from base. */
 static void compose(oled_text_t *t)
@@ -673,6 +686,7 @@ static void compose(oled_text_t *t)
         oled_text_hold(t, holds, n > OLED_HOLDS_MAX ? OLED_HOLDS_MAX : n, hold_ms);
     }
     if (game_clock && t->since >= 0) oled_text_held(t, (long)(game_clock() / 1000u));
+    if (timer_reader) oled_text_timer(t, timer_reader());
 }
 
 static void show(lv_obj_t *scr, const char *t, const char *data)
@@ -687,14 +701,20 @@ static void show(lv_obj_t *scr, const char *t, const char *data)
 }
 
 /* A hold's bar stepping (four times a second at most) or the held time's second: the footer
- * only, one or two of the panel's pages (as a countdown's tick); the TFT is not touched. */
-static void refresh(void)
+ * only, one or two of the panel's pages (as a countdown's tick); the TFT is not touched. The
+ * game timer's second (ADR-P1-3) is in the header, which is drawn whole. */
+static void refresh(lv_obj_t *scr)
 {
     if (!base_on || !built) return;
     oled_text_t t;
     compose(&t);
-    if (t.bar == drawn.bar && strcmp(t.foot, drawn.foot) == 0) return;
-    draw_foot(&t);
+    if (strcmp(t.head_right, drawn.head_right) != 0) {
+        draw(scr, &t);
+    } else if (t.bar != drawn.bar || strcmp(t.foot, drawn.foot) != 0) {
+        draw_foot(&t);
+    } else {
+        return;
+    }
     drawn = t;
 }
 
@@ -720,7 +740,7 @@ void oled_view_handle(lv_obj_t *scr, const char *t, const char *data, uint32_t n
 void oled_view_poll(lv_obj_t *scr, uint32_t now_ms)
 {
     if (!splash_on) {
-        refresh();
+        refresh(scr);
         return;
     }
     if ((int32_t)(now_ms - splash_until) < 0) return;

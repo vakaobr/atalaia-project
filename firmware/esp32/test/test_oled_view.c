@@ -358,8 +358,30 @@ static void test_names_in_the_boxs_language(void)
     box_lang_set(BOX_LANG_EN);
 }
 
+/* The game timer's time left in the header's right (ADR-P1-3), where nothing else is. */
+static void test_game_timer_header(void)
+{
+    oled_text_t t = map("DOMINATION", "neutral", "{}");
+    CHECK(oled_text_timer(&t, 754));
+    CHECK(strcmp(t.head_right, "12:34") == 0);
+    t = map("DOMINATION", "neutral", "{}");
+    CHECK(oled_text_timer(&t, 5400));
+    CHECK(strcmp(t.head_right, "1:30:00") == 0);
+    t = map("DOMINATION", "neutral", "{}");
+    CHECK(oled_text_timer(&t, 0)); /* the last second is still a clock: 0:00 */
+    CHECK(strcmp(t.head_right, "0:00") == 0);
+    /* No timed game runs: nothing. The captured screen's points keep the place. */
+    t = map("DOMINATION", "neutral", "{}");
+    CHECK(!oled_text_timer(&t, -1));
+    CHECK(t.head_right[0] == '\0');
+    t = map("DOMINATION", "captured", "{\"team\":\"red\",\"points\":12}");
+    CHECK(!oled_text_timer(&t, 754));
+    CHECK(strcmp(t.head_right, "12 pts") == 0);
+}
+
 void run_oled_view_tests(void)
 {
+    test_game_timer_header();
     test_version_lines();
     test_mode_title();
     test_mode_message_changes_nothing();

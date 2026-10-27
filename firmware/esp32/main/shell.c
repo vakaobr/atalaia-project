@@ -1079,6 +1079,29 @@ static uint32_t game_clock_ms(void)
     return *(volatile const uint32_t *)&runner.game_time_ms;
 }
 
+/* The stand-alone game timer's length and what is left, in seconds, for the game-timer bar
+ * (ADR-P1-3) and the OLED's header: whole words the game task writes (game_timer_tick), read
+ * here from the LVGL task. total 0 and left -1: no timed game runs (a field game is ended by
+ * its controller, and a game with no limit has no bar). */
+static void game_timer_seconds(long *left_s, long *total_s)
+{
+    *left_s = -1;
+    *total_s = 0;
+    if (!*(volatile const bool *)&runner.running) return;
+    uint32_t total = *(volatile const uint32_t *)&runner.timer.duration_ms;
+    uint32_t elapsed = *(volatile const uint32_t *)&runner.timer.elapsed_ms;
+    if (total == 0) return;
+    *total_s = (long)((total + 999u) / 1000u);
+    *left_s = elapsed >= total ? 0 : (long)((total - elapsed + 999u) / 1000u);
+}
+
+static long game_timer_left_s(void)
+{
+    long left, total;
+    game_timer_seconds(&left, &total);
+    return left;
+}
+
 /* The team buttons held down now, for the OLED's hold bar on a zone's screens (BN-26): read
  * from the LVGL task while the game task updates them (whole words; a name read as it is
  * replaced shows for one frame at most). */
@@ -1113,6 +1136,7 @@ static void task_lvgl(void *arg)
                          CONFIG_ATALAIA_OLED_SPLASH_MS);
         oled_view_set_game_clock(game_clock_ms);
         oled_view_set_hold_reader(held_buttons);
+        oled_view_set_timer_reader(game_timer_left_s);
     }
 
     for (;;) {
@@ -1125,6 +1149,9 @@ static void task_lvgl(void *arg)
             if (oled_scr) oled_view_handle(oled_scr, su.template_name, su.data_json, now_ms());
         }
         if (oled_scr) oled_view_poll(oled_scr, now_ms());
+        long left_s, total_s;
+        game_timer_seconds(&left_s, &total_s);
+        screen_timer_bar(left_s, total_s);
         display_port_handle();
         vTaskDelay(pdMS_TO_TICKS(5));
     }
