@@ -29,10 +29,11 @@ import 'package:flutter/foundation.dart';
 
 import '../checkin/field_route.dart';
 import '../checkin/field_trust.dart';
+import '../security/bytes.dart';
 
 /// A field controller's address and access code.
 final class FieldLink {
-  const FieldLink(this.base, this.token, {this.field});
+  const FieldLink(this.base, this.token, {this.field, this.caSha256});
 
   /// http://host:port, or https://host:port with [field].
   final Uri base;
@@ -41,7 +42,28 @@ final class FieldLink {
   /// The pinned field of a check-in: its CA is the only one trusted.
   final PinnedField? field;
 
-  FieldLink withToken(String t) => FieldLink(base, t, field: field);
+  /// The SHA-256 of the controller's field CA, from the `ca` of an https
+  /// scoreboard link (a phone controller, whose HTTPS has the field's own
+  /// CA, decision PD13). Not trusted yet: [FieldTrust.forLink] fetches the CA
+  /// and checks it against this, and gives the [field] to connect with.
+  final Uint8List? caSha256;
+
+  FieldLink withToken(String t) =>
+      FieldLink(base, t, field: field, caSha256: caSha256);
+
+  /// This link with the CA it names fetched, checked and pinned ([field]);
+  /// as it is when it has none to check (plain HTTP, or a CA the phone
+  /// already trusts).
+  Future<FieldLink> trusted(FieldTrust trust) async {
+    final ca = caSha256;
+    if (ca == null || field != null) return this;
+    return FieldLink(
+      base,
+      token,
+      field: await trust.forLink(base, ca),
+      caSha256: ca,
+    );
+  }
 
   Uri get stream => streamAt(base);
 
@@ -56,7 +78,11 @@ final class FieldLink {
 
   /// A link from what a QR code or a person gives: the scoreboard's
   /// address (http://host:8080/scoreboard#token=CODE), or an address and a
-  /// separate [token]. Null if there is no host or no code.
+  /// separate [token]. An https link may add `&ca=<64 hex digits>` to the
+  /// fragment (never sent to the server): the SHA-256 of the field CA that
+  /// signed the controller's certificate ([caSha256]); on http it is
+  /// ignored. Null if there is no host or no code, or if `ca` is not 64 hex
+  /// digits.
   static FieldLink? parse(String text, [String? token]) {
     var t = text.trim();
     if (t.isEmpty) return null;
@@ -71,14 +97,22 @@ final class FieldLink {
       return null;
     }
     var code = token?.trim();
-    if (code == null || code.isEmpty) {
-      for (final part in u.fragment.split('&')) {
-        final i = part.indexOf('=');
-        if (i > 0 && part.substring(0, i) == 'token') {
-          code = Uri.decodeComponent(part.substring(i + 1));
-        }
+    String? ca;
+    for (final part in u.fragment.split('&')) {
+      final i = part.indexOf('=');
+      if (i <= 0) continue;
+      final key = part.substring(0, i);
+      if (key == 'token' && (code == null || code.isEmpty)) {
+        code = Uri.decodeComponent(part.substring(i + 1));
+      } else if (key == 'ca') {
+        ca = part.substring(i + 1);
       }
-      code ??= u.queryParameters['token'];
+    }
+    if (code == null || code.isEmpty) code = u.queryParameters['token'];
+    Uint8List? caSha;
+    if (u.scheme == 'https' && ca != null) {
+      if (!RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(ca)) return null;
+      caSha = hexDecode(ca);
     }
     if (code == null || code.isEmpty) return null;
     final base = Uri(
@@ -86,7 +120,7 @@ final class FieldLink {
       host: u.host,
       port: u.hasPort ? u.port : 8080,
     );
-    return FieldLink(base, code);
+    return FieldLink(base, code, caSha256: caSha);
   }
 
   @override

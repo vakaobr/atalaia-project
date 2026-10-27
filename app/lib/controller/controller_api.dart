@@ -109,6 +109,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 import '../modes/mode_catalog.dart';
+import '../security/bytes.dart' show hexEncode;
 import '../version.dart';
 import 'controller_branding.dart';
 import 'controller_channel.dart';
@@ -1114,18 +1115,23 @@ class ControllerApi {
     ),
     // The console's "share with players" QR code (decision PD13). This
     // controller's network-facing server is HTTPS, so its links are the
-    // poster's https addresses (the Pi's are http on its API port).
+    // poster's https addresses, each with the field CA's SHA-256 as `ca` in
+    // the fragment (never sent to the server) for the app to pin; the Pi's
+    // are http on its API port, then its https ones.
     _route(
       'GET',
       r'/api/v1/scoreboard-link',
-      _gm(
-        (r) => ApiResponse(200, {
+      _gm((r) {
+        final p = _svc().posterFields();
+        final ca = p['ca_sha256'] as Uint8List?;
+        return ApiResponse(200, {
           'links': [
-            for (final u in (_svc().posterFields()['urls']! as List))
-              '$u/scoreboard#token=$readToken',
+            for (final u in (p['urls']! as List))
+              '$u/scoreboard#token=$readToken'
+                  '${ca == null ? '' : '&ca=${hexEncode(ca)}'}',
           ],
-        }, _noStore),
-      ),
+        }, _noStore);
+      }),
     ),
     _route(
       'GET',

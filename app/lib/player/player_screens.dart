@@ -44,6 +44,7 @@ import '../branding/field_branding.dart';
 import '../checkin/checkin_client.dart';
 import '../checkin/checkin_screen.dart';
 import '../checkin/failure_details.dart';
+import '../checkin/field_trust.dart';
 import '../l10n/strings.dart';
 import '../platform/location.dart';
 import '../platform/platform_check.dart';
@@ -116,8 +117,27 @@ class _PlayerStartScreenState extends State<PlayerStartScreen> {
   Future<void> _go(FieldLink link) async {
     setState(() => _error = null);
     final app = AppScope.read(context);
+    // An https link names the field CA it was signed by (decision PD13):
+    // fetch it, check it and trust it for this stream alone.
+    if (link.caSha256 != null) {
+      try {
+        link = await link.trusted(context.services.trust);
+      } on TrustException catch (e) {
+        if (mounted) {
+          setState(
+            () => _error = switch (e.reason) {
+              TrustFailure.unreachable => 'player.link_unreachable',
+              TrustFailure.mismatch => 'player.link_mismatch',
+              _ => 'player.link_not_controller',
+            },
+          );
+        }
+        return;
+      }
+    }
     await app.update((x) {
-      x.controllerUrl = link.base.toString();
+      // An https address without its CA would not connect again.
+      x.controllerUrl = link.caSha256 == null ? link.base.toString() : null;
       x.readToken = link.token;
     });
     if (!mounted) return;

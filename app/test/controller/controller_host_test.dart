@@ -16,11 +16,14 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:atalaia_app/controller/controller_host.dart';
+import 'package:atalaia_app/checkin/field_trust.dart';
 import 'package:atalaia_app/ffi/bindings.dart';
+import 'package:atalaia_app/player/field_feed.dart';
 import 'package:atalaia_app/pod/pod_client.dart';
 import 'package:atalaia_app/protocol/checkin_poster.dart';
 import 'package:atalaia_app/protocol/join_payload.dart';
 import 'package:atalaia_app/security/bytes.dart';
+import 'package:atalaia_app/storage/app_store.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -243,6 +246,50 @@ void main() {
     final parsed = parsePoster(text!);
     expect(hexEncode(parsed.caSha256), st['ca_sha256']);
     expect(parsed.urls, urls);
+
+    // The scoreboard's QR link (decision PD13): https, the read code and
+    // the CA's fingerprint; the app checks the CA against it and follows the
+    // stream with that CA alone, which default trust would refuse.
+    final (l, lh, sb) = await call(
+      https,
+      'GET',
+      base.resolve('/api/v1/scoreboard-link'),
+      token: gm,
+    );
+    expect(l, 200);
+    expect(lh.value('cache-control'), 'no-store');
+    final links = ((sb! as Map)['links']! as List).cast<String>();
+    expect(links, [
+      '${urls.first}/scoreboard#token=${st['read_token']}'
+          '&ca=${st['ca_sha256']}',
+    ]);
+    final link = FieldLink.parse(links.first)!;
+    expect(hexEncode(link.caSha256!), st['ca_sha256']);
+    await expectLater(
+      WebSocket.connect(link.stream.toString()),
+      throwsA(isA<HandshakeException>()),
+    );
+    final trust = FieldTrust(MemoryAppStore());
+    final pinned = await link.trusted(trust);
+    final socket = await pinnedConnect(pinned.stream, pinned.field!);
+    addTearDown(socket.close);
+    final first = await socket.messages.first.timeout(
+      const Duration(seconds: 10),
+    );
+    expect(jsonDecode(first), containsPair('type', 'hello'));
+    final forged = FieldLink.parse(
+      '${urls.first}/scoreboard#token=x&ca=${'ab' * 32}',
+    )!;
+    await expectLater(
+      forged.trusted(trust),
+      throwsA(
+        isA<TrustException>().having(
+          (e) => e.reason,
+          'reason',
+          TrustFailure.mismatch,
+        ),
+      ),
+    );
   });
 
   test(

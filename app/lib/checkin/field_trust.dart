@@ -294,6 +294,27 @@ class FieldTrust {
     );
   }
 
+  /// A scoreboard link's trust (decision PD13): the CA of the https
+  /// controller at [base] checked against the link's `ca` fingerprint; kept
+  /// for that stream only, never in the phone's store. Its key is the link's
+  /// own, as [FieldFeed.routeKey] makes it.
+  Future<PinnedField> forLink(Uri base, Uint8List caSha256) async {
+    final key = 'link:$base';
+    final (pem, got) = await _fetchCa(
+      key,
+      [base.toString()],
+      caSha256,
+      "the scoreboard's link",
+    );
+    return PinnedField(
+      fieldId: key,
+      fieldName: '',
+      caPem: pem,
+      caSha256: got,
+      urls: [base.toString()],
+    );
+  }
+
   /// Keeps [url] as the address that answered for [fieldId] (a field not
   /// pinned, or a game's prop, has none to keep).
   Future<void> remember(String fieldId, String url) async {

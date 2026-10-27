@@ -383,6 +383,8 @@ Em **Campo** vês as caixas onde as puseste (e as balizas, se juntaste alguma). 
 `http://` *o endereço do controlador* `:8080/scoreboard#token=` *o código só de leitura*
 Junta `&lang=en` para inglês.
 
+Para quem joga acompanhar o jogo na aplicação sem fazer o registo, abre o separador **Jogo**, procura **Partilhar o marcador com quem joga** e toca para mostrar o código QR. Quem joga lê-o na aplicação, em **Participante**. Se o controlador tiver mais do que um endereço, escolhe o que quem joga consegue alcançar. Um endereço com `ca=` e um número comprido é o seguro: a aplicação confere o certificado do controlador com esse número, por isso não é preciso fazer mais nada. Mantém-no entre quem joga: quem o tiver pode acompanhar o jogo.
+
 ### Se uma caixa ou o controlador ficar calado
 
 - Uma caixa que perde contacto continua a jogar e põe-se em dia. Aproxima-a ou junta uma caixa repetidora.

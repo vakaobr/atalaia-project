@@ -138,6 +138,28 @@ class PosterProblemTests(P3Case):
         p = self.poster()
         self.assertEqual((p["text"], p["problem_code"]), (None, "too_long"))
 
+    def test_scoreboard_link_carries_the_field_ca(self) -> None:
+        """Decision PD13: http on the API port as before, then each https address of the poster with the field CA's
+        SHA-256 as `ca` in the fragment (the app checks the CA from /api/v1/controller/ca against it)."""
+        gm = {"Authorization": "Bearer gm-secret"}
+        r = self.client.get("/api/v1/scoreboard-link", headers=gm)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.headers["cache-control"], "no-store")
+        ca = self.svc.ca_sha256.hex()
+        urls = self.svc.poster_fields()["urls"]
+        self.assertTrue(urls)
+        links = r.json()["links"]
+        self.assertEqual(links[len(links) - len(urls):],
+                         [f"{u}/scoreboard#token=read-secret&ca={ca}" for u in urls])
+        for http in links[:len(links) - len(urls)]:
+            self.assertTrue(http.startswith("http://") and http.endswith("/scoreboard#token=read-secret"), http)
+        self.assertEqual(self.client.get("/api/v1/scoreboard-link",
+                                         headers={"Authorization": "Bearer read-secret"}).status_code, 403)
+        # HTTPS off: no CA to name, so the plain links only.
+        self.svc.ca_sha256 = None
+        links = self.client.get("/api/v1/scoreboard-link", headers=gm).json()["links"]
+        self.assertTrue(links and all(link.startswith("http://") and "ca=" not in link for link in links), links)
+
     def test_fields_are_checked_with_https_off(self) -> None:
         """Decision PE24-58: without the field CA the poster's fields were kept unchecked, so a
         game_id of "x" closed check-in to every game ("for another game") without an error."""

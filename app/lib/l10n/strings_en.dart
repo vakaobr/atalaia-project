@@ -267,6 +267,12 @@ const Map<String, String> enStrings = {
       "This is a game scoreboard's link. Use it under Player > Follow a game "
       'without checking in.',
   'player.bad_link': 'The address or the access code is missing.',
+  'player.link_unreachable':
+      'The controller does not answer. Are you on the field\'s Wi-Fi?',
+  'player.link_mismatch':
+      'The controller answering is not the one this code was made for. Do not go on, and tell the organisers.',
+  'player.link_not_controller':
+      'What answers at this address is not a field controller.',
   'player.connecting': 'Connecting to the field controller…',
   'player.offline': 'Offline. Reconnecting…',
   'player.denied': 'The access code was refused.',

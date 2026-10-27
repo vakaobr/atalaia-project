@@ -3,7 +3,10 @@
 //
 // "Share with players" (decision PD13): a QR code of the scoreboard's address with the read-only access
 // code, http://<controller>:8080/scoreboard#token=<read code> (https://... on a phone controller), which
-// the app's Player > Follow a game takes by scanning it. The controller makes the address from the
+// the app's Player > Follow a game takes by scanning it. An https address (the phone controller's, and the
+// Pi's after its http ones) also has `&ca=<SHA-256 of the field CA, 64 hex>` in the fragment: the app checks
+// the CA it fetches from /api/v1/controller/ca against it (the format: console/README.md, "The scoreboard").
+// The controller makes the address from the
 // addresses the check-in poster lists (GET /api/v1/scoreboard-link, GM token only). The code reads the
 // game and changes nothing, but it is a secret all the same: the GM asks to see it, and it is not
 // kept on the page.

@@ -383,6 +383,8 @@ On **Field** you see the boxes where you placed them (and the beacons, if you ad
 `http://` *the controller's address* `:8080/scoreboard#token=` *the read-only code*
 Add `&lang=en` for English.
 
+To let players follow the game in the app without checking in, open the **Game** tab, find **Share the scoreboard with players**, and tap to show its QR code. Players scan it in the app under **Player**. If your controller offers more than one address, choose the one players can reach. A code ending in `ca=` and a long number is for the secure address: the app checks the controller's certificate against it, so the players need do nothing else. Keep it among players: whoever has it can follow the game.
+
 ### If a box or the controller goes quiet
 
 - A box that loses contact keeps playing and catches up. Move it closer or add a relay box.

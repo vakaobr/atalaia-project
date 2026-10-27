@@ -283,6 +283,12 @@ const Map<String, String> deStrings = {
       'Das ist der Link zur Anzeigetafel eines Spiels. Nutze ihn unter '
       'Spielen > Ein Spiel ohne Check-in verfolgen.',
   'player.bad_link': 'Adresse oder Zugangscode fehlt.',
+  'player.link_unreachable':
+      'Der Controller antwortet nicht. Bist du im WLAN des Felds?',
+  'player.link_mismatch':
+      'Der antwortende Controller ist nicht der, für den dieser Code gemacht wurde. Mach nicht weiter und sag der Orga Bescheid.',
+  'player.link_not_controller':
+      'Unter dieser Adresse antwortet kein Feld-Controller.',
   'player.connecting': 'Verbindung zum Feld-Controller…',
   'player.offline': 'Offline. Verbindung wird wiederhergestellt…',
   'player.denied': 'Der Zugangscode wurde abgelehnt.',

@@ -4514,8 +4514,23 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertEqual(httpx.get(self.field.base + "/api/v1/scoreboard-link",
                                    headers={"Authorization": f"Bearer {READ}"}).status_code, 403)
         link = self.field.http.get("/api/v1/scoreboard-link")
-        self.assertEqual(link.json(), {"links": [want]})
+        # Then the https address of the poster with the field CA's fingerprint (`ca`, in the fragment, never sent to
+        # the server): what the app fetches from /api/v1/controller/ca, checks and pins.
+        ca = self.field.bundle.tls.ca_sha256.hex()
+        want_tls = f"https://10.42.0.1:8443/scoreboard#token={READ}&ca={ca}"
+        self.assertEqual(link.json(), {"links": [want, want_tls]})
         self.assertEqual(link.headers["cache-control"], "no-store")
+        page.get_by_test_id("scoreboard-show").click()
+        page.get_by_test_id("scoreboard-address").select_option(index=1)
+        expect(page.get_by_test_id("scoreboard-link")).to_have_text(want_tls)
+        with tempfile.TemporaryDirectory() as tmp:
+            shot = os.path.join(tmp, "scoreboard-tls.png")
+            page.get_by_test_id("scoreboard-qr").screenshot(path=shot)
+            out = read_qr(shot)
+        self.assertEqual(out.stdout, want_tls)
+        parts = urlsplit(out.stdout)
+        self.assertEqual((parts.scheme, parts.port), ("https", 8443))
+        self.assertEqual(parse_qs(parts.fragment), {"token": [READ], "ca": [ca]})
 
     # --- the log's words for every event (E) -----------------------------------------------
 

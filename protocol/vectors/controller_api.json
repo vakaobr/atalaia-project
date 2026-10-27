@@ -395,6 +395,14 @@
       ]
     },
     {
+      "name": "scoreboard link: the GM's share-with-players QR code (decision PD13); no address, no link",
+      "steps": [
+        {"request": {"method": "GET", "path": "/api/v1/scoreboard-link", "token": "gm"}, "status": 200, "json": {"links": []}, "headers": {"cache-control": "no-store"}},
+        {"request": {"method": "GET", "path": "/api/v1/scoreboard-link", "token": "read"}, "status": 403},
+        {"request": {"method": "GET", "path": "/api/v1/scoreboard-link", "token": "none"}, "status": 401}
+      ]
+    },
+    {
       "name": "the modes this controller runs",
       "steps": [
         {"request": {"method": "GET", "path": "/api/v1/modes", "token": "read"}, "status": 200, "json": {"$contains": [

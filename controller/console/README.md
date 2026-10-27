@@ -65,7 +65,9 @@ http://<controller>:8080/scoreboard#token=<read token>          (Portuguese)
 http://<controller>:8080/scoreboard#token=<read token>&lang=en  (English)
 ```
 
-The token is in the fragment, so it is not sent in the request or kept in server logs. **Share with players** (decision PD13): the Game tab's *Share the scoreboard with players* (`components/scoreboard-share.js`) shows this address, with the read code, as a QR code, which the app's *Player > Follow a game without checking in* scans; the GM asks to see it (it is a secret that only reads) and it is not kept on the page. For a scoreboard of your own over MQTT, see [examples/scoreboard/](../../examples/scoreboard/).
+The token is in the fragment, so it is not sent in the request or kept in server logs. **Share with players** (decision PD13): the Game tab's *Share the scoreboard with players* (`components/scoreboard-share.js`) shows this address, with the read code, as a QR code, which the app's *Player > Follow a game without checking in* scans; the GM asks to see it (it is a secret that only reads) and it is not kept on the page.
+
+**The link's format** (shared by both controllers, checked against the app's `FieldLink.parse`): `<scheme>://<host>:<port>/scoreboard#token=<read code>[&ca=<64 hex digits>]`. Everything after `#` stays on the phone and is never sent to the server. `ca` is the SHA-256 of the field's own CA certificate and comes only on `https` links (what the phone controller serves, and the Pi's `[api] tls_port`): the app fetches `GET /api/v1/controller/ca` from the address, checks that the certificate hashes to `ca`, and then follows the stream trusting that CA alone (nothing is kept; scan again next time). A different certificate is refused. A plain `http` link, or an `https` one without `ca`, works as before (default trust). The Pi lists its `http://<host>:<api port>` links first, then the poster's `https` ones with `ca`; the phone controller only has `https` ones, with `ca`. For a scoreboard of your own over MQTT, see [examples/scoreboard/](../../examples/scoreboard/).
 
 ## Files
 

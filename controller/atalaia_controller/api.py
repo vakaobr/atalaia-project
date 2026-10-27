@@ -1314,15 +1314,19 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     def scoreboard_link() -> JSONResponse:
         """The scoreboard's address with the read token, for the console's "share with players" QR code
         (decision PD13): http://<host>:<port>/scoreboard#token=<read token> for each address the poster
-        lists (the app's Player > Follow a game takes it). Secret: never cached."""
+        lists (the app's Player > Follow a game takes it); then, when HTTPS is on, the poster's https
+        addresses with the field CA's SHA-256 as ``&ca=<64 hex>`` in the fragment (never sent to the
+        server), which the app fetches from /api/v1/controller/ca, checks and pins. Secret: never cached."""
         hosts: list[str] = []
-        svc = need_checkin()
-        for u in svc.poster_fields()["urls"]:
+        fields = need_checkin().poster_fields()
+        for u in fields["urls"]:
             host = url_host(u)
             if host and host not in hosts:
                 hosts.append(host)
         links = [f"http://{'[' + h + ']' if ':' in h else h}:{controller.cfg.api_port}/scoreboard#token={auth.read_token}"
                  for h in hosts]
+        if fields["ca_sha256"]:
+            links += [f"{u}/scoreboard#token={auth.read_token}&ca={fields['ca_sha256'].hex()}" for u in fields["urls"]]
         return JSONResponse({"links": links}, headers=NO_STORE)
 
     def own_or_gm(v: Viewer, player_id: str) -> None:

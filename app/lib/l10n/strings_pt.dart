@@ -276,6 +276,12 @@ const Map<String, String> ptStrings = {
       'Isto é a ligação do marcador de um jogo. Usa-a em Participante > '
       'Seguir um jogo sem check-in.',
   'player.bad_link': 'Falta o endereço ou o código de acesso.',
+  'player.link_unreachable':
+      'O controlador não responde. Estás ligado à rede Wi-Fi do campo?',
+  'player.link_mismatch':
+      'O controlador que responde não é aquele para o qual este código foi feito. Não continues e avisa a organização.',
+  'player.link_not_controller':
+      'Quem responde neste endereço não é um controlador de campo.',
   'player.connecting': 'A ligar ao controlador de campo…',
   'player.offline': 'Sem ligação. A voltar a ligar…',
   'player.denied': 'O código de acesso não foi aceite.',

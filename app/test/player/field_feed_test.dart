@@ -10,7 +10,11 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:atalaia_app/checkin/field_trust.dart';
 import 'package:atalaia_app/player/field_feed.dart';
+import 'package:atalaia_app/security/bytes.dart';
+import 'package:atalaia_app/storage/app_store.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeSocket implements FeedSocket {
@@ -81,6 +85,90 @@ void main() {
         'wss',
       );
     });
+
+    test('an https link may carry the field CA fingerprint (PD13)', () {
+      final ca = 'ab' * 32;
+      final l = FieldLink.parse(
+        'https://10.42.0.1:8443/scoreboard#token=abc&ca=${ca.toUpperCase()}',
+      )!;
+      expect(l.base.toString(), 'https://10.42.0.1:8443');
+      expect(l.token, 'abc');
+      expect(hexEncode(l.caSha256!), ca);
+      expect(l.field, isNull);
+      expect(l.withToken('x').caSha256, l.caSha256);
+      // The order does not matter; a separate code keeps the ca.
+      final r = FieldLink.parse(
+        'https://10.42.0.1:8443/scoreboard#ca=$ca&token=abc',
+      )!;
+      expect((r.token, hexEncode(r.caSha256!)), ('abc', ca));
+      expect(
+        hexEncode(
+          FieldLink.parse('https://h/scoreboard#ca=$ca', 'code')!.caSha256!,
+        ),
+        ca,
+      );
+      // Plain HTTP and links without ca work as before.
+      expect(
+        FieldLink.parse(
+          'http://10.0.0.1:8080/scoreboard#token=a&ca=$ca',
+        )!.caSha256,
+        isNull,
+      );
+      expect(FieldLink.parse('https://h/scoreboard#token=a')!.caSha256, isNull);
+      // A malformed fingerprint is a bad link, not a silent default trust.
+      for (final bad in ['', 'zz' * 32, 'ab' * 31, 'ab' * 33]) {
+        expect(FieldLink.parse('https://h/scoreboard#token=a&ca=$bad'), isNull);
+      }
+    });
+
+    test(
+      'trusted: the CA is fetched, checked and pinned for the link',
+      () async {
+        final der = [1, 2, 3, 4, 5];
+        final pem =
+            '-----BEGIN CERTIFICATE-----\n${base64.encode(der)}\n'
+            '-----END CERTIFICATE-----\n';
+        final fetched = <Uri>[];
+        final trust = FieldTrust(
+          MemoryAppStore(),
+          fetch: (u) async {
+            fetched.add(u);
+            return pem;
+          },
+        );
+        final ca = hexEncode(sha256.convert(der).bytes);
+        final link = FieldLink.parse(
+          'https://10.42.0.1:8443/scoreboard#token=t&ca=$ca',
+        )!;
+        final t = await link.trusted(trust);
+        expect(fetched, [
+          Uri.parse('https://10.42.0.1:8443/api/v1/controller/ca'),
+        ]);
+        expect(t.field!.caPem, pem);
+        expect(t.field!.urls, ['https://10.42.0.1:8443']);
+        expect(t.token, 't');
+        expect(await trust.all(), isEmpty); // not kept
+        // Already pinned, or no ca: nothing is fetched.
+        expect(identical(await t.trusted(trust), t), isTrue);
+        final plain = FieldLink.parse('http://10.0.0.1:8080/s#token=t')!;
+        expect(identical(await plain.trusted(trust), plain), isTrue);
+        expect(fetched, hasLength(1));
+        // Another certificate than the link names: refused.
+        final other = FieldLink.parse(
+          'https://10.42.0.1:8443/scoreboard#token=t&ca=${'cd' * 32}',
+        )!;
+        await expectLater(
+          other.trusted(trust),
+          throwsA(
+            isA<TrustException>().having(
+              (e) => e.reason,
+              'reason',
+              TrustFailure.mismatch,
+            ),
+          ),
+        );
+      },
+    );
 
     test('no host or no code: none', () {
       expect(FieldLink.parse(''), isNull);
