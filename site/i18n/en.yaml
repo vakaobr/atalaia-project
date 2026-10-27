@@ -795,6 +795,9 @@ roadmap:
         - "The GM console tells when the check-in poster changed after it was printed."
         - "The marshal and chrono screens say what the app really does, and the limit lists are translated."
         - "The app keeps its secrets sealed with the Android Keystore."
+        - "Players' NFC tags are signed by the field controller and written from the GM console, the phone controller or the marshal's app. Marshals no longer hold the field key for them."
+        - "Replica labels: the app shows, shares or prints each replica's QR sticker, and the GM console prints them for everyone checked in. The marshal's queue scans them."
+        - "Indoor positions: the GM places BLE beacons on the plan, and an Android phone that hears one reports its room instead of GPS. In software and fakes, not tried with real beacons. iOS stays on GPS."
     g_props:
       title: Props and the I/O pod
       items:
@@ -827,6 +830,7 @@ roadmap:
         - "What the Pi controller does, too: failover (a phone and a Pi can each be the other's
           standby), the site server sync (games, logs and scores sent when the internet is there;
           rosters, branding and the scenario library from it), the remote GM and the ATAK feed."
+        - "The GM console fits a phone: its check-in and marshal tables stack, with no sideways scrolling."
     g_ios:
       title: iOS
       items:
@@ -842,6 +846,7 @@ roadmap:
       - The phone as the field controller waits for a real phone.
       - "On iOS, NFC needs a paid Apple account; the prop and the phone as the field controller stay
         Android only."
+      - "Indoor beacons on iOS need a Swift plugin written on a Mac."
     gate: "Gate: one game mixes ESP32 and Android props without issues."
   p4:
     title: Site server and advanced play
@@ -912,6 +917,7 @@ roadmap:
         - "Not yet tried with a real ATAK phone, nor at a real field."
         - "A box that Progressive Domination has made the active one says so on ATAK."
         - "The field map page works on the phone as the field controller too."
+        - "ATAK shows an indoor player at their beacon's place, with the room in the remarks."
     g_server:
       title: Site server, accounts and data
       items:
@@ -925,6 +931,7 @@ roadmap:
         - "The chrono registry: signed readings verified and kept as signed, public keys only,
           sharing between fields with consent. Not yet with a real chronograph."
         - "reset-totp: the operator resets the two-factor code of an account that lost its authenticator."
+        - "Field controllers pull other fields' chrono records for the players on their roster, only with each player's consent. They keep them apart from their own readings and never judge them."
     g_games:
       title: Games, clubs and staff pages
       items:
@@ -946,6 +953,10 @@ roadmap:
           revisions and presets), device health, and the remote GM's live view and commands. Tested
           in a headless browser, not on a real server."
         - "Controllers drop a scenario or preset the site archived or deleted, unless a game still uses it."
+        - "Staff pages for the schedule: list, create, edit, publish and cancel games, with times in the field's time zone."
+        - "Staff pages for registrations: who registered, changing a name, team or federation number, withdrawing a registration, and the CSV export and import."
+        - "A printable game-day roster page, with when a controller last pulled it."
+        - "Staff actions on a registration: paid or unpaid (the server takes no payment), no-show, move to another game, restore, edit the replicas. Tested in a headless browser, not on a real server."
     g_boxes:
       title: Boxes and the field
       items:

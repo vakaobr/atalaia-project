@@ -839,6 +839,9 @@ roadmap:
         - "Die Konsole der Orga meldet, wenn sich der Check-in-Aushang nach dem Druck geändert hat."
         - "Die Marshal- und Chrono-Bildschirme sagen, was die App wirklich tut, und die Limitlisten sind übersetzt."
         - "Die App hält ihre Geheimnisse mit dem Android Keystore versiegelt."
+        - "Die NFC-Tags der Spielenden werden vom Feld-Controller signiert und von der Konsole der Orga, dem Handy-Controller oder der Marshal-App geschrieben. Marshals halten dafür den Feldschlüssel nicht mehr."
+        - "Replik-Labels: Die App zeigt, teilt oder druckt den QR-Aufkleber jeder Replik, und die Konsole druckt sie für alle, die eingecheckt sind. Die Warteschlange der Marshals scannt sie."
+        - "Positionen in Gebäuden: Die Spielleitung setzt BLE-Beacons auf den Plan, und ein Android-Handy, das eines hört, meldet seinen Raum statt GPS. In Software und mit Attrappen, nicht mit echten Beacons ausprobiert. iOS bleibt bei GPS."
     g_props:
       title: Android-Props und I/O-Pod
       items:
@@ -875,6 +878,7 @@ roadmap:
           Reserve sein), der Sync mit dem Site-Server (Spiele, Logs und Punkte gehen raus, wenn
           Internet da ist; Anmeldelisten, Branding und Szenario-Bibliothek kommen von dort), die
           Remote-Spielleitung und der ATAK-Feed."
+        - "Die Konsole der Orga passt auf ein Handy: Check-in- und Marshal-Tabellen stapeln sich, ohne seitliches Scrollen."
     g_ios:
       title: iOS
       items:
@@ -891,6 +895,7 @@ roadmap:
       - Das Handy als Feld-Controller wartet auf ein echtes Handy.
       - "Unter iOS braucht NFC ein kostenpflichtiges Apple-Konto; der Prop und das Handy als
         Feld-Controller bleiben nur für Android."
+      - "Beacons in Gebäuden brauchen unter iOS ein Swift-Plugin, das auf einem Mac geschrieben wird."
     gate: "Gate: Ein Spiel mischt ESP32- und Android-Props ohne Probleme."
   p4:
     title: Site-Server und erweitertes Spiel
@@ -963,6 +968,7 @@ roadmap:
         - "Noch nicht mit einem echten ATAK-Handy ausprobiert, auch nicht auf einem echten Feld."
         - "Eine Box, die Progressive Domination zur aktiven gemacht hat, sagt das auf ATAK."
         - "Die Feldkarten-Seite läuft auch auf dem Handy als Feld-Controller."
+        - "ATAK zeigt Spielende in Gebäuden am Ort ihres Beacons, mit dem Raum in den Bemerkungen."
     g_server:
       title: Site-Server, Konten und Daten
       items:
@@ -976,6 +982,7 @@ roadmap:
           wurden, nur öffentliche Schlüssel, Austausch zwischen Feldern mit Einwilligung. Noch nicht
           mit einem echten Chronographen."
         - "reset-totp: Der Betreiber setzt den Zwei-Faktor-Code eines Kontos zurück, das seinen Authenticator verloren hat."
+        - "Feld-Controller holen die Chrono-Messwerte anderer Felder für die Spielenden auf ihrer Liste, nur mit der Einwilligung jeder Person. Sie halten sie getrennt von den eigenen Messwerten und bewerten sie nie."
     g_games:
       title: Spiele, Clubs und Staff-Seiten
       items:
@@ -1001,6 +1008,10 @@ roadmap:
           Befehle der Remote-Spielleitung. Im Headless-Browser getestet, noch nicht auf einem
           echten Server."
         - "Controller entfernen ein Szenario oder Preset, das der Site-Server archiviert oder gelöscht hat, außer ein Spiel nutzt es noch."
+        - "Staff-Seiten für den Spielplan: Spiele auflisten, anlegen, bearbeiten, veröffentlichen und absagen, mit Zeiten in der Zeitzone des Felds."
+        - "Staff-Seiten für die Anmeldungen: wer sich angemeldet hat, Name, Team oder Verbandsnummer ändern, eine Anmeldung zurückziehen sowie CSV-Export und -Import."
+        - "Eine druckbare Spieltagsliste, mit der Angabe, wann ein Controller sie zuletzt geholt hat."
+        - "Staff-Aktionen an einer Anmeldung: bezahlt oder nicht bezahlt (der Server nimmt kein Geld an), nicht erschienen, in ein anderes Spiel verschieben, wiederherstellen, die Repliken bearbeiten. Im Headless-Browser getestet, nicht auf einem echten Server."
     g_boxes:
       title: Boxen und das Feld
       items:
