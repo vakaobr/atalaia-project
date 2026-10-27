@@ -255,7 +255,14 @@ class StaffScriptTests(AppTestCase):
                  "reg_window_": ("none", "not_yet", "open", "closed"),
                  "reg_status_": ("registered", "checked_in", "no_show", "cancelled"),
                  "fed_": ("off", "optional", "required"),
-                 "replica_state_": ("pending", "passed", "refused", "withdrawn")}
+                 "replica_state_": ("pending", "passed", "refused", "withdrawn"),
+                 "io_res_": ("created", "updated", "unchanged", "skipped", "refused"),
+                 "io_warn_": ("same_name", "no_external_ref", "federation_number_dropped"),
+                 "e_": ("cancelled", "external_ref_invalid", "external_ref_twice", "row_length", "row_not_object",
+                        "display_name_invalid", "team_preference_invalid", "federation_number_invalid",
+                        "federation_number_required", "replicas_invalid", "replicas_not_asked",
+                        "too_many_replicas", "replica_type_invalid", "replica_class_invalid", "make_model_invalid",
+                        "game_full")}
         text = " ".join(self.sources().values())
         for prefix, values in built.items():
             self.assertIn(f"`{prefix}$", text)

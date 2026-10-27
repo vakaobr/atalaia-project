@@ -803,7 +803,7 @@ class ScheduleTests(BrowserCase):
         await expect(page.locator("#status")).to_have_text("Registration withdrawn.")
         self.assertIn("Ana", self.dialogs[-1])
         await expect(rows.nth(1)).to_contain_text("withdrawn")
-        await expect(rows.nth(1).locator("button")).to_have_count(0)
+        await expect(rows.nth(1).locator("button")).to_have_text(["Restore"])  # nothing else is done to a withdrawn one
         await expect(page.locator("#counts")).to_contain_text("Withdrawn: 1")
         # The roster: only the active one, with what the controller gets, and a paper version.
         await page.locator("#roster-link a").click()
@@ -842,7 +842,11 @@ class ScheduleTests(BrowserCase):
         await self.login(page, name, secret, self.field_path(f"/schedule/{started}/registrations"))
         await expect(page.locator("#regs tbody tr")).to_have_count(1)
         await expect(page.locator("#locked")).to_be_visible()
-        await expect(page.locator("#regs tbody button")).to_have_count(0)
+        # Nothing to change, move, withdraw or restore, and it is not over: only the note of payment is offered.
+        await expect(page.locator("#regs tbody button")).to_have_text(["Mark paid"])
+        await expect(page.locator("#io-locked")).to_be_visible()  # a list is imported only before the start
+        await expect(page.locator("#io-check")).to_be_disabled()
+        await expect(page.locator("#io-run")).to_be_disabled()
         # A draft has no roster to print.
         draft = (await self.fetch("INSERT INTO scheduled_games (field_id, title, starts_at, ends_at, status) VALUES "
                                   "($1, 'Rascunho', now() + interval '3 days', now() + interval '3 days 2 hours', "
@@ -866,6 +870,197 @@ class ScheduleTests(BrowserCase):
         await self.check_page(page, 375)
         await page.goto(self.base + self.field_path(f"/schedule/{game}/roster"))
         await expect(page.locator("#roster-meta")).to_contain_text("1 na lista")
+        await self.check_page(page, 375)
+
+
+    async def test_pay_move_restore_and_the_replicas(self) -> None:
+        game = await self.published_game("Sábado")
+        second = await self.published_game("Segundo", starts=datetime.timedelta(days=3))
+        await self.register(game, "falcao", display_name="Falcão", team_preference="red", federation_number="FPA-9",
+                            replicas=[{"type": "aeg", "class": "rifle", "make_model": "M4"}])
+        await self.register(game, "ana", display_name="Ana")
+        name, secret = await self.staff("gm")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path(f"/schedule/{game}/registrations"))
+        rows = page.locator("#regs tbody tr")
+        await expect(rows).to_have_count(2)
+        # Payment is a note: who and when, undone the same way.
+        await expect(rows.nth(1)).to_contain_text("Not paid")
+        await rows.nth(1).locator("button", has_text="Mark paid").click()
+        await expect(page.locator("#status")).to_have_text("Registration marked as paid.")
+        await expect(rows.nth(1)).to_contain_text("Paid (")
+        await expect(rows.nth(1)).to_contain_text(f"marked by {name}")
+        stored = (await self.fetch("SELECT paid_at, paid_by FROM game_registrations WHERE display_name = 'Ana'"))[0]
+        self.assertIsNotNone(stored["paid_at"])
+        await rows.nth(1).locator("button", has_text="Mark unpaid").click()
+        await expect(page.locator("#status")).to_have_text("Paid mark removed.")
+        await expect(rows.nth(1)).to_contain_text("Not paid")
+        # The replicas: add one (type, class, make and model) and save.
+        await rows.nth(1).locator("button", has_text="Edit").click()
+        await expect(page.locator("#r-replicas li")).to_have_count(0)
+        await expect(page.locator("#r-rep-none")).to_be_visible()
+        await page.click("#r-rep-add")
+        item = page.locator("#r-replicas li").first
+        await item.locator("select").nth(0).select_option("dmr")
+        await item.locator("select").nth(1).select_option("dmr")
+        await item.locator("input").fill("VSR-10")
+        await self.check_page(page, 375)
+        await page.click("#reg-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Saved.")
+        await expect(rows.nth(1)).to_contain_text("dmr, dmr, VSR-10")
+        decl = await self.fetch("SELECT replica_type, replica_class, make_model FROM registration_replicas "
+                                "JOIN game_registrations ON game_registrations.id = registration "
+                                "WHERE display_name = 'Ana'")
+        self.assertEqual([tuple(r) for r in decl], [("dmr", "dmr", "VSR-10")])
+        # Saving the form as it was keeps a registration's replicas (their ids); then one is removed.
+        sql = ("SELECT declaration_id FROM registration_replicas JOIN game_registrations "
+               "ON game_registrations.id = registration WHERE display_name = 'Falcão'")
+        before = (await self.fetch(sql))[0][0]
+        await rows.nth(0).locator("button", has_text="Edit").click()
+        await expect(page.locator("#r-replicas li")).to_have_count(1)
+        await page.click("#reg-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Saved.")
+        self.assertEqual((await self.fetch(sql))[0][0], before)
+        await rows.nth(0).locator("button", has_text="Edit").click()
+        await page.locator("#r-replicas li button").first.click()
+        await page.click("#reg-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Saved.")
+        self.assertEqual(await self.fetch(sql), [])
+        # Move one to the other game: the ticket stays, the team and number are fitted to that game.
+        await self.fetch("UPDATE scheduled_games SET teams = '[\"blue\"]', federation = 'off' WHERE id = $1",
+                         uuid.UUID(second))
+        ticket = (await self.fetch("SELECT ticket_hash FROM game_registrations WHERE display_name = 'Falcão'"))[0][0]
+        await rows.nth(0).locator("button", has_text="Move to another game").click()
+        await expect(page.locator("#reg-move")).to_be_visible()
+        await expect(page.locator("#m-game option")).to_have_count(1)
+        await expect(page.locator("#m-game option")).to_contain_text("Segundo")
+        await expect(page.locator("#reg-move .hint").last).to_contain_text("the ticket belongs to the registration")
+        await self.check_page(page, 375)
+        await page.click("#m-go")
+        await expect(page.locator("#status")).to_contain_text("Registration moved to “Segundo”.")
+        await expect(page.locator("#status")).to_contain_text("The team asked for was dropped")
+        await expect(page.locator("#status")).to_contain_text("The federation number was dropped")
+        await expect(rows).to_have_count(1)
+        moved = (await self.fetch("SELECT scheduled_game, ticket_hash, team_preference, federation_number "
+                                  "FROM game_registrations WHERE display_name = 'Falcão'"))[0]
+        self.assertEqual((str(moved["scheduled_game"]), moved["ticket_hash"], moved["team_preference"],
+                          moved["federation_number"]), (second, ticket, None, None))
+        # Withdraw the other, bring it back: it has no ticket (the player asks for one in the app).
+        await rows.nth(0).locator("button", has_text="Withdraw").click()
+        await expect(rows.nth(0)).to_contain_text("withdrawn")
+        await rows.nth(0).locator("button", has_text="Restore").click()
+        await expect(page.locator("#status")).to_contain_text("Registration restored.")
+        await expect(rows.nth(0)).to_contain_text("active")
+        # Without another game to move to, the form says so.
+        await self.fetch("UPDATE scheduled_games SET status = 'cancelled' WHERE id = $1", uuid.UUID(second))
+        await rows.nth(0).locator("button", has_text="Move to another game").click()
+        await expect(page.locator("#m-none")).to_be_visible()
+        await expect(page.locator("#m-go")).to_be_disabled()
+        await page.click("#m-cancel")
+        await expect(page.locator("#reg-move")).to_be_hidden()
+        actions = [a["action"] for a in await self.fetch("SELECT action FROM audit_log WHERE action LIKE 'registration_%'")]
+        for action in ("registration_move", "registration_restore", "registration_paid"):
+            self.assertIn(action, actions)
+        self.assertNotIn("Falcão", json.dumps([str(r["details"]) for r in await self.fetch("SELECT details FROM audit_log")]))
+
+    async def test_a_no_show_after_the_game(self) -> None:
+        over = await self.published_game("Ontem", starts=datetime.timedelta(hours=-6))
+        for who, pid, state in (("Rui", "p-aaaaaaaaaaaa", "registered"), ("Ana", "p-bbbbbbbbbbbb", "checked_in")):
+            await self.fetch("INSERT INTO game_registrations (scheduled_game, field_id, player_id, display_name, status) "
+                             "VALUES ($1, $2, $3, $4, $5)", uuid.UUID(over), self.field_id, pid, who, state)
+        name, secret = await self.staff("admin")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path(f"/schedule/{over}/registrations"))
+        rows = page.locator("#regs tbody tr")
+        await expect(rows).to_have_count(2)
+        # The controller's check-in is not marked here: only a registered player is offered a no-show.
+        await expect(rows.nth(0).locator("button")).to_have_text(["No-show", "Mark paid"])
+        await expect(rows.nth(1).locator("button")).to_have_text(["Mark paid"])
+        await rows.nth(0).locator("button", has_text="No-show").click()
+        self.assertIn("Rui", self.dialogs[-1])
+        await expect(page.locator("#status")).to_have_text("Marked as a no-show.")
+        await expect(rows.nth(0)).to_contain_text("no-show")
+        await expect(page.locator("#counts")).to_contain_text("No-shows: 1")
+        await rows.nth(0).locator("button", has_text="Undo no-show").click()
+        await expect(page.locator("#status")).to_have_text("No-show mark removed.")
+        await expect(rows.nth(0)).to_contain_text("active")
+        # A no-show the controller reported is not undone here.
+        await self.fetch("UPDATE game_registrations SET status = 'no_show', outcome_at = now() WHERE display_name = 'Rui'")
+        await page.reload()
+        await expect(rows.nth(0).locator("button")).to_have_text(["Mark paid"])
+        await self.check_page(page, 375)
+
+    async def test_the_export_and_the_import(self) -> None:
+        game = await self.published_game()
+        await self.register(game, "falcao", display_name="Falcão")
+        name, secret = await self.staff("gm")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path(f"/schedule/{game}/registrations"))
+        await expect(page.locator("#io-export")).to_be_enabled()
+        async with page.expect_download() as download:
+            await page.click("#io-export")
+        saved = await (await download.value).path()
+        text = Path(saved).read_text(encoding="utf-8-sig")
+        self.assertTrue(text.startswith("display_name,external_ref,"), text)
+        self.assertIn("Falcão", text)
+        await expect(page.locator("#status")).to_have_text("File exported.")
+        self.assertEqual((await self.fetch("SELECT count(*) FROM audit_log WHERE action = 'registration_export'"))[0][0], 1)
+        # The import: a check first (nothing is written), then the import, which needs the field's confirmation.
+        folder = Path(tempfile.mkdtemp())
+        csv = folder / "list.csv"
+        csv.write_text("display_name,external_ref,team_preference\r\nRui,r-1,red\r\n,r-2,\r\nAna,r-3,green\r\n",
+                       encoding="utf-8")
+        await page.set_input_files("#io-file", str(csv))
+        await page.fill("#io-source", "club")
+        await expect(page.locator("#io-run")).to_be_disabled()
+        await page.click("#io-check")
+        await expect(page.locator("#status")).to_have_text("Check done: nothing was saved.")
+        await expect(page.locator("#io-summary")).to_contain_text("3 rows: 1 new, 0 changed, 0 the same, 0 skipped, 2 refused.")
+        issues = page.locator("#io-rows tbody tr")
+        await expect(issues).to_have_count(2)
+        await expect(issues.nth(0)).to_contain_text("Invalid display name")
+        await expect(issues.nth(1)).to_contain_text("That team is not in this game.")
+        self.assertEqual((await self.fetch("SELECT count(*) FROM game_registrations"))[0][0], 1)
+        await self.check_page(page, 375)
+        await page.check("#io-basis")
+        await expect(page.locator("#io-run")).to_be_enabled()
+        await page.click("#io-run")
+        await expect(page.locator("#status")).to_have_text("Import done.")
+        await expect(page.locator("#regs tbody tr")).to_have_count(2)
+        stored = await self.fetch("SELECT display_name, source, user_id FROM game_registrations WHERE source = 'club'")
+        self.assertEqual([tuple(r) for r in stored], [("Rui", "club", None)])
+        imported = (await self.fetch("SELECT details FROM audit_log WHERE action = 'registration_import'"))[0][0]
+        self.assertNotIn("Rui", str(imported))
+        # A file the API refuses is shown in words.
+        bad = folder / "bad.csv"
+        bad.write_text("name\r\nRui\r\n", encoding="utf-8")
+        await page.set_input_files("#io-file", str(bad))
+        await page.click("#io-run")
+        await expect(page.locator("#status")).to_have_text("The display_name column is missing.")
+        await page.set_input_files("#io-file", [])
+        await page.click("#io-check")
+        await expect(page.locator("#status")).to_have_text("Choose a file first.")
+        # The same page in Portuguese, at a phone's width.
+        await page.goto(self.base + self.field_path(f"/schedule/{game}/registrations") + "?lang=pt")
+        await expect(page.locator("#io-title")).to_have_text("Exportar e importar")
+        await self.check_page(page, 375)
+
+    async def test_the_roster_says_when_a_controller_last_pulled_it(self) -> None:
+        game = await self.published_game()
+        await self.register(game, "falcao", display_name="Falcão")
+        await self.fetch("UPDATE field_api_keys SET label = 'Pi do campo'")
+        name, secret = await self.staff("gm")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path(f"/schedule/{game}/roster"))
+        await expect(page.locator("#roster-pull")).to_have_text("No controller has pulled this list so far.")
+        pulled = await self.client.get(f"/api/v1/sync/roster?scheduled_game_id={game}",
+                                       headers={"Authorization": f"Bearer {self.key}",
+                                                "User-Agent": "atalaia-controller/1.0"})
+        self.assertEqual(pulled.status_code, 200)
+        await page.reload()
+        await expect(page.locator("#roster-pull")).to_contain_text("A controller last pulled the list:")
+        await expect(page.locator("#roster-pull")).to_contain_text("Key: Pi do campo (")
+        await expect(page.locator("#roster-pull")).to_contain_text("Program: atalaia-controller/1.0.")
         await self.check_page(page, 375)
 
 

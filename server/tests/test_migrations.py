@@ -444,6 +444,41 @@ class MigrationTests(unittest.TestCase):
         command.downgrade(self.cfg, "0012_atak")
         self.assertNotIn("preview_feedback", self.tables())
 
+    def test_0014_with_data(self) -> None:
+        """0014_registration_staff: what staff mark on a registration (kept when the account goes, unlinked) and
+        the last roster pull, on rows that were there before, and back down."""
+        command.upgrade(self.cfg, "0013_preview_feedback")
+        field = self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Campo', 'campo') RETURNING id")[0][0]
+        user = self.db.fetch("INSERT INTO users (username, password_hash) VALUES ('rita', 'x') RETURNING id")[0][0]
+        game = self.db.fetch("INSERT INTO scheduled_games (field_id, title, starts_at, ends_at, status) VALUES "
+                             "($1, 'Domingo', '2030-11-09T09:00:00Z', '2030-11-09T13:00:00Z', 'published') "
+                             "RETURNING id", field)[0][0]
+        reg = self.db.fetch("INSERT INTO game_registrations (scheduled_game, field_id, player_id, display_name) "
+                            "VALUES ($1, $2, 'p-abcdefgh2345', 'Falcão') RETURNING id", game, field)[0][0]
+        command.upgrade(self.cfg, "0014_registration_staff")
+        self.assertEqual(tuple(self.db.fetch("SELECT paid_at, paid_by, outcome_by FROM game_registrations")[0]),
+                         (None, None, None))  # the rows that were there are unmarked
+        self.assertEqual(tuple(self.db.fetch("SELECT roster_pulled_at, roster_key_label, roster_key_fingerprint, "
+                                             "roster_agent FROM scheduled_games")[0]), (None, None, None, None))
+        with self.assertRaisesRegex(Exception, "ck_game_registrations_paid"):
+            self.db.fetch("UPDATE game_registrations SET paid_by = $1", user)  # who without when
+        self.db.fetch("UPDATE game_registrations SET paid_at = now(), paid_by = $1, outcome_by = $1 WHERE id = $2",
+                      user, reg)
+        self.db.fetch("UPDATE scheduled_games SET roster_pulled_at = now(), roster_key_label = repeat('k', 64), "
+                      "roster_key_fingerprint = 'abcdef01', roster_agent = 'atalaia-controller/1.0'")
+        with self.assertRaisesRegex(Exception, "too long"):
+            self.db.fetch("UPDATE scheduled_games SET roster_key_fingerprint = 'abcdef012'")
+        self.db.fetch("DELETE FROM users")  # the marks stay, without who made them
+        row = self.db.fetch("SELECT paid_at IS NOT NULL AS paid, paid_by, outcome_by FROM game_registrations")[0]
+        self.assertEqual(tuple(row), (True, None, None))
+        command.downgrade(self.cfg, "0013_preview_feedback")
+        columns = {r["column_name"] for r in self.db.fetch(
+            "SELECT column_name FROM information_schema.columns WHERE table_name IN "
+            "('game_registrations', 'scheduled_games')")}
+        self.assertFalse(columns & {"paid_at", "paid_by", "outcome_by", "roster_pulled_at", "roster_agent"})
+        self.assertEqual(self.db.fetch("SELECT display_name FROM game_registrations")[0][0], "Falcão")
+        self.db.fetch("DELETE FROM fields")
+
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)
         self.assertEqual(len(self.script.get_bases()), 1)

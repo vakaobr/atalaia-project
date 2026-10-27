@@ -87,6 +87,11 @@ ul.compact li { margin: 0.15rem 0; overflow-wrap: anywhere; }
 .message { white-space: pre-wrap; overflow-wrap: anywhere; display: block; max-width: 32rem; }
 /* The schedule's row buttons, which wrap inside their cell */
 .actions { display: inline-flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; }
+/* The registration form's replicas: one row each, wrapping on a phone */
+ul.replicas { list-style: none; margin: 0.5rem 0; padding: 0; }
+ul.replicas li.replica-row { display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; align-items: center; margin: 0.5rem 0; }
+ul.replicas li.replica-row select, ul.replicas li.replica-row input { width: auto; flex: 1 1 8rem; min-width: 0; }
+ul.replicas li.replica-row span { overflow-wrap: anywhere; flex: 1 1 12rem; }
 /* The game-day roster on paper: no navigation, no buttons, black on white, every row kept whole, the heading
    row repeated on each page, a box to tick in the last column. */
 @media print {

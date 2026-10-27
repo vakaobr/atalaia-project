@@ -9,7 +9,7 @@
 <p id="roster-link" hidden><a id="roster-href" href="$schedule_href">$sched_roster</a></p>
 <div class="table-wrap">
 <table id="regs" class="data" hidden>
-<thead><tr><th scope="col">$col_display</th><th scope="col">$col_team_pref</th><th scope="col" id="th-fed">$col_fed_number</th><th scope="col">$col_replicas</th><th scope="col">$col_ticket</th><th scope="col">$col_state</th><th scope="col">$col_source</th><th scope="col"><span class="visually-hidden">$edit</span></th></tr></thead>
+<thead><tr><th scope="col">$col_display</th><th scope="col">$col_team_pref</th><th scope="col" id="th-fed">$col_fed_number</th><th scope="col">$col_replicas</th><th scope="col">$col_ticket</th><th scope="col">$col_state</th><th scope="col">$col_paid</th><th scope="col">$col_source</th><th scope="col"><span class="visually-hidden">$edit</span></th></tr></thead>
 <tbody></tbody>
 </table>
 </div>
@@ -27,7 +27,58 @@
 <label for="r-fed">$reg_edit_fed</label>
 <input id="r-fed" name="federation_number" maxlength="32" autocapitalize="none" spellcheck="false">
 </div>
+<div id="r-replicas-row">
+<h3>$reg_edit_replicas</h3>
+<p id="r-rep-limit" class="hint"></p>
+<p id="r-rep-none" hidden>$rep_none</p>
+<ul id="r-replicas" class="replicas"></ul>
+<p><button type="button" id="r-rep-add">$rep_add</button></p>
+</div>
+<p id="r-rep-not-asked" class="hint" hidden>$rep_not_asked</p>
 <p><button type="submit">$save</button> <button type="button" id="r-cancel">$cancel</button></p>
 </fieldset>
 </form>
+</section>
+<section id="reg-move" aria-labelledby="reg-move-title" hidden>
+<h2 id="reg-move-title">$reg_move</h2>
+<form id="move-form" class="staff-form" method="post" novalidate>
+<fieldset>
+<label for="m-game">$reg_move_to</label>
+<select id="m-game" name="scheduled_game_id"></select>
+<p id="m-none" class="hint" hidden>$reg_move_none</p>
+<p class="hint">$reg_move_hint</p>
+<p><button type="submit" id="m-go">$reg_move_go</button> <button type="button" id="m-cancel">$cancel</button></p>
+</fieldset>
+</form>
+</section>
+<section id="reg-io" aria-labelledby="io-title">
+<h2 id="io-title">$io_title</h2>
+<p class="hint">$io_export_intro</p>
+<p><button type="button" id="io-export" disabled>$io_export</button></p>
+<h3>$io_import_title</h3>
+<p class="hint">$io_import_intro</p>
+<p id="io-locked" class="hint" hidden>$io_locked</p>
+<form id="io-form" class="staff-form" method="post" novalidate>
+<fieldset>
+<label for="io-file">$io_file</label>
+<input id="io-file" name="file" type="file" accept=".csv,.json,text/csv,application/json">
+<label for="io-source">$io_source</label>
+<input id="io-source" name="source" maxlength="32" autocapitalize="none" spellcheck="false" required>
+<div class="check"><input id="io-basis" name="basis_confirmed" type="checkbox"> <label for="io-basis">$io_basis</label></div>
+<p><button type="button" id="io-check">$io_check</button> <button type="submit" id="io-run" disabled>$io_run</button></p>
+</fieldset>
+</form>
+<div id="io-result" hidden>
+<p id="io-summary"></p>
+<div id="io-issues" hidden>
+<h3>$io_issues</h3>
+<div class="table-wrap">
+<table id="io-rows" class="data">
+<thead><tr><th scope="col" class="num">$col_row</th><th scope="col">$col_display</th><th scope="col">$col_result</th><th scope="col">$col_detail</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="io-more" class="hint" hidden></p>
+</div>
+</div>
 </section>

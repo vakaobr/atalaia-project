@@ -281,8 +281,10 @@ export function toLogin() {
     location.assign(link(`/staff/login?next=${encodeURIComponent(next)}`));
 }
 
-/** Calls the API with the session's access token; a 401 gets one refresh and one retry, then the login page. */
-export async function api(method, path, body) {
+/** Calls the API with the session's access token; a 401 gets one refresh and one retry, then the login page.
+ * body is JSON, or a Blob/ArrayBuffer sent as it is with options.type as its Content-Type (a file to import);
+ * options.blob gives a successful answer as a Blob (a file to save). */
+export async function api(method, path, body, options = {}) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
         const s = await session(attempt > 0);
         if (!s) {
@@ -290,11 +292,12 @@ export async function api(method, path, body) {
             throw new ApiError(401, { detail: 'not_authenticated' });
         }
         const headers = { Authorization: `Bearer ${s.token}` };
-        if (body !== undefined) headers['Content-Type'] = 'application/json';
+        const raw = body instanceof Blob || body instanceof ArrayBuffer;
+        if (body !== undefined) headers['Content-Type'] = raw ? options.type : 'application/json';
         let r;
         try {
             r = await fetch(path, {
-                method, headers, body: body === undefined ? undefined : JSON.stringify(body),
+                method, headers, body: body === undefined || raw ? body : JSON.stringify(body),
                 credentials: 'same-origin', cache: 'no-store',
             });
         } catch (e) {
@@ -309,7 +312,7 @@ export async function api(method, path, body) {
         let data = null;
         if (r.status !== 204) {
             try {
-                data = await r.json();
+                data = options.blob && r.ok ? await r.blob() : await r.json();
             } catch (e) {
                 data = null;
             }
@@ -332,7 +335,7 @@ export function errorText(err, roles) {
     }
     if (err.status === 401) return t('err_session');
     const key = `e_${err.code}`;
-    if (has(key)) return t(key, { error: err.body.error || '', path: err.body.path || '' });
+    if (has(key)) return t(key, { error: err.body.error || '', path: err.body.path || '', line: err.body.line || '' });
     if (err.status === 404) return t('err_not_found');
     return t('err_generic', { code: err.code });
 }

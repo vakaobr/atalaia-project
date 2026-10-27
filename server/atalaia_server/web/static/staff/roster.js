@@ -6,7 +6,7 @@
 // federation number only when the game asks for one), made from the staff list the API gives the field's admin
 // and gm (the controller's own endpoint wants the field's API key, which no page has). Printable: the page's
 // print style sheet keeps the table. The ticket's hash is never shown, only whether there is one.
-// The server does not record when a controller last pulled the roster, so this page cannot say.
+// The server records when a controller last pulled the roster, with the key it used and its program (FU7).
 
 import { $, boot, errorText, fieldPage, fillRows, page, status, t, when } from './staff.js';
 import { loadBoth, replicaCell, summarise, ticketText } from './registrants.js';
@@ -30,6 +30,17 @@ async function main() {
     const meta = [t('roster_as_of', { at: when(new Date().toISOString(), ctx.zone) }),
         `${t('roster_linked')}: ${game.controller_game ? t('roster_linked_yes') : t('roster_linked_no')}`];
     if (game.walkins !== null && game.walkins !== undefined) meta.push(`${t('roster_walkins')}: ${game.walkins}`);
+    const pull = game.roster_pull;
+    if (game.status === 'draft') {
+        $('roster-pull').hidden = true;
+    } else if (pull) {
+        const key = pull.key_label ? `${pull.key_label} (${pull.key_fingerprint})` : (pull.key_fingerprint
+            ? `${t('roster_key_unnamed')} (${pull.key_fingerprint})` : t('none'));
+        $('roster-pull').textContent = `${t('roster_pulled', { at: when(pull.at, ctx.zone) })} ${t('roster_pulled_by', {
+            key, agent: pull.agent || t('none') })}`;
+    } else {
+        $('roster-pull').textContent = t('roster_not_pulled');
+    }
     const asks = game.federation !== 'off';
     $('th-fed').hidden = !asks;
     $('print').disabled = false;

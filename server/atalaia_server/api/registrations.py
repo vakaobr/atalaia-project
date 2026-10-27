@@ -7,6 +7,13 @@
     GET    /api/v1/fields/{field_id}/scheduled-games/{id}/registrations   admin or gm: the list with names
     PATCH  /api/v1/fields/{field_id}/scheduled-games/{id}/registrations/{reg}  admin or gm: change it
     DELETE /api/v1/fields/{field_id}/scheduled-games/{id}/registrations/{reg}  admin or gm: cancel it
+    POST   .../registrations/{reg}/restore              admin or gm: bring a withdrawn one back (game not
+                                                        started, places left; no ticket: the player asks for one)
+    POST   .../registrations/{reg}/move                 admin or gm: {scheduled_game_id}: to another published
+                                                        game of the field that has not started
+    PUT    .../registrations/{reg}/payment              admin or gm: {paid}: a note, no payment is processed
+    PUT    .../registrations/{reg}/no-show              admin or gm: {no_show}: after the game, for a player the
+                                                        controller reported nothing about (FU7)
     GET    /api/v1/me/registrations                     the account's registrations
     PATCH  /api/v1/me/registrations/{reg}               change them while the window is open
     DELETE /api/v1/me/registrations/{reg}               cancel while the window is open
@@ -62,6 +69,21 @@ class RegistrationIn(BaseModel):
     replicas: Optional[list[ReplicaIn]] = PydanticField(default=None, max_length=svc.MAX_REPLICAS + 1)
 
 
+class MoveIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    scheduled_game_id: uuid.UUID
+
+
+class PaidIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    paid: bool
+
+
+class NoShowIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    no_show: bool
+
+
 class ClaimIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     field_id: uuid.UUID
@@ -98,12 +120,13 @@ async def _game(db: AsyncSession, field_id: uuid.UUID, game_id: uuid.UUID) -> Sc
 
 
 async def _answer(db: AsyncSession, reg: GameRegistration, status_code: int = 200,
-                  extra: Optional[dict[str, Any]] = None) -> JSONResponse:
+                  extra: Optional[dict[str, Any]] = None, staff: bool = False) -> JSONResponse:
     await db.refresh(reg)
     game = await db.get(ScheduledGame, reg.scheduled_game)
     field = await db.get(Field, reg.field_id)
     reps = await svc.replicas_of(db, [reg.id])
-    body = {**svc.registration_json(reg, reps[reg.id], game, field), **(extra or {})}
+    names = await svc.staff_names(db, [reg]) if staff else None
+    body = {**svc.registration_json(reg, reps[reg.id], game, field, names), **(extra or {})}
     return JSONResponse(body, status_code=status_code, headers=NO_STORE)
 
 
@@ -136,12 +159,14 @@ async def list_registrations(field_id: uuid.UUID, game_id: uuid.UUID, principal:
     regs = list(await db.scalars(select(GameRegistration).where(GameRegistration.scheduled_game == game_id)
                                  .order_by(GameRegistration.created_at, GameRegistration.id)))
     reps = await svc.replicas_of(db, [r.id for r in regs])
+    names = await svc.staff_names(db, regs)
     counts: dict[str, int] = {}
     for r in regs:
         counts[r.status] = counts.get(r.status, 0) + 1
     return JSONResponse({"scheduled_game_id": str(game_id), "max_players": game.max_players,
                          "walkins": game.walkins, "counts": counts,
-                         "registrations": [svc.registration_json(r, reps[r.id]) for r in regs]}, headers=NO_STORE)
+                         "registrations": [svc.registration_json(r, reps[r.id], names=names) for r in regs]},
+                        headers=NO_STORE)
 
 
 async def _staff_registration(db: AsyncSession, field_id: uuid.UUID, game_id: uuid.UUID,
@@ -170,7 +195,7 @@ async def staff_change(field_id: uuid.UUID, game_id: uuid.UUID, reg_id: uuid.UUI
         record(db, "registration_update", request, user_id=principal.user.id, resource="registration",
                resource_id=reg.id, details={"field_id": str(field_id), "changed": changed, "by": "staff"})
     await db.commit()
-    return await _answer(db, reg)
+    return await _answer(db, reg, staff=True)
 
 
 @router.delete("/fields/{field_id}/scheduled-games/{game_id}/registrations/{reg_id}", status_code=204)
@@ -187,6 +212,94 @@ async def staff_cancel(field_id: uuid.UUID, game_id: uuid.UUID, reg_id: uuid.UUI
            resource_id=reg.id, details={"field_id": str(field_id), "by": "staff"})
     await db.commit()
     return Response(status_code=204)
+
+
+# --- what staff do beyond changing and withdrawing (Phase 4 follow-up FU7) ---------------------
+
+@router.post("/fields/{field_id}/scheduled-games/{game_id}/registrations/{reg_id}/restore")
+async def staff_restore(field_id: uuid.UUID, game_id: uuid.UUID, reg_id: uuid.UUID, request: Request,
+                        principal: Principal = Depends(current_principal),
+                        db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    """Brings a withdrawn registration back: the game has not started and a place is left."""
+    require_field_role(principal, field_id, "admin", "gm")
+    _, game, reg = await _staff_registration(db, field_id, game_id, reg_id)
+    try:
+        changed = await svc.restore(db, game, reg, svc.now_utc())
+    except svc.RegistrationError as exc:
+        await db.rollback()
+        raise _error(exc) from None
+    record(db, "registration_restore", request, user_id=principal.user.id, resource="registration",
+           resource_id=reg.id, details={"field_id": str(field_id), "changed": changed})
+    await db.commit()
+    return await _answer(db, reg, extra={"changed": changed}, staff=True)
+
+
+@router.post("/fields/{field_id}/scheduled-games/{game_id}/registrations/{reg_id}/move")
+async def staff_move(field_id: uuid.UUID, game_id: uuid.UUID, reg_id: uuid.UUID, body: MoveIn, request: Request,
+                     principal: Principal = Depends(current_principal),
+                     db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    """Moves the registration to another published game of the field that has not started. The ticket stays
+    valid (it is the registration's); the answer is the registration in its new game."""
+    require_field_role(principal, field_id, "admin", "gm")
+    if body.scheduled_game_id == game_id:
+        raise HTTPException(400, "same_game")
+    games = {}
+    for gid in sorted((game_id, body.scheduled_game_id), key=str):  # the same order each time: no deadlock
+        games[gid] = await _game(db, field_id, gid)
+    reg = await db.scalar(select(GameRegistration).where(GameRegistration.id == reg_id,
+                                                         GameRegistration.scheduled_game == game_id).with_for_update())
+    if reg is None:
+        raise HTTPException(404, "registration_not_found")
+    try:
+        changed = await svc.move(db, games[game_id], games[body.scheduled_game_id], reg, svc.now_utc())
+    except svc.RegistrationError as exc:
+        await db.rollback()
+        raise _error(exc) from None
+    record(db, "registration_move", request, user_id=principal.user.id, resource="registration",
+           resource_id=reg.id, details={"field_id": str(field_id), "from": str(game_id),
+                                        "to": str(body.scheduled_game_id), "changed": changed})
+    await db.commit()
+    return await _answer(db, reg, extra={"changed": changed, "moved_from": str(game_id)}, staff=True)
+
+
+@router.put("/fields/{field_id}/scheduled-games/{game_id}/registrations/{reg_id}/payment")
+async def staff_payment(field_id: uuid.UUID, game_id: uuid.UUID, reg_id: uuid.UUID, body: PaidIn, request: Request,
+                        principal: Principal = Depends(current_principal),
+                        db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    """Marks the registration paid or not paid (when and by whom is kept). Only a note: the site server
+    processes no payment."""
+    require_field_role(principal, field_id, "admin", "gm")
+    _, game, reg = await _staff_registration(db, field_id, game_id, reg_id)
+    try:
+        changed = svc.mark_paid(game, reg, body.paid, principal.user.id, svc.now_utc())
+    except svc.RegistrationError as exc:
+        await db.rollback()
+        raise _error(exc) from None
+    if changed:
+        record(db, "registration_paid", request, user_id=principal.user.id, resource="registration",
+               resource_id=reg.id, details={"field_id": str(field_id), "paid": body.paid})
+    await db.commit()
+    return await _answer(db, reg, staff=True)
+
+
+@router.put("/fields/{field_id}/scheduled-games/{game_id}/registrations/{reg_id}/no-show")
+async def staff_no_show(field_id: uuid.UUID, game_id: uuid.UUID, reg_id: uuid.UUID, body: NoShowIn, request: Request,
+                        principal: Principal = Depends(current_principal),
+                        db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    """Marks a registered player who did not come, once the game is over, or takes back such a mark. Check-in
+    stays the controller's: an outcome it pushed is not touched here and replaces a mark at its next push."""
+    require_field_role(principal, field_id, "admin", "gm")
+    _, game, reg = await _staff_registration(db, field_id, game_id, reg_id)
+    try:
+        changed = svc.mark_no_show(game, reg, body.no_show, principal.user.id, svc.now_utc())
+    except svc.RegistrationError as exc:
+        await db.rollback()
+        raise _error(exc) from None
+    if changed:
+        record(db, "registration_no_show", request, user_id=principal.user.id, resource="registration",
+               resource_id=reg.id, details={"field_id": str(field_id), "no_show": body.no_show})
+    await db.commit()
+    return await _answer(db, reg, staff=True)
 
 
 # --- the field's games for the app (decisions S16-13, S17-9) -------------------------------
@@ -224,6 +337,7 @@ async def field_games(slug: str, principal: Principal = Depends(current_principa
                                    "timezone": field.timezone, "federation_label": field.federation_label,
                                    "limit_template": field.limit_template,
                                    "classes": list(svc.classes(field.limit_template)),
+                                   "replica_types": list(svc.REPLICA_TYPES),
                                    "max_replicas": field.max_replicas},
                          "games": out}, headers=NO_STORE)
 

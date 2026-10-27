@@ -8,9 +8,12 @@
     GET /staff/fields/<field>/games/<game>             one game: its score timeline, its event log, its boxes
     GET /staff/fields/<field>/schedule                 the field's scheduled games: create, edit, publish, cancel,
                                                        delete a draft (Phase 4 follow-up FU6)
-    GET /staff/fields/<field>/schedule/<id>/registrations   who registered for a game: change a name, a team or
-                                                       a federation number, withdraw a registration
-    GET /staff/fields/<field>/schedule/<id>/roster     the game-day roster as the controller pulls it, printable
+    GET /staff/fields/<field>/schedule/<id>/registrations   who registered for a game: change a name, a team, a
+                                                       federation number or the replicas, move, withdraw or
+                                                       restore a registration, note who paid, mark a no-show
+                                                       after the game, the list's import and CSV export (FU7)
+    GET /staff/fields/<field>/schedule/<id>/roster     the game-day roster as the controller pulls it, printable,
+                                                       and when a controller last pulled it
     GET /staff/fields/<field>/scenarios                the scenario library (archived ones on request)
     GET /staff/fields/<field>/scenarios/new            a new manifest: check (every problem shown), save
     GET /staff/fields/<field>/scenarios/<id>           one scenario: manifest, package, revisions, edit, archive

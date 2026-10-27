@@ -260,5 +260,8 @@ def staff_json(game: ScheduledGame, field: Field, now: datetime, registered: int
         "cancelled_reason": game.cancelled_reason, "ical_sequence": game.ical_sequence,
         "created_by": str(game.created_by) if game.created_by else None,
         "controller_game": str(game.controller_game) if game.controller_game else None, "walkins": game.walkins,
+        "roster_pull": None if game.roster_pulled_at is None else {
+            "at": _iso(game.roster_pulled_at), "key_label": game.roster_key_label,
+            "key_fingerprint": game.roster_key_fingerprint, "agent": game.roster_agent},
         "created_at": _iso(game.created_at), "updated_at": _iso(game.updated_at),
     }

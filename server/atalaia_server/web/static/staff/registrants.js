@@ -19,6 +19,12 @@ export function changeable(game) {
     return game.status === 'published' && new Date(game.starts_at) > new Date();
 }
 
+/** Whether the game is over, when staff may mark who did not come: the API's rule (not cancelled, and
+ * completed or past its end). */
+export function over(game) {
+    return game.status !== 'cancelled' && (game.status === 'completed' || new Date(game.ends_at) <= new Date());
+}
+
 function row(dl, label, value) {
     dl.append(el('dt', { text: label }), el('dd', {}, value));
 }

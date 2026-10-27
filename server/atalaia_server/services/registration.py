@@ -13,6 +13,12 @@ limit template, make and model). Each becomes a declaration with its own ``decla
 player may change it or cancel until the window closes; the field's staff at any time before the game
 starts.
 
+**What staff do beyond that** (Phase 4 follow-up FU7, decisions FU7-1 to FU7-8): note a registration paid (``mark_paid``:
+who and when, no payment), mark a registered player a no-show after the game (``mark_no_show``: the controller's
+outcomes win), bring a withdrawn registration back before the start while a place is left (``restore``: no ticket),
+move one to another published game of the field that has not started (``move``: the ticket stays, it is the
+registration's), and note when a controller pulled a roster (``record_roster_pull``).
+
 **The player's id at the field** (``field_player_ids``) is made on the first registration there (``p-``
 and 12 base32 characters, the phase 3 form), unless the account adopted a phone's id first: the phone
 sends its id and secret once, the site server keeps the secret's SHA-256 in a claim, and the field's
@@ -43,12 +49,12 @@ from typing import Any, Iterable, Optional
 
 import yaml
 from atalaia_controller import REPO_ROOT, checkin_ticket, sync_format
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import (Field, FieldPlayerId, Game, GameRegistration, PlayerIdClaim, RegistrationReplica, Replica,
-                      ScheduledGame)
+from ..models import (Field, FieldApiKey, FieldPlayerId, Game, GameRegistration, PlayerIdClaim,
+                      RegistrationReplica, Replica, ScheduledGame, User)
 from . import scheduling
 
 LIMIT_TEMPLATES = REPO_ROOT / "app" / "lib" / "chrono" / "limit_templates"
@@ -314,11 +320,36 @@ async def change(db: AsyncSession, field: Field, game: ScheduledGame, reg: GameR
             reg.federation_number = number
             changed.append("federation_number")
     if "replicas" in body:
-        await _put_replicas(db, reg, await check_declarations(db, field, game, reg.player_id, body["replicas"]))
-        changed.append("replicas")
+        decls = await check_declarations(db, field, game, reg.player_id, body["replicas"])
+        if await _replace_replicas(db, reg, decls):
+            changed.append("replicas")
     if changed:
         reg.updated_at = now
     return changed
+
+
+def _replica_key(replica_id: Optional[uuid.UUID], kind: str, cls: str, make_model: Optional[str]) -> tuple[Any, ...]:
+    return (replica_id, kind, cls, make_model)
+
+
+async def _replace_replicas(db: AsyncSession, reg: GameRegistration, decls: list[dict[str, Any]]) -> bool:
+    """Puts the declarations in place of the registration's, and says whether they differed. A declaration
+    that is the same as one already there keeps its ``declaration_id`` (the controller's roster follows it), so
+    saving the form with nothing changed, or adding one replica, does not renew the others."""
+    old = (await replicas_of(db, [reg.id]))[reg.id]
+    if [_replica_key(r.replica_id, r.replica_type, r.replica_class, r.make_model) for r in old] == \
+            [_replica_key(d["replica_id"], d["type"], d["cls"], d["make_model"]) for d in decls]:
+        return False
+    pool: dict[tuple[Any, ...], list[uuid.UUID]] = {}
+    for r in old:
+        pool.setdefault(_replica_key(r.replica_id, r.replica_type, r.replica_class, r.make_model), []).append(
+            r.declaration_id)
+    for d in decls:
+        ids = pool.get(_replica_key(d["replica_id"], d["type"], d["cls"], d["make_model"]))
+        if ids:
+            d["declaration_id"] = ids.pop(0)
+    await _put_replicas(db, reg, decls)
+    return True
 
 
 def cancel(game: ScheduledGame, reg: GameRegistration, now: datetime, staff: bool) -> None:
@@ -330,6 +361,122 @@ def cancel(game: ScheduledGame, reg: GameRegistration, now: datetime, staff: boo
     elif not is_open(game, now):
         raise RegistrationError("registration_closed", 409)
     reg.status, reg.cancelled_at, reg.updated_at, reg.ticket_hash = "cancelled", now, now, None
+
+
+def _staff_window(game: ScheduledGame, now: datetime) -> None:
+    """What staff may change in a registration: a published game that has not started."""
+    if game.status != "published" or game.starts_at <= now:
+        raise RegistrationError("game_started", 409)
+
+
+def mark_paid(game: ScheduledGame, reg: GameRegistration, paid: bool, user_id: uuid.UUID, now: datetime) -> bool:
+    """Staff's note that the registration is paid (or not): when and who. No payment is processed. A withdrawn
+    registration or a cancelled game cannot be marked paid (the note can still be cleared). False when
+    nothing changed."""
+    if paid:
+        if reg.status == "cancelled":
+            raise RegistrationError("registration_withdrawn", 409)
+        if game.status == "cancelled":
+            raise RegistrationError("game_cancelled", 409)
+        if reg.paid_at is not None:
+            return False
+        reg.paid_at, reg.paid_by = now, user_id
+    else:
+        if reg.paid_at is None:
+            return False
+        reg.paid_at = reg.paid_by = None
+    reg.updated_at = now
+    return True
+
+
+def mark_no_show(game: ScheduledGame, reg: GameRegistration, no_show: bool, user_id: uuid.UUID,
+                 now: datetime) -> bool:
+    """Staff's mark that a registered player did not come, once the game is over. Check-in stays the
+    controller's: only an active registration (one the controller reported nothing about) is marked, and a
+    controller's outcome overwrites the mark at its next push. Staff undo only a mark staff made. False
+    when nothing changed."""
+    if no_show:
+        if reg.status == "no_show":
+            return False
+        if reg.status != "registered":
+            raise RegistrationError("not_registered", 409)
+        if game.status == "cancelled":
+            raise RegistrationError("game_cancelled", 409)
+        if game.status != "completed" and game.ends_at > now:
+            raise RegistrationError("game_not_over", 409)
+        reg.status, reg.outcome_at, reg.outcome_by = "no_show", now, user_id
+    else:
+        if reg.status != "no_show":
+            return False
+        if reg.outcome_by is None:
+            raise RegistrationError("outcome_from_controller", 409)
+        reg.status, reg.outcome_at, reg.outcome_by = "registered", None, None
+    reg.updated_at = now
+    return True
+
+
+def _fit(game: ScheduledGame, reg: GameRegistration) -> list[str]:
+    """What the game's rules do to the registration's team and federation number: the number is needed when the
+    game requires one (refused without) and dropped when it asks for none; a team the game lacks is cleared."""
+    changed = []
+    number = _federation(game, reg.federation_number)
+    if number != reg.federation_number:
+        reg.federation_number = number
+        changed.append("federation_number")
+    if reg.team_preference is not None and reg.team_preference not in (game.teams or []):
+        reg.team_preference = None
+        changed.append("team_preference")
+    return changed
+
+
+async def restore(db: AsyncSession, game: ScheduledGame, reg: GameRegistration, now: datetime) -> list[str]:
+    """Brings a withdrawn registration back while the game has not started (staff; the window does not apply
+    but the places and the federation rule do). It has no ticket: the player asks for a new one in the app
+    (or the marshal ticks the name). Returns what the game's rules changed."""
+    if reg.status != "cancelled":
+        raise RegistrationError("not_withdrawn", 409)
+    _staff_window(game, now)
+    if reg.display_name is None:
+        raise RegistrationError("registration_erased", 409)  # its person's data is gone: nothing to bring back
+    if game.max_players is not None and (await counts(db, [game.id])).get(game.id, 0) >= game.max_players:
+        raise RegistrationError("game_full", 409)
+    changed = _fit(game, reg)
+    reg.status, reg.cancelled_at, reg.updated_at = "registered", None, now
+    return changed
+
+
+async def move(db: AsyncSession, source: ScheduledGame, target: ScheduledGame, reg: GameRegistration,
+               now: datetime) -> list[str]:
+    """Moves an active registration to another published game of the field that has not started, both games
+    locked by the caller (``lock_game``, in id order). The person, the player id, the registration id, the
+    ticket and the replicas stay (the ticket is the registration's, not the game's: it holds the registration
+    id, the player id and a secret, and the roster carries its hash); the registration window does not apply
+    (staff) but the places, the federation rule and the target's one registration per person do. Returns
+    what the target's rules changed (team, federation number, replicas)."""
+    if reg.status != "registered":
+        raise RegistrationError("not_registered", 409)
+    _staff_window(source, now)
+    if target.id == source.id:
+        raise RegistrationError("same_game", 400)
+    if target.status == "cancelled":
+        raise RegistrationError("game_cancelled", 409)
+    if target.status != "published" or target.starts_at <= now:
+        raise RegistrationError("target_started", 409)
+    clash = [GameRegistration.player_id == reg.player_id]
+    if reg.user_id is not None:
+        clash.append(GameRegistration.user_id == reg.user_id)
+    if reg.external_ref is not None:
+        clash.append((GameRegistration.source == reg.source) & (GameRegistration.external_ref == reg.external_ref))
+    if await db.scalar(select(GameRegistration.id).where(GameRegistration.scheduled_game == target.id, or_(*clash))):
+        raise RegistrationError("already_registered_there", 409)
+    if target.max_players is not None and (await counts(db, [target.id])).get(target.id, 0) >= target.max_players:
+        raise RegistrationError("game_full", 409)
+    changed = _fit(target, reg)
+    if not target.predeclare_replicas and (await replicas_of(db, [reg.id]))[reg.id]:
+        await _put_replicas(db, reg, [])
+        changed.append("replicas")
+    reg.scheduled_game, reg.updated_at = target.id, now
+    return changed
 
 
 def renew_ticket(game: ScheduledGame, reg: GameRegistration, now: datetime) -> bytes:
@@ -353,9 +500,19 @@ def replica_json(r: RegistrationReplica) -> dict[str, Any]:
             "reading_id": str(r.reading_id) if r.reading_id else None}
 
 
+async def staff_names(db: AsyncSession, regs: Iterable[GameRegistration]) -> dict[uuid.UUID, str]:
+    """The usernames of the staff accounts that marked these registrations paid (staff see them, a player not)."""
+    ids = {r.paid_by for r in regs if r.paid_by is not None}
+    if not ids:
+        return {}
+    return {i: name for i, name in await db.execute(select(User.id, User.username).where(User.id.in_(ids)))}
+
+
 def registration_json(reg: GameRegistration, replicas: list[RegistrationReplica],
-                      game: Optional[ScheduledGame] = None, field: Optional[Field] = None) -> dict[str, Any]:
-    """A registration as its player or the field's staff see it: never the ticket's hash."""
+                      game: Optional[ScheduledGame] = None, field: Optional[Field] = None,
+                      names: Optional[dict[uuid.UUID, str]] = None) -> dict[str, Any]:
+    """A registration as its player or the field's staff see it: never the ticket's hash. ``names`` (the
+    staff views) adds who marked it paid."""
     out: dict[str, Any] = {
         "id": str(reg.id), "scheduled_game_id": str(reg.scheduled_game), "field_id": str(reg.field_id),
         "player_id": reg.player_id, "display_name": reg.display_name, "team_preference": reg.team_preference,
@@ -364,7 +521,11 @@ def registration_json(reg: GameRegistration, replicas: list[RegistrationReplica]
         "has_ticket": reg.ticket_hash is not None, "replicas": [replica_json(r) for r in replicas],
         "created_at": _iso(reg.created_at), "updated_at": _iso(reg.updated_at),
         "cancelled_at": _iso(reg.cancelled_at), "outcome_at": _iso(reg.outcome_at),
+        "paid": reg.paid_at is not None, "paid_at": _iso(reg.paid_at),
+        "no_show_by_staff": reg.status == "no_show" and reg.outcome_by is not None,
     }
+    if names is not None:
+        out["paid_by"] = names.get(reg.paid_by) if reg.paid_by is not None else None
     if game is not None:
         out["game"] = {"title": game.title, "starts_at": _iso(game.starts_at), "ends_at": _iso(game.ends_at),
                        "status": game.status}
@@ -453,6 +614,23 @@ async def roster_players(db: AsyncSession, field_id: uuid.UUID, game_id: uuid.UU
         .limit(sync_format.MAX_ROSTER)))
 
 
+def _agent(value: Optional[str]) -> Optional[str]:
+    text = (value or "").strip()[:64]
+    return text if text and _printable(text) else None
+
+
+async def record_roster_pull(db: AsyncSession, key_id: uuid.UUID, game_id: uuid.UUID, now: datetime,
+                             user_agent: Optional[str]) -> None:
+    """Notes that a controller pulled the game's roster: when, the key it used (its label and fingerprint now)
+    and its User-Agent. A pull carries nothing else of the controller. ``updated_at`` is kept: the public pages'
+    and feeds' ``Last-Modified`` follows what the game shows, not a pull."""
+    key = await db.get(FieldApiKey, key_id)
+    await db.execute(update(ScheduledGame).where(ScheduledGame.id == game_id).values(
+        roster_pulled_at=now, roster_key_label=key.label[:64] if key is not None and key.label else None,
+        roster_key_fingerprint=key.key_sha256[:8] if key is not None else None, roster_agent=_agent(user_agent),
+        updated_at=ScheduledGame.updated_at).execution_options(synchronize_session=False))
+
+
 # The scheduled game follows its controller game: published -> in_progress -> completed, never back.
 _FORWARD = {"running": "in_progress", "paused": "in_progress", "ended": "completed"}
 
@@ -502,6 +680,7 @@ async def apply_checkins(db: AsyncSession, field_id: uuid.UUID, game: Game, body
             ignored += 1  # cancelled and did not come: nothing to record
             continue
         reg.status, reg.outcome_at, reg.updated_at = item["outcome"], now, now
+        reg.outcome_by = None  # the controller's word replaces a mark staff made
         applied += 1
         for d in item["declarations"]:
             result = await db.execute(update(RegistrationReplica).where(

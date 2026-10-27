@@ -616,6 +616,12 @@ class ScheduledGame(Base):
     # games.id, not the radio's 16-bit game_id, decision S13-6) and how many walked in (a count only).
     controller_game: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("games.id", ondelete="SET NULL"))
     walkins: Mapped[Optional[int]] = mapped_column(Integer)
+    # Phase 4 follow-up FU7 (migration 0014): the last roster pull (a controller's GET carries only its key
+    # and User-Agent, so those are what is kept: the key's label and fingerprint as they were then).
+    roster_pulled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    roster_key_label: Mapped[Optional[str]] = mapped_column(String(64))
+    roster_key_fingerprint: Mapped[Optional[str]] = mapped_column(String(8))
+    roster_agent: Mapped[Optional[str]] = mapped_column(String(64))
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
 
@@ -639,6 +645,9 @@ class GameRegistration(Base):
         UniqueConstraint("scheduled_game", "user_id"),
         UniqueConstraint("scheduled_game", "source", "external_ref"),
         CheckConstraint("status IN ('registered', 'cancelled', 'checked_in', 'no_show')", name="status"),
+        CheckConstraint("paid_by IS NULL OR paid_at IS NOT NULL", name="paid"),
+        Index("idx_game_registrations_paid_by", "paid_by"),
+        Index("idx_game_registrations_outcome_by", "outcome_by"),
         Index("idx_game_registrations_user", "user_id"),
         Index("idx_game_registrations_field_player", "field_id", "player_id"),
     )
@@ -658,6 +667,12 @@ class GameRegistration(Base):
     external_ref: Mapped[Optional[str]] = mapped_column(String(128))
     cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     outcome_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # Phase 4 follow-up FU7 (migration 0014): what staff record. ``paid_at`` (with who marked it) is only a
+    # note, no payment is processed; ``outcome_by`` is the staff account that marked a no-show by hand (null
+    # for an outcome the controller reported).
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    paid_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    outcome_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
 

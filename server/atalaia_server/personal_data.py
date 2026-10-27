@@ -24,6 +24,7 @@ What holds personal data now (plan phases 10-12):
 | ``replicas`` (plan phase 14) | the replicas of the person's player ids (in ``chrono_records.json``) | kept for the readings, without make, model and tag | the field's retention after the last change, once no reading names them |
 | ``marshal_keys`` (plan phase 14) | the keys the person registered as a marshal (``marshal_keys.json``) | kept, so what they signed still verifies, without the link to the account | the field's retention after the key's period ended, once no reading needs it |
 | ``scheduled_games`` (plan phase 15) | the games the person scheduled as the field's staff (``scheduled_games.json``) | kept (they are the field's), without the link to the account (``created_by``) | 24 months after the game's end, as game history |
+| ``game_registrations.paid_by`` and ``outcome_by``, ``scheduled_games.roster_*`` (FU7) | the registrations' ``paid_at`` (``registrations.json``); that staff marked others' registrations paid or no-show is in the person's own audit log entries (``registration_paid``, ``registration_no_show``, never a name); a roster pull has no person (a key's label and a User-Agent) | ``paid_by`` and ``outcome_by`` cleared (the marks stay as the field's record) | with the registration or the scheduled game |
 | ``game_registrations`` with ``registration_replicas`` (plan phase 16) | the person's registrations with their pre-declared replicas and outcomes (``registrations.json``; never the ticket's hash) | a game not yet started: cancelled; every one: the account, the name, the team preference, the federation number and the ticket's hash cleared, the replicas' make and model too (the outcome and the declarations' states stay, the field's history) | the federation number 30 days after the game (ADR-P4-11); the rest with the scheduled game (24 months) |
 | ``player_id_claims`` (plan phase 16) | the person's claims of a phone's player id (``player_id_claims.json``) | deleted | 30 days after the claim was made |
 | imported ``game_registrations`` (plan phase 17: ``source`` not ``site``, no account) with their replicas | (no account: the field's staff see them in the game's list and its CSV export) | (no account to erase; the field answers a request from the person, as the data controller of what it imported) | deleted 30 days after the game, the guest rule (ADR-P4-8, ADR-P4-12) |
@@ -226,6 +227,7 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
                            "team_preference": r.team_preference, "federation_number": r.federation_number,
                            "status": r.status, "source": r.source, "created_at": _iso(r.created_at),
                            "updated_at": _iso(r.updated_at), "outcome_at": _iso(r.outcome_at),
+                           "paid_at": _iso(r.paid_at),
                            "replicas": [{"declaration_id": str(d.declaration_id),
                                          "replica_id": _str(d.replica_id), "type": d.replica_type,
                                          "class": d.replica_class, "make_model": d.make_model, "state": d.state}
@@ -290,7 +292,8 @@ player_id_claims.json
                     Os seus pedidos para ligar à conta o identificador de um telemóvel.
 registrations.json  Your registrations for scheduled games: the name you chose for the
                     game, team preference, federation number, the replicas you declared
-                    and, after the game, whether you checked in. Never the ticket.
+                    and, after the game, whether you checked in; and when the field
+                    marked it paid. Never the ticket.
                     As suas inscrições em jogos, com as réplicas declaradas.
 chrono_records.json Per field: your chrono readings, each with the record exactly as
                     the marshal signed it (record_json) and the marshal's public key,
@@ -393,6 +396,11 @@ async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_reques
         user_id=None, display_name=None, team_preference=None, federation_number=None, ticket_hash=None,
         updated_at=now).execution_options(synchronize_session=False))
     await db.execute(delete(PlayerIdClaim).where(PlayerIdClaim.user_id == user_id))
+    # What a staff account marked on registrations (paid, no-show: FU7) stays, without who marked it.
+    await db.execute(update(GameRegistration).where(GameRegistration.paid_by == user_id).values(paid_by=None)
+                     .execution_options(synchronize_session=False))
+    await db.execute(update(GameRegistration).where(GameRegistration.outcome_by == user_id).values(outcome_by=None)
+                     .execution_options(synchronize_session=False))
     # The field's schedule stays; who scheduled a game does not.
     await db.execute(update(ScheduledGame).where(ScheduledGame.created_by == user_id).values(created_by=None)
                      .execution_options(synchronize_session=False))

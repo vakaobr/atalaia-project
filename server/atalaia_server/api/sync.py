@@ -164,6 +164,9 @@ async def roster(request: Request) -> JSONResponse:
         answer = await registration.roster(db, caller.field_id, wanted)
         if answer is None:
             raise sync.SyncProblem(404, "scheduled_game_not_found")
+        # FU7-6: when this key's controller last pulled the game's roster (the staff roster page shows it).
+        await registration.record_roster_pull(db, caller.key_id, wanted, datetime.now(timezone.utc),
+                                              request.headers.get("user-agent"))
         return answer
     return await _pull(request, build)
 
