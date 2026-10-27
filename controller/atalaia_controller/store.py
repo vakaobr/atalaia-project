@@ -69,6 +69,11 @@ the GM marks on the field's plans besides the boxes (a safe zone, a team's respa
 first aid, objectives...), one row per feature with its level and the rest (type, label, shape and its
 coordinates, team, who may see it, a note) as JSON (map_features.py). A schema 10 file gets the empty
 table; nothing else changes.
+
+Schema 13 (decision S14-5) adds ``shared_readings``: other fields' signed chrono records of the players
+on a linked game's roster, pulled from the site server with each person's consent (the sync client's
+``_pull_shared_chrono``). Kept apart from ``chrono_readings`` (the field's own measurements), so they
+are never judged, never sent back, and never override a local reading. A schema 12 file gets the empty table.
 """
 
 from __future__ import annotations
@@ -83,7 +88,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes, per level's plan
 FIELD_LEVELS_MAX = 10  # levels of a multi-story field (decision ML-1)
@@ -243,6 +248,16 @@ CREATE TABLE IF NOT EXISTS chrono_readings (
     received_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_readings_replica ON chrono_readings (replica_id, player_id);
+CREATE TABLE IF NOT EXISTS shared_readings (
+    player_id   TEXT NOT NULL,                         -- schema 13 (S14-5): the player's id at THIS field; other
+    reading_id  TEXT NOT NULL,                         -- fields' records pulled from the site server, never
+    field_name  TEXT NOT NULL,                         -- judged, counted or pushed back (chrono_readings is
+    timestamp   TEXT NOT NULL,                         -- the controller's own measurements)
+    record_json TEXT NOT NULL,                         -- the signed record, as the site server gave it
+    public_key  BLOB NOT NULL,                         -- the marshal's key it verified with
+    pulled_at   REAL NOT NULL,
+    PRIMARY KEY (player_id, reading_id)
+);
 CREATE TABLE IF NOT EXISTS marshal_keys (
     marshal_id    TEXT PRIMARY KEY,
     name          TEXT NOT NULL,
@@ -1256,6 +1271,34 @@ class Store:
                            "(SELECT reading_id FROM chrono_readings)")
             return n
 
+    def has_reading(self, reading_id: str) -> bool:
+        return self._exec("SELECT 1 FROM chrono_readings WHERE reading_id = ?", (reading_id,)).fetchone() is not None
+
+    def set_shared_readings(self, player_id: str, rows: list[dict[str, Any]], now: float) -> None:
+        """What the site server shares of a player at other fields, replacing what was kept (a record it no
+        longer gives, a consent withdrawn, goes). Rows: ``{reading_id, field_name, timestamp, record_json,
+        public_key}``."""
+        with self._lock:
+            self._exec("DELETE FROM shared_readings WHERE player_id = ?", (player_id,))
+            for r in rows:
+                self._exec("INSERT OR REPLACE INTO shared_readings (player_id, reading_id, field_name, timestamp, "
+                           "record_json, public_key, pulled_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                           (player_id, r["reading_id"], r["field_name"], r["timestamp"], r["record_json"],
+                            sqlite3.Binary(r["public_key"]), now))
+
+    def shared_readings(self, player_id: str) -> list[dict[str, Any]]:
+        return [{"reading_id": r["reading_id"], "field": r["field_name"], "timestamp": r["timestamp"],
+                 "record": json.loads(r["record_json"]), "pulled_at": r["pulled_at"]}
+                for r in self._exec("SELECT * FROM shared_readings WHERE player_id = ? ORDER BY timestamp, reading_id",
+                                    (player_id,)).fetchall()]
+
+    def delete_shared_readings(self, *, player_id: Optional[str] = None, before: Optional[str] = None) -> int:
+        if player_id is not None:
+            return self._exec("DELETE FROM shared_readings WHERE player_id = ?", (player_id,)).rowcount
+        if before is not None:
+            return self._exec("DELETE FROM shared_readings WHERE timestamp < ?", (before,)).rowcount
+        return 0
+
     def delete_marshal_history(self, replaced_before: float) -> int:
         """Earlier marshal keys replaced before then (retention: no reading they signed is left)."""
         return self._exec("DELETE FROM marshal_key_history WHERE replaced_at < ?", (replaced_before,)).rowcount
@@ -1359,6 +1402,7 @@ class Store:
             self._exec("DELETE FROM checkins WHERE player_id = ?", (player_id,))
             self._exec("DELETE FROM player_positions WHERE player_id = ?", (player_id,))
             self._exec("DELETE FROM field_players WHERE player_id = ?", (player_id,))
+            self._exec("DELETE FROM shared_readings WHERE player_id = ?", (player_id,))  # other fields' copies (S14-5)
 
     def purge_checkins(self, ended_before: float, idle_before: float, now: float) -> dict[str, int]:
         """Retention (ADR-P3-13): personal fields and declarations of games that ended before

@@ -15,6 +15,8 @@
     POST /api/v1/sync/claims   the controller's verdicts on accounts' claims of its player ids
     GET  /api/v1/sync/schedule?days=14         the field's published games of the coming days
     GET  /api/v1/sync/roster?scheduled_game_id= one scheduled game's live registrations
+    GET  /api/v1/sync/chrono?scheduled_game_id= other fields' chrono records of that roster's players, only
+                               with the person's consent for both fields (S14-5)
     GET  /api/v1/sync/claims                   accounts' claims of player ids, waiting for this field's verdict
     GET  /api/v1/sync/field                    the field's branding and saved teams, images by SHA-256 (plan phase 18)
     GET  /api/v1/sync/images/{sha256}          one of those images, as stored (checked, metadata stripped)
@@ -46,7 +48,8 @@ from atalaia_controller import sync_format
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, Response
 
-from .. import remote_gm, sync, tenancy
+from .. import chrono_registry, remote_gm, sync, tenancy
+from ..audit import record
 from ..auth import UNAUTHORISED, bearer
 from ..models import FieldApiKey
 from ..services import branding, library, registration
@@ -162,6 +165,27 @@ async def roster(request: Request) -> JSONResponse:
         if answer is None:
             raise sync.SyncProblem(404, "scheduled_game_not_found")
         return answer
+    return await _pull(request, build)
+
+
+@router.get("/chrono")
+async def shared_chrono(request: Request) -> JSONResponse:
+    try:
+        wanted = uuid.UUID(request.query_params.get("scheduled_game_id", ""))
+    except ValueError:
+        return JSONResponse({"detail": "invalid_query", "error": "not_a_uuid", "path": "scheduled_game_id"},
+                            status_code=400, headers=NO_STORE)
+
+    async def build(db: Any, caller: sync.Caller) -> Any:
+        players = await registration.roster_players(db, caller.field_id, wanted)
+        if players is None:
+            raise sync.SyncProblem(404, "scheduled_game_not_found")
+        found = await chrono_registry.shared_for_players(db, caller.field_id, players)
+        if found:
+            # As the staff's lookup is logged: that a controller pulled and how much, not whose.
+            record(db, "chrono_shared_pull", request, resource="field", resource_id=caller.field_id,
+                   details={"players": len(found), "readings": sum(len(p["readings"]) for p in found)})
+        return {"sync_version": sync_format.SYNC_VERSION, "scheduled_game_id": str(wanted), "players": found}
     return await _pull(request, build)
 
 

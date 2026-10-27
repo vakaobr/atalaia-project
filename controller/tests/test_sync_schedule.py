@@ -24,9 +24,9 @@ import unittest
 import uuid
 from typing import Any, Optional
 
-from p3support import GM, T0, P3Case, bearer, declaration, new_identity
+from p3support import GM, T0, Marshal, P3Case, bearer, declaration, new_identity
 
-from atalaia_controller import checkin_ticket, sync_format
+from atalaia_controller import REPO_ROOT, checkin_ticket, sync_format
 from atalaia_controller.store import SCHEMA_VERSION, Store
 from atalaia_controller.sync_client import SyncClient, SyncError
 
@@ -54,6 +54,8 @@ class FakeSite:
         self.gets: list[str] = []
         self.games: dict[tuple[int, int], dict[str, Any]] = {}
         self.unsupported = False
+        self.shared: list[dict[str, Any]] = []  # other fields' records by player (S14-5)
+        self.no_shared_endpoint = False  # an older site server: the roster, but no shared chrono
 
     def get(self, path: str) -> dict[str, Any]:
         self.gets.append(path)
@@ -69,6 +71,12 @@ class FakeSite:
             answer = {"sync_version": 1, "scheduled_game_id": sid, "status": "published", "federation": "optional",
                       "registrations": copy.deepcopy(self.rosters[sid])}
             kind = "roster"
+        elif path.startswith("/api/v1/sync/chrono"):
+            sid = path.rsplit("=", 1)[1]
+            if self.no_shared_endpoint:
+                raise SyncError("Not Found", 404)
+            answer = {"sync_version": 1, "scheduled_game_id": sid, "players": copy.deepcopy(self.shared)}
+            kind = "shared_chrono"
         else:
             answer = {"sync_version": 1, "claims": copy.deepcopy(self.claims)}
             kind = "claims"
@@ -321,6 +329,143 @@ class ClaimTests(GameDayCase):
         [body] = self.site.bodies("claims")
         self.assertEqual([r["result"] for r in body["results"]], ["confirmed", "refused", "refused", "unknown"])
         self.assertNotIn(sha(mine[1]), json.dumps(self.site.posts))  # nothing of the hash goes back
+
+
+ARENA = "Arena Norte"
+VECTORS = json.loads((REPO_ROOT / "protocol" / "vectors" / "sync.json").read_text(encoding="utf-8"))
+
+
+class SharedChronoTests(GameDayCase):
+    """Other fields' chrono records of the roster's players (decision S14-5): pulled with the roster, kept
+    apart, shown as from another field, never judged, counted or pushed back."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.other = Marshal("m-rui", "Rui", field_id="arena")
+        self.falcao, _, _ = registration("Falcão")
+        self.coruja, _, _ = registration("Coruja")
+        self.site.rosters[SCHEDULED] = [self.falcao, self.coruja]
+        self.gid = self.from_schedule()["id"]
+        self.pid = self.falcao["player_id"]
+        self.cycle()  # the roster, and nothing shared yet
+
+    def shared(self, pid: str, *records: dict[str, Any], field: str = ARENA) -> dict[str, Any]:
+        return {"player_id": pid, "readings": [{"field": field, "record": json.dumps(r, ensure_ascii=False),
+                                                "public_key": self.other.public_b64} for r in records]}
+
+    def record(self, velocity: float = 100.0, pid: str = "p-arenaarena22", **kw: Any) -> dict[str, Any]:
+        return self.other.reading(str(uuid.uuid4()), pid, velocity, when=T0 - 7200, **kw)
+
+    def listed(self, pid: Optional[str] = None) -> list[dict[str, Any]]:
+        players = {p["player_id"]: p for p in self.chrono_list(self.gid)["players"]}
+        return players[pid or self.pid]["shared_readings"]
+
+    def test_the_records_show_marked_and_never_count(self) -> None:
+        before = self.chrono_list(self.gid)
+        rec = self.record(250.0, rtype="spotcheck")  # far over any limit: would refuse a replica if it counted
+        self.site.shared = [self.shared(self.pid, rec)]
+        self.cycle()
+        shown = self.listed()
+        self.assertEqual([(s["reading_id"], s["field"], s["from_other_field"], s["type"], s["energy_j"],
+                           s["marshal_name"]) for s in shown],
+                         [(rec["reading_id"], ARENA, True, "spotcheck", rec["energy_j"], "Rui")])
+        after = self.chrono_list(self.gid)
+        self.assertEqual((after["counts"], self.listed(self.coruja["player_id"])), (before["counts"], []))
+        self.assertEqual([d["state"] for p in after["players"] for d in p["declarations"]], ["pending", "pending"])
+        row = self.rows(self.gid)[self.pid]
+        self.assertEqual([s["reading_id"] for s in row["shared_readings"]], [rec["reading_id"]])
+        # Not the field's own readings: not in the player's data, not judged, never sent to the site server.
+        self.assertEqual(self.client.get(f"/api/v1/players/{self.pid}/chrono", headers=GM).json()["readings"], [])
+        self.assertEqual(self.bundle.store.readings(player_id=self.pid), [])
+        self.cycle()
+        self.assertEqual(self.site.bodies("chrono"), [])
+        self.assertEqual(self.sync.status()["game_day"]["shared_chrono"], {"supported": True, "stored": 1})
+
+    def test_the_roster_players_only_and_only_what_verifies(self) -> None:
+        good = self.record(100.0)
+        tampered = {**self.record(100.0), "velocity_mps": 90.0}  # changed after it was signed
+        stranger = self.record(110.0)
+        self.site.shared = [self.shared(self.pid, good, tampered),
+                            self.shared("p-zzzzzzzzzzzz", stranger)]
+        with self.assertLogs("atalaia.sync", level="WARNING") as logs:
+            self.cycle()
+        self.assertIn("2 records dropped", "\n".join(logs.output))
+        self.assertEqual([s["reading_id"] for s in self.listed()], [good["reading_id"]])
+        self.assertEqual(self.bundle.store.shared_readings("p-zzzzzzzzzzzz"), [])
+
+    def test_a_local_measurement_is_never_replaced(self) -> None:
+        mine = self.record(95.0)
+        self.bundle.store.add_reading(mine, str(uuid.uuid4()), "pass", T0)
+        other = self.record(98.0)
+        self.site.shared = [self.shared(self.pid, mine, other)]
+        self.cycle()
+        self.assertEqual([s["reading_id"] for s in self.listed()], [other["reading_id"]])
+        self.assertEqual([r["reading_id"] for r in self.bundle.store.readings()], [mine["reading_id"]])
+
+    def test_a_withdrawn_consent_takes_the_records_away(self) -> None:
+        self.site.shared = [self.shared(self.pid, self.record())]
+        self.cycle()
+        self.assertEqual(len(self.listed()), 1)
+        self.site.shared = []  # the person withdrew, or the field stopped sharing
+        self.cycle()
+        self.assertEqual(self.listed(), [])
+        self.assertEqual(self.bundle.store.shared_readings(self.pid), [])
+
+    def test_nothing_after_the_game_starts(self) -> None:
+        self.site.shared = [self.shared(self.pid, self.record())]
+        self.cycle()
+        self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True})
+        pulls = [g for g in self.site.gets if "/sync/chrono" in g]
+        self.site.shared = [self.shared(self.pid, self.record(), self.record(101.0))]
+        self.cycle()
+        self.assertEqual([g for g in self.site.gets if "/sync/chrono" in g], pulls)  # no new pull
+        self.assertEqual(len(self.bundle.store.shared_readings(self.pid)), 1)  # kept as it was
+
+    def test_an_older_site_server(self) -> None:
+        self.site.no_shared_endpoint = True
+        self.cycle()  # the roster still applies; the records are skipped quietly
+        self.assertEqual(len(self.rows(self.gid)), 2)
+        self.assertEqual(self.sync.status()["game_day"]["shared_chrono"]["supported"], False)
+        self.assertTrue(self.sync.status()["game_day"]["supported"])
+
+    def test_retention_and_erasure(self) -> None:
+        old = self.other.reading(str(uuid.uuid4()), "p-arenaarena22", 100.0, when=T0 - 366 * 86400)
+        fresh = self.record()
+        self.site.shared = [self.shared(self.pid, old, fresh)]
+        self.cycle()
+        self.assertEqual([s["reading_id"] for s in self.listed()], [fresh["reading_id"]])  # too old: not kept
+        keep = {"field_name": ARENA, "public_key": b"k" * 32, "record_json": json.dumps(fresh)}
+        self.bundle.store.set_shared_readings(self.pid, [
+            {**keep, "reading_id": "old-one", "timestamp": "2025-01-01T00:00:00Z"},
+            {**keep, "reading_id": "new-one", "timestamp": "2027-01-10T00:00:00Z"}], T0)
+        self.assertEqual(self.svc.purge(force=True)["shared_readings"], 1)  # the readings' 365 days
+        self.assertEqual([r["reading_id"] for r in self.bundle.store.shared_readings(self.pid)], ["new-one"])
+        self.client.delete(f"/api/v1/players/{self.pid}/chrono", headers=GM)  # the player's erasure of chrono data
+        self.assertEqual(self.bundle.store.shared_readings(self.pid), [])
+        self.bundle.store.set_shared_readings(self.pid, [{**keep, "reading_id": "again",
+                                                          "timestamp": "2027-01-10T00:00:00Z"}], T0)
+        self.client.delete(f"/api/v1/players/{self.pid}", headers=GM)  # and of the whole identity
+        self.assertEqual(self.bundle.store.shared_readings(self.pid), [])
+
+    def test_the_shared_vectors(self) -> None:
+        """protocol/vectors/sync.json's shared_chrono_apply: what a controller keeps of an answer."""
+        records = {v["record"]["reading_id"]: v["record"] for v in json.loads(
+            (REPO_ROOT / "protocol" / "vectors" / "chrono_record.json").read_text(encoding="utf-8"))["valid"]}
+        store = self.svc.store
+        first = VECTORS["shared_chrono_apply"][0]
+        for vec in VECTORS["shared_chrono_apply"]:
+            with self.subTest(vector=vec["name"]):
+                store.delete_readings(before="9999-01-01T00:00:00Z")
+                for rid in vec["local_reading_ids"]:
+                    store.add_reading(records[rid], str(uuid.uuid4()), "pass", T0)
+                if vec.get("after") == "apply_answer_first":  # what an earlier pull left
+                    self.svc.apply_shared_chrono(self.gid, first["roster"], sync_format.ANSWERS["shared_chrono"](
+                        copy.deepcopy(first["answer"])))
+                answer = sync_format.ANSWERS["shared_chrono"](copy.deepcopy(vec["answer"]))
+                result = self.svc.apply_shared_chrono(self.gid, vec["roster"], answer)
+                self.assertEqual({p: sorted(r["reading_id"] for r in store.shared_readings(p)) for p in vec["roster"]},
+                                 {p: sorted(ids) for p, ids in vec["stored"].items()})
+                self.assertEqual(result["dropped"], vec["dropped"])
 
 
 class StoreUpgradeTests(unittest.TestCase):

@@ -792,6 +792,10 @@ class Checkin:
                         "federation_seen": row["federation_seen"], "team_preference": row["team_preference"]})
         if declarations:
             out["declarations"] = self._decl_views(game["id"], row["player_id"])
+            if names:
+                shared = self.shared_view(row["player_id"])
+                if shared:
+                    out["shared_readings"] = shared
         return out
 
     def me(self, viewer: Viewer) -> dict[str, Any]:
@@ -1058,6 +1062,57 @@ class Checkin:
         self._notify(game_id, row["player_id"])
         return self.row_view(game, row)
 
+    def apply_shared_chrono(self, game_id: int, roster_players: list[str], answer: dict[str, Any]) -> dict[str, Any]:
+        """Other fields' records of the game's roster players, from ``GET /api/v1/sync/chrono`` (S14-5,
+        checked by ``sync_format.check_shared_chrono``). The site server decided what may be shared
+        (consent for both fields); this keeps only what it can check: players on this roster, a record the
+        marshal's key given with it signed (``chrono.parse``), one younger than the retention period, and none
+        whose id is a measurement of this field (a local reading is never replaced). The records go in
+        ``shared_readings``: never judged, counted for the list's states or sent back. A roster player the
+        answer leaves out has none kept (a consent withdrawn). Returns ``{players, stored, dropped}``."""
+        now = self._wall()
+        cutoff = datetime.datetime.fromtimestamp(now - CHRONO_RETENTION_DAYS * 86400,
+                                                 datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        on = set(roster_players)
+        rows: dict[str, list[dict[str, Any]]] = {pid: [] for pid in roster_players}
+        dropped = 0
+        for entry in answer["players"]:
+            if entry["player_id"] not in on:
+                dropped += len(entry["readings"])
+                continue
+            for item in entry["readings"]:
+                try:
+                    record = chrono.parse(item["record"], base64.b64decode(item["public_key"]))
+                except chrono.ChronoError:
+                    dropped += 1
+                    continue
+                if record["timestamp"] < cutoff or self.store.has_reading(record["reading_id"]):
+                    dropped += 1
+                    continue
+                rows[entry["player_id"]].append({"reading_id": record["reading_id"], "field_name": item["field"],
+                                                 "timestamp": record["timestamp"], "record_json": item["record"],
+                                                 "public_key": base64.b64decode(item["public_key"])})
+        changed = []
+        with self._lock:
+            for pid, mine in rows.items():
+                if {r["reading_id"] for r in self.store.shared_readings(pid)} != {r["reading_id"] for r in mine}:
+                    changed.append(pid)
+                self.store.set_shared_readings(pid, mine, now)
+        stored = sum(len(v) for v in rows.values())
+        for pid in changed:
+            if self.store.checkin(game_id, pid) is not None:
+                self._notify(game_id, pid)
+        return {"players": sum(1 for v in rows.values() if v), "stored": stored, "dropped": dropped}
+
+    def shared_view(self, pid: str) -> list[dict[str, Any]]:
+        """A player's records from other fields as the lists show them: marked as from another field (with
+        its name) and never part of the field's own readings or judgements."""
+        return [{"reading_id": r["reading_id"], "field": r["field"], "from_other_field": True,
+                 "type": r["record"]["type"], "timestamp": r["timestamp"],
+                 "velocity_mps": r["record"]["velocity_mps"], "bb_weight_g": r["record"]["bb_weight_g"],
+                 "energy_j": r["record"]["energy_j"], "marshal_name": r["record"]["marshal_name"]}
+                for r in self.store.shared_readings(pid)]
+
     def apply_roster(self, game_id: int, roster: dict[str, Any]) -> dict[str, Any]:
         """A roster pulled from the site server (checked by ``sync_format.check_roster``) becomes this
         game's expected check-ins, until the game starts (ADR-P4-11): new registrations are added with
@@ -1233,7 +1288,7 @@ class Checkin:
                             "status": r["status"], "team": self._team_name(game, r["team"]),
                             "squad": r["squad"], "seq": r["seq"],
                             "pending": sum(1 for d in decls if d["state"] == "pending"),
-                            "declarations": decls})
+                            "declarations": decls, "shared_readings": self.shared_view(r["player_id"])})
         players.sort(key=lambda p: (p["pending"] == 0, p["seq"]))
         return {"game_id": gid, "squads": int(game.get("squads") or 0),
                 "counts": {s: counts.get(s, 0) for s in ("pending", "passed", "refused")},
@@ -1633,6 +1688,8 @@ class Checkin:
                                         now)
         cutoff = datetime.datetime.fromtimestamp(now - CHRONO_RETENTION_DAYS * 86400, datetime.timezone.utc)
         out["readings"] = self.store.delete_readings(before=cutoff.strftime("%Y-%m-%dT%H:%M:%SZ"))
+        # Other fields' records pulled from the site server (S14-5) go with the same retention.
+        out["shared_readings"] = self.store.delete_shared_readings(before=cutoff.strftime("%Y-%m-%dT%H:%M:%SZ"))
         # A marshal's earlier keys outlive what they signed by the same period (schema 6).
         out["marshal_keys"] = self.store.delete_marshal_history(now - CHRONO_RETENTION_DAYS * 86400)
         if any(out.values()):

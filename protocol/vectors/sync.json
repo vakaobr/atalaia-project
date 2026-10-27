@@ -10277,6 +10277,50 @@
      "sha256": "a55ef5a11a38f46a99f85af2fbb9a4f0c12b56e924f1de69fd1c1c0793f045f3",
      "manifest": "id: org.club.foxhound\nversion: 3\nname: Raposa\nteams: [red, blue]\nnodes:\n  ponte: { role: objective }\nobjectives:\n  - id: ponte\n    name: Tomar a ponte\n    type: capture_and_hold\n    target: ponte\n    hold_s: 60\n    effect: { points: 100 }\n"
     }
+   },
+   {
+    "name": "shared_chrono",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "players": [
+      {
+       "player_id": "p-aaaaaaaaaaaa",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Campo do Pinhal",
+         "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      },
+      {
+       "player_id": "p-bbbbbbbbbbbb",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a\", \"replica_id\": \"1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a\", \"player_id\": \"ana.l\", \"type\": \"checkin\", \"velocity_mps\": 88.4, \"bb_weight_g\": 3.2, \"chrono_id\": \"pb:chrono:2\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Łucja 李\", \"field_id\": \"paintball-norte\", \"timestamp\": \"2027-01-02T09:00:00Z\", \"energy_j\": 12.503, \"signature\": \"GSyttFhjqToFAMRuqiiaa1AnVXBVLrAGsf98luBVhapmKFAj/RCYSwWw6i7XcT4eEQMSoDv3VrbQFMNx/iRjCA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "shared_chrono_empty",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "players": []
+    }
    }
   ],
   "invalid": [
@@ -11612,6 +11656,987 @@
     },
     "error": "not_a_text",
     "path": "manifest"
+   },
+   {
+    "name": "shared_chrono_version_2",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 2,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "players": [
+      {
+       "player_id": "p-aaaaaaaaaaaa",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Campo do Pinhal",
+         "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      },
+      {
+       "player_id": "p-bbbbbbbbbbbb",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a\", \"replica_id\": \"1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a\", \"player_id\": \"ana.l\", \"type\": \"checkin\", \"velocity_mps\": 88.4, \"bb_weight_g\": 3.2, \"chrono_id\": \"pb:chrono:2\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Łucja 李\", \"field_id\": \"paintball-norte\", \"timestamp\": \"2027-01-02T09:00:00Z\", \"energy_j\": 12.503, \"signature\": \"GSyttFhjqToFAMRuqiiaa1AnVXBVLrAGsf98luBVhapmKFAj/RCYSwWw6i7XcT4eEQMSoDv3VrbQFMNx/iRjCA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      }
+     ]
+    },
+    "error": "unsupported_version",
+    "path": "sync_version"
+   },
+   {
+    "name": "shared_chrono_no_players",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001"
+    },
+    "error": "missing",
+    "path": "players"
+   },
+   {
+    "name": "shared_chrono_game_not_a_uuid",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "nope",
+     "players": [
+      {
+       "player_id": "p-aaaaaaaaaaaa",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Campo do Pinhal",
+         "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      },
+      {
+       "player_id": "p-bbbbbbbbbbbb",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a\", \"replica_id\": \"1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a\", \"player_id\": \"ana.l\", \"type\": \"checkin\", \"velocity_mps\": 88.4, \"bb_weight_g\": 3.2, \"chrono_id\": \"pb:chrono:2\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Łucja 李\", \"field_id\": \"paintball-norte\", \"timestamp\": \"2027-01-02T09:00:00Z\", \"energy_j\": 12.503, \"signature\": \"GSyttFhjqToFAMRuqiiaa1AnVXBVLrAGsf98luBVhapmKFAj/RCYSwWw6i7XcT4eEQMSoDv3VrbQFMNx/iRjCA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      }
+     ]
+    },
+    "error": "bad_text",
+    "path": "scheduled_game_id"
+   },
+   {
+    "name": "shared_chrono_player_twice",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "players": [
+      {
+       "player_id": "p-aaaaaaaaaaaa",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Campo do Pinhal",
+         "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      },
+      {
+       "player_id": "p-aaaaaaaaaaaa",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a\", \"replica_id\": \"1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a\", \"player_id\": \"ana.l\", \"type\": \"checkin\", \"velocity_mps\": 88.4, \"bb_weight_g\": 3.2, \"chrono_id\": \"pb:chrono:2\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Łucja 李\", \"field_id\": \"paintball-norte\", \"timestamp\": \"2027-01-02T09:00:00Z\", \"energy_j\": 12.503, \"signature\": \"GSyttFhjqToFAMRuqiiaa1AnVXBVLrAGsf98luBVhapmKFAj/RCYSwWw6i7XcT4eEQMSoDv3VrbQFMNx/iRjCA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      }
+     ]
+    },
+    "error": "duplicate_player",
+    "path": "players[1]"
+   },
+   {
+    "name": "shared_chrono_player_id",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "players": [
+      {
+       "player_id": "p-17",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Campo do Pinhal",
+         "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      },
+      {
+       "player_id": "p-bbbbbbbbbbbb",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a\", \"replica_id\": \"1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a\", \"player_id\": \"ana.l\", \"type\": \"checkin\", \"velocity_mps\": 88.4, \"bb_weight_g\": 3.2, \"chrono_id\": \"pb:chrono:2\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Łucja 李\", \"field_id\": \"paintball-norte\", \"timestamp\": \"2027-01-02T09:00:00Z\", \"energy_j\": 12.503, \"signature\": \"GSyttFhjqToFAMRuqiiaa1AnVXBVLrAGsf98luBVhapmKFAj/RCYSwWw6i7XcT4eEQMSoDv3VrbQFMNx/iRjCA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      }
+     ]
+    },
+    "error": "bad_text",
+    "path": "players[0].player_id"
+   },
+   {
+    "name": "shared_chrono_player_without_readings",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "players": [
+      {
+       "player_id": "p-aaaaaaaaaaaa",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Campo do Pinhal",
+         "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      },
+      {
+       "player_id": "p-bbbbbbbbbbbb",
+       "readings": []
+      }
+     ]
+    },
+    "error": "bad_batch_size",
+    "path": "players[1].readings"
+   },
+   {
+    "name": "shared_chrono_too_many_readings",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "players": [
+      {
+       "player_id": "p-aaaaaaaaaaaa",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      },
+      {
+       "player_id": "p-bbbbbbbbbbbb",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a\", \"replica_id\": \"1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a\", \"player_id\": \"ana.l\", \"type\": \"checkin\", \"velocity_mps\": 88.4, \"bb_weight_g\": 3.2, \"chrono_id\": \"pb:chrono:2\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Łucja 李\", \"field_id\": \"paintball-norte\", \"timestamp\": \"2027-01-02T09:00:00Z\", \"energy_j\": 12.503, \"signature\": \"GSyttFhjqToFAMRuqiiaa1AnVXBVLrAGsf98luBVhapmKFAj/RCYSwWw6i7XcT4eEQMSoDv3VrbQFMNx/iRjCA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      }
+     ]
+    },
+    "error": "bad_batch_size",
+    "path": "players[0].readings"
+   },
+   {
+    "name": "shared_chrono_record_twice",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "players": [
+      {
+       "player_id": "p-aaaaaaaaaaaa",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Campo do Pinhal",
+         "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      },
+      {
+       "player_id": "p-bbbbbbbbbbbb",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      }
+     ]
+    },
+    "error": "duplicate_reading",
+    "path": "players[1].readings[0]"
+   },
+   {
+    "name": "shared_chrono_empty_record",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "players": [
+      {
+       "player_id": "p-aaaaaaaaaaaa",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Campo do Pinhal",
+         "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      },
+      {
+       "player_id": "p-bbbbbbbbbbbb",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a\", \"replica_id\": \"1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a\", \"player_id\": \"ana.l\", \"type\": \"checkin\", \"velocity_mps\": 88.4, \"bb_weight_g\": 3.2, \"chrono_id\": \"pb:chrono:2\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Łucja 李\", \"field_id\": \"paintball-norte\", \"timestamp\": \"2027-01-02T09:00:00Z\", \"energy_j\": 12.503, \"signature\": \"GSyttFhjqToFAMRuqiiaa1AnVXBVLrAGsf98luBVhapmKFAj/RCYSwWw6i7XcT4eEQMSoDv3VrbQFMNx/iRjCA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      }
+     ]
+    },
+    "error": "not_a_text",
+    "path": "players[0].readings[0].record"
+   },
+   {
+    "name": "shared_chrono_record_too_large",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "players": [
+      {
+       "player_id": "p-aaaaaaaaaaaa",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Campo do Pinhal",
+         "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      },
+      {
+       "player_id": "p-bbbbbbbbbbbb",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a\", \"replica_id\": \"1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a\", \"player_id\": \"ana.l\", \"type\": \"checkin\", \"velocity_mps\": 88.4, \"bb_weight_g\": 3.2, \"chrono_id\": \"pb:chrono:2\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Łucja 李\", \"field_id\": \"paintball-norte\", \"timestamp\": \"2027-01-02T09:00:00Z\", \"energy_j\": 12.503, \"signature\": \"GSyttFhjqToFAMRuqiiaa1AnVXBVLrAGsf98luBVhapmKFAj/RCYSwWw6i7XcT4eEQMSoDv3VrbQFMNx/iRjCA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      }
+     ]
+    },
+    "error": "too_large",
+    "path": "players[0].readings[0].record"
+   },
+   {
+    "name": "shared_chrono_no_field_name",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "players": [
+      {
+       "player_id": "p-aaaaaaaaaaaa",
+       "readings": [
+        {
+         "field": "",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        },
+        {
+         "field": "Campo do Pinhal",
+         "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      },
+      {
+       "player_id": "p-bbbbbbbbbbbb",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a\", \"replica_id\": \"1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a\", \"player_id\": \"ana.l\", \"type\": \"checkin\", \"velocity_mps\": 88.4, \"bb_weight_g\": 3.2, \"chrono_id\": \"pb:chrono:2\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Łucja 李\", \"field_id\": \"paintball-norte\", \"timestamp\": \"2027-01-02T09:00:00Z\", \"energy_j\": 12.503, \"signature\": \"GSyttFhjqToFAMRuqiiaa1AnVXBVLrAGsf98luBVhapmKFAj/RCYSwWw6i7XcT4eEQMSoDv3VrbQFMNx/iRjCA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      }
+     ]
+    },
+    "error": "not_a_text",
+    "path": "players[0].readings[0].field"
+   },
+   {
+    "name": "shared_chrono_key_not_base64",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "players": [
+      {
+       "player_id": "p-aaaaaaaaaaaa",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        },
+        {
+         "field": "Campo do Pinhal",
+         "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      },
+      {
+       "player_id": "p-bbbbbbbbbbbb",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a\", \"replica_id\": \"1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a\", \"player_id\": \"ana.l\", \"type\": \"checkin\", \"velocity_mps\": 88.4, \"bb_weight_g\": 3.2, \"chrono_id\": \"pb:chrono:2\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Łucja 李\", \"field_id\": \"paintball-norte\", \"timestamp\": \"2027-01-02T09:00:00Z\", \"energy_j\": 12.503, \"signature\": \"GSyttFhjqToFAMRuqiiaa1AnVXBVLrAGsf98luBVhapmKFAj/RCYSwWw6i7XcT4eEQMSoDv3VrbQFMNx/iRjCA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      }
+     ]
+    },
+    "error": "bad_public_key",
+    "path": "players[0].readings[0].public_key"
+   },
+   {
+    "name": "shared_chrono_key_short",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "players": [
+      {
+       "player_id": "p-aaaaaaaaaaaa",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprt"
+        },
+        {
+         "field": "Campo do Pinhal",
+         "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      },
+      {
+       "player_id": "p-bbbbbbbbbbbb",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a\", \"replica_id\": \"1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a\", \"player_id\": \"ana.l\", \"type\": \"checkin\", \"velocity_mps\": 88.4, \"bb_weight_g\": 3.2, \"chrono_id\": \"pb:chrono:2\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Łucja 李\", \"field_id\": \"paintball-norte\", \"timestamp\": \"2027-01-02T09:00:00Z\", \"energy_j\": 12.503, \"signature\": \"GSyttFhjqToFAMRuqiiaa1AnVXBVLrAGsf98luBVhapmKFAj/RCYSwWw6i7XcT4eEQMSoDv3VrbQFMNx/iRjCA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      }
+     ]
+    },
+    "error": "bad_public_key",
+    "path": "players[0].readings[0].public_key"
+   },
+   {
+    "name": "shared_chrono_unknown_member",
+    "kind": "shared_chrono",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "players": [
+      {
+       "player_id": "p-aaaaaaaaaaaa",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4=",
+         "marshal": "m-1"
+        },
+        {
+         "field": "Campo do Pinhal",
+         "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      },
+      {
+       "player_id": "p-bbbbbbbbbbbb",
+       "readings": [
+        {
+         "field": "Arena Norte",
+         "record": "{\"reading_id\": \"9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a\", \"replica_id\": \"1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a\", \"player_id\": \"ana.l\", \"type\": \"checkin\", \"velocity_mps\": 88.4, \"bb_weight_g\": 3.2, \"chrono_id\": \"pb:chrono:2\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Łucja 李\", \"field_id\": \"paintball-norte\", \"timestamp\": \"2027-01-02T09:00:00Z\", \"energy_j\": 12.503, \"signature\": \"GSyttFhjqToFAMRuqiiaa1AnVXBVLrAGsf98luBVhapmKFAj/RCYSwWw6i7XcT4eEQMSoDv3VrbQFMNx/iRjCA==\"}",
+         "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+        }
+       ]
+      }
+     ]
+    },
+    "error": "unknown_field",
+    "path": "players[0].readings[0].marshal"
    }
   ]
  },
@@ -14029,6 +15054,111 @@
     "scenarios": [],
     "presets": []
    }
+  }
+ ],
+ "shared_chrono_apply": [
+  {
+   "name": "roster_only_verified_and_not_local",
+   "why": "player C is not on the roster; one record has a changed velocity, one a key that did not sign it; the paintball record is already stored here as a local measurement",
+   "roster": [
+    "p-aaaaaaaaaaaa",
+    "p-bbbbbbbbbbbb"
+   ],
+   "local_reading_ids": [
+    "9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a"
+   ],
+   "answer": {
+    "sync_version": 1,
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "players": [
+     {
+      "player_id": "p-aaaaaaaaaaaa",
+      "readings": [
+       {
+        "field": "Arena Norte",
+        "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+        "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+       },
+       {
+        "field": "Campo do Pinhal",
+        "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 103.0, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+        "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+       },
+       {
+        "field": "Arena Norte",
+        "record": "{\"reading_id\": \"5b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"retest\", \"velocity_mps\": 100.0, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:41:30Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.0, \"signature\": \"vpnZVxo7M4aG5qzdr1yNpydolb6L9BmGaNWZVP1AyJQlVglauHiUQ4DArfGBWUBqyf9+uNiy33+mAeNsg5xsAA==\"}",
+        "public_key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+       },
+       {
+        "field": "Campo do Pinhal",
+        "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+        "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+       }
+      ]
+     },
+     {
+      "player_id": "p-bbbbbbbbbbbb",
+      "readings": [
+       {
+        "field": "Arena Norte",
+        "record": "{\"reading_id\": \"9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a\", \"replica_id\": \"1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a\", \"player_id\": \"ana.l\", \"type\": \"checkin\", \"velocity_mps\": 88.4, \"bb_weight_g\": 3.2, \"chrono_id\": \"pb:chrono:2\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Łucja 李\", \"field_id\": \"paintball-norte\", \"timestamp\": \"2027-01-02T09:00:00Z\", \"energy_j\": 12.503, \"signature\": \"GSyttFhjqToFAMRuqiiaa1AnVXBVLrAGsf98luBVhapmKFAj/RCYSwWw6i7XcT4eEQMSoDv3VrbQFMNx/iRjCA==\"}",
+        "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+       }
+      ]
+     },
+     {
+      "player_id": "p-cccccccccccc",
+      "readings": [
+       {
+        "field": "Arena Norte",
+        "record": "{\"reading_id\": \"7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+        "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+       }
+      ]
+     }
+    ]
+   },
+   "stored": {
+    "p-aaaaaaaaaaaa": [
+     "3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b",
+     "0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b"
+    ],
+    "p-bbbbbbbbbbbb": []
+   },
+   "dropped": 4
+  },
+  {
+   "name": "nothing_withdraws_what_was_shared",
+   "why": "an answer without a roster player leaves that player with no shared records (consent withdrawn)",
+   "roster": [
+    "p-aaaaaaaaaaaa",
+    "p-bbbbbbbbbbbb"
+   ],
+   "local_reading_ids": [],
+   "answer": {
+    "sync_version": 1,
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "players": [
+     {
+      "player_id": "p-bbbbbbbbbbbb",
+      "readings": [
+       {
+        "field": "Arena Norte",
+        "record": "{\"reading_id\": \"9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a\", \"replica_id\": \"1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a\", \"player_id\": \"ana.l\", \"type\": \"checkin\", \"velocity_mps\": 88.4, \"bb_weight_g\": 3.2, \"chrono_id\": \"pb:chrono:2\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Łucja 李\", \"field_id\": \"paintball-norte\", \"timestamp\": \"2027-01-02T09:00:00Z\", \"energy_j\": 12.503, \"signature\": \"GSyttFhjqToFAMRuqiiaa1AnVXBVLrAGsf98luBVhapmKFAj/RCYSwWw6i7XcT4eEQMSoDv3VrbQFMNx/iRjCA==\"}",
+        "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4="
+       }
+      ]
+     }
+    ]
+   },
+   "stored": {
+    "p-aaaaaaaaaaaa": [],
+    "p-bbbbbbbbbbbb": [
+     "9e8d7c6b-5a49-4382-a716-0f1e2d3c4b5a"
+    ]
+   },
+   "dropped": 0,
+   "after": "apply_answer_first"
   }
  ]
 }

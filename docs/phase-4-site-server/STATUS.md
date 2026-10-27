@@ -531,8 +531,9 @@ run in tools/check.sh with no database; 270 controller tests (12 new: the
 registry's sync against the in-process site server, privacy with signed
 readings, the new shared vectors). Not yet: a real chronograph and phones
 (HW4); the account's adoption of a phone's player id (plan phase 16), so the
-own history and sharing have no real links yet; the controller pulling other
-fields' records (`GET /api/v1/sync/chrono`, with plan phase 16's roster); a
+own history and sharing have no real links yet; ~~the controller pulling other
+fields' records (`GET /api/v1/sync/chrono`, with plan phase 16's roster)~~ (built
+2026-10-27, see "Other fields' chrono records on the controllers" below); a
 controller's erasure reaching the site server by itself (S14-10). Decisions
 S14-1 to S14-12, all open; S14-5 (sharing consent per field) and S14-10
 (erasure propagation) want the maintainer's eye.
@@ -620,6 +621,45 @@ registration import (17). Decisions S16-1 to S16-14, all open; S16-4 (claims
 confirmed by the controller), S16-6 (the field's limit template set on both
 sides) and S16-9 (no registration form on the public pages) want the
 maintainer's eye.
+
+## Other fields' chrono records on the controllers (S14-5, built 2026-10-27, in software)
+
+The prerequisite was plan phase 16's roster: `GET /api/v1/sync/roster` is built
+and tested, and every registration carries its `player_id` and links to the
+account in `field_player_ids`; the consent texts in the privacy notice templates
+stay "for review" but already say that another field can see a replica's
+history, which is all the pull does, so nothing waited on a maintainer decision.
+
+What exists: on the site server, `GET /api/v1/sync/chrono?scheduled_game_id=`
+(`api/sync.py`, `chrono_registry.shared_for_players` over the same
+`shared_history` the staff's lookup uses, `registration.roster_players`): for
+the players of that game's roster only, each record as signed with its field's
+name and the marshal's public key, the newest 100 per player, nothing unless
+both fields share and the person's live consent covers both; the audit log
+has `chrono_shared_pull` with counts. On the Pi (`sync_client.py`
+`_pull_shared_chrono`, `checkin.py` `apply_shared_chrono` and `shared_view`,
+`store.py` schema 13 `shared_readings`) and on the phone
+(`controller_sync.dart`, `controller_sync_format.dart` `checkSharedChrono`,
+`controller_checkin.dart` `applySharedChrono`), with each roster until the game
+starts: every signature verified with the key given, players off the roster,
+records over 365 days old and ids already local readings dropped; the rest kept
+apart (never judged, counted or pushed back; a local measurement is never
+replaced), shown as `shared_readings` (`from_other_field`, the field's name) in
+the chrono list, the check-in row and the console's *From other fields*;
+replaced at every pull (a withdrawn consent removes them), deleted with the
+readings' retention and the player's erasure. Shared: `shared_chrono` in
+`sync.json`'s answers (2 valid, 14 invalid) and `shared_chrono_apply` (2 cases
+both controllers pass); `protocol/sync.md`.
+
+Tests: 535 site server tests (1 new, the pull's rules in `test_chrono.py`), the
+controller's `test_sync_schedule.py` (7 new) and the answer vectors, 2,078 Dart
+tests (5 new in `controller_sync_test.dart`, the vectors in
+`controller_sync_format_test.dart`); `tools/check.sh` green.
+
+Not yet: a real field pair (HW1); the app's own screens for the person's
+consent per field (the endpoints exist, `PUT /api/v1/me/consents/chrono-sharing/{field}`);
+the player's own view of other fields' records in the app; a browser test of the
+console's new list.
 
 ## Plan phase 17: registration import and platform adapters, and the app's registration screens (built 2026-10-20, in software)
 

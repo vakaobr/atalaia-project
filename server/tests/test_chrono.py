@@ -23,9 +23,9 @@ import zipfile
 from pathlib import Path
 from typing import Any, Optional
 
-from atalaia_controller import chrono
+from atalaia_controller import chrono, sync_format
 from atalaia_server import personal_data
-from atalaia_server.models import Field, FieldPlayerId
+from atalaia_server.models import Field, FieldPlayerId, GameRegistration, ScheduledGame
 
 from .test_sync import CONTROLLER, GAME, SyncTestCase
 
@@ -447,6 +447,73 @@ class SharingTests(ChronoCase):
         self.assertEqual(sorted((c["purpose"], c["field_id"] is not None, c["withdrawn_at"] is None) for c in consents),
                          [("chrono_sharing", True, False), ("chrono_sharing", True, True),
                           ("chrono_sharing", True, True)])
+
+    async def roster_game(self) -> uuid.UUID:
+        """A published scheduled game at this field: the person registered with their id here (a valid
+        player id: the sync's format is strict), a guest with no account, and one who cancelled."""
+        now = datetime.datetime.now(datetime.timezone.utc)
+        async with self.app.state.sessionmaker() as db:
+            game = ScheduledGame(field_id=self.field_id, title="Domingo", status="published",
+                                 starts_at=now + datetime.timedelta(hours=48), ends_at=now + datetime.timedelta(hours=52))
+            db.add(game)
+            await db.flush()
+            for pid, user, name, status in ((self.mine, self.user_id, "Ana", "registered"),
+                                            ("p-guestaaaaaaa", None, "Visitante", "registered"),
+                                            ("p-gaveupaaaaaa", None, "Desistente", "cancelled")):
+                db.add(GameRegistration(scheduled_game=game.id, field_id=self.field_id, user_id=user, player_id=pid,
+                                        display_name=name, status=status))
+            db.add(FieldPlayerId(field_id=self.field_id, player_id="p-gaveupaaaaaa", user_id=self.user_id))
+            await db.commit()
+            return game.id
+
+    async def pulled(self, game: uuid.UUID, key: Optional[str] = None, expect: int = 200) -> dict[str, Any]:
+        r = await self.client.get(f"/api/v1/sync/chrono?scheduled_game_id={game}", headers=self.headers(key))
+        self.assertEqual(r.status_code, expect, r.text)
+        return r.json()
+
+    async def test_the_controller_pulls_for_the_roster_only(self) -> None:
+        """S14-5: the same rules as the staff's lookup, for the players of one scheduled game's roster."""
+        self.mine = "p-campoaaaaaaa"
+        await self.link(self.user_id, self.mine)
+        game = await self.roster_game()
+        self.assertEqual((await self.client.get(f"/api/v1/sync/chrono?scheduled_game_id={game}")).status_code, 401)
+        await self.pulled(uuid.uuid4(), expect=404)
+        await self.pulled("nope", expect=400)  # type: ignore[arg-type]
+        await self.pulled(game, self.other_key, expect=404)  # another field's game is not theirs
+        answer = await self.pulled(game)
+        self.assertEqual(answer, {"sync_version": 1, "scheduled_game_id": str(game), "players": []})  # no sharing
+        await self.share(self.field_id)
+        await self.share(self.other_field)
+        await self.consent(self.other_field)
+        self.assertEqual((await self.pulled(game))["players"], [])  # not for this field yet
+        await self.consent(self.field_id)
+        answer = await self.pulled(game)
+        sync_format.ANSWERS["shared_chrono"](json.loads(json.dumps(answer)))
+        # The person, once; not the guest, not the one who cancelled, not the id they hold but did not
+        # register with (p-campo1): the roster is who the controller asked about.
+        [player] = answer["players"]
+        self.assertEqual(player["player_id"], self.mine)
+        [shared] = player["readings"]
+        self.assertEqual((shared["field"], shared["record"], shared["public_key"]),
+                         ("Arena", json.dumps(self.record, ensure_ascii=False), self.ana.public))
+        chrono.parse(shared["record"], base64.b64decode(shared["public_key"]))  # the controller can check it
+        logged = await self.fetch("SELECT details FROM audit_log WHERE action = 'chrono_shared_pull'")
+        self.assertEqual([json.loads(r[0]) if isinstance(r[0], str) else r[0] for r in logged],
+                         [{"players": 1, "readings": 1}])  # a count, not the player
+        self.assertNotIn(self.mine, json.dumps([tuple(r) for r in logged], default=str))
+        # Withdrawn for either field, or a field that stops sharing: nothing.
+        await self.consent(self.field_id, give=False)
+        self.assertEqual((await self.pulled(game))["players"], [])
+        await self.consent(self.field_id)
+        await self.consent(self.other_field, give=False)
+        self.assertEqual((await self.pulled(game))["players"], [])
+        await self.consent(self.other_field)
+        self.assertEqual(len((await self.pulled(game))["players"]), 1)
+        await self.share(self.other_field, on=False)
+        self.assertEqual((await self.pulled(game))["players"], [])
+        await self.share(self.other_field)
+        await self.share(self.field_id, on=False)  # this field must share too
+        self.assertEqual((await self.pulled(game))["players"], [])
 
     async def test_the_fields_admin_switches_sharing(self) -> None:
         url = f"/api/v1/fields/{self.field_id}"

@@ -771,6 +771,236 @@ void main() {
       ],
     };
 
+    group('other fields\' chrono records (S14-5)', () {
+      const falcao = 'p-aaaaaaaaaaaa';
+      late MarshalKey rui;
+      late int gid;
+      late ControllerSync c;
+
+      Future<Map<String, Object?>> record({
+        double v = 100,
+        String player = 'p-arenaarena22',
+        bool tamper = false,
+      }) async {
+        final r = await signReading(
+          ChronoReading.measure(
+            replicaId: newUuid(),
+            playerId: player,
+            type: ReadingType.spotcheck,
+            velocityMps: v,
+            bbWeightG: 0.2,
+            chronoId: 'chrono-2',
+            marshalId: 'm-rui',
+            marshalName: 'Rui',
+            fieldId: 'arena',
+            timestamp: DateTime.utc(2027, 1, 10, 9),
+          ),
+          rui,
+        );
+        final json = r.toJson();
+        if (tamper) json['velocity_mps'] = 90.0;
+        return {
+          'field': 'Arena Norte',
+          'record': jsonEncode(json),
+          'public_key': base64.encode(rui.publicKey),
+          '_id': r.readingId,
+        };
+      }
+
+      Map<String, Object?> answer(
+        List<(String, List<Map<String, Object?>>)> p,
+      ) => {
+        'sync_version': 1,
+        'scheduled_game_id': scheduledId,
+        'players': [
+          for (final (pid, rs) in p)
+            {
+              'player_id': pid,
+              'readings': [
+                for (final r in rs)
+                  {
+                    for (final e in r.entries)
+                      if (e.key != '_id') e.key: e.value,
+                  },
+              ],
+            },
+        ],
+      };
+
+      Future<List<Object?>> shown() async {
+        final list = checkin.chronoList(ApiViewer.gm, gid);
+        final players = (list['players']! as List).cast<Map<String, Object?>>();
+        return [
+          for (final s
+              in players.firstWhere(
+                    (p) => p['player_id'] == falcao,
+                  )['shared_readings']!
+                  as List)
+            (s as Map)['reading_id'],
+        ];
+      }
+
+      setUp(() async {
+        rui = await MarshalKey.fromSeed(List.filled(32, 5));
+        site.gets['/api/v1/sync/schedule'] = scheduled();
+        site.gets['/api/v1/sync/claims'] = {
+          'sync_version': 1,
+          'claims': <Object?>[],
+        };
+        c = client();
+        expect(await c.runOnce(), isTrue, reason: c.lastError);
+        final made = api.handle(
+          'POST',
+          Uri.parse('/api/v1/schedule/$scheduledId/game'),
+          authorization: 'Bearer g',
+          body: '{}',
+        );
+        gid = (made.body! as Map)['id']! as int;
+        site.gets['/api/v1/sync/roster'] = roster();
+        expect(await c.runOnce(), isTrue, reason: c.lastError);
+      });
+
+      test('shown marked as from another field, never judged, counted or '
+          'sent back; only the roster\'s players and what verifies', () async {
+        final counts = checkin.chronoList(ApiViewer.gm, gid)['counts'];
+        final good = await record(v: 250); // far over any limit
+        final bad = await record(tamper: true);
+        final stranger = await record(player: 'p-cccccccccccc');
+        site.gets['/api/v1/sync/chrono'] = answer([
+          (falcao, [good, bad]),
+          ('p-cccccccccccc', [stranger]),
+        ]);
+        site.requests.clear();
+        expect(await c.runOnce(), isTrue, reason: c.lastError);
+        expect(await shown(), [good['_id']]);
+        final list = checkin.chronoList(ApiViewer.gm, gid);
+        final view =
+            ((list['players']! as List).first as Map)['shared_readings']!
+                as List;
+        expect(
+          (view.single as Map)..removeWhere(
+            (k, _) => ![
+              'field',
+              'from_other_field',
+              'type',
+              'marshal_name',
+            ].contains(k),
+          ),
+          {
+            'field': 'Arena Norte',
+            'from_other_field': true,
+            'type': 'spotcheck',
+            'marshal_name': 'Rui',
+          },
+        );
+        expect(list['counts'], counts);
+        expect(checkin.sharedView('p-cccccccccccc'), isEmpty);
+        expect(checkin.playerReadings(falcao), isEmpty); // not the field's own
+        expect(site.paths().contains('chrono'), isFalse); // never sent back
+        expect((c.status()['game_day']! as Map)['shared_chrono'], {
+          'supported': true,
+          'stored': 1,
+        });
+        // The check-in's row shows them too.
+        final rows =
+            (checkin.listCheckins(ApiViewer.gm, gid)['checkins']! as List)
+                .cast<Map<String, Object?>>();
+        expect(
+          (rows.firstWhere((r) => r['player_id'] == falcao)['shared_readings']!
+                  as List)
+              .length,
+          1,
+        );
+      });
+
+      test('a withdrawn consent takes them away; an older server is skipped; '
+          'after the start nothing is pulled', () async {
+        final first = await record();
+        site.gets['/api/v1/sync/chrono'] = answer([
+          (falcao, [first]),
+        ]);
+        expect(await c.runOnce(), isTrue, reason: c.lastError);
+        expect(await shown(), [first['_id']]);
+        site.gets['/api/v1/sync/chrono'] = answer([]);
+        expect(await c.runOnce(), isTrue, reason: c.lastError);
+        expect(await shown(), isEmpty);
+        site.gets['/api/v1/sync/chrono'] = answer([
+          (falcao, [first]),
+        ]);
+        engine.startGame(gid, force: true);
+        expect(await c.runOnce(), isTrue, reason: c.lastError);
+        expect(await shown(), isEmpty); // not pulled after the start
+        site.gets.remove('/api/v1/sync/chrono');
+        expect(await c.runOnce(), isTrue, reason: c.lastError);
+        expect(c.sharedChronoSupported, isTrue); // no pull was tried
+      });
+
+      test('an older site server has the roster but not the records', () async {
+        site.gets.remove('/api/v1/sync/chrono');
+        site.gets['/api/v1/sync/roster'] = roster();
+        expect(await c.runOnce(), isTrue, reason: c.lastError);
+        expect(c.sharedChronoSupported, isFalse);
+        expect(c.gameDaySupported, isTrue);
+      });
+
+      test('retention and erasure', () async {
+        final r = await record();
+        site.gets['/api/v1/sync/chrono'] = answer([
+          (falcao, [r]),
+        ]);
+        expect(await c.runOnce(), isTrue, reason: c.lastError);
+        expect(checkin.sharedView(falcao), hasLength(1));
+        wall += 366 * 86400;
+        expect(checkin.purge(force: true)!['shared_readings'], 1);
+        expect(checkin.sharedView(falcao), isEmpty);
+        wall -= 366 * 86400;
+        expect(await c.runOnce(), isTrue, reason: c.lastError);
+        expect(checkin.sharedView(falcao), hasLength(1));
+        checkin.erasePlayer(falcao);
+        expect(checkin.sharedView(falcao), isEmpty);
+      });
+
+      test(
+        'the shared vectors: what a controller keeps of an answer',
+        () async {
+          final vectors =
+              (loadVectors('sync.json')['shared_chrono_apply']! as List)
+                  .cast<Map<String, Object?>>();
+          final records = {
+            for (final v
+                in (loadVectors('chrono_record.json')['valid']! as List))
+              ((v as Map)['record'] as Map)['reading_id']: v['record'],
+          };
+          Future<Map<String, Object?>> apply(Map<String, Object?> v) =>
+              checkin.applySharedChrono(
+                gid,
+                (v['roster']! as List).cast<String>(),
+                syncAnswers['shared_chrono']!(
+                  jsonDecode(jsonEncode(v['answer'])),
+                ),
+              );
+          for (final v in vectors) {
+            checkin.debugSetLocalReadings([
+              for (final id in (v['local_reading_ids']! as List))
+                (records[id]! as Map).cast<String, Object?>(),
+            ]);
+            if (v['after'] == 'apply_answer_first') await apply(vectors.first);
+            final result = await apply(v);
+            final stored = v['stored']! as Map;
+            for (final pid in stored.keys) {
+              expect(
+                [for (final s in checkin.sharedView('$pid')) s['reading_id']]
+                  ..sort(),
+                ((stored[pid]! as List).cast<String>())..sort(),
+                reason: '${v['name']} $pid',
+              );
+            }
+            expect(result['dropped'], v['dropped'], reason: '${v['name']}');
+          }
+        },
+      );
+    });
+
     test('the schedule, a game made from it, its roster until the start, '
         'claims, and the outcomes after the end', () async {
       site.gets['/api/v1/sync/schedule'] = scheduled();

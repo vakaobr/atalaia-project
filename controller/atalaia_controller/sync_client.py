@@ -44,7 +44,10 @@ the field's schedule of the coming days (``GET /api/v1/sync/schedule``, kept in
 the store for the GM's *Create from the schedule*), the roster of each
 scheduled game a game here was made from while that game has not started
 (``GET /api/v1/sync/roster``, applied by ``Checkin.apply_roster`` as expected
-check-ins), and accounts' claims of this field's player ids (``GET
+check-ins; with it, other fields' signed chrono records of those players that
+their person consented to share, ``GET /api/v1/sync/chrono``, kept apart from the
+field's own readings by ``Checkin.apply_shared_chrono`` and shown marked as from
+another field, never judged and never sent back: decision S14-5), and accounts' claims of this field's player ids (``GET
 /api/v1/sync/claims``), which it answers by comparing the claimed secret's
 hash with its own (``POST /api/v1/sync/claims``: the hashes never leave the
 controller). Once a linked game has ended, its registrations' outcomes go back
@@ -308,6 +311,8 @@ class SyncClient:
         self.game_day_supported = True
         self.schedule_pulled_at: Optional[float] = None
         self.claims_answered = 0
+        self.shared_chrono_supported = True  # S14-5: GET /api/v1/sync/chrono
+        self.shared_chrono_stored = 0  # records kept at the last pull
         self.branding_supported = True
         self.branding_pulled_at: Optional[float] = None
         self.branding_error: Optional[str] = None
@@ -705,6 +710,39 @@ class SyncClient:
             if result.get("conflicts") or result.get("dropped_declarations"):
                 log.warning("roster of game %d: %d conflicts, %d declarations dropped", game["id"],
                             result["conflicts"], result["dropped_declarations"])
+            self._pull_shared_chrono(game, link, [r["player_id"] for r in roster["registrations"]])
+
+    def _pull_shared_chrono(self, game: dict[str, Any], link: dict[str, Any], players: list[str]) -> None:
+        """Other fields' chrono records of the roster's players (``GET /api/v1/sync/chrono``, decision S14-5),
+        the same game, the same time as the roster. The site server decides what may be shared (the person's
+        consent for both fields, both fields sharing); ``Checkin.apply_shared_chrono`` keeps only the roster's
+        players and the records it can verify. A server without the endpoint is skipped quietly."""
+        if not players:
+            return
+        self.pulls += 1
+        try:
+            answer = self.transport.get(f"/api/v1/sync/chrono?scheduled_game_id={link['scheduled_game_id']}")
+        except SyncError as exc:
+            if exc.status in UNSUPPORTED and exc.code in UNSUPPORTED_CODES:
+                if self.shared_chrono_supported:
+                    log.info("the site server has no shared chrono pull: skipped")
+                self.shared_chrono_supported = False
+                return
+            if exc.status == 404:
+                return  # the scheduled game went since the roster: nothing to show
+            raise
+        self.shared_chrono_supported = True
+        try:
+            answer = ANSWERS["shared_chrono"](answer)
+        except SyncFormatError as exc:
+            raise SyncError("bad_answer", detail=str(exc)) from None
+        if answer["scheduled_game_id"] != link["scheduled_game_id"]:
+            raise SyncError("bad_answer", detail="the shared chrono of another game")
+        result = self.checkin.apply_shared_chrono(game["id"], players, answer)
+        self.shared_chrono_stored = result["stored"]
+        if result["dropped"]:
+            log.warning("shared chrono of game %d: %d records dropped (not on the roster, not verified, "
+                        "too old or already a local reading)", game["id"], result["dropped"])
 
     def _answer_claims(self) -> None:
         """Accounts that claim a player id of this field: confirmed when this controller knows the id with
@@ -1061,7 +1099,9 @@ class SyncClient:
                 "refused_readings": self.refused_readings,
                 "game_day": {"supported": self.game_day_supported, "schedule_pulled_at": self.schedule_pulled_at,
                              "linked_games": len(self.store.schedule_links()),
-                             "claims_answered": self.claims_answered},
+                             "claims_answered": self.claims_answered,
+                             "shared_chrono": {"supported": self.shared_chrono_supported,
+                                               "stored": self.shared_chrono_stored}},
                 "branding": {"source": getattr(self.cfg, "sync_branding", "local"),
                              "supported": self.branding_supported, "pulled_at": self.branding_pulled_at,
                              "error": self.branding_error, "images_fetched": self.images_fetched},

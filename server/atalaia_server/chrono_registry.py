@@ -36,6 +36,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from atalaia_controller import sync_format
 from sqlalchemy import and_, delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -333,6 +334,33 @@ async def shared_history(db: AsyncSession, field_id: uuid.UUID, player_id: str) 
     for other, pid, name in links:
         for reading in await readings_with_keys(db, ChronoReading.field_id == other, ChronoReading.player_id == pid):
             out.append({"field": name, "field_id": str(other), **reading})
+    return out
+
+
+SHARED_PER_PLAYER = sync_format.MAX_SHARED  # the newest records of other fields one player's pull carries
+
+
+async def shared_for_players(db: AsyncSession, field_id: uuid.UUID, player_ids: list[str]) -> list[dict[str, Any]]:
+    """What ``GET /api/v1/sync/chrono`` answers for a roster (S14-5): per player id of this field that
+    has records to show, the other fields' signed records ``shared_history`` allows (the account that
+    holds the id here, both fields sharing, the person's live consent for each), the newest
+    ``SHARED_PER_PLAYER`` of them, each as the text that was signed with its field's name and the marshal's
+    public key. A player with nothing to show is left out."""
+    if not player_ids or not await db.scalar(select(Field.chrono_sharing_enabled).where(Field.id == field_id)):
+        return []
+    linked = set(await db.scalars(select(FieldPlayerId.player_id).where(
+        FieldPlayerId.field_id == field_id, FieldPlayerId.player_id.in_(player_ids),
+        FieldPlayerId.user_id.is_not(None))))
+    out = []
+    for pid in player_ids:
+        if pid not in linked:
+            continue
+        shared = await shared_history(db, field_id, pid)
+        shared.sort(key=lambda r: (r["timestamp"] or "", r["reading_id"]))
+        if shared:
+            out.append({"player_id": pid, "readings": [
+                {"field": r["field"], "record": r["record_json"], "public_key": r["public_key"]}
+                for r in shared[-SHARED_PER_PLAYER:]]})
     return out
 
 

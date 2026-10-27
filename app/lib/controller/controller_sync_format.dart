@@ -666,6 +666,7 @@ Json checkChrono(Object? raw) {
 
 const maxSchedule = 200;
 const maxRoster = 5000;
+const maxShared = 100;
 const maxClaims = 500;
 const maxDeclarations = 20;
 const _scheduledStates = ['published', 'in_progress', 'completed', 'cancelled'];
@@ -843,6 +844,45 @@ Json checkRoster(Object? raw) {
       if (!decls.add(d['declaration_id'])) {
         _fail('duplicate_declaration', '$path.replicas[$j].declaration_id');
       }
+    }
+  }
+  return body;
+}
+
+/// GET /api/v1/sync/chrono's answer (decision S14-5; sync_format.py
+/// `check_shared_chrono`): other fields' signed chrono records of the players
+/// on a scheduled game's roster, only the ones their person consented to
+/// share between that field and this one. Per player id of this field (each
+/// once): 1 to [maxShared] readings, each the signed record as text
+/// ([maxRecord] bytes, verified by the controller with the key given), the
+/// name of the field it was made at (1-128) and the marshal's public key. A
+/// record once.
+Json checkSharedChrono(Object? raw) {
+  final body = _answerEnvelope(raw, ['scheduled_game_id', 'players']);
+  _uuid(body['scheduled_game_id'], 'scheduled_game_id');
+  final players = <Object?>{}, records = <Object?>{};
+  final list = _list(body['players'], 'players', maxRoster);
+  for (var i = 0; i < list.length; i++) {
+    final path = 'players[$i]';
+    final p = _obj(list[i], path);
+    _keys(p, path, ['player_id', 'readings']);
+    _text(p['player_id'], '$path.player_id', 14, pattern: playerIdRe);
+    if (!players.add(p['player_id'])) _fail('duplicate_player', path);
+    final readings = _list(p['readings'], '$path.readings', maxShared, 1);
+    for (var j = 0; j < readings.length; j++) {
+      final rpath = '$path.readings[$j]';
+      final r = _obj(readings[j], rpath);
+      _keys(r, rpath, ['field', 'record', 'public_key']);
+      _text(r['field'], '$rpath.field', 128);
+      final record = r['record'];
+      if (record is! String || record.isEmpty) {
+        _fail('not_a_text', '$rpath.record');
+      }
+      if (utf8.encode(record).length > maxRecord) {
+        _fail('too_large', '$rpath.record');
+      }
+      publicKeyBytes(r['public_key'], '$rpath.public_key');
+      if (!records.add(record)) _fail('duplicate_reading', rpath);
     }
   }
   return body;
@@ -1725,6 +1765,7 @@ const gameKinds = ['games', 'events', 'scores', 'nodes', 'checkins'];
 const syncAnswers = <String, Json Function(Object?)>{
   'schedule': checkSchedule,
   'roster': checkRoster,
+  'shared_chrono': checkSharedChrono,
   'claims': checkClaimsList,
   'field': checkField,
   'presets': checkPresets,

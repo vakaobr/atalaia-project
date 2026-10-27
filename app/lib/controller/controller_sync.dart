@@ -23,7 +23,8 @@
 /// server acknowledged, then the game's score counters per source and its
 /// nodes when they changed; then the field's chrono registry (marshal keys
 /// with their periods, the replica registry, the signed readings), game day
-/// (the schedule, each linked game's roster until it starts, the claims'
+/// (the schedule, each linked game's roster until it starts, with it other fields'
+/// chrono records of its players that their person shared (S14-5), the claims'
 /// verdicts, the outcomes after the game), with branding "site" the
 /// field's branding and saved teams with their images, with the library on
 /// the field's scenarios and game presets (a scenario the site archives and a
@@ -392,6 +393,8 @@ class ControllerSync {
   bool gameDaySupported = true;
   double? schedulePulledAt;
   int claimsAnswered = 0;
+  bool sharedChronoSupported = true; // S14-5: GET /api/v1/sync/chrono
+  int sharedChronoStored = 0; // records kept at the last pull
   bool brandingSupported = true;
   double? brandingPulledAt;
   String? brandingError;
@@ -1014,7 +1017,56 @@ class ControllerSync {
         (roster['registrations']! as List).length,
         null,
       );
+      await _pullSharedChrono(gid, link, [
+        for (final r in (roster['registrations']! as List).cast<Json>())
+          r['player_id']! as String,
+      ]);
     }
+  }
+
+  /// Other fields' chrono records of the roster's players (`GET
+  /// /api/v1/sync/chrono`, decision S14-5; sync_client.py `_pull_shared_chrono`),
+  /// for the same game at the same time as the roster. The site server
+  /// decides what may be shared (the person's consent for both fields, both
+  /// fields sharing); `applySharedChrono` keeps only the roster's players and
+  /// the records it can verify. A server without the endpoint is skipped.
+  Future<void> _pullSharedChrono(
+    int gid,
+    Map<String, Object?> link,
+    List<String> players,
+  ) async {
+    final checkin = engine.checkin;
+    if (checkin == null || players.isEmpty) return;
+    pulls++;
+    final Map<String, Object?> raw;
+    try {
+      raw = await transport.get(
+        '/api/v1/sync/chrono?scheduled_game_id=${link['scheduled_game_id']}',
+      );
+    } on SyncError catch (e) {
+      if (_unsupported.contains(e.status) &&
+          _unsupportedCodes.contains(e.code)) {
+        sharedChronoSupported = false;
+        return;
+      }
+      if (e.status == 404) return; // the scheduled game went since the roster
+      rethrow;
+    }
+    sharedChronoSupported = true;
+    final Map<String, Object?> answer;
+    try {
+      answer = syncAnswers['shared_chrono']!(raw);
+    } on SyncFormatError catch (e) {
+      throw SyncError('bad_answer', detail: '$e');
+    }
+    if (answer['scheduled_game_id'] != link['scheduled_game_id']) {
+      throw SyncError(
+        'bad_answer',
+        detail: 'the shared chrono of another game',
+      );
+    }
+    final result = await checkin.applySharedChrono(gid, players, answer);
+    sharedChronoStored = result['stored']! as int;
   }
 
   /// Claims of this field's player ids: confirmed when this controller
@@ -1523,6 +1575,10 @@ class ControllerSync {
         'schedule_pulled_at': schedulePulledAt,
         'linked_games': schedule?.scheduleLinks().length ?? 0,
         'claims_answered': claimsAnswered,
+        'shared_chrono': {
+          'supported': sharedChronoSupported,
+          'stored': sharedChronoStored,
+        },
       },
       'branding': {
         'source': config.branding,

@@ -440,6 +440,19 @@ async def roster(db: AsyncSession, field_id: uuid.UUID, game_id: uuid.UUID) -> O
             "federation": game.federation, "registrations": out}
 
 
+async def roster_players(db: AsyncSession, field_id: uuid.UUID, game_id: uuid.UUID) -> Optional[list[str]]:
+    """The player ids of ``roster``'s registrations, in its order (None for no such game here): the
+    players other fields' chrono records may be pulled for (S14-5)."""
+    game = await db.scalar(select(ScheduledGame).where(ScheduledGame.id == game_id, ScheduledGame.field_id == field_id,
+                                                       ScheduledGame.status != "draft"))
+    if game is None:
+        return None
+    return list(await db.scalars(select(GameRegistration.player_id).where(
+        GameRegistration.scheduled_game == game.id, GameRegistration.status == "registered",
+        GameRegistration.display_name.is_not(None)).order_by(GameRegistration.created_at, GameRegistration.id)
+        .limit(sync_format.MAX_ROSTER)))
+
+
 # The scheduled game follows its controller game: published -> in_progress -> completed, never back.
 _FORWARD = {"running": "in_progress", "paused": "in_progress", "ended": "completed"}
 

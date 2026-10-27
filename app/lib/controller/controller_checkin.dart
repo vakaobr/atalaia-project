@@ -421,6 +421,14 @@ class ControllerCheckin {
   var _checkins = <Map<String, Object?>>[];
   var _declarations = <String, Map<String, Object?>>{};
   var _readings = <Map<String, Object?>>[];
+
+  /// Other fields' records of the players on a linked game's roster, pulled
+  /// from the site server with each person's consent (the Pi's
+  /// `shared_readings`, schema 13, decision S14-5): `{player_id, reading_id,
+  /// field_name, timestamp, record_json, public_key, pulled_at}`. Kept apart
+  /// from [_readings] (the field's own measurements): never judged, counted
+  /// for the list's states or sent back, and never replacing a local reading.
+  var _shared = <Map<String, Object?>>[];
   var _marshals = <String, Map<String, Object?>>{};
 
   /// The GM's list of marshals (the Pi's `marshal_roster`, schema 12): the
@@ -467,6 +475,7 @@ class ControllerCheckin {
         d['declaration_id']! as String: d,
     };
     _readings = _listOf(doc['readings']);
+    _shared = _listOf(doc['shared_readings']);
     _marshals = _mapOf(doc['marshals']);
     _roster = _mapOf(doc['marshal_roster']);
     // A marshal registered before the list existed is on it (the Pi's upgrade).
@@ -496,6 +505,7 @@ class ControllerCheckin {
     'checkins': _checkins,
     'declarations': _declarations.values.toList(),
     'readings': _readings,
+    'shared_readings': _shared,
     'marshals': _marshals,
     'marshal_roster': _roster,
     'replicas': _replicas,
@@ -656,7 +666,20 @@ class ControllerCheckin {
     return n - _readings.length;
   }
 
+  int _deleteShared({String? playerId, String? before}) {
+    final n = _shared.length;
+    if (playerId != null) {
+      _shared.removeWhere((r) => r['player_id'] == playerId);
+    } else if (before != null) {
+      _shared.removeWhere(
+        (r) => (r['timestamp']! as String).compareTo(before) < 0,
+      );
+    }
+    return n - _shared.length;
+  }
+
   void _erasePlayerRecords(String pid) {
+    _deleteShared(playerId: pid); // other fields' copies (S14-5)
     _declarations.removeWhere((_, d) => d['player_id'] == pid);
     _checkins.removeWhere((r) => r['player_id'] == pid);
     _fieldPlayers.remove(pid);
@@ -1452,8 +1475,152 @@ class ControllerCheckin {
         game['id']! as int,
         row['player_id']! as String,
       );
+      if (names) {
+        final shared = sharedView(row['player_id']! as String);
+        if (shared.isNotEmpty) out['shared_readings'] = shared;
+      }
     }
     return out;
+  }
+
+  /// For tests only: the field's own readings replaced by these signed
+  /// records, as if marshals had uploaded them (the shared vectors' "already
+  /// a local measurement").
+  void debugSetLocalReadings(List<Map<String, Object?>> records) {
+    _readings = [
+      for (final r in records)
+        {
+          'reading_id': r['reading_id'],
+          'replica_id': r['replica_id'],
+          'player_id': r['player_id'],
+          'marshal_id': r['marshal_id'],
+          'type': r['type'],
+          'game_id': r['game_id'],
+          'timestamp': r['timestamp'],
+          'record': r,
+          'series_id': newUuid(_random),
+          'outcome': 'pass',
+          'received_at': _wall(),
+        },
+    ];
+  }
+
+  /// A player's records from other fields as the lists show them: marked as
+  /// from another field (with its name) and never part of the field's own
+  /// readings or judgements (checkin.py `shared_view`).
+  List<Map<String, Object?>> sharedView(String pid) {
+    final rows = [
+      for (final r in _shared)
+        if (r['player_id'] == pid) r,
+    ];
+    rows.sort((a, b) {
+      final c = (a['timestamp']! as String).compareTo(
+        b['timestamp']! as String,
+      );
+      return c != 0
+          ? c
+          : (a['reading_id']! as String).compareTo(b['reading_id']! as String);
+    });
+    final out = <Map<String, Object?>>[];
+    for (final r in rows) {
+      final rec = jsonDecode(r['record_json']! as String) as Map;
+      out.add({
+        'reading_id': r['reading_id'],
+        'field': r['field_name'],
+        'from_other_field': true,
+        'type': rec['type'],
+        'timestamp': r['timestamp'],
+        'velocity_mps': rec['velocity_mps'],
+        'bb_weight_g': rec['bb_weight_g'],
+        'energy_j': rec['energy_j'],
+        'marshal_name': rec['marshal_name'],
+      });
+    }
+    return out;
+  }
+
+  /// Other fields' records of the game's roster players, from `GET
+  /// /api/v1/sync/chrono` (S14-5, checked by controller_sync_format.dart's
+  /// `checkSharedChrono`; checkin.py `apply_shared_chrono`). The site server
+  /// decided what may be shared (consent for both fields); this keeps only
+  /// what it can check: players on this roster, a record the marshal's key
+  /// given with it signed, one younger than the retention period, and none
+  /// whose id is a measurement of this field (a local reading is never
+  /// replaced). A roster player the answer leaves out has none kept (a
+  /// consent withdrawn). Returns `{players, stored, dropped}`.
+  Future<Map<String, Object?>> applySharedChrono(
+    int gameId,
+    List<String> rosterPlayers,
+    Map<String, Object?> answer,
+  ) async {
+    final now = _wall();
+    final cutoff = formatTimestamp(
+      DateTime.fromMillisecondsSinceEpoch(
+        ((now - _chronoRetentionDays * 86400) * 1000).round(),
+        isUtc: true,
+      ),
+    );
+    final on = rosterPlayers.toSet();
+    final rows = <String, List<Map<String, Object?>>>{
+      for (final p in rosterPlayers) p: [],
+    };
+    var dropped = 0;
+    for (final entry
+        in (answer['players']! as List).cast<Map<String, Object?>>()) {
+      final readings = (entry['readings']! as List)
+          .cast<Map<String, Object?>>();
+      final pid = entry['player_id']! as String;
+      if (!on.contains(pid)) {
+        dropped += readings.length;
+        continue;
+      }
+      for (final item in readings) {
+        final key = base64.decode(item['public_key']! as String);
+        final ChronoReading record;
+        try {
+          record = await verifyRecordText(item['record']! as String, key);
+        } on ChronoVerifyException {
+          dropped++;
+          continue;
+        }
+        if (record.timestamp.compareTo(cutoff) < 0 ||
+            _readings.any((r) => r['reading_id'] == record.readingId)) {
+          dropped++;
+          continue;
+        }
+        rows[pid]!.add({
+          'player_id': pid,
+          'reading_id': record.readingId,
+          'field_name': item['field'],
+          'timestamp': record.timestamp,
+          'record_json': item['record'],
+          'public_key': item['public_key'],
+          'pulled_at': now,
+        });
+      }
+    }
+    final changed = <String>[];
+    for (final e in rows.entries) {
+      final before = {
+        for (final r in _shared)
+          if (r['player_id'] == e.key) r['reading_id'],
+      };
+      final after = {for (final r in e.value) r['reading_id']};
+      if (before.length != after.length || !before.containsAll(after)) {
+        changed.add(e.key);
+      }
+      _shared.removeWhere((r) => r['player_id'] == e.key);
+      _shared.addAll(e.value);
+    }
+    _save();
+    for (final pid in changed) {
+      if (_row(gameId, pid) != null) _notify(gameId, pid);
+    }
+    return {
+      'players': rows.values.where((v) => v.isNotEmpty).length,
+      'stored': rows.values.fold<int>(0, (n, v) => n + v.length),
+      'dropped': dropped,
+    };
   }
 
   /// The player's own check-in as the stream's hello gives it, or null.
@@ -2078,6 +2245,7 @@ class ControllerCheckin {
         'seq': r['seq'],
         'pending': decls.where((d) => d['state'] == 'pending').length,
         'declarations': decls,
+        'shared_readings': sharedView(r['player_id']! as String),
       });
     }
     // Stable, as Python's sort: players with pending declarations first.
@@ -2813,6 +2981,7 @@ class ControllerCheckin {
   ];
 
   int deletePlayerReadings(String pid) {
+    _deleteShared(playerId: pid); // other fields' copies of them (S14-5)
     final n = _deleteReadings(playerId: pid);
     _save();
     return n;
@@ -3136,6 +3305,8 @@ class ControllerCheckin {
       'declarations': declarations,
       'identities': idle.length,
       'readings': _deleteReadings(before: cutoff),
+      // Other fields' records pulled from the site server (S14-5): the same period.
+      'shared_readings': _deleteShared(before: cutoff),
       'marshal_keys': keysBefore - _marshalHistory.length,
     };
     if (out.values.any((v) => v > 0)) _save();

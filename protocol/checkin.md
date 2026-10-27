@@ -203,7 +203,7 @@ Version 1, at most 128 bytes with the version byte. All three keys are required.
 | PATCH | `/api/v1/games/{id}/checkins/{player}` | GM token: `team`, `squad`, `role`; staff: `status: "checked_in"` (confirm), `federation_seen`, `replicas` | |
 | DELETE | `/api/v1/games/{id}/checkins/{player}` | GM token | Remove: status `removed`, personal fields erased, the player's tokens refused |
 | POST | `/api/v1/games/{id}/checkins/ticket` | the same | `{"ticket": "atalaia:ticket:..."}`: a registered player's printed ticket, scanned; checked in at once |
-| GET | `/api/v1/games/{id}/chrono-list` | GM token, marshal or gm player token | Players with declarations, pending first in check-in order; counts |
+| GET | `/api/v1/games/{id}/chrono-list` | GM token, marshal or gm player token | Players with declarations, pending first in check-in order; counts; per player `shared_readings`: records of other fields pulled from the site server with the person's consent (`from_other_field`, `field`, never judged or counted: [sync.md](sync.md)) |
 | GET | `/api/v1/games/{id}/checkins.csv` | GM token | The list as CSV for the field's own records (cells that a spreadsheet would read as a formula start with `'`) |
 | POST | `/api/v1/games/{id}/checkin/open` · `/close` | GM token | Check-in is open from a game's creation until it ends, unless closed |
 | GET / PUT | `/api/v1/checkin/settings` | GM token | `confirm`, `federation`, `federation_label`, `max_replicas`, `max_players`, `chrono_valid_for` |

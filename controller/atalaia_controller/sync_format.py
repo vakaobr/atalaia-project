@@ -537,7 +537,8 @@ def check_chrono(body: Any) -> dict[str, Any]:
 
 MAX_SCHEDULE = 200          # scheduled games in one schedule answer
 MAX_ROSTER = 5000           # registrations in one roster answer or check-ins body (the controller's max_players)
-MAX_CLAIMS = 500            # player id claims per answer or body
+MAX_SHARED = 100            # other fields' records of one player in a shared-chrono answer (the newest)
+MAX_CLAIMS = 500           # player id claims per answer or body
 MAX_DECLARATIONS = 20       # a registration's pre-declared replicas (the controller's max_replicas bound)
 SCHEDULED_STATES = ("published", "in_progress", "completed", "cancelled")
 ROSTER_STATES = ("published", "in_progress", "completed", "cancelled")
@@ -657,6 +658,40 @@ def check_roster(body: Any) -> dict[str, Any]:
             if d["declaration_id"] in decls:
                 _fail("duplicate_declaration", f"{path}.replicas[{j}].declaration_id")
             decls.add(d["declaration_id"])
+    return body
+
+
+def check_shared_chrono(body: Any) -> dict[str, Any]:
+    """GET /api/v1/sync/chrono's answer (S14-5): other fields' signed chrono records of the players on a
+    scheduled game's roster, only the ones their person consented to share between that field and this one.
+    Per player id of this field (each once): 1 to ``MAX_SHARED`` readings, each the signed record as text
+    (``MAX_RECORD`` bytes, verified by the controller with the key given: chrono.py), the name of the field
+    it was made at (1-128) and the marshal's public key (32 bytes in standard base64). A record once."""
+    body = _answer_envelope(body, ("scheduled_game_id", "players"))
+    _uuid(body["scheduled_game_id"], "scheduled_game_id")
+    players, records = set(), set()
+    for i, p in enumerate(_list(body["players"], "players", MAX_ROSTER)):
+        path = f"players[{i}]"
+        p = _obj(p, path)
+        _keys(p, path, ("player_id", "readings"))
+        _text(p["player_id"], f"{path}.player_id", 14, pattern=PLAYER_ID)
+        if p["player_id"] in players:
+            _fail("duplicate_player", path)
+        players.add(p["player_id"])
+        for j, r in enumerate(_list(p["readings"], f"{path}.readings", MAX_SHARED, 1)):
+            rpath = f"{path}.readings[{j}]"
+            r = _obj(r, rpath)
+            _keys(r, rpath, ("field", "record", "public_key"))
+            _text(r["field"], f"{rpath}.field", 128)
+            record = r["record"]
+            if not isinstance(record, str) or not record:
+                _fail("not_a_text", f"{rpath}.record")
+            if len(record.encode("utf-8", "surrogatepass")) > MAX_RECORD:
+                _fail("too_large", f"{rpath}.record")
+            public_key_bytes(r["public_key"], f"{rpath}.public_key")
+            if record in records:
+                _fail("duplicate_reading", rpath)
+            records.add(record)
     return body
 
 
@@ -1200,7 +1235,7 @@ CHECKS = {"games": check_game, "events": check_events, "scores": check_scores, "
           "checkins": check_checkins, "claims": check_claims}
 GAME_KINDS = ("games", "events", "scores", "nodes", "checkins")  # the bodies about one game; the rest are the field's
 # The answers of the GET endpoints the controller pulls (plan phases 16, 18 and 20).
-ANSWERS = {"schedule": check_schedule, "roster": check_roster, "claims": check_claims_list, "field": check_field,
+ANSWERS = {"schedule": check_schedule, "roster": check_roster, "shared_chrono": check_shared_chrono, "claims": check_claims_list, "field": check_field,
            "presets": check_presets, "scenario": check_scenario}
 
 

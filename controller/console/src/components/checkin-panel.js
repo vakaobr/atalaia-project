@@ -531,6 +531,11 @@ export class CheckinPanel extends Component {
                     ${!d.replica_id && html` <span class="small muted">${t('checkin.unregistered')}</span>`}
                     ${' '}<${StateBadge} state=${d.state} refusedToday=${d.refused_today} />
                 </li>`)}</ul>
+                ${(p.shared_readings || []).length > 0 && html`<div class="small muted" data-testid="chrono-shared">
+                    <span>${t('checkin.shared_title')}</span>
+                    <ul>${p.shared_readings.map((s) => html`<li data-testid=${`chrono-shared-${s.reading_id}`}>${t('checkin.shared_line', {
+                        type: t(`checkin.rtype_${s.type}`), energy: s.energy_j, field: s.field, date: s.timestamp.slice(0, 10) })}</li>`)}</ul>
+                </div>`}
             </li>`)}</ul>
         </section>`;
     }

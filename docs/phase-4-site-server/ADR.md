@@ -1045,7 +1045,8 @@ both check bodies with `controller/atalaia_controller/sync_format.py` against
 game; a `game.end` event does. The other endpoints of item 6 come with
 their plan phases. *(2026-10-20, plan phase 14: `POST /api/v1/sync/marshals`,
 `replicas` and `chrono` are built, field-level bodies without a `game`;
-`GET /api/v1/sync/chrono` still waits, see ADR-P4-5.)* *(2026-10-20, plan phase 18: `GET
+`GET /api/v1/sync/chrono` still waits, see ADR-P4-5; built 2026-10-27 as
+`GET /api/v1/sync/chrono?scheduled_game_id=`, the roster's players only, decision S14-5.)* *(2026-10-20, plan phase 18: `GET
 /api/v1/sync/field` carries the field's branding and saved teams, with
 `GET /api/v1/sync/images/{sha256}` for their images, pulled only with
 `[sync] branding = "site"`; the field settings and limit template are not

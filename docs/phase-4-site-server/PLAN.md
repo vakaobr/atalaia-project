@@ -1357,7 +1357,8 @@ public key (`/api/v1/fields/{field}/marshal-keys`), a field's admin revokes a
 key, switches sharing (`PATCH /api/v1/fields/{field}`) and erases a player's
 chrono data (S14-10); the person's history is `GET /api/v1/me/chrono`; the
 staff views are `api/chrono.py` (S14-6). `GET /api/v1/sync/chrono` (the
-controller pulling other fields' records) waits for plan phase 16's roster.
+controller pulling other fields' records) waited for plan phase 16's roster and
+was built after it (2026-10-27, `?scheduled_game_id=`, S14-5).
 
 ---
 
