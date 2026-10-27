@@ -624,7 +624,8 @@ static void render(const screen_case_t *c)
     for (size_t i = 0; i < sizeof(timer_bars) / sizeof(timer_bars[0]); i++) {
         if (strcmp(timer_bars[i].name, c->name) != 0) continue;
         screen_timer_bar(timer_bars[i].left, timer_bars[i].total);
-        if (screen_timer_bar_left() != timer_bars[i].left) fail(c->name, "the timer bar is not shown");
+        if (screen_timer_bar_left() != timer_bars[i].left)
+            fail(c->name, "the timer bar is not shown");
     }
     test_display_render();
     test_display_rgb888(rendered);
