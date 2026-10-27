@@ -34,7 +34,9 @@ PAGES = {
     "game": f"/staff/fields/{FIELD}/games/{GAME}", "scenarios": f"/staff/fields/{FIELD}/scenarios",
     "scenario": f"/staff/fields/{FIELD}/scenarios/org.test.two", "presets": f"/staff/fields/{FIELD}/presets",
     "devices": f"/staff/fields/{FIELD}/devices", "remote": f"/staff/fields/{FIELD}/remote-gm",
-    "atak": f"/staff/fields/{FIELD}/atak",
+    "atak": f"/staff/fields/{FIELD}/atak", "schedule": f"/staff/fields/{FIELD}/schedule",
+    "registrations": f"/staff/fields/{FIELD}/schedule/{GAME}/registrations",
+    "roster": f"/staff/fields/{FIELD}/schedule/{GAME}/roster",
 }
 
 
@@ -139,6 +141,7 @@ class StaffPageTests(AppTestCase):
     async def test_a_path_without_a_valid_id_is_a_404(self) -> None:
         for path in ("/staff/fields/nope/history", f"/staff/fields/{FIELD}/games/nope",
                      f"/staff/fields/{FIELD}/scenarios/Not-An-Id", f"/staff/fields/{FIELD}/scenarios/x" + "a.b" * 20,
+                     f"/staff/fields/{FIELD}/schedule/nope/registrations", f"/staff/fields/{FIELD}/schedule/nope/roster",
                      f"/staff/fields/{FIELD}/scenarios/%3Cscript%3E.x", "/staff/fields/%22onmouseover%3D/devices"):
             with self.subTest(path=path):
                 r = await self.client.get(path)
@@ -164,7 +167,9 @@ class StaffPageTests(AppTestCase):
         game = r.json()["game"]
         for path in (f"/staff/fields/{field_id}/history", f"/staff/fields/{field_id}/games/{game}",
                      f"/staff/fields/{field_id}/devices", f"/staff/fields/{field_id}/remote-gm",
-                     f"/staff/fields/{field_id}/atak"):
+                     f"/staff/fields/{field_id}/atak", f"/staff/fields/{field_id}/schedule",
+                     f"/staff/fields/{field_id}/schedule/{game}/registrations",
+                     f"/staff/fields/{field_id}/schedule/{game}/roster"):
             r = await self.client.get(path)
             self.assertEqual(r.status_code, 200)
             self.assertNotIn("Operação Noturna", r.text)
@@ -243,6 +248,30 @@ class StaffScriptTests(AppTestCase):
             for key, value in strings.items():
                 self.assertEqual(set(re.findall(r"\{(\w+)\}", value)),
                                  set(re.findall(r"\{(\w+)\}", STRINGS["en"][key])), (lang, key))
+
+    async def test_the_texts_a_script_builds_a_key_from_exist(self) -> None:
+        """``t(`sched_status_${status}`)`: the keys made from a value, for every value the API can give."""
+        built = {"sched_status_": ("draft", "published", "in_progress", "completed", "cancelled"),
+                 "reg_window_": ("none", "not_yet", "open", "closed"),
+                 "reg_status_": ("registered", "checked_in", "no_show", "cancelled"),
+                 "fed_": ("off", "optional", "required"),
+                 "replica_state_": ("pending", "passed", "refused", "withdrawn")}
+        text = " ".join(self.sources().values())
+        for prefix, values in built.items():
+            self.assertIn(f"`{prefix}$", text)
+            for lang, strings in STRINGS.items():
+                for value in values:
+                    self.assertIn(prefix + value, strings, (lang, prefix + value))
+
+    async def test_the_roster_has_a_print_style_sheet(self) -> None:
+        css = (STATIC / "staff.css").read_text(encoding="utf-8")
+        self.assertIn("@media print", css)
+        printed = css[css.index("@media print"):]
+        hiding = printed.split("display: none", 1)[0]
+        for hidden in ("header.staff-top", "footer", ".noprint", "button"):
+            self.assertIn(hidden, hiding)
+        roster = (staff_pages.TEMPLATE_DIR / "roster.html").read_text(encoding="utf-8")
+        self.assertIn('id="print"', roster)  # the button, which the print style sheet hides
 
     async def test_state_changing_calls_carry_the_bearer_token(self) -> None:
         """No request is authorised by a cookie: the scripts call the API through api() (Authorization:

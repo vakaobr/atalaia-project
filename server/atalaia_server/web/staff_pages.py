@@ -6,6 +6,11 @@
     GET /staff/login                                   log in: password, then the TOTP code
     GET /staff/fields/<field>/history                  the field's games, filters, the history settings
     GET /staff/fields/<field>/games/<game>             one game: its score timeline, its event log, its boxes
+    GET /staff/fields/<field>/schedule                 the field's scheduled games: create, edit, publish, cancel,
+                                                       delete a draft (Phase 4 follow-up FU6)
+    GET /staff/fields/<field>/schedule/<id>/registrations   who registered for a game: change a name, a team or
+                                                       a federation number, withdraw a registration
+    GET /staff/fields/<field>/schedule/<id>/roster     the game-day roster as the controller pulls it, printable
     GET /staff/fields/<field>/scenarios                the scenario library (archived ones on request)
     GET /staff/fields/<field>/scenarios/new            a new manifest: check (every problem shown), save
     GET /staff/fields/<field>/scenarios/<id>           one scenario: manifest, package, revisions, edit, archive
@@ -106,7 +111,8 @@ class StaffPage:
         items = [("fields", "/staff/", "nav_fields")]
         if field is not None:
             base = f"/staff/fields/{field}"
-            items += [("history", f"{base}/history", "nav_history"), ("scenarios", f"{base}/scenarios", "nav_scenarios"),
+            items += [("history", f"{base}/history", "nav_history"), ("schedule", f"{base}/schedule", "nav_schedule"),
+                      ("scenarios", f"{base}/scenarios", "nav_scenarios"),
                       ("presets", f"{base}/presets", "nav_presets"), ("devices", f"{base}/devices", "nav_devices"),
                       ("remote", f"{base}/remote-gm", "nav_remote"), ("atak", f"{base}/atak", "nav_atak")]
         out = []
@@ -159,7 +165,7 @@ def _field_page(request: Request, field_text: str, page: str, section: str, titl
         return p.not_found(request)
     base = f"/staff/fields/{field}"
     links = {"history_href": esc(p.link(f"{base}/history")), "scenarios_href": esc(p.link(f"{base}/scenarios")),
-             "new_href": esc(p.link(f"{base}/scenarios/new"))}
+             "new_href": esc(p.link(f"{base}/scenarios/new")), "schedule_href": esc(p.link(f"{base}/schedule"))}
     content = TEMPLATES[page].substitute(p.texts(**links, **values))
     return p.render(request, page, p.t[title_key], content, field=field, section=section, data=data)
 
@@ -212,6 +218,27 @@ async def game(field: str, game: str, request: Request) -> Response:
     if game_id is None:
         return StaffPage(request).not_found(request)
     return _field_page(request, field, "game", "history", "game_title", data={"game": str(game_id)})
+
+
+@router.api_route("/staff/fields/{field}/schedule", methods=GET_HEAD)
+async def schedule(field: str, request: Request) -> Response:
+    return _field_page(request, field, "schedule", "schedule", "schedule_title")
+
+
+@router.api_route("/staff/fields/{field}/schedule/{game}/registrations", methods=GET_HEAD)
+async def registrations(field: str, game: str, request: Request) -> Response:
+    game_id = _uuid(game)
+    if game_id is None:
+        return StaffPage(request).not_found(request)
+    return _field_page(request, field, "registrations", "schedule", "regs_title", data={"game": str(game_id)})
+
+
+@router.api_route("/staff/fields/{field}/schedule/{game}/roster", methods=GET_HEAD)
+async def roster(field: str, game: str, request: Request) -> Response:
+    game_id = _uuid(game)
+    if game_id is None:
+        return StaffPage(request).not_found(request)
+    return _field_page(request, field, "roster", "schedule", "roster_title", data={"game": str(game_id)})
 
 
 @router.api_route("/staff/fields/{field}/scenarios", methods=GET_HEAD)

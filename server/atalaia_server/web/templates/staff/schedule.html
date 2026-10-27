@@ -1,0 +1,72 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$schedule_title</h1>
+<p>$schedule_intro</p>
+<p id="zone-note" class="hint"></p>
+<form id="view-form" class="staff-form inline" method="post" novalidate>
+<fieldset disabled>
+<div class="row">
+<label for="v-view">$sched_view</label>
+<select id="v-view" name="view">
+<option value="upcoming">$sched_view_upcoming</option>
+<option value="past">$sched_view_past</option>
+<option value="all">$sched_view_all</option>
+</select>
+</div>
+<button type="submit">$apply</button>
+</fieldset>
+</form>
+<div class="table-wrap">
+<table id="schedule" class="data" hidden>
+<thead><tr><th scope="col">$col_title</th><th scope="col">$col_starts</th><th scope="col">$col_state</th><th scope="col">$col_registered</th><th scope="col">$col_reg_window</th><th scope="col"><span class="visually-hidden">$edit</span></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="schedule-none" hidden>$schedule_none</p>
+<section id="cancel-section" aria-labelledby="cancel-title" hidden>
+<h2 id="cancel-title">$sched_cancel</h2>
+<p id="cancel-intro">$sched_cancel_intro</p>
+<form id="cancel-form" class="staff-form" method="post" novalidate>
+<fieldset>
+<label for="c-reason">$sched_cancel_reason</label>
+<input id="c-reason" name="reason" maxlength="512" required>
+<p><button type="submit" class="danger">$sched_cancel_do</button> <button type="button" id="c-back">$sched_cancel_back</button></p>
+</fieldset>
+</form>
+</section>
+<section aria-labelledby="game-form-title">
+<h2 id="game-form-title">$sched_new</h2>
+<form id="game-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="g-title">$f_title</label>
+<input id="g-title" name="title" maxlength="256" required>
+<label for="g-description">$f_description</label>
+<textarea id="g-description" name="description" rows="4" maxlength="8000"></textarea>
+<label for="g-starts">$f_starts</label>
+<input id="g-starts" name="starts_at" type="datetime-local" required>
+<label for="g-ends">$f_ends</label>
+<input id="g-ends" name="ends_at" type="datetime-local" required>
+<label for="g-location">$f_location</label>
+<input id="g-location" name="location_text" maxlength="512">
+<label for="g-mode">$f_mode</label>
+<input id="g-mode" name="mode_id" maxlength="128" autocapitalize="none" spellcheck="false">
+<label for="g-teams">$f_teams</label>
+<textarea id="g-teams" name="teams" rows="4" spellcheck="false"></textarea>
+<label for="g-max">$f_max</label>
+<input id="g-max" name="max_players" type="number" min="1" max="10000" step="1">
+<label for="g-opens">$f_opens</label>
+<input id="g-opens" name="registration_opens_at" type="datetime-local">
+<label for="g-closes">$f_closes</label>
+<input id="g-closes" name="registration_closes_at" type="datetime-local">
+<p class="hint">$f_window_hint</p>
+<label for="g-federation">$f_federation</label>
+<select id="g-federation" name="federation">
+<option value="off">$fed_off</option>
+<option value="optional">$fed_optional</option>
+<option value="required">$fed_required</option>
+</select>
+<div class="check"><input id="g-replicas" name="predeclare_replicas" type="checkbox" checked> <label for="g-replicas">$f_replicas</label></div>
+<p><button type="submit" id="g-submit">$sched_create</button> <button type="button" id="g-cancel" hidden>$cancel</button></p>
+</fieldset>
+</form>
+</section>

@@ -1,0 +1,33 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<p><a id="back" href="$schedule_href">$regs_back</a></p>
+<h1 id="regs-heading">$regs_title</h1>
+<p>$regs_intro</p>
+<dl id="summary" class="details"></dl>
+<p id="counts" class="hint"></p>
+<p id="locked" class="hint" hidden>$reg_locked</p>
+<p id="roster-link" hidden><a id="roster-href" href="$schedule_href">$sched_roster</a></p>
+<div class="table-wrap">
+<table id="regs" class="data" hidden>
+<thead><tr><th scope="col">$col_display</th><th scope="col">$col_team_pref</th><th scope="col" id="th-fed">$col_fed_number</th><th scope="col">$col_replicas</th><th scope="col">$col_ticket</th><th scope="col">$col_state</th><th scope="col">$col_source</th><th scope="col"><span class="visually-hidden">$edit</span></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="regs-none" hidden>$regs_none</p>
+<p class="hint">$regs_replicas_note</p>
+<section id="reg-edit" aria-labelledby="reg-edit-title" hidden>
+<h2 id="reg-edit-title">$edit</h2>
+<form id="reg-form" class="staff-form" method="post" novalidate>
+<fieldset>
+<label for="r-name">$reg_edit_name</label>
+<input id="r-name" name="display_name" maxlength="32" required>
+<label for="r-team">$reg_edit_team</label>
+<select id="r-team" name="team_preference"></select>
+<div id="r-fed-row">
+<label for="r-fed">$reg_edit_fed</label>
+<input id="r-fed" name="federation_number" maxlength="32" autocapitalize="none" spellcheck="false">
+</div>
+<p><button type="submit">$save</button> <button type="button" id="r-cancel">$cancel</button></p>
+</fieldset>
+</form>
+</section>

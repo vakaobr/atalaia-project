@@ -7,7 +7,8 @@
 import { $, api, boot, clear, effectiveRoles, el, errorText, link, page, roleName, sectionAllowed, status, t } from './staff.js';
 
 const SECTIONS = [
-    ['history', '/history', 'nav_history'], ['scenarios', '/scenarios', 'nav_scenarios'],
+    ['history', '/history', 'nav_history'], ['schedule', '/schedule', 'nav_schedule'],
+    ['scenarios', '/scenarios', 'nav_scenarios'],
     ['presets', '/presets', 'nav_presets'], ['devices', '/devices', 'nav_devices'], ['remote', '/remote-gm', 'nav_remote'],
     ['atak', '/atak', 'nav_atak'],
 ];

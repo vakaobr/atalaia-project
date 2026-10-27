@@ -57,6 +57,49 @@ export function when(iso, zone) {
     return CHINESE ? text.replace(/(\d)([年月日])/g, '$1 $2').replace(/([年月])(\d)/g, '$1 $2') : text;
 }
 
+/** The wall-clock time zone shows for date, as the milliseconds of that time read as if it were UTC. */
+function wallClock(date, zone) {
+    const parts = {};
+    const format = new Intl.DateTimeFormat('en-US', {
+        timeZone: zone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',
+        minute: '2-digit', second: '2-digit',
+    });
+    for (const p of format.formatToParts(date)) parts[p.type] = p.value;
+    return Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour % 24, +parts.minute, +parts.second);
+}
+
+/** An RFC 3339 time as the value of a datetime-local input (YYYY-MM-DDTHH:MM), in the field's time zone
+ * (the browser's when the zone is unknown or not one the browser knows). */
+export function zonedInput(iso, zone) {
+    if (!iso) return '';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    let wall;
+    try {
+        wall = wallClock(date, zone || undefined);
+    } catch (e) {
+        wall = wallClock(date, undefined);
+    }
+    return new Date(wall).toISOString().slice(0, 16);
+}
+
+/** The value of a datetime-local input, read in the field's time zone, as an RFC 3339 time in UTC; null when
+ * empty. The offset is found from the zone's rules at that moment (twice, for the hour a clock change moves). */
+export function zonedIso(text, zone) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(text || '');
+    if (!m) return null;
+    const wall = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+    let use = zone || undefined;
+    try {
+        wallClock(new Date(wall), use);
+    } catch (e) {
+        use = undefined;
+    }
+    let guess = wall;
+    for (let i = 0; i < 2; i += 1) guess = wall - (wallClock(new Date(guess), use) - guess);
+    return new Date(guess).toISOString();
+}
+
 /** A game time in milliseconds as m:ss or h:mm:ss. */
 export function gameTime(ms) {
     if (ms === null || ms === undefined) return t('none');
@@ -306,6 +349,7 @@ export function effectiveRoles(field, s) {
 
 const SECTIONS = {
     history: (r) => r.size > 0,
+    schedule: (r) => r.has('admin') || r.has('gm'),
     scenarios: (r) => r.has('admin') || r.has('gm'),
     presets: (r) => r.has('admin') || r.has('gm'),
     devices: (r) => r.has('admin') || r.has('gm'),

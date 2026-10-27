@@ -10,7 +10,8 @@ database (``tests/base.py``), and drives the pages as staff would: log in with t
 code, then the game history and a game's timeline and log, the history settings, the scenario library (a
 manifest with problems, checked; fixed, saved, revised, archived), the presets, the device health and the
 remote GM against a controller's socket (``tests/test_remote_gm.Stream``) and the remote ATAK relay's
-enrolment (a data package downloaded, a certificate revoked). The roles are the API's: a
+enrolment (a data package downloaded, a certificate revoked), and the schedule, a game's registrations and
+its printable roster (decisions FU6-1 to FU6-7, at 375 px too). The roles are the API's: a
 player's session sees its role refused. Every page is checked for script errors and content security
 policy violations, for labels on its form controls, and for sideways scrolling at a phone's width.
 
@@ -57,6 +58,7 @@ except ImportError:
 CTRL = {"id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd", "version": "0.1.0"}
 GAME = {"game_id": 4242, "game_seed": 3735928559}
 EVIL = '<img src=x onerror="window.pwned=1">'
+SHORT_EVIL = '<img src=x onerror="pwned=1">'  # within a display name's 32 characters
 ROLE = {"player": 1, "marshal": 4, "gm": 5, "admin": 7}
 PHONE = {"width": 360, "height": 740}
 LIVE = {"game": GAME, "name": "Domingo", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"],
@@ -198,19 +200,19 @@ class BrowserCase(AppTestCase):
             await page.click("#totp-form button[type=submit]")
         await page.wait_for_url(f"{self.base}{path}")
 
-    async def check_page(self, page: Page) -> None:
+    async def check_page(self, page: Page, width: int = PHONE["width"]) -> None:
         """Every visible form control has a label, and nothing scrolls sideways at a phone's width."""
         unlabelled = await page.evaluate("""() => [...document.querySelectorAll('input, select, textarea')]
             .filter((e) => e.offsetParent !== null && e.type !== 'hidden' && !(e.labels && e.labels.length)
                     && !e.getAttribute('aria-label'))
             .map((e) => e.id || e.outerHTML.slice(0, 60))""")
         self.assertEqual(unlabelled, [], page.url)
-        await page.set_viewport_size(PHONE)
+        await page.set_viewport_size({"width": width, "height": PHONE["height"]})
         wide = await page.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
         culprits = await page.evaluate("""() => [...document.querySelectorAll('body *')]
             .filter((e) => e.getBoundingClientRect().right > window.innerWidth + 1 && !(e.parentElement && e.parentElement.closest('.table-wrap')))
             .map((e) => e.tagName + '#' + e.id + '.' + e.className).slice(0, 8)""")
-        self.assertLessEqual(wide, 0, f"{page.url} scrolls sideways at {PHONE['width']} px: {culprits}")
+        self.assertLessEqual(wide, 0, f"{page.url} scrolls sideways at {width} px: {culprits}")
         await page.set_viewport_size({"width": 1200, "height": 900})
 
     def field_path(self, rest: str) -> str:
@@ -608,6 +610,263 @@ class AtakTests(BrowserCase):
         await self.login(other, marshal, marshal_secret, self.field_path("/atak"))
         await expect(other.locator("#status")).to_contain_text("precisa da função administração ou GM neste campo")
         await expect(other.locator('#sections li[data-section="atak"]')).to_be_hidden()
+
+
+class ScheduleTests(BrowserCase):
+    """The schedule, a game's registrations and its roster (Phase 4 follow-up FU6), at 375 px too."""
+
+    async def lisbon(self) -> None:
+        # The browser runs in UTC: a time typed on the page must be read in the field's zone.
+        await self.fetch("UPDATE fields SET timezone = 'Europe/Lisbon' WHERE id = $1", self.field_id)
+
+    async def published_game(self, title: str = "Domingo", starts: datetime.timedelta = datetime.timedelta(days=2)) -> str:
+        row = await self.fetch(
+            "INSERT INTO scheduled_games (field_id, title, starts_at, ends_at, status, teams, max_players, federation, "
+            "registration_opens_at, registration_closes_at) VALUES ($1, $2, now() + $3::interval, "
+            "now() + $3::interval + interval '4 hours', 'published', $4::jsonb, 10, 'optional', "
+            "now() - interval '1 day', now() + interval '1 day') RETURNING id",
+            self.field_id, title, starts, json.dumps(["red", "blue"]))
+        return str(row[0]["id"])
+
+    async def register(self, game: str, username: str, **body: Any) -> dict[str, Any]:
+        await self.make_user(username)
+        # (not self.auth: this class's login() is the page's)
+        session = await self.client.post("/api/v1/auth/login", json={"username": username, "password": PASSWORD})
+        headers = {"Authorization": f"Bearer {session.json()['access_token']}"}
+        r = await self.client.post(f"/api/v1/fields/{self.field_id}/scheduled-games/{game}/registrations",
+                                   json=body, headers=headers)
+        self.assertEqual(r.status_code, 201, r.text)
+        return r.json()
+
+    async def test_create_edit_publish_cancel_and_delete_in_the_fields_time_zone(self) -> None:
+        await self.lisbon()
+        name, secret = await self.staff("admin")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path("/schedule"))
+        await expect(page.locator("#zone-note")).to_contain_text("Europe/Lisbon")
+        await expect(page.locator("#schedule-none")).to_be_visible()
+        await page.fill("#g-title", EVIL)
+        await page.fill("#g-starts", "2030-07-06T10:00")
+        await page.fill("#g-ends", "2030-07-06T14:00")
+        await page.fill("#g-teams", "red\nblue\n")
+        await page.fill("#g-max", "12")
+        await page.fill("#g-opens", "2030-06-01T08:00")
+        await page.fill("#g-closes", "2030-07-05T20:00")
+        await page.select_option("#g-federation", "required")
+        await page.click("#g-submit")
+        await expect(page.locator("#status")).to_contain_text("Draft created")
+        rows = page.locator("#schedule tbody tr")
+        await expect(rows).to_have_count(1)
+        # A title is text, never markup; the time is shown as typed, in the field's zone.
+        await expect(rows.first.locator("th")).to_have_text(EVIL)
+        self.assertEqual(await page.locator("#schedule img").count(), 0)
+        self.assertIsNone(await page.evaluate("() => window.pwned"))
+        await expect(rows.first).to_contain_text("10:00")
+        await expect(rows.first).to_contain_text("draft")
+        await expect(rows.first).to_contain_text("0 of 12")
+        await expect(rows.first.locator("td").nth(3)).to_have_text("—")  # a draft has no registration state
+        stored = (await self.fetch("SELECT title, starts_at, teams, max_players, federation, registration_closes_at, "
+                                   "status FROM scheduled_games"))[0]
+        self.assertEqual(stored["starts_at"].isoformat(), "2030-07-06T09:00:00+00:00")  # 10:00 in Lisbon's summer
+        self.assertEqual(stored["registration_closes_at"].isoformat(), "2030-07-05T19:00:00+00:00")
+        self.assertEqual((stored["title"], json.loads(stored["teams"]), stored["max_players"], stored["federation"],
+                          stored["status"]), (EVIL, ["red", "blue"], 12, "required", "draft"))
+        await self.check_page(page, 375)
+        # Edit: the form comes back as typed (in the zone), and saves.
+        await rows.first.locator("button", has_text="Edit").click()
+        await expect(page.locator("#game-form-title")).to_have_text(f"Edit “{EVIL}”")
+        await expect(page.locator("#g-starts")).to_have_value("2030-07-06T10:00")
+        await page.fill("#g-title", "Sunday game")
+        await page.fill("#g-max", "")
+        await page.click("#g-submit")
+        await expect(page.locator("#status")).to_have_text("Saved.")
+        await expect(rows.first).to_contain_text("Sunday game")
+        await expect(rows.first).to_contain_text("(no limit)")
+        await expect(page.locator("#game-form-title")).to_have_text("New game")
+        # A refusal is in words: the end before the start.
+        await page.fill("#g-title", "Bad times")
+        await page.fill("#g-starts", "2030-08-01T10:00")
+        await page.fill("#g-ends", "2030-08-01T09:00")
+        await page.click("#g-submit")
+        await expect(page.locator("#status")).to_have_text("The end must be after the start, at most 14 days long.")
+        await page.reload()
+        # Publish (the admin's), then cancel with a reason.
+        await rows.first.locator("button", has_text="Publish").click()
+        await expect(page.locator("#status")).to_have_text("Game published.")
+        await expect(rows.first).to_contain_text("published")
+        await expect(rows.first).to_contain_text("not open yet")
+        self.assertIn("Sunday game", self.dialogs[-1])
+        await rows.first.locator("button", has_text="Cancel game").click()
+        await expect(page.locator("#cancel-section")).to_be_visible()
+        await page.fill("#c-reason", "Heavy rain")
+        await page.click("#cancel-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Game cancelled.")
+        await expect(rows.first).to_contain_text("cancelled")
+        await expect(page.locator("#cancel-section")).to_be_hidden()
+        await expect(rows.first.locator("button", has_text="Edit")).to_have_count(0)
+        await expect(rows.first.locator("a", has_text="Registrations")).to_have_count(1)
+        row = (await self.fetch("SELECT status, cancelled_reason FROM scheduled_games"))[0]
+        self.assertEqual((row["status"], row["cancelled_reason"]), ("cancelled", "Heavy rain"))
+        # The views: the game ends in 2030, so it is upcoming, not past.
+        await page.select_option("#v-view", "past")
+        await page.click("#view-form button[type=submit]")
+        await expect(page.locator("#schedule-none")).to_be_visible()
+        await page.select_option("#v-view", "all")
+        await page.click("#view-form button[type=submit]")
+        await expect(rows).to_have_count(1)
+        # A draft is deleted after a question.
+        await page.fill("#g-title", "To delete")
+        await page.fill("#g-starts", "2030-09-01T10:00")
+        await page.fill("#g-ends", "2030-09-01T12:00")
+        await page.click("#g-submit")
+        await expect(rows).to_have_count(2)
+        await page.locator("#schedule tbody tr", has_text="To delete").locator("button", has_text="Delete draft").click()
+        await expect(page.locator("#status")).to_have_text("Draft deleted.")
+        await expect(rows).to_have_count(1)
+        self.assertIn("To delete", self.dialogs[-1])
+        await self.check_page(page, 375)
+
+    async def test_a_gm_edits_but_does_not_publish_or_cancel(self) -> None:
+        name, secret = await self.staff("gm")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path("/schedule"))
+        await page.fill("#g-title", "GM's draft")
+        await page.fill("#g-starts", "2030-07-06T10:00")
+        await page.fill("#g-ends", "2030-07-06T14:00")
+        await page.click("#g-submit")
+        row = page.locator("#schedule tbody tr").first
+        await expect(row).to_contain_text("GM's draft")
+        await expect(row.locator("button", has_text="Edit")).to_have_count(1)
+        await expect(row.locator("button", has_text="Delete draft")).to_have_count(1)
+        await expect(row.locator("button", has_text="Publish")).to_have_count(0)
+        # Published by someone else, the game offers the GM no cancel either (the API would refuse it).
+        await self.fetch("UPDATE scheduled_games SET status = 'published'")
+        await page.reload()
+        await expect(page.locator("#schedule tbody tr").first).to_contain_text("published")
+        await expect(page.locator("#schedule tbody tr").first.locator("button", has_text="Cancel game")).to_have_count(0)
+
+    async def test_a_player_and_a_marshal_meet_the_apis_rules(self) -> None:
+        game = await self.published_game()
+        for role, with_totp in (("player", False), ("marshal", True)):
+            with self.subTest(role=role):
+                name, secret = await self.staff(role, with_totp=with_totp)
+                page = await self.new_page(lang="en-GB")
+                await self.login(page, name, secret, self.field_path("/schedule"))
+                await expect(page.locator("#status")).to_contain_text("This part needs the admin or GM role")
+                await expect(page.locator('#sections li[data-section="schedule"]')).to_be_hidden()
+                await expect(page.locator("#g-title")).to_be_disabled()  # nothing to submit
+                await page.goto(self.base + self.field_path(f"/schedule/{game}/registrations"))
+                await expect(page.locator("#status")).to_contain_text("This part needs the admin or GM role")
+                await expect(page.locator("#regs")).to_be_hidden()
+
+    async def test_registrations_and_the_roster(self) -> None:
+        await self.lisbon()
+        game = await self.published_game()
+        first = await self.register(game, "falcao", display_name=SHORT_EVIL, team_preference="red", federation_number="FPA-9",
+                                    replicas=[{"type": "aeg", "class": "rifle", "make_model": "M4"}])
+        await self.register(game, "ana", display_name="Ana")
+        name, secret = await self.staff("gm")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path(f"/schedule/{game}/registrations"))
+        rows = page.locator("#regs tbody tr")
+        await expect(rows).to_have_count(2)
+        await expect(page.locator("#regs-heading")).to_have_text("Registrations: Domingo")
+        await expect(page.locator("#counts")).to_contain_text("Active: 2")
+        await expect(rows.nth(0).locator("th")).to_have_text(SHORT_EVIL)  # text, never markup
+        self.assertEqual(await page.locator("#regs img").count(), 0)
+        self.assertIsNone(await page.evaluate("() => window.pwned"))
+        await expect(rows.nth(0)).to_contain_text("aeg, rifle, M4")
+        await expect(rows.nth(0)).to_contain_text("issued")
+        await expect(rows.nth(0)).to_contain_text("FPA-9")
+        await expect(rows.nth(0)).to_contain_text("active")
+        await self.check_page(page, 375)
+        # Change a name and a team.
+        await rows.nth(0).locator("button", has_text="Edit").click()
+        await expect(page.locator("#reg-edit")).to_be_visible()
+        await page.fill("#r-name", "Falcão")
+        await page.select_option("#r-team", "blue")
+        await page.click("#reg-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Saved.")
+        await expect(rows.nth(0).locator("th")).to_have_text("Falcão")
+        await expect(rows.nth(0)).to_contain_text("blue")
+        stored = (await self.fetch("SELECT display_name, team_preference FROM game_registrations WHERE id = $1",
+                                   uuid.UUID(first["id"])))[0]
+        self.assertEqual((stored["display_name"], stored["team_preference"]), ("Falcão", "blue"))
+        # A name the API refuses is shown in words.
+        await rows.nth(1).locator("button", has_text="Edit").click()
+        await page.fill("#r-name", "   ")  # the field stops at 32 characters; a blank name is the API's to refuse
+        await page.click("#reg-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Invalid display name (1 to 32 characters).")
+        await page.click("#r-cancel")
+        # Withdraw one: it stays listed as withdrawn.
+        await rows.nth(1).locator("button", has_text="Withdraw").click()
+        await expect(page.locator("#status")).to_have_text("Registration withdrawn.")
+        self.assertIn("Ana", self.dialogs[-1])
+        await expect(rows.nth(1)).to_contain_text("withdrawn")
+        await expect(rows.nth(1).locator("button")).to_have_count(0)
+        await expect(page.locator("#counts")).to_contain_text("Withdrawn: 1")
+        # The roster: only the active one, with what the controller gets, and a paper version.
+        await page.locator("#roster-link a").click()
+        await page.wait_for_url(f"**/schedule/{game}/roster")
+        roster = page.locator("#roster tbody tr")
+        await expect(roster).to_have_count(1)
+        await expect(roster.first).to_contain_text("Falcão")
+        await expect(roster.first).to_contain_text("blue")
+        await expect(roster.first).to_contain_text("aeg, rifle, M4")
+        await expect(roster.first).to_contain_text("FPA-9")
+        await expect(roster.first).to_contain_text("☐")
+        await expect(page.locator("#roster-meta")).to_contain_text("1 on the list")
+        await expect(page.locator("#roster-meta")).to_contain_text("none yet")
+        await expect(page.locator("#print")).to_be_enabled()
+        await self.check_page(page, 375)
+        await page.emulate_media(media="print")
+        await expect(page.locator("header.staff-top")).to_be_hidden()
+        await expect(page.locator("#print")).to_be_hidden()
+        await expect(page.locator("footer")).to_be_hidden()
+        await expect(page.locator("#roster")).to_be_visible()
+        await expect(roster.first).to_contain_text("Falcão")
+        colour = await page.evaluate("() => getComputedStyle(document.body).backgroundColor")
+        self.assertEqual(colour, "rgb(255, 255, 255)")
+        await page.emulate_media(media="screen")
+        # The sync's own answer is the same list.
+        pulled = await self.client.get(f"/api/v1/sync/roster?scheduled_game_id={game}",
+                                       headers={"Authorization": f"Bearer {self.key}"})
+        self.assertEqual([r["display_name"] for r in pulled.json()["registrations"]], ["Falcão"])
+
+    async def test_a_started_game_offers_no_change(self) -> None:
+        started = await self.published_game("Já começou", starts=datetime.timedelta(hours=-1))
+        await self.fetch("INSERT INTO game_registrations (scheduled_game, field_id, player_id, display_name, status) "
+                         "VALUES ($1, $2, 'p-aaaaaaaaaaaa', 'Rui', 'registered')", uuid.UUID(started), self.field_id)
+        name, secret = await self.staff("admin")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path(f"/schedule/{started}/registrations"))
+        await expect(page.locator("#regs tbody tr")).to_have_count(1)
+        await expect(page.locator("#locked")).to_be_visible()
+        await expect(page.locator("#regs tbody button")).to_have_count(0)
+        # A draft has no roster to print.
+        draft = (await self.fetch("INSERT INTO scheduled_games (field_id, title, starts_at, ends_at, status) VALUES "
+                                  "($1, 'Rascunho', now() + interval '3 days', now() + interval '3 days 2 hours', "
+                                  "'draft') RETURNING id", self.field_id))[0]["id"]
+        await page.goto(self.base + self.field_path(f"/schedule/{draft}/roster"))
+        await expect(page.locator("#roster-draft")).to_be_visible()
+        await expect(page.locator("#roster")).to_be_hidden()
+        await self.check_page(page, 375)
+
+    async def test_portuguese_pages_at_a_phones_width(self) -> None:
+        game = await self.published_game()
+        await self.register(game, "joana")
+        name, secret = await self.staff("admin")
+        page = await self.new_page()
+        await self.login(page, name, secret, self.field_path("/schedule"))
+        await expect(page.locator("#schedule tbody tr")).to_have_count(1)
+        await expect(page.locator("#schedule tbody tr").first).to_contain_text("publicado")
+        await self.check_page(page, 375)
+        await page.goto(self.base + self.field_path(f"/schedule/{game}/registrations"))
+        await expect(page.locator("#regs tbody tr")).to_have_count(1)
+        await self.check_page(page, 375)
+        await page.goto(self.base + self.field_path(f"/schedule/{game}/roster"))
+        await expect(page.locator("#roster-meta")).to_contain_text("1 na lista")
+        await self.check_page(page, 375)
 
 
 class RoleTests(BrowserCase):

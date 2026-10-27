@@ -85,3 +85,19 @@ ul.compact li { margin: 0.15rem 0; overflow-wrap: anywhere; }
   .staff-form.inline .row { display: block; margin-right: 0; }
 }
 .message { white-space: pre-wrap; overflow-wrap: anywhere; display: block; max-width: 32rem; }
+/* The schedule's row buttons, which wrap inside their cell */
+.actions { display: inline-flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; }
+/* The game-day roster on paper: no navigation, no buttons, black on white, every row kept whole, the heading
+   row repeated on each page, a box to tick in the last column. */
+@media print {
+  header.staff-top, footer, .skip, .noprint, #status, #field-name, button { display: none !important; }
+  body.staff, body.staff main { background: #fff; color: #000; max-width: none; margin: 0; padding: 0; }
+  body.staff a { color: #000; text-decoration: none; }
+  .table-wrap { overflow: visible; margin: 0.5rem 0; }
+  table.data { font-size: 11pt; color: #000; }
+  table.data th, table.data td { border: 1px solid #000; padding: 0.3rem 0.4rem; color: #000; }
+  table.data thead { display: table-header-group; }
+  table.data tr { break-inside: avoid; }
+  dl.details { grid-template-columns: max-content 1fr; }
+  dl.details dt, .hint { color: #000; }
+}
