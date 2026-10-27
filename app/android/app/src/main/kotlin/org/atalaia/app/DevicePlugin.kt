@@ -156,31 +156,37 @@ class DevicePlugin(private val activity: Activity, messenger: BinaryMessenger) :
     private fun requestPermission(name: String, result: MethodChannel.Result) {
         // Before Android 12 a Bluetooth scan needs the location permission
         // instead; before 13 notifications need none, and a local-only
-        // hotspot (the field controller's Wi-Fi) needs location instead.
-        val permission = when {
-            name == "POST_NOTIFICATIONS" && Build.VERSION.SDK_INT < 33 -> null
+        // hotspot (the field controller's Wi-Fi) needs location instead. From
+        // Android 12 a scan needs the scan permission and, as the manifest does
+        // not declare it is never for location (which would hide the indoor
+        // beacons, BeaconScanPlugin), the location too: one request for both.
+        val wanted = when {
+            name == "POST_NOTIFICATIONS" && Build.VERSION.SDK_INT < 33 -> emptyList()
             name == "NEARBY_WIFI_DEVICES" && Build.VERSION.SDK_INT < 33 ->
-                "android.permission.ACCESS_FINE_LOCATION"
+                listOf("android.permission.ACCESS_FINE_LOCATION")
             (name == "BLUETOOTH_SCAN" || name == "BLUETOOTH_CONNECT") && Build.VERSION.SDK_INT < 31 ->
-                if (name == "BLUETOOTH_SCAN") "android.permission.ACCESS_FINE_LOCATION" else null
-            else -> "android.permission.$name"
+                if (name == "BLUETOOTH_SCAN") listOf("android.permission.ACCESS_FINE_LOCATION") else emptyList()
+            name == "BLUETOOTH_SCAN" ->
+                listOf("android.permission.BLUETOOTH_SCAN", "android.permission.ACCESS_FINE_LOCATION")
+            else -> listOf("android.permission.$name")
         }
-        if (permission == null ||
-            activity.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
-        ) {
+        val missing = wanted.filter {
+            activity.checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isEmpty()) {
             result.success(true)
             return
         }
         val code = nextRequest++
         pendingPermissions[code] = result
-        activity.requestPermissions(arrayOf(permission), code)
+        activity.requestPermissions(missing.toTypedArray(), code)
     }
 
     /** MainActivity forwards the answers here. */
     fun onPermissionsResult(requestCode: Int, grantResults: IntArray) {
         val result = pendingPermissions.remove(requestCode) ?: return
         result.success(
-            grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED,
+            grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED },
         )
     }
 }

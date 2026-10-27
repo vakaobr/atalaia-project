@@ -165,6 +165,18 @@ Opcional, mas o limite é o que faz os telemóveis de quem joga avisarem quando 
 5. **Quadrícula no mapa**: liga-a para teres linhas com letras e colunas com números, para as pessoas dizerem «estou em C4» no rádio.
 6. **Marcações no mapa**: marca zonas seguras, respawns, bases, o estacionamento, primeiros socorros e objetivos. Escolhe quem vê cada uma: toda a gente, uma equipa ou só a organização.
 7. **Posição no mapa (ATAK)**: dá a dois cantos opostos da imagem a latitude e a longitude, para mostrar as caixas nos mapas ATAK.
+8. **Balizas interiores**: para um edifício com balizas Bluetooth, vê [Balizas interiores](#balizas-interiores) mais abaixo.
+
+### Balizas interiores
+
+Opcional. Dentro de um edifício o GPS é fraco. Se puseres balizas Bluetooth do tipo iBeacon nas divisões, o telemóvel de quem joga pode dizer ao controlador em que divisão está. O controlador mostra a divisão, nunca um ponto ao metro.
+
+1. Em **Campo**, por baixo de **Marcações no mapa**, abre **Balizas interiores** e toca em **Adicionar uma baliza**.
+2. Escreve o **UUID**, o **Major** e o **Minor** da baliza (da app da própria baliza ou da etiqueta), a **Divisão** (um nome como «Átrio») e, se quiseres agrupar divisões, uma **Zona**. Num campo de vários pisos escolhe o **Nível**. O major e o minor juntos têm de ser diferentes em cada baliza do campo. Usa material iBeacon padrão; as balizas Eddystone não são suportadas.
+3. Para mostrar a divisão no mapa, toca em **Pôr na planta** e clica na planta onde está a baliza, ou escreve um lugar ao longo e para baixo da planta. Sem lugar a baliza dá na mesma a divisão, mas o ATAK não mostra marcador.
+4. **Guardar**. Muda uma baliza com **Editar** (o major e o minor ficam) e tira uma com **Apagar**.
+
+Como funciona: quem partilha a posição num campo com balizas é perguntado primeiro e pode dizer **Agora não**. O telemóvel só ouve as balizas da tua lista, comunica a mais forte de 5 em 5 segundos, e o controlador só aceita balizas da tua lista. No interior a baliza substitui a posição por GPS; no exterior o GPS continua. A posição passa então a mostrar a divisão (e a zona) no ATAK, que põe a pessoa no lugar da baliza na planta quando lhe deste um e a planta tem posição no mapa. A consola não desenha as posições de quem joga. Com menos níveis, as balizas dos níveis retirados passam para o piso térreo, sem lugar. Ainda não testado com balizas reais.
 
 ### Regras do check-in e o cartaz
 
@@ -357,7 +369,7 @@ A página **Registo e alertas** lista os acontecimentos à medida que chegam: ca
 
 ### Mapa do campo e marcador
 
-Em **Campo** vês as caixas onde as puseste. A consola não desenha as posições de quem joga. Vão para os aparelhos ATAK da organização quando os configuras (`[atak]` em `controller.toml`), e podem ser lidas na API do controlador. O **marcador** é uma página para uma TV ou um portátil. Abre-a com o código só de leitura:
+Em **Campo** vês as caixas onde as puseste (e as balizas, se juntaste alguma). A consola não desenha as posições de quem joga. Vão para os aparelhos ATAK da organização quando os configuras (`[atak]` em `controller.toml`), e podem ser lidas na API do controlador. O **marcador** é uma página para uma TV ou um portátil. Abre-a com o código só de leitura:
 `http://` *o endereço do controlador* `:8080/scoreboard#token=` *o código só de leitura*
 Junta `&lang=en` para inglês.
 

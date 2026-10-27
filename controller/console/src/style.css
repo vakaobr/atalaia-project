@@ -921,7 +921,29 @@ tr.offline td {
     cursor: crosshair;
 }
 
+/* a beacon's pin (beacons-panel.js, BLE-7): round, so it reads apart from a map feature's square one */
+.bc-pin {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 1.6rem;
+    height: 1.6rem;
+    min-height: auto;
+    padding: 0.15rem;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    display: grid;
+    place-items: center;
+}
+
+.bc-pin.draft {
+    outline: 2px dashed var(--fg);
+    outline-offset: 2px;
+}
+
 .field-area.placing .marker,
+.field-area.placing .bc-pin,
 .field-area.placing .mf-pin {
     pointer-events: none;
 }

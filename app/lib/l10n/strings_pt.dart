@@ -693,6 +693,25 @@ const Map<String, String> ptStrings = {
   'prop.radio.offline': 'O rádio do módulo não responde: a tentar outra vez…',
   'prop.radio.closed': 'O rádio do módulo está desligado',
   'prop.gm_message': 'Organização: {text}',
+  // Balizas interiores (decisões BLE-1 a BLE-9)
+  'player.beacons_why_title': 'Posições no interior',
+  'player.beacons_why':
+      'Este campo tem balizas Bluetooth no interior. Para saber em que divisão estás, o Atalaia pode ouvi-las enquanto partilhas a posição: só as balizas do campo, e envia apenas qual é a mais forte. O Android pede as autorizações de Bluetooth e de localização para isso. Sem elas a tua posição fica só por GPS.',
+  'player.beacons_allow': 'Continuar',
+  'player.beacons_skip': 'Agora não',
+  'player.beacons_on':
+      'A ouvir as balizas do campo: no interior a tua posição é a divisão.',
+  'player.beacons_skipped':
+      'As posições no interior estão desligadas. A posição por GPS continua a ser partilhada.',
+  'player.beacons_denied':
+      'As posições no interior estão desligadas: sem autorização para o Bluetooth. A posição por GPS continua a ser partilhada.',
+  'player.beacons_off':
+      'As posições no interior estão desligadas: o Bluetooth está desligado. Liga-o e partilha outra vez.',
+  'player.beacons_unavailable':
+      'Este telemóvel não consegue ouvir as balizas do campo. A posição por GPS continua a ser partilhada.',
+  'player.beacons_ios':
+      'No iPhone as balizas interiores do campo ainda não são usadas: a posição é só por GPS.',
+  'player.my_room': 'A tua posição: {room}',
   'player.share_hint_squads':
       'Só durante o jogo; o controlador decide quem a vê: o teu squad, se o jogo o permitir, e a organização e os marshals nos seus dispositivos ATAK.',
   'checkin.team_squad': '{team} › squad {squad}',

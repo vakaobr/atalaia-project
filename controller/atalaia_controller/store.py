@@ -74,6 +74,10 @@ Schema 13 (decision S14-5) adds ``shared_readings``: other fields' signed chrono
 on a linked game's roster, pulled from the site server with each person's consent (the sync client's
 ``_pull_shared_chrono``). Kept apart from ``chrono_readings`` (the field's own measurements), so they
 are never judged, never sent back, and never override a local reading. A schema 12 file gets the empty table.
+
+Schema 14 (ADR-P3-6, decisions BLE-1 to BLE-9) adds ``beacons``: the indoor iBeacon registry, one row per
+beacon (``major`` and ``minor`` are its key, ``level`` the plan it is on, the uuid, room, zone and plan place
+as JSON; beacons.py). A schema 13 file gets the empty table; nothing else changes.
 """
 
 from __future__ import annotations
@@ -88,7 +92,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes, per level's plan
 FIELD_LEVELS_MAX = 10  # levels of a multi-story field (decision ML-1)
@@ -350,6 +354,15 @@ CREATE TABLE IF NOT EXISTS map_features (
     data_json   TEXT NOT NULL,                         -- type, label, shape, coordinates, team, visibility, note
     created_at  REAL NOT NULL,
     updated_at  REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS beacons (
+    major       INTEGER NOT NULL CHECK (major BETWEEN 0 AND 65535),   -- schema 14 (beacons.py)
+    minor       INTEGER NOT NULL CHECK (minor BETWEEN 0 AND 65535),
+    level       INTEGER NOT NULL CHECK (level BETWEEN 0 AND 9),
+    data_json   TEXT NOT NULL,                         -- uuid, room, zone, x, y
+    created_at  REAL NOT NULL,
+    updated_at  REAL NOT NULL,
+    PRIMARY KEY (major, minor)
 );
 CREATE TABLE IF NOT EXISTS player_positions (
     game_id     INTEGER NOT NULL,
@@ -964,6 +977,55 @@ class Store:
     def delete_map_features_from(self, levels_from: int) -> int:
         """The features of levels that no longer exist (``level >= levels_from``)."""
         return self._exec("DELETE FROM map_features WHERE level >= ?", (levels_from,)).rowcount
+
+    # --- the indoor beacon registry (schema 14, beacons.py) --------------------------
+
+    @staticmethod
+    def _beacon_row(r: Any) -> dict[str, Any]:
+        return {"major": r["major"], "minor": r["minor"], "level": r["level"], "data": json.loads(r["data_json"]),
+                "updated_at": r["updated_at"]}
+
+    def beacons(self) -> list[dict[str, Any]]:
+        return [self._beacon_row(r) for r in self._exec(
+            "SELECT major, minor, level, data_json, updated_at FROM beacons ORDER BY major, minor").fetchall()]
+
+    def beacon(self, major: int, minor: int) -> Optional[dict[str, Any]]:
+        r = self._exec("SELECT major, minor, level, data_json, updated_at FROM beacons WHERE major = ? AND minor = ?",
+                       (major, minor)).fetchone()
+        return None if r is None else self._beacon_row(r)
+
+    def count_beacons(self) -> int:
+        return int(self._exec("SELECT COUNT(*) AS n FROM beacons").fetchone()["n"])
+
+    def add_beacon(self, major: int, minor: int, level: int, data: dict[str, Any]) -> bool:
+        """A new beacon (``data``: uuid, room, zone, x, y); False when major and minor are taken."""
+        now = time.time()
+        return self._exec("INSERT OR IGNORE INTO beacons (major, minor, level, data_json, created_at, updated_at) "
+                          "VALUES (?, ?, ?, ?, ?, ?)",
+                          (major, minor, level, json.dumps(data, separators=(",", ":"), ensure_ascii=False),
+                           now, now)).rowcount == 1
+
+    def put_beacon(self, major: int, minor: int, level: int, data: dict[str, Any]) -> bool:
+        return self._exec("UPDATE beacons SET level = ?, data_json = ?, updated_at = ? WHERE major = ? AND minor = ?",
+                          (level, json.dumps(data, separators=(",", ":"), ensure_ascii=False), time.time(),
+                           major, minor)).rowcount == 1
+
+    def delete_beacon(self, major: int, minor: int) -> bool:
+        return self._exec("DELETE FROM beacons WHERE major = ? AND minor = ?", (major, minor)).rowcount == 1
+
+    def move_beacons_to_level0(self, levels_from: int) -> int:
+        """Beacons on levels that no longer exist (``level >= levels_from``) go to level 0, unplaced."""
+        with self._lock:
+            moved = 0
+            for r in self._exec("SELECT major, minor, data_json FROM beacons WHERE level >= ?",
+                                (levels_from,)).fetchall():
+                data = json.loads(r["data_json"])
+                data["x"] = data["y"] = None
+                self._exec("UPDATE beacons SET level = 0, data_json = ?, updated_at = ? WHERE major = ? AND minor = ?",
+                           (json.dumps(data, separators=(",", ":"), ensure_ascii=False), time.time(),
+                            r["major"], r["minor"]))
+                moved += 1
+            return moved
 
     # --- branding images and team presets (schema 4, decisions BR1-BR24) ------
 

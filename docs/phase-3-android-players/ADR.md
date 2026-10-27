@@ -836,6 +836,73 @@ Room-level granularity is sufficient for indoor sites.  Triangulation
 from multiple beacons is NOT implemented in v1 (too unreliable with
 walls and people).
 
+##### As built (decisions BLE-1 to BLE-9, 2026-10-27)
+
+The registry above is built (`controller/atalaia_controller/beacons.py`,
+store schema 14; the phone controller's `controller_field_beacons.dart`; the
+shared contract cases in `protocol/vectors/controller_api.json`).  Where the
+build differs from the sketch, the field's own plans made the better fit:
+
+- A beacon's place is its `level` (the field's plans, ADR-P2-10 and
+  decisions ML-1 to ML-12; 0 with levels off) and `x`, `y` as fractions
+  0 to 1 of that level's plan (as the boxes' and the map features' places),
+  both or neither, not `floor` and metres.  `room` is required, `zone`
+  (a group of rooms) optional.  `major:minor` is unique across the field,
+  because the position report carries only that pair; each beacon keeps its
+  own UUID.
+- `GET|POST /api/v1/beacons`, `PUT|DELETE /api/v1/beacons/{major:minor}`.
+  Writes are the GM's.  The GM token and the staff tokens read the whole
+  registry; every other token (a player's, the read token's) is given each
+  beacon's `id` and `uuid` only, which is what a phone needs to know which
+  beacons to listen for and which the beacons broadcast anyway.  Staff
+  consoles are told the registry changed by the stream message `beacons`.
+- The controller accepts a `ble` position report only for a beacon of the
+  registry (400 otherwise: a modified app cannot invent a room).  It stores
+  the beacon's `room`, `zone`, `level` (the beacon's level is the player's,
+  whatever the report says) and, when the GM placed the beacon on its plan,
+  `x` and `y`, so `GET /api/v1/positions`, the stream and ATAK carry the
+  room.  A beacon taken out of the registry afterwards leaves the position
+  already stored as it was and is refused from then on.  A level that goes
+  takes its beacons to level 0, unplaced.
+- Rates, as the table above: 5 s by default, 3 to 30 s, from the game
+  parameter `ble_interval_s` (as `position_interval_s`, which no mode
+  declares yet, so today the default), given to the phone with its registry
+  and with every report's answer (`ble_interval_s`); at most 5 reports a
+  request, as for GPS.
+- The phone (`BeaconScanPlugin.kt`, `beacon_scanner.dart`): iBeacon only
+  (decision 21; Eddystone has no major and minor, so the table's
+  "iBeacon/Eddystone" is narrowed to iBeacon).  It runs only while the player
+  shares their position in a running game, listens for the UUIDs of the
+  registry only (a hardware scan filter per UUID, `SCAN_MODE_LOW_POWER`, no
+  wake lock, one wake-up per window, not per advertisement), reports the
+  strongest registered beacon of each window above -95 dBm and nothing else,
+  and keeps nothing heard: the plugin clears its window when it sends it, the
+  scanner holds only the latest reading and forgets it when it stops.
+- Beacons and GPS together: while the phone has heard a registered beacon in
+  the last two beacon intervals it is indoors, its beacon is its position and
+  its GPS fixes are not sent (a building leaves them stale or far off);
+  two intervals without one and the GPS fixes go on.  The controller keeps
+  the latest report of either source, so nothing is merged on the phone.  The
+  out-of-bounds warning (MF-31) still judges the phone's own fixes.
+- Permissions and prompts: nothing is asked on a field with no beacons.  On
+  one with beacons the app explains (*Indoor positions*: what it listens for,
+  that only which beacon is strongest is sent) and asks *Continue* or *Not
+  now* before Android's own prompts for Bluetooth scanning and, with it, the
+  location a scan for a position needs.  A refusal, a phone without Bluetooth
+  LE or Bluetooth switched off leaves the GPS position as it was and the app
+  says so.  The manifest declares `BLUETOOTH_SCAN` without
+  `neverForLocation`, which would make Android hide the beacons.
+- iOS is unchanged: the ADR's iOS table names CoreBluetooth, but iOS does not
+  hand iBeacon advertisements to CoreBluetooth; they are ranged through
+  CoreLocation, a Swift plugin that can be neither built nor run without a
+  Mac, so the app answers "not available" there and the position stays GPS
+  (`app/docs/ios-on-a-mac.md`).
+- The console's field view has a panel under the plan to add, change and
+  remove beacons and to place them on a level's plan (`beacons-panel.js`);
+  ATAK puts an indoor player at the beacon's place on the plan (by its
+  level's map position, `h-e`, never a GPS fix) with the room and zone in
+  the remarks; the player's own screen shows the room the controller gives.
+
 #### GDPR
 
 - Positions are stored in the controller's SQLite only for the duration

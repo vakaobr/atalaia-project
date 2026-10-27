@@ -395,6 +395,28 @@
     "need_label": "Gib ihm einen Namen.",
     "boundary_hint": "Die Feldgrenze ist eine Fläche, höchstens eine pro Ebene und ohne Team; außerhalb davon wird der Plan abgedunkelt."
   },
+  "beacons": {
+    "title": "Beacons im Gebäude",
+    "intro": "Die Bluetooth-Beacons (iBeacon), die du in einem Gebäude angebracht hast. Das Handy einer Spielerin oder eines Spielers meldet das stärkste, das es hört; der Raum, in dem sie oder er ist, erscheint hier und in ATAK. Raumgenau, nicht metergenau. Setze jedes Beacon auf den Plan seiner Ebene, um den Raum auf der Karte zu zeigen.",
+    "none": "Noch keine Beacons.",
+    "add": "Beacon hinzufügen",
+    "editing": "Bearbeiten: {name}",
+    "confirm_delete": "Das Beacon von {name} entfernen? Die Handys melden es dann nicht mehr.",
+    "pin": "Beacon {id}: {name}",
+    "uuid": "UUID",
+    "major": "Major",
+    "minor": "Minor",
+    "room": "Raum",
+    "zone": "Bereich (optional)",
+    "level": "Ebene",
+    "placed": "Auf dem Plan",
+    "not_placed": "Nicht auf dem Plan platziert",
+    "placing": "Klick auf die Stelle im Plan, wo das Beacon hängt.",
+    "unplace": "Vom Plan nehmen",
+    "bad_uuid": "Die UUID besteht aus 32 Hexadezimalziffern im Format 8-4-4-4-12.",
+    "bad_id": "Major und Minor sind ganze Zahlen von 0 bis 65535.",
+    "need_room": "Gib dem Raum einen Namen."
+  },
   "fieldmap": {
     "open": "Feld aus einer Karte laden",
     "title": "Feld aus einer Karte laden",

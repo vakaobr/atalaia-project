@@ -623,7 +623,7 @@ class AtakEmitter:
             remote_out += self._drops(self._remote_markers, now)
         staff, remote = self._players_on(), self._remote_players_on()
         if game is not None and (staff or remote) and (everything or now >= self._next_players):
-            for uid, data, lat, lon in self._players(game, now):
+            for uid, data, lat, lon in self._players(game, now, geos, levels):
                 if staff:
                     tcp_out.append(data)
                     self._staff_markers[uid] = (TYPE_PLAYER, lat, lon)
@@ -809,15 +809,26 @@ class AtakEmitter:
 
         return float(Positions.interval(game))
 
-    def _players(self, game: dict[str, Any], now: float) -> list[tuple[str, bytes, float, float]]:
-        """Staff endpoints and the remote relay only, never UDP: every GPS position of the live game (staff
-        see all), as (uid, event, lat, lon)."""
+    def _players(self, game: dict[str, Any], now: float, geos: Optional[dict[int, Any]] = None,
+                 levels: Optional[dict[str, Any]] = None) -> list[tuple[str, bytes, float, float]]:
+        """Staff endpoints and the remote relay only, never UDP: every position of the live game that has a
+        place (staff see all), as (uid, event, lat, lon). A GPS position is where the phone is; an indoor one
+        (``ble``, beacons.py) is the room: its marker sits where the GM placed the beacon on its level's plan
+        (by that level's map position, as the boxes), is marked as estimated from the image (``h-e``), and its
+        remarks name the room and zone. A beacon not placed on a plan, or on a level without a map position,
+        has no place on the map."""
         teams = list(game.get("teams") or [])
         interval = self._player_interval(game)
-        levels = levelsmod.load(self.ctrl.store)
+        levels = levels if levels is not None else levelsmod.load(self.ctrl.store)
+        geos = geos if geos is not None else {}
         out: list[tuple[str, bytes, float, float]] = []
         for pid, pos in sorted(self.ctrl.store.player_positions(game["id"]).items()):
-            if pos.get("source") != "gps" or pos.get("lat") is None or pos.get("lon") is None:
+            indoor = pos.get("source") == "ble"
+            if indoor:
+                geo = geos.get(levelsmod.shown(levels, pos.get("level")))
+                if geo is None or pos.get("x") is None or pos.get("y") is None:
+                    continue
+            elif pos.get("source") != "gps" or pos.get("lat") is None or pos.get("lon") is None:
                 continue
             seen = float(pos.get("received_at") or now)
             stale = seen + 2 * interval
@@ -835,11 +846,17 @@ class AtakEmitter:
             remarks = f"Atalaia: {self._display(game, team) or '-'}, {role}"
             if levels["enabled"] and isinstance(pos.get("level"), int) and pos["level"] < levelsmod.in_use(levels):
                 remarks += f", {levelsmod.label(levels, pos['level'])}"  # ML-7: only a level the phone gave
+            if indoor and pos.get("room"):
+                remarks += f", {pos['room']}" + (f" ({pos['zone']})" if pos.get("zone") else "")  # BLE-8
             detail.append(_el("remarks", None, xml_text(remarks, REMARKS_MAX, REMARKS_BYTES)))
             uid = self._uid("player", pid)
-            lat, lon = float(pos["lat"]), float(pos["lon"])
-            out.append((uid, event_xml(uid=uid, cot_type=TYPE_PLAYER, how=HOW_GPS, lat=lat, lon=lon, now=now,
-                                       start=min(seen, now), stale=stale, ce=pos.get("accuracy_m"), detail=detail),
+            if indoor:
+                lat, lon = geo.to_latlon(pos["x"], pos["y"])
+            else:
+                lat, lon = float(pos["lat"]), float(pos["lon"])
+            out.append((uid, event_xml(uid=uid, cot_type=TYPE_PLAYER, how=HOW_IMAGE if indoor else HOW_GPS, lat=lat,
+                                       lon=lon, now=now, start=min(seen, now), stale=stale,
+                                       ce=None if indoor else pos.get("accuracy_m"), detail=detail),
                         lat, lon))
         return out
 

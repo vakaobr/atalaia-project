@@ -489,6 +489,12 @@ class CheckinClient {
     },
   );
 
+  /// The field's indoor beacons as a player may know them (each one's `id`
+  /// and `uuid`, nothing about the building) and the interval to report them
+  /// at (`ble_interval_s`): what the phone listens for (ADR-P3-6).
+  Future<Map<String, Object?>> fetchBeacons(String token) =>
+      _call('GET', '/beacons', token: token);
+
   Future<Map<String, Object?>> reportPositions(
     String token,
     List<Map<String, Object?>> reports,

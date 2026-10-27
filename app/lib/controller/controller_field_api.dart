@@ -19,6 +19,8 @@ part of 'controller_api.dart';
 //     GET  /api/v1/field/features            the map features this token may see
 //     POST /api/v1/field/features            GM: add one
 //     PUT|DELETE /api/v1/field/features/{id} GM: change or delete one
+//     GET|POST /api/v1/beacons               the indoor BLE beacon registry (controller_field_beacons.dart)
+//     PUT|DELETE /api/v1/beacons/{major:minor} GM: change or delete one
 //     GET  /api/v1/games/{id}/positions      the boxes' places on the plan {x, y, level}
 //     PUT  /api/v1/games/{id}/positions/{node}  GM: place a box
 //     GET  /api/v1/radio                     the field's channel, candidates, last scan
@@ -183,6 +185,26 @@ extension on ControllerApi {
       'DELETE',
       r'/api/v1/field/features/([^/]+)',
       _gm((r) => ApiResponse(200, _field.deleteFeature(r.pathInt(1)))),
+    ),
+    ControllerApi._route(
+      'GET',
+      r'/api/v1/beacons',
+      _viewer((r, v) => ApiResponse(200, _field.beaconsFor(v), _noStoreField)),
+    ),
+    ControllerApi._route(
+      'POST',
+      r'/api/v1/beacons',
+      _gm((r) => ApiResponse(201, _field.addBeacon(r.json))),
+    ),
+    ControllerApi._route(
+      'PUT',
+      r'/api/v1/beacons/([^/]+)',
+      _gm((r) => ApiResponse(200, _field.putBeacon(r.pathText(1), r.json))),
+    ),
+    ControllerApi._route(
+      'DELETE',
+      r'/api/v1/beacons/([^/]+)',
+      _gm((r) => ApiResponse(200, _field.deleteBeacon(r.pathText(1)))),
     ),
     ControllerApi._route(
       'GET',

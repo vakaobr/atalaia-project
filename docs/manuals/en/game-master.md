@@ -165,6 +165,18 @@ Optional, but the boundary is what makes players' phones warn them when they lea
 5. **Grid on the map**: turn it on for lettered rows and numbered columns, so people can say "I'm in C4" on the radio.
 6. **Map features**: mark safe zones, respawns, HQs, the car park, first aid and objectives. Choose who sees each one: everyone, one team or the organisers only.
 7. **Map position (ATAK)**: give two opposite corners of the image their latitude and longitude, to show the boxes on ATAK maps.
+8. **Indoor beacons**: for a building with Bluetooth beacons, see [Indoor beacons](#indoor-beacons) below.
+
+### Indoor beacons
+
+Optional. Inside a building GPS is weak. If you put iBeacon-type Bluetooth beacons in the rooms, a player's phone can tell the controller which room it is in. The controller shows the room, never a point to the metre.
+
+1. In **Field**, under **Map features**, open **Indoor beacons** and tap **Add a beacon**.
+2. Type the beacon's **UUID**, **Major** and **Minor** (from the beacon's own app or its label), the **Room** (a name such as "Lobby") and, if you want to group rooms, a **Zone**. On a multi-story field choose the **Level**. Major and minor together must be different for every beacon on the field. Use standard iBeacon hardware; Eddystone beacons are not supported.
+3. To show the room on the map, tap **Place on the plan** and click the plan where the beacon is, or type a place across and down it. Without a place the beacon still gives the room, but ATAK shows no marker.
+4. **Save**. Change a beacon with **Edit** (its major and minor stay) and take one out with **Delete**.
+
+How it works: a player who shares their position on a field with beacons is asked first and can say **Not now**. The phone listens only for the beacons on your list, reports the strongest one every 5 seconds, and the controller accepts only beacons on your list. Indoors the phone's beacon replaces its GPS position; outdoors GPS goes on. The player's position then shows the room (and zone) in ATAK, which puts the player at the beacon's place on the plan when you gave it one and the plan has a map position. The console does not draw players. Fewer levels move the beacons of the removed levels to the ground floor, unplaced. Not tested with real beacons yet.
 
 ### Check-in rules and the poster
 
@@ -357,7 +369,7 @@ The **Log and alerts** page lists events as they come: captures, bombs, codes, k
 
 ### Field map and scoreboard
 
-On **Field** you see the boxes where you placed them. The console does not draw players' positions. They go to the organisers' ATAK devices when you set those up (`[atak]` in `controller.toml`), and can be read from the controller's API. The **scoreboard** is a page for a TV or a laptop. Open it with the read-only code:
+On **Field** you see the boxes where you placed them (and the beacons, if you added some). The console does not draw players' positions. They go to the organisers' ATAK devices when you set those up (`[atak]` in `controller.toml`), and can be read from the controller's API. The **scoreboard** is a page for a TV or a laptop. Open it with the read-only code:
 `http://` *the controller's address* `:8080/scoreboard#token=` *the read-only code*
 Add `&lang=en` for English.
 

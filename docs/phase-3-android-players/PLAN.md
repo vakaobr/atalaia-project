@@ -553,7 +553,7 @@ app-to-controller integration. Phase D (Flutter UI).
 | `modes/last_stand/field.lua` | Per-team zone count; countdown when holding exactly 1; cancel on recapture; `laststand.defeated` |
 | `modes/last_stand/tests/basic.yaml` | 3 zones: red holds 1 (countdown); captures 2nd (cancel); countdown expires (defeated) |
 | `app/lib/position/position_reporter.dart` | GPS reporter via `FusedLocationProviderClient`; configurable interval (5-60 s) |
-| `app/lib/position/beacon_scanner.dart` | BLE iBeacon scanner; reports strongest beacon_id |
+| `app/lib/position/beacon_scanner.dart` | BLE iBeacon scanner; reports strongest beacon_id (built 2026-10-27, decisions BLE-1 to BLE-9: with `app/lib/platform/beacon_scan.dart` and `BeaconScanPlugin.kt`) |
 | `app/lib/position/position_report.dart` | Position report data class: player_id, team, lat, lon, accuracy, source, beacon_id, t |
 | `app/lib/controller/api_client.dart` | REST client for the controller API: join, scores, log, positions |
 | `app/lib/controller/ws_client.dart` | WebSocket client for `/api/v1/stream`: live events, scores, positions |

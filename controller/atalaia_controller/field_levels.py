@@ -115,6 +115,7 @@ def save(store: Any, meta: dict[str, Any]) -> list[int]:
             removed.append(level)
     store.move_positions_to_level0(meta["count"])
     store.delete_map_features_from(meta["count"])
+    store.move_beacons_to_level0(meta["count"])  # the hardware stays: level 0, to be placed again (BLE-6)
     store.set_setting(SETTING, json.dumps(meta, separators=(",", ":"), ensure_ascii=False))
     return removed
 

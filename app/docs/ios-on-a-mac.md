@@ -543,8 +543,12 @@ everything under "Needs a paid account".
   single-label hosts, nothing else), so a console on `http://192.168.x.x` works;
   an `https://` console with the field CA's certificate, or `http://` to a
   public host name, is refused by iOS.
-- **Bluetooth**: nothing on iOS uses it (the I/O pod's BLE link is Android's),
-  so the app asks for no Bluetooth permission. **mDNS**: the app does not use it
+- **Bluetooth**: nothing on iOS uses it (the I/O pod's BLE link is Android's), and
+  the indoor beacon positions (decisions BLE-1 to BLE-9) are Android's too: iOS does
+  not hand iBeacon advertisements to CoreBluetooth, they are ranged through
+  CoreLocation (a Swift plugin of its own, not written: it could not be built or
+  run without a Mac), so on an iPhone the app says the field's beacons are not
+  used yet and the position stays GPS. The app asks for no Bluetooth permission. **mDNS**: the app does not use it
   (the controller's address comes from the join), so no Bonjour entry.
 - **Background**: no background modes. A position or a feed is live only while the
   app is on the screen: the position stops when the app leaves it and goes on

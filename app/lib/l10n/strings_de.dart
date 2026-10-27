@@ -707,6 +707,25 @@ const Map<String, String> deStrings = {
   'prop.radio.offline': 'Der Funk des Pods antwortet nicht: neuer Versuch…',
   'prop.radio.closed': 'Der Funk des Pods ist aus',
   'prop.gm_message': 'Spielleitung: {text}',
+  // Beacons im Gebäude (Entscheidungen BLE-1 bis BLE-9)
+  'player.beacons_why_title': 'Positionen im Gebäude',
+  'player.beacons_why':
+      'Dieses Feld hat Bluetooth-Beacons im Gebäude. Um zu sagen, in welchem Raum du bist, kann Atalaia sie hören, während du deine Position teilst: nur die Beacons des Felds, und es sendet nur, welches am stärksten ist. Android fragt dafür nach den Berechtigungen für Bluetooth und Standort. Ohne sie bleibt deine Position nur GPS.',
+  'player.beacons_allow': 'Weiter',
+  'player.beacons_skip': 'Jetzt nicht',
+  'player.beacons_on':
+      'Hört auf die Beacons des Felds: im Gebäude ist deine Position der Raum.',
+  'player.beacons_skipped':
+      'Positionen im Gebäude sind aus. Deine GPS-Position wird weiter geteilt.',
+  'player.beacons_denied':
+      'Positionen im Gebäude sind aus: keine Berechtigung für Bluetooth. Deine GPS-Position wird weiter geteilt.',
+  'player.beacons_off':
+      'Positionen im Gebäude sind aus: Bluetooth ist ausgeschaltet. Schalte es ein und teile erneut.',
+  'player.beacons_unavailable':
+      'Dieses Handy kann die Beacons des Felds nicht hören. Deine GPS-Position wird weiter geteilt.',
+  'player.beacons_ios':
+      'Auf dem iPhone werden die Beacons des Felds im Gebäude noch nicht genutzt: Deine Position ist nur GPS.',
+  'player.my_room': 'Deine Position: {room}',
   'player.share_hint_squads':
       'Nur während des Spiels; der Controller entscheidet, wer sie sieht: dein Squad, wenn das Spiel es erlaubt, und die Orga und die Marshals auf ihren ATAK-Geräten.',
   'checkin.team_squad': '{team} › Squad {squad}',

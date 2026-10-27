@@ -2572,6 +2572,109 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(phone.get_by_test_id("mf-form")).to_be_visible()
         self.no_horizontal_scroll(phone)
 
+    def beacons(self) -> list:
+        return self.field.http.get("/api/v1/beacons").json()["beacons"]
+
+    def test_beacons_registry_and_their_place_on_the_plan(self):
+        """ADR-P3-6 (BLE-1 to BLE-9): the GM adds the building's iBeacons, one placed with a click on the plan, one
+        with the keyboard, one not at all; a wrong UUID is refused before anything is sent; one is changed, one taken
+        out after a confirmation; another console learns of it through the stream, and a read-only page has no
+        panel; in pt-PT."""
+        uuid = "FDA50693-A4E2-4FB1-AFCF-C28847DC5D9F"
+        self.field.http.put("/api/v1/field/image", headers={"Content-Type": "image/png"}, content=ICON.read_bytes())
+        page = self.console()
+        page.get_by_test_id("tab-field").click()
+        expect(page.get_by_role("heading", name="Balizas interiores")).to_be_visible()
+        expect(page.get_by_test_id("bc-none")).to_be_visible()
+        # A first beacon: a wrong UUID is said so, then one placed by a click on the plan.
+        page.get_by_test_id("bc-add").click()
+        page.get_by_test_id("bc-uuid").fill("nope")
+        page.get_by_test_id("bc-major").fill("1")
+        page.get_by_test_id("bc-minor").fill("1")
+        page.get_by_test_id("bc-room").fill("Átrio")
+        page.get_by_test_id("bc-save").click()
+        expect(page.get_by_test_id("bc-error")).to_contain_text("UUID")
+        self.assertEqual(self.beacons(), [])
+        page.get_by_test_id("bc-uuid").fill(uuid.lower())
+        expect(page.get_by_test_id("bc-place-state")).to_have_text("Sem lugar na planta")
+        page.get_by_test_id("bc-place").click()
+        expect(page.get_by_test_id("bc-hint")).to_contain_text("Clica na planta")
+        self.press_area(page, 0.25, 0.5)
+        expect(page.get_by_test_id("bc-place-state")).to_have_text("Na planta")
+        page.get_by_test_id("bc-save").click()
+        expect(page.get_by_test_id("bc-form")).to_have_count(0)
+        self.assertTrue(wait_for(lambda: len(self.beacons()) == 1, 5))
+        first = self.beacons()[0]
+        self.assertEqual((first["id"], first["uuid"], first["room"], first["level"]), ("1:1", uuid, "Átrio", 0))
+        self.assertAlmostEqual(first["x"], 0.25, delta=0.02)
+        self.assertAlmostEqual(first["y"], 0.5, delta=0.02)
+        expect(page.get_by_test_id("bc-pin-1:1")).to_have_attribute("aria-label", "Baliza 1:1: Átrio")
+        expect(page.get_by_test_id("bc-item-1:1")).to_contain_text("Na planta")
+        # A second: the UUID is the last one's, a zone, placed with the keyboard.
+        page.get_by_test_id("bc-add").click()
+        expect(page.get_by_test_id("bc-uuid")).to_have_value(uuid)
+        page.get_by_test_id("bc-major").fill("1")
+        page.get_by_test_id("bc-minor").fill("2")
+        page.get_by_test_id("bc-room").fill("Corredor A")
+        page.get_by_test_id("bc-zone").fill("Piso 0")
+        page.get_by_test_id("bc-place").click()
+        page.get_by_test_id("bc-across").fill("60")
+        page.get_by_test_id("bc-down").fill("40")
+        page.get_by_test_id("bc-put").click()
+        page.get_by_test_id("bc-save").click()
+        self.assertTrue(wait_for(lambda: len(self.beacons()) == 2, 5))
+        second = self.beacons()[1]
+        self.assertEqual((second["id"], second["zone"], second["x"], second["y"]), ("1:2", "Piso 0", 0.6, 0.4))
+        expect(page.get_by_test_id("bc-item-1:2")).to_contain_text("Corredor A (Piso 0)")
+        # A third, not placed on the plan: in the list, with no pin.
+        page.get_by_test_id("bc-add").click()
+        page.get_by_test_id("bc-major").fill("1")
+        page.get_by_test_id("bc-minor").fill("3")
+        page.get_by_test_id("bc-room").fill("Cave")
+        page.get_by_test_id("bc-save").click()
+        self.assertTrue(wait_for(lambda: len(self.beacons()) == 3, 5))
+        expect(page.get_by_test_id("bc-item-1:3")).to_contain_text("Sem lugar na planta")
+        expect(page.locator(".bc-pin")).to_have_count(2)
+        # The same major and minor again: the controller refuses (409) and the form stays.
+        page.get_by_test_id("bc-add").click()
+        page.get_by_test_id("bc-major").fill("1")
+        page.get_by_test_id("bc-minor").fill("3")
+        page.get_by_test_id("bc-room").fill("Outra")
+        page.get_by_test_id("bc-save").click()
+        expect(page.get_by_test_id("bc-form")).to_be_visible()
+        self.drop_errors("HTTP 409", "409 (Conflict)")
+        page.get_by_test_id("bc-cancel").click()
+        # Change one: the pair is fixed, the room is not.
+        page.get_by_test_id("bc-edit-1:1").click()
+        expect(page.get_by_test_id("bc-major")).to_be_disabled()
+        page.get_by_test_id("bc-room").fill("Átrio principal")
+        page.get_by_test_id("bc-save").click()
+        self.assertTrue(wait_for(lambda: self.beacons()[0]["room"] == "Átrio principal", 5))
+        expect(page.get_by_test_id("bc-pin-1:1")).to_have_attribute("aria-label", "Baliza 1:1: Átrio principal")
+        # Another console follows the registry through the stream; a read-only page has no panel.
+        other = self.console()
+        other.get_by_test_id("tab-field").click()
+        expect(other.get_by_test_id("bc-item-1:3")).to_be_visible()
+        viewer = self.console(READ)
+        viewer.get_by_test_id("tab-field").click()
+        expect(viewer.get_by_test_id("field-area")).to_be_visible()
+        expect(viewer.get_by_test_id("beacons")).to_have_count(0)
+        expect(viewer.locator(".bc-pin")).to_have_count(0)
+        # Taken out after a confirmation, on both consoles.
+        page.get_by_test_id("bc-delete-1:3").click()
+        expect(page.get_by_role("group", name="Remover a baliza de Cave? Os telemóveis deixam de a comunicar.")).to_be_visible()
+        page.get_by_test_id("bc-delete-1:3-yes").click()
+        expect(page.get_by_test_id("bc-item-1:3")).to_have_count(0)
+        expect(other.get_by_test_id("bc-item-1:3")).to_have_count(0)
+        self.assertEqual([b["id"] for b in self.beacons()], ["1:1", "1:2"])
+        self.no_horizontal_scroll(page)
+        # The editor at phone width.
+        phone = self.console(width=390, height=844)
+        phone.get_by_test_id("tab-field").click()
+        phone.get_by_test_id("bc-add").click()
+        expect(phone.get_by_test_id("bc-form")).to_be_visible()
+        self.no_horizontal_scroll(phone)
+
     def test_map_features_in_english_without_a_map_position(self):
         """English; a plan without a map position draws a circle at a set size and says so; a feature for the
         organisers only never reaches a read-only page."""
@@ -3680,7 +3783,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v10').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v11').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js"):

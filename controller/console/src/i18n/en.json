@@ -395,6 +395,28 @@
     "need_label": "Give it a name.",
     "boundary_hint": "The field boundary is an area, at most one per level and of no team; the plan is dimmed outside it."
   },
+  "beacons": {
+    "title": "Indoor beacons",
+    "intro": "The Bluetooth beacons (iBeacon) you have put up in a building. A player's phone reports the strongest one it hears, and the room it is in is shown here and in ATAK. Room by room, not to the metre. Place each beacon on its level's plan to show the room on the map.",
+    "none": "No beacons yet.",
+    "add": "Add a beacon",
+    "editing": "Edit: {name}",
+    "confirm_delete": "Remove the beacon of {name}? Phones will no longer report it.",
+    "pin": "Beacon {id}: {name}",
+    "uuid": "UUID",
+    "major": "Major",
+    "minor": "Minor",
+    "room": "Room",
+    "zone": "Zone (optional)",
+    "level": "Level",
+    "placed": "On the plan",
+    "not_placed": "Not placed on the plan",
+    "placing": "Click the plan where the beacon is.",
+    "unplace": "Take it off the plan",
+    "bad_uuid": "The UUID is 32 hexadecimal digits, as 8-4-4-4-12.",
+    "bad_id": "Major and minor are whole numbers from 0 to 65535.",
+    "need_room": "Give the room a name."
+  },
   "fieldmap": {
     "open": "Load the field from a map",
     "title": "Load the field from a map",

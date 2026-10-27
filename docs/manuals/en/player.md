@@ -215,6 +215,13 @@ Sharing your position is optional. Your position goes to the field controller on
 3. Allow the location when the phone asks. Choose **While using the app** on an iPhone. On Android 13 or later also allow notifications.
 4. A notification **Atalaia: sharing your position** stays on. Switch **Share my position** off to stop. It also stops when the game ends.
 
+**Indoors, if the field has beacons.** Some fields put small Bluetooth beacons in their buildings. If this one does, the app asks first, with **Indoor positions**: it can listen for the field's own beacons while you share, and it sends only which one is strongest. Tap **Continue** and Android asks for **Bluetooth** (nearby devices) and the **location**. Tap **Not now**, or refuse, and nothing else changes: the app says **Indoor positions are off** and keeps sharing your GPS position. Bluetooth has to be switched on.
+
+- Indoors your position becomes the **room**. Under the switch it says **Your position: Lobby (Ground floor)**. The organisers see the room, not a point on the floor.
+- The app listens only for the field's beacons and keeps nothing it hears. It listens only while you share, and stops when you stop.
+- When you are out of every beacon's range for a few seconds, your GPS position is shared again.
+- On an iPhone the beacons are not used yet: the position stays GPS.
+
 If the organisers drew the **field boundary**, the app watches it **on your phone**. Nothing about it is sent to anyone.
 
 - You are warned only if you are a player, a squad leader or a VIP, and only while the game runs.
@@ -272,6 +279,7 @@ The app cannot create an account yet. Ask the field's organisers how to get one.
 | **Offline. Reconnecting…** for a long time | Go back into Wi-Fi range. Keep the field's Wi-Fi on even when it says "no internet". |
 | No buzzes | **Settings** › **Vibrate on game events** must be on. Keep the app open on the game page. Check the phone is not on silent. |
 | **Share my position** says "No permission for the location." | Allow the location for Atalaia in the phone's settings. |
+| **Your position: …** never shows indoors | The field may have no beacons, or you chose **Not now**. Check Bluetooth is on and Atalaia may use it (nearby devices and location), then switch **Share my position** off and on. Walk closer to a beacon. |
 | My team is not highlighted | You have no team yet, or you are following without a check-in. Tap your team's card. |
 | I cannot capture a box with my phone | That is right. You capture boxes at the box, by holding your team's button. |
 

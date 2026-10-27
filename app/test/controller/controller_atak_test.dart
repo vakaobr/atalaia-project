@@ -1182,6 +1182,71 @@ void main() {
       expect(emitter.status()['tcp_events'], greaterThanOrEqualTo(3));
     });
 
+    test('an indoor position is the beacon on the plan, the room in the '
+        'remarks (BLE-8)', () async {
+      await rig(players: true, staff: true);
+      putImageAndCorners();
+      final gid = runningGame();
+      final (red, _) = player(gid, 'Falcão', 'red');
+      final (blue, _) = player(gid, 'Mocho', 'blue');
+      const uuid = 'FDA50693-A4E2-4FB1-AFCF-C28847DC5D9F';
+      field.addBeacon({
+        'uuid': uuid,
+        'major': 1,
+        'minor': 1,
+        'room': 'Lobby',
+        'zone': 'Ground',
+        'x': 0.5,
+        'y': 0.5,
+      });
+      field.addBeacon({'uuid': uuid, 'major': 1, 'minor': 2, 'room': 'Cellar'});
+      ApiViewer viewer(String pid, int team) => ApiViewer('player', {
+        'player_id': pid,
+        'game_id': gid,
+        'team': team,
+        'squad': 0,
+        'role': 'player',
+      });
+      positions.report(viewer(red, 1), {
+        'source': 'ble',
+        'beacon_id': '1:1',
+        't': 5,
+      });
+      positions.report(viewer(blue, 2), {
+        'source': 'ble',
+        'beacon_id': '1:2', // not placed on the plan
+        't': 5,
+      });
+      await emitter.cycle(full: true);
+      expect(
+        await waitFor(() => tcp!.connections.isNotEmpty),
+        isTrue,
+        reason: '${emitter.status()}',
+      );
+      final got = byUid([for (final c in tcp!.connections) ...splitStream(c)]);
+      expect(got.containsKey('atalaia.field.player.$blue'), isFalse);
+      final p = got['atalaia.field.player.$red']!;
+      expect(p.attrib['how'], 'h-e'); // from the image, not a GPS fix
+      final point = find(p, 'point')!;
+      expect(
+        double.parse(point.attrib['lat']!),
+        closeTo((38.7240 + 38.7200) / 2, 1e-4),
+      );
+      expect(
+        double.parse(point.attrib['lon']!),
+        closeTo((-9.1420 + -9.1360) / 2, 1e-4),
+      );
+      expect(
+        find(p, 'detail/remarks')!.text,
+        'Atalaia: red, player, Lobby (Ground)',
+      );
+      // Never on the multicast.
+      final types = {
+        for (final e in await udp.drain()) checkEvent(e).attrib['type'],
+      };
+      expect(types, isNot(contains(cotTypePlayer)));
+    });
+
     test('staff get props but no players without players = true', () async {
       await rig(players: false, staff: true);
       putImageAndCorners();

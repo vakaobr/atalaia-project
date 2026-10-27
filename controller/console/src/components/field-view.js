@@ -21,6 +21,9 @@
 // *Load the field from a map* (field-map.js, decisions MF-19 to MF-30) is its own page, the only one
 // of the console allowed to reach the internet; it comes back here (#field) when done.
 //
+// Indoor BLE beacons (beacons-panel.js, decisions BLE-1 to BLE-9): the GM's registry of the beacons
+// in the building, with a pin on the shown level's plan for each one placed, and their editor below.
+//
 // The field grid (field-grid.js, decisions MF-81 to MF-93): lettered rows and numbered columns over
 // the shown level's plan, set by the GM under the plan; any viewer may hide it in this browser.
 
@@ -29,6 +32,7 @@ import { linkBars } from './node-list.js';
 import { GeorefPanel, georefPins } from './georef-panel.js';
 import { LevelSettings, LevelTabs, levelName, levelsInUse, shownLevel, takeLoaded } from './field-levels.js';
 import { MapFeatures, featurePins, featureShapes, planScale } from './map-features.js';
+import { BeaconPanel, beaconPins } from './beacons-panel.js';
 import { GridLayer, GridSettings, GridToggle, gridCell, gridHidden, levelGrid } from './field-grid.js';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -48,7 +52,7 @@ export class FieldView extends Component {
         this.state = {
             imageUrl: null, version: -1, geoVersion: -1, georef: null, ownGeoref: true, drag: null,
             noImage: false, levels: NO_LEVELS, level: 0, draft: null, loadedNote: false,
-            gridVersion: 0, gridHidden: gridHidden(), imageAspect: null,
+            gridVersion: 0, gridHidden: gridHidden(), imageAspect: null, beaconDraft: null,
         };
         // MF-63: back from *Load the field from a map* after saving: that level, and a note saying so.
         this.loaded = takeLoaded();
@@ -129,7 +133,7 @@ export class FieldView extends Component {
 
     selectLevel(level) {
         if (level === this.state.level) return;
-        this.setState({ level, draft: null });
+        this.setState({ level, draft: null, beaconDraft: null });
         this.loadImage(level);
     }
 
@@ -222,7 +226,35 @@ export class FieldView extends Component {
         }
     }
 
+    /** BLE-7: the beacon being edited as the GM has it; a press on the plan places it while she places it. */
+    setBeaconDraft(beaconDraft) {
+        // One thing is placed at a time: placing a beacon leaves any map feature's place aside.
+        this.setState({ beaconDraft, ...(beaconDraft && beaconDraft.placing ? { draft: null } : {}) });
+    }
+
+    placeBeacon(p) {
+        const b = this.state.beaconDraft;
+        if (b) this.setState({ beaconDraft: { ...b, x: p.x, y: p.y } });
+    }
+
+    shownBeacons() {
+        const b = this.state.beaconDraft;
+        const list = (this.props.app.state.beacons || []).filter((x) => !(b && b.id === x.id));
+        return b && b.level === this.state.level ? [...list, b] : list;
+    }
+
+    editBeacon(b) {
+        if (this.props.app.state.role !== 'gm') return;
+        this.setState({ beaconDraft: { ...b, draft: true, placing: false, x: b.x ?? null, y: b.y ?? null }, draft: null });
+    }
+
     areaDown(e) {
+        const bd = this.state.beaconDraft;
+        if (bd && bd.placing && this.props.app.state.role === 'gm') {
+            e.preventDefault();
+            this.placeBeacon(this.point(e));
+            return;
+        }
         const d = this.state.draft;
         if (!d || !d.placing || this.props.app.state.role !== 'gm') return;
         e.preventDefault();
@@ -262,7 +294,7 @@ export class FieldView extends Component {
     }
 
     setDraft(draft) {
-        this.setState({ draft });
+        this.setState({ draft, ...(draft && draft.placing ? { beaconDraft: null } : {}) });
         if (draft === null) this.props.app.loadFeatures();
     }
 
@@ -339,7 +371,7 @@ export class FieldView extends Component {
         const featureTeams = teams.length ? teams : DEFAULT_TEAMS;
         const features = this.shownFeatures();
         const scale = planScale(state.georef);
-        const placing = state.draft && state.draft.placing;
+        const placing = (state.draft && state.draft.placing) || (state.beaconDraft && state.beaconDraft.placing);
         const grid = levelGrid(state.levels, state.level);
         const showGrid = grid.enabled && !state.gridHidden;
         // The plan's shape for square cells (MF-86): on the ground when it has a map position, else the
@@ -376,6 +408,7 @@ export class FieldView extends Component {
                 ${featureShapes(features, featureTeams, scale)}
                 ${showGrid && html`<${GridLayer} grid=${grid} />`}
                 ${featurePins(features, featureTeams, (f) => this.editFeature(f))}
+                ${beaconPins(this.shownBeacons(), state.level, (b) => this.editBeacon(b))}
                 ${here.map((n) => this.marker(n, list.indexOf(n), list.length, teams, grid))}
             </div>
             <${GridToggle} grid=${grid} hidden=${state.gridHidden} onChange=${(h) => this.setState({ gridHidden: h })} />
@@ -390,6 +423,9 @@ export class FieldView extends Component {
         <${MapFeatures} app=${app} features=${app.state.mapFeatures || []} level=${state.level} teams=${featureTeams}
             canEdit=${role === 'gm'} draft=${state.draft} scale=${scale} grid=${grid}
             onDraft=${(d) => this.setDraft(d)} onPlace=${(p) => this.placeDraft(p)} />
+        ${role === 'gm' && app.serves('positions') && html`<${BeaconPanel} app=${app} beacons=${app.state.beacons || []}
+            levels=${state.levels} level=${state.level} canEdit=${true} draft=${state.beaconDraft}
+            onDraft=${(d) => this.setBeaconDraft(d)} onPlace=${(p) => this.placeBeacon(p)} />`}
         ${state.imageUrl && html`<${GeorefPanel} app=${app} georef=${state.georef} level=${state.level}
             own=${state.ownGeoref} levelName=${multi ? name : null} groundName=${levelName(state.levels, 0)}
             onChange=${() => this.loadGeoref()} />`}`;

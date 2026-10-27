@@ -95,9 +95,12 @@ class PositionTests(P3Case):
                     {"reports": [gps()] * 6}, {**gps(), "player_id": self.people["red2"][0]}, {**gps(), "x": 1}):
             with self.subTest(bad):
                 self.assertEqual(self.client.post("/api/v1/positions", headers=bearer(tok), json=bad).status_code, 400)
+        # A beacon is accepted only from the field's registry (beacons.py, test_beacons.py).
+        self.client.post("/api/v1/beacons", headers=GM, json={"uuid": "FDA50693-A4E2-4FB1-AFCF-C28847DC5D9F",
+                                                              "major": 1, "minor": 2, "room": "Lobby"})
         r = self.client.post("/api/v1/positions", headers=bearer(tok),
                              json={"reports": [gps(t=1), {"source": "ble", "beacon_id": "1:2", "t": 5}]})
-        self.assertEqual(r.json(), {"stored": 2, "interval_s": 10})
+        self.assertEqual(r.json(), {"stored": 2, "interval_s": 10, "ble_interval_s": 5})
         mine = self.ctrl.store.player_positions(self.gid)[self.people["red1"][0]]
         self.assertEqual((mine["source"], mine["beacon_id"]), ("ble", "1:2"))  # the latest
         self.assertEqual(self.client.post("/api/v1/positions", headers=READ, json=gps()).status_code, 403)

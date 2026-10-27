@@ -336,6 +336,143 @@ void main() {
     expect(field.fromMap(0, body)['boundary_new'], false);
   });
 
+  group('the indoor beacon registry (BLE-1 to BLE-9)', () {
+    const uuid = 'FDA50693-A4E2-4FB1-AFCF-C28847DC5D9F';
+    Map<String, Object?> beacon(int minor, [Map<String, Object?>? more]) => {
+      'uuid': uuid,
+      'major': 1,
+      'minor': minor,
+      'room': 'Lobby',
+      ...?more,
+    };
+
+    test(
+      'kept in the field\'s document across a restart, by major and minor',
+      () {
+        final tmp = Directory.systemTemp.createTempSync('atalaia-beacons-');
+        addTearDown(() => tmp.deleteSync(recursive: true));
+        ControllerField open() => ControllerField(
+          ControllerEngine(
+            store: FileControllerStore(Directory('${tmp.path}/store')),
+          ),
+          dir: Directory('${tmp.path}/field'),
+        );
+        var field = open();
+        field.addBeacon(beacon(9));
+        field.addBeacon(beacon(2, {'x': 0.25, 'y': 0.75}));
+        field = open();
+        final all = field.beaconsFor(ApiViewer.gm)['beacons']! as List;
+        expect([for (final b in all) (b as Map)['id']], ['1:2', '1:9']);
+        expect((all[0] as Map)['x'], 0.25);
+        expect(field.beaconPlace('1:2'), {
+          'beacon_id': '1:2',
+          'room': 'Lobby',
+          'level': 0,
+          'x': 0.25,
+          'y': 0.75,
+        });
+        expect(field.beaconPlace('1:9'), isNot(contains('x')));
+        expect(field.beaconPlace('7:7'), isNull);
+        expect(field.beaconPlace('nope'), isNull);
+      },
+    );
+
+    test('a player is given each beacon\'s id and uuid, nothing more', () {
+      final field = ControllerField(ControllerEngine());
+      field.addBeacon(beacon(1, {'zone': 'Ground'}));
+      const player = ApiViewer('player', {
+        'player_id': 'p-a',
+        'game_id': 1,
+        'team': 1,
+        'squad': 0,
+        'role': 'player',
+      });
+      expect(field.beaconsFor(player)['beacons'], [
+        {'id': '1:1', 'uuid': uuid},
+      ]);
+      expect(field.beaconsFor(ApiViewer.read)['beacons'], [
+        {'id': '1:1', 'uuid': uuid},
+      ]);
+      expect(
+        (field.beaconsFor(ApiViewer.gm)['beacons']! as List).single,
+        containsPair('zone', 'Ground'),
+      );
+    });
+
+    test('at most 200; a pair is taken once; checks as the Pi\'s', () {
+      final field = ControllerField(ControllerEngine());
+      for (var i = 0; i < beaconsMax; i++) {
+        field.addBeacon({...beacon(0), 'major': 2, 'minor': i});
+      }
+      for (final (body, status) in [
+        (beacon(1), 409), // the field is full
+      ]) {
+        expect(
+          () => field.addBeacon(body),
+          throwsA(
+            isA<ControllerError>().having((e) => e.status, 'status', status),
+          ),
+        );
+      }
+      final small = ControllerField(ControllerEngine());
+      small.addBeacon(beacon(1));
+      expect(
+        () => small.addBeacon(beacon(1)),
+        throwsA(isA<ControllerError>().having((e) => e.status, 'status', 409)),
+      );
+      for (final bad in <Object?>[
+        null,
+        beacon(2, {'uuid': 'nope'}),
+        beacon(2, {'major': 65536}),
+        beacon(2, {'room': ''}),
+        beacon(2, {'room': 'x' * 49}),
+        beacon(2, {'level': 1}),
+        beacon(2, {'x': 0.5}),
+        beacon(2, {'x': 2, 'y': 0.5}),
+        beacon(2, {'colour': 'red'}),
+      ]) {
+        expect(
+          () => small.addBeacon(bad),
+          throwsA(
+            isA<ControllerError>().having((e) => e.status, 'status', 400),
+          ),
+          reason: '$bad',
+        );
+      }
+      expect(
+        () => small.putBeacon('1:1', beacon(5)),
+        throwsA(isA<ControllerError>()),
+      );
+      expect(
+        () => small.putBeacon('1:9', beacon(9)),
+        throwsA(isA<ControllerError>()),
+      );
+      expect(
+        small.putBeacon('1:1', {
+          'uuid': uuid.toLowerCase(),
+          'room': 'Hall',
+        })['uuid'],
+        uuid,
+      );
+    });
+
+    test('a level that goes takes its beacons to level 0, unplaced', () {
+      final field = ControllerField(ControllerEngine());
+      field.putLevels({'enabled': true, 'count': 3});
+      field.addBeacon(beacon(1, {'level': 2, 'x': 0.1, 'y': 0.2}));
+      field.addBeacon(beacon(2, {'level': 1, 'x': 0.3, 'y': 0.4}));
+      field.putLevels({'enabled': true, 'count': 2});
+      final by = {
+        for (final b in field.beaconsFor(ApiViewer.gm)['beacons']! as List)
+          (b as Map)['id']: b,
+      };
+      expect(by['1:1']!['level'], 0);
+      expect(by['1:1']!['x'], isNull);
+      expect(by['1:2']!['level'], 1);
+      expect(by['1:2']!['x'], 0.3);
+    });
+  });
+
   test('who sees which feature (MF-3, MF-4)', () {
     final e = ControllerEngine();
     final field = ControllerField(e);

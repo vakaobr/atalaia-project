@@ -54,7 +54,7 @@ class App extends Component {
             nodes: {}, seen: {}, feed: [], alerts: [], modes: [], presets: [],
             positions: {}, scoreHistory: [], clockBase: null, toast: '', now: Date.now(),
             radio: null, chronoCounts: null, branding: null, teamPresets: [],
-            boxes: null, invites: [], invitePicker: false, mapFeatures: [], modeFetch: null, posterPrompt: null,
+            boxes: null, invites: [], invitePicker: false, mapFeatures: [], beacons: [], modeFetch: null, posterPrompt: null,
         };
         this.checkinPanel = null;
         this.stream = null;
@@ -243,6 +243,7 @@ class App extends Component {
             this.setState({ status: msg.status, score: msg.score, nodes, seen });
             if (msg.branding) this.setState({ branding: msg.branding });
             this.loadFeatures();
+            this.loadBeacons();
             this.setGame(msg.game);
             if (msg.game) {
                 this.loadLog(msg.game.id);
@@ -350,6 +351,9 @@ class App extends Component {
         case 'map_features': // what this token may see (MF-10)
             this.setState({ mapFeatures: msg.features || [] });
             break;
+        case 'beacons': // the registry changed (staff only; BLE-5)
+            this.loadBeacons();
+            break;
         default:
             break;
         }
@@ -408,6 +412,13 @@ class App extends Component {
         if (!this.serves('field')) return;
         const out = await this.call('GET', '/field/features');
         if (out) this.setState({ mapFeatures: out.features });
+    }
+
+    /** The indoor beacon registry (decisions BLE-1 to BLE-9): the GM token's whole registry. */
+    async loadBeacons() {
+        if (!this.serves('positions') || this.state.role !== 'gm') return;
+        const out = await this.call('GET', '/beacons');
+        if (out) this.setState({ beacons: out.beacons || [] });
     }
 
     async loadPositions(gameId) {

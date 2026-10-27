@@ -12,7 +12,12 @@ hardware feature is optional: a phone without NFC or a camera still
 installs the app. Location (plan phase E): a player who chooses to share
 their position during a game (ADR-P3-6), with the foreground service's
 location type so it goes on with the screen off; below Android 12 a
-Bluetooth scan needs it too.
+Bluetooth scan needs it too. Indoor iBeacons (BeaconScanPlugin): the same
+scan permission, asked only when the field has beacons and the player agrees,
+and it is declared without `neverForLocation`: that flag makes Android hide
+BLE beacons from the app, and a scan for them is used for a position, so from
+Android 12 it needs the location permission too (the pod's scan, which is not
+for a position, asks for it along with it).
 
 The field controller role (slice S6 of PE24): the same foreground service
 with its wake and Wi-Fi locks while the phone serves a field; the field's
@@ -50,9 +55,7 @@ field join key, the marshal's private key and the field identities.
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    <uses-permission
-        android:name="android.permission.BLUETOOTH_SCAN"
-        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission
         android:name="android.permission.NEARBY_WIFI_DEVICES"

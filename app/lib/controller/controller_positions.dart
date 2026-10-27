@@ -33,6 +33,7 @@ library;
 
 import 'controller_checkin.dart';
 import 'controller_engine.dart';
+import 'controller_field.dart';
 import 'visibility_engine.dart';
 
 const positionReportsMax = 5;
@@ -248,6 +249,19 @@ class ControllerPositions {
       );
     }
     final gid = game['id']! as int;
+    // A beacon is accepted only from the field's registry, and gives the
+    // room, zone, level and plan place (beacons.py, BLE-1 to BLE-9).
+    for (var i = 0; i < checked.length; i++) {
+      if (checked[i]['source'] != 'ble') continue;
+      final id = checked[i]['beacon_id']! as String;
+      final place = engine.field?.beaconPlace(id);
+      if (place == null) {
+        throw ControllerError(
+          "beacon_id: $id is not a beacon of this field's registry",
+        );
+      }
+      checked[i] = {...checked[i], ...place};
+    }
     var latest = checked.reduce(
       (a, b) => (b['t']! as int) > (a['t']! as int) ? b : a,
     );
@@ -275,7 +289,11 @@ class ControllerPositions {
       '_position': true,
     });
     if (viewer.role == 'vip') _toField(game, viewer, checked);
-    return {'stored': checked.length, 'interval_s': interval(game)};
+    return {
+      'stored': checked.length,
+      'interval_s': interval(game),
+      'ble_interval_s': bleIntervalS(game),
+    };
   }
 
   /// A VIP's GPS reports, oldest first, to the game's field.lua as

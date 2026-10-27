@@ -595,6 +595,19 @@ const Map<String, String> zhTwStrings = {
   'prop.radio.offline': '模組的無線電沒有回應：正在重試…',
   'prop.radio.closed': '模組的無線電已關閉',
   'prop.gm_message': '主辦：{text}',
+  // 場地內部的藍牙信標（決定 BLE-1 到 BLE-9）
+  'player.beacons_why_title': '場地內部的位置',
+  'player.beacons_why':
+      '這個場地的內部裝了藍牙信標。為了知道你在哪個空間，Atalaia 可以在你分享位置時掃描它們：只掃描場地自己的信標，只送出哪一個最近。Android 會為此詢問藍牙和定位權限。沒有這些權限，你的位置就只有 GPS。',
+  'player.beacons_allow': '繼續',
+  'player.beacons_skip': '現在不要',
+  'player.beacons_on': '正在掃描場地的信標：在場地內部時，你的位置就是那個空間。',
+  'player.beacons_skipped': '場地內部的位置已關閉。仍會分享你的 GPS 位置。',
+  'player.beacons_denied': '場地內部的位置已關閉：沒有藍牙權限。仍會分享你的 GPS 位置。',
+  'player.beacons_off': '場地內部的位置已關閉：藍牙沒有開啟。請開啟後再重新分享。',
+  'player.beacons_unavailable': '這支手機無法掃描場地的信標。仍會分享你的 GPS 位置。',
+  'player.beacons_ios': 'iPhone 目前還不使用場地內部的信標：你的位置只有 GPS。',
+  'player.my_room': '你的位置：{room}',
   'player.share_hint_squads':
       '只在遊戲進行中；由控制器決定誰看得到：遊戲允許時是你的小隊，以及主辦和裁判（在他們的 ATAK 裝置上）。',
   'checkin.team_squad': '{team} › 小隊 {squad}',

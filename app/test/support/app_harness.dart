@@ -18,6 +18,7 @@ import 'package:atalaia_app/controller/prop_link.dart';
 import 'package:atalaia_app/core/node_runner.dart';
 import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/platform/links.dart';
+import 'package:atalaia_app/platform/beacon_scan.dart';
 import 'package:atalaia_app/platform/location.dart';
 import 'package:atalaia_app/player/field_feed.dart';
 import 'package:atalaia_app/pod/pod_client.dart';
@@ -41,6 +42,7 @@ class Harness {
     this.siteHttp,
     this.links,
     this.location,
+    this.beacons,
     this.controllerLauncher,
     this.controllerAssets,
     this.routes,
@@ -48,6 +50,9 @@ class Harness {
 
   /// The phone's location (none: not available).
   final LocationService? location;
+
+  /// The phone's iBeacon scanner (none: not available).
+  final BeaconScanService? beacons;
 
   /// The phone controller's isolate (slice S6); none: a [FakeControllerRun].
   final ControllerLauncher? controllerLauncher;
@@ -100,6 +105,7 @@ class Harness {
     siteHttp: siteHttp ?? (_) => const _NoSite(),
     links: links,
     location: location,
+    beacons: beacons,
     wifi: wifi,
     controllerLauncher: controllerLauncher ?? _fakeLaunch,
     controllerAssets:
@@ -170,6 +176,7 @@ Harness harness({
   SiteHttp Function(Uri origin)? siteHttp,
   AppLinks? links,
   LocationService? location,
+  BeaconScanService? beacons,
   ControllerLauncher? controllerLauncher,
   FieldRoutes? routes,
 }) => Harness(
@@ -184,6 +191,7 @@ Harness harness({
   siteHttp: siteHttp,
   links: links,
   location: location,
+  beacons: beacons,
   controllerLauncher: controllerLauncher,
   routes: routes,
 );

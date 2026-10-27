@@ -25,6 +25,12 @@ On a multi-story field (field_levels.py) a report may say the player's level
 the player last gave in this game, so a phone that asks once ("which floor
 are you on?") need not send it every time; never given, the position has no
 level (decision ML-5).
+
+A ``ble`` report names the strongest iBeacon the phone hears (``beacon_id``, major:minor) and only a beacon of
+the field's registry is accepted (beacons.py, decisions BLE-1 to BLE-9): the stored position then carries the
+beacon's ``room``, ``zone`` and ``level`` (the beacon's level is the player's, whatever the report says) and, when
+the GM placed the beacon on its plan, its ``x`` and ``y``. A newer report of either source replaces the older one:
+a phone indoors sends beacons, outdoors GPS (app/lib/position/position_reporter.dart).
 """
 
 from __future__ import annotations
@@ -35,6 +41,7 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
+from . import beacons as beaconsmod
 from .engine import Conflict, ControllerError
 from .field_levels import LEVELS_MAX
 
@@ -167,6 +174,12 @@ class Positions:
         if game is None or game["state"] not in ("running", "paused") or self.ctrl.game is None \
                 or self.ctrl.game["id"] != game["id"]:
             raise Conflict("positions are kept only while the game runs")
+        for i, r in enumerate(checked):
+            if r["source"] == "ble":
+                place = beaconsmod.place_of(self.ctrl.store, r["beacon_id"])
+                if place is None:
+                    raise ControllerError(f"beacon_id: {r['beacon_id']} is not a beacon of this field's registry")
+                checked[i] = {**r, **place}
         latest = max(checked, key=lambda r: r["t"])
         if "level" not in latest:
             latest = {**latest, **self._last_level(game["id"], viewer.player_id)}
@@ -178,7 +191,8 @@ class Positions:
         self.ctrl._emit({"type": "player_position", "game": game["id"], "position": pos, "_position": True})
         if viewer.role == "vip":
             self._to_field(game, viewer, checked)
-        return {"stored": len(checked), "interval_s": self.interval(game)}
+        return {"stored": len(checked), "interval_s": self.interval(game),
+                "ble_interval_s": beaconsmod.interval(game)}
 
     def _last_level(self, game_id: int, player_id: str) -> dict[str, Any]:
         """The level this player last gave in this game, as ``{"level": n}`` (or nothing)."""

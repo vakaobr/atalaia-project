@@ -395,6 +395,28 @@
     "need_label": "請為它命名。",
     "boundary_hint": "場地邊界是一個區域，每個樓層最多一個，不屬於任何隊；邊界外的平面圖會變暗。"
   },
+  "beacons": {
+    "title": "室內藍牙信標",
+    "intro": "你在建築物裡裝設的藍牙信標（iBeacon）。玩家的手機會回報它聽到最強的那一個，所在的房間會顯示在這裡和 ATAK 上。精確到房間，不到公尺。把每個信標放到它所在樓層的平面圖上，就能在地圖上顯示房間。",
+    "none": "還沒有信標。",
+    "add": "新增信標",
+    "editing": "編輯：{name}",
+    "confirm_delete": "移除 {name} 的信標？手機之後就不會再回報它。",
+    "pin": "信標 {id}：{name}",
+    "uuid": "UUID",
+    "major": "Major",
+    "minor": "Minor",
+    "room": "房間",
+    "zone": "區域（選填）",
+    "level": "樓層",
+    "placed": "已放在平面圖上",
+    "not_placed": "尚未放在平面圖上",
+    "placing": "在平面圖上點選信標的位置。",
+    "unplace": "從平面圖上移除",
+    "bad_uuid": "UUID 是 32 個十六進位數字，格式為 8-4-4-4-12。",
+    "bad_id": "Major 和 Minor 是 0 到 65535 的整數。",
+    "need_room": "請為房間命名。"
+  },
   "fieldmap": {
     "open": "從地圖載入場地",
     "title": "從地圖載入場地",

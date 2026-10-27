@@ -24,6 +24,7 @@ import 'core/node_runner.dart';
 import 'l10n/strings.dart';
 import 'modes/mode_catalog.dart';
 import 'platform/channels.dart';
+import 'platform/beacon_scan.dart';
 import 'platform/location.dart';
 import 'platform/services.dart';
 import 'platform/links.dart';
@@ -69,6 +70,7 @@ class AppServices {
     FieldHttp Function(PinnedField field)? fieldHttp,
     CaFetcher? caFetch,
     this.location,
+    this.beacons,
     this.linkConnect,
     BrandingSourceFor? brandingSource,
     SiteHttp Function(Uri origin)? siteHttp,
@@ -111,6 +113,7 @@ class AppServices {
         usbPods: ChannelPodTransport.usb,
         blePods: ChannelPodTransport.ble,
         location: ChannelLocationService(),
+        beacons: ChannelBeaconScanService(),
         links: ChannelAppLinks(),
         wifi: ChannelFieldWifi(),
       );
@@ -142,6 +145,10 @@ class AppServices {
 
   /// The phone's location, for position reports (null: not available).
   final LocationService? location;
+
+  /// The iBeacons it hears, for indoor position reports (decisions BLE-1 to
+  /// BLE-9; null: none: GPS only).
+  final BeaconScanService? beacons;
 
   /// How a prop links to the controller over Wi-Fi (tests give a fake; null:
   /// wss:// with the CA the join payload names, prop_link.dart).

@@ -1365,7 +1365,7 @@ class AtakEmitter {
     if (game != null &&
         (staff || remote) &&
         (everything || now >= _nextPlayers)) {
-      for (final (uid, data, lat, lon) in _players(game, now)) {
+      for (final (uid, data, lat, lon) in _players(game, now, geos, levels)) {
         if (staff) {
           tcpOut.add(data);
           _staffMarkers[uid] = (cotTypePlayer, lat, lon);
@@ -1713,22 +1713,36 @@ class AtakEmitter {
     if (_remoteOn) _remoteMarkers[uid] = (cotType, lat, lon);
   }
 
-  /// Staff endpoints and the remote relay only, never UDP: every GPS
-  /// position of the live game, as (uid, event, lat, lon).
+  /// Staff endpoints and the remote relay only, never UDP: every position
+  /// of the live game that has a place, as (uid, event, lat, lon). A GPS
+  /// position is where the phone is; an indoor one (`ble`, the beacon
+  /// registry) is the room: its marker sits where the GM placed the beacon
+  /// on its level's plan (by that level's map position, as the boxes), is
+  /// marked as estimated from the image, and its remarks name the room and
+  /// zone. A beacon not placed on a plan, or on a level without a map
+  /// position, has no place on the map (atak.py `_players`).
   List<(String, String, double, double)> _players(
     Map<String, Object?> game,
     double now,
+    Map<int, Georef?> geos,
+    Map<String, Object?> levels,
   ) {
     final teams = _teams(game);
     final interval = ControllerPositions.interval(game);
-    final levels = engine.field?.levelsMeta() ?? _defaultLevels;
     final gid = game['id']! as int;
     final all = engine.positions?.playerPositions(gid) ?? const {};
     final out = <(String, String, double, double)>[];
     for (final pid in all.keys.toList()..sort()) {
       final pos = all[pid]!;
+      final indoor = pos['source'] == 'ble';
       final plat = pos['lat'], plon = pos['lon'];
-      if (pos['source'] != 'gps' || plat is! num || plon is! num) continue;
+      Georef? geo;
+      if (indoor) {
+        geo = geos[_shown(levels, pos['level'])];
+        if (geo == null || pos['x'] is! num || pos['y'] is! num) continue;
+      } else if (pos['source'] != 'gps' || plat is! num || plon is! num) {
+        continue;
+      }
       final received = pos['received_at'];
       final seen = received is num && received != 0 ? received.toDouble() : now;
       final stale = seen + 2 * interval;
@@ -1749,21 +1763,33 @@ class AtakEmitter {
         // ML-7: only a level the phone gave.
         remarks += ', ${_label(levels, level)}';
       }
+      final room = pos['room'];
+      if (indoor && room is String && room.isNotEmpty) {
+        final zone = pos['zone'];
+        remarks +=
+            ', $room${zone is String && zone.isNotEmpty ? ' ($zone)' : ''}';
+      }
       final uid = _uid(['player', pid]);
-      final lat = plat.toDouble(), lon = plon.toDouble();
+      final double lat, lon;
+      if (indoor) {
+        (lat, lon) = geo!.toLatLon(_d(pos['x']), _d(pos['y']));
+      } else {
+        lat = (plat! as num).toDouble();
+        lon = (plon! as num).toDouble();
+      }
       final acc = pos['accuracy_m'];
       out.add((
         uid,
         eventXml(
           uid: uid,
           cotType: cotTypePlayer,
-          how: cotHowGps,
+          how: indoor ? cotHowImage : cotHowGps,
           lat: lat,
           lon: lon,
           now: now,
           start: seen < now ? seen : now,
           stale: stale,
-          ce: acc is num ? acc : null,
+          ce: !indoor && acc is num ? acc : null,
           detail: playerDetail(callsign, atakTeam(team), remarks),
         ),
         lat,

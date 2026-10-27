@@ -395,6 +395,28 @@
     "need_label": "Dá-lhe um nome.",
     "boundary_hint": "O limite do campo é uma área, no máximo um por piso e de nenhuma equipa; fora dele, a planta fica escurecida."
   },
+  "beacons": {
+    "title": "Balizas interiores",
+    "intro": "As balizas Bluetooth (iBeacon) que montaste num edifício. O telemóvel de um jogador comunica a mais forte que ouve, e a divisão em que está aparece aqui e no ATAK. Divisão a divisão, não ao metro. Põe cada baliza na planta do seu nível para mostrar a divisão no mapa.",
+    "none": "Ainda não há balizas.",
+    "add": "Adicionar uma baliza",
+    "editing": "Editar: {name}",
+    "confirm_delete": "Remover a baliza de {name}? Os telemóveis deixam de a comunicar.",
+    "pin": "Baliza {id}: {name}",
+    "uuid": "UUID",
+    "major": "Major",
+    "minor": "Minor",
+    "room": "Divisão",
+    "zone": "Zona (opcional)",
+    "level": "Nível",
+    "placed": "Na planta",
+    "not_placed": "Sem lugar na planta",
+    "placing": "Clica na planta onde está a baliza.",
+    "unplace": "Tirar da planta",
+    "bad_uuid": "O UUID tem 32 algarismos hexadecimais, no formato 8-4-4-4-12.",
+    "bad_id": "Major e minor são números inteiros de 0 a 65535.",
+    "need_room": "Dá um nome à divisão."
+  },
   "fieldmap": {
     "open": "Carregar o campo de um mapa",
     "title": "Carregar o campo de um mapa",

@@ -114,6 +114,9 @@ which browsers cannot give headers, also takes ``?token=``.
     POST /api/v1/schedule/{id}/game        GM: a game made from a scheduled game, linked to it
     GET|DELETE /api/v1/players/{player}    GM (or the player): their data / erase it (?chrono=1: readings too)
     GET|POST /api/v1/positions             player positions: the ones the caller may see / report (player token)
+    GET|POST /api/v1/beacons               the indoor BLE beacon registry (beacons.py, ADR-P3-6): staff all of it,
+                                           others each beacon's id and uuid; POST: GM
+    PUT|DELETE /api/v1/beacons/{major:minor} GM: change or delete one
     WS   /api/v1/prop                      an Android prop's Wi-Fi link (prop_link.py)
     GET  /healthz                          liveness, no token
     GET  /console/                         the GM console (static files, no token)
@@ -150,6 +153,7 @@ from . import field_levels as levelsmod
 from . import field_map as fieldmapmod
 from . import georef as georefmod
 from . import map_features as mapmod
+from . import beacons as beaconsmod
 from . import images, player_tags, visibility
 from . import scenario_service as scenarios
 from .branding import SLOTS, Branding, etag
@@ -871,6 +875,53 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         controller._emit(FEATURES_CHANGED)
         return {"deleted": True}
 
+    # --- the indoor BLE beacon registry (beacons.py, decisions BLE-1 to BLE-9) -------------
+
+    def beacon_or_404(beacon_id: str) -> dict[str, Any]:
+        try:
+            major, minor = beaconsmod.parse_id(beacon_id)
+        except ControllerError:
+            raise HTTPException(404, "no such beacon") from None
+        row = controller.store.beacon(major, minor)
+        if row is None:
+            raise HTTPException(404, "no such beacon")
+        return row
+
+    @app.get("/api/v1/beacons")
+    def beacons_list(v: Viewer = Depends(require_read)) -> JSONResponse:
+        """Staff the whole registry; everyone else each beacon's id and uuid (what a phone listens for)."""
+        live = controller.game
+        game = controller.store.game(live["id"]) if live else None
+        return JSONResponse({"beacons": beaconsmod.visible(controller.store, v),
+                             "ble_interval_s": beaconsmod.interval(game)}, headers=NO_STORE)
+
+    @app.post("/api/v1/beacons", status_code=201, dependencies=[Depends(require_gm)])
+    def beacon_add(body: Any = Body(None)) -> dict[str, Any]:
+        data = beaconsmod.check(body, levels_meta())
+        if controller.store.count_beacons() >= beaconsmod.BEACONS_MAX:
+            raise HTTPException(409, f"the field has {beaconsmod.BEACONS_MAX} beacons: delete one first")
+        major, minor, level = data.pop("major"), data.pop("minor"), data.pop("level")
+        if not controller.store.add_beacon(major, minor, level, data):
+            raise HTTPException(409, f"a beacon {major}:{minor} is already in the registry: change that one")
+        controller._emit(BEACONS_CHANGED)
+        return beaconsmod.view(beacon_or_404(beaconsmod.beacon_id(major, minor)))
+
+    @app.put("/api/v1/beacons/{beacon_id}", dependencies=[Depends(require_gm)])
+    def beacon_put(beacon_id: str, body: Any = Body(None)) -> dict[str, Any]:
+        beacon_or_404(beacon_id)
+        data = beaconsmod.check(body, levels_meta(), beacon_id)
+        major, minor, level = data.pop("major"), data.pop("minor"), data.pop("level")
+        controller.store.put_beacon(major, minor, level, data)
+        controller._emit(BEACONS_CHANGED)
+        return beaconsmod.view(beacon_or_404(beacon_id))
+
+    @app.delete("/api/v1/beacons/{beacon_id}", dependencies=[Depends(require_gm)])
+    def beacon_delete(beacon_id: str) -> dict[str, Any]:
+        row = beacon_or_404(beacon_id)
+        controller.store.delete_beacon(row["major"], row["minor"])
+        controller._emit(BEACONS_CHANGED)
+        return {"deleted": True}
+
     @app.get("/api/v1/atak", dependencies=[Depends(require_console)])
     def atak_status() -> dict[str, Any]:
         if controller.atak is None:
@@ -1463,6 +1514,8 @@ HELLO_EVENTS = 100
 # A map feature was added, changed or deleted (or the levels in use changed): make_route sends each
 # connection the features it may see (MF-10). Routing marks never leave the controller (ws.py).
 FEATURES_CHANGED = {"type": "map_features", "_map_features": True}
+# The beacon registry changed: staff are told to read it again (a player's phone reads it when it starts to share).
+BEACONS_CHANGED = {"type": "beacons", "_staff": True}
 
 
 def _snapshot(controller: Controller, viewer: Optional[Viewer] = None) -> dict[str, Any]:

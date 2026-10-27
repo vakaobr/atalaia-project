@@ -682,6 +682,25 @@ const Map<String, String> enStrings = {
   'prop.radio.offline': 'The pod\'s radio is not answering: trying again…',
   'prop.radio.closed': 'The pod\'s radio is off',
   'prop.gm_message': 'Game master: {text}',
+  // Indoor beacons (decisions BLE-1 to BLE-9)
+  'player.beacons_why_title': 'Indoor positions',
+  'player.beacons_why':
+      'This field has Bluetooth beacons indoors. To tell which room you are in, Atalaia can listen for them while you share your position: only the field\'s own beacons, and it sends only which one is strongest. Android asks for the Bluetooth and location permissions for this. Without them your position stays GPS only.',
+  'player.beacons_allow': 'Continue',
+  'player.beacons_skip': 'Not now',
+  'player.beacons_on':
+      'Listening for the field\'s beacons: indoors your position is the room.',
+  'player.beacons_skipped':
+      'Indoor positions are off. Your GPS position is still shared.',
+  'player.beacons_denied':
+      'Indoor positions are off: no permission for Bluetooth. Your GPS position is still shared.',
+  'player.beacons_off':
+      'Indoor positions are off: Bluetooth is switched off. Switch it on and share again.',
+  'player.beacons_unavailable':
+      'This phone cannot listen for the field\'s beacons. Your GPS position is still shared.',
+  'player.beacons_ios':
+      'On iPhone the field\'s indoor beacons are not used yet: your position is GPS only.',
+  'player.my_room': 'Your position: {room}',
   'player.share_hint_squads':
       'Only during the game; the controller decides who sees it: your squad if the game allows it, and the organisers and the marshals on their ATAK devices.',
   'checkin.team_squad': '{team} › squad {squad}',

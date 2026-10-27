@@ -47,6 +47,7 @@ import '../checkin/failure_details.dart';
 import '../l10n/strings.dart';
 import '../platform/location.dart';
 import '../platform/platform_check.dart';
+import '../position/beacon_scanner.dart';
 import '../position/field_bounds.dart';
 import '../position/position_reporter.dart';
 import '../prop/game_timer.dart';
@@ -371,6 +372,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
             role == 'vip');
   }
 
+  /// The room the controller says this player is in, from the beacon they
+  /// reported (decisions BLE-4, BLE-8), or null.
+  String? get _myRoom {
+    final me = feed.me?['player_id'];
+    final pos = feed.positions[me];
+    final room = pos?['room'];
+    if (room is! String || room.isEmpty) return null;
+    final zone = pos?['zone'];
+    return zone is String && zone.isNotEmpty ? '$room ($zone)' : room;
+  }
+
   /// The level the controller keeps for this player (ML-5), or null.
   int? get _myLevel {
     final me = feed.me?['player_id'];
@@ -479,6 +491,85 @@ class _PlayerScreenState extends State<PlayerScreen> {
   PositionReporter? _reporter;
   String? _shareError;
 
+  /// What the indoor beacons are doing, as a text key (null: nothing to say).
+  String? _beaconNote;
+
+  /// Asks the field for its beacons and, if it has any and the phone may
+  /// listen, the player's leave first (decisions BLE-1 to BLE-9): a field
+  /// without beacons asks for nothing; the explanation comes before the
+  /// system's Bluetooth and location prompts; a refusal, a phone without
+  /// Bluetooth LE, or Bluetooth switched off leaves the GPS position as it
+  /// was, and says so.
+  Future<BeaconScanner?> _beaconScanner(
+    AppServices services,
+    CheckinClient client,
+  ) async {
+    _beaconNote = null;
+    final scan = services.beacons;
+    if (scan == null) return null;
+    Map<String, Object?> reg;
+    try {
+      reg = await client.fetchBeacons(feed.link.token);
+    } on CheckinException {
+      return null; // an older controller, or out of reach: GPS only
+    }
+    final registry = [
+      for (final b in (reg['beacons'] as List?) ?? const [])
+        ?RegisteredBeacon.fromApi(b),
+    ];
+    if (registry.isEmpty) return null;
+    if (isIOS) {
+      _beaconNote = 'player.beacons_ios';
+      return null;
+    }
+    if (!await scan.available()) {
+      _beaconNote = 'player.beacons_unavailable';
+      return null;
+    }
+    if (!mounted) return null;
+    final s = context.s;
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        key: const Key('player-beacons-why'),
+        title: Text(s.t('player.beacons_why_title')),
+        content: Text(s.t('player.beacons_why')),
+        actions: [
+          TextButton(
+            key: const Key('player-beacons-skip'),
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(s.t('player.beacons_skip')),
+          ),
+          FilledButton(
+            key: const Key('player-beacons-allow'),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(s.t('player.beacons_allow')),
+          ),
+        ],
+      ),
+    );
+    if (go != true) {
+      _beaconNote = 'player.beacons_skipped';
+      return null;
+    }
+    if (!await services.device.requestPermission('BLUETOOTH_SCAN') ||
+        !await scan.granted()) {
+      _beaconNote = 'player.beacons_denied';
+      return null;
+    }
+    if (!await scan.bluetoothOn()) {
+      _beaconNote = 'player.beacons_off';
+      return null;
+    }
+    final every = reg['ble_interval_s'];
+    _beaconNote = 'player.beacons_on';
+    return BeaconScanner(
+      service: scan,
+      registry: registry,
+      window: every is int ? Duration(seconds: every) : bleIntervalDefault,
+    );
+  }
+
   Future<void> _share(bool on) async {
     final services = context.services;
     final s = context.s;
@@ -487,6 +578,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final field = widget.link.field;
     if (!on) {
       _reporter?.stop();
+      _beaconNote = null;
       _watch.reset();
       await services.foreground.stop();
       await app.update((x) => x.sharePosition = false);
@@ -510,10 +602,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     final http = _http ??= services.fieldHttp(field);
     final client = CheckinClient(http);
-    final r = _reporter ??= PositionReporter(
+    final scanner = await _beaconScanner(services, client);
+    if (!mounted) {
+      scanner?.dispose();
+      return;
+    }
+    _reporter?.dispose();
+    final r = _reporter = PositionReporter(
       location: location,
       send: (reports) => client.reportPositions(feed.link.token, reports),
       onFix: _onFix,
+      beacons: scanner,
     );
     r.start();
     _featuresSeen = feed.mapFeatures;
@@ -571,6 +670,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             sent: _reporter?.sent ?? 0,
                             stopped: _reporter?.stopReason,
                             error: _shareError,
+                            beaconNote: _beaconNote,
+                            room: _myRoom,
                             onChanged: _share,
                             squads: ((feed.game?['squads'] as int?) ?? 0) > 0,
                             bounds: _warns,
@@ -878,6 +979,8 @@ class _SharePosition extends StatelessWidget {
     required this.onChanged,
     this.squads = false,
     this.bounds = false,
+    this.beaconNote,
+    this.room,
   });
 
   final bool running;
@@ -891,6 +994,11 @@ class _SharePosition extends StatelessWidget {
 
   /// Whether the phone watches the field's boundary (MF-31).
   final bool bounds;
+
+  /// What the indoor beacons are doing (a text key), and the room the
+  /// controller shows this player in (BLE-8).
+  final String? beaconNote;
+  final String? room;
 
   @override
   Widget build(BuildContext context) {
@@ -927,6 +1035,23 @@ class _SharePosition extends StatelessWidget {
               s.t('player.bounds_watch'),
               key: const Key('player-bounds-watch'),
               style: TextStyle(color: Theme.of(context).hintColor),
+            ),
+          ),
+        if (running && beaconNote != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              s.t(beaconNote!),
+              key: const Key('player-beacons-note'),
+              style: TextStyle(color: Theme.of(context).hintColor),
+            ),
+          ),
+        if (running && room != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              s.t('player.my_room', {'room': room!}),
+              key: const Key('player-my-room'),
             ),
           ),
         if (error != null) Notice(error!, kind: NoticeKind.warning),

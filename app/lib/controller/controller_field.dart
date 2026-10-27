@@ -31,7 +31,11 @@
 ///   - the field grid (field_grid.py, decisions MF-81 to MF-93): lettered
 ///     rows and numbered columns over each level's plan, off by default,
 ///     set by the GM and sent with the field from a map; fewer levels take
-///     the grids of the levels that go.
+///     the grids of the levels that go;
+///   - the indoor BLE beacon registry (beacons.py, ADR-P3-6, decisions BLE-1
+///     to BLE-9; controller_field_beacons.dart): which beacon is in which
+///     room, zone and level and where on its plan, the rooms position
+///     reports that name a beacon turn into.
 ///
 /// Storage (decision PE24-75): one store document, `field` (the levels, the
 /// map positions' points, the plans' types and sizes, the features, the
@@ -54,6 +58,8 @@ import 'dart:typed_data';
 
 import 'controller_checkin.dart';
 import 'controller_engine.dart';
+
+part 'controller_field_beacons.dart';
 
 /// Bytes of one level's plan (store.py FIELD_IMAGE_MAX).
 const fieldImageMax = 4 * 1024 * 1024;
@@ -1020,7 +1026,8 @@ class ControllerField {
       ..['features'] = [
         for (final f in features)
           if ((f['level']! as int) < count) f,
-      ];
+      ]
+      ..['beacons'] = _beaconsAfterLevels(count);
     _save(state);
     gone.forEach(_dropFile);
     _movePlacesToLevel0(count);

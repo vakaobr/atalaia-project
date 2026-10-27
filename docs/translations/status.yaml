@@ -25,8 +25,9 @@ languages:
     status: draft
     drafted: 2026-10-22
     # Texts added in English and Portuguese after the draft (the GM console's scenario blocks and
-    # hidden areas, the app's phone controller and out-of-bounds warning) drafted the same way.
-    gaps_filled: 2026-10-22
+    # hidden areas, the app's phone controller and out-of-bounds warning) drafted the same way,
+    # and, on 2026-10-27, the indoor beacons' texts (the console's panel, the app's explanation).
+    gaps_filled: 2026-10-27
     # The built-in modes (mode.yaml i18n.de, their screen templates, the Medic Kit's refusals, the
     # registry's sample) and the site server's pages, drafted the same way (P5H-7, P5H-8, P5H-12).
     modes_and_server: 2026-10-23
