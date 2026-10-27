@@ -217,7 +217,7 @@ An objective can say **For** *(team)* or **For** *(team)***, squad** *(number)*.
 
 ## 6. Share your position and the field boundary
 
-Sharing your position is optional. Your position goes to the field controller only, during the game. The controller decides who may see it: the organisers and marshals, and your squad if the game allows it. The organisers see it on their ATAK devices, if they use them. The app does not draw a map of players, and the console does not either. In *VIP / Payload* the VIP's position is what extracts the team.
+Sharing your position is optional. Your position goes to the field controller only, during the game. The controller decides who may see it: the organisers and marshals, and your squad if the game allows it. The organisers see it on their ATAK devices, if they use them. The app draws a map of the field with the positions you may see (see below); the console does not draw players. In *VIP / Payload* the VIP's position is what extracts the team.
 
 1. Check in, then tap **Follow the game**.
 2. While the game is **running**, switch on **Share my position**. It says *Only during the game; the controller decides who sees it …*.
@@ -230,6 +230,10 @@ Sharing your position is optional. Your position goes to the field controller on
 - The app listens only for the field's beacons and keeps nothing it hears. It listens only while you share, and stops when you stop.
 - When you are out of every beacon's range for a few seconds, your GPS position is shared again.
 - On an iPhone the beacons are not used yet: the position stays GPS.
+
+**Which floor are you on?** If the field has several floors, a row of buttons appears under the switch while you share: the floors' names (for example **Ground**, **Level 1**) and **Not sure**. Your phone cannot tell floors apart, so say it once; it is kept while you play, and it goes with your GPS position so your team sees you on the right floor. Choose **Not sure** if you do not know: nobody guesses it for you. Indoors, the room's beacon gives the floor and the buttons give way to *Your floor comes from the room beacon*.
+
+**The field map.** If the organisers put the field's plan on the controller, a **Field map** card shows it: the plan, the places the organisers marked for you (safe zones, respawns, car park, first aid, objectives, your team's headquarters), the field's boundary as an outline with the outside dimmed, and the positions you may see: you (a ringed dot), and the others in their team's colour. With several floors, buttons choose the floor shown; it opens on yours. A hollow dot is a player who has not said which floor they are on. Under the map it counts positions that are not on this plan (a beacon the organisers did not place, a position off the plan). A short list under the map names each kind of place. The map shows only what the controller sends you: another team's places and positions are not there. There is no street map, only the plan; a field with no plan shows no card.
 
 If the organisers drew the **field boundary**, the app watches it **on your phone**. Nothing about it is sent to anyone.
 

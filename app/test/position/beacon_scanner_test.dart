@@ -341,6 +341,40 @@ void main() {
     });
   });
 
+  group('the player\'s floor with a beacon (decisions PM-1, PM-2)', () {
+    test('a beacon report never carries the chosen level; GPS does', () async {
+      final scan = FakeScan();
+      final loc = FakeLocation();
+      final sent = <List<Map<String, Object?>>>[];
+      final r = PositionReporter(
+        location: loc,
+        send: (reports) async {
+          sent.add(reports);
+          return {'stored': 1, 'interval_s': 10};
+        },
+        beacons: BeaconScanner(service: scan, registry: [lobby]),
+      )..start();
+      addTearDown(r.dispose);
+      r.setLevel(2);
+      scan.out.add(window(2000, [heard(1, 1, -70)]));
+      await settle();
+      expect(r.indoors, isTrue);
+      r.setLevel(1); // indoors: nothing is sent for it (the beacon is)
+      await settle();
+      expect(sent, isEmpty);
+      await r.flush();
+      expect(sent.single.single, {
+        'source': 'ble',
+        'beacon_id': '1:1',
+        't': 2000,
+      });
+      loc.fixesOut.add(fix(3000)); // indoors: not sent
+      await settle();
+      await r.flush();
+      expect(sent, hasLength(1));
+    });
+  });
+
   group('the plugin\'s channels (org.atalaia.app/beacons)', () {
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -453,6 +487,7 @@ void main() {
     Future<(Harness, _Http, FakeLocation, FakeScan, FieldFeed)> open(
       WidgetTester tester, {
       List<Map<String, Object?>>? registry,
+      Map<String, Object?>? levels,
       FakeScan? scan,
       Set<String> granted = const {'ACCESS_FINE_LOCATION', 'BLUETOOTH_SCAN'},
     }) async {
@@ -462,7 +497,7 @@ void main() {
       final f = field();
       final fd = feed(f);
       addTearDown(fd.dispose);
-      final http = _Http(registry);
+      final http = _Http(registry, levels: levels);
       final loc = FakeLocation();
       final sc = scan ?? FakeScan();
       final h = harness(
@@ -563,6 +598,44 @@ void main() {
       expect(h.foreground.calls.last, startsWith('stop'));
     });
 
+    testWidgets('a room beacon gives the floor: the picker gives way to it', (
+      tester,
+    ) async {
+      final (_, http, loc, scan, _) = await open(
+        tester,
+        registry: [
+          {'id': '1:2', 'uuid': uuid},
+        ],
+        levels: {
+          'levels': [
+            {'level': 0, 'name': 'Ground', 'image': null},
+            {'level': 1, 'name': 'First', 'image': null},
+          ],
+        },
+      );
+      await tester.tap(find.byKey(const Key('player-share-position')));
+      await pumpAfter(tester);
+      await tester.tap(find.byKey(const Key('player-beacons-allow')));
+      await pumpAfter(tester);
+      expect(find.byKey(const Key('player-level-picker')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('player-level-1')));
+      await pumpAfter(tester);
+      loc.fixesOut.add(fix(4000));
+      await pumpAfter(tester);
+      await tester.pump(const Duration(seconds: 8));
+      await pumpAfter(tester);
+      expect(http.posted.expand((b) => b).any((r) => r['level'] == 1), isTrue);
+      // A beacon is heard: its floor is the position, the choice waits.
+      scan.out.add(window(5000, [heard(1, 2, -65)]));
+      await pumpAfter(tester);
+      expect(find.byKey(const Key('player-level-picker')), findsNothing);
+      expect(find.byKey(const Key('player-level-beacon')), findsOneWidget);
+      final beaconReports = http.posted
+          .expand((b) => b)
+          .where((r) => r['source'] == 'ble');
+      expect(beaconReports.every((r) => !r.containsKey('level')), isTrue);
+    });
+
     testWidgets('"Not now" leaves GPS as it was, and says so', (tester) async {
       final (_, _, _, scan, _) = await open(
         tester,
@@ -646,8 +719,11 @@ void main() {
 /// The field controller as the player screen's requests see it: the beacon
 /// registry (null: an older controller, a 404) and the positions posted.
 class _Http implements FieldHttp {
-  _Http(this.registry);
+  _Http(this.registry, {this.levels});
   final List<Map<String, Object?>>? registry;
+
+  /// The field's levels (GET /field/levels), or null: a 404.
+  final Map<String, Object?>? levels;
   final posted = <List<Map<String, Object?>>>[];
 
   @override
@@ -659,6 +735,9 @@ class _Http implements FieldHttp {
   }) async {
     if (method == 'GET' && path == '/beacons' && registry != null) {
       return FieldResponse(200, {'beacons': registry, 'ble_interval_s': 7});
+    }
+    if (method == 'GET' && path == '/field/levels' && levels != null) {
+      return FieldResponse(200, levels);
     }
     if (method == 'POST' && path == '/positions') {
       posted.add([

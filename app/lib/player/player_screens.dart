@@ -56,8 +56,10 @@ import '../site/site_screens.dart';
 import '../ui/code_kind.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../position/field_plan.dart';
 import 'field_buzz.dart';
 import 'field_feed.dart';
+import 'field_map.dart';
 
 class PlayerStartScreen extends StatefulWidget {
   const PlayerStartScreen({super.key});
@@ -360,6 +362,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _brandEtagSeen = etag;
       if (_brand?.etag != etag) unawaited(_loadBranding());
     }
+    // The map's features and levels again when the stream says they changed.
+    final seen = feed.mapFeatures;
+    if (seen != null && !identical(seen, _planSeen)) {
+      _planSeen = seen;
+      unawaited(_plan?.load(streamFeatures: seen));
+    }
     // The GM changed the map features: the boundary again (MF-10, MF-35).
     final features = feed.mapFeatures;
     if (features != null &&
@@ -403,11 +411,33 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return zone is String && zone.isNotEmpty ? '$room ($zone)' : room;
   }
 
+  /// The field plan for the map and the floor picker (null: no pinned field).
+  FieldPlanLoader? _plan;
+  List<Map<String, Object?>>? _planSeen;
+
+  /// What the player said about their floor (decision PM-1): null until they
+  /// did, then a level or "not sure".
+  ({int? level})? _levelChoice;
+
   /// The level the controller keeps for this player (ML-5), or null.
-  int? get _myLevel {
+  int? get _controllerLevel {
     final me = feed.me?['player_id'];
     final level = feed.positions[me]?['level'];
     return level is int ? level : null;
+  }
+
+  /// The player's level: what they chose, unless a room beacon has the
+  /// position (its level wins, decision PM-2), else the controller's.
+  int? get _myLevel {
+    final choice = _levelChoice;
+    final indoors = _reporter?.indoors ?? false;
+    return choice != null && !indoors ? choice.level : _controllerLevel;
+  }
+
+  void _pickLevel(int? level) {
+    _levelChoice = (level: level);
+    _reporter?.setLevel(level);
+    setState(() {});
   }
 
   Future<void> _loadBounds({List<Map<String, Object?>>? features}) async {
@@ -489,6 +519,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
         );
     if (widget.feed == null) unawaited(feed.start());
     unawaited(_loadBranding());
+    final field = widget.link.field;
+    if (field != null) {
+      final plan = _plan = FieldPlanLoader(
+        () => _http ??= services.fieldHttp(field),
+        () => feed.link.token,
+      );
+      _planSeen = feed.mapFeatures;
+      unawaited(plan.load(streamFeatures: _planSeen));
+    }
     feed.addListener(_onFeed);
     // The buzzes for key game events (VB-1 to VB-9): live events only.
     final app = AppScope.read(context);
@@ -634,6 +673,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       onFix: _onFix,
       beacons: scanner,
     );
+    final choice = _levelChoice;
+    if (choice != null) r.setLevel(choice.level); // said once, kept (PM-1)
     r.start();
     _featuresSeen = feed.mapFeatures;
     unawaited(_loadBounds(features: _featuresSeen));
@@ -658,6 +699,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       unawaited(_services.foreground.stop());
     }
     _reporter?.dispose();
+    _plan?.dispose();
     if (widget.feed == null) feed.dispose();
     super.dispose();
   }
@@ -674,7 +716,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         body: BrandBackdrop(
           branding: _brand,
           child: ListenableBuilder(
-            listenable: Listenable.merge([feed, ?_reporter]),
+            listenable: Listenable.merge([feed, ?_reporter, ?_plan]),
             builder: (context, _) => Column(
               children: [
                 if (_watch.out && (_reporter?.running ?? false))
@@ -695,6 +737,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             onChanged: _share,
                             squads: ((feed.game?['squads'] as int?) ?? 0) > 0,
                             bounds: _warns,
+                            levels: _plan?.levels,
+                            level: _levelChoice != null
+                                ? _levelChoice!.level
+                                : _controllerLevel,
+                            levelFromBeacon: _reporter?.indoors ?? false,
+                            onLevel: _pickLevel,
+                          ),
+                    map: _plan == null
+                        ? null
+                        : FieldMapCard(
+                            loader: _plan!,
+                            feed: feed,
+                            myLevel: _myLevel,
                           ),
                   ),
                 ),
@@ -713,9 +768,13 @@ class PlayerView extends StatelessWidget {
     required this.feed,
     this.sharing,
     this.teams = TeamBranding.none,
+    this.map,
     super.key,
   });
   final FieldFeed feed;
+
+  /// The field plan with the positions (a check-in's link only).
+  final Widget? map;
 
   /// The game's team display names and crests (decision BR14).
   final TeamBranding teams;
@@ -797,6 +856,7 @@ class PlayerView extends StatelessWidget {
               key: const Key('player-me'),
             ),
           if (sharing != null && feed.gameState == 'running') sharing!,
+          ?map,
           if (feed.positions.length > 1)
             Text(
               s.t('player.positions', {'n': feed.positions.length}),
@@ -1001,6 +1061,10 @@ class _SharePosition extends StatelessWidget {
     this.bounds = false,
     this.beaconNote,
     this.room,
+    this.levels,
+    this.level,
+    this.levelFromBeacon = false,
+    this.onLevel,
   });
 
   final bool running;
@@ -1019,6 +1083,14 @@ class _SharePosition extends StatelessWidget {
   /// controller shows this player in (BLE-8).
   final String? beaconNote;
   final String? room;
+
+  /// The field's levels (null or one: no floor to choose), the floor shown as
+  /// the player's (null: not known), whether a room beacon gives it, and what
+  /// to do when they choose (decisions ML-5, PM-1, PM-2).
+  final FieldLevels? levels;
+  final int? level;
+  final bool levelFromBeacon;
+  final ValueChanged<int?>? onLevel;
 
   @override
   Widget build(BuildContext context) {
@@ -1074,10 +1146,88 @@ class _SharePosition extends StatelessWidget {
               key: const Key('player-my-room'),
             ),
           ),
+        if (running && levels != null && levels!.multi)
+          _LevelPicker(
+            levels: levels!,
+            level: level,
+            fromBeacon: levelFromBeacon,
+            onLevel: onLevel,
+          ),
         if (error != null) Notice(error!, kind: NoticeKind.warning),
         if (!running && stopped != null)
           Notice(s.t('player.share_stopped'), kind: NoticeKind.info),
       ],
+    );
+  }
+}
+
+/// "Which floor are you on?" (decisions ML-5, PM-1): the phone cannot tell
+/// floors apart, so the player says, once; the GPS reports carry it. With a
+/// room beacon heard, the beacon's floor is the position and the choice waits.
+class _LevelPicker extends StatelessWidget {
+  const _LevelPicker({
+    required this.levels,
+    required this.level,
+    required this.fromBeacon,
+    required this.onLevel,
+  });
+
+  final FieldLevels levels;
+  final int? level;
+  final bool fromBeacon;
+  final ValueChanged<int?>? onLevel;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    if (fromBeacon) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Text(
+          s.t('player.level_beacon', {
+            'level': level == null ? '' : levelName(s, levels, level!),
+          }),
+          key: const Key('player-level-beacon'),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Column(
+        key: const Key('player-level-picker'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            s.t('player.level_title'),
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (var n = 0; n < levels.count; n++)
+                ChoiceChip(
+                  key: Key('player-level-$n'),
+                  label: Text(levelName(s, levels, n)),
+                  selected: level == n,
+                  onSelected: (_) => onLevel?.call(n),
+                ),
+              ChoiceChip(
+                key: const Key('player-level-unknown'),
+                label: Text(s.t('player.level_unknown')),
+                selected: level == null,
+                onSelected: (_) => onLevel?.call(null),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            s.t('player.level_hint'),
+            style: TextStyle(color: Theme.of(context).hintColor),
+          ),
+        ],
+      ),
     );
   }
 }

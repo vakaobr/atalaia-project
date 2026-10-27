@@ -124,6 +124,35 @@ final class PlanToGround {
     return PlanToGround(tl, tr, bl);
   }
 
+  /// A place on the ground as (x across, y down) on the plan, 0-1 inside it:
+  /// the inverse of [apply] (the plan's map is linear, so two edges and the
+  /// origin are enough); null for a degenerate map position.
+  (double, double)? inverse(double lat, double lon) {
+    final aLat = topRight.$1 - topLeft.$1, aLon = topRight.$2 - topLeft.$2;
+    final bLat = bottomLeft.$1 - topLeft.$1, bLon = bottomLeft.$2 - topLeft.$2;
+    final det = aLat * bLon - aLon * bLat;
+    if (det.abs() < 1e-18) return null;
+    final dLat = lat - topLeft.$1, dLon = lon - topLeft.$2;
+    return (
+      (dLat * bLon - dLon * bLat) / det,
+      (aLat * dLon - aLon * dLat) / det,
+    );
+  }
+
+  /// The plan's size on the ground in metres (across, down), as the
+  /// console's `planScale`; null for a degenerate map position.
+  (double, double)? get groundSizeM {
+    double dist((double, double) a, (double, double) b) {
+      final k = math.pi / 180 * earthRadiusM;
+      final dLat = (b.$1 - a.$1) * k;
+      final dLon = (b.$2 - a.$2) * k * math.cos(a.$1 * math.pi / 180);
+      return math.sqrt(dLat * dLat + dLon * dLon);
+    }
+
+    final w = dist(topLeft, topRight), h = dist(topLeft, bottomLeft);
+    return w > 0 && h > 0 ? (w, h) : null;
+  }
+
   /// A place on the plan (x across, y down, 0-1) as (latitude, longitude).
   (double, double) apply(double x, double y) => (
     topLeft.$1 +

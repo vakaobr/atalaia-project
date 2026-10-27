@@ -217,7 +217,7 @@ Um objetivo pode dizer **Para a equipa** *(equipa)* ou **Para a equipa** *(equip
 
 ## 6. Partilha a tua posição e o limite do campo
 
-Partilhar a posição é opcional. A tua posição vai só para o controlador do campo, durante o jogo. O controlador decide quem a pode ver: a organização e os marshals, e o teu squad se o jogo o permitir. A organização vê-a nos seus aparelhos ATAK, se os usar. A app não desenha um mapa de quem joga, nem a consola. No *VIP / Carga*, a posição do VIP é o que extrai a equipa.
+Partilhar a posição é opcional. A tua posição vai só para o controlador do campo, durante o jogo. O controlador decide quem a pode ver: a organização e os marshals, e o teu squad se o jogo o permitir. A organização vê-a nos seus aparelhos ATAK, se os usar. A app desenha um mapa do campo com as posições que podes ver (mais abaixo); a consola não desenha quem joga. No *VIP / Carga*, a posição do VIP é o que extrai a equipa.
 
 1. Faz o check-in e toca em **Seguir o jogo**.
 2. Enquanto o jogo **decorre**, liga **Partilhar a minha posição**. Diz *Só durante o jogo; o controlador decide quem a vê …*.
@@ -230,6 +230,10 @@ Partilhar a posição é opcional. A tua posição vai só para o controlador do
 - A app só ouve as balizas do campo e não guarda nada do que ouve. Só ouve enquanto partilhas, e pára quando paras.
 - Quando estás fora do alcance de todas as balizas durante alguns segundos, volta a ser partilhada a tua posição por GPS.
 - No iPhone as balizas ainda não são usadas: a posição continua a ser por GPS.
+
+**Em que piso estás?** Se o campo tiver vários pisos, enquanto partilhas aparece por baixo do botão uma fila de botões: os nomes dos pisos (por exemplo **R/C**, **Piso 1**) e **Não sei**. O telemóvel não distingue os pisos, por isso dizes uma vez; fica guardado enquanto jogas e vai com a tua posição por GPS, para a tua equipa te ver no piso certo. Escolhe **Não sei** se não souberes: ninguém o adivinha por ti. No interior, a baliza da sala dá o piso e os botões dão lugar a *O teu piso vem da baliza da sala*.
+
+**O mapa do campo.** Se a organização pôs a planta do campo no controlador, um cartão **Mapa do campo** mostra-a: a planta, os locais que a organização marcou para ti (zonas seguras, respawns, estacionamento, primeiros socorros, objetivos, o quartel-general da tua equipa), o limite do campo como contorno com o exterior escurecido, e as posições que podes ver: tu (um ponto com anel) e os outros na cor da sua equipa. Com vários pisos, os botões escolhem o piso mostrado; abre no teu. Um ponto vazio é quem ainda não disse em que piso está. Por baixo do mapa conta as posições que não estão nesta planta (uma baliza que a organização não pôs na planta, uma posição fora da planta). Uma lista curta por baixo diz o que é cada tipo de local. O mapa mostra só o que o controlador te envia: os locais e as posições de outra equipa não estão lá. Não há mapa de ruas, só a planta; um campo sem planta não mostra o cartão.
 
 Se a organização desenhou o **limite do campo**, a app vigia-o **no teu telemóvel**. Nada disso é enviado a ninguém.
 

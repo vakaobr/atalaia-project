@@ -14,6 +14,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import '../chrono/replica.dart' show Replica;
 import 'field_route.dart';
@@ -21,9 +22,13 @@ import 'field_trust.dart';
 
 /// One answer: its status and JSON body.
 final class FieldResponse {
-  const FieldResponse(this.status, this.body);
+  const FieldResponse(this.status, this.body, {this.bytes});
   final int status;
   final Object? body;
+
+  /// The raw body of an image answer (a level's plan, `image/*`); null for
+  /// everything else, which is JSON in [body].
+  final Uint8List? bytes;
 
   bool get ok => status >= 200 && status < 300;
 
@@ -36,6 +41,10 @@ final class FieldResponse {
     return d is String ? d : 'HTTP $status';
   }
 }
+
+/// A level's plan is at most 4 MB on the controller (ML-1); the phone refuses
+/// more.
+const _imageMaxBytes = 4 * 1024 * 1024;
 
 abstract interface class FieldHttp {
   Future<FieldResponse> send(
@@ -92,6 +101,16 @@ class IoFieldHttp implements FieldHttp {
       req.add(utf8.encode(jsonEncode(body)));
     }
     final res = await req.close().timeout(const Duration(seconds: 15));
+    if (res.headers.contentType?.primaryType == 'image') {
+      final out = BytesBuilder(copy: false);
+      await for (final chunk in res.timeout(const Duration(seconds: 15))) {
+        out.add(chunk);
+        if (out.length > _imageMaxBytes) {
+          return FieldResponse(res.statusCode, null); // no plan: too large
+        }
+      }
+      return FieldResponse(res.statusCode, null, bytes: out.takeBytes());
+    }
     final text = await utf8.decodeStream(res);
     Object? json;
     try {

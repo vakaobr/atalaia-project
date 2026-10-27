@@ -16,6 +16,12 @@
 /// controller shows the room). Two intervals without a beacon and the GPS
 /// fixes go on as before. The controller keeps the latest report of either
 /// source, so the two never need merging on the phone.
+///
+/// On a field with levels the player says which floor they are on (decision
+/// ML-5, PM-1): the GPS reports then carry that `level` (null: "not sure",
+/// said explicitly) and, until the player says anything, none (the
+/// controller keeps the level they last gave). A beacon report never carries
+/// one: the beacon's own level, which the controller knows, wins (PM-2).
 library;
 
 import 'dart:async';
@@ -58,7 +64,31 @@ class PositionReporter extends ChangeNotifier {
   final _pending = <LocationFix>[];
   BeaconReading? _pendingBeacon;
   DateTime? _beaconAt;
+  LocationFix? _lastFix;
+  int? _level;
+  bool _levelGiven = false;
   bool get running => _sub != null;
+
+  /// The floor the player chose (null: "not sure" once [levelGiven]).
+  int? get level => _level;
+
+  /// Whether the player has said anything about their floor yet: until then
+  /// no report carries a level.
+  bool get levelGiven => _levelGiven;
+
+  /// The player's floor (null: not sure). The next GPS reports carry it, and
+  /// the last fix goes again now, so the controller (and the team) learn it
+  /// at once; indoors the beacon's level stays the position's (PM-2).
+  void setLevel(int? level) {
+    _level = level;
+    _levelGiven = true;
+    final f = _lastFix;
+    if (running && !indoors && f != null) {
+      if (!_pending.contains(f)) _pending.add(f);
+      unawaited(flush());
+    }
+    notifyListeners();
+  }
 
   /// Whether a registered beacon was heard in the last two beacon intervals:
   /// the phone is indoors, and the beacon is its position.
@@ -103,6 +133,7 @@ class PositionReporter extends ChangeNotifier {
 
   void _onFix(LocationFix f) {
     onFix?.call(f);
+    _lastFix = f;
     if (indoors) return; // a beacon is the position now (BLE-4)
     _pending.add(f);
     if (_pending.length > 5) _pending.removeAt(0);
@@ -122,7 +153,8 @@ class PositionReporter extends ChangeNotifier {
     final batch = List.of(_pending);
     _pending.clear();
     final reports = [
-      for (final f in batch) f.toReport(),
+      for (final f in batch)
+        {...f.toReport(), if (_levelGiven) 'level': _level},
       if (beacon != null) beacon.toReport(),
     ];
     // At most 5 a request: the oldest fixes give way to the beacon.
@@ -169,6 +201,7 @@ class PositionReporter extends ChangeNotifier {
     _pending.clear();
     _pendingBeacon = null;
     _beaconAt = null;
+    _lastFix = null;
     stopReason = reason;
     notifyListeners();
   }
