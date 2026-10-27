@@ -99,7 +99,16 @@ The registry on your phone lists the replicas you know.
 2. To add one, tap **Register a replica** and fill in **Player's id**, **Type**, **Class** and **Make and model**.
 3. Under **Replica's tag**, hold the replica's NFC tag to the phone, or tap **Scan a QR label**. Then tap **Save**.
 
-A replica you chrono from the queue is registered automatically. The registry shows its label code (**ATL-** and eight characters). You can write that code on a sticker. The app does not print labels yet. Any QR code that holds that text can be scanned.
+A replica you chrono from the queue is registered automatically. The registry shows its label code (**ATL-** and eight characters). Any QR code that holds that text can be scanned.
+
+### Labels for stickers
+
+The app makes the QR label for you. A replica with a QR tag has two buttons in the registry (and the queue shows a small QR icon on a declared replica):
+
+- **Show label**: a big QR code with the code under it. The screen stays on and as bright as it goes, so you can scan it from another phone or photograph it.
+- **Share / print label**: a PNG picture for a sticker of 30 × 30 mm. The phone's share sheet opens: choose a printing service, or save or send the picture.
+
+The printer icon in the registry's title bar, **Share / print all labels**, makes A4 sheets with 54 labels each and a thin line to cut along. The same label works on any marshal's phone: scan it in the queue and the app finds the declared replica, even if this phone has not registered it yet. The QR holds only the code, nothing about the player. A replica with an NFC tag has no QR label. The app cannot share files on iOS yet: use **Show label** there.
 
 ## 7. Write players' tags
 

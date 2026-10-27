@@ -58,6 +58,7 @@ class MainActivity : FlutterActivity() {
         BeaconScanPlugin(this, messenger)
         KeystorePlugin(messenger)
         links = LinkPlugin(messenger, intent)
+        ShareFilePlugin(this, messenger)
         // The pod's links and the local hotspot belong to the engine: an
         // engine an earlier activity left running keeps the ones it has, so
         // a controller's or a prop's pod stays linked (decision PE24-64).

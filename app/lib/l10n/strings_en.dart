@@ -638,6 +638,18 @@ const Map<String, String> enStrings = {
       '{n} series were not accepted because the controller does not have you on its marshal list; they stay on this phone.',
   'queue.waiting_confirmation': 'waiting for confirmation',
   'queue.unregistered': 'not registered yet',
+  'label.title': 'Replica label',
+  'label.show': 'Show label',
+  'label.share': 'Share / print label',
+  'label.share_all': 'Share / print all labels',
+  'label.share_title': 'Replica labels',
+  'label.hint':
+      'Stick this label on the replica. The marshal scans it to find the replica in the chrono queue. It holds only this code, nothing about you. It prints at 30 × 30 mm; several labels go on one A4 sheet.',
+  'label.share_unavailable':
+      'This phone cannot hand a file to the share sheet. Use Show label instead.',
+  'label.share_failed': 'The share sheet did not open.',
+  'label.none_yet':
+      'The label shows here once you have declared this replica for a game.',
   'chrono.send': 'Send to the controller',
   'chrono.sent_pass': 'Sent: passed.',
   'chrono.sent_fail': 'Sent: refused.',

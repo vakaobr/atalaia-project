@@ -15,6 +15,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../chrono/replica.dart' show Replica;
 import 'field_route.dart';
 import 'field_trust.dart';
 
@@ -215,6 +216,14 @@ final class Declaration {
   final String state;
   final String? readingId;
   final bool refusedToday;
+
+  /// The id a marshal's phone registers this replica under: the field's own
+  /// once it has one, else the declaration's (a lowercase UUID, made by the
+  /// player's app), so the QR label `ATL-` + its first eight characters is
+  /// known before the replica is chronographed, to the player's app and to
+  /// the console alike. Null for a declaration id that is no UUID.
+  String? get registryId =>
+      replicaId ?? (Replica.isId(declarationId) ? declarationId : null);
 
   Map<String, Object?> toRequest() => {
     'declaration_id': declarationId,

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<!--
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+
+The replica labels page: stickers of 30 x 30 mm, one QR code per declared replica, printed from
+the browser like the check-in poster. It needs the GM token (kept from the console). Each QR holds
+the replica's label text only (ATL- and eight characters), which the marshal's app scans in the
+chrono queue (protocol/checkin.md, "Replica labels"); nothing about the player.
+-->
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atalaia · Labels</title>
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="labels.css">
+  <script type="module" src="labels.js"></script>
+</head>
+<body>
+  <div id="tools" class="tools"><noscript>As etiquetas precisam de JavaScript. · The labels need JavaScript.</noscript></div>
+  <main id="sheet" class="sheet" data-testid="labels-sheet" hidden></main>
+</body>
+</html>

@@ -75,6 +75,7 @@ class AppServices {
     BrandingSourceFor? brandingSource,
     SiteHttp Function(Uri origin)? siteHttp,
     this.links,
+    this.share,
     this.wifi,
     ControllerLauncher? controllerLauncher,
     ControllerAssetsLoader? controllerAssets,
@@ -115,6 +116,7 @@ class AppServices {
         location: ChannelLocationService(),
         beacons: ChannelBeaconScanService(),
         links: ChannelAppLinks(),
+        share: ChannelFileSharer(),
         wifi: ChannelFieldWifi(),
       );
 
@@ -165,6 +167,9 @@ class AppServices {
   final SiteSessions sites;
   final TicketStore tickets;
   final AppLinks? links;
+
+  /// The share sheet, for a replica's QR label as a PNG (null: none).
+  final FileSharer? share;
 
   /// The field's Wi-Fi for the controller role (null: not available).
   final FieldWifiService? wifi;

@@ -163,6 +163,23 @@ class FakeNfc implements NfcService {
   }
 }
 
+/// The share sheet: records what it was given.
+class FakeSharer implements FileSharer {
+  FakeSharer({this.isAvailable = true, this.opens = true});
+  final bool isAvailable;
+  final bool opens;
+  final shared = <List<SharedFile>>[];
+
+  @override
+  Future<bool> get available async => isAvailable;
+
+  @override
+  Future<bool> sharePng(List<SharedFile> files, {String title = ''}) async {
+    shared.add(files);
+    return opens;
+  }
+}
+
 class FakeQr implements QrScanner {
   FakeQr([this.next]);
   String? next;

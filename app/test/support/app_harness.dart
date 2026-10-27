@@ -20,6 +20,7 @@ import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/platform/links.dart';
 import 'package:atalaia_app/platform/beacon_scan.dart';
 import 'package:atalaia_app/platform/location.dart';
+import 'package:atalaia_app/platform/services.dart';
 import 'package:atalaia_app/player/field_feed.dart';
 import 'package:atalaia_app/pod/pod_client.dart';
 import 'package:atalaia_app/site/site_client.dart';
@@ -41,6 +42,7 @@ class Harness {
     this.brandingSource,
     this.siteHttp,
     this.links,
+    this.share,
     this.location,
     this.beacons,
     this.controllerLauncher,
@@ -67,6 +69,7 @@ class Harness {
   /// A fake site server (test/support/fake_site.dart); none: offline.
   final SiteHttp Function(Uri origin)? siteHttp;
   final AppLinks? links;
+  final FileSharer? share;
 
   /// A fake field controller for check-in (test/support/fake_field.dart).
   final FieldHttp Function(PinnedField field)? fieldHttp;
@@ -104,6 +107,7 @@ class Harness {
     brandingSource: brandingSource ?? (_, _) => const _NoBranding(),
     siteHttp: siteHttp ?? (_) => const _NoSite(),
     links: links,
+    share: share,
     location: location,
     beacons: beacons,
     wifi: wifi,
@@ -175,6 +179,7 @@ Harness harness({
   BrandingSourceFor? brandingSource,
   SiteHttp Function(Uri origin)? siteHttp,
   AppLinks? links,
+  FileSharer? share,
   LocationService? location,
   BeaconScanService? beacons,
   ControllerLauncher? controllerLauncher,
@@ -190,6 +195,7 @@ Harness harness({
   brandingSource: brandingSource,
   siteHttp: siteHttp,
   links: links,
+  share: share,
   location: location,
   beacons: beacons,
   controllerLauncher: controllerLauncher,

@@ -99,7 +99,16 @@ O registo do teu telemóvel lista as réplicas que conheces.
 2. Para juntar uma, toca em **Registar réplica** e preenche **Identificador de quem joga**, **Tipo**, **Classe** e **Marca e modelo**.
 3. Em **Etiqueta da réplica**, encosta a etiqueta NFC da réplica ao telemóvel, ou toca em **Ler etiqueta QR**. Depois toca em **Guardar**.
 
-Uma réplica que cronografas a partir da lista fica registada automaticamente. O registo mostra o código da etiqueta dela (**ATL-** e oito caracteres). Podes escrever esse código num autocolante. A app ainda não imprime etiquetas. Qualquer código QR que tenha esse texto pode ser lido.
+Uma réplica que cronografas a partir da lista fica registada automaticamente. O registo mostra o código da etiqueta dela (**ATL-** e oito caracteres). Qualquer código QR que tenha esse texto pode ser lido.
+
+### Etiquetas para autocolantes
+
+A app faz a etiqueta QR por ti. Uma réplica com etiqueta QR tem dois botões no registo (e a lista mostra um pequeno ícone QR numa réplica declarada):
+
+- **Mostrar etiqueta**: um código QR grande, com o código por baixo. O ecrã fica ligado e com o brilho no máximo, para o leres com outro telemóvel ou o fotografares.
+- **Partilhar / imprimir etiqueta**: uma imagem PNG para um autocolante de 30 × 30 mm. Abre a partilha do telemóvel: escolhe um serviço de impressão, ou guarda ou envia a imagem.
+
+O ícone da impressora na barra de título do registo, **Partilhar / imprimir todas as etiquetas**, faz folhas A4 com 54 etiquetas cada, com uma linha fina para recortar. A mesma etiqueta serve em qualquer telemóvel de marshal: lê-a na lista e a app encontra a réplica declarada, mesmo que este telemóvel ainda a não tenha registado. O QR leva só o código, nada sobre quem joga. Uma réplica com etiqueta NFC não tem etiqueta QR. A app ainda não consegue partilhar ficheiros no iOS: usa aí **Mostrar etiqueta**.
 
 ## 7. Grava as etiquetas de quem joga
 

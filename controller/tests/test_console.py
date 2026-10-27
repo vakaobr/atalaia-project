@@ -156,7 +156,7 @@ class ConsoleFilesTests(unittest.TestCase):
         self.assertEqual(r.headers["permissions-policy"], "geolocation=(self)")
         for path in ("/console/", "/console/index.html", "/console/field-map.js",
                      "/console/components/field-render.js", "/console/components/place-search.js",
-                     "/console/scoreboard.html", "/console/poster.html"):
+                     "/console/scoreboard.html", "/console/poster.html", "/console/labels.html"):
             got = self.client.get(path)
             self.assertEqual(got.headers["content-security-policy"], SECURITY_HEADERS["Content-Security-Policy"], path)
             for origin in FIELD_MAP_ORIGINS.values():
@@ -193,7 +193,7 @@ class ConsoleFilesTests(unittest.TestCase):
             self.assertEqual(r.headers["location"], target)
 
     def test_pages_have_no_inline_scripts_or_styles(self):
-        for page in ("index.html", "scoreboard.html", "field-map.html"):
+        for page in ("index.html", "scoreboard.html", "field-map.html", "poster.html", "labels.html"):
             p = Refs()
             p.feed((SRC / page).read_text(encoding="utf-8"))
             self.assertEqual((p.inline_scripts, p.style_attrs), (0, 0), page)

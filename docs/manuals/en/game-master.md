@@ -191,6 +191,16 @@ How it works: a player who shares their position on a field with beacons is aske
 
 Print the poster from a computer. The app's built-in console cannot print.
 
+### Print replica labels
+
+Marshals find a replica in the chrono queue by scanning its QR label. Players can make theirs in the app. You can print them from the console, too:
+
+1. Open **Check-in**. In a player's row, next to the replica count, tap **Print labels**. To print for everyone, tap **Print labels for everyone checked in** at the top (players still waiting for confirmation are left out).
+2. A page opens with one label of 30 × 30 mm for each declared replica, and a thin line to cut along. Tap **Print**. The player's name and the replica's kind show on the screen only, never on the sticker.
+3. Cut them out and stick them on the replicas.
+
+Each QR holds only the label code (**ATL-** and eight characters), nothing about the player. Print from a computer, as for the poster.
+
 ![The Skirmesh-RF layers: the radio, the encrypted packet, the messages, the shared core and the controller's APIs](../../../site/img/diagrams/skirmesh-wide-en.svg)
 
 ## 5. Create a game

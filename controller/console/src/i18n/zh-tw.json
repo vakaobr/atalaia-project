@@ -677,6 +677,9 @@
     "close": "關閉報到",
     "reopen": "開放報到",
     "print_poster": "列印海報",
+    "print_labels": "列印標籤",
+    "print_labels_all": "列印所有已報到者的標籤",
+    "print_labels_for": "列印 {name} 的標籤",
     "webview_notice": "在手機的 App 中無法列印海報，也無法儲存 CSV：請在電腦的瀏覽器開啟控制台來做這些事。",
     "csv": "匯出 CSV",
     "statuses": {
@@ -825,6 +828,16 @@
     "wifi_draw": "產生 Wi-Fi 代碼",
     "wifi_label": "Wi-Fi 網路的 QR Code",
     "wifi_note": "密碼只用來產生 Wi-Fi 代碼：不會保存也不會傳送。"
+  },
+  "labels": {
+    "title": "槍的標籤",
+    "login": "請先用 GM 權杖開啟控制台。",
+    "error": "無法讀取清單：{error}",
+    "none": "已報到的人還沒有申報任何槍。",
+    "intro": "列印這一頁：每把槍一張 30 × 30 mm 的標籤，剪下後貼上。代碼只有這把槍的標籤（ATL- 加八個字元），沒有任何玩家資料。裁判的 App 會在測速清單中掃描它。",
+    "print": "列印",
+    "count": "{n} 張標籤",
+    "qr_label": "QR 標籤 {code}"
   },
   "branding": {
     "title": "場地外觀",

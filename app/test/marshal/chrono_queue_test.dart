@@ -15,10 +15,13 @@ import 'package:atalaia_app/checkin/field_trust.dart';
 import 'package:atalaia_app/checkin/my_replicas.dart';
 import 'package:atalaia_app/chrono/limit_template.dart';
 import 'package:atalaia_app/chrono/record_signer.dart';
+import 'package:atalaia_app/chrono/replica.dart';
 import 'package:atalaia_app/l10n/strings_pt.dart';
 import 'package:atalaia_app/marshal/chrono_queue.dart';
 import 'package:atalaia_app/marshal/marshal_records.dart';
 import 'package:atalaia_app/security/bytes.dart';
+import 'package:atalaia_app/ui/code_kind.dart';
+import 'package:atalaia_app/ui/qr_painter.dart';
 import 'package:atalaia_app/storage/app_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -196,6 +199,55 @@ void main() {
     await tapKey(tester, 'queue-scan');
     expect(find.text(ptStrings['code.is_poster']!), findsOneWidget);
     expect(find.text(ptStrings['queue.not_found']!), findsNothing);
+  });
+
+  testWidgets("a player's printed label finds the declaration, and is shown", (
+    tester,
+  ) async {
+    // The label a player's app (or the console) makes for a declaration
+    // nobody has registered yet: the scan finds it on any marshal's phone.
+    final label = Replica.labelFor(playerDecl);
+    expect(label, 'ATL-6F1D2A3B');
+    final h = harness(fieldHttp: field.http, qr: FakeQr(label));
+    final r = await records(h.store, h.settings);
+    await tester.pumpWidget(
+      h.app(
+        home: ChronoQueueScreen(
+          checkin: marshal,
+          field: pinned,
+          records: r,
+          templates: templates,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(r.replicas, isEmpty);
+    await tapKey(tester, 'queue-scan');
+    expect(find.text(ptStrings['queue.not_found']!), findsNothing);
+    expect(
+      tester
+          .widget<ListTile>(find.byKey(Key('queue-decl-$playerDecl')))
+          .selected,
+      isTrue,
+    );
+    // Another code is not it.
+    h.qr.next = 'ATL-00000000';
+    await tapKey(tester, 'queue-scan');
+    expect(find.text(ptStrings['queue.not_found']!), findsOneWidget);
+
+    // The marshal can show it too; it holds the same text.
+    await tapKey(tester, 'label-show-$playerDecl');
+    expect(tester.widget<QrCodeView>(find.byType(QrCodeView)).data, label);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+
+    // Chronographed from the queue, the replica is registered under that
+    // label, which the registry's own scan then matches.
+    await tapKey(tester, 'queue-decl-$playerDecl');
+    expect(r.replicas.single.replicaId, playerDecl);
+    expect(r.replicas.single.tagUid, label);
+    expect(r.byTag(label)?.replicaId, playerDecl);
+    expect(classifyCode(label), isNull);
   });
 
   testWidgets('out of reach: the series waits on the phone, then goes', (

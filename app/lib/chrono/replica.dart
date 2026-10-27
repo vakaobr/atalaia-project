@@ -149,6 +149,20 @@ class Replica {
     'tag_uid': tagUid,
   };
 
+  /// Whether [text] is a replica id (a lowercase UUID).
+  static bool isId(String text) => _uuid.hasMatch(text);
+
+  /// The QR label text of a replica the app registers itself: `ATL-` and the
+  /// first eight characters of its registry id, upper case. A marshal's
+  /// phone makes the same text for the same id, so a player's label and the
+  /// marshal's registry agree without sending anything.
+  static String labelFor(String replicaId) =>
+      'ATL-${replicaId.substring(0, 8).toUpperCase()}';
+
+  /// The text a QR label of this replica holds (what the chrono queue's
+  /// scanner matches against [tagUid]); null for an NFC tag, which has none.
+  String? get labelText => tagType == TagType.qr ? tagUid : null;
+
   /// [uid] bytes as a registry tag_uid (`04:A2:B3:...`).
   static String nfcUid(List<int> uid) => uid
       .map((b) => (b & 0xff).toRadixString(16).padLeft(2, '0').toUpperCase())

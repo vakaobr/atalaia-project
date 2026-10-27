@@ -125,6 +125,17 @@ field join key, the marshal's private key and the field identities.
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
+        <!-- Replica labels (PNG) handed to the share sheet: only labels/ of the
+             cache, read access granted per share (ShareFilePlugin). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.labels"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/label_paths" />
+        </provider>
         <!-- Flutter's plugin registration reads this. -->
         <meta-data
             android:name="flutterEmbedding"

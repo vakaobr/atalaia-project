@@ -169,6 +169,24 @@ abstract interface class QrScanner {
   Future<String?> scan({required String hint, required String cancel});
 }
 
+/// One file to share: its plain [name] (no folder) and its [bytes].
+final class SharedFile {
+  const SharedFile(this.name, this.bytes);
+  final String name;
+  final Uint8List bytes;
+}
+
+/// Hands files the app made (a replica's QR label as a PNG) to the phone's
+/// share sheet, which also lists printing (ShareFilePlugin.kt on Android).
+/// Not on every platform: [available] says.
+abstract interface class FileSharer {
+  Future<bool> get available;
+
+  /// Opens the share sheet for [files] (PNG images); false when it could
+  /// not be opened.
+  Future<bool> sharePng(List<SharedFile> files, {String title = ''});
+}
+
 /// The field's Wi-Fi for a phone that is the field controller (slice S6 of
 /// PE24; FieldWifiPlugin.kt): what network the phone is on, its hotspot,
 /// Android's settings for both, and a local-only hotspot the app starts

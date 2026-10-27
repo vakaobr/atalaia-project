@@ -650,6 +650,18 @@ const Map<String, String> ptStrings = {
       '{n} série(s) não foram aceites porque o controlador não te tem na lista de marshals; ficam neste telemóvel.',
   'queue.waiting_confirmation': 'à espera de confirmação',
   'queue.unregistered': 'ainda sem registo',
+  'label.title': 'Etiqueta da réplica',
+  'label.show': 'Mostrar etiqueta',
+  'label.share': 'Partilhar / imprimir etiqueta',
+  'label.share_all': 'Partilhar / imprimir todas as etiquetas',
+  'label.share_title': 'Etiquetas de réplicas',
+  'label.hint':
+      'Cola esta etiqueta na réplica. O marshal lê-a para encontrar a réplica na lista do cronógrafo. Só tem este código, nada sobre ti. Imprime-se a 30 × 30 mm; várias etiquetas cabem numa folha A4.',
+  'label.share_unavailable':
+      'Este telemóvel não consegue passar um ficheiro à partilha. Usa antes Mostrar etiqueta.',
+  'label.share_failed': 'A partilha não abriu.',
+  'label.none_yet':
+      'A etiqueta aparece aqui depois de declarares esta réplica num jogo.',
   'chrono.send': 'Enviar ao controlador',
   'chrono.sent_pass': 'Enviado: aprovada.',
   'chrono.sent_fail': 'Enviado: recusada.',

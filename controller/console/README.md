@@ -74,6 +74,8 @@ src/
   index.html  app.js  ui.js  style.css      the console (ui.js is shared with the scoreboard)
   scoreboard.html  scoreboard.js  scoreboard.css
   poster.html  poster.js  poster.css        the check-in poster
+  labels.html  labels.js  labels.css        the replica labels (30 x 30 mm QR stickers, from the Check-in tab)
+  qr-svg.js                                 the QR drawing the poster and the labels share
   components/                               one file per panel
   i18n/pt.json  i18n/en.json                texts
   lib/                                      vendored libraries (see lib/README.md)

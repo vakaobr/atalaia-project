@@ -113,6 +113,15 @@ The chip next to each replica shows where it is:
 
 A replica that was already chronographed stays declared. Ask a marshal if you need to change it.
 
+### Put a label on your replica
+
+Once you have saved a replica for a game, two buttons appear under it:
+
+- **Show label**: a big QR code with a code under it (**ATL-** and eight characters). The screen stays on and bright.
+- **Share / print label**: a picture for a sticker of 30 × 30 mm. The share sheet opens, where you can pick a printing service or save the picture. **Share / print all labels**, at the bottom of the list, makes A4 sheets with several labels.
+
+Stick the label on the replica. A marshal scans it in the chrono queue to find your replica at once. The label holds only that code, nothing about you. Before you save a replica for a game, the list says the label shows once you have declared it. After a marshal has registered the replica, its label stays the same in the next games at that field.
+
 The class limits in the app come from the project's research. They are **not verified** and they are not the law. The field's organisers and its marshals decide, and a person always decides any penalty. See *[chrono and joules](https://atalaia-project.link/en/glossary/#glossary-chrono)*.
 
 ## 5. Play

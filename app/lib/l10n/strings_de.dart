@@ -661,6 +661,18 @@ const Map<String, String> deStrings = {
       '{n} Serien wurden nicht angenommen, weil der Controller dich nicht auf seiner Marshal-Liste hat; sie bleiben auf diesem Handy.',
   'queue.waiting_confirmation': 'wartet auf Bestätigung',
   'queue.unregistered': 'noch nicht registriert',
+  'label.title': 'Replik-Etikett',
+  'label.show': 'Etikett zeigen',
+  'label.share': 'Etikett teilen / drucken',
+  'label.share_all': 'Alle Etiketten teilen / drucken',
+  'label.share_title': 'Replik-Etiketten',
+  'label.hint':
+      'Klebe dieses Etikett auf die Replik. Der Marshal scannt es, um die Replik in der Chrono-Liste zu finden. Es enthält nur diesen Code, nichts über dich. Gedruckt wird es mit 30 × 30 mm; mehrere Etiketten passen auf ein A4-Blatt.',
+  'label.share_unavailable':
+      'Dieses Telefon kann keine Datei an das Teilen-Menü übergeben. Nutze stattdessen „Etikett zeigen“.',
+  'label.share_failed': 'Das Teilen-Menü hat sich nicht geöffnet.',
+  'label.none_yet':
+      'Das Etikett erscheint hier, sobald du diese Replik für ein Spiel angemeldet hast.',
   'chrono.send': 'An den Controller senden',
   'chrono.sent_pass': 'Gesendet: bestanden.',
   'chrono.sent_fail': 'Gesendet: abgelehnt.',

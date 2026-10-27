@@ -27,6 +27,7 @@ import '../chrono/reading.dart';
 import '../chrono/replica.dart';
 import '../l10n/strings.dart';
 import '../ui/code_kind.dart';
+import '../ui/replica_label.dart';
 import '../ui/widgets.dart';
 import 'marshal_records.dart';
 import '../checkin/failure_details.dart';
@@ -151,13 +152,17 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
   Future<void> _chrono(Map<String, Object?> player, Declaration d) async {
     final records = _records!;
     String? link;
-    Replica? replica = d.replicaId == null
+    // The id a replica is registered under is the field's own, or else its
+    // declaration's, so a player's label (Replica.labelFor) is known before
+    // the marshal registers it, and a second marshal's phone makes the same.
+    final known = d.registryId;
+    Replica? replica = known == null
         ? null
-        : records.replicas.where((r) => r.replicaId == d.replicaId).firstOrNull;
+        : records.replicas.where((r) => r.replicaId == known).firstOrNull;
     if (replica == null) {
       // Not in this phone's registry: register it now with a label the marshal
       // can stick on it; a declaration without an id is linked by the upload.
-      final id = d.replicaId ?? newUuid();
+      final id = known ?? newUuid();
       replica = Replica(
         replicaId: id,
         ownerPlayerId: '${player['player_id']}',
@@ -166,13 +171,13 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
         makeModel: d.makeModel,
         registeredAt: formatTimestamp(DateTime.now()),
         tagType: TagType.qr,
-        tagUid: 'ATL-${id.substring(0, 8).toUpperCase()}',
+        tagUid: Replica.labelFor(id),
       );
       await records.addReplica(replica);
-      if (d.replicaId == null) {
-        link = d.declarationId;
-        await records.setPendingLink(id, link);
-      }
+    }
+    if (d.replicaId == null) {
+      link = d.declarationId;
+      await records.setPendingLink(replica.replicaId, link);
     }
     if (!mounted) return;
     await Navigator.push(
@@ -209,16 +214,24 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
       setState(() => _error = s.t(wrong));
       return;
     }
-    final replica = _records?.byTag(text.trim());
-    final rid = replica?.replicaId;
-    final found = _players.any(
-      (p) => ((p['declarations'] as List?) ?? const []).any(
-        (d) => d is Map && d['replica_id'] == rid,
-      ),
-    );
+    final label = text.trim();
+    final rid = _records?.byTag(label)?.replicaId;
+    // The replica is the one registered here with this tag, or one declared
+    // whose QR label (Replica.labelFor) this is, even before this phone
+    // registered it: a player's printed label works on any marshal's phone.
+    String? hit;
+    for (final p in _players) {
+      for (final d in (p['declarations'] as List?) ?? const []) {
+        if (d is! Map) continue;
+        final id = Declaration.fromJson(d.cast<String, Object?>()).registryId;
+        if (id != null && (id == rid || Replica.labelFor(id) == label)) {
+          hit = id;
+        }
+      }
+    }
     setState(() {
-      _highlight = found ? rid : null;
-      _error = found ? null : s.t('queue.not_found');
+      _highlight = hit;
+      _error = hit != null ? null : s.t('queue.not_found');
     });
   }
 
@@ -359,6 +372,16 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
     );
   }
 
+  /// The text of the QR label this declared replica is found by: its tag in
+  /// this phone's registry, or the one the phone makes for it when it
+  /// registers it; null when it has an NFC tag.
+  String? _labelOf(Declaration d) {
+    final id = d.registryId;
+    if (id == null) return null;
+    final r = _records?.replicas.where((x) => x.replicaId == id).firstOrNull;
+    return r == null ? Replica.labelFor(id) : r.labelText;
+  }
+
   Widget _player(Strings s, Map<String, Object?> p) {
     final decls = [
       for (final d in (p['declarations'] as List?) ?? const [])
@@ -385,16 +408,30 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
               ListTile(
                 key: Key('queue-decl-${d.declarationId}'),
                 dense: true,
-                selected: d.replicaId != null && d.replicaId == _highlight,
+                selected: d.registryId != null && d.registryId == _highlight,
                 title: Text(replicaLabel(s, d.type, d.makeModel)),
                 subtitle: Text(
                   d.replicaId == null
                       ? '${s.replicaClass(d.replicaClass)} · ${s.t('queue.unregistered')}'
                       : s.replicaClass(d.replicaClass),
                 ),
-                trailing: ChronoStateChip(
-                  d.state,
-                  refusedToday: d.refusedToday,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_labelOf(d) != null)
+                      IconButton(
+                        key: Key('label-show-${d.declarationId}'),
+                        tooltip: s.t('label.show'),
+                        icon: const Icon(Icons.qr_code_2),
+                        onPressed: () => showLabel(
+                          context,
+                          _labelOf(d)!,
+                          subtitle:
+                              '${replicaLabel(s, d.type, d.makeModel)} · ${s.replicaClass(d.replicaClass)}',
+                        ),
+                      ),
+                    ChronoStateChip(d.state, refusedToday: d.refusedToday),
+                  ],
                 ),
                 onTap: () => _chrono(p, d),
               ),

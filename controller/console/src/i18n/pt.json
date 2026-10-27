@@ -677,6 +677,9 @@
     "close": "Fechar o check-in",
     "reopen": "Abrir o check-in",
     "print_poster": "Imprimir o cartaz",
+    "print_labels": "Imprimir etiquetas",
+    "print_labels_all": "Imprimir as etiquetas de quem já fez check-in",
+    "print_labels_for": "Imprimir as etiquetas de {name}",
     "webview_notice": "Na app do telemóvel não é possível imprimir o cartaz nem guardar o CSV: para isso, abre a consola no navegador de um computador.",
     "csv": "Exportar CSV",
     "statuses": {
@@ -825,6 +828,16 @@
     "wifi_draw": "Desenhar o código do Wi-Fi",
     "wifi_label": "Código QR da rede Wi-Fi",
     "wifi_note": "A palavra-passe só serve para desenhar o código do Wi-Fi: não é guardada nem enviada."
+  },
+  "labels": {
+    "title": "Etiquetas de réplicas",
+    "login": "Abre primeiro a consola com o código de acesso da organização.",
+    "error": "Não foi possível ler a lista: {error}",
+    "none": "Ainda ninguém com check-in declarou uma réplica.",
+    "intro": "Imprime esta página: uma etiqueta de 30 × 30 mm por réplica, para recortar e colar. O código leva só a etiqueta da réplica (ATL- e oito caracteres), nada sobre quem joga. A app do marshal lê-o na lista do cronógrafo.",
+    "print": "Imprimir",
+    "count": "{n} etiquetas",
+    "qr_label": "Etiqueta QR {code}"
   },
   "branding": {
     "title": "Identidade do campo",

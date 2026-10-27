@@ -217,6 +217,25 @@ class ChannelQrScanner implements QrScanner {
       _call<String?>(_ch, 'scan', null, {'hint': hint, 'cancel': cancel});
 }
 
+/// ShareFilePlugin.kt on Android; no twin on iOS yet, where "not available"
+/// is the answer and the label screen is what the player has.
+class ChannelFileSharer implements FileSharer {
+  static const _ch = MethodChannel('$_prefix/share');
+
+  @override
+  Future<bool> get available => _call<bool>(_ch, 'available', false);
+
+  @override
+  Future<bool> sharePng(List<SharedFile> files, {String title = ''}) =>
+      _call<bool>(_ch, 'share', false, {
+        'mime': 'image/png',
+        'title': title,
+        'files': [
+          for (final f in files) {'name': f.name, 'bytes': f.bytes},
+        ],
+      });
+}
+
 /// The AndroidKeyStore's AES-GCM key (KeystorePlugin.kt). A missing plugin
 /// (iOS, the web, a widget test) is "not available", never a crash.
 class ChannelSecretVault implements SecretVault {

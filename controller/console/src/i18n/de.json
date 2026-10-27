@@ -677,6 +677,9 @@
     "close": "Check-in schließen",
     "reopen": "Check-in öffnen",
     "print_poster": "Plakat drucken",
+    "print_labels": "Etiketten drucken",
+    "print_labels_all": "Etiketten aller Eingecheckten drucken",
+    "print_labels_for": "Etiketten von {name} drucken",
     "webview_notice": "In der App auf dem Handy lässt sich das Plakat nicht drucken und die CSV nicht speichern: Öffne dafür die Konsole im Browser eines Computers.",
     "csv": "CSV exportieren",
     "statuses": {
@@ -825,6 +828,16 @@
     "wifi_draw": "WLAN-Code zeichnen",
     "wifi_label": "QR-Code für das WLAN",
     "wifi_note": "Das Passwort wird nur zum Zeichnen des WLAN-Codes verwendet: Es wird weder gespeichert noch gesendet."
+  },
+  "labels": {
+    "title": "Replik-Etiketten",
+    "login": "Öffne zuerst die Konsole mit dem GM-Token.",
+    "error": "Die Liste kann nicht gelesen werden: {error}",
+    "none": "Noch niemand, der eingecheckt ist, hat eine Replik angemeldet.",
+    "intro": "Druck diese Seite: ein Etikett von 30 × 30 mm pro Replik zum Ausschneiden und Aufkleben. Der Code enthält nur das Etikett der Replik (ATL- und acht Zeichen), nichts über die spielende Person. Die App des Marshals scannt ihn in der Chrono-Liste.",
+    "print": "Drucken",
+    "count": "{n} Etiketten",
+    "qr_label": "QR-Etikett {code}"
   },
   "branding": {
     "title": "Branding des Felds",

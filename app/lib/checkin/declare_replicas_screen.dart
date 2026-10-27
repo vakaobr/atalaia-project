@@ -15,7 +15,9 @@ import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../chrono/reading.dart' show newUuid;
+import '../chrono/replica.dart' show Replica;
 import '../l10n/strings.dart';
+import '../ui/replica_label.dart';
 import '../ui/widgets.dart';
 import 'checkin_client.dart';
 import 'checkin_screen.dart';
@@ -62,6 +64,7 @@ class _DeclareReplicasScreenState extends State<DeclareReplicasScreen> {
 
   Future<void> _load() async {
     await store.load();
+    await store.learnReplicaIds(c, _declared);
     try {
       final info = await widget.client.info();
       if (!mounted) return;
@@ -90,6 +93,7 @@ class _DeclareReplicasScreenState extends State<DeclareReplicasScreen> {
       final decls = store.declarationsFor(c, _picked.toList());
       _declared = await widget.client.putReplicas(c.token, decls);
       await store.saveCheckin(c);
+      await store.learnReplicaIds(c, _declared);
       if (mounted) setState(() => _saved = true);
     } on CheckinException catch (e) {
       if (mounted) {
@@ -114,6 +118,60 @@ class _DeclareReplicasScreenState extends State<DeclareReplicasScreen> {
     if (mounted && _picked.length < _max) setState(() => _picked.add(r.id));
   }
 
+  /// The QR label text of a replica at this field: from the registry id the
+  /// field gave it (the same text a marshal's phone makes), null before a
+  /// marshal registered it.
+  String? _labelOf(MyReplica r) {
+    final id = store.labelIdFor(c, r);
+    return id == null ? null : Replica.labelFor(id);
+  }
+
+  List<String> get _labels => {
+    for (final r in store.replicas)
+      if (_labelOf(r) != null) _labelOf(r)!,
+  }.toList();
+
+  Widget _labelRow(Strings s, MyReplica r) {
+    final code = _labelOf(r);
+    if (code == null) {
+      return Padding(
+        padding: const EdgeInsets.only(left: 72, right: 16, bottom: 8),
+        child: Text(
+          s.t('label.none_yet'),
+          key: Key('label-none-${r.id}'),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      );
+    }
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 56),
+        child: Wrap(
+          children: [
+            TextButton.icon(
+              key: Key('label-show-${r.id}'),
+              icon: const Icon(Icons.qr_code_2),
+              label: Text(s.t('label.show')),
+              onPressed: () => showLabel(
+                context,
+                code,
+                subtitle:
+                    '${replicaLabel(s, r.type, r.makeModel)} · ${s.replicaClass(r.replicaClass)}',
+              ),
+            ),
+            TextButton.icon(
+              key: Key('label-share-${r.id}'),
+              icon: const Icon(Icons.ios_share),
+              label: Text(s.t('label.share')),
+              onPressed: () => shareLabels(context, [code]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = context.s;
@@ -135,7 +193,7 @@ class _DeclareReplicasScreenState extends State<DeclareReplicasScreen> {
                 key: const Key('declare-saved'),
               ),
             if (store.replicas.isEmpty) Text(s.t('declare.none')),
-            for (final r in store.replicas)
+            for (final r in store.replicas) ...[
               CheckboxListTile(
                 key: Key('declare-${r.id}'),
                 value: _picked.contains(r.id),
@@ -157,6 +215,15 @@ class _DeclareReplicasScreenState extends State<DeclareReplicasScreen> {
                         _stateOf(r.id)!.state,
                         refusedToday: _stateOf(r.id)!.refusedToday,
                       ),
+              ),
+              _labelRow(s, r),
+            ],
+            if (_labels.isNotEmpty)
+              OutlinedButton.icon(
+                key: const Key('labels-all'),
+                icon: const Icon(Icons.print),
+                label: Text(s.t('label.share_all')),
+                onPressed: () => shareLabels(context, _labels),
               ),
             const SizedBox(height: 8),
             OutlinedButton.icon(

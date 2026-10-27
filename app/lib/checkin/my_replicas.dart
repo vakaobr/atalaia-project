@@ -11,6 +11,7 @@ library;
 import 'package:flutter/foundation.dart';
 
 import '../chrono/reading.dart' show newUuid;
+import '../chrono/replica.dart' show Replica;
 import '../storage/app_store.dart';
 import 'checkin_client.dart';
 
@@ -197,6 +198,37 @@ class CheckinStore extends ChangeNotifier {
     checkins.remove(c);
     await store.saveList('checkins', [for (final x in checkins) x.toJson()]);
     notifyListeners();
+  }
+
+  /// The registry id the field gave each declared replica, kept with "my
+  /// replicas" (so a label printed once stays good for the next game).
+  Future<void> learnReplicaIds(
+    FieldCheckin c,
+    List<Declaration> declared,
+  ) async {
+    var changed = false;
+    for (final e in c.declarations.entries) {
+      final mine = replicas.where((r) => r.id == e.key).firstOrNull;
+      final d = declared.where((d) => d.declarationId == e.value).firstOrNull;
+      final rid = d?.replicaId;
+      if (mine == null || rid == null || mine.replicaIds[c.fieldId] == rid) {
+        continue;
+      }
+      mine.replicaIds[c.fieldId] = rid;
+      changed = true;
+    }
+    if (changed) await _saveReplicas();
+  }
+
+  /// The id whose QR label (`Replica.labelFor`) is [r]'s at [c]'s field: the
+  /// one the field gave it, else the id of its declaration for this game
+  /// (which a marshal's phone registers it under); null before it was
+  /// declared.
+  String? labelIdFor(FieldCheckin c, MyReplica r) {
+    final known = r.replicaIds[c.fieldId];
+    if (known != null && Replica.isId(known)) return known;
+    final did = c.declarations[r.id];
+    return did != null && Replica.isId(did) ? did : null;
   }
 
   /// The declarations for [c]'s game from the replicas [picked] (my replica

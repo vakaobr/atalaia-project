@@ -15,6 +15,7 @@ import '../l10n/strings.dart';
 import '../marshal/marshal_records.dart';
 import '../platform/services.dart';
 import '../ui/code_kind.dart';
+import '../ui/replica_label.dart';
 import '../ui/widgets.dart';
 import 'chrono_ui.dart';
 import 'limit_template.dart';
@@ -29,7 +30,29 @@ class ReplicaRegistryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.s;
     return Scaffold(
-      appBar: AppBar(title: Text(s.t('replica.title'))),
+      appBar: AppBar(
+        title: Text(s.t('replica.title')),
+        actions: [
+          // One sheet of every QR label in the registry.
+          ListenableBuilder(
+            listenable: records,
+            builder: (context, _) {
+              final codes = {
+                for (final r in records.replicas)
+                  if (r.labelText != null) r.labelText!,
+              }.toList();
+              return codes.isEmpty
+                  ? const SizedBox.shrink()
+                  : IconButton(
+                      key: const Key('labels-all'),
+                      tooltip: s.t('label.share_all'),
+                      icon: const Icon(Icons.print),
+                      onPressed: () => shareLabels(context, codes),
+                    );
+            },
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         key: const Key('replica-add'),
         icon: const Icon(Icons.add),
@@ -58,6 +81,31 @@ class ReplicaRegistryScreen extends StatelessWidget {
                       subtitle: Text(
                         '${s.t('replica.type_${r.type.wire}')} · ${s.replicaClass(r.replicaClass)} · ${r.tagUid}',
                       ),
+                      trailing: r.labelText == null
+                          ? null
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  key: Key('label-show-${r.replicaId}'),
+                                  tooltip: s.t('label.show'),
+                                  icon: const Icon(Icons.qr_code_2),
+                                  onPressed: () => showLabel(
+                                    context,
+                                    r.labelText!,
+                                    subtitle:
+                                        '${s.t('replica.type_${r.type.wire}')} · ${s.replicaClass(r.replicaClass)}',
+                                  ),
+                                ),
+                                IconButton(
+                                  key: Key('label-share-${r.replicaId}'),
+                                  tooltip: s.t('label.share'),
+                                  icon: const Icon(Icons.ios_share),
+                                  onPressed: () =>
+                                      shareLabels(context, [r.labelText!]),
+                                ),
+                              ],
+                            ),
                     ),
                 ],
               ),

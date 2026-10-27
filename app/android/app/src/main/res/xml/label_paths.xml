@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+
+The one folder the label FileProvider may share: labels/ under the app's
+cache, where ShareFilePlugin writes the PNG files of replica labels.
+-->
+<paths>
+    <cache-path name="labels" path="labels/" />
+</paths>

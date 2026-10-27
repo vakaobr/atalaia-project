@@ -677,6 +677,9 @@
     "close": "Close check-in",
     "reopen": "Open check-in",
     "print_poster": "Print the poster",
+    "print_labels": "Print labels",
+    "print_labels_all": "Print labels for everyone checked in",
+    "print_labels_for": "Print the labels of {name}",
     "webview_notice": "In the app on the phone, the poster cannot be printed and the CSV cannot be saved: open the console in a computer's browser for that.",
     "csv": "Export CSV",
     "statuses": {
@@ -825,6 +828,16 @@
     "wifi_draw": "Draw the Wi-Fi code",
     "wifi_label": "QR code for the Wi-Fi network",
     "wifi_note": "The password is used only to draw the Wi-Fi code: it is neither kept nor sent."
+  },
+  "labels": {
+    "title": "Replica labels",
+    "login": "Open the console with the GM token first.",
+    "error": "The list cannot be read: {error}",
+    "none": "Nobody checked in has declared a replica yet.",
+    "intro": "Print this page: one label of 30 × 30 mm for each replica, to cut out and stick on. The code holds only the replica's label (ATL- and eight characters), nothing about the player. The marshal's app scans it in the chrono queue.",
+    "print": "Print",
+    "count": "{n} labels",
+    "qr_label": "QR label {code}"
   },
   "branding": {
     "title": "Field branding",

@@ -191,6 +191,16 @@ Como funciona: quem partilha a posição num campo com balizas é perguntado pri
 
 Imprime o cartaz num computador. A consola dentro da app não consegue imprimir.
 
+### Imprimir etiquetas de réplicas
+
+Os marshals encontram uma réplica na lista do cronógrafo lendo a etiqueta QR dela. Quem joga pode fazer a sua na app. Também as podes imprimir a partir da consola:
+
+1. Abre **Check-in**. Na linha de uma pessoa, junto ao número de réplicas, toca em **Imprimir etiquetas**. Para imprimir para todas, toca em **Imprimir as etiquetas de quem já fez check-in** no topo (quem ainda espera confirmação fica de fora).
+2. Abre uma página com uma etiqueta de 30 × 30 mm por réplica declarada, com uma linha fina para recortar. Toca em **Imprimir**. O nome da pessoa e o tipo de réplica aparecem só no ecrã, nunca no autocolante.
+3. Recorta e cola nas réplicas.
+
+Cada QR leva só o código da etiqueta (**ATL-** e oito caracteres), nada sobre quem joga. Imprime num computador, como o cartaz.
+
 ![As camadas do Skirmesh-RF: o rádio, o pacote cifrado, as mensagens, o núcleo partilhado e as APIs do controlador](../../../site/img/diagrams/skirmesh-wide-pt.svg)
 
 ## 5. Cria um jogo

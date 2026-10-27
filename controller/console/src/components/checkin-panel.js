@@ -349,6 +349,8 @@ export class CheckinPanel extends Component {
         ? html`<button type="button" data-testid="checkin-close" onClick=${() => this.setOpen(false)}>${t('checkin.close')}</button>`
         : html`<button type="button" class="primary" data-testid="checkin-reopen" onClick=${() => this.setOpen(true)}>${t('checkin.reopen')}</button>`}
                 <a class="button" href="poster.html" target="_blank" rel="noopener" data-testid="checkin-poster-link">${t('checkin.print_poster')}</a>
+                <a class="button" href=${`labels.html?game=${g.id}`} target="_blank" rel="noopener"
+                    data-testid="checkin-labels-all">${t('checkin.print_labels_all')}</a>
                 <button type="button" data-testid="checkin-csv" onClick=${() => this.exportCsv()}>${t('checkin.csv')}</button>
             </div>
             ${inWebView() && html`<p class="muted small" data-testid="checkin-webview">${t('checkin.webview_notice')}</p>`}
@@ -409,7 +411,10 @@ export class CheckinPanel extends Component {
                     onChange=${(e) => this.patch(r.player_id, { federation_seen: e.target.checked })} /> ${
                     r.federation_seen ? t('checkin.card_seen') : t('checkin.not_checked')}</label>`}</td>`}
             <td role="cell" data-label=${t('checkin.replicas')} data-testid="checkin-replicas">${decls.length}${decls.length ? ` (${Object.entries(counts)
-                .map(([k, v]) => `${t(`checkin.states.${k}`)} ${v}`).join(', ')})` : ''}</td>
+                .map(([k, v]) => `${t(`checkin.states.${k}`)} ${v}`).join(', ')})` : ''}
+                ${decls.length > 0 && html` <a class="button small" href=${`labels.html?game=${g.id}&player=${encodeURIComponent(r.player_id)}`}
+                    target="_blank" rel="noopener" data-testid="checkin-labels"
+                    aria-label=${t('checkin.print_labels_for', { name: r.display_name || r.player_id })}>${t('checkin.print_labels')}</a>`}</td>
             <td role="cell">${active && html`<button type="button" class="link danger" data-testid="checkin-remove"
                 onClick=${() => this.remove(r.player_id)}>${t('checkin.remove')}</button>`}</td>
         </tr>`;

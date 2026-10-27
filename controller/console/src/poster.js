@@ -11,41 +11,10 @@
 // logo (its branding, decisions BR1-BR24) goes above its name, apart from
 // the QR code, so the code reads as before.
 
-import qrcode from './lib/qrcode.module.js';
+import { qrSvg } from './qr-svg.js';
 import { t, loadLanguage, api, savedToken, fetchBranding, brandingUrl, posterProblem } from './ui.js';
 
-const SVG = 'http://www.w3.org/2000/svg';
-
-/** The QR code of text as an SVG element (byte mode, 4-module quiet zone). */
-export function qrSvg(text, level, testid, label) {
-    const qr = qrcode(0, level);
-    qr.addData(text, 'Byte');
-    qr.make();
-    const n = qr.getModuleCount();
-    const q = 4;
-    let d = '';
-    for (let r = 0; r < n; r += 1) {
-        for (let c = 0; c < n; c += 1) {
-            if (qr.isDark(r, c)) d += `M${c + q} ${r + q}h1v1h-1z`;
-        }
-    }
-    const size = n + 2 * q;
-    const svg = document.createElementNS(SVG, 'svg');
-    svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
-    svg.setAttribute('role', 'img');
-    svg.setAttribute('aria-label', label);
-    svg.setAttribute('shape-rendering', 'crispEdges');
-    svg.setAttribute('data-testid', testid);
-    const bg = document.createElementNS(SVG, 'rect');
-    bg.setAttribute('width', String(size));
-    bg.setAttribute('height', String(size));
-    bg.setAttribute('fill', '#fff');
-    const path = document.createElementNS(SVG, 'path');
-    path.setAttribute('d', d);
-    path.setAttribute('fill', '#000');
-    svg.append(bg, path);
-    return svg;
-}
+export { qrSvg };
 
 /** The Wi-Fi QR text phone cameras read: WIFI:T:WPA;S:<ssid>;P:<password>;; with \ ; , : " escaped. */
 export function wifiText(ssid, password) {

@@ -631,6 +631,10 @@ class _CheckinStatusScreenState extends State<CheckinStatusScreen> {
       c.team = me['team'] as String?;
       c.squad = (me['squad'] as int?) ?? 0;
       await _confirmMarshal(me);
+      await store.learnReplicaIds(c, [
+        for (final d in (me['declarations'] as List?) ?? const [])
+          if (d is Map) Declaration.fromJson(d.cast<String, Object?>()),
+      ]);
       if (mounted) {
         setState(() {
           _me = me;

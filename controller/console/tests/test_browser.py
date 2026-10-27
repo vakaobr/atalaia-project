@@ -3786,7 +3786,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         cached = page.evaluate("caches.open('atalaia-console-v11').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
-                     "/console/components/georef-panel.js"):
+                     "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):
             self.assertIn(path, cached)
         # Offline, the page still opens from the cache (the API is unreachable, so
         # failed requests are expected in the console from here on).
@@ -4250,6 +4250,86 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.no_horizontal_scroll(poster)
         poster.emulate_media(media="print")
         expect(poster.get_by_test_id("poster-print")).to_be_hidden()
+
+    def test_labels_page_prints_a_qr_label_for_each_declared_replica(self):
+        """The replica labels page: one 30 x 30 mm label per declared replica, for one player or for everyone
+        checked in, whose QR reads back (zbarimg) as the text the marshal's app registers and scans, and holds
+        nothing about the player."""
+        if not ZBARIMG:
+            self.skipTest("zbarimg is not installed")
+        game = self.field.create_game()
+        self.field.http.put("/api/v1/checkin/settings", json={"confirm": "staff"})
+        d1, d2, d3 = ("6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b", "0a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3d",
+                      "9e8d7c6b-5a49-4382-a1b0-c9d8e7f6a5b4")
+        me = self.check_in(game["id"], "Coruja", replicas=[
+            {"declaration_id": d1, "type": "aeg", "class": "rifle"},
+            {"declaration_id": d2, "type": "bolt_action", "class": "sniper", "make_model": "Well MB4402"}])
+        other = self.check_in(game["id"], "Gaivota", replicas=[{"declaration_id": d3, "type": "gbb", "class": "cqb"}])
+        page = self.console()
+        page.get_by_test_id("tab-checkin").click()
+        row = page.get_by_test_id(f"checkin-row-{me['player_id']}")
+        row.get_by_test_id("checkin-confirm").click()
+        expect(row).to_contain_text("com check-in")
+        expect(page.get_by_test_id(f"checkin-row-{other['player_id']}").get_by_test_id("checkin-labels")).to_be_visible()
+        expected = ["ATL-6F1D2A3B", "ATL-0A1B2C3D"]
+
+        def read_labels(popup, count):
+            popup.on("pageerror", lambda e: self.errors.append(f"pageerror: {e}"))
+            expect(popup.get_by_test_id("label")).to_have_count(count)
+            texts = []
+            with tempfile.TemporaryDirectory() as tmp:
+                for i in range(count):
+                    shot = os.path.join(tmp, f"label{i}.png")
+                    popup.get_by_test_id("label-qr").nth(i).screenshot(path=shot)
+                    out = read_qr(shot)
+                    self.assertEqual(out.returncode, 0, out.stderr)
+                    texts.append(out.stdout)
+            return texts
+
+        # One player's labels.
+        with page.expect_popup() as popup:
+            row.get_by_test_id("checkin-labels").click()
+        labels = popup.value
+        self.assertEqual(read_labels(labels, 2), expected)
+        expect(labels.get_by_test_id("label-code")).to_have_text(expected)
+        expect(labels.get_by_test_id("labels-count")).to_have_text("2 etiquetas")
+        for text in expected:
+            # What the marshal's scanner accepts: printable ASCII of 1-64 characters that is no other Atalaia code,
+            # and nothing about the player.
+            self.assertRegex(text, r"^[\x21-\x7e]{1,64}$")
+            self.assertFalse(text.startswith("atalaia:"))
+            for private in (me["player_id"], "Coruja", "Well"):
+                self.assertNotIn(private, text)
+        self.assertEqual(self.field.http.get("/api/v1/games/%d/chrono-list" % game["id"]).status_code, 200)
+        # 30 x 30 mm on paper (96 dpi: 113.4 px), the player's name and replica only on the screen.
+        expect(labels.get_by_test_id("label").first).to_contain_text("Coruja")
+        labels.emulate_media(media="print")
+        expect(labels.get_by_test_id("labels-print")).to_be_hidden()
+        box = labels.get_by_test_id("label").first.bounding_box()
+        self.assertAlmostEqual(box["width"], 30 * 96 / 25.4, delta=2)
+        self.assertAlmostEqual(box["height"], 30 * 96 / 25.4, delta=2)
+        self.assertNotIn("Coruja", labels.get_by_test_id("label").first.inner_text())
+        labels.emulate_media(media="screen")
+        labels.set_viewport_size({"width": 390, "height": 844})
+        self.no_horizontal_scroll(labels)
+
+        # Everyone checked in: the player still waiting for confirmation has no labels yet.
+        with page.expect_popup() as popup:
+            page.get_by_test_id("checkin-labels-all").click()
+        self.assertEqual(read_labels(popup.value, 2), expected)
+        other_row = page.get_by_test_id(f"checkin-row-{other['player_id']}")
+        other_row.get_by_test_id("checkin-confirm").click()
+        expect(other_row).to_contain_text("com check-in")
+        with page.expect_popup() as popup:
+            page.get_by_test_id("checkin-labels-all").click()
+        self.assertEqual(read_labels(popup.value, 3), expected + ["ATL-9E8D7C6B"])
+
+        # The language of the console.
+        page.get_by_test_id("lang").select_option("en")
+        with page.expect_popup() as popup:
+            row.get_by_test_id("checkin-labels").click()
+        read_labels(popup.value, 2)
+        expect(popup.value.get_by_test_id("labels-count")).to_have_text("2 labels")
 
     # --- the remote GM's log (decision S19-11) -------------------------------------------
 

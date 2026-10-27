@@ -113,6 +113,15 @@ O símbolo junto de cada réplica mostra em que ponto está:
 
 Uma réplica já cronografada fica declarada. Fala com um marshal se precisares de a mudar.
 
+### Põe uma etiqueta na tua réplica
+
+Depois de guardares uma réplica para um jogo, aparecem dois botões por baixo dela:
+
+- **Mostrar etiqueta**: um código QR grande, com um código por baixo (**ATL-** e oito caracteres). O ecrã fica ligado e com brilho.
+- **Partilhar / imprimir etiqueta**: uma imagem para um autocolante de 30 × 30 mm. Abre a partilha do telemóvel, onde podes escolher um serviço de impressão ou guardar a imagem. **Partilhar / imprimir todas as etiquetas**, no fim da lista, faz folhas A4 com várias etiquetas.
+
+Cola a etiqueta na réplica. Um marshal lê-a na lista do cronógrafo e encontra logo a tua réplica. A etiqueta leva só esse código, nada sobre ti. Antes de guardares uma réplica para um jogo, a lista diz que a etiqueta aparece depois de a declarares. Depois de um marshal registar a réplica, a etiqueta é a mesma nos jogos seguintes nesse campo.
+
 Os limites por classe da app vêm da pesquisa do projeto. **Não estão verificados** e não são a lei. A organização do campo e os marshals é que decidem, e qualquer penalização é sempre decidida por uma pessoa. Vê *[cronografagem e joules](https://atalaia-project.link/glossario/#glossario-cronografagem)*.
 
 ## 5. Joga
