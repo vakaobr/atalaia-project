@@ -779,9 +779,15 @@ roadmap:
       - "Die Boxen hören vor dem Senden: Eine Box prüft, ob der Kanal frei ist, bevor sie sendet,
         damit weniger Nachrichten kollidieren. Im Simulator empfängt ein Feld mit 20 Boxen 89 % der
         Updates statt 65 %."
+      - "Die Spielleitung kann auch bei Domination den Besitzer einer Box setzen oder freigeben, wie in den anderen Modi."
+      - "Der Controller kann seine eigenen Funkframes einzeln und mit Abstand senden. Gebaut, und aus, bis der Feldtest entscheidet."
+      - "Der Pi-Controller lässt ein Firmware-Update sofort scheitern, wenn das Funkmodul das Angebot ablehnt."
+      - "Eine eingerichtete Box kann zurück in die WLAN-Einrichtung, über einen Menüeintrag hinter der Admin-PIN oder einen Befehl an der USB-Konsole. Die Einrichtungsseite gibt es auf Englisch, Portugiesisch, Deutsch und Traditionellem Chinesisch, und Handys öffnen sie von selbst."
+      - "Der Tab Spiel der Konsole zeigt einen QR-Code der Anzeigetafel für Spielende."
     next:
       - Die Funk-Boards und 5 gebaute Boxen für den Feldtest.
       - Ein Feldtest mit 20 Boxen, mit und ohne Hören vor dem Senden.
+      - "Ob das Takten des Controllers an geht, entschieden nach dem Feldtest mit 20 Boxen."
     gate: >-
       Gate: 5 Boxen auf einem <a href="{{ page.to.glossary }}#glossar-cqb">CQB</a>-Gelände und einem
       Outdoor-Feld, keine verlorene Einnahme. <strong>Offen.</strong>
@@ -830,6 +836,9 @@ roadmap:
         - "Ein Feld oder Club mit eigenem Controller kann sein Logo, Hintergrundbild und seine Farbe
           in der App, auf der Anzeigetafel und auf dem Aushang zeigen und seinen Teams Namen und
           Wappen geben."
+        - "Die Konsole der Orga meldet, wenn sich der Check-in-Aushang nach dem Druck geändert hat."
+        - "Die Marshal- und Chrono-Bildschirme sagen, was die App wirklich tut, und die Limitlisten sind übersetzt."
+        - "Die App hält ihre Geheimnisse mit dem Android Keystore versiegelt."
     g_props:
       title: Android-Props und I/O-Pod
       items:
@@ -952,6 +961,8 @@ roadmap:
           kann; Positionen gehen nur an Zertifikate von Spielleitung oder Marshals."
         - "Mehrstöckige Felder in der Konsole: ein Grundriss pro Ebene und jede Box auf ihrer Ebene."
         - "Noch nicht mit einem echten ATAK-Handy ausprobiert, auch nicht auf einem echten Feld."
+        - "Eine Box, die Progressive Domination zur aktiven gemacht hat, sagt das auf ATAK."
+        - "Die Feldkarten-Seite läuft auch auf dem Handy als Feld-Controller."
     g_server:
       title: Site-Server, Konten und Daten
       items:
@@ -964,6 +975,7 @@ roadmap:
         - "Das Chrono-Register: signierte Messwerte geprüft und so gespeichert, wie sie signiert
           wurden, nur öffentliche Schlüssel, Austausch zwischen Feldern mit Einwilligung. Noch nicht
           mit einem echten Chronographen."
+        - "reset-totp: Der Betreiber setzt den Zwei-Faktor-Code eines Kontos zurück, das seinen Authenticator verloren hat."
     g_games:
       title: Spiele, Clubs und Staff-Seiten
       items:
@@ -988,6 +1000,7 @@ roadmap:
           dem Speichern gezeigt, Revisionen und Presets), Gerätezustand sowie Live-Ansicht und
           Befehle der Remote-Spielleitung. Im Headless-Browser getestet, noch nicht auf einem
           echten Server."
+        - "Controller entfernen ein Szenario oder Preset, das der Site-Server archiviert oder gelöscht hat, außer ein Spiel nutzt es noch."
     g_boxes:
       title: Boxen und das Feld
       items:
@@ -1021,6 +1034,7 @@ roadmap:
           das laufende Spiel und startet, pausiert, setzt fort oder beendet es, oder schickt eine
           Nachricht oder einen Modus-Befehl, über eine Verbindung, die der Feld-Controller selbst
           öffnet, nur wenn das Feld es einschaltet, jeder Befehl auf beiden Seiten protokolliert."
+        - "Der Tab Controller der Konsole listet den Zustand der Remote-Spielleitung und jeden Befehl, den sie bekam."
     g_deploy:
       title: Deployment und Hosted-Modus
       items:
@@ -1090,6 +1104,8 @@ roadmap:
       - >-
         <a href="{{ page.to.build }}">Bauanleitungen</a> für Satellit, I/O-Pod und Ziel-Addon, als
         Text. Noch keine Box wurde danach gebaut.
+      - "<strong>Benutzerhandbücher</strong> für Spielende, Spielleitung, Marshals und Field-Box-Betreibende, auf Englisch und Portugiesisch."
+      - "Die Web-Ansicht des Simulators hat jede Eingabe, die ein Modus nutzt: Tags, Tastenfeld, Treffer und GM-Befehle, mit Download des Ereignisprotokolls."
     next:
       - Den Registry-Schlüssel des Projekts offline erzeugen, damit die ersten Modi verifiziert werden können (Aufgabe der Projektbetreuung).
       - "Die Prüfung des Deutschen und des Chinesischen: Wenn du auf Deutsch oder Chinesisch

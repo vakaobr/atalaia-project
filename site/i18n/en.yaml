@@ -740,9 +740,15 @@ roadmap:
         captures, pairing by code, updates over the air, a missing mode fetched."
       - "Boxes listen before they talk: a box checks the channel is free before it sends, so fewer
         messages collide. In the simulator, a 20-box field hears 89 % of updates instead of 65 %."
+      - "The GM can set or free a box's owner in Domination too, as in the other modes."
+      - "The controller can send its own radio frames one at a time, spaced out. Built, and off until the field test decides."
+      - "The Pi controller fails a firmware update at once when the radio refuses the offer."
+      - "A box that was set up can go back into Wi-Fi setup, from a menu entry behind the admin PIN or a command on the USB console. The setup page is in English, Portuguese, German and Traditional Chinese, and phones open it by themselves."
+      - "The console's Game tab shows a QR code of the scoreboard for players."
     next:
       - The radio boards, and 5 built boxes for the field test.
       - A 20-box field test with listen-before-talk on and off.
+      - "Whether to turn the controller's pacing on, decided from the 20-box field test."
     gate: >-
       Gate: 5 boxes on a <a href="{{ page.to.glossary }}#glossary-cqb">CQB</a> site and an outdoor
       field, zero lost captures. <strong>Open.</strong>
@@ -786,6 +792,9 @@ roadmap:
         - Players can share their position during a game, and the controller decides who sees it.
         - "A field or club that runs its own controller can show its logo, wallpaper and colour in
           the app, on the scoreboard and on the poster, and give its teams names and crests."
+        - "The GM console tells when the check-in poster changed after it was printed."
+        - "The marshal and chrono screens say what the app really does, and the limit lists are translated."
+        - "The app keeps its secrets sealed with the Android Keystore."
     g_props:
       title: Props and the I/O pod
       items:
@@ -901,6 +910,8 @@ roadmap:
           positions only to a GM or a marshal."
         - "Multi-storey fields in the console: a floor plan per level and each box on its level."
         - "Not yet tried with a real ATAK phone, nor at a real field."
+        - "A box that Progressive Domination has made the active one says so on ATAK."
+        - "The field map page works on the phone as the field controller too."
     g_server:
       title: Site server, accounts and data
       items:
@@ -913,6 +924,7 @@ roadmap:
           safe to replay. Not yet over a real 4G link."
         - "The chrono registry: signed readings verified and kept as signed, public keys only,
           sharing between fields with consent. Not yet with a real chronograph."
+        - "reset-totp: the operator resets the two-factor code of an account that lost its authenticator."
     g_games:
       title: Games, clubs and staff pages
       items:
@@ -933,6 +945,7 @@ roadmap:
           two-factor code, game history, the scenario library (every problem shown before saving,
           revisions and presets), device health, and the remote GM's live view and commands. Tested
           in a headless browser, not on a real server."
+        - "Controllers drop a scenario or preset the site archived or deleted, unless a game still uses it."
     g_boxes:
       title: Boxes and the field
       items:
@@ -962,6 +975,7 @@ roadmap:
           live game and starts, pauses, resumes or ends it, or sends a message or a mode command,
           over a connection the field controller opens itself, only when the field turns it on,
           with every command logged on both sides."
+        - "The console's Controller tab lists the remote GM's state and every command it got."
     g_deploy:
       title: Deployment and hosted mode
       items:
@@ -1024,6 +1038,8 @@ roadmap:
       - >-
         <a href="{{ page.to.build }}">Build guides</a> for the Satellite, the I/O pod and the
         target addon, as text. No box has been built from them yet.
+      - "<strong>User manuals</strong> for players, game masters, marshals and Field Box operators, in English and Portuguese."
+      - "The simulator's web view has every input a mode uses: tags, keypad, hits and GM commands, with an event-log download."
     next:
       - The project's registry key, made offline, so the first modes can be verified (the maintainer's task).
       - "The review of the German and the Chinese: if you play in German or in Chinese, help us

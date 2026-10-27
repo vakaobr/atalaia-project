@@ -760,9 +760,15 @@ roadmap:
       - "As caixas escutam antes de falar: cada caixa verifica se o canal está livre antes de
         transmitir, e há menos mensagens a colidir. No simulador, um campo de 20 caixas recebe 89 %
         das atualizações em vez de 65 %."
+      - "A organização pode definir ou libertar o dono de uma caixa também no Domínio, como nos outros modos."
+      - "O controlador pode enviar as suas próprias tramas de rádio uma de cada vez, espaçadas. Está feito e desligado até o teste no campo decidir."
+      - "O controlador Pi falha logo uma atualização de firmware quando o rádio recusa a oferta."
+      - "Uma caixa já configurada pode voltar à configuração do Wi-Fi, por uma entrada de menu atrás do PIN de administração ou por um comando na consola USB. A página de configuração está em inglês, português, alemão e chinês tradicional, e os telemóveis abrem-na sozinhos."
+      - "O separador Jogo da consola mostra um código QR do marcador para quem joga."
     next:
       - As placas de rádio e 5 caixas montadas para o teste no campo.
       - Um teste no campo com 20 caixas, com e sem escuta antes de falar.
+      - "Ligar ou não o espaçamento do controlador, decidido a partir do teste no campo com 20 caixas."
     gate: >-
       Prova: 5 caixas num espaço de <a href="{{ page.to.glossary }}#glossario-cqb">CQB</a> e num campo
       exterior, sem uma única captura perdida. <strong>Em aberto.</strong>
@@ -809,6 +815,9 @@ roadmap:
         - Quem joga pode partilhar a posição durante o jogo, e o controlador decide quem a vê.
         - "Um campo ou clube com o seu próprio controlador pode mostrar o logótipo, a imagem de fundo
           e a cor na app, no marcador e no cartaz, e dar nomes e emblemas às equipas."
+        - "A consola da organização avisa quando o cartaz de check-in mudou depois de impresso."
+        - "Os ecrãs do marshal e do cronógrafo dizem o que a app faz de facto, e as listas de limites estão traduzidas."
+        - "A app guarda os seus segredos selados com o Keystore do Android."
     g_props:
       title: Dispositivos Android e módulo de E/S
       items:
@@ -930,6 +939,8 @@ roadmap:
           revogar de imediato; as posições só chegam aos certificados de GM ou marshal."
         - "Campos com vários pisos na consola: uma planta por piso e cada caixa no seu piso."
         - "Ainda não experimentado num telemóvel com ATAK real, nem num campo real."
+        - "Uma caixa que o Domínio Progressivo tornou a ativa di-lo no ATAK."
+        - "A página do mapa do campo funciona também no telemóvel como controlador de campo."
     g_server:
       title: Servidor do site, contas e dados
       items:
@@ -942,6 +953,7 @@ roadmap:
           funcionam sem rede e podem repetir o envio sem duplicar nada. Ainda não numa ligação 4G real."
         - "O registo de cronógrafo: leituras assinadas verificadas e guardadas tal como assinadas, só
           chaves públicas, partilha entre campos com consentimento. Ainda sem um cronógrafo real."
+        - "reset-totp: quem opera o servidor repõe o código de dois fatores de uma conta que perdeu o autenticador."
     g_games:
       title: Jogos, clubes e páginas da organização
       items:
@@ -965,6 +977,7 @@ roadmap:
           problemas mostrados antes de guardar, revisões e predefinições), estado das caixas, e a
           vista ao vivo e os comandos do GM remoto. Testadas num browser automático, ainda não num
           servidor real."
+        - "Os controladores largam um cenário ou predefinição que o servidor do site arquivou ou apagou, a menos que um jogo ainda o use."
     g_boxes:
       title: Caixas e o campo
       items:
@@ -996,6 +1009,7 @@ roadmap:
           vivo e inicia-o, pausa-o, retoma-o ou termina-o, ou envia uma mensagem ou um comando do
           modo, por uma ligação que o próprio controlador de campo abre, só quando o campo o liga,
           com cada comando registado dos dois lados."
+        - "O separador Controlador da consola lista o estado do GM remoto e todos os comandos que recebeu."
     g_deploy:
       title: Instalação e modo alojado
       items:
@@ -1061,6 +1075,8 @@ roadmap:
       - >-
         <a href="{{ page.to.build }}">Guias de montagem</a> da caixa satélite, do módulo de E/S e do
         módulo de alvo, em texto. Ainda não se montou nenhuma caixa com eles.
+      - "<strong>Manuais de utilizador</strong> para quem joga, a organização, os marshals e quem opera a Field Box, em inglês e português."
+      - "A vista web do simulador tem todas as entradas que um modo usa: tags, teclado, impactos e comandos da organização, com descarga do registo de eventos."
     next:
       - A chave do registo do projeto, feita offline, para que os primeiros modos possam ser verificados (tarefa de quem mantém o projeto).
       - "A revisão do alemão e do chinês: se jogas em alemão ou em chinês, ajuda-nos a revê-los. As
