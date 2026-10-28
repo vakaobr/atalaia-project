@@ -4,9 +4,10 @@
 /// The app's settings and records, as JSON files in the app's private
 /// folder (Android's Context.filesDir; other apps cannot read it, and
 /// android:allowBackup is off so it is not copied to the cloud). The field
-/// join key, the marshal's private key and the read code are not in
-/// `settings.json` on Android: they are sealed with a key in the
-/// AndroidKeyStore (`secrets.enc`, secret_vault.dart, decision PD6). Where
+/// join key, the marshal's private key, the read code, the controller's site
+/// API key, the player's per-field secrets and the site refresh tokens are not
+/// in their JSON files on Android: they are sealed with a key in the
+/// AndroidKeyStore (`secrets.enc`, secret_vault.dart, decisions PD6, PKA-4). Where
 /// there is no Keystore plugin (iOS) they stay in the file, protected by the
 /// app sandbox.
 /// Writes go to a temporary file first, then replace the old one. Binary
@@ -291,6 +292,48 @@ String _checkBlobName(String name) {
 /// key, the marshal's Ed25519 seed and the player's read code.
 const _secretKeys = ['join_key', 'marshal_seed', 'read_token'];
 
+/// The phone controller's site API key lives inside `controller_sync`; in the
+/// sealed file it has a key of its own (decision PKA-4).
+const _syncKeyName = 'sync_api_key';
+
+/// The lists with a secret in each record (decision PKA-4): the list name,
+/// the field that names the record and the field that is the secret. In the
+/// sealed file each is `list.<name>.<record>`.
+const _listSecrets = {
+  'field_identities': ('field_id', 'secret'),
+  'site_accounts': ('site', 'refresh'),
+};
+
+bool _sealedKey(String k) =>
+    _secretKeys.contains(k) || k == _syncKeyName || k.startsWith('list.');
+
+/// Takes the secrets out of settings [json] (in place) and returns them.
+Map<String, Object?> _takeSettingsSecrets(Map<String, Object?> json) {
+  final out = <String, Object?>{
+    for (final k in _secretKeys)
+      if (json.remove(k) case final String v) k: v,
+  };
+  final sync = json['controller_sync'];
+  if (sync is Map && sync['api_key'] is String) {
+    out[_syncKeyName] = sync['api_key'];
+    json['controller_sync'] = {...sync}..remove('api_key');
+  }
+  return out;
+}
+
+void _putSettingsSecrets(
+  Map<String, Object?> json,
+  Map<String, Object?> secrets,
+) {
+  for (final k in _secretKeys) {
+    if (secrets[k] case final String v) json[k] = v;
+  }
+  final key = secrets[_syncKeyName];
+  final sync = json['controller_sync'];
+  if (key is String && sync is Map)
+    json['controller_sync'] = {...sync, 'api_key': key};
+}
+
 class FileAppStore implements AppStore {
   /// With a [vault] (Android's Keystore), the secrets in [_secretKeys] are
   /// kept sealed in `secrets.enc`, never in `settings.json`; a plaintext
@@ -309,6 +352,7 @@ class FileAppStore implements AppStore {
   bool _vaultWorks = false;
   String? _sealedJson; // the secrets the file on disk holds, as sealed last
   bool _unreadable = false; // sealed secrets exist but could not be read now
+  Map<String, Object?>? _secrets; // all the sealed secrets, once read
   Future<void> _turn = Future.value();
 
   File _file(String name) => File('$dir/$name.json');
@@ -378,8 +422,7 @@ class FileAppStore implements AppStore {
         _sealedJson = jsonEncode(j);
         return {
           for (final e in j.entries)
-            if (_secretKeys.contains(e.key) && e.value is String)
-              e.key: e.value,
+            if (_sealedKey(e.key) && e.value is String) e.key: e.value,
         };
       }
       throw const FormatException('not a map');
@@ -410,34 +453,38 @@ class FileAppStore implements AppStore {
     }
     final map = j is Map<String, Object?> ? {...j} : <String, Object?>{};
     _unreadable = false;
-    final plain = {
-      for (final k in _secretKeys)
-        if (map[k] is String) k: map[k],
-    };
+    final plain = _takeSettingsSecrets(map);
+    var secrets = await _unseal();
     if (plain.isNotEmpty) {
       // An earlier version's plaintext: seal it, check it reads back, and only
       // then rewrite settings.json without it. Any failure leaves the
       // plaintext as it was (the secrets are not lost over a Keystore hiccup)
       // and the next start tries again.
+      final merged = {...secrets, ...plain};
       try {
-        await _seal(plain);
+        await _seal(merged);
         final back = await vault!.open(await _sealedFile.readAsBytes());
-        if (utf8.decode(back) != jsonEncode(plain)) {
+        if (utf8.decode(back) != jsonEncode(merged)) {
           throw const VaultException(VaultFailure.unavailable, 'read-back');
         }
-        for (final k in _secretKeys) {
-          map.remove(k);
-        }
         await _write('settings', map);
-        map.addAll(plain);
+        secrets = merged;
       } on VaultException catch (e) {
         lastVaultFailure = e.failure;
+        secrets = merged;
+        _putSettingsSecrets(map, plain);
+        _secrets = secrets;
+        return AppSettings.fromJson(map);
       } on FileSystemException {
         lastVaultFailure = VaultFailure.unavailable;
+        secrets = merged;
+        _putSettingsSecrets(map, plain);
+        _secrets = secrets;
+        return AppSettings.fromJson(map);
       }
-    } else {
-      map.addAll(await _unseal());
     }
+    _secrets = secrets;
+    _putSettingsSecrets(map, secrets);
     return AppSettings.fromJson(map);
   });
 
@@ -445,38 +492,138 @@ class FileAppStore implements AppStore {
   Future<void> saveSettings(AppSettings settings) => _serial(() async {
     final json = settings.toJson();
     if (!await _vaultReady()) return _write('settings', json);
-    final secrets = <String, Object?>{
-      for (final k in _secretKeys)
-        if (json.remove(k) case final String v) k: v,
-    };
+    final own = _takeSettingsSecrets(json);
+    await _ensureSecrets();
+    await _sealAll({...own, ..._listEntries(_secrets!)});
+    await _write('settings', json);
+  });
+
+  /// The sealed secrets, read once (and again after a read that failed).
+  Future<void> _ensureSecrets() async {
+    if (_secrets != null && !_unreadable) return;
+    _unreadable = false;
+    _secrets = await _unseal();
+  }
+
+  Map<String, Object?> _listEntries(Map<String, Object?> all, [String? skip]) =>
+      {
+        for (final e in all.entries)
+          if (e.key.startsWith('list.') &&
+              (skip == null || !e.key.startsWith('list.$skip.')))
+            e.key: e.value,
+      };
+
+  /// Seals [all] (the whole set; nothing in it is kept in the clear) and
+  /// remembers it for this run. A failure drops the stale sealed copy: the
+  /// secrets stay in memory for this run and the next start asks again.
+  Future<void> _sealAll(Map<String, Object?> all) async {
     try {
-      if (secrets.isNotEmpty) {
-        await _seal(secrets);
+      if (all.isNotEmpty) {
+        await _seal(all);
         _unreadable = false;
       } else if (!_unreadable) {
         await _dropSealed();
       }
     } on VaultException catch (e) {
-      // Never to disk in the clear: the secrets stay in memory for this run,
-      // the old sealed copy (now stale) goes, and the next start asks to
-      // join again.
       lastVaultFailure = e.failure;
       await _dropSealed().catchError((Object _) {});
     } on FileSystemException {
       lastVaultFailure = VaultFailure.unavailable;
     }
-    await _write('settings', json);
-  });
+    _secrets = all;
+  }
 
   @override
-  Future<List<Map<String, Object?>>> loadList(String name) async {
+  Future<List<Map<String, Object?>>> loadList(String name) {
+    final spec = _listSecrets[name];
+    if (spec == null) return _loadPlain(name);
+    return _serial(() async {
+      final items = await _loadPlain(name);
+      if (!await _vaultReady()) return items;
+      await _ensureSecrets();
+      final (idField, secretField) = spec;
+      final all = {..._secrets!};
+      var migrate = false;
+      final out = <Map<String, Object?>>[];
+      for (final item in items) {
+        final id = item[idField];
+        if (id is! String) {
+          out.add(item);
+          continue;
+        }
+        final k = 'list.$name.$id';
+        if (item[secretField] is String) {
+          all[k] = item[secretField]; // an earlier version's plaintext
+          migrate = true;
+        } else if (all[k] case final String v) {
+          out.add({...item, secretField: v});
+          continue;
+        }
+        out.add(item);
+      }
+      if (migrate) {
+        // Seal first, check, and only then rewrite the list without them; a
+        // failure leaves the plaintext for the next start.
+        try {
+          await _seal(all);
+          final back = await vault!.open(await _sealedFile.readAsBytes());
+          if (utf8.decode(back) != jsonEncode(all)) {
+            throw const VaultException(VaultFailure.unavailable, 'read-back');
+          }
+          await _write(name, [
+            for (final i in out) {...i}..remove(secretField),
+          ]);
+          _secrets = all;
+        } on VaultException catch (e) {
+          lastVaultFailure = e.failure;
+        } on FileSystemException {
+          lastVaultFailure = VaultFailure.unavailable;
+        }
+      }
+      return out;
+    });
+  }
+
+  Future<List<Map<String, Object?>>> _loadPlain(String name) async {
     final j = await _read(name);
     return j is List ? j.whereType<Map<String, Object?>>().toList() : [];
   }
 
   @override
-  Future<void> saveList(String name, List<Map<String, Object?>> items) =>
-      _write(name, items);
+  Future<void> saveList(String name, List<Map<String, Object?>> items) {
+    final spec = _listSecrets[name];
+    if (spec == null) return _write(name, items);
+    return _serial(() async {
+      if (!await _vaultReady()) return _write(name, items);
+      await _ensureSecrets();
+      final (idField, secretField) = spec;
+      final mine = <String, Object?>{};
+      final clean = <Map<String, Object?>>[];
+      for (final item in items) {
+        final id = item[idField];
+        final secret = item[secretField];
+        if (id is String && secret is String) {
+          mine['list.$name.$id'] = secret;
+          clean.add({...item}..remove(secretField));
+        } else {
+          clean.add(item);
+        }
+      }
+      final rest = {
+        for (final e in _secrets!.entries)
+          if (!e.key.startsWith('list.$name.')) e.key: e.value,
+      };
+      // settings secrets first, then the lists' (a stable order: an unchanged
+      // set is not sealed again)
+      await _sealAll({
+        for (final e in rest.entries)
+          if (!e.key.startsWith('list.')) e.key: e.value,
+        ..._listEntries(rest),
+        ...mine,
+      });
+      await _write(name, clean);
+    });
+  }
 
   File _blob(String name) => File('$dir/blobs/${_checkBlobName(name)}');
 
