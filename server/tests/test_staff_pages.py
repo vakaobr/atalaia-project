@@ -30,7 +30,7 @@ STATIC = Path(staff_pages.__file__).resolve().parent / "static" / "staff"
 FIELD = "0192f3a4-5b6c-7d8e-9f01-23456789abcd"
 GAME = "0192f3a4-5b6c-7d8e-9f01-000000000001"
 PAGES = {
-    "home": "/staff/", "login": "/staff/login", "history": f"/staff/fields/{FIELD}/history",
+    "home": "/staff/", "login": "/staff/login", "account": "/staff/account", "history": f"/staff/fields/{FIELD}/history",
     "game": f"/staff/fields/{FIELD}/games/{GAME}", "scenarios": f"/staff/fields/{FIELD}/scenarios",
     "scenario": f"/staff/fields/{FIELD}/scenarios/org.test.two", "presets": f"/staff/fields/{FIELD}/presets",
     "devices": f"/staff/fields/{FIELD}/devices", "remote": f"/staff/fields/{FIELD}/remote-gm",

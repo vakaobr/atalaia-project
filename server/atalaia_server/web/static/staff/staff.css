@@ -60,6 +60,18 @@ button.link { background: none; border: 0; color: var(--accent); padding: 0 0.25
 .alt-logins .consent { font-size: 0.95rem; color: var(--muted); }
 #stepup { margin: 1rem 0; padding: 0.5rem 1rem; border: 1px solid var(--accent); border-radius: 0.3rem; }
 #stepup h2 { margin: 0.25rem 0; font-size: 1.1rem; }
+/* The account page (account.js): one box per kind of login method, rows that wrap on a phone */
+header.staff-top .account a { margin: 0 0.25rem; }
+section.acct { border: 1px solid var(--line); border-radius: 0.3rem; padding: 0 1rem 0.75rem; margin: 1rem 0; }
+section.acct h2 { font-size: 1.1rem; }
+ul.acct-list { list-style: none; margin: 0.5rem 0; padding: 0; }
+ul.acct-list li { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; align-items: center; border-top: 1px solid var(--line);
+                  padding: 0.5rem 0; }
+ul.acct-list li:first-child { border-top: 0; }
+ul.acct-list .title { font-weight: 600; overflow-wrap: anywhere; }
+ul.acct-list .when { color: var(--muted); font-size: 0.9rem; flex: 1 1 12rem; }
+ul.acct-list .rename { flex: 1 1 100%; margin: 0; }
+section.acct .alt-buttons button.provider { background: transparent; color: var(--ink); border-color: var(--muted); }
 /* Tables */
 .table-wrap { overflow-x: auto; margin: 1rem 0; position: relative; }  /* also holds visually-hidden headers */
 table.data { border-collapse: collapse; width: 100%; font-size: 0.95rem; }

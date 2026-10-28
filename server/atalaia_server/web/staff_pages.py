@@ -8,6 +8,11 @@
                                                        comes from GET /api/v1/auth/methods); a session that logged
                                                        in with no second factor is offered the TOTP or passkey
                                                        step-up on every page (static/staff/stepup.js)
+    GET /staff/account                                 the logged-in account's own login methods: link or unlink
+                                                       Google, Microsoft or Apple, add, rename and remove passkeys,
+                                                       set, change or remove the password, turn TOTP on or off,
+                                                       and the confirmation those ask for (decisions ACC-*); linked
+                                                       from every page's header
     GET /staff/fields/<field>/history                  the field's games, filters, the history settings
     GET /staff/fields/<field>/games/<game>             one game: its score timeline, its event log, its boxes
     GET /staff/fields/<field>/schedule                 the field's scheduled games: create, edit, publish, cancel,
@@ -165,7 +170,8 @@ class StaffPage:
             self.texts(),
             html_lang=HTML_LANG[self.lang], title=esc(f"{title} · {self.t['site']}"), script=esc(f"{page}.js"),
             data_attrs=" ".join(f'data-{k}="{esc(v)}"' for k, v in attrs.items()),
-            home=esc(self.link("/staff/")), sections=self.sections(field, section),
+            home=esc(self.link("/staff/")), account_href=esc(self.link("/staff/account")),
+            sections=self.sections(field, section),
             language_label=esc(i18n.STRINGS[self.lang]["language"]), languages=self.languages(),
             content=content, strings=strings_block(self.t))
         body = preview_texts.inject_banner(request, body, self.lang)  # a preview server's banner (PV-3)
@@ -232,6 +238,13 @@ async def login(request: Request) -> Response:
     p = StaffPage(request)
     content = TEMPLATES["login"].substitute(p.texts())
     return p.render(request, "login", p.t["login_title"], content)
+
+
+@router.api_route("/staff/account", methods=GET_HEAD)
+async def account(request: Request) -> Response:
+    p = StaffPage(request)
+    content = TEMPLATES["account"].substitute(p.texts())
+    return p.render(request, "account", p.t["acct_title"], content, section="account")
 
 
 @router.api_route("/staff/fields/{field}/history", methods=GET_HEAD)

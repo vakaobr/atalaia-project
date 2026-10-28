@@ -1,0 +1,81 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$acct_title</h1>
+<p>$acct_intro</p>
+<section id="confirm" class="acct" aria-labelledby="confirm-title" hidden>
+<h2 id="confirm-title">$acct_confirm_title</h2>
+<div id="confirm-password-box" class="staff-form" hidden>
+<label for="confirm-password">$acct_confirm_password</label>
+<input id="confirm-password" name="current-password" type="password" autocomplete="current-password" maxlength="4096">
+<p class="hint">$acct_confirm_password_hint</p>
+</div>
+<div id="confirm-recent-box" hidden>
+<p class="hint">$acct_confirm_recent</p>
+<form id="confirm-totp-form" class="staff-form" method="post" novalidate hidden>
+<fieldset disabled>
+<label for="confirm-code">$totp_code</label>
+<input id="confirm-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{6,8}">
+<button type="submit">$stepup_totp_button</button>
+</fieldset>
+</form>
+<p><button type="button" id="confirm-passkey" hidden>$stepup_passkey_button</button></p>
+<div id="confirm-providers" class="alt-buttons"></div>
+</div>
+</section>
+<section id="providers-section" class="acct" aria-labelledby="providers-title">
+<h2 id="providers-title">$acct_providers_title</h2>
+<ul id="providers" class="acct-list"></ul>
+<p id="providers-none" hidden>$acct_providers_none</p>
+<p id="providers-off" class="hint" hidden>$acct_providers_off</p>
+<div id="link-buttons" class="alt-buttons"></div>
+</section>
+<section id="passkeys-section" class="acct" aria-labelledby="passkeys-title">
+<h2 id="passkeys-title">$acct_passkeys_title</h2>
+<p class="hint">$acct_passkeys_intro</p>
+<ul id="passkeys" class="acct-list"></ul>
+<p id="passkeys-none" hidden>$acct_passkeys_none</p>
+<form id="passkey-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="passkey-name">$acct_passkey_name</label>
+<input id="passkey-name" name="name" maxlength="64" autocomplete="off">
+<button type="submit" id="passkey-add">$acct_passkey_add</button>
+</fieldset>
+</form>
+<p id="passkey-unsupported" class="hint" hidden>$acct_passkey_unsupported</p>
+</section>
+<section id="password-section" class="acct" aria-labelledby="password-title">
+<h2 id="password-title">$acct_pw_title</h2>
+<p id="password-state"></p>
+<p id="password-off" class="hint" hidden>$acct_pw_off</p>
+<form id="password-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="new-password">$acct_pw_new</label>
+<input id="new-password" name="new-password" type="password" autocomplete="new-password" maxlength="4096">
+<button type="submit" id="password-save">$acct_pw_set_button</button>
+</fieldset>
+</form>
+<p><button type="button" id="password-remove" class="danger" hidden>$acct_pw_remove</button></p>
+</section>
+<section id="totp-section" class="acct" aria-labelledby="totp-title">
+<h2 id="totp-title">$acct_totp_title</h2>
+<p id="totp-state"></p>
+<p><button type="button" id="totp-enable" hidden>$acct_totp_enable</button></p>
+<form id="totp-confirm-form" class="staff-form" method="post" novalidate hidden>
+<fieldset disabled>
+<p id="totp-enrol-intro"></p>
+<p><span class="hint">$acct_totp_secret</span> <code id="totp-secret" class="data"></code></p>
+<p><span class="hint">$acct_totp_uri</span> <code id="totp-uri" class="data"></code></p>
+<label for="totp-enrol-code">$totp_code</label>
+<input id="totp-enrol-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{6,8}">
+<button type="submit">$acct_totp_confirm</button>
+</fieldset>
+</form>
+<form id="totp-disable-form" class="staff-form" method="post" novalidate hidden>
+<fieldset disabled>
+<p class="hint">$acct_totp_disable_intro</p>
+<label for="totp-disable-code">$totp_code</label>
+<input id="totp-disable-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{6,8}">
+<button type="submit" class="danger">$acct_totp_disable</button>
+</fieldset>
+</form>
+</section>
