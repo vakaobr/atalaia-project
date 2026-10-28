@@ -86,7 +86,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import asyncpg
 from sqlalchemy.engine import make_url
 
-from . import dnsquery
+from . import dnsquery, tenant_roles
 from .config import MAX_QUOTA, QUOTA_DEFAULTS, quotas_from_env
 from .tenancy import (CHALLENGE_PREFIX, COLUMNS, STATUSES, Tenant, TenantError, challenge_name, check_custom_host,
                       check_schema, check_slug, from_row, schema_for)
@@ -146,8 +146,10 @@ ALTER TABLE public.atalaia_tenants
         CHECK (custom_host IS NULL OR custom_host ~ '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$'),
     ADD COLUMN IF NOT EXISTS custom_host_status text CHECK (custom_host_status IN ('pending', 'active')),
     ADD COLUMN IF NOT EXISTS custom_host_token text,
-    ADD COLUMN IF NOT EXISTS custom_host_verified_at timestamptz;
+    ADD COLUMN IF NOT EXISTS custom_host_verified_at timestamptz,
+    ADD COLUMN IF NOT EXISTS role_name text GENERATED ALWAYS AS ('atalaia_t_' || replace(field_id::text, '-', '')) STORED;
 CREATE UNIQUE INDEX IF NOT EXISTS atalaia_tenants_custom_host ON public.atalaia_tenants (custom_host);
+CREATE UNIQUE INDEX IF NOT EXISTS atalaia_tenants_role_name ON public.atalaia_tenants (role_name);
 CREATE TABLE IF NOT EXISTS public.atalaia_quota_hits (
     id          bigserial PRIMARY KEY,
     created_at  timestamptz NOT NULL DEFAULT now(),
@@ -159,14 +161,18 @@ REVOKE ALL ON public.atalaia_quota_hits FROM PUBLIC;
 """
 
 # The hub-level chrono sharing (SVX-2, ADR-P4-4's amendment of 2026-10-28): three tables each tenant fills with
-# its own rows only (one row-level policy: ``tenant`` is the transaction's own ``atalaia.tenant``; ENABLEd, not
-# FORCEd, so their owner, which the two functions run as, sees every row) and two SECURITY DEFINER functions, the
+# its own rows only (one row-level policy: ``tenant`` is the schema of the field whose database role runs the
+# transaction, ``atalaia_caller_tenant()``, which reads the ``role`` setting that only SET ROLE changes, and not the
+# ``atalaia.tenant`` setting any statement could rewrite, S2113-3; ENABLEd, not
+# FORCEd, so their owner, which the functions run as, sees every row) and two SECURITY DEFINER functions, the
 # only way across: ``atalaia_share_read`` (the other fields' records of the persons the caller is linked to, when
 # both are active members and consented) and ``atalaia_share_redeem`` (a link code, once). They read hub tables
 # only, never a tenant's schema. Idempotent: run by ``init`` and by ``migrate``.
 SHARE_TABLES = ("atalaia_share_members", "atalaia_share_records", "atalaia_share_codes")
 SHARE_FUNCTIONS = ("public.atalaia_share_read(uuid[], integer)", "public.atalaia_share_redeem(bytea)")
-SHARE_POLICY = "(tenant = current_setting('atalaia.tenant'::text, true))"
+CALLER_FUNCTION = "public.atalaia_caller_tenant()"
+TENANT_FUNCTIONS = SHARE_FUNCTIONS + (CALLER_FUNCTION,)
+SHARE_POLICY = "(tenant = atalaia_caller_tenant())"
 SHARE_DDL = """
 CREATE TABLE IF NOT EXISTS public.atalaia_share_members (
     person_id   uuid NOT NULL,
@@ -202,12 +208,16 @@ ALTER TABLE public.atalaia_share_codes NO FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS atalaia_tenant ON public.atalaia_share_members;
 DROP POLICY IF EXISTS atalaia_tenant ON public.atalaia_share_records;
 DROP POLICY IF EXISTS atalaia_tenant ON public.atalaia_share_codes;
+CREATE OR REPLACE FUNCTION public.atalaia_caller_tenant() RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $fn$
+    SELECT t.schema_name FROM public.atalaia_tenants t WHERE t.role_name = current_setting('role', true)
+$fn$;
 CREATE POLICY atalaia_tenant ON public.atalaia_share_members
-    USING (tenant = current_setting('atalaia.tenant', true)) WITH CHECK (tenant = current_setting('atalaia.tenant', true));
+    USING (tenant = public.atalaia_caller_tenant()) WITH CHECK (tenant = public.atalaia_caller_tenant());
 CREATE POLICY atalaia_tenant ON public.atalaia_share_records
-    USING (tenant = current_setting('atalaia.tenant', true)) WITH CHECK (tenant = current_setting('atalaia.tenant', true));
+    USING (tenant = public.atalaia_caller_tenant()) WITH CHECK (tenant = public.atalaia_caller_tenant());
 CREATE POLICY atalaia_tenant ON public.atalaia_share_codes
-    USING (tenant = current_setting('atalaia.tenant', true)) WITH CHECK (tenant = current_setting('atalaia.tenant', true));
+    USING (tenant = public.atalaia_caller_tenant()) WITH CHECK (tenant = public.atalaia_caller_tenant());
 CREATE OR REPLACE FUNCTION public.atalaia_share_read(p_persons uuid[], p_per_person integer)
 RETURNS TABLE (person_id uuid, field_name text, reading_id uuid, taken_at timestamptz, record_json text, public_key text)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $fn$
@@ -219,7 +229,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $fn$
         JOIN public.atalaia_share_records r ON r.person_id = me.person_id AND r.tenant <> me.tenant
         JOIN public.atalaia_share_members src ON src.person_id = r.person_id AND src.tenant = r.tenant
         JOIN public.atalaia_tenants t ON t.schema_name = r.tenant
-        WHERE me.tenant = nullif(current_setting('atalaia.tenant', true), '') AND me.active AND src.active
+        WHERE me.tenant = public.atalaia_caller_tenant() AND me.active AND src.active
           AND t.status = 'active' AND me.person_id = ANY (p_persons)
     ) x
     WHERE x.n <= p_per_person
@@ -227,7 +237,7 @@ $fn$;
 CREATE OR REPLACE FUNCTION public.atalaia_share_redeem(p_hash bytea) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $fn$
 DECLARE
-    me  text := nullif(current_setting('atalaia.tenant', true), '');
+    me  text := public.atalaia_caller_tenant();
     pid uuid;
 BEGIN
     IF me IS NULL THEN
@@ -294,6 +304,10 @@ async def _check_app_role(conn: asyncpg.Connection, app_role: str) -> None:
                           "would not apply to it")
     if app_role == await conn.fetchval("SELECT current_user"):
         raise HostedError("the server's role must not be the owner role these commands run as")
+    if not await conn.fetchval("SELECT rolcreaterole FROM pg_roles WHERE rolname = current_user"):
+        raise HostedError("the owner role must have CREATEROLE: every field has a database role of its own, made "
+                          "and dropped by these commands (ALTER ROLE <owner> CREATEROLE; server/hosted-roles.sh "
+                          "does it; decisions S2113-1)")
 
 
 async def _tenant(conn: asyncpg.Connection, slug: str, lock: bool = False) -> Tenant:
@@ -344,32 +358,51 @@ def _strip(regclass: str, schema: str) -> str:
     return name.strip('"')
 
 
-async def apply_security(conn: asyncpg.Connection, schema: str, app_role: str) -> int:
-    """The server's grants and the row-level security of one tenant's schema; returns the tables covered.
+async def apply_security(conn: asyncpg.Connection, schema: str, app_role: str, role: str) -> int:
+    """The grants and the row-level security of one tenant's schema; returns the tables covered.
 
-    The server's role gets USAGE on the schema, SELECT/INSERT/UPDATE/DELETE on its tables (never TRUNCATE,
-    which row-level security does not cover, nor REFERENCES or TRIGGER) and its sequences; nothing on
-    ``alembic_version``. Every table gets ENABLE and FORCE ROW LEVEL SECURITY and the one policy
-    ``atalaia_tenant``: rows are seen and written only while ``atalaia.tenant`` is this schema's name."""
+    ``role`` is the field's own database role (``tenant_roles.role_for``; made here if missing, no login). It alone
+    gets USAGE on the schema, SELECT/INSERT/UPDATE/DELETE on its tables (never TRUNCATE, which row-level security
+    does not cover, nor REFERENCES or TRIGGER) and its sequences, and its rows of the hub's sharing tables and the
+    functions over them; nothing on ``alembic_version``. The server's login role ``app_role`` gets *no* grant on the
+    schema (any it had from an older release is revoked) and only the right to ``SET ROLE`` to ``role`` (``WITH
+    INHERIT FALSE``): a connection can reach one field's rows only, whatever it sets. Every table also gets ENABLE
+    and FORCE ROW LEVEL SECURITY and the one policy ``atalaia_tenant``: rows are seen and written only while
+    ``atalaia.tenant`` is this schema's name (defence in depth, the operator's own commands set it)."""
     check_schema(schema)
     check_role(app_role)
-    s, role = _q(schema), _q(app_role)
-    await conn.execute(f"REVOKE ALL ON SCHEMA {s} FROM PUBLIC; GRANT USAGE ON SCHEMA {s} TO {role}")
+    tenant_roles.check_tenant_role(role)
+    s, app, own = _q(schema), _q(app_role), _q(role)
+    await conn.execute(tenant_roles.create_sql(role))
+    await conn.execute(f"ALTER ROLE {own} NOLOGIN")  # the one attribute an owner role with CREATEROLE may set back
+    await conn.execute(f"GRANT {own} TO {app} WITH INHERIT FALSE, SET TRUE")
+    await conn.execute(f"REVOKE ALL ON SCHEMA {s} FROM PUBLIC; REVOKE ALL ON SCHEMA {s} FROM {app}; "
+                       f"GRANT USAGE ON SCHEMA {s} TO {own}")
     tables = await _tables(conn, schema)
     literal = "'" + schema + "'"  # schema passed check_schema: [a-z0-9_] only
     for table in tables:
         t = f"{s}.{_q(table)}"
         await conn.execute(
-            f"REVOKE ALL ON {t} FROM PUBLIC; REVOKE ALL ON {t} FROM {role}; "
-            f"GRANT SELECT, INSERT, UPDATE, DELETE ON {t} TO {role}; "
+            f"REVOKE ALL ON {t} FROM PUBLIC; REVOKE ALL ON {t} FROM {app}; REVOKE ALL ON {t} FROM {own}; "
+            f"GRANT SELECT, INSERT, UPDATE, DELETE ON {t} TO {own}; "
             f"ALTER TABLE {t} ENABLE ROW LEVEL SECURITY; ALTER TABLE {t} FORCE ROW LEVEL SECURITY; "
             f"DROP POLICY IF EXISTS atalaia_tenant ON {t}; "
             f"CREATE POLICY atalaia_tenant ON {t} USING (current_setting('atalaia.tenant', true) = {literal}) "
             f"WITH CHECK (current_setting('atalaia.tenant', true) = {literal})")
     if await conn.fetchval("SELECT to_regclass($1) IS NOT NULL", f"{schema}.alembic_version"):
         await conn.execute(f"REVOKE ALL ON {s}.alembic_version FROM PUBLIC; REVOKE ALL ON {s}.alembic_version "
-                           f"FROM {role}")
-    await conn.execute(f"GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA {s} TO {role}")
+                           f"FROM {app}; REVOKE ALL ON {s}.alembic_version FROM {own}")
+    await conn.execute(f"REVOKE ALL ON ALL SEQUENCES IN SCHEMA {s} FROM {app}; "
+                       f"GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA {s} TO {own}")
+    # The hub's sharing (SVX-2): the field's role runs it, over the rows its role's policy lets it see.
+    if await conn.fetchval("SELECT to_regclass('public.atalaia_share_members') IS NOT NULL"):
+        await conn.execute(
+            f"GRANT USAGE ON SCHEMA public TO {own}; "
+            f"REVOKE ALL ON {', '.join('public.' + t for t in SHARE_TABLES)} FROM {own}; "
+            f"GRANT SELECT, INSERT, UPDATE, DELETE ON public.atalaia_share_members, public.atalaia_share_records "
+            f"TO {own}; "
+            f"GRANT SELECT, INSERT, DELETE ON public.atalaia_share_codes TO {own}; "
+            f"GRANT EXECUTE ON FUNCTION {', '.join(TENANT_FUNCTIONS)} TO {own}")
     return len(tables)
 
 
@@ -399,7 +432,8 @@ async def init_hub(url: str, app_role: str = DEFAULT_APP_ROLE, actor: Optional[s
 
 async def _upgrade_registry(conn: asyncpg.Connection, app_role: str) -> None:
     """The registry's later columns and tables, and the server role's exact rights on the hub's tables: it reads the
-    registry, only adds to the quota inbox, and touches nothing else."""
+    registry, only adds to the quota inbox, and touches nothing else (the sharing's tables and functions belong
+    to the fields' own roles, ``apply_security``)."""
     role = _q(check_role(app_role))
     await conn.execute(REGISTRY_UPGRADE_DDL)
     await conn.execute(
@@ -411,10 +445,7 @@ async def _upgrade_registry(conn: asyncpg.Connection, app_role: str) -> None:
     await conn.execute(SHARE_DDL)
     await conn.execute(
         f"REVOKE ALL ON {', '.join('public.' + t for t in SHARE_TABLES)} FROM PUBLIC, {role}; "
-        f"GRANT SELECT, INSERT, UPDATE, DELETE ON public.atalaia_share_members, public.atalaia_share_records TO {role}; "
-        f"GRANT SELECT, INSERT, DELETE ON public.atalaia_share_codes TO {role}; "
-        f"REVOKE ALL ON FUNCTION {', '.join(SHARE_FUNCTIONS)} FROM PUBLIC; "
-        f"GRANT EXECUTE ON FUNCTION {', '.join(SHARE_FUNCTIONS)} TO {role}")
+        f"REVOKE ALL ON FUNCTION {', '.join(TENANT_FUNCTIONS)} FROM PUBLIC, {role}")  # the fields' roles get them
 
 
 async def upgrade_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> None:
@@ -499,12 +530,13 @@ async def _finish_create(url: str, slug: str, schema: str, name: str, field_type
                     "RETURNING id", name, slug, field_type, timezone_name)
             except asyncpg.PostgresError as e:
                 raise HostedError(f"the field could not be made: {e}") from None
-            tables = await apply_security(conn, schema, app_role)
+            tables = await apply_security(conn, schema, app_role, tenant_roles.role_for(field_id))
             await conn.execute("INSERT INTO public.atalaia_tenants (slug, schema_name, field_id) VALUES ($1, $2, $3)",
                                slug, schema, field_id)
             revision = await conn.fetchval(f"SELECT version_num FROM {_q(schema)}.alembic_version")
             await _audit(conn, "tenant_create", actor, slug, schema, field_id,
-                         {"tables": tables, "revision": revision, "app_role": app_role})
+                         {"tables": tables, "revision": revision, "app_role": app_role,
+                                                "role": tenant_roles.role_for(field_id)})
         return Tenant(slug=slug, schema=schema, field_id=field_id)
     finally:
         await conn.close()
@@ -549,7 +581,7 @@ async def _after_migrate(url: str, slug: str, schema: str, field_id: uuid.UUID, 
     try:
         await _check_app_role(conn, app_role)
         async with conn.transaction():
-            tables = await apply_security(conn, schema, app_role)
+            tables = await apply_security(conn, schema, app_role, tenant_roles.role_for(field_id))
             revision = await conn.fetchval(f"SELECT version_num FROM {_q(schema)}.alembic_version")
             await _audit(conn, "tenant_migrate", actor, slug, schema, field_id, {"tables": tables,
                                                                                   "revision": revision})
@@ -571,15 +603,28 @@ class HubCheck:
     quota_hits: int = 0  # notes of refused quotas waiting for ``hosted quota-hits``
 
 
+# The one function that could change a connection's role from inside a statement: only the server's login role and
+# the owner may call it (server/hosted-roles.sh revokes it from PUBLIC, as the superuser: pg_catalog is not the owner's).
+SET_CONFIG = "pg_catalog.set_config(text, text, boolean)"
+SET_CONFIG_PUBLIC = (f"SELECT EXISTS (SELECT 1 FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', "
+                     f"p.proowner))) a WHERE p.oid = '{SET_CONFIG}'::regprocedure AND a.grantee = 0 "
+                     "AND a.privilege_type = 'EXECUTE')")
 SHARE_PRIVILEGES = {"atalaia_share_members": {"SELECT", "INSERT", "UPDATE", "DELETE"},
                     "atalaia_share_records": {"SELECT", "INSERT", "UPDATE", "DELETE"},
                     "atalaia_share_codes": {"SELECT", "INSERT", "DELETE"}}
 
 
-async def _check_share(conn: asyncpg.Connection, app_role: str, me: str, problems: list[str]) -> None:
+def _same_policy(found: list[str], expected: str) -> bool:
+    """The catalogue prints a qualified name as the checking session's path allows: compare without ``public.``."""
+    return [f.replace("public.", "") for f in found] == [expected.replace("public.", "")]
+
+
+async def _check_share(conn: asyncpg.Connection, app_role: str, roles: list[str], me: str,
+                       problems: list[str]) -> None:
     """The hub-level chrono sharing's tables and functions (SVX-2): owned by the owner role, row-level security on
-    and not forced, exactly the one policy, the server role's exact privileges, and each function a SECURITY
-    DEFINER of the owner with a fixed search path that only the server's role may run."""
+    and not forced, exactly the one policy (the caller's own rows, by the field's database role), each field's role
+    with its exact privileges and the server's login role with none, and each function a SECURITY DEFINER of the
+    owner with a fixed search path that only the fields' roles may run."""
     if not await conn.fetchval("SELECT to_regclass('public.atalaia_share_members') IS NOT NULL"):
         problems.append("the registry is of an older release (no public.atalaia_share_members): run hosted migrate")
         return
@@ -597,13 +642,19 @@ async def _check_share(conn: asyncpg.Connection, app_role: str, me: str, problem
             problems.append(f"{table}: row-level security is not enabled")
         if row["relforcerowsecurity"]:
             problems.append(f"{table}: row-level security is forced (the sharing functions would read nothing)")
-        if list(row["policies"] or []) != [f"atalaia_tenant|*|true|{SHARE_POLICY}|{SHARE_POLICY}|{{0}}"]:
+        if not _same_policy(list(row["policies"] or []),
+                            f"atalaia_tenant|*|true|{SHARE_POLICY}|{SHARE_POLICY}|{{0}}"):
             problems.append(f"{table}: the policies are not exactly atalaia_tenant for the caller's own rows")
         have = {p for p in TABLE_PRIVILEGES
                 if await conn.fetchval("SELECT has_table_privilege($1, $2, $3)", app_role, table, p)}
-        if have != allowed:
-            problems.append(f"{app_role} has {sorted(have)} on {table}, not {sorted(allowed)}")
-    for signature in SHARE_FUNCTIONS:
+        if have:
+            problems.append(f"{app_role} has {sorted(have)} on {table}, not nothing (only the fields' roles use it)")
+        for role in roles:
+            have = {p for p in TABLE_PRIVILEGES
+                    if await conn.fetchval("SELECT has_table_privilege($1, $2, $3)", role, table, p)}
+            if have != allowed:
+                problems.append(f"{role} has {sorted(have)} on {table}, not {sorted(allowed)}")
+    for signature in TENANT_FUNCTIONS:
         row = await conn.fetchrow(
             "SELECT p.prosecdef, pg_get_userbyid(p.proowner) AS owner, p.proconfig, "
             "EXISTS (SELECT 1 FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a "
@@ -617,10 +668,47 @@ async def _check_share(conn: asyncpg.Connection, app_role: str, me: str, problem
         if list(row["proconfig"] or []) != ["search_path=pg_catalog"]:
             problems.append(f"{signature} has no fixed search_path of pg_catalog")
         if row["everyone"]:
-            problems.append(f"{signature} can be run by anyone, not only {app_role}")
-        if not await conn.fetchval("SELECT has_function_privilege($1, to_regprocedure($2), 'EXECUTE')",
-                                   app_role, signature):
-            problems.append(f"{app_role} cannot run {signature}")
+            problems.append(f"{signature} can be run by anyone, not only the fields' roles")
+        if await conn.fetchval("SELECT has_function_privilege($1, to_regprocedure($2), 'EXECUTE')",
+                               app_role, signature):
+            problems.append(f"{app_role} can run {signature}: only the fields' roles may")
+        for role in roles:
+            if not await conn.fetchval("SELECT has_function_privilege($1, to_regprocedure($2), 'EXECUTE')",
+                                       role, signature):
+                problems.append(f"{role} cannot run {signature}")
+
+
+async def _check_tenant_role(conn: asyncpg.Connection, app_role: str, role: str, schema: str,
+                             problems: list[str]) -> None:
+    """One field's database role: it exists, cannot log in, holds no attribute that could bypass the isolation,
+    owns nothing, and the server's login role may SET ROLE to it without inheriting its grants."""
+    row = await conn.fetchrow(
+        "SELECT oid, rolsuper, rolcanlogin, rolbypassrls, rolcreaterole, rolcreatedb, rolreplication, rolinherit "
+        "FROM pg_roles WHERE rolname = $1", role)
+    if row is None:
+        problems.append(f"{schema}: the database role {role} is missing: run hosted migrate")
+        return
+    bad = [n for n in ("rolsuper", "rolcanlogin", "rolbypassrls", "rolcreaterole", "rolcreatedb", "rolreplication")
+           if row[n]]
+    if bad:
+        problems.append(f"{role} has {', '.join(bad)}")
+    owned = await conn.fetchval("SELECT count(*) FROM pg_class WHERE relowner = $1", row["oid"]) \
+        + await conn.fetchval("SELECT count(*) FROM pg_namespace WHERE nspowner = $1", row["oid"])
+    if owned:
+        problems.append(f"{role} owns {owned} schemas or relations")
+    member = await conn.fetchrow(
+        "SELECT m.set_option, m.inherit_option FROM pg_auth_members m WHERE m.roleid = $1 "
+        "AND m.member = (SELECT oid FROM pg_roles WHERE rolname = $2)", row["oid"], app_role)
+    if member is None or not member["set_option"]:
+        problems.append(f"{app_role} cannot SET ROLE to {role}: run hosted migrate")
+    elif member["inherit_option"]:
+        problems.append(f"{app_role} inherits the grants of {role} (it must only SET ROLE to it)")
+    others = await conn.fetchval(
+        "SELECT count(*) FROM pg_auth_members WHERE roleid = $1 AND member <> (SELECT oid FROM pg_roles WHERE "
+        "rolname = $2) AND member NOT IN (SELECT oid FROM pg_roles WHERE rolname = current_user)",
+        row["oid"], app_role)
+    if others:
+        problems.append(f"{role} has {others} other members")
 
 
 async def check_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> HubCheck:
@@ -629,10 +717,12 @@ async def check_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> HubCheck:
     Every registered field has its schema and every ``field_*`` schema is registered; the owner role owns
     every schema and table; every table has ENABLE and FORCE ROW LEVEL SECURITY and exactly one policy,
     ``atalaia_tenant`` for that schema; the server's role is no superuser, has no BYPASSRLS, owns nothing, has
-    exactly SELECT, INSERT, UPDATE and DELETE on each field table, nothing on ``alembic_version``, only SELECT
-    on the registry, only INSERT on the quota inbox and nothing on the hub's audit log; and the sharing's tables and functions (``_check_share``).
-    Reads only; returns the
-    problems found (and how many quota notes wait)."""
+    *no* privilege on any field's schema or tables or on the sharing's tables and functions (it may only SET ROLE
+    to a field's role, without inheriting it), only SELECT on the registry, only INSERT on the quota inbox and
+    nothing on the hub's audit log; each field has a database role (``_check_tenant_role``) with exactly SELECT,
+    INSERT, UPDATE and DELETE on its tables, nothing on ``alembic_version`` and nothing on another field's; and
+    the sharing's tables and functions (``_check_share``). Reads only; returns the problems found (and how many
+    quota notes wait)."""
     check_role(app_role)
     conn = await _connect(url)
     try:
@@ -644,12 +734,20 @@ async def check_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> HubCheck:
             raise HostedError(f"the server's role {app_role!r} does not exist")
         if role["rolsuper"] or role["rolbypassrls"]:
             problems.append(f"{app_role} is a superuser or has BYPASSRLS")
-        if app_role == me:
-            problems.append("the check must run as the owner role, not the server's")
+        if app_role == me:  # the server's role has no right to look into the fields: nothing more can be checked
+            return HubCheck(fields=0, tables=0, problems=["the check must run as the owner role, not the server's"])
         owned = await conn.fetchval("SELECT count(*) FROM pg_class WHERE relowner = $1", role["oid"]) \
             + await conn.fetchval("SELECT count(*) FROM pg_namespace WHERE nspowner = $1", role["oid"])
         if owned:
             problems.append(f"{app_role} owns {owned} schemas or relations")
+        if await conn.fetchval(SET_CONFIG_PUBLIC):
+            problems.append("pg_catalog.set_config can be called by every role: a field's role could switch to "
+                            "another field's (run server/hosted-roles.sh as the superuser)")
+        for who in (app_role, me):
+            if not await conn.fetchval("SELECT has_function_privilege($1, $2::regprocedure, 'EXECUTE')", who,
+                                       SET_CONFIG):
+                problems.append(f"{who} cannot call pg_catalog.set_config (run server/hosted-roles.sh as the "
+                                "superuser)")
         if not await conn.fetchval("SELECT to_regclass('public.atalaia_quota_hits') IS NOT NULL"):
             problems.append("the registry is of an older release (no public.atalaia_quota_hits): run hosted migrate")
         for table, allowed in (("public.atalaia_tenants", {"SELECT"}), ("public.atalaia_hub_audit", set()),
@@ -660,9 +758,13 @@ async def check_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> HubCheck:
                     if await conn.fetchval("SELECT has_table_privilege($1, $2, $3)", app_role, table, p)}
             if have != allowed:
                 problems.append(f"{app_role} has {sorted(have)} on {table}, not {sorted(allowed)}")
-        await _check_share(conn, app_role, me, problems)
         registered = {r["schema_name"]: r["slug"] for r in await conn.fetch(
             "SELECT slug, schema_name FROM public.atalaia_tenants")}
+        role_of = {r["schema_name"]: r["role_name"] for r in await conn.fetch(
+            "SELECT schema_name, role_name FROM public.atalaia_tenants")}
+        existing = {r["rolname"] for r in await conn.fetch("SELECT rolname FROM pg_roles WHERE rolname = ANY($1)",
+                                                          list(role_of.values()))}
+        await _check_share(conn, app_role, sorted(existing), me, problems)
         present = {r["nspname"]: r["owner"] for r in await conn.fetch(
             r"SELECT nspname, pg_get_userbyid(nspowner) AS owner FROM pg_namespace WHERE nspname LIKE 'field\_%'")}
         for schema in sorted(set(registered) - set(present)):
@@ -674,8 +776,21 @@ async def check_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> HubCheck:
             check_schema(schema)
             if present[schema] != me:
                 problems.append(f"{schema} is owned by {present[schema]}, not {me}")
-            if not await conn.fetchval("SELECT has_schema_privilege($1, $2, 'USAGE')", app_role, schema):
-                problems.append(f"{app_role} has no USAGE on {schema}")
+            role = role_of[schema]
+            await _check_tenant_role(conn, app_role, role, schema, problems)
+            if role not in existing:
+                continue  # said above: the rest cannot be told without it
+            if await conn.fetchval("SELECT has_function_privilege($1, $2::regprocedure, 'EXECUTE')", role,
+                                   SET_CONFIG):
+                problems.append(f"{role} can call pg_catalog.set_config: it could switch to another field's role")
+            if await conn.fetchval("SELECT has_schema_privilege($1, $2, 'USAGE, CREATE')", app_role, schema):
+                problems.append(f"{app_role} has privileges on {schema} itself: only {role} may")
+            if not await conn.fetchval("SELECT has_schema_privilege($1, $2, 'USAGE')", role, schema):
+                problems.append(f"{role} has no USAGE on {schema}")
+            for other_schema, other_role in role_of.items():
+                if other_schema != schema and other_role in existing and await conn.fetchval(
+                        "SELECT has_schema_privilege($1, $2, 'USAGE, CREATE')", other_role, schema):
+                    problems.append(f"{other_role} has privileges on {schema}, another field's")
             expected = f"(current_setting('atalaia.tenant'::text, true) = '{schema}'::text)"
             rows = await conn.fetch(
                 "SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity, pg_get_userbyid(c.relowner) AS owner, "
@@ -689,17 +804,22 @@ async def check_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> HubCheck:
                 name, qualified = r["relname"], f"{schema}.{r['relname']}"
                 if r["owner"] != me:
                     problems.append(f"{qualified} is owned by {r['owner']}, not {me}")
+                regular = f"{_q(schema)}.{_q(name)}"
+                theirs = {p for p in TABLE_PRIVILEGES if await conn.fetchval(
+                    "SELECT has_table_privilege($1, $2, $3)", app_role, regular, p)}
                 have = {p for p in TABLE_PRIVILEGES if await conn.fetchval(
-                    "SELECT has_table_privilege($1, $2, $3)", app_role, f"{_q(schema)}.{_q(name)}", p)}
+                    "SELECT has_table_privilege($1, $2, $3)", role, regular, p)}
+                if theirs:
+                    problems.append(f"{app_role} has {sorted(theirs)} on {qualified}, not nothing: only {role} may")
                 if name == "alembic_version":
                     if have:
-                        problems.append(f"{app_role} has {sorted(have)} on {qualified}")
+                        problems.append(f"{role} has {sorted(have)} on {qualified}")
                     continue
                 tables += 1
                 if not (r["relrowsecurity"] and r["relforcerowsecurity"]):
                     problems.append(f"{qualified}: row-level security is not enabled and forced")
                 if have != SERVER_TABLE_PRIVILEGES:
-                    problems.append(f"{app_role} has {sorted(have)} on {qualified}, not SELECT, INSERT, UPDATE, "
+                    problems.append(f"{role} has {sorted(have)} on {qualified}, not SELECT, INSERT, UPDATE, "
                                     "DELETE")
                 if list(r["policies"] or []) != [f"atalaia_tenant|*|true|{expected}|{expected}|{{0}}"]:
                     problems.append(f"{qualified}: the policies are not exactly atalaia_tenant for {schema}")
@@ -1103,6 +1223,8 @@ async def delete_tenant(url: str, slug: str, confirm: str, reason: str, actor: O
                 await conn.execute("DELETE FROM public.atalaia_share_codes WHERE tenant = $1", tenant.schema)
                 await conn.execute("DELETE FROM public.atalaia_share_members WHERE tenant = $1", tenant.schema)
             await conn.execute(f"DROP SCHEMA {_q(tenant.schema)} CASCADE")
+            for statement in tenant_roles.drop_sql(tenant.role, tenant.schema):  # the field's role goes with it
+                await conn.execute(statement)
             await conn.execute("DELETE FROM public.atalaia_tenants WHERE slug = $1", tenant.slug)
             await _audit(conn, "tenant_delete", actor or default_actor(), tenant.slug, tenant.schema, tenant.field_id,
                          {"reason": reason, "rows": counts})

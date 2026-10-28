@@ -10,11 +10,16 @@
 #   - makes atalaia_owner (owns the database, the field schemas and the hub's
 #     tables; runs the migrations and the operator's commands) and atalaia_app
 #     (the server's role) if they are missing: both LOGIN, NOSUPERUSER,
-#     NOBYPASSRLS, NOCREATEDB, NOCREATEROLE, NOREPLICATION, NOINHERIT;
+#     NOBYPASSRLS, NOCREATEDB, NOREPLICATION, NOINHERIT; the owner has CREATEROLE (it makes and drops the
+#     fields' own database roles, which are NOLOGIN), the server's role has not;
 #   - sets their passwords to ATALAIA_OWNER_DB_PASSWORD and
 #     ATALAIA_APP_DB_PASSWORD from the env file, so the file and the database
 #     always agree (a restore on a new machine, a rotated password);
-#   - makes atalaia_owner the owner of the database atalaia.
+#   - makes atalaia_owner the owner of the database atalaia;
+#   - in that database, revokes EXECUTE on pg_catalog.set_config from PUBLIC and grants it to atalaia_owner and
+#     atalaia_app only (decision S2113-1): every field has a database role of its own that only that field's
+#     requests run as, and a statement running as it must not be able to call set_config('role', ...) to become
+#     another field's. Needs the superuser: pg_catalog's functions are not the owner's.
 # The SQL, passwords included, goes to psql on standard input, never on a
 # command line, with statement logging off for that session; PostgreSQL keeps
 # only the passwords' SCRAM hashes. Nothing secret is printed.
@@ -62,10 +67,17 @@ dc up -d --wait postgres
         "END \$\$;"
     for role in atalaia_owner atalaia_app; do
         if [ "$role" = atalaia_owner ]; then pw=$owner_pw; else pw=$app_pw; fi
-        printf "ALTER ROLE %s LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION NOINHERIT PASSWORD '%s';\n" \
-            "$role" "$pw"
+        if [ "$role" = atalaia_owner ]; then createrole=CREATEROLE; else createrole=NOCREATEROLE; fi
+        printf "ALTER ROLE %s LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB %s NOREPLICATION NOINHERIT PASSWORD '%s';\n" \
+            "$role" "$createrole" "$pw"
     done
     printf '%s\n' "ALTER DATABASE atalaia OWNER TO atalaia_owner;"
 } | dc exec -T postgres psql -U atalaia -d postgres -v ON_ERROR_STOP=1 -q -X > /dev/null \
     || fail "making the roles failed"
+# Per database, so after the database exists (and again after a restore replaces it).
+{
+    printf '%s\n' "REVOKE EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) FROM PUBLIC;" \
+        "GRANT EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) TO atalaia_owner, atalaia_app;"
+} | dc exec -T postgres psql -U atalaia -d atalaia -v ON_ERROR_STOP=1 -q -X > /dev/null \
+    || fail "restricting set_config failed"
 echo "hosted-roles.sh: the roles atalaia_owner and atalaia_app are set up (passwords from $env_file, not shown)"

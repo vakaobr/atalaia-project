@@ -464,13 +464,18 @@ certificates.**
   answers at most 5 checks a second (bursts of 20); past that it says no
   without touching the database. It is on the internal networks only: Caddy
   reaches it, nobody else does.
-- **Two database roles.** The schemas, their tables and the hub's own tables
-  belong to `atalaia_owner`, which runs the migrations and the operator's
+- **Two login roles, and one role per field.** The schemas, their tables and the hub's own tables
+  belong to `atalaia_owner` (it has `CREATEROLE`), which runs the migrations and the operator's
   commands. The server, and the `ask` endpoint, connect as `atalaia_app`: no
-  superuser, no `BYPASSRLS`, owner of nothing, member of no role, only the
-  grants each field's tables need (the server refuses to start otherwise).
-  PostgreSQL's own superuser (`atalaia`, `POSTGRES_PASSWORD`) is used only by
-  the scripts, inside the database's container.
+  superuser, no `BYPASSRLS`, owner of nothing, no grant on any field's table (the server refuses to
+  start otherwise); it may only read the registry, add to the quota inbox and `SET ROLE` to a
+  field's own database role (decision S2113-1). Each field has that role, `atalaia_t_<the field's id>`,
+  no login: `hosted create` and `hosted migrate` make it and give it the field's grants, `hosted delete`
+  drops it, and every request of the field runs as it. [`hosted-roles.sh`](../hosted-roles.sh) also revokes
+  `EXECUTE` on `pg_catalog.set_config` from `PUBLIC` in the hub's database and grants it to the owner and
+  `atalaia_app` only, so a field's role cannot switch to another's from inside a statement; this is the one step
+  that needs the superuser, and it is repeated after a restore. PostgreSQL's own superuser (`atalaia`,
+  `POSTGRES_PASSWORD`) is used only by the scripts, inside the database's container.
 - **The migrations** run in the `hub` container (`hosted migrate`, as the
   owner) every time the stack starts, before the server; the server's own
   command does not migrate. `hosted migrate` also applies every field's
@@ -582,8 +587,11 @@ under the DPA):
   enabled and not forced and their one policy, the server role's exact
   privileges on them, and the two `SECURITY DEFINER` functions the sharing
   uses, owned by the owner role, with a fixed search path, runnable by the
-  server's role only) and exits 1 on any problem. Run it after anything you
-  did to the database by hand.
+  server's role only) and exits 1 on any problem. Since decision S2113-1 it also reads each field's database role
+  (it exists, no login, owns nothing, the server's role may only `SET ROLE` to it without inheriting it), that the
+  field's role alone has the grants (and the server's role has none on any field's table or schema, nor on the
+  sharing's tables and functions, which the fields' roles run), and that no role but the owner's and the server's
+  can call `pg_catalog.set_config`. Run it after anything you did to the database by hand.
 - Chrono sharing across fields (SVX-2): nothing to turn on at the hub. `hosted init` and `hosted migrate` make the
   sharing's tables and functions in `public` (idempotent); each field's admin switches sharing on in the field's
   settings as before, and each player consents per field and links their accounts at the hub's fields with a code
@@ -601,7 +609,12 @@ cd server && docker compose up -d --build --wait caddy server tls-ask
 ```
 
 `hub` runs `hosted migrate` before the new server starts; if a migration
-fails, the server does not start (`docker compose logs hub`). `hosted migrate` also brings the registry up to
+fails, the server does not start (`docker compose logs hub`). **Upgrading a hub made before decision S2113-1** (a
+database role per field): run `sh server/hosted-roles.sh` first (it gives `atalaia_owner` `CREATEROLE` and restricts
+`set_config`; the stack's up-to-date `.env` is enough), then `hub` (migration `0023_tenant_roles` and `hosted migrate`
+make each field's role and move the grants from `atalaia_app` to it). Until then the new server refuses to start
+(`cannot SET ROLE to the database role of ...`), and the old server stops working once the grants have moved: do it in
+one maintenance window, with a backup taken first. Rolling back is `hosted migrate` of the older release. `hosted migrate` also brings the registry up to
 date (the per-field limits, the custom host names and the quota-note table of PKC-5 and PKC-6 are added to a hub made
 by an older release, idempotently), and a server that finds the older registry refuses to start and says so: run
 `docker compose run --rm hub hosted migrate`. `Caddyfile.hosted` changed in the same release (a second site block for
@@ -622,13 +635,15 @@ those above.
   single-field server's backup on a hub (and a hub's on a single-field
   server) with nothing changed. Then it makes both roles again from `.env`
   (on a new machine too), stops the server and `tls-ask`, creates the
-  database owned by `atalaia_owner` and restores **with** the owners and the
-  grants (no `--no-owner`), in one transaction. `hosted check` must then pass
-  (everything owned by the owner again, row-level security forced on every
-  table, the server role's grants exactly as they were), or the server stays
-  stopped; `hub` migrates (a backup from an older release is brought up to
-  date, grants and policies applied again), the server starts, and
-  `hosted check` runs once more.
+  database owned by `atalaia_owner` and restores **with** the owners but
+  **without** the grants (`--no-acl`: the fields' database roles belong to the
+  cluster, not to the backup, so on a new machine the backup's grants to them
+  would fail), in one transaction. Then it runs `hosted-roles.sh` again (the
+  `set_config` restriction is per database) and `hosted migrate`, which makes every
+  field's role again from the registry and gives every grant back. `hosted check` must
+  then pass (everything owned by the owner again, row-level security forced on every
+  table, every role's grants exactly as they should be), or the server stays
+  stopped; `hub` migrates again, the server starts, and `hosted check` runs once more.
 
 **On a new machine:** install Docker, clone the repository, put back your
 copy of `.env` as `server/.env` (mode 0600), run `sh server/setup.sh

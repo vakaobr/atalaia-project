@@ -35,6 +35,16 @@ Per request:
    would read and write nothing there; a missing setting reads nothing. The
    server's database role owns no table, has no ``BYPASSRLS`` and is no
    superuser: ``check_app_role`` refuses to start otherwise.
+4. Under both, the grants (S2113-1, ``tenant_roles.py``): every field has a database role of its own that alone
+   holds the grants on its schema, and each transaction starts with ``set_config('role', <field's role>, true)``
+   (``SET LOCAL ROLE``). The server's login role holds no grant on any field's table, so even a statement that
+   calls ``set_config('atalaia.tenant', <another field>, ...)`` reaches no row of another field: ``permission
+   denied``; and a field's role cannot call ``pg_catalog.set_config`` (revoked from PUBLIC by
+   ``server/hosted-roles.sh``; ``check_app_role`` refuses to start otherwise), so a statement running as it cannot
+   switch role or setting at all (``SET ROLE`` is a command, and the server's driver sends one statement at a
+   time). What stays across fields is by design and explicit: the registry, the quota inbox, the lookups of
+   the host name and the watcher read as the server's login role; the chrono sharing's hub tables as the field's
+   role, their policy keyed on that role (``atalaia_caller_tenant``), not on the setting.
 
 The server's engine opens its connections with ``search_path=pg_catalog``, so
 even outside a session's transaction nothing resolves. Access tokens carry
@@ -58,7 +68,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.orm import Session, SessionTransaction
 
-from . import quotas
+from . import quotas, tenant_roles
 
 # A tenant's slug is one DNS label (its host name is <slug>.<domain>) of at most 40 characters.
 TENANT_SLUG = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?")
@@ -125,6 +135,11 @@ class Tenant:
     quotas: Mapping[str, int] = dc_field(default_factory=dict, hash=False, compare=False)
     custom_host: Optional[str] = dc_field(default=None, compare=False)
     custom_host_status: Optional[str] = dc_field(default=None, compare=False)
+
+    @property
+    def role(self) -> str:
+        """The field's own database role (``tenant_roles``): what every request of the field runs as."""
+        return tenant_roles.role_for(self.field_id)
 
     def host(self, domain: str) -> str:
         return f"{self.slug}.{domain}"
@@ -222,7 +237,13 @@ async def active_tenants(engine: AsyncEngine) -> list[Tenant]:
 
 # Sessions -------------------------------------------------------------------------------------
 
-_SCOPE = text("SELECT set_config('search_path', :path, true), set_config('atalaia.tenant', :tenant, true)")
+# ``set_config('role', ..., true)`` is ``SET LOCAL ROLE``: the transaction runs as the field's own role (the one
+# that alone holds the grants on its schema, S2113-1) and the role goes back to the server's at its end. The role
+# comes last: the function calls are checked before the statement runs, as the server's role (the only one that
+# may call ``set_config``), and run left to right.
+_SCOPE = text("SELECT set_config('search_path', :path, true), set_config('atalaia.tenant', :tenant, true), "
+              "set_config('role', :role, true)")
+NO_ROLE = "none"
 
 
 class TenantSession(Session):
@@ -230,20 +251,40 @@ class TenantSession(Session):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.info["atalaia_tenant"] = current_schema()
+        tenant = current()
+        self.info["atalaia_tenant"] = tenant.schema if tenant is not None else None
+        self.info["atalaia_role"] = tenant.role if tenant is not None else None
 
 
 @event.listens_for(TenantSession, "after_begin")
 def _scope_transaction(session: Session, transaction: SessionTransaction, connection: Connection) -> None:
+    if transaction.parent is not None:
+        return  # a savepoint: its outer transaction is already scoped, and now runs as the field's role
     schema = session.info.get("atalaia_tenant")
     if schema is not None:
         check_schema(schema)
-    connection.execute(_SCOPE, {"path": schema or NO_TENANT_PATH, "tenant": schema or ""})
+    role = session.info.get("atalaia_role")
+    if role is not None:
+        tenant_roles.check_tenant_role(role)
+    connection.execute(_SCOPE, {"role": role or NO_ROLE, "path": schema or NO_TENANT_PATH, "tenant": schema or ""})
 
 
 def engine_options() -> dict[str, Any]:
-    """asyncpg's start-up settings for the hosted server's connections: no schema on the path."""
-    return {"server_settings": {"search_path": NO_TENANT_PATH}}
+    """asyncpg's start-up settings for the hosted server's connections: no schema on the path, and no JIT (the
+    driver's type introspection would switch it off with ``set_config``, see ``keep_set_config_to_the_server``)."""
+    return {"server_settings": {"search_path": NO_TENANT_PATH, "jit": "off"}}
+
+
+def keep_set_config_to_the_server(engine: AsyncEngine) -> None:
+    """asyncpg learns a type it has not met by a query that calls ``set_config('jit', 'off', false)`` first, as
+    whatever role the connection has then: a field's role, which may not call ``set_config`` (S2113-1,
+    ``hosted-roles.sh``). The connections start with JIT off already (``engine_options``), so tell the driver not
+    to bother: its ``jit`` capability is off, and it never calls ``set_config``. ``asyncpg`` is pinned by hash; the
+    hosted tests run a query that needs the introspection as a field's role, and fail if a new release changes this."""
+    @event.listens_for(engine.sync_engine, "connect")
+    def _no_jit_toggle(dbapi_connection: Any, record: Any) -> None:
+        raw = dbapi_connection.driver_connection
+        raw._server_caps = raw._server_caps._replace(jit=False)
 
 
 # The server's database role ---------------------------------------------------------------------
@@ -254,11 +295,22 @@ SELECT r.rolsuper, r.rolbypassrls,
          WHERE c.relowner = r.oid AND (n.nspname LIKE 'field\_%' OR c.relname LIKE 'atalaia\_%')) AS tables_owned,
        (SELECT count(*) FROM pg_namespace n WHERE n.nspowner = r.oid AND n.nspname LIKE 'field\_%') AS schemas_owned,
        to_regclass('public.atalaia_tenants') IS NOT NULL AS registry,
-       EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public'
-                  AND table_name = 'atalaia_tenants' AND column_name = 'custom_host') AS current_registry,
-       to_regclass('public.atalaia_quota_hits') IS NOT NULL AS hits
+       (SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public'
+                  AND table_name = 'atalaia_tenants' AND column_name IN ('custom_host', 'role_name')) = 2
+           AS current_registry,
+       to_regclass('public.atalaia_quota_hits') IS NOT NULL AS hits,
+       EXISTS (SELECT 1 FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+                WHERE p.oid = 'pg_catalog.set_config(text, text, boolean)'::regprocedure
+                  AND a.grantee = 0 AND a.privilege_type = 'EXECUTE') AS set_config_public,
+       has_function_privilege('pg_catalog.set_config(text, text, boolean)'::regprocedure, 'EXECUTE') AS set_config_own,
+       (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname LIKE 'field\_%' AND c.relkind IN ('r', 'p')
+           AND (has_table_privilege(c.oid, 'SELECT') OR has_table_privilege(c.oid, 'INSERT')
+                OR has_table_privilege(c.oid, 'UPDATE') OR has_table_privilege(c.oid, 'DELETE'))) AS direct_grants
   FROM pg_roles r WHERE r.rolname = current_user
 """)
+_ROLES_MISSING = text("SELECT t.slug FROM public.atalaia_tenants t LEFT JOIN pg_roles r ON r.rolname = t.role_name "
+                      "WHERE r.oid IS NULL OR NOT pg_has_role(r.oid, 'SET') ORDER BY t.slug")
 _REGISTRY_WRITE = text("SELECT has_table_privilege('public.atalaia_tenants', 'INSERT, UPDATE, DELETE, TRUNCATE')")
 
 
@@ -271,7 +323,7 @@ async def check_app_role(engine: AsyncEngine) -> None:
     or may change the registry, and a database with no registry (``hosted init`` not run)."""
     async with engine.connect() as conn:
         row = (await conn.execute(_ROLE_CHECK)).one()
-        superuser, bypass, tables, schemas, registry, current_registry, hits = row
+        superuser, bypass, tables, schemas, registry, current_registry, hits, set_config_public, set_config_own, direct = row
         problems = []
         if superuser:
             problems.append("is a superuser")
@@ -283,8 +335,20 @@ async def check_app_role(engine: AsyncEngine) -> None:
             problems.append("finds no public.atalaia_tenants (run: python -m atalaia_server hosted init)")
         elif not (current_registry and hits):
             problems.append("finds the registry of an older release (run: python -m atalaia_server hosted migrate)")
-        elif await conn.scalar(_REGISTRY_WRITE):
-            problems.append("may change public.atalaia_tenants")
+        else:
+            if set_config_public or not set_config_own:
+                problems.append("finds pg_catalog.set_config callable by every role, or not by itself (a field's "
+                                "role must not be able to call it: it could SET ROLE to another field; run "
+                                "server/hosted-roles.sh as the database's superuser, server/docs/DEPLOY.md)")
+            if await conn.scalar(_REGISTRY_WRITE):
+                problems.append("may change public.atalaia_tenants")
+            if direct:
+                problems.append(f"holds grants on {direct} tenant tables itself (only a field's own role may: run "
+                                "python -m atalaia_server hosted migrate)")
+            missing = [r[0] for r in (await conn.execute(_ROLES_MISSING)).all()]
+            if missing:
+                problems.append("cannot SET ROLE to the database role of " + ", ".join(missing[:5])
+                                + " (run python -m atalaia_server hosted migrate)")
     if problems:
         raise RoleProblem("hosted mode: the server's database role " + "; ".join(problems)
                           + " (server/docs/DEPLOY.md, hosted mode)")

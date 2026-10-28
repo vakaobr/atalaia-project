@@ -86,10 +86,33 @@ class Hub:
             .render_as_string(hide_password=False)
         self.super_url = base.set(database=self.name).render_as_string(hide_password=False)
 
+    async def restrict_set_config(self) -> None:
+        """What server/hosted-roles.sh does in the hub's database (as the superuser): only the owner and the server's
+        login role may call set_config, so a field's role cannot switch role or setting from inside a statement."""
+        conn = await asyncpg.connect(hosted.dsn(self.super_url), timeout=10)
+        try:
+            await conn.execute(f"REVOKE EXECUTE ON FUNCTION {hosted.SET_CONFIG} FROM PUBLIC; "
+                               f"GRANT EXECUTE ON FUNCTION {hosted.SET_CONFIG} TO {self.owner}, {self.app_role}")
+        finally:
+            await conn.close()
+
+    async def _tenant_roles(self) -> list[str]:
+        try:
+            conn = await asyncpg.connect(hosted.dsn(self.super_url), timeout=10)
+        except Exception:  # noqa: BLE001  (the database was never made)
+            return []
+        try:
+            return [r["role_name"] for r in await conn.fetch("SELECT role_name FROM public.atalaia_tenants")]
+        except asyncpg.PostgresError:
+            return []
+        finally:
+            await conn.close()
+
     def create(self) -> None:
-        asyncio.run(_admin(f"CREATE ROLE {self.owner} LOGIN PASSWORD '{self.owner_pw}' NOSUPERUSER NOBYPASSRLS"))
+        asyncio.run(_admin(f"CREATE ROLE {self.owner} LOGIN PASSWORD '{self.owner_pw}' NOSUPERUSER NOBYPASSRLS CREATEROLE"))
         asyncio.run(_admin(f"CREATE ROLE {self.app_role} LOGIN PASSWORD '{self.app_pw}' NOSUPERUSER NOBYPASSRLS"))
         asyncio.run(_admin(f'CREATE DATABASE "{self.name}" OWNER {self.owner}'))
+        asyncio.run(self.restrict_set_config())
         asyncio.run(hosted.init_hub(self.owner_url, self.app_role, actor="test:operator"))
         self.a = hosted.create_tenant(self.owner_url, "campo-a", "Campo A", app_role=self.app_role,
                                       actor="test:operator")
@@ -97,13 +120,24 @@ class Hub:
                                       actor="test:operator")
 
     def drop(self) -> None:
+        roles = asyncio.run(self._tenant_roles())
         asyncio.run(_admin(f'DROP DATABASE IF EXISTS "{self.name}" WITH (FORCE)'))
+        for role in roles:  # the fields' database roles belong to the cluster, not the database
+            asyncio.run(_admin(f'DROP ROLE IF EXISTS "{role}"'))
         asyncio.run(_admin(f"DROP ROLE IF EXISTS {self.app_role}"))
         asyncio.run(_admin(f"DROP ROLE IF EXISTS {self.owner}"))
 
 
 async def connect(url: str) -> asyncpg.Connection:
     return await asyncpg.connect(hosted.dsn(url), timeout=10)
+
+
+async def connect_driver_safe(url: str) -> asyncpg.Connection:
+    """A connection that, like the server's engine, never lets asyncpg's type introspection call ``set_config``
+    (a field's role may not: ``tenancy.keep_set_config_to_the_server``)."""
+    conn = await connect(url)
+    conn._server_caps = conn._server_caps._replace(jit=False)
+    return conn
 
 
 class HubCase(unittest.IsolatedAsyncioTestCase):
@@ -492,7 +526,12 @@ class SurfaceTests(HubCase):
         self.assertEqual(len(await self.sql(self.tb, "SELECT 1 FROM users WHERE username = 'chefe-a'")), 0)
 
 
-# Row-level security, directly as the server's role ----------------------------------------------------
+# Row-level security and the fields' database roles, directly as the server's login role ---------------------
+
+async def as_field(conn: asyncpg.Connection, tenant: tenancy.Tenant) -> None:
+    """What every request of the field does first (``tenancy.TenantSession``), minus the path and the setting."""
+    await conn.execute("SELECT set_config('role', $1, true)", tenant.role)
+
 
 class RowSecurityTests(HubCase):
     async def asyncSetUp(self) -> None:
@@ -500,43 +539,130 @@ class RowSecurityTests(HubCase):
         await self.user(self.ta, f"rls-a-{secrets.token_hex(3)}")
         await self.user(self.tb, f"rls-b-{secrets.token_hex(3)}")
 
-    async def test_no_setting_reads_nothing(self) -> None:
+    async def test_the_server_login_role_reads_no_field_at_all(self) -> None:
         conn = await connect(self.hub.app_url)
         try:
             self.assertEqual(await conn.fetchval("SHOW search_path"), '"$user", public')  # the role's default
             for schema in (self.ta.schema, self.tb.schema):
-                with self.subTest(schema=schema):
-                    self.assertEqual(await conn.fetchval(f"SELECT count(*) FROM {schema}.users"), 0)
-                    self.assertEqual(await conn.fetchval(f"SELECT count(*) FROM {schema}.fields"), 0)
-            await conn.execute("SELECT set_config('atalaia.tenant', '', false)")
-            self.assertEqual(await conn.fetchval(f"SELECT count(*) FROM {self.ta.schema}.users"), 0)
-            with self.assertRaises(asyncpg.InsufficientPrivilegeError):  # WITH CHECK: no setting writes nothing
+                for table in ("users", "fields", "alembic_version"):
+                    with self.subTest(schema=schema, table=table):
+                        with self.assertRaises(asyncpg.InsufficientPrivilegeError):
+                            await conn.fetchval(f"SELECT count(*) FROM {schema}.{table}")
+                        await conn.execute("SELECT set_config('atalaia.tenant', $1, false)", schema)  # no help
+                        with self.assertRaises(asyncpg.InsufficientPrivilegeError):
+                            await conn.fetchval(f"SELECT count(*) FROM {schema}.{table}")
+            with self.assertRaises(asyncpg.InsufficientPrivilegeError):
                 await conn.execute(f"INSERT INTO {self.ta.schema}.users (username, password_hash) VALUES ('x', 'y')")
         finally:
             await conn.close()
 
-    async def test_another_fields_setting_reads_and_writes_nothing(self) -> None:
+    async def test_a_field_role_without_the_setting_reads_nothing(self) -> None:
         conn = await connect(self.hub.app_url)
         try:
             async with conn.transaction():
-                await conn.execute("SELECT set_config('atalaia.tenant', $1, true)", self.tb.schema)
+                await as_field(conn, self.ta)
                 self.assertEqual(await conn.fetchval(f"SELECT count(*) FROM {self.ta.schema}.users"), 0)
-                self.assertGreater(await conn.fetchval(f"SELECT count(*) FROM {self.tb.schema}.users"), 0)
-                self.assertEqual(await conn.execute(f"UPDATE {self.ta.schema}.users SET email = 'x@y.pt'"),
-                                 "UPDATE 0")
-                self.assertEqual(await conn.execute(f"DELETE FROM {self.ta.schema}.fields"), "DELETE 0")
-            with self.assertRaises(asyncpg.InsufficientPrivilegeError):
-                async with conn.transaction():
-                    await conn.execute("SELECT set_config('atalaia.tenant', $1, true)", self.tb.schema)
+                with self.assertRaises(asyncpg.InsufficientPrivilegeError):  # WITH CHECK: no setting writes nothing
                     await conn.execute(f"INSERT INTO {self.ta.schema}.users (username, password_hash) "
-                                       "VALUES ('intruder', 'y')")
-            async with conn.transaction():
-                await conn.execute("SELECT set_config('atalaia.tenant', $1, true)", self.ta.schema)
-                self.assertGreater(await conn.fetchval(f"SELECT count(*) FROM {self.ta.schema}.users"), 0)
-            # SET LOCAL: gone with the transaction.
-            self.assertIn(await conn.fetchval("SELECT current_setting('atalaia.tenant', true)"), (None, ""))
+                                       "VALUES ('x', 'y')")
         finally:
             await conn.close()
+
+    async def test_a_field_cannot_reach_another_fields_rows_by_setting_its_tenant(self) -> None:
+        """S21-13: the setting is no longer what keeps the fields apart. A connection that runs as field A and
+        sets ``atalaia.tenant`` to B (what an injected ``set_config`` would do) is refused B's schema, tables
+        and sequences outright, for reading and for writing, and keeps reading only A's own rows. The setting is
+        put on first, as the server's role (a field's role may not call ``set_config`` at all: the next test)."""
+        b_rows = len(await self.sql(self.tb, "SELECT 1 FROM users"))
+        self.assertGreater(b_rows, 0)
+        conn = await connect(self.hub.app_url)
+        a, b = self.ta.schema, self.tb.schema
+        try:
+            async with conn.transaction():
+                await conn.execute("SELECT set_config('atalaia.tenant', $1, true)", b)
+                await as_field(conn, self.ta)
+                for sql in (f"SELECT count(*) FROM {b}.users", f"SELECT count(*) FROM {b}.fields",
+                            f"UPDATE {b}.users SET email = 'x@y.pt'", f"DELETE FROM {b}.fields",
+                            f"INSERT INTO {b}.users (username, password_hash) VALUES ('intruder', 'y')",
+                            f"SELECT 1 FROM {b}.sessions", f"SELECT * FROM {b}.alembic_version",
+                            f"TRUNCATE {b}.users"):
+                    with self.subTest(sql=sql):
+                        sp = conn.transaction()
+                        await sp.start()
+                        try:
+                            with self.assertRaises(asyncpg.InsufficientPrivilegeError):
+                                await conn.execute(sql)
+                        finally:
+                            await sp.rollback()
+                # A's own rows are read only while A's own setting is on (the policy, under the grants)
+                self.assertEqual(await conn.fetchval(f"SELECT count(*) FROM {a}.users"), 0)
+            async with conn.transaction():
+                await conn.execute("SELECT set_config('atalaia.tenant', $1, true)", a)
+                await as_field(conn, self.ta)
+                self.assertGreater(await conn.fetchval(f"SELECT count(*) FROM {a}.users"), 0)
+            # SET LOCAL ROLE and the setting are gone with the transaction.
+            self.assertIn(await conn.fetchval("SELECT current_setting('atalaia.tenant', true)"), (None, ""))
+            self.assertEqual(await conn.fetchval("SELECT current_user"), self.hub.app_role)
+        finally:
+            await conn.close()
+        self.assertEqual(len(await self.sql(self.tb, "SELECT 1 FROM users")), b_rows)  # nothing of B changed
+
+    async def test_a_savepoint_keeps_the_field_role(self) -> None:
+        """A savepoint (``begin_nested``, as registration and the like use) begins inside a transaction that already
+        runs as the field's role: it must not set the scope again (that needs ``set_config``), and keeps the role."""
+        with tenancy.use(self.ta):
+            async with self.app.state.sessionmaker() as db:
+                self.assertEqual(await db.scalar(text("SELECT current_user")), self.ta.role)
+                async with db.begin_nested():
+                    self.assertEqual(await db.scalar(text("SELECT current_user")), self.ta.role)
+                    self.assertGreater(len((await db.scalars(select(User))).all()), 0)
+            async with self.app.state.sessionmaker() as db:  # a savepoint as the very first thing
+                async with db.begin_nested():
+                    self.assertEqual(await db.scalar(text("SELECT current_user")), self.ta.role)
+                    self.assertGreater(len((await db.scalars(select(User))).all()), 0)
+
+    async def test_a_field_role_cannot_call_set_config(self) -> None:
+        """What an SQL injection in a request of field A could try from inside a statement: ``set_config`` of the
+        tenant setting, of the search path or of the role itself (to B's, or back to the server's). Every one is
+        refused to a field's role, because ``set_config`` is callable by the server's role and the owner only."""
+        conn = await connect(self.hub.app_url)
+        try:
+            for call in (f"set_config('atalaia.tenant', '{self.tb.schema}', true)",
+                         f"set_config('search_path', '{self.tb.schema}', true)",
+                         f"set_config('role', '{self.tb.role}', true)", "set_config('role', 'none', true)",
+                         "set_config('row_security', 'off', true)"):
+                with self.subTest(call=call):
+                    async with conn.transaction():
+                        await as_field(conn, self.ta)
+                        with self.assertRaises(asyncpg.InsufficientPrivilegeError) as caught:
+                            await conn.fetchval(f"SELECT {call}")
+                        self.assertIn("set_config", str(caught.exception))
+            # the same call as the server's own role, outside a field's transaction, is what TenantSession does
+            self.assertEqual(await conn.fetchval("SELECT set_config('atalaia.tenant', 'x', true)"), "x")
+        finally:
+            await conn.close()
+
+    async def test_the_known_limit_the_role_command_still_works_for_the_session_user(self) -> None:
+        """What this design does not stop, stated so it is a decision and not a surprise (README, hosted mode):
+        PostgreSQL authorises ``SET ROLE`` by the *session* user, so a second statement that is a ``SET ROLE``
+        command (not a function call) switches to another field. The server's driver sends one statement per
+        request (extended protocol, parameters bound), so an injection cannot add one; closing it for good takes
+        a login role and a pool per field. If that day comes, this test is the one to turn around."""
+        conn = await connect(self.hub.app_url)
+        try:
+            async with conn.transaction():
+                await as_field(conn, self.ta)
+                await conn.execute(f'SET LOCAL ROLE "{self.tb.role}"')  # simple protocol: a command of its own
+                self.assertEqual(await conn.fetchval("SELECT current_user"), self.tb.role)
+        finally:
+            await conn.close()
+
+    async def test_one_statement_at_a_time_through_the_server_driver(self) -> None:
+        """The premise of the last test: the server's own engine refuses a second statement in one call."""
+        with tenancy.use(self.ta):
+            async with self.app.state.sessionmaker() as db:
+                with self.assertRaises(DBAPIError):
+                    await db.execute(text(f'SELECT 1; SET LOCAL ROLE "{self.tb.role}"'))
 
     async def test_the_server_role_cannot_get_around_it(self) -> None:
         conn = await connect(self.hub.app_url)
@@ -558,6 +684,9 @@ class RowSecurityTests(HubCase):
             "hub audit": "SELECT * FROM public.atalaia_hub_audit",
             "bypassrls": "ALTER ROLE CURRENT_USER BYPASSRLS",
             "set role": "SET ROLE {owner}",
+            "sharing tables": "SELECT * FROM public.atalaia_share_members",
+            "sharing function": "SELECT * FROM public.atalaia_share_read(ARRAY[gen_random_uuid()], 5)",
+            "grant to itself": "GRANT SELECT ON {s}.users TO CURRENT_USER",
         }
         try:
             for name, sql in attempts.items():
@@ -576,10 +705,11 @@ class RowSecurityTests(HubCase):
                 SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity,
                        (SELECT count(*) FROM pg_policy p WHERE p.polrelid = c.oid) AS policies,
                        pg_get_userbyid(c.relowner) AS owner,
-                       has_table_privilege($2, c.oid, 'TRUNCATE') AS truncate
+                       has_table_privilege($2, c.oid, 'TRUNCATE') OR has_table_privilege($3, c.oid, 'TRUNCATE')
+                           AS truncate
                   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
                  WHERE n.nspname = $1 AND c.relkind = 'r' AND c.relname <> 'alembic_version'""",
-                                  tenant.schema, self.hub.app_role)
+                                  tenant.schema, self.hub.app_role, tenant.role)
             self.assertGreater(len(rows), 30)
             for r in rows:
                 with self.subTest(schema=tenant.schema, table=r["relname"]):
@@ -600,13 +730,16 @@ class RowSecurityTests(HubCase):
                 await conn.execute(text("SELECT count(*) FROM users"))
 
     async def test_a_simulated_routing_bug_reads_nothing(self) -> None:
+        """The bug: the path points at B's schema while the session is A's. Under the fields' own roles it does not
+        even read nothing, it is refused (before S2113-1 the policy alone made it read nothing)."""
         with tenancy.use(self.ta):
             async with self.app.state.sessionmaker() as db:
                 self.assertGreater(len((await db.scalars(select(User))).all()), 0)
-                # The bug: the path points at B's schema while the session is A's.
                 await db.execute(text(f"SET LOCAL search_path TO {self.tb.schema}"))
-                self.assertEqual((await db.scalars(select(User))).all(), [])
-                self.assertEqual((await db.scalars(select(Field))).all(), [])
+                with self.assertRaises(DBAPIError):
+                    await db.scalars(select(User))
+            async with self.app.state.sessionmaker() as db:
+                await db.execute(text(f"SET LOCAL search_path TO {self.tb.schema}"))
                 db.add(User(username="planted", password_hash="x"))
                 with self.assertRaises(DBAPIError):
                     await db.flush()
@@ -626,18 +759,22 @@ class PoolTests(HubCase):
         for tenant in (self.ta, self.tb, None):
             with tenancy.use(tenant):
                 async with self.app.state.sessionmaker() as db:
-                    path, setting = (await db.execute(text(
-                        "SELECT current_setting('search_path'), current_setting('atalaia.tenant', true)"))).one()
-                    self.assertEqual((path, setting), (tenant.schema, tenant.schema) if tenant else ("pg_catalog", ""))
+                    path, setting, user = (await db.execute(text(
+                        "SELECT current_setting('search_path'), current_setting('atalaia.tenant', true), "
+                        "current_user"))).one()
+                    self.assertEqual((path, setting, user), (tenant.schema, tenant.schema, tenant.role) if tenant
+                                     else ("pg_catalog", "", self.hub.app_role))  # a field's requests run as its role
                     await db.commit()
                     # After the commit the next transaction is set up again, the same way.
                     again = await db.scalar(text("SELECT current_setting('atalaia.tenant', true)"))
                     self.assertEqual(again, tenant.schema if tenant else "")
         async with self.app.state.engine.connect() as conn:
-            path, setting = (await conn.execute(text(
-                "SELECT current_setting('search_path'), current_setting('atalaia.tenant', true)"))).one()
+            path, setting, user = (await conn.execute(text(
+                "SELECT current_setting('search_path'), current_setting('atalaia.tenant', true), "
+                "current_user"))).one()
             self.assertEqual(path, "pg_catalog")
             self.assertIn(setting, (None, ""))
+            self.assertEqual(user, self.hub.app_role)  # the role went back with the transaction
         self.assertEqual(self.app.state.engine.pool.size(), 1)
 
 
@@ -753,6 +890,17 @@ class OperatorTests(HubCase):
         tc = await asyncio.to_thread(hosted.create_tenant, url, "campo-c", "Campo C", "cqb", "Europe/Lisbon",
                                      self.hub.app_role, "test:operator")
         c = self.client("campo-c")
+        # S2113-1: creating a field made its database role (named from the field's id, no login), and the server's
+        # login role may only SET ROLE to it.
+        role_c = tc.role
+        self.assertRegex(role_c, r"^atalaia_t_[0-9a-f]{32}$")
+        self.assertEqual(role_c, "atalaia_t_" + tc.field_id.hex)
+        row = (await self.sql(self.tb, "SELECT rolcanlogin, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb "
+                                       "FROM pg_roles WHERE rolname = $1", role_c))[0]
+        self.assertEqual(tuple(row), (False, False, False, False, False))
+        self.assertTrue((await self.sql(self.tb, "SELECT pg_has_role($1, $2, 'SET')", self.hub.app_role, role_c))[0][0])
+        self.assertFalse((await self.sql(self.tb, "SELECT pg_has_role($1, $2, 'USAGE')", self.hub.app_role,
+                                         role_c))[0][0])  # no INHERIT: the login role does not hold its grants
         await self.seed(tc, c, "charlie")
         await self.seed(self.tb, self.b, "bravissimo")
         before_b = {r[0]: r[1] for r in await self.sql(self.tb, "SELECT 'users', count(*) FROM users UNION ALL "
@@ -780,6 +928,10 @@ class OperatorTests(HubCase):
         try:
             self.assertIsNone(await conn.fetchval("SELECT 1 FROM pg_namespace WHERE nspname = 'field_campo_c'"))
             self.assertIsNone(await conn.fetchval("SELECT 1 FROM public.atalaia_tenants WHERE slug = 'campo-c'"))
+            # S2113-1: the field's database role went with it, and nobody else's did.
+            self.assertIsNone(await conn.fetchval("SELECT 1 FROM pg_roles WHERE rolname = $1", role_c))
+            self.assertEqual(await conn.fetchval("SELECT count(*) FROM pg_roles WHERE rolname = ANY($1)",
+                                                 [self.ta.role, self.tb.role]), 2)
         finally:
             await conn.close()
         audit = await self.hub_audit("tenant_delete")
@@ -874,19 +1026,29 @@ class HubCheckTests(HubCase):
 
     async def test_every_weakening_is_found(self) -> None:
         app = self.hub.app_role
+        ra, rb = self.hub.a.role, self.hub.b.role
         breaks = [
             ("ALTER TABLE field_campo_b.users NO FORCE ROW LEVEL SECURITY", "field_campo_b.users: row-level"),
             ("ALTER TABLE field_campo_a.games DISABLE ROW LEVEL SECURITY", "field_campo_a.games: row-level"),
-            (f"GRANT TRUNCATE ON field_campo_a.game_events TO {app}", "TRUNCATE"),
-            (f"REVOKE DELETE ON field_campo_b.sessions FROM {app}", "field_campo_b.sessions, not"),
+            (f"GRANT TRUNCATE ON field_campo_a.game_events TO {ra}", "TRUNCATE"),
+            (f"GRANT SELECT ON field_campo_a.game_events TO {app}", "field_campo_a.game_events, not nothing"),
+            (f"REVOKE DELETE ON field_campo_b.sessions FROM {rb}", "field_campo_b.sessions, not"),
             ("CREATE POLICY open_door ON field_campo_a.users USING (true)", "field_campo_a.users: the policies"),
             ("DROP POLICY atalaia_tenant ON field_campo_b.clubs", "field_campo_b.clubs: the policies"),
+            (f"GRANT SELECT ON field_campo_a.alembic_version TO {ra}", "field_campo_a.alembic_version"),
             (f"GRANT SELECT ON field_campo_a.alembic_version TO {app}", "field_campo_a.alembic_version"),
             (f"GRANT SELECT ON public.atalaia_hub_audit TO {app}", "public.atalaia_hub_audit"),
             (f"GRANT UPDATE ON public.atalaia_tenants TO {app}", "public.atalaia_tenants"),
             (f"GRANT SELECT ON public.atalaia_quota_hits TO {app}", "public.atalaia_quota_hits"),
             (f"REVOKE INSERT ON public.atalaia_quota_hits FROM {app}", "public.atalaia_quota_hits"),
-            (f"REVOKE USAGE ON SCHEMA field_campo_b FROM {app}", f"{app} has no USAGE on field_campo_b"),
+            (f"REVOKE USAGE ON SCHEMA field_campo_b FROM {rb}", f"{rb} has no USAGE on field_campo_b"),
+            (f"GRANT USAGE ON SCHEMA field_campo_b TO {app}", f"{app} has privileges on field_campo_b itself"),
+            (f"GRANT USAGE ON SCHEMA field_campo_b TO {ra}", f"{ra} has privileges on field_campo_b, another"),
+            # The fields' database roles (S2113-1).
+            (f"ALTER ROLE {rb} LOGIN", f"{rb} has rolcanlogin"),
+            (f"REVOKE {rb} FROM {app}", f"{app} cannot SET ROLE to {rb}"),
+            (f"GRANT {rb} TO {app} WITH INHERIT TRUE", f"{app} inherits the grants of {rb}"),
+
             ("CREATE SCHEMA field_orphan", "field_orphan is not registered"),
             # The hub-level chrono sharing (SVX-2).
             ("ALTER TABLE public.atalaia_share_records FORCE ROW LEVEL SECURITY", "atalaia_share_records: row-level"),
@@ -894,13 +1056,18 @@ class HubCheckTests(HubCase):
             ("DROP POLICY atalaia_tenant ON public.atalaia_share_codes", "atalaia_share_codes: the policies"),
             ("CREATE POLICY open_door ON public.atalaia_share_records USING (true)",
              "atalaia_share_records: the policies"),
-            (f"GRANT TRUNCATE ON public.atalaia_share_records TO {app}", "public.atalaia_share_records"),
-            (f"REVOKE DELETE ON public.atalaia_share_members FROM {app}", "public.atalaia_share_members"),
+            (f"GRANT TRUNCATE ON public.atalaia_share_records TO {ra}", "public.atalaia_share_records"),
+            (f"GRANT SELECT ON public.atalaia_share_records TO {app}", f"{app} has ['SELECT'] on public.atalaia"),
+            (f"REVOKE DELETE ON public.atalaia_share_members FROM {rb}", "public.atalaia_share_members"),
+            ("CREATE POLICY open_door ON public.atalaia_share_members USING (tenant = 'field_campo_a')",
+             "atalaia_share_members: the policies"),
             ("GRANT EXECUTE ON FUNCTION public.atalaia_share_read(uuid[], integer) TO PUBLIC",
              "can be run by anyone"),
             ("ALTER FUNCTION public.atalaia_share_read(uuid[], integer) SECURITY INVOKER", "not a SECURITY DEFINER"),
             ("ALTER FUNCTION public.atalaia_share_redeem(bytea) RESET search_path", "no fixed search_path"),
-            (f"REVOKE EXECUTE ON FUNCTION public.atalaia_share_redeem(bytea) FROM {app}", "cannot run"),
+            (f"REVOKE EXECUTE ON FUNCTION public.atalaia_share_redeem(bytea) FROM {ra}", "cannot run"),
+            (f"REVOKE EXECUTE ON FUNCTION public.atalaia_caller_tenant() FROM {rb}", "cannot run"),
+            (f"GRANT EXECUTE ON FUNCTION public.atalaia_share_redeem(bytea) TO {app}", f"{app} can run"),
         ]
         for statement, problem in breaks:
             with self.subTest(statement=statement):
@@ -911,7 +1078,9 @@ class HubCheckTests(HubCase):
                 finally:  # the operator's own repair: the grants and policies again
                     await self.owner(f"DROP SCHEMA IF EXISTS field_orphan; DROP POLICY IF EXISTS open_door ON "
                                      f"field_campo_a.users; DROP POLICY IF EXISTS open_door ON "
-                                     f"public.atalaia_share_records; REVOKE ALL ON public.atalaia_hub_audit FROM {app}; "
+                                     f"public.atalaia_share_records; DROP POLICY IF EXISTS open_door ON public.atalaia_share_members; "
+                                     f"REVOKE ALL ON SCHEMA field_campo_b FROM {ra}; "
+                                     f"REVOKE ALL ON public.atalaia_hub_audit FROM {app}; "
                                      f"REVOKE ALL ON public.atalaia_tenants FROM {app}; "
                                      f"GRANT SELECT ON public.atalaia_tenants TO {app}")
                     await asyncio.to_thread(hosted.migrate_all, self.hub.owner_url, app, "test:operator")

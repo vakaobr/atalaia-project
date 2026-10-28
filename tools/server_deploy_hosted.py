@@ -121,7 +121,7 @@ SELECT line FROM (
          || ' replication=' || rolreplication || ' member_of=' || coalesce((
            SELECT string_agg(pg_get_userbyid(m.roleid), ',' ORDER BY 1) FROM pg_auth_members m
             WHERE m.member = r.oid), '-')
-    FROM pg_roles r WHERE rolname IN ('atalaia_owner', 'atalaia_app')
+    FROM pg_roles r WHERE rolname IN ('atalaia_owner', 'atalaia_app') OR rolname LIKE 'atalaia\_t\_%'
   UNION ALL
   SELECT 'database atalaia owner=' || pg_get_userbyid(datdba) FROM pg_database WHERE datname = 'atalaia'
 ) lines ORDER BY line;
@@ -284,32 +284,60 @@ class HostedDeployment(Deployment):
         for slug, _ in FIELDS:
             schema = "field_" + slug.replace("-", "_")
             expect(int(truth[f"{schema}.game_events"]) == 2, f"{schema} has its two synced events")
-        for setting in [*schemas, ""]:
-            script = (f"BEGIN; SET LOCAL ROLE {APP}; SELECT set_config('atalaia.tenant', '{setting}', true);\n"
-                      + "\n".join(f"SELECT '{t}|' || count(*) FROM {t};" for t in tables) + "\nROLLBACK;")
-            lines = [line for line in self.sql(script).splitlines() if "|" in line]
-            seen = dict(line.split("|") for line in lines)
-            wrong = [t for t in tables if seen.get(t) != (truth[t] if t.startswith(setting + ".") and setting
-                                                           else "0")]
-            what = f"the field {setting}'s setting" if setting else "no setting"
-            expect(len(seen) == len(tables) and not wrong,
-                   f"as {APP} with {what}: {'its own rows only' if setting else 'nothing'}, in every table "
-                   f"({len(tables)}){': ' + ', '.join(wrong[:5]) if wrong else ''}")
+        roles = dict(line.split("|") for line in self.sql(
+            "SELECT schema_name || '|' || role_name FROM public.atalaia_tenants").splitlines())
+        expect(len(roles) == 3 and all(r.startswith("atalaia_t_") for r in roles.values()),
+               "every field has a database role of its own (atalaia_t_<field id>)")
+        for schema in schemas:  # each field's role: its own rows only, whatever the setting, no other field at all
+            own = [t for t in tables if t.startswith(schema + ".")]
+            for setting in (schema, ""):
+                script = (f"BEGIN; SELECT set_config('atalaia.tenant', '{setting}', true); "
+                          f"SET LOCAL ROLE {roles[schema]};\n" + "\n".join(f"SELECT '{t}|' || count(*) FROM {t};" for t in own) + "\nROLLBACK;")
+                seen = dict(line.split("|") for line in self.sql(script).splitlines() if "|" in line)
+                wrong = [t for t in own if seen.get(t) != (truth[t] if setting else "0")]
+                what = "its own setting" if setting else "no setting"
+                expect(len(seen) == len(own) and not wrong,
+                       f"as the role of {schema} with {what}: {'its own rows only' if setting else 'nothing'}, in "
+                       f"every table ({len(own)}){': ' + ', '.join(wrong[:5]) if wrong else ''}")
+            other = next(x for x in schemas if x != schema)
+            for statement, why in ((f"SELECT count(*) FROM {other}.users", "reading another field's table"),
+                                   (f"INSERT INTO {other}.users (username, password_hash) VALUES ('x', 'y')",
+                                    "writing another field's table"),
+                                   (f"SELECT set_config('atalaia.tenant', '{other}', true)",
+                                    "calling set_config (it could name another field or role)")):
+                done = self.dc("exec", "-T", "postgres", "psql", "-U", "atalaia", "-d", "atalaia", "-v",
+                               "ON_ERROR_STOP=1", "-q", "-At",
+                               input=f"BEGIN; SET LOCAL ROLE {roles[schema]}; {statement}; ROLLBACK;".encode(),
+                               check=False, quiet=True)
+                expect(done.returncode != 0 and "permission denied" in done.stderr.decode(),
+                       f"as the role of {schema}, {why} is refused")
+        for schema in schemas:  # the server's login role holds no field's table itself
+            done = self.dc("exec", "-T", "postgres", "psql", "-U", "atalaia", "-d", "atalaia", "-v", "ON_ERROR_STOP=1",
+                           "-q", "-At", input=f"BEGIN; SET LOCAL ROLE {APP}; SELECT count(*) FROM {schema}.users; "
+                                              "ROLLBACK;".encode(), check=False, quiet=True)
+            expect(done.returncode != 0 and "permission denied" in done.stderr.decode(),
+                   f"as {APP}, {schema}.users is refused (only the field's role may read it)")
         for statement, why in (("TRUNCATE field_campo_b.users", "TRUNCATE (which RLS does not cover)"),
                                ("SELECT count(*) FROM public.atalaia_hub_audit", "reading the hub's audit log"),
                                ("UPDATE public.atalaia_tenants SET status = 'active'", "changing the registry"),
                                ("ALTER TABLE field_campo_a.users NO FORCE ROW LEVEL SECURITY", "dropping FORCE"),
                                ("SELECT count(*) FROM field_campo_a.alembic_version", "alembic_version"),
-                               ("CREATE TABLE field_campo_a.extra (id integer)", "a new table in a field")):
+                               ("CREATE TABLE field_campo_a.extra (id integer)", "a new table in a field"),
+                               ("SELECT * FROM public.atalaia_share_members", "the sharing's tables")):
             done = self.dc("exec", "-T", "postgres", "psql", "-U", "atalaia", "-d", "atalaia", "-v", "ON_ERROR_STOP=1",
                            "-q", "-At", input=f"BEGIN; SET LOCAL ROLE {APP}; {statement}; ROLLBACK;".encode(),
                            check=False, quiet=True)
             err = done.stderr.decode()
             expect(done.returncode != 0 and ("permission denied" in err or "must be owner" in err),
                    f"as {APP}, {why} is refused")
-        members = self.sql(f"SELECT count(*) FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member "
+        members = self.sql(f"SELECT string_agg(g.rolname, ',' ORDER BY g.rolname) FROM pg_auth_members m "
+                           f"JOIN pg_roles r ON r.oid = m.member JOIN pg_roles g ON g.oid = m.roleid "
                            f"WHERE r.rolname = '{APP}'")
-        expect(members == "0", f"{APP} is a member of no role (it cannot become the owner)")
+        expect(members == ",".join(sorted(roles.values())),
+               f"{APP} is a member of the fields' own roles only (it cannot become the owner)")
+        expect(self.sql("SELECT count(*) FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a "
+                        "WHERE p.proname = 'set_config' AND a.grantee = 0") == "0",
+               "set_config can be called by the owner and the server's role only (hosted-roles.sh)")
         return self.sql(PRIVILEGES_SQL)
 
     # --- 5 and 6: backup and restore -----------------------------------------------------------------
@@ -365,7 +393,8 @@ class HostedDeployment(Deployment):
         expect(got == expected, f"every table of every field, the registry and the hub's audit log match "
                                 f"({len(expected.splitlines())} tables)")
         expect(self.sql("SELECT count(*) FROM public.atalaia_hub_audit WHERE action = 'tenant_migrate' "
-                        f"AND id > {int(self.audit_cutoff)}") == "3", "starting the restored hub migrated every field")
+                        f"AND id > {int(self.audit_cutoff)}") == "6",
+               "restoring migrated every field to give it its role and grants back, and starting the hub did again")
         say("   the isolation after the restore")
         after = self.isolation()
         changed = sorted(set(privileges.splitlines()) ^ set(after.splitlines()))

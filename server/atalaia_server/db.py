@@ -27,7 +27,7 @@ def make_engine(settings: Settings) -> AsyncEngine:
     connect_args: dict[str, object] = {"timeout": settings.db_timeout_s}
     if settings.hosted:
         connect_args.update(tenancy.engine_options())
-    return create_async_engine(
+    engine = create_async_engine(
         settings.database_url,
         pool_size=settings.db_pool_size,
         max_overflow=settings.db_max_overflow,
@@ -35,6 +35,9 @@ def make_engine(settings: Settings) -> AsyncEngine:
         pool_timeout=settings.db_timeout_s,
         connect_args=connect_args,
     )
+    if settings.hosted:
+        tenancy.keep_set_config_to_the_server(engine)
+    return engine
 
 
 def make_sessionmaker(engine: AsyncEngine, hosted: bool = False) -> async_sessionmaker[AsyncSession]:

@@ -30,7 +30,7 @@ from atalaia_server.models import FieldPlayerId
 
 from .base import PASSWORD
 from .test_chrono import Marshal, field_body, reading
-from .test_tenants import HubCase, connect
+from .test_tenants import HubCase, as_field, connect, connect_driver_safe
 
 
 class ShareCase(HubCase):
@@ -307,25 +307,29 @@ class IsolationTests(ShareCase):
         return p
 
     async def test_the_server_role_sees_and_writes_only_its_own_tenant(self) -> None:
+        """As a field's database role (S2113-3 keys the policy on it, not on the ``atalaia.tenant`` setting)."""
         p = await self.published()
         total = (await self.hubq("SELECT count(*) AS n FROM public.atalaia_share_records WHERE tenant = $1",
                                 self.tb.schema))[0]["n"]
         self.assertGreaterEqual(total, 1)
         conn = await connect(self.hub.app_url)
         try:
-            for schema, expected in ((self.ta.schema, 0), (self.tb.schema, total)):
+            for tenant, other, expected in ((self.ta, self.tb, 0), (self.tb, self.ta, total)):
                 async with conn.transaction():
-                    await conn.execute("SELECT set_config('atalaia.tenant', $1, true)", schema)
+                    # The setting names the other field, as an injected set_config would: it changes nothing.
+                    await conn.execute("SELECT set_config('atalaia.tenant', $1, true)", other.schema)
+                    await as_field(conn, tenant)
                     self.assertEqual(await conn.fetchval("SELECT count(*) FROM public.atalaia_share_records WHERE "
                                                          "tenant = $1", self.tb.schema), expected)
                     self.assertEqual(await conn.fetchval("SELECT count(*) FROM public.atalaia_share_records WHERE "
-                                                         "tenant <> $1", schema), 0)
-            async with conn.transaction():  # no setting: nothing, and nothing to write
-                self.assertEqual(await conn.fetchval("SELECT count(*) FROM public.atalaia_share_records"), 0)
-                self.assertEqual(await conn.fetchval("SELECT count(*) FROM public.atalaia_share_members"), 0)
+                                                         "tenant <> $1", tenant.schema), 0)
+            # The server's login role itself holds nothing in the hub's sharing tables.
+            for table in ("records", "members", "codes"):
+                with self.assertRaises(asyncpg.InsufficientPrivilegeError):
+                    await conn.fetchval(f"SELECT count(*) FROM public.atalaia_share_{table}")
             # Another tenant's rows cannot be changed or planted.
             async with conn.transaction():
-                await conn.execute("SELECT set_config('atalaia.tenant', $1, true)", self.ta.schema)
+                await as_field(conn, self.ta)
                 self.assertEqual(await conn.execute("DELETE FROM public.atalaia_share_records"), "DELETE 0")
                 self.assertEqual(await conn.execute("UPDATE public.atalaia_share_members SET active = true "
                                                     "WHERE tenant = $1", self.tb.schema), "UPDATE 0")
@@ -335,12 +339,16 @@ class IsolationTests(ShareCase):
                     "VALUES ('\\x00', $1, $2, now())"):
                 with self.assertRaises(asyncpg.InsufficientPrivilegeError):
                     async with conn.transaction():
-                        await conn.execute("SELECT set_config('atalaia.tenant', $1, true)", self.ta.schema)
+                        await as_field(conn, self.ta)
                         await conn.execute(statement, uuid.uuid4(), self.tb.schema)
             with self.assertRaises(asyncpg.InsufficientPrivilegeError):  # no TRUNCATE, no DDL
-                await conn.execute("TRUNCATE public.atalaia_share_records")
+                async with conn.transaction():
+                    await as_field(conn, self.ta)
+                    await conn.execute("TRUNCATE public.atalaia_share_records")
             with self.assertRaises(asyncpg.InsufficientPrivilegeError):
-                await conn.execute("CREATE TABLE public.x (a int)")
+                async with conn.transaction():
+                    await as_field(conn, self.ta)
+                    await conn.execute("CREATE TABLE public.x (a int)")
         finally:
             await conn.close()
         self.assertEqual(len(await self.shared_at_a(p)), 1)  # nothing above changed it
@@ -352,20 +360,24 @@ class IsolationTests(ShareCase):
                 from atalaia_server import hub_share
                 person = (await db.get(hub_share.HubShareLink, p.user_a)).person_id
         query = "SELECT count(*) FROM public.atalaia_share_read($1::uuid[], 100)"
-        conn = await connect(self.hub.app_url)
+        conn = await connect_driver_safe(self.hub.app_url)
         try:
-            async def count(tenant: Optional[str]) -> int:
+            async def count(tenant: Optional[tenancy.Tenant], setting: Optional[str] = None) -> int:
                 async with conn.transaction():
+                    if setting is not None:  # what an injected set_config could say: it is not what answers
+                        await conn.execute("SELECT set_config('atalaia.tenant', $1, true)", setting)
                     if tenant is not None:
-                        await conn.execute("SELECT set_config('atalaia.tenant', $1, true)", tenant)
+                        await as_field(conn, tenant)
                     return int(await conn.fetchval(query, [person]))
-            self.assertEqual(await count(self.ta.schema), 1)   # field A reads B's record
-            self.assertEqual(await count(self.tb.schema), 0)   # field B reads none of A's (A has none)
-            self.assertEqual(await count(None), 0)             # no tenant: nothing
-            self.assertEqual(await count("field_campo_z"), 0)  # a tenant that is no member: nothing
-            self.assertEqual(await count(self.ta.schema), 1)
+            self.assertEqual(await count(self.ta), 1)   # field A reads B's record
+            self.assertEqual(await count(self.tb), 0)   # field B reads none of A's (A has none)
+            self.assertEqual(await count(self.tb, setting=self.ta.schema), 0)  # B naming A's setting: still B
+            self.assertEqual(await count(self.ta, setting=self.tb.schema), 1)  # A naming B's setting: still A
+            self.assertEqual(await count(self.ta, setting="field_campo_z"), 1)
+            with self.assertRaises(asyncpg.InsufficientPrivilegeError):  # the login role: no right to the function
+                await count(None, setting=self.ta.schema)
             async with conn.transaction():  # a person nobody asked about
-                await conn.execute("SELECT set_config('atalaia.tenant', $1, true)", self.ta.schema)
+                await as_field(conn, self.ta)
                 self.assertEqual(await conn.fetchval(query, [uuid.uuid4()]), 0)
         finally:
             await conn.close()

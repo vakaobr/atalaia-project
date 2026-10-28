@@ -574,7 +574,8 @@ def run_hosted(args: argparse.Namespace, url: str, out: TextIO) -> None:
             raise hosted.HostedError(f"the hub check found {len(report.problems)} problems: "
                                      + "; ".join(report.problems))
         print(f"Hub check passed: {report.fields} fields, {report.tables} tables, each owned by the owner role "
-              f"with row-level security forced and its one policy; {app_role} has exactly the server's grants.",
+              f"with row-level security forced and its one policy, and each field's own database role has its grants "
+              f"and {app_role} none of them.",
               file=out)
         _say_quota_hits(report.quota_hits, out)
     elif action == "quota":

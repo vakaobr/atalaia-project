@@ -1289,6 +1289,33 @@ itself, and one function that reads them.
   where they have it, and is rate limited. The privacy notices name the recipients (other sharing fields of
   the hub, with the person's consent).
 
+**Amendment 2026-10-28 (S21-13, S2113-*): one database role per field.** The row-level security above keys on
+`atalaia.tenant`, which the server's own role may set (`set_config`), so an SQL injection could name another
+field. The grants now do the separating:
+
+- Each tenant has a role `atalaia_t_<field_id as 32 hex digits>` (`tenant_roles.py`; `NOLOGIN`, no superuser,
+  no `BYPASSRLS`, owns nothing). It alone has USAGE on its schema, SELECT/INSERT/UPDATE/DELETE on its tables,
+  its sequences, and its rows of the sharing tables with `EXECUTE` on the sharing functions. The server's login
+  role has none of it (`hosted check` fails if it does) and `SET ROLE`s to the field's role at the start of every
+  transaction (`set_config('role', ..., true)`, i.e. `SET LOCAL ROLE`; the membership is `WITH INHERIT FALSE, SET
+  TRUE`). Another field's schema is then `permission denied`, whatever the setting says. The tenant policy stays
+  (defence in depth; the operator's commands rely on it).
+- The sharing's policy and functions read the caller's field from the role in use (`public.atalaia_caller_tenant()`,
+  a `SECURITY DEFINER` function over the registry's generated `role_name`, reading `current_setting('role')`), not
+  from `atalaia.tenant`.
+- PostgreSQL authorises `SET ROLE` by the session user, so a field's role is kept from calling `set_config`
+  (`EXECUTE` on `pg_catalog.set_config` revoked from `PUBLIC`, by `hosted-roles.sh` as the superuser; the server
+  refuses to start otherwise; `asyncpg`'s introspection is told not to call it). Residual: a second statement that is
+  a `SET ROLE` command would still work; the driver sends one statement per call. *Rejected:* a login role and a
+  pool per field (the only complete fix: ~1,000 fields would mean ~1,000 pools and passwords to rotate; kept as a
+  possible later decision, S2113-8); an unguessable role name (`pg_roles` is world-readable).
+- Created by `hosted create` / `hosted migrate` (the owner role, which now has `CREATEROLE`; migration
+  `0023_tenant_roles` makes the role of every field a hub already has), dropped by `hosted delete`. Restore uses
+  `--no-acl` and `hosted migrate` gives the grants back. Cross-tenant work stays explicit: the registry lookups, the
+  watcher, the TLS `ask` endpoint and the quota inbox run as the server's login role; the migrations, the commands
+  and the roles' own lifecycle as the owner; backups as the database's superuser; the sharing and the purge as the
+  field's own role.
+
 ---
 
 ### ADR-P4-5: Chrono record signing

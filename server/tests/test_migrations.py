@@ -26,7 +26,10 @@ from sqlalchemy.pool import NullPool
 
 from atalaia_server.models import ROLES, Base
 
+from atalaia_server import hosted, tenant_roles
+
 from .base import SERVER, TempDatabase, alembic_config
+from .test_tenants import Hub, connect
 
 TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log", "refresh_tokens", "consents",
           "field_api_keys", "controllers", "games", "game_events", "game_node_scores", "game_nodes", "user_game_roles",
@@ -92,7 +95,8 @@ class MigrationTests(unittest.TestCase):
                 before = self.schema()
                 command.upgrade(self.cfg, rev.revision)
                 after = self.schema()
-                self.assertNotEqual(after, before, "the migration changes nothing")
+                if rev.revision != "0023_tenant_roles":  # 0023 acts only in a hosted field's schema (below)
+                    self.assertNotEqual(after, before, "the migration changes nothing")
                 command.downgrade(self.cfg, rev.down_revision or "base")
                 self.assertEqual(self.schema(), before)
                 command.upgrade(self.cfg, rev.revision)
@@ -607,6 +611,18 @@ class MigrationTests(unittest.TestCase):
         self.db.fetch("UPDATE fields SET default_retention_days = 7 WHERE slug = 'b'")  # the range is gone with it
         self.db.fetch("DELETE FROM fields")
 
+    def test_0023_changes_nothing_in_a_single_field_server(self) -> None:
+        """0023_tenant_roles makes database roles, and only for a registered hosted field's schema: a single-field
+        server's ``public`` schema gets none, going up or down."""
+        def roles() -> set[str]:
+            return {r["rolname"] for r in self.db.fetch("SELECT rolname FROM pg_roles WHERE rolname LIKE 'atalaia\\_t\\_%'")}
+        command.upgrade(self.cfg, "0022_field_retention")
+        roles_before, schema_before = roles(), self.schema()
+        command.upgrade(self.cfg, "0023_tenant_roles")
+        self.assertEqual((roles(), self.schema()), (roles_before, schema_before))
+        command.downgrade(self.cfg, "0022_field_retention")
+        self.assertEqual((roles(), self.schema()), (roles_before, schema_before))
+
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)
         self.assertEqual(len(self.script.get_bases()), 1)
@@ -620,6 +636,86 @@ class MigrationTests(unittest.TestCase):
                 self.assertIsNotNone(body, "no downgrade()")
                 self.assertNotRegex(body.group(1).strip(), r"^(pass|\.\.\.)$", "an empty downgrade()")
         self.assertTrue((SERVER / "migrations" / "versions").is_dir())
+
+
+class TenantRoleMigrationTests(unittest.TestCase):
+    """0023_tenant_roles in a hosted hub (S2113-1): ``hosted migrate`` runs it in every field's schema, which is how a
+    hub made before it gets its fields' database roles."""
+
+    hub: Hub
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.hub = Hub()
+        try:
+            cls.hub.create()
+        except BaseException:
+            cls.hub.drop()
+            raise
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.hub.drop()
+
+    def rows(self, sql: str, *args: object) -> list:
+        async def run() -> list:
+            conn = await connect(self.hub.owner_url)
+            try:
+                return list(await conn.fetch(sql, *args))
+            finally:
+                await conn.close()
+        return asyncio.run(run())
+
+    def role_exists(self, role: str) -> bool:
+        return bool(self.rows("SELECT 1 FROM pg_roles WHERE rolname = $1", role))
+
+    def test_down_drops_the_fields_role_and_up_with_migrate_gives_it_back(self) -> None:
+        tenant = self.hub.b
+        schema, role = tenant.schema, tenant.role
+        self.assertEqual(role, tenant_roles.role_for(tenant.field_id))
+        self.assertTrue(self.role_exists(role))
+        cfg = hosted.alembic_config(self.hub.owner_url, schema)
+        before = self.rows("SELECT version_num FROM %s.alembic_version" % schema)[0][0]
+        self.assertEqual(before, "0023_tenant_roles")
+        command.downgrade(cfg, "0022_field_retention")
+        self.assertFalse(self.role_exists(role))  # the role and every grant it held are gone ...
+        self.assertTrue(self.role_exists(self.hub.a.role))  # ... and only this field's role
+        self.assertEqual(len(self.rows("SELECT 1 FROM public.atalaia_tenants")), 2)  # the field itself is untouched
+        self.assertGreater(len(self.rows("SELECT 1 FROM pg_tables WHERE schemaname = $1", schema)), 30)
+        command.upgrade(cfg, "head")  # the migration alone: the role again, with no login and no grant yet
+        self.assertTrue(self.role_exists(role))
+        row = self.rows("SELECT rolcanlogin, rolsuper, rolbypassrls, rolcreaterole FROM pg_roles WHERE rolname = $1",
+                        role)[0]
+        self.assertEqual(tuple(row), (False, False, False, False))
+        self.assertFalse(self.rows("SELECT has_schema_privilege($1, $2, 'USAGE')", role, schema)[0][0])
+        done = hosted.migrate_all(self.hub.owner_url, self.hub.app_role, "test:operator")  # grants and membership
+        self.assertEqual(done, ["campo-a", "campo-b"])
+        self.assertTrue(self.rows("SELECT has_schema_privilege($1, $2, 'USAGE')", role, schema)[0][0])
+        self.assertEqual(asyncio.run(hosted.check_hub(self.hub.owner_url, self.hub.app_role)).problems, [])
+
+    def test_an_older_hub_gets_its_roles_from_migrate(self) -> None:
+        """The upgrade path of a hub that has the fields and the grants of the release before: the server's role
+        holds the field tables itself, the fields have no role. ``hosted migrate`` brings it to the new model."""
+        tenant, app = self.hub.a, self.hub.app_role
+        schema, role = tenant.schema, tenant.role
+        cfg = hosted.alembic_config(self.hub.owner_url, schema)
+        command.downgrade(cfg, "0022_field_retention")
+        asyncio.run(self._old_grants(schema, app))
+        self.assertFalse(self.role_exists(role))
+        problems = asyncio.run(hosted.check_hub(self.hub.owner_url, app)).problems
+        self.assertTrue(any(role in p for p in problems), problems)
+        hosted.migrate_all(self.hub.owner_url, app, "test:operator")
+        self.assertTrue(self.role_exists(role))
+        self.assertEqual(asyncio.run(hosted.check_hub(self.hub.owner_url, app)).problems, [])
+        self.assertFalse(self.rows("SELECT has_table_privilege($1, $2 || '.users', 'SELECT')", app, schema)[0][0])
+
+    async def _old_grants(self, schema: str, app: str) -> None:
+        conn = await connect(self.hub.owner_url)
+        try:
+            await conn.execute(f'GRANT USAGE ON SCHEMA "{schema}" TO {app}; '
+                               f'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "{schema}" TO {app}')
+        finally:
+            await conn.close()
 
 
 if __name__ == "__main__":

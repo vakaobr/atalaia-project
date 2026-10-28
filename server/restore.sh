@@ -20,14 +20,17 @@
 # is a single-field server's or a hosted hub's, and a backup of the other mode
 # than the env file's (ATALAIA_HOSTED) is refused before anything changes.
 # A hosted hub's restore (Phase 4 follow-up, decisions FU4-*) keeps the
-# ownership and the grants: it makes the two roles again from .env
-# (hosted-roles.sh), creates the database owned by atalaia_owner and restores
-# without --no-owner, so every schema and table belongs to atalaia_owner again
-# and atalaia_app has exactly the grants it had; then `hosted check` (as the
-# owner) must find FORCE ROW LEVEL SECURITY and the one policy on every table
-# and the server role's privileges as they should be, or the server stays
-# stopped. Starting runs `hosted migrate` (hub), which brings an older backup up
-# to date and applies the grants and policies again, and the check runs once more.
+# ownership: it makes the two roles again from .env (hosted-roles.sh), creates
+# the database owned by atalaia_owner and restores without --no-owner, so every
+# schema and table belongs to atalaia_owner again. It restores with --no-acl:
+# every field has a database role of its own (decision S2113-1), roles belong to
+# the cluster and not to the backup, so on a new machine the backup's grants to
+# them would fail; `hosted migrate` makes the roles again from the registry and
+# gives every grant back, after hosted-roles.sh has restricted set_config in the
+# new database. Then `hosted check` (as the owner) must find FORCE ROW LEVEL
+# SECURITY and the one policy on every table and every role's privileges as they
+# should be, or the server stays stopped. Starting runs `hosted migrate` (hub)
+# again, and the check runs once more.
 # Settings: ATALAIA_ENV_FILE (server/.env), COMPOSE_PROJECT_NAME.
 set -eu
 
@@ -108,7 +111,7 @@ if [ "$hosted" = on ]; then
     echo "restore.sh: stopping the server and replacing the hub's database"
     dc stop server tls-ask
     psql_admin -c "DROP DATABASE IF EXISTS atalaia WITH (FORCE)" -c "CREATE DATABASE atalaia OWNER atalaia_owner"
-    owner_option=
+    owner_option=--no-acl
 else
     echo "restore.sh: stopping the server and replacing the database"
     dc stop server
@@ -130,6 +133,10 @@ if [ "$restored" -ne 1 ] || [ "$opened" != 0 ]; then
 fi
 
 if [ "$hosted" = on ]; then
+    echo "restore.sh: giving the restored hub's fields their database roles and grants (hosted migrate)"
+    ATALAIA_ENV_FILE=$env_file sh "$here/hosted-roles.sh"
+    dc run --rm -T hub hosted migrate \
+        || fail "hosted migrate failed after the restore; the server stays stopped: see above"
     echo "restore.sh: checking the restored hub's isolation (hosted check, as the owner role)"
     dc run --rm -T hub hosted check \
         || fail "the restored hub fails the isolation check; the server stays stopped: see above"
