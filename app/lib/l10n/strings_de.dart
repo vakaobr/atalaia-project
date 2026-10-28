@@ -762,6 +762,7 @@ const Map<String, String> deStrings = {
   'player.map_level_unknown':
       'Leere Punkte: Spielende, die noch nicht gesagt haben, auf welchem Stockwerk sie sind.',
   'player.map_level_unknown_short': 'Stockwerk unbekannt',
+  'player.map_cell': 'Dein Feld: {cell}',
   'player.map_you': 'Du',
   'player.map_player': 'Eine mitspielende Person',
   'player.map_player_team': 'Mitspielende Person von {team}',

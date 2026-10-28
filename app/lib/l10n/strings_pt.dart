@@ -746,6 +746,7 @@ const Map<String, String> ptStrings = {
   'player.map_level_unknown':
       'Pontos vazios: quem ainda não disse em que piso está.',
   'player.map_level_unknown_short': 'piso desconhecido',
+  'player.map_cell': 'A tua quadrícula: {cell}',
   'player.map_you': 'Tu',
   'player.map_player': 'Participante',
   'player.map_player_team': 'Participante de {team}',

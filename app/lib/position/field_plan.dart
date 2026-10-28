@@ -13,6 +13,8 @@
 /// so nothing here decides who may see what, and nothing is sent.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../checkin/checkin_client.dart';
@@ -55,6 +57,56 @@ final class FieldLevels {
     }
     return names.isEmpty ? null : FieldLevels(names, images, stamps);
   }
+}
+
+/// A level's grid (`GET /field/levels/{n}/grid`, decisions MF-81 to MF-93):
+/// lettered rows, numbered columns, equal cells over the plan's rectangle.
+final class FieldGrid {
+  const FieldGrid(this.rows, this.cols);
+
+  /// 1 to 52 each (the controller checks it).
+  final int rows, cols;
+
+  /// Row 0 is "A", 25 "Z", 26 "AA", 27 "AB" (field_grid.py `row_label`).
+  static String rowLabel(int row) {
+    var out = '';
+    var n = row + 1;
+    while (n > 0) {
+      final r = (n - 1) % 26;
+      n = (n - 1) ~/ 26;
+      out = String.fromCharCode(65 + r) + out;
+    }
+    return out;
+  }
+
+  /// The cell of a place on the plan (fractions of its width and height) as
+  /// the radio says it, "C4"; the right and bottom edges are in the last
+  /// cell. Null off the plan (field_grid.py `cell`).
+  String? cell(double x, double y) {
+    if (!(x >= 0 && x <= 1 && y >= 0 && y <= 1)) return null;
+    final r = (y * rows).floor().clamp(0, rows - 1);
+    final c = (x * cols).floor().clamp(0, cols - 1);
+    return '${rowLabel(r)}${c + 1}';
+  }
+
+  /// The grid, or null when it is off, never set, or not a grid (a phone
+  /// controller older than the grid answers 404).
+  static FieldGrid? fromApi(Map<String, Object?> j) {
+    final g = j['grid'];
+    if (g is! Map || g['enabled'] != true) return null;
+    final r = g['rows'], c = g['cols'];
+    if (r is! int || c is! int || r < 1 || c < 1 || r > 52 || c > 52) {
+      return null;
+    }
+    return FieldGrid(r, c);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is FieldGrid && other.rows == rows && other.cols == cols;
+
+  @override
+  int get hashCode => Object.hash(rows, cols);
 }
 
 /// One level's plan: its map position (null: not placed on the ground) and
@@ -164,6 +216,7 @@ class FieldPlanLoader extends ChangeNotifier {
   FieldLevels? levels;
   List<Map<String, Object?>>? _features;
   final _plans = <int, LevelPlan>{};
+  final _grids = <int, FieldGrid?>{};
   final _loading = <int>{};
   bool _disposed = false;
 
@@ -171,6 +224,28 @@ class FieldPlanLoader extends ChangeNotifier {
   List<Map<String, Object?>> get features => _features ?? const [];
 
   LevelPlan? plan(int level) => _plans[level];
+
+  /// Level [n]'s grid, or null: off, not known yet, or none on this
+  /// controller.
+  FieldGrid? grid(int n) => _grids[n];
+
+  /// Reads level [n]'s grid again (the GM may have changed it; the stream
+  /// does not say). A controller without one (404) leaves none.
+  Future<void> refreshGrid(int n) async {
+    try {
+      final r = await httpOf().send(
+        'GET',
+        '/field/levels/$n/grid',
+        token: token(),
+      );
+      final g = r.ok ? FieldGrid.fromApi(r.json) : null;
+      if (_grids.containsKey(n) && _grids[n] == g) return;
+      _grids[n] = g;
+    } on Object {
+      return; // out of reach: what was known stays
+    }
+    _changed();
+  }
 
   /// Whether there is anything to draw: a plan image or a feature.
   bool get hasPlan =>
@@ -197,6 +272,9 @@ class FieldPlanLoader extends ChangeNotifier {
       // Out of reach: what was known stays; the next change tries again.
     }
     _changed();
+    for (final n in _grids.keys.toList()) {
+      unawaited(refreshGrid(n));
+    }
   }
 
   /// Level [n]'s plan (its map position and image), fetched when not kept or

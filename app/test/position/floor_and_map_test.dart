@@ -225,6 +225,67 @@ void main() {
     });
   });
 
+  group('the grid (field_grid.py)', () {
+    test('row labels run A to Z, then AA', () {
+      expect(FieldGrid.rowLabel(0), 'A');
+      expect(FieldGrid.rowLabel(25), 'Z');
+      expect(FieldGrid.rowLabel(26), 'AA');
+      expect(FieldGrid.rowLabel(27), 'AB');
+      expect(FieldGrid.rowLabel(51), 'AZ');
+    });
+
+    test('the cell of a place, edges in the last cell, off the plan none', () {
+      const g = FieldGrid(8, 8);
+      expect(g.cell(0, 0), 'A1');
+      expect(g.cell(0.4, 0.4), 'D4');
+      expect(g.cell(1, 1), 'H8');
+      expect(g.cell(0.26, 0.51), 'E3');
+      expect(g.cell(-0.01, 0.5), isNull);
+      expect(g.cell(0.5, 1.2), isNull);
+      expect(const FieldGrid(2, 4).cell(0.9, 0.9), 'B4');
+    });
+
+    test('read from the API: off or odd is none', () {
+      expect(
+        FieldGrid.fromApi({
+          'grid': {'enabled': true, 'rows': 3, 'cols': 5},
+        }),
+        const FieldGrid(3, 5),
+      );
+      expect(
+        FieldGrid.fromApi({
+          'grid': {'enabled': false, 'rows': 3, 'cols': 5},
+        }),
+        isNull,
+      );
+      expect(
+        FieldGrid.fromApi({
+          'grid': {'enabled': true, 'rows': 0, 'cols': 5},
+        }),
+        isNull,
+      );
+      expect(FieldGrid.fromApi({}), isNull);
+    });
+
+    test('the loader asks again, and a 404 leaves none', () async {
+      var cols = 4;
+      final http = FakeFieldHttp({
+        'GET /field/levels/0/grid': (_) => json({
+          'grid': {'enabled': true, 'rows': 2, 'cols': cols},
+        }),
+      });
+      final loader = FieldPlanLoader(() => http, () => 't');
+      addTearDown(loader.dispose);
+      await loader.refreshGrid(0);
+      expect(loader.grid(0), const FieldGrid(2, 4));
+      cols = 6;
+      await loader.refreshGrid(0);
+      expect(loader.grid(0), const FieldGrid(2, 6));
+      await loader.refreshGrid(1); // a controller without one
+      expect(loader.grid(1), isNull);
+    });
+  });
+
   group('the loader reads with the player\'s token and tolerates a 404', () {
     test('levels, features, then each level once (again when its image '
         'changed)', () async {
@@ -381,6 +442,7 @@ void main() {
       required Map<String, Object?>? levels,
       List<Map<String, Object?>> features = const [],
       List<Map<String, Object?>> positions = const [],
+      Map<String, Object?>? grid,
       double width = 360,
     }) async {
       tester.view.physicalSize = Size(width, 1800);
@@ -391,6 +453,10 @@ void main() {
       final http = FakeFieldHttp({
         if (levels != null) 'GET /field/levels': (_) => json(levels),
         'GET /field/features': (_) => json({'features': features}),
+        if (grid != null)
+          for (final n in [0, 1])
+            'GET /field/levels/$n/grid': (_) =>
+                json({'level': n, 'grid': grid}),
         'GET /field/levels/0/georef': (_) => json({'georef': georefApi()}),
         'GET /field/levels/1/georef': (_) => json({'georef': georefApi()}),
         'GET /field/levels/0/image': (_) =>
@@ -584,6 +650,35 @@ void main() {
     testWidgets('nothing to draw: no map', (tester) async {
       await open(tester, levels: levelsApi(count: 1, images: false));
       expect(find.byKey(const Key('player-map')), findsNothing);
+    });
+
+    testWidgets('the grid is drawn over the plan and the player\'s cell said '
+        '(MF-92)', (tester) async {
+      await open(
+        tester,
+        levels: levelsApi(count: 1),
+        grid: {'enabled': true, 'rows': 8, 'cols': 8},
+        positions: [
+          {'player_id': 'p1', 'team': 1, 'source': 'ble', 'x': 0.4, 'y': 0.4},
+        ],
+      );
+      expect(find.byKey(const Key('map-grid')), findsOneWidget);
+      // x 0.4 of 8 columns is column 4 (index 3), y 0.4 of 8 rows is row D.
+      expect(find.text('Your cell: D4'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a grid that is off: no lines, no cell', (tester) async {
+      await open(
+        tester,
+        levels: levelsApi(count: 1),
+        grid: {'enabled': false, 'rows': 8, 'cols': 8},
+        positions: [
+          {'player_id': 'p1', 'team': 1, 'source': 'ble', 'x': 0.4, 'y': 0.4},
+        ],
+      );
+      expect(find.byKey(const Key('map-grid')), findsNothing);
+      expect(find.byKey(const Key('map-cell')), findsNothing);
     });
 
     testWidgets('a plan of one floor: no floor buttons, the plan and its '

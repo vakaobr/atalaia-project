@@ -632,6 +632,7 @@ const Map<String, String> zhTwStrings = {
   'player.map_off_plan': '有 {n} 個位置不在這張平面圖上',
   'player.map_level_unknown': '空心點：還沒說自己在哪一級的玩家。',
   'player.map_level_unknown_short': '級別不明',
+  'player.map_cell': '你所在的格子：{cell}',
   'player.map_you': '你',
   'player.map_player': '一名玩家',
   'player.map_player_team': '{team} 的玩家',

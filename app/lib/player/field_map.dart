@@ -13,6 +13,7 @@
 /// shown here beyond that.
 library;
 
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -64,6 +65,7 @@ class FieldMapCard extends StatefulWidget {
 
 class _FieldMapCardState extends State<FieldMapCard> {
   int? _viewed;
+  final _gridAsked = <int>{};
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +80,12 @@ class _FieldMapCardState extends State<FieldMapCard> {
         if (mounted) loader.ensureLevel(level);
       });
     }
+    if (_gridAsked.add(level)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(loader.refreshGrid(level));
+      });
+    }
+    final grid = loader.grid(level);
     final feed = widget.feed;
     final features = [
       for (final f in loader.features)
@@ -95,6 +103,10 @@ class _FieldMapCardState extends State<FieldMapCard> {
     );
     final teams = feed.teams;
     final name = levelName(s, levels, level);
+    final mine = placed.markers.where((m) => m.own).firstOrNull;
+    final myCell = grid == null || mine == null
+        ? null
+        : grid.cell(mine.x, mine.y);
     return Card(
       key: const Key('player-map'),
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -126,18 +138,32 @@ class _FieldMapCardState extends State<FieldMapCard> {
               ),
             const SizedBox(height: 8),
             Semantics(
-              label: s.t('player.map_semantics', {
-                'level': name,
-                'n': placed.markers.length,
-              }),
+              label:
+                  s.t('player.map_semantics', {
+                    'level': name,
+                    'n': placed.markers.length,
+                  }) +
+                  (myCell == null
+                      ? ''
+                      : '. ${s.t('player.map_cell', {'cell': myCell})}'),
               child: _PlanView(
                 plan: plan,
                 features: features,
                 markers: placed.markers,
                 teams: teams,
+                grid: grid,
                 s: s,
               ),
             ),
+            if (myCell != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  s.t('player.map_cell', {'cell': myCell}),
+                  key: const Key('map-cell'),
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
             if (placed.off > 0)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -171,9 +197,11 @@ class _PlanView extends StatefulWidget {
     required this.features,
     required this.markers,
     required this.teams,
+    required this.grid,
     required this.s,
   });
 
+  final FieldGrid? grid;
   final LevelPlan? plan;
   final List<Map<String, Object?>> features;
   final List<MapMarker> markers;
@@ -282,6 +310,13 @@ class _PlanViewState extends State<_PlanView> {
                         fit: BoxFit.fill,
                         gaplessPlayback: true,
                         errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  if (widget.grid != null)
+                    Positioned.fill(
+                      child: CustomPaint(
+                        key: const Key('map-grid'),
+                        painter: _GridPainter(widget.grid!),
                       ),
                     ),
                   Positioned.fill(
@@ -561,4 +596,65 @@ class _ShapesPainter extends CustomPainter {
   @override
   bool shouldRepaint(_ShapesPainter old) =>
       old.features != features || old.ground != ground || old.teams != teams;
+}
+
+/// The field grid over the plan (the console's field-grid.js): thin white
+/// lines and the row letters and column numbers on a dark halo, thinned out
+/// when the cells are too small to read.
+class _GridPainter extends CustomPainter {
+  _GridPainter(this.grid);
+
+  final FieldGrid grid;
+
+  static const _minLabelPx = 26.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cw = size.width / grid.cols, ch = size.height / grid.rows;
+    final halo = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4
+      ..color = const Color(0x66000000);
+    final line = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = const Color(0xB3FFFFFF);
+    for (var c = 0; c <= grid.cols; c++) {
+      final x = c * cw;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), halo);
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), line);
+    }
+    for (var r = 0; r <= grid.rows; r++) {
+      final y = r * ch;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), halo);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), line);
+    }
+    final stepC = math.max(1, (_minLabelPx / cw).ceil());
+    final stepR = math.max(1, (_minLabelPx / ch).ceil());
+    void label(String text, Offset at) {
+      final tp = TextPainter(
+        text: TextSpan(
+          text: text,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            shadows: [Shadow(blurRadius: 3), Shadow(blurRadius: 1)],
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, at - Offset(tp.width / 2, tp.height / 2));
+    }
+
+    for (var c = 0; c < grid.cols; c += stepC) {
+      label('${c + 1}', Offset((c + 0.5) * cw, 8));
+    }
+    for (var r = 0; r < grid.rows; r += stepR) {
+      label(FieldGrid.rowLabel(r), Offset(8, (r + 0.5) * ch));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_GridPainter old) => old.grid != grid;
 }

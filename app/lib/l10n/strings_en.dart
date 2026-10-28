@@ -733,6 +733,7 @@ const Map<String, String> enStrings = {
   'player.map_level_unknown':
       'Hollow dots: players who have not said which floor they are on.',
   'player.map_level_unknown_short': 'floor not known',
+  'player.map_cell': 'Your cell: {cell}',
   'player.map_you': 'You',
   'player.map_player': 'A player',
   'player.map_player_team': 'A player of {team}',
