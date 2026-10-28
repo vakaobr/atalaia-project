@@ -968,6 +968,11 @@ class ScheduleTests(BrowserCase):
         await page.locator("#r-replicas li button").first.click()
         await page.click("#reg-form button[type=submit]")
         await expect(page.locator("#status")).to_have_text("Saved.")
+        # "Saved." is still there from the save above: wait for this save to reach the database.
+        for _ in range(200):
+            if await self.fetch(sql) == []:
+                break
+            await asyncio.sleep(0.025)
         self.assertEqual(await self.fetch(sql), [])
         # Move one to the other game: the ticket stays, the team and number are fitted to that game.
         await self.fetch("UPDATE scheduled_games SET teams = '[\"blue\"]', federation = 'off' WHERE id = $1",
