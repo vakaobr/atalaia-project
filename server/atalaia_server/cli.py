@@ -6,6 +6,7 @@
     python -m atalaia_server create-admin --username NAME --generate FILE
     python -m atalaia_server reset-totp --username NAME --reason TEXT [--yes] [--field SLUG]
     python -m atalaia_server demo load|reset
+    python -m atalaia_server demo live [--key-out FILE] [--keep N] [--reset]
     python -m atalaia_server demo reviewer --username NAME --out FILE
     python -m atalaia_server feedback list [--status new|seen|done|all] [--json]
     python -m atalaia_server purge [--dry-run]
@@ -357,6 +358,10 @@ async def run_demo(settings: Settings, args: argparse.Namespace, out: TextIO) ->
                 print("Demo data:", demo_data.json_summary(await demo_data.load(db)), file=out)
             elif args.action == "reset":
                 print("Demo data reset:", demo_data.json_summary(await demo_data.reset(db)), file=out)
+            elif args.action == "live":
+                key_out = Path(args.key_out) if args.key_out else None
+                print("Live demo field:", demo_data.json_summary(
+                    await demo_data.live(db, key_out, args.keep, args.reset)), file=out)
             else:
                 username = args.username.strip().lower()
                 if username_problem(username):
@@ -424,6 +429,11 @@ def _parser() -> argparse.ArgumentParser:
     dsub = demo.add_subparsers(dest="action", required=True)
     dsub.add_parser("load", help="make the demo data or bring it up to date (idempotent)")
     dsub.add_parser("reset", help="delete the demo field and clubs, then load again")
+    p = dsub.add_parser("live", help="the live demo field the preview's simulated controller syncs to: the field, "
+                                     "its API key (written to --key-out, never printed) and the clean-up of old games")
+    p.add_argument("--key-out", help="where to keep the field's API key for the simulated controller (mode 0600)")
+    p.add_argument("--keep", type=int, default=demo_data.LIVE_KEEP, help="games to keep (default %(default)s)")
+    p.add_argument("--reset", action="store_true", help="delete all the live field's games and controllers")
     p = dsub.add_parser("reviewer", help="a test account with the GM role on the demo field")
     p.add_argument("--username", required=True)
     p.add_argument("--out", required=True, help="where to write its login (mode 0600; must not exist)")

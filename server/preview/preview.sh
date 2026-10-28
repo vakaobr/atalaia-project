@@ -19,6 +19,9 @@
 #   sh preview.sh reviewer NAME   a test account with the GM role on the demo field: reviewers/NAME.txt
 #   sh preview.sh demo            load the demo data (also done hourly by the demo-refresh service)
 #   sh preview.sh reset --yes     delete the demo field and clubs and load them again (accounts, feedback stay)
+#   sh preview.sh live [status|restart|reset|logs]
+#                                 the live demo (a simulated field playing on its own, read-only, on 127.0.0.1:8001):
+#                                 its state, a clean restart, deleting its games on the site server, its log
 #   sh preview.sh feedback [new|seen|done|all]
 #   sh preview.sh backup          an encrypted backup into backups/
 #   sh preview.sh update [REF | --from DIR]   new code (default: main of ATALAIA_REPO), rebuild, restart
@@ -67,15 +70,23 @@ case "$cmd" in
         add ATALAIA_SERVER_IMAGE atalaia-server-preview
         add COMPOSE_PROJECT_NAME "$project"
         add ATALAIA_BACKUP_DIR "$home/backups"
+        # The live demo (decisions DEMO-*): its proxy is published on 127.0.0.1:ATALAIA_DEMO_PORT only; a second
+        # Cloudflare Tunnel hostname forwards to it, and ATALAIA_DEMO_PUBLIC_URL (https://HOSTNAME, no path) is what
+        # the preview's landing page links to; leave it empty until that hostname exists.
+        add ATALAIA_DEMO_PORT 8001
+        add ATALAIA_DEMO_PUBLIC_URL ""
+        add ATALAIA_DEMO_IMAGE atalaia-demo-preview
         # Caddy is not part of the preview: its TLS mode is unused but the variable must be set.
         chmod 600 "$env_file"
         echo "preview.sh: $env_file ready (mode 600). Next: 'sh preview.sh up', then 'sh preview.sh admin'."
         ;;
     up)
         need_env
-        dc up -d --build --wait server postgres demo-refresh
+        dc up -d --build --wait server postgres demo-refresh demo-field
         echo "preview.sh: up on 127.0.0.1:$(sed -n 's/^ATALAIA_PREVIEW_PORT=//p' "$env_file" | tail -n 1) only;" \
             "the tunnel (Windows service) serves it at https://$domain"
+        echo "preview.sh: the live demo is on 127.0.0.1:$(sed -n 's/^ATALAIA_DEMO_PORT=//p' "$env_file" | tail -n 1) only" \
+            "(its tunnel hostname is a step of its own: docs/runbooks/preview-server.md, \"The live demo\")"
         ;;
     down)
         need_env
@@ -101,6 +112,10 @@ case "$cmd" in
         if [ -x "$win" ]; then
             "$win" -fsS "http://localhost:${port:-8000}/api/v1/health" > /dev/null && echo "from Windows (localhost:${port:-8000}): ok"
         fi
+        dport=$(sed -n 's/^ATALAIA_DEMO_PORT=//p' "$env_file" | tail -n 1)
+        dbase=http://127.0.0.1:${dport:-8001}
+        curl -fsS "$dbase/demo/health" > /dev/null && echo "live demo (read-only proxy): ok"
+        [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$dbase/api/v1/games")" = 405 ] && echo "live demo refuses writes: ok"
         if curl -fsS "https://$domain/api/v1/health" > /dev/null 2>&1; then
             echo "public ($domain): ok"
         else
@@ -142,6 +157,30 @@ case "$cmd" in
         need_env
         [ "${1:-}" = "--yes" ] || fail "this deletes the demo field and clubs and loads them again: add --yes"
         dc exec -T server python -m atalaia_server demo reset
+        ;;
+    live)
+        need_env
+        case "${1:-status}" in
+            status)
+                dc ps -a demo-field demo-refresh
+                dport=$(sed -n 's/^ATALAIA_DEMO_PORT=//p' "$env_file" | tail -n 1)
+                curl -fsS "http://127.0.0.1:${dport:-8001}/demo/state.json" && echo
+                ;;
+            restart)
+                # A clean start of the simulated field: the boxes forget their game, a game left running is ended,
+                # the controller starts a new database (the demo does this itself every 24 games).
+                dc restart demo-field
+                ;;
+            reset)
+                [ "${2:-}" = "--yes" ] || fail "this deletes the live demo field's games on the site server: add --yes"
+                dc exec -T server python -m atalaia_server demo live --reset
+                dc restart demo-field
+                ;;
+            logs)
+                dc logs --tail 200 demo-field
+                ;;
+            *) fail "usage: preview.sh live [status|restart|reset --yes|logs]" ;;
+        esac
         ;;
     feedback)
         need_env

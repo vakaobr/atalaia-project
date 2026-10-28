@@ -14,6 +14,8 @@
     python3 tools/docker_server.py deploy                     the deployment test (setup, Caddy, backup, restore)
     python3 tools/docker_server.py deploy-hosted              the same for a hosted hub (on-demand TLS, two fields)
     python3 tools/docker_server.py preview-check              the preview deployment's Compose files keep their promises
+    python3 tools/docker_server.py preview-demo-unit          the live demo's own code (read-only proxy, plan, director) in its image
+    python3 tools/docker_server.py preview-demo               the preview's live demo, end to end, in a scratch Compose project (minutes)
 
 Works from any folder; Docker with the Compose plugin must be running. `test`
 and `migrations` build the test image (server/Dockerfile, target test) and
@@ -173,9 +175,9 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 2
     what, args = argv[0], argv[1:]
-    if what not in ("test", "migrations", "browser", "build", "up", "down", "deploy", "deploy-hosted", "preview-check"):
+    if what not in ("test", "migrations", "browser", "build", "up", "down", "deploy", "deploy-hosted", "preview-check", "preview-demo", "preview-demo-unit"):
         return fail(f"unknown command '{what}' (test, migrations, browser, build, up, down, deploy, deploy-hosted, "
-                    "preview-check)")
+                    "preview-check, preview-demo, preview-demo-unit)")
     if what not in ("test", "browser") and args:
         return fail(f"'{what}' takes no arguments")
     try:
@@ -190,6 +192,16 @@ def main(argv: list[str]) -> int:
         import server_preview_check
 
         return server_preview_check.main()
+    if what == "preview-demo-unit":
+        sys.path.insert(0, str(REPO / "tools"))
+        import server_preview_demo
+
+        return server_preview_demo.unit()
+    if what == "preview-demo":
+        sys.path.insert(0, str(REPO / "tools"))
+        import server_preview_demo
+
+        return server_preview_demo.main()
     if what in ("test", "migrations", "browser"):
         return in_tests_image(what, args)
     if what in ("deploy", "deploy-hosted"):

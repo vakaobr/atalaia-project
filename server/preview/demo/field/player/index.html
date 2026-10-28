@@ -1,0 +1,53 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Atalaia · Player</title>
+<link rel="stylesheet" href="/player/player.css">
+</head>
+<body>
+<header>
+  <div class="wrap bar">
+    <a href="/" id="back"></a>
+    <nav id="langs" aria-label="Language"></nav>
+  </div>
+</header>
+<main class="wrap">
+  <p class="banner" id="banner"></p>
+  <h1 id="title"></h1>
+  <p id="waiting" class="muted" hidden></p>
+  <div id="view" hidden>
+    <section class="card me" aria-labelledby="h-me">
+      <h2 id="h-me"></h2>
+      <p class="callsign"><span class="chip" id="chip"></span><strong id="callsign"></strong></p>
+      <dl id="me-list"></dl>
+    </section>
+    <section class="card" aria-labelledby="h-game">
+      <h2 id="h-game"></h2>
+      <p><strong id="game-name"></strong> <span class="badge" id="game-state"></span></p>
+      <p class="clock" id="clock" aria-live="off"></p>
+      <div class="scores" id="scores"></div>
+    </section>
+    <section class="card" aria-labelledby="h-plan">
+      <h2 id="h-plan"></h2>
+      <svg id="plan" viewBox="0 0 720 540" role="img" aria-labelledby="plan-title">
+        <title id="plan-title"></title>
+        <image id="plan-img" href="/player/field.png" x="0" y="0" width="720" height="540"></image>
+        <g id="plan-boxes"></g>
+        <g id="plan-people"></g>
+      </svg>
+      <p class="muted small" id="plan-note"></p>
+    </section>
+    <section class="card" aria-labelledby="h-events">
+      <h2 id="h-events"></h2>
+      <ol id="events" class="events"></ol>
+    </section>
+  </div>
+</main>
+<script src="/player/player.js"></script>
+</body>
+</html>

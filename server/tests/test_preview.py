@@ -9,16 +9,21 @@ test accounts the operator makes.
 
 from __future__ import annotations
 
+import argparse
+import io
 import json
 import re
+import stat
+import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlencode
 
-from atalaia_server import cli, demo_data, personal_data, totp
+from atalaia_server import cli, demo_data, personal_data, sync, totp
 from atalaia_server.config import ConfigError, Settings
+from atalaia_server.models import Controller, Game
 from atalaia_server.ratelimit import Limits
 from atalaia_server.web import preview_texts
 from atalaia_server.web.staff_i18n import STRINGS as STAFF
@@ -444,6 +449,138 @@ class DemoTests(PreviewCase):
         self.assertEqual((await self.fetch("SELECT count(*) FROM preview_feedback"))[0][0], 1)
         roles = await self.fetch("SELECT r.name FROM user_field_roles u JOIN roles r ON r.id = u.role_id")
         self.assertEqual([r[0] for r in roles], ["gm"])
+
+
+class DemoLiveTests(PreviewCase):
+    """The live demo's side on the site server (decisions DEMO-*): its own field, the API key for the simulated
+    controller, the clean-up of old games, and the landing page's link to it."""
+
+    DEMO_URL = "https://demo.example.org"
+
+    def settings(self) -> Settings:
+        s = super().settings()
+        return Settings(database_url=s.database_url, secret_key=s.secret_key, metrics_token=s.metrics_token,
+                        db_timeout_s=2.0, purge_hour=None, preview=True, preview_demo_url=self.DEMO_URL + "/")
+
+    async def live(self, key_file: Optional[Path] = None, **kw: Any) -> dict[str, Any]:
+        async with self.app.state.sessionmaker() as db:
+            return await demo_data.live(db, key_file, **kw)
+
+    async def caller(self, key: str) -> Any:
+        async with self.app.state.sessionmaker() as db:
+            return await sync.authenticate(db, key)
+
+    async def add_games(self, field_id: Any, n: int, now: datetime) -> None:
+        async with self.app.state.sessionmaker() as db:
+            for i in range(n):
+                db.add(Game(field_id=field_id, game_id=100 + i, game_seed=7 + i, name=f"Demonstração {i}",
+                            mode_id="org.atalaia.domination", teams=["red", "blue"], state="ended",
+                            controller_created_at=now - timedelta(minutes=5 * i)))
+            await db.commit()
+
+    async def test_the_field_its_key_and_its_public_pages(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            key_file = Path(tmp) / "sync-key"
+            first = await self.live(key_file)
+            self.assertEqual((first["field"], first["key"]), ("created", "made"))
+            self.assertEqual(stat.S_IMODE(key_file.stat().st_mode), 0o600)
+            key = key_file.read_text().strip()
+            caller = await self.caller(key)
+            self.assertEqual(caller.field_id, demo_data.demo_id("live-field"))
+            # Again: nothing changes, the same key stays.
+            again = await self.live(key_file)
+            self.assertEqual((again["field"], again["key"]), ("kept", "kept"))
+            self.assertEqual(key_file.read_text().strip(), key)
+            # The file is lost (a new volume): a new key, and the old one is revoked.
+            key_file.unlink()
+            third = await self.live(key_file)
+            self.assertEqual(third["key"], "made")
+            self.assertIsNone(await self.caller(key))
+            self.assertIsNotNone(await self.caller(key_file.read_text().strip()))
+            live_keys = await self.fetch("SELECT revoked_at FROM field_api_keys ORDER BY created_at")
+            self.assertEqual([r[0] is not None for r in live_keys], [True, False])
+        r = await self.client.get(f"/f/{demo_data.LIVE_SLUG}/?lang=pt")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Campo Demo ao Vivo", r.text)
+        self.assertEqual((await self.client.get(f"/f/{demo_data.LIVE_SLUG}/scoreboard.json")).status_code, 200)
+
+    async def test_without_a_key_file_no_key_is_made(self) -> None:
+        done = await self.live(None)
+        self.assertNotIn("key", done)
+        self.assertEqual((await self.fetch("SELECT count(*) FROM field_api_keys"))[0][0], 0)
+
+    async def test_old_games_and_controllers_are_deleted_and_the_made_up_field_is_left_alone(self) -> None:
+        now = datetime.now(timezone.utc)
+        async with self.app.state.sessionmaker() as db:
+            await demo_data.load(db, now)
+        await self.live()
+        field_id = demo_data.demo_id("live-field")
+        await self.add_games(field_id, 15, now)
+        async with self.app.state.sessionmaker() as db:
+            db.add(Controller(field_id=field_id, controller_id=demo_data.demo_id("c-old"), version="x",
+                              last_seen_at=now - timedelta(hours=7)))
+            db.add(Controller(field_id=field_id, controller_id=demo_data.demo_id("c-now"), version="x", last_seen_at=now))
+            await db.commit()
+        done = await self.live(keep=5)
+        self.assertEqual(done["deleted_games"], 10)
+        kept = await self.fetch("SELECT name FROM games WHERE field_id = $1 ORDER BY controller_created_at DESC", field_id)
+        self.assertEqual([r[0] for r in kept], [f"Demonstração {i}" for i in range(5)])
+        controllers = await self.fetch("SELECT controller_id FROM controllers WHERE field_id = $1", field_id)
+        self.assertEqual([r[0] for r in controllers], [demo_data.demo_id("c-now")])
+        made_up = await self.fetch("SELECT count(*) FROM games WHERE field_id = $1", demo_data.demo_id("field"))
+        self.assertEqual(made_up[0][0], 3)
+        # `load` in its turn never touches the live field's games.
+        async with self.app.state.sessionmaker() as db:
+            await demo_data.load(db, now + timedelta(hours=1))
+        self.assertEqual((await self.fetch("SELECT count(*) FROM games WHERE field_id = $1", field_id))[0][0], 5)
+
+    async def test_reset_deletes_the_games_and_keeps_the_key(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            key_file = Path(tmp) / "sync-key"
+            await self.live(key_file)
+            await self.add_games(demo_data.demo_id("live-field"), 3, datetime.now(timezone.utc))
+            done = await self.live(key_file, reset=True)
+            self.assertEqual((done["deleted_games"], done["key"]), (3, "kept"))
+            self.assertIsNotNone(await self.caller(key_file.read_text().strip()))
+            self.assertEqual((await self.fetch("SELECT count(*) FROM games"))[0][0], 0)
+
+    async def test_the_command_prints_no_secret(self) -> None:
+        out = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmp:
+            key_file = Path(tmp) / "sync-key"
+            args = argparse.Namespace(action="live", key_out=str(key_file), keep=12, reset=False)
+            await cli.run_demo(self.settings(), args, out)
+            self.assertNotIn(key_file.read_text().strip(), out.getvalue())
+            self.assertIn("key=made", out.getvalue())
+
+    async def test_the_landing_page_links_to_the_demo_in_every_language(self) -> None:
+        for lang in ("pt", "en", "de", "zh-tw"):
+            r = await self.client.get("/", params={"lang": lang})
+            self.assertEqual(r.status_code, 200)
+            self.assertIn(f'href="{self.DEMO_URL}/?lang={lang}"', r.text, lang)
+            self.assertIn(f"/f/{demo_data.LIVE_SLUG}/", r.text, lang)
+            self.assertIn(preview_texts.STRINGS[lang]["not_here_text_demo"], r.text.replace("&#x27;", "'"), lang)
+        for lang, texts in preview_texts.STRINGS.items():
+            for key in ("li_demo", "li_demo_d", "li_live", "li_live_d", "not_here_text_demo"):
+                self.assertTrue(texts[key].strip(), (lang, key))
+
+
+class DemoUrlTests(PreviewCase):
+    async def test_a_preview_without_the_setting_links_nothing(self) -> None:
+        r = await self.client.get("/?lang=en")
+        self.assertNotIn(demo_data.LIVE_SLUG, r.text)
+
+    def test_the_setting_is_checked(self) -> None:
+        base = dict(database_url="postgresql+asyncpg://u:p@h/d", secret_key=SECRET_KEY)
+        ok = Settings(**base, preview=True, preview_demo_url="https://demo.example.org/")
+        self.assertEqual(ok.preview_demo_url, "https://demo.example.org")
+        Settings(**base, preview=True, preview_demo_url="http://127.0.0.1:8001")
+        for bad in ("http://demo.example.org", "https://demo.example.org/path", "https://u:p@demo.example.org",
+                    "demo.example.org", "https://demo.example.org/?x=1"):
+            with self.assertRaises(ConfigError, msg=bad):
+                Settings(**base, preview=True, preview_demo_url=bad)
+        with self.assertRaises(ConfigError):  # not a preview
+            Settings(**base, preview_demo_url="https://demo.example.org")
 
 
 class AccountTests(PreviewCase):

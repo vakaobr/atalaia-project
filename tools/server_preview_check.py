@@ -6,12 +6,15 @@
 Resolves server/docker-compose.yml + server/docker-compose.preview.yml with `docker compose config` (no container
 is made, no secret is real) and asserts what the preview promises:
 
-- the only published port is the site server's, bound to 127.0.0.1, container port 8000;
+- the only published ports are the site server's (127.0.0.1, container port 8000) and the live demo's read-only
+  proxy (127.0.0.1, container port 8001);
 - Caddy is not started, nothing else is published, no service uses the host network;
 - every started service restarts unless stopped, the database has its volume, the images are pinned by digest
   (or are the locally built server image);
 - the server is on no network with a way out except the one that publishes its port, and that one has no outbound
   NAT; the database network is internal; the server trusts forwarded headers from one subnet, not "*";
+- the live demo (DEMO-*) is on a network with no outbound NAT and on an internal one shared with the site server
+  alone, runs read-only with every capability dropped, and only its one-shot `demo-init` does not restart;
 - the preview is on and Portuguese is the default (PV-9);
 - preview.sh is valid POSIX sh and prints no secret by construction (no `cat`/`echo` of the env files).
 """
@@ -43,26 +46,40 @@ def problems(cfg: dict) -> list[str]:
     if "caddy" in services:
         found.append("caddy is started (it should be in the 'caddy' profile)")
     published = [(name, p) for name, s in services.items() for p in s.get("ports", [])]
-    if [n for n, _ in published] != ["server"]:
-        found.append(f"published ports are not the server's alone: {published}")
+    if sorted(n for n, _ in published) != ["demo-field", "server"]:
+        found.append(f"published ports are not the server's and the demo's alone: {published}")
     for name, p in published:
-        if p.get("host_ip") != "127.0.0.1" or int(p["target"]) != 8000:
-            found.append(f"{name} publishes {p}: only 127.0.0.1 -> 8000 is allowed")
+        if p.get("host_ip") != "127.0.0.1" or int(p["target"]) != {"server": 8000, "demo-field": 8001}.get(name):
+            found.append(f"{name} publishes {p}: only 127.0.0.1 -> 8000 (server) and -> 8001 (demo-field) are allowed")
     for name, s in services.items():
         if s.get("network_mode") == "host":
             found.append(f"{name} uses the host network")
         if "profiles" in s:
             continue
-        if s.get("restart") != "unless-stopped" and name != "backup-crypt":
+        if s.get("restart") != "unless-stopped" and name not in ("backup-crypt", "demo-init"):
             found.append(f"{name} restart is {s.get('restart')!r}, not unless-stopped")
         image = s.get("image", "")
-        if name not in ("server", "demo-refresh") and "@sha256:" not in image:
+        if name not in ("server", "demo-refresh", "demo-init", "demo-field") and "@sha256:" not in image:
             found.append(f"{name}: image {image} is not pinned by digest")
     server = services["server"]
     if not any(v.get("source") == "pgdata" for v in services["postgres"].get("volumes", [])):
         found.append("postgres has no pgdata volume")
-    if "atak" not in server["networks"] or "edge" in server["networks"]:
+    if "atak" not in server["networks"] or not set(server["networks"]) <= {"app", "db", "atak", "demo-sync"}:
         found.append(f"the server's networks are {sorted(server['networks'])}")
+    demo = services["demo-field"]
+    if sorted(demo["networks"]) != ["demo", "demo-sync"]:
+        found.append(f"the demo's networks are {sorted(demo['networks'])}: demo and demo-sync only")
+    if networks["demo"].get("driver_opts", {}).get("com.docker.network.bridge.enable_ip_masquerade") != "false":
+        found.append("the demo's published network must have no outbound NAT")
+    if not networks["demo-sync"].get("internal") or "demo-sync" not in server["networks"]:
+        found.append("demo-sync must be an internal network, shared with the server")
+    if not demo.get("read_only") or demo.get("cap_drop") != ["ALL"] or "no-new-privileges:true" not in demo.get(
+            "security_opt", []):
+        found.append("the demo must run read-only, with every capability dropped and no-new-privileges")
+    if [v.get("source") for v in demo.get("volumes", []) if v.get("target") == "/secrets" and not v.get("read_only")]:
+        found.append("the demo must mount the sync key read-only")
+    if services["demo-init"].get("network_mode") != "none":
+        found.append("demo-init must have no network")
     if not networks["db"].get("internal") or not networks["app"].get("internal"):
         found.append("db and app must be internal networks")
     if networks["atak"].get("driver_opts", {}).get("com.docker.network.bridge.enable_ip_masquerade") != "false":

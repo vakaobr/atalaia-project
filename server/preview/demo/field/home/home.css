@@ -1,0 +1,32 @@
+/* SPDX-FileCopyrightText: 2026 The Atalaia contributors */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+:root { color-scheme: light dark; --bg: #f6f7f4; --fg: #1d2420; --muted: #55605a; --card: #ffffff; --line: #d5dbd4;
+        --accent: #2f5d3a; --accent-fg: #ffffff; --banner: #fff3cd; --banner-fg: #5c4400; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #131814; --fg: #e8ece7; --muted: #a2aea6; --card: #1c231e; --line: #333d36; --accent: #7fc48d;
+          --accent-fg: #0d1a11; --banner: #3d3410; --banner-fg: #f1dd8a; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; }
+.wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+header { border-bottom: 1px solid var(--line); }
+.bar { display: flex; justify-content: space-between; align-items: center; min-height: 48px; }
+nav a, nav button { font: inherit; color: var(--muted); background: none; border: 0; padding: 6px 8px; cursor: pointer;
+                    text-decoration: none; border-radius: 4px; }
+nav [aria-current="true"] { color: var(--fg); font-weight: 600; text-decoration: underline; }
+.banner { background: var(--banner); color: var(--banner-fg); padding: 8px 12px; border-radius: 6px; margin: 16px 0; }
+h1 { font-size: 1.9rem; margin: 8px 0; }
+.lead { font-size: 1.1rem; max-width: 62ch; }
+.now { color: var(--muted); min-height: 1.5em; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 20px 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex;
+        flex-direction: column; gap: 8px; }
+.card h2 { font-size: 1.15rem; margin: 0; }
+.card p { margin: 0; color: var(--muted); flex: 1; }
+.card code { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--fg); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.button { display: inline-block; background: var(--accent); color: var(--accent-fg); padding: 8px 14px; border-radius: 6px;
+          text-decoration: none; font-weight: 600; }
+.button:focus-visible, nav a:focus-visible, nav button:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+.notes { color: var(--muted); max-width: 70ch; margin-bottom: 40px; }
+.notes p { margin: 8px 0; }

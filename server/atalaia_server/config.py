@@ -45,6 +45,9 @@
                             on every page, the landing page, the feedback form (/feedback, stored in the
                             database, read by the server administrators), /robots.txt and
                             X-Robots-Tag: noindex everywhere; "off" by default: nothing changes
+    ATALAIA_PREVIEW_DEMO_URL the address of the preview's live demo field (decisions DEMO-*), such as
+                            https://demo.example.org, with no path: the preview's landing page then links to it
+                            and to the live field's public pages; empty by default: no link (a preview only)
     ATALAIA_ATAK_RELAY      "on": the remote ATAK relay (Phase 4 follow-up FU5, atak_relay.py): a TLS
                             listener for the fields' enrolled ATAK devices, client certificates
                             required; "off" by default (no listener, no certificate can be issued)
@@ -334,6 +337,7 @@ class Settings:
     hosted_domain: Optional[str] = None
     atak_relay: bool = False
     preview: bool = False
+    preview_demo_url: Optional[str] = None  # the live demo's address (a preview only; DEMO-*)
     lang_from_browser: bool = True
     default_lang: str = "pt"
     atak_relay_port: int = DEFAULT_ATAK_PORT       # 0: any free port (the tests)
@@ -388,6 +392,17 @@ class Settings:
             raise ConfigError("ATALAIA_DEFAULT_LANG must be pt or en")
         if self.preview and self.hosted:
             raise ConfigError("ATALAIA_PREVIEW=on is for a single-field preview server, not a hosted hub")
+        if self.preview_demo_url is not None:
+            from urllib.parse import urlsplit
+
+            parts = urlsplit(self.preview_demo_url)
+            loopback = parts.hostname in ("localhost", "127.0.0.1", "::1")
+            if (not self.preview or parts.scheme not in ("https", "http") or not parts.hostname
+                    or (parts.scheme == "http" and not loopback) or parts.path not in ("", "/")
+                    or parts.username or parts.password or parts.query or parts.fragment):
+                raise ConfigError("ATALAIA_PREVIEW_DEMO_URL is for a preview (ATALAIA_PREVIEW=on): an https:// "
+                                  "address with no path, such as https://demo.example.org")
+            object.__setattr__(self, "preview_demo_url", self.preview_demo_url.rstrip("/"))
         self._check_atak()
         quotas = {**QUOTA_DEFAULTS, **dict(self.quotas)}
         for name, value in quotas.items():
@@ -502,6 +517,7 @@ class Settings:
             hosted_domain=env.get("ATALAIA_HOSTED_DOMAIN", "").strip() or None,
             atak_relay=_on_off(env, "ATALAIA_ATAK_RELAY"),
             preview=_on_off(env, "ATALAIA_PREVIEW"),
+            preview_demo_url=env.get("ATALAIA_PREVIEW_DEMO_URL", "").strip() or None,
             lang_from_browser=_on_off(env, "ATALAIA_LANG_FROM_BROWSER", default=True),
             default_lang=env.get("ATALAIA_DEFAULT_LANG", "").strip().lower() or "pt",
             atak_relay_port=int(_number(env, "ATALAIA_ATAK_RELAY_PORT", DEFAULT_ATAK_PORT, 1, 65535, int)),

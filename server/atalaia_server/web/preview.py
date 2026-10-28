@@ -190,11 +190,17 @@ async def landing(request: Request) -> Response:
         (f"/staff/login?lang={pt.page_language(page.lang)}", "li_staff", "li_staff_d"),
         (f"/feedback?lang={page.lang}", "li_feedback", "li_feedback_d"),
     ]
+    not_here = t["not_here_text"]
+    demo = request.app.state.settings.preview_demo_url
+    if demo:  # the live demo (decisions DEMO-*): its home page, then its field's public page on this server
+        items = [(f"{demo}/?lang={page.lang}", "li_demo", "li_demo_d"),
+                 (page.site_link(f"/f/{demo_data.LIVE_SLUG}/"), "li_live", "li_live_d"), *items]
+        not_here = t["not_here_text_demo"]
     rows = "".join(f'<li><a href="{esc(href)}">{esc(t[name])}</a>: {esc(t[desc])}</li>\n'
                    for href, name, desc in items)
     content = TEMPLATES["preview_landing"].substitute(
         heading=esc(t["landing_title"]), intro=esc(t["landing_intro"]), what=esc(t["what_title"]), items=rows,
-        not_here=esc(t["not_here_title"]), not_here_text=esc(t["not_here_text"]), demo_note=esc(t["demo_note"]),
+        not_here=esc(t["not_here_title"]), not_here_text=esc(not_here), demo_note=esc(t["demo_note"]),
         project_url="https://atalaia-project.link/")
     return page.render_page(request, t["landing_title"], content)
 

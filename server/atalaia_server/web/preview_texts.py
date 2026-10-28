@@ -83,6 +83,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "fb_back": "Voltar",
         "fb_honeypot": "Deixe este campo vazio",
         "fb_chars": "caracteres",
+        "li_demo": "Experimente a demonstração ao vivo",
+        "li_demo_d": "Um campo simulado joga um jogo atrás do outro: a consola do GM em modo de leitura, o marcador e a "
+                     "vista de quem joga. Só se pode ver, não mudar nada.",
+        "li_live": "A página do campo da demonstração ao vivo",
+        "li_live_d": "Os jogos que o campo simulado joga, enviados para este servidor como faria um campo a sério.",
+        "not_here_text_demo": "O simulador e o editor de modos correm no computador do campo e no browser, não neste "
+                              "servidor; a app para Android também não. A consola do GM só existe aqui na demonstração "
+                              "ao vivo, em modo de leitura. O projeto: ",
     },
     "en": {
         "language": "Language",
@@ -143,6 +151,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "fb_back": "Back",
         "fb_honeypot": "Leave this field empty",
         "fb_chars": "characters",
+        "li_demo": "Try the live demo",
+        "li_demo_d": "A simulated field plays one game after another: the GM console in read-only mode, the "
+                     "scoreboard and the player's view. You can look; nothing can be changed.",
+        "li_live": "The live demo field's page",
+        "li_live_d": "The games the simulated field plays, sent to this server as a real field would.",
+        "not_here_text_demo": "The simulator and the mode editor run on the field's own computer and in the browser, "
+                              "not on this server; neither does the Android app. The GM console is here only in the "
+                              "live demo, read-only. The project: ",
     },
     "de": {
         "language": "Sprache",
@@ -207,6 +223,15 @@ STRINGS: dict[str, dict[str, str]] = {
         "fb_back": "Zurück",
         "fb_honeypot": "Dieses Feld leer lassen",
         "fb_chars": "Zeichen",
+        "li_demo": "Live-Demo ausprobieren",
+        "li_demo_d": "Ein simuliertes Gelände spielt ein Spiel nach dem anderen: die GM-Konsole nur lesend, die "
+                     "Anzeigetafel und die Sicht der Spielenden. Man kann nur zusehen, nichts ändern.",
+        "li_live": "Die Seite des Live-Demo-Geländes",
+        "li_live_d": "Die Spiele, die das simulierte Gelände spielt, an diesen Server gesendet, wie es ein echtes "
+                     "Gelände täte.",
+        "not_here_text_demo": "Der Simulator und der Modus-Editor laufen auf dem Rechner des Geländes und im Browser, "
+                              "nicht auf diesem Server; die Android-App ebenso nicht. Die GM-Konsole gibt es hier nur "
+                              "in der Live-Demo, nur lesend. Das Projekt: ",
     },
     "zh-tw": {
         "language": "語言",
@@ -261,6 +286,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "fb_back": "返回",
         "fb_honeypot": "請讓此欄保持空白",
         "fb_chars": "字元",
+        "li_demo": "試用即時示範",
+        "li_demo_d": "一個模擬場地會一場接著一場進行遊戲：唯讀的 GM 控制台、計分板和玩家視角。只能觀看，無法更動。",
+        "li_live": "即時示範場地的頁面",
+        "li_live_d": "模擬場地所進行的遊戲，會像真實場地一樣傳送到這台伺服器。",
+        "not_here_text_demo": "模擬器和模式編輯器是在場地自己的電腦和瀏覽器上執行，不在這台伺服器上；Android App 也不在。"
+                              "GM 控制台只在即時示範中提供，且為唯讀。專案網站：",
     },
 }
 

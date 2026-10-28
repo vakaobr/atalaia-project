@@ -7,6 +7,8 @@ fictional clubs, scheduled games, finished games with their scores, events and b
     python -m atalaia_server demo reset                 delete the demo field and clubs, then load again
     python -m atalaia_server demo reviewer --username NAME --out FILE
                                                         a test account with the GM role on the demo field
+    python -m atalaia_server demo live [--key-out FILE] [--keep N] [--reset]
+                                                        the live demo field's side (see ``live`` below)
 
 **Everything is invented**: the field, the clubs, the games, the callsigns, the scores. No real person, club or
 place is named (a test checks the names against a list of what the loader may write). The loader writes
@@ -24,21 +26,23 @@ writes, the boxes' health (one box with a low battery, so the devices page has s
 
 from __future__ import annotations
 
+import os
 import random
 import secrets
 import uuid
 from dataclasses import dataclass, field as dc_field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import passwords, personal_data, totp
+from . import passwords, personal_data, sync, totp
 from .history_models import FieldPreset, GameScoreSample
-from .models import (ROLE_NAMES, Club, Controller, Field, FieldTeam, Game, GameEvent, GameNode, GameNodeScore,
-                     GameRegistration, ScheduledGame, User, UserFieldRole)
+from .models import (ROLE_NAMES, Club, Controller, Field, FieldApiKey, FieldTeam, Game, GameEvent, GameNode,
+                     GameNodeScore, GameRegistration, ScheduledGame, User, UserFieldRole)
 from .services import library
 from .tokens import Keys
 from .totp import SeedBox
@@ -472,6 +476,81 @@ async def reset(db: AsyncSession, now: Optional[datetime] = None, holder: Option
         db.add(UserFieldRole(user_id=user_id, field_id=field_id, role_id=role_id))
     await db.commit()
     done["roles_restored"] = len(roles)
+    return done
+
+
+# --- the live demo field --------------------------------------------------------------------------------------
+
+LIVE_SLUG = "demo-ao-vivo"
+LIVE_NAME = "Campo Demo ao Vivo"
+LIVE_KEEP = 12                    # games kept on the live field; older ones are deleted by each run
+LIVE_CONTROLLER_KEEP = timedelta(hours=6)  # a controller that has not synced for this long is forgotten
+LIVE_DESCRIPTION = (
+    "Campo de demonstração ao vivo: um controlador de campo simulado, com caixas simuladas, joga um jogo atrás do "
+    "outro e envia-os para aqui como faria um campo a sério.\n\n"
+    "Nada aqui é real: nem o campo, nem as alcunhas, nem as pontuações. Os jogos mais antigos vão sendo apagados.")
+
+
+async def live(db: AsyncSession, key_file: Optional[Path] = None, keep: int = LIVE_KEEP, reset: bool = False,
+               now: Optional[datetime] = None) -> dict[str, Any]:
+    """The server's side of the preview's live demo (docs/runbooks/preview-server.md, "The live demo"): a field of
+    its own, ``demo-ao-vivo``, that a simulated field controller (the ``demo-field`` service) syncs its looping
+    games to, so the public pages show what the controller plays. Kept apart from ``campo-demo`` so that the
+    hourly ``demo load`` never touches a synced game and the sync never touches the made-up ones.
+
+    ``key_file``: the field's API key for that controller. Made once (only its SHA-256 is kept here, as for any
+    key) and written to the file, mode 0600; kept while the file holds a live key of this field, otherwise
+    replaced (the old one is revoked). Nothing secret is printed. Every run also deletes what is old: all but the
+    newest ``keep`` games and controllers that stopped syncing; ``reset`` deletes all the field's games and
+    controllers. Idempotent; commits."""
+    now = now or datetime.now(timezone.utc)
+    done: dict[str, Any] = {}
+    field_id = demo_id("live-field")
+    field = await db.get(Field, field_id)
+    done["field"] = "created" if field is None else "kept"
+    if field is None:
+        field = Field(id=field_id, name=LIVE_NAME, slug=LIVE_SLUG)
+        db.add(field)
+    _set(field, field_type="outdoor", timezone=ZONE, public_page=True, public_scoreboard=True,
+         description=LIVE_DESCRIPTION, address_text="Campo simulado (local fictício, sem morada)",
+         federation_label="N.º fed.", limit_template="portugal", max_replicas=5, branding_name="Demo ao vivo",
+         accent="#3b5d2a")
+    await db.flush()
+
+    if key_file is not None:
+        wanted = None
+        try:
+            wanted = key_file.read_text(encoding="utf-8").strip() or None
+        except OSError:
+            pass
+        live_keys = list(await db.scalars(select(FieldApiKey).where(
+            FieldApiKey.field_id == field_id, FieldApiKey.revoked_at.is_(None))))
+        if wanted is not None and any(k.key_sha256 == sync.key_hash(wanted) for k in live_keys):
+            done["key"] = "kept"
+        else:
+            for k in live_keys:
+                k.revoked_at = now
+            key = sync.new_key()
+            db.add(FieldApiKey(field_id=field_id, key_sha256=sync.key_hash(key), label="demo-field"))
+            tmp = key_file.with_name(key_file.name + ".tmp")
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(key + "\n")
+            os.replace(tmp, key_file)
+            done["key"] = "made"
+
+    if reset:
+        done["deleted_games"] = (await db.execute(delete(Game).where(Game.field_id == field_id))).rowcount
+        await db.execute(delete(Controller).where(Controller.field_id == field_id))
+    else:
+        old = list(await db.scalars(select(Game.id).where(Game.field_id == field_id)
+                                    .order_by(Game.controller_created_at.desc()).offset(max(keep, 1))))
+        if old:
+            await db.execute(delete(Game).where(Game.id.in_(old)))
+        done["deleted_games"] = len(old)
+        await db.execute(delete(Controller).where(Controller.field_id == field_id,
+                                                  Controller.last_seen_at < now - LIVE_CONTROLLER_KEEP))
+    await db.commit()
     return done
 
 
