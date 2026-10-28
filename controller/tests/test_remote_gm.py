@@ -466,7 +466,8 @@ class AtakStreamTests(RemoteCase):
 
 
 class BrandingStreamTests(RemoteCase):
-    """BR24: with ``[sync] branding = "site"`` the stream opens for the site server's ``field.changed`` note alone."""
+    """BR24, PKD-1: with ``[sync] branding = "site"`` (or the library, on by default) the stream opens for the
+    site server's ``field.changed`` note alone: the branding and settings, the library, the schedule."""
 
     remote_gm = False
 
@@ -475,8 +476,8 @@ class BrandingStreamTests(RemoteCase):
         site = FakeStream()
         self.cfg.sync_url = site.url
         remote = RemoteGm(self.cfg, self.store, self.ctrl, api_key=KEY, controller_id=lambda: CONTROLLER_ID)
-        notes: list[int] = []
-        remote.on_field_changed = lambda: notes.append(1)
+        notes: list[Optional[list[str]]] = []
+        remote.on_field_changed = notes.append
         self.ctrl.add_listener(remote.on_controller_message)
         remote.start()
         self.addCleanup(remote.stop)
@@ -484,13 +485,82 @@ class BrandingStreamTests(RemoteCase):
         hello = site.next("hello")
         self.assertEqual((hello["remote_gm"], "atak" in hello), (False, False))
         site.send({"type": "field.changed", "sync_version": 1})
-        self.assertTrue(wait_for(lambda: notes == [1], 5))
+        self.assertTrue(wait_for(lambda: notes == [None], 5))
         site.send({"type": "field.changed", "sync_version": 1, "etag": "x"})  # not in the form: ignored
         site.send({"type": "field.changed", "sync_version": 2})
+        site.send({"type": "field.changed", "sync_version": 1, "what": ["library", "schedule"]})  # PKD-1
+        site.send({"type": "field.changed", "sync_version": 1, "what": ["positions"]})  # not one it knows: ignored
         site.send({"type": "field.changed", "sync_version": 1})
-        self.assertTrue(wait_for(lambda: notes == [1, 1], 5))
+        self.assertTrue(wait_for(lambda: notes == [None, ["library", "schedule"], None], 5))
         self.assertFalse(any(m.get("type") == "live" for m in list(site.received.queue)))  # nothing of the game
         self.assertFalse(remote.status()["enabled"])  # the remote GM stays off
+
+
+class PositionsTests(RemoteCase):
+    """PKD-5: the live game's player positions go to the remote GM, only while ``remote_gm`` is on."""
+
+    def report(self, game: dict[str, Any], player: str = "p-abcdef234567", **fields: Any) -> None:
+        pos = {"game_id": game["id"], "player_id": player, "team": 1, "squad": 1, "source": "gps", "lat": 41.1579,
+               "lon": -8.6291, "accuracy_m": 6.0, "t": 0, "received_at": time.time(), **fields}
+        self.store.set_player_position(game["id"], player, pos, time.time())
+        self.ctrl._emit({"type": "player_position", "game": game["id"], "position": pos, "_position": True})
+
+    @unittest.skipIf(CORE is None, "the shared core library is not built")
+    def test_the_message_has_the_live_games_players_and_passes_the_shared_check(self) -> None:
+        game = self.game()
+        self.assertEqual(self.remote.positions(), {"game": None, "positions": []})  # not running
+        self.ctrl.start_game(game["id"])
+        self.report(game)
+        self.report(game, "p-bcdefg234567", team=2, squad=0, source="ble", room="Hangar 2", zone="North", level=1,
+                    x=0.25, y=0.75, lat=None, lon=None)
+        body = self.remote.positions_body()
+        assert body is not None
+        self.assertEqual(body["game"], {"game_id": game["id"], "game_seed": game["game_seed"]})
+        first, second = body["positions"]
+        self.assertEqual((first["player_id"], first["team"], first["squad"], first["lat"], first["lon"]),
+                         ("p-abcdef234567", "red", 1, 41.1579, -8.6291))
+        self.assertEqual((second["team"], second["room"], second["zone"], second["x"], "lat" in second),
+                         ("blue", "Hangar 2", "North", 0.25, False))
+        self.assertNotIn("squad", second)
+        sync_format.check_positions(copy.deepcopy(body))
+        # An old report is not sent (three reporting intervals).
+        self.report(game, "p-cdefgh234567", received_at=time.time() - 3600)
+        self.assertEqual([p["player_id"] for p in self.remote.positions()["positions"]],
+                         ["p-abcdef234567", "p-bcdefg234567"])
+
+    @unittest.skipIf(CORE is None, "the shared core library is not built")
+    def test_they_travel_on_the_stream_when_changed_and_stop_with_the_game(self) -> None:
+        game = self.game()
+        self.ctrl.start_game(game["id"])
+        site = FakeStream()
+        self.cfg.sync_url = site.url
+        remote = RemoteGm(self.cfg, self.store, self.ctrl, api_key=KEY, controller_id=lambda: CONTROLLER_ID)
+        self.ctrl.add_listener(remote.on_controller_message)
+        self.report(game)
+        remote.start()
+        self.addCleanup(remote.stop)
+        self.addCleanup(site.close)
+        site.next("hello")
+        sent = site.next("positions")
+        self.assertEqual([p["player_id"] for p in sent["positions"]], ["p-abcdef234567"])
+        self.assertEqual(remote.positions_sent, 1)
+        self.ctrl.end_game(game["id"])
+        self.store.delete_player_positions(game["id"])
+        ended = site.next("positions", timeout=15)
+        self.assertEqual((ended["game"], ended["positions"]), (None, []))
+
+    def test_none_without_the_remote_gm(self) -> None:
+        self.cfg.sync_remote_gm = False
+        site = FakeStream()
+        self.cfg.sync_url = site.url
+        remote = RemoteGm(self.cfg, self.store, self.ctrl, api_key=KEY, controller_id=lambda: CONTROLLER_ID)
+        remote.start()
+        self.addCleanup(remote.stop)
+        self.addCleanup(site.close)
+        site.next("hello")
+        time.sleep(0.8)
+        self.assertFalse(any(m.get("type") == "positions" for m in list(site.received.queue)))
+        self.assertEqual(remote.positions_sent, 0)
 
 
 def _cot_events() -> list[str]:
@@ -578,13 +648,15 @@ class SettingsTests(unittest.TestCase):
                 bundle.store.close()
 
     def test_built_only_when_on_and_the_log_needs_the_gm_token(self) -> None:
-        for on in (False, True):
-            with self.subTest(remote_gm=on), tempfile.TemporaryDirectory() as tmp:
+        """The stream is built for the remote GM, the ATAK relay, the site's branding and, since PKD-1, the library
+        (on by default): the library's alone only listens for notes, so the remote GM stays off."""
+        for on, library in ((False, False), (True, False), (False, True)):
+            with self.subTest(remote_gm=on, library=library), tempfile.TemporaryDirectory() as tmp:
                 cfg = config(tmp, sync_enabled=True, sync_url="https://site.example.org", sync_api_key=KEY,
-                             sync_remote_gm=on)
+                             sync_remote_gm=on, sync_library=library)
                 bundle = build(cfg, core=CORE, load_core_lib=False)
                 try:
-                    self.assertEqual(bundle.remote is not None, on)
+                    self.assertEqual(bundle.remote is not None, on or library)
                     client = TestClient(bundle.app)  # no lifespan: nothing connects to the site server
                     self.assertEqual(client.get("/api/v1/remote-gm", headers=READ).status_code, 403)
                     body = client.get("/api/v1/remote-gm", headers=GM).json()

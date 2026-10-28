@@ -1200,4 +1200,7 @@ const Map<String, String> deStrings = {
   'site.err.apd_not_accepted': 'Dieses Feld akzeptiert diese APD nicht.',
   'site.err.membership_expired':
       'Die Mitgliedschaft ist am Tag dieses Spiels abgelaufen.',
+  // The remote GM may see shared positions (PKD-5)
+  'player.share_remote_gm':
+      'Hat das Feld eine Remote-Spielleitung, die im Site-Server angemeldet ist, sieht die Remote-Spielleitung deine Position ebenfalls, solange du sie teilst. Der Site-Server speichert sie nicht.',
 };

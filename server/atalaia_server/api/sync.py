@@ -248,7 +248,7 @@ async def library_scenario(scenario_id: str, request: Request) -> JSONResponse:
 
 # The remote GM's messages from the controller (plan phase 19) and its CoT for the remote ATAK relay (FU5);
 # ``command`` goes the other way only.
-STREAM_IN = ("hello", "live", "command.result", "cot")
+STREAM_IN = ("hello", "live", "command.result", "cot", "positions")
 
 
 class _Session:
@@ -382,8 +382,9 @@ async def _message(ws: WebSocket, caller: sync.Caller, raw: str,
 
 async def _remote(session: _Session, db: Any, kind: str, msg: dict[str, Any]) -> Optional[dict[str, Any]]:
     """The remote GM's messages (plan phase 19): ``hello`` registers the link (and is answered), ``live``
-    replaces its live view, ``command.result`` answers a waiting command, ``cot`` goes to the remote ATAK
-    relay (FU5); the last three get no answer."""
+    replaces its live view, ``positions`` the players' positions it relays to the remote GM page (PKD-5),
+    ``command.result`` answers a waiting command, ``cot`` goes to the remote ATAK relay (FU5); the last four get
+    no answer."""
     try:
         body = sync_format.STREAM[kind](msg)
     except sync_format.SyncFormatError as exc:
@@ -408,6 +409,8 @@ async def _remote(session: _Session, db: Any, kind: str, msg: dict[str, Any]) ->
         raise sync.SyncProblem(400, "invalid_body", "not_this_controller", "controller.id")
     if kind == "live":
         hub.set_live(link, body["live"])
+    elif kind == "positions":
+        hub.set_positions(link, body)  # relayed in memory to the field's remote GM page: never stored, never logged
     elif kind == "cot":
         if link.atak and relay is not None:  # else dropped: the hello.ack said the relay does not take them
             # At most ``atak_cot`` messages a minute per field, whatever its streams (FU5-15).

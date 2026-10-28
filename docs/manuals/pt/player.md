@@ -218,7 +218,7 @@ Um objetivo pode dizer **Para a equipa** *(equipa)* ou **Para a equipa** *(equip
 
 ## 6. Partilha a tua posição e o limite do campo
 
-Partilhar a posição é opcional. A tua posição vai só para o controlador do campo, durante o jogo. O controlador decide quem a pode ver: a organização e os marshals, e o teu squad se o jogo o permitir. A organização vê-a nos seus aparelhos ATAK, se os usar. A app desenha um mapa do campo com as posições que podes ver (mais abaixo); a consola não desenha quem joga. No *VIP / Carga*, a posição do VIP é o que extrai a equipa.
+Partilhar a posição é opcional. A tua posição vai só para o controlador do campo, durante o jogo. O controlador decide quem a pode ver: a organização e os marshals, e o teu squad se o jogo o permitir. Se o campo tiver um GM remoto com sessão iniciada no servidor do site, o GM remoto também a vê, enquanto a partilhares; o servidor do site não a guarda. A organização vê-a nos seus aparelhos ATAK, se os usar. A app desenha um mapa do campo com as posições que podes ver (mais abaixo); a consola não desenha quem joga. No *VIP / Carga*, a posição do VIP é o que extrai a equipa.
 
 1. Faz o check-in e toca em **Seguir o jogo**.
 2. Enquanto o jogo **decorre**, liga **Partilhar a minha posição**. Diz *Só durante o jogo; o controlador decide quem a vê …*.

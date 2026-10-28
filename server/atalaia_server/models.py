@@ -621,6 +621,11 @@ class ChronoViolation(Base):
     replica_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     violation_type: Mapped[str] = mapped_column(String(32), nullable=False)
     energy_j: Mapped[float] = mapped_column(Float, nullable=False)
+    # PKD-3: the class limit the controller judged against, the excess over it, and whether the player had an
+    # earlier violation at the field (limit_j and delta_j are null when the controller did not send the limit).
+    limit_j: Mapped[Optional[float]] = mapped_column(Float)
+    delta_j: Mapped[Optional[float]] = mapped_column(Float)
+    repeat_offender: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     game: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("games.id", ondelete="SET NULL"))
     outcome: Mapped[Optional[str]] = mapped_column(String(16))
     resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))

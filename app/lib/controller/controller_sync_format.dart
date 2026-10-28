@@ -623,13 +623,16 @@ Json checkReplicas(Object? raw) {
 
 /// One stored reading: `{record, series_id, outcome, received_at,
 /// game_seed?}`; the record's content is the site server's to verify.
+/// The class energy limit (J) the controller judged a series against (PKD-3).
+const limitJMin = 0.001, limitJMax = 100.0;
+
 Json checkReading(Object? raw, [String path = 'reading']) {
   final entry = _obj(raw, path);
   _keys(
     entry,
     path,
     ['record', 'series_id', 'outcome', 'received_at'],
-    ['game_seed'],
+    ['game_seed', 'limit_j'],
   );
   final record = entry['record'];
   if (record is! String || record.isEmpty) _fail('not_a_text', '$path.record');
@@ -648,6 +651,16 @@ Json checkReading(Object? raw, [String path = 'reading']) {
     _u32,
     nullable: true,
   );
+  if (entry.containsKey('limit_j')) {
+    // PKD-3: sent only when known, so an older site server never sees the key.
+    _num(
+      entry['limit_j'],
+      '$path.limit_j',
+      limitJMin,
+      limitJMax,
+      nullable: true,
+    );
+  }
   return entry;
 }
 
@@ -1745,14 +1758,117 @@ Json checkCot(Object? raw) {
   return body;
 }
 
-/// The site server's note that the field's branding, saved teams or
-/// check-in settings changed (it carries nothing else): the controller
-/// pulls `GET /api/v1/sync/field` at once instead of at its next cycle.
+/// What a `field.changed` note may list in `what` (PKD-1).
+const fieldChangedWhat = ['branding', 'library', 'schedule'];
+
+/// The site server's note that something of the field changed: its
+/// branding, saved teams or check-in settings (no `what`, as since BR24) or
+/// what `what` lists (PKD-1: `branding`, `library`, `schedule`): the
+/// controller pulls that at once instead of at its next cycle.
 Json checkFieldChanged(Object? raw) {
   final body = _obj(raw, '');
-  _keys(body, '', ['sync_version']);
+  _keys(body, '', ['sync_version'], ['what']);
   if (body['sync_version'] != syncVersion) {
     _fail('unsupported_version', 'sync_version');
+  }
+  if (body.containsKey('what')) {
+    final what = _list(body['what'], 'what', fieldChangedWhat.length, 1);
+    for (var i = 0; i < what.length; i++) {
+      if (what[i] is! String) _fail('not_a_text', 'what[$i]');
+      if (!fieldChangedWhat.contains(what[i])) _fail('bad_text', 'what[$i]');
+    }
+    if (what.toSet().length != what.length) _fail('duplicate', 'what');
+  }
+  return body;
+}
+
+// --- the players' positions for the remote GM (PKD-5) ----------------------
+// While `remote_gm` is on, the controller sends the live game's player
+// positions on the stream (`positions`), as a GM of the game sees them. The
+// site server relays them in memory to the field's remote GM page and stores
+// or logs none. `game` null (no live game) with no positions clears the
+// page's list.
+
+const maxPositions = 500;
+const positionSources = ['gps', 'ble'];
+const _positionLevelMax = 9;
+const _positionAgeMaxS = 3600;
+
+Json checkPositions(Object? raw) {
+  final body = _envelope(raw, ['game', 'positions'], game: false);
+  final game = body['game'];
+  if (game != null) {
+    final ident = _obj(game, 'game');
+    _keys(ident, 'game', ['game_id', 'game_seed']);
+    _int(ident['game_id'], 'game.game_id', 0, _u16);
+    _int(ident['game_seed'], 'game.game_seed', 0, _u32);
+  }
+  final items = _list(body['positions'], 'positions', maxPositions);
+  if (game == null && items.isNotEmpty) _fail('not_live', 'positions');
+  final seen = <String>{};
+  for (var i = 0; i < items.length; i++) {
+    final path = 'positions[$i]';
+    final item = _obj(items[i], path);
+    _keys(
+      item,
+      path,
+      ['player_id', 'source', 'age_s'],
+      [
+        'team',
+        'squad',
+        'role',
+        'lat',
+        'lon',
+        'accuracy_m',
+        'level',
+        'room',
+        'zone',
+        'x',
+        'y',
+      ],
+    );
+    _text(item['player_id'], '$path.player_id', 15, pattern: playerIdRe);
+    if (!seen.add(item['player_id']! as String)) {
+      _fail('duplicate_player', '$path.player_id');
+    }
+    if (!positionSources.contains(item['source'])) {
+      _fail('bad_source', '$path.source');
+    }
+    _num(item['age_s'], '$path.age_s', 0, _positionAgeMaxS);
+    if (item.containsKey('team')) {
+      _team(item['team'], '$path.team', nullable: true);
+    }
+    if (item.containsKey('squad')) _int(item['squad'], '$path.squad', 0, 255);
+    if (item.containsKey('role')) _text(item['role'], '$path.role', 32);
+    if (item.containsKey('level')) {
+      _int(item['level'], '$path.level', 0, _positionLevelMax, nullable: true);
+    }
+    if (item['source'] == 'gps') {
+      for (final key in ['lat', 'lon']) {
+        if (!item.containsKey(key)) _fail('missing', '$path.$key');
+      }
+      _num(item['lat'], '$path.lat', -90, 90);
+      _num(item['lon'], '$path.lon', -180, 180);
+      if (item.containsKey('accuracy_m')) {
+        _num(item['accuracy_m'], '$path.accuracy_m', 0, 10000, nullable: true);
+      }
+      for (final key in ['room', 'zone', 'x', 'y']) {
+        if (item.containsKey(key)) _fail('unknown_field', '$path.$key');
+      }
+    } else {
+      if (!item.containsKey('room')) _fail('missing', '$path.room');
+      _text(item['room'], '$path.room', 48);
+      if (item.containsKey('zone')) _text(item['zone'], '$path.zone', 48);
+      if (item.containsKey('x') != item.containsKey('y')) {
+        _fail('missing', item.containsKey('x') ? '$path.y' : '$path.x');
+      }
+      for (final key in ['x', 'y']) {
+        if (item.containsKey(key)) _num(item[key], '$path.$key', 0, 1);
+      }
+      for (final key in ['lat', 'lon', 'accuracy_m']) {
+        if (item.containsKey(key)) _fail('unknown_field', '$path.$key');
+      }
+    }
   }
   return body;
 }
@@ -1765,6 +1881,7 @@ const streamChecks = <String, Json Function(Object?)>{
   'command': checkCommand,
   'cot': checkCot,
   'field.changed': checkFieldChanged,
+  'positions': checkPositions,
 };
 
 // --- the scenario library and presets (plan phase 20) ---------------------

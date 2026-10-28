@@ -29,6 +29,7 @@ from atalaia_server import sync
 from atalaia_server.services import library
 
 from .base import AppTestCase, TempDatabase
+from .test_remote_gm import Stream
 from .test_sync_e2e import CORE, REPO, SiteServer
 
 SCENARIO = "org.test.two"
@@ -325,6 +326,51 @@ class LibraryEndToEndTests(unittest.TestCase):
         self.db.fetch("UPDATE field_scenarios SET archived_at = NULL WHERE field_id = $1", self.field)
         self.assertTrue(client.run_once(), client.last_error)
         self.assertEqual([s["id"] for s in scenario_service.listing(ctrl)], [SCENARIO])
+
+
+class NoteTests(LibraryCase):
+    async def test_a_library_change_reaches_the_controllers_on_the_stream(self) -> None:
+        """PKD-1: a preset made, replaced or deleted and a scenario saved or archived send ``field.changed`` with
+        ``what: ["library"]`` to the field's connected controllers; a save that changes nothing sends nothing."""
+        stream = Stream(self.app, self.key)
+        self.addAsyncCleanup(stream.close)
+        self.assertEqual((await stream.open())["type"], "websocket.accept")
+        await stream.send({"type": "hello", "sync_version": 1, "remote_gm": False,
+                           "controller": {"id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd", "version": "0.1.0"}})
+        self.assertEqual((await stream.receive())["type"], "hello.ack")
+
+        async def note(what: str, notes: int = 1) -> None:
+            await self.app.state.remote_hub.settle()
+            for _ in range(notes):
+                self.assertEqual(await stream.receive(), {"type": "field.changed", "sync_version": 1,
+                                                          "what": ["library"]}, what)
+            self.assertEqual(stream.pending(), 0, what)
+
+        body = {"name": "Bomba curta", "mode_id": "org.atalaia.bomb", "params": {"fuse_s": 45}}
+        r = await self.client.post(self.url("/presets"), headers=self.gm, json=body)
+        self.assertEqual(r.status_code, 201, r.text)
+        await note("a preset")
+        r = await self.client.put(self.url(f"/presets/{r.json()['id']}"), headers=self.gm,
+                                  json={**body, "params": {"fuse_s": 60}})
+        self.assertEqual(r.status_code, 200, r.text)
+        await note("replaced")
+        r = await self.client.delete(self.url(f"/presets/{r.json()['id']}"), headers=self.gm)
+        self.assertEqual(r.status_code, 204, r.text)
+        await note("deleted")
+        r = await self.client.post(self.url("/presets"), headers=self.gm, json={**body, "params": {}, "name": "X"})
+        self.assertEqual(r.status_code, 201, r.text)
+        await note("another preset")
+        r = await self.client.post(self.url("/presets"), headers=self.gm, json={**body, "params": {}, "name": "X"})
+        await note("refused: nothing sent", notes=0)
+        await self.save(MANIFEST)
+        await note("a scenario")
+        await self.save(MANIFEST, expect=200)
+        await note("saved again, unchanged", notes=0)
+        r = await self.client.delete(self.url(f"/scenarios/{SCENARIO}"), headers=self.gm)
+        self.assertEqual(r.status_code, 204, r.text)
+        await note("archived")
+        await self.client.delete(self.url(f"/scenarios/{SCENARIO}"), headers=self.gm)
+        await note("archived again", notes=0)
 
 
 if __name__ == "__main__":

@@ -406,7 +406,10 @@ class ControllerSync {
   int imagesFetched = 0;
   bool settingsFromSite = false; // the last answer carried the settings (BR24)
   int settingsApplied = 0; // settings (and limit templates) changed by them
+  bool limitJSupported = true; // PKD-3: an older site server refuses `limit_j`
   int fieldChanges = 0; // stream notes that the field's branding changed
+  int libraryChanges = 0; // ... its scenarios or presets (PKD-1)
+  int scheduleChanges = 0; // ... its schedule (PKD-1)
   bool librarySupported = true;
   double? libraryPulledAt;
   String? libraryError;
@@ -831,6 +834,9 @@ class ControllerSync {
         };
         final seed = _gameSeed(row['game_id']);
         if (seed != null) entry['game_seed'] = seed;
+        if (row['limit_j'] != null && limitJSupported) {
+          entry['limit_j'] = row['limit_j']; // the class limit judged against
+        }
         try {
           batch.add(checkReading(entry));
         } on SyncFormatError {
@@ -840,10 +846,29 @@ class ControllerSync {
       if (batch.isNotEmpty) {
         Map<String, Object?> answer = const {};
         try {
-          answer = await _post('/api/v1/sync/chrono', {
-            ...env,
-            'readings': batch,
-          });
+          try {
+            answer = await _post('/api/v1/sync/chrono', {
+              ...env,
+              'readings': batch,
+            });
+          } on SyncError catch (e) {
+            if (e.status != 400 || !_refusal(e).$2.endsWith('.limit_j')) {
+              rethrow;
+            }
+            // A site server from before PKD-3 refuses the key: send the
+            // batch without it, and every later one too.
+            limitJSupported = false;
+            answer = await _post('/api/v1/sync/chrono', {
+              ...env,
+              'readings': [
+                for (final r in batch)
+                  {
+                    for (final k in r.entries)
+                      if (k.key != 'limit_j') k.key: k.value,
+                  },
+              ],
+            });
+          }
         } on SyncError catch (e) {
           _registryRefused('/api/v1/sync/chrono', e);
         }
@@ -1222,13 +1247,29 @@ class ControllerSync {
     brandingPulledAt = _wall();
   }
 
-  /// The site server's note on the stream that the field's branding, saved
-  /// teams or settings changed (`field.changed`): pull them at once, unless
-  /// this controller keeps its own branding or is backing off (BR24).
-  void fieldChanged() {
-    if (config.branding != 'site') return;
-    fieldChanges++;
-    kick();
+  /// The site server's note on the stream that something of the field
+  /// changed (`field.changed`): pull it at once, unless this controller does
+  /// not take that from the site or is backing off. Without [what] the note
+  /// is BR24's (branding, teams, settings: only with the site's branding);
+  /// `library` counts only with the library on and `schedule` always (the
+  /// game-day pull has no setting) (PKD-1). The cycle that runs pulls
+  /// everything due.
+  void fieldChanged([List<Object?>? what]) {
+    final named = (what == null || what.isEmpty) ? const ['branding'] : what;
+    var wanted = false;
+    if (named.contains('branding') && config.branding == 'site') {
+      fieldChanges++;
+      wanted = true;
+    }
+    if (named.contains('library') && config.library) {
+      libraryChanges++;
+      wanted = true;
+    }
+    if (named.contains('schedule')) {
+      scheduleChanges++;
+      wanted = true;
+    }
+    if (wanted) kick();
   }
 
   Future<bool> _fetchImage(
@@ -1600,6 +1641,7 @@ class ControllerSync {
         'schedule_pulled_at': schedulePulledAt,
         'linked_games': schedule?.scheduleLinks().length ?? 0,
         'claims_answered': claimsAnswered,
+        'changes': scheduleChanges,
         'shared_chrono': {
           'supported': sharedChronoSupported,
           'stored': sharedChronoStored,
@@ -1624,6 +1666,7 @@ class ControllerSync {
         'scenarios_installed': scenariosInstalled,
         'scenarios_removed': scenariosRemoved,
         'presets_removed': presetsRemoved,
+        'changes': libraryChanges,
         'from_site': {
           for (final e in lib.entries) e.key: e.value.keys.toList()..sort(),
         },

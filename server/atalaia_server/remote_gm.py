@@ -16,7 +16,10 @@ the same socket, or the request ends after ``timeout_s`` (10 s) with
 ``controller_timeout``.
 
 Nothing here is stored: live views stay in memory (they hold no position:
-``sync_format.check_live`` refuses one) and the commands are in the audit log.
+``sync_format.check_live`` refuses one) and the commands are in the audit log. The players' positions come
+apart, in their own ``positions`` message (PKD-5): a remote GM may see them whenever the players share them with
+the field controller; they are kept in the link, replaced whole each time and shown with their age, never stored
+and never logged.
 The links live in the server's one worker process (ADR-P4-2; decision S19-4):
 a server with several workers would need a shared channel, which the
 deployment (plan phase 22) does not have. In hosted mode (plan phase 21) a link
@@ -36,6 +39,7 @@ from typing import Any, Awaitable, Callable, Optional
 from . import tenancy
 
 COMMAND_TIMEOUT_S = 10.0
+POSITIONS_FRESH_S = 90.0   # the controller says them at least every 30 s: older ones are not shown
 
 
 class RemoteProblem(Exception):
@@ -62,6 +66,8 @@ class Link:
     connected_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     live: Optional[dict[str, Any]] = None
     live_at: Optional[datetime] = None
+    positions: Optional[list[dict[str, Any]]] = None   # the live game's players' positions (PKD-5): memory only
+    positions_at: Optional[datetime] = None
     pending: dict[str, "asyncio.Future[dict[str, Any]]"] = field(default_factory=dict)
     tenant: Optional[str] = field(default_factory=tenancy.current_schema)  # hosted mode's schema, else None
 
@@ -73,7 +79,19 @@ class Link:
         return {"controller_id": self.controller_id, "controller": str(self.controller_row) if self.controller_row
                 else None, "version": self.version, "remote_gm": self.remote_gm,
                 "atak": self.atak, "connected_at": self.connected_at.isoformat(),
-                "live_at": self.live_at.isoformat() if self.live_at else None, "live": self.live}
+                "live_at": self.live_at.isoformat() if self.live_at else None, "live": self.live,
+                "positions_at": self.positions_at.isoformat() if self.positions_at else None,
+                "positions": self.positions_view()}
+
+    def positions_view(self) -> list[dict[str, Any]]:
+        """The players' positions the controller last sent, each with its age now (the one it had when sent plus
+        the time since); none once the live game is gone or after ``POSITIONS_FRESH_S`` without news."""
+        if not self.positions or self.positions_at is None:
+            return []
+        waited = (datetime.now(timezone.utc) - self.positions_at).total_seconds()
+        if waited > POSITIONS_FRESH_S:
+            return []
+        return [{**p, "age_s": round(p["age_s"] + waited, 1)} for p in self.positions]
 
 
 class RemoteHub:
@@ -103,6 +121,18 @@ class RemoteHub:
     def set_live(self, link: Link, live: dict[str, Any]) -> None:
         """A controller's new live view (its ``live`` message): kept, and the watchers of its field told."""
         link.live, link.live_at = live, datetime.now(timezone.utc)
+        if live is None:
+            link.positions = None  # no live game: no positions
+        self._changed(link)
+
+    def set_positions(self, link: Link, body: dict[str, Any]) -> None:
+        """A controller's ``positions`` (the live game's players, as a GM sees them): kept in memory for the
+        remote GM page, replaced whole each time, and the watchers of its field told. Only from a link that
+        takes remote commands (``remote_gm``); from another they are dropped. Nothing is stored or logged."""
+        if not link.remote_gm:
+            return
+        items = body["positions"] if body["game"] is not None else []
+        link.positions, link.positions_at = (items or None), datetime.now(timezone.utc)
         self._changed(link)
 
     def watch(self, field_id: uuid.UUID) -> "Watcher":
@@ -136,13 +166,17 @@ class RemoteHub:
         return sorted((lk for (t, f, _), lk in self._links.items() if t == tenant and f == field_id),
                       key=lambda lk: lk.controller_id)
 
-    def announce_field(self, field_id: uuid.UUID) -> None:
+    def announce_field(self, field_id: uuid.UUID, what: Optional[tuple[str, ...]] = None) -> None:
         """``field.changed`` to every controller of the field connected on a stream (BR24): its branding, saved
         teams or check-in settings changed and it should pull them now. Sent in the background (the request that
         changed them does not wait), once per link, whatever the controller's settings: one that does not keep
-        the site's branding ignores it, as an older one that does not know the type does."""
+        the site's branding ignores it, as an older one that does not know the type does.
+
+        ``what`` (PKD-1) names what else changed: ``library`` (a scenario or a game preset) and ``schedule``
+        (a scheduled game). Without it the note is the BR24 one, byte for byte (the branding and settings), which
+        a controller before PKD-1 understands; a note with ``what`` it ignores, as it did before it existed."""
         for link in self.links(field_id):
-            task = asyncio.get_running_loop().create_task(self._note(link))
+            task = asyncio.get_running_loop().create_task(self._note(link, what))
             self._notes.add(task)
             task.add_done_callback(self._notes.discard)
 
@@ -152,9 +186,12 @@ class RemoteHub:
             await asyncio.gather(*list(self._notes), return_exceptions=True)
 
     @staticmethod
-    async def _note(link: Link) -> None:
+    async def _note(link: Link, what: Optional[tuple[str, ...]] = None) -> None:
+        note: dict[str, Any] = {"type": "field.changed", "sync_version": 1}
+        if what:
+            note["what"] = list(what)
         with contextlib.suppress(Exception):  # the socket went away: the controller pulls at its next cycle
-            await asyncio.wait_for(link.send({"type": "field.changed", "sync_version": 1}), 5.0)
+            await asyncio.wait_for(link.send(note), 5.0)
 
     def pick(self, field_id: uuid.UUID, controller_id: Optional[str]) -> Link:
         """The link a command goes to: the one named, or the only one that takes commands and is in charge

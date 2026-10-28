@@ -34,7 +34,7 @@ from ..audit import record
 from ..auth import Principal, current_principal, require_field_role
 from ..db import get_session
 from ..models import SCHEDULED_STATUSES, Field, ScheduledGame
-from ..services import registration, scheduling as svc
+from ..services import branding, registration, scheduling as svc
 from .fields import NO_STORE
 
 router = APIRouter(prefix="/api/v1", tags=["scheduling"])
@@ -154,6 +154,7 @@ async def create_game(field_id: uuid.UUID, body: ScheduledGameIn, request: Reque
     record(db, "schedule_create", request, user_id=principal.user.id, resource="scheduled_game",
            resource_id=game.id, details={"field_id": str(field_id)})
     await db.commit()
+    branding.announce(request, [field_id], ("schedule",))  # the controllers pull it at once (PKD-1)
     return await _answer(db, game, field, 201)
 
 
@@ -215,6 +216,8 @@ async def update_game(field_id: uuid.UUID, game_id: uuid.UUID, body: ScheduledGa
         record(db, "schedule_update", request, user_id=principal.user.id, resource="scheduled_game",
                resource_id=game.id, details={"field_id": str(field_id), "changed": changed})
     await db.commit()
+    if changed:
+        branding.announce(request, [field_id], ("schedule",))
     return await _answer(db, game, field)
 
 
@@ -231,6 +234,7 @@ async def delete_game(field_id: uuid.UUID, game_id: uuid.UUID, request: Request,
     record(db, "schedule_delete", request, user_id=principal.user.id, resource="scheduled_game",
            resource_id=game_id, details={"field_id": str(field_id)})
     await db.commit()
+    branding.announce(request, [field_id], ("schedule",))
     return Response(status_code=204)
 
 
@@ -248,6 +252,7 @@ async def publish_game(field_id: uuid.UUID, game_id: uuid.UUID, request: Request
     record(db, "schedule_publish", request, user_id=principal.user.id, resource="scheduled_game",
            resource_id=game.id, details={"field_id": str(field_id)})
     await db.commit()
+    branding.announce(request, [field_id], ("schedule",))
     return await _answer(db, game, field)
 
 
@@ -265,4 +270,5 @@ async def cancel_game(field_id: uuid.UUID, game_id: uuid.UUID, body: CancelIn, r
     record(db, "schedule_cancel", request, user_id=principal.user.id, resource="scheduled_game",
            resource_id=game.id, details={"field_id": str(field_id)})
     await db.commit()
+    branding.announce(request, [field_id], ("schedule",))
     return await _answer(db, game, field)

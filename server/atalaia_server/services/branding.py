@@ -234,14 +234,15 @@ async def fields_of_club(db: AsyncSession, club_id: uuid.UUID) -> list[uuid.UUID
     return list(await db.scalars(select(FieldTeam.field_id).where(FieldTeam.club_id == club_id).distinct()))
 
 
-def announce(request: Any, field_ids: Any) -> None:
+def announce(request: Any, field_ids: Any, what: Optional[tuple[str, ...]] = None) -> None:
     """Tells the controllers of these fields that are connected on the stream that their branding, saved teams
     or settings changed (``field.changed``; they pull ``GET /api/v1/sync/field`` at once). Call it after the
-    change is committed; it never fails a request and never waits for a socket."""
+    change is committed; it never fails a request and never waits for a socket. ``what``: ``("library",)`` or
+    ``("schedule",)`` for the scenario library and the schedule (PKD-1); none for the branding and settings."""
     hub = getattr(request.app.state, "remote_hub", None)
     if hub is not None:
         for field_id in set(field_ids):
-            hub.announce_field(field_id)
+            hub.announce_field(field_id, what)
 
 
 async def field_image(db: AsyncSession, field_id: uuid.UUID, sha: str) -> Optional[BrandingImage]:

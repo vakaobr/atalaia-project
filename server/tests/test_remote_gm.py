@@ -286,6 +286,68 @@ class CommandTests(RemoteCase):
         self.assertEqual(codes, [409, 409, 429])
 
 
+class PositionTests(RemoteCase):
+    """PKD-5: the live game's player positions, relayed in memory to the field's remote GM."""
+
+    PLAYER = {"player_id": "p-abcdef234567", "source": "gps", "age_s": 2.0, "team": "red", "squad": 1,
+              "role": "player", "lat": 41.1579, "lon": -8.6291, "accuracy_m": 6.5}
+    INDOOR = {"player_id": "p-bcdefg234567", "source": "ble", "age_s": 5.0, "team": "blue", "room": "Hangar 2",
+              "zone": "North", "level": 1, "x": 0.25, "y": 0.75}
+
+    async def send(self, stream: Stream, game: Optional[dict[str, Any]], *players: dict[str, Any]) -> None:
+        await stream.send({"type": "positions", **ENV, "game": game, "positions": list(players)})
+        await asyncio.sleep(0.05)
+
+    async def view(self) -> dict[str, Any]:
+        r = await self.client.get(self.url(), headers=self.gm)
+        self.assertEqual(r.status_code, 200, r.text)
+        return r.json()["controllers"][0]
+
+    async def test_the_gm_sees_the_positions_and_nobody_else(self) -> None:
+        stream = await self.controller()
+        self.assertEqual((await self.view())["positions"], [])
+        await self.send(stream, GAME, self.PLAYER, self.INDOOR)
+        entry = await self.view()
+        self.assertEqual([p["player_id"] for p in entry["positions"]], ["p-abcdef234567", "p-bcdefg234567"])
+        self.assertEqual((entry["positions"][0]["lat"], entry["positions"][1]["room"]), (41.1579, "Hangar 2"))
+        self.assertGreaterEqual(entry["positions"][0]["age_s"], 2.0)  # the age it had plus the wait
+        self.assertIsNotNone(entry["positions_at"])
+        marshal, _ = await self.staff("marshal")
+        self.assertEqual((await self.client.get(self.url(), headers=marshal)).status_code, 403)
+        # Replaced whole each time, and emptied with the live game.
+        await self.send(stream, GAME, self.INDOOR)
+        self.assertEqual([p["player_id"] for p in (await self.view())["positions"]], ["p-bcdefg234567"])
+        await stream.send({"type": "live", **ENV, "live": None})
+        await asyncio.sleep(0.05)
+        self.assertEqual((await self.view())["positions"], [])
+        await self.send(stream, GAME, self.PLAYER)
+        await self.send(stream, None)
+        self.assertEqual((await self.view())["positions"], [])
+
+    async def test_nothing_is_stored(self) -> None:
+        stream = await self.controller()
+        await self.send(stream, GAME, self.PLAYER)
+        self.assertEqual(len((await self.view())["positions"]), 1)
+        for table, in await self.fetch("SELECT tablename FROM pg_tables WHERE schemaname = current_schema()"):
+            rows = await self.fetch(f'SELECT count(*) FROM "{table}" WHERE "{table}"::text LIKE \'%abcdef234567%\'')
+            self.assertEqual(rows[0][0], 0, table)
+
+    async def test_a_controller_without_remote_gm_gets_none_kept(self) -> None:
+        stream = await self.controller(remote_gm=False, live=None)
+        await self.send(stream, GAME, self.PLAYER)
+        self.assertEqual((await self.view())["positions"], [])
+
+    async def test_a_message_out_of_form_is_refused(self) -> None:
+        stream = await self.controller()
+        await self.send(stream, GAME, {**self.PLAYER, "name": "Ana"})
+        answer = await stream.receive()
+        self.assertEqual((answer["type"], answer["error"], answer["path"]), ("error", "unknown_field",
+                                                                           "positions[0].name"))
+        self.assertEqual((await self.view())["positions"], [])
+        await self.send(stream, None, self.PLAYER)  # positions with no live game
+        self.assertEqual((await stream.receive())["error"], "not_live")
+
+
 class LiveTests(RemoteCase):
     async def test_the_live_view_and_the_log(self) -> None:
         stream = await self.controller()

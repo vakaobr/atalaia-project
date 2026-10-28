@@ -37,7 +37,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from atalaia_controller import sync_format
-from sqlalchemy import and_, delete, func, select, text
+from sqlalchemy import and_, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -194,7 +194,7 @@ async def _store(db: AsyncSession, field_id: uuid.UUID, controller: Optional[uui
     if inserted is None:
         return False
     if f["type"] == "spotcheck" and entry["outcome"] in ("fail", "warn"):
-        await _violation(db, field_id, uuid.UUID(entry["series_id"]))
+        await _violation(db, field_id, uuid.UUID(entry["series_id"]), entry.get("limit_j"))
     return True
 
 
@@ -235,19 +235,39 @@ async def apply_chrono(db: AsyncSession, field_id: uuid.UUID, controller: Option
     return {"accepted": accepted, "duplicates": duplicates, "refused": refused, "violations": len(flagged)}
 
 
-async def _violation(db: AsyncSession, field_id: uuid.UUID, series: uuid.UUID) -> None:
-    """The series' violation, at its highest-energy reading (as the controller judges a series)."""
+async def _violation(db: AsyncSession, field_id: uuid.UUID, series: uuid.UUID, limit_j: Optional[float] = None) -> None:
+    """The series' violation, at its highest-energy reading (as the controller judges a series). ``limit_j``, the
+    class limit the controller judged against (PKD-3), gives ``delta_j`` (the excess over it); a series
+    that arrives without one keeps the limit an earlier reading of it gave."""
     top = (await db.execute(select(ChronoReading).where(
         ChronoReading.field_id == field_id, ChronoReading.series_id == series)
         .order_by(ChronoReading.energy_j.desc(), ChronoReading.reading_id.desc()).limit(1))).scalar_one()
     vtype = "over_limit" if top.outcome == "fail" else "over_tolerance"
     stmt = insert(ChronoViolation).values(field_id=field_id, series_id=series, reading=top.id, player_id=top.player_id,
                                           replica_id=top.replica_id, violation_type=vtype, energy_j=top.energy_j,
-                                          game=top.game)
+                                          game=top.game, limit_j=limit_j,
+                                          delta_j=top.energy_j - limit_j if limit_j is not None else None)
     ex = stmt.excluded
     await db.execute(stmt.on_conflict_do_update(
         index_elements=["field_id", "series_id"],
-        set_={"reading": ex.reading, "energy_j": ex.energy_j, "violation_type": ex.violation_type}))
+        set_={"reading": ex.reading, "energy_j": ex.energy_j, "violation_type": ex.violation_type,
+              "limit_j": func.coalesce(ex.limit_j, ChronoViolation.limit_j),
+              "delta_j": ex.energy_j - func.coalesce(ex.limit_j, ChronoViolation.limit_j)}))
+    await _flag_repeats(db, field_id, top.player_id)
+
+
+async def _flag_repeats(db: AsyncSession, field_id: uuid.UUID, player_id: str) -> None:
+    """A player's violations at the field, oldest deciding reading first: every one after the first is a repeat
+    (worked out again whenever one arrives, so a late arrival of an older one puts the flags right)."""
+    rows = (await db.execute(
+        select(ChronoViolation.id, ChronoViolation.repeat_offender)
+        .join(ChronoReading, ChronoReading.id == ChronoViolation.reading)
+        .where(ChronoViolation.field_id == field_id, ChronoViolation.player_id == player_id)
+        .order_by(ChronoReading.timestamp, ChronoReading.reading_id))).all()
+    for position, (vid, flag) in enumerate(rows):
+        if flag != (position > 0):
+            await db.execute(update(ChronoViolation).where(ChronoViolation.id == vid).values(
+                repeat_offender=position > 0))
 
 
 # --- reading the registry ----------------------------------------------------------------
@@ -283,6 +303,7 @@ def replica_json(r: Replica) -> dict[str, Any]:
 def violation_json(v: ChronoViolation) -> dict[str, Any]:
     return {"id": str(v.id), "series_id": str(v.series_id), "reading": str(v.reading), "player_id": v.player_id,
             "replica_id": str(v.replica_id), "violation_type": v.violation_type, "energy_j": v.energy_j,
+            "limit_j": v.limit_j, "delta_j": v.delta_j, "repeat_offender": v.repeat_offender,
             "game": str(v.game) if v.game else None, "outcome": v.outcome, "resolved_at": _iso(v.resolved_at),
             "created_at": _iso(v.created_at)}
 

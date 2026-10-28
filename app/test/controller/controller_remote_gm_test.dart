@@ -12,7 +12,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:atalaia_app/controller/controller_api.dart';
+import 'package:atalaia_app/controller/controller_checkin.dart' show ApiViewer;
 import 'package:atalaia_app/controller/controller_engine.dart';
+import 'package:atalaia_app/controller/controller_positions.dart';
 import 'package:atalaia_app/controller/controller_remote_gm.dart';
 import 'package:atalaia_app/controller/controller_store.dart';
 import 'package:atalaia_app/controller/controller_sync.dart';
@@ -455,6 +457,96 @@ void main() {
     });
   });
 
+  group('positions for the remote GM (PKD-5)', () {
+    ApiViewer viewer(String pid, int team) => ApiViewer('player', {
+      'player_id': pid,
+      'game_id': engine.liveGame?['id'],
+      'team': team,
+      'squad': 1,
+      'role': 'player',
+    });
+
+    Map<String, Object?> gps(double lat) => {
+      'lat': lat,
+      'lon': -8.6291,
+      'accuracy_m': 6.0,
+      'source': 'gps',
+      't': 1,
+    };
+
+    test('the live game\'s players, checked, none old', () {
+      final r = remote();
+      final positions = ControllerPositions(engine);
+      final g = game();
+      final gid = g['id']! as int;
+      expect(r.positions(), {'game': null, 'positions': <Object?>[]});
+      engine.startGame(gid, force: true);
+      positions
+        ..report(viewer('p-abcdef234567', 1), gps(41.1579))
+        ..report(viewer('p-bcdefg234567', 2), gps(41.1580));
+      final body = r.positionsBody()!;
+      expect(body['game'], {'game_id': gid, 'game_seed': g['game_seed']});
+      final list = (body['positions']! as List).cast<Map<String, Object?>>();
+      expect(list.map((p) => p['player_id']), [
+        'p-abcdef234567',
+        'p-bcdefg234567',
+      ]);
+      expect((list[0]['team'], list[1]['team']), ('red', 'blue'));
+      expect(
+        (list[0]['lat'], list[0]['lon'], list[0]['squad']),
+        (41.1579, -8.6291, 1),
+      );
+      checkPositions(jsonDecode(jsonEncode(body)));
+      wall += 3600; // older than three reporting intervals
+      expect((r.positions()['positions']! as List), isEmpty);
+    });
+
+    test(
+      'they travel on the stream when changed and stop with the game',
+      () async {
+        final site = FakeStream();
+        await site.start();
+        cleanups.add(site.close);
+        final r = remote(url: site.url);
+        final positions = ControllerPositions(engine);
+        final g = game();
+        final gid = g['id']! as int;
+        engine.startGame(gid, force: true);
+        positions.report(viewer('p-abcdef234567', 1), gps(41.1579));
+        r.start();
+        cleanups.add(r.stop);
+        await site.next('hello');
+        final sent = await site.next('positions');
+        expect(
+          ((sent['positions']! as List).single as Map)['player_id'],
+          'p-abcdef234567',
+        );
+        expect(r.positionsSent, 1);
+        engine.endGame(gid);
+        final ended = await site.next('positions');
+        expect(ended['game'], isNull);
+        expect(ended['positions'], isEmpty);
+      },
+    );
+
+    test('none without the remote GM', () async {
+      final site = FakeStream();
+      await site.start();
+      cleanups.add(site.close);
+      final r = remote(on: false, url: site.url);
+      final positions = ControllerPositions(engine);
+      final g = game();
+      engine.startGame(g['id']! as int, force: true);
+      positions.report(viewer('p-abcdef234567', 1), gps(41.1579));
+      r.start();
+      cleanups.add(r.stop);
+      await site.next('hello');
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+      expect(site.received.where((m) => m['type'] == 'positions'), isEmpty);
+      expect(r.positionsSent, 0);
+    });
+  });
+
   group('the stream', () {
     test('the address', () {
       expect(
@@ -578,20 +670,36 @@ void main() {
       await site.start();
       cleanups.add(site.close);
       final r = remote(on: false, url: site.url);
-      var notes = 0;
+      final notes = <List<Object?>?>[];
       r
-        ..onFieldChanged = (() => notes++)
+        ..onFieldChanged = ((what) => notes.add(what))
         ..start();
       cleanups.add(r.stop);
       final hello = await site.next('hello');
       expect((hello['remote_gm'], hello.containsKey('atak')), (false, false));
       site.send({'type': 'field.changed', 'sync_version': 1});
-      expect(await waitFor(() => notes == 1), isTrue);
+      expect(await waitFor(() => notes.length == 1), isTrue);
+      expect(notes, [null]);
       // Not in the form: ignored.
       site.send({'type': 'field.changed', 'sync_version': 1, 'etag': 'x'});
       site.send({'type': 'field.changed', 'sync_version': 2});
+      site.send({
+        'type': 'field.changed',
+        'sync_version': 1,
+        'what': ['library', 'schedule'], // PKD-1
+      });
+      site.send({
+        'type': 'field.changed',
+        'sync_version': 1,
+        'what': ['positions'], // not one it knows: ignored
+      });
       site.send({'type': 'field.changed', 'sync_version': 1});
-      expect(await waitFor(() => notes == 2), isTrue);
+      expect(await waitFor(() => notes.length == 3), isTrue);
+      expect(notes, [
+        null,
+        ['library', 'schedule'],
+        null,
+      ]);
       expect(site.received.where((m) => m['type'] == 'live'), isEmpty);
       expect(r.status()['enabled'], isFalse);
     });

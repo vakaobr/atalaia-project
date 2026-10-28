@@ -72,6 +72,9 @@ class FakeSite {
   String? redirectTo;
   final refuseReadings = <String>{};
 
+  /// A site server from before PKD-3: it refuses a reading's `limit_j`.
+  bool beforePkd3 = false;
+
   /// GET answers by path (without the query); null: 404 Not Found.
   final gets = <String, Object?>{};
 
@@ -142,6 +145,22 @@ class FakeSite {
         {'detail': 'invalid_body', 'error': 'bad_source', 'path': 'counters.x'},
         {},
       );
+    }
+    if (beforePkd3 && kind == 'chrono') {
+      final list = (body!['readings']! as List).cast<Map<String, Object?>>();
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].containsKey('limit_j')) {
+          return (
+            400,
+            {
+              'detail': 'invalid_body',
+              'error': 'unknown_field',
+              'path': 'readings[$i].limit_j',
+            },
+            {},
+          );
+        }
+      }
     }
     Map<String, Object?> checked;
     try {
@@ -728,6 +747,28 @@ void main() {
       expect(await c.runOnce(), isTrue);
       expect(site.paths(), isEmpty); // nothing new
       expect(c.status()['pending_readings'], 0);
+    });
+
+    test('the class limit goes with a reading judged against it, and a site '
+        'server from before it gets the reading without (PKD-3)', () async {
+      final k = await MarshalKey.fromSeed(List.filled(32, 7));
+      checkin.addMarshal({
+        'marshal_id': 'm-ana',
+        'name': 'Ana',
+        'public_key': base64.encode(k.publicKey),
+      });
+      await reading(k, 'p-aaaaaaaaaaaa', 90);
+      final c = client();
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(site.readings.single['limit_j'], 1.14);
+      site.readings.clear();
+      site.beforePkd3 = true;
+      await reading(k, 'p-aaaaaaaaaaaa', 91);
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(site.readings, hasLength(1)); // not lost
+      expect(site.readings.single.containsKey('limit_j'), isFalse);
+      expect(c.limitJSupported, isFalse);
+      expect(c.registryError, isNull);
     });
   });
 
@@ -1412,6 +1453,19 @@ void main() {
       final local = client();
       local.fieldChanged();
       expect((local.status()['branding']! as Map)['field_changes'], 0);
+    });
+
+    test('field.changed what pulls the library and the schedule too '
+        '(PKD-1)', () {
+      final c = client(library: true);
+      c
+        ..fieldChanged(['library'])
+        ..fieldChanged(['schedule'])
+        ..fieldChanged(['branding'])
+        ..fieldChanged();
+      expect((c.status()['library']! as Map)['changes'], 1);
+      expect((c.status()['game_day']! as Map)['changes'], 1);
+      expect((c.status()['branding']! as Map)['field_changes'], 0);
     });
 
     test('an image that does not hash to its name is refused', () async {

@@ -962,4 +962,7 @@ const Map<String, String> zhTwStrings = {
   'site.err.membership_missing': '報名需要填寫這個場地要求的 APD 會員編號。',
   'site.err.apd_not_accepted': '這個場地不接受該 APD。',
   'site.err.membership_expired': '會員在這場遊戲當天已過期。',
+  // The remote GM may see shared positions (PKD-5)
+  'player.share_remote_gm':
+      '如果場地有遠端 GM（已登入網站伺服器），你分享位置時遠端 GM 也看得到。網站伺服器不會保存位置。',
 };

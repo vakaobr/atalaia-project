@@ -3104,6 +3104,7 @@ class ControllerCheckin {
         'series_id': seriesId,
         'outcome': judged.outcome,
         'received_at': now,
+        'limit_j': judged.limitJ,
       });
     }
     var changed = <String>[];
@@ -3430,6 +3431,7 @@ class ControllerCheckin {
         'outcome': r['outcome'],
         'received_at': r['received_at'],
         'game_id': r['game_id'],
+        'limit_j': r['limit_j'],
       },
   ];
 

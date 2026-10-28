@@ -500,12 +500,15 @@ def check_replicas(body: Any) -> dict[str, Any]:
     return body
 
 
+LIMIT_J_MIN, LIMIT_J_MAX = 0.001, 100.0  # the class energy limit the controller judged a series against (PKD-3)
+
+
 def check_reading(entry: Any, path: str = "reading") -> dict[str, Any]:
-    """One stored reading: ``{record, series_id, outcome, received_at, game_seed?}``. ``record`` is the
+    """One stored reading: ``{record, series_id, outcome, received_at, game_seed?, limit_j?}``. ``record`` is the
     signed record's JSON text as the controller stored it; its content is the site server's to verify
     (chrono.py), not this check's."""
     entry = _obj(entry, path)
-    _keys(entry, path, ("record", "series_id", "outcome", "received_at"), ("game_seed",))
+    _keys(entry, path, ("record", "series_id", "outcome", "received_at"), ("game_seed", "limit_j"))
     record = entry["record"]
     if not isinstance(record, str) or not record:
         _fail("not_a_text", f"{path}.record")
@@ -516,6 +519,8 @@ def check_reading(entry: Any, path: str = "reading") -> dict[str, Any]:
         _fail("bad_outcome", f"{path}.outcome")
     _num(entry["received_at"], f"{path}.received_at", 0, TIME_MAX)
     _int(entry.setdefault("game_seed", None), f"{path}.game_seed", 0, U32, null=True)
+    if "limit_j" in entry:  # PKD-3: sent only when known, so an older site server never sees the key
+        _num(entry["limit_j"], f"{path}.limit_j", LIMIT_J_MIN, LIMIT_J_MAX, null=True)
     return entry
 
 
@@ -1215,19 +1220,104 @@ def check_cot(body: Any) -> dict[str, Any]:
     return body
 
 
+# --- the players' positions for the remote GM (PKD-5; decision of 2026-10-28) -----------------------------------
+# While ``remote_gm`` is on, the controller sends the live game's player positions on the stream (``positions``),
+# as a GM of the game sees them. The site server relays them in memory to the field's remote GM page and stores
+# or logs none of them. ``game`` null (no live game) with no positions clears the page's list.
+MAX_POSITIONS = 500          # players in one message (the live game's check-ins are fewer)
+POSITION_SOURCES = ("gps", "ble")
+POSITION_LEVEL_MAX = 9       # field_levels.LEVELS_MAX - 1
+POSITION_AGE_MAX_S = 3600
+
+
+def check_positions(body: Any) -> dict[str, Any]:
+    """The live game's player positions for the remote GM: ``{game: null | {game_id, game_seed}, positions: [..]}``
+    each ``{player_id, source, team?, squad?, role?, lat, lon, accuracy_m? (gps) | room, zone?, x?, y? (ble),
+    level?, age_s}``: the pseudonymous player id, never a name, a token or a beacon id."""
+    body = _envelope(body, ("game", "positions"), game=False)
+    if body["game"] is not None:
+        ident = _obj(body["game"], "game")
+        _keys(ident, "game", ("game_id", "game_seed"))
+        _int(ident["game_id"], "game.game_id", 0, U16)
+        _int(ident["game_seed"], "game.game_seed", 0, U32)
+    items = _list(body["positions"], "positions", MAX_POSITIONS)
+    if body["game"] is None and items:
+        _fail("not_live", "positions")
+    seen: set[str] = set()
+    for i, item in enumerate(items):
+        path = f"positions[{i}]"
+        item = _obj(item, path)
+        _keys(item, path, ("player_id", "source", "age_s"),
+              ("team", "squad", "role", "lat", "lon", "accuracy_m", "level", "room", "zone", "x", "y"))
+        _text(item["player_id"], f"{path}.player_id", 15, pattern=PLAYER_ID)
+        if item["player_id"] in seen:
+            _fail("duplicate_player", f"{path}.player_id")
+        seen.add(item["player_id"])
+        if item["source"] not in POSITION_SOURCES:
+            _fail("bad_source", f"{path}.source")
+        _num(item["age_s"], f"{path}.age_s", 0, POSITION_AGE_MAX_S)
+        if "team" in item:
+            _team(item["team"], f"{path}.team", null=True)
+        if "squad" in item:
+            _int(item["squad"], f"{path}.squad", 0, 255)
+        if "role" in item:
+            _text(item["role"], f"{path}.role", 32)
+        if "level" in item:
+            _int(item["level"], f"{path}.level", 0, POSITION_LEVEL_MAX, null=True)
+        if item["source"] == "gps":
+            for key in ("lat", "lon"):
+                if key not in item:
+                    _fail("missing", f"{path}.{key}")
+            _num(item["lat"], f"{path}.lat", -90, 90)
+            _num(item["lon"], f"{path}.lon", -180, 180)
+            if "accuracy_m" in item:
+                _num(item["accuracy_m"], f"{path}.accuracy_m", 0, 10_000, null=True)
+            for key in ("room", "zone", "x", "y"):
+                if key in item:
+                    _fail("unknown_field", f"{path}.{key}")
+        else:
+            if "room" not in item:
+                _fail("missing", f"{path}.room")
+            _text(item["room"], f"{path}.room", 48)
+            if "zone" in item:
+                _text(item["zone"], f"{path}.zone", 48)
+            if ("x" in item) != ("y" in item):
+                _fail("missing", f"{path}.y" if "x" in item else f"{path}.x")
+            for key in ("x", "y"):
+                if key in item:
+                    _num(item[key], f"{path}.{key}", 0, 1)
+            for key in ("lat", "lon", "accuracy_m"):
+                if key in item:
+                    _fail("unknown_field", f"{path}.{key}")
+    return body
+
+
 # The stream's own messages (``type`` taken out): what the controller sends, and the command it gets.
+FIELD_CHANGED_WHAT = ("branding", "library", "schedule")
+
+
 def check_field_changed(body: Any) -> dict[str, Any]:
-    """The site server's note that the field's branding, saved teams or check-in settings changed (it carries
-    nothing else): the controller pulls ``GET /api/v1/sync/field`` at once instead of at its next cycle."""
+    """The site server's note that something of the field changed: its branding, saved teams or check-in
+    settings (no ``what``, as since BR24) or what ``what`` lists (PKD-1: ``branding``, ``library`` (scenarios and
+    game presets), ``schedule``): the controller pulls that at once instead of at its next cycle."""
     body = _obj(body, "")
-    _keys(body, "", ("sync_version",))
+    _keys(body, "", ("sync_version",), ("what",))
     if body["sync_version"] != SYNC_VERSION or isinstance(body["sync_version"], bool):
         _fail("unsupported_version", "sync_version")
+    if "what" in body:
+        what = _list(body["what"], "what", len(FIELD_CHANGED_WHAT), 1)
+        for i, item in enumerate(what):
+            if not isinstance(item, str):
+                _fail("not_a_text", f"what[{i}]")
+            if item not in FIELD_CHANGED_WHAT:
+                _fail("bad_text", f"what[{i}]")
+        if len(set(what)) != len(what):
+            _fail("duplicate", "what")
     return body
 
 
 STREAM = {"hello": check_hello, "live": check_live, "command.result": check_result, "command": check_command,
-          "cot": check_cot, "field.changed": check_field_changed}
+          "cot": check_cot, "field.changed": check_field_changed, "positions": check_positions}
 
 
 # --- the scenario library and presets (plan phase 20) -------------------------------------

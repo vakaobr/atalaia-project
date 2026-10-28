@@ -38,11 +38,12 @@ site server relays them to the field's enrolled ATAK devices; it never connects
 to the controller. With ``remote_gm`` off no ``live`` view is sent and every
 command is refused, as before.
 
-With ``[sync] branding = "site"`` the controller opens the stream too (BR24), even with both of those
-off: it then sends only ``hello`` (``remote_gm: false``) and pings, and the site server sends a
-``field.changed`` note whenever the field's branding, saved teams or check-in settings change, on which the
-sync client pulls them at once instead of at its next cycle. A site server that never sends it (an older
-one) leaves the pull to the cycle, as before.
+With ``[sync] branding = "site"`` or ``[sync] library`` on (the default; PKD-1) the controller opens the
+stream too (BR24), even with both of those off: it then sends only ``hello`` (``remote_gm: false``) and
+pings, and the site server sends a ``field.changed`` note whenever the field's branding, saved teams or
+check-in settings change (no ``what``), or its scenario library (``what: ["library"]``) or schedule
+(``["schedule"]``) do, on which the sync client pulls them at once instead of at its next cycle. A site
+server that never sends it (an older one) leaves the pull to the cycle, as before.
 
 Every command, carried out or refused, is in the store's ``remote_commands``
 (store schema 8): who sent it (the site server's account id and username),
@@ -68,7 +69,8 @@ from urllib.parse import urlsplit, urlunsplit
 from . import __version__
 from .engine import Conflict, ControllerError, NotFound, StartBlocked, Unavailable
 from .sync_format import (MAX_COT_EVENTS, MAX_LIVE_EVENTS, MISSING_MAX, NODE_INFO, ROLE_MAX, STALE_S, SYNC_VERSION, SyncFormatError,
-                          check_command, check_event, check_field_changed, check_live, check_nodes)
+                          check_command, check_event, check_field_changed, check_live, check_nodes, check_positions)
+from .positions import Positions
 from .ws_client import WebSocket, WsError
 
 log = logging.getLogger("atalaia.remote_gm")
@@ -82,7 +84,15 @@ BACKOFF_MIN_S = 5.0
 BACKOFF_MAX_S = 300.0
 AUTH_REFUSED = 4401
 BROADCAST = 0xFFFF   # every node (atalaia_sim.field_controller.BROADCAST)
+POSITIONS_MIN_S = 5.0     # changed positions go at most this often (PKD-5)
+POSITIONS_EVERY_S = 30.0  # and, while there are any, at least this often (their ages are fresh)
 COT_QUEUE_MAX = 500  # CoT events waiting for the stream; older ones go first (the next full cycle resends)
+
+
+def _positions_digest(body: dict[str, Any]) -> str:
+    """What changed in a ``positions`` body, without the ages (they change every second)."""
+    rows = [{k: v for k, v in item.items() if k != "age_s"} for item in body["positions"]]
+    return json.dumps([body["game"], rows], sort_keys=True)
 
 
 def stream_url(sync_url: str) -> str:
@@ -106,6 +116,9 @@ class RemoteGm:
         self._wall = wall
         self._stop = threading.Event()
         self._dirty = threading.Event()
+        self._pos_dirty = threading.Event()
+        self._pos_digest: Optional[str] = None  # what the site server has of the positions (never logged)
+        self.positions_sent = 0
         self._thread: Optional[threading.Thread] = None
         self.connected = False
         self.connected_at: Optional[float] = None
@@ -117,8 +130,8 @@ class RemoteGm:
         self._cot: collections.deque[str] = collections.deque(maxlen=COT_QUEUE_MAX)
         self.atak_relay = False
         self.on_relay_open: Optional[Callable[[], None]] = None
-        # The site server's ``field.changed`` (BR24): the sync client pulls the field's branding at once.
-        self.on_field_changed: Optional[Callable[[], None]] = None
+        # The site server's ``field.changed`` (BR24, PKD-1): the sync client pulls what changed at once.
+        self.on_field_changed: Optional[Callable[[Optional[list[str]]], None]] = None
         self.cot_sent = 0
 
     # --- the thread ------------------------------------------------------------------------
@@ -130,8 +143,9 @@ class RemoteGm:
         if self.cfg.sync_remote_gm:
             log.warning("remote GM is on: users with the gm role on this field at %s may act on the live game",
                         self.cfg.sync_url)
-        if self.cfg.sync_branding == "site" and not self.cfg.sync_remote_gm and not self.cfg.atak_remote:
-            log.info("stream open for the site server's notes on the field's branding (nothing of the game leaves)")
+        if not self.cfg.sync_remote_gm and not self.cfg.atak_remote:
+            log.info("stream open for the site server's notes on the field's branding, library and schedule "
+                     "(nothing of the game leaves)")
         if self.cfg.atak_remote:
             log.warning("remote ATAK is on: this field's CoT events go to %s for its enrolled ATAK devices%s",
                         self.cfg.sync_url, ", player positions included"
@@ -147,6 +161,8 @@ class RemoteGm:
         """The engine's listener: something the live view shows changed."""
         if msg.get("type") in ("game", "event", "nodes", "node", "score"):
             self._dirty.set()
+        if msg.get("type") in ("player_position", "positions", "game"):
+            self._pos_dirty.set()
 
     def _open(self) -> Any:
         return WebSocket.connect(stream_url(self.cfg.sync_url), {
@@ -203,8 +219,10 @@ class RemoteGm:
         self._send(ws, "hello", hello)
         self.atak_relay = False
         self._cot.clear()
-        last_live = last_ping = 0.0
+        last_live = last_ping = last_pos = 0.0
         self._dirty.set()
+        self._pos_dirty.set()
+        self._pos_digest = None
         while not self._stop.is_set():
             raw = ws.recv(RECV_S)
             if raw is not None:
@@ -219,6 +237,8 @@ class RemoteGm:
                     self._send(ws, "live", body)
                     self.lives += 1
                 last_live = now
+            if self.cfg.sync_remote_gm:
+                last_pos = self._send_positions(ws, now, last_pos)
             if now - last_ping >= PING_S:
                 self._send(ws, "ping", {})
                 last_ping = now
@@ -246,7 +266,7 @@ class RemoteGm:
                 log.warning("remote GM stream: a field.changed note in a form this controller does not know")
             else:
                 if self.on_field_changed is not None:
-                    self.on_field_changed()
+                    self.on_field_changed(msg.get("what"))
         elif kind == "command":
             result = self.handle_command(msg)
             self._send(ws, "command.result", {**self.envelope(), **result})
@@ -372,6 +392,72 @@ class RemoteGm:
         except SyncFormatError as exc:
             log.warning("remote GM: the live view is not in protocol/sync.md's form (%s): not sent", exc)
             return None
+
+    def _send_positions(self, ws: Any, now: float, last: float) -> float:
+        """The live game's player positions for the remote GM (PKD-5), when they changed (at most every 5 s) or,
+        while there are any, every 30 s so their ages stay fresh; an empty list once when the last one is gone
+        or the game ends. Returns the time of the last send. Never logged."""
+        if not ((self._pos_dirty.is_set() and now - last >= POSITIONS_MIN_S) or now - last >= POSITIONS_EVERY_S):
+            return last
+        self._pos_dirty.clear()
+        body = self.positions_body()
+        if body is None:
+            return now
+        same = self._pos_digest == _positions_digest(body)
+        if same and not body["positions"]:
+            return now  # nothing then, nothing now
+        if same and now - last < POSITIONS_EVERY_S:
+            return last
+        self._pos_digest = _positions_digest(body)
+        self._send(ws, "positions", body)
+        self.positions_sent += 1
+        return now
+
+    def positions_body(self) -> Optional[dict[str, Any]]:
+        """The ``positions`` message, checked; None (nothing sent) if it does not pass the shared check."""
+        body = {**self.envelope(), **self.positions()}
+        try:
+            return check_positions(body)
+        except SyncFormatError as exc:
+            log.warning("remote GM: the positions are not in protocol/sync.md's form (%s): not sent", exc.code)
+            return None
+
+    def positions(self) -> dict[str, Any]:
+        """``{game, positions}``: the live game's positions the GM sees (a GM sees everyone's, positions.py), the
+        latest of each player, none older than three reporting intervals; ``game`` null when none is live."""
+        ctrl = self.controller
+        game = ctrl.game
+        if game is None or game["state"] not in ("running", "paused"):
+            return {"game": None, "positions": []}
+        now = self._wall()
+        teams = list(game.get("teams") or [])
+        stale = 3 * Positions.interval(game)
+        items: list[dict[str, Any]] = []
+        for pid, pos in ctrl.store.player_positions(int(game["id"])).items():
+            age = max(0.0, now - float(pos.get("received_at") or now))
+            if age > stale:
+                continue
+            item: dict[str, Any] = {"player_id": pid, "source": pos.get("source"), "age_s": round(age, 1)}
+            team_id = pos.get("team")
+            if isinstance(team_id, int) and 1 <= team_id <= len(teams):
+                item["team"] = teams[team_id - 1]
+            if isinstance(pos.get("squad"), int) and pos["squad"] > 0:
+                item["squad"] = pos["squad"]
+            role = (ctrl.store.checkin(int(game["id"]), pid) or {}).get("role")
+            if isinstance(role, str) and role:
+                item["role"] = role
+            if isinstance(pos.get("level"), int):
+                item["level"] = pos["level"]
+            if pos.get("source") == "gps":
+                item.update({k: pos[k] for k in ("lat", "lon") if pos.get(k) is not None})
+                if pos.get("accuracy_m") is not None:
+                    item["accuracy_m"] = pos["accuracy_m"]
+            else:
+                for key in ("room", "zone", "x", "y"):
+                    if pos.get(key) is not None:
+                        item[key] = pos[key]
+            items.append(item)
+        return {"game": {"game_id": int(game["id"]), "game_seed": int(game["game_seed"])}, "positions": items}
 
     def live(self) -> Optional[dict[str, Any]]:
         ctrl = self.controller

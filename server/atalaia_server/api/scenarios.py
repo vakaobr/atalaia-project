@@ -39,7 +39,7 @@ from ..auth import Principal, current_principal, require_field_role
 from ..db import get_session
 from ..history_models import FieldPreset, FieldScenarioRevision
 from ..models import Field
-from ..services import library
+from ..services import branding, library
 from .fields import NO_STORE
 
 router = APIRouter(prefix="/api/v1/fields/{field_id}", tags=["scenarios"])
@@ -114,6 +114,8 @@ async def save_scenario(field_id: uuid.UUID, request: Request, body: Any = Body(
         record(db, f"scenario_{outcome}", request, user_id=principal.user.id, resource="field", resource_id=field_id,
                details={"scenario": saved["scenario_id"], "revision": saved["revision"]})
     await db.commit()
+    if outcome != "unchanged":
+        branding.announce(request, [field_id], ("library",))  # the controllers pull it at once (PKD-1)
     return JSONResponse({**saved, "outcome": outcome}, status_code=201 if outcome == "created" else 200,
                         headers=NO_STORE)
 
@@ -157,11 +159,14 @@ async def archive_scenario(field_id: uuid.UUID, scenario_id: str, request: Reque
                            db: AsyncSession = Depends(get_session)) -> Response:
     await _staff(principal, db, field_id)
     scenario = await _scenario(db, field_id, scenario_id)
-    if scenario.archived_at is None:
+    changed = scenario.archived_at is None
+    if changed:
         scenario.archived_at = func.now()
         record(db, "scenario_archived", request, user_id=principal.user.id, resource="field", resource_id=field_id,
                details={"scenario": scenario.scenario_id, "revision": scenario.revision})
     await db.commit()
+    if changed:
+        branding.announce(request, [field_id], ("library",))
     return Response(status_code=204)
 
 
@@ -202,6 +207,7 @@ async def create_preset(field_id: uuid.UUID, request: Request, body: Any = Body(
     record(db, "preset_create", request, user_id=principal.user.id, resource="field", resource_id=field_id,
            details={"preset": preset.name, "mode_id": preset.mode_id})
     await db.commit()
+    branding.announce(request, [field_id], ("library",))
     return JSONResponse(library.preset_json(preset), status_code=201, headers=NO_STORE)
 
 
@@ -227,6 +233,7 @@ async def replace_preset(field_id: uuid.UUID, preset_id: uuid.UUID, request: Req
     record(db, "preset_update", request, user_id=principal.user.id, resource="field", resource_id=field_id,
            details={"preset": preset.name, "mode_id": preset.mode_id})
     await db.commit()
+    branding.announce(request, [field_id], ("library",))
     return JSONResponse(library.preset_json(preset), headers=NO_STORE)
 
 
@@ -240,4 +247,5 @@ async def delete_preset(field_id: uuid.UUID, preset_id: uuid.UUID, request: Requ
     record(db, "preset_delete", request, user_id=principal.user.id, resource="field", resource_id=field_id,
            details={"preset": preset.name})
     await db.commit()
+    branding.announce(request, [field_id], ("library",))
     return Response(status_code=204)

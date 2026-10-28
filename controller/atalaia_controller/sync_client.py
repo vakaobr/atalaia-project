@@ -70,7 +70,8 @@ a site server that knows it adds the field's check-in settings (``max_replicas``
 the federation label, the limit template whole), which ``Checkin.apply_site_settings``
 makes this controller's; an older one ignores the query and the settings stay
 the controller's own. The site server's ``field.changed`` note on the stream
-(``remote_gm.py``) calls ``field_changed``, which runs the cycle at once.
+(``remote_gm.py``) calls ``field_changed``, which runs the cycle at once; since PKD-1 the note's ``what``
+also names the scenario library and the schedule, which it pulls at once too.
 A standby controller has its own sync and does all this by itself.
 
 **The scenario library** (plan phase 20; ADR-P4-6 as amended, P4R9): with
@@ -317,6 +318,7 @@ class SyncClient:
         self.game_day_supported = True
         self.schedule_pulled_at: Optional[float] = None
         self.claims_answered = 0
+        self.limit_j_supported = True  # PKD-3: an older site server refuses a reading's ``limit_j``
         self.shared_chrono_supported = True  # S14-5: GET /api/v1/sync/chrono
         self.shared_chrono_stored = 0  # records kept at the last pull
         self.branding_supported = True
@@ -326,6 +328,8 @@ class SyncClient:
         self.settings_from_site = False  # the last answer carried the field's check-in settings (BR24)
         self.settings_applied = 0        # settings (and limit templates) changed by them
         self.field_changes = 0           # stream notes that the field's branding changed (BR24)
+        self.library_changes = 0         # ... that its scenarios or presets changed (PKD-1)
+        self.schedule_changes = 0        # ... that its schedule changed (PKD-1)
         self.remote: Optional[Any] = None  # remote_gm.RemoteGm, with [sync] remote_gm = true (plan phase 19)
         self.library_supported = True
         self.library_pulled_at: Optional[float] = None
@@ -378,12 +382,24 @@ class SyncClient:
         if self.failures == 0:
             self._wake.set()
 
-    def field_changed(self) -> None:
-        """The site server's note on the stream that the field's branding, teams or settings changed
-        (``field.changed``): pull them at once, unless this controller keeps its own branding or is
-        backing off."""
-        if getattr(self.cfg, "sync_branding", "local") == "site":
+    def field_changed(self, what: Optional[list[str]] = None) -> None:
+        """The site server's note on the stream that something of the field changed (``field.changed``): pull
+        it at once, unless this controller does not take that from the site or is backing off. Without ``what``
+        the note is BR24's (the branding, teams and settings: only with ``[sync] branding = "site"``); ``library``
+        counts only with ``[sync] library`` on, and ``schedule`` always (the game-day pull has no setting) (PKD-1).
+        The cycle that runs pulls everything due, so it also takes what the note did not name."""
+        what = what or ["branding"]
+        wanted = False
+        if "branding" in what and getattr(self.cfg, "sync_branding", "local") == "site":
             self.field_changes += 1
+            wanted = True
+        if "library" in what and getattr(self.cfg, "sync_library", True):
+            self.library_changes += 1
+            wanted = True
+        if "schedule" in what:
+            self.schedule_changes += 1
+            wanted = True
+        if wanted:
             self.kick()
 
     def on_controller_message(self, msg: dict[str, Any]) -> None:
@@ -588,13 +604,25 @@ class SyncClient:
                 seed = self._game_seed(row["game_id"])
                 if seed is not None:
                     entry["game_seed"] = seed
+                if row.get("limit_j") is not None and self.limit_j_supported:
+                    entry["limit_j"] = row["limit_j"]  # the class limit it was judged against (PKD-3)
                 try:
                     batch.append(check_reading(entry))
                 except SyncFormatError as exc:
                     log.warning("chrono reading %s not sent: %s", row["reading_id"], exc)
             if batch:
                 try:
-                    answer = self._post("/api/v1/sync/chrono", {**env, "readings": batch})
+                    try:
+                        answer = self._post("/api/v1/sync/chrono", {**env, "readings": batch})
+                    except SyncError as exc:
+                        if exc.status != 400 or not _refusal(exc)[1].endswith(".limit_j"):
+                            raise
+                        # A site server from before PKD-3 refuses the key: send the batch without it, and
+                        # every later one too (the violations it makes have no delta_j there).
+                        log.info("the site server does not take the class limit with chrono readings: omitted")
+                        self.limit_j_supported = False
+                        answer = self._post("/api/v1/sync/chrono", {
+                            **env, "readings": [{k: v for k, v in e.items() if k != "limit_j"} for e in batch]})
                 except SyncError as exc:
                     self._registry_refused("/api/v1/sync/chrono", exc)
                     answer = {}
@@ -1122,6 +1150,7 @@ class SyncClient:
                 "game_day": {"supported": self.game_day_supported, "schedule_pulled_at": self.schedule_pulled_at,
                              "linked_games": len(self.store.schedule_links()),
                              "claims_answered": self.claims_answered,
+                             "changes": self.schedule_changes,
                              "shared_chrono": {"supported": self.shared_chrono_supported,
                                                "stored": self.shared_chrono_stored}},
                 "branding": {"source": getattr(self.cfg, "sync_branding", "local"),
@@ -1134,4 +1163,5 @@ class SyncClient:
                             "supported": self.library_supported, "pulled_at": self.library_pulled_at,
                             "error": self.library_error, "scenarios_installed": self.scenarios_installed,
                             "scenarios_removed": self.scenarios_removed, "presets_removed": self.presets_removed,
+                            "changes": self.library_changes,
                             "from_site": {k: sorted(v) for k, v in self._library_state().items()}}}

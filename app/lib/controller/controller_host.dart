@@ -468,9 +468,13 @@ class ControllerHost {
     RemoteGm? r;
     if (s != null &&
         cfg != null &&
-        (cfg.remoteGm || a?.remote == true || cfg.branding == 'site')) {
-      // With branding "site" alone the stream carries only the site
-      // server's field.changed note (BR24): nothing of the game leaves.
+        (cfg.remoteGm ||
+            a?.remote == true ||
+            cfg.branding == 'site' ||
+            cfg.library)) {
+      // With branding "site" or the library on (the default) alone the
+      // stream carries only the site server's field.changed notes (BR24,
+      // PKD-1): nothing of the game leaves.
       r = remote = RemoteGm(
         engine,
         s,

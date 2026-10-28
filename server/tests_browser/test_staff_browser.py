@@ -457,6 +457,30 @@ class RemoteGmTests(BrowserCase):
                            "code": code, **({"detail": detail} if detail else {}), **result})
         return cmd
 
+    async def test_the_players_positions_are_listed(self) -> None:
+        """PKD-5: the controller's ``positions`` come to the page as a list (no plan), pushed with the view."""
+        stream = await self.controller(LIVE)
+        name, secret = await self.staff("gm")
+        page = await self.new_page()
+        await self.login(page, name, secret, self.field_path("/remote-gm"))
+        card = page.locator("article.controller")
+        await expect(card).to_have_count(1)
+        await expect(card.locator(".positions")).to_contain_text("Ninguém está a partilhar a posição.")
+        await stream.send({"type": "positions", "sync_version": 1, "controller": CTRL, "game": GAME, "positions": [
+            {"player_id": "p-abcdef234567", "source": "gps", "age_s": 2, "team": "red", "role": "player",
+             "lat": 41.1579, "lon": -8.6291, "accuracy_m": 6.4},
+            {"player_id": "p-bcdefg234567", "source": "ble", "age_s": 9, "team": "blue", "room": "Hangar 2",
+             "zone": "Norte", "level": 1}]})
+        rows = card.locator(".positions tbody tr")
+        await expect(rows).to_have_count(2, timeout=15000)
+        await expect(rows.first).to_contain_text("p-abcdef234567")
+        await expect(rows.first).to_contain_text("41.15790, -8.62910")
+        await expect(rows.nth(1)).to_contain_text("Hangar 2 (Norte), piso 1")
+        await stream.send({"type": "positions", "sync_version": 1, "controller": CTRL, "game": None,
+                           "positions": []})
+        await expect(rows).to_have_count(0, timeout=15000)
+        await self.check_page(page)
+
     async def test_live_view_commands_and_log(self) -> None:
         stream = await self.controller(LIVE)
         name, secret = await self.staff("gm")

@@ -92,7 +92,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 15
+SCHEMA_VERSION = 16
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes, per level's plan
 FIELD_LEVELS_MAX = 10  # levels of a multi-story field (decision ML-1)
@@ -249,7 +249,8 @@ CREATE TABLE IF NOT EXISTS chrono_readings (
     record_json TEXT NOT NULL,                         -- the signed record, as received
     series_id   TEXT NOT NULL,
     outcome     TEXT,                                  -- the series' result when it was judged
-    received_at REAL NOT NULL
+    received_at REAL NOT NULL,
+    limit_j     REAL                                   -- schema 16 (PKD-3): the class limit it was judged against
 );
 CREATE INDEX IF NOT EXISTS idx_readings_replica ON chrono_readings (replica_id, player_id);
 CREATE TABLE IF NOT EXISTS shared_readings (
@@ -404,6 +405,10 @@ CHECKIN_COLUMNS_V15 = (
     ("apd_override", "INTEGER NOT NULL DEFAULT 0"),  # 1: staff let the check-in through with a verdict other than valid
 )
 
+# Column added to chrono_readings in schema 16 (PKD-3): the class limit (J) the series was judged against, sent to the
+# site server so it can work out how far over a violation went.
+CHRONO_COLUMNS_V16 = (("limit_j", "REAL"),)
+
 LIVE_STATES = ("ready", "running", "paused")
 
 
@@ -458,6 +463,10 @@ class Store:
             for name, decl in CHECKIN_COLUMNS_V15:
                 if name not in have:
                     self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
+            have = {r["name"] for r in self._db.execute("PRAGMA table_info(chrono_readings)").fetchall()}
+            for name, decl in CHRONO_COLUMNS_V16:
+                if name not in have:
+                    self._db.execute(f"ALTER TABLE chrono_readings ADD COLUMN {name} {decl}")
             have = {r["name"] for r in self._db.execute("PRAGMA table_info(modes)").fetchall()}
             for name, decl in MODE_COLUMNS_V10:
                 if name not in have:
@@ -844,7 +853,8 @@ class Store:
             "SELECT r.* FROM chrono_readings r LEFT JOIN sync_items s ON s.kind = 'reading' "
             "AND s.item_id = r.reading_id WHERE s.item_id IS NULL ORDER BY r.rowid LIMIT ?", (limit,)).fetchall()
         return [{"reading_id": r["reading_id"], "record_json": r["record_json"], "series_id": r["series_id"],
-                 "outcome": r["outcome"], "received_at": r["received_at"], "game_id": r["game_id"]} for r in rows]
+                 "outcome": r["outcome"], "received_at": r["received_at"], "game_id": r["game_id"],
+                 "limit_j": r["limit_j"]} for r in rows]
 
     def count_readings_unsynced(self) -> int:
         row = self._exec("SELECT count(*) AS n FROM chrono_readings r LEFT JOIN sync_items s ON s.kind = 'reading' "
@@ -1303,15 +1313,17 @@ class Store:
         row = self._exec("SELECT data_json FROM replicas WHERE replica_id = ?", (replica_id,)).fetchone()
         return json.loads(row["data_json"]) if row else None
 
-    def add_reading(self, record: dict[str, Any], series_id: str, outcome: Optional[str], now: float) -> bool:
-        """Stores a signed reading once (False: its reading_id was already stored)."""
+    def add_reading(self, record: dict[str, Any], series_id: str, outcome: Optional[str], now: float,
+                    limit_j: Optional[float] = None) -> bool:
+        """Stores a signed reading once (False: its reading_id was already stored), with the class limit (J) its
+        series was judged against, when one was known (PKD-3)."""
         cur = self._exec(
             "INSERT OR IGNORE INTO chrono_readings (reading_id, replica_id, player_id, marshal_id, type, "
-            "game_id, timestamp, record_json, series_id, outcome, received_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "game_id, timestamp, record_json, series_id, outcome, received_at, limit_j) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (record["reading_id"], record["replica_id"], record["player_id"], record["marshal_id"],
              record["type"], record.get("game_id"), record["timestamp"],
-             json.dumps(record, sort_keys=True, ensure_ascii=False), series_id, outcome, now))
+             json.dumps(record, sort_keys=True, ensure_ascii=False), series_id, outcome, now, limit_j))
         return cur.rowcount == 1
 
     def readings(self, *, replica_id: Optional[str] = None, player_id: Optional[str] = None,

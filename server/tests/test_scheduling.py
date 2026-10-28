@@ -16,10 +16,11 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from atalaia_server import personal_data
+from atalaia_server import personal_data, sync
 from atalaia_server.models import ScheduledGame
 
 from .base import PASSWORD, AppTestCase
+from .test_remote_gm import Stream
 
 UTC = timezone.utc
 
@@ -329,3 +330,42 @@ class ScheduleDataTests(ScheduleCase):
         r = await self.client.get("/api/v1/metrics", headers={"Authorization": f"Bearer {self.metrics_token}"})
         body = r.json()
         self.assertEqual((body["scheduled_games_total"], body["public_fields_total"]), (1, 0))
+
+
+class NoteTests(ScheduleCase):
+    async def test_a_schedule_change_reaches_the_controllers_on_the_stream(self) -> None:
+        """PKD-1: creating, changing, publishing, cancelling and deleting a scheduled game send ``field.changed``
+        with ``what: ["schedule"]`` to the field's connected controllers (nothing when nothing changed)."""
+        key = sync.new_key()
+        await self.fetch("INSERT INTO field_api_keys (field_id, key_sha256) VALUES ($1, $2)", self.field_id,
+                         sync.key_hash(key))
+        stream = Stream(self.app, key)
+        self.addAsyncCleanup(stream.close)
+        self.assertEqual((await stream.open())["type"], "websocket.accept")
+        await stream.send({"type": "hello", "sync_version": 1, "remote_gm": False,
+                           "controller": {"id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd", "version": "0.1.0"}})
+        self.assertEqual((await stream.receive())["type"], "hello.ack")
+
+        async def note(what: str, notes: int = 1) -> None:
+            await self.app.state.remote_hub.settle()
+            for _ in range(notes):
+                self.assertEqual(await stream.receive(), {"type": "field.changed", "sync_version": 1,
+                                                          "what": ["schedule"]}, what)
+            self.assertEqual(stream.pending(), 0, what)
+
+        game = await self.create()
+        await note("created")
+        await self.patch(game["id"], title="Outro título")
+        await note("changed")
+        await self.patch(game["id"], title="Outro título")
+        await note("the same", notes=0)
+        await self.publish(game["id"])
+        await note("published")
+        r = await self.client.post(self.url(game["id"], "cancel"), json={"reason": "chuva"}, headers=self.admin)
+        self.assertEqual(r.status_code, 200, r.text)
+        await note("cancelled")
+        draft = await self.create()
+        await note("another draft")
+        r = await self.client.delete(self.url(draft["id"]), headers=self.gm)
+        self.assertEqual(r.status_code, 204, r.text)
+        await note("deleted")

@@ -46,6 +46,7 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 
 import 'controller_engine.dart';
+import 'controller_positions.dart' show ControllerPositions;
 import 'controller_sync.dart';
 import 'controller_sync_format.dart';
 
@@ -53,6 +54,8 @@ const streamPath = '/api/v1/sync/stream';
 const _liveMinS = 2.0;
 const _liveEveryS = 30.0;
 const _pingS = 30.0;
+const _positionsMinS = 5.0; // changed positions go at most this often (PKD-5)
+const _positionsEveryS = 30.0; // and, while there are any, at least this often
 const _backoffMinS = 5.0;
 const _backoffMaxS = 300.0;
 const _authRefused = 4401;
@@ -149,15 +152,18 @@ class RemoteGm {
   /// whole picture again) and with false when the socket goes.
   void Function(bool ready)? onRelay;
 
-  /// Called on the site server's `field.changed` note (BR24): the sync
-  /// pulls the field's branding and settings now.
-  void Function()? onFieldChanged;
+  /// Called on the site server's `field.changed` note (BR24, PKD-1) with its
+  /// `what` (null: the branding and settings): the sync pulls it now.
+  void Function(List<Object?>? what)? onFieldChanged;
 
   final _cot = Queue<String>();
   RemoteSocket? _socket;
-  bool _stopped = true, _dirty = true;
+  bool _stopped = true, _dirty = true, _posDirty = true;
+  String?
+  _posDigest; // what the site server has of the positions (never logged)
+  int positionsSent = 0;
   Timer? _tick, _retry;
-  double _lastLive = -1e9, _lastPing = 0;
+  double _lastLive = -1e9, _lastPing = 0, _lastPositions = -1e9;
   double _delay = _backoffMinS;
   DateTime? _began;
 
@@ -289,6 +295,9 @@ class RemoteGm {
     ].contains(msg['type'])) {
       _dirty = true;
     }
+    if (const ['player_position', 'positions', 'game'].contains(msg['type'])) {
+      _posDirty = true;
+    }
   }
 
   Future<void> _run() async {
@@ -338,8 +347,11 @@ class RemoteGm {
     _setRelay(false);
     _cot.clear();
     _lastLive = -1e9;
+    _lastPositions = -1e9;
     _lastPing = _monotonic();
     _dirty = true;
+    _posDirty = true;
+    _posDigest = null;
     _tick = Timer.periodic(const Duration(milliseconds: 500), (_) => _pump(ws));
     _pump(ws);
     await for (final raw in ws.messages) {
@@ -366,10 +378,109 @@ class RemoteGm {
       }
       _lastLive = now;
     }
+    if (remoteGm) _pumpPositions(ws, now);
     if (now - _lastPing >= _pingS) {
       _send(ws, 'ping', {});
       _lastPing = now;
     }
+  }
+
+  /// The live game's player positions for the remote GM (PKD-5), when they
+  /// changed (at most every 5 s) or, while there are any, every 30 s so their
+  /// ages stay fresh; an empty list once when the last one is gone or the
+  /// game ends. Never logged.
+  void _pumpPositions(RemoteSocket ws, double now) {
+    final due =
+        (_posDirty && now - _lastPositions >= _positionsMinS) ||
+        now - _lastPositions >= _positionsEveryS;
+    if (!due) return;
+    _posDirty = false;
+    final body = positionsBody();
+    if (body == null) {
+      _lastPositions = now;
+      return;
+    }
+    final digest = _positionsDigest(body);
+    final same = _posDigest == digest;
+    if (same && (body['positions']! as List).isEmpty) {
+      _lastPositions = now;
+      return;
+    }
+    if (same && now - _lastPositions < _positionsEveryS) return;
+    _posDigest = digest;
+    _send(ws, 'positions', body);
+    positionsSent++;
+    _lastPositions = now;
+  }
+
+  String _positionsDigest(Map<String, Object?> body) => jsonEncode([
+    body['game'],
+    for (final p in (body['positions']! as List))
+      {
+        for (final e in (p as Map).entries)
+          if (e.key != 'age_s') e.key: e.value,
+      },
+  ]);
+
+  /// The `positions` message, checked; null when it does not pass.
+  Map<String, Object?>? positionsBody() {
+    final body = {...sync.envelope(), ...positions()};
+    try {
+      return checkPositions(jsonDecode(jsonEncode(body)));
+    } on SyncFormatError {
+      return null;
+    }
+  }
+
+  /// `{game, positions}`: the live game's positions the GM sees (a GM sees
+  /// everyone's), the latest of each player, none older than three reporting
+  /// intervals; `game` null when none is live.
+  Map<String, Object?> positions() {
+    final game = engine.liveGame;
+    final state = game?['state'];
+    if (game == null || (state != 'running' && state != 'paused')) {
+      return {'game': null, 'positions': <Object?>[]};
+    }
+    final gid = game['id']! as int;
+    final now = _wall();
+    final teams = (game['teams'] as List?)?.cast<String>() ?? const <String>[];
+    final stale = 3 * ControllerPositions.interval(game);
+    final items = <Map<String, Object?>>[];
+    final all = engine.positions?.playerPositions(gid) ?? const {};
+    for (final pid in all.keys.toList()..sort()) {
+      final pos = all[pid]!;
+      final received = pos['received_at'];
+      final age = max(0.0, now - (received is num ? received.toDouble() : now));
+      if (age > stale) continue;
+      final item = <String, Object?>{
+        'player_id': pid,
+        'source': pos['source'],
+        'age_s': (age * 10).round() / 10,
+      };
+      final teamId = pos['team'];
+      if (teamId is int && teamId >= 1 && teamId <= teams.length) {
+        item['team'] = teams[teamId - 1];
+      }
+      final squad = pos['squad'];
+      if (squad is int && squad > 0) item['squad'] = squad;
+      final role = engine.checkin?.checkinRow(gid, pid)?['role'];
+      if (role is String && role.isNotEmpty) item['role'] = role;
+      if (pos['level'] is int) item['level'] = pos['level'];
+      if (pos['source'] == 'gps') {
+        for (final k in const ['lat', 'lon', 'accuracy_m']) {
+          if (pos[k] != null) item[k] = pos[k];
+        }
+      } else {
+        for (final k in const ['room', 'zone', 'x', 'y']) {
+          if (pos[k] != null) item[k] = pos[k];
+        }
+      }
+      items.add(item);
+    }
+    return {
+      'game': {'game_id': gid, 'game_seed': game['game_seed']},
+      'positions': items,
+    };
   }
 
   void _setRelay(bool on) {
@@ -395,7 +506,7 @@ class RemoteGm {
       } on SyncFormatError {
         return; // not in a form this controller knows: ignored
       }
-      onFieldChanged?.call();
+      onFieldChanged?.call(msg['what'] as List<Object?>?);
     } else if (kind == 'command') {
       final result = handleCommand(msg);
       _send(ws, 'command.result', {...sync.envelope(), ...result});

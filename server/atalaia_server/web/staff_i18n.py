@@ -2951,3 +2951,59 @@ for _lang, _texts in _ADMIN.items():
     _clash = set(STRINGS[_lang]) & set(_texts)
     assert not _clash, sorted(_clash)
     STRINGS[_lang].update(_texts)
+
+# The remote GM page's list of the players' positions (PKD-5); every key is new, as above.
+_POSITIONS: dict[str, dict[str, str]] = {
+    "pt": {
+        "pos_title": "Posições de quem joga",
+        "pos_none": "Ninguém está a partilhar a posição.",
+        "pos_note": "Só se veem enquanto quem joga as partilha com o controlador. O servidor do site não guarda nenhuma.",
+        "pos_player": "Quem joga",
+        "pos_role": "Papel",
+        "pos_place": "Local",
+        "pos_age": "Há",
+        "pos_age_value": "{n} s",
+        "pos_level": "piso {n}",
+        "pos_accuracy": "±{n} m",
+    },
+    "en": {
+        "pos_title": "Players' positions",
+        "pos_none": "No player is sharing a position.",
+        "pos_note": "Seen only while the players share them with the controller. The site server keeps none of them.",
+        "pos_player": "Player",
+        "pos_role": "Role",
+        "pos_place": "Place",
+        "pos_age": "Age",
+        "pos_age_value": "{n} s",
+        "pos_level": "level {n}",
+        "pos_accuracy": "±{n} m",
+    },
+    "de": {
+        "pos_title": "Positionen der Spielenden",
+        "pos_none": "Niemand teilt eine Position.",
+        "pos_note": "Nur sichtbar, solange die Spielenden sie mit dem Controller teilen. Der Site-Server speichert keine davon.",
+        "pos_player": "Spielende",
+        "pos_role": "Rolle",
+        "pos_place": "Ort",
+        "pos_age": "Alter",
+        "pos_age_value": "{n} s",
+        "pos_level": "Ebene {n}",
+        "pos_accuracy": "±{n} m",
+    },
+    "zh-tw": {
+        "pos_title": "玩家位置",
+        "pos_none": "沒有玩家在分享位置。",
+        "pos_note": "只在玩家與控制器分享位置時看得到。網站伺服器不會保存任何位置。",
+        "pos_player": "玩家",
+        "pos_role": "角色",
+        "pos_place": "地點",
+        "pos_age": "時間",
+        "pos_age_value": "{n} 秒",
+        "pos_level": "樓層 {n}",
+        "pos_accuracy": "±{n} 公尺",
+    },
+}
+for _lang, _texts in _POSITIONS.items():
+    _clash = set(STRINGS[_lang]) & set(_texts)
+    assert not _clash, sorted(_clash)
+    STRINGS[_lang].update(_texts)

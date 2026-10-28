@@ -1111,6 +1111,14 @@ class _SharePosition extends StatelessWidget {
                   ),
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            s.t('player.share_remote_gm'),
+            key: const Key('player-share-remote-gm'),
+            style: TextStyle(color: Theme.of(context).hintColor),
+          ),
+        ),
         if (isIOS)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),

@@ -1141,4 +1141,7 @@ const Map<String, String> enStrings = {
   'site.err.apd_not_accepted': 'This field does not accept that APD.',
   'site.err.membership_expired':
       'The membership has expired by the day of this game.',
+  // The remote GM may see shared positions (PKD-5)
+  'player.share_remote_gm':
+      'If the field has a remote GM signed in on the site server, the remote GM sees your position too while you share it. The site server does not keep it.',
 };

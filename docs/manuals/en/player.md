@@ -218,7 +218,7 @@ An objective can say **For** *(team)* or **For** *(team)***, squad** *(number)*.
 
 ## 6. Share your position and the field boundary
 
-Sharing your position is optional. Your position goes to the field controller only, during the game. The controller decides who may see it: the organisers and marshals, and your squad if the game allows it. The organisers see it on their ATAK devices, if they use them. The app draws a map of the field with the positions you may see (see below); the console does not draw players. In *VIP / Payload* the VIP's position is what extracts the team.
+Sharing your position is optional. Your position goes to the field controller only, during the game. The controller decides who may see it: the organisers and marshals, and your squad if the game allows it. If the field has a remote GM signed in on the site server, the remote GM sees it too, while you share it; the site server does not keep it. The organisers see it on their ATAK devices, if they use them. The app draws a map of the field with the positions you may see (see below); the console does not draw players. In *VIP / Payload* the VIP's position is what extracts the team.
 
 1. Check in, then tap **Follow the game**.
 2. While the game is **running**, switch on **Share my position**. It says *Only during the game; the controller decides who sees it …*.

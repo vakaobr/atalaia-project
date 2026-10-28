@@ -49,6 +49,8 @@ class ChronoListTests(P3Case):
         self.assertEqual(cl["counts"], {"pending": 2, "passed": 0, "refused": 0})
         out = self.upload(self.mtoken, self.marshal.series(r1, pid, PASS, game_id=self.gid))
         self.assertEqual((out["outcome"], out["class"], out["limit_j"]), ("pass", "rifle", 1.14))
+        # PKD-3: the class limit the series was judged against is kept with its readings, for the site sync.
+        self.assertEqual({r["limit_j"] for r in self.ctrl.store.readings_unsynced(10)}, {1.14})
         failing = self.marshal.series(r2, pid, FAIL, game_id=self.gid)
         self.assertEqual(self.upload(self.mtoken, failing)["outcome"], "fail")
         self.assertEqual(self.states(me), {r1: "passed", r2: "refused"})

@@ -7,7 +7,9 @@
 // seconds (GET .../remote-gm, the field's gm in a TOTP session), the commands the site server
 // may send (start, pause, resume, end, a GM message, a mode command the live game declares; POST
 // .../remote-gm/commands, answered with the controller's own result) and the remote GM log (GET
-// .../remote-gm/log, the field's admin or gm). Both stop while the tab is hidden.
+// .../remote-gm/log, the field's admin or gm). Both stop while the tab is hidden. With the view come the live game's
+// players' positions as a list (PKD-5): the controller sends them whenever players share them, the site server
+// relays them in memory and keeps none.
 
 import {
     $, api, boot, brief, clear, el, errorText, fieldApi, fillRows, gameTime, page, stateName, status, stream, t, when,
@@ -195,6 +197,38 @@ function liveView(data) {
     return box;
 }
 
+/** The players' positions the controller sent while they share them (PKD-5): a list, as this page has no plan.
+ * The site server keeps none of them; they come with the view and go with it. */
+function positionPlace(p) {
+    if (p.source === 'ble') {
+        const level = Number.isInteger(p.level) ? `, ${t('pos_level', { n: p.level })}` : '';
+        return `${p.room}${p.zone ? ` (${p.zone})` : ''}${level}`;
+    }
+    const accuracy = typeof p.accuracy_m === 'number' ? ` ${t('pos_accuracy', { n: Math.round(p.accuracy_m) })}` : '';
+    return `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}${accuracy}`;
+}
+
+function positionsView(data) {
+    const box = el('div', { class: 'positions' });
+    if (!data.live) return box;
+    const list = Array.isArray(data.positions) ? data.positions : [];
+    box.append(el('h4', { text: t('pos_title') }));
+    if (list.length === 0) {
+        box.append(el('p', { text: t('pos_none') }));
+    } else {
+        const rows = list.map((p) => el('tr', {}, el('th', { scope: 'row', text: p.player_id }),
+            el('td', { text: p.team || t('none') }), el('td', { text: p.role || t('none') }),
+            el('td', { text: positionPlace(p) }), el('td', { class: 'num', text: t('pos_age_value', { n: Math.round(p.age_s) }) })));
+        box.append(el('div', { class: 'table-wrap' }, el('table', { class: 'data positions-table' },
+            el('thead', {}, el('tr', {}, el('th', { scope: 'col', text: t('pos_player') }),
+                el('th', { scope: 'col', text: t('team') }), el('th', { scope: 'col', text: t('pos_role') }),
+                el('th', { scope: 'col', text: t('pos_place') }), el('th', { scope: 'col', class: 'num', text: t('pos_age') }))),
+            el('tbody', {}, rows))));
+    }
+    box.append(el('p', { class: 'hint', text: t('pos_note') }));
+    return box;
+}
+
 function render(data) {
     let entry = shown.get(data.controller_id);
     if (!entry) {
@@ -202,8 +236,9 @@ function render(data) {
         const head = el('h2', { text: t('controller', { id: data.controller_id }) });
         entry.meta = el('dl', { class: 'details' });
         entry.live = el('div');
+        entry.positions = el('div');
         entry.off = el('p', { class: 'notice', text: t('remote_off') });
-        entry.root = el('article', { class: 'controller' }, head, entry.meta, entry.off, entry.live, commandForm(entry));
+        entry.root = el('article', { class: 'controller' }, head, entry.meta, entry.off, entry.live, entry.positions, commandForm(entry));
         shown.set(data.controller_id, entry);
         $('controllers').append(entry.root);
     }
@@ -215,6 +250,7 @@ function render(data) {
     }
     entry.off.hidden = data.remote_gm;
     entry.live.replaceChildren(liveView(data));
+    entry.positions.replaceChildren(positionsView(data));
     update(entry);
 }
 

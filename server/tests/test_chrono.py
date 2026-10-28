@@ -341,6 +341,39 @@ class ViolationTests(ChronoCase):
         still_open = (await self.client.get(url + "?open=true", headers=marshal)).json()
         self.assertEqual([v["series_id"] for v in still_open], [series[1]])
 
+    async def test_the_excess_over_the_class_limit_and_repeat_offenders(self) -> None:
+        """PKD-3: the controller sends the class limit with each reading; the violation gets ``limit_j`` and
+        ``delta_j`` (the excess of the deciding reading), and a player's later violations at the field are
+        flagged ``repeat_offender``, also when the older one arrives later; no limit sent, no ``delta_j``."""
+        ana = Marshal()
+        await self.marshals(ana.entry())
+        series = [str(uuid.uuid4()) for _ in range(3)]
+        older = [ana.record(v, rtype="spotcheck", at=T - 600) for v in (100.0, 104.0)]
+        newer = [ana.record(v, rtype="spotcheck", at=T - 300) for v in (110.0,)]
+        other = [ana.record(v, rtype="spotcheck", player="p-bea") for v in (101.0,)]
+        # The newer one first: alone it is no repeat.
+        await self.chrono(*[reading(r, series[1], "fail", limit_j=1.0) for r in newer])
+        gm = await self.staff("gm")
+        url = f"/api/v1/fields/{self.field_id}/chrono/violations"
+
+        async def listed() -> dict[str, Any]:
+            return {v["series_id"]: v for v in (await self.client.get(url, headers=gm)).json()}
+
+        got = await listed()
+        energy = chrono.round_half_away(chrono.energy_j(0.2, 110.0), 3)
+        self.assertEqual((got[series[1]]["limit_j"], got[series[1]]["repeat_offender"]), (1.0, False))
+        self.assertAlmostEqual(got[series[1]]["delta_j"], energy - 1.0)
+        # The older series comes later (two readings, the second decides): it is the first, the newer a repeat.
+        await self.chrono(*[reading(r, series[0], "fail", limit_j=1.0) for r in older])
+        await self.chrono(*[reading(r, series[2], "warn") for r in other])  # no limit sent
+        got = await listed()
+        top = chrono.round_half_away(chrono.energy_j(0.2, 104.0), 3)
+        self.assertEqual((got[series[0]]["energy_j"], got[series[0]]["repeat_offender"]), (top, False))
+        self.assertAlmostEqual(got[series[0]]["delta_j"], top - 1.0)
+        self.assertTrue(got[series[1]]["repeat_offender"])
+        self.assertEqual((got[series[2]]["limit_j"], got[series[2]]["delta_j"], got[series[2]]["repeat_offender"]),
+                         (None, None, False))  # another player, no limit sent
+
 
 class StaffViewTests(ChronoCase):
     async def asyncSetUp(self) -> None:

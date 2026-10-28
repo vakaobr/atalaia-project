@@ -60,6 +60,7 @@ class FakeSite:
         self.replicas: dict[str, dict[str, Any]] = {}
         self.readings: list[dict[str, Any]] = []
         self.refuse_readings: set[str] = set()  # reading ids to answer as kept apart
+        self.before_pkd3 = False  # a site server that refuses a reading's ``limit_j`` (unknown_field)
         self.lock = threading.Lock()
         site = self
 
@@ -106,6 +107,11 @@ class FakeSite:
             if self.reject == kind:
                 self.reject = None
                 return 400, {"detail": "invalid_body", "error": "bad_source", "path": "counters.x"}, {}
+            if self.before_pkd3 and kind == "chrono":
+                for i, entry in enumerate(body["readings"]):
+                    if "limit_j" in entry:
+                        return 400, {"detail": "invalid_body", "error": "unknown_field",
+                                     "path": f"readings[{i}].limit_j"}, {}
             try:
                 body = sync_format.CHECKS[kind](body)
             except sync_format.SyncFormatError as exc:
@@ -456,6 +462,33 @@ class RegistryTests(SyncCase):
         self.assertEqual(self.site.readings[0]["game_seed"], self.seed(gid))
 
 
+    def test_the_class_limit_goes_with_a_reading_it_was_judged_against(self) -> None:
+        """PKD-3: ``limit_j`` is sent when the controller knew the class limit, and only then."""
+        self.register(self.marshal, T0)
+        judged, unjudged = (str(uuid.uuid4()) for _ in range(2))
+        a, b = self.marshal.series(self.replica, "p-rita", [100.0, 101.0])
+        self.store.add_reading(a, judged, "fail", T0 + 60, limit_j=1.2)
+        self.store.add_reading(b, unjudged, "unjudged", T0 + 60)
+        self.assertTrue(self.client().run_once())
+        self.assertEqual([r.get("limit_j") for r in self.site.readings], [1.2, None])
+        self.assertNotIn("limit_j", self.site.readings[1])
+
+    def test_a_site_server_from_before_the_class_limit_gets_readings_without_it(self) -> None:
+        self.register(self.marshal, T0)
+        a, b = self.marshal.series(self.replica, "p-rita", [100.0, 101.0])
+        self.store.add_reading(a, str(uuid.uuid4()), "fail", T0 + 60, limit_j=1.2)
+        self.site.before_pkd3 = True
+        client = self.client()
+        self.assertTrue(client.run_once(), client.last_error)
+        self.assertEqual(len(self.site.readings), 1)  # not lost
+        self.assertNotIn("limit_j", self.site.readings[0])
+        self.assertFalse(client.limit_j_supported)
+        self.assertIsNone(client.registry_error)
+        self.store.add_reading(b, str(uuid.uuid4()), "fail", T0 + 60, limit_j=1.2)
+        self.assertTrue(client.run_once())
+        self.assertNotIn("limit_j", self.site.readings[1])  # and no more tries with it
+
+
 class BackoffTests(SyncCase):
     def test_intervals_and_doubling(self) -> None:
         client = self.client()
@@ -650,7 +683,7 @@ ALLOWED = {
     "marshals[]": {"marshal_id", "name", "public_key", "player_id", "registered_at", "replaced_at"},
     "replicas[]": {"replica_id", "owner_player_id", "type", "class", "make_model", "registered_at", "tag_type",
                    "tag_uid"},
-    "readings[]": {"record", "series_id", "outcome", "received_at", "game_seed"},
+    "readings[]": {"record", "series_id", "outcome", "received_at", "game_seed", "limit_j"},
     # Plan phase 16: outcomes and claim verdicts; never a name, a federation number or a secret's hash.
     "registrations[]": {"registration_id", "player_id", "outcome", "ticket_sha256", "declarations"},
     "registrations[].declarations[]": {"declaration_id", "state", "reading_id"},

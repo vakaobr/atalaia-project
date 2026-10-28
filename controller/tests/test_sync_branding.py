@@ -261,6 +261,28 @@ class SiteSettingsTests(SiteBrandingCase):
         self.assertFalse(self.sync._wake.is_set())
         self.assertEqual(self.sync.status()["branding"]["field_changes"], 1)
 
+    def test_field_changed_what_pulls_the_library_and_the_schedule_too(self) -> None:
+        """PKD-1: ``what`` names the library (with ``[sync] library`` on) and the schedule (always)."""
+        status = self.sync.status
+        self.cfg.sync_branding = "local"
+        for what, wanted in ((None, False), (["branding"], False), (["library"], True), (["schedule"], True),
+                             (["library", "schedule"], True)):
+            with self.subTest(what=what):
+                self.sync._wake.clear()
+                self.sync.field_changed(what)
+                self.assertEqual(self.sync._wake.is_set(), wanted)
+        self.assertEqual((status()["library"]["changes"], status()["game_day"]["changes"]), (2, 2))
+        self.assertEqual(status()["branding"]["field_changes"], 0)
+        self.cfg.sync_library = False
+        self.sync._wake.clear()
+        self.sync.field_changed(["library"])
+        self.assertFalse(self.sync._wake.is_set())
+        self.sync.field_changed(["branding", "library", "schedule"])  # the schedule still counts
+        self.assertTrue(self.sync._wake.is_set())
+        self.cfg.sync_branding = "site"
+        self.sync.field_changed(["branding"])
+        self.assertEqual(status()["branding"]["field_changes"], 1)
+
     def test_a_standby_gets_the_field_from_its_own_sync(self) -> None:
         """BR24: a standby controller has its own ``[sync]``: it pulls the branding and the settings itself."""
         tmp = tempfile.TemporaryDirectory()

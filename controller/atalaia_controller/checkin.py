@@ -1702,7 +1702,7 @@ class Checkin:
             series_id = str(uuid.uuid4())
             now = self._wall()
             for rec, _ in checked:
-                self.store.add_reading(rec, series_id, judged["outcome"], now)
+                self.store.add_reading(rec, series_id, judged["outcome"], now, limit_j=judged["limit_j"])
             changed = []
             if game is not None and first["type"] != "spotcheck" and judged["outcome"] in ("pass", "fail"):
                 changed = self._apply(game, first, judged, now)

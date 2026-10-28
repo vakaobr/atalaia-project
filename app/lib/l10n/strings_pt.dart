@@ -1171,4 +1171,7 @@ const Map<String, String> ptStrings = {
   'site.err.apd_not_accepted': 'Este campo não aceita essa APD.',
   'site.err.membership_expired':
       'A filiação já terá caducado no dia deste jogo.',
+  // The remote GM may see shared positions (PKD-5)
+  'player.share_remote_gm':
+      'Se o campo tiver um GM remoto com sessão iniciada no servidor do site, o GM remoto também vê a tua posição enquanto a partilhares. O servidor do site não a guarda.',
 };

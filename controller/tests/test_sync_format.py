@@ -28,7 +28,7 @@ VECTORS = json.loads((REPO / "protocol" / "vectors" / "sync.json").read_text(enc
 
 class VectorTests(unittest.TestCase):
     def test_counts(self) -> None:
-        self.assertEqual((len(VECTORS["valid"]), len(VECTORS["invalid"]), len(VECTORS["merge"])), (14, 65, 3))
+        self.assertEqual((len(VECTORS["valid"]), len(VECTORS["invalid"]), len(VECTORS["merge"])), (14, 68, 3))
         self.assertEqual((len(VECTORS["answers"]["valid"]), len(VECTORS["answers"]["invalid"])), (18, 75))
         self.assertEqual({v["kind"] for v in VECTORS["answers"]["valid"]}, set(fmt.ANSWERS))
         self.assertEqual({v["kind"] for v in VECTORS["valid"]}, set(fmt.CHECKS))
@@ -65,7 +65,7 @@ class VectorTests(unittest.TestCase):
     def test_stream(self) -> None:
         """The remote GM's messages on the stream (plan phase 19): the controller's and the site server's."""
         stream = VECTORS["stream"]
-        self.assertEqual((len(stream["valid"]), len(stream["invalid"])), (19, 51))
+        self.assertEqual((len(stream["valid"]), len(stream["invalid"])), (23, 67))
         self.assertEqual({v["kind"] for v in stream["valid"]}, set(fmt.STREAM))
         for vector in stream["valid"]:
             with self.subTest(vector=vector["name"]):
