@@ -727,7 +727,7 @@
       "team_preference_invalid": "不是這場遊戲的隊伍",
       "federation_number_invalid": "號碼超過 32 個字元",
       "federation_number_required": "本場地要求填寫號碼",
-      "replicas_invalid": "複製槍格式不符「類型:等級[:廠牌型號]|…」",
+      "replicas_invalid": "複製槍格式不符 type:class[:make model]|…",
       "replicas_not_asked": "這場遊戲不接受預先申報的複製槍",
       "too_many_replicas": "複製槍數量超過場地上限",
       "replica_type_invalid": "複製槍類型未知",
