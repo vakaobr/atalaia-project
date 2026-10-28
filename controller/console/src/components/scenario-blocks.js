@@ -69,15 +69,23 @@ const COLOURS = {
     objective: '#b5651d', who: '#3d7d7d', how: '#5b6fb3', effect: '#8a7a14',
 };
 
+// The languages a scenario's texts are translated into (manifest `i18n`; English is the text itself, PKB-9, SCL-1):
+// the language code, the suffix of its blocks and fields (scn_name_pt, LABEL_PT; scn_name_zh_tw, LABEL_ZH_TW).
+export const TRANSLATIONS = [['pt', 'pt'], ['de', 'de'], ['zh-tw', 'zh_tw']];
+// The translated text rules of an objective: block type -> [language, key].
+const TEXT_RULES = Object.fromEntries(TRANSLATIONS.flatMap(([lang, sfx]) => [
+    [`scn_name_${sfx}`, [lang, 'name']], [`scn_description_${sfx}`, [lang, 'description']]]));
+const TEXT_BLOCKS = TRANSLATIONS.flatMap(([, sfx]) => [`scn_name_${sfx}`, `scn_description_${sfx}`]);
+
 // What each statement input of a block takes (the generator checks it; Blockly's connection
 // checks only look at neighbours).
 const PLACES = {
-    'scn_scenario.INFO': ['scn_description', 'scn_author', 'scn_name_pt', 'scn_description_pt'],
+    'scn_scenario.INFO': ['scn_description', 'scn_author', ...TEXT_BLOCKS],
     'scn_scenario.TEAMS': ['scn_team'],
     'scn_scenario.PARAMS': ['scn_param'],
     'scn_scenario.NODES': ['scn_box', 'scn_player'],
     'scn_scenario.OBJECTIVES': ['scn_objective'],
-    'scn_objective.RULES': ['scn_description', 'scn_name_pt', 'scn_description_pt', 'scn_assignee', 'scn_visibility',
+    'scn_objective.RULES': ['scn_description', ...TEXT_BLOCKS, 'scn_assignee', 'scn_visibility',
         'scn_after', 'scn_opens_at', 'scn_closes_at', 'scn_hold', 'scn_duration', 'scn_code', 'scn_tags',
         'scn_defuse', 'scn_fuse', 'scn_circle', 'scn_area', 'scn_max_acc', 'scn_lives', 'scn_points',
         'scn_points_param', 'scn_win', 'scn_reveal'],
@@ -125,12 +133,15 @@ export function blockDefinitions(tr) {
         ], { tooltip: tr('scenario_tip') }),
         def('scn_description', C.text, [[tr('description'), [text('TEXT')]]], item),
         def('scn_author', C.text, [[tr('author'), [text('TEXT')]]], item),
-        def('scn_name_pt', C.text, [[tr('name_pt'), [text('TEXT')]]], item),
-        def('scn_description_pt', C.text, [[tr('description_pt'), [text('TEXT')]]], item),
+        ...TRANSLATIONS.flatMap(([, sfx]) => [
+            def(`scn_name_${sfx}`, C.text, [[tr(`name_${sfx}`), [text('TEXT')]]], item),
+            def(`scn_description_${sfx}`, C.text, [[tr(`description_${sfx}`), [text('TEXT')]]], item),
+        ]),
         def('scn_team', C.team, [[tr('team'), [text('TEAM', 'red')]]], item),
         def('scn_param', C.param, [
             [tr('param'), [text('NAME', 'points'), text('MIN'), text('MAX'), num('DEFAULT', 0)]],
             [tr('param_label'), [text('LABEL'), text('LABEL_PT')]],
+            [tr('param_label_more'), [text('LABEL_DE'), text('LABEL_ZH_TW')]],
             [tr('param_gm_only'), [check('GM_ONLY')]],
         ], { ...item, tooltip: tr('param_tip') }),
         def('scn_box', C.node, [[tr('box'), [text('NAME', 'alpha'),
@@ -188,7 +199,7 @@ export function toolbox(tr) {
             cat('cat_how', C.how, ['scn_hold', 'scn_duration', 'scn_code', 'scn_tags', 'scn_defuse', 'scn_fuse',
                 'scn_circle', 'scn_area', 'scn_corner', 'scn_max_acc', 'scn_lives']),
             cat('cat_effects', C.effect, ['scn_points', 'scn_points_param', 'scn_win', 'scn_reveal']),
-            cat('cat_texts', C.text, ['scn_description', 'scn_name_pt', 'scn_description_pt', 'scn_author']),
+            cat('cat_texts', C.text, ['scn_description', ...TEXT_BLOCKS, 'scn_author']),
             cat('cat_teams', C.team, ['scn_team']),
             cat('cat_params', C.param, ['scn_param']),
         ],
@@ -276,22 +287,25 @@ export function manifestToState(m) {
     if (description !== undefined) info.push(block('scn_description', { TEXT: description }));
     const author = textOf(m, 'author', '');
     if (author !== undefined) info.push(block('scn_author', { TEXT: author }));
-    let labelsPt = {};
+    const labels = {}; // language -> { parameter: label }
     if ('i18n' in m) {
         if (!isObject(m.i18n)) lost.push('i18n');
         else {
-            only(m.i18n, ['pt'], 'i18n');
-            const pt = m.i18n.pt;
-            if (pt !== undefined && !isObject(pt)) lost.push('i18n.pt');
-            else if (pt) {
-                only(pt, ['name', 'description', 'params'], 'i18n.pt');
-                const name = textOf(pt, 'name', 'i18n.pt');
-                if (name !== undefined) info.push(block('scn_name_pt', { TEXT: name }));
-                const desc = textOf(pt, 'description', 'i18n.pt');
-                if (desc !== undefined) info.push(block('scn_description_pt', { TEXT: desc }));
-                if ('params' in pt) {
-                    if (isObject(pt.params)) labelsPt = { ...pt.params };
-                    else lost.push('i18n.pt.params');
+            only(m.i18n, TRANSLATIONS.map(([lang]) => lang), 'i18n');
+            for (const [lang, sfx] of TRANSLATIONS) {
+                const tr = m.i18n[lang];
+                const at = `i18n.${lang}`;
+                if (tr !== undefined && !isObject(tr)) lost.push(at);
+                else if (tr) {
+                    only(tr, ['name', 'description', 'params'], at);
+                    const name = textOf(tr, 'name', at);
+                    if (name !== undefined) info.push(block(`scn_name_${sfx}`, { TEXT: name }));
+                    const desc = textOf(tr, 'description', at);
+                    if (desc !== undefined) info.push(block(`scn_description_${sfx}`, { TEXT: desc }));
+                    if ('params' in tr) {
+                        if (isObject(tr.params)) labels[lang] = { ...tr.params };
+                        else lost.push(`${at}.params`);
+                    }
                 }
             }
         }
@@ -319,7 +333,7 @@ export function manifestToState(m) {
                 }
                 only(spec, ['type', 'min', 'max', 'default', 'label', 'gm_only'], path);
                 if (spec.type !== 'int') lost.push(`${path}.type`);
-                const fields = { NAME: name, MIN: '', MAX: '', DEFAULT: 0, LABEL: '', LABEL_PT: '', GM_ONLY: 'FALSE' };
+                const fields = { NAME: name, MIN: '', MAX: '', DEFAULT: 0, LABEL: '', LABEL_PT: '', LABEL_DE: '', LABEL_ZH_TW: '', GM_ONLY: 'FALSE' };
                 for (const [key, field] of [['min', 'MIN'], ['max', 'MAX']]) {
                     const v = intOf(spec, key, path);
                     if (v !== undefined) fields[field] = String(v);
@@ -332,16 +346,20 @@ export function manifestToState(m) {
                     if (spec.gm_only === true) fields.GM_ONLY = 'TRUE';
                     else lost.push(`${path}.gm_only`); // false is the default: the blocks write nothing
                 }
-                if (name in labelsPt) {
-                    if (isText(labelsPt[name]) && labelsPt[name] !== '') fields.LABEL_PT = labelsPt[name];
-                    else lost.push(`i18n.pt.params.${name}`);
-                    delete labelsPt[name];
+                for (const [lang, sfx] of TRANSLATIONS) {
+                    const got = labels[lang];
+                    if (!got || !(name in got)) continue;
+                    if (isText(got[name]) && got[name] !== '') fields[`LABEL_${sfx.toUpperCase()}`] = got[name];
+                    else lost.push(`i18n.${lang}.params.${name}`);
+                    delete got[name];
                 }
                 params.push(block('scn_param', fields));
             }
         }
     }
-    for (const name of Object.keys(labelsPt)) lost.push(`i18n.pt.params.${name}`); // a label of no parameter
+    for (const [lang, got] of Object.entries(labels)) { // a label of no parameter
+        for (const name of Object.keys(got)) lost.push(`i18n.${lang}.params.${name}`);
+    }
 
     const nodes = [];
     if ('nodes' in m) {
@@ -406,15 +424,23 @@ function objectiveBlock(o, path, lost, { only, textOf, intOf }) {
     const description = textOf(o, 'description', path);
     if (description !== undefined) rules.push(block('scn_description', { TEXT: description }));
     if ('i18n' in o) {
-        const pt = isObject(o.i18n) ? o.i18n.pt : undefined;
-        if (!isObject(o.i18n) || !isObject(pt)) lost.push(`${path}.i18n`);
+        if (!isObject(o.i18n) || !Object.keys(o.i18n).length) lost.push(`${path}.i18n`);
         else {
-            only(o.i18n, ['pt'], `${path}.i18n`);
-            only(pt, ['name', 'description'], `${path}.i18n.pt`);
-            const name = textOf(pt, 'name', `${path}.i18n.pt`);
-            if (name !== undefined) rules.push(block('scn_name_pt', { TEXT: name }));
-            const desc = textOf(pt, 'description', `${path}.i18n.pt`);
-            if (desc !== undefined) rules.push(block('scn_description_pt', { TEXT: desc }));
+            only(o.i18n, TRANSLATIONS.map(([lang]) => lang), `${path}.i18n`);
+            for (const [lang, sfx] of TRANSLATIONS) {
+                const tr = o.i18n[lang];
+                const at = `${path}.i18n.${lang}`;
+                if (tr === undefined) continue;
+                if (!isObject(tr)) {
+                    lost.push(at);
+                    continue;
+                }
+                only(tr, ['name', 'description'], at);
+                const name = textOf(tr, 'name', at);
+                if (name !== undefined) rules.push(block(`scn_name_${sfx}`, { TEXT: name }));
+                const desc = textOf(tr, 'description', at);
+                if (desc !== undefined) rules.push(block(`scn_description_${sfx}`, { TEXT: desc }));
+            }
         }
     }
     if ('assignee' in o) {
@@ -579,15 +605,18 @@ export function workspaceToManifest(ws) {
     for (const [key, name] of [['id', 'ID'], ['version', 'VERSION'], ['name', 'NAME']]) {
         if (field(root, name) !== '') m[key] = put(key, field(root, name), root);
     }
-    const i18n = {};
+    const i18n = Object.fromEntries(TRANSLATIONS.map(([lang]) => [lang, {}]));
+    const places = {
+        scn_description: [m, 'description', 'description'],
+        scn_author: [m, 'author', 'author'],
+    };
+    for (const [lang, sfx] of TRANSLATIONS) {
+        places[`scn_name_${sfx}`] = [i18n[lang], 'name', `i18n.${lang}.name`];
+        places[`scn_description_${sfx}`] = [i18n[lang], 'description', `i18n.${lang}.description`];
+    }
     for (const b of placed(root, 'INFO')) {
         const value = field(b, 'TEXT');
-        const [obj, key, path] = {
-            scn_description: [m, 'description', 'description'],
-            scn_author: [m, 'author', 'author'],
-            scn_name_pt: [i18n, 'name', 'i18n.pt.name'],
-            scn_description_pt: [i18n, 'description', 'i18n.pt.description'],
-        }[b.type];
+        const [obj, key, path] = places[b.type];
         if (key in obj) problems.push({ blockId: b.id, path, code: 'twice', level: 'error' });
         else obj[key] = put(path, value, b);
     }
@@ -598,7 +627,6 @@ export function workspaceToManifest(ws) {
     if (field(root, 'REVEAL') !== 'all') m.reveal = put('reveal', field(root, 'REVEAL'), root);
     if (field(root, 'DISCLOSURE') !== 'members') m.disclosure = put('disclosure', field(root, 'DISCLOSURE'), root);
     const params = {};
-    const labelsPt = {};
     for (const b of placed(root, 'PARAMS')) {
         const name = field(b, 'NAME');
         const path = `params.${name}`;
@@ -615,12 +643,19 @@ export function workspaceToManifest(ws) {
         if (field(b, 'LABEL') !== '') spec.label = field(b, 'LABEL');
         if (field(b, 'GM_ONLY') === 'TRUE') spec.gm_only = true;
         params[name] = put(path, spec, b);
-        if (field(b, 'LABEL_PT') !== '') labelsPt[name] = put(`i18n.pt.params.${name}`, field(b, 'LABEL_PT'), b);
+        for (const [lang, sfx] of TRANSLATIONS) {
+            const label = field(b, `LABEL_${sfx.toUpperCase()}`);
+            if (label) {
+                i18n[lang].params = i18n[lang].params || {};
+                i18n[lang].params[name] = put(`i18n.${lang}.params.${name}`, label, b);
+            }
+        }
     }
     if (Object.keys(params).length) m.params = params;
-    if (Object.keys(labelsPt).length) i18n.params = labelsPt;
-    if (Object.keys(i18n).length) {
-        m.i18n = { pt: i18n };
+    for (const [lang] of TRANSLATIONS) {
+        if (!Object.keys(i18n[lang]).length) continue;
+        m.i18n = m.i18n || {};
+        m.i18n[lang] = i18n[lang];
         where['i18n'] = where['i18n'] || root.id;
     }
     const nodes = {};
@@ -652,7 +687,7 @@ function objectiveOf(b, path, placed, put, problems) {
     put(path, o, b);
     if (field(b, 'ID') !== '') o.id = put(`${path}.id`, field(b, 'ID'), b);
     if (field(b, 'NAME') !== '') o.name = put(`${path}.name`, field(b, 'NAME'), b);
-    const pt = {};
+    const tr = Object.fromEntries(TRANSLATIONS.map(([lang]) => [lang, {}]));
     const assignee = {};
     const params = {};
     const window = {};
@@ -676,12 +711,6 @@ function objectiveOf(b, path, placed, put, problems) {
         switch (r.type) {
         case 'scn_description':
             once(r, 'description', `${path}.description`, () => { description = field(r, 'TEXT'); });
-            break;
-        case 'scn_name_pt':
-            once(r, 'name_pt', `${path}.i18n.pt.name`, () => { pt.name = field(r, 'TEXT'); });
-            break;
-        case 'scn_description_pt':
-            once(r, 'description_pt', `${path}.i18n.pt.description`, () => { pt.description = field(r, 'TEXT'); });
             break;
         case 'scn_assignee':
             once(r, 'assignee', `${path}.assignee`, () => {
@@ -756,12 +785,21 @@ function objectiveOf(b, path, placed, put, problems) {
             reveal.push(field(r, 'OBJECTIVE'));
             put(`${path}.effect.reveal[${reveal.length - 1}]`, null, r);
             break;
-        default:
+        default: {
+            const t = TEXT_RULES[r.type];
+            if (t) {
+                once(r, `${t[1]}_${t[0]}`, `${path}.i18n.${t[0]}.${t[1]}`, () => { tr[t[0]][t[1]] = field(r, 'TEXT'); });
+            }
             break;
+        }
         }
     }
     if (description !== undefined) o.description = description;
-    if (Object.keys(pt).length) o.i18n = { pt };
+    for (const [lang] of TRANSLATIONS) {
+        if (!Object.keys(tr[lang]).length) continue;
+        o.i18n = o.i18n || {};
+        o.i18n[lang] = tr[lang];
+    }
     o.type = put(`${path}.type`, field(b, 'TYPE'), b);
     if (field(b, 'TARGET') !== '') o.target = put(`${path}.target`, field(b, 'TARGET'), b);
     if (Object.keys(assignee).length) o.assignee = assignee;

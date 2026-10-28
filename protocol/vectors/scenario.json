@@ -384,6 +384,76 @@
    ],
    "lang": "zh-tw"
   }
+ },
+ {
+  "name": "Names in all four languages, a German box (PKB-9, SCL-1)",
+  "manifest": {
+   "id": "org.club.vectors",
+   "version": "1",
+   "name": "Vectors",
+   "teams": [
+    "red",
+    "blue"
+   ],
+   "nodes": {
+    "a": {
+     "role": "objective"
+    }
+   },
+   "objectives": [
+    {
+     "id": "hill",
+     "name": "Hill",
+     "description": "Hold it.",
+     "type": "capture_and_hold",
+     "target": "a",
+     "i18n": {
+      "pt": {
+       "name": "Colina",
+       "description": "Segura-a."
+      },
+      "de": {
+       "name": "H\u00fcgel",
+       "description": "Haltet ihn."
+      },
+      "zh-tw": {
+       "name": "\u5c71\u4e18",
+       "description": "\u5b88\u4f4f\u5b83\u3002"
+      }
+     }
+    }
+   ],
+   "lang": "de",
+   "params": {
+    "bonus": {
+     "type": "int",
+     "min": 0,
+     "max": 500,
+     "default": 25,
+     "label": "Bonus points"
+    }
+   },
+   "i18n": {
+    "pt": {
+     "name": "Vetores",
+     "params": {
+      "bonus": "Pontos extra"
+     }
+    },
+    "de": {
+     "name": "Vektoren",
+     "params": {
+      "bonus": "Bonuspunkte"
+     }
+    },
+    "zh-tw": {
+     "name": "\u5411\u91cf",
+     "params": {
+      "bonus": "\u734e\u52f5\u5206"
+     }
+    }
+   }
+  }
  }
  ],
  "invalid": [

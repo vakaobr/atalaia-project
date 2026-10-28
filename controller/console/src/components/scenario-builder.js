@@ -84,7 +84,7 @@ function saveView(view) {
     }
 }
 
-/** A text of the scenario or an objective in the console's language (i18n.pt, else English). */
+/** A text of the scenario or an objective in the console's language (i18n.<language>, else English). */
 function named(entry) {
     if (!entry) return '';
     const tr = entry.i18n && entry.i18n[lang()];

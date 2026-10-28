@@ -187,7 +187,7 @@ class ScenarioBlocksTests(unittest.TestCase):
         page = self.console()
         self.blocks_view(page)  # loads Blockly and defines the blocks
         cases = examples()
-        self.assertEqual(len(cases), 12)  # with scenario.json's emoji as a surrogate pair (PE24-107)
+        self.assertEqual(len(cases), 13)  # with scenario.json's emoji as a surrogate pair (PE24-107)
         for name, text in cases:
             with self.subTest(name):
                 original = load(text)
@@ -206,6 +206,45 @@ class ScenarioBlocksTests(unittest.TestCase):
                 check = self.field.http.post("/api/v1/scenarios/check", json={"manifest": got["yaml"]}).json()
                 self.assertTrue(check["ok"], check["problems"])
                 self.assertTrue(check["checked_in_core"])
+
+    @unittest.skipIf(CORE is None, "the shared core library is not built")
+    def test_names_in_german_and_chinese_round_trip_and_old_manifests_stay(self):
+        """SCL-1: an objective, the scenario and a parameter's label carry names in pt, de and
+        zh-tw (blocks of their own, nothing lost); a manifest with only i18n.pt, as written before
+        German and Chinese, gives the same blocks and the same YAML as ever; a language the
+        manifest format has no translation for (fr, or en: English is the text itself) is named as
+        lost, and the compiled German box setup carries the German name."""
+        page = self.console()
+        self.blocks_view(page)
+        base = {"id": "org.club.names", "version": "1", "name": "Names", "lang": "de",
+                "teams": ["red", "blue"], "nodes": {"a": {"role": "objective"}},
+                "params": {"bonus": {"type": "int", "default": 5, "label": "Bonus"}},
+                "objectives": [{"id": "hill", "name": "Hill", "type": "capture_and_hold", "target": "a"}]}
+        names = {"pt": "Colina", "de": "H\u00fcgel", "zh-tw": "\u5c71\u4e18"}
+        full = json.loads(json.dumps(base))
+        full["i18n"] = {lang: {"name": f"S-{n}", "params": {"bonus": f"B-{n}"}} for lang, n in names.items()}
+        full["objectives"][0]["i18n"] = {lang: {"name": n, "description": f"D-{n}"} for lang, n in names.items()}
+        got = page.evaluate(ROUND_TRIP, full)
+        self.assertEqual((got["lost"], got["problems"]), ([], []))
+        written = load(got["yaml"])
+        self.assertEqual(written["i18n"], full["i18n"])
+        self.assertEqual(written["objectives"][0]["i18n"], full["objectives"][0]["i18n"])
+        self.assertEqual([p.to_dict() for p in validate(written)], [])
+        self.assertIn('label = "H\u00fcgel"', compile_scenario(written).files["field.lua"])
+        # Before: only Portuguese, the same as it was.
+        old = json.loads(json.dumps(base))
+        old["objectives"][0]["i18n"] = {"pt": {"name": "Colina"}}
+        old["i18n"] = {"pt": {"name": "Nomes", "params": {"bonus": "Bónus"}}}
+        got = page.evaluate(ROUND_TRIP, old)
+        self.assertEqual((got["lost"], got["problems"]), ([], []))
+        self.assertEqual(load(got["yaml"])["objectives"][0]["i18n"], {"pt": {"name": "Colina"}})
+        self.assertEqual(load(got["yaml"])["i18n"], old["i18n"])
+        # Languages the blocks (and the format) do not have are named, never dropped.
+        for lang in ("fr", "en"):
+            bad = json.loads(json.dumps(base))
+            bad["objectives"][0]["i18n"] = {lang: {"name": "X"}}
+            lost = page.evaluate(ROUND_TRIP, bad)["lost"]
+            self.assertEqual(lost, [f"objectives[0].i18n.{lang}"])
 
     # --- the view -------------------------------------------------------------------------
 

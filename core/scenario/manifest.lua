@@ -60,7 +60,7 @@ m.LEVELS_MAX = 10 -- a box's optional level on a multi-story field (ML-8)
 m.POINTS_MAX = 100000
 m.WINDOW_MAX_MIN = 7 * 24 * 60 -- a week, in minutes
 m.LANGS = { "pt", "en", "de", "zh-tw" } -- the objectives package's screens (modes/objectives/node.lua; PKB-9)
-m.TRANSLATIONS = { "pt" } -- texts are in English, with i18n.pt (P4R8; the block editor edits no other, PKB-9)
+m.TRANSLATIONS = { "pt", "de", "zh-tw" } -- texts are in English, with i18n.<lang> for these (P4R8; PKB-9 opened de and zh-tw)
 m.NODE_ROLES = { "objective", "bomb_site" } -- org.atalaia.objectives' roles
 m.VISIBILITY = { "public", "team", "squad", "hidden" }
 -- When the objectives that depend on others become known (SQ-1): `all` at the start (unless hidden), `active`

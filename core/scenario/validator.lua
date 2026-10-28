@@ -358,7 +358,11 @@ function Checker:check_i18n(i18n, path, keys)
     return
   end
   if not py.is_map(i18n) then
-    self:err(path, "bad_i18n", "a map of a language (pt) to its texts")
+    self:err(
+      path,
+      "bad_i18n",
+      "a map of a language (" .. join(m.TRANSLATIONS, ", ") .. ") to its texts"
+    )
     return
   end
   for i = 1, i18n.n do
