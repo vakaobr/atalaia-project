@@ -11,9 +11,9 @@
  * commit raises the numbers and sets "dev" again. A firmware build adds its commit
  * (tools/docker_fw.py: 0.3.0-dev.<commits>+g<hash>; firmware/esp32/CMakeLists.txt). */
 #define ATALAIA_VERSION_MAJOR      0
-#define ATALAIA_VERSION_MINOR      4
+#define ATALAIA_VERSION_MINOR      5
 #define ATALAIA_VERSION_PATCH      0
-#define ATALAIA_VERSION_PRERELEASE ""
+#define ATALAIA_VERSION_PRERELEASE "dev"
 
 /* ATALAIA_PROTOCOL_VERSION, the Skirmesh-RF version this core speaks. */
 #include "atalaia/protocol.h"
