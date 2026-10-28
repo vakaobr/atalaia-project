@@ -643,6 +643,12 @@ export function generateManifest(info, nodeWs, fieldWs, scripts) {
             lines.push(`  ${name}: { roles: [${forRoles.join(', ')}], label: ${yamlValue(label)} }`);
         }
     }
+    // How a box scores while it holds, so a controller can project the points between two STATEs
+    // (modes/README.md, "Projected score"). No block sets it: the project carries it as it came.
+    const hold = info.scoring && info.scoring.hold;
+    if (hold && hold.every && hold.points) {
+        lines.push('scoring:', `  hold: { every: ${yamlValue(hold.every)}, points: ${yamlValue(hold.points)} }`);
+    }
     for (const [lang, suffix] of TRANSLATIONS) {
         const labels = params.filter(([, , tr]) => tr[lang]);
         const commandLabels = commands.filter(([, , , tr]) => tr[lang]);

@@ -16,7 +16,13 @@
   "name_de": "Domination",
   "description_de": "Das letzte Team, das die Box einnimmt, punktet, solange es sie hält.",
   "name_zh_tw": "佔點",
-  "description_zh_tw": "最後佔領盒子的隊伍，在佔有期間持續得分。"
+  "description_zh_tw": "最後佔領盒子的隊伍，在佔有期間持續得分。",
+  "scoring": {
+   "hold": {
+    "every": "tick_s",
+    "points": "points_per_tick"
+   }
+  }
  },
  "node": {
   "blocks": {
