@@ -1152,6 +1152,7 @@ roadmap:
         <a href="{{ page.to.build }}">Bauanleitungen</a> für Satellit, I/O-Pod und Ziel-Addon, als
         Text. Noch keine Box wurde danach gebaut.
       - "<strong>Benutzerhandbücher</strong> für Spielende, Spielleitung, Marshals und Field-Box-Betreibende, auf Englisch und Portugiesisch."
+      - "Bauanleitungen mit einer Pin-Tabelle für jede Platine, eine Firmware-Anleitung (eine veröffentlichte Version herunterladen oder selbst bauen) und eine Anleitung zum Einrichten des Controllers, auf Englisch und Portugiesisch."
       - "Die Web-Ansicht des Simulators hat jede Eingabe, die ein Modus nutzt: Tags, Tastenfeld, Treffer und GM-Befehle, mit Download des Ereignisprotokolls."
       - "Die Szenario-Blöcke der GM-Konsole haben eine Sprachliste mit allen vier Sprachen."
       - "Die Modus-Schlüssel des Projekts: ein offline gehaltener Root-Schlüssel und ein Schlüssel, mit dem die Registry das Verifiziert-Abzeichen signiert. Boxen, App und Controller vertrauen standardmäßig beiden."

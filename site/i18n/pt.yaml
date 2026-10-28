@@ -1123,6 +1123,7 @@ roadmap:
         <a href="{{ page.to.build }}">Guias de montagem</a> da caixa satélite, do módulo de E/S e do
         módulo de alvo, em texto. Ainda não se montou nenhuma caixa com eles.
       - "<strong>Manuais de utilizador</strong> para quem joga, a organização, os marshals e quem opera a Field Box, em inglês e português."
+      - "Manuais de montagem com a tabela de pinos de cada placa, um guia do firmware (transferir uma versão publicada ou compilá-la) e um guia de montagem do controlador, em inglês e português."
       - "A vista web do simulador tem todas as entradas que um modo usa: tags, teclado, impactos e comandos da organização, com descarga do registo de eventos."
       - "Os blocos de cenários da consola do GM têm uma lista de línguas com as quatro."
       - "As chaves de modos do projeto: uma chave raiz guardada offline e uma chave com que o registo assina o selo de verificado. As caixas, a app e os controladores confiam nas duas por omissão."

@@ -1086,6 +1086,7 @@ roadmap:
         <a href="{{ page.to.build }}">Build guides</a> for the Satellite, the I/O pod and the
         target addon, as text. No box has been built from them yet.
       - "<strong>User manuals</strong> for players, game masters, marshals and Field Box operators, in English and Portuguese."
+      - "Build manuals with a pin table for each board, a firmware guide (download a release or build it) and a controller setup guide, in English and Portuguese."
       - "The simulator's web view has every input a mode uses: tags, keypad, hits and GM commands, with an event-log download."
       - "The GM console's scenario blocks have a language list with all four languages."
       - "The project's mode keys: an offline root key and a key the registry uses to sign the verified badge. Boxes, the app and the controllers trust both by default."
