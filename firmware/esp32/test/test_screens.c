@@ -437,6 +437,7 @@ static const screen_case_t cases[] = {
      "\"r2\":0,\"c2\":2,\"g3\":\"1234\",\"r3\":0,\"c3\":1}",
      HACK_DE},
     {"yaml_bomb_defused_de", "defused", "{\"team\":\"blue\"}", BOMB},
+    {"yaml_bomb_defused_pt", "defused", "{\"team\":\"blue\"}", BOMB},
     {"yaml_hack_sequence_locked_de", "hack_sequence",
      "{\"phase\":\"idle\",\"step\":0,\"of\":4,\"locked\":20}", HACK_DE},
     {"yaml_hack_wires_locked_de", "hack_wires",

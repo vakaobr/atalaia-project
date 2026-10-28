@@ -19,6 +19,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 - **`users.data_retention_days`** (decision CONS-3; migration `0020_drop_user_retention`): an unused per-account override that was only exported and set to null on erasure. GDPR asks for a defined period per kind of data, which the daily purge applies; a field per account promised what the code did not do. The access answer and the export's `profile.json` no longer have it.
 
 ### Fixed
+- **Bomb's end screen clipped the Portuguese word** (`modes/bomb/assets/screens/defused.yaml`). DESARMADA at 48 px was wider than the 320 px screen and lost about 4 px each side; it is now drawn at 28 px, like German's and Sabotage's. New reference screen `yaml_bomb_defused_pt`.
 - **The controller's default check-in notice told players their data does not go to the internet** (`controller/templates/checkin-notice-{en,pt}.md`). With a site server, the controller sends the player's pseudonymous id, the game's events and chronograph readings there (never the name or membership number). The notice now says so, says chronograph readings are kept 365 days (not "the field's retention rules"), mentions membership numbers, shared positions and the remote game master, and points to the CNPD. Found by the privacy-notice draft; its pt-PT text was also corrected (marcador, número de filiação, organização, gender-neutral wording).
 
 ### Changed

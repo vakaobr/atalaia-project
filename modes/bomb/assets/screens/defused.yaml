@@ -10,12 +10,16 @@ layout:
     icon: ok
     style: { font_size: 48, color: contrast }
   - type: label
-    text: "{lang == 'pt' && 'DESARMADA' || lang == 'zh-tw' && '已拆除' || 'DEFUSED'}"
-    style: { font_size: 48, color: contrast, visible: "{lang != 'de'}" }
-  # German's word is wider than the screen at 48 px: 28, as the box's own screen fits it.
+    text: "{lang == 'zh-tw' && '已拆除' || 'DEFUSED'}"
+    style: { font_size: 48, color: contrast, visible: "{lang != 'de' && lang != 'pt'}" }
+  # German's and Portuguese's words are wider than the screen at 48 px: 28, as the box's own
+  # screen (and Sabotage's) fits them.
   - type: label
     text: ENTSCHÄRFT
     style: { font_size: 28, color: contrast, visible: "{lang == 'de'}" }
+  - type: label
+    text: DESARMADA
+    style: { font_size: 28, color: contrast, visible: "{lang == 'pt'}" }
   - type: label
     text: "{team|upper} team wins"
     style: { font_size: 28, color: contrast, visible: "{team && lang != 'pt' && lang != 'de' && lang != 'zh-tw'}" }
