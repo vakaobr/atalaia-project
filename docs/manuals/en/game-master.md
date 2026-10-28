@@ -38,7 +38,7 @@ For the people who run a field: setting up the *field controller*, preparing a g
 
 ### On a Raspberry Pi (or another Linux computer)
 
-Not yet tested on a field: no Raspberry Pi with a real modem and real boxes has run a game yet. The full commands are in the [controller guide](../../../controller/README.md#running-it). In short:
+Not yet tested on a field: no Raspberry Pi with a real modem and real boxes has run a game yet. For a step-by-step setup that does not assume you are a developer, use the [controller setup guide](controller-setup.md). The full commands are in the [controller guide](../../../controller/README.md#running-it). In short:
 
 1. Flash a spare Heltec V4.3 board with the modem firmware and plug it into the Pi's USB. This is the **USB radio modem**. Its small screen shows `LINK OK` when the controller is talking to it. See the [firmware guide](../../../firmware/esp32/README.md#usb-radio-modem-variant).
 2. Install the packages and build the core, as in the guide.

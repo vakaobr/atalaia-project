@@ -1,0 +1,292 @@
+<!--
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
+# Firmware guide for builders
+
+For the person who builds a box or a prop and has to put the software on it. You do not need to write code. You need a computer, a USB-C data cable and the board. The steps are the same for every kind of board in the project: the Field Box, the Satellite, the I/O pod and the controller's modem board.
+
+> **Not field-ready yet.** Atalaia is pre-alpha. Real Heltec V4.3 boards have been flashed and used on a bench with the field controller: boot, radio, buttons, the board's own OLED, adoption by USB cable and by code, and an update over the air. Nothing else in this guide has run on a real board. Steps that depend on hardware that was not tried say **Not yet tested on a real board**.
+
+The hardware is in the build manuals: [Field Box](../../../hardware/field-box/BUILD.md), [Satellite](../../../hardware/satellite/BUILD.md), [I/O pod](../../../hardware/io-pod/BUILD.md). The controller is in the [controller setup guide](controller-setup.md).
+
+## Contents
+
+1. [What you flash](#1-what-you-flash)
+2. [Get the firmware](#2-get-the-firmware)
+3. [Flash it](#3-flash-it)
+4. [The options a builder sets](#4-the-options-a-builder-sets)
+5. [First boot and setup](#5-first-boot-and-setup)
+6. [Adoption](#6-adoption)
+7. [Updates over the air, and what else uses the field Wi-Fi](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)
+8. [A box that does not boot](#8-a-box-that-does-not-boot)
+9. [The modem board](#9-the-modem-board)
+10. [The I/O pod variants](#10-the-io-pod-variants)
+
+## 1. What you flash
+
+There is one firmware project and four images you can build from it.
+
+| Image | Build command | Output folder | For | Use in a game |
+| --- | --- | --- | --- | --- |
+| Field Box | `python tools/docker_fw.py build` | `firmware/esp32/build/` | A Field Box, and also a Satellite (same image, fewer parts) | Yes |
+| USB radio modem | `python tools/docker_fw.py modem` | `firmware/esp32/build-modem/` | The second board, plugged into the controller | Yes |
+| I/O pod | `python tools/docker_fw.py pod` | `firmware/esp32/build-pod/` | A board that lends its buttons and radio to an Android phone | Yes |
+| Bench | `python tools/docker_fw.py bench` | `firmware/esp32/build-bench/` | A bare board on your desk: keys typed on the USB console, no setup page, admin PIN 1234 | **Never** |
+
+All of them are made for the **Heltec WiFi LoRa 32 V4** (revision V4.3 by default, V4.2 with one change, see [section 4](#4-the-options-a-builder-sets)). Do not flash a build for one kind of board onto another. A box will refuse an update made for another variant or board anyway.
+
+## 2. Get the firmware
+
+**Today there is no ready-made firmware file to download.** The project has not published binaries, and it has no release signing key yet. You build the image yourself. It takes about ten minutes the first time.
+
+You need:
+
+- [Docker](https://docs.docker.com/get-docker/) (Docker Desktop on Windows and macOS). Start it.
+- [Python 3](https://www.python.org/downloads/) and [git](https://git-scm.com/downloads).
+
+Then, in a terminal (`cmd`, PowerShell, Terminal, any shell):
+
+```
+git clone https://github.com/vakaobr/atalaia-project
+cd atalaia-project
+python tools/docker_fw.py build
+```
+
+On macOS and Linux, use `python3` if `python` is not found. The first build downloads the build tools and takes several minutes. It ends with a line that names the file `firmware/esp32/build/atalaia_esp32.bin`. The other files you need are in the same folder. You do not need to read them.
+
+The build prints a version such as `0.4.0-dev.12+g1a2b3c4`. That is the next release's number, the number of changes since the last release, and the code's identifier. It is also on the board's small screen at boot. Keep a note of it with the box.
+
+**What a release will change.** A release is a tagged version, built from a clean copy of the code, with its version shown plain (`0.4.0`), signed with the project's release key, and published as files you can download. Then you will not need to build anything for a standard box. Boxes built from today's code cannot install a project release over the air until they are built with the project's release key, because the key does not exist yet ([section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)). Check the project's Releases page on GitHub: if it lists firmware files, they come with a `.release.json` file, and the steps below work the same with them. If it lists none, build.
+
+## 3. Flash it
+
+Flashing writes the image to the board. You do it with **esptool**, a free tool from Espressif. The board's USB-C port is the chip's own USB port, so there is no USB-serial chip to install a driver for.
+
+**Windows and Docker.** Docker on Windows cannot see USB ports. Build in Docker, then flash from Windows itself. If you build inside WSL, copy the build folder to a Windows folder and flash from there.
+
+### 3.1 Install esptool once
+
+Use a separate Python environment and this version (4.8.1, the one the build uses).
+
+Windows (`cmd`):
+
+```
+python -m venv %USERPROFILE%\atalaia-flash
+%USERPROFILE%\atalaia-flash\Scripts\python -m pip install esptool==4.8.1
+```
+
+macOS and Linux:
+
+```
+python3 -m venv ~/atalaia-flash
+~/atalaia-flash/bin/python -m pip install esptool==4.8.1
+```
+
+Below, `PY` means that Python: `%USERPROFILE%\atalaia-flash\Scripts\python` on Windows, `~/atalaia-flash/bin/python` on macOS and Linux. In PowerShell write it as `& "$env:USERPROFILE\atalaia-flash\Scripts\python"`.
+
+### 3.2 Find the board's port
+
+Fit the antennas first. **Never power the board without the LoRa antenna.** Plug the board in with a USB-C **data** cable. A charge-only cable shows nothing.
+
+| System | Where the port appears | Notes |
+| --- | --- | --- |
+| Windows 10 and 11 | A new `COM` port (Device Manager, *Ports (COM & LPT)*; USB ID 303A:1001) | No driver is needed. On the first board tested, the port appeared only on the PC's own USB-C port, not through a hub |
+| Linux | `/dev/ttyACM0` (or `ttyACM1`...) | Add yourself to the `dialout` group once (`sudo usermod -aG dialout $USER`), then log in again |
+| macOS | `/dev/cu.usbmodem...` (list them with `ls /dev/cu.usbmodem*`) | Not tested by the project on macOS |
+
+To list ports with the tool: `PY -m serial.tools.list_ports -v`.
+
+If no port appears, hold the board's **PRG** button, press and release **RST**, then release PRG. That is download mode. The port may disappear and come back when the board restarts. That is normal.
+
+### 3.3 Write the image
+
+Go to the build folder and write all the files with one command. The examples use `COM5`. Use your own port, for example `/dev/ttyACM0`.
+
+First flash of a new board only, erase it. This also erases the settings and any adoption:
+
+```
+PY -m esptool --chip esp32s3 -p COM5 erase_flash
+```
+
+Then write:
+
+```
+cd firmware/esp32/build
+PY -m esptool --chip esp32s3 -p COM5 -b 921600 write_flash "@flash_args"
+```
+
+Keep the quotes: PowerShell reads a bare `@` differently. `flash_args` is a file the build made. It lists the files and where they go. If the connection fails, use download mode, or try `-b 460800` or `-b 115200`.
+
+For the modem and the pod, go to `build-modem` or `build-pod` instead.
+
+### 3.4 Restart and watch
+
+Restart the board with this command. It is the reliable way. A serial program's own reset is not:
+
+```
+PY -m esptool --chip esp32s3 -p COM5 --after hard_reset chip_id
+```
+
+Open the log and press `Ctrl+]` to leave:
+
+```
+PY -m serial.tools.miniterm COM5 115200
+```
+
+You should see the firmware's version, the memory, and one line for each part found. A part that is not fitted gives a warning and the box goes on. The log may warn about GPIO 33 to 37: the project's bench notes call that cosmetic.
+
+**Without Python, in Chrome or Edge.** Make one image file, then flash it at address `0x0` with Espressif's web page. In a bash shell:
+
+```
+docker run --rm -v "$PWD/firmware/esp32/build:/b" -w /b espressif/idf:v5.3.2 bash -c '. $IDF_PATH/export.sh > /dev/null && esptool.py --chip esp32s3 merge_bin -o atalaia-merged.bin @flash_args'
+```
+
+On Windows `cmd`, use the command in the [Field Box manual](../../../hardware/field-box/BUILD.md#11-first-flash). The merge step works; the web page was not tried.
+
+## 4. The options a builder sets
+
+Most options are build options. Give them to `docker_fw.py`:
+
+| What | How | Default |
+| --- | --- | --- |
+| Radio region | `--region=eu868` or `--region=as923-tw` (Taiwan, 920-925 MHz) | EU868 |
+| Listen before talk | `--lbt=on` or `--lbt=off` | on |
+| Mode keys | `--mode-keys=<key>[,<key>...]` (up to 4, hex or base64) | The project's two keys |
+| Release keys | `--release-keys=<key>[,<key>...]` (up to 4) | None: every update is refused |
+| Version | `--fw-version=0.4.1` | From the code |
+
+Example for a Taiwanese field: `python tools/docker_fw.py build --region=as923-tw`. Build the modem and the pod with the same `--region`. A box refuses a game from another region. Use an antenna for the band: an 868 MHz antenna is wrong at 920 MHz.
+
+**Mode keys.** A box fetches a game mode it lacks from the controller, as a signed package. It accepts only packages signed by a key built into its firmware. The default is the project's two registry keys (root `d9521a79030ce544`, CI `7275108d2e3fe583`), listed in [docs/community/keys.md](../../community/keys.md). Do not change this unless you run your own mode registry. `--mode-keys` replaces the list, so add the project's keys again if you still want them.
+
+**Settings you edit in a file.** A few settings have no command-line option. After one build, open `firmware/esp32/build/sdkconfig` (for the modem `build-modem/sdkconfig`, for the pod `build-pod/sdkconfig`), change the line, save, and build again.
+
+| What | Line |
+| --- | --- |
+| Board revision V4.2 (chip GC1109 next to the LoRa connector) | `CONFIG_ATALAIA_BOARD_HELTEC_V4_2=y` and `# CONFIG_ATALAIA_BOARD_HELTEC_V4_3 is not set` |
+| Antenna of more than 2 dBi | `CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI=` its gain, rounded up |
+| Display chip ST7789 | `CONFIG_ATALAIA_DISP_ST7789=y` and `# CONFIG_ATALAIA_DISP_ILI9341 is not set` |
+| 12 or 16 LEDs in the ring | `CONFIG_ATALAIA_LED_COUNT=12` (or 16) |
+| Board's small screen upside down | `CONFIG_ATALAIA_OLED_FLIP=y` |
+
+Never lower `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` or the antenna gain below the real values. That would break the legal power limit.
+
+If you change `--region`, `--lbt`, a key option, or update the repository, the build may make the settings file again from the defaults and your edits are lost. Do the edit again. Keep a note of your edits.
+
+**Settings you do not set at build time.**
+
+- **The admin PIN** has no default. You choose it on the setup page ([section 5](#5-first-boot-and-setup)). Easy PINs such as 1234 are refused.
+- **The field Wi-Fi** name and password are set on the setup page too.
+- **The field join key** is given to the box when it is adopted ([section 6](#6-adoption)).
+
+## 5. First boot and setup
+
+A new Field Box or Satellite does this on its first start. The 2.4 GHz antenna must be fitted for the setup page.
+
+1. The board's small screen shows the tower and the version for 2 seconds. The big screen (if fitted) and the small one then show **FIRST-TIME SETUP** and a Wi-Fi name such as `atalaia-1A2B`.
+2. On your phone, join that Wi-Fi. **It has no password**, so do the setup away from the players.
+3. The setup page opens by itself on most phones. If it does not, open `http://192.168.4.1` in the browser. The page is in the language of the box, else of the phone: English, Portuguese, German or Traditional Chinese.
+4. Fill in the page:
+   - **Node Name**: a name for the box.
+   - **Radio Region**: it must be the region the firmware was built for.
+   - **Number of Teams**: 2, 3 or 4.
+   - **Admin PIN**: 4 to 8 digits. Write it down. 1234, 0000, a sequence such as 9876 and a repeated pair such as 1212 are refused.
+   - **Display Brightness** and **Audio Volume**.
+   - **Field join key** (optional): the 64 digits from the organisers. You can add it later by adoption.
+   - **Field Wi-Fi name** and **password** (optional, but needed for updates, the field's logo and fetched game modes: [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)). The field Wi-Fi must be 2.4 GHz.
+5. Tap **Save & Reboot**. The box restarts.
+
+Then a box with no field shows **PAIR THIS BOX** and a 6-digit code ([section 6](#6-adoption)). A box that is already adopted shows **READY**, with the field's logo if it has one.
+
+**Open the setup page again.** On a box that was set up, there are two ways. Neither works during a game.
+
+- On the keypad: press a key, type the admin PIN and `#`, go to the list's last entry **Wi-Fi setup**, press `#`, then `#` again to confirm.
+- On the USB console (a serial monitor on the box's port, 115200): type `@setup` and the admin PIN, then Enter.
+
+The box keeps its adoption and its field key. It replaces what the page asks for. The bench build has no setup page.
+
+**Forgotten PIN.** After five wrong PINs the box makes you wait 1, 2, 4... up to 60 minutes. The wait survives a restart. If you really lost the PIN, erase the settings ([section 8](#8-a-box-that-does-not-boot)).
+
+Not yet tested on a real board: the setup page and the screens above. The page was tested on a computer and in the emulator.
+
+## 6. Adoption
+
+A box plays only in the field that **adopted** it. Adopting gives it the field's join key, once. The organisers do it from the controller's console, in the **Adopt** tab. There are three ways. Details for the organisers are in the [Game master manual](game-master.md) and the [Field Box operator manual](field-box.md).
+
+- **By code, over the radio** (no cable, no card). A box with no field shows **PAIR THIS BOX** and a 6-digit code, on its screen and on its small screen. In the console, **Pair by code (radio)**, look for boxes on the radio, pick the box by name and type the code. The box then shows **ADOPTED** and the field's name. A wrong code gives a new code. Three wrong codes make the box wait a minute. Ten stop pairing until it restarts. Done on two real boards on a bench. Not yet tested on a field.
+- **By USB cable.** Plug the box into the computer that runs the controller. In the console, look for boxes and press **Adopt**. The box's USB port must be reachable by the controller. Done on a real board on a bench.
+- **By NFC field card.** Tap the field card on the box's NFC reader. The card is the field's master secret: lock it away. Not yet tested on a real board (no NFC reader has been fitted on a real board).
+
+A box of another field asks for its **admin PIN**. **Change field** moves a box on purpose: on the keypad press a key, type the PIN and `#`, pick **Change field** (the entry after the games and **Wi-Fi setup**), confirm. The box shows a pairing code and keeps its old field until the new field has paired it. A Satellite has no keypad: use the USB cable.
+
+## 7. Updates over the air, and what else uses the field Wi-Fi
+
+Three things use the field's Wi-Fi, and only between games: **firmware updates**, **game modes the box does not have** (fetched from the controller as signed packages) and **the field's logo** (one PNG, fetched once for each joined game). For all three the box needs the **field Wi-Fi name and password** from the setup page. You can also set them on the USB console: `@wifi <name> <password>`. The controller must be running with HTTPS on.
+
+**The rules for firmware updates.** The box installs an update only if all of these are true:
+
+- No game is being played.
+- The update is signed by a **release key built into the box's own firmware** (`--release-keys`). Boxes built from today's code have **no** key, so they refuse every update. You make your own key, build the boxes with its public half, and sign your releases with its private half. The steps are in [RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md).
+- The version is higher than the one it runs.
+- It is the same variant and board (a V4.2 image never goes on a V4.3).
+- The battery is at 30 % or more, if the box has a gauge.
+
+**The short path.**
+
+1. Make a key with `tools/firmware_release.py keygen`. Keep the private file safe and out of the repository.
+2. Build the boxes with `--release-keys=<the public key>`. Flash them over USB, once. Updates cannot install a new bootloader.
+3. Put the key's public half in the controller's `[firmware] release_keys` setting.
+4. For an update, build a higher version (`--fw-version=0.4.1`), sign it with `tools/firmware_release.py sign`, and upload the image and its `.release.json` in the console's **Boxes** tab. Press **Update to**.
+5. The box downloads it, checks it again, installs it and restarts. If the new image fails its self-test, the box goes back to the old one by itself.
+
+Done once on a real board on a bench, with a throw-away key, sent by the controller over the radio, on a home Wi-Fi network (about 11 seconds). Not yet tested on a field. A box flashed with firmware from before updates over the air existed needs one USB flash first.
+
+## 8. A box that does not boot
+
+Go down the list. Stop when the box works.
+
+1. **The cable and the port.** Use a data cable, a PC's own USB-C port, no hub. Close any other program that holds the port (a serial monitor, esptool).
+2. **Power.** A weak port or a low battery gives restarts and `brownout` in the log. Try another port, with the switch off.
+3. **Download mode by hand.** Hold **PRG**, press and release **RST**, release PRG. Flash again ([section 3](#3-flash-it)).
+4. **Wrong build.** Check you flashed `build`, not `build-bench`, `build-modem` or `build-pod`.
+5. **Update that went wrong.** A new image that cannot confirm itself is replaced by the old one at the next restart. You need do nothing. If it keeps looping, flash over USB.
+6. **Erase the settings** (name, PIN, adoption, Wi-Fi) and keep the program:
+
+   ```
+   PY -m esptool --chip esp32s3 -p COM5 erase_region 0x9000 0x6000
+   ```
+
+7. **Erase everything and flash again.** `erase_flash`, then write ([section 3.3](#33-write-the-image)). The box is then new: set it up and adopt it again.
+
+If the radio does not work, check the board revision first ([section 4](#4-the-options-a-builder-sets)), then the antenna. The [Field Box manual](../../../hardware/field-box/BUILD.md#13-troubleshooting) has a table of faults for each part.
+
+## 9. The modem board
+
+The controller's radio is a second Heltec V4 plugged into its USB port. It runs the modem image.
+
+1. Fit the **LoRa antenna**. The modem has no Wi-Fi, so it needs no 2.4 GHz antenna.
+2. Build it for the same board revision and the same region as the boxes: `python tools/docker_fw.py modem` (with `--region=as923-tw` for Taiwan). For a V4.2, edit `firmware/esp32/build-modem/sdkconfig` as in [section 4](#4-the-options-a-builder-sets).
+3. Flash from `firmware/esp32/build-modem` as in [section 3](#3-flash-it). If the board is already plugged into a running controller, stop the controller first: it holds the port.
+4. Plug it into the controller. Its small screen shows the tower and **MODEM MODE**, then the status:
+   - **LINK**: `waiting` (the controller has not talked to it yet: it is not running, or the modem is on another port), `OK`, or `DOWN` (it talked, then stopped for 12 seconds).
+   - The game number, the channel, the packets sent and received with their failures, and the airtime left.
+   - **RADIO FAULT** if the radio chip did not start.
+5. Put its port into the controller's `[modem] port` setting. On Linux it is usually `/dev/ttyACM0`. The [controller setup guide](controller-setup.md) shows how.
+
+The modem is the only image whose USB port carries data frames, so its log is on UART0, not on USB. A modem like this has run with the controller and real boxes on a bench (2026-10-21). Not yet tested on a Raspberry Pi.
+
+## 10. The I/O pod variants
+
+An I/O pod lends its buttons, keypad, ring, sound, NFC reader and radio to an Android phone. Its parts are in the [I/O pod build guide](../../../hardware/io-pod/BUILD.md).
+
+- Build: `python tools/docker_fw.py pod` (`--region` as above). Flash from `firmware/esp32/build-pod`. Edit `build-pod/sdkconfig` for a V4.2.
+- A pod has no setup page, no Wi-Fi and no admin PIN. It has the 2.4 GHz antenna for **Bluetooth** (`atalaia-pod-XXXX`), which is paired and encrypted.
+- Its USB port carries the frames to the phone, so the log is on **GPIO 43** (UART0 transmit), read with a 3.3 V USB-serial adapter at 115200 baud. It is not on the USB port.
+- Build options for the pod, in `build-pod/sdkconfig`: a colour for each button (`CONFIG_ATALAIA_POD_BTN1_TEAM="red"` and so on), the enclosure switch pin (`CONFIG_ATALAIA_POD_TAMPER_PIN`), Bluetooth on or off. Leave `CONFIG_ATALAIA_POD_BLE_ENCRYPTED` on.
+- It does not use the board's small screen.
+
+Not yet tested on a real board: all of it. The pod firmware has run on a computer, against the app and the controller. The Satellite is not a variant: it is the Field Box image with fewer parts fitted ([Satellite build guide](../../../hardware/satellite/BUILD.md)). The target addon cannot be built yet ([its page](../../../hardware/target-addon/BUILD.md)).
+
+Found a step that does not match what you see? Open an issue or tell us in [Discussions](https://github.com/vakaobr/atalaia-project/discussions).

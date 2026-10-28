@@ -60,6 +60,22 @@ the keypad expander's "powered from 3V3, never 5V" in the
 | 4 | black | SCL | The SCL rail (board GPIO 18) |
 | 5 | grey | not connected | Free at both ends, and never 5 V. A later box with a GPIO to spare could make it an interrupt line |
 
+**Pin reference for the port.** The port uses no GPIO of its own. It is the
+box's I2C bus and rails, so it follows the
+[Field Box pin reference](../field-box/BUILD.md#15-pin-reference):
+
+| Port signal | Board pin | Firmware option | Level |
+| --- | --- | --- | --- |
+| 3.3 V | the board's 3V3 pin, through the hub and a resettable fuse | -- | 3.3 V |
+| SDA | GPIO 17 | `ATALAIA_NFC_SDA_PIN` | 3.3 V, 100 kHz |
+| SCL | GPIO 18 | `ATALAIA_NFC_SCL_PIN` | 3.3 V |
+| GND | the hub's GND rail | -- | 0 V |
+
+Checked against the firmware on 2026-10-28: the polling driver
+(`firmware/esp32/main/target_addon.c`) is still not called by the box and has
+no I2C address, so a Field Box cannot talk to an addon yet. **Not yet tested
+on a real board**: the port, the fuse and the cable.
+
 SDA and SCL are on pins 2 and 4, across the connector from each other rather
 than side by side (decision P5J-20). The port waits for the first addon: a
 Field Box built today does not need it.

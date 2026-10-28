@@ -59,6 +59,11 @@ SITE_BUILD = REPO / "site" / "src" / "build.html"
 # pins for the parts it has, in a table whose rows name their Kconfig symbol in backticks
 # ("| Button 1 | 4 | `ATALAIA_BTN1_PIN` | ..."); these symbols must each have a row.
 GUIDES: dict[Path, tuple[str, ...]] = {
+    REPO / "hardware" / "field-box" / "BUILD.md": (
+        "ATALAIA_BTN1_PIN", "ATALAIA_BTN2_PIN", "ATALAIA_BTN3_PIN", "ATALAIA_KP_P7_BUTTON",
+        "ATALAIA_NFC_SDA_PIN", "ATALAIA_NFC_SCL_PIN", "ATALAIA_LED_PIN", "ATALAIA_DISP_CS_PIN",
+        "ATALAIA_DISP_DC_PIN", "ATALAIA_DISP_MOSI_PIN", "ATALAIA_DISP_CLK_PIN",
+        "ATALAIA_AUDIO_BCLK_PIN", "ATALAIA_AUDIO_LRCLK_PIN", "ATALAIA_AUDIO_DOUT_PIN"),
     REPO / "hardware" / "satellite" / "BUILD.md": (
         "ATALAIA_BTN1_PIN", "ATALAIA_BTN2_PIN", "ATALAIA_BTN3_PIN", "ATALAIA_LED_PIN",
         "ATALAIA_BATT_SDA_PIN", "ATALAIA_BATT_SCL_PIN", "ATALAIA_AUDIO_BCLK_PIN",

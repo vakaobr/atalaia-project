@@ -15,8 +15,8 @@ pins and wires and use a multimeter, like the
 refers to for every step the two builds share.
 
 > **Status: not yet built.** No pod has been built from this guide, and the
-> pod firmware has not run on a board yet: it is built and tested on a
-> computer, against the app and the field controller (phase 3 plan phase F).
+> pod firmware has **not yet been tested on a real board**: it is built and
+> tested on a computer, against the app and the field controller (phase 3 plan phase F).
 > The pod uses the Field Box's pins, checked automatically against the
 > firmware's defaults (`python3 tools/check_wiring.py`). Every physical step,
 > the links to a real phone, pairing and the radio on air are **untested**
@@ -165,21 +165,26 @@ are the defaults in
 the reference if the two ever disagree; `python3 tools/check_wiring.py` fails
 if this table does.
 
-| Function | GPIO | Kconfig symbol | Notes |
-| --- | --- | --- | --- |
-| Button 1 | 4 | `ATALAIA_BTN1_PIN` | Active low, internal pull-up |
-| Button 2 | 48 | `ATALAIA_BTN2_PIN` | |
-| Button 3 | 44 | `ATALAIA_BTN3_PIN` | UART0's receive line: the log adapter's TX must stay off it |
-| Button 4 | PCF8574 P7 | `ATALAIA_KP_P7_BUTTON` | On the keypad expander's spare pin; works only when the expander is fitted |
-| Keypad | I2C | -- | PCF8574 at 0x20: rows on P0-P3, columns on P4-P6 |
-| LED ring data | 35 | `ATALAIA_LED_PIN` | Through the 74AHCT125 |
-| I2C SDA | 17 | `ATALAIA_NFC_SDA_PIN` | The board's bus: OLED, PCF8574, PN532, MAX17048 |
-| I2C SCL | 18 | `ATALAIA_NFC_SCL_PIN` | |
-| I2S BCLK | 6 | `ATALAIA_AUDIO_BCLK_PIN` | MAX98357A |
-| I2S LRCLK | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | |
-| I2S DOUT | 16 | `ATALAIA_AUDIO_DOUT_PIN` | |
-| Enclosure switch | 47 | `ATALAIA_POD_TAMPER_PIN` | To GND; closed while the lid is shut; internal pull-up |
-| Log (UART0 TX) | 43 | -- | Board-internal: only a 3.3 V USB-UART adapter's RX, with its GND, while you read the log |
+| Function | GPIO | Kconfig symbol | Wire colour | Goes to | Level | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Button 1 | 4 | `ATALAIA_BTN1_PIN` | green | microswitch NO; COM to GND | 3.3 V | Active low, internal pull-up |
+| Button 2 | 48 | `ATALAIA_BTN2_PIN` | green | microswitch NO; COM to GND | 3.3 V | |
+| Button 3 | 44 | `ATALAIA_BTN3_PIN` | green | microswitch NO; COM to GND | 3.3 V | UART0's receive line: the log adapter's TX must stay off it |
+| Button 4 | PCF8574 P7 | `ATALAIA_KP_P7_BUTTON` | green | microswitch NO; COM to GND | 3.3 V | On the keypad expander's spare pin; works only when the expander is fitted |
+| Keypad | I2C | -- | brown, red, orange, yellow (rows R1-R4), green, blue, violet (columns C1-C3) | PCF8574 P0-P3 and P4-P6 | 3.3 V | PCF8574 at 0x20 (a PCF8574A at 0x38 is found too) |
+| LED ring data | 35 | `ATALAIA_LED_PIN` | white | hub "LED data in", then the 74AHCT125 and 330 ohm to ring DIN | 3.3 V in, 5 V out | |
+| I2C SDA | 17 | `ATALAIA_NFC_SDA_PIN` | blue | hub SDA rail: PCF8574, PN532 (0x24), MAX17048 (0x36) | 3.3 V | The board's bus (its OLED is not used by a pod) |
+| I2C SCL | 18 | `ATALAIA_NFC_SCL_PIN` | yellow | hub SCL rail | 3.3 V | |
+| I2S BCLK | 6 | `ATALAIA_AUDIO_BCLK_PIN` | grey | amplifier BCLK | 3.3 V | MAX98357A |
+| I2S LRCLK | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | pink | amplifier LRC | 3.3 V | |
+| I2S DOUT | 16 | `ATALAIA_AUDIO_DOUT_PIN` | brown | amplifier DIN | 3.3 V | |
+| Enclosure switch | 47 | `ATALAIA_POD_TAMPER_PIN` | any (not in the Field Box diagram) | microswitch COM to GND, NO to the pin | 3.3 V, internal pull-up | Closed while the lid is shut |
+| Log (UART0 TX) | 43 | -- | any | A 3.3 V USB-UART adapter's RX, with its GND | 3.3 V | Board-internal: only while you read the log |
+
+Rails, not GPIOs: 3V3 (violet) to the I2C parts and the keypad expander; GND
+(black); the 5 V rail (orange) to the ring, the amplifier and the button
+LEDs. The full list of pins you must never wire is in the
+[Field Box pin reference](../field-box/BUILD.md#15-pin-reference).
 
 The display's other pins on a Field Box (GPIO 1, 3, 33) are not used by the pod:
 leave them unconnected. GPIO 0, 45 and 46 are boot straps; the board-internal
@@ -275,7 +280,8 @@ The pod firmware is built in Docker and flashed from your computer, like the
 Field Box's ([manual, section 11](../field-box/BUILD.md#11-first-flash)), with
 two differences: the build command and the build folder.
 
-1. **Build:**
+1. **Build** (add `--region=as923-tw` for Taiwan: the pod, the modem, the
+   boxes and the controller must share one region):
 
    ```
    python tools\docker_fw.py pod
@@ -294,9 +300,12 @@ two differences: the build command and the build folder.
 
    ```
    cd firmware\esp32\build-pod
-   %FLASH% -m esptool --chip esp32s3 -p COM5 -b 460800 --before default_reset --after hard_reset write_flash "@flash_args"
+   %FLASH% -m esptool --chip esp32s3 -p COM5 -b 921600 write_flash "@flash_args"
    cd ..\..\..
    ```
+   Restart it with `%FLASH% -m esptool --chip esp32s3 -p COM5 --after hard_reset chip_id`.
+   The [firmware guide](../../docs/manuals/en/firmware.md#10-the-io-pod-variants)
+   has the steps for macOS and Linux and what else is different for a pod.
 3. **Read the log** on GPIO 43 with the 3.3 V USB-UART adapter (its RX to GPIO
    43, its GND to GND, its TX unconnected), at 115200 baud. Expect
    `Atalaia I/O pod`, `Vext on`, a line for each part that is missing, the

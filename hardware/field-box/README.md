@@ -8,7 +8,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 The main Atalaia prop.  Status: firmware done, hardware pending: no box has
 been built from this design yet.
 
-**To build one, follow the [build manual](BUILD.md).** It has the tools,
+**To build one, follow the [build manual](BUILD.md)** (it has a [pin reference](BUILD.md#15-pin-reference)), then the [firmware guide](../../docs/manuals/en/firmware.md) to flash and set it up. It has the tools,
 sourcing notes, enclosure preparation, step-by-step wiring, battery safety,
 the first flash and troubleshooting. The wiring diagrams are generated from
 text sources in [`wiring/`](wiring/) and checked against the firmware's pin

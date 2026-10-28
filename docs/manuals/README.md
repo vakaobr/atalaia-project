@@ -19,6 +19,16 @@ These are the manuals for the people who **use** Atalaia on a field: players, or
 | **Marshals**: chrono check-in, spot checks, replicas to chrono | [Marshal manual](en/marshal.md) | [Manual de marshal](pt/marshal.md) |
 | **Field Box operators**: switching on, joining a game, screens, battery, radio basics, troubleshooting | [Field Box operator manual](en/field-box.md) | [Manual de operação da Field Box](pt/field-box.md) |
 
+For people who **build** things (not for players or organisers on game day):
+
+| For | English |
+| --- | --- |
+| **Builders**: get, flash and set up the firmware of a box, a pod or the modem board | [Firmware guide](en/firmware.md) |
+| **Organisers**: set up the field controller on a Raspberry Pi, with its modem board | [Controller setup guide](en/controller-setup.md) |
+| **Builders**: the hardware, with a pin reference for each board | [Field Box](../../hardware/field-box/BUILD.md), [Satellite](../../hardware/satellite/BUILD.md), [I/O pod](../../hardware/io-pod/BUILD.md), [Target addon](../../hardware/target-addon/BUILD.md) |
+
+These three are in English only for now. Portuguese follows.
+
 Each manual has a **Troubleshooting** section at the end.
 
 ## Languages
@@ -35,7 +45,7 @@ The manuals are in **English** and **European Portuguese (pt-PT)**. The Portugue
 
 ## Related guides
 
-- The [Field Box build manual](../../hardware/field-box/BUILD.md) and the [build guide](https://atalaia-project.link/en/build-guides/) on the project page: for building a box.
+- The [firmware guide](en/firmware.md) and the [Field Box build manual](../../hardware/field-box/BUILD.md) and the [build guide](https://atalaia-project.link/en/build-guides/) on the project page: for building a box.
 - The [app guide](../../app/README.md) and the [iPhone guide](../../app/docs/ios-on-a-mac.md): for building and installing the app.
 - The [controller guide](../../controller/README.md) and the [site server guide](../../server/README.md): for installing the controller and the server.
 - The [community mode registry](https://vakaobr.github.io/atalaia-modes/): shared game modes.

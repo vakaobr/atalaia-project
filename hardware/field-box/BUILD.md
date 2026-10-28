@@ -10,16 +10,25 @@ bring-up checklist ([`BRING_UP.md`](../../firmware/esp32/docs/BRING_UP.md)).
 Written for a club member who can solder header pins and wires and use a
 multimeter. You do not need to write code.
 
-> **Status: not yet built.** This manual describes the standard build, but
-> no Field Box has been built from it yet. The pin assignments are checked
+> **Status: no complete box has been built yet.** Real Heltec V4.3 boards
+> have been used on a bench with the field controller: boot, radio send and
+> receive, the board's own OLED, two team buttons (GPIO 4 and 48), adoption
+> by USB cable and by code over the radio, and an update over the air. All of
+> that was on bare boards. **Not yet tested on a real board:** the 2.8-inch
+> screen, the keypad, the LED ring, the NFC reader, the amplifier, the
+> battery gauge, button 3 and button 4, the power path (fuse, switch, boost
+> converter, charging), the Wi-Fi setup page, the field's logo on the screen
+> and the range through an enclosure. The pin assignments are checked
 > automatically against the firmware (see
-> [Regenerating the diagrams](#14-regenerating-the-diagrams)) and the
-> firmware runs in the Wokwi emulator, but every physical step below
-> (enclosure, power path, currents, charging, radio range) is **untested**.
-> Steps marked **Verify at the first build** are open questions; please
-> report what you find in an issue so the manual can be corrected.
-> Photos will be added after the first prototype build; this manual never
-> uses mock-up or generated photos.
+> [Regenerating the diagrams](#14-regenerating-the-diagrams)). Steps marked
+> **Verify at the first build** are open questions; please report what you
+> find in an issue so the manual can be corrected. Photos will be added after
+> the first prototype build; this manual never uses mock-up or generated
+> photos.
+>
+> Related guides: the [pin reference](#15-pin-reference) (every signal, with
+> wire colour and voltage) and the [firmware guide](../../docs/manuals/en/firmware.md)
+> (getting, flashing and setting up the firmware, in plain steps).
 
 > **New pin map (2026-10-21): rewire if you followed the old one.** The
 > board's GNSS connector now keeps all its pins (GPIO 34, 38-42) so the GNSS
@@ -50,6 +59,7 @@ multimeter. You do not need to write code.
 12. [Hand-off to bring-up](#12-hand-off-to-bring-up)
 13. [Troubleshooting](#13-troubleshooting)
 14. [Regenerating the diagrams](#14-regenerating-the-diagrams)
+15. [Pin reference](#15-pin-reference)
 
 ## 1. What you are building
 
@@ -94,7 +104,8 @@ drawing; go by the pin names printed on each module.
 
 The GPIO numbers are filled in from the firmware's defaults in
 [`firmware/esp32/main/Kconfig.projbuild`](../../firmware/esp32/main/Kconfig.projbuild)
-and are summarised in the [pin table](README.md#peripheral-pins). If you
+and are summarised in the [pin reference](#15-pin-reference) and the
+[pin table](README.md#peripheral-pins). If you
 wire a pin differently, the firmware must be configured to match
 ([section 12](#12-hand-off-to-bring-up)).
 
@@ -136,7 +147,7 @@ prices ([hardware overview](../README.md)).
 | 5 | 60 mm arcade button with LED | 2 (up to 4) | Microswitch with COM, NO and NC terminals; LED rated **5 V** | 12 V LED versions will be dim on 5 V; the LED is optional. Not waterproof: see [section 5](#5-enclosure-preparation). Industrial IP65 mushroom buttons are a sturdier alternative |
 | 6 | 3x4 membrane keypad, 7-pin | 1 | 12 keys (1-9, *, 0, #), 7-pin ribbon, self-adhesive back | Pin order varies by maker: you will identify it with a meter |
 | 7 | PCF8574 I/O expander module | 1 | Chip marked **PCF8574** or **PCF8574A**, address jumpers A0-A2 | Listings sell both under one name: the firmware finds either (0x20-0x27, or 0x38-0x3F for the A). Power it from **3V3** even if the listing says 5V: its pull-ups go to its supply. Do **not** use an "LCD I2C backpack": its pins are wired to an LCD connector and a transistor |
-| 8 | 2.8" SPI TFT, 320x240, ILI9341 (or ST7789) | 1 | SPI interface (pins CS, RESET, DC, SDI/MOSI, SCK, LED); 3.3 V logic | Touch pins can stay unconnected. Note which controller it has: ST7789 needs a firmware setting |
+| 8 | 2.8" SPI TFT, 320x240, ILI9341 (or ST7789) | 1 | SPI interface (pins CS, RESET, DC, SDI/MOSI, SCK, LED); 3.3 V logic | Touch pins can stay unconnected. Note which controller it has: ST7789 needs a firmware setting ([section 12](#12-hand-off-to-bring-up)) |
 | 9 | WS2812B LED ring, 24 LEDs | 1 | 5 V, pads DIN / DOUT / 5V / GND | 12- or 16-LED rings work with a firmware setting (`LED_COUNT`) |
 | 10 | 74AHCT125 (or 74HCT125), DIP-14, plus a 14-pin socket | 1 | The letters **AHCT** or **HCT** | **Not** 74HC125 or 74AHC125: those need more than 3.3 V at the input when powered from 5 V |
 | 11 | PN532 NFC module (I2C capable) | 1 | Mode switches or jumpers for HSU / I2C / SPI | NTAG215 or NTAG216 cards for join cards |
@@ -421,7 +432,7 @@ care:
 | GNSS module (only while a mode uses it; off otherwise) | 3V3, via the board's GNSS switch | **Verify at the first build** | |
 | PN532 NFC (field on) | 3V3 | 50-150 mA | |
 | PCF8574, MAX17048 | 3V3 | under 1 mA | |
-| LED ring, 24 LEDs | 5 V | ~25 mA (all off) to ~0.5 A (one full team colour) | ~1.4 A (all white, full brightness) |
+| LED ring, 24 LEDs | 5 V | ~25 mA (all off) to ~0.5 A (one full team colour) | ~1.4 A (all white at 100 % brightness). The firmware starts at 40 % (`CONFIG_ATALAIA_LED_BRIGHTNESS_PCT`), so less; not measured |
 | Amplifier and speaker | 5 V | a few mA | 0.6-0.8 A (loud) |
 | Button LEDs (4) | 5 V | 40-80 mA | |
 
@@ -429,8 +440,9 @@ Current drawn from the cells for the 5 V loads is roughly 1.6 times the 5 V
 current (voltage ratio plus converter losses). With two ~3000 mAh cells and
 a typical game load the box should last well beyond the 2-hour gate of
 phase 1, but **this has not been measured**: BRING_UP.md step 12 runs a
-2-hour game and is where the real figure will come from. The firmware does
-not dim the LED ring yet, so budget for full-colour LEDs.
+2-hour game and is where the real figure will come from. The firmware
+starts the LED ring at 40 % brightness; a mode can change it, so budget for
+full brightness to be safe.
 
 **Verify at the first build:** the board's charge current and how long a
 full charge takes; that the board's 3.3 V regulator copes with the display
@@ -519,7 +531,7 @@ pulls on a solder joint.
 3. **Leave every other board pin unconnected.** In particular never wire
    GPIO 0, 45 or 46 (boot straps; 46 also drives the V4.2's front-end
    module), GPIO 5 (the V4.3's front-end module), the board-internal
-   GPIO 2, 7, 8-14, 19-21, 26, 36, 37, 43, or the GNSS connector's GPIO 34
+   GPIO 2, 7, 8-14, 19-21, 26-32, 36, 37, 43, or the GNSS connector's GPIO 34
    and 38-42. Three board pins are used on purpose, each only as the
    diagram shows: GPIO 1 (display CS), GPIO 35 (LED ring data; the board's
    white LED flickers with it) and GPIO 44 (button 3).
@@ -537,9 +549,12 @@ The keypad expander (PCF8574), NFC reader (PN532) and battery gauge
 (GPIO 17/18). Each module gets four wires from its own group of hub pins:
 3V3, GND, SDA, SCL.
 
-1. **PCF8574:** set the address jumpers A0, A1 and A2 all to GND, which
-   gives address 0x20. Leave its INT pin unconnected; its P7 is team
-   button 4 ([section 9.6](#96-team-buttons)).
+1. **PCF8574 or PCF8574A:** set the address jumpers A0, A1 and A2 all to
+   GND. That gives address 0x20 for a PCF8574 and 0x38 for a PCF8574A. The
+   firmware finds either, and also other jumper settings (0x20-0x27 and
+   0x38-0x3F), but never an address used by another part (0x24, 0x36, 0x3C).
+   Leave its INT pin unconnected; its P7 is team button 4
+   ([section 9.6](#96-team-buttons)).
 2. **PN532:** set the mode switches (or jumpers) to **I2C**, following the
    table printed on the module. Use its 4-pin I2C header.
 3. **MAX17048:** connect its logic supply pin (if it has a separate one,
@@ -671,50 +686,44 @@ heat, smell or smoke: switch off and take the fuse out.
 
 ## 11. First flash
 
+This section gives the short Windows steps. The
+[firmware guide](../../docs/manuals/en/firmware.md) has the same steps for
+Windows, macOS and Linux, and everything after the flash (setup, adoption,
+updates, recovery).
+
 The firmware is built in Docker; flashing runs on your computer, because
-Docker Desktop on Windows cannot reach USB serial ports. The commands below
-are for **Windows `cmd`**, run from the repository folder. Docker Desktop
-must be running.
+Docker on Windows cannot reach USB serial ports. The commands below are for
+**Windows `cmd`**, run from the repository folder. Docker Desktop must be
+running.
 
 The V4's USB-C port is the ESP32-S3's own USB serial port (no USB-serial
 bridge chip): Windows 10 and 11 need no driver, and flashing and the boot
 log both go over it.
 
-1. **Check the firmware configuration.** The build uses
-   `firmware\esp32\sdkconfig` if it exists, and that file keeps the values
-   of the last build, whatever they were. Open it in Notepad (or run
-   `findstr /B "CONFIG_ATALAIA_KP_ CONFIG_ATALAIA_SKIP_SETUP CONFIG_ATALAIA_MODEM_MODE CONFIG_ATALAIA_BOARD_" firmware\esp32\sdkconfig`)
-   and check that it has `CONFIG_ATALAIA_KP_PCF8574=y` and the line for
-   your board revision (`CONFIG_ATALAIA_BOARD_HELTEC_V4_3=y` or
-   `CONFIG_ATALAIA_BOARD_HELTEC_V4_2=y`), and none of
-   `CONFIG_ATALAIA_KP_GPIO_MATRIX=y`, `CONFIG_ATALAIA_SKIP_SETUP=y` or
-   `CONFIG_ATALAIA_MODEM_MODE=y`. If it does not, or if you are not sure,
-   start from the defaults:
-
-   ```
-   del firmware\esp32\sdkconfig
-   python tools\docker_fw.py clean
-   ```
-
-   A checkout that was never built has no `sdkconfig` and gets the
-   defaults automatically.
-2. **Build:**
+1. **Build:**
 
    ```
    python tools\docker_fw.py build
    ```
 
    The first build takes several minutes. It ends with
-   `Firmware: firmware/esp32/build/atalaia_esp32.bin`.
+   `Firmware: firmware/esp32/build/atalaia_esp32.bin`. The Field Box build
+   keeps its settings in `firmware\esp32\build\sdkconfig`, made fresh from
+   the project's defaults. A file `firmware\esp32\sdkconfig` from an older
+   or a Wokwi build is not used.
 
-   The defaults are for a **V4.3** board. For a **V4.2** board
-   ([section 6](#6-board-revision-and-antennas)), open
-   `firmware\esp32\sdkconfig`, replace the line
+   The defaults are for a **V4.3** board and the **EU868** region. For a
+   **V4.2** board ([section 6](#6-board-revision-and-antennas)), open
+   `firmware\esp32\build\sdkconfig`, replace the line
    `CONFIG_ATALAIA_BOARD_HELTEC_V4_3=y` with
    `# CONFIG_ATALAIA_BOARD_HELTEC_V4_3 is not set` and the line
    `# CONFIG_ATALAIA_BOARD_HELTEC_V4_2 is not set` with
-   `CONFIG_ATALAIA_BOARD_HELTEC_V4_2=y`, save, and build again.
-3. **Install the flasher once,** in its own Python environment (esptool
+   `CONFIG_ATALAIA_BOARD_HELTEC_V4_2=y`, save, and run the build again. For
+   Taiwan, build with `--region=as923-tw`
+   ([firmware guide](../../docs/manuals/en/firmware.md#4-the-options-a-builder-sets)).
+   Changing `--region`, `--lbt` or a key option makes the build start the
+   settings file again from the defaults: apply your V4.2 edit again after it.
+2. **Install the flasher once,** in its own Python environment (esptool
    4.8.1, the version in the ESP-IDF build image):
 
    ```
@@ -725,27 +734,27 @@ log both go over it.
 
    (`set FLASH=...` lasts only for this `cmd` window; repeat it in a new
    one.)
-4. **Find the port.** Antennas on, switch off, plug in the USB-C cable, then:
+3. **Find the port.** Antennas on, switch off, plug in the USB-C cable, then:
 
    ```
    %FLASH% -m serial.tools.list_ports -v
    ```
 
    Note the new `COM` port (also in Device Manager, under *Ports (COM &
-   LPT)*, usually as a "USB Serial Device"). The examples use `COM5`. No
-   new port: see [troubleshooting](#13-troubleshooting).
-5. **Erase the board** (first flash of a new board only: it removes the
-   factory firmware and any old settings):
+   LPT)*; the USB ID is 303A:1001). The examples use `COM5`. No new port:
+   see [troubleshooting](#13-troubleshooting).
+4. **Erase the board** (first flash of a new board only: it removes the
+   factory firmware, the settings and any adoption):
 
    ```
    %FLASH% -m esptool --chip esp32s3 -p COM5 erase_flash
    ```
 
-6. **Write the firmware:**
+5. **Write the firmware:**
 
    ```
    cd firmware\esp32\build
-   %FLASH% -m esptool --chip esp32s3 -p COM5 -b 460800 --before default_reset --after hard_reset write_flash "@flash_args"
+   %FLASH% -m esptool --chip esp32s3 -p COM5 -b 921600 write_flash "@flash_args"
    cd ..\..\..
    ```
 
@@ -753,9 +762,16 @@ log both go over it.
    table and application with their addresses. If the connection fails,
    put the board in download mode by hand (hold its PRG/BOOT button, press
    and release RST, release PRG; or hold PRG while plugging the cable in)
-   and run the command again, or try `-b 115200`. The COM port can
-   disappear and come back while the board resets; that is normal with the
-   built-in USB port.
+   and run the command again, or try `-b 460800` or `-b 115200`. The COM
+   port can disappear and come back while the board resets; that is normal
+   with the built-in USB port.
+6. **Restart the board** (the reliable way; resetting with a serial
+   program's RTS line is not):
+
+   ```
+   %FLASH% -m esptool --chip esp32s3 -p COM5 --after hard_reset chip_id
+   ```
+
 7. **Watch the boot log:**
 
    ```
@@ -763,9 +779,15 @@ log both go over it.
    ```
 
    Press `Ctrl+]` to quit. You should see the boot messages described in
-   BRING_UP.md step 1, with a warning for each part that is not found, and
-   the board's own small screen shows the Atalaia tower for 2 s, then the
-   same step as the main screen (a compact copy of it).
+   BRING_UP.md step 1, with a warning for each part that is not found. The
+   board's own small screen shows the Atalaia tower and the version for 2 s.
+   A new box then shows **FIRST-TIME SETUP** on the big screen and on the
+   small one: go on with the [firmware guide](../../docs/manuals/en/firmware.md#5-first-boot-and-setup).
+
+   The log may warn that GPIO 33-37 are reserved by the PSRAM driver. The
+   project's bench notes call this a cosmetic warning (decision PIN-9).
+   Display MOSI (GPIO 33) and the LED ring (GPIO 35) are on those numbers
+   and have **not yet been tested on a real board**.
 
 **Alternative without Python, in Chrome or Edge:** make a single image
 file, then flash it with Espressif's browser-based esptool page at address
@@ -775,23 +797,25 @@ file, then flash it with Espressif's browser-based esptool page at address
 docker run --rm -v "%cd%\firmware\esp32\build:/b" -w /b espressif/idf:v5.3.2 bash -c ". $IDF_PATH/export.sh > /dev/null && esptool.py --chip esp32s3 merge_bin -o atalaia-merged.bin @flash_args"
 ```
 
-The image is `firmware\esp32\build\atalaia-merged.bin`.
+The image is `firmware\esp32\build\atalaia-merged.bin`. (The merge step was
+run on 2026-10-28; the browser page was not tried.)
 
-**Linux and macOS:** the same steps, with `python3`, `rm` instead of `del`,
-`~/atalaia-flash/bin/python` instead of `%FLASH%`, and `/dev/ttyACM0`
-(Linux) or `/dev/cu.usbmodem*` (macOS) instead of `COM5`.
+**Linux and macOS:** the same steps, with `python3`, `~/atalaia-flash/bin/python`
+instead of `%FLASH%`, and `/dev/ttyACM0` (Linux) or `/dev/cu.usbmodem*`
+(macOS) instead of `COM5`. See the firmware guide.
 
 **Typing into the console.** What you type in miniterm reaches the box
 over the same USB port (`CONFIG_ATALAIA_CONSOLE_USB_INPUT`, checked on a
-V4.3 on 2026-10-20): `@joinkey` and `@join` lines on every build, and keypad
-keys (`0`-`9`, `*`, `#`) on the bench variant
-(firmware/esp32/README.md, Build). The setup portal's "Field join key" field
-does the same as `@joinkey` (BRING_UP.md step 10b).
+V4.3 on 2026-10-20): `@joinkey`, `@join`, `@setup`, `@wifi` and `@adopt`
+lines on every build, and keypad keys (`0`-`9`, `*`, `#`) on the bench
+variant (firmware/esp32/README.md, Build). The setup page's "Field join key"
+field does the same as `@joinkey` (BRING_UP.md step 10b).
 
 ## 12. Hand-off to bring-up
 
 Continue with [`firmware/esp32/docs/BRING_UP.md`](../../firmware/esp32/docs/BRING_UP.md),
-from step 1. Things to know first:
+from step 1, and with the [firmware guide](../../docs/manuals/en/firmware.md)
+for the setup page, adoption and updates. Things to know first:
 
 - **Skip the eFuse key provisioning** (the "production only" step) on your
   first box. Burning an eFuse cannot be undone.
@@ -799,6 +823,8 @@ from step 1. Things to know first:
   [section 6](#6-board-revision-and-antennas). With the wrong one the radio
   hears little or transmits weakly; if BRING_UP.md's radio step looks
   wrong, check this first.
+- **Region:** the box, the controller's modem and the controller must all be
+  built for the same radio region (EU868 by default).
 - **No game use before the transmit-power check** of BRING_UP.md (radio
   step): the 14 dB front-end gain the firmware assumes has not been
   measured yet.
@@ -806,26 +832,32 @@ from step 1. Things to know first:
   hub's 3V3 rail where BRING_UP.md says "check Vext" for an external part.
 - **The board's own small OLED** shows the box's status (on in every
   build); BRING_UP.md says what to expect on it.
+- **The admin PIN** has no default. The Wi-Fi setup page makes you choose
+  one. (The bench variant uses 1234; never put it in a box for a game.)
 - On USB with the switch off, the gauge reports "not found" and the ring and
   amplifier are unpowered. That is expected; switch on to test them.
 
 **Changing a firmware setting** (for a part that differs from the standard
-build): after one build, open `firmware\esp32\sdkconfig` (not tracked by
-git), change the line, save, and run `python tools\docker_fw.py build`
+build): after one build, open `firmware\esp32\build\sdkconfig` (not tracked
+by git), change the line, save, and run `python tools\docker_fw.py build`
 again, then flash. Common changes:
 
-| Your build | Line in `sdkconfig` |
+| Your build | Line in `build\sdkconfig` |
 | --- | --- |
 | V4.2 board | `CONFIG_ATALAIA_BOARD_HELTEC_V4_2=y` and `# CONFIG_ATALAIA_BOARD_HELTEC_V4_3 is not set` |
 | ST7789 display | `CONFIG_ATALAIA_DISP_ST7789=y` and `# CONFIG_ATALAIA_DISP_ILI9341 is not set` |
 | 12- or 16-LED ring | `CONFIG_ATALAIA_LED_COUNT=12` (or 16) |
 | Antenna with more than 2 dBi | `CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI=` its gain, rounded **up** |
 | Two-team box, free the pins | `CONFIG_ATALAIA_BTN3_PIN=-1` and `CONFIG_ATALAIA_KP_P7_BUTTON=0` (optional) |
+| Board mounted the other way up (small OLED upside down) | `CONFIG_ATALAIA_OLED_FLIP=y` |
 | GNSS module switched on at boot (bench test only: nothing reads it yet) | `CONFIG_ATALAIA_GNSS_POWER_ON=y` |
 
+Taiwan (`--region=as923-tw`), listen before talk (`--lbt=`), the release keys
+and the mode keys are build options, not lines to edit; see the
+[firmware guide](../../docs/manuals/en/firmware.md#4-the-options-a-builder-sets).
 Never lower `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` or the antenna gain below the
-real values. Anything you change by hand is lost when you delete
-`sdkconfig`; keep a note of it inside the box lid.
+real values. Anything you change by hand is lost when the settings file is
+made again (see section 11, step 1); keep a note of it inside the box lid.
 
 ## 13. Troubleshooting
 
@@ -834,11 +866,11 @@ real values. Anything you change by hand is lost when you delete
 | No COM port appears | Charge-only USB cable or panel extension: try a known data cable straight into the board, and another USB port (with the first board only the computer's own USB-C port worked). Firmware that crashes very early can hide the built-in USB port: put the board in download mode by hand (hold PRG, tap RST, release PRG) and flash again |
 | A held button arms or captures only sometimes; the log shows `hal_btn: ... released` in the middle of a hold | The wire's pin does not touch its hole: solder the header (or the wire). Any release restarts a hold |
 | The board's small screen stays dark | The log says `SSD1306 OLED not found`: Vext (BRING_UP.md step 2); upside down: `ATALAIA_OLED_FLIP` |
-| Typed console commands do nothing | Keypad keys are read from the console only in the bench variant; `@join` lines need Enter at the end. Close any other program holding the port ([section 11](#11-first-flash)) |
+| Typed console commands do nothing | Keypad keys are read from the console only in the bench variant; `@join` lines need Enter at the end. Close any other program holding the port ([section 11](#11-first-flash)). Another program (esptool, a second miniterm) may hold the port |
 | esptool: "Failed to connect" | Put the board in download mode by hand (hold PRG, tap RST, release PRG); use `-b 115200`; close miniterm or any other program holding the port |
 | Boot loop, "brownout" in the log | Weak USB port or cable; low battery; a short on 3V3. If it happens when the screen and NFC start, the board's 3.3 V supply may be overloaded: report it ([section 7](#7-power-and-battery-safety)) |
-| Log shows the Wokwi settings (GPIO keypad, setup skipped) | `firmware\esp32\sdkconfig` was from a Wokwi or modem build: [section 11](#11-first-flash), step 1 |
-| `PCF8574 keypad not found at 0x20` | SDA/SCL swapped or not on the hub; module not powered; address jumpers not all at GND; a PCF8574**A** (set `CONFIG_ATALAIA_KP_I2C_ADDR=0x38`) |
+| Log shows the Wokwi or bench settings (GPIO keypad, setup skipped) | You flashed the wrong build folder. Flash `firmware\esp32\build`, not `build-wokwi`, `build-bench`, `build-modem` or `build-pod` |
+| `PCF8574 keypad not found at 0x20` | SDA/SCL swapped or not on the hub; module not powered; address jumpers not all at GND; address jumpers set to an address the firmware refuses (0x24, 0x36, 0x3C); a PCF8574A needs no setting: the firmware finds it at 0x38-0x3F |
 | Wrong digits, or a whole row or column dead | Rows and columns swapped or misidentified: redo [section 9.3](#93-keypad) |
 | `PN532 NFC reader not found at 0x24` | Mode switches not on I2C (power-cycle after changing them); SDA/SCL swapped |
 | `MAX17048 battery gauge not found` | Switch off (the gauge is powered from the battery); battery-sense wire missing |
@@ -851,7 +883,9 @@ real values. Anything you change by hand is lost when you delete
 | A team button "presses" by itself | Long button wires picking up noise: add a 10 kohm resistor from the button's signal wire to 3V3 at the hub, and route the wires away from the LED ring and speaker wires |
 | Button 4 never registers | It is read through the keypad expander: the log must say `PCF8574 keypad at 0x..`; its wire goes to P7, not to a board GPIO |
 | No sound | Switch off (amplifier on 5 V); BCLK/LRC/DIN swapped; speaker wire touching GND |
-| Phone cannot see the `atalaia-XXXX` Wi-Fi | 2.4 GHz antenna missing or on the wrong connector; phone too far |
+| Phone cannot see the `atalaia-XXXX` Wi-Fi | 2.4 GHz antenna missing or on the wrong connector; phone too far; the box is already set up (the setup Wi-Fi opens only on a new box or after **Wi-Fi setup**: [firmware guide](../../docs/manuals/en/firmware.md#5-first-boot-and-setup)) |
+| The setup page does not open by itself | Open `http://192.168.4.1` in the phone's browser; switch off mobile data and private DNS for a minute |
+| The field's logo does not show on the big screen | It is fetched over the field Wi-Fi when a game is joined: the box needs the field Wi-Fi name and password, and the logo must be a PNG. See the [firmware guide](../../docs/manuals/en/firmware.md#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi) |
 | Fuse blows at switch-on | Battery reversed (the diode did its job: fix the battery wiring) or a short on BAT+ or 5 V |
 | Box does not charge | Switch off: charging needs the switch on ([section 7](#7-power-and-battery-safety)) |
 | Anything hot, a smell, smoke | Switch off at once, take the fuse out, take the cells out into a fire-safe bag. Look for reversed polarity or a short before powering again |
@@ -885,7 +919,78 @@ board-internal, front-end-module (GPIO 5, 46), GNSS-connector (GPIO 34,
 purpose (GPIO 1, 35, 44) is used for anything else, if two pins share a
 GPIO, if the keypad or button 4 is not wired to the PCF8574 the way the
 firmware reads it, if the pin table disagrees with Kconfig, or if an SVG was
-not rendered from the current YAML and Kconfig defaults.
+not rendered from the current YAML and Kconfig defaults. It also checks the
+GPIO numbers in the [pin reference](#15-pin-reference) below against Kconfig.
+
+## 15. Pin reference
+
+One table for the whole box. The GPIO numbers are the defaults in
+[`firmware/esp32/main/Kconfig.projbuild`](../../firmware/esp32/main/Kconfig.projbuild)
+and `python tools/docker_hw.py check` fails if a number here is wrong. The
+wire colours are the ones in the diagrams (a suggestion; label both ends).
+"Level" is the voltage the signal swings between. **Every GPIO signal is 3.3 V.**
+Only the parts on the 5 V rail are 5 V, and none of them is wired to a GPIO
+except through the level shifter.
+
+**Board pins** (find each by the number printed on your board):
+
+| Signal | GPIO | Firmware option | Wire colour | Goes to | Level | Used by |
+| --- | --- | --- | --- | --- | --- | --- |
+| Button 1 (red team), signal | 4 | `ATALAIA_BTN1_PIN` | green | microswitch NO; COM to GND | 3.3 V, active low, internal pull-up | buttons driver (`hal_esp_buttons.c`) |
+| Button 2 (blue team), signal | 48 | `ATALAIA_BTN2_PIN` | green | microswitch NO; COM to GND | 3.3 V, active low | buttons driver |
+| Button 3 (optional), signal | 44 | `ATALAIA_BTN3_PIN` | green | microswitch NO; COM to GND | 3.3 V, active low. UART0's receive pin: no console input there | buttons driver |
+| Button 4 (optional), signal | PCF8574 P7 | `ATALAIA_KP_P7_BUTTON` | green | microswitch NO; COM to GND | 3.3 V, active low | keypad driver (read with the keys) |
+| I2C data (SDA) | 17 | `ATALAIA_NFC_SDA_PIN` | blue | hub SDA rail: PCF8574, PN532, MAX17048 (and the board's OLED) | 3.3 V, 100 kHz. The gauge's own option is `ATALAIA_BATT_SDA_PIN`, same pin | I2C driver, NFC, gauge, keypad, OLED |
+| I2C clock (SCL) | 18 | `ATALAIA_NFC_SCL_PIN` | yellow | hub SCL rail | 3.3 V. The gauge's own option is `ATALAIA_BATT_SCL_PIN`, same pin | as above |
+| LED ring data | 35 | `ATALAIA_LED_PIN` | white | hub "LED data in", then 74AHCT125 and 330 ohm to ring DIN | 3.3 V in, 5 V out of the shifter. The board's white LED flickers with it | LED driver (`hal_esp_leds.c`, RMT) |
+| Display chip select (CS) | 1 | `ATALAIA_DISP_CS_PIN` | white | TFT CS | 3.3 V. The board's battery-voltage pin, used as an output | display driver (`hal_esp_display.c`, SPI2, 40 MHz) |
+| Display data/command (DC) | 3 | `ATALAIA_DISP_DC_PIN` | pink | TFT DC | 3.3 V | display driver |
+| Display data (MOSI, SDI) | 33 | `ATALAIA_DISP_MOSI_PIN` | brown | TFT SDI (MOSI) | 3.3 V | display driver |
+| Display clock (SCK) | 47 | `ATALAIA_DISP_CLK_PIN` | turquoise | TFT SCK | 3.3 V | display driver |
+| Audio bit clock (BCLK) | 6 | `ATALAIA_AUDIO_BCLK_PIN` | grey | amplifier BCLK | 3.3 V | audio driver (`hal_esp_audio.c`, I2S) |
+| Audio left/right clock (LRC) | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | pink | amplifier LRC | 3.3 V | audio driver |
+| Audio data (DIN) | 16 | `ATALAIA_AUDIO_DOUT_PIN` | brown | amplifier DIN | 3.3 V | audio driver |
+
+**Not GPIO signals** (wired to rails, not to a pin of the firmware):
+
+| Signal | Wire colour | Goes to | Level | Notes |
+| --- | --- | --- | --- | --- |
+| Display RESET | grey | hub 3V3 rail | 3.3 V | Firmware option `ATALAIA_DISP_RST_PIN` = -1: the firmware resets the panel with a command |
+| Display backlight (LED) | light blue | hub 3V3 rail | 3.3 V | Firmware option `ATALAIA_DISP_BL_PIN` = -1: on whenever the box is on |
+| Display VCC, PCF8574 VCC, PN532 VCC, gauge logic | violet | hub 3V3 rail (from the board's 3V3 pin) | 3.3 V | Never 5 V: their pull-ups would put 5 V on the bus |
+| All GND | black | hub GND rail (from the board's GND pin) | 0 V | |
+| Button LEDs | orange | hub 5V rail; LED- to COM | 5 V | Not driven by the firmware: lit whenever the box is on |
+| LED ring 5V and GND, 1000 uF capacitor across them | orange / black, 0.5 mm² | 5 V splices | 5 V | Up to about 1.4 A at full white |
+| Amplifier VIN and GND | orange / black, 0.5 mm² | 5 V splices | 5 V | Speaker wires never to GND |
+| Keypad R1-R4 | brown, red, orange, yellow | PCF8574 P0-P3 | 3.3 V | Rows, driven low in turn |
+| Keypad C1-C3 | green, blue, violet | PCF8574 P4-P6 | 3.3 V | Columns, read with pull-ups |
+| Gauge battery sense (CELL+) | red | BAT+ splice | 3.0-4.2 V | The only part wired to the battery voltage |
+
+**I2C addresses** on the shared bus: PCF8574 0x20 (or 0x38 for a PCF8574A,
+`ATALAIA_KP_I2C_ADDR`), PN532 0x24, MAX17048 0x36, the board's OLED 0x3C.
+
+**Pins you must never wire** (the firmware drives them itself):
+
+| GPIO | What it is |
+| --- | --- |
+| 0, 45, 46 | Boot strapping pins. GPIO 46 is also the V4.2's front-end module line |
+| 2, 7, 8-14 | The radio and its front-end module |
+| 5 | The V4.3's front-end module (receive amplifier on or off) |
+| 19, 20 | USB |
+| 21 | The board's OLED reset |
+| 26-32 | Flash and PSRAM |
+| 34, 38-42 | The GNSS connector and its module (power, TX, RX, wake-up, PPS, reset) |
+| 36, 37 | The board's Vext switch and battery-voltage gate |
+| 43 | UART0 transmit: the log. Never wire it to a part |
+
+Board pins used **on purpose**, each for one thing only: GPIO 1 (display CS),
+GPIO 35 (LED ring data), GPIO 44 (button 3).
+
+**Where the pin reference and the firmware disagreed.** On 2026-10-28 this
+section was checked against `Kconfig.projbuild` and `hal_esp_*.c`. The GPIO
+numbers agree. Two older statements in this manual were wrong and are fixed:
+the PCF8574A is found by the firmware (it needs no setting), and the LED ring
+is not full brightness at start (40 %).
 
 ---
 

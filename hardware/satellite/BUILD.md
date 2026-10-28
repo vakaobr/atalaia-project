@@ -12,8 +12,12 @@ header pins and wires and use a multimeter, like the
 [Field Box build manual](../field-box/BUILD.md), which this guide follows and
 refers to for every step the two builds share.
 
-> **Status: not yet built.** No Satellite has been built from this guide. It
-> runs the Field Box's own firmware with fewer parts fitted, so every pin
+> **Status: not yet built.** No Satellite has been built from this guide.
+> The same firmware has run on bare Heltec V4.3 boards on a bench with two
+> buttons and the board's own OLED (invited into games over the radio,
+> adopted by USB and by code). **Not yet tested on a real board:** the LED
+> ring, the battery gauge, the amplifier, the power path and the enclosure.
+> It runs the Field Box's own firmware with fewer parts fitted, so every pin
 > below is a Field Box pin, checked automatically against the firmware's
 > defaults (`python3 tools/check_wiring.py`, see
 > [Regenerating the diagrams](../field-box/BUILD.md#14-regenerating-the-diagrams)).
@@ -160,17 +164,24 @@ The Field Box's pins, for the parts a Satellite has. These are the defaults in
 the reference if the two ever disagree; `python3 tools/check_wiring.py` fails
 if this table does.
 
-| Function | GPIO | Kconfig symbol | Notes |
-| --- | --- | --- | --- |
-| Button 1 (first team) | 4 | `ATALAIA_BTN1_PIN` | Active low, internal pull-up: microswitch NO to the pin, COM to GND |
-| Button 2 (second team) | 48 | `ATALAIA_BTN2_PIN` | |
-| Button 3 (optional) | 44 | `ATALAIA_BTN3_PIN` | UART0's receive line: no console input on UART0 with it (the USB-C console is unaffected). Unwired, it reads as never pressed |
-| LED ring data | 35 | `ATALAIA_LED_PIN` | Through the 74AHCT125. Also the board's white LED, which flickers with it |
-| I2C SDA (gauge) | 17 | `ATALAIA_BATT_SDA_PIN` | The board's own I2C bus, shared with its OLED |
-| I2C SCL (gauge) | 18 | `ATALAIA_BATT_SCL_PIN` | |
-| I2S BCLK (optional amplifier) | 6 | `ATALAIA_AUDIO_BCLK_PIN` | |
-| I2S LRCLK | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | |
-| I2S DOUT | 16 | `ATALAIA_AUDIO_DOUT_PIN` | |
+| Function | GPIO | Kconfig symbol | Wire colour | Goes to | Level | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Button 1 (first team) | 4 | `ATALAIA_BTN1_PIN` | green | microswitch NO; COM to GND | 3.3 V | Active low, internal pull-up |
+| Button 2 (second team) | 48 | `ATALAIA_BTN2_PIN` | green | microswitch NO; COM to GND | 3.3 V | |
+| Button 3 (optional) | 44 | `ATALAIA_BTN3_PIN` | green | microswitch NO; COM to GND | 3.3 V | UART0's receive line: no console input on UART0 with it (the USB-C console is unaffected). Unwired, it reads as never pressed |
+| LED ring data | 35 | `ATALAIA_LED_PIN` | white | hub "LED data in", then the 74AHCT125 and 330 ohm to ring DIN | 3.3 V in, 5 V out of the shifter | Also the board's white LED, which flickers with it |
+| I2C SDA (gauge) | 17 | `ATALAIA_BATT_SDA_PIN` | blue | hub SDA rail, gauge SDA | 3.3 V | The board's own I2C bus, shared with its OLED |
+| I2C SCL (gauge) | 18 | `ATALAIA_BATT_SCL_PIN` | yellow | hub SCL rail, gauge SCL | 3.3 V | |
+| I2S BCLK (optional amplifier) | 6 | `ATALAIA_AUDIO_BCLK_PIN` | grey | amplifier BCLK | 3.3 V | |
+| I2S LRCLK | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | pink | amplifier LRC | 3.3 V | |
+| I2S DOUT | 16 | `ATALAIA_AUDIO_DOUT_PIN` | brown | amplifier DIN | 3.3 V | |
+
+Rails, not GPIOs: gauge logic VDD to the hub's 3V3 (violet, 3.3 V); button
+COM, gauge GND and ring GND to GND (black); ring 5V, amplifier VIN and
+button LEDs to the 5 V rail (orange, 5 V); the gauge's CELL+ to the BAT+
+splice (red, 3.0-4.2 V). The gauge's I2C address is 0x36 and the board's OLED
+is 0x3C. The full list of pins is in the
+[Field Box pin reference](../field-box/BUILD.md#15-pin-reference).
 
 Leave every other board pin unconnected. The firmware still drives the Field
 Box's display pins (GPIO 1, 3, 33, 47) as outputs, so nothing else may be wired
@@ -320,8 +331,10 @@ free.
    [Field Box manual, section 11](../field-box/BUILD.md#11-first-flash) says:
    `python tools\docker_fw.py build`, then esptool from your computer (Docker
    on Windows cannot reach USB ports). Build it for your board revision
-   (V4.3 by default; V4.2 needs the change described there).
-4. **Settings for a Satellite** (optional; in `firmware\esp32\sdkconfig` after
+   (V4.3 by default; V4.2 needs the change described there). The
+   [firmware guide](../../docs/manuals/en/firmware.md) has the same steps
+   for Windows, macOS and Linux.
+4. **Settings for a Satellite** (optional; in `firmware\esp32\build\sdkconfig` after
    one build, then build again, as the
    [manual, section 12](../field-box/BUILD.md#12-hand-off-to-bring-up) says):
 
@@ -361,7 +374,14 @@ free.
    give it its role (`satellite` for a satellite). Holding a team button
    captures it; the ring shows the holding team.
 4. **Moving it to another field** needs its admin PIN, which the console asks
-   for when it adopts a box of another field by cable.
+   for when it adopts a box of another field by cable. A Satellite has no
+   keypad, so it cannot use the keypad's **Change field** and **Wi-Fi setup**
+   entries (the [firmware guide](../../docs/manuals/en/firmware.md#5-first-boot-and-setup)
+   describes them). Use the USB cable and the console instead, and
+   `@setup <PIN>` on the USB console to open the setup page again.
+5. **More about the setup page, adoption and updates:** the
+   [firmware guide](../../docs/manuals/en/firmware.md). The field's logo
+   needs a big screen, so a Satellite never shows it.
 
 ## 12. Troubleshooting
 

@@ -122,8 +122,8 @@ connectors:
     loops: [[2, 4]]
 
   PCF8574:
-    type: PCF8574 module (not PCF8574A)
-    subtype: I2C address 0x20, A0-A2 to GND; P7 is button 4
+    type: PCF8574 or PCF8574A module
+    subtype: I2C address 0x20 (0x38 for a PCF8574A), A0-A2 to GND, P7 is button 4
     pinlabels: [VCC, GND, SDA, SCL, INT, P0, P1, P2, P3, P4, P5, P6, P7]
   KEYPAD:
     type: 3x4 membrane keypad

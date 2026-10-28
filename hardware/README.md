@@ -13,6 +13,8 @@ Costs are approximate hobby-market prices, not quotes. No box of any kind has be
 what is untested, and photos come with the first builds (phase 5 plan phase HW2). The guides are also on the project page,
 in Portuguese, English and German (`/montagem/`, `/en/build-guides/`, `/de/bauen/`).
 
+The firmware for every build is covered by the [firmware guide](../docs/manuals/en/firmware.md); the field controller by the [controller setup guide](../docs/manuals/en/controller-setup.md).
+
 Licence: CERN-OHL-S-2.0. Improved designs you distribute must stay open. The build guides themselves are CC-BY-SA-4.0.
 
 Each build folder will hold: a bill of materials, wiring diagram, enclosure files (STL/STEP), assembly guide and photos.
