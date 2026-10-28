@@ -235,6 +235,19 @@ def _details(page: Page, game: ScheduledGame, field: Field, now: datetime, regis
         if field.federation_label:
             label += i18n.paren(field.federation_label, page.lang)
         rows.append((label, esc(t["fed_required" if game.federation == "required" else "fed_optional"])))
+    rule = registration.field_rule(field)
+    if rule["register"] or rule["checkin"]:
+        shown = [t["apd_register"]] if rule["register"] else []
+        if rule["checkin"]:
+            shown.append(t["apd_checkin"])
+        if rule["expiry"]:
+            shown.append(t["apd_expiry"])
+        if rule["accepted"] is None:
+            shown.append(t["apd_any"])
+        else:
+            names = {e["id"]: e["name"] for e in registration.project_apds() + rule["custom"]}
+            shown.append(t["apd_only"].format(names=i18n.join([names.get(a, a) for a in rule["accepted"]], page.lang)))
+        rows.append((t["apd"], esc("; ".join(shown))))
     return "".join(f"<dt>{esc(k)}</dt><dd>{v}</dd>\n" for k, v in rows)
 
 

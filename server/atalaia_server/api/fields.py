@@ -44,6 +44,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from atalaia_controller import apd as apd_core
+
 from .. import sync
 from ..services import branding, registration, scheduling
 from ..audit import record
@@ -80,6 +82,7 @@ class FieldPatch(BaseModel):
     federation_label: Optional[str] = None
     limit_template: Optional[str] = PydanticField(default=None, max_length=32)
     max_replicas: Optional[int] = None
+    apd: Optional[dict[str, Any]] = None  # the whole APD rule (protocol/apd.md); {} puts the default back
 
 
 class SyncKeyIn(BaseModel):
@@ -97,7 +100,7 @@ def field_json(f: Field, roles: Any = None) -> dict[str, Any]:
     body = {"id": str(f.id), "name": f.name, "slug": f.slug, "field_type": f.field_type, "timezone": f.timezone,
             "chrono_sharing_enabled": f.chrono_sharing_enabled, "public_page": f.public_page,
             "description": f.description, "address_text": f.address_text, "federation_label": f.federation_label,
-            "limit_template": f.limit_template, "max_replicas": f.max_replicas}
+            "limit_template": f.limit_template, "max_replicas": f.max_replicas, "apd": registration.field_rule(f)}
     if roles is not None:
         body["my_roles"] = sorted(roles)
     return body
@@ -189,13 +192,21 @@ async def update_field(field_id: uuid.UUID, body: FieldPatch, request: Request,
         if isinstance(body.max_replicas, bool) or not 1 <= body.max_replicas <= registration.MAX_REPLICAS:
             raise HTTPException(400, "max_replicas_invalid")
         field.max_replicas = changed["max_replicas"] = body.max_replicas
+    if "apd" in body.model_fields_set:
+        try:
+            rule = apd_core.check_rule(body.apd)
+        except apd_core.ApdError:
+            raise HTTPException(400, "apd_rule_invalid") from None
+        if rule != registration.field_rule(field):
+            field.apd_rule = rule
+            changed["apd"] = "set"  # the audit log names the change, not the field's own entries
     if "address_text" in changed:
         await scheduling.bump_for_field_address(db, field.id, datetime.now(timezone.utc))
     if changed:
         record(db, "field_update", request, user_id=principal.user.id, resource="field", resource_id=field.id,
                details=changed)
     await db.commit()
-    if changed.keys() & {"limit_template", "max_replicas", "federation_label"}:
+    if changed.keys() & {"limit_template", "max_replicas", "federation_label", "apd"}:
         branding.announce(request, [field.id])  # the controllers take over the field's check-in settings (BR24)
     await db.refresh(field)
     return JSONResponse(field_json(field, principal.roles.get(field.id, set())), headers=NO_STORE)

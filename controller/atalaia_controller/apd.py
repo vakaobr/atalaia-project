@@ -126,7 +126,7 @@ def status(rule: dict[str, Any], apd: Optional[str], number: Optional[str], expi
 def project_list() -> list[dict[str, Any]]:
     """The shipped list's entries (without ``source``)."""
     doc = json.loads(DATA.read_text(encoding="utf-8"))
-    return [check_entry(e, own=False) for e in doc["apds"]]
+    return [check_entry({k: v for k, v in e.items() if k != "source"}, own=False) for e in doc["apds"]]
 
 
 def choices(rule: dict[str, Any]) -> list[dict[str, Any]]:

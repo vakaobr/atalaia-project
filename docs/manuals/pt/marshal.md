@@ -45,6 +45,10 @@ Se a organização te tirar da lista, o teu telemóvel deixa logo de ser de mars
 
 Mais abaixo, **Quem és** tem **Identificador do cronógrafo** (um nome para o teu aparelho, por exemplo *chrono-1*) e **Chave de assinatura**. **Medições guardadas** diz quantas medições estão neste telemóvel. Guardam-se 365 dias e depois são apagadas. **Apagar as medições de alguém** apaga as medições de uma pessoa: escreve o **Identificador de quem joga** e toca em **Apagar**.
 
+## 2b. O veredicto da filiação em APD à receção
+
+Quando o campo verifica a filiação em APD, o cartão de quem joga na lista mostra a APD, o número e a validade com um selo: **Filiação válida**, **Filiação caducada**, **APD não aceite aqui** ou **Filiação em falta**. A app não verifica nada: compara o número e a data com o cartão da pessoa. Quem não tem selo válido fica **à espera**; **Admitir** admite-a na mesma. Nunca ficas bloqueado e o controlador regista-o sem o número (o cartão passa a dizer **admitido por um marshal**). A lista lista quem declarou réplicas; a consola do GM lista toda a gente.
+
 ## 3. A lista: réplicas por cronografar
 
 1. Toca em **Réplicas por cronografar**.

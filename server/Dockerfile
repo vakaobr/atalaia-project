@@ -69,7 +69,8 @@ RUN pip install --no-cache-dir --require-hashes --no-deps --only-binary=:all: --
 # controller's engine in tests/test_sync_e2e.py; the shared sync and chrono vectors for
 # tests/test_sync.py, test_chrono.py and test_chrono_verify.py.
 COPY modes /app/modes
-COPY protocol/vectors/sync.json protocol/vectors/chrono_record.json /app/protocol/vectors/
+COPY protocol/vectors/sync.json protocol/vectors/chrono_record.json protocol/vectors/apd.json /app/protocol/vectors/
+COPY registry/apds/apds.json /app/registry/apds/apds.json
 COPY server/schemas /app/server/schemas
 COPY server/tests /app/server/tests
 ENV ATALAIA_REQUIRE_ALL=1

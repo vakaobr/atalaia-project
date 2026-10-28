@@ -1064,6 +1064,35 @@ class ScheduleTests(BrowserCase):
         await expect(page.locator("#io-title")).to_have_text("Exportar e importar")
         await self.check_page(page, 375)
 
+    async def test_the_apd_membership_and_its_verdict(self) -> None:
+        """protocol/apd.md: with a field rule that checks it, the registrations page and the roster show the APD,
+        the number, the expiry and the verdict; staff change them and the verdict follows."""
+        await self.lisbon()
+        await self.fetch("UPDATE fields SET apd_rule = $1::jsonb", json.dumps(
+            {"accepted": ["apd-a", "x-norte"], "register": False, "checkin": True, "expiry": True,
+             "custom": [{"id": "x-norte", "name": "Clube Norte, APD", "short_name": "Norte", "website": None}]}))
+        game = await self.published_game()
+        await self.register(game, "falcao", display_name="Falcão", federation_number="FPA-9", apd_id="apd-b",
+                            membership_expires="2031-01-31")
+        name, secret = await self.staff("gm")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path(f"/schedule/{game}/registrations"))
+        row = page.locator("#regs tbody tr").nth(0)
+        await expect(row).to_contain_text("apd-b · FPA-9 · expires 2031-01-31 — APD not accepted")
+        await row.locator("button", has_text="Edit").click()
+        await expect(page.locator("#r-apd option")).to_have_text(["APD unknown", "ALA", "APACORP", "APAP", "Norte", "apd-b"])
+        await page.select_option("#r-apd", "x-norte")
+        await page.click("#reg-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Saved.")
+        await expect(row).to_contain_text("Norte · FPA-9 · expires 2031-01-31 — valid")
+        await row.locator("button", has_text="Edit").click()
+        await page.fill("#r-expires", "2020-01-01")
+        await page.click("#reg-form button[type=submit]")
+        await expect(row).to_contain_text("expired")
+        await self.check_page(page, 375)
+        await page.goto(self.base + self.field_path(f"/schedule/{game}/roster"))
+        await expect(page.locator("#roster tbody tr").first).to_contain_text("Norte · FPA-9 · expires 2020-01-01 — expired")
+
     async def test_the_roster_says_when_a_controller_last_pulled_it(self) -> None:
         game = await self.published_game()
         await self.register(game, "falcao", display_name="Falcão")

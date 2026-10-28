@@ -10,13 +10,15 @@
 // controller decides on the day, and the arrivals come from its sync. The rules are the API's.
 
 import { $, boot, clear, el, enable, errorText, api, fieldApi, fieldPage, fillRows, page, status, t, when } from './staff.js';
-import { changeable, loadBoth, over, replicaCell, summarise, ticketText } from './registrants.js';
+import { apdChoices, asksMembership, changeable, loadBoth, membershipText, over, replicaCell, summarise, ticketText }
+    from './registrants.js';
 
 const base = () => `/scheduled-games/${encodeURIComponent(page.game)}/registrations`;
 const regPath = (reg, rest = '') => fieldApi(`${base()}/${encodeURIComponent(reg.id)}${rest}`);
-const MOVED = { team_preference: 'reg_moved_team', federation_number: 'reg_moved_fed', replicas: 'reg_moved_replicas' };
+const MOVED = { team_preference: 'reg_moved_team', federation_number: 'reg_moved_fed', apd_id: 'reg_moved_fed', membership_expires: 'reg_moved_fed', replicas: 'reg_moved_replicas' };
 let ctx = null;
 let game = null;
+let regList = { apd: {}, apds: [] };
 let rules = { classes: [], replica_types: [], max_replicas: 0 };
 let editing = null;
 let rows = [];
@@ -85,8 +87,16 @@ function edit(reg) {
     teams.append(el('option', { value: '', text: t('reg_team_none') }));
     for (const team of game.teams || []) teams.append(el('option', { value: team, text: team }));
     teams.value = reg.team_preference || '';
-    $('r-fed-row').hidden = game.federation === 'off';
+    const asks = asksMembership(game, regList);
+    $('r-fed-row').hidden = !asks;
     $('r-fed').value = reg.federation_number || '';
+    const apds = clear($('r-apd'));
+    apds.append(el('option', { value: '', text: t('apd_unknown') }));
+    const known = apdChoices(regList);
+    for (const e of known) apds.append(el('option', { value: e.id, text: e.short_name }));
+    if (reg.apd_id && !known.some((e) => e.id === reg.apd_id)) apds.append(el('option', { value: reg.apd_id, text: reg.apd_id }));
+    apds.value = reg.apd_id || '';
+    $('r-expires').value = reg.membership_expires || '';
     const asked = game.predeclare_replicas && rules.classes.length > 0 && rules.replica_types.length > 0;
     $('r-replicas-row').hidden = !asked;
     $('r-rep-not-asked').hidden = game.predeclare_replicas;
@@ -109,7 +119,13 @@ async function submit(event) {
     const team = $('r-team').value;
     if (team !== (reg.team_preference || '')) body.team_preference = team === '' ? null : team;
     const fed = $('r-fed').value.trim();
-    if (game.federation !== 'off' && fed !== (reg.federation_number || '')) body.federation_number = fed === '' ? null : fed;
+    if (asksMembership(game, regList)) {
+        if (fed !== (reg.federation_number || '')) body.federation_number = fed === '' ? null : fed;
+        const apd = $('r-apd').value;
+        if (apd !== (reg.apd_id || '')) body.apd_id = apd === '' ? null : apd;
+        const expires = $('r-expires').value;
+        if (expires !== (reg.membership_expires || '')) body.membership_expires = expires === '' ? null : expires;
+    }
     if (!$('r-replicas-row').hidden && replicaKey(replicaBody()) !== reg.original) body.replicas = replicaBody();
     if (Object.keys(body).length) {
         try {
@@ -239,6 +255,7 @@ async function load() {
     }
     game = loaded.game;
     const { list } = loaded;
+    regList = list;
     $('regs-heading').textContent = t('regs_heading', { title: game.title });
     summarise($('summary'), game, ctx.zone);
     const counts = list.counts || {};
@@ -252,11 +269,11 @@ async function load() {
     const roster = $('roster-link');
     roster.hidden = game.status === 'draft';
     roster.firstChild.setAttribute('href', fieldPage(`/schedule/${encodeURIComponent(page.game)}/roster`));
-    const asks = game.federation !== 'off';
+    const asks = asksMembership(game, list);
     $('th-fed').hidden = !asks;
     const regs = list.registrations || [];
     fillRows($('regs'), regs.map((r) => [
-        r.display_name || t('none'), r.team_preference || t('none'), ...(asks ? [r.federation_number || t('none')] : []),
+        r.display_name || t('none'), r.team_preference || t('none'), ...(asks ? [membershipText(r, list)] : []),
         replicaCell(r.replicas, true), ticketText(r), t(`reg_status_${r.status}`), paidText(r),
         r.source === 'site' ? t('source_site') : r.source, actions(r)]));
     $('regs').hidden = regs.length === 0;

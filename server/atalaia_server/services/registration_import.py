@@ -42,7 +42,11 @@ class Outcome:
 
 
 def rules_for(field: Field, game: ScheduledGame) -> fmt.Rules:
-    return fmt.Rules(teams=tuple(game.teams or ()), federation=game.federation,
+    rule = reg_svc.field_rule(field)
+    # A field whose APD rule asks keeps the number an import carries even when the game itself asks for none
+    # (never required by an import: protocol/apd.md).
+    federation = "optional" if game.federation == "off" and (rule["register"] or rule["checkin"]) else game.federation
+    return fmt.Rules(teams=tuple(game.teams or ()), federation=federation,
                      predeclare_replicas=game.predeclare_replicas, classes=reg_svc.classes(field.limit_template),
                      max_replicas=field.max_replicas)
 

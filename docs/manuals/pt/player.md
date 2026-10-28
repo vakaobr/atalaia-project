@@ -66,6 +66,7 @@ A organização afixa um **cartaz de check-in** com um código QR. Não leva nen
    - **Jogo**: escolhe um, se o campo tiver mais do que um aberto.
    - **Nome ou alcunha**: até 32 caracteres. Só a organização e os marshals o veem. Quem joga contigo não.
    - **Número de federado**: só se o campo o pedir. A organização confere o cartão à entrada. A app não o verifica.
+   - **Filiação numa APD**: se o campo a pedir, escolhe a tua APD (ou **Não consta da lista**), escreve o número de filiação e a data de validade (AAAA-MM-DD). A app não os verifica: um marshal compara-os com o teu cartão. Se a filiação não for válida para o jogo, o check-in fica à espera de um marshal, que decide. Num campo que a exija para a inscrição, a inscrição é recusada sem filiação válida.
    - **Equipa preferida**: **Qualquer uma**, ou uma equipa. A organização decide a equipa final.
    - **Inscrição online**: só se te inscreveste no site do campo. Vê a [secção 8](#8-se-te-inscreveste-online).
    - **Réplicas que trazes**: marca as réplicas que guardaste antes. Também o podes fazer depois ([secção 4](#4-declara-as-tuas-réplicas)).
@@ -280,7 +281,7 @@ A app ainda não cria contas. Pergunta à organização do campo como obter uma.
 
 - **Sair do jogo** (em **O meu check-in**) apaga o teu nome e o número de federado deste jogo. As réplicas já cronografadas ficam registadas.
 - A organização e os marshals veem o teu nome. Nunca vai para os acontecimentos do jogo, o marcador nem as vistas de quem joga.
-- O controlador apaga nomes e números de federado alguns dias depois do jogo (30 por omissão).
+- O controlador apaga nomes, números de federado e de filiação em APD (com a APD e a validade) alguns dias depois do jogo (30 por omissão).
 
 ## Resolução de problemas
 

@@ -66,6 +66,7 @@ The organisers put up a **check-in poster** with a QR code. It holds no secret.
    - **Game**: pick one if the field has more than one open.
    - **Name or callsign**: up to 32 characters. Only the organisers and marshals see it. Other players do not.
    - **Federation number**: only if the field asks for it. The organisers look at your card at the desk. The app does not check it.
+   - **APD membership**: if the field asks for it, pick your APD (or **Not in the list**), type your membership number and its expiry date (YYYY-MM-DD). The app does not check them: a marshal compares them with your card. If your membership is not valid for the game, your check-in waits for a marshal, who decides. At a field that requires it to register, the registration is refused without a valid membership.
    - **Preferred team**: **Any**, or a team. The organisers decide the final team.
    - **Online registration**: only if you registered on the field's site. See [section 8](#8-if-you-registered-online).
    - **Replicas you bring**: tick the replicas you saved earlier. You can also do this later ([section 4](#4-declare-your-replicas)).
@@ -280,7 +281,7 @@ The app cannot create an account yet. Ask the field's organisers how to get one.
 
 - **Leave the game** (on **My check-in**) erases your name and federation number from this game. Replicas already chronographed stay on record.
 - The organisers and marshals see your name. It never goes in the game's events, the scoreboard or other players' views.
-- The controller erases names and federation numbers some days after the game (30 by default).
+- The controller erases names, federation and APD membership numbers (with the APD and expiry) some days after the game (30 by default).
 
 ## Troubleshooting
 

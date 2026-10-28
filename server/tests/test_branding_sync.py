@@ -90,7 +90,8 @@ class FieldBrandingTests(AppTestCase):
 
     async def test_branding(self) -> None:
         self.assertEqual(await self.sync_field(), {"sync_version": 1, "teams": [], "field": {
-            "field_name": None, "accent": None, "logo": None, "wallpaper": None}})
+            "field_name": None, "accent": None, "logo": None, "wallpaper": None,
+            "apd": {"accepted": None, "register": False, "checkin": False, "expiry": False, "custom": []}}})
         r = await self.client.patch(self.url("/branding"), json={"accent": "#C0FFEE"}, headers=self.gm)
         self.assertEqual(r.status_code, 403)  # the field's admin only
         r = await self.client.patch(self.url("/branding"), json={"accent": "#C0FFEE", "field_name": "Campo Tejo"},

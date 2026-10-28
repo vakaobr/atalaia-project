@@ -66,6 +66,9 @@ class RegistrationIn(BaseModel):
     display_name: Optional[str] = PydanticField(default=None, max_length=256)
     team_preference: Optional[str] = PydanticField(default=None, max_length=64)
     federation_number: Optional[str] = PydanticField(default=None, max_length=256)
+    membership_number: Optional[str] = PydanticField(default=None, max_length=256)  # the same value (protocol/apd.md)
+    apd_id: Optional[str] = PydanticField(default=None, max_length=64)
+    membership_expires: Optional[str] = PydanticField(default=None, max_length=10)
     replicas: Optional[list[ReplicaIn]] = PydanticField(default=None, max_length=svc.MAX_REPLICAS + 1)
 
 
@@ -160,12 +163,15 @@ async def list_registrations(field_id: uuid.UUID, game_id: uuid.UUID, principal:
                                  .order_by(GameRegistration.created_at, GameRegistration.id)))
     reps = await svc.replicas_of(db, [r.id for r in regs])
     names = await svc.staff_names(db, regs)
+    field = await db.get(Field, field_id)
     counts: dict[str, int] = {}
     for r in regs:
         counts[r.status] = counts.get(r.status, 0) + 1
     return JSONResponse({"scheduled_game_id": str(game_id), "max_players": game.max_players,
-                         "walkins": game.walkins, "counts": counts,
-                         "registrations": [svc.registration_json(r, reps[r.id], names=names) for r in regs]},
+                         "walkins": game.walkins, "counts": counts, "apd": svc.field_rule(field),
+                         "apds": svc.project_apds(),
+                         "registrations": [svc.registration_json(r, reps[r.id], names=names, verdict_for=(game, field))
+                                          for r in regs]},
                         headers=NO_STORE)
 
 
@@ -302,6 +308,13 @@ async def staff_no_show(field_id: uuid.UUID, game_id: uuid.UUID, reg_id: uuid.UU
     return await _answer(db, reg, staff=True)
 
 
+@router.get("/apds")
+async def list_apds() -> JSONResponse:
+    """The project's list of APDs (protocol/apd.md): public, the same for everyone. A field adds its own entries
+    in its rule (``field.apd.custom``)."""
+    return JSONResponse({"format": 1, "apds": svc.project_apds()}, headers={"Cache-Control": "public, max-age=3600"})
+
+
 # --- the field's games for the app (decisions S16-13, S17-9) -------------------------------
 
 @router.get("/fields-by-slug/{slug}")
@@ -335,6 +348,7 @@ async def field_games(slug: str, principal: Principal = Depends(current_principa
             "predeclare_replicas": g.predeclare_replicas, "status": g.status, "cancelled_reason": g.cancelled_reason})
     return JSONResponse({"field": {"id": str(field.id), "slug": field.slug, "name": field.name,
                                    "timezone": field.timezone, "federation_label": field.federation_label,
+                                   "apd": svc.field_rule(field),
                                    "limit_template": field.limit_template,
                                    "classes": list(svc.classes(field.limit_template)),
                                    "replica_types": list(svc.REPLICA_TYPES),

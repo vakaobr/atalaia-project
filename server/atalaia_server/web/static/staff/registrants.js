@@ -54,6 +54,30 @@ export function replicaCell(replicas, withState) {
     }));
 }
 
+/** Whether the membership column shows: the game asks for the federation number or the field's rule asks for an
+ * APD membership at registration or check-in (protocol/apd.md). */
+export function asksMembership(game, list) {
+    const rule = list.apd || {};
+    return game.federation !== 'off' || Boolean(rule.register || rule.checkin);
+}
+
+/** The APDs a registration may name: the project's, then the field's own. */
+export function apdChoices(list) {
+    return [...(list.apds || []), ...((list.apd || {}).custom || [])];
+}
+
+/** A registration's membership as text: the APD, the number, the expiry and the verdict when a rule asks. */
+export function membershipText(reg, list) {
+    if (!reg.federation_number && !reg.apd_id && !reg.membership_expires) {
+        return reg.apd_status ? t(`apd_status_${reg.apd_status}`) : t('none');
+    }
+    const apd = apdChoices(list).find((e) => e.id === reg.apd_id);
+    const parts = [reg.apd_id ? (apd ? apd.short_name : reg.apd_id) : t('apd_unknown'), reg.federation_number || t('none')];
+    if (reg.membership_expires) parts.push(`${t('apd_expires')} ${reg.membership_expires}`);
+    const text = parts.join(' · ');
+    return reg.apd_status ? `${text} — ${t(`apd_status_${reg.apd_status}`)}` : text;
+}
+
 export function ticketText(reg) {
     return reg.has_ticket ? t('ticket_yes') : t('ticket_no');
 }

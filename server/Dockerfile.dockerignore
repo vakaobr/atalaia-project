@@ -11,6 +11,8 @@
 !modes/
 !protocol/vectors/sync.json
 !protocol/vectors/chrono_record.json
+!protocol/vectors/apd.json
+!registry/apds/apds.json
 !server/requirements.txt
 !server/requirements-test.txt
 !server/atalaia_server/

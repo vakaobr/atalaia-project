@@ -479,6 +479,31 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(self.db.fetch("SELECT display_name FROM game_registrations")[0][0], "Falcão")
         self.db.fetch("DELETE FROM fields")
 
+    def test_0016_with_data(self) -> None:
+        """0016_apd_membership: a federation number that was there stays as the membership number with the APD
+        unknown, the APD id is checked, the field's rule is null (the default), and back down."""
+        command.upgrade(self.cfg, "0014_registration_staff")
+        field = self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Campo', 'campo') RETURNING id")[0][0]
+        game = self.db.fetch("INSERT INTO scheduled_games (field_id, title, starts_at, ends_at, status) VALUES "
+                             "($1, 'Domingo', '2030-11-09T09:00:00Z', '2030-11-09T13:00:00Z', 'published') "
+                             "RETURNING id", field)[0][0]
+        self.db.fetch("INSERT INTO game_registrations (scheduled_game, field_id, player_id, display_name, "
+                      "federation_number) VALUES ($1, $2, 'p-abcdefgh2345', 'Falcão', 'FPA-1')", game, field)
+        command.upgrade(self.cfg, "0016_apd_membership")
+        row = self.db.fetch("SELECT federation_number, apd_id, membership_expires FROM game_registrations")[0]
+        self.assertEqual(tuple(row), ("FPA-1", None, None))
+        self.assertIsNone(self.db.fetch("SELECT apd_rule FROM fields")[0][0])
+        self.db.fetch("UPDATE game_registrations SET apd_id = 'apd-a', membership_expires = '2031-01-31'")
+        self.db.fetch("UPDATE fields SET apd_rule = '{\"checkin\": true}'::jsonb")
+        with self.assertRaisesRegex(Exception, "ck_game_registrations_apd_id"):
+            self.db.fetch("UPDATE game_registrations SET apd_id = 'APD A'")
+        command.downgrade(self.cfg, "0014_registration_staff")
+        columns = {r["column_name"] for r in self.db.fetch(
+            "SELECT column_name FROM information_schema.columns WHERE table_name IN ('game_registrations', 'fields')")}
+        self.assertFalse(columns & {"apd_id", "membership_expires", "apd_rule"})
+        self.assertEqual(self.db.fetch("SELECT federation_number FROM game_registrations")[0][0], "FPA-1")
+        self.db.fetch("DELETE FROM fields")
+
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)
         self.assertEqual(len(self.script.get_bases()), 1)

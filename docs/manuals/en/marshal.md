@@ -45,6 +45,10 @@ If the organisers take you off the list, your phone stops being a marshal at onc
 
 Below, **Who you are** has **Chronograph's id** (a name for your device, for example *chrono-1*) and **Signing key**. **Stored readings** says how many readings are on this phone. They are kept for 365 days and then deleted. **Erase someone's readings** erases one player's readings: type the **Player's id** and tap **Erase**.
 
+## 2b. The APD verdict at check-in
+
+When the field checks APD membership, a player's card in the queue shows their APD, membership number and expiry with a badge: **Valid membership**, **Membership expired**, **APD not accepted here** or **Membership missing**. The app does not verify anything: compare the number and the date with the player's card. A player whose badge is not valid is **waiting**; **Let in** admits them anyway. You are never blocked, and the controller logs it without the number (the card then says **let in by a marshal**). The queue lists players who declared replicas; the GM console lists everyone.
+
 ## 3. The queue: replicas to chrono
 
 1. Tap **Replicas to chrono**.

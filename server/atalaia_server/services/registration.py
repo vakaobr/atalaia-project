@@ -40,15 +40,17 @@ from __future__ import annotations
 import functools
 import hashlib
 import hmac
+import json
 import re
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
 import yaml
-from atalaia_controller import REPO_ROOT, checkin_ticket, sync_format
+from atalaia_controller import REPO_ROOT, apd as apd_core, checkin_ticket, sync_format
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -255,13 +257,102 @@ def _team(game: ScheduledGame, value: Any) -> Optional[str]:
     return value
 
 
-def _federation(game: ScheduledGame, value: Any) -> Optional[str]:
-    number = clean_name(value, "federation_number", FEDERATION_MAX)
-    if game.federation == "off":
-        return None
+APDS_FILE = Path(__file__).resolve().parents[1] / "data" / "apds.json"
+
+
+@functools.lru_cache(maxsize=1)
+def project_apds() -> list[dict[str, Any]]:
+    """The project's list of APDs (``data/apds.json``, a copy of ``registry/apds/apds.json``), without each
+    entry's ``source``."""
+    doc = json.loads(APDS_FILE.read_text(encoding="utf-8"))
+    return [{k: v for k, v in e.items() if k != "source"} for e in doc["apds"]]
+
+
+def field_rule(field: Optional[Field]) -> dict[str, Any]:
+    """The field's APD rule, normalised (the default when none is set or it cannot be read: a rule stored by an
+    older build must never lock a registration out)."""
+    try:
+        return apd_core.check_rule(field.apd_rule if field is not None else None)
+    except apd_core.ApdError:
+        return apd_core.default_rule()
+
+
+def asks_membership(game: ScheduledGame, rule: dict[str, Any]) -> bool:
+    """Whether the game or the field's rule has a use for the membership number (protocol/apd.md): otherwise it
+    is dropped, as the federation number always was."""
+    return game.federation != "off" or rule["register"] or rule["checkin"]
+
+
+def game_day(game: ScheduledGame, field: Optional[Field]) -> str:
+    """The local date (``YYYY-MM-DD``) the game is played on, in the field's time zone."""
+    try:
+        tz = ZoneInfo(field.timezone) if field is not None else timezone.utc
+    except (KeyError, ValueError):
+        tz = timezone.utc
+    return game.starts_at.astimezone(tz).date().isoformat()
+
+
+def declared_membership(body: dict[str, Any]) -> dict[str, Any]:
+    """What a request body says about the membership, only for the keys it has: ``number`` (``membership_number``,
+    or the old ``federation_number``: both given must agree), ``apd`` and ``expires`` (a date)."""
+    out: dict[str, Any] = {}
+    names = [k for k in ("membership_number", "federation_number") if k in body]
+    if names:
+        values = [clean_name(body[k], "federation_number", FEDERATION_MAX) for k in names]
+        if len(set(values)) > 1:
+            raise RegistrationError("membership_number_conflict")
+        out["number"] = values[0]
+    if "apd_id" in body:
+        v = body["apd_id"]
+        if v is not None and v != "":
+            if not isinstance(v, str) or not apd_core.ID_RE.fullmatch(v):
+                raise RegistrationError("apd_id_invalid")
+        out["apd"] = v or None
+    if "membership_expires" in body:
+        v = body["membership_expires"]
+        if v is not None and v != "":
+            try:
+                apd_core.check_membership({"expires": v})
+            except apd_core.ApdError:
+                raise RegistrationError("membership_expires_invalid") from None
+            out["expires"] = date.fromisoformat(v)
+        else:
+            out["expires"] = None
+    return out
+
+
+def membership_for(game: ScheduledGame, field: Optional[Field], cur: tuple[Optional[str], Optional[str], Optional[date]],
+                   declared: dict[str, Any], enforce: bool) -> tuple[Optional[str], Optional[str], Optional[date]]:
+    """The registration's ``(number, apd_id, expires)`` after ``declared`` is put over ``cur`` and the game's and
+    the field's rules are applied: all of it is dropped when neither asks for a membership; the number is needed
+    when the game requires one; with ``enforce`` (a player registering or changing) a field rule with ``register``
+    refuses a missing number, an APD it does not accept and an expired membership (protocol/apd.md)."""
+    number = declared["number"] if "number" in declared else cur[0]
+    apd = declared["apd"] if "apd" in declared else cur[1]
+    expires = declared["expires"] if "expires" in declared else cur[2]
+    rule = field_rule(field)
+    if not asks_membership(game, rule):
+        return None, None, None
     if game.federation == "required" and number is None:
         raise RegistrationError("federation_number_required")
-    return number
+    if enforce and rule["register"]:
+        verdict = apd_core.status(rule, apd, number, expires.isoformat() if expires else None,
+                                  game_day(game, field))
+        if verdict != "valid":
+            raise RegistrationError({"missing": "membership_missing", "not_accepted": "apd_not_accepted",
+                                     "expired": "membership_expired"}[verdict])
+    return number, apd, expires
+
+
+def membership_status(game: Optional[ScheduledGame], field: Optional[Field], reg: GameRegistration,
+                      now: Optional[datetime] = None) -> Optional[str]:
+    """The verdict shown to staff (null when no rule of the field asks at registration or check-in)."""
+    rule = field_rule(field)
+    if not (rule["register"] or rule["checkin"]):
+        return None
+    on = game_day(game, field) if game is not None else (now or datetime.now(timezone.utc)).date().isoformat()
+    return apd_core.status(rule, reg.apd_id, reg.federation_number,
+                           reg.membership_expires.isoformat() if reg.membership_expires else None, on)
 
 
 async def replicas_of(db: AsyncSession, reg_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, list[RegistrationReplica]]:
@@ -308,7 +399,7 @@ async def register(db: AsyncSession, field: Field, game: ScheduledGame, user_id:
         await quotas.check(db, "registrations", field.id)
     name = clean_name(body.get("display_name"), "display_name", NAME_MAX) or username[:NAME_MAX]
     team = _team(game, body.get("team_preference"))
-    federation = _federation(game, body.get("federation_number"))
+    number, apd_id, expires = membership_for(game, field, (None, None, None), declared_membership(body), True)
     pid = await player_id_for(db, user_id, field.id)
     assert pid is not None
     decls = await check_declarations(db, field, game, pid, body.get("replicas"))
@@ -320,7 +411,8 @@ async def register(db: AsyncSession, field: Field, game: ScheduledGame, user_id:
     else:
         reg = existing
         reg.player_id, reg.cancelled_at, reg.outcome_at = pid, None, None
-    reg.display_name, reg.team_preference, reg.federation_number = name, team, federation
+    reg.display_name, reg.team_preference, reg.federation_number = name, team, number
+    reg.apd_id, reg.membership_expires = apd_id, expires
     reg.status, reg.ticket_hash, reg.updated_at = "registered", digest, now
     await db.flush()
     await _put_replicas(db, reg, decls)
@@ -349,11 +441,13 @@ async def change(db: AsyncSession, field: Field, game: ScheduledGame, reg: GameR
         if team != reg.team_preference:
             reg.team_preference = team
             changed.append("team_preference")
-    if "federation_number" in body:
-        number = _federation(game, body["federation_number"])
-        if number != reg.federation_number:
-            reg.federation_number = number
-            changed.append("federation_number")
+    if any(k in body for k in ("federation_number", "membership_number", "apd_id", "membership_expires")):
+        number, apd_id, expires = membership_for(game, field, (reg.federation_number, reg.apd_id, reg.membership_expires),
+                                                 declared_membership(body), enforce=not staff)
+        for name, new in (("federation_number", number), ("apd_id", apd_id), ("membership_expires", expires)):
+            if new != getattr(reg, name):
+                setattr(reg, name, new)
+                changed.append(name)
     if "replicas" in body:
         decls = await check_declarations(db, field, game, reg.player_id, body["replicas"])
         if await _replace_replicas(db, reg, decls):
@@ -450,14 +544,17 @@ def mark_no_show(game: ScheduledGame, reg: GameRegistration, no_show: bool, user
     return True
 
 
-def _fit(game: ScheduledGame, reg: GameRegistration) -> list[str]:
-    """What the game's rules do to the registration's team and federation number: the number is needed when the
-    game requires one (refused without) and dropped when it asks for none; a team the game lacks is cleared."""
+def _fit(game: ScheduledGame, field: Optional[Field], reg: GameRegistration) -> list[str]:
+    """What the game's and the field's rules do to the registration's team and membership: the number is needed
+    when the game requires one (refused without) and dropped when nothing asks for one; a team the game lacks is
+    cleared. Staff's moves never enforce the field's ``register`` rule."""
     changed = []
-    number = _federation(game, reg.federation_number)
-    if number != reg.federation_number:
-        reg.federation_number = number
-        changed.append("federation_number")
+    number, apd_id, expires = membership_for(game, field, (reg.federation_number, reg.apd_id, reg.membership_expires),
+                                             {}, enforce=False)
+    for name, new in (("federation_number", number), ("apd_id", apd_id), ("membership_expires", expires)):
+        if new != getattr(reg, name):
+            setattr(reg, name, new)
+            changed.append(name)
     if reg.team_preference is not None and reg.team_preference not in (game.teams or []):
         reg.team_preference = None
         changed.append("team_preference")
@@ -475,7 +572,7 @@ async def restore(db: AsyncSession, game: ScheduledGame, reg: GameRegistration, 
         raise RegistrationError("registration_erased", 409)  # its person's data is gone: nothing to bring back
     if game.max_players is not None and (await counts(db, [game.id])).get(game.id, 0) >= game.max_players:
         raise RegistrationError("game_full", 409)
-    changed = _fit(game, reg)
+    changed = _fit(game, await db.get(Field, reg.field_id), reg)
     reg.status, reg.cancelled_at, reg.updated_at = "registered", None, now
     return changed
 
@@ -506,7 +603,7 @@ async def move(db: AsyncSession, source: ScheduledGame, target: ScheduledGame, r
         raise RegistrationError("already_registered_there", 409)
     if target.max_players is not None and (await counts(db, [target.id])).get(target.id, 0) >= target.max_players:
         raise RegistrationError("game_full", 409)
-    changed = _fit(target, reg)
+    changed = _fit(target, await db.get(Field, reg.field_id), reg)
     if not target.predeclare_replicas and (await replicas_of(db, [reg.id]))[reg.id]:
         await _put_replicas(db, reg, [])
         changed.append("replicas")
@@ -545,13 +642,17 @@ async def staff_names(db: AsyncSession, regs: Iterable[GameRegistration]) -> dic
 
 def registration_json(reg: GameRegistration, replicas: list[RegistrationReplica],
                       game: Optional[ScheduledGame] = None, field: Optional[Field] = None,
-                      names: Optional[dict[uuid.UUID, str]] = None) -> dict[str, Any]:
+                      names: Optional[dict[uuid.UUID, str]] = None,
+                      verdict_for: Optional[tuple[ScheduledGame, Field]] = None) -> dict[str, Any]:
     """A registration as its player or the field's staff see it: never the ticket's hash. ``names`` (the
     staff views) adds who marked it paid."""
     out: dict[str, Any] = {
         "id": str(reg.id), "scheduled_game_id": str(reg.scheduled_game), "field_id": str(reg.field_id),
         "player_id": reg.player_id, "display_name": reg.display_name, "team_preference": reg.team_preference,
-        "federation_number": reg.federation_number, "status": reg.status, "source": reg.source,
+        "federation_number": reg.federation_number, "membership_number": reg.federation_number,
+        "apd_id": reg.apd_id, "membership_expires": reg.membership_expires.isoformat()
+        if reg.membership_expires else None, "apd_status": membership_status(*(verdict_for or (game, field)), reg),
+        "status": reg.status, "source": reg.source,
         "external_ref": reg.external_ref,
         "has_ticket": reg.ticket_hash is not None, "replicas": [replica_json(r) for r in replicas],
         "created_at": _iso(reg.created_at), "updated_at": _iso(reg.updated_at),
@@ -613,14 +714,20 @@ async def roster(db: AsyncSession, field_id: uuid.UUID, game_id: uuid.UUID) -> O
         GameRegistration.display_name.is_not(None)).order_by(GameRegistration.created_at, GameRegistration.id)
         .limit(sync_format.MAX_ROSTER)))
     reps = await replicas_of(db, [r.id for r in regs])
+    rule = field_rule(await db.get(Field, field_id))
+    asks = asks_membership(game, rule)
     out = []
     for r in regs:
         entry: dict[str, Any] = {"registration_id": str(r.id), "player_id": r.player_id,
                                  "display_name": r.display_name, "replicas": []}
         if r.team_preference:
             entry["team_preference"] = r.team_preference
-        if r.federation_number and game.federation != "off":
+        if asks and r.federation_number:
             entry["federation_number"] = r.federation_number
+            if r.apd_id:
+                entry["apd_id"] = r.apd_id
+            if r.membership_expires:
+                entry["membership_expires"] = r.membership_expires.isoformat()
         if r.ticket_hash:
             entry["ticket_sha256"] = r.ticket_hash
         for d in reps[r.id]:
@@ -632,8 +739,11 @@ async def roster(db: AsyncSession, field_id: uuid.UUID, game_id: uuid.UUID) -> O
                 decl["make_model"] = d.make_model
             entry["replicas"].append(decl)
         out.append(entry)
-    return {"sync_version": sync_format.SYNC_VERSION, "scheduled_game_id": str(game.id), "status": game.status,
-            "federation": game.federation, "registrations": out}
+    answer = {"sync_version": sync_format.SYNC_VERSION, "scheduled_game_id": str(game.id), "status": game.status,
+              "federation": game.federation, "registrations": out}
+    if rule["register"] or rule["checkin"]:
+        answer["apd"] = rule  # protocol/apd.md: the controller shows the verdict with the field's rule
+    return answer
 
 
 async def roster_players(db: AsyncSession, field_id: uuid.UUID, game_id: uuid.UUID) -> Optional[list[str]]:

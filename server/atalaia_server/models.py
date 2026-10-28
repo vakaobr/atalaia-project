@@ -37,10 +37,10 @@ migrations build exactly these models. User-facing keys are UUIDv7
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Optional
 
-from sqlalchemy import (BigInteger, Boolean, CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, LargeBinary,
+from sqlalchemy import (BigInteger, Boolean, CheckConstraint, Date, DateTime, Float, ForeignKey, Index, Integer, LargeBinary,
                         MetaData, PrimaryKeyConstraint, SmallInteger, String, Text, UniqueConstraint, func, text)
 from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -95,6 +95,8 @@ class Field(Base):
     description: Mapped[Optional[str]] = mapped_column(Text)
     address_text: Mapped[Optional[str]] = mapped_column(String(512))
     federation_label: Mapped[Optional[str]] = mapped_column(String(16))
+    # APD membership rule (migration 0016, protocol/apd.md): null is the default rule (any APD, nothing asked).
+    apd_rule: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB)
     # Registration's replica rules (plan phase 16): the controller's [checkin] limit_template and
     # max_replicas, so a pre-declared replica is one the field's check-in accepts.
     limit_template: Mapped[str] = mapped_column(String(32), nullable=False, server_default="portugal")
@@ -711,6 +713,7 @@ class GameRegistration(Base):
         UniqueConstraint("scheduled_game", "source", "external_ref"),
         CheckConstraint("status IN ('registered', 'cancelled', 'checked_in', 'no_show')", name="status"),
         CheckConstraint("paid_by IS NULL OR paid_at IS NOT NULL", name="paid"),
+        CheckConstraint("apd_id IS NULL OR apd_id ~ '^[a-z0-9][a-z0-9-]{0,31}$'", name="apd_id"),
         Index("idx_game_registrations_paid_by", "paid_by"),
         Index("idx_game_registrations_outcome_by", "outcome_by"),
         Index("idx_game_registrations_user", "user_id"),
@@ -725,7 +728,11 @@ class GameRegistration(Base):
     player_id: Mapped[str] = mapped_column(String(14), nullable=False)
     display_name: Mapped[Optional[str]] = mapped_column(String(32))
     team_preference: Mapped[Optional[str]] = mapped_column(String(32))
+    # The membership number (migration 0016: ``federation_number`` is it; ``apd_id`` null is "APD unknown"),
+    # the APD the player declared and the expiry. Personal data, erased together (protocol/apd.md).
     federation_number: Mapped[Optional[str]] = mapped_column(String(32))
+    apd_id: Mapped[Optional[str]] = mapped_column(String(32))
+    membership_expires: Mapped[Optional[date]] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="registered")
     ticket_hash: Mapped[Optional[str]] = mapped_column(String(64))
     source: Mapped[str] = mapped_column(String(32), nullable=False, server_default="site")

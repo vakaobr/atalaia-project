@@ -9,7 +9,7 @@
 // The server records when a controller last pulled the roster, with the key it used and its program (FU7).
 
 import { $, boot, errorText, fieldPage, fillRows, page, status, t, when } from './staff.js';
-import { loadBoth, replicaCell, summarise, ticketText } from './registrants.js';
+import { asksMembership, loadBoth, membershipText, replicaCell, summarise, ticketText } from './registrants.js';
 
 async function main() {
     const ctx = await boot();
@@ -41,7 +41,7 @@ async function main() {
     } else {
         $('roster-pull').textContent = t('roster_not_pulled');
     }
-    const asks = game.federation !== 'off';
+    const asks = asksMembership(game, list);
     $('th-fed').hidden = !asks;
     $('print').disabled = false;
     $('print').addEventListener('click', () => window.print());
@@ -55,7 +55,7 @@ async function main() {
     $('roster-meta').textContent = meta.join(' · ');
     fillRows($('roster'), roster.map((r, i) => [
         [String(i + 1), { class: 'num' }], r.display_name, r.team_preference || t('none'), r.player_id,
-        ...(asks ? [r.federation_number || t('none')] : []), replicaCell(r.replicas, false), ticketText(r), '☐']));
+        ...(asks ? [membershipText(r, list)] : []), replicaCell(r.replicas, false), ticketText(r), '☐']));
     $('roster').hidden = roster.length === 0;
     $('roster-none').hidden = roster.length > 0;
 }

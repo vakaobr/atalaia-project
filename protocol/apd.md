@@ -73,9 +73,9 @@ worked out when shown, so a changed rule or a new day changes it.
 | --- | --- |
 | a registration or a check-in body (player to server or controller) | `apd_id`, `membership_number`, `membership_expires`; the old `federation_number` is the same value as `membership_number` (both sent: they must agree, else 400; either alone is accepted) |
 | a registration or check-in row (staff views, roster, exports) | `apd_id`, `membership_expires`, `membership_number` **and** `federation_number` (same value), and `apd_status` (null when no rule asks) |
-| site server: the field's rule | `apd` (the rule) in the field's settings (`apd_rule` in `PUT /api/v1/fields/{field}`), in the public game's `field` object, and in `GET /api/v1/sync/field` as `field.apd` |
+| site server: the field's rule | `apd` (the rule): set by the field's admin with `PATCH /api/v1/fields/{field}` (`{"apd": {...}}`, a whole rule; `{}` puts the default back; 400 `apd_rule_invalid`), shown in the field's JSON, in `GET /api/v1/fields-by-slug/{slug}`'s `field`, in the staff's registration list (with `apds`, the project list) and in `GET /api/v1/sync/field` as `field.apd` (always sent; the default when none is set) |
 | `GET /api/v1/sync/roster` | optional top-level `apd` (the rule); a registration may carry `apd_id` and `membership_expires` beside `federation_number`, when the game asks for the federation number or the rule has `checkin` or `register` |
-| `GET /api/v1/apds` (site server, no token) | `{"format": 1, "apds": [entry...]}` the project list |
+| `GET /api/v1/apds` (site server, no token, cacheable) | `{"format": 1, "apds": [entry...]}` the project list |
 | controller `GET /api/v1/checkin` | `settings.apd` (the rule) and `apds` (the choices: the project's, then `custom`) |
 | controller `PUT /api/v1/checkin/settings` | `apd` (a whole rule, replaces) |
 
