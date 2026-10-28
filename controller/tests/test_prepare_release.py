@@ -32,6 +32,11 @@ class Tree(unittest.TestCase):
         for name in FILES:
             (self.root / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(REPO / name, self.root / name)
+        # The tree as just after the 0.4.0 release, whatever the real repository says now (a dev
+        # version after a release, an rc before one).
+        files: dict[str, str] = {}
+        tool._set_core(self.root, V("0.4.0"), "", files)
+        tool._write_all(self.root, files)
         self.set_changelog("## [Unreleased]\n\n### Added\n- A thing.\n\n## [0.4.0] - 2026-10-28\n\nOld.\n\n### Added\n- Old thing.\n")
 
     def set_changelog(self, text: str) -> None:
