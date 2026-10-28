@@ -320,7 +320,7 @@ export class CheckinPanel extends Component {
             game_id: f.pinned.checked && this.game() ? this.game().id : null };
         const poster = await this.props.app.call('PUT', '/checkin/poster', body);
         if (poster) {
-            this.setState({ poster });
+            this.setState({ poster, posterEdit: null });
             this.props.app.showToast(t('checkin.saved'));
         }
     }
@@ -711,19 +711,30 @@ export class CheckinPanel extends Component {
     renderPoster() {
         const p = this.state.poster;
         if (!p) return null;
+        // What the GM typed or ticked and has not saved wins over the saved poster: the tab is drawn again whenever the
+        // stream brings news (and every second), and fields drawn from the saved values would lose the edit.
+        const e = this.state.posterEdit || {};
+        const urls = e.urls !== undefined ? e.urls : (p.urls || []).join('\n');
+        const ssid = e.wifi_ssid !== undefined ? e.wifi_ssid : (p.wifi_ssid || '');
+        const pinned = e.pinned !== undefined ? e.pinned : !!p.game_id;
+        const edit = (ev) => {
+            const f = ev.target;
+            if (f.name === 'urls' || f.name === 'wifi_ssid') this.setState({ posterEdit: { ...this.state.posterEdit, [f.name]: f.value } });
+            else if (f.name === 'pinned') this.setState({ posterEdit: { ...this.state.posterEdit, pinned: f.checked } });
+        };
         return html`<section class="card" aria-labelledby="cp-h">
             <h2 id="cp-h">${t('checkin.poster')}</h2>
             <p class="muted">${t('checkin.poster_intro')}</p>
             ${p.problem && html`<p class="warning" data-testid="poster-problem">${posterProblem(p)}</p>`}
             ${p.changed && html`<${PosterChanged} change=${p.changed} />`}
             ${p.ca_short && html`<p>${t('checkin.ca')}: <code data-testid="poster-ca">${p.ca_short}</code></p>`}
-            <form class="form" data-testid="poster-form" onSubmit=${(e) => this.savePoster(e)}>
+            <form class="form" data-testid="poster-form" onInput=${edit} onChange=${edit} onSubmit=${(e) => this.savePoster(e)}>
                 <div class="field"><label for="cp-urls">${t('checkin.poster_urls')}</label>
                     <textarea id="cp-urls" name="urls" rows="3" data-testid="poster-urls"
-                        value=${(p.urls || []).join('\n')}></textarea></div>
+                        value=${urls}></textarea></div>
                 <div class="field"><label for="cp-ssid">${t('checkin.poster_ssid')}</label>
-                    <input id="cp-ssid" name="wifi_ssid" maxlength="32" value=${p.wifi_ssid || ''} /></div>
-                <label class="check"><input type="checkbox" name="pinned" checked=${!!p.game_id} disabled=${!this.game()} />
+                    <input id="cp-ssid" name="wifi_ssid" maxlength="32" value=${ssid} /></div>
+                <label class="check"><input type="checkbox" name="pinned" checked=${pinned} disabled=${!this.game()} />
                     ${t('checkin.poster_pinned')}</label>
                 <button type="submit" data-testid="poster-save">${t('common.save')}</button>
             </form>

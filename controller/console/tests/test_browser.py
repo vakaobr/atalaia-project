@@ -3996,6 +3996,27 @@ class ConsoleBrowserTests(unittest.TestCase):
                                  == ["x-clube", "x-outra"], 10))
         self.assertEqual(self.field.http.get("/api/v1/checkin/settings").json()["federation_label"], "N.º APD")
 
+    def test_checkin_poster_form_keeps_unsaved_edits_when_the_tab_is_drawn_again(self):
+        """Audit CF-1 (the same loss as the check-in settings): the poster form drew its fields from the saved poster,
+        so any new drawing of the tab (a player checking in) put the saved values back under the GM's typing."""
+        game = self.field.create_game()
+        page = self.console()
+        page.get_by_test_id("tab-checkin").click()
+        expect(page.get_by_test_id("poster-urls")).to_be_visible()
+        page.get_by_test_id("poster-urls").fill("https://10.0.0.9:8443")
+        page.locator("#cp-ssid").fill("CampoTeste")
+        page.locator("input[name=pinned]").check()
+        late = self.check_in(game["id"], "Chegada")
+        expect(page.get_by_test_id(f"checkin-row-{late['player_id']}")).to_be_visible()
+        page.wait_for_timeout(1500)   # and the console's own clock draws it again every second
+        expect(page.get_by_test_id("poster-urls")).to_have_value("https://10.0.0.9:8443")
+        expect(page.locator("#cp-ssid")).to_have_value("CampoTeste")
+        expect(page.locator("input[name=pinned]")).to_be_checked()
+        page.get_by_test_id("poster-save").click()
+        self.assertTrue(wait_for(lambda: self.field.http.get("/api/v1/checkin/poster").json()["wifi_ssid"] == "CampoTeste", 10))
+        saved = self.field.http.get("/api/v1/checkin/poster").json()
+        self.assertEqual((saved["urls"], saved["game_id"]), (["https://10.0.0.9:8443"], game["id"]))
+
     def test_checkin_tab_says_association_membership_outside_portugal(self):
         """Decision MEM-2: the country is a setting of the field; PT keeps the APD texts, any other country (or none)
         says association membership and offers that country's list; the GM changes it in the settings."""
