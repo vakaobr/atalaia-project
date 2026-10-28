@@ -142,6 +142,81 @@ class LoginTestCase(AppTestCase):
         await self.fetch("UPDATE sessions SET confirmed_at = now() - interval '11 minutes'")
 
 
+SHA = ":".join(["AB", "CD", "EF", "01"] * 8)
+
+
+class AppLinkTests(LoginTestCase):
+    """What the Android and iOS apps need from the site (decision PKA-1): the two well-known files, only when
+    configured, and a social login that returns to the app's own path."""
+
+    configured = True
+
+    def settings(self) -> Settings:
+        base = super().settings()
+        if not self.configured:
+            return base
+        from dataclasses import replace
+        return replace(base, app_android_package="org.atalaia.app", app_android_sha256=(SHA, SHA.lower()),
+                       app_ios_app_ids=("ABCDE12345.org.atalaia.app",))
+
+    async def test_assetlinks_names_the_app_and_its_certificates(self) -> None:
+        r = await self.client.get("/.well-known/assetlinks.json")
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.headers["content-type"].startswith("application/json"))
+        target = r.json()[0]
+        self.assertIn("delegate_permission/common.handle_all_urls", r.json()[0]["relation"])
+        self.assertIn("delegate_permission/common.get_login_creds", r.json()[0]["relation"])
+        self.assertEqual(target["target"], {"namespace": "android_app", "package_name": "org.atalaia.app",
+                                            "sha256_cert_fingerprints": [SHA, SHA]})
+
+    async def test_the_apple_file_has_webcredentials_and_applinks(self) -> None:
+        r = await self.client.get("/.well-known/apple-app-site-association")
+        self.assertEqual(r.status_code, 200)
+        ids = ["ABCDE12345.org.atalaia.app"]
+        self.assertEqual(r.json(), {
+            "applinks": {"details": [{"appIDs": ids, "components": [{"/": "/app/*"}]}]},
+            "webcredentials": {"apps": ids}})
+
+    async def test_a_social_login_can_return_to_the_apps_path(self) -> None:
+        for wanted in ("/app/oidc", f"{ORIGIN}/app/oidc", "/app/oidc?x=1"):
+            with self.subTest(wanted=wanted):
+                params, r = await self.begin("google", return_to=wanted)
+                self.assertEqual(r.status_code, 200, r.text)
+                path, query, fragment = self.landed(await self.callback("google", params, f"app-{wanted}"))
+                self.assertEqual(path, "/app/oidc")
+                self.assertTrue(fragment.startswith("oidc="), fragment)
+                self.assertEqual(query.get("oidc_error"), None)
+                done = await self.client.post("/api/v1/auth/oidc/complete", json={"ticket": fragment[5:]})
+                self.assertEqual(done.status_code, 200, done.text)
+        # Nothing else is a place to send the browser.
+        for wanted, expected in (("https://evil.example/app/oidc", "/staff/login"), ("//evil.example/app/oidc", "/staff/login"),
+                                 ("/app/oidc/../staff/x", "/staff/login"), ("/app/other", "/staff/login"),
+                                 ("/app/oidcx", "/staff/login"), ("/app/oidc#x", "/staff/login"),
+                                 ("https://evil.example.app/app/oidc", "/staff/login")):
+            with self.subTest(wanted=wanted):
+                params, _ = await self.begin("google", return_to=wanted)
+                path, _, _ = self.landed(await self.callback("google", params, f"s-{wanted}"))
+                self.assertEqual(path, expected)
+
+    async def test_a_browser_that_lands_there_sees_a_short_page_with_no_script(self) -> None:
+        r = await self.client.get("/app/oidc", params={"oidc": "linked"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.headers["cache-control"], "no-store")
+        self.assertNotIn("<script", r.text.lower())
+
+
+class AppLinksOffTests(AppLinkTests):
+    """With no app configured the server says nothing about one."""
+
+    configured = False
+
+    async def test_assetlinks_names_the_app_and_its_certificates(self) -> None:
+        self.assertEqual((await self.client.get("/.well-known/assetlinks.json")).status_code, 404)
+
+    async def test_the_apple_file_has_webcredentials_and_applinks(self) -> None:
+        self.assertEqual((await self.client.get("/.well-known/apple-app-site-association")).status_code, 404)
+
+
 class SocialLoginTests(LoginTestCase):
     async def test_what_the_server_offers(self) -> None:
         r = await self.client.get("/api/v1/auth/methods")

@@ -114,6 +114,23 @@ class SettingsTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "ATALAIA_ATAK_RELAY_HOST must be unset in hosted mode"):
             Settings.from_env({**hosted, "ATALAIA_ATAK_RELAY_HOST": "atak.example.pt"})
 
+    def test_the_apps_identity_for_app_links(self) -> None:
+        """PKA-1: the package and its certificates go together; each is checked."""
+        sha = ":".join(["ab"] * 32)
+        s = Settings.from_env(BASE)
+        self.assertEqual((s.app_android_package, s.app_android_sha256, s.app_ios_app_ids), (None, (), ()))
+        s = Settings.from_env({**BASE, "ATALAIA_APP_ANDROID_PACKAGE": "org.atalaia.app",
+                               "ATALAIA_APP_ANDROID_SHA256": f"{sha}, {sha.upper()}",
+                               "ATALAIA_APP_IOS_APP_IDS": "ABCDE12345.org.atalaia.app"})
+        self.assertEqual(s.app_android_sha256, (sha.upper(), sha.upper()))
+        self.assertEqual(s.app_ios_app_ids, ("ABCDE12345.org.atalaia.app",))
+        for env in ({"ATALAIA_APP_ANDROID_PACKAGE": "org.atalaia.app"}, {"ATALAIA_APP_ANDROID_SHA256": sha},
+                    {"ATALAIA_APP_ANDROID_PACKAGE": "nodots", "ATALAIA_APP_ANDROID_SHA256": sha},
+                    {"ATALAIA_APP_ANDROID_PACKAGE": "org.atalaia.app", "ATALAIA_APP_ANDROID_SHA256": "AB:CD"},
+                    {"ATALAIA_APP_IOS_APP_IDS": "org.atalaia.app"}):
+            with self.subTest(env=env), self.assertRaisesRegex(ConfigError, "ATALAIA_APP_"):
+                Settings.from_env({**BASE, **env})
+
     def test_every_setting(self) -> None:
         s = Settings.from_env({
             **BASE, "ATALAIA_DB_POOL_SIZE": "10", "ATALAIA_DB_MAX_OVERFLOW": "0",

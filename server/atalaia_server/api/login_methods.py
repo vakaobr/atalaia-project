@@ -79,6 +79,8 @@ BINDING_PATH = "/api/v1/auth/oidc"
 STATE_TTL_S = 600
 DEFAULT_RETURN = "/staff/login"
 RETURN_TO = re.compile(r"/staff/[A-Za-z0-9/_.?=&%-]{0,380}")
+APP_RETURN = "/app/oidc"      # the app's own path on this host: an Android App Link or an iOS Universal Link
+APP_RETURN_TO = re.compile(r"/app/oidc(?:\?[A-Za-z0-9_.=&%-]{0,380})?")
 
 
 # Bodies ---------------------------------------------------------------------------------------------
@@ -136,11 +138,16 @@ def callback_url(request: Request, provider: str) -> str:
     return f"{site_origin(request)}{BINDING_PATH}/{provider}/callback"
 
 
-def safe_return_to(text: str) -> str:
-    """A path on the staff pages (with its query), else the staff login: nothing else is a place to send a
-    browser after a login (no other host, no protocol-relative address)."""
+def safe_return_to(text: str, origin: Optional[str] = None) -> str:
+    """A path on the staff pages (with its query), or the app's named path ``/app/oidc`` (PKA-1: the app asks
+    for it as a link on this very host, which the phone opens in the app; ``origin`` is this site's address,
+    so the full address of that link is read as its path), else the staff login: nothing else is a place to
+    send a browser after a login (no other host, no protocol-relative address)."""
+    if origin and text.startswith(f"{origin}{APP_RETURN}"):
+        text = text[len(origin):]
     parts = urlsplit(text)
-    if parts.scheme or parts.netloc or parts.fragment or "//" in text or "\\" in text or not RETURN_TO.fullmatch(text):
+    if parts.scheme or parts.netloc or parts.fragment or "//" in text or "\\" in text \
+            or not (RETURN_TO.fullmatch(text) or APP_RETURN_TO.fullmatch(text)):
         return DEFAULT_RETURN
     return text
 
@@ -271,7 +278,7 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
     redirect_uri = callback_url(request, provider)
     db.add(OidcLogin(state_hash=_hash(state), binding_hash=_hash(binding), provider=provider, purpose=body.purpose,
                      user_id=user_id, session_id=session_id, nonce=nonce, code_verifier=verifier,
-                     redirect_uri=redirect_uri, return_to=safe_return_to(body.return_to), consent=body.consent,
+                     redirect_uri=redirect_uri, return_to=safe_return_to(body.return_to, site_origin(request)), consent=body.consent,
                      expires_at=now + timedelta(seconds=STATE_TTL_S)))
     await db.commit()
     url = request.app.state.oidc.authorization_url(provider, redirect_uri, state, nonce,

@@ -51,6 +51,14 @@
                             another one (default: ATALAIA_ATAK_RELAY_PORT)
     ATALAIA_PASSWORD_LOGIN  "on" (default) or "off": "off" turns password login and password registration off
                             (accounts then sign in with a passkey or a social login; decision LG-3)
+    ATALAIA_APP_ANDROID_PACKAGE, ATALAIA_APP_ANDROID_SHA256
+                            the Android app's package name and its signing certificate's SHA-256 (hex pairs
+                            separated by colons; several, separated by commas, for a debug and a release key):
+                            both set, the server serves /.well-known/assetlinks.json, which lets the app open
+                            this site's /app/... links (App Links) and use its passkeys (decision PKA-1); unset:
+                            nothing is served
+    ATALAIA_APP_IOS_APP_IDS the iOS app's ids (<team id>.<bundle id>, separated by commas): set, the server
+                            serves /.well-known/apple-app-site-association (webcredentials and applinks)
     ATALAIA_OIDC_GOOGLE_CLIENT_ID, ATALAIA_OIDC_GOOGLE_CLIENT_SECRET
     ATALAIA_OIDC_MICROSOFT_CLIENT_ID, ATALAIA_OIDC_MICROSOFT_CLIENT_SECRET,
     ATALAIA_OIDC_MICROSOFT_TENANT   (common by default: personal and work accounts; organizations, consumers
@@ -153,6 +161,16 @@ class OidcClient:
         if self.provider == "microsoft" and not MICROSOFT_TENANT.fullmatch(self.tenant or ""):
             raise ConfigError("ATALAIA_OIDC_MICROSOFT_TENANT must be common, organizations, consumers or a "
                               "tenant's id (a UUID)")
+
+
+ANDROID_PACKAGE = re.compile(r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+")
+CERT_SHA256 = re.compile(r"[0-9A-F]{2}(?::[0-9A-F]{2}){31}")
+IOS_APP_ID = re.compile(r"[A-Z0-9]{10}\.[A-Za-z0-9][A-Za-z0-9.-]{0,150}")
+MAX_APP_IDS = 8
+
+
+def _list(env: Mapping[str, str], name: str) -> tuple[str, ...]:
+    return tuple(v.strip() for v in env.get(name, "").split(",") if v.strip())
 
 
 def _oidc_clients(env: Mapping[str, str]) -> tuple[OidcClient, ...]:
@@ -320,6 +338,9 @@ class Settings:
     hosted_watch_s: float = DEFAULT_HOSTED_WATCH_S
     password_login: bool = True                    # LG-3: "off" turns password login and registration off
     oidc: tuple[OidcClient, ...] = ()              # the configured social login providers (LG-1)
+    app_android_package: Optional[str] = None      # PKA-1: the app's Digital Asset Links (off when unset)
+    app_android_sha256: tuple[str, ...] = ()
+    app_ios_app_ids: tuple[str, ...] = ()          # PKA-1: apple-app-site-association (off when unset)
 
     def __post_init__(self) -> None:
         _check_url(self.database_url)
@@ -371,11 +392,29 @@ class Settings:
             raise ConfigError("ATALAIA_EXPORT_MAX_MB must be between 1 and 10240")
         if not 0.1 <= self.hosted_watch_s <= 60:
             raise ConfigError("ATALAIA_HOSTED_WATCH_S must be between 0.1 and 60")
+        self._check_app()
         if len({c.provider for c in self.oidc}) != len(self.oidc):
             raise ConfigError("a social login provider is configured twice")
 
     def oidc_client(self, provider: str) -> Optional[OidcClient]:
         return next((c for c in self.oidc if c.provider == provider), None)
+
+    def _check_app(self) -> None:
+        """The app's identity for App Links and passkeys (PKA-1): the package and its certificates go together;
+        a typo must not turn the file off silently."""
+        package = self.app_android_package
+        if (package is None) != (not self.app_android_sha256):
+            raise ConfigError("ATALAIA_APP_ANDROID_PACKAGE and ATALAIA_APP_ANDROID_SHA256 go together: "
+                              "set both or neither")
+        if package is not None and not ANDROID_PACKAGE.fullmatch(package):
+            raise ConfigError("ATALAIA_APP_ANDROID_PACKAGE must be an Android package name such as org.atalaia.app")
+        hashes = tuple(h.strip().upper() for h in self.app_android_sha256)
+        if len(hashes) > MAX_APP_IDS or not all(CERT_SHA256.fullmatch(h) for h in hashes):
+            raise ConfigError("ATALAIA_APP_ANDROID_SHA256 is up to 8 SHA-256 fingerprints, each 32 hex pairs "
+                              "separated by colons (keytool -list -v shows it)")
+        object.__setattr__(self, "app_android_sha256", hashes)
+        if len(self.app_ios_app_ids) > MAX_APP_IDS or not all(IOS_APP_ID.fullmatch(i) for i in self.app_ios_app_ids):
+            raise ConfigError("ATALAIA_APP_IOS_APP_IDS is up to 8 ids like TEAMID123.org.atalaia.app")
 
     def _check_atak(self) -> None:
         if not 0 <= self.atak_relay_port <= 65535:
@@ -459,4 +498,7 @@ class Settings:
             hosted_watch_s=float(_number(env, "ATALAIA_HOSTED_WATCH_S", DEFAULT_HOSTED_WATCH_S, 0.1, 60.0, float)),
             password_login=_on_off(env, "ATALAIA_PASSWORD_LOGIN", default=True),
             oidc=_oidc_clients(env),
+            app_android_package=env.get("ATALAIA_APP_ANDROID_PACKAGE", "").strip() or None,
+            app_android_sha256=_list(env, "ATALAIA_APP_ANDROID_SHA256"),
+            app_ios_app_ids=_list(env, "ATALAIA_APP_IOS_APP_IDS"),
         )
