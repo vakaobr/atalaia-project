@@ -260,11 +260,20 @@ class _Session:
         self.caller = caller
         self.lock = asyncio.Lock()
         self.link: Optional[remote_gm.Link] = None
+        self.rx: Optional[asyncio.Future[str]] = None  # the pending receive (see _receive)
         self.closed = asyncio.Event()  # set when the server closes the socket (a deleted or suspended field)
 
     async def send(self, msg: dict[str, Any]) -> None:
         async with self.lock:
             await self.ws.send_json(msg)
+
+    async def release(self) -> None:
+        """Ends the pending receive, if any, and waits for it so no cancellation or error is left over."""
+        rx, self.rx = self.rx, None
+        if rx is not None:
+            if not rx.done():
+                rx.cancel()
+            await asyncio.gather(rx, return_exceptions=True)
 
     async def close(self, code: int) -> None:
         """Closes the socket from outside its own handler (tenant_watch.py) and wakes the handler."""
@@ -276,21 +285,22 @@ class _Session:
 
 
 async def _receive(session: _Session) -> Optional[str]:
-    """The next text message, or None when the server closed the socket meanwhile."""
+    """The next text message, or None when the server closed the socket meanwhile. One receive task lives
+    as long as a message is awaited and is kept across calls (never cancelled mid-wait, which could lose
+    a message or leak a cancellation into the transport); ``session.release()`` ends it."""
     if session.closed.is_set():
         return None
-    receive = asyncio.ensure_future(session.ws.receive_text())
+    if session.rx is None:
+        session.rx = asyncio.ensure_future(session.ws.receive_text())
     closed = asyncio.ensure_future(session.closed.wait())
     try:
-        await asyncio.wait({receive, closed}, return_when=asyncio.FIRST_COMPLETED)
-        if receive.done():
-            return receive.result()
-        return None
+        await asyncio.wait({session.rx, closed}, return_when=asyncio.FIRST_COMPLETED)
     finally:
-        for task in (receive, closed):
-            if not task.done():
-                task.cancel()
-        await asyncio.gather(receive, closed, return_exceptions=True)
+        closed.cancel()
+    if session.rx.done():
+        rx, session.rx = session.rx, None
+        return rx.result()
+    return None
 
 
 @router.websocket("/stream")
@@ -328,6 +338,7 @@ async def stream(ws: WebSocket) -> None:
     except WebSocketDisconnect:
         return
     finally:
+        await session.release()
         if watched is not None:
             watch.remove(watched)
         if session.link is not None:
