@@ -95,6 +95,7 @@ final class ControllerMode {
     this.i18n = const {},
     this.parts = const [],
     this.commands = const {},
+    this.scoring,
     this.roleParts = const {},
     this.mainId = '',
     this.scenarioParams = const {},
@@ -120,6 +121,11 @@ final class ControllerMode {
   /// A composed mode's parts, in order (empty for one package).
   final List<String> parts;
   final Map<String, Object?> commands;
+
+  /// The optional scoring contract (manifest `scoring`, decision BSC-2): how a
+  /// box scores while it holds, so the controller can project the points
+  /// between two STATEs. Null: the mode does not say (a composed mode never).
+  final Map<String, Object?>? scoring;
 
   /// Role to the role package its nodes run.
   final Map<String, RolePart> roleParts;
@@ -286,6 +292,72 @@ void fillLangParam(bool declared, Map<String, Object?> params, String? code) {
   }
 }
 
+/// The optional `scoring` block (atalaia_sim.mode `check_scoring`, decision
+/// BSC-2): `scoring: {hold: {every: tick_s, points: points_per_tick}}`.
+void _checkScoring(Map<String, Object?> manifest, String where) {
+  final scoring = manifest['scoring'];
+  if (scoring == null) return;
+  if ((manifest['kind'] ?? 'mode') != 'mode') {
+    throw ModeException(
+      '$where: only a mode (not a role package or scenario) has scoring',
+    );
+  }
+  if (scoring is! Map || scoring.length != 1 || !scoring.containsKey('hold')) {
+    throw ModeException('$where: scoring has one key, hold: {every, points}');
+  }
+  final hold = scoring['hold'];
+  if (hold is! Map ||
+      hold.length != 2 ||
+      !hold.containsKey('every') ||
+      !hold.containsKey('points')) {
+    throw ModeException('$where: scoring.hold has every and points');
+  }
+  final params = _truthy(manifest['params'])
+      ? manifest['params']
+      : const <String, Object?>{};
+  for (final key in const ['every', 'points']) {
+    final value = hold[key];
+    if (value is! String && !(value is int && value >= 1)) {
+      throw ModeException(
+        "$where: scoring.hold.$key is a whole number from 1 or a parameter's name",
+      );
+    }
+    if (value is String) {
+      final spec = params is Map ? params[value] : null;
+      if (spec is! Map || spec['type'] != 'int') {
+        throw ModeException(
+          '$where: scoring.hold.$key names $value, which is not an int parameter',
+        );
+      }
+      final min = spec['min'];
+      if (min is! int || min < 1) {
+        throw ModeException(
+          '$where: parameter $value needs min: 1 or more to be a scoring.hold.$key',
+        );
+      }
+    }
+  }
+}
+
+/// A mode's `scoring.hold` with a game's parameters: (every in game ms,
+/// points), or null when the mode has no such block or a value cannot be read
+/// (atalaia_sim.mode `hold_scoring`).
+(int, int)? holdScoring(
+  Map<String, Object?>? scoring,
+  Map<String, Object?> params,
+) {
+  final hold = scoring?['hold'];
+  if (hold is! Map) return null;
+  final values = <int>[];
+  for (final key in const ['every', 'points']) {
+    var value = hold[key];
+    if (value is String) value = params[value];
+    if (value is! int || value < 1) return null;
+    values.add(value);
+  }
+  return (values[0] * 1000, values[1]);
+}
+
 /// The optional parts of a manifest: kind, commands and i18n
 /// (atalaia_sim.mode `check_manifest`).
 void checkManifest(Map<String, Object?> manifest, String where) {
@@ -323,6 +395,7 @@ void checkManifest(Map<String, Object?> manifest, String where) {
       );
     }
   }
+  _checkScoring(manifest, where);
   final commands = manifest['commands'];
   if (commands != null) {
     if (commands is! Map) {
@@ -449,6 +522,7 @@ ControllerMode modeFromManifest(
         : '',
     i18n: map(manifest['i18n']),
     commands: map(manifest['commands']),
+    scoring: map(manifest['scoring']).isEmpty ? null : map(manifest['scoring']),
   );
 }
 
@@ -488,6 +562,7 @@ final class ModePackage {
     'roles': mode.roles,
     'params': mode.params,
     'commands': mode.commands,
+    'scoring': mode.scoring,
     'i18n': mode.i18n,
     'parts': mode.parts,
     'field_script': mode.fieldScript != null,

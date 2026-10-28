@@ -214,6 +214,22 @@ class RadioInputTests(EngineCase):
         self.assertTrue(any(m["type"] == "score" and m["teams"] == {"red": 12, "blue": 4}
                             for m in self.messages))
 
+    def test_box_penalties_reach_the_totals_and_survive_a_restart(self):
+        """RFC 0001 Amendment 17: STATE key 9 is subtracted; it is stored with the node."""
+        gid = self.gid
+        lost_state = state_encode({"owner_team": 1, "phase": 1, "game_time_ms": 0, "counters": {1: 12, 2: 4},
+                                   "epoch": 3, "lost": {2: 3}})
+        self.rx(4, 1, "STATE", lost_state, epoch=3)
+        self.assertEqual(self.ctrl.score(gid)["teams"], {"red": 12, "blue": 1})
+        self.assertEqual(self.ctrl.nodes()[0]["lost"], {"red": 0, "blue": 3})
+        self.assertTrue(any(m["type"] == "score" and m["teams"] == {"red": 12, "blue": 1}
+                            for m in self.messages))
+        self.assertEqual({n["node_id"]: n for n in self.store.nodes(gid)}[4]["lost"], {"red": 0, "blue": 3})
+        self.reopen(persist_game_key=True)  # the Pi rebooted
+        self.assertEqual(self.ctrl.score(gid)["teams"], {"red": 12, "blue": 1})
+        self.rx(4, 2, "STATE", state(1, {1: 12, 2: 4}, epoch=3), epoch=3)  # an older box: no key 9
+        self.assertEqual(self.ctrl.score(gid)["teams"], {"red": 12, "blue": 1})
+
     def test_other_games_are_ignored(self):
         self.modem.rx(4, 0, "STATE", state(1, {1: 50}), game_id=(self.gid % 0xFFFE) + 1)
         self.assertEqual(self.ctrl.score(self.gid)["teams"], {"red": 0, "blue": 0})
@@ -410,3 +426,74 @@ class FieldScriptTests(EngineCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProjectedScoreTests(EngineCase):
+    """Decision BSC-2: a mode that says how a box scores while it holds (mode.yaml `scoring`) gets
+    a projected total between STATEs; display only, replaced by every STATE."""
+
+    def start(self, **params):
+        gid = self.create(params={"tick_s": 10, "points_per_tick": 2, **params})["id"]
+        self.ctrl.start_game(gid, force=True)
+        return gid
+
+    def run_to(self, game_ms):
+        self.clock.advance(game_ms / 1000 - self.ctrl.fc.game_time_ms / 1000)
+        self.ctrl.tick()
+
+    def test_projection_counts_the_ticks_since_the_last_state_and_every_state_replaces_it(self):
+        gid = self.start()
+        self.assertEqual(self.ctrl.score(gid)["projected"], {"red": 0, "blue": 0})  # nothing held yet
+        self.rx(4, 1, "STATE", state(1, {}, game_time=0))
+        self.run_to(25_000)  # the boxes ticked at 10 s and 20 s: 2 x 2 points, not reported yet
+        out = self.ctrl.score(gid)
+        self.assertEqual((out["teams"], out["projected"]), ({"red": 0, "blue": 0}, {"red": 4, "blue": 0}))
+        ticks = [m for m in self.messages if m["type"] == "score" and m.get("tick")]
+        self.assertEqual(ticks[-1]["projected"], {"red": 4, "blue": 0})
+        self.assertEqual(ticks[-1]["teams"], {"red": 0, "blue": 0})
+        # The next STATE (box time 20 s) says what the box really has: the projection was right.
+        self.rx(4, 2, "STATE", state(1, {1: 4}, game_time=20_000))
+        out = self.ctrl.score(gid)
+        self.assertEqual((out["teams"]["red"], out["projected"]["red"]), (4, 4))
+        self.assertEqual(self.store.scores(gid), {"red": 4, "blue": 0})  # stored: reports only
+        self.assertEqual(self.ctrl.status()["projection"]["max_abs"], 0)
+        self.run_to(35_000)
+        self.assertEqual(self.ctrl.score(gid)["projected"]["red"], 6)  # one more tick at 30 s
+        # A box that said less than the projection (it missed a tick): the drift is measured
+        # and the total never accumulates it.
+        self.rx(4, 3, "STATE", state(1, {1: 4}, game_time=35_000))
+        out = self.ctrl.score(gid)
+        self.assertEqual((out["teams"]["red"], out["projected"]["red"]), (4, 4))
+        stats = self.ctrl.status()["projection"]
+        self.assertEqual((stats["samples"], stats["off"], stats["max_abs"]), (2, 1, 2))
+        self.assertEqual(stats["last"]["drift"], 2)
+
+    def test_no_projection_while_paused_for_an_offline_box_or_a_box_with_no_owner(self):
+        gid = self.start()
+        self.rx(4, 1, "STATE", state(1, {}, game_time=0))
+        self.rx(5, 1, "STATE", state(0, {}, game_time=0))  # nobody holds box 5
+        self.run_to(15_000)
+        self.assertEqual(self.ctrl.score(gid)["projected"], {"red": 2, "blue": 0})
+        self.ctrl.fc.nodes[4].link = "offline"
+        self.assertEqual(self.ctrl.score(gid)["projected"], {"red": 0, "blue": 0})
+        self.ctrl.fc.nodes[4].link = "online"
+        self.ctrl.pause_game(gid)
+        self.assertNotIn("projected", self.ctrl.score(gid))
+        self.ctrl.resume_game(gid)
+        self.ctrl.end_game(gid)
+        self.assertNotIn("projected", self.ctrl.score(gid))
+
+    def test_a_mode_that_does_not_opt_in_has_no_projection(self):
+        gid = self.create(mode_id="org.atalaia.holdall")["id"]
+        self.ctrl.start_game(gid, force=True)
+        self.rx(4, 1, "STATE", state(1, {}, game_time=0))
+        self.run_to(15_000)
+        self.assertNotIn("projected", self.ctrl.score(gid))
+        self.assertIsNone(self.ctrl.status()["projection"])
+        self.assertFalse([m for m in self.messages if m["type"] == "score" and m.get("tick")])
+
+    def test_the_games_own_tick_and_points_are_used(self):
+        gid = self.start(tick_s=5, points_per_tick=3)
+        self.rx(4, 1, "STATE", state(2, {}, game_time=0))
+        self.run_to(12_000)
+        self.assertEqual(self.ctrl.score(gid)["projected"], {"red": 0, "blue": 6})

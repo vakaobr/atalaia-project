@@ -203,6 +203,7 @@ PAYLOAD_FIELDS = {
         'battery_pct': PayloadField(6, 'uint8', False),
         'flags': PayloadField(7, 'uint8', False),
         'epoch': PayloadField(8, 'uint16', True),
+        'lost': PayloadField(9, 'map_u8_u32', False),
     },
     'CMD': {
         'cmd': PayloadField(1, 'uint8', True),

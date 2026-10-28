@@ -36,6 +36,8 @@ python3 tools/gen_box_fonts.py --check
 python3 tools/check_wiring.py
 # The listen-before-talk bench gate's report tool, on a made-up log (decision SL-25).
 python3 tools/bench_lbt_gate.py --selftest
+# The projected score's bench report, on a made-up log (decision BSC-2).
+python3 tools/bench_projected_score.py --selftest
 if command -v clang-format > /dev/null 2>&1 && command -v stylua > /dev/null 2>&1; then
     sh tools/format.sh --check
 else

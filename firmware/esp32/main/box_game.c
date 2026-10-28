@@ -110,6 +110,7 @@ static void link_get_state(void *user, atalaia_state_msg_t *st)
     st->phase = game_state_of(g);
     st->game_time_ms = g->runner->game_time_ms;
     st->counter_count = 0;
+    st->lost_count = 0;
     if (g->runner->node != NULL) {
         const atalaia_score_t *score = atalaia_node_score(g->runner->node);
         for (uint8_t t = 1; t <= g->join.team_count && st->counter_count < 16; t++) {
@@ -117,6 +118,15 @@ static void link_get_state(void *user, atalaia_state_msg_t *st)
             st->counters[st->counter_count].team = t;
             st->counters[st->counter_count].score = score->gained[t];
             st->counter_count++;
+        }
+        /* Penalties (RFC 0001 Amendment 17): only the teams that lost points, so a game with no
+         * penalty sends the same STATE as before; never decreasing, merged by maximum. */
+        for (uint8_t t = 1; t <= g->join.team_count && st->lost_count < 16; t++) {
+            if (score->lost[t] > 0) {
+                st->lost[st->lost_count].team = t;
+                st->lost[st->lost_count].points = score->lost[t];
+                st->lost_count++;
+            }
         }
     }
     int battery = g->shell.battery_pct != NULL ? g->shell.battery_pct(g->shell.user) : -1;

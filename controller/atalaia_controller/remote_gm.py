@@ -159,8 +159,8 @@ class RemoteGm:
 
     def on_controller_message(self, msg: dict[str, Any]) -> None:
         """The engine's listener: something the live view shows changed."""
-        if msg.get("type") in ("game", "event", "nodes", "node", "score"):
-            self._dirty.set()
+        if msg.get("type") in ("game", "event", "nodes", "node", "score") and not msg.get("tick"):
+            self._dirty.set()  # (a projected-score tick, decision BSC-2, is not in the site's live view)
         if msg.get("type") in ("player_position", "positions", "game"):
             self._pos_dirty.set()
 

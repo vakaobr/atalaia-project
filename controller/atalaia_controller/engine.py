@@ -54,7 +54,7 @@ from atalaia_sim.field_controller import (
     FieldNode,
     NotController,
 )
-from atalaia_sim.mode import COMMAND_NAME, SEPARATOR, ModeError
+from atalaia_sim.mode import COMMAND_NAME, SEPARATOR, ModeError, hold_scoring
 from atalaia_sim.packet import Header, vf_make
 from atalaia_sim.protocol import MESSAGE_TYPES
 
@@ -513,6 +513,10 @@ class Controller:
         fc.on_node = self._on_node
         fc.on_scores = self._on_scores
         fc.on_role = self._on_role
+        # The mode's optional scoring contract: a projected score between STATEs (decision BSC-2).
+        fc.scoring_hold = self._scoring_hold(game)
+        fc.on_drift = self._on_drift
+        self._last_gains: dict[str, int] = {}  # the projection's gains the stream last heard of
         self.fc = fc
         self.game = game
         self._key = key
@@ -523,6 +527,27 @@ class Controller:
         # Each box's device id as its HELLOs gave it, and the node ids two devices shared (BN-18).
         self._devices: dict[int, str] = {}
         self.conflicts: dict[int, list[str]] = {}
+
+    def _scoring_hold(self, game: dict[str, Any]) -> Optional[tuple[int, int]]:
+        """The game's (every in ms, points) of its mode's `scoring.hold` with the game's own
+        parameters; None when the mode does not opt in (a composed game never does)."""
+        mode_id = game.get("mode_id")
+        try:
+            pkg = self.modes.get(mode_id) if isinstance(mode_id, str) and SEPARATOR not in mode_id else None
+        except ModeError:
+            return None
+        if pkg is None:
+            return None
+        params = {**{k: v.get("default") for k, v in pkg.mode.params.items() if isinstance(v, dict)},
+                  **(game.get("params") or {})}
+        return hold_scoring(pkg.mode.scoring, params)
+
+    def _on_drift(self, sample: dict[str, Any]) -> None:
+        """One box's projection against its next STATE, in the log for the bench runbook
+        (docs/runbooks/projected-score-bench.md)."""
+        log.info("projection node %d team %s: projected %d, reported %d, drift %+d (%d ms after its last STATE)",
+                 sample["node"], sample["team"], sample["projected"], sample["reported"],
+                 sample["drift"], sample["age_ms"])
 
     def _restore(self) -> None:
         game = self.store.live_game()
@@ -544,6 +569,7 @@ class Controller:
         for node in self.store.nodes(game["id"]):
             # Each box's counters as last reported: merging by maximum continues from them.
             fc.merge_scores(node["node_id"], node.get("score") or {})
+            fc.merge_lost(node["node_id"], node.get("lost") or {})
             known = fc.register_node(node["node_id"], node["name"], node["role"])
             known.epoch = node.get("epoch") or 0
             if node.get("device_id"):
@@ -1562,7 +1588,19 @@ class Controller:
                 teams = self.fc.total_scores
             else:
                 teams = self.store.scores(game_id)
-            return {"game": game_id, "teams": {t: int(teams.get(t, 0)) for t in game["teams"]}}
+            out: dict[str, Any] = {"game": game_id, "teams": {t: int(teams.get(t, 0)) for t in game["teams"]}}
+            projected = self._projected()
+            if projected is not None and self.game is not None and self.game["id"] == game_id:
+                out["projected"] = {t: int(projected.get(t, 0)) for t in game["teams"]}
+            return out
+
+    def _projected(self) -> Optional[dict[str, int]]:
+        """The live game's projected totals (display only), or None when its mode does not opt in
+        or the game is not running."""
+        fc = self.fc
+        if fc is None or fc.scoring_hold is None or fc.game_state != GAME_RUNNING or not fc.is_controller:
+            return None  # (a standby follows the game; the controller's own totals are the ones shown)
+        return fc.projected_scores()
 
     def adjust_score(self, game_id: int, team: str, amount: int, reason: str) -> dict[str, Any]:
         with self._lock:
@@ -1613,6 +1651,9 @@ class Controller:
             # The box's stable device id (HELLO key 10, protocol/field-frames.md), as hex.
             "device_id": device.hex() if isinstance(device, (bytes, bytearray)) and len(device) == 8 else None,
             "score": {t: v.get(f"node-{node.node_id}", 0) for t, v in self.fc._scores.items()},
+            # What the box lost to penalties (STATE key 9, RFC 0001 Amendment 17); total_scores
+            # subtracts it.
+            "lost": {t: v.get(f"node-{node.node_id}", 0) for t, v in self.fc._lost.items()},
             # Health as the controller logged it (node.online/node.offline, battery.low).
             "link": node.link, "battery_low": node.battery_low,
             # Two devices said HELLO on this node id (BN-18): one join used twice.
@@ -1720,6 +1761,9 @@ class Controller:
                 "field_channel_hz": self.field_channel,
                 "channel_confirmed": self.store.get_setting("radio.channel_confirmed") == "1",
                 "sync": self.sync.status() if self.sync is not None else {"enabled": False},
+                # The projected score's drift against the boxes' STATEs, when the mode opts in.
+                "projection": ({"every_ms": fc.scoring_hold[0], "points": fc.scoring_hold[1],
+                                **fc.projection_stats} if fc is not None and fc.scoring_hold else None),
             }
 
     def promote(self) -> dict[str, Any]:
@@ -1767,7 +1811,28 @@ class Controller:
                 self._follow_state(fc)
                 if self.game is None:
                     return
+            self._emit_projection(fc)
             self._save_game_time()
+
+    def _emit_projection(self, fc: FieldController) -> None:
+        """When the points a mode that opts in is projecting change, say so on the stream: the usual
+        `score` message with the extra `projected` (the totals with the estimate, left out when
+        there is none any more: the game paused, the box went offline) and `tick` (the MQTT bridge
+        and the remote GM's live view ignore it)."""
+        if self.game is None or fc.scoring_hold is None:
+            return
+        projected = self._projected()
+        gains = fc.projected_gains() if projected is not None else {}
+        if gains == self._last_gains:
+            return
+        self._last_gains = gains
+        teams = self.game["teams"]
+        totals = fc.total_scores
+        msg: dict[str, Any] = {"type": "score", "game": self.game["id"], "tick": True,
+                               "teams": {t: int(totals.get(t, 0)) for t in teams}}
+        if projected is not None and gains:
+            msg["projected"] = {t: int(projected.get(t, 0)) for t in teams}
+        self._emit(msg)
 
     def _follow_state(self, fc: FieldController) -> None:
         """On standby: the stored game follows the controller's TIME beacons."""
@@ -1909,8 +1974,13 @@ class Controller:
         if self.game is None:
             return
         self.store.save_scores(self.game["id"], totals)
-        self._emit({"type": "score", "game": self.game["id"],
-                    "teams": {t: int(totals.get(t, 0)) for t in self.game["teams"]}})
+        msg: dict[str, Any] = {"type": "score", "game": self.game["id"],
+                               "teams": {t: int(totals.get(t, 0)) for t in self.game["teams"]}}
+        projected = self._projected()
+        if projected is not None:
+            msg["projected"] = {t: int(projected.get(t, 0)) for t in self.game["teams"]}
+        self._last_gains = self.fc.projected_gains() if projected is not None and self.fc else {}
+        self._emit(msg)
 
     def _on_role(self, role: str, term: int) -> None:
         if self.game is not None:

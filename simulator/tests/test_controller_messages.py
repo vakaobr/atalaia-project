@@ -234,6 +234,26 @@ class EventHandlingTests(unittest.TestCase):
         self.assertEqual(self.ctrl.nodes[5].battery_pct, 77)
         self.assertEqual(scores[-1], {"red": 3, "blue": 8})
 
+    def test_state_lost_is_subtracted_and_merged_by_maximum(self):
+        """RFC 0001 Amendment 17: key 9 is the box's penalties; an older STATE without it loses none."""
+        from atalaia_sim.packet import state_encode
+        scores = []
+        self.ctrl.on_scores = scores.append
+        base = {"owner_team": 2, "phase": 1, "game_time_ms": 900, "counters": {1: 10, 2: 8}, "epoch": 0}
+        self.ctrl.on_packet(5, header(5, 0, "STATE"), state_encode(base))
+        self.assertEqual(self.ctrl.total_scores, {"red": 10, "blue": 8})
+        self.ctrl.on_packet(5, header(5, 1, "STATE"), state_encode({**base, "lost": {2: 3}}))
+        self.assertEqual(self.ctrl.total_scores, {"red": 10, "blue": 5})
+        self.assertEqual(scores[-1], {"red": 10, "blue": 5})
+        # A later STATE that says less (or nothing) changes nothing: merged by maximum.
+        self.ctrl.on_packet(5, header(5, 2, "STATE"), state_encode({**base, "lost": {2: 1}}))
+        self.ctrl.on_packet(5, header(5, 3, "STATE"), state_encode(base))
+        self.assertEqual(self.ctrl.total_scores, {"red": 10, "blue": 5})
+        # Another box's penalties add, and the GM's adjustment still applies on top.
+        self.ctrl.on_packet(6, header(6, 0, "STATE"), state_encode({**base, "counters": {2: 4}, "lost": {2: 2}}))
+        self.ctrl.adjust_score("blue", -1)
+        self.assertEqual(self.ctrl.total_scores, {"red": 10, "blue": 5 + 4 - 2 - 1})
+
     def test_manual_adjustment_is_a_score_delta_event(self):
         rec = self.ctrl.adjust_score("red", -2, "penalty")
         self.assertEqual(rec["type"], "score.delta")

@@ -25,11 +25,18 @@ RfHeader header(int source, int seq, int type, {bool ack = false}) =>
       ack: ack,
     );
 
-Uint8List state(int owner, Map<int, int> counters, {int? battery}) => RfState(
+Uint8List state(
+  int owner,
+  Map<int, int> counters, {
+  int? battery,
+  Map<int, int> lost = const {},
+  int gameTimeMs = 0,
+}) => RfState(
   ownerTeam: owner,
   phase: 1,
-  gameTimeMs: 0,
+  gameTimeMs: gameTimeMs,
   counters: counters,
+  lost: lost,
   batteryPct: battery,
   epoch: 1,
 ).encode();
@@ -116,6 +123,79 @@ void main() {
       () => fc.sendCmd('update', null),
       throwsA(isA<FieldControllerException>()),
     );
+  });
+
+  test('penalties (STATE key 9): the highest per node, subtracted (BSC-1)', () {
+    fc.onPacket(header(4, 0, RfType.state), state(1, {1: 10, 2: 8}), epoch: 1);
+    expect(fc.totalScores, {'red': 10, 'blue': 8});
+    fc.onPacket(
+      header(4, 1, RfType.state),
+      state(1, {1: 10, 2: 8}, lost: {2: 3}),
+      epoch: 1,
+    );
+    expect(fc.totalScores, {'red': 10, 'blue': 5});
+    expect(totals.last, {'red': 10, 'blue': 5});
+    // Less, or nothing (an older box): merged by maximum, so no change.
+    fc.onPacket(
+      header(4, 2, RfType.state),
+      state(1, {1: 10, 2: 8}, lost: {2: 1}),
+      epoch: 1,
+    );
+    fc.onPacket(header(4, 3, RfType.state), state(1, {1: 10, 2: 8}), epoch: 1);
+    expect(fc.totalScores, {'red': 10, 'blue': 5});
+    expect(fc.lostOf('blue', 'node-4'), 3);
+    // Another box's penalties add, and the GM's adjustment applies on top.
+    fc.onPacket(
+      header(5, 0, RfType.state),
+      state(2, {2: 4}, lost: {2: 2}),
+      epoch: 1,
+    );
+    fc.adjustScore('blue', -1, 'gm');
+    expect(fc.totalScores, {'red': 10, 'blue': 5 + 4 - 2 - 1});
+  });
+
+  test('projected score: ticks since the last STATE, replaced by the next '
+      '(BSC-2)', () {
+    fc.scoringHold = (10000, 2);
+    final drifts = <Map<String, Object?>>[];
+    fc.onDrift = drifts.add;
+    expect(fc.projectedScores(), {'red': 0, 'blue': 0});
+    fc.startGame(nowMs: 0);
+    fc.onPacket(header(4, 1, RfType.state), state(1, {}), epoch: 1);
+    fc.tick(25000);
+    expect(fc.projectedScores(), {'red': 4, 'blue': 0});
+    expect(fc.totalScores, {'red': 0, 'blue': 0}); // reports only
+    fc.onPacket(
+      header(4, 2, RfType.state),
+      state(1, {1: 4}, gameTimeMs: 20000),
+      epoch: 1,
+    );
+    expect(fc.projectedScores(), {'red': 4, 'blue': 0});
+    expect(drifts.single['drift'], 0);
+    fc.tick(35000);
+    expect(fc.projectedScores(), {'red': 6, 'blue': 0});
+    // A box that missed a tick: the drift is measured, nothing accumulates.
+    fc.onPacket(
+      header(4, 3, RfType.state),
+      state(1, {1: 4}, gameTimeMs: 35000),
+      epoch: 1,
+    );
+    expect(fc.projectedScores(), {'red': 4, 'blue': 0});
+    expect(drifts.last['drift'], 2);
+    expect(fc.projectionStats['samples'], 2);
+    expect(fc.projectionStats['max_abs'], 2);
+    // An offline box and a paused game project nothing.
+    fc.tick(45000);
+    expect(fc.projectedScores()!['red'], 6);
+    fc.nodes[4]!.link = 'offline';
+    expect(fc.projectedScores()!['red'], 4);
+    fc.nodes[4]!.link = 'online';
+    fc.pauseGame(nowMs: 45000);
+    fc.tick(65000);
+    expect(fc.projectedScores()!['red'], 4); // paused: no ticks counted
+    // A mode that does not opt in has no projection at all.
+    fc.scoringHold = null;
+    expect(fc.projectedScores(), isNull);
   });
 
   test('scores: the highest value per node, summed, plus adjustments', () {

@@ -69,6 +69,7 @@ class ModePackage:
             "roles": self.mode.roles,
             "params": self.mode.params,
             "commands": self.mode.commands,
+            "scoring": self.mode.scoring,
             "i18n": self.mode.i18n,
             "parts": list(self.mode.parts),
             "field_script": self.field_script is not None,
@@ -117,7 +118,8 @@ def parse_package(files: dict[str, str], path: Path = Path("<upload>")) -> ModeP
                 version=str(manifest["version"]), roles=manifest.get("roles") or {}, params=params,
                 node_script=files.get("node.lua", ""), field_script=files.get("field.lua"),
                 kind=manifest.get("kind", "mode"), description=str(manifest.get("description", "")),
-                i18n=manifest.get("i18n") or {}, commands=manifest.get("commands") or {})
+                i18n=manifest.get("i18n") or {}, commands=manifest.get("commands") or {},
+                scoring=manifest.get("scoring") or None)
     return ModePackage(mode, dict(files), builtin=False)
 
 

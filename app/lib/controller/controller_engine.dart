@@ -894,11 +894,75 @@ class ControllerEngine {
       ..onEvent = _onEvent
       ..onNode = _onNode
       ..onScores = _onScores
-      ..onRole = _onRole;
+      ..onRole = _onRole
+      // The mode's optional scoring contract: a projected score between
+      // STATEs (decision BSC-2; engine.py `_scoring_hold`).
+      ..scoringHold = _scoringHold(game);
+    _lastGains = {};
     _fc = fc;
     _game = game;
     _key = key;
   }
+
+  /// The projection's gains the stream last heard of.
+  Map<String, int> _lastGains = {};
+
+  /// The game's (every in ms, points) of its mode's `scoring.hold` with the
+  /// game's own parameters; null when the mode does not opt in (a composed
+  /// game never does).
+  (int, int)? _scoringHold(Map<String, Object?> game) {
+    final id = game['mode_id'];
+    if (id is! String || id.contains('+')) return null;
+    final mode = _mode(id);
+    if (mode == null) return null;
+    final params = <String, Object?>{
+      for (final e in mode.params.entries) e.key: e.value['default'],
+      ...?(game['params'] as Map?)?.cast<String, Object?>(),
+    };
+    return holdScoring(mode.scoring, params);
+  }
+
+  /// The live game's projected totals (display only), or null when its mode
+  /// does not opt in or the game is not running.
+  Map<String, int>? _projected() {
+    final fc = _fc;
+    // (a standby follows the game; the controller's own totals are the ones
+    // shown)
+    if (fc == null ||
+        fc.scoringHold == null ||
+        fc.gameState != gameRunning ||
+        !fc.isController) {
+      return null;
+    }
+    return fc.projectedScores();
+  }
+
+  /// When the points a mode that opts in is projecting change, say so on the
+  /// stream: the usual `score` message with the extra `projected` (the totals
+  /// with the estimate, left out when there is none any more) and `tick` (the
+  /// MQTT bridge and the remote GM's live view ignore it; engine.py
+  /// `_emit_projection`).
+  void _emitProjection(FieldController fc) {
+    final game = _game;
+    if (game == null || fc.scoringHold == null) return;
+    final projected = _projected();
+    final gains = projected == null ? <String, int>{} : fc.projectedGains();
+    if (_sameTotals(gains, _lastGains)) return;
+    _lastGains = gains;
+    final teams = (game['teams']! as List).cast<String>();
+    final totals = fc.totalScores;
+    _emit({
+      'type': 'score',
+      'game': game['id'],
+      'tick': true,
+      'teams': {for (final t in teams) t: totals[t] ?? 0},
+      if (projected != null && gains.isNotEmpty)
+        'projected': {for (final t in teams) t: projected[t] ?? 0},
+    });
+  }
+
+  static bool _sameTotals(Map<String, int> a, Map<String, int> b) =>
+      a.length == b.length && a.entries.every((e) => b[e.key] == e.value);
 
   EmittedEvent _decodeEvent(Uint8List payload) {
     final d = core!.decodeEvent(payload);
@@ -956,6 +1020,13 @@ class ControllerEngine {
       if (score is Map) {
         fc.mergeCounters('node-$nodeId', {
           for (final e in score.entries)
+            if (e.value is int) '${e.key}': e.value as int,
+        });
+      }
+      final lost = node['lost'];
+      if (lost is Map) {
+        fc.mergeLost('node-$nodeId', {
+          for (final e in lost.entries)
             if (e.value is int) '${e.key}': e.value as int,
         });
       }
@@ -1351,9 +1422,14 @@ class ControllerEngine {
     final teams = _fc != null && _game!['id'] == id
         ? _fc!.totalScores
         : store.scores(id);
+    final projected = _fc != null && _game!['id'] == id ? _projected() : null;
     return {
       'game': id,
       'teams': {for (final t in game['teams']! as List) '$t': teams[t] ?? 0},
+      if (projected != null)
+        'projected': {
+          for (final t in game['teams']! as List) '$t': projected[t] ?? 0,
+        },
     };
   }
 
@@ -1434,6 +1510,10 @@ class ControllerEngine {
           .join(),
       'score': {
         for (final t in fc.teams) t: fc.counter(t, 'node-${node.nodeId}'),
+      },
+      // What the box lost to penalties (STATE key 9, RFC 0001 Amendment 17).
+      'lost': {
+        for (final t in fc.teams) t: fc.lostOf(t, 'node-${node.nodeId}'),
       },
       'link': node.link,
       'battery_low': node.batteryLow,
@@ -1882,6 +1962,15 @@ class ControllerEngine {
       'field_channel_hz': fieldChannel,
       'channel_confirmed': store.getSetting('radio.channel_confirmed') == '1',
       'sync': syncStatus?.call() ?? {'enabled': false},
+      // The projected score's drift against the boxes' STATEs, when the mode
+      // opts in.
+      'projection': fc == null || fc.scoringHold == null
+          ? null
+          : {
+              'every_ms': fc.scoringHold!.$1,
+              'points': fc.scoringHold!.$2,
+              ...fc.projectionStats,
+            },
     };
   }
 
@@ -2129,6 +2218,7 @@ class ControllerEngine {
       _followState(fc);
       if (_game == null) return;
     }
+    _emitProjection(fc);
     _saveGameTime();
   }
 
@@ -2361,10 +2451,16 @@ class ControllerEngine {
     final game = _game;
     if (game == null) return;
     store.saveScores(game['id']! as int, totals);
+    final projected = _projected();
+    _lastGains = projected == null ? {} : (_fc?.projectedGains() ?? {});
     _emit({
       'type': 'score',
       'game': game['id'],
       'teams': {for (final t in game['teams']! as List) '$t': totals[t] ?? 0},
+      if (projected != null)
+        'projected': {
+          for (final t in game['teams']! as List) '$t': projected[t] ?? 0,
+        },
     });
   }
 

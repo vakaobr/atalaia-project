@@ -144,6 +144,8 @@ class FieldNode:
     link_changed_ms: Optional[int] = None
     battery_low: bool = False
     battery_low_since: Optional[int] = None
+    # Projected score (decision BSC-2): a STATE from this box was heard in this run.
+    reported: bool = False
 
     def owner_name(self, teams: list[str]) -> Optional[str]:
         if 1 <= self.owner_team <= len(teams):
@@ -308,7 +310,16 @@ class FieldController:
 
         # Score aggregation: team name -> node key -> max value.
         self._scores: dict[str, dict[str, int]] = {t: {} for t in self.teams}
+        # Penalties the boxes report in STATE (key 9, RFC 0001 Amendment 17): the same shape.
+        self._lost: dict[str, dict[str, int]] = {t: {} for t in self.teams}
         self._adjust: dict[str, int] = {}
+        # The mode's optional scoring contract (modes/README.md "Projected score", decision BSC-2):
+        # (every in game ms, points) for the team that owns a box, or None = no projection.
+        self.scoring_hold: Optional[tuple[int, int]] = None
+        # How far the projection was from each box's next STATE (the bench's drift measure).
+        self.projection_stats: dict[str, Any] = {"samples": 0, "off": 0, "max_abs": 0, "sum_abs": 0,
+                                                 "last": None}
+        self.on_drift: Optional[Callable[[dict[str, Any]], None]] = None
 
         self.acks = AckTracker()
         self._packets_seen: dict[tuple[int, int, int], int] = {}
@@ -546,9 +557,11 @@ class FieldController:
             state = state_decode(payload)
         except Exception:
             return
+        drift_before = self._projection_before(node) if self.scoring_hold else None
         for name in ("owner_team", "phase", "game_time_ms"):
             if isinstance(state.get(name), int):
                 setattr(node, name, state[name])
+        node.reported = True
         if isinstance(state.get("battery_pct"), int):
             node.battery_pct = state["battery_pct"]
         if isinstance(state.get("rssi"), int):
@@ -556,6 +569,11 @@ class FieldController:
         counters = state.get("counters")
         if isinstance(counters, dict):
             self.merge_scores(node.node_id, counters)
+        lost = state.get("lost")
+        if isinstance(lost, dict):
+            self.merge_lost(node.node_id, lost)
+        if drift_before is not None:
+            self._record_drift(node, drift_before)
         if self.on_node:
             self.on_node(node, "state")
 
@@ -718,18 +736,94 @@ class FieldController:
     def merge_counters(self, node_key: str, counters: dict[Any, Any]) -> None:
         """Like merge_scores, for any counter source: a node ("node-ID") or a run of the
         controller's field script ("field-N"), whose points never travel in STATE."""
+        if self._merge_max(self._scores, node_key, counters) and self.on_scores:
+            self.on_scores(self.total_scores)
+
+    def merge_lost(self, node_id: int, lost: dict[Any, Any]) -> None:
+        """The points a node lost to penalties (STATE key 9), merged by maximum like the gains and
+        subtracted in total_scores. A box that never sends the key (an older firmware) loses none."""
+        if self._merge_max(self._lost, f"node-{node_id}", lost) and self.on_scores:
+            self.on_scores(self.total_scores)
+
+    def _merge_max(self, table: dict[str, dict[str, int]], node_key: str,
+                   counters: dict[Any, Any]) -> bool:
         changed = False
         for key, value in counters.items():
             if not isinstance(value, int) or isinstance(value, bool):
                 continue
             team_name = self.team_name(key) if isinstance(key, int) else None
             team_name = team_name or str(key)
-            per_node = self._scores.setdefault(team_name, {})
+            per_node = table.setdefault(team_name, {})
             if value > per_node.get(node_key, 0):
                 per_node[node_key] = value
                 changed = True
-        if changed and self.on_scores:
-            self.on_scores(self.total_scores)
+        return changed
+
+    # --- projected score (decision BSC-2) -------------------------------------
+
+    def _ticks_since_report(self, node: FieldNode) -> int:
+        """Scoring ticks of the mode that happened on this box since its last STATE, by game
+        time: the boundaries k x every between the box's own report time and the controller's
+        game time. 0 unless the game runs, the box is online, it reported and it is running."""
+        if (self.scoring_hold is None or self.game_state != GAME_RUNNING or not node.reported
+                or node.phase != GAME_RUNNING or node.link == "offline"
+                or not 1 <= node.owner_team <= len(self.teams)):
+            return 0
+        every = self.scoring_hold[0]
+        return max(0, self.game_time_ms // every - node.game_time_ms // every)
+
+    def projected_gains(self) -> dict[str, int]:
+        """Points each team has probably made since its boxes' last STATEs: every box that holds
+        for a team adds `points` per tick boundary crossed since its report. Display only."""
+        out: dict[str, int] = {}
+        if self.scoring_hold is None:
+            return out
+        points = self.scoring_hold[1]
+        for node in self.nodes.values():
+            ticks = self._ticks_since_report(node)
+            team = node.owner_name(self.teams)
+            if ticks and team is not None:
+                out[team] = out.get(team, 0) + ticks * points
+        return out
+
+    def projected_scores(self) -> Optional[dict[str, int]]:
+        """The totals with the projection added, or None when the mode does not opt in. The stored
+        totals, score.delta and the final result never use it: every STATE replaces it."""
+        if self.scoring_hold is None:
+            return None
+        totals = self.total_scores
+        for team, gain in self.projected_gains().items():
+            totals[team] = totals.get(team, 0) + gain
+        return totals
+
+    def _projection_before(self, node: FieldNode) -> Optional[dict[str, Any]]:
+        """What this box's projection said just before its STATE (None: nothing to compare)."""
+        if not node.reported or self.game_state != GAME_RUNNING:
+            return None
+        team = node.owner_name(self.teams)
+        if team is None:
+            return None
+        return {"team": team, "reported": self._scores.get(team, {}).get(f"node-{node.node_id}", 0),
+                "ticks": self._ticks_since_report(node),
+                "age_ms": max(0, self.game_time_ms - node.game_time_ms)}
+
+    def _record_drift(self, node: FieldNode, before: dict[str, Any]) -> None:
+        """The projection against what the box really said: projected = its old report plus the
+        ticks since; reported = its new counter for the team. Zero is a perfect projection."""
+        assert self.scoring_hold is not None
+        team = before["team"]
+        projected = before["reported"] + before["ticks"] * self.scoring_hold[1]
+        reported = self._scores.get(team, {}).get(f"node-{node.node_id}", 0)
+        drift = projected - reported
+        stats = self.projection_stats
+        stats["samples"] += 1
+        stats["off"] += 1 if drift else 0
+        stats["max_abs"] = max(stats["max_abs"], abs(drift))
+        stats["sum_abs"] += abs(drift)
+        stats["last"] = {"node": node.node_id, "team": team, "projected": projected,
+                         "reported": reported, "drift": drift, "age_ms": before["age_ms"]}
+        if self.on_drift:
+            self.on_drift(dict(stats["last"]))
 
     def controller_event(self, type_: str, data: Optional[dict[str, Any]] = None,
                          team: Optional[str] = None, prio: str = "normal") -> dict[str, Any]:
@@ -838,10 +932,13 @@ class FieldController:
 
     @property
     def total_scores(self) -> dict[str, int]:
-        """Total per team: the max reported by each node, summed, plus GM adjustments."""
+        """Total per team: the max gained reported by each node, summed, minus the max lost the
+        boxes reported (their penalties), plus GM adjustments."""
         result: dict[str, int] = {}
         for team, node_scores in self._scores.items():
             result[team] = sum(node_scores.values())
+        for team, node_lost in self._lost.items():
+            result[team] = result.get(team, 0) - sum(node_lost.values())
         for team, amount in self._adjust.items():
             result[team] = result.get(team, 0) + amount
         return result

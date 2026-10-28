@@ -168,6 +168,64 @@ static void test_state_minimal(void)
     CHECK(out.counter_count == 0);
 }
 
+/* Amendment 17: `lost` is optional and additive. */
+static void test_state_lost(void)
+{
+    atalaia_state_msg_t msg;
+    memset(&msg, 0, sizeof(msg));
+    msg.owner_team = 1;
+    msg.phase = 1;
+    msg.game_time_ms = 125000;
+    msg.counters[0].team = 1;
+    msg.counters[0].score = 100;
+    msg.counters[1].team = 2;
+    msg.counters[1].score = 40;
+    msg.counter_count = 2;
+    msg.rssi = INT8_MIN;
+    msg.battery_pct = 0xFF;
+    msg.flags = 0xFF;
+    msg.epoch = 3;
+
+    uint8_t plain[BUF];
+    size_t plain_n = atalaia_state_encode(&msg, plain, sizeof(plain));
+    CHECK(plain_n > 0);
+
+    msg.lost[0].team = 1;
+    msg.lost[0].points = 30;
+    msg.lost[1].team = 2;
+    msg.lost[1].points = UINT32_MAX;
+    msg.lost_count = 2;
+    uint8_t buf[BUF];
+    size_t n = atalaia_state_encode(&msg, buf, sizeof(buf));
+    CHECK(n > plain_n);
+    atalaia_state_msg_t out;
+    CHECK(atalaia_state_decode(buf, n, &out));
+    CHECK(out.lost_count == 2);
+    CHECK(out.lost[0].team == 1 && out.lost[0].points == 30);
+    CHECK(out.lost[1].team == 2 && out.lost[1].points == UINT32_MAX);
+    CHECK(out.counter_count == 2 && out.counters[1].score == 40 && out.epoch == 3);
+
+    /* No penalty: byte for byte the STATE of before the amendment, and it reads back as none. */
+    CHECK(atalaia_state_decode(plain, plain_n, &out));
+    CHECK(out.lost_count == 0);
+
+    /* A STATE from an older sender with an unknown key 10 still decodes (skipped). */
+    uint8_t extra[BUF];
+    memcpy(extra, plain, plain_n);
+    extra[0] = (uint8_t)(extra[0] + 1); /* one more entry in the map (0xa5 -> 0xa6) */
+    extra[plain_n] = 0x0a;
+    extra[plain_n + 1] = 0x01;
+    CHECK(atalaia_state_decode(extra, plain_n + 2, &out) && out.lost_count == 0);
+
+    /* Too many teams do not fit the struct; a duplicate team is refused. */
+    msg.lost_count = 17;
+    CHECK(atalaia_state_encode(&msg, buf, sizeof(buf)) == 0);
+    msg.lost_count = 2;
+    msg.lost[1].team = 1;
+    n = atalaia_state_encode(&msg, buf, sizeof(buf));
+    CHECK(n > 0 && !atalaia_state_decode(buf, n, &out));
+}
+
 static void test_cmd_round_trip(void)
 {
     atalaia_cmd_msg_t msg;
@@ -674,6 +732,7 @@ void run_msg_codec_tests(void)
     test_ack_msg_round_trip();
     test_ack_msg_no_bitmap();
     test_state_round_trip();
+    test_state_lost();
     test_state_minimal();
     test_cmd_round_trip();
     test_cmd_broadcast();

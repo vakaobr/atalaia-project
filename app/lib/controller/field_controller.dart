@@ -22,6 +22,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:math' show max;
 import 'dart:typed_data';
 
 import '../core/node_types.dart';
@@ -139,6 +140,10 @@ class FieldNode {
   int? linkChangedMs;
   bool batteryLow = false;
   int? batteryLowSince;
+
+  /// Projected score (decision BSC-2): a STATE from this box was heard in this
+  /// run.
+  bool reported = false;
 
   String? ownerName(List<String> teams) =>
       ownerTeam >= 1 && ownerTeam <= teams.length ? teams[ownerTeam - 1] : null;
@@ -274,6 +279,10 @@ class FieldController {
 
   /// team -> node key ("node-4", "field-1") -> highest value reported.
   final _scores = <String, Map<String, int>>{};
+
+  /// team -> node key ("node-4") -> highest penalty total reported (STATE key
+  /// 9, RFC 0001 Amendment 17); [totalScores] subtracts it.
+  final _lost = <String, Map<String, int>>{};
   final _adjust = <String, int>{};
   final acks = AckTracker();
   final _packetsSeen = <(int, int, int), int>{};
@@ -283,6 +292,24 @@ class FieldController {
   void Function(Map<String, Object?> record)? onEvent;
   void Function(FieldNode node, String kind)? onNode;
   void Function(Map<String, int> totals)? onScores;
+
+  /// The mode's optional scoring contract (modes/README.md "Projected
+  /// score", decision BSC-2): (every in game ms, points) for the team that
+  /// owns a box, or null = no projection.
+  (int, int)? scoringHold;
+
+  /// How far the projection was from each box's next STATE (the bench's
+  /// drift measure; the Python controller's `projection_stats`).
+  final projectionStats = <String, Object?>{
+    'samples': 0,
+    'off': 0,
+    'max_abs': 0,
+    'sum_abs': 0,
+    'last': null,
+  };
+
+  /// One box's projection against its next STATE.
+  void Function(Map<String, Object?> sample)? onDrift;
 
   /// The role changed ([electionLeader], [electionCandidate],
   /// [electionFollower]) with the term.
@@ -583,16 +610,25 @@ class FieldController {
     } on Object {
       return;
     }
+    final driftBefore = scoringHold == null ? null : _projectionBefore(node);
     node
       ..ownerTeam = state.ownerTeam
       ..phase = state.phase
-      ..gameTimeMs = state.gameTimeMs;
+      ..gameTimeMs = state.gameTimeMs
+      ..reported = true;
     if (state.batteryPct != null) node.batteryPct = state.batteryPct;
     if (state.rssi != null) node.rssi = state.rssi;
     mergeCounters('node-${node.nodeId}', {
       for (final e in state.counters.entries)
         teamName(e.key) ?? '${e.key}': e.value,
     });
+    if (state.lost.isNotEmpty) {
+      mergeLost('node-${node.nodeId}', {
+        for (final e in state.lost.entries)
+          teamName(e.key) ?? '${e.key}': e.value,
+      });
+    }
+    if (driftBefore != null) _recordDrift(node, driftBefore);
     onNode?.call(node, 'state');
   }
 
@@ -689,6 +725,114 @@ class FieldController {
     });
     if (changed) onScores?.call(totalScores);
   }
+
+  // --- projected score (decision BSC-2) -------------------------------------
+
+  /// Scoring ticks of the mode that happened on this box since its last
+  /// STATE, by game time: the boundaries k x every between the box's own
+  /// report time and the controller's game time. 0 unless the game runs, the
+  /// box is online, it reported and it is running.
+  int _ticksSinceReport(FieldNode node) {
+    final hold = scoringHold;
+    if (hold == null ||
+        gameState != gameRunning ||
+        !node.reported ||
+        node.phase != gameRunning ||
+        node.link == 'offline' ||
+        node.ownerName(teams) == null) {
+      return 0;
+    }
+    final every = hold.$1;
+    final ticks = gameTimeMs ~/ every - node.gameTimeMs ~/ every;
+    return ticks < 0 ? 0 : ticks;
+  }
+
+  /// Points each team has probably made since its boxes' last STATEs. Display
+  /// only.
+  Map<String, int> projectedGains() {
+    final out = <String, int>{};
+    final hold = scoringHold;
+    if (hold == null) return out;
+    for (final node in nodes.values) {
+      final ticks = _ticksSinceReport(node);
+      final team = node.ownerName(teams);
+      if (ticks > 0 && team != null) {
+        out[team] = (out[team] ?? 0) + ticks * hold.$2;
+      }
+    }
+    return out;
+  }
+
+  /// The totals with the projection added, or null when the mode does not opt
+  /// in. The stored totals, score.delta and the final result never use it:
+  /// every STATE replaces it.
+  Map<String, int>? projectedScores() {
+    if (scoringHold == null) return null;
+    final totals = totalScores;
+    projectedGains().forEach(
+      (team, gain) => totals[team] = (totals[team] ?? 0) + gain,
+    );
+    return totals;
+  }
+
+  ({String team, int reported, int ticks, int ageMs})? _projectionBefore(
+    FieldNode node,
+  ) {
+    if (!node.reported || gameState != gameRunning) return null;
+    final team = node.ownerName(teams);
+    if (team == null) return null;
+    final age = gameTimeMs - node.gameTimeMs;
+    return (
+      team: team,
+      reported: _scores[team]?['node-${node.nodeId}'] ?? 0,
+      ticks: _ticksSinceReport(node),
+      ageMs: age < 0 ? 0 : age,
+    );
+  }
+
+  void _recordDrift(
+    FieldNode node,
+    ({String team, int reported, int ticks, int ageMs}) before,
+  ) {
+    final hold = scoringHold;
+    if (hold == null) return;
+    final projected = before.reported + before.ticks * hold.$2;
+    final reported = _scores[before.team]?['node-${node.nodeId}'] ?? 0;
+    final drift = projected - reported;
+    final stats = projectionStats;
+    stats['samples'] = (stats['samples']! as int) + 1;
+    stats['off'] = (stats['off']! as int) + (drift != 0 ? 1 : 0);
+    stats['max_abs'] = max(stats['max_abs']! as int, drift.abs());
+    stats['sum_abs'] = (stats['sum_abs']! as int) + drift.abs();
+    final sample = <String, Object?>{
+      'node': node.nodeId,
+      'team': before.team,
+      'projected': projected,
+      'reported': reported,
+      'drift': drift,
+      'age_ms': before.ageMs,
+    };
+    stats['last'] = sample;
+    onDrift?.call(Map.of(sample));
+  }
+
+  /// The points a node lost to penalties (STATE key 9), merged by maximum like
+  /// the gains and subtracted in [totalScores]. A box that never sends the key
+  /// (an older firmware) loses none.
+  void mergeLost(String nodeKey, Map<String, int> lost) {
+    var changed = false;
+    lost.forEach((team, value) {
+      final perNode = _lost.putIfAbsent(team, () => {});
+      if (value > (perNode[nodeKey] ?? 0)) {
+        perNode[nodeKey] = value;
+        changed = true;
+      }
+    });
+    if (changed) onScores?.call(totalScores);
+  }
+
+  /// What one node reported lost to penalties for [team].
+  int lostOf(String team, String nodeKey) => _lost[team]?[nodeKey] ?? 0;
 
   /// [team]'s points from one source ("node-4").
   int counter(String team, String nodeKey) => _scores[team]?[nodeKey] ?? 0;
@@ -822,12 +966,15 @@ class FieldController {
       ..addAll(adjustments);
   }
 
-  /// Per team: the highest value each source reported, summed, plus the
-  /// GM's adjustments.
+  /// Per team: the highest value each source reported, summed, minus the
+  /// highest penalties the boxes reported, plus the GM's adjustments.
   Map<String, int> get totalScores {
     final out = <String, int>{};
     _scores.forEach((team, perNode) {
       out[team] = perNode.values.fold(0, (a, b) => a + b);
+    });
+    _lost.forEach((team, perNode) {
+      out[team] = (out[team] ?? 0) - perNode.values.fold(0, (a, b) => a + b);
     });
     _adjust.forEach((team, amount) => out[team] = (out[team] ?? 0) + amount);
     return out;

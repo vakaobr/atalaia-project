@@ -49,7 +49,7 @@ Ideas from public community requests (design specification sections 2 and 15); t
 
 On a box without a controller (picked from the box's own preset list), Hold-All and Last Stand boxes only capture: their scoring and countdown live in `field.lua`.
 
-**How late a score is:** points a box makes itself (Domination, King of the Hill, Money Factory) reach the controller, the console and the app with the box's periodic STATE, every 15 s, so they trail the box's own screen by up to about 15 s plus the relay; a capture is sent at once. Points a `field.lua` makes (Hold-All, Master and Satellites) are the controller's own and current (decision SL-1 to SL-5).
+**How late a score is:** points a box makes itself (Domination, King of the Hill, Money Factory) reach the controller, the console and the app with the box's periodic STATE, every 15 s, so they trail the box's own screen by up to about 15 s plus the relay; a capture is sent at once. Points a `field.lua` makes (Hold-All, Master and Satellites) are the controller's own and current (decision SL-1 to SL-5). A mode that scores by holding can say so in its manifest (`scoring`, "Projected score" below) and gets a projected total in between (SL-6, BSC-2).
 
 ## Master and Satellites (phase 4)
 
@@ -133,7 +133,7 @@ On a Field Box picked from its own preset list (the thirteenth built-in preset, 
 
 These modes identify players by their **player tag**: an NFC tag signed with the game key ([protocol/nfc-tag.md](../protocol/nfc-tag.md)). The box checks the tag before the script sees it and gives the script `nfc.tag` with `valid`, and `player` and `team` (or the `reason` it was refused). In a game a box picked from its own preset list there is no game key, so tags are refused there (`no_game`); these modes are for games run by a field controller. Each box counts on its own: no state is shared between boxes.
 
-- **Kill Confirmed** (`org.atalaia.kill_confirmed`): players drop their tag when hit. A team presses its button at the station and scans the tags it collected within `turn_in_s` seconds (each tag that counts keeps the station open). An enemy's tag confirms the kill: `kill.confirmed`, `confirm_points` for the team and `penalty_points` off the tag's team (`score.delta`). A teammate's tag denies it: `kill.denied`, no points. The same player's tag counts again only after `retag_after_s` seconds. The penalty is local to the box: a box reports only the points a team gained to the controller (decision E6), so the controller's totals do not subtract it, although the console lists the `score.delta` event.
+- **Kill Confirmed** (`org.atalaia.kill_confirmed`): players drop their tag when hit. A team presses its button at the station and scans the tags it collected within `turn_in_s` seconds (each tag that counts keeps the station open). An enemy's tag confirms the kill: `kill.confirmed`, `confirm_points` for the team and `penalty_points` off the tag's team (`score.delta`). A teammate's tag denies it: `kill.denied`, no points. The same player's tag counts again only after `retag_after_s` seconds. The box reports the points each team lost as well as the points it gained (STATE key 9, RFC 0001 Amendment 17, decision BSC-1), so the controller's totals subtract the penalty; the console also lists the `score.delta` event.
 - **Respawn and Lives** (`org.atalaia.respawn`): a respawn point counts lives, per team (default) or per player (`per_player`). A player scans their tag to come back in (`player.respawn` with `lives_left`) and waits `respawn_cooldown_s` before the next respawn. Without tags, a team's button press is a respawn for that team (with a 2 s guard against double presses). A team with no lives left is refused and reported once: `team.eliminated`.
 - **Player Check-in** (`org.atalaia.player_checkin`): players check in at a checkpoint with their tag (`player.checkin`); the screen shows the count per team, and the team gets `points` per check-in. A player counts once per game, or again after `repeat_after_s` seconds; a scan before that is a duplicate and is refused.
 
@@ -214,6 +214,20 @@ i18n:
 ```
 
 The console shows a button per command on each box of those roles (the *Boxes* tab); the controller sends it as a **mode command**, CMD opcode 8 with the command's name in its params (`{"name": "refill"}`, RFC 0001 Amendment 5), and refuses names the game does not declare, or a box of another role. A `field.lua` sends mode commands of its own with `field.send(node, "mode", { name = "heals", ... })` (names: 1-24 of `a-z`, `0-9` and `_`, starting with a letter; they need no declaration). Either way the node's script gets `cmd.mode` with the params, the name included, and checks `e.name`.
+
+### Projected score (`scoring`, optional)
+
+A box's points reach the controller with its STATE every 15 s, so the totals the controller, the console and the app show trail a box that scores on its own tick by up to a STATE. A mode that scores **by holding** can say how, and the controller then shows a projected total between two STATEs (decisions SL-6 and BSC-2; the mode opts in, nothing changes for one that does not):
+
+```yaml
+scoring:
+  hold: { every: tick_s, points: points_per_tick }
+```
+
+- **The contract:** the box gives `points` to the team that owns it every `every` seconds of game time, counted from the game's start (the box's `every(tick_s, ...)` starts at `game.start` and its game time stops while paused). Each value is a whole number from 1 or the name of one of the mode's `int` parameters whose `min` is 1 or more (the game's own value is used). Only a mode (`kind: mode`) may have it; a game made of a main mode with modifiers, role packages or a scenario has none, whatever its parts say. Built in: Domination.
+- **What the controller does:** for each box that reported a STATE, is online and running, and whose last STATE named an owner, it adds `points` for each boundary k x `every` crossed between the box's own report time (`game_time_ms` of its STATE) and the controller's game time. Nothing is projected while the game is paused or over, for an offline box, for a box nobody holds, or for a game without the block.
+- **Display only:** the stored totals, `score.delta`, MQTT's `.../score`, the sync to a site server and the final result come from the boxes' reports as before. Every STATE replaces the projection of its box, so it never accumulates; the drift is at most the ticks a capture or a lost STATE hides. `GET /api/v1/games/{id}/score` and the stream's `score` message carry it as `projected` (per team; a stream message sent only because the projection moved also has `tick: true` and is not sent to MQTT); the console writes it as an estimate. `GET /api/v1/controller` has `projection` (`every_ms`, `points`, and the drift against each box's next STATE: `samples`, `off`, `max_abs`, `sum_abs`, `last`), measured the way `docs/runbooks/projected-score-bench.md` says.
+- **Not for:** modes whose points depend on something other than holding (Money Factory's deposits, a hit, a code) leave the block out and keep the 15 s; the simulator's mode editor does not write it yet (add it to `mode.yaml` by hand).
 
 ## Translations
 

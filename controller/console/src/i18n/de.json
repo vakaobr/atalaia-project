@@ -1647,5 +1647,9 @@
     "chrono_days": "Chrono-Messungen aufbewahrt (Tage)",
     "game_days": "Spieldaten aufbewahrt (Tage)",
     "hint": "30 bis 3653 Tage. Chrono-Messungen (auch Kopien anderer Spielfelder) und frühere Marshal-Schlüssel werden nach der ersten Frist gelöscht; Ereignisse, Punkte und Knoten eines beendeten Spiels nach der zweiten. Ist ein Site-Server verbunden, wird ein Spiel nie gelöscht, bevor der Server alles davon hat. Beide gehören dem Site-Server, wenn das Spielfeld seine Einstellungen von dort bezieht."
+  },
+  "projected_score": {
+    "label": "geschätzt {n}",
+    "explain": "Zwischen den Meldungen der Boxen (alle 15 s) addiert die Schätzung die Punkte, die eine gehaltene Box seither gemacht hat, für Modi, die ihre Wertung angeben. Nur die Zahl ohne „geschätzt“ ist die offizielle Wertung."
   }
 }

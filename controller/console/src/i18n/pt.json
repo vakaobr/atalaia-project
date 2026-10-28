@@ -1647,5 +1647,9 @@
     "chrono_days": "Registos de cronografagem guardados (dias)",
     "game_days": "Dados dos jogos guardados (dias)",
     "hint": "De 30 a 3653 dias. Os registos de cronografagem (também as cópias de outros campos) e as chaves antigas dos marshals são apagados passado o primeiro prazo; os eventos, pontuações e nós de um jogo terminado, passado o segundo. Com um servidor do site ligado, um jogo nunca é apagado antes de o servidor ter tudo. Ambos são do servidor do site quando o campo recebe as definições dele."
+  },
+  "projected_score": {
+    "label": "estimado {n}",
+    "explain": "Entre os relatórios das caixas (de 15 em 15 s), a estimativa soma os pontos que uma caixa ocupada já fez, nos modos que dizem como pontuam. Só o número sem «estimado» é a pontuação oficial."
   }
 }

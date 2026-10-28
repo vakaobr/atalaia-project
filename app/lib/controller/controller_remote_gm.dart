@@ -286,13 +286,15 @@ class RemoteGm {
   }
 
   void _onEngine(Map<String, Object?> msg) {
-    if (const [
-      'game',
-      'event',
-      'nodes',
-      'node',
-      'score',
-    ].contains(msg['type'])) {
+    // (a projected-score tick, decision BSC-2, is not in the site's live view)
+    if (msg['tick'] != true &&
+        const [
+          'game',
+          'event',
+          'nodes',
+          'node',
+          'score',
+        ].contains(msg['type'])) {
       _dirty = true;
     }
     if (const ['player_position', 'positions', 'game'].contains(msg['type'])) {

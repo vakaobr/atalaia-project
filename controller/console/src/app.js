@@ -270,9 +270,12 @@ class App extends Component {
             break;
         }
         case 'score':
+            // `projected` (decision BSC-2): an estimate between the boxes' reports, display only; a
+            // message with `tick` is only the estimate moving, so it adds no point to the timeline.
             this.setState((s) => ({
-                score: { game: msg.game, teams: msg.teams },
-                scoreHistory: [...s.scoreHistory, { at: now, teams: msg.teams }].slice(-HISTORY_MAX),
+                score: { game: msg.game, teams: msg.teams, projected: msg.projected || null },
+                scoreHistory: msg.tick ? s.scoreHistory
+                    : [...s.scoreHistory, { at: now, teams: msg.teams }].slice(-HISTORY_MAX),
             }));
             break;
         case 'node': {

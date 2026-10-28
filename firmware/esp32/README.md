@@ -863,7 +863,9 @@ controller's game.
   emits (normal and critical ones wait for an ACK, are resent in a new packet
   after 3, 6, 12, 24 s and then every 30 s, and are written to the flash log first), STATE every
   `CONFIG_ATALAIA_STATE_INTERVAL_S` seconds and after a capture (owner, game
-  state, game time, points gained per team, epoch), follows the controller
+  state, game time, points gained per team, epoch, and, only for a team that has
+  lost points to penalties, the points lost: STATE key 9, RFC 0001 Amendment 17),
+  follows the controller
   with the highest term, applies the time sync (slew, or a step ahead, or
   holding the clock), and relays authenticated packets by the rules of RFC 0001
   Amendment 13 (core `atalaia_relay_*`, entropy from the shell): a frame that asks

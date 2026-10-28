@@ -95,7 +95,8 @@ class EndpointTests(ApiCase):
         self.assertEqual(c.get(f"/api/v1/nodes?game={gid}", headers=READ).json()[0]["node_id"], 4)
         # score
         self.assertEqual(c.get(f"/api/v1/games/{gid}/score", headers=READ).json(),
-                         {"game": gid, "teams": {"red": 7, "blue": 0}})
+                         {"game": gid, "teams": {"red": 7, "blue": 0},
+                          "projected": {"red": 7, "blue": 0}})  # Domination says how it scores (BSC-2)
         r = c.post(f"/api/v1/games/{gid}/score", json={"team": "blue", "amount": 3, "reason": "bonus"},
                    headers=GM)
         self.assertEqual(r.status_code, 200, r.text)

@@ -73,6 +73,9 @@ class Mode:
     # Commands the GM console offers for the nodes of some roles (manifest `commands`):
     # {name: {"roles": [...], "label": ...}}. They reach the node's script as cmd.mode.
     commands: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # The optional scoring contract (manifest `scoring`, decision BSC-2): how a box scores while it
+    # holds, so a controller can project the points between two STATEs. None = the mode does not say.
+    scoring: Optional[dict[str, Any]] = None
     # For a composed mode: role -> the role package its nodes run instead of node_script.
     role_parts: dict[str, RolePart] = field(default_factory=dict)
     # For a composed mode: the id of what the main mode's roles run (main mode and modifiers).
@@ -167,6 +170,52 @@ def _check_param(mode_id: str, name: str, spec: dict[str, Any], value: Any, team
         raise ModeError(f"{where} has unknown type {kind!r}")
 
 
+def check_scoring(manifest: dict[str, Any], where: str) -> None:
+    """The optional `scoring` block (decision BSC-2): ``scoring: {hold: {every: tick_s, points:
+    points_per_tick}}`` says the mode's box scores `points` for the team that owns it every `every`
+    seconds of game time, counted from the game's start. Each value is a whole number from 1 or the
+    name of one of the mode's whole-number parameters. A mode that scores otherwise leaves the block
+    out and keeps the 15 s of its STATEs."""
+    scoring = manifest.get("scoring")
+    if scoring is None:
+        return
+    if manifest.get("kind", "mode") != "mode":
+        raise ModeError(f"{where}: only a mode (not a role package or scenario) has scoring")
+    if not isinstance(scoring, dict) or set(scoring) != {"hold"}:
+        raise ModeError(f"{where}: scoring has one key, hold: {{every, points}}")
+    hold = scoring["hold"]
+    if not isinstance(hold, dict) or set(hold) != {"every", "points"}:
+        raise ModeError(f"{where}: scoring.hold has every and points")
+    params = manifest.get("params") or {}
+    for key in ("every", "points"):
+        value = hold[key]
+        if isinstance(value, bool) or not (isinstance(value, int) and value >= 1 or isinstance(value, str)):
+            raise ModeError(f"{where}: scoring.hold.{key} is a whole number from 1 or a parameter's name")
+        if isinstance(value, str):
+            spec = params.get(value)
+            if not isinstance(spec, dict) or spec.get("type") != "int":
+                raise ModeError(f"{where}: scoring.hold.{key} names {value!r}, which is not an int parameter")
+            if not isinstance(spec.get("min"), int) or spec["min"] < 1:
+                raise ModeError(f"{where}: parameter {value!r} needs min: 1 or more to be a scoring.hold.{key}")
+
+
+def hold_scoring(scoring: Optional[dict[str, Any]], params: dict[str, Any]) -> Optional[tuple[int, int]]:
+    """A mode's `scoring.hold` with a game's parameters: (every in game ms, points), or None when
+    the mode has no such block or a value cannot be read."""
+    hold = (scoring or {}).get("hold")
+    if not isinstance(hold, dict):
+        return None
+    values = []
+    for key in ("every", "points"):
+        value = hold.get(key)
+        if isinstance(value, str):
+            value = params.get(value)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            return None
+        values.append(value)
+    return values[0] * 1000, values[1]
+
+
 def check_manifest(manifest: dict[str, Any], where: str) -> None:
     """The optional parts of a manifest: kind, commands and i18n."""
     kind = manifest.get("kind", "mode")
@@ -185,6 +234,7 @@ def check_manifest(manifest: dict[str, Any], where: str) -> None:
     for name, spec in params.items():
         if not isinstance(spec.get("gm_only", False), bool):
             raise ModeError(f"{where}: parameter {name!r}: gm_only is true or false")
+    check_scoring(manifest, where)
     commands = manifest.get("commands")
     if commands is not None:
         if not isinstance(commands, dict):
@@ -267,6 +317,7 @@ def mode_from_text(path: Path, manifest_text: str, node_script: Optional[str],
         description=str(manifest.get("description", "")),
         i18n=manifest.get("i18n") or {},
         commands=manifest.get("commands") or {},
+        scoring=manifest.get("scoring") or None,
     )
 
 

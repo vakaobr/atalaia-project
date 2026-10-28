@@ -114,7 +114,8 @@ class MqttBridge:
             # (a terminal's revealed code; decision M5-1). The GM console has it on the stream.
             ev = public_event(msg["event"])
             self._publish(f"{PREFIX}/{game}/events/{ev['type']}", {"game": game, **ev})
-        elif kind == "score":
+        elif kind == "score" and not msg.get("tick"):
+            # (a tick is a projected total on the stream only: MQTT carries the boxes' reports)
             self._publish(f"{PREFIX}/{game}/score", {"game": game, "teams": msg["teams"],
                                                     "at": time.time()}, retain=True)
         elif kind == "node":

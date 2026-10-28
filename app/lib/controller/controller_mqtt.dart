@@ -76,6 +76,9 @@ class ControllerMqtt {
         final ev = publicEvent((msg['event']! as Map).cast<String, Object?>());
         _out('$mqttPrefix/$game/events/${ev['type']}', {'game': game, ...ev});
       case 'score':
+        // A tick is a projected total on the stream only: MQTT carries the
+        // boxes' reports.
+        if (msg['tick'] == true) return;
         _out('$mqttPrefix/$game/score', {
           'game': game,
           'teams': msg['teams'],

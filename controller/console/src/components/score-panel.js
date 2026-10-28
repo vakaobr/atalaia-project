@@ -30,6 +30,7 @@ export class ScorePanel extends Component {
         if (!game) return null;
         const teams = game.teams || [];
         const totals = (score && score.game === game.id && score.teams) || {};
+        const projected = score && score.game === game.id ? score.projected : null;
         const max = Math.max(1, ...teams.map((tm) => Math.abs(totals[tm] || 0)));
         return html`<section class="card" aria-labelledby="score-h">
             <h2 id="score-h">${t('score.title')}</h2>
@@ -37,6 +38,8 @@ export class ScorePanel extends Component {
                 ${teams.map((tm) => html`<li class="score" data-team=${tm}>
                     <${TeamLabel} game=${game} team=${tm} teams=${teams} />
                     <strong class="team-score" data-testid=${`score-${tm}`}>${totals[tm] || 0}</strong>
+                    ${projected && (projected[tm] || 0) !== (totals[tm] || 0) ? html`<span class="muted small"
+                        data-testid=${`projected-${tm}`}>${t('projected_score.label', { n: projected[tm] || 0 })}</span>` : null}
                     <span class="bar" aria-hidden="true"><span ref=${(el) => {
                         if (el) {
                             el.style.width = `${Math.round(Math.abs(totals[tm] || 0) / max * 100)}%`;
@@ -47,6 +50,7 @@ export class ScorePanel extends Component {
             </ul>
             <${Timeline} history=${scoreHistory} teams=${teams} />
             <p class="muted small">${t('score.explain')}</p>
+            ${projected ? html`<p class="muted small">${t('projected_score.explain')}</p>` : null}
         </section>`;
     }
 }

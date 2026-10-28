@@ -243,6 +243,9 @@ bool atalaia_ack_msg_decode(const uint8_t *buf, size_t len, atalaia_ack_msg_t *m
      BIT(ATALAIA_PL_STATE_GAME_TIME_MS) | BIT(ATALAIA_PL_STATE_COUNTERS) |                         \
      BIT(ATALAIA_PL_STATE_EPOCH))
 
+#define STATE_LOST_MAX                                                                             \
+    (sizeof(((atalaia_state_msg_t *)0)->lost) / sizeof(((atalaia_state_msg_t *)0)->lost[0]))
+
 #define STATE_COUNTERS_MAX                                                                         \
     (sizeof(((atalaia_state_msg_t *)0)->counters) / sizeof(((atalaia_state_msg_t *)0)->counters[0]))
 
@@ -250,7 +253,7 @@ size_t atalaia_state_encode(const atalaia_state_msg_t *msg, uint8_t *buf, size_t
 {
     mc_writer_t w;
     mc_init_writer(&w, buf, cap);
-    if (msg->counter_count > STATE_COUNTERS_MAX) {
+    if (msg->counter_count > STATE_COUNTERS_MAX || msg->lost_count > STATE_LOST_MAX) {
         return 0;
     }
 
@@ -258,6 +261,7 @@ size_t atalaia_state_encode(const atalaia_state_msg_t *msg, uint8_t *buf, size_t
     if (msg->rssi != INT8_MIN) entries++;
     if (msg->battery_pct != 0xFF) entries++;
     if (msg->flags != 0xFF) entries++;
+    if (msg->lost_count > 0) entries++;
 
     mc_put_map(&w, entries);
     mc_put_uint(&w, ATALAIA_PL_STATE_OWNER_TEAM);
@@ -289,6 +293,14 @@ size_t atalaia_state_encode(const atalaia_state_msg_t *msg, uint8_t *buf, size_t
     }
     mc_put_uint(&w, ATALAIA_PL_STATE_EPOCH);
     mc_put_uint(&w, msg->epoch);
+    if (msg->lost_count > 0) {
+        mc_put_uint(&w, ATALAIA_PL_STATE_LOST);
+        mc_put_map(&w, msg->lost_count);
+        for (uint8_t c = 0; c < msg->lost_count; c++) {
+            mc_put_uint(&w, msg->lost[c].team);
+            mc_put_uint(&w, msg->lost[c].points);
+        }
+    }
 
     return w.ok ? w.pos : 0;
 }
@@ -357,6 +369,22 @@ bool atalaia_state_decode(const uint8_t *buf, size_t len, atalaia_state_msg_t *m
             if (!read_uint_max(&r, UINT16_MAX, &v)) return false;
             msg->epoch = (uint16_t)v;
             break;
+        case ATALAIA_PL_STATE_LOST: {
+            uint64_t n;
+            if (!mc_read_map(&r, &n) || n > STATE_LOST_MAX) return false;
+            for (uint64_t c = 0; c < n; c++) {
+                uint64_t team, points;
+                if (!read_uint_max(&r, UINT8_MAX, &team) || !read_uint_max(&r, UINT32_MAX, &points))
+                    return false;
+                for (uint64_t k = 0; k < c; k++) {
+                    if (msg->lost[k].team == team) return false; /* duplicate team */
+                }
+                msg->lost[c].team = (uint8_t)team;
+                msg->lost[c].points = (uint32_t)points;
+            }
+            msg->lost_count = (uint8_t)n;
+            break;
+        }
         default:
             if (!mc_skip_value(&r)) return false;
             break;

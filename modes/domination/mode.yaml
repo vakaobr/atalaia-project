@@ -12,6 +12,10 @@ params:
   capture_hold_ms: { type: int, min: 0, max: 60000, default: 3000, label: "Hold time to capture (ms)" }
   tick_s:          { type: int, min: 1, max: 600,   default: 10,   label: "Seconds per scoring tick" }
   points_per_tick: { type: int, min: 1, max: 1000,  default: 1,    label: "Points per tick" }
+# How a box scores while it holds, so a controller can project the points between two STATEs
+# (modes/README.md, "Projected score"): points_per_tick for the owner every tick_s seconds.
+scoring:
+  hold: { every: tick_s, points: points_per_tick }
 i18n:
   pt:
     name: Domínio

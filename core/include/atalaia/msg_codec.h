@@ -54,6 +54,14 @@ typedef struct {
         uint32_t score;
     } counters[16];
     uint8_t counter_count;
+    /* Points each team lost to penalties on the node (RFC 0001 Amendment 17): optional key 9,
+     * sent only when a team lost something, so lost_count 0 means "none" and an older sender is
+     * read the same way. Never decreases, like the gains in counters. */
+    struct {
+        uint8_t team;
+        uint32_t points;
+    } lost[16];
+    uint8_t lost_count;
     int8_t rssi;         /* INT8_MIN = not present */
     uint8_t battery_pct; /* 0xFF = not present     */
     uint8_t flags;       /* 0xFF = not present     */

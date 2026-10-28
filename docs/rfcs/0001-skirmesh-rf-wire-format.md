@@ -199,8 +199,9 @@ Sent every 10-60 seconds (per field profile).
 | 6 | `battery_pct` | uint8 | no | 0-100 |
 | 7 | `flags` | uint8 | no | Bit 0: running, bit 1: paused |
 | 8 | `epoch` | uint16 | yes | Current nonce epoch |
+| 9 | `lost` | map[uint8->uint32] | no | Per-team points lost to penalties on this node (Amendment 17); absent = none |
 
-Typical size: 20-40 bytes (2-team game).
+Typical size: 20-40 bytes (2-team game); a team with a penalty adds 2-6 bytes.
 
 #### CMD (type 5)
 
@@ -804,6 +805,23 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 **Compatibility:** an older pod passes the packet to its phone, which ignores an opcode it does not know, and never answers (the controller says "no answer"); an older box logs "unknown command ignored"; an older controller never sends it. The opcode range in the CMD payload is 0-10.
 
 **Reason:** a pod's settings were fixed at build time (decision PF15); a pod in a case in the field could not be changed without a cable. Settings that touch the radio's key, region, channel, pins or the pod's Bluetooth security are not in it, on purpose.
+
+## Amendment 18 (2026-10-28): A box reports the points its teams lost to penalties
+
+**Status:** built (decision BSC-1 of the maintainer's 2026-10-28 choice to close decision E6: a penalty was logged but never subtracted from a total). Core codec (`atalaia_state_msg_t.lost`), the Field Box's STATE (`firmware/esp32/main/box_game.c`), both controllers (`simulator/atalaia_sim/field_controller.py` for the Pi, `app/lib/controller/field_controller.dart` for the phone), the Dart codec (`app/lib/radio/rf_codec.dart`); the shared cases are `protocol/vectors/state.json` (`state_with_lost`, `state_full_with_lost`, `state_lost_not_a_map`) and the controller contract case "box penalties" in `protocol/vectors/controller_api.json`.
+
+**Supersedes:** the sentence of decision E6 that said a box's STATE carries gains only and that a per-team "lost" counter "needs an RFC". Nothing else: `counters` (key 4) is still the points **gained**, never decreasing.
+
+**Change:**
+
+1. **STATE gets one optional key, 9 `lost`**: a CBOR map from team id (uint8) to the points that team lost to penalties on this node (uint32), the node's `atalaia_score_t.lost[team]`, the sum of its `score.add(team, -n)` calls. It is the mirror of `counters`: it only ever grows, so a controller merges it by the **maximum** per (node, team), a late or repeated STATE changes nothing and a lost STATE is repaired by the next. The score's own saturating add (`UINT32_MAX`) holds for both.
+2. **Sent only when a team lost something**, and then only for the teams that did. A game with no penalty sends byte for byte the STATE of before this amendment (no airtime change); a penalty adds 2 bytes of key and map header plus 2-6 per team (a Kill Confirmed box that has penalised one team: 6 bytes, under 1 % of a 52-byte frame's time on air).
+3. **A controller's total per team** is `sum over nodes of gained (key 4) - sum over nodes of lost (key 9) + the GM's adjustments (score.delta events the controller itself logged) + the field script's own points`. Boxes' own `score.delta` events (the penalty's explicit event for the GM's feed) are **not** added again by the controller: the lost counter is the number, the event is the news. (The site server already adds every `score.delta` event of a game to its counters' sum, protocol/sync.md; it therefore already subtracted a box's penalty, and after this amendment the controller's live total and the server's agree.)
+4. **The controller keeps it with the node** (`lost` next to `score` in the node's stored info, in `GET /api/v1/nodes`, the `node` stream message and after a restart); the totals, the `score` stream message, MQTT's `.../score`, the console, the scoreboards and the app show the net figure. A box's own screen was never wrong: `score.get(team)` in a mode's script is gained minus lost on that node, so Kill Confirmed's station already showed a team's points net of its penalty; what was missing was the controller (and everything fed by it) learning the penalty.
+
+**Compatibility:** the key is additive and optional. A box without it (an older firmware) is read as having lost nothing: its penalties stay as before (logged as `score.delta`, not subtracted live). An older controller built on the C codec or the Python decoder skips key 9 (unknown keys are skipped) and shows the totals it always showed. **An older phone controller (the Android app before this change) refuses a STATE with an unknown key** (`RfState.decode` rejects any key above 8), so with such an app as the controller a box that has penalised a team looks silent until the app is updated: update the app first on a field that plays Kill Confirmed or any mode that penalises. Relays and modems forward the ciphertext whole and need no change. The Android prop link (`protocol/prop-link.md`) does not carry the key yet: a phone playing a box that penalises is not subtracted live, as before.
+
+**Reason:** decision E6 (2026-10-21) shipped gains only so the controller's merge by maximum works, and recorded the price: Kill Confirmed's penalty (the only built-in mode that uses one) lowered the station's own number and never the team's total. A second grow-only counter keeps the merge rule, costs nothing when unused, and needs no new frame, event or acknowledgement.
 
 ## Open questions
 

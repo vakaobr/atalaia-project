@@ -25,6 +25,32 @@
         "epoch": 10
       },
       "cbor": "a8010202000319ea6004a3011901f40219012c030005384506182d0701080a"
+    },
+    {
+      "name": "state_with_lost",
+      "fields": {
+        "owner_team": 1,
+        "phase": 1,
+        "game_time_ms": 125000,
+        "counters": {"1": 100, "2": 40},
+        "epoch": 3,
+        "lost": {"1": 30}
+      },
+      "cbor": "a601010201031a0001e84804a2011864021828080309a101181e"
+    },
+    {
+      "name": "state_full_with_lost",
+      "fields": {
+        "owner_team": 0,
+        "phase": 3,
+        "game_time_ms": 900000,
+        "counters": {"1": 500, "2": 300, "3": 0},
+        "battery_pct": 80,
+        "flags": 0,
+        "epoch": 65535,
+        "lost": {"1": 25, "3": 4000000000}
+      },
+      "cbor": "a801000203031a000dbba004a3011901f40219012c030006185007000819ffff09a2011819031aee6b2800"
     }
   ],
   "invalid": [
@@ -32,6 +58,11 @@
       "name": "state_missing_counters",
       "cbor": "a401010202031913880801",
       "reason": "missing required field counters (key 4)"
+    },
+    {
+      "name": "state_lost_not_a_map",
+      "cbor": "a601010201031a0001e84804a2011864021828080309181e",
+      "reason": "lost (key 9) is a number, not a map of team to points"
     }
   ]
 }

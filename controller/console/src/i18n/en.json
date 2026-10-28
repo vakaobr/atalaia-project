@@ -1647,5 +1647,9 @@
     "chrono_days": "Chrono readings kept for (days)",
     "game_days": "Game data kept for (days)",
     "hint": "30 to 3653 days. Chrono readings (also other fields' copies) and marshals' earlier keys are deleted after the first; an ended game's events, scores and nodes after the second. With a site server connected, a game is never deleted before the site server has all of it. Both are the site server's when the field takes its settings from it."
+  },
+  "projected_score": {
+    "label": "estimated {n}",
+    "explain": "Between the boxes' reports (every 15 s) the estimate adds the points a held box has made since, for modes that say how they score. Only the number without \"estimated\" is the official score."
   }
 }

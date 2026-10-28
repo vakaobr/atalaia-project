@@ -334,6 +334,8 @@ class ContractCase(unittest.TestCase):
             elif kind == "STATE":
                 state = dict(rx["state"])
                 state["counters"] = {int(k): v for k, v in state["counters"].items()}
+                if "lost" in state:
+                    state["lost"] = {int(k): v for k, v in state["lost"].items()}
                 payload = state_encode(state)
             elif kind == "EVENT":
                 payload = codec.encode_event(rx["event"])

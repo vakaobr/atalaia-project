@@ -180,19 +180,40 @@ static const uint8_t pl_state_1[] = {
     0x06, 0x18, 0x2d, 0x07, 0x01, 0x08, 0x0a,
 };
 #define pl_state_1_len sizeof(pl_state_1)
+static const uint8_t pl_state_2[] = {
+    0xa6, 0x01, 0x01, 0x02, 0x01, 0x03, 0x1a, 0x00, 0x01, 0xe8, 0x48, 0x04,
+    0xa2, 0x01, 0x18, 0x64, 0x02, 0x18, 0x28, 0x08, 0x03, 0x09, 0xa1, 0x01,
+    0x18, 0x1e,
+};
+#define pl_state_2_len sizeof(pl_state_2)
+static const uint8_t pl_state_3[] = {
+    0xa8, 0x01, 0x00, 0x02, 0x03, 0x03, 0x1a, 0x00, 0x0d, 0xbb, 0xa0, 0x04,
+    0xa3, 0x01, 0x19, 0x01, 0xf4, 0x02, 0x19, 0x01, 0x2c, 0x03, 0x00, 0x06,
+    0x18, 0x50, 0x07, 0x00, 0x08, 0x19, 0xff, 0xff, 0x09, 0xa2, 0x01, 0x18,
+    0x19, 0x03, 0x1a, 0xee, 0x6b, 0x28, 0x00,
+};
+#define pl_state_3_len sizeof(pl_state_3)
 static const uint8_t pl_state_bad_0[] = {
     0xa4, 0x01, 0x01, 0x02, 0x02, 0x03, 0x19, 0x13, 0x88, 0x08, 0x01,
 };
 #define pl_state_bad_0_len sizeof(pl_state_bad_0)
+static const uint8_t pl_state_bad_1[] = {
+    0xa6, 0x01, 0x01, 0x02, 0x01, 0x03, 0x1a, 0x00, 0x01, 0xe8, 0x48, 0x04,
+    0xa2, 0x01, 0x18, 0x64, 0x02, 0x18, 0x28, 0x08, 0x03, 0x09, 0x18, 0x1e,
+};
+#define pl_state_bad_1_len sizeof(pl_state_bad_1)
 
 static const payload_vector_t state_vectors[] = {
     {"state_minimal", "{\"owner_team\":1,\"phase\":2,\"game_time_ms\":5000,\"counters\":{\"1\":100,\"2\":200},\"epoch\":1}", pl_state_0, pl_state_0_len},
     {"state_full", "{\"owner_team\":2,\"phase\":0,\"game_time_ms\":60000,\"counters\":{\"1\":500,\"2\":300,\"3\":0},\"rssi\":-70,\"battery_pct\":45,\"flags\":1,\"epoch\":10}", pl_state_1, pl_state_1_len},
+    {"state_with_lost", "{\"owner_team\":1,\"phase\":1,\"game_time_ms\":125000,\"counters\":{\"1\":100,\"2\":40},\"epoch\":3,\"lost\":{\"1\":30}}", pl_state_2, pl_state_2_len},
+    {"state_full_with_lost", "{\"owner_team\":0,\"phase\":3,\"game_time_ms\":900000,\"counters\":{\"1\":500,\"2\":300,\"3\":0},\"battery_pct\":80,\"flags\":0,\"epoch\":65535,\"lost\":{\"1\":25,\"3\":4000000000}}", pl_state_3, pl_state_3_len},
 };
 #define STATE_VECTOR_COUNT (sizeof(state_vectors) / sizeof(state_vectors[0]))
 
 static const payload_bad_vector_t state_bad_vectors[] = {
     {"state_missing_counters", pl_state_bad_0, pl_state_bad_0_len, "missing required field counters (key 4)"},
+    {"state_lost_not_a_map", pl_state_bad_1, pl_state_bad_1_len, "lost (key 9) is a number, not a map of team to points"},
 };
 #define STATE_BAD_VECTOR_COUNT (sizeof(state_bad_vectors) / sizeof(state_bad_vectors[0]))
 

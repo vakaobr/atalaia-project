@@ -108,10 +108,15 @@ void main() {
           batteryPct: f['battery_pct'] as int?,
           flags: f['flags'] as int?,
           epoch: f['epoch']! as int,
+          lost: {
+            for (final e in ((f['lost'] ?? const {}) as Map).entries)
+              int.parse('${e.key}'): e.value as int,
+          },
         );
         expect(hexEncode(st.encode()), c['cbor']);
         final back = RfState.decode(hexDecode(c['cbor'] as String));
         expect(back.counters, st.counters);
+        expect(back.lost, st.lost);
         expect(hexEncode(back.encode()), c['cbor']);
       });
     }

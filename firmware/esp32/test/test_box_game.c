@@ -520,6 +520,7 @@ static void test_join_play_end(void)
     CHECK(atalaia_state_decode(pl, pn, &st));
     CHECK(st.owner_team == 1 && st.counter_count == 2 && st.counters[0].team == 1);
     CHECK(st.counters[0].score >= 5 && st.phase == FIELD_GAME_RUNNING && (st.flags & 1));
+    CHECK(st.lost_count == 0); /* no penalty: the same STATE as before Amendment 17 */
 
     /* Pause: game time stands still. Resume: it moves again. */
     cmd(FIELD_CMD_PAUSE);
@@ -709,6 +710,22 @@ static void test_player_tags(void)
     CHECK(events_named("score.delta") == 1); /* blue's penalty */
     CHECK(atalaia_score_net(atalaia_node_score(runner.node), 1) == 1);
     CHECK(atalaia_score_net(atalaia_node_score(runner.node), 2) == -1);
+
+    /* The periodic STATE carries the penalty as `lost` (Amendment 17): only blue lost points,
+     * and the gains stay what they were. */
+    ack_all(); /* (an unacknowledged event would be sent again within these 15 s) */
+    run_ms(&now, FIELD_LINK_STATE_MS + 100);
+    {
+        atalaia_header_t sh;
+        uint8_t spl[PKT_CAP];
+        size_t spn;
+        atalaia_state_msg_t sst;
+        CHECK(last_of(ATALAIA_MSG_STATE, &sh, spl, &spn));
+        CHECK(atalaia_state_decode(spl, spn, &sst));
+        CHECK(sst.lost_count == 1 && sst.lost[0].team == 2 && sst.lost[0].points == 1);
+        CHECK(sst.counters[0].team == 1 && sst.counters[0].score == 1);
+        CHECK(sst.counters[1].team == 2 && sst.counters[1].score == 0);
+    }
 
     /* Signed with another key, for another game, unsigned: the node hears them, nothing counts. */
     static const uint8_t other[16] = {1};

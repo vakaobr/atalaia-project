@@ -263,25 +263,18 @@ final class RfState {
     this.rssi,
     this.batteryPct,
     this.flags,
+    this.lost = const {},
   });
 
   factory RfState.decode(List<int> payload) {
     final m = _map(payload);
-    _only(m, 8);
-    final c = m[4];
-    if (c is! Map) throw RfException('counters is a map');
-    final counters = <int, int>{};
-    c.forEach((k, v) {
-      if (k is! int ||
-          k < 0 ||
-          k > 255 ||
-          v is! int ||
-          v < 0 ||
-          v > 0xffffffff) {
-        throw RfException('counters map team ids to 0-4294967295');
-      }
-      counters[k] = v;
-    });
+    _only(m, 9);
+    final counters = _teamPoints(m[4], 'counters');
+    // Key 9 (RFC 0001 Amendment 17): the points each team lost to penalties on
+    // the node; absent from a box that has none and from an older one.
+    final lost = m.containsKey(9)
+        ? _teamPoints(m[9], 'lost')
+        : const <int, int>{};
     final rssi = m[5];
     if (rssi != null && (rssi is! int || rssi < -128 || rssi > 127)) {
       throw RfException('rssi is -128-127');
@@ -291,6 +284,7 @@ final class RfState {
       phase: _uint(m, 2, 'phase', 255),
       gameTimeMs: _uint(m, 3, 'game_time_ms', 0xffffffff),
       counters: counters,
+      lost: lost,
       rssi: rssi as int?,
       batteryPct: m.containsKey(6) ? _uint(m, 6, 'battery_pct', 100) : null,
       flags: m.containsKey(7) ? _uint(m, 7, 'flags', 255) : null,
@@ -300,6 +294,9 @@ final class RfState {
 
   final int ownerTeam, phase, gameTimeMs, epoch;
   final Map<int, int> counters;
+
+  /// Points lost to penalties per team id (STATE key 9); empty when none.
+  final Map<int, int> lost;
   final int? rssi, batteryPct, flags;
 
   Uint8List encode() => cborEncode(<int, Object?>{
@@ -314,7 +311,29 @@ final class RfState {
     if (batteryPct != null) 6: _checked('battery_pct', batteryPct!, 100),
     if (flags != null) 7: _checked('flags', flags!, 255),
     8: _checked('epoch', epoch, 0xffff),
+    if (lost.isNotEmpty)
+      9: <int, Object?>{
+        for (final e in lost.entries)
+          _checked('team', e.key, 255): _checked('lost', e.value, 0xffffffff),
+      },
   });
+
+  static Map<int, int> _teamPoints(Object? c, String name) {
+    if (c is! Map) throw RfException('$name is a map');
+    final out = <int, int>{};
+    c.forEach((k, v) {
+      if (k is! int ||
+          k < 0 ||
+          k > 255 ||
+          v is! int ||
+          v < 0 ||
+          v > 0xffffffff) {
+        throw RfException('$name map team ids to 0-4294967295');
+      }
+      out[k] = v;
+    });
+    return out;
+  }
 }
 
 // ---- ACK ----------------------------------------------------------------------------------

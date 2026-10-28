@@ -58,6 +58,118 @@ void main() {
   late AtalaiaCore core;
   setUpAll(() => core = AtalaiaCore.open(coreLibraryPath()));
 
+  group('the optional scoring block (BSC-2, atalaia_sim.mode)', () {
+    Map<String, Object?> manifest(Object? scoring, {String kind = 'mode'}) => {
+      'id': 'org.x.y',
+      'version': '1',
+      'kind': kind,
+      'roles': {'r': <String, Object?>{}},
+      'params': {
+        'tick_s': {'type': 'int', 'min': 1, 'max': 600, 'default': 10},
+        'points': {'type': 'int', 'min': 1, 'max': 100, 'default': 1},
+        'zero': {'type': 'int', 'min': 0, 'max': 5, 'default': 0},
+        'label': {'type': 'text'},
+      },
+      'scoring': scoring,
+    };
+
+    test('valid blocks', () {
+      for (final scoring in [
+        {
+          'hold': {'every': 'tick_s', 'points': 'points'},
+        },
+        {
+          'hold': {'every': 5, 'points': 1},
+        },
+        {
+          'hold': {'every': 'tick_s', 'points': 3},
+        },
+      ]) {
+        checkManifest(manifest(scoring), 'm');
+      }
+    });
+
+    test('invalid blocks are refused', () {
+      for (final scoring in <Object?>[
+        'hold',
+        <Object?>[],
+        <String, Object?>{},
+        {'hold': <String, Object?>{}},
+        {'other': <String, Object?>{}},
+        {
+          'hold': {'every': 'tick_s'},
+        },
+        {
+          'hold': {'every': 'tick_s', 'points': 'points', 'extra': 1},
+        },
+        {
+          'hold': {'every': 0, 'points': 1},
+        },
+        {
+          'hold': {'every': true, 'points': 1},
+        },
+        {
+          'hold': {'every': 1.5, 'points': 1},
+        },
+        {
+          'hold': {'every': 'nope', 'points': 1},
+        },
+        {
+          'hold': {'every': 'label', 'points': 1},
+        },
+        {
+          'hold': {'every': 'zero', 'points': 1},
+        },
+      ]) {
+        expect(
+          () => checkManifest(manifest(scoring), 'm'),
+          throwsA(isA<ModeException>()),
+          reason: '$scoring',
+        );
+      }
+      expect(
+        () => checkManifest(
+          manifest({
+            'hold': {'every': 5, 'points': 1},
+          }, kind: 'role'),
+          'm',
+        ),
+        throwsA(isA<ModeException>()),
+      );
+    });
+
+    test('the game\'s own values', () {
+      const scoring = {
+        'hold': {'every': 'tick_s', 'points': 'points'},
+      };
+      expect(holdScoring(scoring, {'tick_s': 10, 'points': 2}), (10000, 2));
+      expect(
+        holdScoring({
+          'hold': {'every': 5, 'points': 1},
+        }, {}),
+        (5000, 1),
+      );
+      expect(holdScoring(scoring, {'tick_s': 10}), isNull);
+      expect(holdScoring(scoring, {'tick_s': 0, 'points': 1}), isNull);
+      expect(holdScoring(null, {}), isNull);
+    });
+
+    test('a mode with the block keeps it; a composed mode has none', () {
+      final dom = modeFromManifest(
+        manifest({
+          'hold': {'every': 'tick_s', 'points': 'points'},
+        }),
+        'y',
+        nodeScript: '-- y\n',
+      );
+      expect(dom.scoring, {
+        'hold': {'every': 'tick_s', 'points': 'points'},
+      });
+      final mod = _mode('org.t.mod', 'modifier');
+      expect(composeModes(dom, [mod]).scoring, isNull);
+    });
+  });
+
   group('composition (atalaia_sim.mode compose)', () {
     final main = _mode(
       'org.t.main',

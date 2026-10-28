@@ -287,6 +287,10 @@ void main() {
               int.parse('${e.key}'): e.value as int,
           },
           epoch: s['epoch']! as int,
+          lost: {
+            for (final e in ((s['lost'] ?? const {}) as Map).entries)
+              int.parse('${e.key}'): e.value as int,
+          },
         ).encode();
       case 'TIME':
         // Slice S7: another controller's beacon.

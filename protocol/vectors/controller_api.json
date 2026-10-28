@@ -485,6 +485,43 @@
       ]
     },
     {
+      "name": "box penalties: STATE key 9 (lost) is subtracted from the totals, merged by maximum (RFC 0001 Amendment 17, BSC-1)",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Penalty", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "assignments": {"4": "zone", "5": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"rx": {"source": 4, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"rx": {"source": 5, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-5", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 200, "json": {"state": "running"}},
+        {"rx": {"source": 4, "seq": 1, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 10, "counters": {"1": 12, "2": 4}, "epoch": 1}}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 12, "blue": 4}}},
+        {"rx": {"source": 4, "seq": 2, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 15010, "counters": {"1": 12, "2": 4}, "epoch": 1, "lost": {"2": 3}}}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 12, "blue": 1}}},
+        {"request": {"method": "GET", "path": "/api/v1/nodes", "token": "read"}, "status": 200, "json": [{"node_id": 4, "score": {"red": 12, "blue": 4}, "lost": {"red": 0, "blue": 3}}, {"node_id": 5, "lost": {"red": 0, "blue": 0}}]},
+        {"rx": {"source": 4, "seq": 3, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 30010, "counters": {"1": 12, "2": 4}, "epoch": 1, "lost": {"2": 1}}}},
+        {"rx": {"source": 5, "seq": 1, "epoch": 1, "type": "STATE", "state": {"owner_team": 2, "phase": 1, "game_time_ms": 30020, "counters": {"2": 5}, "epoch": 1, "lost": {"2": 2}}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/score", "token": "gm", "body": {"team": "blue", "amount": -1, "reason": "gm"}}, "status": 200, "json": {"score": {"teams": {"red": 12, "blue": 3}}}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 12, "blue": 3}}}
+      ]
+    },
+    {
+      "name": "projected score: a mode with scoring.hold gets an estimate between STATEs; every STATE replaces it (SL-6, BSC-2)",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Project", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "assignments": {"4": "zone"}, "params": {"tick_s": 10, "points_per_tick": 2}}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "GET", "path": "/api/v1/modes", "token": "read"}, "status": 200, "json": {"$contains": [{"id": "org.atalaia.domination", "scoring": {"hold": {"every": "tick_s", "points": "points_per_tick"}}}, {"id": "org.atalaia.holdall", "scoring": null}]}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm", "body": {"force": true}}, "status": 200},
+        {"rx": {"source": 4, "seq": 1, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 0, "counters": {}, "epoch": 1}}},
+        {"advance_ms": 25000},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 0, "blue": 0}, "projected": {"red": 4, "blue": 0}}},
+        {"rx": {"source": 4, "seq": 2, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 20000, "counters": {"1": 4}, "epoch": 1}}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 4, "blue": 0}, "projected": {"red": 4, "blue": 0}}},
+        {"advance_ms": 10000},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 4, "blue": 0}, "projected": {"red": 6, "blue": 0}}},
+        {"rx": {"source": 4, "seq": 3, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 35000, "counters": {"1": 4}, "epoch": 1}}},
+        {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"projection": {"every_ms": 10000, "points": 2, "samples": 2, "off": 1, "max_abs": 2}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/pause", "token": "gm"}, "status": 200},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 4, "blue": 0}, "projected": "$absent"}}
+      ]
+    },
+    {
       "name": "Hold-All's field.lua scores while one team holds every box",
       "steps": [
         {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Hold", "mode_id": "org.atalaia.holdall", "assignments": {"4": "zone", "5": "zone"}}}, "status": 201,
