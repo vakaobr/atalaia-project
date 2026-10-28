@@ -49,6 +49,16 @@
     ATALAIA_ATAK_RELAY_PUBLIC_PORT
                             the port ATAK devices connect to, if the deployment publishes the relay on
                             another one (default: ATALAIA_ATAK_RELAY_PORT)
+    ATALAIA_PASSWORD_LOGIN  "on" (default) or "off": "off" turns password login and password registration off
+                            (accounts then sign in with a passkey or a social login; decision LG-3)
+    ATALAIA_OIDC_GOOGLE_CLIENT_ID, ATALAIA_OIDC_GOOGLE_CLIENT_SECRET
+    ATALAIA_OIDC_MICROSOFT_CLIENT_ID, ATALAIA_OIDC_MICROSOFT_CLIENT_SECRET,
+    ATALAIA_OIDC_MICROSOFT_TENANT   (common by default: personal and work accounts; organizations, consumers
+                            or one tenant's id)
+    ATALAIA_OIDC_APPLE_CLIENT_ID (the Services ID), ATALAIA_OIDC_APPLE_TEAM_ID, ATALAIA_OIDC_APPLE_KEY_ID,
+    ATALAIA_OIDC_APPLE_KEY_FILE     (the .p8 private key the client secret JWT is signed with)
+                            each social login provider is off until all of its settings are given
+                            (atalaia_server/oidc.py; decisions LG-*)
 
     ATALAIA_QUOTA_<NAME>    hosted mode only: one field's limit on a resource (``QUOTA_DEFAULTS`` lists the names
                             and defaults: ACCOUNTS, SCHEDULED_GAMES, REGISTRATIONS, GAMES,
@@ -110,10 +120,61 @@ MAX_QUOTA = 100_000_000
 DEFAULT_EXPORT_INTERVAL_S = 300
 DEFAULT_EXPORT_MAX_MB = 512
 DEFAULT_HOSTED_WATCH_S = 2.0
+OIDC_PROVIDERS = ("google", "microsoft", "apple")
+MICROSOFT_TENANT = re.compile(
+    r"common|organizations|consumers|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+OIDC_VALUE = re.compile(r"[\x21-\x7e]{1,512}")  # printable ASCII, no spaces: client ids, team and key ids
 
 
 class ConfigError(ValueError):
     """A setting is missing or not valid."""
+
+
+@dataclass(frozen=True)
+class OidcClient:
+    """One social login provider's client, as the operator registered it with the provider."""
+
+    provider: str
+    client_id: str
+    client_secret: Optional[str] = field(default=None, repr=False)   # Google, Microsoft
+    tenant: Optional[str] = None                                      # Microsoft
+    team_id: Optional[str] = None                                     # Apple
+    key_id: Optional[str] = None                                      # Apple
+    key_file: Optional[str] = None                                    # Apple: the .p8 file's path
+
+    def __post_init__(self) -> None:
+        if self.provider not in OIDC_PROVIDERS:
+            raise ConfigError(f"unknown social login provider {self.provider!r}")
+        if not OIDC_VALUE.fullmatch(self.client_id):
+            raise ConfigError(f"ATALAIA_OIDC_{self.provider.upper()}_CLIENT_ID is not a client id")
+        if self.provider == "microsoft" and not MICROSOFT_TENANT.fullmatch(self.tenant or ""):
+            raise ConfigError("ATALAIA_OIDC_MICROSOFT_TENANT must be common, organizations, consumers or a "
+                              "tenant's id (a UUID)")
+
+
+def _oidc_clients(env: Mapping[str, str]) -> tuple[OidcClient, ...]:
+    """The providers whose settings are all there; one that has some and not all is an error (a typo must
+    not turn a login method off silently)."""
+    wanted = {"google": ("CLIENT_ID", "CLIENT_SECRET"), "microsoft": ("CLIENT_ID", "CLIENT_SECRET"),
+              "apple": ("CLIENT_ID", "TEAM_ID", "KEY_ID", "KEY_FILE")}
+    clients = []
+    for provider, names in wanted.items():
+        values = {n: env.get(f"ATALAIA_OIDC_{provider.upper()}_{n}", "").strip() for n in names}
+        if not any(values.values()):
+            continue
+        missing = [f"ATALAIA_OIDC_{provider.upper()}_{n}" for n, v in values.items() if not v]
+        if missing:
+            raise ConfigError(f"{', '.join(missing)} not set: a social login provider needs all of its settings")
+        if provider == "apple":
+            if not os.path.isfile(values["KEY_FILE"]):
+                raise ConfigError("ATALAIA_OIDC_APPLE_KEY_FILE is not a file this server can read")
+            clients.append(OidcClient("apple", values["CLIENT_ID"], team_id=values["TEAM_ID"],
+                                      key_id=values["KEY_ID"], key_file=values["KEY_FILE"]))
+        else:
+            tenant = env.get("ATALAIA_OIDC_MICROSOFT_TENANT", "").strip().lower() or "common"
+            clients.append(OidcClient(provider, values["CLIENT_ID"], client_secret=values["CLIENT_SECRET"],
+                                      tenant=tenant if provider == "microsoft" else None))
+    return tuple(clients)
 
 
 def check_firmware_key(text: str) -> str:
@@ -254,6 +315,8 @@ class Settings:
     export_min_interval_s: int = DEFAULT_EXPORT_INTERVAL_S
     export_max_mb: int = DEFAULT_EXPORT_MAX_MB
     hosted_watch_s: float = DEFAULT_HOSTED_WATCH_S
+    password_login: bool = True                    # LG-3: "off" turns password login and registration off
+    oidc: tuple[OidcClient, ...] = ()              # the configured social login providers (LG-1)
 
     def __post_init__(self) -> None:
         _check_url(self.database_url)
@@ -305,6 +368,11 @@ class Settings:
             raise ConfigError("ATALAIA_EXPORT_MAX_MB must be between 1 and 10240")
         if not 0.1 <= self.hosted_watch_s <= 60:
             raise ConfigError("ATALAIA_HOSTED_WATCH_S must be between 0.1 and 60")
+        if len({c.provider for c in self.oidc}) != len(self.oidc):
+            raise ConfigError("a social login provider is configured twice")
+
+    def oidc_client(self, provider: str) -> Optional[OidcClient]:
+        return next((c for c in self.oidc if c.provider == provider), None)
 
     def _check_atak(self) -> None:
         if not 0 <= self.atak_relay_port <= 65535:
@@ -348,7 +416,8 @@ class Settings:
                 f"atak_relay_port={self.atak_relay_port}, atak_relay_host={self.atak_relay_host!r}, "
                 f"atak_relay_public_port={self.atak_relay_public_port!r}, quotas={dict(self.quotas)!r}, "
                 f"export_min_interval_s={self.export_min_interval_s}, export_max_mb={self.export_max_mb}, "
-                f"hosted_watch_s={self.hosted_watch_s})")
+                f"hosted_watch_s={self.hosted_watch_s}, password_login={self.password_login!r}, "
+                f"oidc={[c.provider for c in self.oidc]!r})")
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
@@ -385,4 +454,6 @@ class Settings:
                                               0, 86400, int)),
             export_max_mb=int(_number(env, "ATALAIA_EXPORT_MAX_MB", DEFAULT_EXPORT_MAX_MB, 1, 10240, int)),
             hosted_watch_s=float(_number(env, "ATALAIA_HOSTED_WATCH_S", DEFAULT_HOSTED_WATCH_S, 0.1, 60.0, float)),
+            password_login=_on_off(env, "ATALAIA_PASSWORD_LOGIN", default=True),
+            oidc=_oidc_clients(env),
         )

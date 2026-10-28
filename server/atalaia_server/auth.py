@@ -8,9 +8,11 @@ revoked nor expired, and the roles are the user's rows in
 ``user_field_roles`` now, not the token's ``roles`` claim. A logout, a revoked
 session or a removed role therefore counts at the next request.
 
-Roles are per field. ``admin``, ``gm`` and ``marshal`` need TOTP (granting
-them to an account without TOTP fails) and count only in a session that
-passed the TOTP step (``sessions.mfa``); so does the server administrator.
+Roles are per field. ``admin``, ``gm`` and ``marshal`` need a second factor, TOTP
+or a passkey (granting them to an account with neither fails), and count only in
+a session that passed it (``sessions.mfa``): a TOTP step, or a passkey login or
+step-up, which is both factors at once (user verification required). A social login
+alone never sets ``mfa``. So does the server administrator.
 Per-game roles come with the ``games`` table (plan phase 13; decision S11-6).
 """
 
@@ -96,6 +98,7 @@ async def current_principal(request: Request, db: AsyncSession = Depends(get_ses
     principal = await principal_from_token(request, db, token) if token else None
     if principal is None:
         raise HTTPException(401, "not_authenticated", headers=UNAUTHORISED)
+    request.state.principal = principal  # for the confirmation an account with no password gives (api/auth.py)
     return principal
 
 

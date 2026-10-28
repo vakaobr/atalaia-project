@@ -37,6 +37,7 @@ from ..audit import record
 from ..auth import Principal, current_principal, require_field_role
 from ..db import get_session
 from ..models import (PRIVILEGED_ROLES, ROLE_BY_ID, ROLE_NAMES, Game, GameEvent, GameNode, User, UserGameRole)
+from .auth import has_second_factor
 from .fields import GM_GRANTS, NO_STORE, GrantIn
 
 router = APIRouter(prefix="/api/v1", tags=["games"])
@@ -149,7 +150,7 @@ async def grant_game_role(game_id: uuid.UUID, body: GrantIn, request: Request,
     target = await db.scalar(select(User).where(User.username == body.username.strip().lower()))
     if target is None:
         raise HTTPException(404, "user_not_found")
-    if body.role in PRIVILEGED_ROLES and not target.totp_enabled:
+    if body.role in PRIVILEGED_ROLES and not await has_second_factor(db, target):
         raise HTTPException(409, "totp_required")
     inserted = await db.scalar(
         insert(UserGameRole).values(user_id=target.id, game=game.id, role_id=ROLE_NAMES[body.role],

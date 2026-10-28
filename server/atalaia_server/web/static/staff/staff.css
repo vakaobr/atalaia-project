@@ -53,6 +53,13 @@ button.link { background: none; border: 0; color: var(--accent); padding: 0 0.25
               text-decoration: underline; font-weight: 400; margin: 0; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .staff-form.inline .row { display: inline-block; vertical-align: bottom; margin-right: 0.75rem; min-width: 10rem; }
+/* Other ways to log in (login.js) and the second factor step-up (stepup.js) */
+.alt-logins { margin: 1.5rem 0; }
+.alt-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; }
+.alt-logins button, .alt-buttons button.provider { background: transparent; color: var(--ink); border-color: var(--muted); }
+.alt-logins .consent { font-size: 0.95rem; color: var(--muted); }
+#stepup { margin: 1rem 0; padding: 0.5rem 1rem; border: 1px solid var(--accent); border-radius: 0.3rem; }
+#stepup h2 { margin: 0.25rem 0; font-size: 1.1rem; }
 /* Tables */
 .table-wrap { overflow-x: auto; margin: 1rem 0; position: relative; }  /* also holds visually-hidden headers */
 table.data { border-collapse: collapse; width: 100%; font-size: 0.95rem; }

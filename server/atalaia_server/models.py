@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """ORM models (ADR-P4-1; migrations 0001_base, 0002_accounts, 0003_personal_data, 0004_sync, 0005_chrono,
 0006_scheduling, 0007_registration, 0008_integrations, 0009_clubs, 0010_firmware; 0011_history in
-``history_models``; 0012_atak in ``atak_models``; 0013_preview_feedback in ``preview_models``).
+``history_models``; 0012_atak in ``atak_models``; 0013_preview_feedback in ``preview_models``; 0015_login_methods: ``user_identities``,
+``passkeys``, ``oidc_logins``, ``sessions.confirmed_at`` and a nullable ``users.password_hash``).
 
 Fields, users, roles, per-field roles, sessions and the audit log, as
 ADR-P4-1 defines them, with plan phase 11's additions for accounts: the
@@ -127,7 +128,8 @@ class User(Base):
     id: Mapped[uuid.UUID] = _uuid_pk()
     username: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     email: Mapped[Optional[str]] = mapped_column(String(320), unique=True)
-    password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
+    # NULL: no password (the account signs in with a passkey or a social login, plan "login methods", LG-3).
+    password_hash: Mapped[Optional[str]] = mapped_column(String(256))
     totp_secret_enc: Mapped[Optional[bytes]] = mapped_column(LargeBinary)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     # The time step of the last TOTP code accepted: a code is used once (RFC 6238 section 5.2).
@@ -179,6 +181,69 @@ class UserSession(Base):
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     mfa: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # The last time the account proved it is there (a login, a TOTP or passkey step-up, a social re-login): an
+    # account with no password confirms a sensitive change with a proof this recent (LG-6).
+    confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class UserIdentity(Base):
+    """A social login linked to an account (OpenID Connect, LG-1): the provider and the subject the provider
+    gave, nothing of the profile. One per provider per account; a subject belongs to one account."""
+
+    __tablename__ = "user_identities"
+    __table_args__ = (UniqueConstraint("provider", "subject"), UniqueConstraint("user_id", "provider"),
+                      CheckConstraint("provider IN ('google', 'microsoft', 'apple')", name="provider"))
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    provider: Mapped[str] = mapped_column(String(16), nullable=False)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = _created()
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class Passkey(Base):
+    """A WebAuthn credential of an account (LG-2). ``rp_id`` is the host name it was made for."""
+
+    __tablename__ = "passkeys"
+    __table_args__ = (Index("idx_passkeys_user", "user_id"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    credential_id: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, unique=True)
+    public_key: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    sign_count: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    rp_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    transports: Mapped[Optional[str]] = mapped_column(String(128))
+    backed_up: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    created_at: Mapped[datetime] = _created()
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class OidcLogin(Base):
+    """A social login in progress (LG-1): the state, nonce and PKCE verifier of one authorization request, for
+    ten minutes and one use (the callback deletes the row). ``binding_hash`` is the hash of the random value in
+    the browser's short-lived cookie, so a callback can only be finished by the browser that began it."""
+
+    __tablename__ = "oidc_logins"
+    __table_args__ = (Index("idx_oidc_logins_expires", "expires_at"),
+                      CheckConstraint("purpose IN ('login', 'link', 'reauth')", name="purpose"))
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    state_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    binding_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    provider: Mapped[str] = mapped_column(String(16), nullable=False)
+    purpose: Mapped[str] = mapped_column(String(8), nullable=False)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    session_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"))
+    nonce: Mapped[str] = mapped_column(String(64), nullable=False)
+    code_verifier: Mapped[str] = mapped_column(String(128), nullable=False)
+    redirect_uri: Mapped[str] = mapped_column(String(512), nullable=False)
+    return_to: Mapped[str] = mapped_column(String(512), nullable=False)
+    consent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    created_at: Mapped[datetime] = _created()
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class RefreshToken(Base):

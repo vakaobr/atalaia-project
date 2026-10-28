@@ -56,7 +56,9 @@ class RegisterTests(AuthTestCase):
         body = r.json()
         self.assertEqual((body["username"], body["email"]), ("rita.tejo", "rita@example.pt"))
         self.assertEqual((body["totp_enabled"], body["server_admin"], body["roles"]), (False, False, {}))
-        self.assertNotIn("password", json.dumps(body))
+        self.assertNotIn("password_hash", json.dumps(body))
+        self.assertNotIn("argon2", json.dumps(body))
+        self.assertTrue(body["has_password"])
         row = (await self.fetch("SELECT * FROM users WHERE username = 'rita.tejo'"))[0]
         self.assertTrue(row["password_hash"].startswith("$argon2id$v=19$m=65536,t=3,p=4$"))
         self.assertIsNotNone(row["gdpr_consent_at"])

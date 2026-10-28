@@ -15,6 +15,9 @@ What holds personal data now (plan phases 10-12):
 | ``users`` | the profile (never the password hash or the TOTP secret) | anonymised in place: a ``deleted-...`` name, everything else cleared | (the anonymised row stays, it identifies nobody) |
 | ``user_field_roles`` | the person's roles, with the field's name | deleted | (with the account) |
 | ``sessions`` (+ ``refresh_tokens``) | address, user agent, times | deleted | 30 days after expiry or revocation |
+| ``user_identities`` (LG-1) | the provider and subject of each social login linked, and when (``identities.json``) | deleted | (with the account) |
+| ``passkeys`` (LG-2) | the name, when made and last used, the host name (``passkeys.json``; never a key) | deleted | (with the account) |
+| ``oidc_logins`` (LG-1) | (a login in progress, ten minutes: nothing to give) | deleted | when it expires |
 | ``consents`` | every record | deleted | (with the account) |
 | ``audit_log`` | the person's own entries, and entries about them (without who made them) | kept for the log's integrity, without addresses; the account it names is anonymised | after 36 months |
 | ``user_game_roles`` (plan phase 13) | the person's roles per game, with the game (``games.json`` in the export) | deleted | with the game |
@@ -104,7 +107,7 @@ from .preview_models import CONTACT_RETENTION, RETENTION as FEEDBACK_RETENTION, 
 from .audit import record
 from .models import (ROLE_BY_ID, AuditLog, ChronoReading, ChronoReject, Club, ClubMember, ClubReport, Consent, Field,
                      FieldPlayerId, FirmwareRelease, Game, GameRegistration, MarshalKey, PlayerIdClaim, RegistrationReplica, Replica,
-                     ScheduledGame, User, UserFieldRole, UserGameRole, UserSession)
+                     ScheduledGame, User, UserFieldRole, UserGameRole, UserSession, OidcLogin, Passkey, UserIdentity)
 from .services import branding, history
 
 log = logging.getLogger("atalaia.server.purge")
@@ -163,6 +166,9 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
         AuditLog.resource == "user", AuditLog.resource_id == user.id,
         or_(AuditLog.user_id.is_(None), AuditLog.user_id != user.id)).order_by(AuditLog.id))
     consents = await db.scalars(select(Consent).where(Consent.user_id == user.id).order_by(Consent.given_at))
+    identities = await db.scalars(select(UserIdentity).where(UserIdentity.user_id == user.id)
+                                  .order_by(UserIdentity.created_at))
+    passkeys = await db.scalars(select(Passkey).where(Passkey.user_id == user.id).order_by(Passkey.created_at))
     player_ids = await db.execute(select(FieldPlayerId.field_id, Field.name, FieldPlayerId.player_id,
                                          FieldPlayerId.created_at).join(Field, Field.id == FieldPlayerId.field_id)
                                   .where(FieldPlayerId.user_id == user.id).order_by(Field.name))
@@ -199,8 +205,15 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
             "created_at": _iso(user.created_at), "updated_at": _iso(user.updated_at),
             "last_login_at": _iso(user.last_login_at), "gdpr_consent_at": _iso(user.gdpr_consent_at),
             "data_retention_days": user.data_retention_days, "totp_enabled": user.totp_enabled,
-            "server_admin": user.server_admin,
+            "has_password": user.password_hash is not None, "server_admin": user.server_admin,
         },
+        # Login methods (LG-1, LG-2): the social logins linked (provider and the subject it gave) and the
+        # passkeys (name, when, where it was made for). Never a key, never a credential id.
+        "identities": [{"provider": i.provider, "subject": i.subject, "linked_at": _iso(i.created_at),
+                        "last_login_at": _iso(i.last_login_at)} for i in identities],
+        "passkeys": [{"id": str(k.id), "name": k.name, "rp_id": k.rp_id, "backed_up": k.backed_up,
+                      "transports": k.transports, "created_at": _iso(k.created_at),
+                      "last_used_at": _iso(k.last_used_at)} for k in passkeys],
         "field_roles": [{"field_id": str(field_id), "field": name, "role": ROLE_BY_ID[role_id],
                          "granted_at": _iso(granted_at)} for field_id, name, role_id, granted_at in roles],
         "sessions": [{"id": str(s.id), "created_at": _iso(s.created_at), "expires_at": _iso(s.expires_at),
@@ -266,6 +279,13 @@ profile.json        Your account: id, username, email, when it was made and last
                     hash and the TOTP secret are not included: they are security
                     credentials, not information about you.
                     A sua conta (sem o hash da palavra-passe nem o segredo TOTP).
+identities.json     The social logins (Google, Microsoft, Apple) linked to your account:
+                    the provider, the opaque subject it gave and when. Nothing else of
+                    your profile there is ever read or kept.
+                    Os inícios de sessão social ligados à conta.
+passkeys.json       Your passkeys: the name you gave, when made and last used, the host
+                    name they were made for. Never a key.
+                    As suas chaves de acesso (passkeys), sem qualquer chave.
 field_roles.json    Your roles on each field (player, marshal, gm, ...).
                     Os seus papéis em cada campo.
 sessions.json       Your logins: address, browser or app (user agent), when they
@@ -334,7 +354,8 @@ are listed in player_ids.json. Positions never reach the site server.
 def export_zip(data: dict[str, Any]) -> bytes:
     """The portable copy (GDPR Art. 20): a ZIP of JSON files and a README.txt."""
     files = {
-        "profile.json": data["user"], "field_roles.json": data["field_roles"], "sessions.json": data["sessions"],
+        "profile.json": data["user"], "identities.json": data["identities"], "passkeys.json": data["passkeys"],
+        "field_roles.json": data["field_roles"], "sessions.json": data["sessions"],
         "audit_log.json": data["audit_log"], "audit_log_about_you.json": data["audit_log_about_you"],
         "consents.json": data["consents"], "games.json": data["games"],
         "player_ids.json": data["player_ids"], "player_id_claims.json": data["player_id_claims"],
@@ -369,6 +390,9 @@ async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_reques
         last_login_at=None).execution_options(synchronize_session=False))
     await db.execute(delete(UserFieldRole).where(UserFieldRole.user_id == user_id))
     await db.execute(delete(UserSession).where(UserSession.user_id == user_id))  # refresh tokens cascade
+    await db.execute(delete(UserIdentity).where(UserIdentity.user_id == user_id))
+    await db.execute(delete(Passkey).where(Passkey.user_id == user_id))
+    await db.execute(delete(OidcLogin).where(OidcLogin.user_id == user_id))
     await db.execute(delete(Consent).where(Consent.user_id == user_id))
     await db.execute(delete(UserGameRole).where(UserGameRole.user_id == user_id))
     # The chrono registry (ADR-P4-8 as amended): signed records stay as they are; the person's replicas
@@ -499,6 +523,8 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
     counts["feedback_contacts"] = contacts.rowcount or 0
     feedback = await db.execute(delete(PreviewFeedback).where(PreviewFeedback.created_at < now - FEEDBACK_RETENTION))
     counts["preview_feedback"] = feedback.rowcount or 0
+    logins = await db.execute(delete(OidcLogin).where(OidcLogin.expires_at < now))  # social logins never finished
+    counts["oidc_logins"] = logins.rowcount or 0
     if dry_run:
         await db.rollback()
         return counts

@@ -168,6 +168,80 @@ docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt ./atalaia-roo
 
 Browsers warn about such a certificate; players' phones would too.
 
+## Login methods: passkeys, social login, no passwords
+
+Accounts always log in with a password, and can also log in with a **passkey** and, when you register a client with the
+provider, with **Google**, **Microsoft** (personal and work or school accounts) and **Apple**
+(server/README.md, "Accounts, sessions and roles"). Passkeys need nothing: the server uses the address it is served
+from (`ATALAIA_PUBLIC_URL`, so set it) as the WebAuthn origin and its host name as the RP ID; that name must not
+change afterwards, or the passkeys stop working. A provider is **off** until you give all of its settings in `.env`
+(`docker compose up -d` afterwards); the server stores only the provider and the opaque subject it gives, never an
+email or a name, so you ask the providers for nothing but sign-in.
+
+The one address every provider needs is the **redirect URI**: `https://DOMAIN/api/v1/auth/oidc/PROVIDER/callback`, with
+`DOMAIN` your site's name and `PROVIDER` `google`, `microsoft` or `apple`, typed exactly (https, no trailing slash). In
+a hosted hub each field has its own name, so register `https://<slug>.<hub domain>/api/v1/auth/oidc/PROVIDER/callback`
+for every field that should offer the provider (Google and Microsoft take many redirect URIs; none of the three takes
+a wildcard host).
+
+**Google** (Google Cloud console, *APIs and services*, *Credentials*): configure the OAuth consent screen (the app's
+name, your address, the scope `openid` only, no sensitive or restricted scope), then *Create credentials*, *OAuth
+client ID*, *Web application*, with the redirect URI above as an *Authorized redirect URI*. Put the client id and secret in
+`.env`:
+
+```
+ATALAIA_OIDC_GOOGLE_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
+ATALAIA_OIDC_GOOGLE_CLIENT_SECRET=...
+```
+
+**Microsoft** (Microsoft Entra admin center, *App registrations*, *New registration*): *Supported account types*:
+"Accounts in any organizational directory and personal Microsoft accounts" (tenant `common`), the platform *Web* with the
+redirect URI above; then *Certificates and secrets*, *New client secret* (it expires: note the date in your calendar and
+make a new one before it does). Use the *Application (client) ID* and the secret's **value**:
+
+```
+ATALAIA_OIDC_MICROSOFT_CLIENT_ID=00000000-0000-0000-0000-000000000000
+ATALAIA_OIDC_MICROSOFT_CLIENT_SECRET=...
+ATALAIA_OIDC_MICROSOFT_TENANT=common
+```
+
+`ATALAIA_OIDC_MICROSOFT_TENANT` may be `organizations` (work and school only), `consumers` (personal only) or one
+tenant's id (only that organisation), and must then match the registration's account types.
+
+**Apple** (Apple Developer, *Certificates, Identifiers & Profiles*; a paid developer membership is needed): make an
+*App ID* with *Sign in with Apple* on, then a *Services ID* (its identifier is the client id) with *Sign in with Apple*
+configured: the domain (`DOMAIN`) and the redirect URI above as a *Return URL*. Then *Keys*, a new key with *Sign in with
+Apple* on, linked to that App ID: download the `.p8` file **once** (Apple shows it only once), and note the *Key ID* and
+your *Team ID* (top right of the developer page). Put the `.p8` somewhere the container can read it, outside the
+repository and never in the image (for example `server/secrets/AuthKey_KEYID.p8`, mode 0600, mounted read-only by a
+`docker-compose.override.yml`: `volumes: ["./secrets/AuthKey_KEYID.p8:/run/secrets/apple.p8:ro"]` on the `server` service):
+
+```
+ATALAIA_OIDC_APPLE_CLIENT_ID=pt.example.campo.web
+ATALAIA_OIDC_APPLE_TEAM_ID=ABCDE12345
+ATALAIA_OIDC_APPLE_KEY_ID=ABC123DEFG
+ATALAIA_OIDC_APPLE_KEY_FILE=/run/secrets/apple.p8
+```
+
+The server signs Apple's short-lived client secret with that key each time, so there is nothing to renew; revoke the
+key in Apple's console if the file leaks. The server asks Apple for no `name` or `email` scope, so Apple's
+*private email relay* and its `form_post` answer are not involved.
+
+A server that has a typo in these settings, or some of a provider's settings and not all, does not start: its log says
+which one. A first login with an unknown provider account makes a **new** account (the consent box beside the
+buttons); the server never links a provider to an existing account by email, which it does not know. An existing
+account (your administrator's, say) links a provider while logged in, with `POST /api/v1/auth/oidc/PROVIDER/start`
+(`{"purpose": "link", "password": "..."}`, Bearer) and registers a passkey with `POST /api/v1/me/passkeys/options` and
+`POST /api/v1/me/passkeys` (server/README.md has the list); the Atalaia app's account screen is meant to do both for
+people (it does not yet: the site login in the app is a later task), so until then the staff pages only *log in* with them.
+
+**Switching passwords off** (`ATALAIA_PASSWORD_LOGIN=off`): password login and password registration answer 403;
+accounts then log in with a passkey or a provider. Before you switch it off, make sure **every administrator has a
+passkey or a linked provider** (and TOTP or a passkey as the second factor): an account must keep at least one way to
+log in, and the server refuses to remove the last, but it cannot know that an account's only remaining way is one you
+cannot use. The command-line `create-admin` still makes an administrator with a password and TOTP; with passwords off
+that administrator logs in with a passkey made while passwords were on, or through a provider.
+
 ## Connecting a field controller
 
 A field's admin makes an API key on the site server

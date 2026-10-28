@@ -28,3 +28,5 @@ pyotp
 # Imported by the code shared with the controller: the mode loader, the chrono verifier.
 PyYAML
 cryptography
+# Sign-in without a password (plan: login methods, LG-*): passkeys (WebAuthn).
+webauthn

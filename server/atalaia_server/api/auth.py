@@ -41,7 +41,7 @@ from .. import passwords, personal_data, quotas, tenancy, totp
 from ..audit import record, request_ip
 from ..auth import Principal, current_principal, load_roles
 from ..db import get_session
-from ..models import PRIVILEGED_ROLES, ROLE_NAMES, RefreshToken, User, UserFieldRole, UserSession
+from ..models import PRIVILEGED_ROLES, ROLE_NAMES, Passkey, RefreshToken, User, UserFieldRole, UserSession
 from ..ratelimit import login_key
 from ..tokens import (ACCESS_TTL_S, REFRESH_TTL_S, SESSION_MAX_S, TokenError, make_access_token,
                       make_totp_step_token, new_refresh_token, read_totp_step_token, refresh_token_hash)
@@ -78,7 +78,8 @@ class TotpLoginIn(Strict):
 
 
 class PasswordIn(Strict):
-    password: str = Field(max_length=4096)
+    # Empty for an account with no password: it confirms with a recent login instead (LG-6).
+    password: str = Field(default="", max_length=4096)
 
 
 class CodeIn(Strict):
@@ -86,7 +87,7 @@ class CodeIn(Strict):
 
 
 class DisableIn(Strict):
-    password: str = Field(max_length=4096)
+    password: str = Field(default="", max_length=4096)
     code: str = Field(max_length=16)
 
 
@@ -109,6 +110,15 @@ def email_problem(email: Optional[str]) -> Optional[str]:
     return None
 
 
+async def passkey_count(db: AsyncSession, user_id: uuid.UUID) -> int:
+    return await db.scalar(select(func.count()).select_from(Passkey).where(Passkey.user_id == user_id)) or 0
+
+
+async def has_second_factor(db: AsyncSession, user: User) -> bool:
+    """TOTP on, or a passkey: what a role that needs a second factor asks of an account (LG-4)."""
+    return user.totp_enabled or await passkey_count(db, user.id) > 0
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -123,7 +133,8 @@ def _too_many(retry_after: int) -> HTTPException:
 
 def user_json(user: User, roles: dict[uuid.UUID, set[str]]) -> dict[str, Any]:
     return {"id": str(user.id), "username": user.username, "email": user.email,
-            "totp_enabled": user.totp_enabled, "server_admin": user.server_admin,
+            "totp_enabled": user.totp_enabled, "has_password": user.password_hash is not None,
+            "server_admin": user.server_admin,
             "roles": {str(f): sorted(r) for f, r in roles.items()},
             "created_at": user.created_at.isoformat() if user.created_at else None}
 
@@ -145,18 +156,22 @@ def _session_body(request: Request, user: User, session: UserSession,
             "user": user_json(user, roles)}
 
 
-async def _start_session(db: AsyncSession, request: Request, user: User, mfa: bool) -> JSONResponse:
+async def _start_session(db: AsyncSession, request: Request, user: User, mfa: bool, method: str = "password",
+                         provider: Optional[str] = None) -> JSONResponse:
+    """A new session and its refresh token. ``method`` (password, passkey, oidc) goes in the audit entry; a
+    passkey login counts as both factors (``mfa``), a password login only when the TOTP step passed, a social
+    login never (LG-4)."""
     now = _now()
     session = UserSession(user_id=user.id, user_agent=(request.headers.get("user-agent") or "")[:512] or None,
                           ip_address=request_ip(request), expires_at=now + timedelta(seconds=REFRESH_TTL_S),
-                          mfa=mfa, last_used_at=now)
+                          mfa=mfa, last_used_at=now, confirmed_at=now)
     db.add(session)
     await db.flush()
     refresh = new_refresh_token()
     db.add(RefreshToken(session_id=session.id, token_hash=refresh_token_hash(refresh)))
     user.last_login_at = now
     record(db, "login", request, user_id=user.id, resource="session", resource_id=session.id,
-           details={"mfa": mfa})
+           details={"mfa": mfa, "method": method, **({"provider": provider} if provider else {})})
     await db.commit()
     roles = await load_roles(db, user.id)
     response = JSONResponse(_session_body(request, user, session, roles), headers=NO_STORE)
@@ -171,6 +186,9 @@ async def _check_password(db: AsyncSession, request: Request, user: Optional[Use
     Two lockouts count each failure (decisions S11-12, S12-1): one per (address, username),
     ``username`` being what was typed at login (the account's own name elsewhere), and a much
     higher one per address against spraying many usernames from one place."""
+    if user is not None and user.password_hash is None and where != "login":
+        _recently_confirmed(request, user)  # an account with no password: a recent proof instead (LG-6)
+        return
     limits = request.app.state.limits
     address = _ip_key(request)
     key = login_key(address, username if username is not None else (user.username if user else ""),
@@ -193,6 +211,18 @@ async def _check_password(db: AsyncSession, request: Request, user: Optional[Use
     if where == "login":
         raise HTTPException(401, "invalid_credentials")
     raise HTTPException(403, "invalid_password")
+
+
+RECENT_CONFIRM_S = 600
+
+
+def _recently_confirmed(request: Request, user: User) -> None:
+    """403 ``confirmation_required`` unless this session proved the account is there in the last ten minutes
+    (a login, a TOTP or passkey step-up, a social re-login): what a password confirms for an account that has one."""
+    principal = getattr(request.state, "principal", None)
+    confirmed = principal.session.confirmed_at if principal is not None and principal.user.id == user.id else None
+    if confirmed is None or (_now() - confirmed).total_seconds() > RECENT_CONFIRM_S:
+        raise HTTPException(403, "confirmation_required")
 
 
 async def _check_code(db: AsyncSession, request: Request, user: User, secret: Optional[str], code: str,
@@ -230,6 +260,8 @@ def _secret(request: Request, user: User) -> Optional[str]:
 
 @router.post("/auth/register", status_code=201)
 async def register(body: RegisterIn, request: Request, db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    if not request.app.state.settings.password_login:
+        raise HTTPException(403, "password_login_disabled")
     username = body.username.strip().lower()
     email = normalise_email(body.email)
     problem = username_problem(username) or email_problem(email)
@@ -263,6 +295,8 @@ async def register(body: RegisterIn, request: Request, db: AsyncSession = Depend
 
 @router.post("/auth/login")
 async def login(body: LoginIn, request: Request, db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    if not request.app.state.settings.password_login:
+        raise HTTPException(403, "password_login_disabled")
     username = body.username.strip().lower()
     user = await db.scalar(select(User).where(User.username == username)) if username else None
     await _check_password(db, request, user, body.password, "login", username)
@@ -405,8 +439,8 @@ async def totp_disable(body: DisableIn, request: Request, principal: Principal =
     privileged = await db.scalar(select(func.count()).select_from(UserFieldRole).where(
         UserFieldRole.user_id == user.id,
         UserFieldRole.role_id.in_([ROLE_NAMES[r] for r in PRIVILEGED_ROLES])))
-    if user.server_admin or privileged:
-        raise HTTPException(409, "totp_required_by_role")
+    if (user.server_admin or privileged) and not await passkey_count(db, user.id):
+        raise HTTPException(409, "totp_required_by_role")  # a passkey is the other second factor (LG-4)
     await _check_password(db, request, user, body.password, "totp_disable")
     await _check_code(db, request, user, _secret(request, user), body.code, "totp_disable")
     user.totp_enabled = False

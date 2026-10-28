@@ -34,7 +34,7 @@ TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log
           "scheduled_games", "game_registrations", "registration_replicas", "player_id_claims",
           "platform_links", "external_game_links", "branding_images", "clubs", "club_members", "club_reports",
           "field_teams", "firmware_releases", "field_history_settings", "game_score_samples", "field_scenarios",
-          "field_scenario_revisions", "field_presets", "atak_cas", "atak_certs", "preview_feedback"}
+          "field_scenario_revisions", "field_presets", "atak_cas", "atak_certs", "preview_feedback", "user_identities", "passkeys", "oidc_logins"}
 
 SCHEMA_SQL = (
     ("columns", "SELECT table_name, column_name, data_type, is_nullable, column_default, character_maximum_length "

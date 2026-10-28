@@ -47,18 +47,18 @@ router = APIRouter(prefix="/api/v1", tags=["personal data"])
 
 
 class ProfileIn(Strict):
-    password: str = Field(max_length=4096)
+    password: str = Field(default="", max_length=4096)  # empty for an account with no password (LG-6)
     username: Optional[str] = Field(default=None, max_length=64)
     email: Optional[str] = Field(default=None, max_length=320)
 
 
 class NewPasswordIn(Strict):
-    password: str = Field(max_length=4096)
+    password: str = Field(default="", max_length=4096)
     new_password: str = Field(max_length=4096)
 
 
 class EraseIn(Strict):
-    password: str = Field(max_length=4096)
+    password: str = Field(default="", max_length=4096)
     code: Optional[str] = Field(default=None, max_length=16)
 
 
@@ -120,8 +120,12 @@ async def update_me(body: ProfileIn, request: Request, principal: Principal = De
 @router.post("/me/password", status_code=204)
 async def change_password(body: NewPasswordIn, request: Request, principal: Principal = Depends(current_principal),
                           db: AsyncSession = Depends(get_session)) -> Response:
-    """A new password; every other session of the account ends (this one stays)."""
+    """A new password; every other session of the account ends (this one stays). An account with no password
+    gets its first one this way (confirmed with a recent login), when password login is on."""
     user = await _user_for_update(db, principal)
+    if not request.app.state.settings.password_login:
+        raise HTTPException(409, "password_login_disabled")
+    first = user.password_hash is None
     await _check_password(db, request, user, body.password, "password_change")
     problem = passwords.policy_problem(body.new_password, user.username)
     if problem:
@@ -132,7 +136,7 @@ async def change_password(body: NewPasswordIn, request: Request, principal: Prin
         UserSession.user_id == user.id, UserSession.id != principal.session.id,
         UserSession.revoked_at.is_(None)).values(revoked_at=datetime.now(timezone.utc)))
     record(db, "password_change", request, user_id=user.id, resource="user", resource_id=user.id,
-           details={"sessions_ended": ended.rowcount or 0})
+           details={"sessions_ended": ended.rowcount or 0, **({"added": True} if first else {})})
     await db.commit()
     return Response(status_code=204)
 

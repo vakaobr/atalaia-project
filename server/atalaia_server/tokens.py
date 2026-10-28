@@ -66,6 +66,8 @@ class Keys:
         self.totp_step = _derive(secret_key, "totp login step")
         self.totp_seed = base64.urlsafe_b64encode(_derive(secret_key, "totp seed"))  # a Fernet key
         self.platform_config = base64.urlsafe_b64encode(_derive(secret_key, "platform config"))  # a Fernet key
+        self.webauthn = _derive(secret_key, "webauthn challenge")  # signs the passkey ceremonies' challenges (LG-2)
+        self.oidc_ticket = _derive(secret_key, "social login ticket")  # signs the tickets of finished social logins (LG-1)
         self.feedback_form = _derive(secret_key, "preview feedback form")  # signs the preview feedback form's token
 
     def __repr__(self) -> str:
@@ -133,6 +135,68 @@ def read_totp_step_token(keys: Keys, token: str) -> tuple[uuid.UUID, str, int]:
     claims = _decode(keys.totp_step, token, "totp")
     try:
         return uuid.UUID(claims["sub"]), claims["jti"], int(claims["exp"])
+    except (KeyError, ValueError, TypeError):
+        raise TokenError("malformed claims") from None
+
+
+OIDC_TICKET_TTL_S = 60
+
+
+def make_oidc_ticket(keys: Keys, user_id: uuid.UUID, provider: str, now: Optional[float] = None) -> str:
+    """What a finished social login hands the browser (LG-1): a signed, one-minute, single-use ticket that
+    ``POST /api/v1/auth/oidc/complete`` turns into a session. The session itself is made by that same-site
+    call, so the refresh cookie is set by a request the site started, not by a redirect from the provider."""
+    token, _ = _encode(keys.oidc_ticket, {"typ": "oidc", "sub": str(user_id), "prov": provider}, OIDC_TICKET_TTL_S,
+                       now)
+    return token
+
+
+def read_oidc_ticket(keys: Keys, token: str) -> tuple[uuid.UUID, str, str, int]:
+    """The user, the provider, the ``jti`` and the expiry of a social login ticket."""
+    claims = _decode(keys.oidc_ticket, token, "oidc")
+    try:
+        return uuid.UUID(claims["sub"]), str(claims["prov"]), claims["jti"], int(claims["exp"])
+    except (KeyError, ValueError, TypeError):
+        raise TokenError("malformed claims") from None
+
+
+WEBAUTHN_TTL_S = 5 * 60
+WEBAUTHN_PURPOSES = ("register", "login", "stepup")
+
+
+def make_webauthn_challenge(keys: Keys, purpose: str, challenge: bytes, user_id: Optional[uuid.UUID] = None,
+                            session_id: Optional[uuid.UUID] = None, now: Optional[float] = None) -> str:
+    """A WebAuthn challenge, signed, to come back with the browser's answer (LG-2): the server keeps no state,
+    and the challenge is single use (``UsedTokens``). ``purpose`` is register, login or stepup; a token made
+    for one purpose, user or session is refused for another."""
+    if purpose not in WEBAUTHN_PURPOSES:
+        raise ValueError(purpose)
+    claims: dict[str, Any] = {"typ": "webauthn", "sub": str(user_id) if user_id else "-", "pur": purpose,
+                              "ch": base64.urlsafe_b64encode(challenge).rstrip(b"=").decode("ascii")}
+    if session_id is not None:
+        claims["sid"] = str(session_id)
+    token, _ = _encode(keys.webauthn, claims, WEBAUTHN_TTL_S, now)
+    return token
+
+
+@dataclass(frozen=True)
+class WebauthnChallenge:
+    purpose: str
+    challenge: bytes
+    user_id: Optional[uuid.UUID]
+    session_id: Optional[uuid.UUID]
+    jti: str
+    expires_at: int
+
+
+def read_webauthn_challenge(keys: Keys, token: str) -> WebauthnChallenge:
+    claims = _decode(keys.webauthn, token, "webauthn")
+    try:
+        sub = claims["sub"]
+        return WebauthnChallenge(
+            claims["pur"], base64.urlsafe_b64decode(claims["ch"] + "=" * (-len(claims["ch"]) % 4)),
+            None if sub == "-" else uuid.UUID(sub), uuid.UUID(claims["sid"]) if "sid" in claims else None,
+            claims["jti"], int(claims["exp"]))
     except (KeyError, ValueError, TypeError):
         raise TokenError("malformed claims") from None
 

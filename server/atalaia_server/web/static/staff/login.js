@@ -1,12 +1,19 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The staff login (staff_pages.py): POST /api/v1/auth/login, then /api/v1/auth/login/totp when the
-// account has TOTP. The answer's access token is kept for this tab (staff.js); the refresh token
-// is the HttpOnly cookie the server sets. Then back to the page that sent the browser here, if it
-// is one of the staff pages, else the field list.
+// The staff login (staff_pages.py): the ways this server offers (GET /api/v1/auth/methods).
+//   - password: POST /api/v1/auth/login, then /api/v1/auth/login/totp when the account has TOTP;
+//   - passkey: POST /api/v1/auth/passkey/login/options, the browser's WebAuthn prompt, POST /api/v1/auth/passkey/login
+//     (a passkey is both factors: no code afterwards);
+//   - Google, Microsoft or Apple (OpenID Connect): POST /api/v1/auth/oidc/<provider>/start gives the provider's
+//     address, the browser goes there and comes back to this page with a one-minute ticket in the address
+//     fragment (or ?oidc_error=<code>), which POST /api/v1/auth/oidc/complete turns into a session. A social
+//     login alone does not count as the second factor: the pages offer the TOTP or passkey step-up (stepup.js).
+// The answer's access token is kept for this tab (staff.js); the refresh token is the HttpOnly cookie the server
+// sets. Then back to the page that sent the browser here, if it is one of the staff pages, else the field list.
 
-import { $, enable, forget, keep, link, status, t } from './staff.js';
+import { $, el, enable, forget, has, keep, link, status, t } from './staff.js';
+import { assertionJson, passkeysSupported, requestOptions } from './webauthn.js';
 
 const params = new URLSearchParams(location.search);
 
@@ -17,12 +24,12 @@ function next() {
     return safe ? wanted : link('/staff/');
 }
 
-async function post(path, body) {
+async function call(method, path, body) {
     let r;
     try {
         r = await fetch(path, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-            credentials: 'same-origin', cache: 'no-store',
+            method, headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+            body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', cache: 'no-store',
         });
     } catch (e) {
         return { status: 0, body: {} };
@@ -36,6 +43,8 @@ async function post(path, body) {
     return { status: r.status, body: data || {}, retry: r.headers.get('Retry-After') };
 }
 
+const post = (path, body) => call('POST', path, body || {});
+
 function refused(answer, wrong) {
     if (answer.status === 0) return t('err_network');
     if (answer.status === 429) return t('login_locked', { s: answer.retry || 60 });
@@ -46,6 +55,7 @@ function refused(answer, wrong) {
 
 const loginForm = $('login-form');
 const totpForm = $('totp-form');
+const alt = $('alt-logins');
 let step = null;
 
 function done(body) {
@@ -72,6 +82,7 @@ loginForm.addEventListener('submit', async (event) => {
         step = answer.body.totp_session;
         status('');
         loginForm.hidden = true;
+        alt.hidden = true;
         totpForm.hidden = false;
         enable(totpForm);
         $('code').focus();
@@ -95,11 +106,127 @@ totpForm.addEventListener('submit', async (event) => {
         step = null;
         totpForm.hidden = true;
         loginForm.hidden = false;
+        alt.hidden = false;
         $('username').focus();
     }
 });
 
+// ---- passkey ------------------------------------------------------------------------------------
+
+async function passkeyLogin() {
+    status(t('loading'));
+    const first = await post('/api/v1/auth/passkey/login/options');
+    if (first.status !== 200) {
+        status(refused(first, t('passkey_failed')), 'error');
+        return;
+    }
+    let credential;
+    try {
+        credential = await navigator.credentials.get({ publicKey: requestOptions(first.body.options) });
+    } catch (e) {
+        status(t('passkey_cancelled'), 'error');
+        return;
+    }
+    if (!credential) {
+        status(t('passkey_cancelled'), 'error');
+        return;
+    }
+    const answer = await post('/api/v1/auth/passkey/login', {
+        challenge_token: first.body.challenge_token, credential: assertionJson(credential),
+    });
+    if (answer.status !== 200) {
+        status(refused(answer, t('passkey_failed')), 'error');
+        return;
+    }
+    done(answer.body);
+}
+
+// ---- Google, Microsoft, Apple -------------------------------------------------------------------
+
+async function socialLogin(provider) {
+    status(t('login_social_working'));
+    const back = `${location.pathname}${location.search}`;
+    const answer = await post(`/api/v1/auth/oidc/${provider}/start`, {
+        purpose: 'login', consent: $('consent').checked, return_to: back,
+    });
+    if (answer.status !== 200 || typeof answer.body.authorization_url !== 'string') {
+        status(refused(answer, t('oidc_err_other')), 'error');
+        return;
+    }
+    let target;
+    try {
+        target = new URL(answer.body.authorization_url);
+    } catch (e) {
+        target = null;
+    }
+    if (!target || target.protocol !== 'https:') {
+        status(t('oidc_err_other'), 'error');
+        return;
+    }
+    location.assign(target.href);
+}
+
+function oidcError(code) {
+    const key = `oidc_err_${code}`;
+    return has(key) ? t(key) : t('oidc_err_other');
+}
+
+/** Back from a provider: a ticket in the fragment makes the session (and leaves the address at once). */
+async function finishSocial() {
+    const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
+    const ticket = fragment.get('oidc');
+    const failure = params.get('oidc_error');
+    if (ticket || failure || params.get('oidc')) {
+        params.delete('oidc_error');
+        params.delete('oidc');
+        const rest = params.toString();
+        history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}`);
+    }
+    if (failure) {
+        status(oidcError(failure), 'error');
+        return false;
+    }
+    if (!ticket) return false;
+    status(t('loading'));
+    const answer = await post('/api/v1/auth/oidc/complete', { ticket });
+    if (answer.status !== 200) {
+        status(oidcError('state_invalid'), 'error');
+        return false;
+    }
+    done(answer.body);
+    return true;
+}
+
+async function offer() {
+    const answer = await call('GET', '/api/v1/auth/methods');
+    if (answer.status !== 200) return;
+    const { password_login: passwordLogin, oidc } = answer.body;
+    if (!passwordLogin) loginForm.hidden = true;
+    const providers = Array.isArray(oidc) ? oidc : [];
+    const buttons = $('oidc-buttons');
+    for (const item of providers) {
+        buttons.append(el('button', {
+            type: 'button', class: 'provider', 'data-provider': item.provider,
+            text: t('login_with', { provider: item.label }),
+            onclick: () => socialLogin(item.provider),
+        }));
+    }
+    $('consent-row').hidden = providers.length === 0;
+    const passkey = $('passkey-login');
+    passkey.hidden = !passkeysSupported();
+    passkey.addEventListener('click', passkeyLogin);
+    alt.hidden = providers.length === 0 && passkey.hidden;
+    $('login-or').hidden = !passwordLogin;
+    if (!passwordLogin) {
+        const first = alt.querySelector('button:not([hidden])');
+        if (first) first.focus();
+    }
+}
+
 forget();
 if (params.get('out')) status(t('logged_out'), 'ok');
 enable(loginForm);
-$('username').focus();
+if (!(await finishSocial())) {
+    await offer();
+    if (!loginForm.hidden) $('username').focus();
+}

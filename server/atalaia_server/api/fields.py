@@ -50,6 +50,7 @@ from ..audit import record
 from ..auth import Principal, current_principal, require_field_role, server_admin
 from ..db import get_session
 from ..models import PRIVILEGED_ROLES, ROLE_BY_ID, ROLE_NAMES, Field, FieldApiKey, User, UserFieldRole
+from .auth import has_second_factor
 
 router = APIRouter(prefix="/api/v1", tags=["fields"])
 
@@ -231,7 +232,7 @@ async def grant_role(field_id: uuid.UUID, body: GrantIn, request: Request,
     target = await db.scalar(select(User).where(User.username == body.username.strip().lower()))
     if target is None:
         raise HTTPException(404, "user_not_found")
-    if body.role in PRIVILEGED_ROLES and not target.totp_enabled:
+    if body.role in PRIVILEGED_ROLES and not await has_second_factor(db, target):
         raise HTTPException(409, "totp_required")
     inserted = await db.scalar(
         insert(UserFieldRole).values(user_id=target.id, field_id=field_id,

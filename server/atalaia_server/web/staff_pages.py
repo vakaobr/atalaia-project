@@ -3,7 +3,11 @@
 """The field staff's pages (Phase 4 follow-up, decisions FU2-1 to FU2-12): pages for the APIs that had none.
 
     GET /staff/                                        the fields the account has a role on
-    GET /staff/login                                   log in: password, then the TOTP code
+    GET /staff/login                                   log in: password (then the TOTP code), a passkey, or Google,
+                                                       Microsoft or Apple (decisions LG-*; what the server offers
+                                                       comes from GET /api/v1/auth/methods); a session that logged
+                                                       in with no second factor is offered the TOTP or passkey
+                                                       step-up on every page (static/staff/stepup.js)
     GET /staff/fields/<field>/history                  the field's games, filters, the history settings
     GET /staff/fields/<field>/games/<game>             one game: its score timeline, its event log, its boxes
     GET /staff/fields/<field>/schedule                 the field's scheduled games: create, edit, publish, cancel,

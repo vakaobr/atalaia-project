@@ -224,6 +224,12 @@ export function forget() {
     storageSet(null);
 }
 
+/** This session now counts as having a second factor (after a step-up, stepup.js). */
+export function markMfa() {
+    const s = storageGet() || memory;
+    if (s) storageSet({ ...s, mfa: true });
+}
+
 function current() {
     const s = storageGet() || memory;
     return s && s.expires > Date.now() ? s : null;
@@ -457,6 +463,9 @@ export async function boot() {
         return null;
     }
     $('who').textContent = t('signed_in_as', { user: s.user.username || '' });
+    if (!s.mfa) {  // a social login, or a password with no TOTP step: offer the second factor if a role needs it
+        import('./stepup.js').then((m) => m.maybeStepUp()).catch(() => {});
+    }
     const logout = $('logout');
     logout.hidden = false;
     logout.addEventListener('click', async () => {

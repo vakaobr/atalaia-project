@@ -45,10 +45,11 @@ from fastapi.responses import JSONResponse
 from . import __version__, atak_pki, integrations, personal_data, quotas, tenancy, tenant_watch
 from .api import (atak, auth, branding, chrono, clubs, devices, export, feedback, fields, firmware, games, health, history,
                   integrations as integrations_api, me, registration_import, registrations, remote_gm, scenarios,
-                  scheduling, sync)
+                  login_methods, scheduling, sync)
 from .atak_relay import AtakRelay
 from .config import Settings, redact_url
 from .db import make_engine, make_sessionmaker
+from .oidc import OidcService
 from .ratelimit import Limits, RequestLimitMiddleware
 from .remote_gm import RemoteHub
 from .security_headers import SecurityHeadersMiddleware
@@ -120,6 +121,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.state.adapters = integrations.default_registry(settings.test_adapter)
     app.state.limits = Limits()
     app.state.used_totp_steps = UsedTokens()
+    app.state.used_challenges = UsedTokens()  # spent passkey challenges and social login tickets (LG-1, LG-2)
+    app.state.oidc = OidcService(settings)    # the social login providers, if any are configured
     app.state.clock = time.time
     app.state.remote_hub = RemoteHub()  # the remote GM's open controller links (plan phase 19)
     app.state.tenant_watch = tenant_watch.TenantWatch()  # open sockets of hosted mode, closed when a field goes
@@ -137,6 +140,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         app.add_middleware(preview.PreviewHeadersMiddleware)
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(login_methods.router)  # social login, passkeys, step-up (LG-*)
     app.include_router(fields.router)
     app.include_router(export.router)  # a field's data export for its administrator (S21-12)
     app.include_router(me.router)

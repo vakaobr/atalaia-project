@@ -49,7 +49,7 @@ METRICS_TOKEN = "t" * 40
 SECRET_KEY = "s" * 43
 PASSWORD = "correct horse battery staple 42"
 # The tables tests write to (not roles, which the migrations seed).
-DATA_TABLES = ("preview_feedback", "atak_certs", "atak_cas", "firmware_releases", "club_reports", "club_members", "field_teams", "clubs", "branding_images", "external_game_links", "platform_links", "player_id_claims", "registration_replicas", "game_registrations", "scheduled_games", "audit_log", "consents", "refresh_tokens", "sessions", "user_field_roles",
+DATA_TABLES = ("oidc_logins", "passkeys", "user_identities", "preview_feedback", "atak_certs", "atak_cas", "firmware_releases", "club_reports", "club_members", "field_teams", "clubs", "branding_images", "external_game_links", "platform_links", "player_id_claims", "registration_replicas", "game_registrations", "scheduled_games", "audit_log", "consents", "refresh_tokens", "sessions", "user_field_roles",
                "user_game_roles",
                "chrono_violations", "chrono_rejects", "chrono_readings", "replicas", "marshal_keys",
                "field_player_ids", "game_nodes", "game_node_scores", "game_events", "games", "controllers",
