@@ -871,7 +871,7 @@
     "apd_column": "APD · filiação",
     "apd_unknown": "APD desconhecida",
     "apd_pick": "APD",
-    "apd_number": "Número de filiação",
+    "apd_number": "Número de associado",
     "apd_expires": "Válida até",
     "apd_expires_on": "válida até {date}",
     "apd_override": "confirmado pela organização",

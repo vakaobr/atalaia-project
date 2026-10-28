@@ -66,7 +66,7 @@ A organização afixa um **cartaz de check-in** com um código QR. Não leva nen
    - **Jogo**: escolhe um, se o campo tiver mais do que um aberto.
    - **Nome ou alcunha**: até 32 caracteres. Só a organização e os marshals o veem. Quem joga contigo não.
    - **Número de federado**: só se o campo o pedir. A organização confere o cartão à entrada. A app não o verifica.
-   - **Filiação numa APD**: se o campo a pedir, escolhe a tua APD (ou **Não consta da lista**), escreve o número de filiação e a data de validade (AAAA-MM-DD). A app não os verifica: um marshal compara-os com o teu cartão. Se a filiação não for válida para o jogo, o check-in fica à espera de um marshal, que decide. Num campo que a exija para a inscrição, a inscrição é recusada sem filiação válida.
+   - **Filiação numa APD**: se o campo a pedir, escolhe a tua APD (ou **Não consta da lista**), escreve o número de associado e a data de validade (AAAA-MM-DD). A app não os verifica: um marshal compara-os com o teu cartão. Se a filiação não for válida para o jogo, o check-in fica à espera de um marshal, que decide. Num campo que a exija para a inscrição, a inscrição é recusada sem filiação válida.
      Num campo fora de Portugal diz **Filiação numa associação**: escolhe a tua associação (clube, federação ou seguradora) em vez de uma APD; a lista é a do país do campo e **Não consta da lista** está sempre lá.
    - **Equipa preferida**: **Qualquer uma**, ou uma equipa. A organização decide a equipa final.
    - **Inscrição online**: só se te inscreveste no site do campo. Vê a [secção 8](#8-se-te-inscreveste-online).

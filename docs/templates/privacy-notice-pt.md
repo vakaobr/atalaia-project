@@ -113,13 +113,13 @@ de cronógrafo), diz-se.
 
 | Dados | Para quê | Fundamento |
 | --- | --- | --- |
-| **Inscrição (servidor)**: o teu identificador de jogador no campo, um nome a mostrar no jogo (por omissão o teu nome de utilizador), a preferência de equipa, o teu **número de filiação** se o jogo o pedir, as réplicas que declaras, se vieste ou não, se pagaste (o campo anota; nenhum pagamento é processado) | Organizar o jogo | [ADVOGADO: b) contrato, pelo jogo em que te inscreves, ou f)] |
+| **Inscrição (servidor)**: o teu identificador de jogador no campo, um nome a mostrar no jogo (por omissão o teu nome de utilizador), a preferência de equipa, o teu **número de associado** se o jogo o pedir, as réplicas que declaras, se vieste ou não, se pagaste (o campo anota; nenhum pagamento é processado) | Organizar o jogo | [ADVOGADO: b) contrato, pelo jogo em que te inscreves, ou f)] |
 | Um **bilhete de inscrição**: um segredo aleatório mostrado uma vez; só se guarda um hash | Associar a tua chegada à inscrição | idem |
-| **Check-in no campo (controlador)**: o nome ou a alcunha que escreves, a preferência de equipa, as réplicas que declaras, **o teu número de filiação e a validade** se o campo os pedir (o check-in diz à equipa se parece válido, caducado, não aceite ou em falta; **nada verifica o número com ninguém**), a hora. O teu telemóvel cria um identificador para este campo; o controlador guarda-o e um hash do segredo que o acompanha. **Não se pede email, telefone, data de nascimento, documento de identificação nem fotografia** | Gerir o jogo e saber quem está no campo | [ADVOGADO: f) o interesse do campo em jogos seguros, ou b)] |
-| **Número de filiação e validade**: ver 2.3 | | |
+| **Check-in no campo (controlador)**: o nome ou a alcunha que escreves, a preferência de equipa, as réplicas que declaras, **o teu número de associado e a validade** se o campo os pedir (o check-in diz à equipa se parece válido, caducado, não aceite ou em falta; **nada verifica o número com ninguém**), a hora. O teu telemóvel cria um identificador para este campo; o controlador guarda-o e um hash do segredo que o acompanha. **Não se pede email, telefone, data de nascimento, documento de identificação nem fotografia** | Gerir o jogo e saber quem está no campo | [ADVOGADO: f) o interesse do campo em jogos seguros, ou b)] |
+| **Número de associado e validade**: ver 2.3 | | |
 | Um marshal ou a organização pode confirmar ou fazer o check-in à mão mesmo que a verificação da filiação falhe. Fica registado com o identificador da pessoa e o veredicto, nunca o número | Decisão da equipa | f) |
 
-### 2.3 Números de filiação (APD) e validade
+### 2.3 Números de associado (APD) e validade
 
 Alguns campos pedem a filiação numa associação de airsoft (em Portugal,
 uma "APD"; noutros países, um clube, uma federação ou uma seguradora). O
@@ -268,7 +268,7 @@ Não damos os teus dados a mais ninguém.
 
 O controlador do campo não precisa de internet. O check-in, o jogo, o
 cronógrafo e a tua posição funcionam na rede Wi-Fi do próprio campo. O teu
-nome, o teu número de filiação, a tua preferência de equipa e as tuas
+nome, o teu número de associado, a tua preferência de equipa e as tuas
 réplicas declaradas **ficam no controlador e nunca são enviados ao servidor
 nem a mais lado nenhum** (nomes e números do check-in nunca são enviados,
 mesmo quando o controlador sincroniza).
@@ -339,7 +339,7 @@ DO CAMPO]** é um que o campo pode alterar; os outros estão fixos no código.
 | Sessões | servidor | 30 dias depois de terminarem ou caducarem; um início de sessão nunca concluído: 10 minutos |
 | Registo de segurança | servidor | 36 meses. Apagar a conta tira-lhe os endereços |
 | Dados de inscrição de quem não tem conta (convidados importados) | servidor | 30 dias depois do jogo |
-| O número de filiação de uma inscrição | servidor | 30 dias depois do jogo |
+| O número de associado de uma inscrição | servidor | 30 dias depois do jogo |
 | Reclamações de um identificador de jogador de um telemóvel | servidor | 30 dias depois de feitas |
 | Jogos marcados e as suas inscrições | servidor | 24 meses depois de o jogo terminar |
 | Jogos, os seus eventos e pontuações (o teu histórico de jogos) | servidor | **[ESCOLHA DO CAMPO:]** 24 meses depois de o jogo terminar, ou menos se o campo o definir |
@@ -350,7 +350,7 @@ DO CAMPO]** é um que o campo pode alterar; os outros estão fixos no código.
 | Certificados ATAK | servidor | Um certificado caduca em 7 dias por omissão (30 no máximo); o registo sai 30 dias depois de caducar |
 | Imagens de identidade visual que nada usa | servidor | Um dia depois de carregadas |
 | Registo da organização remota (que conta enviou um comando) | controlador | 365 dias |
-| **Check-in: nome ou alcunha, número de filiação e validade, preferência de equipa** | controlador | **[ESCOLHA DO CAMPO:]** 30 dias depois do jogo por omissão (`retention_days`), ou logo que saias do jogo na app |
+| **Check-in: nome ou alcunha, número de associado e validade, preferência de equipa** | controlador | **[ESCOLHA DO CAMPO:]** 30 dias depois do jogo por omissão (`retention_days`), ou logo que saias do jogo na app |
 | Réplicas declaradas num check-in | controlador | Os mesmos 30 dias |
 | O identificador de campo que o teu telemóvel criou | controlador | Apagado ao fim de **um ano** sem check-in |
 | Leituras de cronógrafo, leituras de outros campos recebidas para a lista de inscritos, chaves antigas de marshals | controlador | 365 dias. (Fixo no controlador; não segue a definição por campo do servidor.) |
@@ -381,7 +381,7 @@ Podes, a partir da tua conta (servidor) ou no controlador:
   sem nome, sem email, sem palavra-passe, sem consentimento; papéis, sessões,
   inícios de sessão sociais e chaves de acesso são **apagados**; as ligações
   aos identificadores de jogador são **apagadas**; as inscrições perdem a
-  conta, o nome, a preferência de equipa, o número de filiação e o bilhete
+  conta, o nome, a preferência de equipa, o número de associado e o bilhete
   (o resultado da inscrição fica como histórico do campo); a pertença a
   clubes e os convites são apagados; as tuas entradas do registo ficam sem
   endereços. **As leituras de cronógrafo assinadas e os resultados de jogos
@@ -392,7 +392,7 @@ Podes, a partir da tua conta (servidor) ou no controlador:
   leituras, se pedires). **O último administrador de um servidor não pode ser
   apagado.**
 - **Sair de um jogo**, na app: o teu check-in passa a "saiu" e o teu nome, o
-  número de filiação e a preferência de equipa são apagados.
+  número de associado e a preferência de equipa são apagados.
 - **Opor-te, limitar, retirar o consentimento** (art. 7.º, n.º 3, 18.º e
   21.º): no contacto da secção 1; deixar de partilhar a posição é um
   interruptor na app. Retirar o consentimento não afeta o que foi feito
@@ -484,7 +484,7 @@ mais ou menos este tamanho. O inglês está em `privacy-notice-en.md`.
 > sessão com Google, Microsoft ou Apple, caso em que só guardamos o
 > identificador que esse fornecedor dá para ti, nunca o teu email nem nome),
 > os teus papéis no campo, as tuas inscrições (um nome a mostrar, equipa e,
-> se o jogo o pedir, um número de filiação) e o teu histórico de jogos.
+> se o jogo o pedir, um número de associado) e o teu histórico de jogos.
 >
 > **O que não guardamos:** a tua posição GPS (fica no controlador do campo
 > durante um jogo e é apagada quando este termina), uma palavra-passe em
@@ -528,7 +528,7 @@ depois de revisto. No máximo um ecrã de texto.
 > responsável pelos teus dados.
 >
 > **O que guardamos no check-in:** o nome ou a alcunha que escreves, a tua
-> preferência de equipa, as réplicas que declaras, o teu número de filiação
+> preferência de equipa, as réplicas que declaras, o teu número de associado
 > e a validade se o campo os pedir (nada os verifica com ninguém) e a hora. O
 > teu telemóvel cria um identificador para este campo, e guardamos esse
 > identificador e um hash do seu segredo. Não pedimos email, telefone, data
@@ -549,7 +549,7 @@ depois de revisto. No máximo um ecrã de texto.
 > cronógrafo são enviados ao servidor do campo; o teu nome e o número de
 > filiação nunca são.
 >
-> **Durante quanto tempo:** o nome, o número de filiação, a preferência de
+> **Durante quanto tempo:** o nome, o número de associado, a preferência de
 > equipa e as réplicas declaradas são apagados [30] dias depois do jogo, ou
 > logo que saias do jogo na app. Leituras de cronógrafo: 365 dias. O teu
 > identificador de campo: um ano depois do último check-in.
@@ -570,7 +570,7 @@ O rascunho não os pode resolver. Cada um está marcado **[ADVOGADO]** acima.
    conta e uma inscrição ficam melhor com base em contrato (art. 6.º, n.º
    1, alínea b)) do que em consentimento, sendo que o software regista hoje
    um consentimento com a finalidade `account`.
-2. Os **números de filiação** (2.3): o fundamento, e se alguma regra do
+2. Os **números de associado** (2.3): o fundamento, e se alguma regra do
    campo ou o seguro do campo o torna uma obrigação legal.
 3. Os **dados de posição** (2.5): consentimento em cada jogo, a equipa ver
    todas as pessoas que jogam, a organização remota e o ATAK remoto; se é
