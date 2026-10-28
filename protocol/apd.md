@@ -118,6 +118,8 @@ worked out when shown, so a changed rule or a new day changes it.
 | controller `GET /api/v1/checkin` | `settings.apd` (the rule), `settings.country` and `apds` (the choices: the country's entries, then `custom`) |
 | controller `PUT /api/v1/checkin/settings` | `apd` (a whole rule, replaces) and `country` (two letters, any case; `""` or null: the configured or default one; 400 for anything else; 409 once the site has sent its country with `[sync] branding = "site"`, as for the rule) |
 | controller staff rows, `GET /api/v1/checkin/me` and `GET /api/v1/games/{id}/chrono-list` | `country` (the field's, for the words of the verdict) beside `apd_status` |
+| controller `GET /api/v1/games/{id}/chrono-list`, per player | `apd_id`, `membership_number`, `membership_expires`, `apd_override` and `apd_status` (null when no rule asks), as in the staff rows, for the marshal's queue (decision APDF-4); the Pi and the phone controller both send them, held to the `chrono-list: a pending player without replicas...` case of [`vectors/controller_api.json`](vectors/controller_api.json). A player who has **no declared replica** is listed too while their check-in is `pending` (a marshal has to let them in: decision APDF-3), with `pending: 0` and `declarations: []`; the counts stay the replicas' |
+| registration import and export (CSV or JSON) | the columns `apd_id` and `membership_expires` beside `federation_number` (the membership number), optional: see "The import and the exports" below |
 
 Entries in a check-in's or registration's `apd_id` are not validated against any list (an older build or a
 removed entry must not lose a player), only against the id syntax.
@@ -137,6 +139,12 @@ With `rule.checkin`, a **self check-in** whose verdict is not `valid` is recorde
 they do any pending check-in. A **marshal's confirmation or hand check-in is never refused** because of the
 verdict: when it is not `valid` the controller logs it (`apd override`: the player id and the verdict, no number)
 and keeps `apd_override: true` on the row. A check-in without a rule behaves as before.
+
+## The import and the exports
+
+The registration list the site server and the controllers import ([`vectors/registration_import.json`](vectors/registration_import.json); `import_format.py` and its Dart port) has two more optional columns, **`apd_id`** (the id syntax above, or empty: `apd_id_invalid`) and **`membership_expires`** (`YYYY-MM-DD`, a real date in 2000-2100, or empty: `membership_expires_invalid`), beside `federation_number`, which stays the membership number (decision APDF-1). A file without them imports as before; a column the file lacks is left as it is on an update, and an empty cell clears the value. When the game (or the controller's `federation` setting with no rule asking at check-in) asks for no membership, all three are dropped with a warning (`federation_number_dropped`, `apd_id_dropped`, `membership_expires_dropped`); an import never makes a number required for a rule (the importing side only relaxes `federation: off` to `optional` when the rule asks). The vectors' results carry `apd_id` and `membership_expires`; a case may leave them out (null).
+
+The exports write the same two columns right after `federation_number`: the site server's registration export (`display_name, external_ref, team_preference, federation_number, apd_id, membership_expires, replicas, ...`, so an export imports back) and the check-in CSV of the Pi and of the phone controller, which already had `apd_id`, `membership_expires` and `apd_status`; their columns are ignored by the import except those two, so the check-in CSV imports back too.
 
 ## Personal data
 

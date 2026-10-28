@@ -186,6 +186,38 @@ class ChronoListTests(P3Case):
         self.assertEqual(start["pending_declarations"], 2)  # a warning, the game started anyway
         self.assertEqual(start["state"], "running")
 
+    def test_membership_and_a_pending_player_without_replicas(self):
+        """APDF-3, APDF-4 (protocol/apd.md): a row carries the membership the marshal checks, and a player who
+        waits for a marshal is listed even with no replica (only while they wait); the counts stay the replicas'."""
+        r = self.client.put("/api/v1/checkin/settings", headers=GM, json={"confirm": "staff", "federation": "optional",
+                            "apd": {"checkin": True, "expiry": True, "accepted": ["apd-a"]}})
+        self.assertEqual(r.status_code, 200, r.text)
+        r1 = str(uuid.uuid4())
+        with_replica, _ = self.player(r1, name="Com Réplica")
+        self.check_in(self.gid, name="Sem Réplica", federation_number="N-9", apd_id="apd-a",
+                      membership_expires="2020-01-01")
+        walk_in = self.client.post(f"/api/v1/games/{self.gid}/checkins", json={"display_name": "À Mão"}, headers=GM)
+        self.assertEqual(walk_in.status_code, 201, walk_in.text)
+        cl = self.chrono_list(self.gid, bearer(self.mtoken))
+        self.assertEqual(cl["counts"], {"pending": 1, "passed": 0, "refused": 0})
+        by_name = {p["display_name"]: p for p in cl["players"]}
+        self.assertEqual(set(by_name), {"Com Réplica", "Sem Réplica"})  # not the marshal, not the walk-in
+        lapsed = by_name["Sem Réplica"]
+        self.assertEqual((lapsed["status"], lapsed["pending"], lapsed["declarations"]), ("pending", 0, []))
+        self.assertEqual((lapsed["apd_id"], lapsed["membership_number"], lapsed["membership_expires"],
+                          lapsed["apd_status"], lapsed["apd_override"]),
+                         ("apd-a", "N-9", "2020-01-01", "expired", False))
+        self.assertEqual(by_name["Com Réplica"]["apd_status"], "missing")  # no number declared
+        self.assertIsNone(by_name["Com Réplica"]["apd_id"])
+        # The marshal lets them in: the verdict is kept as an override and they leave the list (no replica).
+        self.gm_patch(self.gid, lapsed["player_id"], status="checked_in")
+        cl = self.chrono_list(self.gid, bearer(self.mtoken))
+        self.assertEqual([p["display_name"] for p in cl["players"]], ["Com Réplica"])
+        self.assertEqual(self.ctrl.store.checkin(self.gid, lapsed["player_id"])["apd_override"], True)
+        # A field whose rule does not check at check-in has no verdict to show.
+        self.client.put("/api/v1/checkin/settings", headers=GM, json={"apd": {}})
+        self.assertIsNone(self.chrono_list(self.gid, bearer(self.mtoken))["players"][0]["apd_status"])
+
     def test_shared_vectors_verify_through_the_api(self):
         """protocol/vectors/chrono_record.json through POST /api/v1/chrono/readings: the valid records
         are stored, every invalid one is refused with the vector's reason (the API adds none)."""

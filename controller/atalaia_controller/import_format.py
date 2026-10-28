@@ -15,7 +15,11 @@ JSON array of objects, with only these names (``COLUMNS``):
     external_ref       the other platform's registration id (1-128 characters); recommended: rows
                        update by (source, external_ref), rows without it are added each time
     team_preference    one of the game's teams, or empty
-    federation_number  1-32 characters; required, optional or dropped as the game says
+    federation_number  1-32 characters; required, optional or dropped as the game says (the membership
+                       number: protocol/apd.md)
+    apd_id             the membership body's id (``[a-z0-9][a-z0-9-]{0,31}``) or empty; dropped with the
+                       number when the game asks for none (protocol/apd.md)
+    membership_expires YYYY-MM-DD (a real date, 2000-2100) or empty; dropped as ``apd_id`` is
     replicas           JSON: an array of {type, class, make_model?};
                        CSV: entries separated by "|", each "type:class[:make_model]"
 
@@ -39,18 +43,22 @@ import csv
 import io
 import json
 import re
+from datetime import date
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Optional
 
 from . import sync_format
 
-COLUMNS = ("display_name", "external_ref", "team_preference", "federation_number", "replicas")
+COLUMNS = ("display_name", "external_ref", "team_preference", "federation_number", "apd_id",
+           "membership_expires", "replicas")
 MAX_BYTES = 1024 * 1024
 MAX_ROWS = sync_format.MAX_ROSTER
 NAME_MAX = 32
 REF_MAX = 128
 TEAM_MAX = 32
 FEDERATION_MAX = 32
+APD_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,31}")
+EXPIRES = re.compile(r"\d{4}-\d{2}-\d{2}")
 MAKE_MODEL_MAX = 64
 MAX_REPLICAS = 20               # the controller's bound for [checkin] max_replicas
 MAX_IGNORED = 50                # ignored column names listed in a preview
@@ -114,6 +122,8 @@ class Row:
     external_ref: Optional[str]
     team_preference: Optional[str]
     federation_number: Optional[str]
+    apd_id: Optional[str]
+    membership_expires: Optional[str]
     replicas: Optional[list[dict[str, Optional[str]]]]  # None: no replicas column in the file
     present: frozenset[str]
     warnings: list[str] = field(default_factory=list)
@@ -278,6 +288,27 @@ def _text(value: Any, code: str, limit: int, integers: bool = False) -> Optional
     return text
 
 
+def _membership_date(value: Any) -> Optional[str]:
+    """``YYYY-MM-DD`` (a real date in 2000-2100), or None for empty."""
+    text = _text(value, "membership_expires_invalid", 10)
+    if text is None:
+        return None
+    try:
+        year = date.fromisoformat(text).year if EXPIRES.fullmatch(text) else 0
+    except ValueError:
+        year = 0
+    if not 2000 <= year <= 2100:
+        raise RowError("membership_expires_invalid")
+    return text
+
+
+def _apd_id(value: Any) -> Optional[str]:
+    text = _text(value, "apd_id_invalid", 32)
+    if text is not None and not APD_ID.fullmatch(text):
+        raise RowError("apd_id_invalid")
+    return text
+
+
 def _replica_entries(value: Any) -> list[dict[str, Any]]:
     """The replicas column as entries {type, class, make_model}: a JSON array of objects, or the CSV
     text ``type:class[:make_model]|...`` (a make and model may hold ``:``; it cannot hold ``|``)."""
@@ -335,23 +366,27 @@ def check_row(raw: RawRow, rules: Rules) -> Row:
     if team is not None and team not in rules.teams:
         raise RowError("team_preference_invalid")
     number = _text(v.get("federation_number"), "federation_number_invalid", FEDERATION_MAX, integers=True)
+    apd_id = _apd_id(v.get("apd_id"))
+    expires = _membership_date(v.get("membership_expires"))
     warnings = []
     if rules.federation == "off":
-        if number is not None:
-            warnings.append("federation_number_dropped")  # the game asks for none: not kept
-        number = None
+        for kept, code in ((number, "federation_number_dropped"), (apd_id, "apd_id_dropped"),
+                           (expires, "membership_expires_dropped")):
+            if kept is not None:
+                warnings.append(code)  # the game asks for no membership: not kept
+        number = apd_id = expires = None
     elif rules.federation == "required" and number is None:
         raise RowError("federation_number_required")
     replicas = check_replicas(v.get("replicas"), rules) if "replicas" in v else None
     if ref is None:
         warnings.append("no_external_ref")
-    return Row(raw.number, name, ref, team, number, replicas, frozenset(v), warnings)
+    return Row(raw.number, name, ref, team, number, apd_id, expires, replicas, frozenset(v), warnings)
 
 
 # --- the export ---------------------------------------------------------------------------
 
-EXPORT_COLUMNS = ("display_name", "external_ref", "team_preference", "federation_number", "replicas",
-                  "registration_id", "player_id", "status", "source")
+EXPORT_COLUMNS = ("display_name", "external_ref", "team_preference", "federation_number", "apd_id",
+                  "membership_expires", "replicas", "registration_id", "player_id", "status", "source")
 
 
 def replicas_text(replicas: Iterable[dict[str, Optional[str]]]) -> str:
@@ -374,6 +409,7 @@ def export_csv(rows: Iterable[dict[str, Any]]) -> str:
     for r in rows:
         w.writerow([csv_safe(r.get("display_name")), csv_safe(r.get("external_ref")),
                     csv_safe(r.get("team_preference")), csv_safe(r.get("federation_number")),
+                    r.get("apd_id") or "", r.get("membership_expires") or "",
                     csv_safe(replicas_text(r.get("replicas") or ())), r.get("registration_id") or "",
                     r.get("player_id") or "", r.get("status") or "", csv_safe(r.get("source"))])
     return out.getvalue()

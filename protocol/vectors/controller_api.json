@@ -1141,6 +1141,19 @@
       ]
     },
     {
+      "name": "chrono-list: a pending player without replicas is listed with the membership (APDF-3, APDF-4)",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Membership", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "PUT", "path": "/api/v1/checkin/settings", "token": "gm", "body": {"federation": "optional", "apd": {"accepted": ["fpa"], "checkin": true}}}, "status": 200, "json": {"apd": {"accepted": ["fpa"], "checkin": true, "register": false, "expiry": false, "custom": []}}},
+        {"request": {"method": "POST", "path": "/api/v1/checkin", "token": "none", "body": {"game_id": "${gid}", "player_id": "p-aaaaaaaaaaaa", "player_secret": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE", "display_name": "Falcão", "notice_version": 1, "membership_number": "N-1", "apd_id": "fpa", "membership_expires": "2100-01-31", "replicas": [{"declaration_id": "d1111111-1111-4111-8111-111111111111", "type": "aeg", "class": "rifle"}]}}, "status": 201, "json": {"status": "checked_in"}},
+        {"request": {"method": "POST", "path": "/api/v1/checkin", "token": "none", "body": {"game_id": "${gid}", "player_id": "p-bbbbbbbbbbbb", "player_secret": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI", "display_name": "Corvo", "notice_version": 1, "membership_number": "N-2"}}, "status": 201, "json": {"status": "pending"}},
+        {"request": {"method": "POST", "path": "/api/v1/checkin", "token": "none", "body": {"game_id": "${gid}", "player_id": "p-cccccccccccc", "player_secret": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM", "display_name": "Gaio", "notice_version": 1, "membership_number": "N-3", "apd_id": "fpa"}}, "status": 201, "json": {"status": "checked_in"}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/chrono-list", "token": "gm"}, "status": 200, "json": {"counts": {"pending": 1, "passed": 0, "refused": 0}, "players": [{"player_id": "p-aaaaaaaaaaaa", "display_name": "Falcão", "status": "checked_in", "pending": 1, "apd_id": "fpa", "membership_number": "N-1", "membership_expires": "2100-01-31", "apd_status": "valid", "apd_override": false, "declarations": [{"declaration_id": "d1111111-1111-4111-8111-111111111111", "state": "pending"}]}, {"player_id": "p-bbbbbbbbbbbb", "display_name": "Corvo", "status": "pending", "pending": 0, "apd_id": null, "membership_number": "N-2", "membership_expires": null, "apd_status": "not_accepted", "apd_override": false, "declarations": []}]}},
+        {"request": {"method": "PATCH", "path": "/api/v1/games/${gid}/checkins/p-bbbbbbbbbbbb", "token": "gm", "body": {"status": "checked_in"}}, "status": 200, "json": {"status": "checked_in", "apd_override": true, "apd_status": "not_accepted"}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/chrono-list", "token": "gm"}, "status": 200, "json": {"counts": {"pending": 1, "passed": 0, "refused": 0}, "players": [{"player_id": "p-aaaaaaaaaaaa", "status": "checked_in", "pending": 1, "apd_status": "valid", "apd_override": false}]}}
+      ]
+    },
+    {
       "name": "chrono: a marshal's signed readings pass and refuse declarations",
       "steps": [
         {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "assignments": {"4": "zone"}}}, "status": 201, "json": {"state": "ready"}, "save": {"gid": "id"}},

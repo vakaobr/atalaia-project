@@ -123,8 +123,19 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
 
   List<ApdEntry> _apds = const [];
 
+  /// The field's check-in settings (the membership rule and the APDs it
+  /// offers), for the hand check-in's form; null when the controller did not
+  /// answer (the form then asks for the name only).
+  FieldInfo? _info;
+
   Future<void> _init() async {
     _apds = await loadProjectApds();
+    if (!mounted) return;
+    try {
+      _info = await _client.info();
+    } on CheckinException {
+      _info = null;
+    }
     if (!mounted) return;
     _records = widget.records ?? await marshalRecordsFor(context);
     await _load();
@@ -272,20 +283,13 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
 
   Future<void> _manual() async {
     final s = context.s;
-    final name = await promptText(
-      context,
-      title: s.t('queue.manual'),
-      label: s.t('checkin.name'),
-      actions: [
-        (s.t('common.cancel'), (_) => null, false),
-        (s.t('queue.manual_do'), (t) => t.trim(), true),
-      ],
+    final body = await showDialog<Map<String, Object?>>(
+      context: context,
+      builder: (_) => _ManualCheckinDialog(info: _info),
     );
-    if (name == null || name.isEmpty) return;
+    if (body == null) return;
     try {
-      final row = await _client.manualCheckin(c.token, c.gameId, {
-        'display_name': name,
-      });
+      final row = await _client.manualCheckin(c.token, c.gameId, body);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -584,6 +588,114 @@ class _StickerDialogState extends State<_StickerDialog> {
           key: const Key('queue-sticker-qr'),
           onPressed: () => Navigator.pop(context, ''),
           child: Text(s.t('queue.sticker_qr')),
+        ),
+      ],
+    );
+  }
+}
+
+/// The hand check-in of a player without the app: the name and, when the
+/// field asks for a membership (or a federation number), the APD, number and
+/// expiry the player shows on their card (protocol/apd.md). Nothing is
+/// verified and the marshal is never refused for the verdict. Pops the body
+/// of `POST /games/{id}/checkins`, or null when cancelled.
+class _ManualCheckinDialog extends StatefulWidget {
+  const _ManualCheckinDialog({required this.info});
+
+  final FieldInfo? info;
+
+  @override
+  State<_ManualCheckinDialog> createState() => _ManualCheckinDialogState();
+}
+
+class _ManualCheckinDialogState extends State<_ManualCheckinDialog> {
+  final _name = TextEditingController();
+  final _apd = ApdInput();
+  String? _error;
+
+  FieldInfo? get _info => widget.info;
+  bool get _withApd =>
+      _info != null && (apdAsked(_info!.apdRule) || _info!.federation != 'off');
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _apd.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final name = _name.text.trim();
+    if (name.isEmpty) return;
+    final info = _info;
+    if (_withApd && info != null) {
+      final bad = _apd.problem(
+        info.apdRule,
+        needNumber: info.federation == 'required',
+      );
+      if (bad != null) {
+        setState(() => _error = apdKey(bad, info.country));
+        return;
+      }
+    }
+    Navigator.pop(context, {
+      'display_name': name,
+      if (_withApd) ...{
+        if (_apd.apd != null) 'apd_id': _apd.apd,
+        if (_apd.numberOrNull != null) 'membership_number': _apd.numberOrNull,
+        if (_apd.expiresOrNull != null)
+          'membership_expires': _apd.expiresOrNull,
+      },
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final info = _info;
+    return AlertDialog(
+      title: Text(s.t('queue.manual')),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              key: const Key('queue-manual-name'),
+              controller: _name,
+              autofocus: true,
+              decoration: InputDecoration(labelText: s.t('checkin.name')),
+            ),
+            if (_withApd && info != null)
+              ApdFields(
+                input: _apd,
+                rule: info.apdRule,
+                country: info.country,
+                choices: info.apds,
+                numberRequired: info.federation == 'required',
+                keyPrefix: 'queue-manual-apd',
+              ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  s.t(_error!),
+                  key: const Key('queue-manual-error'),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(s.t('common.cancel')),
+        ),
+        FilledButton(
+          key: const Key('queue-manual-do'),
+          onPressed: _submit,
+          child: Text(s.t('queue.manual_do')),
         ),
       ],
     );

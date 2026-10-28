@@ -2681,7 +2681,9 @@ class ControllerCheckin {
       for (final d in decls) {
         counts[d['state']! as String] = (counts[d['state']] ?? 0) + 1;
       }
-      if (decls.isEmpty) continue;
+      // A player with no replica is listed only while a marshal has to let
+      // them in.
+      if (decls.isEmpty && r['status'] != 'pending') continue;
       players.add({
         'player_id': r['player_id'],
         'display_name': r['display_name'],
@@ -3720,6 +3722,8 @@ class ControllerCheckin {
       'status': 'expected',
       'display_name': row.displayName,
       'federation_number': asked ? row.federationNumber : null,
+      'apd_id': asked ? row.apdId : null,
+      'membership_expires': asked ? row.membershipExpires : null,
       'team_preference': teams.contains(row.teamPreference)
           ? row.teamPreference
           : null,
@@ -3752,6 +3756,12 @@ class ControllerCheckin {
     }
     if (row.present.contains('federation_number')) {
       fields['federation_number'] = asked ? row.federationNumber : null;
+    }
+    if (row.present.contains('apd_id')) {
+      fields['apd_id'] = asked ? row.apdId : null;
+    }
+    if (row.present.contains('membership_expires')) {
+      fields['membership_expires'] = asked ? row.membershipExpires : null;
     }
     _update(game['id']! as int, pid, fields);
     if (row.replicas != null) {
@@ -3796,6 +3806,15 @@ class ControllerCheckin {
         (asked ? row.federationNumber : null) !=
             existing['federation_number']) {
       changed.add('federation_number');
+    }
+    if (row.present.contains('apd_id') &&
+        (asked ? row.apdId : null) != existing['apd_id']) {
+      changed.add('apd_id');
+    }
+    if (row.present.contains('membership_expires') &&
+        (asked ? row.membershipExpires : null) !=
+            existing['membership_expires']) {
+      changed.add('membership_expires');
     }
     final replicas = row.replicas;
     if (replicas != null) {

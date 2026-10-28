@@ -47,7 +47,7 @@ Below, **Who you are** has **Chronograph's id** (a name for your device, for exa
 
 ## 2b. The APD verdict at check-in
 
-When the field checks APD membership, a player's card in the queue shows their APD, membership number and expiry with a badge: **Valid membership**, **Membership expired**, **APD not accepted here** or **Membership missing**. The app does not verify anything: compare the number and the date with the player's card. A player whose badge is not valid is **waiting**; **Let in** admits them anyway. You are never blocked, and the controller logs it without the number (the card then says **let in by a marshal**). The queue lists players who declared replicas; the GM console lists everyone.
+When the field checks APD membership, a player's card in the queue shows their APD, membership number and expiry with a badge: **Valid membership**, **Membership expired**, **APD not accepted here** or **Membership missing**. The app does not verify anything: compare the number and the date with the player's card. A player whose badge is not valid is **waiting**; **Let in** admits them anyway. You are never blocked, and the controller logs it without the number (the card then says **let in by a marshal**). The queue lists players who declared replicas, and also any player who is **waiting for confirmation** without replicas, so you can see their membership and let them in from your phone; once they are in and have no replica, they leave the queue. The GM console lists everyone.
 
 **Outside Portugal** the same screens say **association membership**: the field's country decides the words (the GM sets it), so the badge reads **Association not accepted here** and the player's card shows their association instead of an APD. What you check is the same: the number and the date against the player's card.
 
@@ -59,7 +59,7 @@ When the field checks APD membership, a player's card in the queue shows their A
 4. To find a replica by its label, tap the **scan** icon and point the camera at its QR label.
 5. Tap a replica to chrono it ([section 4](#4-chrono-a-replica)).
 6. If you chrono several replicas offline, tap **Send** *n* **series not sent yet** when you are back on the field's Wi-Fi. A series the controller does not accept stays on your phone.
-7. A player without the app: tap **Check in by hand**, type their name and tap **Check in**. The controller gives them an id.
+7. A player without the app: tap **Check in by hand**, type their name and tap **Check in**. When the field asks for a membership, the form also has the **APD** (or association), the **membership number** and the **expiry** (YYYY-MM-DD): type what the player's card says. None is verified and you are never refused because of the verdict; a verdict that is not valid is logged without the number. The controller gives them an id.
 
 The organisers can also see this list in their console. The list needs the organisers' confirmation that you are a marshal.
 

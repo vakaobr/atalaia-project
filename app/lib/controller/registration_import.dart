@@ -10,7 +10,7 @@
 /// site server, on the Pi and on the phone.
 ///
 /// A CSV file (RFC 4180, UTF-8, a header row, an optional byte order mark) or a
-/// JSON array of objects, with only the five [importColumns]; any other column
+/// JSON array of objects, with only the seven [importColumns]; any other column
 /// is not read (its name is listed, its values never leave this file). A file
 /// is refused whole ([ImportFileError]) when it is not what it says; a row is
 /// refused on its own ([ImportRowError], with a code) when a value is not valid.
@@ -33,6 +33,8 @@ const importColumns = [
   'external_ref',
   'team_preference',
   'federation_number',
+  'apd_id',
+  'membership_expires',
   'replicas',
 ];
 const importMaxBytes = 1024 * 1024;
@@ -57,6 +59,8 @@ const importReplicaTypes = [
   'pistol',
   'shotgun',
 ];
+final _apdIdRe = RegExp(r'^[a-z0-9][a-z0-9-]{0,31}$');
+final _expiresRe = RegExp(r'^\d{4}-\d{2}-\d{2}$');
 final _sourceRe = RegExp(r'^[a-z0-9][a-z0-9._-]{0,31}$');
 const _reservedSources = {'site'};
 
@@ -128,6 +132,8 @@ class ImportRow {
     required this.externalRef,
     required this.teamPreference,
     required this.federationNumber,
+    required this.apdId,
+    required this.membershipExpires,
     required this.replicas,
     required this.present,
     required this.warnings,
@@ -137,6 +143,10 @@ class ImportRow {
   final String? externalRef;
   final String? teamPreference;
   final String? federationNumber;
+
+  /// The membership body's id and the expiry (YYYY-MM-DD), protocol/apd.md.
+  final String? apdId;
+  final String? membershipExpires;
 
   /// null: no replicas column in the file.
   final List<Map<String, String?>>? replicas;
@@ -666,6 +676,34 @@ String? _text(Object? value, String code, int limit, {bool integers = false}) {
   return text;
 }
 
+/// YYYY-MM-DD (a real date in 2000-2100), or null for empty.
+String? _membershipDate(Object? value) {
+  final text = _text(value, 'membership_expires_invalid', 10);
+  if (text == null) return null;
+  final ok = _expiresRe.hasMatch(text);
+  final y = ok ? int.parse(text.substring(0, 4)) : 0;
+  final mo = ok ? int.parse(text.substring(5, 7)) : 0;
+  final d = ok ? int.parse(text.substring(8, 10)) : 0;
+  final real =
+      ok &&
+      y >= 2000 &&
+      y <= 2100 &&
+      mo >= 1 &&
+      mo <= 12 &&
+      d >= 1 &&
+      d <= DateTime.utc(y, mo + 1, 0).day;
+  if (!real) throw ImportRowError('membership_expires_invalid');
+  return text;
+}
+
+String? _apdId(Object? value) {
+  final text = _text(value, 'apd_id_invalid', 32);
+  if (text != null && !_apdIdRe.hasMatch(text)) {
+    throw ImportRowError('apd_id_invalid');
+  }
+  return text;
+}
+
 List<Map<String, Object?>> _replicaEntries(Object? value) {
   if (value == null) return const [];
   if (value is String) {
@@ -757,10 +795,16 @@ ImportRow checkImportRow(RawRow raw, ImportRules rules) {
     _federationMax,
     integers: true,
   );
+  var apdId = _apdId(v['apd_id']);
+  var expires = _membershipDate(v['membership_expires']);
   final warnings = <String>[];
   if (rules.federation == 'off') {
     if (number != null) warnings.add('federation_number_dropped');
+    if (apdId != null) warnings.add('apd_id_dropped');
+    if (expires != null) warnings.add('membership_expires_dropped');
     number = null;
+    apdId = null;
+    expires = null;
   } else if (rules.federation == 'required' && number == null) {
     throw ImportRowError('federation_number_required');
   }
@@ -774,6 +818,8 @@ ImportRow checkImportRow(RawRow raw, ImportRules rules) {
     externalRef: ref,
     teamPreference: team,
     federationNumber: number,
+    apdId: apdId,
+    membershipExpires: expires,
     replicas: replicas,
     present: v.keys.toSet(),
     warnings: warnings,

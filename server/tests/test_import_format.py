@@ -42,7 +42,7 @@ class CsvTests(unittest.TestCase):
                 '"Diz ""Lobo""",ref-2,,,\r\n'
                 '"Duas\r\nlinhas",ref-3,blue,,\r\n').encode("utf-8")
         parsed = fmt.parse_csv(data)
-        self.assertEqual(parsed.columns, fmt.COLUMNS)
+        self.assertEqual(parsed.columns, tuple(c for c in fmt.COLUMNS if c not in ("apd_id", "membership_expires")))
         self.assertEqual((parsed.ignored, parsed.ignored_more), ([], 0))
         out = rows(parsed)
         self.assertEqual(out[0].display_name, "Falcão, o Velho")
@@ -190,14 +190,17 @@ class ExportTests(unittest.TestCase):
 
     def test_an_export_imports_back_unchanged(self) -> None:
         source = [{"display_name": "=1+1", "external_ref": "-7", "team_preference": "red",
-                   "federation_number": "+351", "replicas": [{"type": "aeg", "class": "rifle", "make_model": "@M4|A"}],
+                   "federation_number": "+351", "apd_id": "x-clube", "membership_expires": "2027-03-01",
+                   "replicas": [{"type": "aeg", "class": "rifle", "make_model": "@M4|A"}],
                    "registration_id": "r1", "player_id": "p-aaaaaaaaaaaa", "status": "registered", "source": "site"}]
         text = fmt.export_csv(source)
-        self.assertTrue(text.startswith("display_name,external_ref,team_preference,federation_number,replicas,"))
+        self.assertTrue(text.startswith(
+            "display_name,external_ref,team_preference,federation_number,apd_id,membership_expires,replicas,"))
         self.assertIn("'=1+1", text)
         self.assertTrue(text.endswith("\r\n"))
         row = rows(fmt.parse_csv(text.encode("utf-8")))[0]
         self.assertEqual((row.display_name, row.external_ref, row.federation_number), ("=1+1", "-7", "+351"))
+        self.assertEqual((row.apd_id, row.membership_expires), ("x-clube", "2027-03-01"))
         self.assertEqual(row.replicas, [{"type": "aeg", "class": "rifle", "make_model": "@M4/A"}])
         self.assertEqual(fmt.parse_csv(text.encode()).ignored, ["registration_id", "player_id", "status", "source"])
 

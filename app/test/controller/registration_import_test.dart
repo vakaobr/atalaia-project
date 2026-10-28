@@ -80,6 +80,8 @@ void main() {
             'external_ref': row.externalRef,
             'team_preference': row.teamPreference,
             'federation_number': row.federationNumber,
+            'apd_id': row.apdId,
+            'membership_expires': row.membershipExpires,
             'replicas': row.replicas,
             'present': row.present.toList()..sort(),
             'warnings': row.warnings,
@@ -89,7 +91,20 @@ void main() {
         }
         got.add({'number': raw.number, 'result': res});
       }
-      expect(got, want['rows'], reason: name);
+      // An expected result may leave the two membership keys out: null.
+      final wantRows = [
+        for (final r in (want['rows'] as List).cast<Map<String, dynamic>>())
+          {
+            ...r,
+            if (r['result'] is Map)
+              'result': {
+                'apd_id': null,
+                'membership_expires': null,
+                ...(r['result'] as Map<String, dynamic>),
+              },
+          },
+      ];
+      expect(got, wantRows, reason: name);
     }
   });
 

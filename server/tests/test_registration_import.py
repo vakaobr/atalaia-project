@@ -54,12 +54,45 @@ class ImportCase(RegistrationCase):
 
 
 class ImportTests(ImportCase):
+    async def test_membership_columns_import_update_and_export(self) -> None:
+        """The APD and expiry columns (protocol/apd.md): stored, changed by a later file, dropped when the game
+        asks for no membership, and written back by the export."""
+        game = await self.game(federation="optional")
+        data = ("display_name,external_ref,federation_number,apd_id,membership_expires\n"
+                "Ana,r1,FPA-1,x-clube,2027-03-01\nBea,r2,FPA-2,,\nCris,r3,,FPA,\n")
+        out = await self.run_import(game, data)
+        self.assertEqual([(r["result"], r.get("code")) for r in out["results"]],
+                         [("created", None), ("created", None), ("refused", "apd_id_invalid")])
+        rows = await self.regs(game)
+        self.assertEqual([(r["apd_id"], str(r["membership_expires"])) for r in rows],
+                         [("x-clube", "2027-03-01"), (None, "None")])
+        again = await self.run_import(game, data.replace("FPA,", ","))
+        self.assertEqual([r["result"] for r in again["results"][:2]], ["unchanged", "unchanged"])
+        out = await self.run_import(game, "display_name,external_ref,apd_id,membership_expires\n"
+                                          "Ana,r1,,2028-01-31\nBea,r2,x-clube,\n")
+        self.assertEqual([r["changed"] for r in out["results"]],
+                         [["apd_id", "membership_expires"], ["apd_id"]])
+        rows = await self.regs(game)
+        self.assertEqual([(r["apd_id"], str(r["membership_expires"]), r["federation_number"]) for r in rows[:2]],
+                         [(None, "2028-01-31", "FPA-1"), ("x-clube", "None", "FPA-2")])
+        r = await self.client.get(self.path(game) + ".csv", headers=self.admin)
+        lines = r.text.lstrip("\ufeff").splitlines()  # the export starts with a byte order mark
+        self.assertTrue(lines[0].startswith("display_name,external_ref,team_preference,federation_number,"
+                                            "apd_id,membership_expires,replicas,"))
+        self.assertTrue(lines[1].startswith("Ana,r1,,FPA-1,,2028-01-31,,"), lines[1])
+        # A game that asks for no membership drops all three.
+        off = await self.game(federation="off")
+        out = await self.run_import(off, data)
+        self.assertEqual(out["results"][0]["warnings"],
+                         ["federation_number_dropped", "apd_id_dropped", "membership_expires_dropped"])
+
     async def test_dry_run_then_import_then_again(self) -> None:
         game = await self.game(federation="optional")
         preview = await self.run_import(game, CSV, dry_run=True, confirmed=False)
         self.assertEqual(preview["counts"], {"created": 3, "updated": 0, "unchanged": 0, "skipped": 0, "refused": 0})
         self.assertEqual(preview["not_imported_columns"], ["Nome completo", "Email"])
-        self.assertEqual(preview["columns"], list(import_format.COLUMNS))
+        self.assertEqual(preview["columns"], ["display_name", "external_ref", "team_preference",
+                                              "federation_number", "replicas"])
         self.assertEqual([r["result"] for r in preview["results"]], ["created"] * 3)
         self.assertEqual(preview["results"][2]["warnings"], ["no_external_ref"])
         self.assertNotIn("registration_id", preview["results"][0])

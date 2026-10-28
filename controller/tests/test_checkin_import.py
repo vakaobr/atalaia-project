@@ -109,6 +109,35 @@ class ImportTests(P3Case):
         self.assertEqual([e.get("code") for e in out["results"]],
                          [None, "federation_number_required", "federation_number_required"])
 
+    def test_membership_columns_import_update_and_export(self):
+        """APD id and expiry columns (protocol/apd.md): kept when the field asks for a membership, changed by a
+        later file, dropped when it asks for none, and written back by the check-in export."""
+        data = ("display_name,external_ref,federation_number,apd_id,membership_expires\r\n"
+                "Ana,a1,FPA-1,x-clube,2027-03-01\r\nBea,a2,FPA-2,FPA,\r\n")
+        g = self.new_game()
+        off = self.post(g["id"], data=data, source="clube", dry_run=True)  # federation off, no rule: all dropped
+        self.assertEqual(off["results"][0]["warnings"],
+                         ["federation_number_dropped", "apd_id_dropped", "membership_expires_dropped"])
+        self.client.put("/api/v1/checkin/settings", json={"federation": "optional"}, headers=GM)
+        out = self.post(g["id"], data=data, source="clube", basis_confirmed=True)
+        self.assertEqual([(e["result"], e.get("code")) for e in out["results"]],
+                         [("created", None), ("refused", "apd_id_invalid")])
+        ana = self.rows(g["id"])["checkins"][0]
+        self.assertEqual((ana["federation_number"], ana["apd_id"], ana["membership_expires"]),
+                         ("FPA-1", "x-clube", "2027-03-01"))
+        again = self.post(g["id"], data=data.replace("FPA,", ","), source="clube", basis_confirmed=True)
+        self.assertEqual([e["result"] for e in again["results"]], ["unchanged", "created"])
+        upd = self.post(g["id"], source="clube", basis_confirmed=True,
+                        data="display_name,external_ref,apd_id,membership_expires\r\nAna,a1,,2028-01-31\r\n")
+        self.assertEqual(upd["results"][0]["changed"], ["apd_id", "membership_expires"])
+        ana = next(r for r in self.rows(g["id"])["checkins"] if r["display_name"] == "Ana")
+        self.assertEqual((ana["federation_number"], ana["apd_id"], ana["membership_expires"]),
+                         ("FPA-1", None, "2028-01-31"))
+        text = self.client.get(f"/api/v1/games/{g['id']}/checkins.csv", headers=GM).content.decode("utf-8-sig")
+        self.assertIn(",FPA-1,,2028-01-31,", text)
+        back = self.post(g["id"], data=text, source="clube", dry_run=True)
+        self.assertEqual(back["counts"]["refused"], 0)
+
     def test_an_expected_row_is_ticked_by_name_and_then_left_alone(self):
         g = self.new_game()
         out = self.post(g["id"], data=CSV, source="clube", basis_confirmed=True)

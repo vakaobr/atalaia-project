@@ -1460,8 +1460,9 @@ class Checkin:
         self.store.add_field_player(pid, None, now)
         self.store.add_checkin(game["id"], pid, {
             "status": "expected", "display_name": row.display_name,
-            "federation_number": row.federation_number if asked else None, "team_preference": pref,
-            "registration_id": rid, "from_roster": 0}, now)
+            "federation_number": row.federation_number if asked else None,
+            "apd_id": row.apd_id if asked else None, "membership_expires": row.membership_expires if asked else None,
+            "team_preference": pref, "registration_id": rid, "from_roster": 0}, now)
         self._replace_declarations(game, pid, self._import_declarations(rid, row), staff=True, now=now)
 
     def _import_update(self, game: dict[str, Any], st: dict[str, Any], existing: dict[str, Any], row: importfmt.Row,
@@ -1473,6 +1474,9 @@ class Checkin:
             fields["team_preference"] = row.team_preference
         if "federation_number" in row.present:
             fields["federation_number"] = row.federation_number if asked else None
+        for name in ("apd_id", "membership_expires"):
+            if name in row.present:
+                fields[name] = getattr(row, name) if asked else None
         self.store.update_checkin(game["id"], existing["player_id"], **fields)
         if row.replicas is not None:
             self._replace_declarations(game, existing["player_id"],
@@ -1497,6 +1501,9 @@ class Checkin:
         wanted = row.federation_number if asked else None
         if "federation_number" in row.present and wanted != existing["federation_number"]:
             changed.append("federation_number")
+        for name in ("apd_id", "membership_expires"):
+            if name in row.present and (getattr(row, name) if asked else None) != existing.get(name):
+                changed.append(name)
         if row.replicas is not None:
             old = [(d["type"], d["class"], d["make_model"]) for d in self.store.declarations(game_id, existing["player_id"])
                    if d["state"] != "withdrawn"]
@@ -1673,6 +1680,7 @@ class Checkin:
         gid = game["id"]
         players = []
         counts = collections.Counter()
+        st, now = self.settings(), self._wall()
         for r in self.store.checkins(gid):
             if r["status"] in ("left", "removed"):
                 continue
@@ -1680,17 +1688,22 @@ class Checkin:
                      if d["state"] != "withdrawn"]
             for d in decls:
                 counts[d["state"]] += 1
-            if not decls:
-                continue
+            if not decls and r["status"] != "pending":
+                continue  # a player with no replica is listed only while a marshal has to let them in
             players.append({"player_id": r["player_id"], "display_name": r["display_name"],
                             "status": r["status"], "team": self._team_name(game, r["team"]),
                             "squad": r["squad"], "seq": r["seq"],
                             "pending": sum(1 for d in decls if d["state"] == "pending"),
+                            "apd_id": r.get("apd_id"), "membership_number": r["federation_number"],
+                            "membership_expires": r.get("membership_expires"),
+                            "apd_override": bool(r.get("apd_override")),
+                            "apd_status": self._verdict(st, r.get("apd_id"), r["federation_number"],
+                                                        r.get("membership_expires"), now),
                             "declarations": decls, "shared_readings": self.shared_view(r["player_id"])})
         players.sort(key=lambda p: (p["pending"] == 0, p["seq"]))
         return {"game_id": gid, "squads": int(game.get("squads") or 0),
                 "counts": {s: counts.get(s, 0) for s in ("pending", "passed", "refused")},
-                "chrono_valid_for": self.settings()["chrono_valid_for"], "country": self.settings()["country"],
+                "chrono_valid_for": st["chrono_valid_for"], "country": st["country"],
                 "players": players}
 
     def pending_count(self, game_id: int) -> int:

@@ -54,12 +54,15 @@ class VectorTests(unittest.TestCase):
                         row = fmt.check_row(raw, rules)
                         res: object = {"display_name": row.display_name, "external_ref": row.external_ref,
                                        "team_preference": row.team_preference,
-                                       "federation_number": row.federation_number, "replicas": row.replicas,
+                                       "federation_number": row.federation_number, "apd_id": row.apd_id,
+                                       "membership_expires": row.membership_expires, "replicas": row.replicas,
                                        "present": sorted(row.present), "warnings": row.warnings}
                     except fmt.RowError as exc:
                         res = exc.code
                     got.append({"number": raw.number, "result": res})
-                self.assertEqual(got, want["rows"])
+                # An expected result may leave the two membership keys out: null (the older cases).
+                self.assertEqual(got, [{**r, "result": {"apd_id": None, "membership_expires": None, **r["result"]}
+                                        if isinstance(r["result"], dict) else r["result"]} for r in want["rows"]])
 
 
 if __name__ == "__main__":

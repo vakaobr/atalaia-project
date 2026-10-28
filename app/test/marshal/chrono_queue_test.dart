@@ -345,6 +345,105 @@ void main() {
     expect(find.textContaining('admitido por um marshal'), findsOneWidget);
   });
 
+  testWidgets('a pending player without replicas is listed and let in', (
+    tester,
+  ) async {
+    field
+      ..confirm = 'staff'
+      ..verdict = 'missing';
+    field.handle('POST', '/checkin', {
+      'game_id': 42,
+      'player_id': 'p-noreplicasaa',
+      'player_secret': 'z',
+      'display_name': 'Pardal',
+      'notice_version': 1,
+    }, null);
+    final h = harness(fieldHttp: field.http);
+    final r = await records(h.store, h.settings);
+    await tester.pumpWidget(
+      h.app(
+        home: ChronoQueueScreen(
+          checkin: marshal,
+          field: pinned,
+          records: r,
+          templates: templates,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('queue-player-p-noreplicasaa')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('apd-badge-missing')), findsOneWidget);
+    await tapKey(tester, 'queue-confirm-p-noreplicasaa');
+    final row = field.rows['p-noreplicasaa']!;
+    expect(row['status'], 'checked_in');
+    expect(row['apd_override'], true);
+  });
+
+  testWidgets('a hand check-in takes the APD, number and expiry', (
+    tester,
+  ) async {
+    field
+      ..apd = {
+        'accepted': null,
+        'register': false,
+        'checkin': true,
+        'expiry': true,
+        'custom': <Object?>[],
+      }
+      ..apds = [
+        {'id': 'apd-a', 'name': 'APD Alfa', 'short_name': 'Alfa'},
+      ];
+    final h = harness(fieldHttp: field.http);
+    final r = await records(h.store, h.settings);
+    await tester.pumpWidget(
+      h.app(
+        home: ChronoQueueScreen(
+          checkin: marshal,
+          field: pinned,
+          records: r,
+          templates: templates,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'queue-manual');
+    await tester.enterText(
+      find.byKey(const Key('queue-manual-name')),
+      'Sem Cartão',
+    );
+    await tester.enterText(
+      find.byKey(const Key('queue-manual-apd-number')),
+      'A-77',
+    );
+    await tester.enterText(
+      find.byKey(const Key('queue-manual-apd-expires')),
+      '31/01/2027',
+    );
+    await tester.tap(find.byKey(const Key('queue-manual-do')));
+    await tester.pumpAndSettle();
+    // A date that is not YYYY-MM-DD is said, not sent.
+    expect(find.byKey(const Key('queue-manual-error')), findsOneWidget);
+    expect(
+      field.rows.values.where((x) => x['display_name'] == 'Sem Cartão'),
+      isEmpty,
+    );
+    await tester.enterText(
+      find.byKey(const Key('queue-manual-apd-expires')),
+      '2027-01-31',
+    );
+    await tester.tap(find.byKey(const Key('queue-manual-do')));
+    await tester.pumpAndSettle();
+    final row = field.rows.values.singleWhere(
+      (x) => x['display_name'] == 'Sem Cartão',
+    );
+    expect(row['federation_number'], 'A-77');
+    expect(row['membership_expires'], '2027-01-31');
+    expect(row['apd_id'], isNull);
+  });
+
   testWidgets('out of reach: the series waits on the phone, then goes', (
     tester,
   ) async {

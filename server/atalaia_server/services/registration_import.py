@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Optional
 
 from sqlalchemy import select
@@ -136,7 +136,8 @@ async def run(db: AsyncSession, field: Field, game: ScheduledGame, parsed: fmt.P
                 reg = GameRegistration(scheduled_game=game.id, field_id=field.id, user_id=None,
                                        player_id=await _new_player_id(db, field.id, taken),
                                        display_name=row.display_name, team_preference=row.team_preference,
-                                       federation_number=row.federation_number, status="registered",
+                                       federation_number=row.federation_number, apd_id=row.apd_id,
+                                       membership_expires=_expires(row.membership_expires), status="registered",
                                        ticket_hash=None, source=source, external_ref=row.external_ref,
                                        updated_at=now)
                 db.add(reg)
@@ -154,6 +155,8 @@ async def run(db: AsyncSession, field: Field, game: ScheduledGame, parsed: fmt.P
                     for name in changed:
                         if name == "replicas":
                             await _put(db, existing, row.replicas or [])
+                        elif name == "membership_expires":
+                            existing.membership_expires = _expires(row.membership_expires)
                         else:
                             setattr(existing, name, getattr(row, name))
                     existing.updated_at = now
@@ -173,12 +176,18 @@ async def run(db: AsyncSession, field: Field, game: ScheduledGame, parsed: fmt.P
     return Outcome(answer, counts)
 
 
+def _expires(value: Optional[str]) -> Optional[date]:
+    return date.fromisoformat(value) if value else None
+
+
 def _changes(reg: GameRegistration, old: list[RegistrationReplica], row: fmt.Row) -> list[str]:
     """The names of what the row changes, among the columns the file has."""
     changed = []
-    for name in ("display_name", "team_preference", "federation_number"):
+    for name in ("display_name", "team_preference", "federation_number", "apd_id"):
         if name in row.present and getattr(reg, name) != getattr(row, name):
             changed.append(name)
+    if "membership_expires" in row.present and reg.membership_expires != _expires(row.membership_expires):
+        changed.append("membership_expires")
     if row.replicas is not None and not _same_replicas(old, row.replicas):
         changed.append("replicas")
     return changed
@@ -198,7 +207,8 @@ async def export_rows(db: AsyncSession, game: ScheduledGame) -> list[dict[str, A
                                  .order_by(GameRegistration.created_at, GameRegistration.id)))
     reps = await reg_svc.replicas_of(db, [r.id for r in regs])
     return [{"display_name": r.display_name, "external_ref": r.external_ref, "team_preference": r.team_preference,
-             "federation_number": r.federation_number,
+             "federation_number": r.federation_number, "apd_id": r.apd_id,
+             "membership_expires": r.membership_expires.isoformat() if r.membership_expires else None,
              "replicas": [{"type": d.replica_type, "class": d.replica_class, "make_model": d.make_model}
                           for d in reps[r.id]],
              "registration_id": str(r.id), "player_id": r.player_id, "status": r.status, "source": r.source}

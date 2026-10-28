@@ -374,7 +374,10 @@ class FakeField {
         }
         final players = [
           for (final r in rows.values)
-            if ((r['declarations']! as List).isNotEmpty)
+            // As the controller lists them: players with replicas, and a
+            // pending one without, whom a marshal has to let in.
+            if ((r['declarations']! as List).isNotEmpty ||
+                r['status'] == 'pending')
               {
                 'player_id': r['player_id'],
                 'display_name': r['display_name'],
@@ -455,6 +458,9 @@ class FakeField {
           'status': 'checked_in',
           'role': 'player',
           'display_name': b['display_name'],
+          'federation_number': b['membership_number'],
+          'apd_id': b['apd_id'],
+          'membership_expires': b['membership_expires'],
           'declarations': <Map<String, Object?>>[],
         };
         return FieldResponse(201, rows[pid]);

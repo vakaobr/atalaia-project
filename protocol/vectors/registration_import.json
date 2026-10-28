@@ -1,5 +1,5 @@
 {
- "description": "The registration import's format (controller/atalaia_controller/import_format.py, which the site server re-exports; app/lib/controller/registration_import.dart is its port; PKE-1). Each case gives a file ('data' text, 'data_hex' bytes, or 'data_gen': head + unit x times + tail), its 'format' and the game's 'rules' (the top-level ones unless the case gives its own, merged over them); 'expect' is either {'error': code, 'line'?} (the file is refused whole) or the parse (format, columns, ignored, ignored_more) and, per row, its number and either the code it is refused with or the checked values (display_name, external_ref, team_preference, federation_number, replicas (null: no column), present (the columns the file had, sorted), warnings). 'expect' of a generated file has only a row_count. Cases whose names start with 'csv:' or 'json:' parse; 'refused' ones are refused whole. Python's csv module (strict, excel dialect) is the reference for the CSV reader.",
+ "description": "The registration import's format (controller/atalaia_controller/import_format.py, which the site server re-exports; app/lib/controller/registration_import.dart is its port; PKE-1). Each case gives a file ('data' text, 'data_hex' bytes, or 'data_gen': head + unit x times + tail), its 'format' and the game's 'rules' (the top-level ones unless the case gives its own, merged over them); 'expect' is either {'error': code, 'line'?} (the file is refused whole) or the parse (format, columns, ignored, ignored_more) and, per row, its number and either the code it is refused with or the checked values (display_name, external_ref, team_preference, federation_number, apd_id, membership_expires (a result may leave these two out: null), replicas (null: no column), present (the columns the file had, sorted), warnings). 'expect' of a generated file has only a row_count. Cases whose names start with 'csv:' or 'json:' parse; 'refused' ones are refused whole. Python's csv module (strict, excel dialect) is the reference for the CSV reader.",
  "rules": {
   "teams": [
    "red",
@@ -659,6 +659,250 @@
    }
   },
   {
+   "name": "csv: membership columns (apd_id, membership_expires)",
+   "format": "csv",
+   "data": "display_name,federation_number,apd_id,membership_expires\nAna,FPA-1,fpa,2027-03-01\nBea,N-2,,\nCris,,x-clube,\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "federation_number",
+     "apd_id",
+     "membership_expires"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": "FPA-1",
+       "apd_id": "fpa",
+       "membership_expires": "2027-03-01",
+       "replicas": null,
+       "present": [
+        "apd_id",
+        "display_name",
+        "federation_number",
+        "membership_expires"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     },
+     {
+      "number": 3,
+      "result": {
+       "display_name": "Bea",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": "N-2",
+       "apd_id": null,
+       "membership_expires": null,
+       "replicas": null,
+       "present": [
+        "apd_id",
+        "display_name",
+        "federation_number",
+        "membership_expires"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     },
+     {
+      "number": 4,
+      "result": {
+       "display_name": "Cris",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "apd_id": "x-clube",
+       "membership_expires": null,
+       "replicas": null,
+       "present": [
+        "apd_id",
+        "display_name",
+        "federation_number",
+        "membership_expires"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: membership columns refused values",
+   "format": "csv",
+   "data": "display_name,apd_id,membership_expires\nA,FPA,\nB,-x,\nC,,2027-02-30\nD,,01/03/2027\nE,,1999-12-31\nF,,2101-01-01\nG,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,\nH,,2000-01-01\nI,,2100-12-31\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "apd_id",
+     "membership_expires"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": "apd_id_invalid"
+     },
+     {
+      "number": 3,
+      "result": "apd_id_invalid"
+     },
+     {
+      "number": 4,
+      "result": "membership_expires_invalid"
+     },
+     {
+      "number": 5,
+      "result": "membership_expires_invalid"
+     },
+     {
+      "number": 6,
+      "result": "membership_expires_invalid"
+     },
+     {
+      "number": 7,
+      "result": "membership_expires_invalid"
+     },
+     {
+      "number": 8,
+      "result": "apd_id_invalid"
+     },
+     {
+      "number": 9,
+      "result": {
+       "display_name": "H",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "apd_id": null,
+       "membership_expires": "2000-01-01",
+       "replicas": null,
+       "present": [
+        "apd_id",
+        "display_name",
+        "membership_expires"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     },
+     {
+      "number": 10,
+      "result": {
+       "display_name": "I",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "apd_id": null,
+       "membership_expires": "2100-12-31",
+       "replicas": null,
+       "present": [
+        "apd_id",
+        "display_name",
+        "membership_expires"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: federation off drops the membership too",
+   "format": "csv",
+   "rules": {
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "federation": "off",
+    "predeclare_replicas": true,
+    "classes": [
+     "dmr",
+     "pistol",
+     "rifle",
+     "sniper"
+    ],
+    "max_replicas": 3
+   },
+   "data": "display_name,federation_number,apd_id,membership_expires\nAna,FPA-9,fpa,2027-03-01\nBea,,,\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "federation_number",
+     "apd_id",
+     "membership_expires"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "apd_id": null,
+       "membership_expires": null,
+       "replicas": null,
+       "present": [
+        "apd_id",
+        "display_name",
+        "federation_number",
+        "membership_expires"
+       ],
+       "warnings": [
+        "federation_number_dropped",
+        "apd_id_dropped",
+        "membership_expires_dropped",
+        "no_external_ref"
+       ]
+      }
+     },
+     {
+      "number": 3,
+      "result": {
+       "display_name": "Bea",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "apd_id": null,
+       "membership_expires": null,
+       "replicas": null,
+       "present": [
+        "apd_id",
+        "display_name",
+        "federation_number",
+        "membership_expires"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
    "name": "csv: display name limits",
    "format": "csv",
    "data": "display_name\n\"  Ana  \"\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\"A\tB\"\n\"AB\"\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n",
@@ -1266,6 +1510,73 @@
        "present": [
         "display_name",
         "external_ref"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "json: membership columns",
+   "format": "json",
+   "data": "[{\"display_name\": \"Ana\", \"federation_number\": \"FPA-1\", \"apd_id\": \"fpa\", \"membership_expires\": \"2027-03-01\"}, {\"display_name\": \"Bea\", \"membership_expires\": 20270301}, {\"display_name\": \"Cris\", \"apd_id\": 5}, {\"display_name\": \"Dina\", \"apd_id\": null, \"membership_expires\": null}]",
+   "expect": {
+    "format": "json",
+    "columns": [
+     "display_name",
+     "federation_number",
+     "apd_id",
+     "membership_expires"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 1,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": "FPA-1",
+       "apd_id": "fpa",
+       "membership_expires": "2027-03-01",
+       "replicas": null,
+       "present": [
+        "apd_id",
+        "display_name",
+        "federation_number",
+        "membership_expires"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     },
+     {
+      "number": 2,
+      "result": "membership_expires_invalid"
+     },
+     {
+      "number": 3,
+      "result": "apd_id_invalid"
+     },
+     {
+      "number": 4,
+      "result": {
+       "display_name": "Dina",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "apd_id": null,
+       "membership_expires": null,
+       "replicas": null,
+       "present": [
+        "apd_id",
+        "display_name",
+        "membership_expires"
        ],
        "warnings": [
         "no_external_ref"

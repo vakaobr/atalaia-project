@@ -36,6 +36,8 @@ registrations instead of adding them twice.
 | `external_ref` | the other platform's registration id, 1-128 characters; recommended (rows without it are added on every import, and the preview warns: `no_external_ref`) |
 | `team_preference` | one of the game's teams, or empty |
 | `federation_number` | 1-32 characters; required when the game says so (`federation_number_required`), dropped with a warning when the game asks for none (`federation_number_dropped`) |
+| `apd_id` | the membership body's id (`[a-z0-9][a-z0-9-]{0,31}`, for example `x-mylabel`) or empty (`apd_id_invalid`); optional, dropped with a warning when the game asks for no membership (`apd_id_dropped`); [protocol/apd.md](../../protocol/apd.md) |
+| `membership_expires` | `YYYY-MM-DD`, a real date in 2000-2100, or empty (`membership_expires_invalid`; a JSON integer is refused); optional, dropped as `apd_id` is (`membership_expires_dropped`) |
 | `replicas` | CSV: entries separated by `\|`, each `type:class[:make_model]` (`aeg:rifle:Tokyo Marui M4\|sniper:sniper`); JSON: an array of `{"type", "class", "make_model"}`. Types are the check-in's (`aeg`, `gbb`, `hpa`, `bolt_action`, `dmr`, `sniper`, `pistol`, `shotgun`), classes the field's limit template's, at most the field's `max_replicas`, and only when the game takes pre-declared replicas |
 
 **Nothing else is read.** Any other column (an email, a phone number, a birth date) is listed in the
@@ -57,9 +59,9 @@ twice in one object, or anything but an array is refused.
 | `updated` | the same (source, external_ref) is already registered and something differs (`changed` names what); columns the file does not have stay as they are, an empty cell clears the value |
 | `unchanged` | the same, nothing differs |
 | `skipped` | the field cancelled that registration (`code: cancelled`): an import never brings it back |
-| `refused` | with a `code`: `display_name_invalid`, `external_ref_invalid`, `external_ref_twice` (the same reference earlier in the file), `team_preference_invalid`, `federation_number_invalid`, `federation_number_required`, `replicas_invalid`, `replica_type_invalid`, `replica_class_invalid`, `too_many_replicas`, `replicas_not_asked`, `make_model_invalid`, `row_length` (a CSV record with more or fewer fields than the header), `row_not_object` (a JSON item), `column_twice`, `game_full` |
+| `refused` | with a `code`: `display_name_invalid`, `external_ref_invalid`, `external_ref_twice` (the same reference earlier in the file), `team_preference_invalid`, `federation_number_invalid`, `federation_number_required`, `apd_id_invalid`, `membership_expires_invalid`, `replicas_invalid`, `replica_type_invalid`, `replica_class_invalid`, `too_many_replicas`, `replicas_not_asked`, `make_model_invalid`, `row_length` (a CSV record with more or fewer fields than the header), `row_not_object` (a JSON item), `column_twice`, `game_full` |
 
-A refused row does not stop the others. Warnings: `no_external_ref`, `federation_number_dropped`,
+A refused row does not stop the others. Warnings: `no_external_ref`, `federation_number_dropped`, `apd_id_dropped`, `membership_expires_dropped`,
 `same_name` (someone with that name is already registered: perhaps on the site too). Registrations of the
 same source that are not in the file are listed in `missing`, never cancelled.
 

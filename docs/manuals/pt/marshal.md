@@ -47,7 +47,7 @@ Mais abaixo, **Quem és** tem **Identificador do cronógrafo** (um nome para o t
 
 ## 2b. O veredicto da filiação em APD à receção
 
-Quando o campo verifica a filiação em APD, o cartão de quem joga na lista mostra a APD, o número e a validade com um selo: **Filiação válida**, **Filiação caducada**, **APD não aceite aqui** ou **Filiação em falta**. A app não verifica nada: compara o número e a data com o cartão da pessoa. Quem não tem selo válido fica **à espera**; **Admitir** admite-a na mesma. Nunca ficas bloqueado e o controlador regista-o sem o número (o cartão passa a dizer **admitido por um marshal**). A lista lista quem declarou réplicas; a consola do GM lista toda a gente.
+Quando o campo verifica a filiação em APD, o cartão de quem joga na lista mostra a APD, o número e a validade com um selo: **Filiação válida**, **Filiação caducada**, **APD não aceite aqui** ou **Filiação em falta**. A app não verifica nada: compara o número e a data com o cartão da pessoa. Quem não tem selo válido fica **à espera**; **Admitir** admite-a na mesma. Nunca ficas bloqueado e o controlador regista-o sem o número (o cartão passa a dizer **admitido por um marshal**). A lista mostra quem declarou réplicas e também quem está **à espera de confirmação** sem réplicas, para veres a filiação e admitires a pessoa a partir do telemóvel; depois de admitida e sem réplicas, deixa de estar na lista. A consola do GM lista toda a gente.
 
 **Fora de Portugal** os mesmos ecrãs falam de **filiação numa associação**: o país do campo (definido pelo GM) decide as palavras, por isso o selo diz **Associação não aceite aqui** e o cartão mostra a associação em vez de uma APD. O que verificas é o mesmo: o número e a data contra o cartão da pessoa.
 
@@ -59,7 +59,7 @@ Quando o campo verifica a filiação em APD, o cartão de quem joga na lista mos
 4. Para encontrar uma réplica pela etiqueta, toca no ícone de **ler** e aponta a câmara à etiqueta QR dela.
 5. Toca numa réplica para a cronografar ([secção 4](#4-cronografa-uma-réplica)).
 6. Se cronografares várias réplicas sem ligação, toca em **Enviar** *n* **série(s) por enviar** quando voltares ao Wi-Fi do campo. Uma série que o controlador não aceita fica no teu telemóvel.
-7. Alguém sem a app: toca em **Check-in à mão**, escreve o nome e toca em **Fazer o check-in**. O controlador dá-lhe um identificador.
+7. Alguém sem a app: toca em **Check-in à mão**, escreve o nome e toca em **Fazer o check-in**. Quando o campo pede filiação, o formulário tem também a **APD** (ou associação), o **número de associado** e a **validade** (AAAA-MM-DD): escreve o que diz o cartão da pessoa. Nada é verificado e nunca és impedido por causa do veredicto; um veredicto que não seja válido fica registado sem o número. O controlador dá-lhe um identificador.
 
 A organização também vê esta lista na consola dela. A lista precisa de a organização confirmar que és marshal.
 
