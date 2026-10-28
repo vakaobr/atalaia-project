@@ -232,8 +232,21 @@ which one. A first login with an unknown provider account makes a **new** accoun
 buttons); the server never links a provider to an existing account by email, which it does not know. An existing
 account (your administrator's, say) links a provider while logged in, with `POST /api/v1/auth/oidc/PROVIDER/start`
 (`{"purpose": "link", "password": "..."}`, Bearer) and registers a passkey with `POST /api/v1/me/passkeys/options` and
-`POST /api/v1/me/passkeys` (server/README.md has the list); the Atalaia app's account screen is meant to do both for
-people (it does not yet: the site login in the app is a later task), so until then the staff pages only *log in* with them.
+`POST /api/v1/me/passkeys` (server/README.md has the list); the staff page `/staff/account` and the Atalaia app's
+account screen (app/README.md) do both for people.
+
+**The Android app** logs in with the same passkeys and providers, and for that the site must say the app is its own:
+set `ATALAIA_APP_ANDROID_PACKAGE` (`org.atalaia.app` for the project's build) and `ATALAIA_APP_ANDROID_SHA256` (the
+SHA-256 fingerprint of the key that signed the app, as `keytool -list -v` prints it, `AB:CD:...`; several separated by
+commas, for example a debug and a release key) and the server serves `/.well-known/assetlinks.json`, which lets the
+app open the site's `https://DOMAIN/app/oidc` link (where a social login returns to the app) and use its passkeys; it
+also accepts a passkey made in the app (whose origin is that certificate's hash) besides the site's own. Unset, the file
+is a 404 and the app logs in with the password only. The app also needs the **host** in its manifest, because Android
+reads App Links from there at install: the project's build is made with `-Patalaia.appLinkHost=DOMAIN` for the
+site it serves (or `*.hub.example.pt` for a hosted hub), so a club with its own site server builds the app with its own
+host, or keeps the password login in the app. For an iOS app, `ATALAIA_APP_IOS_APP_IDS` (`TEAMID.bundle.id`, commas)
+does the same for `/.well-known/apple-app-site-association`; the iOS app does not use it yet. Check with
+`curl https://DOMAIN/.well-known/assetlinks.json`.
 
 **Switching passwords off** (`ATALAIA_PASSWORD_LOGIN=off`): password login and password registration answer 403;
 accounts then log in with a passkey or a provider. Before you switch it off, make sure **every administrator has a

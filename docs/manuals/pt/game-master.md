@@ -162,7 +162,7 @@ Opcional, mas o limite é o que faz os telemóveis de quem joga avisarem quando 
 2. Carrega uma imagem com **Carregar imagem do campo** (PNG, JPEG ou WebP, até 4 MB), ou toca em **Carregar o campo de um mapa**. Essa página precisa de internet enquanto preparas o jogo. Encontra o campo, marca os cantos do contorno (3 a 12) e toca em **Desenhar a imagem do campo** e depois em **Usar como campo**. Guarda a imagem, o lugar dela no mapa e o **limite do campo**. O controlador não precisa de internet para isto.
 3. **Arrasta as caixas** para o sítio onde estão no campo.
 4. **Edifício com vários pisos**: marca-o para um edifício com vários pisos. Cada piso tem a sua planta.
-5. **Quadrícula no mapa**: liga-a para teres linhas com letras e colunas com números, para as pessoas dizerem «estou em C4» no rádio.
+5. **Quadrícula no mapa**: liga-a para teres linhas com letras e colunas com números, para as pessoas dizerem «estou em C4» no rádio. A app de quem joga desenha a mesma quadrícula sobre a planta no **Mapa do campo** e diz a cada pessoa a sua quadrícula.
 6. **Marcações no mapa**: marca zonas seguras, respawns, bases, o estacionamento, primeiros socorros e objetivos. Escolhe quem vê cada uma: toda a gente, uma equipa ou só a organização.
 7. **Posição no mapa (ATAK)**: dá a dois cantos opostos da imagem a latitude e a longitude, para mostrar as caixas nos mapas ATAK.
 8. **Balizas interiores**: para um edifício com balizas Bluetooth, vê [Balizas interiores](#balizas-interiores) mais abaixo.

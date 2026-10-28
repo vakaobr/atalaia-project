@@ -10,6 +10,7 @@ library;
 
 import 'package:atalaia_app/checkin/my_replicas.dart';
 import 'package:atalaia_app/l10n/strings.dart';
+import 'package:atalaia_app/site/account_screen.dart';
 import 'package:atalaia_app/site/site_api.dart';
 import 'package:atalaia_app/site/site_link.dart';
 import 'package:atalaia_app/site/site_screens.dart';
@@ -18,6 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_harness.dart';
 import '../support/fake_site.dart';
+import '../support/fakes.dart';
 
 Future<void> phone(WidgetTester tester) async {
   tester.view.physicalSize = const Size(360, 780);
@@ -75,6 +77,35 @@ void main() {
       await tester.pumpWidget(h.app(home: SiteScreen(link: link)));
       await tester.pumpAndSettle();
       await snap(tester, 'games', lang);
+    });
+
+    testWidgets('the account\'s login methods (${lang.code})', (tester) async {
+      final site = FakeSite();
+      site.identities.add({
+        'provider': 'google',
+        'label': 'Google',
+        'linked_at': '2026-10-01T10:00:00+00:00',
+        'last_login_at': '2026-10-20T18:30:00+00:00',
+      });
+      site.passkeys.add({
+        'id': 'k-one',
+        'name': 'Pixel',
+        'backed_up': true,
+        'created_at': '2026-10-02T10:00:00+00:00',
+        'last_used_at': null,
+      });
+      final h = await start(tester, site);
+      final session = h.services.sites.of(link.site);
+      await tester.pumpWidget(
+        harness(
+          language: lang,
+          siteHttp: site.http,
+          authBrowser: FakeAuthBrowser(),
+          passkeys: FakePasskeys(),
+        ).app(home: SiteAccountScreen(session: session)),
+      );
+      await tester.pumpAndSettle();
+      await snap(tester, 'account', lang);
     });
 
     testWidgets('registering (${lang.code})', (tester) async {

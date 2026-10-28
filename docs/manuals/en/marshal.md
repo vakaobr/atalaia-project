@@ -80,7 +80,7 @@ The organisers can also see this list in their console. The list needs the organ
 
 A person always decides any penalty. The app shows the numbers. Do not rely on a colour alone.
 
-If the replica is not in the list, the app registers it for you when you tap it in the queue. See [section 6](#6-the-replica-registry).
+If the replica is not in the list, the app registers it for you when you tap it in the queue. See [section 6](#6-the-replica-registry). On a phone with NFC the app first asks **Use an NFC sticker?**: hold the replica's NFC sticker to the phone and its number becomes the replica's tag (a sticker already on another replica is refused), or tap **Use the QR label** to use the printed label as before. **Cancel** registers nothing. A phone without NFC goes straight to the QR label.
 
 A pass counts for the rest of the day or for this game only, depending on the field's rules.
 

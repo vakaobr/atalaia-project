@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/// A vault for the few secrets the app keeps at rest (decision PD6): the field
-/// join key, the marshal's Ed25519 seed and the player's read code. On
+/// A vault for the few secrets the app keeps at rest (decisions PD6, PKA-4): the
+/// field join key, the marshal's Ed25519 seed, the player's read code, the
+/// phone controller's site API key, the player's secret at each field and the
+/// site account's refresh token. On
 /// Android it is an AES-256-GCM key made inside the AndroidKeyStore
 /// (non-exportable; no user-authentication requirement, so the foreground
 /// service and a boot-time start still work), reached through the

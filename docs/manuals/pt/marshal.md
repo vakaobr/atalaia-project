@@ -103,7 +103,7 @@ O registo do teu telemóvel lista as réplicas que conheces.
 2. Para juntar uma, toca em **Registar réplica** e preenche **Identificador de quem joga**, **Tipo**, **Classe** e **Marca e modelo**.
 3. Em **Etiqueta da réplica**, encosta a etiqueta NFC da réplica ao telemóvel, ou toca em **Ler etiqueta QR**. Depois toca em **Guardar**.
 
-Uma réplica que cronografas a partir da lista fica registada automaticamente. O registo mostra o código da etiqueta dela (**ATL-** e oito caracteres). Qualquer código QR que tenha esse texto pode ser lido.
+Uma réplica que cronografas a partir da lista fica registada automaticamente. Num telemóvel com NFC a app pergunta primeiro **Usar um autocolante NFC?**: encosta o autocolante NFC da réplica ao telemóvel e o número dele passa a ser a etiqueta da réplica (um autocolante que já está noutra réplica é recusado), ou toca em **Usar a etiqueta QR** para usar a etiqueta impressa como antes. **Cancelar** não regista nada. Um telemóvel sem NFC vai logo para a etiqueta QR. O registo mostra o código da etiqueta dela (**ATL-** e oito caracteres). Qualquer código QR que tenha esse texto pode ser lido.
 
 ### Etiquetas para autocolantes
 

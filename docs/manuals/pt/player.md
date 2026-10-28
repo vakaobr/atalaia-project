@@ -234,7 +234,7 @@ Partilhar a posição é opcional. A tua posição vai só para o controlador do
 
 **Em que piso estás?** Se o campo tiver vários pisos, enquanto partilhas aparece por baixo do botão uma fila de botões: os nomes dos pisos (por exemplo **R/C**, **Piso 1**) e **Não sei**. O telemóvel não distingue os pisos, por isso dizes uma vez; fica guardado enquanto jogas e vai com a tua posição por GPS, para a tua equipa te ver no piso certo. Escolhe **Não sei** se não souberes: ninguém o adivinha por ti. No interior, a baliza da sala dá o piso e os botões dão lugar a *O teu piso vem da baliza da sala*.
 
-**O mapa do campo.** Se a organização pôs a planta do campo no controlador, um cartão **Mapa do campo** mostra-a: a planta, os locais que a organização marcou para ti (zonas seguras, respawns, estacionamento, primeiros socorros, objetivos, o quartel-general da tua equipa), o limite do campo como contorno com o exterior escurecido, e as posições que podes ver: tu (um ponto com anel) e os outros na cor da sua equipa. Com vários pisos, os botões escolhem o piso mostrado; abre no teu. Um ponto vazio é quem ainda não disse em que piso está. Por baixo do mapa conta as posições que não estão nesta planta (uma baliza que a organização não pôs na planta, uma posição fora da planta). Uma lista curta por baixo diz o que é cada tipo de local. O mapa mostra só o que o controlador te envia: os locais e as posições de outra equipa não estão lá. Não há mapa de ruas, só a planta; um campo sem planta não mostra o cartão.
+**O mapa do campo.** Se a organização pôs a planta do campo no controlador, um cartão **Mapa do campo** mostra-a (com a quadrícula da organização por cima, se a ligou: linhas finas com letras ao lado e números em cima, e debaixo do mapa **A tua quadrícula: C4**, para dizeres no rádio onde estás): a planta, os locais que a organização marcou para ti (zonas seguras, respawns, estacionamento, primeiros socorros, objetivos, o quartel-general da tua equipa), o limite do campo como contorno com o exterior escurecido, e as posições que podes ver: tu (um ponto com anel) e os outros na cor da sua equipa. Com vários pisos, os botões escolhem o piso mostrado; abre no teu. Um ponto vazio é quem ainda não disse em que piso está. Por baixo do mapa conta as posições que não estão nesta planta (uma baliza que a organização não pôs na planta, uma posição fora da planta). Uma lista curta por baixo diz o que é cada tipo de local. O mapa mostra só o que o controlador te envia: os locais e as posições de outra equipa não estão lá. Não há mapa de ruas, só a planta; um campo sem planta não mostra o cartão.
 
 Se a organização desenhou o **limite do campo**, a app vigia-o **no teu telemóvel**. Nada disso é enviado a ninguém.
 
@@ -267,7 +267,7 @@ Alguns campos deixam-te inscrever num jogo no site deles, com uma conta.
 
 1. Abre a página do jogo do campo num browser. Toca em **Fazer a inscrição** e depois em **Abrir na app Atalaia**. Ou, na app: **Participante › Inscrições online**, cola o endereço da página e toca em **Abrir**.
 2. A app mostra o nome do site e pergunta se é o certo. Toca em **É este o site, continuar**.
-3. Entra com o teu **Nome de utilizador** e a tua **Palavra-passe**. Se a conta tiver verificação em dois passos, escreve o código de 6 algarismos.
+3. Entra com o teu **Nome de utilizador** e a tua **Palavra-passe**. Se a conta tiver verificação em dois passos, escreve o código de 6 algarismos. Se o site as oferecer, podes em alternativa tocar em **Entrar com uma chave de acesso** (o telemóvel pede a impressão digital, a cara ou o bloqueio do ecrã) ou em **Entrar com Google** (ou Microsoft, ou Apple): abre-se o navegador do telemóvel, entras lá e ele traz-te de volta à app. À primeira vez com Google, Microsoft ou Apple, marca a caixa que autoriza criar uma conta nova; se te esqueceres, a app diz e tentas de novo. As chaves de acesso precisam do Android 14 ou mais recente.
 4. Escolhe o jogo, preenche o formulário e toca em **Fazer a inscrição**.
 5. A app guarda o teu **bilhete de check-in**. No campo, mostra o código QR dele a um marshal, ou em **Check-in no campo** escolhe a tua inscrição em **Inscrição online**.
 
@@ -275,7 +275,9 @@ Não partilhes o bilhete. Quem o tiver pode fazer o check-in no teu lugar. Podes
 
 **O teu histórico de jogos.** Depois de entrares, toca em **Histórico de jogos** para ver os jogos em que participaste, do mais recente para o mais antigo. Toca num jogo para ver as pontuações, a equipa vencedora e os teus eventos. A app não guarda nada: pergunta ao site de cada vez.
 
-A app ainda não cria contas. Pergunta à organização do campo como obter uma.
+**As tuas formas de entrar.** Depois de entrares, toca em **Formas de entrar na conta** para ligar ou desligar Google, Microsoft ou Apple, juntar, mudar o nome ou remover chaves de acesso, definir, mudar ou remover a palavra-passe e ligar ou desligar o código de autenticação. A conta fica sempre com pelo menos uma forma de entrar, e a app diz por palavras quando uma coisa é recusada. Uma conta com palavra-passe pede-a no topo do ecrã antes de cada alteração; uma conta sem ela pede primeiro uma confirmação com um código de autenticação, uma chave de acesso ou o fornecedor, e depois repete-se a ação. Se uma entrada social abre o navegador do telemóvel mas nunca volta à app, o site ainda não foi preparado para a app: usa a palavra-passe e avisa a organização.
+
+A app entra numa conta que já existe, ou cria uma com Google, Microsoft ou Apple (com a caixa marcada). Ainda não cria uma conta com palavra-passe. Pergunta à organização do campo como obter uma.
 
 ## 9. Sair de um jogo e os teus dados
 

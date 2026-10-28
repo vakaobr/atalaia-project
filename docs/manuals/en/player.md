@@ -234,7 +234,7 @@ Sharing your position is optional. Your position goes to the field controller on
 
 **Which floor are you on?** If the field has several floors, a row of buttons appears under the switch while you share: the floors' names (for example **Ground**, **Level 1**) and **Not sure**. Your phone cannot tell floors apart, so say it once; it is kept while you play, and it goes with your GPS position so your team sees you on the right floor. Choose **Not sure** if you do not know: nobody guesses it for you. Indoors, the room's beacon gives the floor and the buttons give way to *Your floor comes from the room beacon*.
 
-**The field map.** If the organisers put the field's plan on the controller, a **Field map** card shows it: the plan, the places the organisers marked for you (safe zones, respawns, car park, first aid, objectives, your team's headquarters), the field's boundary as an outline with the outside dimmed, and the positions you may see: you (a ringed dot), and the others in their team's colour. With several floors, buttons choose the floor shown; it opens on yours. A hollow dot is a player who has not said which floor they are on. Under the map it counts positions that are not on this plan (a beacon the organisers did not place, a position off the plan). A short list under the map names each kind of place. The map shows only what the controller sends you: another team's places and positions are not there. There is no street map, only the plan; a field with no plan shows no card.
+**The field map.** If the organisers put the field's plan on the controller, a **Field map** card shows it (with their grid over it, if they turned one on: thin lines with letters down the side and numbers along the top, and under the map **Your cell: C4**, so you can say where you are on the radio): the plan, the places the organisers marked for you (safe zones, respawns, car park, first aid, objectives, your team's headquarters), the field's boundary as an outline with the outside dimmed, and the positions you may see: you (a ringed dot), and the others in their team's colour. With several floors, buttons choose the floor shown; it opens on yours. A hollow dot is a player who has not said which floor they are on. Under the map it counts positions that are not on this plan (a beacon the organisers did not place, a position off the plan). A short list under the map names each kind of place. The map shows only what the controller sends you: another team's places and positions are not there. There is no street map, only the plan; a field with no plan shows no card.
 
 If the organisers drew the **field boundary**, the app watches it **on your phone**. Nothing about it is sent to anyone.
 
@@ -267,7 +267,7 @@ Some fields let you register for a game on their site, with an account.
 
 1. Open the field's game page in a browser. Tap **Register**, then **Open in the Atalaia app**. Or in the app: **Player › Online registration**, paste the page's address and tap **Open**.
 2. The app shows the site's name and asks if it is the right one. Tap **This is the site, go on**.
-3. Log in with your **Username** and **Password**. If your account has two-step verification, type the 6-digit code.
+3. Log in with your **Username** and **Password**. If your account has two-step verification, type the 6-digit code. If the site offers them, you can instead tap **Log in with a passkey** (the phone asks for your fingerprint, face or screen lock), or **Log in with Google** (or Microsoft, or Apple): the phone's browser opens, you sign in there and it brings you back to the app. The very first time with Google, Microsoft or Apple, tick the box that agrees to a new account being made; if you forget, the app says so and you try again. Passkeys need Android 14 or newer.
 4. Pick the game, fill in the form and tap **Register**.
 5. The app keeps your **check-in ticket**. At the field, show its QR code to a marshal, or at **Check in at the field** pick your registration under **Online registration**.
 
@@ -275,7 +275,9 @@ Do not share the ticket. Whoever has it can check in in your place. You can chan
 
 **Your game history.** After you log in, tap **Game history** to see the games you played, newest first. Tap a game for its scores, the winner and your own events. The app keeps nothing: it asks the site each time.
 
-The app cannot create an account yet. Ask the field's organisers how to get one.
+**Your login methods.** After you log in, tap **Ways to log in to the account** to link or unlink Google, Microsoft or Apple, add, rename or remove passkeys, set, change or remove your password, and turn the authenticator code on or off. The account keeps at least one way to log in, and the app tells you in words when something is refused. An account with a password asks for it at the top of the screen before each change; an account without one asks you to confirm first with an authenticator code, a passkey or the provider, then repeat the action. If a social login opens the phone's browser but never comes back to the app, the site was not set up for the app yet: use the password, and tell the organisers.
+
+The app can log you in to an account that already exists, or make one with Google, Microsoft or Apple (with the box ticked). It cannot yet create a password account. Ask the field's organisers how to get one.
 
 ## 9. Leave a game and your data
 

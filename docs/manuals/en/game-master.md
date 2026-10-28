@@ -162,7 +162,7 @@ Optional, but the boundary is what makes players' phones warn them when they lea
 2. Upload a picture with **Upload field image** (PNG, JPEG or WebP, up to 4 MB), or tap **Load the field from a map**. That page needs the internet while you set the game up. Find the field, mark the corners of its outline (3 to 12) and tap **Draw the field image**, then **Use as the field**. It saves the picture, its place on the map and the **field boundary**. The controller needs no internet for this.
 3. **Drag the boxes** to where they are on the field.
 4. **Multi-story building**: tick it for a building with several floors. Each floor has its own plan.
-5. **Grid on the map**: turn it on for lettered rows and numbered columns, so people can say "I'm in C4" on the radio.
+5. **Grid on the map**: turn it on for lettered rows and numbered columns, so people can say "I'm in C4" on the radio. The players' app draws the same grid over the plan in its **Field map** and tells each player their cell.
 6. **Map features**: mark safe zones, respawns, HQs, the car park, first aid and objectives. Choose who sees each one: everyone, one team or the organisers only.
 7. **Map position (ATAK)**: give two opposite corners of the image their latitude and longitude, to show the boxes on ATAK maps.
 8. **Indoor beacons**: for a building with Bluetooth beacons, see [Indoor beacons](#indoor-beacons) below.
