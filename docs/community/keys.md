@@ -22,6 +22,42 @@ P5G-2, P5G-3 and P5G-7.
 The project's registry key is a separate key from the firmware release keys, so
 day-to-day reviews never need the key that can replace a box's firmware.
 
+## The project's keys
+
+Since 2026-10-28 the project has **two** registry keys, both listed in the
+registry's `keys/project/` and built into the Field Box firmware's default
+`CONFIG_ATALAIA_MODE_KEYS` and the Android app's default mode keys:
+
+| Key | Key id | Public key (base64) | Where it lives | Used for |
+| --- | --- | --- | --- | --- |
+| **Root** | `d9521a79030ce544` | `I+m3rO++TcVNhvDHzI28pkNA8UGoTJSi84IWQguq4Mo=` | offline, with the maintainer only (as below); its passphrase kept apart | signing by hand when the CI key cannot be used, and re-signing every badge if the CI key is ever revoked |
+| **CI** | `7275108d2e3fe583` | `0nMp0OGboGJZUMsbc/ykqkxQFNdmI/a2k4nQ6YsdTIY=` | the registry's GitHub secrets `ATALAIA_PROJECT_CI_KEY` (encrypted PEM) and `ATALAIA_PROJECT_CI_KEY_PASSPHRASE` | the verified badge, from the registry's *Verified badge* workflow, which a maintainer starts by hand and which opens a pull request |
+
+Hex, for `--mode-keys` and `CONFIG_ATALAIA_MODE_KEYS`:
+`23e9b7acefbe4dc54d86f0c7cc8dbca64340f141a84c94a2f38216420baae0ca`
+(root) and
+`d27329d0e19ba0625950cb1b73fca4aa4c5014d76623f6b69389d0e98b1d4c86` (CI).
+
+This is a deliberate exception to "never in a CI secret" below, chosen by the
+maintainer (2026-10-28) so that badges can be signed without the root key
+leaving its offline media. What it means:
+
+- **Who can sign with the CI key:** whoever can start the registry's workflows
+  (write access to `vakaobr/atalaia-modes`) or change them, and whoever takes
+  over such an account. Pull requests from forks never see the secret.
+- **If the CI key may be exposed:** add it to the registry's `keys/revoked.json`
+  (field controllers then refuse what it signed, and a box only gets modes from
+  its controller), delete both secrets, make a new CI key and sign the badges
+  again with it (or with the root key). The next firmware and app releases drop
+  the old CI key from their defaults; until a box runs that firmware it still
+  trusts the old key, but only for packages its own controller offers.
+- **The root key** never goes into a secret, a repository or a chat. If both
+  keys were lost, boxes would need a firmware release with new keys.
+
+A field controller trusts the project's packages for its own installs only by
+listing these keys in `[modes] keys` (`controller/controller.example.toml`);
+`[modes] box_keys` defaults to them, as the firmware does.
+
 ## Making and keeping a key
 
 ```sh
@@ -35,7 +71,8 @@ It asks for a passphrase (PKCS#8, encrypted), writes the private key with mode
   store). A lost key cannot sign a new version of your modes: you would add a
   new key (below).
 - **Never** put it in a repository, a CI secret, a chat or a ticket. Signing
-  happens on your own computer.
+  happens on your own computer. (The project's CI key is the one exception,
+  above.)
 - **The project's registry key** lives only on offline media held by the
   maintainer, with a second copy in a separate place, and is used on a computer
   that is not the maintainer's daily one where possible. Its passphrase is not

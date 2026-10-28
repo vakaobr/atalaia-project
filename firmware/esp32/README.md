@@ -460,7 +460,7 @@ Firmware update options (under "Firmware updates (OTA)", the Field Box only):
 - `ATALAIA_OTA_MIN_BATTERY_PCT` -- refuse an update below this level (default 30; with a MAX17048 only)
 
 Mode package options (under "Mode packages", the Field Box only):
-- `ATALAIA_MODE_KEYS` -- the Ed25519 public keys (64 hex digits each, up to 4) that sign the mode packages a box fetches for a game; empty (the default): a join asking to fetch a missing mode is answered *no mode*, as before (`tools/mode_package.py keygen` prints the line)
+- `ATALAIA_MODE_KEYS` -- the Ed25519 public keys (64 hex digits each, up to 4) that sign the mode packages a box fetches for a game; the default is the project's two registry keys, root `d9521a79030ce544` and CI `7275108d2e3fe583` ([docs/community/keys.md](../../docs/community/keys.md)); empty: a join asking to fetch a missing mode is answered *no mode* (`tools/mode_package.py keygen` prints the line)
 - `ATALAIA_OTA_WIFI_TIMEOUT_S` -- how long to wait for the field Wi-Fi (default 20)
 
 The firmware variant is a choice at the top of the menu: `ATALAIA_NODE_MODE`

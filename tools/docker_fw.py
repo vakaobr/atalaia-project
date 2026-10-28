@@ -36,7 +36,7 @@ a shallow clone, which cannot count, the core's version and the commit: 0.3.0-de
                                                tools/firmware_release.py keygen prints them.
     --mode-keys=<hex or base64>[,...]          the mode public keys a box accepts fetched mode
                                                packages from (CONFIG_ATALAIA_MODE_KEYS; default:
-                                               none, and the box fetches no modes). Public keys
+                                               the project's two registry keys). Public keys
                                                only: tools/mode_package.py pubkey prints them.
 All three apply to that build folder only, and are reset when left out.
 
@@ -76,6 +76,9 @@ from typing import Optional
 
 REPO = Path(__file__).resolve().parents[1]
 FW = REPO / "firmware" / "esp32"
+# The project's registry keys (root d9521a79030ce544, CI 7275108d2e3fe583; docs/community/keys.md):
+# the mode keys a build takes when --mode-keys is left out, like the Kconfig default.
+PROJECT_MODE_KEYS_HEX = "23e9b7acefbe4dc54d86f0c7cc8dbca64340f141a84c94a2f38216420baae0ca d27329d0e19ba0625950cb1b73fca4aa4c5014d76623f6b69389d0e98b1d4c86"
 VERSION_H = REPO / "core" / "include" / "atalaia" / "version.h"
 FW_VERSION_LEN = 31  # esp_app_desc_t's version (32 bytes with its NUL)
 IDF_IMAGE = "espressif/idf:v5.3.2"
@@ -258,7 +261,7 @@ def field_box_options(build_dir: str) -> tuple[str, ...]:
     keys_file = FW / build_dir / "sdkconfig.release_keys"
     text = ("# Written by tools/docker_fw.py (--release-keys): public keys only.\n"
             f'CONFIG_ATALAIA_OTA_RELEASE_KEYS="{FW_OPTIONS.get("release_keys", "")}"\n'
-            f'CONFIG_ATALAIA_MODE_KEYS="{FW_OPTIONS.get("mode_keys", "")}"\n')
+            f'CONFIG_ATALAIA_MODE_KEYS="{FW_OPTIONS.get("mode_keys", PROJECT_MODE_KEYS_HEX)}"\n')
     keys_file.parent.mkdir(parents=True, exist_ok=True)
     if not keys_file.exists() or keys_file.read_text() != text:
         keys_file.write_text(text)

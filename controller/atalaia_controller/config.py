@@ -137,7 +137,8 @@
     box_keys = []               # the mode keys (and release keys) built into the boxes' firmware
                                 # (CONFIG_ATALAIA_MODE_KEYS, CONFIG_ATALAIA_OTA_RELEASE_KEYS), at most 8:
                                 # only packages one of them signed are offered to boxes that lack a
-                                # game's mode (mode_fetch.py); empty: none is offered
+                                # game's mode (mode_fetch.py); empty: none is offered. Default: the
+                                # project's two registry keys, as the firmware's default
     fetch_timeout_s = 300.0     # a box fetching a game's modes not heard of this long has timed out;
                                 # until then the game waits for it (the GM may stop waiting)
 
@@ -170,6 +171,12 @@ from typing import Any, Mapping, Optional
 from atalaia_sim import eu868, regions
 
 from . import REPO_ROOT
+
+# The project's registry keys (docs/community/keys.md): root d9521a79030ce544, held offline by the
+# maintainer, and CI 7275108d2e3fe583, which signs the registry's verified badges. They are the
+# default of the boxes' CONFIG_ATALAIA_MODE_KEYS, so they are the default of [modes] box_keys too.
+# A field trusts them for its own installs only by listing them in [modes] keys.
+PROJECT_MODE_KEYS = ("I+m3rO++TcVNhvDHzI28pkNA8UGoTJSi84IWQguq4Mo=", "0nMp0OGboGJZUMsbc/ykqkxQFNdmI/a2k4nQ6YsdTIY=")
 
 SECTIONS = {
     "controller": ("node_id", "db_path", "modes_dirs", "failover_mode", "power_source",
@@ -290,7 +297,7 @@ class Config:
     modes_keys: list[str] = field(default_factory=list)
     modes_revoked: list[str] = field(default_factory=list)
     modes_index: str = ""
-    modes_box_keys: list[str] = field(default_factory=list)
+    modes_box_keys: list[str] = field(default_factory=lambda: list(PROJECT_MODE_KEYS))
     modes_fetch_timeout_s: float = 300.0
     # [adopt]
     adopt_usb: bool = True

@@ -37,13 +37,22 @@ const indexMaxBytes = 1000000;
 /// An index fetched this recently is not fetched again unless asked.
 const indexTtlS = 300.0;
 
+/// The project's registry keys (docs/community/keys.md): root
+/// d9521a79030ce544, held offline, and CI 7275108d2e3fe583. The default of
+/// the boxes' firmware keys, so the default of [ModesConfig.boxKeys], as on
+/// the Pi (`PROJECT_MODE_KEYS` in config.py).
+const projectModeKeys = [
+  'I+m3rO++TcVNhvDHzI28pkNA8UGoTJSi84IWQguq4Mo=',
+  '0nMp0OGboGJZUMsbc/ykqkxQFNdmI/a2k4nQ6YsdTIY=',
+];
+
 /// The Pi's `[modes]` settings on a phone controller.
 final class ModesConfig {
   const ModesConfig({
     this.keys = const [],
     this.revoked = const [],
     this.index = '',
-    this.boxKeys = const [],
+    this.boxKeys = projectModeKeys,
     this.fetchTimeoutS = 300,
   });
 
@@ -80,7 +89,9 @@ final class ModesConfig {
       keys: list(j['keys']),
       revoked: list(j['revoked']),
       index: j['index'] is String ? j['index'] as String : '',
-      boxKeys: list(j['box_keys']),
+      boxKeys: j.containsKey('box_keys')
+          ? list(j['box_keys'])
+          : projectModeKeys,
       fetchTimeoutS: t is num ? t.toDouble() : 300,
     );
   }

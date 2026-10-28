@@ -49,8 +49,14 @@ import 'mode_catalog.dart';
 const propModeKeysMax = 4;
 
 /// The mode keys built into this build, space-separated base64 given as
-/// `--dart-define=ATALAIA_MODE_KEYS=...`; none in a build without them.
-const builtInModeKeys = String.fromEnvironment('ATALAIA_MODE_KEYS');
+/// `--dart-define=ATALAIA_MODE_KEYS=...`; by default the project's two
+/// registry keys, root d9521a79030ce544 and CI 7275108d2e3fe583
+/// (docs/community/keys.md), as in the Field Box's firmware.
+const builtInModeKeys = String.fromEnvironment(
+  'ATALAIA_MODE_KEYS',
+  defaultValue:
+      'I+m3rO++TcVNhvDHzI28pkNA8UGoTJSi84IWQguq4Mo= 0nMp0OGboGJZUMsbc/ykqkxQFNdmI/a2k4nQ6YsdTIY=',
+);
 
 /// The keys a prop trusts for a mode package: those built in, then the
 /// settings' ([builtIn] is for tests), valid ones only, once each.

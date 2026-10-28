@@ -676,7 +676,7 @@ menu "Atalaia Field Box Configuration"
 
         config ATALAIA_MODE_KEYS
             string "Mode public keys (64 hex digits each, separated by spaces)"
-            default ""
+            default "23e9b7acefbe4dc54d86f0c7cc8dbca64340f141a84c94a2f38216420baae0ca d27329d0e19ba0625950cb1b73fca4aa4c5014d76623f6b69389d0e98b1d4c86"
             help
                 The Ed25519 public keys whose signatures this firmware accepts
                 on a mode package a game needs and the box lacks, fetched from
@@ -687,6 +687,8 @@ menu "Atalaia Field Box Configuration"
                 `python3 tools/mode_package.py keygen` prints this line.
                 Empty: every package is refused ("no_key") and a game whose
                 mode the box lacks is answered "no mode", as before.
+                Default: the project's two registry keys, root d9521a79030ce544
+                and CI 7275108d2e3fe583 (docs/community/keys.md).
     endmenu
 
     # ---- Firmware updates over the air (protocol/firmware-update.md) --------
