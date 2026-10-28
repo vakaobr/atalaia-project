@@ -341,6 +341,11 @@ class ConsoleFilesTests(unittest.TestCase):
                  .replace("'", "").replace(" ", "").split(",")}
         keys |= {f"visibility_{v}" for v in ("public", "team", "squad", "hidden")}
         keys |= {f"lang_{v}" for v in ("pt", "en", "de", "zh-tw")}  # the language dropdown (PKB-9)
+        # The name and description blocks per i18n language, built from TRANSLATIONS (SCL-1).
+        suffixes = re.findall(r"\['[a-z-]+', '([a-z_]+)'\]",
+                              re.search(r"export const TRANSLATIONS = \[(.*?)\];", js).group(1))
+        self.assertEqual(suffixes, ["pt", "de", "zh_tw"])
+        keys |= {f"{what}_{s}" for what in ("name", "description") for s in suffixes}
         self.assertGreater(len(keys), 60)
         for lang in ("pt", "en"):
             d = json.loads((SRC / "i18n" / f"{lang}.json").read_text(encoding="utf-8"))["scenario_blocks"]
