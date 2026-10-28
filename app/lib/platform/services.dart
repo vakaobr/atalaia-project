@@ -187,6 +187,28 @@ abstract interface class FileSharer {
   Future<bool> sharePng(List<SharedFile> files, {String title = ''});
 }
 
+/// A file the user picked: its plain [name] and its [bytes] (at most the
+/// limit asked for, plus one byte, so that a file over it can be told).
+final class PickedFile {
+  const PickedFile(this.name, this.bytes);
+  final String name;
+  final Uint8List bytes;
+}
+
+/// Android's file chooser (FilePickerPlugin.kt: ACTION_OPEN_DOCUMENT, so no
+/// storage permission is asked), for the phone controller's registration
+/// import (decision PIM-1). Not on every platform: [available] says.
+abstract interface class FilePicker {
+  Future<bool> get available;
+
+  /// Opens the chooser for files of [mimes]; null when the user cancels or
+  /// the file cannot be read. At most [maxBytes] + 1 bytes are read.
+  Future<PickedFile?> pick({
+    required List<String> mimes,
+    required int maxBytes,
+  });
+}
+
 /// The field's Wi-Fi for a phone that is the field controller (slice S6 of
 /// PE24; FieldWifiPlugin.kt): what network the phone is on, its hotspot,
 /// Android's settings for both, and a local-only hotspot the app starts

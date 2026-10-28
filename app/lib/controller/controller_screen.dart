@@ -29,6 +29,7 @@ import '../ui/qr_painter.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'controller_boxes_screen.dart';
+import 'controller_import_screen.dart';
 import 'controller_tags_screen.dart';
 import 'controller_shell.dart';
 import 'controller_signed_modes.dart';
@@ -273,6 +274,12 @@ class _ControllerScreenState extends State<ControllerScreen> {
               SectionTitle(s.t('ctl.tags')),
               ..._tags(context, s),
             ],
+            // Decision PIM-1: a registration list imported into the live
+            // game's check-in list, as the GM console's import panel does.
+            if (_shell.running && _shell.status?.httpPort != null) ...[
+              SectionTitle(s.t('ctl.import')),
+              ..._import(context, s),
+            ],
             SectionTitle(s.t('ctl.firmware')),
             FirmwareKeysTile(onChanged: _firmwareKeysChanged),
           ],
@@ -311,6 +318,42 @@ class _ControllerScreenState extends State<ControllerScreen> {
                   id,
                   player: player,
                   team: team,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _import(BuildContext context, Strings s) {
+    final st = _shell.status!;
+    final game = st.game;
+    if (game == null || game['state'] == 'ended') {
+      return [Text(s.t('ctl.import_none'), key: const Key('ctl-import-none'))];
+    }
+    final id = game['id']! as int;
+    return [
+      Text(s.t('ctl.import_hint')),
+      const SizedBox(height: 8),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          key: const Key('ctl-import'),
+          icon: const Icon(Icons.upload_file),
+          label: Text(s.t('ctl.import_open')),
+          onPressed: () => Navigator.push<void>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ControllerImportScreen(
+                gameId: id,
+                gameName: '${game['name']}',
+                request: (body) => requestRegistrationImport(
+                  st.httpPort!,
+                  st.gmToken,
+                  id,
+                  body,
                 ),
               ),
             ),

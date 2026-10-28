@@ -14,7 +14,7 @@ import io.flutter.embedding.engine.FlutterEngineCache
  * phase D) on the Flutter engine, each on its own channel (lib/platform/
  * channels.dart, lib/pod/pod_transports.dart), and forwards the activity
  * events they need: resume and pause (NFC reader mode), permission answers
- * and activity results (the QR scanner), and links that open the app
+ * and activity results (the QR scanner, the file chooser), and links that open the app
  * (LinkPlugin: the site server's register page, decision S16-13, and a
  * social login's return, decision PKA-1).
  *
@@ -31,6 +31,7 @@ class MainActivity : FlutterActivity() {
     private var device: DevicePlugin? = null
     private var nfc: NfcPlugin? = null
     private var qr: QrScanPlugin? = null
+    private var files: FilePickerPlugin? = null
     private var usb: UsbPodPlugin? = null
     private var ble: BlePodPlugin? = null
     private var links: LinkPlugin? = null
@@ -60,6 +61,7 @@ class MainActivity : FlutterActivity() {
         KeystorePlugin(messenger)
         links = LinkPlugin(messenger, intent)
         ShareFilePlugin(this, messenger)
+        files = FilePickerPlugin(this, messenger)
         BrowserPlugin(this, messenger)
         PasskeyPlugin(this, messenger)
         // The pod's links and the local hotspot belong to the engine: an
@@ -118,6 +120,7 @@ class MainActivity : FlutterActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         qr?.onActivityResult(requestCode, resultCode, data)
+        files?.onActivityResult(requestCode, resultCode, data)
     }
 
     private class EngineLinks(

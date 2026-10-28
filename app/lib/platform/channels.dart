@@ -236,6 +236,34 @@ class ChannelFileSharer implements FileSharer {
       });
 }
 
+/// Android's file chooser (FilePickerPlugin.kt). A missing plugin (iOS, the
+/// web, a widget test) is "not available", never a crash.
+class ChannelFilePicker implements FilePicker {
+  static const _ch = MethodChannel('$_prefix/files');
+
+  @override
+  Future<bool> get available => _call<bool>(_ch, 'available', false);
+
+  @override
+  Future<PickedFile?> pick({
+    required List<String> mimes,
+    required int maxBytes,
+  }) async {
+    try {
+      final r = await _call<Map<Object?, Object?>>(_ch, 'pick', const {}, {
+        'mimes': mimes,
+        'max_bytes': maxBytes,
+      });
+      final name = r['name'];
+      final bytes = r['bytes'];
+      if (name is! String || bytes is! Uint8List) return null;
+      return PickedFile(name, bytes);
+    } on PlatformException {
+      return null;
+    }
+  }
+}
+
 /// The AndroidKeyStore's AES-GCM key (KeystorePlugin.kt). A missing plugin
 /// (iOS, the web, a widget test) is "not available", never a crash.
 class ChannelSecretVault implements SecretVault {

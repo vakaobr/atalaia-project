@@ -180,6 +180,26 @@ class FakeSharer implements FileSharer {
   }
 }
 
+/// The file chooser: hands out [next] (null: the user cancels).
+class FakePicker implements FilePicker {
+  FakePicker([this.next, this.isAvailable = true]);
+  PickedFile? next;
+  final bool isAvailable;
+  final asked = <(List<String>, int)>[];
+
+  @override
+  Future<bool> get available async => isAvailable;
+
+  @override
+  Future<PickedFile?> pick({
+    required List<String> mimes,
+    required int maxBytes,
+  }) async {
+    asked.add((mimes, maxBytes));
+    return next;
+  }
+}
+
 class FakeQr implements QrScanner {
   FakeQr([this.next]);
   String? next;

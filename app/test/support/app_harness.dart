@@ -46,6 +46,7 @@ class Harness {
     this.authBrowser,
     this.passkeys,
     this.share,
+    this.picker,
     this.location,
     this.beacons,
     this.controllerLauncher,
@@ -79,6 +80,7 @@ class Harness {
   final AuthBrowser? authBrowser;
   final PasskeyService? passkeys;
   final FileSharer? share;
+  final FilePicker? picker;
 
   /// A fake field controller for check-in (test/support/fake_field.dart).
   final FieldHttp Function(PinnedField field)? fieldHttp;
@@ -120,6 +122,7 @@ class Harness {
     authBrowser: authBrowser,
     passkeys: passkeys,
     share: share,
+    picker: picker,
     location: location,
     beacons: beacons,
     wifi: wifi,
@@ -194,6 +197,7 @@ Harness harness({
   AuthBrowser? authBrowser,
   PasskeyService? passkeys,
   FileSharer? share,
+  FilePicker? picker,
   LocationService? location,
   BeaconScanService? beacons,
   ControllerLauncher? controllerLauncher,
@@ -213,6 +217,7 @@ Harness harness({
   authBrowser: authBrowser,
   passkeys: passkeys,
   share: share,
+  picker: picker,
   location: location,
   beacons: beacons,
   controllerLauncher: controllerLauncher,

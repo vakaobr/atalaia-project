@@ -1394,4 +1394,91 @@ const Map<String, String> ptStrings = {
   'site.err.membership_missing_m':
       'Este campo exige o número de associado para a inscrição.',
   'site.err.apd_not_accepted_m': 'Este campo não aceita essa associação.',
+  // The registration import on the phone controller's own screen (decision PIM-1);
+  // the file and row texts are the console's (checkin_import in its i18n).
+  'ctl.import': 'Lista de inscrições',
+  'ctl.import_hint':
+      'Para um campo sem servidor do campo: importe uma lista de inscrições (CSV ou JSON) de outra plataforma como as pessoas esperadas deste jogo. Verifique primeiro; nada muda até se importar.',
+  'ctl.import_open': 'Importar uma lista de inscrições',
+  'ctl.import_none':
+      'Inicie um jogo para importar uma lista de inscrições para ele.',
+  'ctl_import.pick': 'Escolher um ficheiro',
+  'ctl_import.pick_again': 'Escolher outro ficheiro',
+  'ctl_import.picked': 'Ficheiro: {name}',
+  'ctl_import.no_file': 'Ainda nenhum ficheiro escolhido.',
+  'ctl_import.no_picker':
+      'Este telemóvel não consegue abrir aqui um seletor de ficheiros. Importe a lista na consola do GM, num navegador.',
+  'ctl_import.offline': 'O controlador não respondeu. Está a funcionar?',
+  'ctl_import.failed': 'O controlador recusou a lista: {detail}',
+  'ctl_import.rows_more': 'Mais {n} linhas não são mostradas.',
+  'ctl_import.title': 'Importar uma lista de inscrições',
+  'ctl_import.intro':
+      'Para um campo sem servidor do campo: uma lista de inscrições de outra plataforma (CSV ou JSON, no formato de importação do servidor do campo) passa a ser as pessoas esperadas deste jogo, e um marshal assinala cada pessoa à chegada. Só se leem display_name, external_ref, team_preference, federation_number e replicas; qualquer outra coluna (um email, um telefone) é apenas nomeada, nunca lida.',
+  'ctl_import.source': 'Origem',
+  'ctl_import.source_hint':
+      'O nome da outra plataforma (a-z, 0-9, ponto, hífen, sublinhado). A mesma origem e o mesmo external_ref atualizam o mesmo jogador.',
+  'ctl_import.basis':
+      'O campo é responsável pela lista: tem base legal própria para guardar os dados destas pessoas.',
+  'ctl_import.check': 'Verificar o ficheiro',
+  'ctl_import.run': 'Importar',
+  'ctl_import.order': 'Verifica-se primeiro: nada muda até se importar.',
+  'ctl_import.checked': 'Verificado, ainda nada importado.',
+  'ctl_import.imported': 'Importado.',
+  'ctl_import.counts':
+      '{rows} linhas: {created} novas, {updated} alteradas, {unchanged} iguais, {skipped} ignoradas, {refused} recusadas.',
+  'ctl_import.ignored': 'Colunas não lidas: {names}',
+  'ctl_import.more': 'e mais {n}',
+  'ctl_import.missing':
+      '{n} pessoas importadas que ainda não chegaram não estão neste ficheiro (ficam).',
+  'ctl_import.row': 'Linha',
+  'ctl_import.result': 'Resultado',
+  'ctl_import.line': 'linha {n}',
+  'ctl_import.done': 'Importado: {created} novos, {updated} alterados.',
+  'ctl_import.results.created': 'novo',
+  'ctl_import.results.updated': 'alterado',
+  'ctl_import.results.unchanged': 'igual',
+  'ctl_import.results.skipped': 'ignorado',
+  'ctl_import.results.refused': 'recusado',
+  'ctl_import.codes.empty': 'o ficheiro está vazio',
+  'ctl_import.codes.display_name_column_missing': 'falta a coluna display_name',
+  'ctl_import.codes.column_twice': 'uma coluna repetida',
+  'ctl_import.codes.encoding_invalid': 'o ficheiro não é texto UTF-8',
+  'ctl_import.codes.csv_invalid': 'CSV inválido',
+  'ctl_import.codes.json_invalid': 'JSON inválido (uma lista de objetos)',
+  'ctl_import.codes.too_large': 'o ficheiro tem mais de 1 MiB',
+  'ctl_import.codes.too_many_rows': 'mais de 5 000 linhas',
+  'ctl_import.codes.format_invalid': 'não é um ficheiro CSV ou JSON',
+  'ctl_import.codes.source_invalid':
+      'a origem não é válida (a-z, 0-9, ponto, hífen, sublinhado; não "site")',
+  'ctl_import.codes.basis_not_confirmed':
+      'confirme-se que o campo tem base própria para a lista',
+  'ctl_import.codes.game_ended': 'o jogo terminou',
+  'ctl_import.codes.row_length':
+      'a linha não tem tantas células como o cabeçalho',
+  'ctl_import.codes.row_not_object': 'não é um objeto',
+  'ctl_import.codes.display_name_invalid':
+      'falta o nome ou não tem 1 a 32 carateres numa só linha',
+  'ctl_import.codes.external_ref_invalid':
+      'external_ref com mais de 128 carateres',
+  'ctl_import.codes.team_preference_invalid': 'não é uma equipa deste jogo',
+  'ctl_import.codes.federation_number_invalid':
+      'número com mais de 32 carateres',
+  'ctl_import.codes.federation_number_required': 'este campo pede o número',
+  'ctl_import.codes.replicas_invalid':
+      'réplicas fora do formato tipo:classe[:marca e modelo]|…',
+  'ctl_import.codes.replicas_not_asked':
+      'este jogo não aceita réplicas declaradas',
+  'ctl_import.codes.too_many_replicas': 'mais réplicas do que o campo permite',
+  'ctl_import.codes.replica_type_invalid': 'tipo de réplica desconhecido',
+  'ctl_import.codes.replica_class_invalid':
+      'classe de réplica fora dos limites do campo',
+  'ctl_import.codes.make_model_invalid':
+      'marca e modelo com mais de 64 carateres',
+  'ctl_import.codes.external_ref_twice': 'external_ref repetido no ficheiro',
+  'ctl_import.codes.already_arrived': 'já chegou: não se altera',
+  'ctl_import.codes.removed': 'removido: não se altera',
+  'ctl_import.codes.no_external_ref':
+      'sem external_ref: acrescenta-se de novo de cada vez',
+  'ctl_import.codes.federation_number_dropped':
+      'número não guardado: este campo não pede nenhum',
 };

@@ -1359,4 +1359,87 @@ const Map<String, String> enStrings = {
   'site.err.membership_missing_m':
       'This field needs your membership number to register.',
   'site.err.apd_not_accepted_m': 'This field does not accept that association.',
+  // The registration import on the phone controller's own screen (decision PIM-1);
+  // the file and row texts are the console's (checkin_import in its i18n).
+  'ctl.import': 'Registration list',
+  'ctl.import_hint':
+      'For a field with no site server: import a list of registrations (CSV or JSON) from another platform as this game\'s expected players. Check it first; nothing changes until you import.',
+  'ctl.import_open': 'Import a registration list',
+  'ctl.import_none': 'Start a game to import a registration list into it.',
+  'ctl_import.pick': 'Choose a file',
+  'ctl_import.pick_again': 'Choose another file',
+  'ctl_import.picked': 'File: {name}',
+  'ctl_import.no_file': 'No file chosen yet.',
+  'ctl_import.no_picker':
+      'This phone cannot open a file chooser here. Import the list from the GM console in a browser instead.',
+  'ctl_import.offline': 'The controller did not answer. Is it running?',
+  'ctl_import.failed': 'The controller refused the list: {detail}',
+  'ctl_import.rows_more': '{n} more rows are not shown.',
+  'ctl_import.title': 'Import a registration list',
+  'ctl_import.intro':
+      'For a field with no site server: a list of registrations from another platform (CSV or JSON, the site server\'s import format) becomes this game\'s expected players, and a marshal ticks each one when they arrive. Only display_name, external_ref, team_preference, federation_number and replicas are read; any other column (an email, a phone number) is only named, never read.',
+  'ctl_import.source': 'Source',
+  'ctl_import.source_hint':
+      'The other platform\'s name (a-z, 0-9, dot, dash, underscore). The same source and external_ref update the same player.',
+  'ctl_import.basis':
+      'This field is responsible for the list: it has its own legal basis for holding these players\' data.',
+  'ctl_import.check': 'Check the file',
+  'ctl_import.run': 'Import',
+  'ctl_import.order': 'Check first: nothing is changed until Import.',
+  'ctl_import.checked': 'Checked, nothing imported yet.',
+  'ctl_import.imported': 'Imported.',
+  'ctl_import.counts':
+      '{rows} rows: {created} new, {updated} changed, {unchanged} unchanged, {skipped} skipped, {refused} refused.',
+  'ctl_import.ignored': 'Columns not read: {names}',
+  'ctl_import.more': 'and {n} more',
+  'ctl_import.missing':
+      '{n} imported players that have not arrived are not in this file (they stay).',
+  'ctl_import.row': 'Row',
+  'ctl_import.result': 'Result',
+  'ctl_import.line': 'line {n}',
+  'ctl_import.done': 'Imported: {created} new, {updated} changed.',
+  'ctl_import.results.created': 'new',
+  'ctl_import.results.updated': 'changed',
+  'ctl_import.results.unchanged': 'unchanged',
+  'ctl_import.results.skipped': 'skipped',
+  'ctl_import.results.refused': 'refused',
+  'ctl_import.codes.empty': 'the file is empty',
+  'ctl_import.codes.display_name_column_missing': 'no display_name column',
+  'ctl_import.codes.column_twice': 'a column twice',
+  'ctl_import.codes.encoding_invalid': 'the file is not UTF-8 text',
+  'ctl_import.codes.csv_invalid': 'not valid CSV',
+  'ctl_import.codes.json_invalid': 'not valid JSON (an array of objects)',
+  'ctl_import.codes.too_large': 'the file is over 1 MiB',
+  'ctl_import.codes.too_many_rows': 'more than 5,000 rows',
+  'ctl_import.codes.format_invalid': 'not a CSV or JSON file',
+  'ctl_import.codes.source_invalid':
+      'the source is not valid (a-z, 0-9, dot, dash, underscore; not "site")',
+  'ctl_import.codes.basis_not_confirmed':
+      'confirm that this field has its own basis for the list',
+  'ctl_import.codes.game_ended': 'the game has ended',
+  'ctl_import.codes.row_length':
+      'the row does not have as many cells as the header',
+  'ctl_import.codes.row_not_object': 'not an object',
+  'ctl_import.codes.display_name_invalid':
+      'name missing or not 1-32 characters on one line',
+  'ctl_import.codes.external_ref_invalid': 'external_ref over 128 characters',
+  'ctl_import.codes.team_preference_invalid': 'not a team of this game',
+  'ctl_import.codes.federation_number_invalid': 'number over 32 characters',
+  'ctl_import.codes.federation_number_required':
+      'this field asks for the number',
+  'ctl_import.codes.replicas_invalid':
+      'replicas not as type:class[:make model]|…',
+  'ctl_import.codes.replicas_not_asked':
+      'this game does not take declared replicas',
+  'ctl_import.codes.too_many_replicas': 'more replicas than the field allows',
+  'ctl_import.codes.replica_type_invalid': 'replica type unknown',
+  'ctl_import.codes.replica_class_invalid':
+      'replica class not in the field\'s limits',
+  'ctl_import.codes.make_model_invalid': 'make and model over 64 characters',
+  'ctl_import.codes.external_ref_twice': 'external_ref twice in the file',
+  'ctl_import.codes.already_arrived': 'already arrived: not changed',
+  'ctl_import.codes.removed': 'removed: not changed',
+  'ctl_import.codes.no_external_ref': 'no external_ref: added again each time',
+  'ctl_import.codes.federation_number_dropped':
+      'number not kept: this field asks for none',
 };

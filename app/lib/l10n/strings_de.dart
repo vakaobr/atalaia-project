@@ -1426,4 +1426,91 @@ const Map<String, String> deStrings = {
   'site.err.membership_missing_m':
       'Dieses Feld braucht für die Anmeldung deine Mitgliedsnummer.',
   'site.err.apd_not_accepted_m': 'Dieses Feld akzeptiert diesen Verband nicht.',
+  // The registration import on the phone controller's own screen (decision PIM-1);
+  // the file and row texts are the console's (checkin_import in its i18n).
+  'ctl.import': 'Anmeldeliste',
+  'ctl.import_hint':
+      'Für ein Feld ohne Feldserver: Eine Anmeldeliste (CSV oder JSON) einer anderen Plattform als erwartete Spielende dieses Spiels importieren. Erst prüfen; bis zum Importieren ändert sich nichts.',
+  'ctl.import_open': 'Anmeldeliste importieren',
+  'ctl.import_none':
+      'Starte ein Spiel, um eine Anmeldeliste darin zu importieren.',
+  'ctl_import.pick': 'Datei wählen',
+  'ctl_import.pick_again': 'Andere Datei wählen',
+  'ctl_import.picked': 'Datei: {name}',
+  'ctl_import.no_file': 'Noch keine Datei gewählt.',
+  'ctl_import.no_picker':
+      'Dieses Telefon kann hier keine Dateiauswahl öffnen. Importiere die Liste stattdessen in der GM-Konsole in einem Browser.',
+  'ctl_import.offline': 'Der Controller hat nicht geantwortet. Läuft er?',
+  'ctl_import.failed': 'Der Controller hat die Liste abgelehnt: {detail}',
+  'ctl_import.rows_more': '{n} weitere Zeilen werden nicht angezeigt.',
+  'ctl_import.title': 'Anmeldeliste importieren',
+  'ctl_import.intro':
+      'Für ein Feld ohne Feldserver: Eine Anmeldeliste einer anderen Plattform (CSV oder JSON, im Importformat des Feldservers) wird zu den erwarteten Spielenden dieses Spiels, und ein Marshal hakt jede Person bei der Ankunft ab. Gelesen werden nur display_name, external_ref, team_preference, federation_number und replicas; jede andere Spalte (eine E-Mail, eine Telefonnummer) wird nur genannt, nie gelesen.',
+  'ctl_import.source': 'Quelle',
+  'ctl_import.source_hint':
+      'Der Name der anderen Plattform (a-z, 0-9, Punkt, Bindestrich, Unterstrich). Dieselbe Quelle und dasselbe external_ref aktualisieren dieselbe Person.',
+  'ctl_import.basis':
+      'Das Feld ist für die Liste verantwortlich: Es hat eine eigene Rechtsgrundlage, die Daten dieser Spielenden zu speichern.',
+  'ctl_import.check': 'Datei prüfen',
+  'ctl_import.run': 'Importieren',
+  'ctl_import.order': 'Erst prüfen: Bis zum Importieren ändert sich nichts.',
+  'ctl_import.checked': 'Geprüft, noch nichts importiert.',
+  'ctl_import.imported': 'Importiert.',
+  'ctl_import.counts':
+      '{rows} Zeilen: {created} neu, {updated} geändert, {unchanged} unverändert, {skipped} übersprungen, {refused} abgelehnt.',
+  'ctl_import.ignored': 'Nicht gelesene Spalten: {names}',
+  'ctl_import.more': 'und {n} weitere',
+  'ctl_import.missing':
+      '{n} importierte Spielende, die noch nicht angekommen sind, fehlen in dieser Datei (sie bleiben).',
+  'ctl_import.row': 'Zeile',
+  'ctl_import.result': 'Ergebnis',
+  'ctl_import.line': 'Zeile {n}',
+  'ctl_import.done': 'Importiert: {created} neu, {updated} geändert.',
+  'ctl_import.results.created': 'neu',
+  'ctl_import.results.updated': 'geändert',
+  'ctl_import.results.unchanged': 'unverändert',
+  'ctl_import.results.skipped': 'übersprungen',
+  'ctl_import.results.refused': 'abgelehnt',
+  'ctl_import.codes.empty': 'die Datei ist leer',
+  'ctl_import.codes.display_name_column_missing':
+      'die Spalte display_name fehlt',
+  'ctl_import.codes.column_twice': 'eine Spalte doppelt',
+  'ctl_import.codes.encoding_invalid': 'die Datei ist kein UTF-8-Text',
+  'ctl_import.codes.csv_invalid': 'kein gültiges CSV',
+  'ctl_import.codes.json_invalid':
+      'kein gültiges JSON (eine Liste von Objekten)',
+  'ctl_import.codes.too_large': 'die Datei ist größer als 1 MiB',
+  'ctl_import.codes.too_many_rows': 'mehr als 5.000 Zeilen',
+  'ctl_import.codes.format_invalid': 'keine CSV- oder JSON-Datei',
+  'ctl_import.codes.source_invalid':
+      'die Quelle ist ungültig (a-z, 0-9, Punkt, Bindestrich, Unterstrich; nicht "site")',
+  'ctl_import.codes.basis_not_confirmed':
+      'bestätigen, dass das Feld eine eigene Grundlage für die Liste hat',
+  'ctl_import.codes.game_ended': 'das Spiel ist beendet',
+  'ctl_import.codes.row_length':
+      'die Zeile hat nicht so viele Zellen wie die Kopfzeile',
+  'ctl_import.codes.row_not_object': 'kein Objekt',
+  'ctl_import.codes.display_name_invalid':
+      'Name fehlt oder nicht 1 bis 32 Zeichen in einer Zeile',
+  'ctl_import.codes.external_ref_invalid': 'external_ref über 128 Zeichen',
+  'ctl_import.codes.team_preference_invalid': 'kein Team dieses Spiels',
+  'ctl_import.codes.federation_number_invalid': 'Nummer über 32 Zeichen',
+  'ctl_import.codes.federation_number_required':
+      'dieses Feld verlangt die Nummer',
+  'ctl_import.codes.replicas_invalid':
+      'Repliken nicht im Format Typ:Klasse[:Marke und Modell]|…',
+  'ctl_import.codes.replicas_not_asked':
+      'dieses Spiel nimmt keine angegebenen Repliken an',
+  'ctl_import.codes.too_many_replicas': 'mehr Repliken, als das Feld erlaubt',
+  'ctl_import.codes.replica_type_invalid': 'Replikentyp unbekannt',
+  'ctl_import.codes.replica_class_invalid':
+      'Replikenklasse nicht in den Grenzwerten des Feldes',
+  'ctl_import.codes.make_model_invalid': 'Marke und Modell über 64 Zeichen',
+  'ctl_import.codes.external_ref_twice': 'external_ref doppelt in der Datei',
+  'ctl_import.codes.already_arrived': 'schon angekommen: nicht geändert',
+  'ctl_import.codes.removed': 'entfernt: nicht geändert',
+  'ctl_import.codes.no_external_ref':
+      'kein external_ref: wird jedes Mal neu hinzugefügt',
+  'ctl_import.codes.federation_number_dropped':
+      'Nummer nicht gespeichert: dieses Feld verlangt keine',
 };

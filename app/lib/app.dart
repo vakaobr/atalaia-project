@@ -81,6 +81,7 @@ class AppServices {
     this.authBrowser,
     this.passkeys,
     this.share,
+    this.picker,
     this.wifi,
     ControllerLauncher? controllerLauncher,
     ControllerAssetsLoader? controllerAssets,
@@ -132,6 +133,7 @@ class AppServices {
         authBrowser: ChannelAuthBrowser(),
         passkeys: ChannelPasskeyService(),
         share: ChannelFileSharer(),
+        picker: ChannelFilePicker(),
         wifi: ChannelFieldWifi(),
       );
 
@@ -205,6 +207,10 @@ class AppServices {
 
   /// The share sheet, for a replica's QR label as a PNG (null: none).
   final FileSharer? share;
+
+  /// Android's file chooser, for the phone controller's registration import
+  /// (null: none).
+  final FilePicker? picker;
 
   /// The field's Wi-Fi for the controller role (null: not available).
   final FieldWifiService? wifi;
