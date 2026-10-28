@@ -50,6 +50,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "apd_expiry": "com validade em dia",
         "apd_any": "qualquer APD",
         "apd_only": "aceites: {names}",
+        "apd_m": "Filiação numa associação",  # a field outside Portugal (decision MEM-4)
+        "apd_any_m": "qualquer associação",
         "local_time": "hora local, {zone}",
         "calendar": "Calendário",
         "feeds_text": "Os jogos deste campo para calendários e outros sites:",
@@ -127,6 +129,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "apd_expiry": "must be unexpired",
         "apd_any": "any APD",
         "apd_only": "accepted: {names}",
+        "apd_m": "Association membership",  # a field outside Portugal (decision MEM-4)
+        "apd_any_m": "any association",
         "local_time": "local time, {zone}",
         "calendar": "Calendar",
         "feeds_text": "This field's games for calendars and other sites:",
@@ -204,6 +208,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "apd_expiry": "muss gültig sein",
         "apd_any": "jede APD",
         "apd_only": "akzeptiert: {names}",
+        "apd_m": "Verbandsmitgliedschaft",  # a field outside Portugal (decision MEM-4)
+        "apd_any_m": "jeder Verband",
         "local_time": "Ortszeit, {zone}",
         "calendar": "Kalender",
         "feeds_text": "Die Spiele dieses Spielfelds für Kalender und andere Websites:",
@@ -285,6 +291,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "apd_expiry": "需在有效期內",
         "apd_any": "任何 APD",
         "apd_only": "接受：{names}",
+        "apd_m": "協會會員資格",  # a field outside Portugal (decision MEM-4)
+        "apd_any_m": "任何協會",
         "local_time": "當地時間，{zone}",
         "calendar": "行事曆",
         "feeds_text": "這個場地的遊戲，提供給行事曆和其他網站：",

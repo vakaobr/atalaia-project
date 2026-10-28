@@ -45,6 +45,7 @@ import hmac
 import io
 import json
 import logging
+import os
 import re
 import secrets
 import threading
@@ -92,8 +93,9 @@ IDENTITY_DAYS = 365
 CHRONO_RETENTION_DAYS = 365
 SITE_LIMITS_SETTING = "checkin.site_limits"  # the limit template the site server sent (BR24), as it sent it
 SETTINGS_KEYS = ("confirm", "federation", "federation_label", "max_replicas", "max_players",
-                 "chrono_valid_for", "apd")
+                 "chrono_valid_for", "apd", "country")
 APD_SITE_SETTING = "checkin.apd_site"  # the field's APD rule from the site server's settings (branding = "site")
+COUNTRY_SITE_SETTING = "checkin.country_site"  # ... and its country (JSON: a code or null; empty: the site sent none)
 IMPORT_NS = uuid.UUID("6f1b5f0e-3c1d-5a7e-9b44-0a7a1a1a0001")  # registration ids of an imported list (uuid5 of source + ref)
 IMPORT_LISTED = 100  # external refs listed as missing in an import's answer
 
@@ -408,6 +410,11 @@ class Checkin:
             changed += 1
             if not spec:
                 self.ctrl._emit({"type": "checkin_settings", "settings": self.settings(), "_staff": True})
+        if "country" in site and self.store.get_setting(COUNTRY_SITE_SETTING) != json.dumps(site["country"]):
+            self.store.set_setting(COUNTRY_SITE_SETTING, json.dumps(site["country"]))  # an older site sends none
+            changed += 1
+            if not spec:
+                self.ctrl._emit({"type": "checkin_settings", "settings": self.settings(), "_staff": True})
         template = site["limit_template"]
         if self.store.get_setting(SITE_LIMITS_SETTING) != json.dumps(template, sort_keys=True):
             self.limits = site_limits(template)
@@ -422,13 +429,20 @@ class Checkin:
                "federation_label": self.cfg.federation_label, "max_replicas": self.cfg.max_replicas,
                "max_players": self.cfg.max_players, "chrono_valid_for": self.cfg.chrono_valid_for}
         out["apd"] = self._local_apd()
+        out["country"] = self._local_country()
         saved = self.store.get_setting("checkin.settings")
         if saved:
             try:
-                out.update({k: v for k, v in json.loads(saved).items() if k in SETTINGS_KEYS and k != "apd"})
+                out.update({k: v for k, v in json.loads(saved).items() if k in SETTINGS_KEYS and k not in ("apd", "country")})
             except ValueError:
                 pass
         if getattr(self.cfg, "sync_branding", "local") == "site":
+            site_country = self.store.get_setting(COUNTRY_SITE_SETTING)
+            if site_country:
+                try:
+                    out["country"] = apdfmt.check_country(json.loads(site_country))
+                except (ValueError, apdfmt.ApdError):
+                    pass
             raw = self.store.get_setting(APD_SITE_SETTING)
             if raw:
                 try:
@@ -449,6 +463,39 @@ class Checkin:
                 pass
         return rule
 
+    def _zone_name(self) -> Optional[str]:
+        """The IANA name of the controller's time zone: the one it was given, else ``TZ``, ``/etc/timezone`` or
+        the ``/etc/localtime`` link; None when none is known."""
+        key = getattr(self._tz, "key", None)
+        if isinstance(key, str):
+            return key
+        if os.environ.get("TZ"):
+            return os.environ["TZ"].lstrip(":")
+        try:
+            return Path("/etc/timezone").read_text(encoding="utf-8").strip() or None
+        except OSError:
+            pass
+        try:
+            return os.path.realpath("/etc/localtime").split("zoneinfo/", 1)[1]
+        except (OSError, IndexError):
+            return None
+
+    def _local_country(self) -> Optional[str]:
+        """The field's country: the console's saved one, else ``[checkin] country``, else PT where the time zone is
+        Portugal's (decision MEM-2); None is unset. The site server's is laid over it."""
+        saved = self.store.get_setting("checkin.settings")
+        if saved:
+            try:
+                value = json.loads(saved).get("country")
+                if isinstance(value, str) and apdfmt.COUNTRY_RE.fullmatch(value):
+                    return value
+            except (ValueError, AttributeError):
+                pass
+        return self._config_country()
+
+    def _config_country(self) -> Optional[str]:
+        return self.cfg.country or apdfmt.default_country(self._zone_name())
+
     def set_site_apd(self, rule: Optional[dict[str, Any]]) -> None:
         """The field's APD rule from the site server (None: it sent none)."""
         self.store.set_setting(APD_SITE_SETTING, json.dumps(rule, sort_keys=True) if rule is not None else "")
@@ -468,8 +515,17 @@ class Checkin:
         if "apd" in spec and getattr(self.cfg, "sync_branding", "local") == "site" \
                 and self.store.get_setting(APD_SITE_SETTING):
             raise Conflict("the APD rule is the site server's ([sync] branding = \"site\"): change it there")
+        if "country" in spec and getattr(self.cfg, "sync_branding", "local") == "site" \
+                and self.store.get_setting(COUNTRY_SITE_SETTING):
+            raise Conflict("the country is the site server's ([sync] branding = \"site\"): change it there")
         cur = self.settings()
         local_apd = self._local_apd()
+        saved_country = None  # the console's own choice; None: the configured or default one
+        if (blob := self.store.get_setting("checkin.settings")):
+            try:
+                saved_country = json.loads(blob).get("country")
+            except (ValueError, AttributeError):
+                pass
         choices = {"confirm": ("auto", "staff"), "federation": ("off", "optional", "required"),
                    "chrono_valid_for": ("day", "game")}
         for k, v in spec.items():
@@ -482,6 +538,13 @@ class Checkin:
                     v = local_apd = apdfmt.check_rule(v)
                 except apdfmt.ApdError as exc:
                     raise ControllerError(f"apd: {exc}") from None
+            if k == "country":
+                code = v.strip().upper() if isinstance(v, str) else v
+                try:
+                    saved_country = apdfmt.check_country(code or None)
+                except apdfmt.ApdError:
+                    raise ControllerError("country: two letters (ISO 3166-1 alpha-2, e.g. PT) or empty") from None
+                v = saved_country or self._config_country()
             if k == "max_replicas" and (isinstance(v, bool) or not isinstance(v, int) or not 1 <= v <= 20):
                 raise ControllerError("max_replicas: 1-20")
             if k == "max_players" and (isinstance(v, bool) or not isinstance(v, int) or not 1 <= v <= 5000):
@@ -489,6 +552,7 @@ class Checkin:
             cur[k] = v.strip() if isinstance(v, str) else v
         saved = {k: cur[k] for k in SETTINGS_KEYS}
         saved["apd"] = local_apd
+        saved["country"] = saved_country
         self.store.set_setting("checkin.settings", json.dumps(saved))
         self.ctrl._emit({"type": "checkin_settings", "settings": cur, "_staff": True})
         return cur
@@ -652,20 +716,18 @@ class Checkin:
     def info(self) -> dict[str, Any]:
         """GET /api/v1/checkin: what a player's app needs before checking in. No names."""
         p = self.poster_fields()
+        st = self.settings()
         return {
             "version": 1,
             "field": {"id": self.cfg.field_id, "name": p["field_name"], "operator": self.cfg.operator or None},
             "notice": self.notice(),
-            "settings": {k: v for k, v in self.settings().items() if k != "max_players"},
+            "settings": {k: v for k, v in st.items() if k != "max_players"},
             "limits": {"id": self.limits["id"], "name": self.limits["name"],
                        "status": self.limits["status"], "classes": sorted(self.limits["classes"])},
             "replica_types": list(REPLICA_TYPES),
-            "apds": apdfmt.choices(self._settings_apd()),
+            "apds": apdfmt.choices(st["apd"], st["country"]),
             "games": self.open_games(),
         }
-
-    def _settings_apd(self) -> dict[str, Any]:
-        return self.settings()["apd"]
 
     # --- tokens ----------------------------------------------------------------
 
@@ -931,13 +993,15 @@ class Checkin:
                "seq": row["seq"], "registration_id": row.get("registration_id"),
                "registered": bool(row.get("registration_id"))}
         if names:
+            st = self.settings()
             out.update({"display_name": row["display_name"], "federation_number": row["federation_number"],
                         "federation_seen": row["federation_seen"], "team_preference": row["team_preference"],
                         "membership_number": row["federation_number"], "apd_id": row.get("apd_id"),
                         "membership_expires": row.get("membership_expires"),
                         "apd_override": bool(row.get("apd_override")),
-                        "apd_status": self._verdict(self.settings(), row.get("apd_id"), row["federation_number"],
-                                                    row.get("membership_expires"), self._wall())})
+                        "apd_status": self._verdict(st, row.get("apd_id"), row["federation_number"],
+                                                    row.get("membership_expires"), self._wall()),
+                        "country": st["country"]})  # the words of the verdict: protocol/apd.md
         if declarations:
             out["declarations"] = self._decl_views(game["id"], row["player_id"])
             if names:
@@ -1049,7 +1113,7 @@ class Checkin:
         arrived = [r for r in rows if r["status"] in ("pending", "checked_in")]
         st = self.settings()
         return {"game_id": game_id, "open": self.is_open(game_id), "settings": st,
-                "apds": apdfmt.choices(st["apd"]), "squads": int(game.get("squads") or 0),
+                "apds": apdfmt.choices(st["apd"], st["country"]), "squads": int(game.get("squads") or 0),
                 "counts": {s: counts.get(s, 0) for s in STATUSES}, "checkins": rows,
                 # Plan phase 16: registered players expected and arrived, and walk-ins (not registered).
                 "registrations": {"expected": counts.get("expected", 0),
@@ -1626,7 +1690,8 @@ class Checkin:
         players.sort(key=lambda p: (p["pending"] == 0, p["seq"]))
         return {"game_id": gid, "squads": int(game.get("squads") or 0),
                 "counts": {s: counts.get(s, 0) for s in ("pending", "passed", "refused")},
-                "chrono_valid_for": self.settings()["chrono_valid_for"], "players": players}
+                "chrono_valid_for": self.settings()["chrono_valid_for"], "country": self.settings()["country"],
+                "players": players}
 
     def pending_count(self, game_id: int) -> int:
         """Pending declarations of the players at the field (not of registered players who never came)."""

@@ -844,7 +844,12 @@ def check_field_settings(value: Any, path: str = "settings") -> Any:
     if value is None:
         return None
     st = _obj(value, path)
-    _keys(st, path, ("federation_label", "max_replicas", "limit_template"), ("apd",))
+    _keys(st, path, ("federation_label", "max_replicas", "limit_template"), ("apd", "country"))
+    if "country" in st:  # the field's country (protocol/apd.md): a code or null (unset); absent from an older site server's
+        try:
+            apdfmt.check_country(st["country"])
+        except apdfmt.ApdError:
+            _fail("bad_value", f"{path}.country")
     if "apd" in st:  # the field's APD membership rule (protocol/apd.md); absent from an older site server's
         st["apd"] = check_apd_rule(st["apd"], f"{path}.apd")
     label = _text(st["federation_label"], f"{path}.federation_label", FEDERATION_LABEL_MAX, null=True)

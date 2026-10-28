@@ -95,6 +95,8 @@ operator = ""                     # who runs the field: the data controller in t
 confirm = "auto"                  # or "staff": a marshal or the GM confirms each check-in
 federation = "off"                # or "optional", "required": the federation number, never verified
 federation_label = "FPA"
+country = ""                      # the field's country (PT, ES, ...); empty: PT where the time zone is Portugal's, else unset.
+                                  # PT shows "APD" texts, any other "association membership"; the list offers that country's entries
 apd_checkin = false               # check the player's APD membership (association, number, expiry) at check-in
 apd_expiry = false                # ... and require its expiry date and check it
 apd_accepted = []                 # APD ids accepted, e.g. ["x-meu-clube"]; empty: any (protocol/apd.md)

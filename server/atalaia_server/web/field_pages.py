@@ -47,6 +47,8 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from atalaia_controller import apd as apd_core
+
 from .. import tenancy
 from ..db import get_session
 from ..feeds import FeedField, ical, json_feed
@@ -242,12 +244,13 @@ def _details(page: Page, game: ScheduledGame, field: Field, now: datetime, regis
             shown.append(t["apd_checkin"])
         if rule["expiry"]:
             shown.append(t["apd_expiry"])
+        in_pt = apd_core.wording(field.country) == "apd"  # "APD" for a Portuguese field, else "association"
         if rule["accepted"] is None:
-            shown.append(t["apd_any"])
+            shown.append(t["apd_any" if in_pt else "apd_any_m"])
         else:
             names = {e["id"]: e["name"] for e in registration.project_apds() + rule["custom"]}
             shown.append(t["apd_only"].format(names=i18n.join([names.get(a, a) for a in rule["accepted"]], page.lang)))
-        rows.append((t["apd"], esc("; ".join(shown))))
+        rows.append((t["apd" if in_pt else "apd_m"], esc("; ".join(shown))))
     return "".join(f"<dt>{esc(k)}</dt><dd>{v}</dd>\n" for k, v in rows)
 
 

@@ -36,9 +36,16 @@ import 'site_link.dart';
 
 /// The text for a site server's error [code] (`game_full`), or the generic
 /// one with the code.
-String siteError(Strings s, SiteException e) => e.offline
+///
+/// A registration's membership errors say "APD" or "association" by the
+/// field's [country] (apdKey).
+String siteError(Strings s, SiteException e, {String? country = 'PT'}) =>
+    e.offline
     ? s.t('site.err.offline')
-    : s.tOr('site.err.${e.code}', s.t('site.error', {'error': e.code}));
+    : s.tOr(
+        apdKey('site.err.${e.code}', country),
+        s.t('site.error', {'error': e.code}),
+      );
 
 /// A date and time on the phone's clock: `08/11/2026 09:00`.
 String siteMoment(DateTime t) {
@@ -707,7 +714,7 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
         needNumber: g.federation == 'required' || rule.register,
       );
       if (bad != null) {
-        setState(() => _error = s.t(bad));
+        setState(() => _error = s.t(apdKey(bad, f.country)));
         return null;
       }
     }
@@ -753,7 +760,9 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
     try {
       await action(SiteApi(widget.session));
     } on SiteException catch (e) {
-      if (mounted) setState(() => _error = siteError(context.s, e));
+      if (mounted) {
+        setState(() => _error = siteError(context.s, e, country: f.country));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -946,6 +955,7 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
         ApdFields(
           input: _apd,
           rule: f.apd,
+          country: f.country,
           numberRequired: g.federation == 'required' || f.apd.register,
           keyPrefix: 'reg-apd',
         )

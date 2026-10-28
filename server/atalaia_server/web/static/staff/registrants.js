@@ -4,13 +4,14 @@
 // Shared by the registrations page and the roster page: the scheduled game and its registrations from the
 // API (admin or gm only: the API refuses anyone else), the game's summary, and a registration's replicas.
 
-import { api, clear, el, fieldApi, has, page, t, when } from './staff.js';
+import { api, clear, el, fieldApi, has, membershipWording, page, t, when } from './staff.js';
 
 /** The game (GET .../scheduled-games/{id}) and its registrations (GET .../registrations), in that order. */
 export async function loadBoth() {
     const id = encodeURIComponent(page.game);
     const game = await api('GET', fieldApi(`/scheduled-games/${id}`));
     const list = await api('GET', fieldApi(`/scheduled-games/${id}/registrations`));
+    membershipWording(list.country, [['#th-fed', 'col_fed_number'], ['label[for="r-apd"]', 'reg_edit_apd']]);
     return { game, list };
 }
 

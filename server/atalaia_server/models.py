@@ -97,6 +97,9 @@ class Field(Base):
     federation_label: Mapped[Optional[str]] = mapped_column(String(16))
     # APD membership rule (migration 0016, protocol/apd.md): null is the default rule (any APD, nothing asked).
     apd_rule: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB)
+    # The field's country (migration 0019): ISO 3166-1 alpha-2, null is unset. It picks the wording of the
+    # membership texts ("APD" for PT, "association membership" otherwise) and the shipped list's entries offered.
+    country: Mapped[Optional[str]] = mapped_column(String(2))
     # Registration's replica rules (plan phase 16): the controller's [checkin] limit_template and
     # max_replicas, so a pre-declared replica is one the field's check-in accepts.
     limit_template: Mapped[str] = mapped_column(String(32), nullable=False, server_default="portugal")
@@ -108,7 +111,8 @@ class Field(Base):
     wallpaper_sha256: Mapped[Optional[str]] = mapped_column(ForeignKey("branding_images.sha256"))
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
-    __table_args__ = (CheckConstraint("accent IS NULL OR accent ~ '^#[0-9a-f]{6}$'", name="accent"),)
+    __table_args__ = (CheckConstraint("accent IS NULL OR accent ~ '^#[0-9a-f]{6}$'", name="accent"),
+                      CheckConstraint("country IS NULL OR country ~ '^[A-Z]{2}$'", name="country"))
 
 
 # Roles that need TOTP (ADR-P4-2): granting one to an account without TOTP fails, and they

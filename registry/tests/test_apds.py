@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""The list of APDs (registry/apds/apds.json, protocol/apd.md): its entries follow the schema's rules, and the copies
+"""The list of membership bodies, historically APDs (registry/apds/apds.json, protocol/apd.md): its entries follow the schema's rules, and the copies
 the server, the Pi controller and the app ship are byte for byte the registry's."""
 
 from __future__ import annotations
@@ -24,8 +24,9 @@ class ApdList(unittest.TestCase):
         self.assertEqual(doc["format"], 1)
         ids = []
         for e in doc["apds"]:
-            self.assertEqual(set(e), {"id", "name", "short_name", "website", "source"})
+            self.assertEqual(set(e), {"id", "country", "name", "short_name", "website", "source"})
             self.assertTrue(ID.fullmatch(e["id"]), e["id"])
+            self.assertRegex(e["country"], r"[A-Z]{2}")  # ISO 3166-1 alpha-2, in capitals (decision MEM-1)
             self.assertFalse(e["id"].startswith("x-"), "x- is reserved for a field's own entries")
             self.assertTrue(1 <= len(e["name"]) <= 96 and 1 <= len(e["short_name"]) <= 16)
             self.assertTrue(e["website"] is None or URL.fullmatch(e["website"]))

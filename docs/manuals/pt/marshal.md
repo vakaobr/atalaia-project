@@ -49,6 +49,8 @@ Mais abaixo, **Quem és** tem **Identificador do cronógrafo** (um nome para o t
 
 Quando o campo verifica a filiação em APD, o cartão de quem joga na lista mostra a APD, o número e a validade com um selo: **Filiação válida**, **Filiação caducada**, **APD não aceite aqui** ou **Filiação em falta**. A app não verifica nada: compara o número e a data com o cartão da pessoa. Quem não tem selo válido fica **à espera**; **Admitir** admite-a na mesma. Nunca ficas bloqueado e o controlador regista-o sem o número (o cartão passa a dizer **admitido por um marshal**). A lista lista quem declarou réplicas; a consola do GM lista toda a gente.
 
+**Fora de Portugal** os mesmos ecrãs falam de **filiação numa associação**: o país do campo (definido pelo GM) decide as palavras, por isso o selo diz **Associação não aceite aqui** e o cartão mostra a associação em vez de uma APD. O que verificas é o mesmo: o número e a data contra o cartão da pessoa.
+
 ## 3. A lista: réplicas por cronografar
 
 1. Toca em **Réplicas por cronografar**.

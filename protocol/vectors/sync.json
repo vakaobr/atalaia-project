@@ -10886,6 +10886,240 @@
       ]
      }
     }
+   },
+   {
+    "name": "field_settings_with_country_pt",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ],
+     "settings": {
+      "federation_label": "FPA",
+      "max_replicas": 5,
+      "limit_template": {
+       "id": "portugal",
+       "name": "Portugal",
+       "classes": {
+        "rifle": {
+         "max_energy_j": 1.14,
+         "med_m": 0,
+         "fire_mode": "full_auto"
+        },
+        "dmr": {
+         "max_energy_j": 1.88,
+         "med_m": 20,
+         "fire_mode": "semi_only"
+        },
+        "sniper": {
+         "max_energy_j": 2.81,
+         "med_m": 30,
+         "fire_mode": "bolt_only"
+        }
+       },
+       "status": "unverified"
+      },
+      "apd": {},
+      "country": "PT"
+     }
+    }
+   },
+   {
+    "name": "field_settings_with_country_es",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ],
+     "settings": {
+      "federation_label": "FPA",
+      "max_replicas": 5,
+      "limit_template": {
+       "id": "portugal",
+       "name": "Portugal",
+       "classes": {
+        "rifle": {
+         "max_energy_j": 1.14,
+         "med_m": 0,
+         "fire_mode": "full_auto"
+        },
+        "dmr": {
+         "max_energy_j": 1.88,
+         "med_m": 20,
+         "fire_mode": "semi_only"
+        },
+        "sniper": {
+         "max_energy_j": 2.81,
+         "med_m": 30,
+         "fire_mode": "bolt_only"
+        }
+       },
+       "status": "unverified"
+      },
+      "apd": {},
+      "country": "ES"
+     }
+    }
+   },
+   {
+    "name": "field_settings_with_country_unset",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ],
+     "settings": {
+      "federation_label": "FPA",
+      "max_replicas": 5,
+      "limit_template": {
+       "id": "portugal",
+       "name": "Portugal",
+       "classes": {
+        "rifle": {
+         "max_energy_j": 1.14,
+         "med_m": 0,
+         "fire_mode": "full_auto"
+        },
+        "dmr": {
+         "max_energy_j": 1.88,
+         "med_m": 20,
+         "fire_mode": "semi_only"
+        },
+        "sniper": {
+         "max_energy_j": 2.81,
+         "med_m": 30,
+         "fire_mode": "bolt_only"
+        }
+       },
+       "status": "unverified"
+      },
+      "apd": {},
+      "country": null
+     }
+    }
    }
   ],
   "invalid": [
@@ -15320,6 +15554,246 @@
     },
     "error": "bad_value",
     "path": "registrations[0].membership_expires"
+   },
+   {
+    "name": "field_settings_country_lowercase",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ],
+     "settings": {
+      "federation_label": "FPA",
+      "max_replicas": 5,
+      "limit_template": {
+       "id": "portugal",
+       "name": "Portugal",
+       "classes": {
+        "rifle": {
+         "max_energy_j": 1.14,
+         "med_m": 0,
+         "fire_mode": "full_auto"
+        },
+        "dmr": {
+         "max_energy_j": 1.88,
+         "med_m": 20,
+         "fire_mode": "semi_only"
+        },
+        "sniper": {
+         "max_energy_j": 2.81,
+         "med_m": 30,
+         "fire_mode": "bolt_only"
+        }
+       },
+       "status": "unverified"
+      },
+      "apd": {},
+      "country": "pt"
+     }
+    },
+    "error": "bad_value",
+    "path": "settings.country"
+   },
+   {
+    "name": "field_settings_country_three_letters",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ],
+     "settings": {
+      "federation_label": "FPA",
+      "max_replicas": 5,
+      "limit_template": {
+       "id": "portugal",
+       "name": "Portugal",
+       "classes": {
+        "rifle": {
+         "max_energy_j": 1.14,
+         "med_m": 0,
+         "fire_mode": "full_auto"
+        },
+        "dmr": {
+         "max_energy_j": 1.88,
+         "med_m": 20,
+         "fire_mode": "semi_only"
+        },
+        "sniper": {
+         "max_energy_j": 2.81,
+         "med_m": 30,
+         "fire_mode": "bolt_only"
+        }
+       },
+       "status": "unverified"
+      },
+      "apd": {},
+      "country": "PRT"
+     }
+    },
+    "error": "bad_value",
+    "path": "settings.country"
+   },
+   {
+    "name": "field_settings_country_not_a_string",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ],
+     "settings": {
+      "federation_label": "FPA",
+      "max_replicas": 5,
+      "limit_template": {
+       "id": "portugal",
+       "name": "Portugal",
+       "classes": {
+        "rifle": {
+         "max_energy_j": 1.14,
+         "med_m": 0,
+         "fire_mode": "full_auto"
+        },
+        "dmr": {
+         "max_energy_j": 1.88,
+         "med_m": 20,
+         "fire_mode": "semi_only"
+        },
+        "sniper": {
+         "max_energy_j": 2.81,
+         "med_m": 30,
+         "fire_mode": "bolt_only"
+        }
+       },
+       "status": "unverified"
+      },
+      "apd": {},
+      "country": 351
+     }
+    },
+    "error": "bad_value",
+    "path": "settings.country"
    }
   ]
  },

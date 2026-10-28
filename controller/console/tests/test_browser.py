@@ -3960,7 +3960,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         """APD membership (protocol/apd.md): the GM sets the rule in the settings (an own APD included), the table
         shows the declared APD, the expiry and a verdict, and a check-in the rule does not accept waits for a marshal."""
         game = self.field.create_game()
-        self.field.http.put("/api/v1/checkin/settings", json={"apd": {
+        self.field.http.put("/api/v1/checkin/settings", json={"country": "PT", "apd": {
             "checkin": True, "expiry": True, "accepted": ["x-clube"],
             "custom": [{"id": "x-clube", "name": "Clube Teste, APD", "short_name": "Clube", "website": None}]}})
         late = self.check_in(game["id"], "Atrasada", apd_id="x-clube", membership_number="12", membership_expires="2020-01-01")
@@ -3986,6 +3986,32 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("checkin-settings-save").click()
         self.assertTrue(wait_for(lambda: self.field.http.get("/api/v1/checkin/settings").json()["apd"]["accepted"]
                                  == ["x-clube", "x-outra"], 5))
+
+    def test_checkin_tab_says_association_membership_outside_portugal(self):
+        """Decision MEM-2: the country is a setting of the field; PT keeps the APD texts, any other country (or none)
+        says association membership and offers that country's list; the GM changes it in the settings."""
+        game = self.field.create_game()
+        self.field.http.put("/api/v1/checkin/settings", json={"country": "ES", "apd": {
+            "checkin": True, "accepted": ["x-club"],
+            "custom": [{"id": "x-club", "name": "Club de Prueba", "short_name": "Club", "website": None}]}})
+        late = self.check_in(game["id"], "Atrasada", apd_id="x-club", membership_number="12")
+        other = self.check_in(game["id"], "Outra", apd_id="apd-a", membership_number="13")
+        self.assertEqual((late["status"], other["status"]), ("checked_in", "pending"))
+        page = self.console()
+        page.get_by_test_id("tab-checkin").click()
+        expect(page.get_by_test_id("checkin-country")).to_have_value("ES")
+        expect(page.get_by_test_id(f"checkin-row-{other['player_id']}").get_by_test_id("checkin-apd-status")) \
+            .to_have_text("associação não aceite")
+        expect(page.get_by_test_id("checkin-apd-settings").locator("legend")).to_have_text("Filiação numa associação")
+        expect(page.get_by_test_id("checkin-apd-accept-ala")).to_have_count(0)  # Portugal's list is not Spain's
+        expect(page.get_by_test_id("checkin-apd-accept-x-club")).to_be_checked()
+        page.get_by_test_id("checkin-country").fill("pt")
+        page.get_by_test_id("checkin-settings-save").click()
+        self.assertTrue(wait_for(lambda: self.field.http.get("/api/v1/checkin/settings").json()["country"] == "PT", 5))
+        expect(page.get_by_test_id("checkin-apd-settings").locator("legend")).to_have_text("Filiação numa APD")
+        expect(page.get_by_test_id("checkin-apd-accept-ala")).to_be_visible()
+        expect(page.get_by_test_id(f"checkin-row-{other['player_id']}").get_by_test_id("checkin-apd-status")) \
+            .to_have_text("APD não aceite")
 
     def test_marshal_list_in_the_checkin_tab(self):
         """Decisions MR-1 to MR-14: the GM adds a checked-in player to the marshal list (the controller gives the

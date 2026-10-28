@@ -61,9 +61,41 @@ class VectorTests(unittest.TestCase):
         self.assertEqual(mine, (ROOT / "registry" / "apds" / "apds.json").read_bytes())
         self.assertIsInstance(apd.project_list(), list)
 
-    def test_choices_put_the_projects_first_then_the_fields_own(self):
+    def test_choices_put_the_countrys_entries_first_then_the_fields_own(self):
         rule = apd.check_rule({"custom": [{"id": "x-a", "name": "A", "short_name": "A"}]})
-        self.assertEqual([e["id"] for e in apd.choices(rule)], [e["id"] for e in apd.project_list()] + ["x-a"])
+        self.assertEqual([e["id"] for e in apd.choices(rule, "PT")], [e["id"] for e in apd.project_list()] + ["x-a"])
+        self.assertEqual([e["id"] for e in apd.choices(rule, "ES")], ["x-a"])
+        self.assertEqual([e["id"] for e in apd.choices(rule, None)], ["x-a"])
+
+    def test_countries(self):
+        for v in VECTORS["country_valid"]:
+            with self.subTest(v["name"]):
+                self.assertEqual(apd.check_country(v["input"]), v["country"])
+        for v in VECTORS["country_invalid"]:
+            with self.subTest(v["name"]):
+                with self.assertRaises(apd.ApdError) as cm:
+                    apd.check_country(v["input"])
+                self.assertEqual(cm.exception.code, v["error"])
+        for v in VECTORS["default_country"]:
+            with self.subTest(v["zone"]):
+                self.assertEqual(apd.default_country(v["zone"]), v["country"])
+        for v in VECTORS["wording"]:
+            with self.subTest(v["country"]):
+                self.assertEqual(apd.wording(v["country"]), v["wording"])
+
+    def test_the_vectors_choices(self):
+        for v in VECTORS["choices"]:
+            with self.subTest(v["name"]):
+                got = apd.offered(v["project"], apd.check_rule(v["rule"]), v["country"])
+                self.assertEqual([e["id"] for e in got], v["ids"])
+
+    def test_every_shipped_entry_has_a_country(self):
+        for e in apd.project_list():
+            self.assertRegex(e["country"], "^[A-Z]{2}$")
+        with self.assertRaises(apd.ApdError):
+            apd.check_entry({"id": "x-a", "country": "PT", "name": "A", "short_name": "A"})  # own entries have none
+        with self.assertRaises(apd.ApdError):
+            apd.check_entry({"id": "a", "name": "A", "short_name": "A"}, own=False)
 
     def test_the_old_and_new_number_names_agree(self):
         self.assertEqual(declared_membership({"federation_number": "1"})["number"], "1")
@@ -87,7 +119,39 @@ class ApdCheckinTests(P3Case):
     def row(self, gid, me):
         return self.ctrl.store.checkin(gid, me["player_id"])
 
+    def put_country(self, country):
+        return self.client.put("/api/v1/checkin/settings", json={"country": country}, headers=GM)
+
+    def test_the_country_and_the_list_it_offers(self):
+        self.svc.cfg.country = ""
+        self.svc._zone_name = lambda: "Europe/Madrid"
+        self.assertIsNone(self.info()["settings"]["country"])  # no country: only the field's own entries
+        self.assertEqual(self.info()["apds"], [])
+        self.assertEqual(self.put_country("es").json()["country"], "ES")  # capitals whatever the case typed
+        self.assertEqual(self.info()["apds"], [])  # the shipped list has no entry for ES yet
+        own = {"id": "x-club", "name": "Club", "short_name": "Club", "website": None}
+        self.put_rule(custom=[own])
+        self.assertEqual(self.info()["apds"], [own])
+        self.assertEqual(self.put_country("pt").json()["country"], "PT")
+        self.assertEqual(self.info()["apds"], apd.project_list() + [own])
+        self.restart()  # saved
+        self.assertEqual(self.svc.settings()["country"], "PT")
+        self.assertEqual(self.put_country("").json()["country"], None)  # back to the default: none for Madrid
+        r = self.put_country("PRT")
+        self.assertEqual(r.status_code, 400, r.text)
+        r = self.put_country(5)
+        self.assertEqual(r.status_code, 400, r.text)
+
+    def test_the_default_country_follows_the_time_zone(self):
+        self.svc._zone_name = lambda: "Atlantic/Azores"
+        self.assertEqual(self.svc.settings()["country"], "PT")
+        self.svc._zone_name = lambda: "Europe/Berlin"
+        self.assertIsNone(self.svc.settings()["country"])
+        self.svc.cfg.country = "DE"  # [checkin] country wins over the zone
+        self.assertEqual(self.svc.settings()["country"], "DE")
+
     def test_settings_and_the_choices(self):
+        self.put_country("PT")
         info = self.info()
         self.assertEqual(info["settings"]["apd"], apd.default_rule())
         self.assertEqual(info["apds"], apd.project_list())
@@ -214,6 +278,17 @@ class ApdCheckinTests(P3Case):
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual(r.json()["apd"]["accepted"], ["apd-a"])
 
+    def test_the_site_country_overrides_the_console_with_branding_site(self):
+        self.cfg.sync_branding = "site"
+        self.client.put("/api/v1/checkin/settings", json={"country": "ES"}, headers=GM)
+        self.assertEqual(self.svc.settings()["country"], "ES")
+        self.svc.store.set_setting("checkin.country_site", json.dumps("DE"))
+        self.assertEqual(self.svc.settings()["country"], "DE")
+        r = self.client.put("/api/v1/checkin/settings", json={"country": "PT"}, headers=GM)
+        self.assertEqual(r.status_code, 409, r.text)
+        self.svc.store.set_setting("checkin.country_site", json.dumps(None))  # the site says: unset
+        self.assertIsNone(self.svc.settings()["country"])
+
 
 class SiteRuleTests(P3Case):
     """With ``[sync] branding = "site"`` the settings of the field answer carry the APD rule (BR24's ``settings``)."""
@@ -238,6 +313,21 @@ class SiteRuleTests(P3Case):
         site.settings["apd"] = {}  # the site's rule is the default again
         self.assertTrue(sync.run_once(), sync.last_error)
         self.assertEqual(self.svc.settings()["apd"], apd.default_rule())
+
+    def test_the_pull_sets_the_country(self):
+        self.svc._zone_name = lambda: "Europe/Lisbon"
+        site = FakeSite()
+        site.settings = copy.deepcopy(SETTINGS)
+        sync = SyncClient(self.cfg, self.bundle.store, api_key="k" * 43, transport=site, checkin=self.svc,
+                          branding=self.ctrl.branding)
+        self.assertTrue(sync.run_once(), sync.last_error)
+        self.assertEqual(self.svc.settings()["country"], "PT")  # an older site sends none: the default stays
+        site.settings["country"] = "ES"
+        self.assertTrue(sync.run_once(), sync.last_error)
+        self.assertEqual(self.client.get("/api/v1/checkin").json()["settings"]["country"], "ES")
+        site.settings["country"] = None  # the site's field has no country
+        self.assertTrue(sync.run_once(), sync.last_error)
+        self.assertIsNone(self.svc.settings()["country"])
 
 
 class RosterFormatTests(unittest.TestCase):
@@ -277,6 +367,15 @@ class RosterFormatTests(unittest.TestCase):
         st["apd"] = {"bogus": 1}
         with self.assertRaises(sync_format.SyncFormatError):
             sync_format.check_field(ans)
+        st["apd"] = {}
+        for good in ("PT", None):
+            st["country"] = good
+            self.assertEqual(sync_format.check_field(copy.deepcopy(ans))["settings"]["country"], good)
+        for bad in ("pt", "PRT", 7):
+            st["country"] = bad
+            with self.assertRaises(sync_format.SyncFormatError) as cm:
+                sync_format.check_field(copy.deepcopy(ans))
+            self.assertEqual((cm.exception.code, cm.exception.path), ("bad_value", "settings.country"))
         plain = {"sync_version": 1, "field": {"apd": {"checkin": True}}, "teams": []}
         with self.assertRaises(sync_format.SyncFormatError):  # no rule in the branding part
             sync_format.check_field(plain)

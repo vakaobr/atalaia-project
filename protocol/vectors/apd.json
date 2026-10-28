@@ -1,5 +1,5 @@
 {
- "description": "APD membership vectors (protocol/apd.md). rule_valid: a rule as given (null or missing keys allowed) and the normalised rule every implementation must produce; rule_invalid: refused with the error given. membership_valid / membership_invalid likewise for {apd, number, expires} (missing keys are null). status: the verdict for a rule, a membership and the local date the check is for: missing, not_accepted, expired, valid, in that order of precedence. Written by hand from protocol/apd.md; the server, the Pi controller and the Dart controller and app all run these.",
+ "description": "APD membership vectors (protocol/apd.md). rule_valid: a rule as given (null or missing keys allowed) and the normalised rule every implementation must produce; rule_invalid: refused with the error given. membership_valid / membership_invalid likewise for {apd, number, expires} (missing keys are null). status: the verdict for a rule, a membership and the local date the check is for: missing, not_accepted, expired, valid, in that order of precedence. Written by hand from protocol/apd.md; the server, the Pi controller and the Dart controller and app all run these. Package H (decisions MEM-1 to MEM-6): country_valid / country_invalid: a field's country as given and refused with country_invalid; default_country: the country a field gets from its time zone (null: unset); wording: which words the screens use for a country (apd: Portugal's APD texts; membership: 'association membership', for any other country or none); choices: what a field of a country offers from the given project list and its rule's own entries (the entries of the country, then the own ones; none from the project for a field without a country); status cases do not depend on the country.",
  "rule_valid": [
   {
    "name": "empty_is_the_default",
@@ -891,6 +891,474 @@
    },
    "on": "2028-02-29",
    "status": "valid"
+  },
+  {
+   "name": "non_pt_field_unknown_body_valid_without_accepted_list",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": true,
+    "expiry": false,
+    "custom": []
+   },
+   "membership": {
+    "apd": "club-es",
+    "number": "ES-77",
+    "expires": null
+   },
+   "on": "2026-11-15",
+   "status": "valid",
+   "country": "ES"
+  },
+  {
+   "name": "non_pt_field_accepted_list_applies",
+   "rule": {
+    "accepted": [
+     "club-de"
+    ],
+    "register": false,
+    "checkin": true,
+    "expiry": false,
+    "custom": []
+   },
+   "membership": {
+    "apd": "club-es",
+    "number": "ES-77",
+    "expires": null
+   },
+   "on": "2026-11-15",
+   "status": "not_accepted",
+   "country": "ES"
+  }
+ ],
+ "country_valid": [
+  {
+   "name": "portugal",
+   "input": "PT",
+   "country": "PT"
+  },
+  {
+   "name": "spain",
+   "input": "ES",
+   "country": "ES"
+  },
+  {
+   "name": "unset",
+   "input": null,
+   "country": null
+  }
+ ],
+ "country_invalid": [
+  {
+   "name": "lowercase",
+   "input": "pt",
+   "error": "country_invalid"
+  },
+  {
+   "name": "three_letters",
+   "input": "PRT",
+   "error": "country_invalid"
+  },
+  {
+   "name": "one_letter",
+   "input": "P",
+   "error": "country_invalid"
+  },
+  {
+   "name": "digits",
+   "input": "P1",
+   "error": "country_invalid"
+  },
+  {
+   "name": "empty",
+   "input": "",
+   "error": "country_invalid"
+  },
+  {
+   "name": "not_a_string",
+   "input": 351,
+   "error": "country_invalid"
+  }
+ ],
+ "default_country": [
+  {
+   "zone": "Europe/Lisbon",
+   "country": "PT"
+  },
+  {
+   "zone": "Atlantic/Azores",
+   "country": "PT"
+  },
+  {
+   "zone": "Atlantic/Madeira",
+   "country": "PT"
+  },
+  {
+   "zone": "Europe/Madrid",
+   "country": null
+  },
+  {
+   "zone": "America/Sao_Paulo",
+   "country": null
+  },
+  {
+   "zone": "UTC",
+   "country": null
+  },
+  {
+   "zone": null,
+   "country": null
+  }
+ ],
+ "wording": [
+  {
+   "country": "PT",
+   "wording": "apd"
+  },
+  {
+   "country": "ES",
+   "wording": "membership"
+  },
+  {
+   "country": "BR",
+   "wording": "membership"
+  },
+  {
+   "country": null,
+   "wording": "membership"
+  }
+ ],
+ "choices": [
+  {
+   "name": "pt_field_offers_pt_entries",
+   "project": [
+    {
+     "id": "apd-a",
+     "country": "PT",
+     "name": "Associação A, APD",
+     "short_name": "A",
+     "website": null
+    },
+    {
+     "id": "apd-b",
+     "country": "PT",
+     "name": "Associação B, APD",
+     "short_name": "B",
+     "website": "https://b.example"
+    },
+    {
+     "id": "club-es",
+     "country": "ES",
+     "name": "Federación Ejemplo",
+     "short_name": "FE",
+     "website": "https://fe.example"
+    },
+    {
+     "id": "club-de",
+     "country": "DE",
+     "name": "Verband Beispiel",
+     "short_name": "VB",
+     "website": null
+    }
+   ],
+   "country": "PT",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": false,
+    "expiry": false,
+    "custom": []
+   },
+   "ids": [
+    "apd-a",
+    "apd-b"
+   ]
+  },
+  {
+   "name": "non_pt_field_offers_its_countrys_entries",
+   "project": [
+    {
+     "id": "apd-a",
+     "country": "PT",
+     "name": "Associação A, APD",
+     "short_name": "A",
+     "website": null
+    },
+    {
+     "id": "apd-b",
+     "country": "PT",
+     "name": "Associação B, APD",
+     "short_name": "B",
+     "website": "https://b.example"
+    },
+    {
+     "id": "club-es",
+     "country": "ES",
+     "name": "Federación Ejemplo",
+     "short_name": "FE",
+     "website": "https://fe.example"
+    },
+    {
+     "id": "club-de",
+     "country": "DE",
+     "name": "Verband Beispiel",
+     "short_name": "VB",
+     "website": null
+    }
+   ],
+   "country": "ES",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": false,
+    "expiry": false,
+    "custom": []
+   },
+   "ids": [
+    "club-es"
+   ]
+  },
+  {
+   "name": "non_pt_field_adds_its_own",
+   "project": [
+    {
+     "id": "apd-a",
+     "country": "PT",
+     "name": "Associação A, APD",
+     "short_name": "A",
+     "website": null
+    },
+    {
+     "id": "apd-b",
+     "country": "PT",
+     "name": "Associação B, APD",
+     "short_name": "B",
+     "website": "https://b.example"
+    },
+    {
+     "id": "club-es",
+     "country": "ES",
+     "name": "Federación Ejemplo",
+     "short_name": "FE",
+     "website": "https://fe.example"
+    },
+    {
+     "id": "club-de",
+     "country": "DE",
+     "name": "Verband Beispiel",
+     "short_name": "VB",
+     "website": null
+    }
+   ],
+   "country": "DE",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": false,
+    "expiry": false,
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte",
+      "short_name": "Norte",
+      "website": null
+     }
+    ]
+   },
+   "ids": [
+    "club-de",
+    "x-clube-norte"
+   ]
+  },
+  {
+   "name": "country_without_entries_offers_only_own",
+   "project": [
+    {
+     "id": "apd-a",
+     "country": "PT",
+     "name": "Associação A, APD",
+     "short_name": "A",
+     "website": null
+    },
+    {
+     "id": "apd-b",
+     "country": "PT",
+     "name": "Associação B, APD",
+     "short_name": "B",
+     "website": "https://b.example"
+    },
+    {
+     "id": "club-es",
+     "country": "ES",
+     "name": "Federación Ejemplo",
+     "short_name": "FE",
+     "website": "https://fe.example"
+    },
+    {
+     "id": "club-de",
+     "country": "DE",
+     "name": "Verband Beispiel",
+     "short_name": "VB",
+     "website": null
+    }
+   ],
+   "country": "BR",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": false,
+    "expiry": false,
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte",
+      "short_name": "Norte",
+      "website": null
+     }
+    ]
+   },
+   "ids": [
+    "x-clube-norte"
+   ]
+  },
+  {
+   "name": "no_country_offers_only_own",
+   "project": [
+    {
+     "id": "apd-a",
+     "country": "PT",
+     "name": "Associação A, APD",
+     "short_name": "A",
+     "website": null
+    },
+    {
+     "id": "apd-b",
+     "country": "PT",
+     "name": "Associação B, APD",
+     "short_name": "B",
+     "website": "https://b.example"
+    },
+    {
+     "id": "club-es",
+     "country": "ES",
+     "name": "Federación Ejemplo",
+     "short_name": "FE",
+     "website": "https://fe.example"
+    },
+    {
+     "id": "club-de",
+     "country": "DE",
+     "name": "Verband Beispiel",
+     "short_name": "VB",
+     "website": null
+    }
+   ],
+   "country": null,
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": false,
+    "expiry": false,
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte",
+      "short_name": "Norte",
+      "website": null
+     }
+    ]
+   },
+   "ids": [
+    "x-clube-norte"
+   ]
+  },
+  {
+   "name": "no_country_no_own_offers_nothing",
+   "project": [
+    {
+     "id": "apd-a",
+     "country": "PT",
+     "name": "Associação A, APD",
+     "short_name": "A",
+     "website": null
+    },
+    {
+     "id": "apd-b",
+     "country": "PT",
+     "name": "Associação B, APD",
+     "short_name": "B",
+     "website": "https://b.example"
+    },
+    {
+     "id": "club-es",
+     "country": "ES",
+     "name": "Federación Ejemplo",
+     "short_name": "FE",
+     "website": "https://fe.example"
+    },
+    {
+     "id": "club-de",
+     "country": "DE",
+     "name": "Verband Beispiel",
+     "short_name": "VB",
+     "website": null
+    }
+   ],
+   "country": null,
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": false,
+    "expiry": false,
+    "custom": []
+   },
+   "ids": []
+  },
+  {
+   "name": "accepted_rule_does_not_filter_the_offer",
+   "project": [
+    {
+     "id": "apd-a",
+     "country": "PT",
+     "name": "Associação A, APD",
+     "short_name": "A",
+     "website": null
+    },
+    {
+     "id": "apd-b",
+     "country": "PT",
+     "name": "Associação B, APD",
+     "short_name": "B",
+     "website": "https://b.example"
+    },
+    {
+     "id": "club-es",
+     "country": "ES",
+     "name": "Federación Ejemplo",
+     "short_name": "FE",
+     "website": "https://fe.example"
+    },
+    {
+     "id": "club-de",
+     "country": "DE",
+     "name": "Verband Beispiel",
+     "short_name": "VB",
+     "website": null
+    }
+   ],
+   "country": "ES",
+   "rule": {
+    "accepted": [
+     "apd-a"
+    ],
+    "register": false,
+    "checkin": false,
+    "expiry": false,
+    "custom": []
+   },
+   "ids": [
+    "club-es"
+   ]
   }
  ]
 }

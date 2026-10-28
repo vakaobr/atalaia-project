@@ -30,6 +30,9 @@ final class SiteField {
       timezone = _str(j['timezone']) ?? 'UTC',
       federationLabel = _str(j['federation_label']) ?? '',
       apd = ApdRule.lenient(j['apd']),
+      country = j.containsKey('country')
+          ? lenientApdCountry(j['country'])
+          : 'PT',
       classes = _strings(j['classes']),
       maxReplicas = j['max_replicas'] is int ? j['max_replicas']! as int : 5;
 
@@ -41,6 +44,11 @@ final class SiteField {
 
   /// The field's APD rule (protocol/apd.md); the default when it sends none.
   final ApdRule apd;
+
+  /// The field's country (ISO 3166-1 alpha-2, null: unset): the wording of
+  /// the membership texts and the list it offers. `PT` from a site server
+  /// that sends none (before fields had one it only knew Portugal's APDs).
+  final String? country;
   final List<String> classes;
   final int maxReplicas;
 }

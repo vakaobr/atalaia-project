@@ -56,6 +56,7 @@ import 'dart:typed_data';
 
 import '../ffi/bindings.dart';
 import '../pod/pod_client.dart';
+import '../protocol/apd.dart';
 import 'console_files.dart';
 import 'controller_adoption.dart';
 import 'controller_api.dart';
@@ -376,6 +377,7 @@ class ControllerHost {
         noticePt: boot.noticePt,
         noticeEn: boot.noticeEn,
         apdsJson: boot.apdsJson,
+        zoneName: apdZoneOfAbbreviation(DateTime.now().timeZoneName),
       ),
       caSha256: tls.caSha256,
     );

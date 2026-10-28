@@ -1092,6 +1092,7 @@ class ScheduleTests(BrowserCase):
         """protocol/apd.md: with a field rule that checks it, the registrations page and the roster show the APD,
         the number, the expiry and the verdict; staff change them and the verdict follows."""
         await self.lisbon()
+        await self.fetch("UPDATE fields SET country = 'PT'")
         await self.fetch("UPDATE fields SET apd_rule = $1::jsonb", json.dumps(
             {"accepted": ["apd-a", "x-norte"], "register": False, "checkin": True, "expiry": True,
              "custom": [{"id": "x-norte", "name": "Clube Norte, APD", "short_name": "Norte", "website": None}]}))
@@ -1116,6 +1117,28 @@ class ScheduleTests(BrowserCase):
         await self.check_page(page, 375)
         await page.goto(self.base + self.field_path(f"/schedule/{game}/roster"))
         await expect(page.locator("#roster tbody tr").first).to_contain_text("Norte · FPA-9 · expires 2020-01-01 — expired")
+
+    async def test_a_field_outside_portugal_says_association_membership(self) -> None:
+        """Decisions MEM-3 and MEM-4: the registrations page of a Spanish field names the association, not the APD,
+        and offers only its own entries; the same field in Portugal's words is the test above."""
+        await self.fetch("UPDATE fields SET country = 'ES'")
+        await self.fetch("UPDATE fields SET apd_rule = $1::jsonb", json.dumps(
+            {"accepted": ["x-norte"], "register": False, "checkin": True, "expiry": False,
+             "custom": [{"id": "x-norte", "name": "Club Norte", "short_name": "Norte", "website": None}]}))
+        game = await self.published_game()
+        await self.register(game, "falcao", display_name="Falcão", federation_number="ES-9", apd_id="apd-b")
+        name, secret = await self.staff("gm")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path(f"/schedule/{game}/registrations"))
+        await expect(page.locator("#th-fed")).to_have_text("Membership (association)")
+        row = page.locator("#regs tbody tr").nth(0)
+        await expect(row).to_contain_text("apd-b · ES-9 — association not accepted")
+        await row.locator("button", has_text="Edit").click()
+        await expect(page.locator("label[for=r-apd]")).to_have_text("Member's association")
+        await expect(page.locator("#r-apd option")).to_have_text(["Association unknown", "Norte", "apd-b"])
+        await self.check_page(page, 375)
+        await page.goto(self.base + self.field_path(f"/schedule/{game}/registrations") + "?lang=pt")
+        await expect(page.locator("#th-fed")).to_have_text("Filiação (associação)")
 
     async def test_the_roster_says_when_a_controller_last_pulled_it(self) -> None:
         game = await self.published_game()

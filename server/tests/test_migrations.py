@@ -504,6 +504,26 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(self.db.fetch("SELECT federation_number FROM game_registrations")[0][0], "FPA-1")
         self.db.fetch("DELETE FROM fields")
 
+    def test_0019_with_data(self) -> None:
+        """0019_field_country: a field in a Portuguese time zone becomes PT, any other stays unset, the code is
+        checked, and back down."""
+        command.upgrade(self.cfg, "0018_chrono_violation_delta")
+        for slug, zone in (("lisboa", "Europe/Lisbon"), ("acores", "Atlantic/Azores"), ("madeira", "Atlantic/Madeira"),
+                           ("madrid", "Europe/Madrid"), ("utc", "UTC")):
+            self.db.fetch("INSERT INTO fields (name, slug, timezone) VALUES ($1, $1, $2)", slug, zone)
+        command.upgrade(self.cfg, "0019_field_country")
+        got = {r["slug"]: r["country"] for r in self.db.fetch("SELECT slug, country FROM fields")}
+        self.assertEqual(got, {"lisboa": "PT", "acores": "PT", "madeira": "PT", "madrid": None, "utc": None})
+        self.db.fetch("UPDATE fields SET country = 'ES' WHERE slug = 'madrid'")
+        for bad in ("pt", "P1", "", "p\n"[:2]):
+            with self.assertRaisesRegex(Exception, "ck_fields_country"):
+                self.db.fetch("UPDATE fields SET country = $1 WHERE slug = 'utc'", bad)
+        command.downgrade(self.cfg, "0018_chrono_violation_delta")
+        columns = {r["column_name"] for r in self.db.fetch(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'fields'")}
+        self.assertNotIn("country", columns)
+        self.db.fetch("DELETE FROM fields")
+
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)
         self.assertEqual(len(self.script.get_bases()), 1)

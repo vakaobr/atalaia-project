@@ -67,6 +67,7 @@ The organisers put up a **check-in poster** with a QR code. It holds no secret.
    - **Name or callsign**: up to 32 characters. Only the organisers and marshals see it. Other players do not.
    - **Federation number**: only if the field asks for it. The organisers look at your card at the desk. The app does not check it.
    - **APD membership**: if the field asks for it, pick your APD (or **Not in the list**), type your membership number and its expiry date (YYYY-MM-DD). The app does not check them: a marshal compares them with your card. If your membership is not valid for the game, your check-in waits for a marshal, who decides. At a field that requires it to register, the registration is refused without a valid membership.
+     At a field outside Portugal this reads **Association membership**: pick your association (club, federation or insurance body) instead of an APD; the list is the one for the field's country, and **Not in the list** is always there.
    - **Preferred team**: **Any**, or a team. The organisers decide the final team.
    - **Online registration**: only if you registered on the field's site. See [section 8](#8-if-you-registered-online).
    - **Replicas you bring**: tick the replicas you saved earlier. You can also do this later ([section 4](#4-declare-your-replicas)).

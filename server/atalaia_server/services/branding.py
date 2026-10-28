@@ -212,12 +212,12 @@ async def field_branding(db: AsyncSession, field: Field) -> dict[str, Any]:
 
 def field_settings(field: Field) -> Optional[dict[str, Any]]:
     """The field's check-in rules a controller takes over (decision S16-6, BR24): its federation label (null
-    when it has none), ``max_replicas``, limit template whole and APD membership rule (protocol/apd.md); None when the template's file is gone."""
+    when it has none), ``max_replicas``, limit template whole, APD membership rule and country (protocol/apd.md); None when the template's file is gone."""
     template = registration.limit_template_body(field.limit_template)
     if template is None:
         return None
     return {"federation_label": field.federation_label, "max_replicas": field.max_replicas,
-            "limit_template": template, "apd": registration.field_rule(field)}
+            "limit_template": template, "apd": registration.field_rule(field), "country": field.country}
 
 
 async def field_answer(db: AsyncSession, field_id: uuid.UUID, settings: bool = False) -> dict[str, Any]:

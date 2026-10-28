@@ -107,6 +107,7 @@ process.
 | crest | emblema | Wappen | 隊徽 | |
 | federation number | número de federado | Verbandsnummer | 協會會員編號 | |
 | APD (membership) | APD (filiação) | APD (Mitgliedschaft) | APD（會員資格） | APD stays as is in every language; pt-PT: "número de filiação", never gendered "sócio" |
+| association (membership) | associação (filiação) | Verband (Mitgliedschaft) | 協會（會員資格） | the words for a field outside Portugal or with no country (decision MEM-4), where a Portuguese field says APD; pt-PT: "filiação numa associação", never gendered "sócio" |
 | callsign | alcunha | Callsign | 呼號 | |
 | spot check | verificação aleatória (check) | Stichprobe | 抽查 | |
 | bolt action | ferrolho | Repetierer | 手拉 | Sniper, Shotgun kept; zh-tw: 「手拉狙」；Sniper、Shotgun 照用 |

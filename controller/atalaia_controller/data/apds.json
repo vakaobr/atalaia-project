@@ -1,9 +1,10 @@
 {
   "format": 1,
-  "note": "Started on 2026-10-28 from the associations jogarairsoft.pt names as partners; each entry is kept only where the association's own site confirms it (see its source). Not a directory and not a verification of any member.",
+  "note": "Started on 2026-10-28 from the associations jogarairsoft.pt names as partners; each entry is kept only where the association's own site confirms it (see its source). Not a directory and not a verification of any member. Each entry names the country (ISO 3166-1 alpha-2) whose fields offer it.",
   "apds": [
     {
       "id": "ala",
+      "country": "PT",
       "name": "Associação Lusitana de Airsoft, APD",
       "short_name": "ALA",
       "website": "https://ala-airsoft.com/",
@@ -11,6 +12,7 @@
     },
     {
       "id": "apacorp",
+      "country": "PT",
       "name": "Associação Portuguesa de Airsoft Corporativo, APD",
       "short_name": "APACORP",
       "website": "https://www.apacorp.org/",
@@ -18,6 +20,7 @@
     },
     {
       "id": "apap",
+      "country": "PT",
       "name": "APAP-APD",
       "short_name": "APAP",
       "website": "https://www.apap-apd.com/",

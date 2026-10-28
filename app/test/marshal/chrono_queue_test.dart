@@ -256,6 +256,46 @@ void main() {
     expect(classifyCode(label), isNull);
   });
 
+  testWidgets('outside Portugal the marshal\'s badge says association', (
+    tester,
+  ) async {
+    field
+      ..sendsCountry = true
+      ..country = 'ES'
+      ..verdict = 'not_accepted';
+    field.handle('POST', '/checkin', {
+      'game_id': 42,
+      'player_id': 'p-lapsedlapsed',
+      'player_secret': 'z',
+      'display_name': 'Gaio',
+      'notice_version': 1,
+      'apd_id': 'apd-a',
+      'membership_number': 'A-1',
+      'replicas': [
+        {
+          'declaration_id': '7a1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b',
+          'type': 'aeg',
+          'class': 'rifle',
+        },
+      ],
+    }, null);
+    final h = harness(fieldHttp: field.http);
+    final r = await records(h.store, h.settings);
+    await tester.pumpWidget(
+      h.app(
+        home: ChronoQueueScreen(
+          checkin: marshal,
+          field: pinned,
+          records: r,
+          templates: templates,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Associação não aceite aqui'), findsOneWidget);
+    expect(find.text('APD não aceite aqui'), findsNothing);
+  });
+
   testWidgets('the marshal sees the APD verdict and lets a pending player in', (
     tester,
   ) async {

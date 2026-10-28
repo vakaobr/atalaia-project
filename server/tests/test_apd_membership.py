@@ -40,6 +40,13 @@ class ListAndRuleTests(ApdCase):
         shipped = json.loads((ROOT / "registry" / "apds" / "apds.json").read_text(encoding="utf-8"))
         self.assertEqual(r.json(), {"format": 1, "apds": [{k: v for k, v in e.items() if k != "source"}
                                                           for e in shipped["apds"]]})
+        self.assertTrue(all(e["country"] == "PT" for e in r.json()["apds"]))
+        r = await self.client.get("/api/v1/apds?country=ES")  # one country's entries
+        self.assertEqual(r.json(), {"format": 1, "apds": []})
+        r = await self.client.get("/api/v1/apds?country=PT")
+        self.assertEqual(len(r.json()["apds"]), len(shipped["apds"]))
+        r = await self.client.get("/api/v1/apds?country=pt")
+        self.assertEqual((r.status_code, r.json()["detail"]), (400, "country_invalid"))
         copy = Path(__file__).resolve().parents[1] / "atalaia_server" / "data" / "apds.json"
         self.assertEqual(copy.read_bytes(), (ROOT / "registry" / "apds" / "apds.json").read_bytes())
 
@@ -75,6 +82,93 @@ class ListAndRuleTests(ApdCase):
         await self.rule({"checkin": True})
         r = await self.client.get("/api/v1/fields-by-slug/campo", headers=self.player)
         self.assertEqual(r.json()["field"]["apd"]["checkin"], True)
+
+
+class CountryTests(ApdCase):
+    """Package H (decisions MEM-1 to MEM-6): the field's country picks the wording and the list it offers."""
+
+    async def patch(self, body: dict[str, Any], expect: int = 200) -> dict[str, Any]:
+        admin = await self.staff("admin")
+        r = await self.client.patch(f"/api/v1/fields/{self.field_id}", json=body, headers=admin)
+        self.assertEqual(r.status_code, expect, r.text)
+        return r.json()
+
+    async def test_the_admin_sets_and_clears_the_country(self) -> None:
+        self.assertEqual((await self.patch({"country": "es"}))["country"], "ES")  # capitals whatever the case typed
+        self.assertEqual((await self.fetch("SELECT country FROM fields"))[0][0], "ES")
+        for bad in ("ESP", "E", "1A", "E S"):
+            await self.patch({"country": bad}, expect=400)
+        self.assertIsNone((await self.patch({"country": None}))["country"])
+        self.assertEqual((await self.patch({"country": "pt"}))["country"], "PT")
+        self.assertIsNone((await self.patch({"country": ""}))["country"])
+        gm = await self.staff("gm")
+        r = await self.client.patch(f"/api/v1/fields/{self.field_id}", json={"country": "PT"}, headers=gm)
+        self.assertEqual(r.status_code, 403)  # only the admin
+        audit = await self.fetch("SELECT details FROM audit_log WHERE action = 'field_update'")
+        self.assertIn("ES", json.dumps([dict(a) for a in audit], default=str))
+
+    async def test_the_list_a_field_offers_is_its_countrys_plus_its_own(self) -> None:
+        await self.rule({"custom": [OWN]})
+        await self.patch({"country": "PT"})
+        r = await self.client.get("/api/v1/fields-by-slug/campo", headers=self.player)
+        field = r.json()["field"]
+        self.assertEqual(field["country"], "PT")
+        self.assertEqual([e["id"] for e in field["apds"]], ["ala", "apacorp", "apap"])
+        self.assertEqual(field["apd"]["custom"], [OWN])
+        await self.patch({"country": "ES"})
+        field = (await self.client.get("/api/v1/fields-by-slug/campo", headers=self.player)).json()["field"]
+        self.assertEqual((field["country"], field["apds"], field["apd"]["custom"]), ("ES", [], [OWN]))
+        await self.patch({"country": None})  # no country: only its own entries
+        field = (await self.client.get("/api/v1/fields-by-slug/campo", headers=self.player)).json()["field"]
+        self.assertEqual((field["country"], field["apds"]), (None, []))
+        game = await self.game()
+        staff = await self.staff("gm")
+        listed = (await self.client.get(self.path(game), headers=staff)).json()
+        self.assertEqual((listed["country"], listed["apds"]), (None, []))
+        await self.patch({"country": "PT"})
+        listed = (await self.client.get(self.path(game), headers=staff)).json()
+        self.assertEqual((listed["country"], len(listed["apds"])), ("PT", 3))
+
+    async def test_the_accepted_rule_is_unchanged_by_the_country(self) -> None:
+        await self.rule({"register": True, "accepted": ["apd-a"]})
+        await self.patch({"country": "ES"})
+        game = await self.game(federation="optional")
+        r = await self.client.post(self.path(game), json={"display_name": "Rui", "membership_number": "1",
+                                                          "apd_id": "apd-b"}, headers=self.player)
+        self.assertEqual((r.status_code, r.json()["detail"]), (400, "apd_not_accepted"))
+        r = await self.client.post(self.path(game), json={"display_name": "Rui", "membership_number": "1",
+                                                          "apd_id": "apd-a"}, headers=self.player)
+        self.assertEqual(r.status_code, 201, r.text)
+
+    async def test_the_country_travels_with_the_settings(self) -> None:
+        await self.patch({"country": "ES"})
+        plain = await self.pull("/api/v1/sync/field")
+        self.assertNotIn("country", plain["field"])  # unchanged without the query
+        answer = await self.pull("/api/v1/sync/field?settings=1")
+        sync_format.check_field(json.loads(json.dumps(answer)))
+        self.assertEqual(answer["settings"]["country"], "ES")
+        await self.patch({"country": None})
+        answer = await self.pull("/api/v1/sync/field?settings=1")
+        sync_format.check_field(json.loads(json.dumps(answer)))
+        self.assertIsNone(answer["settings"]["country"])
+
+    async def test_the_public_page_words_follow_the_country(self) -> None:
+        await self.rule({"register": True, "checkin": True, "custom": [OWN]})
+        await self.fetch("UPDATE fields SET public_page = true")
+        game = await self.game(federation="off")
+        for country, words in (("PT", {"pt": "Filiação numa APD", "en": "APD membership", "de": "APD-Mitgliedschaft",
+                                       "zh-tw": "APD 會員資格"}),
+                               ("ES", {"pt": "Filiação numa associação", "en": "Association membership",
+                                       "de": "Verbandsmitgliedschaft", "zh-tw": "協會會員資格"}),
+                               (None, {"en": "Association membership"})):
+            await self.fetch("UPDATE fields SET country = $1", country)
+            for lang, word in words.items():
+                r = await self.client.get(f"/f/campo/games/{game.id}?lang={lang}")
+                self.assertEqual(r.status_code, 200, (country, lang))
+                self.assertIn(word, r.text)
+                if country != "PT" and lang == "en":
+                    self.assertIn("any association", r.text)
+                    self.assertNotIn("any APD", r.text)
 
 
 class RegisterTests(ApdCase):
@@ -176,7 +270,7 @@ class RegisterTests(ApdCase):
 
     async def test_the_public_page_names_the_rule(self) -> None:
         await self.rule({"register": True, "checkin": True, "accepted": ["x-clube-norte"], "custom": [OWN]})
-        await self.fetch("UPDATE fields SET public_page = true")
+        await self.fetch("UPDATE fields SET public_page = true, country = 'PT'")
         game = await self.game(federation="off")
         for lang, word in (("pt", "Filiação numa APD"), ("en", "APD membership"), ("de", "APD-Mitgliedschaft"),
                            ("zh-tw", "APD 會員資格")):

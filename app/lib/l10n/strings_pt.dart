@@ -1384,4 +1384,14 @@ const Map<String, String> ptStrings = {
   'propmodes.err.no_space':
       'Sem espaço para {mode}: o telemóvel guarda no máximo 8 modos obtidos, 512 KiB no total.',
   'propmodes.err.other': 'Não foi possível obter o modo ({mode}).',
+  // The membership texts of a field outside Portugal (decision MEM-4)
+  'apd.section_m': 'Filiação numa associação',
+  'apd.accepts_any_m': 'Qualquer associação é aceite.',
+  'apd.accepts_m': 'Associações aceites: {list}',
+  'apd.pick_m': 'A associação',
+  'apd.need_number_m': 'Este campo pede o número de associado.',
+  'apd.status.not_accepted_m': 'Associação não aceite aqui',
+  'site.err.membership_missing_m':
+      'Este campo exige o número de associado para a inscrição.',
+  'site.err.apd_not_accepted_m': 'Este campo não aceita essa associação.',
 };

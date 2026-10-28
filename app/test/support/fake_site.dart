@@ -190,6 +190,11 @@ class FakeSite {
 
   /// The field's APD rule (protocol/apd.md), sent with the field; null: none.
   Map<String, Object?>? apdRule;
+
+  /// The field's country, sent with the field when [sendsCountry] (a site
+  /// server from before fields had one sends none: the app takes PT).
+  String? country;
+  var sendsCountry = false;
   final regs = <String, Map<String, Object?>>{};
   final claims = <Map<String, Object?>>[];
   final linked = <String, String>{};
@@ -201,6 +206,7 @@ class FakeSite {
     'timezone': 'Europe/Lisbon',
     'federation_label': 'FPA',
     if (apdRule != null) 'apd': apdRule,
+    if (sendsCountry) 'country': country,
     'limit_template': 'portugal',
     'classes': ['cqb', 'dmr', 'rifle', 'sniper'],
     'max_replicas': 3,

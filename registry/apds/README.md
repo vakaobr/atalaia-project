@@ -2,11 +2,13 @@
 SPDX-FileCopyrightText: 2026 The Atalaia contributors
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
-# APDs recognised for airsoft
+# Membership bodies recognised for airsoft
 
-[`apds.json`](apds.json) lists the APDs (Associações Promotoras de Desporto) a Portuguese airsoft player
-may belong to, so a field can say which ones it accepts and a player can pick theirs when registering or
-checking in ([protocol/apd.md](../../protocol/apd.md)). Its format is [`../schema/apds.schema.json`](../schema/apds.schema.json).
+[`apds.json`](apds.json) lists the bodies an airsoft player may belong to: Portugal's APDs (Associações
+Promotoras de Desporto) and, as they are added, the clubs, federations and associations of other countries (the
+file and its schema keep the historical "apds" name, decision MEM-1). Each entry has the `country` whose fields
+offer it, so a field can say which ones it accepts and a player can pick theirs when registering or
+checking in ([protocol/apd.md](../../protocol/apd.md)). A field with no entry for its country adds its own. Its format is [`../schema/apds.schema.json`](../schema/apds.schema.json).
 
 **There is no national directory here and no verification of a member.** The list only names the associations;
 the membership number and its expiry are what the player declares and the marshal checks against the card.
@@ -30,6 +32,7 @@ Add one object to `apds`, in alphabetical order of `id`:
 ```json
 {
   "id": "example-apd",
+  "country": "PT",
   "name": "Associação Exemplo de Airsoft, APD",
   "short_name": "Exemplo",
   "website": "https://example.pt",
@@ -39,6 +42,7 @@ Add one object to `apds`, in alphabetical order of `id`:
 
 - `id`: 1-32 characters `a-z 0-9 -`, starting with a letter or digit; it never changes once published
   (registrations keep it). An id starting with `x-` is reserved for a field's own entries.
+- `country`: the ISO 3166-1 alpha-2 code, in capitals, of the country whose fields offer the entry.
 - `name` (1-96 characters, as the association writes it), `short_name` (1-16 characters, what players say),
   `website` (`https://`, or `null` when it has none).
 - `source`: the page that shows the association exists and is recognised for airsoft: its own site or a public

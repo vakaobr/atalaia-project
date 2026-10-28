@@ -28,8 +28,9 @@ String _secret(int n) =>
 
 const _list =
     '{"format":1,"apds":['
-    '{"id":"apd-a","name":"APD A","short_name":"A","website":null,"source":"https://a.example/"},'
-    '{"id":"apd-b","name":"APD B","short_name":"B","website":null,"source":"https://b.example/"}'
+    '{"id":"apd-a","country":"PT","name":"APD A","short_name":"A","website":null,"source":"https://a.example/"},'
+    '{"id":"apd-b","country":"PT","name":"APD B","short_name":"B","website":null,"source":"https://b.example/"},'
+    '{"id":"club-es","country":"ES","name":"Club ES","short_name":"CES","website":null,"source":"https://es.example/"}'
     ']}';
 
 void main() {
@@ -49,7 +50,12 @@ void main() {
     );
     svc = ControllerCheckin(
       engine,
-      CheckinConfig(limitsYaml: limits, utcDay: true, apdsJson: _list),
+      CheckinConfig(
+        limitsYaml: limits,
+        utcDay: true,
+        apdsJson: _list,
+        country: 'PT',
+      ),
     );
     ControllerPositions(engine);
     api = ControllerApi(engine, gmToken: 'g', readToken: 'r');
@@ -314,6 +320,112 @@ void main() {
     final csv = svc.csvExport(gid);
     expect(csv.split('\r\n').first.contains('apd_id,membership_expires'), true);
     expect(csv.contains(',apd-a,,valid,'), true);
+  });
+
+  group('the field\'s country (decisions MEM-2, MEM-3)', () {
+    Map<String, Object?> put(Object? country) {
+      final r = call(
+        'PUT',
+        '/api/v1/checkin/settings',
+        body: {'country': country},
+      );
+      expect(r.status, 200, reason: '${r.body}');
+      return (r.body! as Map).cast<String, Object?>();
+    }
+
+    List<Object?> offered() => [
+      for (final e in svc.info()['apds']! as List) (e as Map)['id'],
+    ];
+
+    test('the configured country, then the console\'s, then the default', () {
+      expect(svc.settings()['country'], 'PT');
+      expect(offered(), ['apd-a', 'apd-b']);
+      expect(put('es')['country'], 'ES'); // capitals whatever the case typed
+      expect(offered(), ['club-es']);
+      expect(((svc.info()['settings']! as Map))['country'], 'ES');
+      put('');
+      expect(svc.settings()['country'], 'PT'); // back to the configured one
+      final bad = call(
+        'PUT',
+        '/api/v1/checkin/settings',
+        body: {'country': 'PRT'},
+      );
+      expect(bad.status, 400);
+      expect(
+        call('PUT', '/api/v1/checkin/settings', body: {'country': 7}).status,
+        400,
+      );
+    });
+
+    test('without a configured country the time zone decides', () {
+      ControllerCheckin make(String zone) => ControllerCheckin(
+        ControllerEngine(transport: RecordingRadio(), wallSeconds: () => wall),
+        CheckinConfig(limitsYaml: limits, apdsJson: _list, zoneName: zone),
+      );
+      expect(make('Europe/Lisbon').settings()['country'], 'PT');
+      expect(make('Atlantic/Madeira').settings()['country'], 'PT');
+      expect(make('Europe/Madrid').settings()['country'], isNull);
+      final none = make('Europe/Madrid');
+      expect(
+        [for (final e in none.info()['apds']! as List) (e as Map)['id']],
+        isEmpty, // no country: only the field's own entries
+      );
+    });
+
+    test('a field without a country offers only its own entries', () {
+      put('ES');
+      rule({
+        'custom': [
+          {'id': 'x-own', 'name': 'Own', 'short_name': 'O'},
+        ],
+      });
+      expect(offered(), ['club-es', 'x-own']);
+      svc.siteManaged = true;
+      svc.applySiteSettings({
+        'max_replicas': 5,
+        'federation_label': null,
+        'limit_template': {
+          'id': 'portugal',
+          'name': 'Portugal',
+          'classes': {
+            'rifle': {
+              'max_energy_j': 1.14,
+              'med_m': 0,
+              'fire_mode': 'full_auto',
+            },
+          },
+        },
+        'country': null,
+      });
+      expect(svc.settings()['country'], isNull);
+      expect(offered(), ['x-own']);
+    });
+
+    test(
+      'the site server\'s country applies, and the console cannot change it',
+      () {
+        svc.siteManaged = true;
+        expect(svc.country(), 'PT'); // nothing from the site: the local one
+        engine.store.setSetting('checkin.country_site', '"DE"');
+        expect(svc.settings()['country'], 'DE');
+        final r = call(
+          'PUT',
+          '/api/v1/checkin/settings',
+          body: {'country': 'PT'},
+        );
+        expect(r.status, 409);
+        svc.siteManaged = false;
+        expect(svc.settings()['country'], 'PT');
+      },
+    );
+
+    test('rows and the chrono list carry it for the marshal\'s words', () {
+      final gid = newGame();
+      expect(checkIn(gid, {}).status, 201);
+      expect(row(gid)['country'], 'PT');
+      put('ES');
+      expect(row(gid)['country'], 'ES');
+    });
   });
 
   test('the site server\'s rule applies, and the console cannot change it', () {

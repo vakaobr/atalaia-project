@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/// The APD membership part of a registration or check-in form, and the
-/// verdict's label and colour (protocol/apd.md; decisions APD-40 to APD-49).
+/// The membership part of a registration or check-in form ("APD" on a field
+/// in Portugal, "association membership" elsewhere), and the verdict's label
+/// and colour (protocol/apd.md; decisions APD-40 to APD-49, MEM-4).
 ///
 /// A player declares the APD, the membership number and its expiry. Nothing
 /// is verified: the field's rule only says whether the declaration is needed
@@ -32,6 +33,32 @@ Future<List<ApdEntry>> loadProjectApds([AssetBundle? bundle]) async {
     return const [];
   }
 }
+
+/// The strings that have an association twin (`<key>_m`) for a field outside
+/// Portugal.
+const _associationTwins = {
+  'apd.section',
+  'apd.accepts_any',
+  'apd.accepts',
+  'apd.pick',
+  'apd.need_number',
+  'apd.status.not_accepted',
+  'site.err.membership_missing',
+  'site.err.apd_not_accepted',
+};
+
+/// The key of [key] in the wording of a field of [country]: its `_m` twin
+/// when the field is outside Portugal (or has no country), else [key].
+String apdKey(String key, String? country) =>
+    apdWording(country) == 'membership' && _associationTwins.contains(key)
+    ? '${key}_m'
+    : key;
+
+/// The country a peer's answer names: its `country` when the answer has the
+/// key, else Portugal (an older controller or site server, from before
+/// fields had a country, only knew Portugal's APDs).
+String? apdCountryOf(Map<Object?, Object?> answer) =>
+    answer.containsKey('country') ? lenientApdCountry(answer['country']) : 'PT';
 
 /// What a person typed or was given: the APD, the number and the expiry.
 final class ApdInput {
@@ -65,6 +92,7 @@ final class ApdInput {
   /// The string key of what is wrong with the form for [rule], or null.
   /// [needNumber]: the number is required (the game's federation rule or
   /// the field's `register`).
+  /// A key with a `_m` twin goes through [apdKey] with the field's country.
   String? problem(ApdRule rule, {required bool needNumber}) {
     final e = expiresOrNull;
     if (e != null && !validApdDate(e)) return 'apd.bad_date';
@@ -96,8 +124,16 @@ Color apdStatusColor(BuildContext context, String? status) {
 /// "valid" / "expired" / "not accepted" / "missing" as a small badge; nothing
 /// when no rule asks (the verdict is null).
 class ApdBadge extends StatelessWidget {
-  const ApdBadge({required this.status, this.overridden = false, super.key});
+  const ApdBadge({
+    required this.status,
+    this.overridden = false,
+    this.country = 'PT',
+    super.key,
+  });
   final String? status;
+
+  /// The field's country: the wording of "APD not accepted".
+  final String? country;
 
   /// A marshal confirmed it with this verdict.
   final bool overridden;
@@ -116,7 +152,7 @@ class ApdBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        s.t(apdStatusKey(st)) +
+        s.t(apdKey(apdStatusKey(st), country)) +
             (overridden ? ' · ${s.t('apd.overridden')}' : ''),
         style: TextStyle(color: color, fontWeight: FontWeight.w600),
       ),
@@ -147,6 +183,7 @@ class ApdFields extends StatefulWidget {
     required this.input,
     required this.rule,
     required this.numberRequired,
+    this.country = 'PT',
     this.choices,
     this.keyPrefix = 'apd',
     super.key,
@@ -155,6 +192,10 @@ class ApdFields extends StatefulWidget {
   final ApdInput input;
   final ApdRule rule;
   final bool numberRequired;
+
+  /// The field's country (null: unset): the wording, and which of the
+  /// project's entries are offered.
+  final String? country;
 
   /// The APDs to offer (the controller's `apds`); null: the project's list
   /// and the rule's own entries.
@@ -181,7 +222,7 @@ class _ApdFieldsState extends State<ApdFields> {
   }
 
   List<ApdEntry> get _choices =>
-      widget.choices ?? widget.rule.choices(_project);
+      widget.choices ?? widget.rule.choices(_project, widget.country);
 
   @override
   Widget build(BuildContext context) {
@@ -198,12 +239,15 @@ class _ApdFieldsState extends State<ApdFields> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
-        Text(s.t('apd.section'), style: Theme.of(context).textTheme.titleSmall),
+        Text(
+          s.t(apdKey('apd.section', widget.country)),
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
         const SizedBox(height: 4),
         Text(
           names == null
-              ? s.t('apd.accepts_any')
-              : s.t('apd.accepts', {'list': names}),
+              ? s.t(apdKey('apd.accepts_any', widget.country))
+              : s.t(apdKey('apd.accepts', widget.country), {'list': names}),
           key: Key('${widget.keyPrefix}-accepts'),
         ),
         const SizedBox(height: 12),
@@ -211,7 +255,9 @@ class _ApdFieldsState extends State<ApdFields> {
           key: Key('${widget.keyPrefix}-pick'),
           initialValue: ids.contains(input.apd) ? input.apd : null,
           isExpanded: true,
-          decoration: InputDecoration(labelText: s.t('apd.pick')),
+          decoration: InputDecoration(
+            labelText: s.t(apdKey('apd.pick', widget.country)),
+          ),
           items: [
             DropdownMenuItem(value: null, child: Text(s.t('apd.unlisted'))),
             for (final e in choices)

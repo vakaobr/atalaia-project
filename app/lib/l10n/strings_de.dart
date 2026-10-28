@@ -1416,4 +1416,14 @@ const Map<String, String> deStrings = {
   'propmodes.err.no_space':
       'Kein Platz für {mode}: Das Handy behält höchstens 8 geladene Modi, insgesamt 512 KiB.',
   'propmodes.err.other': 'Der Modus konnte nicht geladen werden ({mode}).',
+  // The membership texts of a field outside Portugal (decision MEM-4)
+  'apd.section_m': 'Verbandsmitgliedschaft',
+  'apd.accepts_any_m': 'Jeder Verband wird akzeptiert.',
+  'apd.accepts_m': 'Akzeptierte Verbände: {list}',
+  'apd.pick_m': 'Dein Verband',
+  'apd.need_number_m': 'Dieses Feld verlangt deine Mitgliedsnummer.',
+  'apd.status.not_accepted_m': 'Verband hier nicht akzeptiert',
+  'site.err.membership_missing_m':
+      'Dieses Feld braucht für die Anmeldung deine Mitgliedsnummer.',
+  'site.err.apd_not_accepted_m': 'Dieses Feld akzeptiert diesen Verband nicht.',
 };

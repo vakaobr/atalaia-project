@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/// APD membership (protocol/apd.md, decisions APD-1 to APD-14): the list of
-/// APDs, a field's rule, a membership and the verdict. The Pi's
+/// Association membership, historically "APD" (protocol/apd.md, decisions
+/// APD-1 to APD-14 and MEM-1 to MEM-6): the list of membership bodies with
+/// their country, a field's rule and country, a membership and the verdict. The Pi's
 /// controller/atalaia_controller/apd.py and the server's services/apd.py do
 /// the same; all run protocol/vectors/apd.json (test/protocol/apd_test.dart).
 ///
@@ -11,13 +12,15 @@ library;
 
 import 'dart:convert';
 
-/// One APD of the list, or a field's own entry.
+/// One entry of the list (it has a [country]), or a field's own entry (it
+/// has none and is offered whatever the field's country).
 final class ApdEntry {
   const ApdEntry({
     required this.id,
     required this.name,
     required this.shortName,
     this.website,
+    this.country,
   });
 
   final String id;
@@ -25,8 +28,12 @@ final class ApdEntry {
   final String shortName;
   final String? website;
 
+  /// ISO 3166-1 alpha-2 of the country whose fields offer the entry.
+  final String? country;
+
   Map<String, Object?> toJson() => {
     'id': id,
+    if (country != null) 'country': country,
     'name': name,
     'short_name': shortName,
     'website': website,
@@ -38,11 +45,69 @@ final class ApdEntry {
       other.id == id &&
       other.name == name &&
       other.shortName == shortName &&
-      other.website == website;
+      other.website == website &&
+      other.country == country;
 
   @override
-  int get hashCode => Object.hash(id, name, shortName, website);
+  int get hashCode => Object.hash(id, name, shortName, website, country);
 }
+
+final _countryRe = RegExp(r'^[A-Z]{2}$');
+
+/// The time zones whose field defaults to Portugal (decision MEM-2).
+const apdPortugalZones = {
+  'Europe/Lisbon',
+  'Atlantic/Azores',
+  'Atlantic/Madeira',
+};
+
+/// A field's country: two capitals or null (unset); else [ApdError]
+/// `country_invalid`.
+String? checkApdCountry(Object? value) {
+  if (value == null) return null;
+  if (value is! String || !_countryRe.hasMatch(value)) {
+    throw const ApdError('country_invalid');
+  }
+  return value;
+}
+
+/// [checkApdCountry] for a value from a peer: one this build cannot read is
+/// unset.
+String? lenientApdCountry(Object? value) {
+  try {
+    return checkApdCountry(value);
+  } on ApdError {
+    return null;
+  }
+}
+
+/// The country a field gets from its time zone: PT in Portugal's, else unset.
+String? apdDefaultCountry(String? zone) =>
+    apdPortugalZones.contains(zone) ? 'PT' : null;
+
+/// A time zone's IANA name from the abbreviation Dart gives for the phone's
+/// (`DateTime.timeZoneName`, the only name it has): WET and WEST are taken as
+/// Lisbon's, AZOT and AZOST as the Azores'; any other abbreviation is kept
+/// (it is no zone of Portugal). The Canary Islands and the Faroes share WET:
+/// their GM sets the country in the console.
+String apdZoneOfAbbreviation(String abbreviation) => switch (abbreviation) {
+  'WET' || 'WEST' => 'Europe/Lisbon',
+  'AZOT' || 'AZOST' => 'Atlantic/Azores',
+  _ => abbreviation,
+};
+
+/// Which words the screens use: `apd` (Portugal's APD texts) for PT,
+/// `membership` ("association membership") for any other country or none.
+String apdWording(String? country) => country == 'PT' ? 'apd' : 'membership';
+
+/// What a field of [country] offers from [project]: the entries of the
+/// country (none for a field without one), then the [rule]'s own entries
+/// (decision MEM-3).
+List<ApdEntry> apdOffered(
+  List<ApdEntry> project,
+  ApdRule rule,
+  String? country,
+) => rule.choices(project, country);
 
 /// The membership verdict; `null` where no rule asks.
 const apdStatuses = ['missing', 'not_accepted', 'expired', 'valid'];
@@ -75,6 +140,7 @@ List<ApdEntry> parseApdList(String json) {
         name: e['name'] as String,
         shortName: e['short_name'] as String,
         website: e['website'] as String?,
+        country: e['country'] as String?,
       ),
   ];
 }
@@ -206,8 +272,19 @@ final class ApdRule {
     'custom': [for (final e in custom) e.toJson()],
   };
 
-  /// The choices a form shows: the project's list, then the field's own.
-  List<ApdEntry> choices(List<ApdEntry> project) => [...project, ...custom];
+  /// The choices a form shows on a field of [country]: the project's entries
+  /// of that country (none for a field without one), then the field's own.
+  List<ApdEntry> choices(List<ApdEntry> project, String? country) {
+    final listed = [
+      for (final e in project)
+        if (country != null && e.country == country) e,
+    ];
+    return [
+      ...listed,
+      for (final e in custom)
+        if (!listed.any((x) => x.id == e.id)) e,
+    ];
+  }
 
   @override
   bool operator ==(Object other) =>

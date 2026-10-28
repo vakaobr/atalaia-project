@@ -58,6 +58,8 @@
     confirm = "auto"            # or "staff": a check-in waits until a marshal or the GM confirms it
     federation = "off"          # or "optional", "required": the federation number (never verified)
     federation_label = "FPA"
+    country = ""                # the field's country, ISO 3166-1 alpha-2 (PT, ES, ...); empty: PT where the
+                                # time zone is Portugal's, otherwise unset (protocol/apd.md)
     apd_checkin = false         # check the player's APD membership at check-in (protocol/apd.md)
     apd_expiry = false          # ... and its expiry date
     apd_accepted = []           # APD ids accepted; empty: any
@@ -181,7 +183,7 @@ SECTIONS = {
     "sync": ("enabled", "url", "api_key", "ca_file", "interval_game_s", "interval_idle_s", "timeout_s",
              "branding", "remote_gm", "library"),
     "checkin": ("field_id", "field_name", "operator", "confirm", "federation", "federation_label",
-                "apd_checkin", "apd_expiry", "apd_accepted", "max_replicas", "max_players", "chrono_valid_for",
+                "country", "apd_checkin", "apd_expiry", "apd_accepted", "max_replicas", "max_players", "chrono_valid_for",
                 "rate_per_minute", "urls",
                 "wifi_ssid", "limit_template", "notice_version", "notice_pt", "notice_en",
                 "retention_days"),
@@ -245,6 +247,7 @@ class Config:
     checkin_confirm: str = "auto"
     federation: str = "off"
     federation_label: str = "FPA"
+    country: str = ""
     apd_checkin: bool = False
     apd_expiry: bool = False
     apd_accepted: list[str] = field(default_factory=list)
@@ -365,6 +368,11 @@ def _check_checkin(cfg: "Config") -> None:
         raise ConfigError(f"checkin.field_name: 1-{FIELD_NAME_MAX} characters")
     if not 1 <= len(cfg.federation_label) <= 16:
         raise ConfigError("checkin.federation_label: 1-16 characters")
+    if cfg.country:
+        from .apd import COUNTRY_RE  # noqa: PLC0415
+
+        if not COUNTRY_RE.fullmatch(cfg.country):
+            raise ConfigError("checkin.country: two capital letters (ISO 3166-1 alpha-2, e.g. PT) or empty")
     try:
         from .apd import check_rule  # noqa: PLC0415
 

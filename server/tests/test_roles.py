@@ -214,6 +214,16 @@ class RoleTestCase(AppTestCase):
 
 
 class FieldTests(RoleTestCase):
+    async def test_a_new_field_gets_its_country_from_its_time_zone(self) -> None:
+        """Decision MEM-2: PT in Portugal's three zones, otherwise unset."""
+        for zone, want in (("Europe/Lisbon", "PT"), ("Atlantic/Azores", "PT"), ("Atlantic/Madeira", "PT"),
+                           ("Europe/Madrid", None), ("UTC", None)):
+            with self.subTest(zone=zone):
+                slug = "z" + zone.lower().replace("/", "-").replace("_", "-")
+                r = await self.client.post("/api/v1/fields", headers=self.as_admin,
+                                           json={"name": slug, "slug": slug, "timezone": zone})
+                self.assertEqual((r.status_code, r.json()["country"]), (201, want), r.text)
+
     async def test_server_administrators_create_fields(self) -> None:
         r = await self.client.post("/api/v1/fields", headers=self.as_admin,
                                    json={"name": "Campo Tejo", "slug": "campo-tejo", "field_type": "cqb",

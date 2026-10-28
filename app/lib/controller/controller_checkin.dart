@@ -121,6 +121,7 @@ const _settingsKeys = [
   'max_players',
   'chrono_valid_for',
   'apd',
+  'country',
 ];
 
 /// Who a request or a stream connection belongs to (checkin.py `Viewer`):
@@ -179,6 +180,8 @@ class CheckinConfig {
     this.confirm = 'auto',
     this.federation = 'off',
     this.federationLabel = 'FPA',
+    this.country = '',
+    this.zoneName,
     this.maxReplicas = 5,
     this.maxPlayers = 300,
     this.chronoValidFor = 'day',
@@ -202,6 +205,13 @@ class CheckinConfig {
   final String confirm;
   final String federation;
   final String federationLabel;
+
+  /// The field's country (two capitals); empty: PT where [zoneName] is
+  /// Portugal's, else unset (decision MEM-2).
+  final String country;
+
+  /// The IANA name of the phone's time zone, when known.
+  final String? zoneName;
   final int maxReplicas;
   final int maxPlayers;
   final String chronoValidFor;
@@ -713,6 +723,7 @@ class ControllerCheckin {
   // --- settings and the poster ------------------------------------------------
 
   static const _siteLimitsKey = 'checkin.site_limits';
+  static const _countrySiteKey = 'checkin.country_site';
 
   /// With `[sync] branding = "site"` (set by the sync): the limit template
   /// the site server sent last, kept in the store, replaces the configured
@@ -793,6 +804,22 @@ class ControllerCheckin {
         }
       }
     }
+    if (site.containsKey('country')) {
+      // The field's country (protocol/apd.md); an older site server sends none.
+      final encodedCountry = jsonEncode(site['country']);
+      if (engine.store.getSetting(_countrySiteKey) != encodedCountry) {
+        engine.store.setSetting(_countrySiteKey, encodedCountry);
+        _save();
+        changed++;
+        if (spec.isEmpty) {
+          engine.emit({
+            'type': 'checkin_settings',
+            'settings': settings(),
+            '_staff': true,
+          });
+        }
+      }
+    }
     final template = (site['limit_template']! as Map).cast<String, Object?>();
     final encoded = jsonEncode(template);
     if (engine.store.getSetting(_siteLimitsKey) != encoded) {
@@ -826,7 +853,9 @@ class ControllerCheckin {
         final m = jsonDecode(saved);
         if (m is Map) {
           for (final e in m.entries) {
-            if (_settingsKeys.contains(e.key)) out['${e.key}'] = e.value;
+            if (e.key != 'country' && _settingsKeys.contains(e.key)) {
+              out['${e.key}'] = e.value;
+            }
           }
         }
       } on FormatException {
@@ -834,7 +863,43 @@ class ControllerCheckin {
       }
     }
     out['apd'] = apdRule().toJson();
+    out['country'] = country();
     return out;
+  }
+
+  // --- the field's country (protocol/apd.md, decisions MEM-2, MEM-3) ---------
+
+  /// The console's own choice: null when it made none.
+  String? _savedCountry() {
+    final saved = engine.store.getSetting('checkin.settings');
+    if (saved == null) return null;
+    try {
+      final m = jsonDecode(saved);
+      return m is Map ? lenientApdCountry(m['country']) : null;
+    } on Object {
+      return null;
+    }
+  }
+
+  /// The configured country, else the default of the phone's time zone.
+  String? _configCountry() => config.country.isNotEmpty
+      ? config.country
+      : apdDefaultCountry(config.zoneName);
+
+  /// The field's country: the site server's when managed there (it may say
+  /// unset), else the console's, else the configured or default one.
+  String? country() {
+    if (_siteManaged) {
+      final raw = engine.store.getSetting(_countrySiteKey);
+      if (raw != null) {
+        try {
+          return lenientApdCountry(jsonDecode(raw));
+        } on Object {
+          // Falls through to the local one.
+        }
+      }
+    }
+    return _savedCountry() ?? _configCountry();
   }
 
   // --- APD membership (protocol/apd.md) --------------------------------------
@@ -885,9 +950,10 @@ class ControllerCheckin {
     }
   }
 
-  /// What a form offers: the project's list, then the field's own entries.
+  /// What a form offers: the project's entries of the field's country, then
+  /// the field's own entries.
   List<Map<String, Object?>> apdChoices() => [
-    for (final e in apdRule().choices(projectApds())) e.toJson(),
+    for (final e in apdRule().choices(projectApds(), country())) e.toJson(),
   ];
 
   /// The local date a membership is checked against (the field's day).
@@ -975,7 +1041,16 @@ class ControllerCheckin {
     if (unknown.isNotEmpty) {
       throw ControllerError('unknown check-in settings $unknown');
     }
+    if (spec.containsKey('country') &&
+        _siteManaged &&
+        engine.store.getSetting(_countrySiteKey) != null) {
+      throw ControllerError.conflict(
+        "the field's country comes from the site server (the sync's "
+        'branding is "site"): change it there',
+      );
+    }
     final cur = settings();
+    var savedCountry = _savedCountry();
     const choices = {
       'confirm': ['auto', 'staff'],
       'federation': ['off', 'optional', 'required'],
@@ -999,6 +1074,18 @@ class ControllerCheckin {
     for (final e in spec.entries) {
       final k = e.key, v = e.value;
       if (k == 'apd') continue;
+      if (k == 'country') {
+        final code = v is String ? v.trim().toUpperCase() : v;
+        try {
+          savedCountry = checkApdCountry(code == '' ? null : code);
+        } on ApdError {
+          throw ControllerError(
+            'country: two letters (ISO 3166-1 alpha-2, e.g. PT) or empty',
+          );
+        }
+        cur[k] = savedCountry ?? _configCountry();
+        continue;
+      }
       final c = choices[k];
       if (c != null && !c.contains(v)) {
         throw ControllerError('$k: one of ${c.join(', ')}');
@@ -1016,7 +1103,11 @@ class ControllerCheckin {
       'checkin.settings',
       jsonEncode({
         for (final k in _settingsKeys)
-          k: k == 'apd' ? (apd ?? _localApd()).toJson() : cur[k],
+          k: switch (k) {
+            'apd' => (apd ?? _localApd()).toJson(),
+            'country' => savedCountry,
+            _ => cur[k],
+          },
       }),
     );
     cur['apd'] = apdRule().toJson();
@@ -1772,6 +1863,7 @@ class ControllerCheckin {
           row['federation_number'] as String?,
           row['membership_expires'] as String?,
         ),
+        'country': country(),
       });
     }
     if (declarations) {
@@ -2629,6 +2721,7 @@ class ControllerCheckin {
         for (final s in ['pending', 'passed', 'refused']) s: counts[s] ?? 0,
       },
       'chrono_valid_for': settings()['chrono_valid_for'],
+      'country': country(),
       'players': [...(waiting..sort(bySeq)), ...(done..sort(bySeq))],
     };
   }

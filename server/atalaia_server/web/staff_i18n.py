@@ -3009,3 +3009,58 @@ for _lang, _texts in _POSITIONS.items():
     _clash = set(STRINGS[_lang]) & set(_texts)
     assert not _clash, sorted(_clash)
     STRINGS[_lang].update(_texts)
+
+# The membership texts of a field outside Portugal (decision MEM-4): where a field in Portugal says "APD", any other
+# country (or none) says "association". Each ``<key>_m`` is the twin of an APD text above; ``static/staff/registrants.js``
+# swaps them in by the country the registrations API sends. ``e_country_invalid`` is for PATCH /fields. Every key is
+# new, as above.
+_MEMBERSHIP: dict[str, dict[str, str]] = {
+    "pt": {
+        "col_fed_number_m": "Filiação (associação)",
+        "reg_edit_apd_m": "Associação da filiação",
+        "apd_unknown_m": "Associação desconhecida",
+        "apd_status_not_accepted_m": "associação não aceite",
+        "e_apd_id_invalid_m": "Associação inválida.",
+        "e_membership_missing_m": "Este campo exige o número de filiação numa associação.",
+        "e_apd_not_accepted_m": "Este campo não aceita essa associação.",
+        "e_apd_rule_invalid_m": "Regra de filiação inválida.",
+        "e_country_invalid": "País inválido: usar um código de duas letras (ISO 3166-1), por exemplo PT.",
+    },
+    "en": {
+        "col_fed_number_m": "Membership (association)",
+        "reg_edit_apd_m": "Member's association",
+        "apd_unknown_m": "Association unknown",
+        "apd_status_not_accepted_m": "association not accepted",
+        "e_apd_id_invalid_m": "Invalid association.",
+        "e_membership_missing_m": "This field requires an association membership number.",
+        "e_apd_not_accepted_m": "This field does not accept that association.",
+        "e_apd_rule_invalid_m": "Invalid membership rule.",
+        "e_country_invalid": "Invalid country: use a two-letter ISO 3166-1 code, for example PT.",
+    },
+    "de": {
+        "col_fed_number_m": "Mitgliedschaft (Verband)",
+        "reg_edit_apd_m": "Verband des Mitglieds",
+        "apd_unknown_m": "Verband unbekannt",
+        "apd_status_not_accepted_m": "Verband nicht akzeptiert",
+        "e_apd_id_invalid_m": "Ungültiger Verband.",
+        "e_membership_missing_m": "Dieses Spielfeld verlangt die Mitgliedsnummer eines Verbands.",
+        "e_apd_not_accepted_m": "Dieses Spielfeld akzeptiert diesen Verband nicht.",
+        "e_apd_rule_invalid_m": "Ungültige Mitgliedschaftsregel.",
+        "e_country_invalid": "Ungültiges Land: Verwende einen zweistelligen ISO-3166-1-Code, zum Beispiel PT.",
+    },
+    "zh-tw": {
+        "col_fed_number_m": "會員資格（協會）",
+        "reg_edit_apd_m": "會員的協會",
+        "apd_unknown_m": "協會不明",
+        "apd_status_not_accepted_m": "不接受此協會",
+        "e_apd_id_invalid_m": "協會無效。",
+        "e_membership_missing_m": "這個場地必須填寫協會會員編號。",
+        "e_apd_not_accepted_m": "這個場地不接受該協會。",
+        "e_apd_rule_invalid_m": "會員資格規則無效。",
+        "e_country_invalid": "國家無效：請使用兩個字母的 ISO 3166-1 代碼，例如 PT。",
+    },
+}
+for _lang, _texts in _MEMBERSHIP.items():
+    _clash = set(STRINGS[_lang]) & set(_texts)
+    assert not _clash, sorted(_clash)
+    STRINGS[_lang].update(_texts)

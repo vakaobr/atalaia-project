@@ -452,6 +452,7 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
                     ApdBadge(
                       status: p['apd_status'] as String?,
                       overridden: p['apd_override'] == true,
+                      country: apdCountryOf(_list ?? const {}),
                     ),
                     Text(
                       apdLine(

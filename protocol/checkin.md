@@ -67,7 +67,7 @@ Playing never needs an account. For each field the app makes a **field identity*
  "field": {"id": "campo-norte", "name": "Campo Norte", "operator": "Clube X"},
  "notice": {"version": 1, "pt": "...", "en": "..."},
  "settings": {"confirm": "auto", "federation": "off", "federation_label": "FPA",
-              "max_replicas": 5, "chrono_valid_for": "day"},
+              "max_replicas": 5, "chrono_valid_for": "day", "country": "PT"},
  "limits": {"id": "portugal", "name": "Portugal", "status": "unverified", "classes": ["cqb", "dmr", "rifle", "sniper"]},
  "replica_types": ["aeg", "gbb", "hpa", "bolt_action", "dmr", "sniper", "pistol", "shotgun"],
  "games": [{"game_id": 4242, "name": "Domingo", "state": "ready", "teams": ["red", "blue"], "squads": 0}]}
@@ -212,7 +212,7 @@ Version 1, at most 128 bytes with the version byte. All three keys are required.
 | POST | `/api/v1/games/{id}/checkins/import` | GM token | A registration list for a field with no site server (PKE-1): `{"format": "csv" \| "json", "data": the file's text, "source", "dry_run"?, "basis_confirmed"?}`, in the site server's import format (`controller/atalaia_controller/import_format.py`; cases in `protocol/vectors/registration_import.json`). The answer lists each row as `created`, `updated`, `unchanged`, `skipped` or `refused` with a code; a real import needs `basis_confirmed`. The players are `expected` with no ticket (a marshal ticks them by name) and never go back to a site server |
 | POST | `/api/v1/games/{id}/tags` | GM token, marshal or gm player token (of this game) | `{"player", "team"?}`: one signed player tag (protocol/nfc-tag.md) as hex (`payload`, `ndef`, `memory`), signed with the live game's key, which never leaves the controller; the console, the phone controller's screen and the marshal's app write it to the NFC tag |
 | POST | `/api/v1/games/{id}/checkin/open` · `/close` | GM token | Check-in is open from a game's creation until it ends, unless closed |
-| GET / PUT | `/api/v1/checkin/settings` | GM token | `confirm`, `federation`, `federation_label`, `max_replicas`, `max_players`, `chrono_valid_for` |
+| GET / PUT | `/api/v1/checkin/settings` | GM token | `confirm`, `federation`, `federation_label`, `max_replicas`, `max_players`, `chrono_valid_for`, `apd` (the membership rule) and `country` ([apd.md](apd.md): picks the words and the list the membership part offers) |
 | GET / PUT | `/api/v1/checkin/poster` | GM token | The poster's fields and text, `ca_short`, and why it cannot be made (`problem` in English, `problem_code` for the console: `https_off`, `no_address`, `too_long`, `invalid`); PUT `urls`, `wifi_ssid`, `game_id`, `field_name` |
 | GET / POST | `/api/v1/marshals` | GM token | The marshal list / add to it `{"player_id"?, "name"?, "marshal_id"?, "public_key"?}` (below) |
 | PATCH / DELETE | `/api/v1/marshals/{id}` | GM token | Rename (`name`) or rebind (`player_id`, null unbinds) / take a marshal off the list |

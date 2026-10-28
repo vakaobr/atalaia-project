@@ -67,10 +67,67 @@ void main() {
     });
   });
 
+  group('countries (apd.json)', () {
+    for (final c in cases(v, 'country_valid')) {
+      test('valid: ${c['name']}', () {
+        expect(checkApdCountry(c['input']), c['country']);
+      });
+    }
+    for (final c in cases(v, 'country_invalid')) {
+      test('invalid: ${c['name']}', () {
+        expect(
+          () => checkApdCountry(c['input']),
+          throwsA(isA<ApdError>().having((e) => e.code, 'code', c['error'])),
+        );
+      });
+    }
+    for (final c in cases(v, 'default_country')) {
+      test('default for ${c['zone']}', () {
+        expect(apdDefaultCountry(c['zone'] as String?), c['country']);
+      });
+    }
+    for (final c in cases(v, 'wording')) {
+      test('wording for ${c['country']}', () {
+        expect(apdWording(c['country'] as String?), c['wording']);
+      });
+    }
+    for (final c in cases(v, 'choices')) {
+      test('offers: ${c['name']}', () {
+        final project = [
+          for (final e in (c['project'] as List).cast<Map<String, Object?>>())
+            ApdEntry(
+              id: e['id'] as String,
+              country: e['country'] as String?,
+              name: e['name'] as String,
+              shortName: e['short_name'] as String,
+              website: e['website'] as String?,
+            ),
+        ];
+        final offered = apdOffered(
+          project,
+          ApdRule.parse(c['rule']),
+          c['country'] as String?,
+        );
+        expect([for (final e in offered) e.id], c['ids']);
+      });
+    }
+    test('a phone gives only an abbreviation of its zone', () {
+      expect(apdDefaultCountry(apdZoneOfAbbreviation('WET')), 'PT');
+      expect(apdDefaultCountry(apdZoneOfAbbreviation('WEST')), 'PT');
+      expect(apdDefaultCountry(apdZoneOfAbbreviation('AZOT')), 'PT');
+      expect(apdDefaultCountry(apdZoneOfAbbreviation('CET')), isNull);
+      expect(apdDefaultCountry(apdZoneOfAbbreviation('UTC')), isNull);
+    });
+  });
+
   test('the shipped list is the registry\'s', () {
     final shipped = File('assets/apds.json').readAsBytesSync();
     final registry = File('../registry/apds/apds.json').readAsBytesSync();
     expect(shipped, registry);
-    expect(parseApdList(String.fromCharCodes(shipped)), isA<List<ApdEntry>>());
+    final list = parseApdList(String.fromCharCodes(shipped));
+    expect(list, isA<List<ApdEntry>>());
+    for (final e in list) {
+      expect(e.country, matches(RegExp(r'^[A-Z]{2}$')), reason: e.id);
+    }
   });
 }

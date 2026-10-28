@@ -49,6 +49,8 @@ Below, **Who you are** has **Chronograph's id** (a name for your device, for exa
 
 When the field checks APD membership, a player's card in the queue shows their APD, membership number and expiry with a badge: **Valid membership**, **Membership expired**, **APD not accepted here** or **Membership missing**. The app does not verify anything: compare the number and the date with the player's card. A player whose badge is not valid is **waiting**; **Let in** admits them anyway. You are never blocked, and the controller logs it without the number (the card then says **let in by a marshal**). The queue lists players who declared replicas; the GM console lists everyone.
 
+**Outside Portugal** the same screens say **association membership**: the field's country decides the words (the GM sets it), so the badge reads **Association not accepted here** and the player's card shows their association instead of an APD. What you check is the same: the number and the date against the player's card.
+
 ## 3. The queue: replicas to chrono
 
 1. Tap **Replicas to chrono**.

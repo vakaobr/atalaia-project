@@ -1107,9 +1107,17 @@ Json? checkFieldSettings(Object? value, [String path = 'settings']) {
     st,
     path,
     ['federation_label', 'max_replicas', 'limit_template'],
-    ['apd'],
+    ['apd', 'country'],
   );
   if (st.containsKey('apd')) st['apd'] = _checkApd(st['apd'], '$path.apd');
+  if (st.containsKey('country')) {
+    // The field's country (protocol/apd.md): a code or null.
+    try {
+      checkApdCountry(st['country']);
+    } on ApdError {
+      _fail('bad_value', '$path.country');
+    }
+  }
   final label = _text(
     st['federation_label'],
     '$path.federation_label',

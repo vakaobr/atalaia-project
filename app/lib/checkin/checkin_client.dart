@@ -18,6 +18,7 @@ import 'dart:typed_data';
 
 import '../chrono/replica.dart' show Replica;
 import '../protocol/apd.dart';
+import 'apd_fields.dart' show apdCountryOf;
 import 'field_route.dart';
 import 'field_trust.dart';
 
@@ -337,7 +338,12 @@ final class FieldInfo {
   /// controller or one this build cannot read.
   ApdRule get apdRule => ApdRule.lenient(settings['apd']);
 
-  /// The APDs to offer: the project's list and the field's own entries.
+  /// The field's country (protocol/apd.md): `PT` for an older controller, which
+  /// only knew Portugal's APDs; null when the controller has none set.
+  String? get country => apdCountryOf(settings);
+
+  /// The APDs to offer: the controller's list for its country and the field's
+  /// own entries.
   List<ApdEntry> get apds {
     final raw = json['apds'];
     if (raw is! List) return const [];
@@ -349,6 +355,7 @@ final class FieldInfo {
             name: '${e['name']}',
             shortName: '${e['short_name'] ?? e['name']}',
             website: e['website'] as String?,
+            country: e['country'] as String?,
           ),
     ];
   }

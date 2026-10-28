@@ -205,6 +205,38 @@ void main() {
     expect(find.byKey(const Key('checkin-apd-hint')), findsOneWidget);
   });
 
+  testWidgets('outside Portugal the same screens say association membership', (
+    tester,
+  ) async {
+    final field = FakeField()
+      ..sendsCountry = true
+      ..country = 'ES'
+      ..apd = {
+        'accepted': ['x-club'],
+        'register': false,
+        'checkin': true,
+        'expiry': false,
+        'custom': [
+          {'id': 'x-club', 'name': 'Club Norte', 'short_name': 'Norte'},
+        ],
+      }
+      ..apds = [
+        {'id': 'x-club', 'name': 'Club Norte', 'short_name': 'Norte'},
+      ]
+      ..verdict = 'not_accepted';
+    await start(tester, language: AppLanguage.en, field: field);
+    await tapKey(tester, 'checkin-scan');
+    await tapKey(tester, 'checkin-notice-ok');
+    expect(find.text('Association membership'), findsOneWidget);
+    expect(find.text('APD membership'), findsNothing);
+    expect(find.text('Accepted associations: Norte'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('checkin-name')), 'Hawk');
+    await tester.enterText(find.byKey(const Key('checkin-apd-number')), 'E-1');
+    await tapKey(tester, 'checkin-submit');
+    expect(field.rows.values.single['federation_number'], 'E-1');
+    expect(find.text('Association not accepted here'), findsOneWidget);
+  });
+
   testWidgets('the notice is shown again only when its version changes', (
     tester,
   ) async {

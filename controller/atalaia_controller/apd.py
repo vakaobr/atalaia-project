@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""APD membership: the rule, the membership a player declares and the verdict (protocol/apd.md).
+"""Association membership (historically "APD", Portugal's Associação Promotora de Desporto): the rule, the field's
+country, the membership a player declares and the verdict (protocol/apd.md). Names here and on the wire keep "apd".
 
 Nothing here verifies a membership: the player declares it, the field's rule says what it needs and the
 marshal decides. ``protocol/vectors/apd.json`` is run against these functions.
@@ -21,10 +22,13 @@ ACCEPTED_MAX = 32
 CUSTOM_MAX = 16
 RULE_KEYS = ("accepted", "register", "checkin", "expiry", "custom")
 STATUSES = ("missing", "not_accepted", "expired", "valid")
+COUNTRY_RE = re.compile(r"[A-Z]{2}")
+# Time zones whose field defaults to Portugal (decision MEM-2); any other zone leaves the country unset.
+PT_ZONES = frozenset({"Europe/Lisbon", "Atlantic/Azores", "Atlantic/Madeira"})
 
 
 class ApdError(ValueError):
-    """``code`` is ``apd_rule_invalid`` or ``apd_membership_invalid``."""
+    """``code`` is ``apd_rule_invalid``, ``apd_membership_invalid`` or ``country_invalid``."""
 
     def __init__(self, code: str, detail: str = "") -> None:
         super().__init__(f"{code}: {detail}" if detail else code)
@@ -39,11 +43,35 @@ def _printable(text: str) -> bool:
     return all(c.isprintable() for c in text)
 
 
+def check_country(value: Any) -> Optional[str]:
+    """A field's country: an ISO 3166-1 alpha-2 code in capitals, or null (unset), else ``country_invalid``."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or not COUNTRY_RE.fullmatch(value):
+        raise ApdError("country_invalid", "country")
+    return value
+
+
+def default_country(zone: Optional[str]) -> Optional[str]:
+    """The country a field gets when none is set: PT for Portugal's time zones, otherwise unset."""
+    return "PT" if zone in PT_ZONES else None
+
+
+def wording(country: Optional[str]) -> str:
+    """Which words the screens use: ``apd`` for a Portuguese field, ``membership`` ("association membership")
+    for any other country or none."""
+    return "apd" if country == "PT" else "membership"
+
+
 def check_entry(e: Any, own: bool = True) -> dict[str, Any]:
+    """An entry of the shipped list (``own`` False: it has a ``country``) or of a field's own list (``own``: it
+    has none; it is offered whatever the field's country)."""
     bad = "apd_rule_invalid"
-    if not isinstance(e, dict) or set(e) - {"id", "name", "short_name", "website"} \
-            or not {"id", "name", "short_name"} <= set(e):
+    need = {"id", "name", "short_name"} | (set() if own else {"country"})
+    if not isinstance(e, dict) or set(e) - (need | {"website"}) or not need <= set(e):
         raise ApdError(bad, "entry")
+    if not own and (not isinstance(e["country"], str) or not COUNTRY_RE.fullmatch(e["country"])):
+        raise ApdError(bad, "entry country")
     ident, name, short, site = e["id"], e["name"], e["short_name"], e.get("website")
     if not isinstance(ident, str) or not ID_RE.fullmatch(ident) or (own and not ident.startswith("x-")):
         raise ApdError(bad, "entry id")
@@ -54,7 +82,10 @@ def check_entry(e: Any, own: bool = True) -> dict[str, Any]:
     if site is not None and (not isinstance(site, str) or not site.startswith("https://") or len(site) > 128
                              or len(site) <= 8 or re.search(r"\s", site)):
         raise ApdError(bad, "entry website")
-    return {"id": ident, "name": name, "short_name": short, "website": site}
+    out = {"id": ident, "name": name, "short_name": short, "website": site}
+    if not own:
+        out = {"id": ident, "country": e["country"], "name": name, "short_name": short, "website": site}
+    return out
 
 
 def check_rule(value: Any) -> dict[str, Any]:
@@ -129,8 +160,14 @@ def project_list() -> list[dict[str, Any]]:
     return [check_entry({k: v for k, v in e.items() if k != "source"}, own=False) for e in doc["apds"]]
 
 
-def choices(rule: dict[str, Any]) -> list[dict[str, Any]]:
-    """What a player may pick: the project's list, then the rule's own entries."""
-    out = project_list()
+def offered(project: list[dict[str, Any]], rule: dict[str, Any], country: Optional[str]) -> list[dict[str, Any]]:
+    """What a player may pick on a field of ``country``: the entries of ``project`` for that country (none for a
+    field without one), then the rule's own entries (decision MEM-3)."""
+    out = [e for e in project if country is not None and e.get("country") == country]
     ids = {e["id"] for e in out}
     return out + [e for e in rule["custom"] if e["id"] not in ids]
+
+
+def choices(rule: dict[str, Any], country: Optional[str]) -> list[dict[str, Any]]:
+    """``offered`` over the shipped list."""
+    return offered(project_list(), rule, country)

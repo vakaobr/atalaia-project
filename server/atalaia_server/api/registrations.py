@@ -40,6 +40,8 @@ from pydantic import BaseModel, ConfigDict, Field as PydanticField
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from atalaia_controller import apd as apd_core
+
 from ..audit import record
 from ..auth import Principal, current_principal, require_field_role
 from ..db import get_session
@@ -169,7 +171,7 @@ async def list_registrations(field_id: uuid.UUID, game_id: uuid.UUID, principal:
         counts[r.status] = counts.get(r.status, 0) + 1
     return JSONResponse({"scheduled_game_id": str(game_id), "max_players": game.max_players,
                          "walkins": game.walkins, "counts": counts, "apd": svc.field_rule(field),
-                         "apds": svc.project_apds(),
+                         "country": svc.field_country(field), "apds": svc.country_apds(svc.field_country(field)),
                          "registrations": [svc.registration_json(r, reps[r.id], names=names, verdict_for=(game, field))
                                           for r in regs]},
                         headers=NO_STORE)
@@ -309,10 +311,16 @@ async def staff_no_show(field_id: uuid.UUID, game_id: uuid.UUID, reg_id: uuid.UU
 
 
 @router.get("/apds")
-async def list_apds() -> JSONResponse:
-    """The project's list of APDs (protocol/apd.md): public, the same for everyone. A field adds its own entries
-    in its rule (``field.apd.custom``)."""
-    return JSONResponse({"format": 1, "apds": svc.project_apds()}, headers={"Cache-Control": "public, max-age=3600"})
+async def list_apds(country: Optional[str] = None) -> JSONResponse:
+    """The project's list of membership bodies (protocol/apd.md, historically the APDs): public, the same for
+    everyone, every country's entries (each has its ``country``), or one country's with ``?country=ES``. A field
+    adds its own entries in its rule (``field.apd.custom``)."""
+    try:
+        code = apd_core.check_country(country)
+    except apd_core.ApdError:
+        raise HTTPException(400, "country_invalid") from None
+    entries = svc.project_apds() if code is None else svc.country_apds(code)
+    return JSONResponse({"format": 1, "apds": entries}, headers={"Cache-Control": "public, max-age=3600"})
 
 
 # --- the field's games for the app (decisions S16-13, S17-9) -------------------------------
@@ -348,7 +356,8 @@ async def field_games(slug: str, principal: Principal = Depends(current_principa
             "predeclare_replicas": g.predeclare_replicas, "status": g.status, "cancelled_reason": g.cancelled_reason})
     return JSONResponse({"field": {"id": str(field.id), "slug": field.slug, "name": field.name,
                                    "timezone": field.timezone, "federation_label": field.federation_label,
-                                   "apd": svc.field_rule(field),
+                                   "apd": svc.field_rule(field), "country": field.country,
+                                   "apds": svc.country_apds(field.country),
                                    "limit_template": field.limit_template,
                                    "classes": list(svc.classes(field.limit_template)),
                                    "replica_types": list(svc.REPLICA_TYPES),

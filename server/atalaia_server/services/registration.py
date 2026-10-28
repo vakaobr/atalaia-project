@@ -277,6 +277,17 @@ def field_rule(field: Optional[Field]) -> dict[str, Any]:
         return apd_core.default_rule()
 
 
+def field_country(field: Optional[Field]) -> Optional[str]:
+    """The field's country (null: unset), which picks the wording and the list it offers (decisions MEM-2, MEM-3)."""
+    return field.country if field is not None else None
+
+
+def country_apds(country: Optional[str]) -> list[dict[str, Any]]:
+    """The project's entries of ``country`` (none for a field without one): what a field of it offers besides
+    the entries in its own rule (``custom``)."""
+    return [e for e in project_apds() if country is not None and e.get("country") == country]
+
+
 def asks_membership(game: ScheduledGame, rule: dict[str, Any]) -> bool:
     """Whether the game or the field's rule has a use for the membership number (protocol/apd.md): otherwise it
     is dropped, as the federation number always was."""

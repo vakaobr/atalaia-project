@@ -31,6 +31,22 @@ export function t(key, vars) {
     return text;
 }
 
+// The APD texts that have an association twin ("<key>_m", staff_i18n.py): a field outside Portugal, or without a
+// country, says "association membership" (protocol/apd.md, decision MEM-4).
+const MEMBERSHIP_KEYS = ['col_fed_number', 'reg_edit_apd', 'apd_unknown', 'apd_status_not_accepted', 'e_apd_id_invalid',
+    'e_membership_missing', 'e_apd_not_accepted', 'e_apd_rule_invalid'];
+
+/** Swaps the APD texts for the association ones unless the field's country is PT; call it before the texts are
+ * used. The texts the server put into the page's HTML are the APD ones: [[selector, key]] names the elements to redo. */
+export function membershipWording(country, elements) {
+    if (country === 'PT') return;
+    for (const key of MEMBERSHIP_KEYS) if (Object.prototype.hasOwnProperty.call(STRINGS, `${key}_m`)) STRINGS[key] = STRINGS[`${key}_m`];
+    for (const [selector, key] of elements || []) {
+        const node = document.querySelector(selector);
+        if (node) node.textContent = t(key);
+    }
+}
+
 export function has(key) {
     return Object.prototype.hasOwnProperty.call(STRINGS, key);
 }

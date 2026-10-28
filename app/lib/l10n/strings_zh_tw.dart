@@ -1128,4 +1128,13 @@ const Map<String, String> zhTwStrings = {
   'propmodes.err.load': '已拒絕：{mode} 無法在沙箱裡載入。沒有執行。',
   'propmodes.err.no_space': '{mode} 沒有空間了：手機最多保留 8 個下載的模式，總共 512 KiB。',
   'propmodes.err.other': '無法取得這個模式（{mode}）。',
+  // The membership texts of a field outside Portugal (decision MEM-4)
+  'apd.section_m': '協會會員',
+  'apd.accepts_any_m': '接受任何協會。',
+  'apd.accepts_m': '接受的協會：{list}',
+  'apd.pick_m': '你的協會',
+  'apd.need_number_m': '這個場地要求填寫會員編號。',
+  'apd.status.not_accepted_m': '此處不接受該協會',
+  'site.err.membership_missing_m': '報名需要填寫這個場地要求的會員編號。',
+  'site.err.apd_not_accepted_m': '這個場地不接受該協會。',
 };

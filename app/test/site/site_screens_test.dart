@@ -326,6 +326,60 @@ void main() {
     expect(site.regs.values.single['apd_id'], 'x-own');
   });
 
+  testWidgets('a field outside Portugal says association, not APD, and offers '
+      'only its own entries', (tester) async {
+    final site = FakeSite()
+      ..sendsCountry = true
+      ..country = 'ES'
+      ..apdRule = {
+        'accepted': ['x-own'],
+        'register': true,
+        'checkin': true,
+        'expiry': false,
+        'custom': [
+          {
+            'id': 'x-own',
+            'name': 'Club Propio',
+            'short_name': 'Propio',
+            'website': null,
+          },
+        ],
+      };
+    final h = harness(language: AppLanguage.en, siteHttp: site.http);
+    await tester.pumpWidget(h.app(home: const SiteScreen()));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('site-address')),
+      'https://campo.example.pt/f/campo-norte',
+    );
+    await tapKey(tester, 'site-open');
+    await tapKey(tester, 'site-confirm');
+    await login(tester, site);
+    await tapKey(tester, 'site-game-$game1');
+    expect(find.text('Association membership'), findsOneWidget);
+    expect(find.text('APD membership'), findsNothing);
+    expect(find.text('Accepted associations: Propio'), findsOneWidget);
+    await enter(tester, 'reg-name', 'Halcón');
+    await tapKey(tester, 'reg-submit');
+    expect(
+      find.text('This field asks for your membership number.'),
+      findsOneWidget,
+    );
+    await enter(tester, 'reg-apd-number', 'N-1');
+    await tapKey(tester, 'reg-submit'); // no association: the server refuses
+    expect(
+      find.text('This field does not accept that association.'),
+      findsOneWidget,
+    );
+    await tapKey(tester, 'reg-apd-pick');
+    // Portugal's entries are not offered to a Spanish field.
+    expect(find.text('Associação Lusitana de Airsoft, APD'), findsNothing);
+    await tester.tap(find.text('Club Propio').last);
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'reg-submit');
+    expect(site.regs.values.single['apd_id'], 'x-own');
+  });
+
   testWidgets('a kept ticket goes with the check-in, with its player id', (
     tester,
   ) async {
@@ -433,6 +487,18 @@ void main() {
         'site.err.$c',
       for (final st in ['valid', 'expired', 'not_accepted', 'missing'])
         'apd.status.$st',
+      // The twins for a field outside Portugal (apd_fields.dart).
+      for (final k in [
+        'apd.section',
+        'apd.accepts_any',
+        'apd.accepts',
+        'apd.pick',
+        'apd.need_number',
+        'apd.status.not_accepted',
+        'site.err.membership_missing',
+        'site.err.apd_not_accepted',
+      ])
+        '${k}_m',
     ]) {
       expect(ptStrings.containsKey(k), isTrue, reason: k);
       expect(enStrings.containsKey(k), isTrue, reason: k);

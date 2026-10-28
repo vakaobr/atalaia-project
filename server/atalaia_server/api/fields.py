@@ -83,6 +83,7 @@ class FieldPatch(BaseModel):
     limit_template: Optional[str] = PydanticField(default=None, max_length=32)
     max_replicas: Optional[int] = None
     apd: Optional[dict[str, Any]] = None  # the whole APD rule (protocol/apd.md); {} puts the default back
+    country: Optional[str] = PydanticField(default=None, max_length=8)  # ISO 3166-1 alpha-2; null or "" unsets it
 
 
 class SyncKeyIn(BaseModel):
@@ -100,7 +101,8 @@ def field_json(f: Field, roles: Any = None) -> dict[str, Any]:
     body = {"id": str(f.id), "name": f.name, "slug": f.slug, "field_type": f.field_type, "timezone": f.timezone,
             "chrono_sharing_enabled": f.chrono_sharing_enabled, "public_page": f.public_page,
             "description": f.description, "address_text": f.address_text, "federation_label": f.federation_label,
-            "limit_template": f.limit_template, "max_replicas": f.max_replicas, "apd": registration.field_rule(f)}
+            "limit_template": f.limit_template, "max_replicas": f.max_replicas, "apd": registration.field_rule(f),
+            "country": f.country}
     if roles is not None:
         body["my_roles"] = sorted(roles)
     return body
@@ -122,7 +124,8 @@ async def create_field(body: FieldIn, request: Request, principal: Principal = D
         ZoneInfo(body.timezone)
     except (ZoneInfoNotFoundError, ValueError):
         raise HTTPException(400, "timezone_invalid") from None
-    field = Field(name=name, slug=body.slug, field_type=body.field_type, timezone=body.timezone)
+    field = Field(name=name, slug=body.slug, field_type=body.field_type, timezone=body.timezone,
+                  country=apd_core.default_country(body.timezone))  # PT in Portugal's time zones (decision MEM-2)
     db.add(field)
     try:
         await db.flush()
@@ -200,13 +203,22 @@ async def update_field(field_id: uuid.UUID, body: FieldPatch, request: Request,
         if rule != registration.field_rule(field):
             field.apd_rule = rule
             changed["apd"] = "set"  # the audit log names the change, not the field's own entries
+    if "country" in body.model_fields_set:
+        typed = (body.country or "").strip().upper()  # null and "" unset it; the case typed does not matter
+        try:
+            country = apd_core.check_country(typed or None)
+        except apd_core.ApdError:
+            raise HTTPException(400, "country_invalid") from None
+        if country != field.country:
+            field.country = country
+            changed["country"] = country or "cleared"
     if "address_text" in changed:
         await scheduling.bump_for_field_address(db, field.id, datetime.now(timezone.utc))
     if changed:
         record(db, "field_update", request, user_id=principal.user.id, resource="field", resource_id=field.id,
                details=changed)
     await db.commit()
-    if changed.keys() & {"limit_template", "max_replicas", "federation_label", "apd"}:
+    if changed.keys() & {"limit_template", "max_replicas", "federation_label", "apd", "country"}:
         branding.announce(request, [field.id])  # the controllers take over the field's check-in settings (BR24)
     await db.refresh(field)
     return JSONResponse(field_json(field, principal.roles.get(field.id, set())), headers=NO_STORE)

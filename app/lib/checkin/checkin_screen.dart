@@ -218,7 +218,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
       final bad = _apd.problem(rule, needNumber: info.federation == 'required');
       if (bad != null) {
         setState(() {
-          _error = bad;
+          _error = apdKey(bad, info.country);
           _errorArgs = const {};
         });
         return;
@@ -470,6 +470,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
           ApdFields(
             input: _apd,
             rule: info.apdRule,
+            country: info.country,
             choices: info.apds,
             numberRequired: info.federation == 'required',
             keyPrefix: 'checkin-apd',
@@ -807,6 +808,7 @@ class _CheckinStatusScreenState extends State<CheckinStatusScreen> {
                     ApdBadge(
                       status: me!['apd_status'] as String?,
                       overridden: me['apd_override'] == true,
+                      country: apdCountryOf(me),
                     ),
                     if (me['apd_status'] != 'valid')
                       Expanded(

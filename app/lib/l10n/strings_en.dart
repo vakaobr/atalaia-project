@@ -1349,4 +1349,14 @@ const Map<String, String> enStrings = {
   'propmodes.err.no_space':
       'No room for {mode}: the phone keeps at most 8 fetched modes, 512 KiB in all.',
   'propmodes.err.other': 'The mode could not be fetched ({mode}).',
+  // The membership texts of a field outside Portugal (decision MEM-4)
+  'apd.section_m': 'Association membership',
+  'apd.accepts_any_m': 'Any association is accepted.',
+  'apd.accepts_m': 'Accepted associations: {list}',
+  'apd.pick_m': 'Your association',
+  'apd.need_number_m': 'This field asks for your membership number.',
+  'apd.status.not_accepted_m': 'Association not accepted here',
+  'site.err.membership_missing_m':
+      'This field needs your membership number to register.',
+  'site.err.apd_not_accepted_m': 'This field does not accept that association.',
 };

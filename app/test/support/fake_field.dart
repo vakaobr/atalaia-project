@@ -65,6 +65,11 @@ class FakeField {
   /// The field's APD rule and the APDs it offers (protocol/apd.md).
   Map<String, Object?>? apd;
 
+  /// The field's country in the settings, when [sendsCountry] (a controller
+  /// from before fields had one sends none: the app takes PT).
+  String? country;
+  var sendsCountry = false;
+
   /// The verdict this fake gives a check-in (the controller's job).
   String? verdict;
   List<Map<String, Object?>> apds = [];
@@ -233,6 +238,7 @@ class FakeField {
             'max_replicas': 5,
             'chrono_valid_for': 'day',
             if (apd != null) 'apd': apd,
+            if (sendsCountry) 'country': country,
           },
           'apds': apds,
           'limits': {
@@ -269,6 +275,7 @@ class FakeField {
         row['apd_id'] = b['apd_id'];
         row['membership_expires'] = b['membership_expires'];
         row['apd_status'] = verdict;
+        if (sendsCountry) row['country'] = country;
         // A site server registration's id and ticket (decision S16-8).
         row['registration_id'] = b['registration_id'];
         row['registration_ticket'] = b['ticket'];
@@ -390,6 +397,7 @@ class FakeField {
         }
         return FieldResponse(200, {
           'game_id': 42,
+          if (sendsCountry) 'country': country,
           'counts': counts,
           'players': players,
         });
