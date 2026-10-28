@@ -981,7 +981,7 @@ roadmap:
         - "Staff actions on a registration: paid or unpaid (the server takes no payment), no-show, move to another game, restore, edit the replicas. Tested in a headless browser, not on a real server."
         - "Staff pages for roles, sync keys, branding, clubs, platform links, firmware and administration."
         - "The remote GM page updates live, with no reload."
-        - "APD membership is checked at registration and at check-in."
+        - "Association membership is checked at registration and at check-in: APDs for fields in Portugal, any association or federation elsewhere."
         - "Chrono records show by how much a replica was over the limit, and flag repeat offenders."
         - "A staff page for the field's data export and its use of the quotas."
         - "Score timelines in game time."

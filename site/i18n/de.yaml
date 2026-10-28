@@ -1036,7 +1036,7 @@ roadmap:
         - "Staff-Aktionen an einer Anmeldung: bezahlt oder nicht bezahlt (der Server nimmt kein Geld an), nicht erschienen, in ein anderes Spiel verschieben, wiederherstellen, die Repliken bearbeiten. Im Headless-Browser getestet, nicht auf einem echten Server."
         - "Seiten für das Personal zu Rollen, Sync-Schlüsseln, Erscheinungsbild, Clubs, Plattform-Verknüpfungen, Firmware und Verwaltung."
         - "Die Seite des Remote-GM aktualisiert sich live, ohne Neuladen."
-        - "Die APD-Mitgliedschaft wird bei der Anmeldung und beim Check-in geprüft."
+        - "Die Mitgliedschaft in einem Verband wird bei der Anmeldung und beim Check-in geprüft: APDs bei Spielfeldern in Portugal, anderswo jeder Verein oder Verband."
         - "Chrono-Einträge zeigen, wie weit eine Replik über dem Limit lag, und markieren Wiederholungstäter."
         - "Eine Seite für das Personal des Feldes mit dem Datenexport und dem Verbrauch der Kontingente."
         - "Punkteverläufe in Spielzeit."
