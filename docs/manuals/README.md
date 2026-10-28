@@ -48,5 +48,6 @@ The manuals are in **English** and **European Portuguese (pt-PT)**. The Portugue
 - The [controller guide](../../controller/README.md) and the [site server guide](../../server/README.md): for installing the controller and the server.
 - The [community mode registry](https://vakaobr.github.io/atalaia-modes/): shared game modes.
 - The [radio page](https://atalaia-project.link/en/radio/): how the radio works.
+- The [architecture diagrams](../architecture.md): how the radio links, the app, the controller and the site server talk to each other.
 
 Found a step that does not match the software? Open an issue or tell us in [Discussions](https://github.com/vakaobr/atalaia-project/discussions). To help translate, see [`../translations/`](../translations/README.md).

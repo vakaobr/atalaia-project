@@ -99,7 +99,7 @@ Atalaia takes a different approach:
     (ESP32)     (ESP32)    (+ ESP32 pod)    (Arduino)
 ```
 
-Every full node runs the same C11 core and the same Lua game modes; only the platform shell and hardware drivers differ. The complete design is in the [design specification](docs/design-spec.md).
+Every full node runs the same C11 core and the same Lua game modes; only the platform shell and hardware drivers differ. The complete design is in the [design specification](docs/design-spec.md), and [how the parts talk to each other](docs/architecture.md) is shown in diagrams.
 
 ## How the radio works
 

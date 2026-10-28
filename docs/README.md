@@ -26,6 +26,14 @@ The full design specification is in [`design-spec.md`](design-spec.md):
 architecture, platforms, reference hardware, protocol, game runtime, apps,
 security, roadmap and decision log.
 
+## Architecture diagrams
+
+[`architecture.md`](architecture.md) shows, with Mermaid diagrams, how the parts
+talk to each other: the radio links, the app, the field controller, the site
+server, a game from the invite to the end, players on game day, the sync, getting
+files onto a box and the site server's login. It marks what works with no
+internet at the field.
+
 ## Protocol documents
 
 | Document | What it covers |
