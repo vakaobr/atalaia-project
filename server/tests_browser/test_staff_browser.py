@@ -1159,6 +1159,136 @@ class ScheduleTests(BrowserCase):
         await self.check_page(page, 375)
 
 
+class SettingsTests(BrowserCase):
+    """FS-*: a field's settings page is its API (PATCH /api/v1/fields/{field}); the membership words follow the country."""
+
+    async def row(self) -> Any:
+        return (await self.fetch("SELECT country, apd_rule, chrono_sharing_enabled, public_page, description, max_replicas "
+                                 "FROM fields WHERE id = $1", self.field_id))[0]
+
+    async def test_the_country_changes_the_words_and_the_membership_rule_is_edited(self) -> None:
+        await self.fetch("UPDATE fields SET country = 'PT'")
+        name, secret = await self.staff("admin")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path("/settings"))
+        await expect(page.locator("#country-form fieldset")).to_be_enabled()
+        # Portugal: the APD words and the three shipped entries.
+        await expect(page.locator("#fs-member-title")).to_have_text("APD membership")
+        await expect(page.locator("#m-any-label")).to_have_text("Any APD")
+        await expect(page.locator("#m-entries li")).to_have_count(3)
+        await expect(page.locator("#m-offered")).to_contain_text("PT")
+        # A new country (typed in lower case): the words and the list change at once, and the API has it.
+        await page.fill("#f-country", "es")
+        await page.click("#country-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Saved. The controllers get the change at once.")
+        await expect(page.locator("#fs-member-title")).to_have_text("Association membership")
+        await expect(page.locator("#m-any-label")).to_have_text("Any association")
+        await expect(page.locator("#m-only-label")).to_have_text("Only the ticked associations")
+        await expect(page.locator("#m-entries li")).to_have_count(0)
+        self.assertEqual((await self.row())[0], "ES")
+        await page.fill("#f-country", "")  # no country
+        await page.click("#country-form button[type=submit]")
+        await expect(page.locator("#m-offered")).to_have_text("With no country set, only the field's own entries are offered.")
+        self.assertIsNone((await self.row())[0])
+        await page.fill("#f-country", "PT")
+        await page.click("#country-form button[type=submit]")
+        await expect(page.locator("#fs-member-title")).to_have_text("APD membership")  # and back again
+        await expect(page.locator("#m-entries li")).to_have_count(3)
+        # The membership rule: the field's own entry, the accepted list, the switches.
+        await page.fill("#c-id", "x-norte")
+        await page.fill("#c-name", "Clube Norte")
+        await page.fill("#c-short", "Norte")
+        await page.click("#custom-form button[type=submit]")
+        await expect(page.locator("#m-entries li")).to_have_count(4)
+        await expect(page.locator("#m-custom li")).to_contain_text("x-norte")
+        await page.check("#m-only")
+        await page.check("#m-e-3")  # the field's own entry
+        await page.check("#m-e-0")
+        await page.check("#m-register")
+        await page.check("#m-expiry")
+        await page.click("#member-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Saved. The controllers get the change at once.")
+        rule = json.loads((await self.row())[1]) if isinstance((await self.row())[1], str) else (await self.row())[1]
+        self.assertEqual(rule["register"], True)
+        self.assertEqual(rule["checkin"], False)
+        self.assertEqual(rule["expiry"], True)
+        self.assertEqual(len(rule["accepted"]), 2)
+        self.assertIn("x-norte", rule["accepted"])
+        self.assertEqual([e["id"] for e in rule["custom"]], ["x-norte"])
+        # Removing the own entry and going back to any.
+        await page.locator("#m-custom li button").click()
+        await page.check("#m-any")
+        await page.click("#member-form button[type=submit]")
+        await expect(page.locator("#status")).to_contain_text("Saved.")
+        await page.reload()
+        await expect(page.locator("#m-any")).to_be_checked()
+        await expect(page.locator("#m-register")).to_be_checked()
+        await expect(page.locator("#m-custom-none")).to_be_visible()
+        await self.check_page(page, 375)
+
+    async def test_the_other_sections_and_a_refusal_in_words(self) -> None:
+        name, secret = await self.staff("admin")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path("/settings"))
+        await expect(page.locator("#public-form fieldset")).to_be_enabled()
+        await page.check("#f-public")
+        await page.fill("#f-description", "Campo de bosque.\nChegada às 9h.")
+        await page.click("#public-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Saved.")
+        await page.fill("#f-replicas", "3")
+        await page.click("#checkin-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Saved. The controllers get the change at once.")
+        await page.check("#f-chrono")
+        await page.click("#chrono-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Saved.")
+        row = await self.row()
+        self.assertEqual((row[2], row[3], row[4], row[5]), (True, True, "Campo de bosque.\nChegada às 9h.", 3))
+        # Refusals, each in words: a country that is not two letters, a one-line text with a tab, a rule
+        # that accepts only the ticked ones with none ticked, a number the API refuses.
+        await page.fill("#f-country", "PORTUGAL")
+        await page.click("#country-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Invalid country: use a two-letter ISO 3166-1 code, for example PT.")
+        await page.fill("#f-fedlabel", "a\tb")
+        await page.click("#public-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Invalid label: one line, at most 16 characters.")
+        await page.fill("#f-fedlabel", "")
+        await page.fill("#f-address", "Rua um\u0007")
+        await page.click("#public-form button[type=submit]")
+        await expect(page.locator("#status")).to_contain_text("Invalid address")
+        await page.fill("#f-address", "")
+        await page.check("#m-only")
+        await page.click("#member-form button[type=submit]")
+        await expect(page.locator("#status")).to_contain_text("Invalid")
+        await expect(page.locator("#status")).to_contain_text("rule")
+        await page.fill("#f-replicas", "999")
+        await page.click("#checkin-form button[type=submit]")
+        await expect(page.locator("#status")).to_contain_text("Invalid most-replicas value")
+        self.assertEqual((await self.row())[5], 3)  # nothing of the refused ones was kept
+        # A gm sees the page's link no more and the API refuses the page's writes.
+        gm, gm_secret = await self.staff("gm")
+        other = await self.new_page(lang="en-GB")
+        await self.login(other, gm, gm_secret, self.field_path("/settings"))
+        await expect(other.locator('#sections li[data-section="settings"]')).to_be_hidden()
+        await other.click("#chrono-form button[type=submit]")
+        await expect(other.locator("#status")).to_contain_text("This part needs")
+
+    async def test_german_at_a_phones_width(self) -> None:
+        await self.fetch("UPDATE fields SET country = 'PT'")
+        name, secret = await self.staff("admin")
+        page = await self.new_page(lang="de-DE", viewport={"width": 375, "height": 740})
+        await self.login(page, name, secret, self.field_path("/settings") + "?lang=de")
+        await expect(page.locator("h1")).to_have_text("Einstellungen des Spielfelds")
+        await expect(page.locator("#fs-member-title")).to_have_text("APD-Mitgliedschaft")
+        await page.fill("#f-country", "AT")
+        await page.click("#country-form button[type=submit]")
+        await expect(page.locator("#fs-member-title")).to_have_text("Verbandsmitgliedschaft")
+        await expect(page.locator("#m-only-label")).to_have_text("Nur die angehakten Verbände")
+        await page.fill("#f-country", "Österreich")
+        await page.click("#country-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("Ungültiges Land: Verwende einen zweistelligen ISO-3166-1-Code, zum Beispiel PT.")
+        await self.check_page(page, 375)
+
+
 class Fu8PageTests(BrowserCase):
     """The pages FU9 added for APIs that had none (decisions FU9-1 to FU9-7): each is its API."""
 

@@ -1,0 +1,92 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$fs_title</h1>
+<p>$fs_intro</p>
+<p class="hint">$fs_controllers_note</p>
+<section aria-labelledby="fs-public-title">
+<h2 id="fs-public-title">$fs_public_title</h2>
+<p>$fs_public_intro</p>
+<form id="public-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<p class="check"><input type="checkbox" id="f-public" name="public_page"> <label for="f-public">$fs_public_page</label></p>
+<label for="f-description">$fs_description</label>
+<textarea id="f-description" name="description" rows="5" maxlength="$description_max"></textarea>
+<p class="hint">$fs_description_hint</p>
+<label for="f-address">$fs_address</label>
+<input id="f-address" name="address_text" maxlength="$address_max" autocomplete="off">
+<p class="hint">$fs_address_hint</p>
+<label for="f-fedlabel">$fs_fed_label</label>
+<input id="f-fedlabel" name="federation_label" maxlength="$label_max" autocomplete="off">
+<p class="hint">$fs_fed_label_hint</p>
+<p><button type="submit">$save</button></p>
+</fieldset>
+</form>
+</section>
+<section aria-labelledby="fs-checkin-title">
+<h2 id="fs-checkin-title">$fs_checkin_title</h2>
+<p>$fs_checkin_intro</p>
+<form id="checkin-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="f-template">$fs_limit_template</label>
+<select id="f-template" name="limit_template">$template_options</select>
+<label for="f-replicas">$fs_max_replicas</label>
+<input id="f-replicas" name="max_replicas" type="number" inputmode="numeric" min="1" max="$replicas_max">
+<p><button type="submit">$save</button></p>
+</fieldset>
+</form>
+</section>
+<section aria-labelledby="fs-member-title">
+<h2 id="fs-member-title">$fs_member_title</h2>
+<p id="fs-member-intro">$fs_member_intro</p>
+<form id="member-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<p class="check"><input type="radio" id="m-any" name="accepted" value="any"> <label for="m-any" id="m-any-label">$fs_member_any</label></p>
+<p class="check"><input type="radio" id="m-only" name="accepted" value="list"> <label for="m-only" id="m-only-label">$fs_member_only</label></p>
+<p class="hint" id="m-offered"></p>
+<ul id="m-entries" class="plain"></ul>
+<p class="check"><input type="checkbox" id="m-register" name="register"> <label for="m-register">$fs_member_register</label></p>
+<p class="check"><input type="checkbox" id="m-checkin" name="checkin"> <label for="m-checkin">$fs_member_checkin</label></p>
+<p class="check"><input type="checkbox" id="m-expiry" name="expiry"> <label for="m-expiry">$fs_member_expiry</label></p>
+<p><button type="submit">$save</button></p>
+</fieldset>
+</form>
+<h3 id="fs-custom-title">$fs_member_custom_title</h3>
+<p id="fs-custom-intro" class="hint">$fs_member_custom_intro</p>
+<ul id="m-custom" class="plain"></ul>
+<p id="m-custom-none" hidden>$fs_member_custom_none</p>
+<form id="custom-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="c-id">$fs_member_custom_id</label>
+<input id="c-id" name="id" maxlength="32" autocapitalize="none" spellcheck="false" autocomplete="off">
+<label for="c-name">$fs_member_custom_name</label>
+<input id="c-name" name="name" maxlength="96" autocomplete="off">
+<label for="c-short">$fs_member_custom_short</label>
+<input id="c-short" name="short_name" maxlength="16" autocomplete="off">
+<label for="c-website">$fs_member_custom_website</label>
+<input id="c-website" name="website" maxlength="128" autocapitalize="none" spellcheck="false" autocomplete="off">
+<p><button type="submit">$fs_member_custom_add</button></p>
+</fieldset>
+</form>
+</section>
+<section aria-labelledby="fs-chrono-title">
+<h2 id="fs-chrono-title">$fs_chrono_title</h2>
+<p>$fs_chrono_intro</p>
+<form id="chrono-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<p class="check"><input type="checkbox" id="f-chrono" name="chrono_sharing_enabled"> <label for="f-chrono">$fs_chrono_enabled</label></p>
+<p><button type="submit">$save</button></p>
+</fieldset>
+</form>
+</section>
+<section aria-labelledby="fs-country-title">
+<h2 id="fs-country-title">$fs_country_title</h2>
+<p>$fs_country_intro</p>
+<form id="country-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="f-country">$fs_country</label>
+<input id="f-country" name="country" maxlength="8" autocapitalize="characters" spellcheck="false" autocomplete="off">
+<p class="hint">$fs_country_hint</p>
+<p><button type="submit">$save</button></p>
+</fieldset>
+</form>
+</section>

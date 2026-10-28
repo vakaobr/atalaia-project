@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from atalaia_server.ratelimit import RequestLimit
 from atalaia_server.web import i18n, staff_pages
 from atalaia_server.web.staff_i18n import STRINGS
 
@@ -35,6 +36,7 @@ class AccountPageTests(AppTestCase):
     async def test_the_page_is_listed_and_linked_from_every_page(self) -> None:
         self.assertIn("account", staff_pages.page_names())
         self.assertIn("account.js", staff_pages.FILES)
+        self.app.state.limits.requests = RequestLimit(100000, 60)  # every page in every language is many requests
         for name, path in {**PAGES, "account": "/staff/account"}.items():
             for lang in i18n.LANGUAGES:
                 with self.subTest(page=name, lang=lang):

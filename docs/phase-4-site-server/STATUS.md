@@ -1036,3 +1036,7 @@ Run `/sdlc phase-4-site-server --implement`. STATE.json records
 `resume_with: "--implement"`, the plan phases done and the next one. Each plan phase
 is verified from a clean copy (PLAN.md, "How each plan phase is
 verified") and committed by the coordinator; agents do not commit.
+
+## Follow-up: the field's settings page (FS, 2026-10-28, in software)
+
+The maintainer asked for a **staff page for a field's settings** so that a field's admin no longer needs the API for them: `/staff/fields/<field>/settings` (the field's `admin`, linked from the field's section list), the FU2/FU9 page rules (the page is its API, four languages, `no-store`, `noindex`, CSP unchanged, bearer token, 375 px). Five sections, each saved on its own through `PATCH /api/v1/fields/{field_id}`: public page, check-in rules, membership (`apd`: accepted list or any, register, check-in, expiry, the country's shipped list from `GET /api/v1/apds?country=` and the field's own entries), chrono sharing, country. The membership words follow the country by the existing `_m` twins and change on the page when a new country is saved, with the offered list. Every refusal the API can raise has one text per language (a test reads the codes from the API's source); the page says that the controllers get the change at once. No API change. Tests: `tests/test_staff_pages.py` (page listed, texts in every language, API paths, refusal codes, twins) and `tests_browser` `SettingsTests` (country switch, membership edit, refusals, German at 375 px). Decisions FS-1 to FS-6.

@@ -2947,8 +2947,9 @@ STRINGS: dict[str, dict[str, str]] = {
 # administration (FU9) are in their own module; every key is new (a clash would silently change another page's text).
 from .staff_i18n_admin import BY_LANGUAGE as _ADMIN  # noqa: E402
 from .staff_i18n_data import BY_LANGUAGE as _DATA  # noqa: E402  (the data export and quota page, PKC-1)
+from .staff_i18n_settings import BY_LANGUAGE as _SETTINGS  # noqa: E402  (the field's settings page, FS-*)
 
-for _more in (_ADMIN, _DATA):
+for _more in (_ADMIN, _DATA, _SETTINGS):
     for _lang, _texts in _more.items():
         _clash = set(STRINGS[_lang]) & set(_texts)
         assert not _clash, sorted(_clash)

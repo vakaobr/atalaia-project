@@ -43,6 +43,9 @@
     GET /staff/fields/<field>/platforms                the links to third-party platforms: on or off, configured
     GET /staff/fields/<field>/data                     the field's data export (a ZIP, with its SHA-256) and what it
                                                        uses of each hosted-mode limit (PKC-1)
+    GET /staff/fields/<field>/settings                 the field's settings, for its admin: public page, check-in
+                                                       rules, association membership (the rule, the country's list
+                                                       and the field's own entries), chrono sharing, country (FS-*)
     GET /staff/clubs, /staff/clubs/<club>              the account's clubs and invitations; one club, its images
                                                        and members (and a server administrator's moderation)
     GET /staff/firmware                                the firmware catalogue (add and withdraw: server administrator)
@@ -87,7 +90,7 @@ from .. import firmware, sync
 from ..api import fields as fields_api
 from ..history_models import DEFAULT_RETENTION_DAYS, MAX_DELAY_S, MIN_RETENTION_DAYS
 from ..services import branding as branding_svc
-from ..services import devices
+from ..services import devices, registration, scheduling
 from . import i18n, preview_texts
 from .field_pages import GET_HEAD, HERE, HTML_TYPE, STARTED, answer, esc, switcher
 from .staff_i18n import STRINGS
@@ -149,7 +152,8 @@ class StaffPage:
                       ("remote", f"{base}/remote-gm", "nav_remote"), ("atak", f"{base}/atak", "nav_atak"),
                       ("roles", f"{base}/roles", "nav_roles"), ("synckeys", f"{base}/sync-keys", "nav_synckeys"),
                       ("branding", f"{base}/branding", "nav_branding"),
-                      ("platforms", f"{base}/platforms", "nav_platforms"), ("data", f"{base}/data", "nav_data")]
+                      ("platforms", f"{base}/platforms", "nav_platforms"), ("data", f"{base}/data", "nav_data"),
+                      ("settings", f"{base}/settings", "nav_fsettings")]
         # Not of one field: any account's clubs, the firmware list, the server administrator's page.
         items += [("clubs", "/staff/clubs", "nav_clubs"), ("firmware", "/staff/firmware", "nav_firmware"),
                   ("admin", "/staff/admin", "nav_admin")]
@@ -375,6 +379,15 @@ async def platforms(field: str, request: Request) -> Response:
 @router.api_route("/staff/fields/{field}/data", methods=GET_HEAD)
 async def data(field: str, request: Request) -> Response:
     return _field_page(request, field, "data", "data", "data_title")
+
+
+@router.api_route("/staff/fields/{field}/settings", methods=GET_HEAD)
+async def settings(field: str, request: Request) -> Response:
+    # The limit templates the API accepts (its own list) as the select's options; the field's value comes from the API.
+    options = "".join(f'<option value="{esc(name)}">{esc(name)}</option>' for name in registration.limit_templates())
+    return _field_page(request, field, "settings", "settings", "fs_title", template_options=options,
+                       description_max=str(scheduling.FIELD_DESCRIPTION_MAX), address_max=str(scheduling.LOCATION_MAX),
+                       label_max=str(scheduling.FEDERATION_LABEL_MAX), replicas_max=str(registration.MAX_REPLICAS))
 
 
 def _page(request: Request, page: str, section: str, title_key: str, data: Optional[dict[str, str]] = None,

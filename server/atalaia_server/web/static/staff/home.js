@@ -11,7 +11,7 @@ const SECTIONS = [
     ['scenarios', '/scenarios', 'nav_scenarios'],
     ['presets', '/presets', 'nav_presets'], ['devices', '/devices', 'nav_devices'], ['remote', '/remote-gm', 'nav_remote'],
     ['atak', '/atak', 'nav_atak'], ['roles', '/roles', 'nav_roles'], ['synckeys', '/sync-keys', 'nav_synckeys'],
-    ['branding', '/branding', 'nav_branding'], ['platforms', '/platforms', 'nav_platforms'],
+    ['branding', '/branding', 'nav_branding'], ['platforms', '/platforms', 'nav_platforms'], ['settings', '/settings', 'nav_fsettings'],
 ];
 
 async function main() {

@@ -44,6 +44,8 @@ PAGES = {
     "firmware": "/staff/firmware", "admin": "/staff/admin",
     # PKC-1
     "data": f"/staff/fields/{FIELD}/data",
+    # FS-*
+    "settings": f"/staff/fields/{FIELD}/settings",
 }
 
 
@@ -181,7 +183,7 @@ class StaffPageTests(AppTestCase):
                      f"/staff/fields/{field_id}/schedule/{game}/roster", f"/staff/fields/{field_id}/roles",
                      f"/staff/fields/{field_id}/games/{game}/roles", f"/staff/fields/{field_id}/sync-keys",
                      f"/staff/fields/{field_id}/branding", f"/staff/fields/{field_id}/platforms",
-                     "/staff/clubs", f"/staff/clubs/{game}", "/staff/firmware", "/staff/admin"):
+                     "/staff/clubs", f"/staff/clubs/{game}", "/staff/firmware", "/staff/admin", f"/staff/fields/{field_id}/settings"):
             r = await self.client.get(path)
             self.assertEqual(r.status_code, 200)
             self.assertNotIn("Operação Noturna", r.text)
@@ -312,18 +314,19 @@ class StaffScriptTests(AppTestCase):
     async def test_every_api_path_a_new_script_names_exists(self) -> None:
         """A page is its API (FU2-2): the paths the FU9 scripts call are routes of the application, with that method."""
         scripts = ("roles", "rolestable", "gameroles", "synckeys", "branding", "clubs", "club", "platforms", "firmware",
-                   "admin", "imageblock", "remote", "data")
+                   "admin", "imageblock", "remote", "data", "settings")
         field = "00000000-0000-0000-0000-000000000000"
         found: set[tuple[str, str]] = set()
         for name in scripts:
             text = (STATIC / f"{name}.js").read_text(encoding="utf-8")
             for method, path in re.findall(r"(?:api|act)\('(GET|POST|PUT|PATCH|DELETE)',\s*[`']([^`']+)[`']", text):
                 found.add((method, path))
-            for method, path in re.findall(r"api\('(GET|POST|PUT|PATCH|DELETE)',\s*fieldApi\([`']([^`']+)[`']\)", text):
+            for method, path in re.findall(r"api\('(GET|POST|PUT|PATCH|DELETE)',\s*fieldApi\([`']([^`']*)[`']\)", text):
                 found.add((method, f"/api/v1/fields/{field}{path}"))
             for path in re.findall(r"stream\(fieldApi\('([^']+)'\)", text):
                 found.add(("GET", f"/api/v1/fields/{field}{path}"))
         self.assertGreater(len(found), 25)
+        self.assertIn(("PATCH", f"/api/v1/fields/{field}"), found)  # the settings page's one write
         schema = self.app.openapi()["paths"]  # the API's routes (the staff pages are not in it)
         bases = {"${base}": (f"/api/v1/fields/{field}/roles", f"/api/v1/games/{field}/roles"),
                  "${CLUB}": (f"/api/v1/clubs/{field}",)}  # the variables the scripts build their paths from
@@ -338,6 +341,61 @@ class StaffScriptTests(AppTestCase):
                 matched += [p for p, ops in schema.items() if method.lower() in ops
                             and re.fullmatch(re.sub(r"\{[^}]+\}", "[^/]+", p), concrete)]
             self.assertTrue(matched, f"{method} {path}")
+
+    async def test_every_refusal_of_the_field_settings_has_words(self) -> None:
+        """FS-*: PATCH /api/v1/fields/{field} and GET /api/v1/apds can raise these codes (read from their source, and
+        the scheduling codes of the three texts); each has exactly one text in every language, the membership
+        ones with their association twin."""
+        api = Path(staff_pages.__file__).resolve().parents[1] / "api"
+        fields = (api / "fields.py").read_text(encoding="utf-8")
+        update = fields[fields.index("async def update_field"):fields.index("def _may_manage")]
+        codes = set(re.findall(r'HTTPException\(\d+, "([a-z_]+)"', update))
+        codes |= {f"{name}_invalid" for name in ("description", "address_text", "federation_label")}
+        registrations = (api / "registrations.py").read_text(encoding="utf-8")
+        apds = registrations[registrations.index("async def list_apds"):]
+        codes |= set(re.findall(r'HTTPException\(\d+, "([a-z_]+)"', apds[:apds.index("\n\n\n")]))
+        codes |= {"role_required", "field_not_found", "http_422"}  # the role rule, the id, a malformed body
+        self.assertGreaterEqual(len(codes), 10)
+        for lang, strings in STRINGS.items():
+            self.assertEqual(sorted(c for c in codes if f"e_{c}" not in strings), [], lang)
+        for code in sorted(codes - {"role_required"}):  # one text per code (role_required has err_role)
+            self.assertEqual(len({STRINGS[lang][f"e_{code}"] for lang in STRINGS}), 4, code)
+
+    async def test_the_membership_texts_have_their_association_twins(self) -> None:
+        from atalaia_server.web import staff_i18n_settings as fs
+
+        script = (STATIC / "staff.js").read_text(encoding="utf-8")
+        keys = re.search(r"const MEMBERSHIP_KEYS = \[(.*?)\];", script, re.S)
+        assert keys is not None
+        in_script = set(re.findall(r"'([a-z_]+)'", keys.group(1)))
+        for key in fs.MEMBERSHIP_TWINS:
+            self.assertIn(key, in_script)  # the script swaps it
+            for lang, strings in STRINGS.items():
+                self.assertIn(f"{key}_m", strings, (lang, key))
+                self.assertNotEqual(strings[key], strings[f"{key}_m"], (lang, key)) if key.endswith(
+                    ("_title", "_any", "_only")) else None
+                self.assertEqual(set(re.findall(r"\{(\w+)\}", strings[key])),
+                                 set(re.findall(r"\{(\w+)\}", strings[f"{key}_m"])), (lang, key))
+        # "APD" is Portugal's word: the association twin never says it.
+        for lang, strings in STRINGS.items():
+            for key in fs.MEMBERSHIP_TWINS:
+                self.assertNotIn("APD", strings[f"{key}_m"], (lang, key))
+        # The settings page's script swaps the elements the template has.
+        template = (staff_pages.TEMPLATE_DIR / "settings.html").read_text(encoding="utf-8")
+        for selector in re.findall(r"\['#([a-z-]+)', 'fs_", (STATIC / "settings.js").read_text(encoding="utf-8")):
+            self.assertIn(f'id="{selector}"', template)
+
+    async def test_the_settings_page_is_linked_for_the_admin_only(self) -> None:
+        r = await self.client.get(f"/staff/fields/{FIELD}/history", params={"lang": "en"})
+        self.assertIn(f'<li data-section="settings"><a href="/staff/fields/{FIELD}/settings?lang=en">Settings</a>', r.text)
+        self.assertIn("settings: (r) => r.has('admin')", (STATIC / "staff.js").read_text(encoding="utf-8"))
+        self.assertIn("'/settings', 'nav_fsettings'", (STATIC / "home.js").read_text(encoding="utf-8"))
+        self.assertIn("settings", staff_pages.page_names())
+        r = await self.client.get(f"/staff/fields/{FIELD}/settings", params={"lang": "de"})
+        for section in ("Öffentliche Seite", "Check-in-Regeln", "Mitgliedschaft", "Chrono-Freigabe", "Land"):
+            self.assertIn(section, r.text)
+        r = await self.client.get("/staff/fields/not-a-field/settings")
+        self.assertEqual(r.status_code, 404)
 
     async def test_the_roster_has_a_print_style_sheet(self) -> None:
         css = (STATIC / "staff.css").read_text(encoding="utf-8")

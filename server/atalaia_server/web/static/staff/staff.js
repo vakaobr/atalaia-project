@@ -34,13 +34,19 @@ export function t(key, vars) {
 // The APD texts that have an association twin ("<key>_m", staff_i18n.py): a field outside Portugal, or without a
 // country, says "association membership" (protocol/apd.md, decision MEM-4).
 const MEMBERSHIP_KEYS = ['col_fed_number', 'reg_edit_apd', 'apd_unknown', 'apd_status_not_accepted', 'e_apd_id_invalid',
-    'e_membership_missing', 'e_apd_not_accepted', 'e_apd_rule_invalid'];
+    'e_membership_missing', 'e_apd_not_accepted', 'e_apd_rule_invalid', 'fs_member_title', 'fs_member_intro',
+    'fs_member_any', 'fs_member_only', 'fs_member_custom_title', 'fs_member_custom_intro'];
+const APD_TEXTS = {};  // the APD texts as the server sent them, to put back when the country becomes PT
 
-/** Swaps the APD texts for the association ones unless the field's country is PT; call it before the texts are
- * used. The texts the server put into the page's HTML are the APD ones: [[selector, key]] names the elements to redo. */
+/** Picks the APD texts for a field in PT and the association ones for any other country (or none); call it before
+ * the texts are used, and again when the country changes (the settings page). The texts the server put into the
+ * page's HTML are the APD ones: [[selector, key]] names the elements to redo. */
 export function membershipWording(country, elements) {
-    if (country === 'PT') return;
-    for (const key of MEMBERSHIP_KEYS) if (Object.prototype.hasOwnProperty.call(STRINGS, `${key}_m`)) STRINGS[key] = STRINGS[`${key}_m`];
+    for (const key of MEMBERSHIP_KEYS) {
+        if (!Object.prototype.hasOwnProperty.call(STRINGS, `${key}_m`)) continue;
+        if (!(key in APD_TEXTS)) APD_TEXTS[key] = STRINGS[key];
+        STRINGS[key] = country === 'PT' ? APD_TEXTS[key] : STRINGS[`${key}_m`];
+    }
     for (const [selector, key] of elements || []) {
         const node = document.querySelector(selector);
         if (node) node.textContent = t(key);
@@ -451,6 +457,7 @@ const SECTIONS = {
     branding: (r) => r.has('admin') || r.has('gm'),
     platforms: (r) => r.has('admin'),
     data: (r) => r.has('admin'),
+    settings: (r) => r.has('admin'),
     // The pages not of one field: any account's clubs and the firmware list; the server administrator's page.
     clubs: () => true,
     firmware: () => true,
