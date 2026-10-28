@@ -10,6 +10,7 @@
 // boxes given their role run them alone, modes/README.md).
 
 import { html, Component, t, brief, modeText, paramLabel, commandLabel } from '../ui.js';
+import { GlyphWarning } from './box-glyphs.js';
 
 /** Main modes (kind "mode", and role packages, which may run alone), modifiers (kind
  * "modifier") and role packages (kind "role") of the catalogue. */
@@ -239,7 +240,8 @@ export class PresetBuilder extends Component {
                 <h3>${t('presets.new')}</h3>
                 <div class="field"><label for="preset-name">${t('presets.name')}</label>
                     <input id="preset-name" required maxlength="64" value=${state.name}
-                        onInput=${(e) => this.setState({ name: e.target.value })} /></div>
+                        onInput=${(e) => this.setState({ name: e.target.value })} />
+                    <${GlyphWarning} text=${state.name} testid="glyph-preset" /></div>
                 <div class="field"><label for="preset-mode">${t('presets.mode')}</label>
                     <select id="preset-mode" value=${mode.id} onChange=${(e) => this.pickMode(e.target.value)}>
                         ${mainModes(modes).map((m) => html`<option value=${m.id}>${modeText(m, 'name')} (${m.id})</option>`)}

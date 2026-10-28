@@ -676,6 +676,10 @@
       "low_airtime": "0,1%, nicht empfohlen"
     }
   },
+  "glyphs": {
+    "none": "Die Boxen können {letters} nicht zeichnen: Der Bildschirm eines Modus zeigt dafür „?“, die eigenen Bildschirme der Box ein leeres Quadrat. Die App und diese Konsole zeigen den Namen wie eingegeben; auf der Box unterscheidet man Teams an der Farbe.",
+    "some": "{letters} gibt es nur in einigen Textgrößen der Box, daher kann eine Box dafür auf einem Teil der Bildschirme „?“ zeigen."
+  },
   "checkin_import": {
     "title": "Anmeldeliste importieren",
     "intro": "Für ein Feld ohne Feldserver: Eine Anmeldeliste einer anderen Plattform (CSV oder JSON, im Importformat des Feldservers) wird zu den erwarteten Spielenden dieses Spiels, und ein Marshal hakt jede Person bei der Ankunft ab. Gelesen werden nur display_name, external_ref, team_preference, federation_number und replicas; jede andere Spalte (eine E-Mail, eine Telefonnummer) wird nur genannt, nie gelesen.",

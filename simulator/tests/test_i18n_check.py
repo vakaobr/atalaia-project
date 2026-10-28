@@ -170,7 +170,8 @@ class BoxFontCheckTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         for name in ("firmware/esp32/main/box_text.c", "firmware/esp32/main/box_text.h",
-                     "firmware/esp32/main/fonts", "firmware/esp32/main/box_fonts_cjk.h"):
+                     "firmware/esp32/main/fonts", "firmware/esp32/main/box_fonts_cjk.h",
+                     "controller/console/src/box-glyphs.json"):
             src, dst = REPO / name, self.root / name
             dst.parent.mkdir(parents=True, exist_ok=True)
             if src.is_dir():
@@ -233,6 +234,27 @@ class BoxFontCheckTests(unittest.TestCase):
         self.assertNotIn("lv_font_atalaia_14.c: lacks 閒", err)
         self.assertNotIn("lv_font_atalaia_48.c: lacks 閒", err)
         self.assertIn("box_fonts_cjk.h is not the fonts' Chinese letters", err)
+        self.assertIn("box-glyphs.json is not the fonts' letters", err)  # the console's copy (PKE-3)
+
+    def test_the_consoles_glyph_json_is_the_tables(self):
+        """PKE-3: box-glyphs.json holds the Latin ranges and each font's Chinese letters, as box_fonts_cjk.h."""
+        data = json.loads((REPO / "controller/console/src/box-glyphs.json").read_text(encoding="utf-8"))
+        header = (REPO / "firmware/esp32/main/box_fonts_cjk.h").read_text(encoding="utf-8")
+        for size in (14, 20, 28, 48):
+            block = header[header.index(f"box_fonts_cjk_{size}[]"):]
+            block = block[:block.index("};")]
+            letters = sorted(int(x, 16) for x in re.findall(r"0x[0-9A-Fa-f]{4}", block))
+            self.assertEqual(data["cjk"][str(size)], letters, size)
+        self.assertEqual(data["latin"][0], [0x20, 0x7F])
+        self.assertTrue(any(lo <= 0xE3 <= hi for lo, hi in data["latin"]))  # ã, for Portuguese
+        self.assertFalse(any(lo <= 0x141 <= hi for lo, hi in data["latin"]))  # Polish Ł: in no font
+
+    def test_a_stale_glyph_json_fails(self):
+        path = self.root / "controller/console/src/box-glyphs.json"
+        path.write_text(path.read_text(encoding="utf-8").replace("[32, 127]", "[33, 127]"), encoding="utf-8")
+        code, _, err = self.check()
+        self.assertEqual(code, 1)
+        self.assertIn("box-glyphs.json is not the fonts' letters", err)
 
     def test_a_letter_in_no_font_at_all_fails(self):
         # Polish l with stroke is neither in LATIN nor Chinese.

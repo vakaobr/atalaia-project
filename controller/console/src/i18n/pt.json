@@ -676,6 +676,10 @@
       "low_airtime": "0,1%, não recomendado"
     }
   },
+  "glyphs": {
+    "none": "As caixas não conseguem desenhar {letters}: o ecrã de um modo mostra «?» no seu lugar e os ecrãs da própria caixa um quadrado vazio. A app e esta consola mostram o nome como escrito; na caixa, as equipas distinguem-se pela cor.",
+    "some": "{letters} só existe em alguns dos tamanhos de texto da caixa, pelo que uma caixa pode mostrar «?» no seu lugar em parte dos ecrãs."
+  },
   "checkin_import": {
     "title": "Importar uma lista de inscrições",
     "intro": "Para um campo sem servidor do campo: uma lista de inscrições de outra plataforma (CSV ou JSON, no formato de importação do servidor do campo) passa a ser os jogadores esperados deste jogo, e um marshal assinala cada jogador à chegada. Só se leem display_name, external_ref, team_preference, federation_number e replicas; qualquer outra coluna (um email, um telefone) é apenas nomeada, nunca lida.",

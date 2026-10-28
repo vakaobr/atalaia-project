@@ -10,6 +10,7 @@
 // whoever uploads them is responsible for having the rights (said here).
 
 import { html, Component, t, teamColour, teamName, crestUrl, brandingUrl, textOn, ConfirmButton } from '../ui.js';
+import { GlyphWarning } from './box-glyphs.js';
 
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const COLOURS = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'black', 'white'];
@@ -125,7 +126,8 @@ export class BrandingSettings extends Component {
                 <div class="field"><label for="b-name">${t('branding.field_name')}</label>
                     <input id="b-name" data-testid="branding-name" required maxlength="48" value=${name}
                         onInput=${(e) => this.setState({ name: e.target.value, saved: false })} />
-                    <small class="muted">${t('branding.field_name_hint')}</small></div>
+                    <small class="muted">${t('branding.field_name_hint')}</small>
+                    <${GlyphWarning} text=${name} testid="glyph-field-name" /></div>
                 <div class="field"><label for="b-accent">${t('branding.accent')}</label>
                     <div class="actions">
                         <input id="b-accent" type="color" data-testid="branding-accent" value=${accent || '#ffb300'}
@@ -201,7 +203,8 @@ export class TeamPresets extends Component {
             ${gm && html`<form class="form" onSubmit=${(e) => this.add(e)} data-testid="team-preset-form">
                 <div class="field"><label for="tp-name">${t('teams.name')}</label>
                     <input id="tp-name" data-testid="team-preset-name" required maxlength="32" value=${state.name}
-                        onInput=${(e) => this.setState({ name: e.target.value })} /></div>
+                        onInput=${(e) => this.setState({ name: e.target.value })} />
+                    <${GlyphWarning} text=${state.name} testid="glyph-team-preset" /></div>
                 <div class="field"><label for="tp-colour">${t('teams.colour')}</label>
                     <select id="tp-colour" data-testid="team-preset-colour" value=${state.colour}
                         onChange=${(e) => this.setState({ colour: e.target.value })}>

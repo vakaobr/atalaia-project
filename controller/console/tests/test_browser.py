@@ -4699,6 +4699,36 @@ class ConsoleBrowserTests(unittest.TestCase):
         """A refusal the test asked for is not a page error."""
         self.errors = [e for e in self.errors if path not in e and "status of 4" not in e]
 
+    def test_names_the_box_cannot_draw_are_warned_about(self):
+        """PKE-3 (follow-up of P5K-5): a team, preset or field name with a letter the box's fonts lack is warned
+        about where it is typed, with the letters; Portuguese and German letters, and Chinese ones the box's texts
+        have, pass; the name is still accepted."""
+        page = self.console()
+        got = page.evaluate("""() => import('./components/box-glyphs.js').then(async (m) => {
+            const g = await m.loadGlyphs();
+            return [m.glyphProblems('Águias ção Größe 123 -', g), m.glyphProblems('紅隊', g),
+                    m.glyphProblems('Łódź Привет', g), m.glyphProblems('', g), m.glyphProblems('x', null)];
+        })""")
+        self.assertEqual(got[0], {"none": [], "some": []})
+        self.assertEqual(got[1]["none"], ["紅"])  # 隊 is in the box's texts, 紅 is not (P5K-14)
+        self.assertEqual(sorted(got[2]["none"]), sorted(["Ł", "ź", "П", "р", "и", "в", "е", "т"]))
+        self.assertEqual(got[3:], [{"none": [], "some": []}, {"none": [], "some": []}])
+        page.get_by_test_id("tab-game").click()
+        expect(page.get_by_test_id("glyph-teams")).to_have_count(0)
+        page.get_by_test_id("game-teams").fill("Lobos, 紅隊")
+        expect(page.get_by_test_id("glyph-teams")).to_contain_text("紅")
+        expect(page.get_by_test_id("glyph-teams")).to_contain_text("?")
+        expect(page.get_by_test_id("glyph-none")).to_have_count(1)
+        page.get_by_test_id("game-teams").fill("Lobos, Águias")
+        expect(page.get_by_test_id("glyph-teams")).to_have_count(0)
+        page.get_by_test_id("tab-settings").click()
+        page.get_by_test_id("branding-name").fill("Campo 北")
+        expect(page.get_by_test_id("glyph-field-name")).to_contain_text("北")
+        page.get_by_test_id("branding-name").fill("Campo Norte")
+        expect(page.get_by_test_id("glyph-field-name")).to_have_count(0)
+        page.get_by_test_id("team-preset-name").fill("Яблоко")
+        expect(page.get_by_test_id("glyph-team-preset")).to_be_visible()
+
     def test_field_branding_from_settings_to_header_scoreboard_and_poster(self):
         if not ZBARIMG:
             self.skipTest("zbarimg is not installed")

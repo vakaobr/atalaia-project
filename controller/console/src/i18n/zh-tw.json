@@ -676,6 +676,10 @@
       "low_airtime": "0.1%，不建議"
     }
   },
+  "glyphs": {
+    "none": "盒子無法顯示「{letters}」：模式的畫面會顯示「?」，盒子自己的畫面則是空白方框。App 與此控制台會照輸入顯示名稱；盒子上以顏色區分隊伍。",
+    "some": "盒子只有部分字級包含「{letters}」，因此盒子在部分畫面可能會以「?」顯示。"
+  },
   "checkin_import": {
     "title": "匯入報名名單",
     "intro": "適用於沒有場地伺服器的場地：其他平台的報名名單（CSV 或 JSON，採場地伺服器的匯入格式）會成為這場遊戲的預期玩家，裁判在玩家抵達時逐一勾選。只讀取 display_name、external_ref、team_preference、federation_number 與 replicas；其他欄位（電子郵件、電話）只列出名稱，不會讀取。",

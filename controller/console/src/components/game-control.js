@@ -6,6 +6,7 @@
 // box, adjust a team's score. ControllerPanel: role, term, radio, promote.
 
 import { html, Component, createRef, t, lang, clock, ConfirmButton, modeText, teamName } from '../ui.js';
+import { GlyphWarning } from './box-glyphs.js';
 import { isTyping } from './poster-prompt.js';
 import { FirstSetupNotice, mhz } from './radio-settings.js';
 import { TeamFields, TeamsEditor, teamInfoBody } from './branding-settings.js';
@@ -139,7 +140,8 @@ class CreateGame extends Component {
             <div class="field"><label for="g-teams">${t('game.teams')}</label>
                 <input id="g-teams" data-testid="game-teams" required value=${state.teams}
                     onInput=${(e) => this.setState({ teams: e.target.value })} />
-                <small class="muted">${t('game.teams_hint')}</small></div>
+                <small class="muted">${t('game.teams_hint')}</small>
+                <${GlyphWarning} text=${state.teams} testid="glyph-teams" /></div>
             ${props.app.serves('branding') && html`<details class="team-branding" data-testid="game-team-branding">
                 <summary>${t('teams.for_game')}</summary>
                 <p class="muted small">${t('teams.for_game_hint')}</p>

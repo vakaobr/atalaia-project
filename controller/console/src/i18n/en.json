@@ -676,6 +676,10 @@
       "low_airtime": "0.1%, not recommended"
     }
   },
+  "glyphs": {
+    "none": "The boxes cannot draw {letters}: a mode's screen shows “?” for it and the box's own screens an empty square. The app and this console show the name as typed; on the box, teams are told apart by colour.",
+    "some": "{letters} is in only some of the box's text sizes, so a box may show “?” for it on part of its screens."
+  },
   "checkin_import": {
     "title": "Import a registration list",
     "intro": "For a field with no site server: a list of registrations from another platform (CSV or JSON, the site server's import format) becomes this game's expected players, and a marshal ticks each one when they arrive. Only display_name, external_ref, team_preference, federation_number and replicas are read; any other column (an email, a phone number) is only named, never read.",
