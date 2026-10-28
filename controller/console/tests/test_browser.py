@@ -2641,6 +2641,8 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("bc-minor").fill("3")
         page.get_by_test_id("bc-room").fill("Outra")
         page.get_by_test_id("bc-save").click()
+        # Wait for the refusal itself: the form was visible before the answer came.
+        expect(page.get_by_test_id("toast")).to_contain_text("1:3")
         expect(page.get_by_test_id("bc-form")).to_be_visible()
         self.drop_errors("HTTP 409", "409 (Conflict)")
         page.get_by_test_id("bc-cancel").click()
