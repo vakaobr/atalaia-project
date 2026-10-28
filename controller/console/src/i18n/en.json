@@ -1592,5 +1592,9 @@
     "download": "Download the NDEF file",
     "hide": "Hide",
     "no_game": "Make a game first: tags are signed with the running game's key."
+  },
+  "boxlogo": {
+    "failed": "The logo is saved for the console, but this browser could not convert it for the Field Boxes: they keep the Atalaia logo.",
+    "ready": "The Field Boxes will show this logo."
   }
 }

@@ -104,6 +104,46 @@ class BoxLogoApiTests(P3Case):
         self.client.delete("/api/v1/field/branding/logo", headers=GM)
         self.assertEqual(self.client.get("/api/v1/field/box-logo/release").status_code, 404)
 
+    # --- a JPEG or WebP logo, converted by the GM console (decision LOGO-1) ---------------------------------
+
+    def put_box(self, image_id, data, headers=GM):
+        return self.client.put(f"/api/v1/field/branding/logo/box?id={image_id}", content=data,
+                               headers={**headers, "Content-Type": "application/octet-stream"})
+
+    def test_a_jpeg_logo_is_served_from_the_consoles_bytes(self):
+        ready = box_logo.convert(fixture("logo.png"))  # stands for what the console makes in the browser
+        image_id = self.put_logo("logo.jpg", "image/jpeg")
+        r = self.put_box(image_id, ready)
+        self.assertEqual(r.status_code, 200, r.text)
+        data = self.client.get("/api/v1/field/box-logo")
+        self.assertEqual((data.status_code, data.content), (200, ready))
+        self.assertEqual(data.headers["etag"], f'"{image_id}"')
+        rel = self.client.get("/api/v1/field/box-logo/release").text.splitlines()
+        self.assertEqual(rel[1], f"id={image_id}")
+        self.assertEqual(rel[2], f"sha256={hashlib.sha256(ready).hexdigest()}")
+        # A new logo makes the bytes stale: nothing is served until the console uploads new ones.
+        self.put_logo("wallpaper.jpg", "image/jpeg")
+        self.assertEqual(self.client.get("/api/v1/field/box-logo").status_code, 404)
+
+    def test_the_controller_checks_the_uploaded_bytes(self):
+        ready = box_logo.convert(fixture("logo.png"))
+        image_id = self.put_logo("logo.jpg", "image/jpeg")
+        bad = [ready[:-1], b"", b"XXXX" + ready[4:], ready[:4] + struct.pack("<HH", 95, 96) + ready[8:]]
+        for data in bad:
+            self.assertEqual(self.put_box(image_id, data).status_code, 400, len(data))
+        self.assertEqual(self.put_box(image_id, b"\0" * (box_logo.SIZE + 1)).status_code, 413)
+        self.assertEqual(self.client.get("/api/v1/field/box-logo").status_code, 404)
+        self.assertEqual(self.put_box(image_id, ready, headers={}).status_code, 401)
+        self.assertEqual(self.put_box("0" * 64, ready).status_code, 409)  # not the field's logo
+        self.assertEqual(self.client.get("/api/v1/field/box-logo").status_code, 404)
+
+    def test_a_png_logo_is_never_replaced_by_uploaded_bytes(self):
+        image_id = self.put_logo("logo.png", "image/png")
+        self.assertEqual(self.put_box(image_id, box_logo.convert(fixture("logo.png"))).status_code, 409)
+
+    def test_no_logo_no_box_logo(self):
+        self.assertEqual(self.put_box("0" * 64, box_logo.convert(fixture("logo.png"))).status_code, 409)
+
 
 if __name__ == "__main__":
     unittest.main()

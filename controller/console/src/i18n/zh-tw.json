@@ -1592,5 +1592,9 @@
     "download": "下載 NDEF 檔案",
     "hide": "隱藏",
     "no_game": "請先建立一場遊戲：標籤用進行中遊戲的金鑰簽署。"
+  },
+  "boxlogo": {
+    "failed": "標誌已為主控台儲存，但此瀏覽器無法為 Field Box 轉換它：Field Box 仍顯示 Atalaia 標誌。",
+    "ready": "Field Box 將顯示此標誌。"
   }
 }

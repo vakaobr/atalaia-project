@@ -9,7 +9,8 @@ integers, alpha composited on the box's screen colour #101418), and written as R
     "ALG1"  u16le width (96)  u16le height (96)  96 x 96 pixels, each a little-endian RGB565 word
 
 18,440 bytes. Only PNG is converted: the controller has no JPEG or WebP decoder (decision BR7), so a field whose
-logo is one of those keeps the Atalaia logo on its boxes (the box asks, and is told there is none). The Dart
+logo is one of those keeps the Atalaia logo on its boxes unless the GM console, which has a browser's decoder,
+converts it and uploads the bytes (decision LOGO-1; branding.py checks them with check()). The Dart
 controller (app/lib/controller/controller_box_logo.dart) does the same sums on whole integers, so both give the
 same bytes; protocol/vectors/box_logo.json holds the PNG files and the SHA-256 of the result.
 """
@@ -41,6 +42,11 @@ def release_text(image_id: str, data: bytes) -> str:
             f"id={image_id}\n"
             f"sha256={hashlib.sha256(data).hexdigest()}\n"
             f"bytes={len(data)}\n")
+
+
+def check(data: bytes) -> bool:
+    """Whether uploaded bytes are box-ready: exactly SIZE bytes with the header above (decision LOGO-1)."""
+    return len(data) == SIZE and data[:HEADER] == MAGIC + struct.pack("<HH", SIDE, SIDE)
 
 
 def _paeth(a: int, b: int, c: int) -> int:

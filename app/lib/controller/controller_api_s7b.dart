@@ -24,7 +24,8 @@ part of 'controller_api.dart';
 //     GET|POST /api/v1/presets               saved presets / GM: save one {"name", "mode_id", "params"}
 //     GET|PUT /api/v1/field/branding         the field's name, logo, wallpaper, accent (GET: no token, ETag)
 //     GET|PUT|DELETE /api/v1/field/branding/{logo|wallpaper}  the images (GET: no token)
-//     GET  /api/v1/field/box-logo[/release]  the PNG logo as a Field Box draws it, 96x96 RGB565 (no token)
+//     GET  /api/v1/field/box-logo[/release]  the logo as a Field Box draws it, 96x96 RGB565 (no token)
+//     PUT  /api/v1/field/branding/logo/box?id=  a JPEG or WebP logo's box-ready bytes, made by the console (GM)
 //     POST /api/v1/crests                    GM: upload a team crest (raw PNG, JPEG or WebP)
 //     GET  /api/v1/crests/{id}               a crest (no token, immutable)
 //     GET|POST /api/v1/team-presets          saved teams: display name, colour, crest
@@ -33,7 +34,8 @@ part of 'controller_api.dart';
 //     PUT  /api/v1/games/{id}/teams/{team}   GM: {"display_name"?, "crest_id"?, "team_preset_id"?}
 
 const _noBoxLogo =
-    'no logo a box can draw (a PNG logo is converted for the box)';
+    'no logo a box can draw (a PNG logo is converted for the box, a JPEG or '
+    'WebP one by the console)';
 
 /// Served images: never sniffed as anything else, inert if opened as a page
 /// (api.py IMAGE_HEADERS, decision BR9).
@@ -367,6 +369,17 @@ extension _S7bRoutes on ControllerApi {
         'ETag': etagOf(made.$1),
       });
     }),
+    // The box-ready bytes of a JPEG or WebP logo, converted by the GM console
+    // in the browser (decision LOGO-1); checked here and kept for that logo.
+    ControllerApi._route(
+      'PUT',
+      r'/api/v1/field/branding/logo/box',
+      _gm((r) {
+        final (data, _) = _upload(r, boxLogoSize, 'box logo');
+        final id = r.uri.queryParameters['id'] ?? '';
+        return ApiResponse(200, _branding().putBoxLogo(id, data));
+      }),
+    ),
     ControllerApi._route('GET', r'/api/v1/field/branding/([^/]+)', (r) {
       final slot = r.pathText(1);
       _slot(slot);

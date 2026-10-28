@@ -254,7 +254,7 @@ Uma caixa de outro campo pede o seu **PIN de administração**. **Mudar de campo
 
 ## 7. Atualizações pelo ar, e o que mais usa o Wi-Fi do campo
 
-Três coisas usam o Wi-Fi do campo, e só entre jogos: as **atualizações de firmware**, os **modos de jogo que a caixa não tem** (obtidos do controlador, como pacotes assinados) e **o logótipo do campo** (um PNG, obtido uma vez por cada jogo em que a caixa entra). Para as três, a caixa precisa do **nome e da palavra-passe do Wi-Fi do campo** da página de configuração. Também os podes definir na consola USB: `@wifi <name> <password>`. O controlador tem de estar a correr com HTTPS ligado.
+Três coisas usam o Wi-Fi do campo, e só entre jogos: as **atualizações de firmware**, os **modos de jogo que a caixa não tem** (obtidos do controlador, como pacotes assinados) e **o logótipo do campo** (uma imagem pequena, obtida uma vez por cada jogo em que a caixa entra). Para as três, a caixa precisa do **nome e da palavra-passe do Wi-Fi do campo** da página de configuração. Também os podes definir na consola USB: `@wifi <name> <password>`. O controlador tem de estar a correr com HTTPS ligado.
 
 **As regras das atualizações de firmware.** A caixa só instala uma atualização se tudo isto for verdade:
 

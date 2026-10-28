@@ -6,11 +6,12 @@
 // crest for teams that come back). The game form and the game card: each
 // team colour's display name and crest for one game. FieldBrand: the
 // field's logo and name in the console's header. The images are PNG, JPEG
-// or WebP only; the controller checks them and strips their metadata, and
+// or WebP only (a JPEG or WebP logo is also converted here for the Field Boxes, box-logo.js); the controller checks them and strips their metadata, and
 // whoever uploads them is responsible for having the rights (said here).
 
 import { html, Component, t, teamColour, teamName, crestUrl, brandingUrl, textOn, ConfirmButton } from '../ui.js';
 import { GlyphWarning } from './box-glyphs.js';
+import { convertImage } from './box-logo.js';
 
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const COLOURS = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'black', 'white'];
@@ -63,7 +64,28 @@ class ImageSlot extends Component {
             return;
         }
         const out = await app.call('PUT', `/field/branding/${slot}`, undefined, { type: file.type, data: file });
-        if (out) app.setState({ branding: out });
+        if (out) {
+            app.setState({ branding: out });
+            if (slot === 'logo' && out.logo && out.logo.content_type !== 'image/png') await this.boxLogo(out.logo);
+        }
+    }
+
+    /**
+     * A JPEG or WebP logo for the Field Boxes (decision LOGO-1): the controllers convert only PNG, so this
+     * browser decodes the logo as the controller stores it, makes the box-ready bytes and uploads them.
+     */
+    async boxLogo(ref) {
+        const { app } = this.props;
+        try {
+            const r = await fetch(brandingUrl(ref), { cache: 'no-cache' });
+            if (!r.ok) throw new Error(String(r.status));
+            const bytes = await convertImage(await r.blob());
+            const done = await app.call('PUT', `/field/branding/logo/box?id=${ref.id}`, undefined,
+                { type: 'application/octet-stream', data: new Blob([bytes]) });
+            if (done) app.showToast(t('boxlogo.ready'));
+        } catch (e) {
+            app.showToast(t('boxlogo.failed'));
+        }
     }
 
     async remove() {

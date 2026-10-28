@@ -1592,5 +1592,9 @@
     "download": "NDEF-Datei herunterladen",
     "hide": "Ausblenden",
     "no_game": "Erstelle zuerst ein Spiel: Tags werden mit dem Schlüssel des laufenden Spiels signiert."
+  },
+  "boxlogo": {
+    "failed": "Das Logo ist für die Konsole gespeichert, aber dieser Browser konnte es nicht für die Field Boxes umwandeln: sie behalten das Atalaia-Logo.",
+    "ready": "Die Field Boxes zeigen dieses Logo."
   }
 }

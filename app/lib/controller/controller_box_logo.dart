@@ -29,6 +29,17 @@ const boxLogoSide = 96;
 const _header = 8;
 const boxLogoSize = _header + boxLogoSide * boxLogoSide * 2;
 
+/// Whether uploaded bytes are box-ready: exactly [boxLogoSize] bytes with the
+/// header above (decision LOGO-1; the console converts JPEG and WebP logos).
+bool checkBoxLogo(Uint8List data) {
+  if (data.length != boxLogoSize) return false;
+  const head = [0x41, 0x4C, 0x47, 0x31, boxLogoSide, 0, boxLogoSide, 0];
+  for (var i = 0; i < head.length; i++) {
+    if (data[i] != head[i]) return false;
+  }
+  return true;
+}
+
 /// The box's screen colour (COLOR_BG in screen_renderer.c).
 const _bg = [0x10, 0x14, 0x18];
 

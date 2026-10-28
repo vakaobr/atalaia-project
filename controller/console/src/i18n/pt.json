@@ -1592,5 +1592,9 @@
     "download": "Descarregar o ficheiro NDEF",
     "hide": "Esconder",
     "no_game": "Cria primeiro um jogo: as etiquetas são assinadas com a chave do jogo em curso."
+  },
+  "boxlogo": {
+    "failed": "O logótipo ficou guardado para a consola, mas este navegador não o conseguiu converter para as Field Boxes: elas mantêm o logótipo da Atalaia.",
+    "ready": "As Field Boxes vão mostrar este logótipo."
   }
 }

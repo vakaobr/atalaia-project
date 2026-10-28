@@ -31,6 +31,7 @@ to is deleted a day after its upload (purge, from the controller's tick).
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import logging
@@ -51,6 +52,7 @@ ACCENT_RE = re.compile(r"#[0-9a-fA-F]{6}")
 SLOTS = {"logo": images.LOGO, "wallpaper": images.WALLPAPER}
 SETTING = "branding.field"
 SITE_PRESETS = "branding.site_presets"  # {site team id: team preset id} (plan phase 18)
+BOX_LOGO_SETTING = "branding.box_logo"  # the console's box-ready logo for a JPEG or WebP logo (decision LOGO-1)
 NAME_SETTING = "branding.field_name"  # only without check-in (the poster keeps the name otherwise)
 FIELD_NAME_MAX = 48
 CREST_MAX = 500           # crests kept at once (decision BR8)
@@ -189,18 +191,47 @@ class Branding:
         return self.store.image(image_id) if image_id else None
 
     def box_logo(self) -> Optional[tuple[str, bytes]]:
-        """The field's logo as a Field Box draws it (box_logo.py, decision PKG-1): the source image's id and the
-        box-ready bytes, or None when there is no logo or it is not a PNG the controller can convert. The result
-        is kept by the image's id, so each logo is converted once."""
+        """The field's logo as a Field Box draws it (box_logo.py, decisions PKG-1 and LOGO-1): the source image's
+        id and the box-ready bytes, or None when there is no logo or none a box can draw. A PNG is converted here
+        (kept by the image's id, so each logo is converted once); a JPEG or WebP logo is the bytes the GM console
+        made in the browser and uploaded for exactly this logo (put_box_logo), when there are any."""
         img = self.image("logo")
-        if img is None or img["content_type"] != "image/png":
+        if img is None:
             return None
+        if img["content_type"] != "image/png":
+            return self._uploaded_box_logo(img["id"])
         if self._box_logo is None or self._box_logo[0] != img["id"]:
             try:
                 self._box_logo = (img["id"], box_logo.convert(img["data"]))
             except box_logo.BoxLogoError:
                 self._box_logo = (img["id"], b"")
         return self._box_logo if self._box_logo[1] else None
+
+    def _uploaded_box_logo(self, image_id: str) -> Optional[tuple[str, bytes]]:
+        raw = self.store.get_setting(BOX_LOGO_SETTING)
+        try:
+            kept = json.loads(raw) if raw else {}
+            data = base64.b64decode(kept["data"], validate=True)
+            if kept["id"] == image_id and box_logo.check(data):
+                return image_id, data
+        except (ValueError, KeyError, TypeError):
+            pass
+        return None
+
+    def put_box_logo(self, image_id: str, data: bytes) -> dict[str, Any]:
+        """PUT /api/v1/field/branding/logo/box?id=<logo id>: the box-ready bytes of the field's JPEG or WebP logo,
+        made by the GM console (the controller has no decoder for them). Checked (size, header) and kept for
+        that logo only; a new logo, or none, makes them stale and they are never served."""
+        self._local_only()
+        img = self.image("logo")
+        if img is None or img["id"] != image_id:
+            raise Conflict("the box logo is for another logo than the field's: upload the logo first")
+        if img["content_type"] == "image/png":
+            raise Conflict("a PNG logo is converted by the controller itself")
+        if not box_logo.check(data):
+            raise ControllerError(f"the box logo is {box_logo.SIZE} bytes: 'ALG1', 96, 96 and 9,216 RGB565 pixels")
+        self.store.set_setting(BOX_LOGO_SETTING, json.dumps({"id": image_id, "data": base64.b64encode(data).decode()}))
+        return self.view()
 
     # --- crests and team presets ---------------------------------------------
 
