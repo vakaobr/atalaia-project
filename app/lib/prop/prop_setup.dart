@@ -9,6 +9,7 @@
 /// requires (capability_mapper.dart).
 library;
 
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -18,6 +19,7 @@ import '../app.dart';
 import '../controller/controller_modes.dart';
 import '../l10n/strings.dart';
 import '../modes/mode_catalog.dart';
+import '../modes/prop_mode_fetch.dart';
 import '../platform/services.dart';
 import '../pod/pod_client.dart';
 import '../protocol/join_payload.dart';
@@ -38,7 +40,12 @@ class PropSetupScreen extends StatefulWidget {
 }
 
 class _PropSetupScreenState extends State<PropSetupScreen> {
-  late final ModeCatalog catalog = context.services.modes;
+  late ModeCatalog catalog = context.services.modes;
+
+  /// A join's mode is being fetched from the controller (PKF-1), or the
+  /// fetch refused it: [_fetchError] says why.
+  bool _fetching = false;
+  ModeFetchException? _fetchError;
   ModeManifest? _main;
   final _modifiers = <ModeManifest>{};
   String? _role;
@@ -56,15 +63,11 @@ class _PropSetupScreenState extends State<PropSetupScreen> {
     final j = join;
     if (j != null) {
       try {
-        final g = catalog.compose(j.modeId);
-        _main = g.main;
-        _modifiers.addAll(g.modifiers);
-        _role = g.main.role(j.role) == null ? null : j.role;
-        if (_role == null) _error = 'setup.unknown_role';
-        _teams = [...j.teams];
-        _values.addAll(j.params ?? const {});
+        _useJoinMode(j);
       } on ModeException {
-        _error = 'setup.unknown_mode';
+        // Not built in: a package kept or fetched from the controller.
+        _fetching = true;
+        unawaited(_fetchJoinMode(j));
       }
     } else {
       _pick(
@@ -75,6 +78,50 @@ class _PropSetupScreenState extends State<PropSetupScreen> {
       );
     }
     _loadFeatures();
+  }
+
+  void _useJoinMode(JoinPayload j) {
+    final g = catalog.compose(j.modeId);
+    _main = g.main;
+    _modifiers.addAll(g.modifiers);
+    _role = g.main.role(j.role) == null ? null : j.role;
+    _error = _role == null ? 'setup.unknown_role' : null;
+    _teams = [...j.teams];
+    _values.addAll(j.params ?? const {});
+  }
+
+  /// The parts of the join's mode the app lacks: the packages kept before,
+  /// else those the controller offers, checked as a Field Box checks them
+  /// (lib/modes/prop_mode_fetch.dart). Nothing unverified runs.
+  Future<void> _fetchJoinMode(JoinPayload j) async {
+    final services = context.services;
+    final keys = propModeKeys(AppScope.read(context).settings);
+    try {
+      final got = await services.modeFetcher.resolve(j, services.modes, keys);
+      if (!mounted) return;
+      setState(() {
+        catalog = got;
+        _fetching = false;
+        _fetchError = null;
+        try {
+          _useJoinMode(j);
+        } on ModeException {
+          _error = 'setup.unknown_mode';
+        }
+      });
+    } on ModeFetchException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _fetching = false;
+        // Without a fetch asked for, the old message: this prop does not
+        // have the mode.
+        if (e.code == 'not_offered' && !j.fetchModes) {
+          _error = 'setup.unknown_mode';
+        } else {
+          _fetchError = e;
+        }
+      });
+    }
   }
 
   Future<void> _loadFeatures() async {
@@ -184,6 +231,20 @@ class _PropSetupScreenState extends State<PropSetupScreen> {
                 'mhz': s.number(j.channelHz / 1e6, 3),
               }),
               kind: NoticeKind.ok,
+            ),
+          if (_fetching)
+            Notice(
+              s.t('propmodes.fetching'),
+              kind: NoticeKind.info,
+              key: const Key('setup-fetching'),
+            ),
+          if (_fetchError case final e?)
+            Notice(
+              s.tOr('propmodes.err.${e.code}', s.t('propmodes.err.other'), {
+                'mode': e.part ?? join?.modeId ?? '',
+              }),
+              kind: NoticeKind.error,
+              key: const Key('setup-fetch-error'),
             ),
           if (_error != null)
             Notice(

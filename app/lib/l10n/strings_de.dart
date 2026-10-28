@@ -1375,4 +1375,45 @@ const Map<String, String> deStrings = {
   'site.login_waiting': 'Warten auf die Anmeldung im Browser …',
   'site.login_waiting_cancel': 'Abbrechen',
   'site.account': 'Anmeldemöglichkeiten des Kontos',
+  // Android props fetch signed mode packages from their controller (PKF-1).
+  'propmodes.keys': 'Modus-Schlüssel für geladene Modi',
+  'propmodes.keys_none':
+      'Keine: Dieses Prop führt nur die in der App eingebauten Modi aus.',
+  'propmodes.keys_set':
+      '{n} Schlüssel: Ein Modus, den sie signieren, darf vom Controller geladen werden.',
+  'propmodes.keys_hint':
+      'Die öffentlichen Hälften (Base64, je 44 Zeichen) der Modus-Schlüssel, denen dieses Prop vertraut, einer pro Zeile, höchstens 4: wie die in die Firmware einer Feldbox eingebauten Modus-Schlüssel. Ein Spiel, dessen Modus die App nicht hat, wird nur dann vom Controller geladen, wenn ein Schlüssel dieser Liste ihn signiert hat. Füge keinen Schlüssel hinzu, den du nicht vom Projekt oder von deinem Verein bekommen hast.',
+  'propmodes.keys_bad':
+      'Jeder Schlüssel hat 44 Base64-Zeichen (32 Bytes); höchstens 4.',
+  'propmodes.fetching':
+      'Der Modus des Spiels wird vom Controller geladen und seine Signatur geprüft …',
+  'propmodes.err.no_key':
+      'Dieses Gerät vertraut keinem Modus-Schlüssel und nimmt deshalb keinen Modus vom Controller an. Füge in den Einstellungen den Schlüssel des Projekts oder deines Vereins hinzu.',
+  'propmodes.err.unreachable':
+      'Der Controller war mit dem Zertifikat des Feldes nicht erreichbar. Verbinde dich mit dem WLAN des Feldes und versuche es erneut.',
+  'propmodes.err.not_offered':
+      'Der Controller bietet {mode} nicht an, oder das Spiel hat schon begonnen. Bitte die Orga, ihn signiert zu senden oder eingebaute Modi zu nehmen.',
+  'propmodes.err.download':
+      'Der Download von {mode} ist abgebrochen oder hatte nicht die angekündigte Größe. Versuche es erneut.',
+  'propmodes.err.bad_release':
+      'Abgelehnt: Die signierte Freigabe von {mode} hat nicht die erlaubte Form. Sie wurde nicht ausgeführt.',
+  'propmodes.err.bad_signature':
+      'Abgelehnt: {mode} ist nicht signiert oder nicht von einem Schlüssel, dem dieses Gerät vertraut. Er wurde nicht ausgeführt.',
+  'propmodes.err.kind':
+      'Abgelehnt: {mode} ist keine Art von Paket, die ein Prop ausführt.',
+  'propmodes.err.tier':
+      'Abgelehnt: {mode} braucht ein leistungsfähigeres Gerät als dieses.',
+  'propmodes.err.builtin':
+      'Abgelehnt: {mode} hat die Kennung eines in die App eingebauten Modus; diese werden nie ersetzt.',
+  'propmodes.err.too_big':
+      'Abgelehnt: {mode} ist für ein Prop zu groß (höchstens 256 KiB).',
+  'propmodes.err.bad_hash':
+      'Abgelehnt: {mode} ist nicht die signierte Datei. Sie wurde nicht ausgeführt.',
+  'propmodes.err.bad_archive':
+      'Abgelehnt: Das Paket von {mode} ist beschädigt oder hat nicht die erlaubte Form. Es wurde nicht ausgeführt.',
+  'propmodes.err.load':
+      'Abgelehnt: {mode} lässt sich in der Sandbox nicht laden. Er wurde nicht ausgeführt.',
+  'propmodes.err.no_space':
+      'Kein Platz für {mode}: Das Handy behält höchstens 8 geladene Modi, insgesamt 512 KiB.',
+  'propmodes.err.other': 'Der Modus konnte nicht geladen werden ({mode}).',
 };

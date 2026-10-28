@@ -193,7 +193,7 @@ More: the [radio page](https://atalaia-project.link/en/radio/), the [radio field
 
 ## 11. A phone as a game prop
 
-An Android phone can be a box too. In the app choose **Game prop**, then **Join a game** and scan the **join QR code** the organisers show, or hold a join card. The phone shows the mode's screen with team buttons on the screen. An optional **I/O pod** adds a radio and big buttons. Set the **Field join key** and the **Admin PIN** in **Settings**. In **Settings**, **Kiosk mode** pins the phone to the app and **Battery and background** tells you how to stop Android from sleeping the app. Not yet tested on a field. See the [app guide](../../../app/README.md).
+An Android phone can be a box too. In the app choose **Game prop**, then **Join a game** and scan the **join QR code** the organisers show, or hold a join card. The phone shows the mode's screen with team buttons on the screen. An optional **I/O pod** adds a radio and big buttons. Set the **Field join key** and the **Admin PIN** in **Settings**. In **Settings**, **Kiosk mode** pins the phone to the app and **Battery and background** tells you how to stop Android from sleeping the app. If the game uses a mode the app does not carry, and the organisers allow it, the phone gets the mode from the field controller over the field's Wi-Fi before you start: it takes only a package **signed** by a mode key you trust. Add the project's (or your club's) key in **Settings › Mode keys for fetched modes**, and ask the organisers for it. A package that is unsigned, signed by another key or damaged is refused with a message and never runs. Not yet tested on a field. See the [app guide](../../../app/README.md).
 
 ## Troubleshooting
 

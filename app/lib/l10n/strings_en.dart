@@ -1309,4 +1309,44 @@ const Map<String, String> enStrings = {
   'site.login_waiting': 'Waiting for the login in the browser…',
   'site.login_waiting_cancel': 'Cancel',
   'site.account': 'Ways to log in to the account',
+  // Android props fetch signed mode packages from their controller (PKF-1).
+  'propmodes.keys': 'Mode keys for fetched modes',
+  'propmodes.keys_none':
+      'None: this prop runs only the modes built into the app.',
+  'propmodes.keys_set':
+      '{n} key(s): a mode they sign may be fetched from the controller.',
+  'propmodes.keys_hint':
+      "The public halves (base64, 44 characters each) of the mode keys this prop trusts, one per line, at most 4: as the mode keys built into a Field Box's firmware. A game whose mode the app lacks is fetched from its controller only when a key in this list signed it. Never add a key you were not given by the project or your club.",
+  'propmodes.keys_bad':
+      'Each key is 44 base64 characters (32 bytes); at most 4.',
+  'propmodes.fetching':
+      "Getting the game's mode from the controller and checking its signature…",
+  'propmodes.err.no_key':
+      'This phone trusts no mode key, so it takes no mode from the controller. Add the key of the project or your club in Settings.',
+  'propmodes.err.unreachable':
+      "Could not reach the controller with the field's certificate. Join the field's Wi-Fi and try again.",
+  'propmodes.err.not_offered':
+      'The controller does not offer {mode}, or the game has already started. Ask the GM to send it signed, or to start from built-in modes.',
+  'propmodes.err.download':
+      'The download of {mode} broke or was not the size announced. Try again.',
+  'propmodes.err.bad_release':
+      'Refused: the signed release of {mode} is not in the accepted form. It was not run.',
+  'propmodes.err.bad_signature':
+      'Refused: {mode} is not signed, or not signed by a key this phone trusts. It was not run.',
+  'propmodes.err.kind': 'Refused: {mode} is not a kind of package a prop runs.',
+  'propmodes.err.tier':
+      'Refused: {mode} needs a stronger device than this phone.',
+  'propmodes.err.builtin':
+      'Refused: {mode} has the id of a mode built into the app; those are never replaced.',
+  'propmodes.err.too_big':
+      'Refused: {mode} is too large for a prop (256 KiB at most).',
+  'propmodes.err.bad_hash':
+      'Refused: {mode} is not the file that was signed. It was not run.',
+  'propmodes.err.bad_archive':
+      'Refused: the package of {mode} is damaged or not in the accepted form. It was not run.',
+  'propmodes.err.load':
+      'Refused: {mode} does not load in the sandbox. It was not run.',
+  'propmodes.err.no_space':
+      'No room for {mode}: the phone keeps at most 8 fetched modes, 512 KiB in all.',
+  'propmodes.err.other': 'The mode could not be fetched ({mode}).',
 };

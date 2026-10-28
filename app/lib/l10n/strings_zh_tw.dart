@@ -1104,4 +1104,28 @@ const Map<String, String> zhTwStrings = {
   'site.login_waiting': '正在瀏覽器中等待登入…',
   'site.login_waiting_cancel': '取消',
   'site.account': '帳號的登入方式',
+  // Android props fetch signed mode packages from their controller (PKF-1).
+  'propmodes.keys': '下載模式的模式金鑰',
+  'propmodes.keys_none': '沒有：這個道具只執行內建在 App 裡的模式。',
+  'propmodes.keys_set': '{n} 把金鑰：可以從控制器下載它們簽署的模式。',
+  'propmodes.keys_hint':
+      '這個道具信任的模式金鑰的公開部分（base64，每把 44 個字元），每行一把，最多 4 把，就像內建在場地盒韌體裡的模式金鑰。App 沒有的遊戲模式，只有在這份清單裡的金鑰簽署過時，才會從控制器下載。請不要加入不是專案或你的社團給你的金鑰。',
+  'propmodes.keys_bad': '每把金鑰是 44 個 base64 字元（32 位元組）；最多 4 把。',
+  'propmodes.fetching': '正在從控制器取得這場遊戲的模式並檢查簽章…',
+  'propmodes.err.no_key': '這支手機不信任任何模式金鑰，所以不接受控制器的模式。請在設定裡加入專案或你的社團的金鑰。',
+  'propmodes.err.unreachable': '無法用場地的憑證連到控制器。請連上場地的 Wi-Fi 再試一次。',
+  'propmodes.err.not_offered':
+      '控制器沒有提供 {mode}，或是遊戲已經開始。請請遊戲主持人傳送已簽署的版本，或改用內建模式。',
+  'propmodes.err.download': '{mode} 的下載中斷，或大小與通知的不符。請再試一次。',
+  'propmodes.err.bad_release': '已拒絕：{mode} 的簽署版本格式不被接受。沒有執行。',
+  'propmodes.err.bad_signature': '已拒絕：{mode} 沒有簽署，或不是這支手機信任的金鑰簽的。沒有執行。',
+  'propmodes.err.kind': '已拒絕：{mode} 不是道具會執行的套件種類。',
+  'propmodes.err.tier': '已拒絕：{mode} 需要比這支手機更強的裝置。',
+  'propmodes.err.builtin': '已拒絕：{mode} 的識別碼和內建在 App 裡的模式相同；內建模式絕不會被取代。',
+  'propmodes.err.too_big': '已拒絕：{mode} 對道具來說太大了（最多 256 KiB）。',
+  'propmodes.err.bad_hash': '已拒絕：{mode} 不是簽署過的那個檔案。沒有執行。',
+  'propmodes.err.bad_archive': '已拒絕：{mode} 的套件已損壞，或格式不被接受。沒有執行。',
+  'propmodes.err.load': '已拒絕：{mode} 無法在沙箱裡載入。沒有執行。',
+  'propmodes.err.no_space': '{mode} 沒有空間了：手機最多保留 8 個下載的模式，總共 512 KiB。',
+  'propmodes.err.other': '無法取得這個模式（{mode}）。',
 };

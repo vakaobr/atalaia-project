@@ -152,6 +152,13 @@ void main() {
         'ctl.local_error_$e',
       // The settings' language buttons (settings_screen.dart).
       for (final l in AppLanguage.values) 'settings.lang_${l.code}',
+      // A fetched mode refused, by the box's result codes (PKF-1).
+      for (final c in [
+        'no_key', 'unreachable', 'not_offered', 'download', 'bad_release', //
+        'bad_signature', 'kind', 'tier', 'builtin', 'too_big', 'bad_hash',
+        'bad_archive', 'load', 'no_space', 'other',
+      ])
+        'propmodes.err.$c',
     ];
     for (final k in keys) {
       expect(ptStrings.containsKey(k), isTrue, reason: k);

@@ -17,6 +17,7 @@ import 'package:atalaia_app/controller/controller_shell.dart';
 import 'package:atalaia_app/controller/prop_link.dart';
 import 'package:atalaia_app/core/node_runner.dart';
 import 'package:atalaia_app/l10n/strings.dart';
+import 'package:atalaia_app/modes/prop_mode_fetch.dart';
 import 'package:atalaia_app/platform/links.dart';
 import 'package:atalaia_app/platform/beacon_scan.dart';
 import 'package:atalaia_app/platform/location.dart';
@@ -50,6 +51,7 @@ class Harness {
     this.controllerLauncher,
     this.controllerAssets,
     this.routes,
+    this.modeHttp,
   }) : qr = qr ?? FakeQr();
 
   /// The phone's location (none: not available).
@@ -64,6 +66,9 @@ class Harness {
 
   /// The addresses' winners and failures (none: the app's own).
   final FieldRoutes? routes;
+
+  /// The controller's mode packages for a joined prop (none: the real client).
+  final Future<ModeHttp> Function(List<String> urls, Uint8List ca)? modeHttp;
   final wifi = FakeFieldWifi();
   final controllerRuns = <FakeControllerRun>[];
   final controllerBoots = <ControllerBoot>[];
@@ -106,6 +111,7 @@ class Harness {
         Center(child: Text('console $url', key: const Key('console-view'))),
     fieldHttp: fieldHttp,
     routes: routes,
+    modeHttp: modeHttp,
     caFetch: caFetch ?? _noCa,
     linkConnect: linkConnect,
     brandingSource: brandingSource ?? (_, _) => const _NoBranding(),
@@ -192,6 +198,7 @@ Harness harness({
   BeaconScanService? beacons,
   ControllerLauncher? controllerLauncher,
   FieldRoutes? routes,
+  Future<ModeHttp> Function(List<String> urls, Uint8List ca)? modeHttp,
 }) => Harness(
   settings: (settings ?? AppSettings())..language = language,
   runner: runner ?? FakeNodeRunner(),
@@ -210,4 +217,5 @@ Harness harness({
   beacons: beacons,
   controllerLauncher: controllerLauncher,
   routes: routes,
+  modeHttp: modeHttp,
 );

@@ -149,6 +149,12 @@ final class AppSettings {
   /// halves, standard base64 of 32 bytes, at most 8.
   List<String> firmwareKeys = [];
 
+  /// The mode keys an Android prop trusts for the signed mode packages it
+  /// fetches from its controller (PKF-2; a Field Box's
+  /// `CONFIG_ATALAIA_MODE_KEYS`): public halves, standard base64 of 32
+  /// bytes, at most 4. Added to the keys built into the app.
+  List<String> modeKeys = [];
+
   /// The phone controller's `[modes]` settings (ModesConfig's JSON: keys,
   /// box_keys, revoked, index; slice S7b of PE24).
   Map<String, Object?> controllerModes = {};
@@ -218,6 +224,7 @@ final class AppSettings {
     'notice_seen': noticeSeen,
     'share_position': sharePosition,
     'firmware_keys': firmwareKeys,
+    'mode_keys': modeKeys,
     'controller_modes': controllerModes,
     'failover_mode': failoverMode,
     'controller_sync': controllerSync,
@@ -254,6 +261,10 @@ final class AppSettings {
       ..sharePosition = j['share_position'] == true
       ..firmwareKeys = [
         for (final k in (j['firmware_keys'] as List?) ?? const [])
+          if (k is String) k,
+      ]
+      ..modeKeys = [
+        for (final k in (j['mode_keys'] as List?) ?? const [])
           if (k is String) k,
       ]
       ..controllerModes =

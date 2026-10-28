@@ -8,6 +8,7 @@ library;
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -23,6 +24,7 @@ import 'controller/prop_link.dart';
 import 'core/node_runner.dart';
 import 'l10n/strings.dart';
 import 'modes/mode_catalog.dart';
+import 'modes/prop_mode_fetch.dart';
 import 'platform/channels.dart';
 import 'platform/beacon_scan.dart';
 import 'platform/location.dart';
@@ -84,6 +86,7 @@ class AppServices {
     ControllerAssetsLoader? controllerAssets,
     String? controllerDir,
     FieldRoutes? routes,
+    Future<ModeHttp> Function(List<String> urls, Uint8List caSha256)? modeHttp,
   }) : modes = modes ?? ModeCatalog.builtin(),
        controller = ControllerShell(
          device: device,
@@ -102,6 +105,13 @@ class AppServices {
     trust = FieldTrust(store, fetch: caFetch, routes: this.routes);
     // The winning address of a field is kept in its pinned record (check-R3).
     this.routes.persist = trust.remember;
+    modeFetcher = PropModeFetcher(
+      cache: PropModeCache(store),
+      runner: runner,
+      open:
+          modeHttp ??
+          (urls, ca) async => IoModeHttp(await trust.forGame(urls, ca)),
+    );
   }
 
   /// The phone's own plugins, the core from the APK.
@@ -143,6 +153,10 @@ class AppServices {
   /// replicas and check-ins.
   late final FieldHttp Function(PinnedField field) fieldHttp;
   late final FieldTrust trust;
+
+  /// Gets the signed mode packages a joined game needs from its controller
+  /// (PKF-1; lib/modes/prop_mode_fetch.dart).
+  late final PropModeFetcher modeFetcher;
 
   /// Which of a field's addresses answered, and the last failures (check-R1
   /// to check-R5): the requests, the feed and the "does not answer" screens

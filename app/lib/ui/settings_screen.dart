@@ -13,7 +13,9 @@ import '../app.dart';
 import '../controller/controller_modes_screen.dart';
 import '../controller/controller_site_screen.dart';
 import '../controller/controller_signed_modes.dart';
+import '../controller/mode_package.dart' show publicKeyBytes;
 import '../l10n/strings.dart';
+import '../modes/prop_mode_fetch.dart';
 import '../platform/platform_check.dart';
 import '../prop/battery_guide.dart';
 import '../storage/app_store.dart';
@@ -83,6 +85,17 @@ class SettingsScreen extends StatelessWidget {
                     }),
             ),
             onTap: () => _editJoinKey(context),
+          ),
+          ListTile(
+            key: const Key('prop-mode-keys'),
+            leading: const Icon(Icons.verified),
+            title: Text(s.t('propmodes.keys')),
+            subtitle: Text(
+              propModeKeys(st).isEmpty
+                  ? s.t('propmodes.keys_none')
+                  : s.t('propmodes.keys_set', {'n': propModeKeys(st).length}),
+            ),
+            onTap: () => _editModeKeys(context),
           ),
           ListTile(
             key: const Key('admin-pin'),
@@ -219,6 +232,35 @@ class SettingsScreen extends StatelessWidget {
     } else if (context.mounted) {
       showMessage(context, s.t('settings.join_key_bad'));
     }
+  }
+
+  Future<void> _editModeKeys(BuildContext context) async {
+    final s = context.s;
+    final app = AppScope.read(context);
+    final result = await promptText(
+      context,
+      title: s.t('propmodes.keys'),
+      body: s.t('propmodes.keys_hint'),
+      fieldKey: const Key('prop-mode-keys-field'),
+      monospace: true,
+      maxLines: 4,
+      actions: [
+        (s.t('settings.join_key_clear'), (_) => '', false),
+        (s.t('common.cancel'), (_) => null, false),
+        (s.t('common.save'), (t) => t, true),
+      ],
+    );
+    if (result == null || !context.mounted) return;
+    final keys = [
+      for (final w in result.split(RegExp(r'[\s,]+')))
+        if (w.isNotEmpty) w,
+    ];
+    if (keys.length > propModeKeysMax ||
+        keys.any((k) => publicKeyBytes(k) == null)) {
+      showMessage(context, s.t('propmodes.keys_bad'));
+      return;
+    }
+    await app.update((x) => x.modeKeys = keys);
   }
 
   Future<void> _editPin(BuildContext context) async {

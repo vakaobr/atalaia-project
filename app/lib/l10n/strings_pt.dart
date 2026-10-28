@@ -1343,4 +1343,45 @@ const Map<String, String> ptStrings = {
   'site.login_waiting': 'À espera da entrada no navegador…',
   'site.login_waiting_cancel': 'Cancelar',
   'site.account': 'Formas de entrar na conta',
+  // Android props fetch signed mode packages from their controller (PKF-1).
+  'propmodes.keys': 'Chaves dos modos obtidos',
+  'propmodes.keys_none':
+      'Nenhuma: este dispositivo só corre os modos incluídos na aplicação.',
+  'propmodes.keys_set':
+      '{n} chave(s): pode obter do controlador um modo que elas assinem.',
+  'propmodes.keys_hint':
+      'As metades públicas (base64, 44 caracteres cada) das chaves de modo em que este dispositivo confia, uma por linha, no máximo 4: como as chaves de modo incluídas no firmware de uma caixa. Um jogo cujo modo a aplicação não tem só é obtido do controlador se uma chave desta lista o assinou. Não acrescentes uma chave que não te foi dada pelo projeto ou pelo teu clube.',
+  'propmodes.keys_bad':
+      'Cada chave tem 44 caracteres base64 (32 bytes); no máximo 4.',
+  'propmodes.fetching':
+      'A obter o modo do jogo do controlador e a verificar a assinatura…',
+  'propmodes.err.no_key':
+      'Este dispositivo não confia em nenhuma chave de modo, por isso não aceita modos do controlador. Acrescenta a chave do projeto ou do teu clube nas Definições.',
+  'propmodes.err.unreachable':
+      'Não foi possível chegar ao controlador com o certificado do campo. Liga-te ao Wi-Fi do campo e tenta outra vez.',
+  'propmodes.err.not_offered':
+      'O controlador não oferece {mode}, ou o jogo já começou. Pede à organização que o envie assinado, ou que use modos incluídos.',
+  'propmodes.err.download':
+      'A transferência de {mode} falhou ou não tinha o tamanho anunciado. Tenta outra vez.',
+  'propmodes.err.bad_release':
+      'Recusado: a versão assinada de {mode} não está na forma aceite. Não foi executado.',
+  'propmodes.err.bad_signature':
+      'Recusado: {mode} não está assinado, ou não o está por uma chave em que este dispositivo confia. Não foi executado.',
+  'propmodes.err.kind':
+      'Recusado: {mode} não é um tipo de pacote que um dispositivo execute.',
+  'propmodes.err.tier':
+      'Recusado: {mode} precisa de um dispositivo mais potente do que este.',
+  'propmodes.err.builtin':
+      'Recusado: {mode} tem o identificador de um modo incluído na aplicação; esses nunca são substituídos.',
+  'propmodes.err.too_big':
+      'Recusado: {mode} é grande demais para um dispositivo (256 KiB no máximo).',
+  'propmodes.err.bad_hash':
+      'Recusado: {mode} não é o ficheiro que foi assinado. Não foi executado.',
+  'propmodes.err.bad_archive':
+      'Recusado: o pacote de {mode} está danificado ou não está na forma aceite. Não foi executado.',
+  'propmodes.err.load':
+      'Recusado: {mode} não carrega no isolamento de execução. Não foi executado.',
+  'propmodes.err.no_space':
+      'Sem espaço para {mode}: o telemóvel guarda no máximo 8 modos obtidos, 512 KiB no total.',
+  'propmodes.err.other': 'Não foi possível obter o modo ({mode}).',
 };
