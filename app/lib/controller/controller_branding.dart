@@ -401,7 +401,7 @@ class ControllerBranding {
     }
   }
 
-  /// PUT /api/v1/field/branding/logo/box?id=<logo id>: the box-ready bytes of
+  /// `PUT /api/v1/field/branding/logo/box?id=<logo id>`: the box-ready bytes of
   /// the field's JPEG or WebP logo, made by the GM console (the controller has
   /// no decoder for them). Checked (size, header) and kept for that logo
   /// only; a new logo, or none, makes them stale and they are never served.
