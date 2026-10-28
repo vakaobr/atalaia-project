@@ -3983,12 +3983,18 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("checkin-apd-accept-x-outra")).to_be_visible()
         expect(page.get_by_test_id("checkin-apd-accept-x-clube")).to_be_checked()  # what was ticked stays
         page.get_by_test_id("checkin-apd-accept-x-outra").check()
-        # The form is drawn again by the stream after the confirm: save only once both boxes show ticked.
+        page.locator("#cs-label").fill("N.º APD")
+        # A player checks in before the GM saves: the stream draws the tab again, and nothing the GM ticked or
+        # typed may be lost (both were, before the draft kept them).
+        late2 = self.check_in(game["id"], "Tardia", apd_id="x-clube", membership_number="14", membership_expires="2099-01-01")
+        expect(page.get_by_test_id(f"checkin-row-{late2['player_id']}")).to_be_visible()
         expect(page.get_by_test_id("checkin-apd-accept-x-outra")).to_be_checked()
         expect(page.get_by_test_id("checkin-apd-accept-x-clube")).to_be_checked()
+        expect(page.locator("#cs-label")).to_have_value("N.º APD")
         page.get_by_test_id("checkin-settings-save").click()
         self.assertTrue(wait_for(lambda: self.field.http.get("/api/v1/checkin/settings").json()["apd"]["accepted"]
                                  == ["x-clube", "x-outra"], 10))
+        self.assertEqual(self.field.http.get("/api/v1/checkin/settings").json()["federation_label"], "N.º APD")
 
     def test_checkin_tab_says_association_membership_outside_portugal(self):
         """Decision MEM-2: the country is a setting of the field; PT keeps the APD texts, any other country (or none)

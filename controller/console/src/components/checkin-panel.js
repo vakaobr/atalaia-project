@@ -20,6 +20,8 @@ import { TagWriter } from './tag-writer.js';
 import { RegistrationImport } from './registration-import.js';
 
 const STATUSES = ['expected', 'pending', 'checked_in', 'left', 'removed'];
+// The check-in settings form's plain fields, kept as typed until saved (renderSettings).
+const SETTINGS_FIELDS = ['confirm', 'federation', 'federation_label', 'max_replicas', 'max_players', 'chrono_valid_for', 'country'];
 /** Portugal's field says "APD"; any other country (or none) says "association membership" (protocol/apd.md). */
 function usesApd(s) {
     return Boolean(s) && s.country === 'PT';
@@ -267,7 +269,7 @@ export class CheckinPanel extends Component {
         const s = await this.props.app.call('PUT', '/checkin/settings', body);
         if (s && this.state.list) {
             this.setState({ list: { ...this.state.list, settings: s, apds: apdChoices(this.state.list.apds, s.apd) },
-                apdDraft: null });
+                apdDraft: null, settingsEdit: null });
             this.props.app.showToast(t('checkin.saved'));
             if (body.country !== undefined) this.load(); // the list the field offers follows its country
         }
@@ -634,10 +636,16 @@ export class CheckinPanel extends Component {
     renderSettings() {
         const list = this.state.list;
         if (!list) return null;
-        const s = list.settings;
+        // What the GM typed and has not saved yet wins over the saved settings: the tab is drawn again whenever the
+        // stream brings news (a player checking in), and fields drawn from the saved values would lose the edit.
+        const s = { ...list.settings, ...(this.state.settingsEdit || {}) };
+        const edit = (e) => {
+            const name = e.target.name;
+            if (SETTINGS_FIELDS.includes(name)) this.setState({ settingsEdit: { ...(this.state.settingsEdit || {}), [name]: e.target.value } });
+        };
         return html`<section class="card" aria-labelledby="cs-h">
             <h2 id="cs-h">${t('checkin.settings')}</h2>
-            <form class="form" data-testid="checkin-settings" onSubmit=${(e) => this.saveSettings(e)}>
+            <form class="form" data-testid="checkin-settings" onInput=${edit} onChange=${edit} onSubmit=${(e) => this.saveSettings(e)}>
                 <div class="field"><label for="cs-confirm">${t('checkin.confirm_mode')}</label>
                     <select id="cs-confirm" name="confirm" value=${s.confirm}>
                         <option value="auto">${t('checkin.confirm_auto')}</option>
@@ -670,7 +678,12 @@ export class CheckinPanel extends Component {
         const rule = this.apdDraft();
         const s = list.settings;
         const choices = apdChoices(list.apds, rule);
-        return html`<fieldset class="field" data-testid="checkin-apd-settings"><legend>${tw(s, 'checkin.apd_title')}</legend>
+        // Every tick goes into the draft at once: the tab is drawn again whenever the stream brings news (a player
+        // checking in), and checkboxes drawn from the saved rule would lose what the GM ticked before saving.
+        const keep = (e) => {
+            if (e.target.type === 'checkbox') this.setState({ apdDraft: this.apdRuleFromForm(e.target.form) });
+        };
+        return html`<fieldset class="field" data-testid="checkin-apd-settings" onChange=${keep}><legend>${tw(s, 'checkin.apd_title')}</legend>
             <label class="check"><input type="checkbox" name="apd_checkin" data-testid="checkin-apd-checkin" checked=${rule.checkin} /> ${tw(s, 'checkin.apd_checkin')}</label>
             <label class="check"><input type="checkbox" name="apd_expiry" data-testid="checkin-apd-expiry" checked=${rule.expiry} /> ${t('checkin.apd_expiry')}</label>
             <p class="small muted">${tw(s, 'checkin.apd_accepted')}</p>
