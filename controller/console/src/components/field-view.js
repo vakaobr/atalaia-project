@@ -31,9 +31,9 @@ import { html, Component, createRef, t, teamColour, OFFLINE_MS } from '../ui.js'
 import { linkBars } from './node-list.js';
 import { GeorefPanel, georefPins } from './georef-panel.js';
 import { LevelSettings, LevelTabs, levelName, levelsInUse, shownLevel, takeLoaded } from './field-levels.js';
-import { MapFeatures, featurePins, featureShapes, planScale } from './map-features.js';
+import { MapFeatures, featureName, featurePins, featureShapes, planScale } from './map-features.js';
 import { BeaconPanel, beaconPins } from './beacons-panel.js';
-import { GridLayer, GridSettings, GridToggle, gridCell, gridHidden, levelGrid } from './field-grid.js';
+import { GridLayer, GridPrint, GridSettings, GridToggle, cellSize, gridCell, gridHidden, gridSpan, levelGrid } from './field-grid.js';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const NO_LEVELS = { enabled: false, count: 1, names: [''], levels: [] };
@@ -339,6 +339,33 @@ export class FieldView extends Component {
         </button>`;
     }
 
+    /** What the printed grid map lists (PKE-2): each box placed on this level's plan and each map feature on it,
+     * with its cell ("C4"; an area's span "B2–D5"). A box not placed has no cell and is not listed. */
+    printEntries(here, features, grid) {
+        const { positions } = this.props.app.state;
+        const boxes = here.filter((n) => positions[n.node_id]).map((n) => ({
+            label: t('field.marker', { node: n.node_id, owner: n.owner || t('nodes.no_owner') }),
+            where: gridCell(grid, positions[n.node_id].x, positions[n.node_id].y) }));
+        const marks = features.filter((f) => !f.draft).map((f) => ({
+            label: `${featureName(f)}${f.team ? ` (${f.team})` : ''}`,
+            where: f.shape === 'polygon' ? gridSpan(grid, f.points) : (typeof f.x === 'number' ? gridCell(grid, f.x, f.y) : '') }));
+        return [...boxes, ...marks].filter((e) => e.where);
+    }
+
+    /** The plan as the sheet draws it: the image, the features, the pins and the boxes, not interactive. */
+    printLayers(here, features, featureTeams, teams, list, scale) {
+        const { imageUrl } = this.state;
+        return html`${imageUrl && html`<img src=${imageUrl} alt="" />`}${featureShapes(features, featureTeams, scale)}
+            ${featurePins(features, featureTeams, () => {})}
+            ${here.map((n) => html`<span class="marker gp-marker" ref=${(el) => {
+        if (!el) return;
+        const p = this.where(n, list.indexOf(n), list.length);
+        el.style.left = `${(p.x * 100).toFixed(2)}%`;
+        el.style.top = `${(p.y * 100).toFixed(2)}%`;
+        el.style.background = n.owner ? teamColour(n.owner, teams) : '';
+    }}>${n.node_id}</span>`)}`;
+    }
+
     /** Each box's level, changeable by the GM (the keyboard's way to move a box between levels). */
     renderNodeLevels(list) {
         const { levels } = this.state;
@@ -412,6 +439,10 @@ export class FieldView extends Component {
                 ${here.map((n) => this.marker(n, list.indexOf(n), list.length, teams, grid))}
             </div>
             <${GridToggle} grid=${grid} hidden=${state.gridHidden} onChange=${(h) => this.setState({ gridHidden: h })} />
+            ${state.imageUrl && html`<${GridPrint} grid=${grid} title=${printTitle(app.state.branding)}
+                levelName=${multi ? name : ''} size=${cellSize(grid, scale)}
+                entries=${this.printEntries(here, features, grid)}
+                layers=${() => this.printLayers(here, features, featureTeams, teams, list, scale)} />`}
             <p class="muted small">${state.noImage ? t(multi ? 'levels.no_image' : 'field.no_image', { name }) : ''}
                 ${' '}${role === 'gm' && game ? t('field.drag_hint') : ''}</p>
             ${list.length === 0 && html`<p class="muted">${t('nodes.none')}</p>`}
@@ -430,4 +461,9 @@ export class FieldView extends Component {
             own=${state.ownGeoref} levelName=${multi ? name : null} groundName=${levelName(state.levels, 0)}
             onChange=${() => this.loadGeoref()} />`}`;
     }
+}
+
+/** The field's name for the printed grid map: the branding's, else the product's. */
+function printTitle(branding) {
+    return (branding && branding.field_name) || 'Atalaia';
 }

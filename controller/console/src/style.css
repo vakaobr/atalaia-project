@@ -1106,6 +1106,83 @@ tr.offline td {
     margin: 0.3rem 0;
 }
 
+/* the printed grid map (field-grid.js GridPrint, PKE-2): a sheet drawn into its own root while the browser prints;
+ * on screen it is never seen, in print it is all there is. Light colours on paper, whatever the theme. */
+#grid-print-root {
+    display: none;
+}
+
+.gp-sheet {
+    color: #000;
+    background: #fff;
+    font-family: system-ui, sans-serif;
+}
+
+.gp-sheet h1 {
+    margin: 0 0 0.2rem;
+    font-size: 1.6rem;
+}
+
+.gp-sheet h2 {
+    margin: 0.8rem 0 0.3rem;
+    font-size: 1.05rem;
+}
+
+.gp-sub,
+.gp-foot {
+    margin: 0 0 0.6rem;
+    color: #333;
+    font-size: 0.9rem;
+}
+
+.gp-plan {
+    border: 1px solid #000;
+    border-radius: 0;
+    break-inside: avoid;
+}
+
+.gp-list ul {
+    columns: 3 12rem;
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    font-size: 0.9rem;
+}
+
+.gp-list li {
+    break-inside: avoid;
+    margin-bottom: 0.15rem;
+}
+
+.gp-cell {
+    display: inline-block;
+    min-width: 2.6em;
+}
+
+.gp-marker {
+    pointer-events: none;
+}
+
+@media print {
+    html.print-grid-map,
+    html.print-grid-map body {
+        background: #fff;
+    }
+
+    html.print-grid-map #app {
+        display: none;
+    }
+
+    html.print-grid-map #grid-print-root {
+        display: block;
+    }
+
+    html.print-grid-map .gp-sheet * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
+
 /* load the field from a map (field-map.js, MF-19 to MF-30) */
 .fm-map {
     margin: 0.4rem 0;

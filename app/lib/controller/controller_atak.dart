@@ -81,7 +81,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'controller_engine.dart';
-import 'controller_field.dart' show Georef, levelsInUse;
+import 'controller_field.dart' show Georef, gridCell, levelsInUse;
 import 'controller_positions.dart' show ControllerPositions;
 import 'controller_sync_format.dart'
     show SyncFormatError, cotEvent, maxCotEvents;
@@ -549,15 +549,18 @@ String eventXml({
 
 /// A box's remarks (atak.py `node_remarks`): its owner (`-` for none),
 /// `active` while the mode has made it the box to take (Progressive
-/// Domination, decision PD-MODE-16), then its level's name.
+/// Domination, decision PD-MODE-16), then its level's name, then its cell
+/// of the level's field grid (`grid C4`, PKE-2) when the level has one.
 String nodeRemarks(
   String ownerDisplay, {
   String? levelLabel,
   bool active = false,
+  String? gridCell,
 }) {
   var out = ownerDisplay.isNotEmpty ? 'Atalaia: $ownerDisplay' : 'Atalaia: -';
   if (active) out += ', active';
   if (levelLabel != null) out += ', $levelLabel';
+  if (gridCell != null && gridCell.isNotEmpty) out += ', grid $gridCell';
   return out;
 }
 
@@ -1279,6 +1282,7 @@ class AtakEmitter {
       'field_georef',
       'field_image',
       'field_levels',
+      'field_grid',
       'map_features',
     ].contains(kind)) {
       _all = true;
@@ -1490,6 +1494,13 @@ class AtakEmitter {
   static int _shown(Map<String, Object?> levels, Object? level) =>
       level is int && level >= 0 && level < levelsInUse(levels) ? level : 0;
 
+  /// A level's field grid, read once per cycle.
+  Map<String, Object?> _grid(Map<int, Map<String, Object?>> cache, int level) =>
+      cache.putIfAbsent(
+        level,
+        () => engine.field?.grid(level) ?? const {'enabled': false},
+      );
+
   /// A level's name for the remarks (field_levels.py `label`).
   static String _label(Map<String, Object?> levels, int level) {
     final names = (levels['names'] as List?) ?? const [];
@@ -1521,6 +1532,7 @@ class AtakEmitter {
     };
     final ids = {...nodes.keys, ...places.keys}.toList()..sort();
     final levelsOn = levels['enabled'] == true;
+    final grids = <int, Map<String, Object?>>{};
     for (final nid in ids) {
       if (only != null && !only.contains(nid)) continue;
       final place = places[nid];
@@ -1539,6 +1551,7 @@ class AtakEmitter {
         owner != null && owner.isNotEmpty ? _display(game, owner) : '',
         levelLabel: levelsOn ? _label(levels, level) : null,
         active: active != null && name == active,
+        gridCell: gridCell(_grid(grids, level), _d(place['x']), _d(place['y'])),
       );
       final battery = node['battery_pct'];
       out.add(
@@ -1624,6 +1637,7 @@ class AtakEmitter {
         sentTcp = <String, _Marker>{},
         sentRemote = <String, _Marker>{};
     final levelsOn = levels['enabled'] == true;
+    final grids = <int, Map<String, Object?>>{};
     for (final f
         in engine.field?.featuresInUse() ?? const <Map<String, Object?>>[]) {
       final level = f['level']! as int;
@@ -1644,6 +1658,9 @@ class AtakEmitter {
         remarks += ', ${pyFixed(_d(f['radius_m']), 0)} m';
       }
       if (levelsOn) remarks += ', ${_label(levels, level)}';
+      final (fx, fy) = featureCentre(f);
+      final cell = gridCell(_grid(grids, level), fx, fy);
+      if (cell != null) remarks += ', grid $cell';
       final note = f['note'];
       if (note is String && note.isNotEmpty) remarks += '. $note';
       final argb = featureColour(f, teams);
@@ -1732,6 +1749,7 @@ class AtakEmitter {
     final gid = game['id']! as int;
     final all = engine.positions?.playerPositions(gid) ?? const {};
     final out = <(String, String, double, double)>[];
+    final grids = <int, Map<String, Object?>>{};
     for (final pid in all.keys.toList()..sort()) {
       final pos = all[pid]!;
       final indoor = pos['source'] == 'ble';
@@ -1768,6 +1786,15 @@ class AtakEmitter {
         final zone = pos['zone'];
         remarks +=
             ', $room${zone is String && zone.isNotEmpty ? ' ($zone)' : ''}';
+      }
+      if (indoor) {
+        // A GPS fix has no place on the plan: no cell (PKE-2).
+        final cell = gridCell(
+          _grid(grids, _shown(levels, pos['level'])),
+          _d(pos['x']),
+          _d(pos['y']),
+        );
+        if (cell != null) remarks += ', grid $cell';
       }
       final uid = _uid(['player', pid]);
       final double lat, lon;

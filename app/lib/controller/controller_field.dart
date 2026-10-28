@@ -502,6 +502,33 @@ int _gridCount(Object? v, String where, int top) {
   return v;
 }
 
+/// Row 0 is "A", 25 "Z", 26 "AA", 27 "AB", ... (field_grid.py `row_label`).
+String gridRowLabel(int row) {
+  var out = '';
+  var n = row + 1;
+  while (n > 0) {
+    final r = (n - 1) % 26;
+    n = (n - 1) ~/ 26;
+    out = String.fromCharCode(0x41 + r) + out;
+  }
+  return out;
+}
+
+/// The cell of a place on a plan ([x], [y]: fractions of its width and
+/// height) as the radio says it, "C4": the row's letters, then the column's
+/// number (field_grid.py `cell`). The right and bottom edges are in the last
+/// cell; null when the grid is off or the place is not on the plan.
+String? gridCell(Map<String, Object?> grid, num x, num y) {
+  if (grid['enabled'] != true || !(x >= 0 && x <= 1 && y >= 0 && y <= 1)) {
+    return null;
+  }
+  final rows = grid['rows']! as int;
+  final cols = grid['cols']! as int;
+  final row = (y * rows).floor() < rows - 1 ? (y * rows).floor() : rows - 1;
+  final col = (x * cols).floor() < cols - 1 ? (x * cols).floor() : cols - 1;
+  return '${gridRowLabel(row)}${col + 1}';
+}
+
 /// The GM's `{"enabled", "rows"?, "cols"?}`, checked (field_grid.py
 /// `check`): rows and columns not given stay as [current] has them.
 Map<String, Object?> checkGrid(Object? body, Map<String, Object?> current) {

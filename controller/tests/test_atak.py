@@ -486,6 +486,34 @@ class EmitterTests(AtakCase):
         self.udp.drain()
         self.assertIsNone(self.emitter._active)  # a game that ended forgets it
 
+    def test_the_grid_cell_is_in_a_marker_remarks(self):
+        """PKE-2: with a field grid, a box and a map feature on the plan say their cell ("grid C3") in ATAK;
+        without one, nothing changes; changing the grid sends everything again."""
+        self.put_image_and_corners()
+        gid = self.running_game()
+        self.place(gid, 4, 0.5, 0.5)
+        self.place(gid, 5, 0.0, 1.0)
+        f = self.client.post("/api/v1/field/features", headers=GM, json={
+            "type": "first_aid", "shape": "point", "x": 0.9, "y": 0.1, "label": "Posto", "note": "Kit verde"})
+        self.assertEqual(f.status_code, 201, f.text)
+        self.emitter.cycle(full=True)
+        got = self.events_by_uid(self.udp.drain())
+        self.assertEqual(got["atalaia.field.node.4"].find("detail/remarks").text, "Atalaia: -")  # no grid yet
+        r = self.client.put("/api/v1/field/grid", headers=GM, json={"enabled": True, "rows": 4, "cols": 4})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.emitter.on_controller_message({"type": "field_grid", "level": 0, "grid": r.json()["grid"]})
+        self.assertGreaterEqual(self.emitter.cycle(full=False)["udp"], 3)  # the grid asked for everything again
+        got = self.events_by_uid(self.udp.drain())
+        self.assertEqual(got["atalaia.field.node.4"].find("detail/remarks").text, "Atalaia: -, grid C3")
+        self.assertEqual(got["atalaia.field.node.5"].find("detail/remarks").text, "Atalaia: -, grid D1")  # the bottom edge
+        feature = got[f"atalaia.field.feature.{f.json()['id']}"]
+        self.assertEqual(feature.find("detail/remarks").text, "Atalaia: First aid, grid A4. Kit verde")
+
+    def test_node_remarks_with_a_grid_cell(self):
+        self.assertEqual(atak.node_remarks("red", None, False, "C4"), "Atalaia: red, grid C4")
+        self.assertEqual(atak.node_remarks("", "Cave", True, "AB12"), "Atalaia: -, active, Cave, grid AB12")
+        self.assertEqual(atak.node_remarks("red", None, False, None), "Atalaia: red")
+
     def test_node_remarks(self):
         self.assertEqual(atak.node_remarks(""), "Atalaia: -")
         self.assertEqual(atak.node_remarks("red", None, True), "Atalaia: red, active")

@@ -2389,6 +2389,49 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertEqual(self.field.http.get("/api/v1/field/grid").json()["grid"],
                          {"enabled": False, "rows": 52, "cols": 52})
 
+    def test_field_grid_map_prints(self):
+        """PKE-2: the grid map is printable (a poster or a PDF through the browser's own dialog): a sheet with the
+        field's name, the plan under its grid, and what is in which cell; nothing without a grid; the sheet is gone
+        again after printing, and the console itself is hidden for print by a class on <html>."""
+        game = self.field.create_game(start=True)
+        self.field.box_hello()
+        self.field.http.put("/api/v1/field/image", headers={"Content-Type": "image/png"}, content=ICON.read_bytes())
+        self.field.http.put(f"/api/v1/games/{game['id']}/positions/{BOX}", json={"x": 0.35, "y": 0.3})
+        r = self.field.http.post("/api/v1/field/features", json={"type": "first_aid", "shape": "point", "x": 0.9,
+                                                                 "y": 0.95, "label": "Posto"})
+        self.assertEqual(r.status_code, 201, r.text)
+        self.field.http.put("/api/v1/field/grid", json={"enabled": True, "rows": 8, "cols": 10})
+        page = self.console()
+        # No dialog in a headless browser: window.print() is recorded, with what the page held at that moment.
+        page.evaluate("""() => { window.__printed = [];
+            window.print = () => { const s = document.querySelector('[data-testid=grid-print-sheet]');
+                window.__printed.push({ html: document.documentElement.className,
+                    title: s && s.querySelector('h1').textContent,
+                    plan: !!(s && s.querySelector('[data-testid=grid-print-plan] img')),
+                    layer: !!(s && s.querySelector('[data-testid=grid-print-layer]')),
+                    rows: s ? s.querySelectorAll('.fg-row').length : 0,
+                    entries: s ? Array.from(s.querySelectorAll('[data-testid=grid-print-entries] li'))
+                        .map((l) => l.textContent.replace(/\\s+/g, ' ').trim()) : [] }); }; }""")
+        page.get_by_test_id("tab-field").click()
+        expect(page.locator("[data-testid=field-area] img")).to_be_visible()
+        expect(page.get_by_test_id("grid-print")).to_be_visible()
+        page.get_by_test_id("grid-print").click()
+        self.assertTrue(wait_for(lambda: page.evaluate("window.__printed.length") == 1, 6))
+        got = page.evaluate("window.__printed[0]")
+        self.assertIn("print-grid-map", got["html"])
+        self.assertTrue(got["title"].endswith(": mapa com grelha"), got)
+        self.assertTrue(got["plan"] and got["layer"])
+        self.assertEqual(got["rows"], 8)
+        self.assertTrue(any(e.startswith("C4 ") and str(BOX) in e for e in got["entries"]), got["entries"])
+        self.assertTrue(any(e.startswith("H10 ") and "Posto" in e for e in got["entries"]), got["entries"])
+        # Gone again after printing: the sheet, its root and the class.
+        self.assertTrue(wait_for(lambda: page.evaluate(
+            "!document.getElementById('grid-print-root') && !document.documentElement.classList.contains('print-grid-map')"), 6))
+        expect(page.get_by_test_id("grid-print")).to_be_enabled()
+        # A level with no grid has nothing to print.
+        self.field.http.put("/api/v1/field/grid", json={"enabled": False})
+        expect(page.get_by_test_id("grid-print")).to_have_count(0)
+
     def test_field_map_grid_over_the_preview(self):
         """MF-87: a grid put over the drawn image on *Load the field from a map*, saved with the field in the same
         request, then shown on the console's plan; a level's grid comes back on the page."""

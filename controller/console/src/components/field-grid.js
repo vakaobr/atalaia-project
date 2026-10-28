@@ -12,9 +12,10 @@
 // GridLayer draws it: thin white lines on a dark halo and labels in white with a dark outline, which
 // read on light and dark imagery; labels are thinned out when cells are too small for them. Any viewer
 // may hide it in this browser (GridToggle, MF-89). gridCell and gridSpan name a place's cell or an
-// area's cells (the map features' list, a box's label).
+// area's cells (the map features' list, a box's label). GridPrint (PKE-2) prints the plan with its grid
+// and the list of what is where, as a poster or a PDF through the browser's own print dialog.
 
-import { html, Component, createRef, t } from '../ui.js';
+import { html, render, Component, createRef, t, inWebView } from '../ui.js';
 
 export const ROWS_MAX = 52; // field_grid.ROWS_MAX: A to AZ
 export const COLS_MAX = 52;
@@ -288,5 +289,94 @@ export class GridSettings extends Component {
                 </div>
             </form>`}
         </div>`;
+    }
+}
+
+const PRINT_ROOT = 'grid-print-root';
+
+/** Waits until the sheet's images are loaded, so the print dialog does not show them half drawn. */
+async function imagesReady(root) {
+    const pending = Array.from(root.querySelectorAll('img')).filter((img) => !img.complete)
+        .map((img) => new Promise((done) => { img.onload = done; img.onerror = done; }));
+    await Promise.race([Promise.all(pending), new Promise((done) => setTimeout(done, 4000))]);
+}
+
+/** The grid map as a printable sheet (PKE-2): the field's name, the plan under its grid (``layers()``: the plan's
+ * image, features and boxes as the Field tab draws them), then a list of what is in which cell, for a poster
+ * on the field's wall or a PDF. The sheet is drawn into its own root outside the console only while the
+ * browser prints (``html.print-grid-map`` in style.css hides the rest), then taken away again. Not in the
+ * Android app's web view, which cannot print (the console of a computer's browser can). */
+export class GridPrint extends Component {
+    constructor() {
+        super();
+        this.state = { busy: false };
+    }
+
+    componentWillUnmount() {
+        this.cleanup();
+    }
+
+    cleanup() {
+        document.documentElement.classList.remove('print-grid-map');
+        const root = document.getElementById(PRINT_ROOT);
+        if (root) {
+            render(null, root);
+            root.remove();
+        }
+        if (this.done) window.removeEventListener('afterprint', this.done);
+        this.done = null;
+    }
+
+    sheet() {
+        const { grid, title, levelName, entries, size, layers } = this.props;
+        const date = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+        return html`<article class="gp-sheet" data-testid="grid-print-sheet">
+            <header>
+                <h1>${t('grid.print_title', { name: title })}</h1>
+                <p class="gp-sub">${levelName ? `${levelName} · ` : ''}${t('grid.print_sub', {
+        rows: `A–${rowLabel(grid.rows - 1)}`, cols: `1–${grid.cols}` })}${size ? ` · ${t('grid.size', { size })}` : ''} · ${date}</p>
+            </header>
+            <div class="field-area with-image with-field-grid gp-plan" data-testid="grid-print-plan">
+                ${layers()}
+                <${GridLayer} grid=${grid} testid="grid-print-layer" />
+            </div>
+            ${entries.length > 0 && html`<section class="gp-list">
+                <h2>${t('grid.print_where')}</h2>
+                <ul data-testid="grid-print-entries">${entries.map((e) => html`<li><strong class="gp-cell">${e.where || '–'}</strong>
+                    ${' '}${e.label}</li>`)}</ul>
+            </section>`}
+            <p class="gp-foot">${t('grid.print_foot')}</p>
+        </article>`;
+    }
+
+    async print() {
+        if (this.state.busy) return;
+        this.setState({ busy: true });
+        this.cleanup();
+        const root = document.createElement('div');
+        root.id = PRINT_ROOT;
+        document.body.appendChild(root);
+        render(this.sheet(), root);
+        document.documentElement.classList.add('print-grid-map');
+        this.done = () => {
+            this.cleanup();
+            this.setState({ busy: false });
+        };
+        window.addEventListener('afterprint', this.done);
+        try {
+            await imagesReady(root);
+            await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+            window.print();
+        } finally {
+            // A browser that prints without a dialog (or none at all) gives no afterprint: take the sheet away.
+            setTimeout(() => { if (this.done) this.done(); }, 1500);
+        }
+    }
+
+    render({ grid }, { busy }) {
+        if (!grid || !grid.enabled) return null;
+        if (inWebView()) return html`<p class="muted small" data-testid="grid-print-webview">${t('grid.print_webview')}</p>`;
+        return html`<button type="button" data-testid="grid-print" disabled=${busy}
+            onClick=${() => this.print()}>${t('grid.print')}</button>`;
     }
 }

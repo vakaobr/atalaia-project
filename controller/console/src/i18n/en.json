@@ -333,7 +333,13 @@
     "show": "Show the grid ({rows}, {cols})",
     "cell": "grid {cell}",
     "fm_toggle": "Put a grid over the map",
-    "fm_hint": "Letters on the rows and numbers on the columns, for calling positions on the radio. It is saved with the field; you can change it later on the Field tab."
+    "fm_hint": "Letters on the rows and numbers on the columns, for calling positions on the radio. It is saved with the field; you can change it later on the Field tab.",
+    "print": "Print the grid map",
+    "print_title": "{name}: grid map",
+    "print_sub": "rows {rows}, columns {cols}",
+    "print_where": "What is where",
+    "print_foot": "Call a position by its square: the row's letter, then the column's number (“C4”).",
+    "print_webview": "In the app on the phone, the grid map cannot be printed: open the console in a computer's browser for that."
   },
   "features": {
     "title": "Map features",

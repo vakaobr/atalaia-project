@@ -333,7 +333,13 @@
     "show": "Mostrar a quadrícula ({rows}, {cols})",
     "cell": "quadrícula {cell}",
     "fm_toggle": "Pôr uma quadrícula sobre o mapa",
-    "fm_hint": "Letras nas linhas e números nas colunas, para dizer posições pelo rádio. Fica guardada com o campo; podes mudá-la depois no separador Campo."
+    "fm_hint": "Letras nas linhas e números nas colunas, para dizer posições pelo rádio. Fica guardada com o campo; podes mudá-la depois no separador Campo.",
+    "print": "Imprimir o mapa com a grelha",
+    "print_title": "{name}: mapa com grelha",
+    "print_sub": "linhas {rows}, colunas {cols}",
+    "print_where": "O que está onde",
+    "print_foot": "Chama-se uma posição pelo quadrado: a letra da linha, depois o número da coluna («C4»).",
+    "print_webview": "Na aplicação no telemóvel não se imprime o mapa com a grelha: abra-se a consola no navegador de um computador."
   },
   "features": {
     "title": "Marcações no mapa",

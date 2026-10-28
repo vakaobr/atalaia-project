@@ -38,7 +38,10 @@ owner, and one for a VIP / Payload extraction zone:
   fill). Only those for everyone go to multicast; the staff
   devices get them all (a team's and the organisers' too: the feed is not per team); the remote
   relay gets the points and circles for everyone, a circle as a spot marker with its radius as
-  ``ce`` (the extraction zone's form), never a polygon (the relay's narrow form, sync_format.py).
+  ``ce`` (the extraction zone's form), never a polygon (the relay's narrow form, sync_format.py);
+- with a field grid on a level (field_grid.py, MF-81 to MF-93) a marker placed on that level's plan (a box,
+  a map feature at its pin, an indoor player) says its cell in its ``<remarks>`` as ``grid C4``, the call a
+  player makes on the radio (PKE-2); a level with no grid says nothing.
 
 The format is the CoT base event schema, version 2.0 (MITRE, "CoT
 Base-Event Schema (PUBLIC RELEASE).xsd", in the ATAK-CIV repository's
@@ -68,6 +71,7 @@ import time
 import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
+from . import field_grid as gridmod
 from . import field_levels as levelsmod
 from . import georef as georefmod
 from . import map_features as mapmod
@@ -259,14 +263,18 @@ def _el(tag: str, attrs: Optional[dict[str, str]] = None, text: Optional[str] = 
     return el
 
 
-def node_remarks(owner_display: str, level_label: Optional[str] = None, active: bool = False) -> str:
+def node_remarks(owner_display: str, level_label: Optional[str] = None, active: bool = False,
+                 grid_cell: Optional[str] = None) -> str:
     """A box's remarks: its owner (``-`` for none), ``active`` while the mode has made it the box to
-    take (Progressive Domination, decision PD-MODE-16), then its level's name on a multi-story field."""
+    take (Progressive Domination, decision PD-MODE-16), then its level's name on a multi-story field,
+    then its cell of the level's grid (``grid C4``, PKE-2) when the level has one."""
     out = f"Atalaia: {owner_display}" if owner_display else "Atalaia: -"
     if active:
         out += ", active"
     if level_label is not None:
         out += f", {level_label}"
+    if grid_cell:
+        out += f", grid {grid_cell}"
     return out
 
 
@@ -561,7 +569,7 @@ class AtakEmitter:
                     self._active = None
                 self._active_game = game.get("id")
                 self._all = True
-            elif kind in ("field_georef", "field_image", "field_levels", "map_features"):
+            elif kind in ("field_georef", "field_image", "field_levels", "field_grid", "map_features"):
                 self._all = True
             else:
                 wake = False
@@ -695,6 +703,7 @@ class AtakEmitter:
         places = self.ctrl.store.positions(game["id"])
         out: list[bytes] = []
         nodes = {n["node_id"]: n for n in self.ctrl.nodes(game["id"]) if isinstance(n.get("node_id"), int)}
+        grids: dict[int, dict[str, Any]] = {}
         for nid in sorted(set(nodes) | set(places)):
             if only is not None and nid not in only:
                 continue
@@ -712,7 +721,8 @@ class AtakEmitter:
             name = node.get("name") or f"{nid}"
             remarks = node_remarks(self._display(game, owner) if owner else "",
                                    levelsmod.label(levels, level) if levels["enabled"] else None,
-                                   active is not None and name == active)
+                                   active is not None and name == active,
+                                   gridmod.cell(self._grid(grids, level), place["x"], place["y"]))
             data = event_xml(uid=uid, cot_type=TYPE_PROP, how=HOW_IMAGE, lat=lat, lon=lon, now=now, start=now,
                              stale=stale, detail=marker_detail(name, remarks, team_colour(owner, teams),
                                                                node.get("battery_pct"), atak_team(owner)))
@@ -722,6 +732,12 @@ class AtakEmitter:
         if only is None:
             out += self._zones(game, now, stale, teams)
         return out
+
+    def _grid(self, cache: dict[int, dict[str, Any]], level: int) -> dict[str, Any]:
+        """A level's field grid, read once per cycle."""
+        if level not in cache:
+            cache[level] = gridmod.load(self.ctrl.store, level)
+        return cache[level]
 
     def _zones(self, game: dict[str, Any], now: float, stale: float, teams: list[str]) -> list[bytes]:
         """VIP / Payload's extraction zone (public, decision M5-1): a marker with the radius as ce."""
@@ -750,6 +766,7 @@ class AtakEmitter:
         prefix = self._uid("feature") + "."
         out: dict[str, list[bytes]] = {"udp": [], "tcp": [], "remote": []}
         sent: dict[str, dict[str, tuple[str, float, float]]] = {"udp": {}, "tcp": {}, "remote": {}}
+        grids: dict[int, dict[str, Any]] = {}
         for f in mapmod.in_use(self.ctrl.store, levels):
             geo = geos.get(f["level"])
             if geo is None:
@@ -768,6 +785,9 @@ class AtakEmitter:
                 remarks += f", {float(f['radius_m']):.0f} m"
             if levels["enabled"]:
                 remarks += f", {levelsmod.label(levels, f['level'])}"
+            cell = gridmod.cell(self._grid(grids, f["level"]), *mapmod.centre(f))
+            if cell:
+                remarks += f", grid {cell}"
             if f.get("note"):
                 remarks += f". {f['note']}"
             argb = feature_colour(f, teams)
@@ -821,6 +841,7 @@ class AtakEmitter:
         interval = self._player_interval(game)
         levels = levels if levels is not None else levelsmod.load(self.ctrl.store)
         geos = geos if geos is not None else {}
+        grids: dict[int, dict[str, Any]] = {}
         out: list[tuple[str, bytes, float, float]] = []
         for pid, pos in sorted(self.ctrl.store.player_positions(game["id"]).items()):
             indoor = pos.get("source") == "ble"
@@ -848,6 +869,10 @@ class AtakEmitter:
                 remarks += f", {levelsmod.label(levels, pos['level'])}"  # ML-7: only a level the phone gave
             if indoor and pos.get("room"):
                 remarks += f", {pos['room']}" + (f" ({pos['zone']})" if pos.get("zone") else "")  # BLE-8
+            if indoor:  # a GPS fix has no place on the plan: no cell (PKE-2)
+                cell = gridmod.cell(self._grid(grids, levelsmod.shown(levels, pos.get("level"))), pos["x"], pos["y"])
+                if cell:
+                    remarks += f", grid {cell}"
             detail.append(_el("remarks", None, xml_text(remarks, REMARKS_MAX, REMARKS_BYTES)))
             uid = self._uid("player", pid)
             if indoor:

@@ -333,7 +333,13 @@
     "show": "Gitter zeigen ({rows}, {cols})",
     "cell": "Planquadrat {cell}",
     "fm_toggle": "Ein Gitter über die Karte legen",
-    "fm_hint": "Buchstaben für die Zeilen und Zahlen für die Spalten, um Positionen über Funk durchzugeben. Es wird mit dem Feld gespeichert; du kannst es später im Tab Feld ändern."
+    "fm_hint": "Buchstaben für die Zeilen und Zahlen für die Spalten, um Positionen über Funk durchzugeben. Es wird mit dem Feld gespeichert; du kannst es später im Tab Feld ändern.",
+    "print": "Gitterkarte drucken",
+    "print_title": "{name}: Gitterkarte",
+    "print_sub": "Zeilen {rows}, Spalten {cols}",
+    "print_where": "Was wo ist",
+    "print_foot": "Eine Position wird über ihr Feld durchgegeben: der Buchstabe der Zeile, dann die Nummer der Spalte („C4“).",
+    "print_webview": "In der App auf dem Handy lässt sich die Gitterkarte nicht drucken: Dafür die Konsole im Browser eines Computers öffnen."
   },
   "features": {
     "title": "Kartenelemente",

@@ -327,6 +327,47 @@ void main() {
       }
     });
 
+    test('a box\'s remarks with the grid cell (PKE-2)', () {
+      for (final c in _vectors['node_remarks_grid']! as List) {
+        final l = c as List;
+        expect(
+          nodeRemarks(
+            l[0]! as String,
+            levelLabel: l[1] as String?,
+            active: l[2]! as bool,
+            gridCell: l[3] as String?,
+          ),
+          l[4],
+          reason: '$l',
+        );
+      }
+    });
+
+    test('the grid cell of a place and the row letters (field_grid.py)', () {
+      expect([0, 1, 2, 25, 26, 27, 51, 52].map(gridRowLabel).toList(), [
+        'A',
+        'B',
+        'C',
+        'Z',
+        'AA',
+        'AB',
+        'AZ',
+        'BA',
+      ]);
+      expect(gridRowLabel(26 + 26 * 26), 'AAA');
+      const grid = {'enabled': true, 'rows': 8, 'cols': 10};
+      expect(gridCell(grid, 0, 0), 'A1');
+      expect(gridCell(grid, 0.35, 0.3), 'C4');
+      expect(gridCell(grid, 1, 1), 'H10');
+      expect(gridCell(grid, 0.0999, 0.125), 'B1');
+      expect(
+        gridCell(const {'enabled': true, 'rows': 30, 'cols': 52}, 0.999, 0.89),
+        'AA52',
+      );
+      expect(gridCell({...grid, 'enabled': false}, 0.5, 0.5), isNull);
+      expect(gridCell(grid, 1.2, 0.5), isNull);
+    });
+
     test('colours and ATAK teams', () {
       final c = _map(_vectors['colours']);
       final teams = (c['teams']! as List).cast<String>();
@@ -1005,6 +1046,48 @@ void main() {
       expect(
         find(got['atalaia.field.node.4']!, 'detail/remarks')!.text,
         'Atalaia: -',
+      );
+    });
+
+    test('the grid cell is in a marker\'s remarks, and a changed grid sends '
+        'everything again (PKE-2)', () async {
+      await rig();
+      putImageAndCorners();
+      final gid = runningGame();
+      place(gid, 4, 0.5, 0.5);
+      place(gid, 5, 0.0, 1.0);
+      final pin = field.addFeature({
+        'type': 'first_aid',
+        'shape': 'point',
+        'x': 0.9,
+        'y': 0.1,
+        'label': 'Posto',
+        'note': 'Kit verde',
+      })['id']!;
+      await emitter.cycle(full: true);
+      var got = byUid(await udp.drain());
+      expect(
+        find(got['atalaia.field.node.4']!, 'detail/remarks')!.text,
+        'Atalaia: -',
+      ); // no grid yet
+      field.putGrid(0, {'enabled': true, 'rows': 4, 'cols': 4});
+      emitter.onControllerMessage({'type': 'field_grid', 'level': 0});
+      expect(
+        (await emitter.cycle(full: false))['udp'],
+        greaterThanOrEqualTo(3),
+      );
+      got = byUid(await udp.drain());
+      expect(
+        find(got['atalaia.field.node.4']!, 'detail/remarks')!.text,
+        'Atalaia: -, grid C3',
+      );
+      expect(
+        find(got['atalaia.field.node.5']!, 'detail/remarks')!.text,
+        'Atalaia: -, grid D1',
+      );
+      expect(
+        find(got['atalaia.field.feature.$pin']!, 'detail/remarks')!.text,
+        'Atalaia: First aid, grid A4. Kit verde',
       );
     });
 
