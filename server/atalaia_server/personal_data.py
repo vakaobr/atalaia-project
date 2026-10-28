@@ -101,7 +101,7 @@ from sqlalchemy import DateTime, cast, delete, func, literal, literal_column, or
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from . import chrono_registry, tenancy
+from . import chrono_registry, hub_share, tenancy
 from .atak_models import AtakCert
 from .preview_models import CONTACT_RETENTION, RETENTION as FEEDBACK_RETENTION, PreviewFeedback
 from .audit import record
@@ -416,6 +416,7 @@ async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_reques
     anonymised name. The caller commits. The ATAK certificates it revokes are added to ``revoked_atak``:
     the caller closes their relay connections once committed (``AtakRelay.drop_cert``)."""
     tombstone = ERASED_PREFIX + secrets.token_hex(8)
+    await hub_share.unlink(db, user_id)  # a hosted hub's shared view of the person's records here (SVX-2)
     await db.execute(update(User).where(User.id == user_id).values(
         username=tombstone, email=None, password_hash=ERASED_PASSWORD, totp_secret_enc=None, totp_enabled=False,
         totp_last_step=None, server_admin=False, gdpr_consent_at=None,
@@ -521,6 +522,7 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
     games = await db.execute(delete(Game).where(history.past_retention(now)))
     counts = {"sessions": sessions.rowcount or 0, "audit_log": audit.rowcount or 0, "games": games.rowcount or 0}
     counts.update(await _purge_chrono(db, now))
+    await hub_share.sync_all(db)  # a hosted hub's copies follow what the purge removed (SVX-2)
     # The schedule (plan phase 15): a scheduled game is game history once it has ended.
     scheduled = await db.execute(delete(ScheduledGame).where(ScheduledGame.ends_at < now - GAME_RETENTION))
     counts["scheduled_games"] = scheduled.rowcount or 0

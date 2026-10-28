@@ -623,6 +623,8 @@ class AtakTests(BrowserCase):
         rows = page.locator("#atak-certs tbody tr")
         await expect(rows).to_have_count(1)
         await expect(rows.first).to_contain_text("válido")
+        await expect(page.locator("#atak-expiring")).to_be_visible()  # 3 days: near expiry (SVX-1)
+        await expect(rows.first).to_contain_text("expira em breve")
         await expect(rows.first.locator("th")).to_have_text(EVIL)  # a device's name is text, never markup
         self.assertIsNone(await page.evaluate("() => window.pwned"))
         await rows.first.get_by_role("button").click()  # the confirmation is accepted

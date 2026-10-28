@@ -26,6 +26,8 @@ role that is no superuser, has no BYPASSRLS and owns nothing.
   read it) and the hub's audit log (``public.atalaia_hub_audit``; the server
   cannot read it), and refuses a database whose ``public`` already holds the
   single-field tables.
+  Since SVX-2 it also makes the hub-level chrono sharing's three ``public.atalaia_share_*`` tables and two
+  SECURITY DEFINER functions (``SHARE_DDL``; ``migrate`` brings an older hub up to date).
 - ``create`` makes the schema ``field_<slug>``, runs every migration in it,
   writes the field's one ``fields`` row, applies the grants and the row-level
   security (``apply_security``) and registers the tenant; a failure leaves no
@@ -154,6 +156,88 @@ CREATE TABLE IF NOT EXISTS public.atalaia_quota_hits (
     limit_value bigint NOT NULL
 );
 REVOKE ALL ON public.atalaia_quota_hits FROM PUBLIC;
+"""
+
+# The hub-level chrono sharing (SVX-2, ADR-P4-4's amendment of 2026-10-28): three tables each tenant fills with
+# its own rows only (one row-level policy: ``tenant`` is the transaction's own ``atalaia.tenant``; ENABLEd, not
+# FORCEd, so their owner, which the two functions run as, sees every row) and two SECURITY DEFINER functions, the
+# only way across: ``atalaia_share_read`` (the other fields' records of the persons the caller is linked to, when
+# both are active members and consented) and ``atalaia_share_redeem`` (a link code, once). They read hub tables
+# only, never a tenant's schema. Idempotent: run by ``init`` and by ``migrate``.
+SHARE_TABLES = ("atalaia_share_members", "atalaia_share_records", "atalaia_share_codes")
+SHARE_FUNCTIONS = ("public.atalaia_share_read(uuid[], integer)", "public.atalaia_share_redeem(bytea)")
+SHARE_POLICY = "(tenant = current_setting('atalaia.tenant'::text, true))"
+SHARE_DDL = """
+CREATE TABLE IF NOT EXISTS public.atalaia_share_members (
+    person_id   uuid NOT NULL,
+    tenant      text NOT NULL CHECK (tenant ~ '^field_[a-z0-9_]{1,40}$'),
+    active      boolean NOT NULL DEFAULT false,
+    field_name  text NOT NULL DEFAULT '',
+    updated_at  timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (person_id, tenant)
+);
+CREATE TABLE IF NOT EXISTS public.atalaia_share_records (
+    tenant      text NOT NULL,
+    person_id   uuid NOT NULL,
+    reading_id  uuid NOT NULL,
+    taken_at    timestamptz NOT NULL,
+    record_json text NOT NULL,
+    public_key  text NOT NULL,
+    PRIMARY KEY (tenant, reading_id),
+    FOREIGN KEY (person_id, tenant) REFERENCES public.atalaia_share_members (person_id, tenant) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS atalaia_share_records_person ON public.atalaia_share_records (person_id, tenant);
+CREATE TABLE IF NOT EXISTS public.atalaia_share_codes (
+    code_hash   bytea PRIMARY KEY,
+    person_id   uuid NOT NULL,
+    tenant      text NOT NULL,
+    expires_at  timestamptz NOT NULL
+);
+ALTER TABLE public.atalaia_share_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.atalaia_share_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.atalaia_share_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.atalaia_share_members NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.atalaia_share_records NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.atalaia_share_codes NO FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS atalaia_tenant ON public.atalaia_share_members;
+DROP POLICY IF EXISTS atalaia_tenant ON public.atalaia_share_records;
+DROP POLICY IF EXISTS atalaia_tenant ON public.atalaia_share_codes;
+CREATE POLICY atalaia_tenant ON public.atalaia_share_members
+    USING (tenant = current_setting('atalaia.tenant', true)) WITH CHECK (tenant = current_setting('atalaia.tenant', true));
+CREATE POLICY atalaia_tenant ON public.atalaia_share_records
+    USING (tenant = current_setting('atalaia.tenant', true)) WITH CHECK (tenant = current_setting('atalaia.tenant', true));
+CREATE POLICY atalaia_tenant ON public.atalaia_share_codes
+    USING (tenant = current_setting('atalaia.tenant', true)) WITH CHECK (tenant = current_setting('atalaia.tenant', true));
+CREATE OR REPLACE FUNCTION public.atalaia_share_read(p_persons uuid[], p_per_person integer)
+RETURNS TABLE (person_id uuid, field_name text, reading_id uuid, taken_at timestamptz, record_json text, public_key text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $fn$
+    SELECT x.person_id, x.field_name, x.reading_id, x.taken_at, x.record_json, x.public_key
+    FROM (
+        SELECT r.person_id, src.field_name, r.reading_id, r.taken_at, r.record_json, r.public_key,
+               row_number() OVER (PARTITION BY r.person_id ORDER BY r.taken_at DESC, r.reading_id DESC) AS n
+        FROM public.atalaia_share_members me
+        JOIN public.atalaia_share_records r ON r.person_id = me.person_id AND r.tenant <> me.tenant
+        JOIN public.atalaia_share_members src ON src.person_id = r.person_id AND src.tenant = r.tenant
+        JOIN public.atalaia_tenants t ON t.schema_name = r.tenant
+        WHERE me.tenant = nullif(current_setting('atalaia.tenant', true), '') AND me.active AND src.active
+          AND t.status = 'active' AND me.person_id = ANY (p_persons)
+    ) x
+    WHERE x.n <= p_per_person
+$fn$;
+CREATE OR REPLACE FUNCTION public.atalaia_share_redeem(p_hash bytea) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $fn$
+DECLARE
+    me  text := nullif(current_setting('atalaia.tenant', true), '');
+    pid uuid;
+BEGIN
+    IF me IS NULL THEN
+        RETURN NULL;
+    END IF;
+    DELETE FROM public.atalaia_share_codes WHERE expires_at < now();
+    DELETE FROM public.atalaia_share_codes WHERE code_hash = p_hash AND tenant <> me RETURNING person_id INTO pid;
+    RETURN pid;
+END
+$fn$;
 """
 
 
@@ -324,6 +408,13 @@ async def _upgrade_registry(conn: asyncpg.Connection, app_role: str) -> None:
         f"GRANT SELECT ON public.atalaia_tenants TO {role}; "
         f"GRANT INSERT ON public.atalaia_quota_hits TO {role}; "
         f"GRANT USAGE ON SEQUENCE public.atalaia_quota_hits_id_seq TO {role}")
+    await conn.execute(SHARE_DDL)
+    await conn.execute(
+        f"REVOKE ALL ON {', '.join('public.' + t for t in SHARE_TABLES)} FROM PUBLIC, {role}; "
+        f"GRANT SELECT, INSERT, UPDATE, DELETE ON public.atalaia_share_members, public.atalaia_share_records TO {role}; "
+        f"GRANT SELECT, INSERT, DELETE ON public.atalaia_share_codes TO {role}; "
+        f"REVOKE ALL ON FUNCTION {', '.join(SHARE_FUNCTIONS)} FROM PUBLIC; "
+        f"GRANT EXECUTE ON FUNCTION {', '.join(SHARE_FUNCTIONS)} TO {role}")
 
 
 async def upgrade_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> None:
@@ -480,6 +571,58 @@ class HubCheck:
     quota_hits: int = 0  # notes of refused quotas waiting for ``hosted quota-hits``
 
 
+SHARE_PRIVILEGES = {"atalaia_share_members": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+                    "atalaia_share_records": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+                    "atalaia_share_codes": {"SELECT", "INSERT", "DELETE"}}
+
+
+async def _check_share(conn: asyncpg.Connection, app_role: str, me: str, problems: list[str]) -> None:
+    """The hub-level chrono sharing's tables and functions (SVX-2): owned by the owner role, row-level security on
+    and not forced, exactly the one policy, the server role's exact privileges, and each function a SECURITY
+    DEFINER of the owner with a fixed search path that only the server's role may run."""
+    if not await conn.fetchval("SELECT to_regclass('public.atalaia_share_members') IS NOT NULL"):
+        problems.append("the registry is of an older release (no public.atalaia_share_members): run hosted migrate")
+        return
+    for name, allowed in SHARE_PRIVILEGES.items():
+        table = f"public.{name}"
+        row = await conn.fetchrow(
+            "SELECT c.relrowsecurity, c.relforcerowsecurity, pg_get_userbyid(c.relowner) AS owner, "
+            "(SELECT array_agg(p.polname || '|' || p.polcmd::text || '|' || p.polpermissive::text || '|' "
+            "|| coalesce(pg_get_expr(p.polqual, p.polrelid), '') || '|' "
+            "|| coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') || '|' || p.polroles::text) "
+            "FROM pg_policy p WHERE p.polrelid = c.oid) AS policies FROM pg_class c WHERE c.oid = $1::regclass", table)
+        if row["owner"] != me:
+            problems.append(f"{table} is owned by {row['owner']}, not {me}")
+        if not row["relrowsecurity"]:
+            problems.append(f"{table}: row-level security is not enabled")
+        if row["relforcerowsecurity"]:
+            problems.append(f"{table}: row-level security is forced (the sharing functions would read nothing)")
+        if list(row["policies"] or []) != [f"atalaia_tenant|*|true|{SHARE_POLICY}|{SHARE_POLICY}|{{0}}"]:
+            problems.append(f"{table}: the policies are not exactly atalaia_tenant for the caller's own rows")
+        have = {p for p in TABLE_PRIVILEGES
+                if await conn.fetchval("SELECT has_table_privilege($1, $2, $3)", app_role, table, p)}
+        if have != allowed:
+            problems.append(f"{app_role} has {sorted(have)} on {table}, not {sorted(allowed)}")
+    for signature in SHARE_FUNCTIONS:
+        row = await conn.fetchrow(
+            "SELECT p.prosecdef, pg_get_userbyid(p.proowner) AS owner, p.proconfig, "
+            "EXISTS (SELECT 1 FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a "
+            "        WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE') AS everyone "
+            "FROM pg_proc p WHERE p.oid = to_regprocedure($1)", signature)
+        if row is None:
+            problems.append(f"{signature} is missing: run hosted migrate")
+            continue
+        if not row["prosecdef"] or row["owner"] != me:
+            problems.append(f"{signature} is not a SECURITY DEFINER function of {me}")
+        if list(row["proconfig"] or []) != ["search_path=pg_catalog"]:
+            problems.append(f"{signature} has no fixed search_path of pg_catalog")
+        if row["everyone"]:
+            problems.append(f"{signature} can be run by anyone, not only {app_role}")
+        if not await conn.fetchval("SELECT has_function_privilege($1, to_regprocedure($2), 'EXECUTE')",
+                                   app_role, signature):
+            problems.append(f"{app_role} cannot run {signature}")
+
+
 async def check_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> HubCheck:
     """What keeps the fields apart, checked as the owner role (``hosted check``; after a restore above all).
 
@@ -487,7 +630,8 @@ async def check_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> HubCheck:
     every schema and table; every table has ENABLE and FORCE ROW LEVEL SECURITY and exactly one policy,
     ``atalaia_tenant`` for that schema; the server's role is no superuser, has no BYPASSRLS, owns nothing, has
     exactly SELECT, INSERT, UPDATE and DELETE on each field table, nothing on ``alembic_version``, only SELECT
-    on the registry, only INSERT on the quota inbox and nothing on the hub's audit log. Reads only; returns the
+    on the registry, only INSERT on the quota inbox and nothing on the hub's audit log; and the sharing's tables and functions (``_check_share``).
+    Reads only; returns the
     problems found (and how many quota notes wait)."""
     check_role(app_role)
     conn = await _connect(url)
@@ -516,6 +660,7 @@ async def check_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> HubCheck:
                     if await conn.fetchval("SELECT has_table_privilege($1, $2, $3)", app_role, table, p)}
             if have != allowed:
                 problems.append(f"{app_role} has {sorted(have)} on {table}, not {sorted(allowed)}")
+        await _check_share(conn, app_role, me, problems)
         registered = {r["schema_name"]: r["slug"] for r in await conn.fetch(
             "SELECT slug, schema_name FROM public.atalaia_tenants")}
         present = {r["nspname"]: r["owner"] for r in await conn.fetch(
@@ -949,6 +1094,14 @@ async def delete_tenant(url: str, slug: str, confirm: str, reason: str, actor: O
             counts = {}
             for table in await _tables(conn, tenant.schema):
                 counts[table] = await conn.fetchval(f"SELECT count(*) FROM {_q(tenant.schema)}.{_q(table)}")
+            if await conn.fetchval("SELECT to_regclass('public.atalaia_share_members') IS NOT NULL"):
+                # The field's rows in the hub's sharing tables (SVX-2): the published records go with it.
+                counts["hub_share_records"] = await conn.fetchval(
+                    "SELECT count(*) FROM public.atalaia_share_records WHERE tenant = $1", tenant.schema)
+                counts["hub_share_members"] = await conn.fetchval(
+                    "SELECT count(*) FROM public.atalaia_share_members WHERE tenant = $1", tenant.schema)
+                await conn.execute("DELETE FROM public.atalaia_share_codes WHERE tenant = $1", tenant.schema)
+                await conn.execute("DELETE FROM public.atalaia_share_members WHERE tenant = $1", tenant.schema)
             await conn.execute(f"DROP SCHEMA {_q(tenant.schema)} CASCADE")
             await conn.execute("DELETE FROM public.atalaia_tenants WHERE slug = $1", tenant.slug)
             await _audit(conn, "tenant_delete", actor or default_actor(), tenant.slug, tenant.schema, tenant.field_id,

@@ -478,6 +478,19 @@ class FieldPlayerId(Base):
     created_at: Mapped[datetime] = _created()
 
 
+class HubShareLink(Base):
+    """Hosted mode only (SVX-2, ADR-P4-4's 2026-10-28 amendment): this account is one person's account at this
+    field, and ``person_id`` is the random id the person's accounts at the hub's other fields hold too. Made
+    when the person asks for a link code or gives one (``hub_share.py``); never derived from an e-mail
+    address or a user name. A single-field server never has a row."""
+
+    __tablename__ = "hub_share_links"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    person_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, unique=True)
+    linked_at: Mapped[datetime] = _created()
+
+
 class MarshalKey(Base):
     """A marshal's Ed25519 public key at a field, with the period it was the marshal's key in
     (P4R14): from its first registration until it was replaced (``valid_until``, NULL while

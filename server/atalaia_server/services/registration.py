@@ -55,7 +55,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import quotas
+from .. import hub_share, quotas
 from ..models import (Field, FieldApiKey, FieldPlayerId, Game, GameRegistration, PlayerIdClaim,
                       RegistrationReplica, Replica, ScheduledGame, User)
 from . import scheduling
@@ -904,6 +904,7 @@ async def apply_claims(db: AsyncSession, field_id: uuid.UUID, body: dict[str, An
                                                                   FieldPlayerId.player_id == c.player_id)) is None
             if free and await player_id_for(db, c.user_id, field_id, create=False) is None:
                 db.add(FieldPlayerId(field_id=field_id, player_id=c.player_id, user_id=c.user_id))
+                await hub_share.sync_user(db, c.user_id)  # its readings join a hosted hub's shared view (SVX-2)
                 status = "confirmed"
         c.status, c.decided_at = status, now
         out[status] += 1

@@ -60,8 +60,18 @@ async function load() {
     connect.hidden = !state.connect;
     if (state.connect) connect.textContent = t('atak_connect', { host: state.connect.host, port: state.connect.port });
     const certs = state.certificates;
+    const days = $('a-days');
+    days.max = String(state.max_days);
+    if (!days.dataset.touched) days.value = String(state.default_days);
+    days.addEventListener('input', () => { days.dataset.touched = '1'; }, { once: true });
+    // SVX-1: a certificate near expiry (the server says which) is called out above the table.
+    const near = certs.filter((c) => c.expiring);
+    const warn = $('atak-expiring');
+    warn.hidden = near.length === 0;
+    if (near.length) warn.textContent = t('atak_expiring', { n: near.length, days: state.warn_days,
+        devices: near.map((c) => `${c.device_name} (${when(c.not_after, ctx.zone)})`).join(', ') });
     fillRows($('atak-certs'), certs.map((c) => [c.device_name, c.holder || t('atak_operator'), yesNo(c.positions),
-        when(c.not_after, ctx.zone), stateName(c.state), when(c.last_connected_at, ctx.zone),
+        when(c.not_after, ctx.zone), c.expiring ? `${stateName(c.state)} - ${t('atak_expiring_short')}` : stateName(c.state), when(c.last_connected_at, ctx.zone),
         c.state === 'valid' ? el('button', {
             type: 'button', class: 'danger', text: t('atak_revoke'), 'aria-label': `${t('atak_revoke')}: ${c.device_name}`,
             onclick: () => revoke(c),

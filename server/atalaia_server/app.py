@@ -44,8 +44,8 @@ from fastapi.responses import JSONResponse
 
 from . import __version__, atak_pki, integrations, personal_data, quotas, tenancy, tenant_watch
 from .api import (app_links, atak, auth, branding, chrono, clubs, devices, export, feedback, fields, firmware, games,
-                  health, history, integrations as integrations_api, me, registration_import, registrations,
-                  privacy as privacy_api, remote_gm, scenarios, login_methods, scheduling, sync)
+                  hub_share as hub_share_api, health, history, integrations as integrations_api, me, registration_import,
+                  registrations, privacy as privacy_api, remote_gm, scenarios, login_methods, scheduling, sync)
 from .atak_relay import AtakRelay
 from .config import Settings, redact_url
 from .db import make_engine, make_sessionmaker
@@ -146,6 +146,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(export.router)  # a field's data export for its administrator (S21-12)
     app.include_router(me.router)
     app.include_router(privacy_api.router)  # the published privacy notice (CONS-1)
+    app.include_router(hub_share_api.router)  # chrono sharing across a hosted hub's tenants (SVX-2)
     app.include_router(games.router)
     app.include_router(chrono.router)
     app.include_router(sync.router)

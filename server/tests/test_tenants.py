@@ -888,6 +888,19 @@ class HubCheckTests(HubCase):
             (f"REVOKE INSERT ON public.atalaia_quota_hits FROM {app}", "public.atalaia_quota_hits"),
             (f"REVOKE USAGE ON SCHEMA field_campo_b FROM {app}", f"{app} has no USAGE on field_campo_b"),
             ("CREATE SCHEMA field_orphan", "field_orphan is not registered"),
+            # The hub-level chrono sharing (SVX-2).
+            ("ALTER TABLE public.atalaia_share_records FORCE ROW LEVEL SECURITY", "atalaia_share_records: row-level"),
+            ("ALTER TABLE public.atalaia_share_members DISABLE ROW LEVEL SECURITY", "atalaia_share_members: row-level"),
+            ("DROP POLICY atalaia_tenant ON public.atalaia_share_codes", "atalaia_share_codes: the policies"),
+            ("CREATE POLICY open_door ON public.atalaia_share_records USING (true)",
+             "atalaia_share_records: the policies"),
+            (f"GRANT TRUNCATE ON public.atalaia_share_records TO {app}", "public.atalaia_share_records"),
+            (f"REVOKE DELETE ON public.atalaia_share_members FROM {app}", "public.atalaia_share_members"),
+            ("GRANT EXECUTE ON FUNCTION public.atalaia_share_read(uuid[], integer) TO PUBLIC",
+             "can be run by anyone"),
+            ("ALTER FUNCTION public.atalaia_share_read(uuid[], integer) SECURITY INVOKER", "not a SECURITY DEFINER"),
+            ("ALTER FUNCTION public.atalaia_share_redeem(bytea) RESET search_path", "no fixed search_path"),
+            (f"REVOKE EXECUTE ON FUNCTION public.atalaia_share_redeem(bytea) FROM {app}", "cannot run"),
         ]
         for statement, problem in breaks:
             with self.subTest(statement=statement):
@@ -897,7 +910,8 @@ class HubCheckTests(HubCase):
                     self.assertTrue(any(problem in p for p in problems), problems)
                 finally:  # the operator's own repair: the grants and policies again
                     await self.owner(f"DROP SCHEMA IF EXISTS field_orphan; DROP POLICY IF EXISTS open_door ON "
-                                     f"field_campo_a.users; REVOKE ALL ON public.atalaia_hub_audit FROM {app}; "
+                                     f"field_campo_a.users; DROP POLICY IF EXISTS open_door ON "
+                                     f"public.atalaia_share_records; REVOKE ALL ON public.atalaia_hub_audit FROM {app}; "
                                      f"REVOKE ALL ON public.atalaia_tenants FROM {app}; "
                                      f"GRANT SELECT ON public.atalaia_tenants TO {app}")
                     await asyncio.to_thread(hosted.migrate_all, self.hub.owner_url, app, "test:operator")

@@ -46,7 +46,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from atalaia_controller import apd as apd_core
 
-from .. import sync
+from .. import hub_share, sync
 from ..services import branding, registration, scheduling
 from ..audit import record
 from ..auth import Principal, current_principal, require_field_role, server_admin
@@ -214,6 +214,8 @@ async def update_field(field_id: uuid.UUID, body: FieldPatch, request: Request,
             changed["country"] = country or "cleared"
     if "address_text" in changed:
         await scheduling.bump_for_field_address(db, field.id, datetime.now(timezone.utc))
+    if "chrono_sharing_enabled" in changed:
+        await hub_share.sync_all(db)  # a hosted hub's shared view follows the field's switch (SVX-2)
     if changed:
         record(db, "field_update", request, user_id=principal.user.id, resource="field", resource_id=field.id,
                details=changed)

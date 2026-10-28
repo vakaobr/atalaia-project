@@ -303,7 +303,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "atak_issue": "Novo certificado",
         "atak_device": "Nome do dispositivo (1 a 48 caracteres)",
         "atak_holder": "Conta de quem o usa (vazio: esta conta)",
-        "atak_days": "Validade em dias (1 a 30)",
+        "atak_days": "Validade em dias (1 a 365)",
         "atak_positions": "Ver as posições de quem joga (só para GM ou marshal neste campo)",
         "atak_issue_button": "Emitir",
         "atak_issued": "Certificado de «{device}», válido até {until}.",
@@ -1035,7 +1035,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "atak_issue": "New certificate",
         "atak_device": "Device name (1 to 48 characters)",
         "atak_holder": "Account of whoever uses it (empty: this account)",
-        "atak_days": "Valid for days (1 to 30)",
+        "atak_days": "Valid for days (1 to 365)",
         "atak_positions": "See player positions (GM or marshal on this field only)",
         "atak_issue_button": "Issue",
         "atak_issued": "Certificate for “{device}”, valid until {until}.",
@@ -1770,7 +1770,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "atak_issue": "Neues Zertifikat",
         "atak_device": "Gerätename (1 bis 48 Zeichen)",
         "atak_holder": "Konto der Person, die es nutzt (leer: dieses Konto)",
-        "atak_days": "Gültigkeit in Tagen (1 bis 30)",
+        "atak_days": "Gültigkeit in Tagen (1 bis 365)",
         "atak_positions": "Positionen der Spielenden sehen (nur für GM oder Marshal auf diesem Spielfeld)",
         "atak_issue_button": "Ausstellen",
         "atak_issued": "Zertifikat für „{device}“, gültig bis {until}.",
@@ -2489,7 +2489,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "atak_issue": "新憑證",
         "atak_device": "裝置名稱（1 到 48 個字元）",
         "atak_holder": "使用者的帳號（留空：這個帳號）",
-        "atak_days": "有效天數（1 到 30）",
+        "atak_days": "有效天數（1 到 365）",
         "atak_positions": "查看玩家位置（僅限這個場地的 GM 或裁判）",
         "atak_issue_button": "核發",
         "atak_issued": "「{device}」的憑證，有效期限至 {until}。",
@@ -3070,6 +3070,33 @@ for _lang, _texts in _MEMBERSHIP.items():
 from .consent_i18n import STAFF as _CONSENT  # noqa: E402
 
 for _lang, _texts in _CONSENT.items():
+    _clash = set(STRINGS[_lang]) & set(_texts)
+    assert not _clash, sorted(_clash)
+    STRINGS[_lang].update(_texts)
+
+# SVX-1: the remote ATAK page says when a certificate is near expiry. Every key is new.
+_ATAK_EXPIRY: dict[str, dict[str, str]] = {
+    "pt": {
+        "atak_expiring": "Atenção: {n} certificado(s) expiram em {days} dias ou menos: {devices}. Emitir um novo "
+                         "certificado para o dispositivo e revogar o antigo.",
+        "atak_expiring_short": "expira em breve",
+    },
+    "en": {
+        "atak_expiring": "Attention: {n} certificate(s) expire within {days} days: {devices}. Issue a new "
+                         "certificate for the device and revoke the old one.",
+        "atak_expiring_short": "expires soon",
+    },
+    "de": {
+        "atak_expiring": "Achtung: {n} Zertifikat(e) laufen innerhalb von {days} Tagen ab: {devices}. Stelle für das "
+                         "Gerät ein neues Zertifikat aus und widerrufe das alte.",
+        "atak_expiring_short": "läuft bald ab",
+    },
+    "zh-tw": {
+        "atak_expiring": "注意：有 {n} 張憑證將在 {days} 天內到期：{devices}。請為該裝置簽發新憑證，並撤銷舊的。",
+        "atak_expiring_short": "即將到期",
+    },
+}
+for _lang, _texts in _ATAK_EXPIRY.items():
     _clash = set(STRINGS[_lang]) & set(_texts)
     assert not _clash, sorted(_clash)
     STRINGS[_lang].update(_texts)

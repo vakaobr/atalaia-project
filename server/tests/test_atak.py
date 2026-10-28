@@ -365,12 +365,36 @@ class EnrolmentTests(RelayCase):
         await self.issue(root, holder=marshal_name)
         # Bad requests.
         for body in ({"device_name": ""}, {"device_name": " x"}, {"device_name": "a\nb"}, {"device_name": "x" * 49},
-                     {"days": 0}, {"days": 31}, {"days": True}, {"positions": "yes"}, {"colour": "red"}):
+                     {"days": 0}, {"days": 366}, {"days": True}, {"positions": "yes"}, {"colour": "red"}):
             with self.subTest(body=body):
                 self.assertEqual((await self.issue(gm, status=400, **body))["detail"], "invalid_request")
         r = await self.client.post(f"/api/v1/fields/{uuid.uuid4()}/atak/certificates", headers=gm,
                                    json={"device_name": "x"})
         self.assertEqual(r.status_code, 403)
+
+    async def test_certificates_last_90_days_by_default_and_say_when_they_expire(self) -> None:
+        """SVX-1: the default lifetime is 90 days (a setting), the state shows it, and a near expiry is flagged."""
+        gm, _, _ = await self.person("gm")
+        self.assertEqual(atak_pki.DEFAULT_DAYS, 90)
+        self.assertEqual(self.settings().atak_cert_days, 90)
+        d = await self.device(gm)  # no days: the setting's default
+        life = d.cert.not_valid_after_utc - d.cert.not_valid_before_utc
+        self.assertEqual(life, dt.timedelta(days=90) + atak_pki.BACKDATE)
+        await self.device(gm, days=3, device_name="Short")
+        await self.device(gm, days=365, device_name="Long")
+        state = (await self.client.get(f"/api/v1/fields/{self.field_id}/atak", headers=gm)).json()
+        self.assertEqual((state["default_days"], state["max_days"], state["warn_days"]), (90, 365, 14))
+        flagged = {c["device_name"]: c["expiring"] for c in state["certificates"]}
+        self.assertEqual(flagged, {"Tablet do posto": False, "Short": True, "Long": False})
+
+    def test_the_lifetime_is_a_setting(self) -> None:
+        from atalaia_server.config import ConfigError, Settings as S
+        base = {"ATALAIA_DATABASE_URL": "postgresql+asyncpg://u@h/d", "ATALAIA_SECRET_KEY": SECRET_KEY}
+        self.assertEqual(S.from_env(base).atak_cert_days, 90)
+        self.assertEqual(S.from_env({**base, "ATALAIA_ATAK_CERT_DAYS": "30"}).atak_cert_days, 30)
+        for bad in ("0", "366", "x"):
+            with self.assertRaises(ConfigError):
+                S.from_env({**base, "ATALAIA_ATAK_CERT_DAYS": bad})
 
     async def test_positions_need_an_issuer_with_gm_or_marshal(self) -> None:
         """FU5-13: the answer gives the issuer the certificate's key, so positions need the issuer's role too."""

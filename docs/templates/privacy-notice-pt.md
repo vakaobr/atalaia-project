@@ -147,7 +147,7 @@ confirmar.]
 | As **réplicas** que declaras ou que o campo regista por ti: tipo, classe, marca e modelo, um identificador num **autocolante NFC ou numa etiqueta QR** (`ATL-` e oito caracteres: nada pessoal na etiqueta em si, mas o registo do campo liga-a a ti) | Segurança: limites de potência das réplicas | f) segurança de quem joga |
 | **Leituras de cronógrafo** (a energia de um tiro, a hora, o check-in ou a verificação pontual, o resultado passa, aviso ou falha), **assinadas pelo marshal**; a chave pública do marshal | Segurança | f) |
 | **Infrações**: uma verificação pontual que falhou ou deu aviso, quanto passou do limite, e se és **reincidente** (tens uma infração anterior neste campo). A equipa regista o que foi feito | Segurança; deixar a equipa ver o histórico antes de decidir | f) [ADVOGADO: confirmar que mostrar à equipa a marca de "reincidente", que é só um indicador e não uma decisão, é proporcionado; confirmar que não há "decisão exclusivamente automatizada" (art. 22.º). O software não decide nada sozinho: uma pessoa confirma cada consequência.] |
-| **Partilha com outros campos** (opcional): se dois campos a ativarem **e consentires em cada um dos dois**, a equipa do outro campo vê as tuas leituras, cada uma com a chave pública do marshal. Os identificadores de cada campo nunca são cruzados: só uma conta que tenha ambos os liga | Outro campo ver o historial de uma réplica | a) o teu consentimento próprio, por campo, que podes retirar na tua conta |
+| **Partilha com outros campos** (opcional): se dois campos a ativarem **e consentires em cada um dos dois**, a equipa do outro campo vê as tuas leituras, cada uma com a chave pública do marshal. Os identificadores de cada campo nunca são cruzados: só uma conta que tenha ambos os liga. Num **hub alojado**, onde cada campo tem as suas contas, ligas tu as tuas contas com um código de uso único; o operador do hub guarda então, por cada campo em que consentiste, uma cópia das leituras assinadas desse campo sobre ti nas tabelas de partilha do hub, e só os campos em que consentiste a podem ler. Retirar o consentimento, desligar as contas ou apagar a conta remove essa cópia | Outro campo ver o historial de uma réplica | a) o teu consentimento próprio, por campo, que podes retirar na tua conta |
 
 ### 2.5 A tua posição (GPS, balizas Bluetooth)
 
@@ -251,6 +251,12 @@ do próprio projeto não recebem os teus dados.
   de segurança dos dados como subcontratante do campo, ao abrigo do acordo.
   Os seus subcontratantes: [LISTAR NO ANEXO DO ACORDO: FORNECEDOR DE
   ALOJAMENTO, ARMAZENAMENTO DE CÓPIAS].
+- **Outros campos do mesmo hub alojado com quem escolheste partilhar**
+  (opcional): só os campos onde ligaste as tuas contas **e em que
+  consentiste**, e só enquanto os dois campos tiverem a partilha ligada:
+  veem as leituras de cronógrafo da secção 2.4 (assinadas pelo marshal,
+  com a chave pública do marshal), através de uma vista partilhada que o
+  operador do hub mantém. Não veem mais nada da tua conta.
 - **Fornecedores de início de sessão** (Google, Microsoft, Apple), se os
   usares: ver 6.
 - **Fornecedores de mapas**, quando a organização carrega um mapa do

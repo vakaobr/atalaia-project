@@ -4,6 +4,7 @@
 <p>$atak_intro</p>
 <p id="atak-off" hidden>$atak_off</p>
 <p id="atak-connect" hidden></p>
+<p id="atak-expiring" class="status error" role="status" hidden></p>
 <section id="atak-issue" aria-labelledby="atak-issue-title" hidden>
 <h2 id="atak-issue-title">$atak_issue</h2>
 <form id="atak-form" class="staff-form" method="post" novalidate>
@@ -13,7 +14,7 @@
 <label for="a-holder">$atak_holder</label>
 <input id="a-holder" name="holder" maxlength="64" autocapitalize="none" spellcheck="false">
 <label for="a-days">$atak_days</label>
-<input id="a-days" name="days" type="number" min="1" max="30" value="7" required>
+<input id="a-days" name="days" type="number" min="1" max="365" value="90" required>
 <p><input type="checkbox" id="a-positions" name="positions"> <label for="a-positions">$atak_positions</label></p>
 <p><button type="submit">$atak_issue_button</button></p>
 </fieldset>

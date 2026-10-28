@@ -143,7 +143,7 @@ association is not a special category of data (Art. 9) on its face; confirm.]
 | The **replicas** you declare or the field registers for you: type, class, make and model, an identifier on an **NFC sticker or a QR label** (`ATL-` and eight characters: nothing personal in the label itself, but the field's registry links it to you) | Safety: replica power limits | (f) safety of players |
 | **Chronograph readings** (the energy of a shot, the time, the check-in or spot check, the result pass, warn or fail), **signed by the marshal**; the marshal's public key | Safety | (f) |
 | **Violations**: a spot check that failed or warned, how far over the limit, and whether you are a **repeat offender** (you have an earlier violation at this field). Staff record what was done | Safety; to let staff see the history before deciding | (f) [LAWYER: confirm that showing staff a "repeat offender" mark, which is only an indicator and not a decision, is proportionate; confirm there is no "solely automated decision" under Art. 22. The software decides nothing by itself: a person confirms every consequence.] |
-| **Sharing with other fields** (optional): if two fields both switch it on **and you consent for each of the two**, the other field's staff can see your readings, each with the marshal's public key. Per-field identifiers are never matched with each other: only an account that holds both links them | So another field can see a replica's history | (a) your separate consent, per field, which you can withdraw in your account |
+| **Sharing with other fields** (optional): if two fields both switch it on **and you consent for each of the two**, the other field's staff can see your readings, each with the marshal's public key. Per-field identifiers are never matched with each other: only an account that holds both links them. On a **hosted hub**, where each field has its own accounts, you link your accounts yourself with a one-time code; the hub operator then keeps, for each field you consented for, a copy of that field's signed readings of you in the hub's sharing tables, and only fields you consented for can read it. Withdrawing your consent, unlinking or erasing your account removes that copy | So another field can see a replica's history | (a) your separate consent, per field, which you can withdraw in your account |
 
 ### 2.5 Your position (GPS, Bluetooth beacons)
 
@@ -248,6 +248,12 @@ receive your data.
   backs up the data as the field's processor, under the agreement. Its own
   sub-processors: [LIST IN THE DPA'S ANNEX: HOSTING PROVIDER, BACKUP
   STORAGE].
+- **Other fields of the same hosted hub that you chose to share with**
+  (optional): only the fields you linked your accounts at **and consented
+  for**, and only while both fields have sharing switched on: they see the
+  chronograph readings in section 2.4 (signed by the marshal, with the
+  marshal's public key), through a shared view that the hub operator
+  maintains. They see nothing else of your account.
 - **Sign-in providers** (Google, Microsoft, Apple), if you use them: see 6.
 - **Map providers**, when the game master loads a field map: see 6.
 - **jogarairsoft.pt or any other federation or insurance service**:

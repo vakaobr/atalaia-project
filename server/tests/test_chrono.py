@@ -548,6 +548,15 @@ class SharingTests(ChronoCase):
         await self.share(self.field_id, on=False)  # this field must share too
         self.assertEqual((await self.pulled(game))["players"], [])
 
+    async def test_a_single_field_server_has_no_hub_link(self) -> None:
+        """SVX-2: the hub-level sharing is hosted mode's; here the account's own links do it."""
+        for method, path, body in (("GET", "", None), ("POST", "/code", None), ("POST", "/link", {"code": "ABCD"}),
+                                   ("DELETE", "", None)):
+            with self.subTest(method=method, path=path):
+                r = await self.client.request(method, f"/api/v1/me/hub-share{path}", json=body, headers=self.person)
+                self.assertEqual((r.status_code, r.json()["detail"]), (404, "not_hosted") if method != "DELETE"
+                                 else (404, "not_hosted"))
+
     async def test_the_fields_admin_switches_sharing(self) -> None:
         url = f"/api/v1/fields/{self.field_id}"
         r = await self.client.patch(url, json={"chrono_sharing_enabled": True}, headers=self.gm)

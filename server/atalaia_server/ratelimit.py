@@ -150,6 +150,7 @@ class Limits:
         self.feedback_total = RequestLimit(300, 86400, clock)     # ... and all together, so the table cannot be flooded
         self.remote_commands = RequestLimit(30, 60, clock)        # remote GM commands per account (plan phase 19)
         self.atak_issue = RequestLimit(20, 3600, clock)           # ATAK certificates per account (FU5)
+        self.hub_share = RequestLimit(10, 3600, clock)            # link codes and links per account (SVX-2)
         self.atak_cot = RequestLimit(120, 60, clock)              # a controller's cot messages per field (FU5-15)
 
 

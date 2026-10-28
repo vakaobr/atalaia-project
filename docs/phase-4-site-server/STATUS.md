@@ -999,6 +999,10 @@ Package C of the 2026-10-28 review round. **Staff page for a field's data export
 
 Pages for the APIs that still had none: a field's roles and a game's roles, sync (API) keys (labelled, up to two live, fingerprint shown), branding and clubs, platform links, the firmware catalogue and server administration, by the FU2 rules (a page is its API, four languages, `no-store`, `noindex`, CSP unchanged, bearer token, 375 px). The remote GM page (S19-11) reads a server-sent-events stream (`GET .../remote-gm/stream`) and polls only while no stream delivers. Tests: `server/tests/test_staff_pages.py`, `test_remote_gm_push.py`, `server/tests_browser/` (`Fu8PageTests`, `RemoteGmTests`).
 
+## Follow-up: ATAK certificate lifetime and chrono sharing across tenants (SVX, 2026-10-28, in software)
+
+The maintainer's decisions of 2026-10-28 on the site server. **SVX-1 (FU5-4):** the server still makes the device's key; a device's ATAK certificate is valid **90 days** by default (`ATALAIA_ATAK_CERT_DAYS`, 1 to 365; it was 7, 30 at most), revocable as before; the staff page `/staff/fields/<field>/atak` shows the expiry and says above the table when a certificate expires within 14 days (`expiring` on each certificate, `warn_days` in `GET .../atak`). **SVX-2 (S21-2):** chrono sharing now crosses tenants in hosted mode, through a hub-level, consent-gated, read-only view (ADR-P4-4's amendment of 2026-10-28; `hub_share.py`, `api/hub_share.py`, migration 0020, `hosted.SHARE_DDL`): three tables in `public` each tenant fills with its own rows under row-level security, one `SECURITY DEFINER` function to read across, a link code to say two accounts are one person, `hosted check` and `hosted delete` extended. Tested: `tests/test_hub_share.py` (13), `tests/test_tenants.py` (`hosted check` finds each weakening of the new tables and functions), `test_atak.py`, `test_chrono.py`, `test_config.py`, `test_migrations.py`, the browser test of the ATAK page; the hosted deployment test. Not done: staff or app screens for the link code (the API is built), which the app's account screens can call.
+
 ## Dependencies
 
 | Dependency | Status (2026-10-19) | Impact on Phase 4 |

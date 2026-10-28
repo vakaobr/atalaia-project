@@ -41,6 +41,7 @@ from sqlalchemy import and_, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from . import hub_share
 from .chrono_verify import Key, same_record, verify_reading
 from .models import (ChronoReading, ChronoReject, ChronoViolation, Consent, Field, FieldPlayerId, Game, MarshalKey,
                      Replica)
@@ -210,6 +211,7 @@ async def apply_chrono(db: AsyncSession, field_id: uuid.UUID, controller: Option
     accepted = duplicates = 0
     refused: list[dict[str, Any]] = []
     flagged: set[uuid.UUID] = set()
+    published: list[dict[str, Any]] = []  # for the hub's shared view (SVX-2), when the player's person shares
     for index, entry in enumerate(readings):
         verdict = verify_reading(entry["record"], entry["received_at"], lambda mid: keys.get(mid, []))
         reason, detail = verdict.reason, verdict.detail
@@ -223,6 +225,9 @@ async def apply_chrono(db: AsyncSession, field_id: uuid.UUID, controller: Option
                     ChronoReject.field_id == field_id, ChronoReject.reason == "marshal",
                     ChronoReject.record_sha256 == _sha(entry["record"])))
                 accepted += 1
+                published.append({"player_id": f["player_id"], "reading_id": uuid.UUID(f["reading_id"]),
+                                  "taken_at": record_time(f["timestamp"]), "record_json": entry["record"],
+                                  "public_key": base64.b64encode(bytes(verdict.key.public_key)).decode("ascii")})
                 if f["type"] == "spotcheck" and entry["outcome"] in ("fail", "warn"):
                     flagged.add(uuid.UUID(entry["series_id"]))
                 continue
@@ -232,6 +237,7 @@ async def apply_chrono(db: AsyncSession, field_id: uuid.UUID, controller: Option
             reason, detail = "conflict", f"another record is stored under reading_id {f['reading_id']}"
         await _keep_apart(db, field_id, controller, entry, reason or "format", detail, verdict)
         refused.append({"index": index, "reading_id": verdict.reading_id, "reason": reason, "detail": detail})
+    await hub_share.publish(db, field_id, published)
     return {"accepted": accepted, "duplicates": duplicates, "refused": refused, "violations": len(flagged)}
 
 
@@ -342,12 +348,14 @@ async def shared_history(db: AsyncSession, field_id: uuid.UUID, player_id: str) 
     user_id = await linked_user(db, field_id, player_id)
     if user_id is None:
         return []
+    # A hosted hub's other fields (SVX-2): the hub's function answers only while both are active for the person.
+    hub = await hub_share.shared_history(db, user_id)
     fields = await sharing_fields(db, user_id)
     if field_id not in fields:
         return []
     others = fields - {field_id}
     if not others:
-        return []
+        return hub
     links = (await db.execute(select(FieldPlayerId.field_id, FieldPlayerId.player_id, Field.name)
                               .join(Field, Field.id == FieldPlayerId.field_id)
                               .where(FieldPlayerId.user_id == user_id, FieldPlayerId.field_id.in_(others)))).all()
@@ -355,7 +363,7 @@ async def shared_history(db: AsyncSession, field_id: uuid.UUID, player_id: str) 
     for other, pid, name in links:
         for reading in await readings_with_keys(db, ChronoReading.field_id == other, ChronoReading.player_id == pid):
             out.append({"field": name, "field_id": str(other), **reading})
-    return out
+    return out + hub
 
 
 SHARED_PER_PLAYER = sync_format.MAX_SHARED  # the newest records of other fields one player's pull carries
@@ -420,6 +428,7 @@ async def erase_player(db: AsyncSession, field_id: uuid.UUID, player_id: str) ->
     """Everything of one player id at a field (their readings with their violations, the refused
     readings naming them, their replicas): a field's erasure, not an account's (an account's keeps
     the signed records and drops the link, ``personal_data.erase``). The caller commits."""
+    await hub_share.forget_player(db, field_id, player_id)  # a hosted hub's shared copies (SVX-2)
     readings = await db.execute(delete(ChronoReading).where(ChronoReading.field_id == field_id,
                                                             ChronoReading.player_id == player_id))
     rejects = await db.execute(delete(ChronoReject).where(ChronoReject.field_id == field_id,

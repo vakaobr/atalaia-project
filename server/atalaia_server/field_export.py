@@ -93,6 +93,7 @@ SKIPPED: dict[str, str] = {
     "oidc_logins": "logins in progress: security credentials",
     "firmware_releases": "the server's firmware catalogue, not a field's data",
     "preview_feedback": "a preview server's visitor feedback, belongs to no field",
+    "hub_share_links": "a hosted hub's link between a person's accounts (SVX-2): meaningful only on that hub",
 }
 # Left out on a single-field server, exported in hosted mode where the whole schema is the field's.
 HOSTED_ONLY = ("clubs", "club_members", "club_reports")

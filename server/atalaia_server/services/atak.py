@@ -202,9 +202,11 @@ async def revoke(db: AsyncSession, field_id: uuid.UUID, cert_id: uuid.UUID, by: 
 def cert_json(row: AtakCert, holder: Optional[str] = None, now: Optional[dt.datetime] = None) -> dict[str, Any]:
     now = now or dt.datetime.now(dt.timezone.utc)
     state = "revoked" if row.revoked_at else ("expired" if row.not_after <= now else "valid")
+    expiring = state == "valid" and row.not_after <= now + dt.timedelta(days=atak_pki.EXPIRY_WARN_DAYS)
     return {"id": str(row.id), "device_name": row.device_name, "serial": row.serial, "sha256": row.sha256,
             "holder": holder, "positions": row.positions, "issued_via": row.issued_via,
             "issued_at": row.issued_at.isoformat(), "not_after": row.not_after.isoformat(), "state": state,
+            "expiring": expiring,
             "revoked_at": row.revoked_at.isoformat() if row.revoked_at else None, "revoke_reason": row.revoke_reason,
             "last_connected_at": row.last_connected_at.isoformat() if row.last_connected_at else None}
 

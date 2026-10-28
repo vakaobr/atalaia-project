@@ -282,7 +282,8 @@ async def run_atak(settings: Settings, args: argparse.Namespace, out: TextIO) ->
                     raise CommandError(f"{path} exists")
                 box = atak_pki.CaBox(settings.secret_key)
                 try:
-                    done = await enrolment.issue(db, box, field, device_name=args.device, days=args.days,
+                    done = await enrolment.issue(db, box, field, device_name=args.device,
+                                                 days=args.days if args.days is not None else settings.atak_cert_days,
                                                  holder=None, positions=False, issued_by=None, via="command")
                 except enrolment.AtakProblem as e:
                     raise CommandError(f"refused: {e.detail}") from None
@@ -451,7 +452,7 @@ def _parser() -> argparse.ArgumentParser:
     p = asub.add_parser("issue", help="a TAK data package for one device (boxes and zones, never positions)")
     p.add_argument("--field", required=True, help="the field's slug")
     p.add_argument("--device", required=True, help="the device's name (1-48 characters)")
-    p.add_argument("--days", type=int, default=atak_pki.DEFAULT_DAYS, help="1-30 (default 7)")
+    p.add_argument("--days", type=int, default=None, help="1-365 (default: ATALAIA_ATAK_CERT_DAYS, 90)")
     p.add_argument("--out", required=True, help="where to write the ZIP (mode 0600; must not exist)")
     p = asub.add_parser("list", help="the field's certificates")
     p.add_argument("--field", required=True)

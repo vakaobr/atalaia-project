@@ -1241,6 +1241,54 @@ compares the setting with the schema's own name, so it covers every table
 the operator's command, with an import into a single-field server, instead of
 `pg_dump` and an admin endpoint (S21-8).
 
+**Amendment 2026-10-28 (SVX-2): chrono sharing across tenants, through a hub-level view.**
+The tenant rule above stays: the server's role reads and writes only its own schema, and no query of
+the server joins two schemas. Fields that share chrono records with each other (ADR-P4-5; S14-5) now do
+so across tenants through three small tables in `public` that the hub owns and each tenant fills for
+itself, and one function that reads them.
+
+- *Who is the same person.* A person has one account per hosted field (S21-2), and a player id is per
+  field, so nothing in a tenant says two accounts are one person. The person says it, once per pair of
+  fields, with a code: signed in at field A they ask for a link code (`POST /api/v1/me/hub-share/code`,
+  16 random bytes, valid 15 minutes, used once, kept only as a SHA-256 hash), and signed in at field B
+  they give it back (`POST /api/v1/me/hub-share/link`). Both accounts then hold the same random
+  `person_id`, kept in the new tenant table `hub_share_links` (user, person) and in the hub's
+  `public.atalaia_share_members`. An e-mail address or a user name is never matched: neither is verified.
+- *What the hub holds.* `atalaia_share_members` (person, tenant, `active`, the field's name),
+  `atalaia_share_records` (tenant, person, reading id, time, the signed record exactly as the field
+  stored it, the marshal's public key) and `atalaia_share_codes`. A tenant publishes **only for a person
+  whose link is active**: a link, that field's live `chrono_sharing` consent of the person, and the field's
+  `chrono_sharing_enabled`. Withdrawing the consent, switching the field's sharing off, unlinking, erasing
+  the account or a player's records, the retention purge and deleting the tenant remove the published rows
+  (at once for the first four; the purge and a nightly resync for rows a purge left behind). The server's
+  role has SELECT, INSERT, UPDATE and DELETE on those tables with one row-level policy each: only rows
+  whose `tenant` is the transaction's own `atalaia.tenant`. It can therefore neither read nor change
+  another field's published rows, and a bug in routing reads nothing, as everywhere else.
+- *Who may read across.* Only `public.atalaia_share_read(person_ids, limit)`, a `SECURITY DEFINER`
+  function owned by the operator's role with a fixed `search_path` (the tables are not `FORCE`d, so their
+  owner sees every row, which is why the function is the only way in). It takes the calling tenant from
+  `atalaia.tenant`, never from an argument, and returns a record only when all hold: the caller and the
+  record's field are both active members of that person, the record's field is `active` in the registry,
+  and the record's field is not the caller. It reads only hub tables, never a tenant's schema; `EXECUTE` is
+  for the server's role alone. A field that is suspended stops being read.
+- *What the field then does* is what single-field mode does: `shared_history` adds the hub's records to
+  the other-field records it already finds, for a player id of this field that an account holds, if this
+  field also shares and the person consented here. The controller's pull (`GET /api/v1/sync/chrono`) and the
+  staff's lookup both go through it; each record is still checked by the receiver against the marshal's key.
+- *Single-field servers and self-hosted multi-field databases* have no hub: nothing changes, and the new
+  endpoints answer 404 `not_hosted`.
+- `hosted check` verifies the three tables (row-level security on, not forced, exactly the one policy
+  each, the server role's exact privileges), and the function (definer, owner, `search_path`, `EXECUTE`
+  only for the server's role). `hosted delete` removes the tenant's rows, and its audit entry counts them.
+- *Rejected:* a view or query over `field_*.chrono_readings` (would give the server role SELECT across
+  schemas and turn RLS off for it, the one thing S21-1 forbids); matching by e-mail or social-login
+  subject (unverified, or not every account has one); a hub worker copying between schemas (the owner role
+  would be running continuously and could read everything).
+- *Residual risk:* the link code is a bearer secret for 15 minutes; whoever holds it and an account at
+  another hosted field can link to the person. It is shown once, over TLS, to a person signed in with TOTP
+  where they have it, and is rate limited. The privacy notices name the recipients (other sharing fields of
+  the hub, with the person's consent).
+
 ---
 
 ### ADR-P4-5: Chrono record signing

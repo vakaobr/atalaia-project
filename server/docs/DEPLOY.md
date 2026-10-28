@@ -309,7 +309,9 @@ the site server from the field controller's own stream.
 4. The field's admin or gm, logged in with TOTP, issues a certificate per
    device at `https://campo.example.pt/staff/fields/<field>/atak`: a device
    name, whose account it is (positions only for a gm or a marshal), how many
-   days (7 by default, 30 at most). The page gives the TAK data package (a
+   days (90 by default, set with `ATALAIA_ATAK_CERT_DAYS`; 365 at most). The page
+   shows each certificate's expiry and warns when one expires within 14 days:
+   issue a new package for the device and revoke the old one. The page gives the TAK data package (a
    ZIP: the connection, the relay's CA, the device's certificate) and the
    certificate's password, **once**: the server keeps neither. Import the
    package in ATAK and type the password when it asks. Revoke a lost device's
@@ -575,8 +577,20 @@ under the DPA):
 - `hosted check`: reads what keeps the fields apart (every schema and table
   owned by the owner role, row-level security enabled and forced and exactly
   one policy, `atalaia_tenant`, on every table, the server role's exact
-  grants, every schema registered) and exits 1 on any problem. Run it after
-  anything you did to the database by hand.
+  grants, every schema registered; and, since the hub-level chrono sharing
+  (SVX-2), the three `public.atalaia_share_*` tables with row-level security
+  enabled and not forced and their one policy, the server role's exact
+  privileges on them, and the two `SECURITY DEFINER` functions the sharing
+  uses, owned by the owner role, with a fixed search path, runnable by the
+  server's role only) and exits 1 on any problem. Run it after anything you
+  did to the database by hand.
+- Chrono sharing across fields (SVX-2): nothing to turn on at the hub. `hosted init` and `hosted migrate` make the
+  sharing's tables and functions in `public` (idempotent); each field's admin switches sharing on in the field's
+  settings as before, and each player consents per field and links their accounts at the hub's fields with a code
+  (`POST /api/v1/me/hub-share/code` at one field, `.../link` at the other). A hub made by an older release needs
+  `hosted migrate` before the new server starts (`hub` does it); `hosted check` says so otherwise. `hosted delete`
+  removes the field's published records with it, and a restore of a hub brings the tables back with the rest (the
+  check runs after it).
 
 ### Updates
 

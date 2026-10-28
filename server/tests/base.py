@@ -53,7 +53,7 @@ DATA_TABLES = ("oidc_logins", "passkeys", "user_identities", "preview_feedback",
                "user_game_roles",
                "chrono_violations", "chrono_rejects", "chrono_readings", "replicas", "marshal_keys",
                "field_player_ids", "game_nodes", "game_node_scores", "game_events", "games", "controllers",
-               "field_api_keys", "users", "fields")
+               "field_api_keys", "hub_share_links", "users", "fields")
 _clock = [time.time()]
 
 

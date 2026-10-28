@@ -13,7 +13,7 @@ Three kinds, all X.509 v3 made with ``cryptography``:
   be enrolled again (the old certificates still verify against the old CA certificate, which is kept).
 - **A device's client certificate** (``issue_client``): RSA 2048 (what TAK clients take everywhere),
   SHA-256, a random 159-bit serial, ``CA:FALSE``, ``digitalSignature, keyEncipherment``, extended key
-  usage ``clientAuth`` only, the device's name as the subject's common name, valid ``days`` (1-30, 7 by
+  usage ``clientAuth`` only, the device's name as the subject's common name, valid ``days`` (1-365, 90 by
   default) from a minute ago. Its private key is made here, goes into the data package once and is never
   stored.
 - **The relay's own identity** (``server_identity``): what the relay's TLS listener presents and what
@@ -59,8 +59,9 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 CA_DAYS = 3 * 365
 LEAF_DAYS = 397                 # the relay's own leaf, made again at every start
-DEFAULT_DAYS = 7                # a device's certificate (decision FU5-4)
-MAX_DAYS = 30
+DEFAULT_DAYS = 90               # a device's certificate (decision SVX-1; ATALAIA_ATAK_CERT_DAYS changes it)
+MAX_DAYS = 365
+EXPIRY_WARN_DAYS = 14           # the staff page says a certificate is near expiry this long before
 BACKDATE = dt.timedelta(minutes=1)  # clocks a little behind still accept a fresh certificate
 SERVER_CA_NOT_BEFORE = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
 SERVER_CA_NOT_AFTER = dt.datetime(2046, 1, 1, tzinfo=dt.timezone.utc)

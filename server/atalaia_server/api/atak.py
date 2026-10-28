@@ -20,7 +20,7 @@ checks it again at every connection; it also needs the **issuer** to hold ``gm``
 field in this session (``403 positions_need_gm_or_marshal``, FU5-13), since the answer gives the issuer the
 certificate's key: the field's ``admin`` alone, or a server administrator without such a role, cannot get
 positions by naming a marshal. Issuing in another member's name is allowed (FU5-14); the issuer is in
-``atak_cert_issued`` and in every ``atak_connect`` row of the certificate. ``days``: 1-30, 7 by default. At most 20 certificates an hour per account (each makes an RSA
+``atak_cert_issued`` and in every ``atak_connect`` row of the certificate. ``days``: 1-365, ``ATALAIA_ATAK_CERT_DAYS`` (90) by default. At most 20 certificates an hour per account (each makes an RSA
 key). Nothing is issued while the relay is off (``409 atak_relay_off``); revoking always works.
 
 The client certificate's private key and password exist only in this answer (``Cache-Control:
@@ -89,7 +89,8 @@ async def state(field_id: uuid.UUID, request: Request, principal: Principal = De
     ca = await enrolment.current_ca(db, field.id)
     return JSONResponse({
         "enabled": relay is not None, "connect": _connect(request, field) if relay is not None else None,
-        "max_days": atak_pki.MAX_DAYS, "default_days": atak_pki.DEFAULT_DAYS,
+        "max_days": atak_pki.MAX_DAYS, "default_days": request.app.state.settings.atak_cert_days,
+        "warn_days": atak_pki.EXPIRY_WARN_DAYS,
         "ca": {"ski": ca.ski, "not_after": ca.not_after.isoformat(), "created_at": ca.created_at.isoformat()}
         if ca is not None else None,
         "relay_ca_sha256": relay.status(field.id)["relay_ca_sha256"] if relay is not None else None,
@@ -123,7 +124,7 @@ async def issue(field_id: uuid.UUID, request: Request, principal: Principal = De
             raise HTTPException(404, "holder_not_found")
     try:
         done = await enrolment.issue(db, request.app.state.atak_box, field, device_name=body.get("device_name"),
-                                     days=body.get("days", atak_pki.DEFAULT_DAYS), holder=holder,
+                                     days=body.get("days", request.app.state.settings.atak_cert_days), holder=holder,
                                      positions=positions, issued_by=principal.user.id,
                                      issuer_roles=principal.field_roles(field.id))
     except enrolment.AtakProblem as exc:

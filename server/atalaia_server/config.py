@@ -55,6 +55,8 @@
     ATALAIA_ATAK_RELAY_HOST the name ATAK devices connect to, written into their data packages and the
                             relay's certificate; default: ATALAIA_PUBLIC_URL's host (hosted mode: each
                             field's <slug>.<ATALAIA_HOSTED_DOMAIN>, and this must be unset)
+    ATALAIA_ATAK_CERT_DAYS  how long a device's ATAK certificate is valid by default, 1-365 days
+                            (default 90); the staff page and the API may ask for fewer or more
     ATALAIA_ATAK_RELAY_PUBLIC_PORT
                             the port ATAK devices connect to, if the deployment publishes the relay on
                             another one (default: ATALAIA_ATAK_RELAY_PORT)
@@ -118,6 +120,7 @@ _KEY_HINT = "(python3 -c \"import secrets; print(secrets.token_urlsafe(32))\")"
 
 
 MAX_FIRMWARE_KEYS = 8
+DEFAULT_ATAK_CERT_DAYS = 90
 DEFAULT_ATAK_PORT = 8089  # TAK's streaming CoT over TLS (FU5)
 # A host name of one label or more, lower case, no port: where ATAK devices reach the relay.
 ATAK_HOST = re.compile(r"(?=.{1,200}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
@@ -343,6 +346,7 @@ class Settings:
     atak_relay_port: int = DEFAULT_ATAK_PORT       # 0: any free port (the tests)
     atak_relay_host: Optional[str] = None
     atak_relay_public_port: Optional[int] = None
+    atak_cert_days: int = DEFAULT_ATAK_CERT_DAYS   # a device certificate's default lifetime (SVX-1)
     quotas: Mapping[str, int] = field(default_factory=lambda: dict(QUOTA_DEFAULTS))  # 0: no limit
     export_min_interval_s: int = DEFAULT_EXPORT_INTERVAL_S
     export_max_mb: int = DEFAULT_EXPORT_MAX_MB
@@ -524,6 +528,7 @@ class Settings:
             atak_relay_host=env.get("ATALAIA_ATAK_RELAY_HOST", "").strip() or None,
             atak_relay_public_port=(int(_number(env, "ATALAIA_ATAK_RELAY_PUBLIC_PORT", 0, 1, 65535, int))
                                     if env.get("ATALAIA_ATAK_RELAY_PUBLIC_PORT", "").strip() else None),
+            atak_cert_days=int(_number(env, "ATALAIA_ATAK_CERT_DAYS", DEFAULT_ATAK_CERT_DAYS, 1, 365, int)),
             quotas=quotas_from_env(env),
             export_min_interval_s=int(_number(env, "ATALAIA_EXPORT_MIN_INTERVAL_S", DEFAULT_EXPORT_INTERVAL_S,
                                               0, 86400, int)),
