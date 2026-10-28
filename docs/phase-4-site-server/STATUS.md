@@ -452,6 +452,16 @@ chrono, registrations), each added to `personal_data.py` with its plan
 phase; a flow asking existing accounts to consent to a changed notice; the
 legal review of the templates. Decisions S12-1 to S12-8, all open.
 
+**The templates, first full draft (2026-10-28, decisions PRIV-1 to PRIV-8).**
+`docs/templates/privacy-notice-pt.md` and `-en.md` were rewritten to cover
+everything the components do today (accounts and login methods, check-in,
+association membership, chrono readings and repeat offenders, positions and
+the opt-in remote paths, NFC tags and stickers, game history, hosted mode,
+the app's storage, third parties), with a short in-app notice for account
+creation (S17-16) and a short check-in poster notice; `dpa-template.md` was
+brought up to date. All three are marked as drafts not yet reviewed by a
+lawyer; the review (P4-6) is still open and still blocks hosted mode.
+
 ## Plan phase 13: controller sync (built 2026-10-20, in software)
 
 What exists: the site server's `POST /api/v1/sync/games`, `events`, `scores`

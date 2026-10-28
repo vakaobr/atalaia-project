@@ -65,7 +65,7 @@ P4-6):
 
 | Template | What it is |
 | --- | --- |
-| [`templates/privacy-notice-pt.md`](templates/privacy-notice-pt.md), [`templates/privacy-notice-en.md`](templates/privacy-notice-en.md) | The site server's privacy notice, in Portuguese and English (the field controller's own check-in notice is in `controller/templates/`) |
+| [`templates/privacy-notice-pt.md`](templates/privacy-notice-pt.md), [`templates/privacy-notice-en.md`](templates/privacy-notice-en.md) | The field's privacy notice (first full draft, not yet reviewed by a lawyer), in Portuguese and English, with a short in-app notice for account creation and a short check-in poster notice (the field controller's own default check-in notice is in `controller/templates/`) |
 | [`templates/dpa-template.md`](templates/dpa-template.md) | A data processing agreement for a hosted site server (GDPR Art. 28) |
 
 ## Decisions to review
