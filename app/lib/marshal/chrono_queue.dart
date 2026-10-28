@@ -27,6 +27,7 @@ import '../chrono/limit_template.dart';
 import '../chrono/reading.dart';
 import '../chrono/replica.dart';
 import '../l10n/strings.dart';
+import '../platform/services.dart' show NfcRead, NfcService, NfcState;
 import '../protocol/apd.dart';
 import '../ui/code_kind.dart';
 import '../ui/replica_label.dart';
@@ -169,6 +170,10 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
       // Not in this phone's registry: register it now with a label the marshal
       // can stick on it; a declaration without an id is linked by the upload.
       final id = known ?? newUuid();
+      // An NFC sticker on the replica, when this phone reads them (PKA-3):
+      // its UID is the tag; else, or by choice, the printed QR label.
+      final sticker = await _askSticker();
+      if (sticker == null || !mounted) return;
       replica = Replica(
         replicaId: id,
         ownerPlayerId: '${player['player_id']}',
@@ -176,8 +181,8 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
         replicaClass: d.replicaClass,
         makeModel: d.makeModel,
         registeredAt: formatTimestamp(DateTime.now()),
-        tagType: TagType.qr,
-        tagUid: Replica.labelFor(id),
+        tagType: sticker.isEmpty ? TagType.qr : TagType.nfc,
+        tagUid: sticker.isEmpty ? Replica.labelFor(id) : sticker,
       );
       await records.addReplica(replica);
     }
@@ -204,6 +209,19 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
       ),
     );
     await _load();
+  }
+
+  /// The UID of the NFC sticker the marshal holds to the phone for a replica
+  /// registered here, '' for the QR label (no NFC on this phone, or chosen),
+  /// null when the marshal gave up.
+  Future<String?> _askSticker() async {
+    final nfc = context.services.nfc;
+    if (await nfc.state() != NfcState.ready || !mounted) return '';
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _StickerDialog(nfc: nfc, records: _records!),
+    );
   }
 
   Future<void> _scan() async {
@@ -490,6 +508,83 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Waits for an NFC sticker (its UID is the replica's tag) or the marshal's
+/// choice of the printed QR label. A sticker already on another replica of
+/// this phone is refused: one tag, one replica.
+class _StickerDialog extends StatefulWidget {
+  const _StickerDialog({required this.nfc, required this.records});
+
+  final NfcService nfc;
+  final MarshalRecords records;
+
+  @override
+  State<_StickerDialog> createState() => _StickerDialogState();
+}
+
+class _StickerDialogState extends State<_StickerDialog> {
+  StreamSubscription<NfcRead>? _sub;
+  bool _taken = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = widget.nfc.reads.listen(_read);
+    unawaited(widget.nfc.startReading());
+  }
+
+  void _read(NfcRead r) {
+    final uid = Replica.nfcUid(r.uid);
+    if (widget.records.byTag(uid) != null) {
+      setState(() => _taken = true);
+      return;
+    }
+    Navigator.pop(context, uid);
+  }
+
+  @override
+  void dispose() {
+    unawaited(_sub?.cancel());
+    unawaited(widget.nfc.stopReading());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    return AlertDialog(
+      title: Text(s.t('queue.sticker_title')),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.t('queue.sticker_body')),
+          if (_taken)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                s.t('queue.sticker_taken'),
+                key: const Key('queue-sticker-taken'),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          key: const Key('queue-sticker-cancel'),
+          onPressed: () => Navigator.pop(context),
+          child: Text(s.t('common.cancel')),
+        ),
+        TextButton(
+          key: const Key('queue-sticker-qr'),
+          onPressed: () => Navigator.pop(context, ''),
+          child: Text(s.t('queue.sticker_qr')),
+        ),
+      ],
     );
   }
 }

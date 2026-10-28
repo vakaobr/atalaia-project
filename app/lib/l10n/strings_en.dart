@@ -651,6 +651,12 @@ const Map<String, String> enStrings = {
   'queue.held':
       '{n} series were not accepted because the controller does not have you on its marshal list; they stay on this phone.',
   'queue.waiting_confirmation': 'waiting for confirmation',
+  'queue.sticker_title': 'Use an NFC sticker?',
+  'queue.sticker_body':
+      "Hold the replica's NFC sticker to the phone to register it by the sticker, or use the printed QR label.",
+  'queue.sticker_qr': 'Use the QR label',
+  'queue.sticker_taken':
+      'That sticker is already registered to another replica.',
   'queue.unregistered': 'not registered yet',
   'label.title': 'Replica label',
   'label.show': 'Show label',

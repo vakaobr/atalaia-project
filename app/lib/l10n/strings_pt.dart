@@ -665,6 +665,11 @@ const Map<String, String> ptStrings = {
   'queue.held':
       '{n} série(s) não foram aceites porque o controlador não te tem na lista de marshals; ficam neste telemóvel.',
   'queue.waiting_confirmation': 'à espera de confirmação',
+  'queue.sticker_title': 'Usar um autocolante NFC?',
+  'queue.sticker_body':
+      'Encostar o autocolante NFC da réplica ao telemóvel para a registar por ele, ou usar a etiqueta QR impressa.',
+  'queue.sticker_qr': 'Usar a etiqueta QR',
+  'queue.sticker_taken': 'Este autocolante já está registado noutra réplica.',
   'queue.unregistered': 'ainda sem registo',
   'label.title': 'Etiqueta da réplica',
   'label.show': 'Mostrar etiqueta',

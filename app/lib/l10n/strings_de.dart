@@ -678,6 +678,12 @@ const Map<String, String> deStrings = {
   'queue.held':
       '{n} Serien wurden nicht angenommen, weil der Controller dich nicht auf seiner Marshal-Liste hat; sie bleiben auf diesem Handy.',
   'queue.waiting_confirmation': 'wartet auf Bestätigung',
+  'queue.sticker_title': 'NFC-Aufkleber verwenden?',
+  'queue.sticker_body':
+      'Den NFC-Aufkleber der Replik ans Telefon halten, um sie damit zu registrieren, oder das gedruckte QR-Etikett verwenden.',
+  'queue.sticker_qr': 'QR-Etikett verwenden',
+  'queue.sticker_taken':
+      'Dieser Aufkleber ist schon für eine andere Replik registriert.',
   'queue.unregistered': 'noch nicht registriert',
   'label.title': 'Replik-Etikett',
   'label.show': 'Etikett zeigen',

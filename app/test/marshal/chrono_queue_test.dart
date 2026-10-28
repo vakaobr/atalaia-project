@@ -9,13 +9,17 @@
 // of reach and sent later, a hand check-in.
 
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:atalaia_app/checkin/checkin_screen.dart';
 import 'package:atalaia_app/checkin/field_trust.dart';
 import 'package:atalaia_app/checkin/my_replicas.dart';
+import 'package:atalaia_app/chrono/chrono_ui.dart' show ChronoScreen;
 import 'package:atalaia_app/chrono/limit_template.dart';
 import 'package:atalaia_app/chrono/record_signer.dart';
 import 'package:atalaia_app/chrono/replica.dart';
+import 'package:atalaia_app/chrono/reading.dart' show newUuid;
+import 'package:atalaia_app/platform/services.dart' show NfcRead, NfcState;
 import 'package:atalaia_app/l10n/strings_pt.dart';
 import 'package:atalaia_app/marshal/chrono_queue.dart';
 import 'package:atalaia_app/marshal/marshal_records.dart';
@@ -147,6 +151,7 @@ void main() {
     expect(find.textContaining('ainda sem registo'), findsOneWidget);
 
     await tapKey(tester, 'queue-decl-$playerDecl');
+    await tapKey(tester, 'queue-sticker-qr'); // no sticker: the printed label
     for (final k in ['1', '0', '0']) {
       await tapKey(tester, 'chrono-key-$k');
     }
@@ -244,6 +249,7 @@ void main() {
     // Chronographed from the queue, the replica is registered under that
     // label, which the registry's own scan then matches.
     await tapKey(tester, 'queue-decl-$playerDecl');
+    await tapKey(tester, 'queue-sticker-qr'); // no sticker: the printed label
     expect(r.replicas.single.replicaId, playerDecl);
     expect(r.replicas.single.tagUid, label);
     expect(r.byTag(label)?.replicaId, playerDecl);
@@ -316,6 +322,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tapKey(tester, 'queue-decl-$playerDecl');
+    await tapKey(tester, 'queue-sticker-qr'); // no sticker: the printed label
     field.offline = true;
     for (final k in ['1', '1', '0']) {
       await tapKey(tester, 'chrono-key-$k');
@@ -334,6 +341,82 @@ void main() {
       find.text('Por cronografar: 0 · aprovadas: 0 · recusadas: 1'),
       findsOneWidget,
     ); // 1.21 J
+  });
+
+  testWidgets(
+    'an NFC sticker held to the phone is the replica\'s tag (PKA-3)',
+    (tester) async {
+      final h = harness(fieldHttp: field.http);
+      final r = await records(h.store, h.settings);
+      await tester.pumpWidget(
+        h.app(
+          home: ChronoQueueScreen(
+            checkin: marshal,
+            field: pinned,
+            records: r,
+            templates: templates,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'queue-decl-$playerDecl');
+      expect(find.byKey(const Key('queue-sticker-qr')), findsOneWidget);
+      expect(h.nfc.calls, contains('start'));
+      h.nfc.tap(
+        NfcRead(
+          uid: Uint8List.fromList([0x04, 0xA2, 0xB3, 0xC4, 0xD5, 0xE6, 0xF7]),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(h.nfc.calls.last, 'stop');
+      final rep = r.replicas.single;
+      expect((rep.tagType, rep.tagUid), (TagType.nfc, '04:A2:B3:C4:D5:E6:F7'));
+      expect(find.byType(ChronoScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets('a sticker already on another replica is refused; cancel '
+      'registers nothing; no NFC goes straight to the label', (tester) async {
+    final h = harness(fieldHttp: field.http);
+    final r = await records(h.store, h.settings);
+    await r.addReplica(
+      Replica(
+        replicaId: newUuid(),
+        ownerPlayerId: 'p-other',
+        type: ReplicaType.aeg,
+        replicaClass: 'rifle',
+        registeredAt: '2026-01-01T00:00:00Z',
+        tagType: TagType.nfc,
+        tagUid: '04:A2:B3:C4:D5:E6:F7',
+      ),
+    );
+    await tester.pumpWidget(
+      h.app(
+        home: ChronoQueueScreen(
+          checkin: marshal,
+          field: pinned,
+          records: r,
+          templates: templates,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'queue-decl-$playerDecl');
+    h.nfc.tap(
+      NfcRead(
+        uid: Uint8List.fromList([0x04, 0xA2, 0xB3, 0xC4, 0xD5, 0xE6, 0xF7]),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('queue-sticker-taken')), findsOneWidget);
+    await tapKey(tester, 'queue-sticker-cancel');
+    expect(r.replicas, hasLength(1)); // nothing registered
+    expect(find.byType(ChronoScreen), findsNothing);
+    // Without NFC on the phone the printed label is used at once.
+    h.nfc.current = NfcState.unavailable;
+    await tapKey(tester, 'queue-decl-$playerDecl');
+    expect(find.byKey(const Key('queue-sticker-qr')), findsNothing);
+    expect(r.replicas.last.tagType, TagType.qr);
   });
 
   testWidgets('a player without the app, checked in by hand', (tester) async {
