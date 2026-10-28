@@ -1,0 +1,85 @@
+name: Prepare release
+
+# "Run workflow" on main opens a pull request "Release vX.Y.Z": CHANGELOG.md's Unreleased section
+# moved under the new version and every version file bumped (tools/prepare_release.py, what commit
+# 331dcaad did by hand), the release notes as the description. Merging it is the go-ahead:
+# tag-release.yml then tags the merge commit and starts release.yml. Nothing is tagged here.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Which part of the newest released version to raise (ignored when a version is given)"
+        type: choice
+        options: [patch, minor, major]
+        default: minor
+      version:
+        description: "Or an explicit version, MAJOR.MINOR.PATCH (empty: use the bump)"
+        type: string
+        required: false
+      prerelease:
+        description: "Pre-release label, e.g. rc.1 (empty: a final release)"
+        type: string
+        required: false
+
+permissions: {}
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Open the release pull request
+    # Only from main: the pull request is made from the branch the run is on.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the branch release/vX.Y.Z
+      pull-requests: write # the pull request
+    env:
+      GH_TOKEN: ${{ github.token }}
+      IN_BUMP: ${{ inputs.bump }}
+      IN_VERSION: ${{ inputs.version }}
+      IN_PRERELEASE: ${{ inputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Move the Unreleased section and bump the version files
+        id: prep
+        run: |
+          set -eu
+          if [ -n "$IN_VERSION" ]; then
+            version="$(python3 tools/prepare_release.py prepare --version "$IN_VERSION" --prerelease "$IN_PRERELEASE")"
+          else
+            version="$(python3 tools/prepare_release.py prepare --bump "$IN_BUMP" --prerelease "$IN_PRERELEASE")"
+          fi
+          python3 tools/prepare_release.py check --version "$version"
+          python3 tools/prepare_release.py notes --version "$version" --out "$RUNNER_TEMP/notes.md"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Release $version"
+      - name: Commit on release/v${{ steps.prep.outputs.version }} and open the pull request
+        env:
+          VERSION: ${{ steps.prep.outputs.version }}
+        run: |
+          set -eu
+          branch="release/v$VERSION"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "::error::the branch $branch exists already (an open release pull request? close it and delete the branch first)"; exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "::error::the tag v$VERSION exists already"; exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add -A
+          git commit -s -m "Release v$VERSION" \
+            -m "CHANGELOG's Unreleased section becomes $VERSION and the version files say $VERSION (tools/prepare_release.py, prepare-release.yml)."
+          git push origin "$branch"
+          {
+            cat "$RUNNER_TEMP/notes.md"
+            printf '\n---\n\nMerging this pull request tags the merge commit v%s and starts the release workflow (tag-release.yml, then release.yml: builds, signs with the CI key, publishes a GitHub pre-release). Closing it without merging releases nothing: delete the branch %s.\n' "$VERSION" "$branch"
+          } > "$RUNNER_TEMP/body.md"
+          gh pr create --base main --head "$branch" --title "Release v$VERSION" --body-file "$RUNNER_TEMP/body.md"

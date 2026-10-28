@@ -121,6 +121,17 @@ modes/bomb: return to standby after defuse
 docs: explain CQB field profile
 ```
 
+## Cutting a release
+
+For the maintainer. A release is a pull request and a merge; the tag and the build follow by themselves.
+
+1. Check that CHANGELOG.md's `## [Unreleased]` section says what the release contains (an empty one is refused).
+2. **Actions > Prepare release > Run workflow**, on `main`: choose `bump` (patch, minor or major, counted from the newest released CHANGELOG section) or give an explicit `version`, and a `prerelease` label such as `rc.1` if it is one. It runs `tools/prepare_release.py` and opens the pull request **Release vX.Y.Z** from `release/vX.Y.Z`: the Unreleased section moved under the new version, `core/include/atalaia/version.h` (pre-release emptied), `core/CMakeLists.txt`, `app/pubspec.yaml`, `app/lib/version.dart` and the controller's and the server's `__init__.py` bumped (what `controller/tests/test_versions.py` checks), the release notes as the description.
+3. Review it, let CI pass, merge it. Merging is the go-ahead: `tag-release.yml` creates the annotated tag `vX.Y.Z` on the merge commit and starts `release.yml` for it (builds the images, signs the Field Box image with the CI key, publishes a GitHub pre-release; see [firmware/esp32/docs/RELEASE_SIGNING.md](firmware/esp32/docs/RELEASE_SIGNING.md)). A second pull request, **Open X.Y.Z-dev after the vX.Y.Z release**, sets the core's next development version; merge it too, so that later builds sort above the release.
+4. Closing the pull request without merging releases nothing: delete its branch. A release that went wrong is deleted by hand (the GitHub release, then the tag) before trying again; `release.yml` refuses to publish a tag that already has a release.
+
+By hand, the same: `python3 tools/prepare_release.py prepare --bump minor`, commit, tag `vX.Y.Z` on the commit that passes `prepare_release.py check --version X.Y.Z`, push the tag. "Run workflow" on `release.yml` from a branch is a dry run that publishes nothing.
+
 ## Code style
 
 - **C**: C11, 4-space indentation, `snake_case`, public symbols prefixed `atalaia_`. Builds must pass with `-Wall -Wextra -Wpedantic` and no warnings.

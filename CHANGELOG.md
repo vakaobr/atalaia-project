@@ -10,6 +10,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- **Releases are prepared by a pull request** (decisions PREP-1 to PREP-8): **Run workflow** on `.github/workflows/prepare-release.yml` (`bump` patch/minor/major, or an explicit `version`, and an optional `prerelease` label) opens the pull request "Release vX.Y.Z" with CHANGELOG's Unreleased section moved under the new version, the version files bumped as release 0.4.0's commit did by hand and the notes as its description; merging it makes `.github/workflows/tag-release.yml` tag the merge commit and start `release.yml` for the tag (a tag pushed with the workflow token starts no workflow), then open a pull request that sets the next development version. `tools/prepare_release.py` (standard library, with `controller/tests/test_prepare_release.py`) does the editing and refuses an empty Unreleased section. `release.yml` treats a run on a tag `vX.Y.Z` as a real release whatever started it (a branch run stays a dry run), refuses other tags, and stops early when the release exists. "Cutting a release" in `CONTRIBUTING.md`.
+
 ## [0.4.0] - 2026-10-28
 
 The first release published on GitHub, a **pre-alpha, not field-tested** pre-release: firmware images for the Field Box (and the Satellite, the same image), the controller's USB radio modem and the I/O pod, as a USB flash bundle, a single merged image for browser flashers, and the app image with its signed `.release.json`, built and signed by the release workflow (`.github/workflows/release.yml`) with the CI release key. Building the firmware yourself still works and is still documented (`docs/manuals/en/firmware.md`).

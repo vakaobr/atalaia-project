@@ -2,8 +2,13 @@ name: Release
 
 # A pushed tag v* builds the firmware images, signs them with the CI release key and publishes a
 # GitHub pre-release (docs/manuals/en/firmware.md, firmware/esp32/docs/RELEASE_SIGNING.md).
-# "Run workflow" (workflow_dispatch) is a dry run: the same builds and packaging, signed with a
-# throw-away key made on the runner, uploaded as a workflow artifact, no release, no secret used.
+# What decides is the ref the run is on, not the event: a tag v* (pushed by hand, or named by
+# tag-release.yml's `gh workflow run release.yml --ref vX.Y.Z`, because a tag pushed with the
+# workflow token starts no workflow) is a real release; "Run workflow" (workflow_dispatch) on a
+# branch is a dry run: the same builds and packaging, signed with a throw-away key made on the
+# runner, uploaded as a workflow artifact, no release, no secret used. A tag pushed by hand and
+# the dispatch for it cannot publish twice: a release that already exists fails the run
+# (checked here first, and again before anything is created). Cutting one: CONTRIBUTING.md.
 
 on:
   push:
@@ -35,7 +40,7 @@ jobs:
     name: Version of this release
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: read # release view below sees published releases; a draft is caught by the publish job
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
@@ -44,9 +49,20 @@ jobs:
           fetch-depth: 0 # the whole history and tags: the version counts commits since v<X.Y.Z> (FV-9)
       - name: The firmware version is the tag's
         id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           built="$(python3 tools/docker_fw.py version)"
           if [ "$GITHUB_REF_TYPE" = tag ]; then
+            # A real release only from a release tag (a dispatch may name any tag).
+            if ! printf '%s' "$GITHUB_REF_NAME" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+              echo "::error::$GITHUB_REF_NAME is not a release tag (vMAJOR.MINOR.PATCH[-pre-release])"
+              exit 1
+            fi
+            if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+              echo "::error::a release for $GITHUB_REF_NAME already exists; nothing to do (delete it, and the tag if it is wrong, to release again)"
+              exit 1
+            fi
             version="${GITHUB_REF_NAME#v}"
             # A plain vX.Y.Z tag must be the commit that says so (version.h, no pre-release), or the
             # release tool refuses the images; a tag with a pre-release (v0.5.0-rc.1) names its own.

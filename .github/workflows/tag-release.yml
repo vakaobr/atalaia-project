@@ -1,0 +1,93 @@
+name: Tag release
+
+# When the pull request "Release vX.Y.Z" (branch release/vX.Y.Z, made by prepare-release.yml) is
+# merged into main: tag the merge commit vX.Y.Z (annotated), then start release.yml for the tag with
+# `gh workflow run`, because a tag pushed with the workflow token starts no workflow of its own.
+# A last job opens the pull request that sets the next development version (decision FV-1).
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag and start the release
+    # Merged (not just closed), from a branch of this repository, named like a release.
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'release/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the tag
+      actions: write # gh workflow run release.yml
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+      - name: Tag the merge commit
+        id: tag
+        run: |
+          set -eu
+          if ! printf '%s' "$HEAD_REF" | grep -Eq '^release/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error::$HEAD_REF is not a release branch name"; exit 1
+          fi
+          version="${HEAD_REF#release/v}"
+          tag="v$version"
+          test "$(git rev-parse HEAD)" = "$MERGE_SHA"
+          # The merge commit must be a release of exactly this version, or the release build refuses it.
+          python3 tools/prepare_release.py check --version "$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "::error::the tag $tag exists already; nothing tagged (a manual tag push? release.yml has its own run)"; exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "Atalaia $tag" "$MERGE_SHA"
+          git push origin "refs/tags/$tag"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # A tag pushed with GITHUB_TOKEN starts no workflow: start it, on the tag (a real release).
+          gh workflow run release.yml --ref "$tag"
+          echo "Tagged $tag at $MERGE_SHA and started release.yml"
+
+  open-dev:
+    name: Open the next development version
+    needs: tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the branch
+      pull-requests: write # the pull request
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.tag.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+      - name: Version files say the next version with "dev" (core only, as cfcd1382)
+        run: |
+          set -eu
+          next="$(python3 tools/prepare_release.py open-dev --released "$VERSION")"
+          branch="dev/open-$next"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add -A
+          git commit -s -m "Open $next after the $VERSION release" \
+            -m "The commit after a release sets the next version with the pre-release dev again (decision FV-1, RELEASE_SIGNING.md), so its builds sort above $VERSION."
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --title "Open $next after the $VERSION release" \
+            --body "Sets the core's version (version.h, CMakeLists.txt) to $next, as the commit after every release does. Made by tag-release.yml; the release itself is already tagged and running."
