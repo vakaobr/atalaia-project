@@ -41,7 +41,7 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import chrono_registry
+from . import chrono_registry, quotas
 from .models import Controller, FieldApiKey, Game, GameEvent, GameNode, GameNodeScore
 from .services import history, registration
 
@@ -51,18 +51,22 @@ MAX_LIVE_KEYS = 2  # a field's live API keys: the old one and the new one during
 class SyncProblem(Exception):
     """An answer other than 200: status, ``detail`` code and, for a 400, the format error."""
 
-    def __init__(self, status: int, detail: str, error: Optional[str] = None, path: Optional[str] = None) -> None:
+    def __init__(self, status: int, detail: str, error: Optional[str] = None, path: Optional[str] = None,
+                 extra: Optional[dict[str, Any]] = None) -> None:
         super().__init__(detail)
         self.status = status
         self.detail = detail
         self.error = error
         self.path = path
+        self.extra = extra
 
     def body(self) -> dict[str, Any]:
         out: dict[str, Any] = {"detail": self.detail}
         if self.error is not None:
             out["error"] = self.error
             out["path"] = self.path or ""
+        if self.extra:
+            out.update(self.extra)
         return out
 
 
@@ -173,6 +177,10 @@ async def _games(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dict
               "ended_at": func.greatest(Game.ended_at, ex.ended_at), "updated_at": func.now()},
     ).returning(Game.id, Game.state, text("(xmax = 0) AS created"))
     row = (await db.execute(stmt)).one()
+    if row[2] and quotas.limit("games"):  # hosted mode's quota: a new game past it is undone (the caller rolls back)
+        if await db.scalar(select(func.count()).select_from(Game).where(Game.field_id == caller.field_id)) \
+                > quotas.limit("games"):
+            raise SyncProblem(409, quotas.CODE, extra={"quota": "games", "limit": quotas.limit("games")})
     answer = {"game": str(row[0]), "created": bool(row[2]), "state": row[1]}
     if meta["scheduled_game_id"] is not None:
         answer["scheduled"] = await registration.link_game(db, caller.field_id, meta["scheduled_game_id"], row[0],

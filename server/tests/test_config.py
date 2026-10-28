@@ -10,7 +10,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from atalaia_server.config import ConfigError, Settings, database_url_from_env, redact_url  # noqa: E402
+from atalaia_server.config import (QUOTA_DEFAULTS, ConfigError, Settings, database_url_from_env,  # noqa: E402
+                                   redact_url)
 
 URL = "postgresql+asyncpg://atalaia:s3cret@db:5432/atalaia"
 KEY = "k" * 43
@@ -184,6 +185,38 @@ class SettingsTests(unittest.TestCase):
         self.assertNotIn("x" * 40, text)
         self.assertIn("atalaia:***@db:5432", text)
         self.assertIn("metrics_token=set", text)
+
+
+class QuotaSettingsTests(unittest.TestCase):
+    """Hosted mode's per-field quotas, the export's limits and the watch's interval (S21-12)."""
+
+    def test_defaults(self) -> None:
+        s = Settings.from_env(BASE)
+        self.assertEqual(dict(s.quotas), QUOTA_DEFAULTS)
+        self.assertEqual((s.export_min_interval_s, s.export_max_mb, s.hosted_watch_s), (300, 512, 2.0))
+        self.assertTrue(all(v >= 1 for v in QUOTA_DEFAULTS.values()))
+
+    def test_overrides_and_off(self) -> None:
+        s = Settings.from_env({**BASE, "ATALAIA_QUOTA_GAMES": "50", "ATALAIA_QUOTA_ACCOUNTS": " off ",
+                               "ATALAIA_EXPORT_MIN_INTERVAL_S": "0", "ATALAIA_EXPORT_MAX_MB": "64",
+                               "ATALAIA_HOSTED_WATCH_S": "0.5"})
+        self.assertEqual((s.quotas["games"], s.quotas["accounts"], s.quotas["streams"]),
+                         (50, 0, QUOTA_DEFAULTS["streams"]))
+        self.assertEqual((s.export_min_interval_s, s.export_max_mb, s.hosted_watch_s), (0, 64, 0.5))
+
+    def test_wrong_values_are_errors(self) -> None:
+        for env in ({"ATALAIA_QUOTA_GAMES": "0"}, {"ATALAIA_QUOTA_GAMES": "-1"}, {"ATALAIA_QUOTA_GAMES": "many"},
+                    {"ATALAIA_QUOTA_STREAMS": "1.5"}, {"ATALAIA_EXPORT_MAX_MB": "0"},
+                    {"ATALAIA_EXPORT_MIN_INTERVAL_S": "86401"}, {"ATALAIA_HOSTED_WATCH_S": "0"},
+                    {"ATALAIA_HOSTED_WATCH_S": "61"}):
+            with self.subTest(env=env), self.assertRaisesRegex(ConfigError, "ATALAIA_"):
+                Settings.from_env({**BASE, **env})
+
+    def test_unknown_quota_name_is_refused(self) -> None:
+        with self.assertRaisesRegex(ConfigError, "unknown quota"):
+            Settings(database_url=URL, secret_key=KEY, quotas={"gams": 3})
+        s = Settings(database_url=URL, secret_key=KEY, quotas={"games": 3})  # the rest keep their defaults
+        self.assertEqual((s.quotas["games"], s.quotas["accounts"]), (3, QUOTA_DEFAULTS["accounts"]))
 
 
 class RedactTests(unittest.TestCase):

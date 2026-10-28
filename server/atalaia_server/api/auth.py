@@ -37,7 +37,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import passwords, personal_data, tenancy, totp
+from .. import passwords, personal_data, quotas, tenancy, totp
 from ..audit import record, request_ip
 from ..auth import Principal, current_principal, load_roles
 from ..db import get_session
@@ -240,6 +240,7 @@ async def register(body: RegisterIn, request: Request, db: AsyncSession = Depend
     problem = passwords.policy_problem(body.password, username)
     if problem:
         raise HTTPException(400, problem)
+    await quotas.check(db, "accounts", None)  # hosted mode: the field's account quota (409 quota_exceeded)
     limits = request.app.state.limits
     wait = limits.register.retry_after(_ip_key(request))
     if wait:

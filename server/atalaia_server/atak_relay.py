@@ -317,6 +317,18 @@ class AtakRelay:
             self._close(client)
         return len(gone)
 
+    def tenants(self) -> set[str]:
+        """The schemas (hosted mode) that have a connection open."""
+        return {c.tenant for c in self.clients if c.tenant is not None}
+
+    def drop_tenant(self, schema: str, keep_field: Optional[uuid.UUID] = None) -> int:
+        """A deleted or suspended field: its connections close now (those of ``keep_field`` stay); a new one is
+        refused anyway (``_authorise`` reads the registry). Returns how many connections closed."""
+        gone = [c for c in self.clients if c.tenant == schema and c.field_id != keep_field]
+        for client in gone:
+            self._close(client)
+        return len(gone)
+
     def _close(self, client: Client) -> None:
         if client.closed:
             return

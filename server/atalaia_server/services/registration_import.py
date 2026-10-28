@@ -28,6 +28,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import import_format as fmt
+from .. import quotas
 from ..models import Field, FieldPlayerId, GameRegistration, RegistrationReplica, ScheduledGame
 from . import registration as reg_svc
 
@@ -85,6 +86,7 @@ async def run(db: AsyncSession, field: Field, game: ScheduledGame, parsed: fmt.P
     live = sum(1 for r in regs if r.status in reg_svc.ACTIVE)
     reps = await reg_svc.replicas_of(db, [r.id for r in by_ref.values()])
     seen_refs: set[str] = set()
+    free = await quotas.room(db, "registrations", field.id)  # hosted mode's quota; None: no limit
     results: list[dict[str, Any]] = []
     counts = {"created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "refused": 0}
 
@@ -112,6 +114,13 @@ async def run(db: AsyncSession, field: Field, game: ScheduledGame, parsed: fmt.P
                 counts["refused"] += 1
                 results.append(entry)
                 continue
+            if free is not None and free <= 0:
+                entry.update(result="refused", code=quotas.CODE)
+                counts["refused"] += 1
+                results.append(entry)
+                continue
+            if free is not None:
+                free -= 1
             if row.display_name in names:
                 entry["warnings"].append("same_name")  # perhaps registered on the site too
             live += 1

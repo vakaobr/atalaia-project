@@ -50,6 +50,20 @@
                             the port ATAK devices connect to, if the deployment publishes the relay on
                             another one (default: ATALAIA_ATAK_RELAY_PORT)
 
+    ATALAIA_QUOTA_<NAME>    hosted mode only: one field's limit on a resource (``QUOTA_DEFAULTS`` lists the names
+                            and defaults: ACCOUNTS, SCHEDULED_GAMES, REGISTRATIONS, GAMES,
+                            ATAK_CERTS, STREAMS), a whole number of 1 or more, or "off" for no limit; past it
+                            the API answers 409 ``quota_exceeded`` (atalaia_server/quotas.py)
+    ATALAIA_EXPORT_MIN_INTERVAL_S
+                            seconds between two data exports of the same field (default 300, 0-86400); a
+                            field's administrator may download the field's data
+                            (GET /api/v1/fields/{id}/export, atalaia_server/field_export.py)
+    ATALAIA_EXPORT_MAX_MB   the largest export the server builds, in MB (default 512, 1-10240); a bigger one is
+                            refused with 413 ``export_too_large`` (the operator's ``hosted export`` has no limit)
+    ATALAIA_HOSTED_WATCH_S  hosted mode only: how often (seconds, 0.1-60, default 2) the server looks at the
+                            registry and closes the open sockets of a field that was deleted or suspended
+                            (atalaia_server/tenant_watch.py)
+
 Plain Python with no third-party imports, so its tests also run in the
 atalaia-dev image (tools/check.sh). A setting that is present but wrong is
 an error at start-up, never silently replaced by its default.
@@ -80,6 +94,22 @@ DEFAULT_ATAK_PORT = 8089  # TAK's streaming CoT over TLS (FU5)
 ATAK_HOST = re.compile(r"(?=.{1,200}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 # A DNS name of two labels or more, lower case, no port: the hosted hub's domain (plan phase 21).
 HOSTED_DOMAIN = re.compile(r"(?=.{4,200}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?")
+
+
+# Hosted mode's per-field quotas (atalaia_server/quotas.py): name -> default limit. They sit far above what a
+# field's club needs and far below what one tenant could use to starve the others.
+QUOTA_DEFAULTS: dict[str, int] = {
+    "accounts": 5000,           # user accounts of the field
+    "scheduled_games": 5000,    # the field's schedule (any status)
+    "registrations": 50000,     # game registrations, imported ones too
+    "games": 20000,             # games synced from the field's controllers (the retention purge frees room)
+    "atak_certs": 200,          # live (not revoked, not expired) ATAK certificates
+    "streams": 8,               # open WebSocket streams of the field's controllers
+}
+MAX_QUOTA = 100_000_000
+DEFAULT_EXPORT_INTERVAL_S = 300
+DEFAULT_EXPORT_MAX_MB = 512
+DEFAULT_HOSTED_WATCH_S = 2.0
 
 
 class ConfigError(ValueError):
@@ -185,6 +215,18 @@ def _on_off(env: Mapping[str, str], name: str, default: bool = False) -> bool:
     raise ConfigError(f"{name} must be on or off, not {raw}")
 
 
+def _quotas(env: Mapping[str, str]) -> dict[str, int]:
+    """The per-field quotas: each default, or ATALAIA_QUOTA_<NAME> (a number of 1 or more, or "off" = 0)."""
+    out = dict(QUOTA_DEFAULTS)
+    for name in QUOTA_DEFAULTS:
+        var = f"ATALAIA_QUOTA_{name.upper()}"
+        if env.get(var, "").strip().lower() == "off":
+            out[name] = 0
+        else:
+            out[name] = int(_number(env, var, QUOTA_DEFAULTS[name], 1, MAX_QUOTA, int))
+    return out
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str = field(repr=False)
@@ -208,6 +250,10 @@ class Settings:
     atak_relay_port: int = DEFAULT_ATAK_PORT       # 0: any free port (the tests)
     atak_relay_host: Optional[str] = None
     atak_relay_public_port: Optional[int] = None
+    quotas: Mapping[str, int] = field(default_factory=lambda: dict(QUOTA_DEFAULTS))  # 0: no limit
+    export_min_interval_s: int = DEFAULT_EXPORT_INTERVAL_S
+    export_max_mb: int = DEFAULT_EXPORT_MAX_MB
+    hosted_watch_s: float = DEFAULT_HOSTED_WATCH_S
 
     def __post_init__(self) -> None:
         _check_url(self.database_url)
@@ -246,6 +292,19 @@ class Settings:
         if self.preview and self.hosted:
             raise ConfigError("ATALAIA_PREVIEW=on is for a single-field preview server, not a hosted hub")
         self._check_atak()
+        quotas = {**QUOTA_DEFAULTS, **dict(self.quotas)}
+        for name, value in quotas.items():
+            if name not in QUOTA_DEFAULTS:
+                raise ConfigError(f"unknown quota {name!r} (known: {', '.join(QUOTA_DEFAULTS)})")
+            if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= MAX_QUOTA:
+                raise ConfigError(f"ATALAIA_QUOTA_{name.upper()} must be a whole number of 1 or more, or off")
+        object.__setattr__(self, "quotas", quotas)
+        if not 0 <= self.export_min_interval_s <= 86400:
+            raise ConfigError("ATALAIA_EXPORT_MIN_INTERVAL_S must be between 0 and 86400")
+        if not 1 <= self.export_max_mb <= 10240:
+            raise ConfigError("ATALAIA_EXPORT_MAX_MB must be between 1 and 10240")
+        if not 0.1 <= self.hosted_watch_s <= 60:
+            raise ConfigError("ATALAIA_HOSTED_WATCH_S must be between 0.1 and 60")
 
     def _check_atak(self) -> None:
         if not 0 <= self.atak_relay_port <= 65535:
@@ -287,7 +346,9 @@ class Settings:
                 f"hosted_domain={self.hosted_domain!r}, atak_relay={self.atak_relay!r}, preview={self.preview!r}, "
                 f"lang_from_browser={self.lang_from_browser!r}, default_lang={self.default_lang!r}, "
                 f"atak_relay_port={self.atak_relay_port}, atak_relay_host={self.atak_relay_host!r}, "
-                f"atak_relay_public_port={self.atak_relay_public_port!r})")
+                f"atak_relay_public_port={self.atak_relay_public_port!r}, quotas={dict(self.quotas)!r}, "
+                f"export_min_interval_s={self.export_min_interval_s}, export_max_mb={self.export_max_mb}, "
+                f"hosted_watch_s={self.hosted_watch_s})")
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
@@ -319,4 +380,9 @@ class Settings:
             atak_relay_host=env.get("ATALAIA_ATAK_RELAY_HOST", "").strip() or None,
             atak_relay_public_port=(int(_number(env, "ATALAIA_ATAK_RELAY_PUBLIC_PORT", 0, 1, 65535, int))
                                     if env.get("ATALAIA_ATAK_RELAY_PUBLIC_PORT", "").strip() else None),
+            quotas=_quotas(env),
+            export_min_interval_s=int(_number(env, "ATALAIA_EXPORT_MIN_INTERVAL_S", DEFAULT_EXPORT_INTERVAL_S,
+                                              0, 86400, int)),
+            export_max_mb=int(_number(env, "ATALAIA_EXPORT_MAX_MB", DEFAULT_EXPORT_MAX_MB, 1, 10240, int)),
+            hosted_watch_s=float(_number(env, "ATALAIA_HOSTED_WATCH_S", DEFAULT_HOSTED_WATCH_S, 0.1, 60.0, float)),
         )

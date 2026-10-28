@@ -68,6 +68,9 @@ services:
       ATALAIA_LOG_LEVEL: "${ATALAIA_LOG_LEVEL:-info}"
       ATALAIA_PURGE_HOUR: "${ATALAIA_PURGE_HOUR:-}"
       ATALAIA_PRIVACY_NOTICE_VERSION: "${ATALAIA_PRIVACY_NOTICE_VERSION:-}"
+      # The field's data export for its administrator (S21-12): empty means the server's defaults.
+      ATALAIA_EXPORT_MIN_INTERVAL_S: "${ATALAIA_EXPORT_MIN_INTERVAL_S:-}"
+      ATALAIA_EXPORT_MAX_MB: "${ATALAIA_EXPORT_MAX_MB:-}"
       # The remote ATAK relay (FU5): off unless ATALAIA_ATAK_RELAY=on; devices connect to
       # ATALAIA_ATAK_RELAY_HOST (default: ATALAIA_PUBLIC_URL's host) on ATALAIA_ATAK_PORT.
       ATALAIA_ATAK_RELAY: "${ATALAIA_ATAK_RELAY:-off}"

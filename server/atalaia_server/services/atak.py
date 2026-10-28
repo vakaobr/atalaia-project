@@ -31,7 +31,7 @@ from cryptography import x509
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import atak_pki
+from .. import atak_pki, quotas
 from ..atak_models import AtakCa, AtakCert
 from ..models import ROLE_BY_ID, Field, User, UserFieldRole
 
@@ -174,6 +174,7 @@ async def issue(db: AsyncSession, box: atak_pki.CaBox, field: Field, *, device_n
             raise AtakProblem(409, "positions_not_allowed")
     elif holder is not None or positions:
         raise AtakProblem(400, "invalid_request")  # the operator's certificates: no holder, no positions
+    await quotas.check(db, "atak_certs", field.id)  # hosted mode's quota of live certificates
     rotated: list[uuid.UUID] = []
     ca_row, ca_cert, ca_key, made = await ensure_ca(db, box, field, rotated=rotated)
     issued = await asyncio.to_thread(atak_pki.issue_client, ca_cert, ca_key, name, days)

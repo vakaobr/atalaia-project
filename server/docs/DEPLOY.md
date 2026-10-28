@@ -101,7 +101,9 @@ paste it into a chat.
 | `ATALAIA_OWNER_DB_PASSWORD`, `ATALAIA_APP_DB_PASSWORD` | random, with `--hosted` only | The passwords of the hub's owner role and of the server's role |
 
 The server's other settings (`ATALAIA_PURGE_HOUR`,
-`ATALAIA_PRIVACY_NOTICE_VERSION`) can be added to `.env` too; the list is in
+`ATALAIA_PRIVACY_NOTICE_VERSION`, `ATALAIA_EXPORT_MIN_INTERVAL_S`, `ATALAIA_EXPORT_MAX_MB` and, for a hub,
+the per-field limits `ATALAIA_QUOTA_ACCOUNTS`, `_SCHEDULED_GAMES`, `_REGISTRATIONS`, `_GAMES`, `_ATAK_CERTS`,
+`_STREAMS` and `ATALAIA_HOSTED_WATCH_S`) can be added to `.env` too; the list, with the defaults, is in
 [server/README.md](../README.md). After a change: `docker compose up -d`
 (from `server/`). Not for a real deployment: `ATALAIA_TEST_ADAPTER`.
 Optional, for the ports: `ATALAIA_BIND` (`0.0.0.0`), `ATALAIA_HTTP_PORT`
@@ -445,6 +447,7 @@ under the DPA):
   encrypted. On the field's own server, at the same release,
   with an empty migrated database: `python -m atalaia_server import-field
   campo-tejo.zip`; everyone logs in and enrols TOTP again.
+- **A field's own export, without the operator.** The field's administrator can download the field's own data from `GET /api/v1/fields/<field id>/export` (their TOTP session's bearer token; a ZIP of JSON Lines files, documented in its `README.txt` and `manifest.json`): everything except credentials, e-mail and IP addresses. It is audit-logged in the field, limited to one every 5 minutes (`ATALAIA_EXPORT_MIN_INTERVAL_S`) and 512 MB (`ATALAIA_EXPORT_MAX_MB`). It is not the data return the DPA asks for on the controller's instruction: that is `hosted export` above, which holds every credential hash. For a field too big for the limit, use `hosted export`.
 - `hosted suspend campo-tejo --reason "..."` and `hosted resume ...`: every
   request refused, data kept. A suspended field gets no **new** certificate;
   one it already has stays in Caddy's store until it expires.
@@ -453,6 +456,7 @@ under the DPA):
   keeps who, when, why and the row counts. The backups still hold the field
   until they expire (`ATALAIA_BACKUP_DAYS`, 30): say so when confirming the
   deletion in writing, as the DPA asks.
+  Controllers connected to the field are disconnected within `ATALAIA_HOSTED_WATCH_S` seconds (2 by default): the server closes their stream, and the remote GM's link and ATAK connections, as soon as it sees the field gone or suspended in the registry (close codes 4404 and 4403); they do not wait for their next message.
 - `hosted check`: reads what keeps the fields apart (every schema and table
   owned by the owner role, row-level security enabled and forced and exactly
   one policy, `atalaia_tenant`, on every table, the server role's exact

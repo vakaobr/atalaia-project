@@ -51,7 +51,7 @@ from atalaia_controller import sync_format
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, Response
 
-from .. import chrono_registry, remote_gm, sync, tenancy
+from .. import chrono_registry, quotas, remote_gm, sync, tenancy, tenant_watch
 from ..audit import record
 from ..auth import UNAUTHORISED, bearer
 from ..models import FieldApiKey
@@ -260,17 +260,45 @@ class _Session:
         self.caller = caller
         self.lock = asyncio.Lock()
         self.link: Optional[remote_gm.Link] = None
+        self.closed = asyncio.Event()  # set when the server closes the socket (a deleted or suspended field)
 
     async def send(self, msg: dict[str, Any]) -> None:
         async with self.lock:
             await self.ws.send_json(msg)
+
+    async def close(self, code: int) -> None:
+        """Closes the socket from outside its own handler (tenant_watch.py) and wakes the handler."""
+        self.closed.set()
+        try:
+            await self.ws.close(code=code)
+        except RuntimeError:  # already closed
+            pass
+
+
+async def _receive(session: _Session) -> Optional[str]:
+    """The next text message, or None when the server closed the socket meanwhile."""
+    if session.closed.is_set():
+        return None
+    receive = asyncio.ensure_future(session.ws.receive_text())
+    closed = asyncio.ensure_future(session.closed.wait())
+    try:
+        await asyncio.wait({receive, closed}, return_when=asyncio.FIRST_COMPLETED)
+        if receive.done():
+            return receive.result()
+        return None
+    finally:
+        for task in (receive, closed):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(receive, closed, return_exceptions=True)
 
 
 @router.websocket("/stream")
 async def stream(ws: WebSocket) -> None:
     """One socket per controller: ``{"type": kind, ...body}`` in, ``{"type": kind + ".ack", ...}`` out;
     the remote GM's ``hello``, ``live`` and ``command.result`` in (only ``hello`` is answered), its
-    ``command`` out."""
+    ``command`` out. Closed by the server with 4401 (no valid key), 4429 (the field's stream quota, hosted
+    mode) and, in hosted mode, 4404 or 4403 when the field is deleted or suspended while it is open."""
     scheme, _, value = ws.headers.get("authorization", "").partition(" ")
     key = value.strip() if scheme.lower() == "bearer" else None
     async with ws.app.state.sessionmaker() as db:
@@ -279,18 +307,29 @@ async def stream(ws: WebSocket) -> None:
     if caller is None:
         await ws.close(code=WS_UNAUTHORISED)
         return
-    await ws.accept()
+    watch: tenant_watch.TenantWatch = ws.app.state.tenant_watch
+    tenant = tenancy.current()
+    if tenant is not None and quotas.streams_full(watch.count(tenant.schema, caller.field_id)):
+        await ws.close(code=quotas.STREAM_CLOSE)
+        return
     session = _Session(ws, caller)
+    # Counted before the accept: no await between the quota's check and the registration.
+    watched = watch.add(tenant, caller.field_id, session.close) if tenant is not None else None
     hub: remote_gm.RemoteHub = ws.app.state.remote_hub
     try:
+        await ws.accept()
         while True:
-            raw = await ws.receive_text()
+            raw = await _receive(session)
+            if raw is None:
+                return
             answer = await _message(ws, caller, raw, session)
             if answer is not None:
                 await session.send(answer)
     except WebSocketDisconnect:
         return
     finally:
+        if watched is not None:
+            watch.remove(watched)
         if session.link is not None:
             hub.detach(session.link)
 

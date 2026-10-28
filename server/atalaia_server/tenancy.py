@@ -57,6 +57,8 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.orm import Session, SessionTransaction
 
+from . import quotas
+
 # A tenant's slug is one DNS label (its host name is <slug>.<domain>) of at most 40 characters.
 TENANT_SLUG = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?")
 SCHEMA_NAME = re.compile(r"field_[a-z0-9_]{1,40}")
@@ -260,7 +262,7 @@ class TenantMiddleware:
         if tenant.status != "active":
             await _refuse(scope, receive, send, 403, "field_suspended")
             return
-        with use(tenant):
+        with use(tenant), quotas.use(state.settings.quotas):
             await self.app(scope, receive, send)
 
 

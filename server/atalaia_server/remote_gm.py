@@ -119,6 +119,18 @@ class RemoteHub:
         for link in [lk for lk in self._links.values() if lk.key_id == key_id and lk.tenant == tenant]:
             self.detach(link)
 
+    def tenants(self) -> set[str]:
+        """The schemas (hosted mode) that have a link open."""
+        return {lk.tenant for lk in self._links.values() if lk.tenant is not None}
+
+    def drop_tenant(self, schema: str, keep_field: Optional[uuid.UUID] = None) -> int:
+        """A deleted or suspended field: every link of that tenant goes (those of ``keep_field`` stay), and a
+        command waiting on one fails ``controller_offline``. Returns how many."""
+        gone = [lk for lk in self._links.values() if lk.tenant == schema and lk.field_id != keep_field]
+        for link in gone:
+            self.detach(link)
+        return len(gone)
+
     def links(self, field_id: uuid.UUID) -> list[Link]:
         tenant = tenancy.current_schema()
         return sorted((lk for (t, f, _), lk in self._links.items() if t == tenant and f == field_id),

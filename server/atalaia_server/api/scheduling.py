@@ -29,6 +29,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import quotas
 from ..audit import record
 from ..auth import Principal, current_principal, require_field_role
 from ..db import get_session
@@ -140,6 +141,7 @@ async def create_game(field_id: uuid.UUID, body: ScheduledGameIn, request: Reque
                       db: AsyncSession = Depends(get_session)) -> JSONResponse:
     require_field_role(principal, field_id, "admin", "gm")
     field = await _field(db, field_id)
+    await quotas.check(db, "scheduled_games", field_id)
     try:
         values = _values(body, set(ScheduledGameIn.model_fields))
         game = ScheduledGame(field_id=field_id, created_by=principal.user.id, status="draft", ical_sequence=0,

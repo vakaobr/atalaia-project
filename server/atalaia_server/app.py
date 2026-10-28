@@ -14,8 +14,9 @@ The app's own state: ``keys`` (derived from ATALAIA_SECRET_KEY), ``seed_box``
 (TOTP seeds), ``limits`` (rate limits and lockouts), ``used_totp_steps``
 (spent TOTP login steps), ``remote_hub`` (the remote GM's controller links, plan phase 19), ``atak_relay`` (the
 remote ATAK relay's TLS listener with ATALAIA_ATAK_RELAY=on, else None; Phase 4 follow-up FU5),
-``atak_box`` (seals the fields' ATAK CA keys), ``purge_task`` (the daily retention purge, unless
-ATALAIA_PURGE_HOUR is off) and ``clock`` (the time TOTP codes are checked at;
+``atak_box`` (seals the fields' ATAK CA keys), ``tenant_watch`` (hosted mode's open sockets, closed when
+their field is deleted or suspended), ``export_state`` (the field data export's one-at-a-time lock and cooldown),
+``purge_task`` (the daily retention purge, unless ATALAIA_PURGE_HOUR is off) and ``clock`` (the time TOTP codes are checked at;
 the tests move it). All of it is in memory, for the one worker process the
 image runs (ADR-P4-2).
 
@@ -41,8 +42,8 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from . import __version__, atak_pki, integrations, personal_data, tenancy
-from .api import (atak, auth, branding, chrono, clubs, devices, feedback, fields, firmware, games, health, history,
+from . import __version__, atak_pki, integrations, personal_data, quotas, tenancy, tenant_watch
+from .api import (atak, auth, branding, chrono, clubs, devices, export, feedback, fields, firmware, games, health, history,
                   integrations as integrations_api, me, registration_import, registrations, remote_gm, scenarios,
                   scheduling, sync)
 from .atak_relay import AtakRelay
@@ -88,9 +89,18 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             relay = AtakRelay(settings, app.state.sessionmaker, app.state.engine)
             await relay.start()
         app.state.atak_relay = relay
+        watcher = None
+        if settings.hosted:  # closes the sockets of a field that was deleted or suspended (S21-12)
+            watcher = asyncio.create_task(
+                app.state.tenant_watch.run(app.state.engine, settings.hosted_watch_s, app.state.remote_hub,
+                                           lambda: app.state.atak_relay), name="tenant-watch")
         try:
             yield
         finally:
+            if watcher is not None:
+                watcher.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await watcher
             if relay is not None:
                 await relay.stop()
                 app.state.atak_relay = None
@@ -112,9 +122,12 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.state.used_totp_steps = UsedTokens()
     app.state.clock = time.time
     app.state.remote_hub = RemoteHub()  # the remote GM's open controller links (plan phase 19)
+    app.state.tenant_watch = tenant_watch.TenantWatch()  # open sockets of hosted mode, closed when a field goes
+    app.state.export_state = {}  # per (tenant, field): an export running, when the last one ended
     app.state.atak_relay = None  # the remote ATAK relay, started with the app when ATALAIA_ATAK_RELAY=on (FU5)
     app.state.atak_box = atak_pki.CaBox(settings.secret_key)
     app.add_exception_handler(RequestValidationError, _invalid_request)
+    app.add_exception_handler(quotas.QuotaExceeded, _quota_exceeded)
     # The last one added runs first: security headers wrap everything, the 429s and the hosted mode's
     # refusals included; the tenant is chosen before anything else reads the database.
     app.add_middleware(RequestLimitMiddleware, get_limits=lambda: app.state.limits)
@@ -125,6 +138,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(fields.router)
+    app.include_router(export.router)  # a field's data export for its administrator (S21-12)
     app.include_router(me.router)
     app.include_router(games.router)
     app.include_router(chrono.router)
@@ -149,6 +163,12 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         app.include_router(feedback.router)  # the administrators' side of the feedback form (PV-8)
         app.include_router(preview.router)  # /, /feedback, /robots.txt, /staff/feedback
     return app
+
+
+async def _quota_exceeded(request: Request, exc: Exception) -> JSONResponse:
+    """409 ``quota_exceeded`` with the quota's name and limit (hosted mode's per-field quotas)."""
+    assert isinstance(exc, quotas.QuotaExceeded)
+    return JSONResponse(exc.body(), status_code=409, headers={"Cache-Control": "no-store"})
 
 
 async def _invalid_request(request: Request, exc: Exception) -> JSONResponse:

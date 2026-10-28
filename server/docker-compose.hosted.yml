@@ -44,6 +44,15 @@ services:
       ATALAIA_HOSTED_DOMAIN: "${ATALAIA_DOMAIN:?set ATALAIA_DOMAIN (server/setup.sh)}"
       # Each field's links are https://<slug>.ATALAIA_DOMAIN; the server refuses a public URL here.
       ATALAIA_PUBLIC_URL: ""
+      # Per-field quotas and the watch that closes a deleted or suspended field's sockets (S21-12): empty means
+      # the server's defaults (atalaia_server/config.py); a number, or "off" for a quota, changes one.
+      ATALAIA_QUOTA_ACCOUNTS: "${ATALAIA_QUOTA_ACCOUNTS:-}"
+      ATALAIA_QUOTA_SCHEDULED_GAMES: "${ATALAIA_QUOTA_SCHEDULED_GAMES:-}"
+      ATALAIA_QUOTA_REGISTRATIONS: "${ATALAIA_QUOTA_REGISTRATIONS:-}"
+      ATALAIA_QUOTA_GAMES: "${ATALAIA_QUOTA_GAMES:-}"
+      ATALAIA_QUOTA_ATAK_CERTS: "${ATALAIA_QUOTA_ATAK_CERTS:-}"
+      ATALAIA_QUOTA_STREAMS: "${ATALAIA_QUOTA_STREAMS:-}"
+      ATALAIA_HOSTED_WATCH_S: "${ATALAIA_HOSTED_WATCH_S:-}"
     # The image's command runs `alembic upgrade head`, which refuses hosted mode: hub migrates instead.
     command: ["uvicorn", "--factory", "atalaia_server.app:create_app", "--host", "0.0.0.0", "--port", "8000",
               "--workers", "1", "--proxy-headers", "--no-server-header"]

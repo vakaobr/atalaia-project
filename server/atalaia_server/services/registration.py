@@ -53,6 +53,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import quotas
 from ..models import (Field, FieldApiKey, FieldPlayerId, Game, GameRegistration, PlayerIdClaim,
                       RegistrationReplica, Replica, ScheduledGame, User)
 from . import scheduling
@@ -303,6 +304,8 @@ async def register(db: AsyncSession, field: Field, game: ScheduledGame, user_id:
         raise RegistrationError("already_registered", 409)
     if game.max_players is not None and (await counts(db, [game.id])).get(game.id, 0) >= game.max_players:
         raise RegistrationError("game_full", 409)
+    if existing is None:
+        await quotas.check(db, "registrations", field.id)
     name = clean_name(body.get("display_name"), "display_name", NAME_MAX) or username[:NAME_MAX]
     team = _team(game, body.get("team_preference"))
     federation = _federation(game, body.get("federation_number"))
