@@ -95,7 +95,27 @@ final class AppSettings {
   ThemeMode theme = ThemeMode.system;
 
   /// The field join key (64 hex digits), to check join payloads (protocol/join.md).
+  /// Kept only where it is still needed (decision APX-1): by a prop, to read
+  /// its join card, and by the phone controller, which is the field's key
+  /// holder. A marshal's phone and a player's need none (the controller signs
+  /// the tags, TW-1..TW-7), so a marshal's phone does not keep one.
   String? joinKeyHex;
+
+  /// Why [joinKeyHex] is kept: [joinKeyForController] (the phone controller
+  /// made or was given it) or [joinKeyForProp] (typed in for a prop); null
+  /// with no key.
+  String? joinKeyUse;
+  static const joinKeyForController = 'controller';
+  static const joinKeyForProp = 'prop';
+
+  /// The settings layout: 1 before the marshal join-key clean-up (APX-1), 2
+  /// after.
+  int settingsVersion = currentSettingsVersion;
+  static const currentSettingsVersion = 2;
+
+  /// Whether this phone has been confirmed as a marshal, or holds a marshal's
+  /// signing key.
+  bool get isMarshal => marshalSeedHex != null || marshalValidation != null;
 
   /// The admin PIN that guards a prop's pause, end and leave: a salted
   /// SHA-256 of it, never the PIN.
@@ -205,6 +225,8 @@ final class AppSettings {
     'language': language.code,
     'theme': theme.name,
     'join_key': joinKeyHex,
+    'join_key_use': joinKeyUse,
+    'settings_version': settingsVersion,
     'pin_hash': pinHash,
     'pin_salt': pinSalt,
     'kiosk': kiosk,
@@ -238,6 +260,10 @@ final class AppSettings {
       ..language = AppLanguage.fromCode(str('language'))
       ..theme = ThemeMode.values.asNameMap()[str('theme')] ?? ThemeMode.system
       ..joinKeyHex = str('join_key')
+      ..joinKeyUse = str('join_key_use')
+      ..settingsVersion = j['settings_version'] is int
+          ? j['settings_version']! as int
+          : 1
       ..pinHash = str('pin_hash')
       ..pinSalt = str('pin_salt')
       ..kiosk = j['kiosk'] == true
@@ -316,6 +342,7 @@ const _syncKeyName = 'sync_api_key';
 const _listSecrets = {
   'field_identities': ('field_id', 'secret'),
   'site_accounts': ('site', 'refresh'),
+  'scoreboard_links': ('ca', 'token'),
 };
 
 bool _sealedKey(String k) =>
@@ -459,7 +486,29 @@ class FileAppStore implements AppStore {
   }
 
   @override
-  Future<AppSettings> loadSettings() => _serial(() async {
+  Future<AppSettings> loadSettings() async {
+    final s = await _loadSettings();
+    if (s.settingsVersion >= AppSettings.currentSettingsVersion) return s;
+    // Version 1 -> 2 (APX-1): a marshal's phone no longer keeps the field join
+    // key. A phone that has run the phone controller keeps it (it is the
+    // field's key holder); one that is a marshal and has not, drops it.
+    final controller = Directory('$dir/controller').existsSync();
+    if (s.joinKeyHex != null) {
+      if (s.isMarshal && !controller) {
+        s.joinKeyHex = null;
+        s.joinKeyUse = null;
+      } else {
+        s.joinKeyUse = controller
+            ? AppSettings.joinKeyForController
+            : AppSettings.joinKeyForProp;
+      }
+    }
+    s.settingsVersion = AppSettings.currentSettingsVersion;
+    await saveSettings(s);
+    return s;
+  }
+
+  Future<AppSettings> _loadSettings() => _serial(() async {
     final j = await _read('settings');
     if (!await _vaultReady()) {
       return j is Map<String, Object?>

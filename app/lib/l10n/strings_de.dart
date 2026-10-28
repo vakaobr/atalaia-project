@@ -1513,4 +1513,9 @@ const Map<String, String> deStrings = {
       'kein external_ref: wird jedes Mal neu hinzugefügt',
   'ctl_import.codes.federation_number_dropped':
       'Nummer nicht gespeichert: dieses Feld verlangt keine',
+  'player.buzz_title': 'Atalaia: Spiel wird verfolgt',
+  'player.buzz_text':
+      'Vibriert bei Spielereignissen, auch wenn die App geschlossen ist',
+  'player.saved': 'Gemerkte Felder',
+  'player.saved_forget': 'Dieses Feld vergessen',
 };

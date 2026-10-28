@@ -120,7 +120,7 @@ O ícone da impressora na barra de título do registo, **Partilhar / imprimir to
 
 Alguns modos (Baixa Confirmada, Reentradas e Vidas, Registo de Presença, Ligaduras, Fábrica de Dinheiro) precisam de que cada pessoa leve uma etiqueta NFC. Gravas as etiquetas no teu telemóvel. Isto precisa de um telemóvel Android com NFC. Ainda não testado num campo.
 
-O **controlador do campo assina cada etiqueta** com a chave do jogo e o teu telemóvel grava o que recebe. O teu telemóvel nunca guarda a chave de entrada do campo nem a chave do jogo. O preço é que tens de estar no Wi-Fi do campo para cada etiqueta: não há maneira de gravar etiquetas sem o controlador.
+O **controlador do campo assina cada etiqueta** com a chave do jogo e o teu telemóvel grava o que recebe. O teu telemóvel nunca guarda a chave de entrada do campo nem a chave do jogo (uma atualização apaga a chave de entrada que uma versão antiga tenha guardado num telemóvel de marshal, a não ser que o telemóvel também seja o controlador do campo). O preço é que tens de estar no Wi-Fi do campo para cada etiqueta: não há maneira de gravar etiquetas sem o controlador.
 
 1. Liga-te ao Wi-Fi do campo e abre **Marshal**.
 2. Toca em **Etiquetas de quem joga**. O ecrã mostra **Jogo: ** e o nome do jogo em que fizeste o check-in.

@@ -1481,4 +1481,8 @@ const Map<String, String> ptStrings = {
       'sem external_ref: acrescenta-se de novo de cada vez',
   'ctl_import.codes.federation_number_dropped':
       'número não guardado: este campo não pede nenhum',
+  'player.buzz_title': 'Atalaia: a acompanhar o jogo',
+  'player.buzz_text': 'A vibrar nos eventos do jogo com a aplicação fechada',
+  'player.saved': 'Campos guardados',
+  'player.saved_forget': 'Esquecer este campo',
 };

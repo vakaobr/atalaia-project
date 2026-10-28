@@ -10,6 +10,7 @@
 // confirmed, offline past the day, removed from the list with readings not
 // yet sent, and put back.
 
+import 'package:atalaia_app/storage/app_store.dart';
 import 'package:atalaia_app/checkin/checkin_client.dart';
 import 'package:atalaia_app/checkin/my_replicas.dart';
 import 'package:atalaia_app/checkin/field_trust.dart';
@@ -140,6 +141,32 @@ void main() {
     expect(v.validUntilMs - v.validatedAtMs, 2 * 3600 * 1000);
     expect(await shoot(tester), isNull);
     expect(records.readings.single.marshalId, 'M-03');
+  });
+
+  testWidgets('confirmed as a marshal: no join key is kept (APX-1)', (
+    tester,
+  ) async {
+    await boot(tester);
+    h.settings
+      ..joinKeyHex = 'ab' * 32
+      ..joinKeyUse = AppSettings.joinKeyForProp;
+    field.listMarshal(_pid, id: 'M-03');
+    await open(tester);
+    expect(h.settings.marshalValidation, isNotNull);
+    expect(h.settings.joinKeyHex, isNull);
+    expect(h.settings.joinKeyUse, isNull);
+  });
+
+  testWidgets('a phone controller keeps its key as a marshal too', (
+    tester,
+  ) async {
+    await boot(tester);
+    h.settings
+      ..joinKeyHex = 'ab' * 32
+      ..joinKeyUse = AppSettings.joinKeyForController;
+    field.listMarshal(_pid, id: 'M-03');
+    await open(tester);
+    expect(h.settings.joinKeyHex, 'ab' * 32);
   });
 
   testWidgets('not on the list: refused, with the words, nothing recorded', (

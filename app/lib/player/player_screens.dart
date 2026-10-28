@@ -49,6 +49,8 @@ import '../l10n/strings.dart';
 import '../platform/location.dart';
 import '../platform/platform_check.dart';
 import '../position/beacon_scanner.dart';
+import '../protocol/checkin_poster.dart' show shortFingerprint;
+import '../security/bytes.dart';
 import '../position/field_bounds.dart';
 import '../position/position_reporter.dart';
 import '../prop/game_timer.dart';
@@ -60,6 +62,7 @@ import '../position/field_plan.dart';
 import 'field_buzz.dart';
 import 'field_feed.dart';
 import 'field_map.dart';
+import 'saved_links.dart';
 
 class PlayerStartScreen extends StatefulWidget {
   const PlayerStartScreen({super.key});
@@ -73,12 +76,23 @@ class _PlayerStartScreenState extends State<PlayerStartScreen> {
   late final TextEditingController _code;
   String? _error;
 
+  /// The CA-pinned scoreboard links used before (decision APX-2).
+  List<FieldLink> _saved = const [];
+  late final SavedLinks _links;
+
   @override
   void initState() {
     super.initState();
     final st = AppScope.read(context).settings;
     _address = TextEditingController(text: st.controllerUrl ?? '');
     _code = TextEditingController(text: st.readToken ?? '');
+    _links = SavedLinks(context.services.store);
+    unawaited(_loadSaved());
+  }
+
+  Future<void> _loadSaved() async {
+    final saved = await _links.load();
+    if (mounted) setState(() => _saved = saved);
   }
 
   @override
@@ -125,6 +139,11 @@ class _PlayerStartScreenState extends State<PlayerStartScreen> {
       try {
         link = await link.trusted(context.services.trust);
       } on TrustException catch (e) {
+        // The CA is no longer the one remembered for this field: forget it.
+        if (e.reason == TrustFailure.mismatch && link.caSha256 != null) {
+          await _links.forget(link.caSha256!);
+          await _loadSaved();
+        }
         if (mounted) {
           setState(
             () => _error = switch (e.reason) {
@@ -138,10 +157,15 @@ class _PlayerStartScreenState extends State<PlayerStartScreen> {
       }
     }
     await app.update((x) {
-      // An https address without its CA would not connect again.
+      // An https address without its CA would not connect again: that one is
+      // kept in the saved links, by its CA (APX-2), not here.
       x.controllerUrl = link.caSha256 == null ? link.base.toString() : null;
       x.readToken = link.token;
     });
+    if (link.caSha256 != null) {
+      await _links.remember(link);
+      await _loadSaved();
+    }
     if (!mounted) return;
     await Navigator.push(
       context,
@@ -201,6 +225,27 @@ class _PlayerStartScreenState extends State<PlayerStartScreen> {
             label: Text(s.t('player.scan')),
             onPressed: _scan,
           ),
+          if (_saved.isNotEmpty) ...[
+            SectionTitle(s.t('player.saved')),
+            for (final l in _saved)
+              ListTile(
+                key: Key(
+                  'player-saved-${hexEncode(l.caSha256!).substring(0, 8)}',
+                ),
+                leading: const Icon(Icons.lock_outline),
+                title: Text('${l.base.host}:${l.base.port}'),
+                subtitle: Text(shortFingerprint(l.caSha256!)),
+                onTap: () => _go(l),
+                trailing: IconButton(
+                  tooltip: s.t('player.saved_forget'),
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () async {
+                    await _links.forget(l.caSha256!);
+                    await _loadSaved();
+                  },
+                ),
+              ),
+          ],
           SectionTitle(s.t('player.by_hand')),
           AddressField(
             fieldKey: const Key('player-address'),
@@ -336,6 +381,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// when the game's teams change, and the field's branding when the
   /// stream says it changed.
   void _onFeed() {
+    _syncBuzzService();
     // New orders (an objective revealed to this player, or their squad
     // leader's): two short pulses, no sound, as for the field's boundary
     // (SQ-5, MF-33): a tone could give a player's place away.
@@ -640,6 +686,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _beaconNote = null;
       _watch.reset();
       await services.foreground.stop();
+      // The buzz service goes on for the live game (it had been the same
+      // service; a stopped sharing drops its location type).
+      if (_buzzService && mounted) await _startBuzzService();
       await app.update((x) => x.sharePosition = false);
       if (mounted) setState(() {});
       return;
@@ -690,12 +739,55 @@ class _PlayerScreenState extends State<PlayerScreen> {
   late final FieldBuzzer _buzzer;
   StreamSubscription<FeedEvent>? _liveBuzz;
 
+  /// Whether the Android foreground service is up for the buzzes (decision
+  /// APX-3, amending VB-9): while this view is open on a live game, with the
+  /// buzzes on, the service keeps the app's process (and this feed and its
+  /// buzzes) running with the app closed or the screen off, behind an
+  /// ongoing notification. It stops when the game ends, the buzzes go off or
+  /// the player leaves. Position sharing uses the same service (its own
+  /// notification and location type); neither stops the other's. iOS has no
+  /// such service (ForegroundService is a no-op there).
+  bool _buzzService = false;
+  Future<void> _serviceTurn = Future.value();
+
+  bool get _wantBuzzService {
+    if (!AppScope.read(context).settings.vibrateOnEvents) return false;
+    if (feed.me?['role'] == 'spectator' || feed.state == FeedState.denied) {
+      return false;
+    }
+    return const ['ready', 'running', 'paused'].contains(feed.gameState);
+  }
+
+  void _syncBuzzService() {
+    final want = _wantBuzzService;
+    if (want == _buzzService) return;
+    _buzzService = want;
+    _serviceTurn = _serviceTurn.then(
+      (_) => want ? _startBuzzService() : _stopBuzzService(),
+    );
+  }
+
+  Future<void> _startBuzzService() async {
+    if (!mounted || (_reporter?.running ?? false)) return;
+    final s = context.s;
+    await _services.foreground.start(
+      title: s.t('player.buzz_title'),
+      text: s.t('player.buzz_text'),
+    );
+  }
+
+  Future<void> _stopBuzzService() async {
+    if (_reporter?.running ?? false) return; // the sharing needs it
+    await _services.foreground.stop();
+  }
+
   @override
   void dispose() {
     _clock?.cancel();
     unawaited(_liveBuzz?.cancel());
     feed.removeListener(_onFeed);
-    if (_reporter?.running ?? false) {
+    if (_buzzService || (_reporter?.running ?? false)) {
+      _buzzService = false;
       unawaited(_services.foreground.stop());
     }
     _reporter?.dispose();

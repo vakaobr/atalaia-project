@@ -20,6 +20,7 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../app.dart';
+import '../storage/app_store.dart';
 import '../l10n/strings.dart';
 import '../platform/services.dart';
 import '../pod/pod_client.dart';
@@ -80,10 +81,18 @@ class _ControllerScreenState extends State<ControllerScreen> {
   Future<Uint8List> _joinKey() async {
     final app = AppScope.read(context);
     final have = app.settings.joinKey;
-    if (have != null) return Uint8List.fromList(have);
+    if (have != null) {
+      // The controller is what keeps it here from now on (APX-1).
+      await app.update((s) => s.joinKeyUse = AppSettings.joinKeyForController);
+      return Uint8List.fromList(have);
+    }
     final r = Random.secure();
     final key = Uint8List.fromList(List.generate(32, (_) => r.nextInt(256)));
-    await app.update((s) => s.joinKeyHex = hexEncode(key));
+    await app.update(
+      (s) => s
+        ..joinKeyHex = hexEncode(key)
+        ..joinKeyUse = AppSettings.joinKeyForController,
+    );
     return key;
   }
 

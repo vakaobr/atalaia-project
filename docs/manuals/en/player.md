@@ -130,7 +130,7 @@ The class limits in the app come from the project's research. They are **not ver
 
 The app **follows** the game. You capture boxes **at the box**, not on the phone.
 
-1. On **My check-in**, tap **Follow the game**. (Without a check-in: **Player**, then **Scan the scoreboard's QR code**, or type the controller's **Address** and **Access code** under **Or type them**, then tap **Connect**. The organisers give you a read-only code.)
+1. On **My check-in**, tap **Follow the game**. (Without a check-in: **Player**, then **Scan the scoreboard's QR code**, or type the controller's **Address** and **Access code** under **Or type them**, then tap **Connect**. The organisers give you a read-only code. A scoreboard code that names the field's certificate (a phone-controller field) is remembered: next time it is under **Fields remembered**, one tap connects. **Forget this field** removes it, and it goes by itself if the field's certificate changes.)
 2. You see:
    - the game's name, its state (**ready**, **running**, **paused**, **ended**) and the time. With a time limit it shows the time **to go**;
    - **You:** your role and team, for example *Player, blue › squad 2*;
@@ -250,6 +250,8 @@ Not yet tested on a field. GPS can be weak under trees or inside buildings.
 
 In **Settings**, **Vibrate on game events** is on by default. The phone buzzes with a pattern, and never with a sound. Your phone's silent settings apply.
 
+On **Android** the buzzes also come **with the app closed or the screen off**, while you have the game open and it is not ended: the app keeps a quiet ongoing notification (**Atalaia: following the game**) so Android lets it run. It goes away when the game ends, when you leave the game page or when you switch **Vibrate on game events** off. It needs no Google services. A spectator has no buzzes, so no notification. On an **iPhone** there is no such notification: the buzzes only play while the game page is open.
+
 | Event | The buzz |
 | --- | --- |
 | A message from the organisers | One long buzz |
@@ -296,7 +298,7 @@ The app can log you in to an account that already exists, or make one with Googl
 | The app says "This is a field's check-in poster. Use it under Player > Check in at the field." | You scanned the poster in the wrong place. Go back and use **Check in at the field**. |
 | The game page says **No game is running yet.** | The organisers have not started a game. Wait, or ask. |
 | **Offline. Reconnecting…** for a long time | Go back into Wi-Fi range. Keep the field's Wi-Fi on even when it says "no internet". |
-| No buzzes | **Settings** › **Vibrate on game events** must be on. Keep the app open on the game page. Check the phone is not on silent. |
+| No buzzes | **Settings** › **Vibrate on game events** must be on. On an iPhone keep the app open on the game page; on Android do not leave the game page (the notification says the app is following the game). Check the phone is not on silent. |
 | **Share my position** says "No permission for the location." | Allow the location for Atalaia in the phone's settings. |
 | **Your position: …** never shows indoors | The field may have no beacons, or you chose **Not now**. Check Bluetooth is on and Atalaia may use it (nearby devices and location), then switch **Share my position** off and on. Walk closer to a beacon. |
 | My team is not highlighted | You have no team yet, or you are following without a check-in. Tap your team's card. |

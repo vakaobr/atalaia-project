@@ -26,10 +26,18 @@ import android.os.PowerManager
  * running with the screen off, and a Wi-Fi lock so the link to the field
  * controller stays up. The game loop itself is the Dart isolate of the
  * app's Flutter engine, in the same process (decision PD7).
+ *
+ * It is also what a player's phone runs while the player view is open on a
+ * live game (decision APX-3, amending VB-9): the process and the Flutter
+ * engine (MainActivity keeps it) stay up with the app closed, so the live
+ * feed goes on and the phone still vibrates on the same events as in the
+ * app. No Google Play services: plain Android foreground service. The
+ * notification's texts come from the app, in its language.
  */
 class AtalaiaForegroundService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
+    private var hasLocation = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -37,22 +45,25 @@ class AtalaiaForegroundService : Service() {
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Atalaia"
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: ""
         val notification = notification(title, text)
-        if (!running) {
+        // A player sharing their position also keeps location running with the
+        // screen off (ADR-P3-6); only with the permission granted, or Android 14 refuses.
+        val wantsLocation = intent?.getBooleanExtra(EXTRA_LOCATION, false) == true &&
+            checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!running || (wantsLocation && !hasLocation)) {
+            // Also when the service is already up for a player's buzzes (APX-3)
+            // and the player then shares their position: the type is widened.
             if (Build.VERSION.SDK_INT >= 29) {
-                // A player sharing their position also keeps location running with the
-                // screen off (ADR-P3-6); only with the permission granted, or Android 14 refuses.
                 var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-                if (intent?.getBooleanExtra(EXTRA_LOCATION, false) == true &&
-                    checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ==
-                    android.content.pm.PackageManager.PERMISSION_GRANTED
-                ) {
+                if (wantsLocation) {
                     types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
                 }
                 startForeground(NOTIFICATION_ID, notification, types)
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
-            acquireLocks()
+            hasLocation = wantsLocation
+            if (!running) acquireLocks()
             running = true
         } else {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -108,6 +119,7 @@ class AtalaiaForegroundService : Service() {
         wakeLock?.let { if (it.isHeld) it.release() }
         wifiLock?.let { if (it.isHeld) it.release() }
         running = false
+        hasLocation = false
         super.onDestroy()
     }
 

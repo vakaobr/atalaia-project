@@ -1208,4 +1208,8 @@ const Map<String, String> zhTwStrings = {
   'ctl_import.codes.removed': '已移除：不更動',
   'ctl_import.codes.no_external_ref': '沒有 external_ref：每次都會重新新增',
   'ctl_import.codes.federation_number_dropped': '號碼不保留：本場地不要求號碼',
+  'player.buzz_title': 'Atalaia：正在追蹤遊戲',
+  'player.buzz_text': 'App 關閉時仍會在遊戲事件時震動',
+  'player.saved': '已記住的場地',
+  'player.saved_forget': '忘記此場地',
 };

@@ -10,6 +10,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+- **The app: a marshal's phone no longer keeps the field join key, CA-pinned scoreboard links are remembered, and buzzes reach a closed app on Android** (decisions APX-1 to APX-3; `app/`). (1) The join key stays only where it is used, by a prop (its join card) and by the phone controller; `AppSettings.joinKeyUse` records which, a settings migration (version 2) clears it on an upgrade for a phone that is a marshal and never ran the controller, and confirming a marshal clears it unless the controller's. (2) A scoreboard link with `&ca=` is kept per field by the CA's fingerprint (`scoreboard_links`, read code sealed) and offered under *Campos guardados*; it is forgotten when the CA changes. (3) While the player view is open on a live game, an Android foreground service with an ongoing notification (four languages) keeps the app's engine running, so the same event buzzes play with the app closed or the screen off; it stops when the game ends or the player leaves; no Play services; iOS is not covered. Manuals (player, marshal, en and pt) and `app/README.md` updated.
+
 ### Fixed
 - **The controller's default check-in notice told players their data does not go to the internet** (`controller/templates/checkin-notice-{en,pt}.md`). With a site server, the controller sends the player's pseudonymous id, the game's events and chronograph readings there (never the name or membership number). The notice now says so, says chronograph readings are kept 365 days (not "the field's retention rules"), mentions membership numbers, shared positions and the remote game master, and points to the CNPD. Found by the privacy-notice draft; its pt-PT text was also corrected (marcador, número de filiação, organização, gender-neutral wording).
 

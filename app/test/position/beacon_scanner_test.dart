@@ -595,7 +595,11 @@ void main() {
       await pumpAfter(tester);
       expect(find.byKey(const Key('player-beacons-note')), findsNothing);
       expect(scan.out.hasListener, isFalse);
-      expect(h.foreground.calls.last, startsWith('stop'));
+      // The sharing's service is stopped; the live game's buzz service (APX-3)
+      // is started in its place.
+      final calls = h.foreground.calls;
+      expect(calls[calls.length - 2], startsWith('stop'));
+      expect(calls.last, startsWith('start Atalaia: following the game'));
     });
 
     testWidgets('a room beacon gives the floor: the picker gives way to it', (

@@ -1442,4 +1442,8 @@ const Map<String, String> enStrings = {
   'ctl_import.codes.no_external_ref': 'no external_ref: added again each time',
   'ctl_import.codes.federation_number_dropped':
       'number not kept: this field asks for none',
+  'player.buzz_title': 'Atalaia: following the game',
+  'player.buzz_text': 'Vibrating on game events while the app is closed',
+  'player.saved': 'Fields remembered',
+  'player.saved_forget': 'Forget this field',
 };

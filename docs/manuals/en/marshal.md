@@ -120,7 +120,7 @@ The printer icon in the registry's title bar, **Share / print all labels**, make
 
 Some modes (Kill Confirmed, Respawn and Lives, Player Check-in, Medic Kit, Money Factory) need each player to carry an NFC tag. You write them on your phone. This needs an Android phone with NFC. Not yet tested on a field.
 
-The **field controller signs each tag** with the game's key and your phone writes what it gets. Your phone never holds the field join key or the game key. The price is that you must be on the field's Wi-Fi for every tag: there is no way to write tags without the controller.
+The **field controller signs each tag** with the game's key and your phone writes what it gets. Your phone never holds the field join key or the game key (an upgrade clears a join key an older version had kept on a marshal's phone, unless that phone also runs the field controller). The price is that you must be on the field's Wi-Fi for every tag: there is no way to write tags without the controller.
 
 1. Join the field's Wi-Fi and open **Marshal**.
 2. Tap **Players' tags**. The screen shows **Game: ** and the name of the game you checked in to.

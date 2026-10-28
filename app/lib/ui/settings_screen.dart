@@ -226,9 +226,17 @@ class SettingsScreen extends StatelessWidget {
     );
     if (result == null || !context.mounted) return;
     if (result.isEmpty) {
-      await app.update((x) => x.joinKeyHex = null);
+      await app.update(
+        (x) => x
+          ..joinKeyHex = null
+          ..joinKeyUse = null,
+      );
     } else if (isJoinKeyHex(result)) {
-      await app.update((x) => x.joinKeyHex = result.toLowerCase());
+      await app.update(
+        (x) => x
+          ..joinKeyHex = result.toLowerCase()
+          ..joinKeyUse ??= AppSettings.joinKeyForProp,
+      );
     } else if (context.mounted) {
       showMessage(context, s.t('settings.join_key_bad'));
     }

@@ -183,6 +183,13 @@ class MarshalAccess extends ChangeNotifier {
         validatedAtMs: now,
         validUntilMs: now + seconds * 1000,
       );
+    // A marshal needs no join key (the controller signs the tags, TW-1); one
+    // stays only for the phone controller (APX-1).
+    if (settings.joinKeyUse != AppSettings.joinKeyForController) {
+      settings
+        ..joinKeyHex = null
+        ..joinKeyUse = null;
+    }
     await persist();
     return _set(MarshalStatus.validated);
   }

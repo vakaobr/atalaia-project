@@ -130,7 +130,7 @@ Os limites por classe da app vêm da pesquisa do projeto. **Não estão verifica
 
 A app **acompanha** o jogo. Capturas as caixas **na caixa**, não no telemóvel.
 
-1. Em **O meu check-in**, toca em **Seguir o jogo**. (Sem check-in: **Participante** e depois **Ler o código QR do marcador**, ou escreve o **Endereço do controlador** e o **Código de acesso** em **Ou escreve** e toca em **Ligar**. A organização dá-te um código só de leitura.)
+1. Em **O meu check-in**, toca em **Seguir o jogo**. (Sem check-in: **Participante** e depois **Ler o código QR do marcador**, ou escreve o **Endereço do controlador** e o **Código de acesso** em **Ou escreve** e toca em **Ligar**. A organização dá-te um código só de leitura. Um código do marcador que indica o certificado do campo (campo com telemóvel como controlador) fica guardado: da próxima vez aparece em **Campos guardados** e um toque liga. **Esquecer este campo** retira-o, e sai sozinho se o certificado do campo mudar.)
 2. Vês:
    - o nome do jogo, o estado (**pronto**, **a decorrer**, **em pausa**, **terminado**) e o tempo. Com limite de tempo mostra o que falta, **para o fim**;
    - **Tu:** a tua função e equipa, por exemplo *Jogador/a, azul › squad 2*;
@@ -250,6 +250,8 @@ Ainda não testado num campo. O GPS pode ser fraco debaixo de árvores ou dentro
 
 Nas **Definições**, **Vibrar nos eventos do jogo** vem ligado. O telemóvel vibra com um padrão, e nunca com som. Valem as definições de silêncio do telemóvel.
 
+No **Android** a vibração também chega **com a app fechada ou o ecrã desligado**, enquanto tens o jogo aberto e ele não terminou: a app mantém uma notificação discreta e permanente (**Atalaia: a acompanhar o jogo**) para o Android a deixar correr. Desaparece quando o jogo termina, quando sais da página do jogo ou quando desligas **Vibrar nos eventos do jogo**. Não precisa de serviços Google. Quem assiste não vibra, por isso não tem notificação. No **iPhone** não há esta notificação: a vibração só toca com a página do jogo aberta.
+
 | Acontecimento | A vibração |
 | --- | --- |
 | Uma mensagem da organização | Uma vibração longa |
@@ -296,7 +298,7 @@ A app entra numa conta que já existe, ou cria uma com Google, Microsoft ou Appl
 | A app diz «Isto é o cartaz de check-in de um campo. Usa-o em Participante > Check-in no campo.» | Leste o cartaz no sítio errado. Volta atrás e usa **Check-in no campo**. |
 | A página do jogo diz **Ainda não há jogo a decorrer.** | A organização ainda não começou um jogo. Espera, ou pergunta. |
 | **Sem ligação. A voltar a ligar…** durante muito tempo | Volta para o alcance do Wi-Fi. Mantém o Wi-Fi do campo ligado mesmo que diga «sem internet». |
-| Não vibra | **Definições** › **Vibrar nos eventos do jogo** tem de estar ligado. Mantém a app aberta na página do jogo. Confirma que o telemóvel não está em silêncio. |
+| Não vibra | **Definições** › **Vibrar nos eventos do jogo** tem de estar ligado. No iPhone mantém a app aberta na página do jogo; no Android não saias da página do jogo (a notificação diz que a app está a acompanhar o jogo). Confirma que o telemóvel não está em silêncio. |
 | **Partilhar a minha posição** diz «Sem autorização para a localização.» | Permite a localização à Atalaia nas definições do telemóvel. |
 | **A tua posição: …** nunca aparece no interior | O campo pode não ter balizas, ou escolheste **Agora não**. Confirma que o Bluetooth está ligado e que a Atalaia o pode usar (dispositivos próximos e localização), e desliga e volta a ligar **Partilhar a minha posição**. Chega-te mais perto de uma baliza. |
 | A minha equipa não está destacada | Ainda não tens equipa, ou estás a seguir sem check-in. Toca no cartão da tua equipa. |
