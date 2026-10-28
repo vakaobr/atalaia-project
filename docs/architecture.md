@@ -5,6 +5,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # How the parts of Atalaia talk to each other
 
+Em português: [Como as partes do Atalaia falam entre si](architecture.pt.md).
+
 This page shows, with diagrams, which part of Atalaia talks to which, over what
 link, and what travels on it. It is for club members, makers and new
 contributors. The [design specification](design-spec.md) explains why the

@@ -28,7 +28,7 @@ security, roadmap and decision log.
 
 ## Architecture diagrams
 
-[`architecture.md`](architecture.md) shows, with Mermaid diagrams, how the parts
+[`architecture.md`](architecture.md) (em português: [`architecture.pt.md`](architecture.pt.md)) shows, with Mermaid diagrams, how the parts
 talk to each other: the radio links, the app, the field controller, the site
 server, a game from the invite to the end, players on game day, the sync, getting
 files onto a box and the site server's login. It marks what works with no
