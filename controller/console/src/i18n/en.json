@@ -229,6 +229,7 @@
       "node_online": "A box came online",
       "node_offline": "A box went offline",
       "node_rebooted": "A box restarted ({reason})",
+      "node_setup_applied": "{zone} confirmed its scenario setup",
       "battery_low": "A box's battery is low",
       "nobody": "Nobody known"
     },

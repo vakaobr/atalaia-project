@@ -229,6 +229,7 @@
       "node_online": "Uma caixa ligou-se",
       "node_offline": "Uma caixa deixou de dar notícias",
       "node_rebooted": "Uma caixa reiniciou ({reason})",
+      "node_setup_applied": "{zone} confirmou a configuração do cenário",
       "battery_low": "Uma caixa tem a bateria fraca",
       "nobody": "Alguém por identificar"
     },

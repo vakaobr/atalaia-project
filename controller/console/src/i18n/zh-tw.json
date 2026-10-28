@@ -229,6 +229,7 @@
       "node_online": "一個盒子已上線",
       "node_offline": "一個盒子已離線",
       "node_rebooted": "一個盒子重新啟動（{reason}）",
+      "node_setup_applied": "{zone}已確認情境設定",
       "battery_low": "一個盒子電量偏低",
       "nobody": "不明"
     },

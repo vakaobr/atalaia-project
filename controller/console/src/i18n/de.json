@@ -229,6 +229,7 @@
       "node_online": "Eine Box ist online",
       "node_offline": "Eine Box ist offline",
       "node_rebooted": "Eine Box wurde neu gestartet ({reason})",
+      "node_setup_applied": "{zone} hat die Szenario-Einstellung bestätigt",
       "battery_low": "Der Akku einer Box ist schwach",
       "nobody": "Unbekannt"
     },
