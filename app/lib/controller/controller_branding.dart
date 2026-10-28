@@ -37,6 +37,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
+import 'controller_box_logo.dart';
 import 'controller_checkin.dart';
 import 'controller_engine.dart';
 import 'controller_images.dart';
@@ -364,6 +365,26 @@ class ControllerBranding {
     final id = _saved()[slot];
     return id is String ? image(id) : null;
   }
+
+  /// The field's logo as a Field Box draws it (controller_box_logo.dart,
+  /// decision PKG-1): the source image's id and the box-ready bytes, or null
+  /// when there is no logo or it is not a PNG the controller can convert.
+  /// Kept by the image's id, so each logo is converted once.
+  (String, Uint8List)? boxLogo() {
+    final img = slotImage('logo');
+    if (img == null || img['content_type'] != 'image/png') return null;
+    final id = img['id']! as String;
+    if (_boxLogo == null || _boxLogo!.$1 != id) {
+      try {
+        _boxLogo = (id, convertBoxLogo(img['data']! as Uint8List));
+      } on BoxLogoError {
+        _boxLogo = (id, Uint8List(0));
+      }
+    }
+    return _boxLogo!.$2.isEmpty ? null : _boxLogo;
+  }
+
+  (String, Uint8List)? _boxLogo;
 
   static CheckedImage _check(
     Uint8List data,

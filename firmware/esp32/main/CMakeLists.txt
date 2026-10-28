@@ -133,6 +133,8 @@ else()
         "mode_store.c"
         "mode_fetch.c"
         "mode_fetch_esp.c"
+        "box_logo.c"
+        "box_logo_esp.c"
         "admin_pin.c"
         "adoption.c"
         "cpace.c"

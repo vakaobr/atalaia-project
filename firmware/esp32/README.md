@@ -596,6 +596,30 @@ tests; not yet run on a real board.
 - **Console** (`ATALAIA_SERIAL_JOIN`): `@modes` lists the kept packages, `@forgetmodes`
   forgets them between games.
 
+## The field's logo on the big screen (decision PKG-1)
+
+Once for each joined game, while the box waits for the game to start, it asks its controller for the
+field's logo over the same Wi-Fi and HTTPS as a firmware update or a mode package (pinned to the join's
+field CA; never over LoRa; protocol/mode-packages.md, section 8). The controller prepares the picture
+(a PNG fitted into 96 x 96 pixels, RGB565, 18,440 bytes with an 8-byte header), so the firmware has no
+image decoder.
+
+- **Fetch** (`main/box_logo.c`, platform-free, run by `test/test_box_logo.c` with fakes;
+  `main/box_logo_esp.c` is the task, started from the game loop): `GET /api/v1/field/box-logo/release`,
+  then, only when the logo's SHA-256 in it is not the one kept, `GET /api/v1/field/box-logo`, streamed
+  into `logo.new`, hashed as it goes, checked (size, SHA-256, header) and renamed over `logo.bin`. A
+  failure of any kind keeps what the box had; a `404` (no logo, or a JPEG or WebP one the controller
+  cannot convert) removes it. A box adopted to another field forgets it.
+- **Storage**: `/littlefs/logo.bin` on the existing `storage` partition (the 64 hex digits of the key,
+  then the bytes). The partition table is unchanged.
+- **Screen** (`screen_renderer.c`): the 96 x 96 image is loaded from the file only while a screen that
+  draws it is built (`box_logo_load` / `box_logo_unload`, 18 KB), and drawn by LVGL as it is: the
+  **READY** screen (no game) and the *waiting* screen of a bomb that is not armed show it, with the
+  Atalaia towers of the OLED, scaled up and in the accent colour, when the box keeps no logo. The
+  OLED keeps the Atalaia tower.
+- **Image size**: the Field Box image is 1,949,264 bytes of its 2,097,152-byte OTA slot (92.95 %, 3,328
+  bytes more than before the logo).
+
 ## IDF Component Dependencies
 
 Listed in `main/idf_component.yml`:

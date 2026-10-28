@@ -34,6 +34,8 @@
 #include "button_tracker.h"
 #include "config_store.h"
 #include "fw_update_esp.h"
+#include "box_logo.h"
+#include "box_logo_esp.h"
 #include "mode_fetch_esp.h"
 #include "mode_store.h"
 #include "game_timer.h"
@@ -723,6 +725,7 @@ static bool adopt_store(void *user, const uint8_t key[ADOPTION_KEY_SIZE], const 
     (void)user;
     if (!box_game_set_join_key(&box, key)) return false;
     config_store_set_str("field_name", name);
+    box_logo_forget(); /* another field's logo: the next join fetches this field's */
     return true;
 }
 
@@ -877,6 +880,7 @@ static void box_start(const char *tier)
     wifi_setup_set_join_key_handler(portal_join_key);
     fw_update_esp_init(&box, update_screen, update_battery);
     mode_fetch_esp_init(&box, update_screen, hello.tier != 0, mem_limit);
+    box_logo_esp_init(&box);
 }
 
 /* Start the game the picker chose. */
@@ -1046,6 +1050,7 @@ static void task_game(void *arg)
         bool field_game = box_game_active(&box);
         fw_update_esp_poll();  /* a failed update the controller has not heard of: over LoRa */
         mode_fetch_esp_poll(); /* a mode fetch that is over: join its game, or say why not */
+        box_logo_esp_poll();   /* a joined game, not started: the field's logo, once (PKG-1) */
         box_game_tick(&box, delta_ms, now);
         if (field_game) {
             /* ticked above */

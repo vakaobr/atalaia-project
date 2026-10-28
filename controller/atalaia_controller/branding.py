@@ -38,7 +38,7 @@ import re
 import time
 from typing import TYPE_CHECKING, Any, Optional
 
-from . import images
+from . import box_logo, images
 from .checkin import RateLimit
 from .engine import Conflict, ControllerError, NotFound, display_name
 
@@ -70,6 +70,7 @@ class Branding:
         self.store = controller.store
         self.rate = RateLimit(240)  # public reads per address and minute
         self._last_purge = 0.0
+        self._box_logo: Optional[tuple[str, bytes]] = None
         controller.branding = self
         sync = getattr(controller, "sync", None)
         if sync is not None:
@@ -186,6 +187,20 @@ class Branding:
     def image(self, slot: str) -> Optional[dict[str, Any]]:
         image_id = self._saved().get(slot)
         return self.store.image(image_id) if image_id else None
+
+    def box_logo(self) -> Optional[tuple[str, bytes]]:
+        """The field's logo as a Field Box draws it (box_logo.py, decision PKG-1): the source image's id and the
+        box-ready bytes, or None when there is no logo or it is not a PNG the controller can convert. The result
+        is kept by the image's id, so each logo is converted once."""
+        img = self.image("logo")
+        if img is None or img["content_type"] != "image/png":
+            return None
+        if self._box_logo is None or self._box_logo[0] != img["id"]:
+            try:
+                self._box_logo = (img["id"], box_logo.convert(img["data"]))
+            except box_logo.BoxLogoError:
+                self._box_logo = (img["id"], b"")
+        return self._box_logo if self._box_logo[1] else None
 
     # --- crests and team presets ---------------------------------------------
 

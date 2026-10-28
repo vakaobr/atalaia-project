@@ -121,6 +121,7 @@ add_library(atalaia_screens_fw STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/screen_template.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/oled_view.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/oled_logo.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../main/box_logo.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/modem/modem_screen.c
     ${CMAKE_CURRENT_BINARY_DIR}/builtin_screens.c
 )
@@ -174,6 +175,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/mode_package.c
     ${SHELL_DIR}/mode_store.c
     ${SHELL_DIR}/mode_fetch.c
+    ${SHELL_DIR}/box_logo.c
     ${SHELL_DIR}/admin_pin.c
     ${SHELL_DIR}/adoption.c
     ${SHELL_DIR}/cpace.c
@@ -235,6 +237,7 @@ set(TEST_SOURCES
     test_fw_update.c
     test_mode_package.c
     test_mode_fetch.c
+    test_box_logo.c
     test_adoption.c
     test_admin_pin.c
     test_box_pair.c

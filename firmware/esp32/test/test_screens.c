@@ -28,6 +28,7 @@
 #include <sys/stat.h>
 
 #include "lvgl.h"
+#include "box_logo.h"
 #include "box_text.h"
 #include "font_check.h"
 #include "png_io.h"
@@ -125,6 +126,13 @@ static const screen_case_t cases[] = {
     {"waiting_invited", "waiting", "{\"game\":3073,\"role\":\"zone\",\"invited\":true}", NULL},
     {"playing", "playing", "{\"game\":3073,\"role\":\"zone\"}", NULL},
     {"ready", "ready", "{}", NULL},
+    /* The field's logo (box_logo.h, PKG-1): cases named field_logo_* have a kept logo (a test one);
+     * the others show the Atalaia towers in its place. */
+    {"field_logo_ready", "ready", "{}", NULL},
+    {"field_logo_ready_picker_pt", "ready", "{\"picker\":true}", NULL},
+    {"field_logo_standby", "standby", "{}", NULL},
+    {"field_logo_standby_armed", "standby", "{\"arm\":\"red\"}", NULL},
+    {"standby_waiting", "standby", "{}", NULL},
     {"ready_picker", "ready", "{\"picker\":true}", NULL},
     /* A zone nobody holds and a zone a team holds, for the modes without their own (BN-11). */
     {"neutral", "neutral", "{\"hold_s\":3}", NULL},
@@ -619,8 +627,47 @@ static void check_glyphs(const char *name)
     if (font_check_labels(lv_screen_active(), msg, sizeof(msg)) > 0) fail(name, msg);
 }
 
+/* A kept logo as a box would have fetched it: a test pattern, a disc on a blue field, in the
+ * folder the renderer's box_logo reads. */
+static void install_logo(bool on)
+{
+    static char dir[512];
+    if (!dir[0]) {
+        snprintf(dir, sizeof(dir), "%s/logo", SCREENS_OUT_DIR);
+        mkdir(dir, 0755);
+        box_logo_init(dir);
+    }
+    box_logo_forget();
+    if (!on) return;
+    static uint8_t file[BL_ID_LEN + BL_BYTES];
+    memset(file, '7', BL_ID_LEN);
+    uint8_t *f = file + BL_ID_LEN;
+    memcpy(f, "ALG1", 4);
+    f[4] = BL_SIDE;
+    f[6] = BL_SIDE;
+    for (int y = 0; y < BL_SIDE; y++) {
+        for (int x = 0; x < BL_SIDE; x++) {
+            int dx = x - 48, dy = y - 48;
+            uint16_t px = dx * dx + dy * dy < 40 * 40 ? (uint16_t)0xFFE0 /* yellow */
+                                                      : (uint16_t)(0x001F + (x / 3) * 32);
+            if (x < 2 || y < 2 || x > 93 || y > 93)
+                px = 0xF800; /* a red frame: the edges are seen */
+            f[BL_HEADER + 2 * (y * BL_SIDE + x)] = (uint8_t)(px & 0xFF);
+            f[BL_HEADER + 2 * (y * BL_SIDE + x) + 1] = (uint8_t)(px >> 8);
+        }
+    }
+    char path[560];
+    snprintf(path, sizeof(path), "%s/logo.bin", dir);
+    FILE *out = fopen(path, "wb");
+    if (out == NULL || fwrite(file, 1, sizeof(file), out) != sizeof(file)) {
+        fail("(logo)", "cannot write the test logo");
+    }
+    if (out) fclose(out);
+}
+
 static void render(const screen_case_t *c)
 {
+    install_logo(strncmp(c->name, "field_logo_", 11) == 0);
     box_lang_set_code(language(c->name));
     if (c->mode) screen_render(SCREEN_MODE_MESSAGE, c->mode);
     if (!screen_render(c->template_name, c->data)) fail(c->name, "template not recognised");
