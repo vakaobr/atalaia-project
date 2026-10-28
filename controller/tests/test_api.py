@@ -139,9 +139,9 @@ class EndpointTests(ApiCase):
 
     def test_errors(self):
         c = self.client
-        self.assertEqual(c.get("/api/v1/games/999", headers=READ).status_code, 404)
-        self.assertEqual(c.get("/api/v1/games/999/log", headers=READ).status_code, 404)
-        self.assertEqual(c.post("/api/v1/games/999/start", headers=GM).status_code, 404)
+        self.assertEqual(c.get("/api/v1/games/65000", headers=READ).status_code, 404)
+        self.assertEqual(c.get("/api/v1/games/65000/log", headers=READ).status_code, 404)
+        self.assertEqual(c.post("/api/v1/games/65000/start", headers=GM).status_code, 404)
         r = c.post("/api/v1/games", json={"name": "x", "mode_id": "org.no.such"}, headers=GM)
         self.assertEqual(r.status_code, 400)
         self.assertIn("unknown mode", r.json()["detail"])

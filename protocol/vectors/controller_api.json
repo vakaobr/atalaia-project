@@ -559,9 +559,9 @@
     {
       "name": "requests the controller refuses",
       "steps": [
-        {"request": {"method": "GET", "path": "/api/v1/games/999", "token": "gm"}, "status": 404},
-        {"request": {"method": "GET", "path": "/api/v1/games/999/score", "token": "read"}, "status": 404},
-        {"request": {"method": "GET", "path": "/api/v1/games/999/log", "token": "read"}, "status": 404},
+        {"request": {"method": "GET", "path": "/api/v1/games/65000", "token": "gm"}, "status": 404},
+        {"request": {"method": "GET", "path": "/api/v1/games/65000/score", "token": "read"}, "status": 404},
+        {"request": {"method": "GET", "path": "/api/v1/games/65000/log", "token": "read"}, "status": 404},
         {"request": {"method": "GET", "path": "/api/v1/nope", "token": "gm"}, "status": 404},
         {"request": {"method": "POST", "path": "/api/v1/nodes/4/cmd", "token": "gm", "body": {"cmd": "message"}}, "status": 409},
         {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "x", "mode_id": "org.example.nope"}}, "status": 400},
@@ -1093,7 +1093,7 @@
         {"request": {"method": "GET", "path": "/api/v1/games/${gid}/checkins", "token": "read"}, "status": 403},
         {"request": {"method": "GET", "path": "/api/v1/games/${gid}/checkins", "bearer": "${ptok}"}, "status": 403},
         {"request": {"method": "GET", "path": "/api/v1/games/${gid}/checkins", "token": "gm"}, "status": 200, "json": {"game_id": "${gid}", "open": true, "squads": 2, "counts": {"expected": 0, "pending": 0, "checked_in": 1, "left": 0, "removed": 0}, "checkins": [{"player_id": "p-aaaaaaaaaaaa", "display_name": "Falcão 2", "seq": 1}], "registrations": {"expected": 0, "arrived": 0, "walkins": 1}}},
-        {"request": {"method": "GET", "path": "/api/v1/games/999/checkins", "token": "gm"}, "status": 404}
+        {"request": {"method": "GET", "path": "/api/v1/games/65000/checkins", "token": "gm"}, "status": 404}
       ]
     },
     {
@@ -1244,8 +1244,8 @@
         {"request": {"method": "POST", "path": "/api/v1/games/${gid}/tags", "token": "gm", "body": {}}, "status": 400},
         {"request": {"method": "POST", "path": "/api/v1/games/${gid}/tags", "token": "gm", "body": {"player": "p-17", "team": "green"}}, "status": 400},
         {"request": {"method": "POST", "path": "/api/v1/games/${gid}/tags", "token": "gm", "body": {"player": "p-17", "key": "00"}}, "status": 400},
-        {"request": {"method": "POST", "path": "/api/v1/games/999/tags", "token": "gm", "body": {"player": "p-17"}}, "status": 404},
-        {"request": {"method": "POST", "path": "/api/v1/games/999/tags", "bearer": "${mtok}", "body": {"player": "p-17"}}, "status": 403},
+        {"request": {"method": "POST", "path": "/api/v1/games/65000/tags", "token": "gm", "body": {"player": "p-17"}}, "status": 404},
+        {"request": {"method": "POST", "path": "/api/v1/games/65000/tags", "bearer": "${mtok}", "body": {"player": "p-17"}}, "status": 403},
         {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
         {"request": {"method": "POST", "path": "/api/v1/games/${gid}/tags", "token": "gm", "body": {"player": "p-17", "team": "blue"}}, "status": 409}
       ]
@@ -1957,7 +1957,7 @@
         {"request": {"method": "PUT", "path": "/api/v1/games/${gid}/teams/red", "token": "gm", "body": {"display_name": "Lobos"}}, "status": 200, "json": {"team_info": {"red": {"display_name": "Lobos", "crest_id": "${crest_id}", "team_preset_id": "$absent"}}}},
         {"request": {"method": "PUT", "path": "/api/v1/games/${gid}/teams/green", "token": "gm", "body": {"display_name": "x"}}, "status": 404},
         {"request": {"method": "PUT", "path": "/api/v1/games/${gid}/teams/red", "token": "gm", "body": {"crest_id": "nope"}}, "status": 400},
-        {"request": {"method": "PUT", "path": "/api/v1/games/999/teams/red", "token": "gm", "body": {}}, "status": 404},
+        {"request": {"method": "PUT", "path": "/api/v1/games/65000/teams/red", "token": "gm", "body": {}}, "status": 404},
         {"ws_connect": "gm", "token": "gm", "hello": {"type": "hello", "branding": {"version": 1, "accent": "#aa0000", "field_name": "Ridge Club"}}},
         {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
         {"request": {"method": "PUT", "path": "/api/v1/games/${gid}/teams/red", "token": "gm", "body": {"display_name": "x"}}, "status": 409}
@@ -2007,7 +2007,7 @@
         {"request": {"method": "PUT", "path": "/api/v1/games/${gid}/objective-disclosure", "token": "gm", "body": {"disclosure": "everyone"}}, "status": 400},
         {"request": {"method": "PUT", "path": "/api/v1/games/${gid}/objective-disclosure", "token": "gm", "body": {"disclosure": "members", "x": 1}}, "status": 400},
         {"request": {"method": "PUT", "path": "/api/v1/games/${gid}/objective-disclosure", "token": "gm", "body": {}}, "status": 400},
-        {"request": {"method": "PUT", "path": "/api/v1/games/999/objective-disclosure", "token": "gm", "body": {"disclosure": "members"}}, "status": 404},
+        {"request": {"method": "PUT", "path": "/api/v1/games/65000/objective-disclosure", "token": "gm", "body": {"disclosure": "members"}}, "status": 404},
         {"request": {"method": "PUT", "path": "/api/v1/games/${gid}/objective-disclosure", "token": "gm", "body": {"disclosure": "members"}}, "status": 200, "json": {"scenario": {"disclosure": "members", "disclosure_default": "leader"}}},
         {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "bearer": "${tL}"}, "status": 200, "json": {"scenario": {"objectives": [{"id": "a1"}, {"id": "a2"}]}}},
         {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "bearer": "${tM}"}, "status": 200, "json": {"scenario": {"objectives": [{"id": "a1"}, {"id": "a2"}]}}},
