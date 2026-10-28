@@ -7,7 +7,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 Para quem cuida das caixas num campo: ligá-las, pô-las num jogo e mantê-las vivas. Em inglês: [Field Box operator manual](../en/field-box.md).
 
-**Montar uma caixa não está neste manual.** Segue o [guia de montagem](https://atalaia-project.link/montagem/) da página do projeto, ou o [manual de montagem da Field Box](../../../hardware/field-box/BUILD.md) passo a passo (em inglês).
+**Montar uma caixa não está neste manual.** Segue o [guia de montagem](https://atalaia-project.link/montagem/) da página do projeto, ou o [manual de montagem da Field Box](../../../hardware/field-box/BUILD.pt.md) passo a passo.
 
 > **Ainda não está pronta para o campo.** A Atalaia está em pré-alfa. Placas Heltec V4.3 a sério já jogaram jogos inteiros numa bancada com o controlador de campo. Nenhuma caixa montada foi usada num campo. Cada passo abaixo corresponde ao que o firmware mostra hoje. Os passos que dependem de hardware dizem **Ainda não testado num campo**. As palavras em *itálico* estão no [glossário](https://atalaia-project.link/glossario/).
 
@@ -64,7 +64,7 @@ Uma caixa nova mostra **PRIMEIRA CONFIGURAÇÃO** com o nome de uma rede Wi-Fi c
 
 A caixa reinicia. Uma caixa ainda sem campo mostra **Emparelhar caixa** e um código de 6 algarismos ([secção 4](#4-adota-a-caixa-no-campo)).
 
-A página de configuração só abre sozinha numa caixa que ainda não foi configurada. Para a abrir de novo numa caixa já configurada: carrega numa tecla, escreve o PIN de administração e `#`, escolhe **Configurar o Wi-Fi** (a seguir aos jogos) e confirma com `#`. A caixa reinicia na página de configuração; guarda o campo, a chave de entrada e os jogos, e volta a pedir o resto (nome, PIN de administração, Wi-Fi). Uma caixa sem teclado faz o mesmo a partir de um computador por USB (o guia do firmware, em inglês: [firmware.md](../en/firmware.md)). Ainda não testado num campo.
+A página de configuração só abre sozinha numa caixa que ainda não foi configurada. Para a abrir de novo numa caixa já configurada: carrega numa tecla, escreve o PIN de administração e `#`, escolhe **Configurar o Wi-Fi** (a seguir aos jogos) e confirma com `#`. A caixa reinicia na página de configuração; guarda o campo, a chave de entrada e os jogos, e volta a pedir o resto (nome, PIN de administração, Wi-Fi). Uma caixa sem teclado faz o mesmo a partir de um computador por USB (o [guia do firmware](firmware.md)). Ainda não testado num campo.
 
 ## 4. Adota a caixa no campo
 
@@ -215,4 +215,4 @@ Um telemóvel Android também pode ser uma caixa. Na app escolhe **Dispositivo d
 | A caixa reiniciou num jogo | Volta no mesmo jogo. A organização vê **node.rebooted** no registo dela. |
 | O ecrã pequeno está apagado | Fala com quem montou a caixa. O ecrã grande pode continuar a funcionar. |
 
-Para avarias de montagem e de bancada, vê [a tabela de resolução de problemas do manual de montagem](../../../hardware/field-box/BUILD.md#13-troubleshooting) (em inglês).
+Para avarias de montagem e de bancada, vê [a tabela de resolução de problemas do manual de montagem](../../../hardware/field-box/BUILD.pt.md#13-resolução-de-problemas).

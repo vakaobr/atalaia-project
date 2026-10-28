@@ -21,13 +21,13 @@ These are the manuals for the people who **use** Atalaia on a field: players, or
 
 For people who **build** things (not for players or organisers on game day):
 
-| For | English |
-| --- | --- |
-| **Builders**: get, flash and set up the firmware of a box, a pod or the modem board | [Firmware guide](en/firmware.md) |
-| **Organisers**: set up the field controller on a Raspberry Pi, with its modem board | [Controller setup guide](en/controller-setup.md) |
-| **Builders**: the hardware, with a pin reference for each board | [Field Box](../../hardware/field-box/BUILD.md), [Satellite](../../hardware/satellite/BUILD.md), [I/O pod](../../hardware/io-pod/BUILD.md), [Target addon](../../hardware/target-addon/BUILD.md) |
+| For | English | Português (pt-PT) |
+| --- | --- | --- |
+| **Builders**: get, flash and set up the firmware of a box, a pod or the modem board | [Firmware guide](en/firmware.md) | [Guia do firmware](pt/firmware.md) |
+| **Organisers**: set up the field controller on a Raspberry Pi, with its modem board | [Controller setup guide](en/controller-setup.md) | [Guia de montagem do controlador](pt/controller-setup.md) |
+| **Builders**: the hardware, with a pin reference for each board | [Field Box](../../hardware/field-box/BUILD.md), [Satellite](../../hardware/satellite/BUILD.md), [I/O pod](../../hardware/io-pod/BUILD.md), [Target addon](../../hardware/target-addon/BUILD.md) | [Field Box](../../hardware/field-box/BUILD.pt.md); em inglês: [Satellite](../../hardware/satellite/BUILD.md), [I/O pod](../../hardware/io-pod/BUILD.md), [Target addon](../../hardware/target-addon/BUILD.md) |
 
-These three are in English only for now. Portuguese follows.
+The guides for the satellite, the I/O pod and the target addon are in English only for now. Portuguese follows.
 
 Each manual has a **Troubleshooting** section at the end.
 
@@ -45,7 +45,7 @@ The manuals are in **English** and **European Portuguese (pt-PT)**. The Portugue
 
 ## Related guides
 
-- The [firmware guide](en/firmware.md) and the [Field Box build manual](../../hardware/field-box/BUILD.md) and the [build guide](https://atalaia-project.link/en/build-guides/) on the project page: for building a box.
+- The firmware guide ([English](en/firmware.md), [Português](pt/firmware.md)) and the Field Box build manual ([English](../../hardware/field-box/BUILD.md), [Português](../../hardware/field-box/BUILD.pt.md)) and the [build guide](https://atalaia-project.link/en/build-guides/) on the project page: for building a box.
 - The [app guide](../../app/README.md) and the [iPhone guide](../../app/docs/ios-on-a-mac.md): for building and installing the app.
 - The [controller guide](../../controller/README.md) and the [site server guide](../../server/README.md): for installing the controller and the server.
 - The [community mode registry](https://vakaobr.github.io/atalaia-modes/): shared game modes.

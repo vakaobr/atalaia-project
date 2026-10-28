@@ -5,6 +5,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Field Box build manual
 
+> Em português (pt-PT): [Manual de montagem da Field Box](BUILD.pt.md).
+
 From a bag of parts to a flashed box that is ready for the hardware
 bring-up checklist ([`BRING_UP.md`](../../firmware/esp32/docs/BRING_UP.md)).
 Written for a club member who can solder header pins and wires and use a

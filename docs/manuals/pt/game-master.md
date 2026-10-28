@@ -38,7 +38,7 @@ Para quem dirige um campo: montar o *controlador de campo*, preparar um jogo, di
 
 ### Num Raspberry Pi (ou outro computador Linux)
 
-Ainda não testado num campo: nenhum Raspberry Pi com um modem a sério e caixas a sério correu um jogo até hoje. Os comandos completos estão no [guia do controlador](../../../controller/README.md#running-it) (em inglês). Em resumo:
+Ainda não testado num campo: nenhum Raspberry Pi com um modem a sério e caixas a sério correu um jogo até hoje. Para uma montagem passo a passo que não presume que és programador, usa o [guia de montagem do controlador](controller-setup.md). Os comandos completos estão no [guia do controlador](../../../controller/README.md#running-it) (em inglês). Em resumo:
 
 1. Grava o firmware do modem numa placa Heltec V4.3 sobresselente e liga-a ao USB do Pi. É o **modem de rádio USB**. O ecrã pequeno dele mostra `LINK OK` quando o controlador está a falar com ele. Vê o [guia do firmware](../../../firmware/esp32/README.md#usb-radio-modem-variant).
 2. Instala os pacotes e compila o núcleo, como no guia.
