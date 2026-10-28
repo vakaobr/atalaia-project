@@ -789,6 +789,22 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 
 **Reason:** the model measured (decision SL-13, table 7) that 0-78 % of a scenario's setup CMDs reach their box and, with the scenario's repeats and the box's confirmation in the same model (`python -m atalaia_sim.relay_report --setup-study`; `docs/phase-2-field-network/STATUS.md`), every setup reaches its box in the meshes and the CQB layout up to 20 boxes (89-100 % at 30), in the long field at 10 boxes, and 56 % and 11 % in the long field of 20 and 30 (one shot: 0-78 %), at 1.4-2.8 CMD frames per setup in the cases that work; the repeats without the confirmation reach about the same fraction and always cost six.
 
+## Amendment 17 (2026-10-28): CMD pod, the I/O pod's settings over the radio
+
+**Status:** built (the maintainer's decision of 2026-10-28 to build the I/O pod's configuration over the radio that decision PF15 left open; decisions PODC-1 to PODC-9). The pod's radio takes it (`firmware/esp32/main/pod/pod_settings.c`, `pod.c`), the Pi and the Android controllers send it (`controller/atalaia_controller/pod_config.py`, `app/lib/controller/controller_pod_config.dart`), the GM console sets it (`controller/console/src/components/pod-config-panel.js`); the shared vectors are `protocol/vectors/pod_config.json`. The specification is `protocol/pod-config.md`.
+
+**Supersedes:** nothing. It adds one CMD opcode; no frame, no field, no other opcode and no ACK or retry rule changes.
+
+**Change:**
+
+1. **CMD opcode 10, `pod`**, params `{"v": 1, "rev": N, ...}` with the optional settings `reset`, `btn` (four colours), `bright`, `vol` and `tamper`, addressed (`dest`) to the node id of the phone an I/O pod serves, as sealed and flooded as every CMD. The controller sends it only to one node, never to every node, and only before a game starts or after it ended. The pod's radio takes it after authenticating the packet with the game key, and it is not passed to the phone.
+2. **The pod's answer is the box's setup acknowledgement** (Amendment 16): the pod tells its phone (EVT `pod.config` `{"rev"}`, over the capability proxy) and the phone sends `node.setup_applied` with `kind` `pod_config` and `rev`. The controller sends the command again after 8, 16, 32, 64 and 128 s until it hears it.
+3. **Versioned:** `v` is 1; a pod ignores a higher one. `rev` orders the pushes; a pod applies only a `rev` above the last it took.
+
+**Compatibility:** an older pod passes the packet to its phone, which ignores an opcode it does not know, and never answers (the controller says "no answer"); an older box logs "unknown command ignored"; an older controller never sends it. The opcode range in the CMD payload is 0-10.
+
+**Reason:** a pod's settings were fixed at build time (decision PF15); a pod in a case in the field could not be changed without a cable. Settings that touch the radio's key, region, channel, pins or the pod's Bluetooth security are not in it, on purpose.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit

@@ -55,6 +55,7 @@ void run_serial_console_tests(void);
 void run_board_fem_tests(void);
 void run_screen_template_tests(void);
 void run_pod_tests(void);
+void run_pod_settings_tests(void);
 void run_fw_update_tests(void);
 void run_mode_package_tests(void);
 void run_mode_fetch_tests(void);

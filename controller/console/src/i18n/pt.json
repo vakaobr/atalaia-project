@@ -1602,5 +1602,45 @@
   "boxlogo": {
     "failed": "O logótipo ficou guardado para a consola, mas este navegador não o conseguiu converter para as Field Boxes: elas mantêm o logótipo da Atalaia.",
     "ready": "As Field Boxes vão mostrar este logótipo."
+  },
+  "pod_config": {
+    "title": "Definições dos módulos de E/S",
+    "hint": "Define as cores dos botões, o brilho do anel, o volume e o interruptor da caixa do módulo de E/S a que um telemóvel está ligado, pelo rádio, selado com a chave do jogo. Só mudam as definições preenchidas; o módulo guarda-as na sua memória flash. Rádio, pinos e segurança Bluetooth ficam como foram compilados.",
+    "not_ready": "As definições do módulo só seguem antes de um jogo começar ou depois de terminar.",
+    "no_phones": "Nenhum telemóvel disse olá neste jogo: junta primeiro o telemóvel que tem o módulo.",
+    "buttons": "Cores dos botões",
+    "set_buttons": "Definir as cores",
+    "button": "Botão {n}",
+    "game_team": "a equipa do jogo",
+    "bright": "Brilho do anel (%)",
+    "vol": "Volume (%)",
+    "other": "Interruptor da caixa",
+    "tamper": "Interruptor",
+    "tamper_on": "avisa de violação",
+    "tamper_off": "ignorado",
+    "unchanged": "sem alteração",
+    "reset": "Voltar primeiro às definições da compilação",
+    "state": "Módulo",
+    "send": "Enviar ao módulo",
+    "nothing": "Escolhe pelo menos uma definição.",
+    "cancel": "Deixar de esperar pelos módulos",
+    "no_answer_hint": "Sem resposta: o telemóvel não tem módulo de E/S, o firmware do módulo é anterior a esta funcionalidade ou está fora do alcance do rádio. Já foi enviado várias vezes.",
+    "states": {
+      "sent": "enviado ({tries}), a aguardar",
+      "applied": "aceite pelo módulo",
+      "no_answer": "sem resposta",
+      "cancelled": "interrompido"
+    },
+    "colours": {
+      "red": "vermelho",
+      "blue": "azul",
+      "green": "verde",
+      "yellow": "amarelo",
+      "orange": "laranja",
+      "purple": "roxo",
+      "white": "branco",
+      "pink": "rosa",
+      "cyan": "ciano"
+    }
   }
 }

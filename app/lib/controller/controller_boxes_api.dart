@@ -16,6 +16,8 @@ part of 'controller_api.dart';
 //     GET  /api/v1/adopt/pair                GM: boxes offering a code, the run
 //     POST /api/v1/adopt/pair/listen         GM: the radio on the pairing channel, 5 min
 //     POST /api/v1/adopt/pair                GM: pair a box with the code it shows
+//     GET|DELETE /api/v1/pod-config          GM: the phones of the game and the pod settings sent / stop waiting
+//     POST /api/v1/pod-config/{node}         GM: push settings to the I/O pod of a phone
 //     GET|POST /api/v1/firmware              GM: releases and updates / upload a signed release
 //     DELETE /api/v1/firmware/updates        GM: stop waiting for the updates on their way
 //     DELETE /api/v1/firmware/{id}           GM: delete a release
@@ -54,6 +56,10 @@ extension _BoxesRoutes on ControllerApi {
   ControllerAdoption _needAdoption() =>
       engine.adoption ??
       (throw _HttpError(503, 'adoption is not set up on this controller'));
+
+  ControllerPodConfig _needPodConfig() =>
+      engine.podConfig ??
+      (throw _HttpError(503, 'pod settings are not set up on this controller'));
 
   ControllerFirmware _needFirmware() =>
       engine.firmware ??
@@ -126,6 +132,25 @@ extension _BoxesRoutes on ControllerApi {
       _gm((r) {
         final b = r.body;
         return ApiResponse(200, _needPairing().pair(b['pair_id'], b['code']));
+      }),
+    ),
+    // --- the I/O pod's settings over the radio (protocol/pod-config.md) ---
+    ControllerApi._route(
+      'GET',
+      r'/api/v1/pod-config',
+      _gm((r) => ApiResponse(200, _needPodConfig().status())),
+    ),
+    ControllerApi._route(
+      'DELETE',
+      r'/api/v1/pod-config',
+      _gm((r) => ApiResponse(200, {'cancelled': _needPodConfig().cancel()})),
+    ),
+    ControllerApi._route(
+      'POST',
+      r'/api/v1/pod-config/(\d+)',
+      _gm((r) {
+        final node = int.parse(r.pathText(1));
+        return ApiResponse(200, _needPodConfig().push(node, r.body));
       }),
     ),
     // --- firmware updates (protocol/firmware-update.md) -------------------

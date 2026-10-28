@@ -29,6 +29,7 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`sync.md`](sync.md) | The controller sync: how a field controller pushes its games, event logs, score counters and nodes, and the field's chrono registry (marshals' public keys, replicas, signed readings), to a site server, the merge rules, the API key; vectors in `vectors/sync.json` |
 | [`usb-modem.md`](usb-modem.md) | The serial link between the field controller and its USB radio modem |
 | [`capability-proxy.md`](capability-proxy.md) | The link between an I/O pod and a phone (USB-OTG and BLE), version 1 |
+| [`pod-config.md`](pod-config.md) | The I/O pod's settings pushed over the radio by the field controller: CMD pod (opcode 10, RFC 0001 Amendment 17), which settings, the revision, the pod's acknowledgement through its phone (`node.setup_applied`), the threat model; vectors in `vectors/pod_config.json` (written by `tools/pod_config_vectors.py`) |
 | [`json/event.schema.json`](json/event.schema.json) | JSON Schema of an event in the game log and the API (generated) |
 | [`json/examples/`](json/examples/) | Events that CI validates against that schema, plus invalid ones it must reject |
 
@@ -49,6 +50,7 @@ The generator writes these files; none of them should be edited by hand:
 | `firmware/esp32/test/firmware_vectors.h` | C: the Field Box's firmware update vectors (from `vectors/firmware.json`) |
 | `core/tests/pair_vectors.h` | C: CPace's draft vectors and the pair frames (from `vectors/pairing.json`), core and firmware tests |
 | `firmware/esp32/test/field_card_vectors.h` | C: the Field Box's field card vectors (from `vectors/field_card.json`) |
+| `firmware/esp32/test/pod_config_vectors.h` | C: the I/O pod's settings over CMD pod (from `vectors/pod_config.json`) |
 | `core/tests/geo_vectors.h` | C: geo test vectors, as exact hexadecimal doubles (from `vectors/geo.json`) |
 | `core/tests/field_frame_vectors.h` | C: HKDF and field frame test vectors (from `vectors/field_frame.json`) |
 | `simulator/atalaia_sim/protocol.py` | Python: the same tables |

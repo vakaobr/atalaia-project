@@ -1,0 +1,258 @@
+{
+  "description": "CMD pod (opcode 10): the I/O pod's settings pushed over the radio, as one pod takes them in order from a pod never configured (decision PODC; protocol/pod-config.md). Made by tools/pod_config_vectors.py; checked by firmware/esp32/test/test_pod_settings.c, controller/tests/test_pod_config.py and app/test/controller/controller_pod_config_test.dart.",
+  "opcode": 10,
+  "dest": 7,
+  "version": 1,
+  "steps": [
+    {
+      "name": "first_colours",
+      "note": "the first push: two buttons get a colour, the others follow the game",
+      "params": {
+        "v": 1,
+        "rev": 1,
+        "btn": [
+          "red",
+          "",
+          "",
+          "blue"
+        ]
+      },
+      "cmd_cbor": "a3010a02a361760163726576016362746e8463726564606064626c75650307",
+      "result": "applied",
+      "stored": "{\"v\":1,\"rev\":1,\"btn\":[\"red\",\"\",\"\",\"blue\"]}"
+    },
+    {
+      "name": "same_rev_again",
+      "note": "the same rev again (the pod's ACK was lost): taken before, nothing changes",
+      "params": {
+        "v": 1,
+        "rev": 1,
+        "btn": [
+          "red",
+          "",
+          "",
+          "blue"
+        ]
+      },
+      "cmd_cbor": "a3010a02a361760163726576016362746e8463726564606064626c75650307",
+      "result": "same",
+      "stored": "{\"v\":1,\"rev\":1,\"btn\":[\"red\",\"\",\"\",\"blue\"]}"
+    },
+    {
+      "name": "other_settings",
+      "note": "another push changes other settings and keeps the colours",
+      "params": {
+        "v": 1,
+        "rev": 2,
+        "bright": 60,
+        "vol": 80,
+        "tamper": false
+      },
+      "cmd_cbor": "a3010a02a5617601637265760266627269676874183c63766f6c18506674616d706572f40307",
+      "result": "applied",
+      "stored": "{\"v\":1,\"rev\":2,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":60,\"vol\":80,\"tamper\":false}"
+    },
+    {
+      "name": "stale_rev",
+      "note": "an older rev (a delayed packet): ignored",
+      "params": {
+        "v": 1,
+        "rev": 1,
+        "btn": [
+          "green",
+          "",
+          "",
+          ""
+        ]
+      },
+      "cmd_cbor": "a3010a02a361760163726576016362746e8465677265656e6060600307",
+      "result": "stale",
+      "stored": "{\"v\":1,\"rev\":2,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":60,\"vol\":80,\"tamper\":false}"
+    },
+    {
+      "name": "unknown_key",
+      "note": "a key this version does not know refuses the whole command",
+      "params": {
+        "v": 1,
+        "rev": 3,
+        "bright": 10,
+        "leds": 12
+      },
+      "cmd_cbor": "a3010a02a46176016372657603666272696768740a646c6564730c0307",
+      "result": "refused",
+      "stored": "{\"v\":1,\"rev\":2,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":60,\"vol\":80,\"tamper\":false}"
+    },
+    {
+      "name": "bad_colour",
+      "note": "a colour the pod has no name for",
+      "params": {
+        "v": 1,
+        "rev": 3,
+        "btn": [
+          "red",
+          "magenta",
+          "",
+          ""
+        ]
+      },
+      "cmd_cbor": "a3010a02a361760163726576036362746e8463726564676d6167656e746160600307",
+      "result": "refused",
+      "stored": "{\"v\":1,\"rev\":2,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":60,\"vol\":80,\"tamper\":false}"
+    },
+    {
+      "name": "three_buttons",
+      "note": "btn is exactly four colours",
+      "params": {
+        "v": 1,
+        "rev": 3,
+        "btn": [
+          "red",
+          "blue",
+          "green"
+        ]
+      },
+      "cmd_cbor": "a3010a02a361760163726576036362746e836372656464626c756565677265656e0307",
+      "result": "refused",
+      "stored": "{\"v\":1,\"rev\":2,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":60,\"vol\":80,\"tamper\":false}"
+    },
+    {
+      "name": "bright_too_high",
+      "note": "a percentage above 100",
+      "params": {
+        "v": 1,
+        "rev": 3,
+        "bright": 101
+      },
+      "cmd_cbor": "a3010a02a361760163726576036662726967687418650307",
+      "result": "refused",
+      "stored": "{\"v\":1,\"rev\":2,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":60,\"vol\":80,\"tamper\":false}"
+    },
+    {
+      "name": "negative_volume",
+      "note": "a negative number",
+      "params": {
+        "v": 1,
+        "rev": 3,
+        "vol": -1
+      },
+      "cmd_cbor": "a3010a02a3617601637265760363766f6c200307",
+      "result": "refused",
+      "stored": "{\"v\":1,\"rev\":2,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":60,\"vol\":80,\"tamper\":false}"
+    },
+    {
+      "name": "fractional_bright",
+      "note": "a number with a fraction",
+      "params": {
+        "v": 1,
+        "rev": 3,
+        "bright": 50.5
+      },
+      "cmd_cbor": "a3010a02a3617601637265760366627269676874f952500307",
+      "result": "refused",
+      "stored": "{\"v\":1,\"rev\":2,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":60,\"vol\":80,\"tamper\":false}"
+    },
+    {
+      "name": "tamper_not_bool",
+      "note": "tamper is true or false",
+      "params": {
+        "v": 1,
+        "rev": 3,
+        "tamper": 1
+      },
+      "cmd_cbor": "a3010a02a361760163726576036674616d706572010307",
+      "result": "refused",
+      "stored": "{\"v\":1,\"rev\":2,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":60,\"vol\":80,\"tamper\":false}"
+    },
+    {
+      "name": "newer_format",
+      "note": "a format newer than 1 is ignored, not guessed at",
+      "params": {
+        "v": 2,
+        "rev": 3,
+        "bright": 10
+      },
+      "cmd_cbor": "a3010a02a36176026372657603666272696768740a0307",
+      "result": "refused",
+      "stored": "{\"v\":1,\"rev\":2,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":60,\"vol\":80,\"tamper\":false}"
+    },
+    {
+      "name": "no_version",
+      "note": "v is required",
+      "params": {
+        "rev": 3,
+        "bright": 10
+      },
+      "cmd_cbor": "a3010a02a26372657603666272696768740a0307",
+      "result": "refused",
+      "stored": "{\"v\":1,\"rev\":2,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":60,\"vol\":80,\"tamper\":false}"
+    },
+    {
+      "name": "no_rev",
+      "note": "rev is required",
+      "params": {
+        "v": 1,
+        "bright": 10
+      },
+      "cmd_cbor": "a3010a02a2617601666272696768740a0307",
+      "result": "refused",
+      "stored": "{\"v\":1,\"rev\":2,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":60,\"vol\":80,\"tamper\":false}"
+    },
+    {
+      "name": "rev_zero",
+      "note": "rev 0 is 'nothing pushed yet', never a push",
+      "params": {
+        "v": 1,
+        "rev": 0,
+        "bright": 10
+      },
+      "cmd_cbor": "a3010a02a36176016372657600666272696768740a0307",
+      "result": "refused",
+      "stored": "{\"v\":1,\"rev\":2,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":60,\"vol\":80,\"tamper\":false}"
+    },
+    {
+      "name": "reset_and_set",
+      "note": "reset drops every setting pushed so far, then sets the volume",
+      "params": {
+        "v": 1,
+        "rev": 3,
+        "reset": true,
+        "vol": 30
+      },
+      "cmd_cbor": "a3010a02a46176016372657603657265736574f563766f6c181e0307",
+      "result": "applied",
+      "stored": "{\"v\":1,\"rev\":3,\"vol\":30}"
+    },
+    {
+      "name": "reset_only",
+      "note": "reset alone: back to the build's settings",
+      "params": {
+        "v": 1,
+        "rev": 4,
+        "reset": true
+      },
+      "cmd_cbor": "a3010a02a36176016372657604657265736574f50307",
+      "result": "applied",
+      "stored": "{\"v\":1,\"rev\":4}"
+    },
+    {
+      "name": "largest",
+      "note": "everything at once with the longest values: 99 bytes, at most 127 fit",
+      "params": {
+        "v": 1,
+        "rev": 4294967295,
+        "btn": [
+          "purple",
+          "orange",
+          "yellow",
+          "purple"
+        ],
+        "bright": 100,
+        "vol": 100,
+        "tamper": false
+      },
+      "cmd_cbor": "a3010a02a6617601637265761affffffff6362746e8466707572706c65666f72616e67656679656c6c6f7766707572706c6566627269676874186463766f6c18646674616d706572f40307",
+      "result": "applied",
+      "stored": "{\"v\":1,\"rev\":4294967295,\"btn\":[\"purple\",\"orange\",\"yellow\",\"purple\"],\"bright\":100,\"vol\":100,\"tamper\":false}"
+    }
+  ]
+}

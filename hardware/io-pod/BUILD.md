@@ -104,8 +104,11 @@ Not decided, or not supported yet:
   first build** (decision P5J-8, for the maintainer).
 - **The enclosure**, and how the phone and the pod are carried together (one
   case, or two linked by the cable): not chosen.
-- **Settings over the link** (button colours, LED count...): the pod takes them
-  from its firmware build only (decision PF15).
+- **Settings that are not in the radio command**: the LED count, the pins, the
+  radio and the Bluetooth security come from the firmware build only; a pod has
+  no admin menu, so no admin PIN (decision PODC-2). The button colours, the
+  ring's brightness, the volume and the enclosure switch can be set over the
+  radio ([section 9, "Settings over the radio"](#settings-over-the-radio)).
 - **A wiring diagram of its own**: the pod's wiring is the Field Box's without
   the display ([section 8](#8-wiring-step-by-step)); one may follow its first
   build (P5J-12).
@@ -332,6 +335,42 @@ the Kconfig menu "I/O pod", listed in firmware/esp32/README.md):
 
 Leave `CONFIG_ATALAIA_POD_BLE_ENCRYPTED` on: it keeps the game key off an
 unencrypted Bluetooth link.
+
+### Settings over the radio
+
+Four of the pod's settings can be changed without a cable and without building
+again: **the buttons' colours, the ring's default brightness, the volume and
+whether the enclosure switch reports**. The field controller pushes them over
+the radio from the GM console (decision PODC; the format is
+[protocol/pod-config.md](../../protocol/pod-config.md)). The `build-pod\sdkconfig` lines above are the values the pod has until
+something is pushed; what is pushed is kept in the pod's flash and wins over them,
+also after a restart, until it is reset.
+
+1. **The pod must be linked to a phone that has joined the game** ([section 10](#10-linking-it-to-a-phone)):
+   the pod's radio is the phone's node in the game, and it opens the command
+   with the game key. A pod not linked, or a phone not in the game, cannot be
+   reached.
+2. In the GM console (the Pi's or the phone's), tab *Boxes*, panel *I/O pods'
+   settings*: the phones of the game are listed. For the phone with the pod,
+   tick *Set the colours* and choose a colour for each button (*the game's team*
+   is the default: button N is the game's N-th team), and/or the ring's
+   brightness and the volume in percent, and the enclosure switch (*reports a
+   tamper* or *ignored*; a switch the build did not fit stays off). Fill in only
+   what you want to change. *Back to the build's settings first* drops
+   everything pushed so far.
+3. Press *Send to the pod*. The controller sends it over the radio and shows
+   *sent (1), waiting*; the pod keeps it, shows its new colours to the phone at
+   once and says so through its phone: the page shows *taken by the pod*. If the
+   answer does not come, the controller sends it again after 8, 16, 32, 64 and
+   128 seconds, then shows *no answer*.
+4. **No answer** means one of: the phone has no I/O pod (the console cannot
+   tell), the pod's firmware is older than this feature (flash a newer one), the pod is
+   not linked or out of radio reach, or it is out of battery.
+
+Only **before a game starts or after it ended**; during a game the panel is
+disabled. A **new pod firmware** is needed once (this feature is in the
+firmware); until then a pod keeps working with its build's settings and the
+console shows *no answer*.
 
 ## 10. Linking it to a phone
 

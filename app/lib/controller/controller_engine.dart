@@ -77,6 +77,7 @@ import 'controller_firmware.dart';
 import 'controller_mode_fetch.dart';
 import 'controller_modes.dart';
 import 'controller_pairing.dart';
+import 'controller_pod_config.dart';
 import 'controller_positions.dart';
 import 'controller_radio.dart';
 import 'controller_scenarios.dart';
@@ -431,6 +432,9 @@ class ControllerEngine {
   ControllerPairing? pairing;
   ControllerAdoption? adoption;
   ControllerFirmware? firmware;
+
+  /// The I/O pods' settings over the radio (controller_pod_config.dart).
+  ControllerPodConfig? podConfig;
 
   /// Slice S7: the schedule pulled from the site server
   /// (controller_schedule.dart), the site sync (controller_sync.dart) and
@@ -2099,6 +2103,8 @@ class ControllerEngine {
     // or without a game.
     boxes?.tick(nowMs());
     pairing?.tick(nowMs());
+    podConfig
+        ?.tick(); // pod settings sent again until the pod says it took them
     branding?.purge(); // crests nothing refers to, at most every 10 minutes
     final fc = _fc;
     if (fc == null) return;
@@ -2238,6 +2244,38 @@ class ControllerEngine {
     final int? seq;
     try {
       seq = fc.sendUpdateCmd(params, dest: nodeId);
+    } on FieldControllerException catch (e) {
+      throw ControllerError(e.message);
+    }
+    if (seq == null) {
+      throw ControllerError.unavailable(
+        '${radioProblem() ?? 'the radio is $radioState'}; command not sent',
+      );
+    }
+    return seq;
+  }
+
+  /// CMD pod (RFC 0001 Amendment 17) to the node id of the phone an I/O pod
+  /// serves, only while the live game has not started or after it ended
+  /// (engine.py `send_pod_config`; controller_pod_config.dart checks the
+  /// settings and the node first): the packet's seq.
+  int sendPodConfig(int nodeId, Map<String, Object?> params) {
+    final g = _game;
+    if (g == null) {
+      throw ControllerError.conflict(
+        "no live game: the pod's phone must be joined to one",
+      );
+    }
+    final fc = _live(g['id']! as int);
+    if (g['state'] != 'ready' && g['state'] != 'ended') {
+      throw ControllerError.conflict(
+        "game ${g['id']} is ${g['state']}: pod settings only before a game "
+        'starts or after it ended',
+      );
+    }
+    final int? seq;
+    try {
+      seq = fc.sendPodCmd(params, dest: nodeId);
     } on FieldControllerException catch (e) {
       throw ControllerError(e.message);
     }

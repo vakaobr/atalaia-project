@@ -133,6 +133,7 @@ import 'controller_adoption.dart' show ControllerAdoption;
 import 'controller_boxes.dart' show ControllerBoxes;
 import 'controller_firmware.dart' show ControllerFirmware, reportMax, slotSize;
 import 'controller_pairing.dart' show ControllerPairing;
+import 'controller_pod_config.dart' show ControllerPodConfig;
 import 'mode_package.dart';
 
 part 'controller_api_s7b.dart';
@@ -165,6 +166,7 @@ const controllerFeatures = [
   'boxes',
   'adoption',
   'firmware',
+  'pod_config',
   'presets',
   'branding',
   'scenarios',

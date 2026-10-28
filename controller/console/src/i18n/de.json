@@ -1602,5 +1602,45 @@
   "boxlogo": {
     "failed": "Das Logo ist für die Konsole gespeichert, aber dieser Browser konnte es nicht für die Field Boxes umwandeln: sie behalten das Atalaia-Logo.",
     "ready": "Die Field Boxes zeigen dieses Logo."
+  },
+  "pod_config": {
+    "title": "Einstellungen der E/A-Module",
+    "hint": "Stellt per Funk, mit dem Spielschlüssel versiegelt, die Tastenfarben, die Helligkeit des Rings, die Lautstärke und den Gehäuseschalter des E/A-Moduls ein, mit dem ein Telefon verbunden ist. Nur ausgefüllte Einstellungen ändern sich; das Modul speichert sie im Flash. Funk, Pins und Bluetooth-Sicherheit bleiben wie gebaut.",
+    "not_ready": "Moduleinstellungen werden nur vor dem Spielstart oder nach dem Spielende gesendet.",
+    "no_phones": "In diesem Spiel hat sich noch kein Telefon gemeldet: zuerst das Telefon mit dem Modul beitreten lassen.",
+    "buttons": "Tastenfarben",
+    "set_buttons": "Farben setzen",
+    "button": "Taste {n}",
+    "game_team": "das Team des Spiels",
+    "bright": "Helligkeit des Rings (%)",
+    "vol": "Lautstärke (%)",
+    "other": "Gehäuseschalter",
+    "tamper": "Schalter",
+    "tamper_on": "meldet Manipulation",
+    "tamper_off": "ignoriert",
+    "unchanged": "unverändert",
+    "reset": "Zuerst auf die Einstellungen des Builds zurück",
+    "state": "Modul",
+    "send": "An das Modul senden",
+    "nothing": "Mindestens eine Einstellung wählen.",
+    "cancel": "Nicht mehr auf die Module warten",
+    "no_answer_hint": "Keine Antwort: Das Telefon hat kein E/A-Modul, die Firmware des Moduls ist älter als diese Funktion oder es ist außer Funkreichweite. Es wurde schon mehrfach erneut gesendet.",
+    "states": {
+      "sent": "gesendet ({tries}), wartet",
+      "applied": "vom Modul übernommen",
+      "no_answer": "keine Antwort",
+      "cancelled": "gestoppt"
+    },
+    "colours": {
+      "red": "rot",
+      "blue": "blau",
+      "green": "grün",
+      "yellow": "gelb",
+      "orange": "orange",
+      "purple": "violett",
+      "white": "weiß",
+      "pink": "rosa",
+      "cyan": "cyan"
+    }
   }
 }

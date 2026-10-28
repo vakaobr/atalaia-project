@@ -1602,5 +1602,45 @@
   "boxlogo": {
     "failed": "The logo is saved for the console, but this browser could not convert it for the Field Boxes: they keep the Atalaia logo.",
     "ready": "The Field Boxes will show this logo."
+  },
+  "pod_config": {
+    "title": "I/O pods' settings",
+    "hint": "Sets the buttons' colours, the ring's brightness, the volume and the enclosure switch of the I/O pod a phone is linked to, over the radio, sealed with the game key. Only the settings you fill in change; the pod keeps them in its flash. Radio, pins and Bluetooth security stay as built.",
+    "not_ready": "Pod settings go out only before a game starts or after it ended.",
+    "no_phones": "No phone has said hello in this game yet: join the phone that has the pod first.",
+    "buttons": "Button colours",
+    "set_buttons": "Set the colours",
+    "button": "Button {n}",
+    "game_team": "the game's team",
+    "bright": "Ring brightness (%)",
+    "vol": "Volume (%)",
+    "other": "Enclosure switch",
+    "tamper": "Switch",
+    "tamper_on": "reports a tamper",
+    "tamper_off": "ignored",
+    "unchanged": "unchanged",
+    "reset": "Back to the build's settings first",
+    "state": "Pod",
+    "send": "Send to the pod",
+    "nothing": "Choose at least one setting.",
+    "cancel": "Stop waiting for the pods",
+    "no_answer_hint": "No answer: the phone has no I/O pod, the pod's firmware is older than this feature, or it is out of radio reach. Sent again several times already.",
+    "states": {
+      "sent": "sent ({tries}), waiting",
+      "applied": "taken by the pod",
+      "no_answer": "no answer",
+      "cancelled": "stopped"
+    },
+    "colours": {
+      "red": "red",
+      "blue": "blue",
+      "green": "green",
+      "yellow": "yellow",
+      "orange": "orange",
+      "purple": "purple",
+      "white": "white",
+      "pink": "pink",
+      "cyan": "cyan"
+    }
   }
 }

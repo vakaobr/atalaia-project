@@ -20,7 +20,7 @@ messages:
   - { id: 2, name: EVENT,  doc: "one game or system event" }
   - { id: 3, name: ACK,    doc: "confirms receipt of a sequence number" }
   - { id: 4, name: STATE,  doc: "periodic snapshot of local state and per-team counters" }
-  - { id: 5, name: CMD,    doc: "controller or GM instruction: start, pause, reset, set owner, message, a mode command, a firmware update" }
+  - { id: 5, name: CMD,    doc: "controller or GM instruction: start, pause, reset, set owner, message, a mode command, a firmware update, an I/O pod's settings" }
   - { id: 6, name: TIME,   doc: "game-clock beacon; also the controller heartbeat" }
   - { id: 7, name: CONFIG, doc: "assigns a preset and role; parameters only" }
   - { id: 8, name: CLAIM,  doc: "controller election: candidate claims the role with a term number" }
@@ -53,7 +53,7 @@ payloads:
     - { key: 7, name: flags, type: uint8, required: false, doc: "bit 0: running, bit 1: paused" }
     - { key: 8, name: epoch, type: uint16, required: true, doc: "current nonce epoch" }
   CMD:
-    - { key: 1, name: cmd, type: uint8, required: true, doc: "opcode: 0-9 (9: firmware update, RFC 0001 Amendment 6)" }
+    - { key: 1, name: cmd, type: uint8, required: true, doc: "opcode: 0-10 (9: firmware update, RFC 0001 Amendment 6; 10: an I/O pod's settings, Amendment 17)" }
     - { key: 2, name: params, type: map, required: false, doc: "command-specific parameters" }
     - { key: 3, name: dest, type: uint16, required: false, doc: "destination node; absent = broadcast" }
   TIME:

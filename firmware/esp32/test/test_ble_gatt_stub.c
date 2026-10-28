@@ -179,7 +179,7 @@ static void setup(bool encrypted)
     cfg.leds = true;
     cfg.led_count = 24;
     pod_caps_init(&caps, &cfg, &hal, NULL);
-    pod_io_t io = {link_write, now, command, ident, NULL, NULL, NULL};
+    pod_io_t io = {link_write, now, command, ident, NULL, NULL, NULL, NULL};
     modem_io_t rio = {.radio_send = radio_send, .now_ms = now};
     pod_init(&pod, &io, &rio, &atalaia_crypto_test_stub, "test", true, 16);
     pod_ble_stack_t stack = {stub_notify, NULL};

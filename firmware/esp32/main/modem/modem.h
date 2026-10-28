@@ -57,6 +57,13 @@ typedef struct {
      * its own links as RADIO_* frames (main/pod/pod.c). NULL for the modem. */
     void (*frame_out)(void *frame_ctx, uint8_t type, const uint8_t *payload, size_t len);
     void *frame_ctx;
+    /* When set, called with every game packet heard once it is authenticated and is not a
+     * repeat (header, plaintext payload); true takes it: it is not sent to the host. The I/O
+     * pod takes the CMD that configures it here (main/pod/pod.c, decision PODC). NULL for the
+     * modem. */
+    bool (*rx_filter)(void *filter_ctx, const atalaia_header_t *hdr, const uint8_t *plain,
+                      size_t len);
+    void *filter_ctx;
 } modem_io_t;
 
 typedef struct {
@@ -77,6 +84,7 @@ typedef struct {
     uint32_t bad_frames;
     uint32_t field_rx; /* field frames forwarded to the host */
     uint32_t field_tx; /* field frames queued for the radio */
+    uint32_t rx_taken; /* packets the I/O pod took for itself (rx_filter), not sent on */
 } modem_counters_t;
 
 typedef struct {

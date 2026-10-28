@@ -77,6 +77,9 @@ CMD_MODE = 8
 # A firmware update over Wi-Fi (RFC 0001 Amendment 6, protocol/firmware-update.md):
 # params {"id", "version"}; the controller sends it only to boxes between games.
 CMD_UPDATE = 9
+# The I/O pod's settings (RFC 0001 Amendment 17, protocol/pod-config.md): params {"v", "rev", ...};
+# the controller sends it to the node id of the phone a pod serves, and the pod's radio takes it.
+CMD_POD = 10
 CMD_OPCODES = {
     "start": CMD_START,
     "pause": CMD_PAUSE,
@@ -88,6 +91,7 @@ CMD_OPCODES = {
     "reboot": CMD_REBOOT,
     "mode": CMD_MODE,
     "update": CMD_UPDATE,
+    "pod": CMD_POD,
 }
 
 PRIO_TELEMETRY = 0
@@ -443,7 +447,7 @@ class FieldController:
         if isinstance(cmd, str) and cmd not in CMD_OPCODES:
             raise ValueError(f"unknown command {cmd!r}")
         opcode = CMD_OPCODES[cmd] if isinstance(cmd, str) else int(cmd)
-        if not 0 <= opcode <= CMD_UPDATE:
+        if not 0 <= opcode <= CMD_POD:
             raise ValueError(f"unknown command opcode {opcode}")
         return self._send_cmd(opcode, params, dest, now_ms=now_ms)
 

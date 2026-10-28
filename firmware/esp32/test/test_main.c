@@ -51,6 +51,7 @@ int main(void)
     run_board_fem_tests();
     run_screen_template_tests();
     run_pod_tests();
+    run_pod_settings_tests();
     run_fw_update_tests();
     run_mode_package_tests();
     run_mode_fetch_tests();

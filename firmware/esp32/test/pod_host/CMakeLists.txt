@@ -30,6 +30,7 @@ add_executable(pod_host
     ${MAIN_DIR}/pod/pod.c
     ${MAIN_DIR}/pod/pod_caps.c
     ${MAIN_DIR}/pod/pod_json.c
+    ${MAIN_DIR}/pod/pod_settings.c
     ${MAIN_DIR}/pod/pod_ble.c
     ${MAIN_DIR}/key_filter.c
     ${MAIN_DIR}/modem/modem.c

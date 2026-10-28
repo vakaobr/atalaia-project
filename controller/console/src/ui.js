@@ -203,7 +203,7 @@ export function takeHashToken() {
 /** The console's areas a controller may serve: GET /api/v1/whoami's "features". The Pi's
  * controller serves them all (api.py FEATURES); the Android controller fewer. */
 export const AREAS = ['checkin', 'join', 'box_language', 'positions', 'presets', 'branding', 'radio', 'boxes',
-    'adoption', 'firmware', 'atak', 'field', 'scenarios', 'schedule', 'mode_packages', 'failover'];
+    'adoption', 'firmware', 'pod_config', 'atak', 'field', 'scenarios', 'schedule', 'mode_packages', 'failover'];
 
 /** Whether a controller whose whoami gave `features` serves `area`; one that gives no list (an
  * older controller) serves them all. */

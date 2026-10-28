@@ -150,8 +150,8 @@ class Field:
         self.host.hear(node_packet(key, game["id"], BOX, self.box_seq, 1, msg_type, payload, ack=ack))
         self.box_seq += 1
 
-    def box_hello(self, fw: str = "0.3.0", device: "bytes | None" = None) -> None:
-        fields = {"node_name": "box-7", "platform": 1, "fw_version": fw, "core_version": "0.2.0", "tier": 0,
+    def box_hello(self, fw: str = "0.3.0", device: "bytes | None" = None, platform: int = 1) -> None:
+        fields = {"node_name": "box-7", "platform": platform, "fw_version": fw, "core_version": "0.2.0", "tier": 0,
                   "capabilities": [0, 2], "transports": 1, "battery_pct": 87, "epoch": 1}
         if device is not None:
             fields["device_id"] = device  # HELLO key 10 (protocol/field-frames.md)
@@ -932,6 +932,59 @@ class ConsoleBrowserTests(unittest.TestCase):
             for answer in box.tick(now_ms + 9_000):
                 self.field.host.hear(answer)
         return box, device, hexid, deliver_invite
+
+    def test_pod_settings_from_the_boxes_tab(self):
+        """The I/O pod's settings over the radio (protocol/pod-config.md): the GM sets a phone's pod in
+        the Boxes tab before the game starts; CMD pod (opcode 10) goes on the air to that phone's node
+        id; the phone's node.setup_applied shows it taken, in both languages."""
+        ctrl = self.field.bundle.controller
+        game = self.field.create_game()
+        self.field.box_hello("app-0.5.0", platform=3)  # a phone: only a phone has an I/O pod
+        page = self.console()
+        page.get_by_test_id("tab-nodes").click()
+        expect(page.get_by_test_id("pod-config-panel")).to_contain_text("Definições dos módulos de E/S")
+        expect(page.get_by_test_id("pod-config-nodes")).to_contain_text(str(BOX))
+        send = page.get_by_test_id(f"pod-send-{BOX}")
+        send.click()  # nothing chosen: refused on the page, nothing goes on the air
+        expect(page.get_by_test_id("toast")).to_contain_text("Escolhe pelo menos uma definição")
+        page.get_by_test_id(f"pod-setbtn-{BOX}").check()
+        page.get_by_test_id(f"pod-btn-{BOX}-1").select_option("red")
+        page.get_by_test_id(f"pod-btn-{BOX}-4").select_option("blue")
+        page.get_by_test_id(f"pod-bright-{BOX}").fill("55")
+        page.get_by_test_id(f"pod-tamper-{BOX}").select_option("off")
+        key = ctrl.game_key(game["id"])
+        epoch = ctrl.transport.epoch
+        self.field.host.transmitted_all(0.3)
+        send.click()
+        state = page.get_by_test_id(f"pod-state-{BOX}")
+        expect(state).to_contain_text("enviado (1), a aguardar")
+        cmds = []
+
+        def heard() -> bool:
+            for pkt in self.field.host.transmitted_all(0.2):
+                hdr, plain = packet_decrypt(pkt, epoch, key)
+                if hdr.type == MESSAGE_TYPES["CMD"]:
+                    cmds.append(cmd_decode(plain))
+            return any(c["cmd"] == 10 and c["dest"] == BOX for c in cmds)
+        self.assertTrue(wait_for(heard, 5), cmds)
+        sent = next(c for c in cmds if c["cmd"] == 10)
+        self.assertEqual(sent["params"]["btn"], ["red", "", "", "blue"])
+        self.assertEqual((sent["params"]["v"], sent["params"]["bright"], sent["params"]["tamper"]), (1, 55, False))
+        expect(page.get_by_test_id("pod-cancel")).to_be_visible()
+        # The pod took it: its phone says so over the radio (node.setup_applied), the page follows.
+        rev = sent["params"]["rev"]
+        self.field.box("EVENT", codec.encode_event({
+            "node": BOX, "seq": 2, "t": 0, "type": "node.setup_applied",
+            "data": {"kind": "pod_config", "rev": rev}}), ack=True)
+        expect(state).to_contain_text("aceite pelo módulo")
+        expect(page.get_by_test_id("pod-cancel")).to_have_count(0)
+        page.get_by_test_id("lang").first.select_option("en")
+        expect(page.get_by_test_id("pod-config-panel")).to_contain_text("I/O pods' settings")
+        expect(state).to_contain_text("taken by the pod")
+        # Never during a game.
+        self.assertEqual(self.field.http.post(f"/api/v1/games/{game['id']}/start", json={"force": True}).status_code, 200)
+        expect(page.get_by_test_id("pod-not-ready")).to_be_visible()
+        expect(send).to_be_disabled()
 
     def test_firmware_update_from_the_boxes_tab(self):
         """Firmware updates (protocol/firmware-update.md): the GM uploads a signed release in the
@@ -3828,7 +3881,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v13').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v14').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):

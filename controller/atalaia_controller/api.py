@@ -79,6 +79,8 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/games/{id}/positions      where the nodes are on the field image: {x, y, level}
     PUT  /api/v1/games/{id}/positions/{n}  move a node on it (or to another level)
     GET  /api/v1/controller/ca             the field CA's certificate (PEM), no token (ADR-P3-9)
+    GET|DELETE /api/v1/pod-config          GM: the phones of the game and the pod settings sent / stop waiting
+    POST /api/v1/pod-config/{node}         GM: push settings to the I/O pod of a phone {"btn": [4 colours], "bright", "vol", "tamper", "reset"}
     GET|POST /api/v1/firmware              GM: firmware releases and updates / upload a signed release
                                            (raw image; ?platform=&version=&signature=)
     DELETE /api/v1/firmware/{id}           GM: delete a release
@@ -175,7 +177,7 @@ IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp"}
 # The console hides the tabs and panels of an area a controller leaves out; the Android controller
 # (app/lib/controller/controller_api.dart, controllerFeatures) serves fewer. A new area goes in both.
 FEATURES = ("checkin", "join", "box_language", "positions", "presets", "branding", "radio", "boxes",
-            "adoption", "firmware", "atak", "field", "scenarios", "schedule", "mode_packages", "failover")
+            "adoption", "firmware", "pod_config", "atak", "field", "scenarios", "schedule", "mode_packages", "failover")
 NO_STORE = {"Cache-Control": "no-store"}
 # Served images: never sniffed as anything else, and inert if opened as a page (decision BR9).
 NO_BOX_LOGO = "no logo a box can draw (a PNG logo is converted for the box, a JPEG or WebP one by the console)"
@@ -1117,6 +1119,25 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         return Response(ca_pem, media_type="application/x-pem-file",
                         headers={"X-Atalaia-CA-SHA256": hashlib.sha256(der).hexdigest(),
                                  "Cache-Control": "no-cache"})
+
+    # --- the I/O pod's settings over the radio (pod_config.py, protocol/pod-config.md) ---
+
+    def pod_config() -> Any:
+        if controller.pod_config is None:
+            raise HTTPException(503, "pod settings are not set up on this controller")
+        return controller.pod_config
+
+    @app.get("/api/v1/pod-config", dependencies=[Depends(require_gm)])
+    def pod_config_status() -> dict[str, Any]:
+        return pod_config().status()
+
+    @app.delete("/api/v1/pod-config", dependencies=[Depends(require_gm)])
+    def pod_config_cancel() -> dict[str, Any]:
+        return {"cancelled": pod_config().cancel()}
+
+    @app.post("/api/v1/pod-config/{node_id}", dependencies=[Depends(require_gm)])
+    def pod_config_push(node_id: int, body: Any = Body(None)) -> dict[str, Any]:
+        return pod_config().push(node_id, body if body is not None else {})
 
     # --- firmware updates (firmware_updates.py, protocol/firmware-update.md) -----------
 

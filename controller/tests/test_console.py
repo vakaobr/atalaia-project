@@ -29,6 +29,7 @@ from atalaia_controller.api import (CONSOLE_DIR, FEATURES, FIELD_MAP_HEADERS, FI
                                     FIELD_MAP_ORTHOPHOTOS, SECURITY_HEADERS, Auth, create_app)
 from atalaia_controller.engine import BOX_LANGUAGES, Controller
 from atalaia_controller.firmware_release import REPORT_RESULTS
+from atalaia_controller.pod_config import COLOURS as POD_COLOURS
 from atalaia_controller.store import Store
 from atalaia_controller.ws import Hub
 
@@ -295,6 +296,8 @@ class ConsoleFilesTests(unittest.TestCase):
                                                    "cancelled")),
                               ("firmware.reasons", tuple(r for r in REPORT_RESULTS if r != "installed")
                                + ("self_test",)),
+                              ("pod_config.states", ("sent", "applied", "no_answer", "cancelled")),
+                              ("pod_config.colours", POD_COLOURS),
                               ("firmware.results", ("sent", "unknown", "wrong_platform", "wrong_tier",
                                                     "unknown_version", "not_newer", "in_progress", "not_in_game",
                                                     "radio"))):
@@ -387,6 +390,7 @@ class ConsoleFilesTests(unittest.TestCase):
         "boxes": ("GET", "/api/v1/boxes"),
         "adoption": ("GET", "/api/v1/adopt"),
         "firmware": ("GET", "/api/v1/firmware"),
+        "pod_config": ("GET", "/api/v1/pod-config"),
         "atak": ("GET", "/api/v1/atak"),
         "field": ("GET", "/api/v1/field/features"),
         "scenarios": ("GET", "/api/v1/scenarios"),

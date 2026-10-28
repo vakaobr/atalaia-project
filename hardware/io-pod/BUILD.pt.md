@@ -111,8 +111,12 @@ Não decidido, ou ainda sem suporte:
   montagem** (decisão P5J-8, para quem mantém o projeto).
 - **A caixa**, e como o telemóvel e o módulo são transportados juntos (uma só
   caixa, ou duas ligadas pelo cabo): não escolhida.
-- **Definições pela ligação** (cores dos botões, número de LED...): o módulo
-  recebe-as só da compilação do firmware (decisão PF15).
+- **Definições que não estão no comando pelo rádio**: o número de LED, os
+  pinos, o rádio e a segurança Bluetooth vêm só da compilação do firmware; um
+  módulo não tem menu de administração, por isso não tem PIN de administração
+  (decisão PODC-2). As cores dos botões, o brilho do anel, o volume e o
+  interruptor da caixa podem ser definidos pelo rádio
+  ([secção 9, "Definições pelo rádio"](#definições-pelo-rádio)).
 - **Um esquema de ligações próprio**: as ligações do módulo são as da Field Box
   sem o ecrã ([secção 8](#8-ligações-passo-a-passo)); pode surgir um com a
   primeira montagem (P5J-12).
@@ -348,6 +352,44 @@ firmware/esp32/README.md):
 
 Deixa `CONFIG_ATALAIA_POD_BLE_ENCRYPTED` ligado: impede que a chave do jogo
 circule numa ligação Bluetooth sem cifra.
+
+### Definições pelo rádio
+
+Quatro definições do módulo podem ser mudadas sem cabo e sem compilar de novo:
+**as cores dos botões, o brilho do anel, o volume e se o interruptor da caixa
+comunica**. O controlador de campo envia-as pelo rádio, a partir da consola do
+GM (decisão PODC; o formato está em
+[protocol/pod-config.md](../../protocol/pod-config.md), em inglês). As linhas de
+`build-pod\sdkconfig` acima são os valores que o módulo tem até lhe enviarem
+alguma coisa; o que é enviado fica guardado na memória flash do módulo e
+prevalece sobre elas, também depois de um reinício, até ser reposto.
+
+1. **O módulo tem de estar ligado a um telemóvel que entrou no jogo**
+   ([secção 10](#10-ligá-lo-a-um-telemóvel)): o rádio do módulo é o nó do
+   telemóvel no jogo e abre o comando com a chave do jogo. Um módulo sem ligação,
+   ou um telemóvel fora do jogo, não pode ser alcançado.
+2. Na consola do GM (a do Pi ou a do telemóvel), separador *Caixas*, painel
+   *Definições dos módulos de E/S*: aparecem os telemóveis do jogo. No telemóvel
+   com o módulo, marca *Definir as cores* e escolhe uma cor para cada botão
+   (*a equipa do jogo* é o predefinido: o botão N é a N.ª equipa do jogo), e/ou
+   o brilho do anel e o volume em percentagem, e o interruptor da caixa (*avisa
+   de violação* ou *ignorado*; um interruptor que a compilação não montou
+   continua desligado). Preenche só o que queres mudar. *Voltar primeiro às
+   definições da compilação* deixa cair tudo o que foi enviado até então.
+3. Carrega em *Enviar ao módulo*. O controlador envia pelo rádio e mostra
+   *enviado (1), a aguardar*; o módulo guarda, mostra as cores novas ao
+   telemóvel de imediato e di-lo através do telemóvel: a página mostra *aceite
+   pelo módulo*. Se a resposta não chegar, o controlador envia de novo ao fim de
+   8, 16, 32, 64 e 128 segundos e depois mostra *sem resposta*.
+4. **Sem resposta** quer dizer uma destas coisas: o telemóvel não tem módulo de
+   E/S (a consola não o sabe), o firmware do módulo é anterior a esta
+   funcionalidade (grava um mais recente), o módulo não está ligado ou está fora
+   do alcance do rádio, ou ficou sem bateria.
+
+Só **antes de um jogo começar ou depois de terminar**; durante um jogo o painel
+fica desativado. É preciso **um firmware novo do módulo** uma vez (esta
+funcionalidade está no firmware); até lá o módulo continua a funcionar com as
+definições da sua compilação e a consola mostra *sem resposta*.
 
 ## 10. Ligá-lo a um telemóvel
 

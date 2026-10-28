@@ -51,6 +51,10 @@ const cmdOpcodes = {
 /// CMD update's opcode (firmware updates, slice S7c).
 const cmdUpdate = 9;
 
+/// CMD pod's opcode (an I/O pod's settings, RFC 0001 Amendment 17,
+/// protocol/pod-config.md): the GM's alone, like [cmdUpdate].
+const cmdPod = 10;
+
 const broadcastNode = 0xffff;
 
 /// A box's C decoder turns CMD params into JSON in a 128-byte buffer.
@@ -426,6 +430,14 @@ class FieldController {
   int? sendUpdateCmd(Map<String, Object?> params, {required int dest}) {
     _requireController();
     return _sendCmd(cmdUpdate, params, dest);
+  }
+
+  /// CMD pod (opcode 10, RFC 0001 Amendment 17) to [dest], the node id of
+  /// the phone an I/O pod serves: the GM's alone (controller_pod_config.dart),
+  /// never a mode's field.lua, so not in [cmdOpcodes].
+  int? sendPodCmd(Map<String, Object?> params, {required int dest}) {
+    _requireController();
+    return _sendCmd(cmdPod, params, dest);
   }
 
   // --- receiving ------------------------------------------------------------

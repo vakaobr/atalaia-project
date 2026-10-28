@@ -293,8 +293,8 @@ class FieldScript:
     def _send(self, node_id: int, cmd: str, params: dict[str, Any]) -> bool:
         if cmd == "mode" and not COMMAND_NAME.match(str((params or {}).get("name", ""))):
             return False  # a mode command names itself (atalaia_sim.mode.COMMAND_NAME)
-        if cmd == "update":
-            return False  # firmware updates are the GM's alone (firmware_updates.py, decision FU3-4)
+        if cmd in ("update", "pod"):
+            return False  # firmware updates and pod settings are the GM's alone (firmware_updates.py, FU3-4; pod_config.py)
         try:
             return self._fc().send_cmd(cmd, params or None, dest=node_id,
                                        now_ms=self.engine.now_ms()) is not None
@@ -384,6 +384,7 @@ class Controller:
         # More of the same: boxes still fetching the game's modes (mode_fetch.py), and others.
         self.start_guards: list[Callable[[], Optional[str]]] = []
         self.firmware: Any = None  # firmware_updates.FirmwareUpdates, set by main.build
+        self.pod_config: Any = None  # pod_config.PodConfig, set by main.build
         self.signed_modes: Any = None  # signed_modes.SignedModes, set by main.build
         self.mode_fetch: Any = None  # mode_fetch.ModeFetch, set by main.build
         self.adoption: Any = None  # adoption.Adoption: field cards and USB adoption, set by main.build
@@ -1659,6 +1660,25 @@ class Controller:
                 raise Unavailable(f"the radio modem is {self.radio_state}; command not sent")
             return seq
 
+    def send_pod_config(self, node_id: int, params: dict[str, Any], resend: bool = False) -> int:
+        """CMD pod (RFC 0001 Amendment 17) to the node id of the phone a pod serves, only while the live
+        game has not started or after it ended (pod_config.py checks the settings and the node first).
+        The packet's seq."""
+        with self._lock:
+            if self.game is None:
+                raise Conflict("no live game: the pod's phone must be joined to one")
+            fc = self._live(self.game["id"])
+            if self.game["state"] not in ("ready", "ended"):
+                raise Conflict(f"game {self.game['id']} is {self.game['state']}: pod settings only before a "
+                               "game starts or after it ended")
+            try:
+                seq = fc.send_cmd("pod", params, dest=node_id, now_ms=self.now_ms())
+            except ValueError as exc:
+                raise ControllerError(str(exc)) from None
+            if seq is None:
+                raise Unavailable(f"the radio modem is {self.radio_state}; command not sent")
+            return seq
+
     def _check_mode_command(self, fc: FieldController, node_id: int, params: dict[str, Any]) -> None:
         """A GM's mode command must be one the game's manifests declare, for the node's role."""
         assert self.game is not None
@@ -1723,6 +1743,8 @@ class Controller:
             self.reinvite.tick(self.now_ms())  # invites and their retries, with or without a game
         if self.pairing is not None:
             self.pairing.tick(self.now_ms())  # pairing runs, offers heard, the listening window
+        if self.pod_config is not None:
+            self.pod_config.tick()  # pod settings sent again until the pod says it took them
         with self._lock:
             fc = self.fc
             if fc is None:

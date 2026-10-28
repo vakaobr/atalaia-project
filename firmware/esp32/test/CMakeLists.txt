@@ -188,6 +188,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/pod/pod.c
     ${SHELL_DIR}/pod/pod_caps.c
     ${SHELL_DIR}/pod/pod_json.c
+    ${SHELL_DIR}/pod/pod_settings.c
     ${SHELL_DIR}/pod/pod_ble.c
 )
 
@@ -235,6 +236,7 @@ set(TEST_SOURCES
     test_board_fem.c
     test_screen_template.c
     test_pod.c
+    test_pod_settings.c
     test_fw_update.c
     test_mode_package.c
     test_mode_fetch.c

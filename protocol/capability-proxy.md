@@ -86,6 +86,10 @@ These confirm the argument shapes the app chose before the pod existed (decision
 
 A button without `team` stands for the game's N-th team for `btn.N`, as a Field Box's button N; a builder may give a button a colour (`"team": "red"`), which the phone uses when the game has a team of that name. `tamper` is a new capability type, in the draft RFC with the phase 3 additions (`docs/rfcs/0000-phase-3-events-tags-and-pods.md`); the phone reports `opened` during a game as `node.tamper` with `reason: pod_opened`. The battery level is in IDENT (`battery_pct`) and in Pod Status, not in events.
 
+### The pod's settings over the radio (decision PODC, 2026-10-28; no change to this protocol's frames)
+
+The pod's own settings (the buttons' colours, the ring's brightness, the volume, the enclosure switch) can be pushed by the field controller as CMD pod (opcode 10, a sealed game packet to the phone's node id), which the pod's radio takes itself: [pod-config.md](pod-config.md). Over this link it appears as **one more EVT**: capability `pod`, event `config`, data `{"rev": N}`, sent when the pod has taken (or already had) the settings, which the phone turns into `node.setup_applied` for the controller; and as **one more IDENT**, sent again with the buttons' new colours. A phone that does not know the `pod` capability ignores the EVT (ACK means received). `protocol_version` stays 1.
+
 ### A hit sensor (refinement of 2026-10-19, phase 4 plan phase 2)
 
 The design specification's `hit` type (a target addon's piezo plate, decision P4R4; draft RFC 0000 Amendment 1) on this protocol: a descriptor `{"id": "hit", "type": "hit"}`, the event `hit` `{"strength": 0-255}` (the phone gives the script `hit.hit` with the same `strength`) and the commands `arm` and `disarm` without arguments (the sensor reports hits only while armed). No pod built so far has one; the vectors `target_addon`, `target_hit` and `target_arm` fix the bytes for the addon or a pod that will.

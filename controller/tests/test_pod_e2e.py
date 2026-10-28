@@ -17,6 +17,7 @@ acknowledged over the radio, and the controller's commands reach it.
 from __future__ import annotations
 
 import tempfile
+import time
 import unittest
 
 from fastapi.testclient import TestClient
@@ -30,6 +31,7 @@ from atalaia_sim.packet import (Header, ack_decode, cmd_decode, header_decode, h
 from atalaia_sim.protocol import MESSAGE_TYPES
 from atalaia_controller.api import Auth, create_app
 from atalaia_controller.engine import Controller
+from atalaia_controller.pod_config import PodConfig
 from atalaia_controller.radio_modem import RadioModem
 from atalaia_controller.store import Store
 from atalaia_controller.ws import Hub
@@ -208,6 +210,49 @@ class PodOnTheFieldRadio(unittest.TestCase):
         self.tx(j, "HELLO", hello_encode({"node_name": "p", "platform": 3, "fw_version": "x",
                                           "core_version": "0.2.0", "tier": 0, "capabilities": [],
                                           "transports": 3, "epoch": 2}), prio=2)
+
+    def test_the_controller_configures_the_pod(self):
+        """The GM's settings reach the pod over the radio, sealed with the game key: the pod takes them,
+        says so to its phone, and the phone's node.setup_applied tells the controller (decision PODC)."""
+        j = self.joined()
+        nid = j["node_id"]
+        pods = PodConfig(self.ctrl)
+        self.phone.send(cp.RADIO_CMD, bytes([cp.OP_IDENT]))
+        self.assertIsNotNone(self.phone.wait(cp.IDENT))
+        self.configure(j)
+        self.tx(j, "HELLO", hello_encode({
+            "node_name": f"phone-{nid}", "platform": 3, "fw_version": "app-0.3.0", "core_version": "0.2.0",
+            "tier": 0, "capabilities": [], "transports": 0b011, "epoch": 1}), prio=2)
+        self.assertTrue(wait_for(lambda: self.node(nid).get("platform") == 3, 5))
+        r = self.client.post(f"/api/v1/pod-config/{nid}", headers=GM, json={"btn": ["red", "", "", "blue"],
+                                                                           "bright": 40, "tamper": False})
+        self.assertEqual(r.status_code, 200, r.text)
+        rev = r.json()["rev"]
+        # The pod took it (its own log line), and did not pass the CMD on to its phone.
+        self.assertTrue(wait_for(lambda: self.pod.logged("POD settings"), 5))
+        self.assertTrue(self.pod.logged(f'"rev":{rev}'))
+        self.assertTrue(self.pod.logged('"btn":["red","","","blue"]'))
+        self.assertIsNone(self.received("CMD", lambda pl: cmd_decode(pl)["cmd"] == 10, timeout=0.5))
+        # Its IDENT again carries the new colours, and its EVT pod.config the rev, for the phone.
+        ident = None
+        end = time.monotonic() + 5
+        while time.monotonic() < end and ident is None:
+            for t, pl in list(self.phone.frames):
+                if t == cp.IDENT and any(c.get("team") == "red" for c in cp.decode_ident(pl)["capabilities"]):
+                    ident = cp.decode_ident(pl)
+            time.sleep(0.05)
+        self.assertIsNotNone(ident)
+        self.assertNotIn("case", [c["id"] for c in ident["capabilities"]])
+        evt = cp.decode_msg(cp.EVT, self.phone.wait(cp.EVT, lambda p: cp.decode_msg(cp.EVT, p)["cap_id"] == "pod"))
+        self.assertEqual((evt["cap_id"], evt["event"], evt["data"]), ("pod", "config", {"rev": rev}))
+        self.phone.send(cp.ACK, cp.encode_ack(evt["seq"]))
+        # The phone sends node.setup_applied over the radio; the controller shows it applied.
+        payload = encode_event({"node": nid, "seq": 1, "t": 0, "type": "node.setup_applied", "prio": "normal",
+                                "data": {"kind": "pod_config", "rev": rev}})
+        self.assertTrue(self.acked(j, self.tx(j, "EVENT", payload)))
+        self.assertTrue(wait_for(lambda: pods.pushes[nid]["state"] == "applied", 5))
+        # The same rev again (the controller's resend after a lost answer): the pod answers again.
+        self.assertEqual(self.client.delete("/api/v1/pod-config", headers=GM).status_code, 200)
 
 
 if __name__ == "__main__":

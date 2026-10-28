@@ -47,6 +47,7 @@ elseif(CONFIG_ATALAIA_POD_MODE)
         "pod/pod.c"
         "pod/pod_caps.c"
         "pod/pod_json.c"
+        "pod/pod_settings.c"
         "pod/pod_ble.c"
         "modem/modem.c"
         "modem/modem_framing.c"

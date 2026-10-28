@@ -242,6 +242,7 @@ void main() {
       'boxes': ('GET', '/api/v1/boxes'),
       'adoption': ('GET', '/api/v1/adopt'),
       'firmware': ('GET', '/api/v1/firmware'),
+      'pod_config': ('GET', '/api/v1/pod-config'),
       'atak': ('GET', '/api/v1/atak'),
       'field': ('GET', '/api/v1/field/features'),
       'scenarios': ('GET', '/api/v1/scenarios'),

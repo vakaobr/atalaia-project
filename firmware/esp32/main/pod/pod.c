@@ -6,6 +6,10 @@
  */
 #include "pod.h"
 
+#include "atalaia/msg_codec.h"
+#include "atalaia/protocol.h"
+#include "pod_settings.h"
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -101,6 +105,39 @@ static void radio_out(void *ctx, uint8_t type, const uint8_t *payload, size_t le
     }
     if (!valid_link(link) || !p->links[link].active) return;
     send(p, link, (uint8_t)(type + 3), payload, len);
+}
+
+/* The modem's rx_filter: a CMD pod (opcode 10) for this node is the pod's own (decision PODC). */
+static bool radio_filter(void *ctx, const atalaia_header_t *hdr, const uint8_t *plain, size_t len)
+{
+    pod_t *p = (pod_t *)ctx;
+    if (p->io.config == NULL || hdr->type != ATALAIA_MSG_CMD) return false;
+    atalaia_cmd_msg_t c;
+    if (!atalaia_cmd_decode(plain, len, &c) || c.cmd != POD_CMD_POD) return false;
+    /* Only the one this radio serves: a CMD to every node (65535) is the boxes' business, and a
+     * pod's settings are never broadcast. Another pod's (or an unknown opcode's) goes to the
+     * phone, which ignores it. */
+    if (c.dest != p->radio.node_id) return false;
+    uint32_t rev = 0;
+    pod_config_result_t r = p->io.config(p->io.ctx, c.params_json, &rev);
+    if (r == POD_CONFIG_REFUSED || r == POD_CONFIG_STALE) {
+        p->count.config_ignored++;
+        say(p, "pod settings ignored (%s)", r == POD_CONFIG_STALE ? "an older rev" : "not valid");
+        return true;
+    }
+    char data[24];
+    snprintf(data, sizeof(data), "{\"rev\":%lu}", (unsigned long)rev);
+    if (r == POD_CONFIG_APPLIED) {
+        p->count.config_applied++;
+        say(p, "pod settings rev %lu taken", (unsigned long)rev);
+        for (int l = 0; l < POD_LINK_COUNT; l++) {
+            if (p->links[l].active) pod_send_ident(p, (pod_link_t)l);
+        }
+    } else {
+        p->count.config_repeats++;
+    }
+    pod_event(p, "pod", "config", data);
+    return true;
 }
 
 static void radio_clear(pod_t *p, const char *why)
@@ -423,5 +460,7 @@ void pod_init(pod_t *p, const pod_io_t *io, const modem_io_t *radio_io,
     rio.serial_write = NULL;
     rio.frame_out = radio_out;
     rio.frame_ctx = p;
+    rio.rx_filter = radio_filter;
+    rio.filter_ctx = p;
     modem_init(&p->radio, &rio, crypto, fw_version, radio_present, epoch_window);
 }

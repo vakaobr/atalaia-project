@@ -254,6 +254,46 @@ void main() {
       expect(device.calls.where((c) => c.startsWith('vibrate')), isNotEmpty);
       pod.send('case closed');
       await until(() => !s.podOpened);
+
+      // The controller pushes the pod's settings over the radio (CMD pod,
+      // opcode 10, to the phone's node id; protocol/pod-config.md): the pod
+      // takes them itself (its phone never sees the CMD), and its phone says
+      // so over the radio as node.setup_applied, kind pod_config, with the rev.
+      final mark3 = ctl.frames.length;
+      controllerSends(
+        RfType.cmd,
+        RfCmd(
+          cmd: 10,
+          params: const {
+            'v': 1,
+            'rev': 1234,
+            'btn': ['red', '', '', 'blue'],
+            'bright': 40,
+          },
+          dest: 5,
+        ).encode(),
+      );
+      final taken = await ctl.wait(
+        ModemLink.rx,
+        from: mark3,
+        // (not the capture's repeats: nobody acknowledges them here)
+        match: (p) =>
+            fromPhone(p, RfType.event) &&
+            String.fromCharCodes(p).contains('pod_config'),
+      );
+      expect(
+        Uint8List.sublistView(taken.payload, 9, taken.payload.length - 4),
+        encode(
+          node: 5,
+          seq: 2,
+          tMs: s.gameTimeMs,
+          type: 'node.setup_applied',
+          team: 0,
+          squad: 0,
+          prio: 1,
+          dataJson: '{"kind":"pod_config","rev":1234}',
+        ),
+      );
       await s.close();
       // Closing the session clears the pod's radio.
       var configured = true;

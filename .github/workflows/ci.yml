@@ -370,6 +370,8 @@ jobs:
         run: python tools/atak_xml_vectors.py --check
       - name: The mode package vectors are up to date
         run: python tools/mode_package_vectors.py --check
+      - name: The I/O pod's settings vectors are up to date
+        run: python tools/pod_config_vectors.py --check
       - name: The scenario compiler's Unicode table is up to date
         run: python tools/scenario_unicode.py --check
       - name: The registry's JSON Schemas accept their examples and reject the invalid ones

@@ -37,12 +37,14 @@
  *   join <uid hex>                 a join card on the reader for 0.5 s
  *   case open | case closed        the enclosure switch
  *   battery <0-100>                the battery gauge's reading
+ *   settings                       the settings pushed over the radio (a POD settings line)
  *   status                         one STATUS line (JSON)
  *   quit
  * stdout: "READY usb=<port> ble=<port> air=<port>", then
  *   LED fill <r> <g> <b> | LED set <i> <r> <g> <b> | LED show <lit> | LED brightness <pct>
  *   TONE <hz> <ms> | AUDIO stop | AUDIO volume <pct>
  *   TX <hex>        a packet the pod's radio put on air
+ *   POD settings <json>  new settings taken from a CMD pod (opcode 10; main/pod/pod_settings.h)
  *   LOG <text>      the pod's log
  *   STATUS {...}
  * Port 0 picks a free port. It serves one client per link and runs until
@@ -68,6 +70,7 @@
 #include "pod/pod.h"
 #include "pod/pod_ble.h"
 #include "pod/pod_caps.h"
+#include "pod/pod_settings.h"
 #include "radio/noise_stats.h"
 #include "radio/radio_limits.h"
 
@@ -241,6 +244,8 @@ static const hal_led_ops_t led_ops = {ok_init, hw_fill, hw_set, hw_show, hw_brig
 static hal_t hal;
 static pod_t pod;
 static pod_caps_t caps;
+static pod_caps_config_t build_cfg;
+static pod_settings_t settings; /* kept in memory only: a host pod has no NVS */
 static pod_ble_t ble;
 static radio_limits_t limits;
 static uint32_t pending_tag[32];
@@ -305,6 +310,17 @@ static void link_active(void *ctx, pod_link_t link)
     (void)ctx;
     out("LOG phone on the %s link", link == POD_LINK_USB ? "usb" : "ble");
     pod_caps_report(&caps, emit, NULL);
+}
+
+static pod_config_result_t config_cmd(void *ctx, const char *params_json, uint32_t *rev)
+{
+    (void)ctx;
+    pod_config_result_t r = pod_settings_handle(&settings, params_json, &caps, &build_cfg, rev);
+    if (r == POD_CONFIG_APPLIED) {
+        char json[POD_SETTINGS_JSON_MAX];
+        if (pod_settings_to_json(&settings, json, sizeof(json)) > 0) out("POD settings %s", json);
+    }
+    return r;
 }
 
 static void log_line(void *ctx, const char *line)
@@ -455,6 +471,9 @@ static bool control(char *line)
         case_raw = 0;
     } else if (sscanf(line, "battery %d", &n) == 1) {
         battery = n < 0 ? -1 : n > 100 ? 100 : n;
+    } else if (strcmp(line, "settings") == 0) {
+        char json[POD_SETTINGS_JSON_MAX];
+        if (pod_settings_to_json(&settings, json, sizeof(json)) > 0) out("POD settings %s", json);
     } else if (strcmp(line, "status") == 0) {
         print_status();
     } else if (strcmp(line, "quit") == 0) {
@@ -585,7 +604,8 @@ int main(int argc, char **argv)
     hal.leds = &led_ops;
     pod_audio_t audio = {hw_tone, hw_stop, hw_volume, NULL};
     pod_caps_init(&caps, &cfg, &hal, &audio);
-    pod_io_t io = {link_write, now, command, ident, link_active, log_line, NULL};
+    build_cfg = caps.cfg;
+    pod_io_t io = {link_write, now, command, ident, link_active, log_line, NULL, config_cmd};
     modem_io_t rio = {
         .radio_send = radio_send,
         .set_channel = set_channel,

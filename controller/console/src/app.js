@@ -20,6 +20,7 @@ import { ScenarioBuilder } from './components/scenario-builder.js';
 import { RadioSettings } from './components/radio-settings.js';
 import { BoxLanguageSettings } from './components/box-language-settings.js';
 import { FirmwarePanel } from './components/firmware-panel.js';
+import { PodConfigPanel } from './components/pod-config-panel.js';
 import { FetchedModes } from './components/fetched-modes.js';
 import { ModePackages } from './components/mode-packages.js';
 import { CheckinPanel, posterChangedText } from './components/checkin-panel.js';
@@ -307,6 +308,9 @@ class App extends Component {
         case 'firmware':
             this.setState({ firmwareUpdates: msg.updates }); // firmware updates' progress (firmware-panel.js)
             break;
+        case 'pod_config':
+            this.setState({ podPushes: msg.pushes }); // the pods' settings sent (pod-config-panel.js)
+            break;
         case 'radio':
             this.setState({ radio: msg.radio });
             break;
@@ -557,6 +561,7 @@ class App extends Component {
             return html`<${FieldView} app=${this} />`;
         case 'nodes':
             return html`<${NodeList} app=${this} />${this.serves('firmware') && html`<${FirmwarePanel} app=${this} />`}${
+                this.serves('pod_config') && html`<${PodConfigPanel} app=${this} />`}${
                 this.serves('mode_packages') && html`<${FetchedModes} app=${this} />`}`;
         case 'join':
             return html`<${JoinPanel} app=${this} />`;

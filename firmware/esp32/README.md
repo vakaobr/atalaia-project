@@ -416,12 +416,23 @@ end a game with GAME_OVER and adopt a box by its code; IDENT says so (keys
 ordinary game packet sent as RADIO_TX (so under the same duty-cycle budget and region rules), and the box's HELLO and
 `node.update_failed` come back as RADIO_RX; the image and the report go over Wi-Fi (decision PE24-130, `test_update_relay`).
 The game key lives in RAM only and is forgotten
-when the link that configured the radio goes (decision PF5). The board
+when the link that configured the radio goes (decision PF5).
+
+**Settings over the radio** (decision PODC, 2026-10-28; `protocol/pod-config.md`): the field controller can push the
+buttons' colours, the ring's default brightness, the volume and whether the enclosure switch reports, as CMD pod (opcode 10,
+a sealed game packet to the node id of the phone the pod serves). The modem's radio logic hands the packet to the pod once it
+is authenticated with the game key and is not a repeat (`modem_io_t.rx_filter`, `radio_filter` in `main/pod/pod.c`); the pod
+does not pass it on to the phone. `main/pod/pod_settings.c` parses it strictly (an unknown key, a value out of range or a
+colour it has no name for refuses it all), orders the pushes by their `rev`, keeps what was pushed in NVS (namespace `pod`,
+key `settings`, applied again at boot before the first IDENT), puts it on the capabilities and answers with the EVT `pod.config`
+`{"rev"}` for the phone to turn into `node.setup_applied`; the pod sends its IDENT again with the new colours. Not in it: the
+radio, the pins, the Bluetooth security, an admin PIN (a pod has no admin menu) and the LED count (wiring); those stay in the
+build's Kconfig. The host pod prints `POD settings <json>` when it applies one. The board
 revision (V4.3 KCT8103L by default, V4.2 GC1109) and Vext are the Field
 Box's settings; the GNSS connector is not used (E21).
 
 ```
-python tools/docker_fw.py pod      -> firmware/esp32/build-pod/atalaia_esp32.bin (~650 KB)
+python tools/docker_fw.py pod      -> firmware/esp32/build-pod/atalaia_esp32.bin (~660 KB: 677,312 bytes with this feature, 33 % of the 2 MB slot)
 ```
 
 `sdkconfig.pod` selects `CONFIG_ATALAIA_POD_MODE` and NimBLE; CI's
@@ -434,13 +445,14 @@ lists the checks that need the board and a phone. Code:
   EVT with ACKs and resends, CMD acted on once, the radio passthrough (field and pair frames
   too), Pod Status (plain C);
 - `main/pod/pod_caps.c` -- the capabilities on the HAL ops (plain C);
+- `main/pod/pod_settings.c` -- the settings pushed over the radio: parse, merge, stored form, apply (plain C);
 - `main/pod/pod_ble.c` -- the GATT service's logic, UUIDs and advertising
   data (plain C); `pod_ble_nimble.c` puts it on NimBLE;
 - `main/pod/pod_task.c`, `pod_main.c` -- the ESP-IDF task, USB, audio queue,
   enclosure switch, and the boot.
 
 Tests: `test/test_pod.c` (the proxy and the capabilities, against the
-shared vectors; a box's update offer through the pod, opened with the game key, its duty-cycle refusal, the box's `node.update_failed` coming back), `test/test_ble_gatt_stub.c` (`ctest -R ble_gatt_stub`: the
+shared vectors; a box's update offer through the pod, opened with the game key, its duty-cycle refusal, the box's `node.update_failed` coming back; CMD pod over the radio: taken and not passed on, a repeat, a stale rev, another node, another key), `test/test_pod_settings.c` (the shared vectors `protocol/vectors/pod_config.json` through the core's CMD decoder, the strict parser's limits, the stored form read back, what the settings do to the capabilities), `test/test_ble_gatt_stub.c` (`ctest -R ble_gatt_stub`: the
 GATT service with the Bluetooth stack stubbed), `test/test_proxy_codec.c`
 (the frames). `test/pod_host/` builds the pod's code with real AES-CCM into
 a Linux program (USB and Bluetooth links as TCP sockets, the radio as UDP,

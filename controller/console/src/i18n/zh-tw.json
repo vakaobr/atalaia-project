@@ -1602,5 +1602,45 @@
   "boxlogo": {
     "failed": "標誌已為主控台儲存，但此瀏覽器無法為 Field Box 轉換它：Field Box 仍顯示 Atalaia 標誌。",
     "ready": "Field Box 將顯示此標誌。"
+  },
+  "pod_config": {
+    "title": "I/O 模組設定",
+    "hint": "透過無線電，以遊戲金鑰封裝，設定手機所連接之 I/O 模組的按鈕顏色、燈環亮度、音量與外殼開關。只有填寫的設定會改變；模組將其存於快閃記憶體。無線電、腳位與藍牙安全性維持建置時的設定。",
+    "not_ready": "模組設定僅能在遊戲開始前或結束後送出。",
+    "no_phones": "此遊戲尚無手機回報：請先讓裝有模組的手機加入。",
+    "buttons": "按鈕顏色",
+    "set_buttons": "設定顏色",
+    "button": "按鈕 {n}",
+    "game_team": "遊戲的隊伍",
+    "bright": "燈環亮度 (%)",
+    "vol": "音量 (%)",
+    "other": "外殼開關",
+    "tamper": "開關",
+    "tamper_on": "回報拆開",
+    "tamper_off": "忽略",
+    "unchanged": "不變",
+    "reset": "先還原為建置時的設定",
+    "state": "模組",
+    "send": "傳送至模組",
+    "nothing": "請至少選擇一項設定。",
+    "cancel": "不再等待模組",
+    "no_answer_hint": "沒有回應：該手機沒有 I/O 模組、模組韌體早於此功能，或不在無線電範圍內。已重送多次。",
+    "states": {
+      "sent": "已傳送（{tries}），等待中",
+      "applied": "模組已接受",
+      "no_answer": "沒有回應",
+      "cancelled": "已停止"
+    },
+    "colours": {
+      "red": "紅",
+      "blue": "藍",
+      "green": "綠",
+      "yellow": "黃",
+      "orange": "橙",
+      "purple": "紫",
+      "white": "白",
+      "pink": "粉紅",
+      "cyan": "青"
+    }
   }
 }

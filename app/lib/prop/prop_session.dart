@@ -425,6 +425,10 @@ class PropSession extends ChangeNotifier {
         _attachRadio(client, ident, replace: reconnected);
         notifyListeners();
       case PodCapabilityEvent(:final message):
+        if (message.capId == 'pod' && message.name == 'config') {
+          _podSettingsTaken(message.data);
+          return;
+        }
         unawaited(screenManager.activity());
         final inputs = _podInputs;
         if (inputs != null && inputs.caseOpened(message)) {
@@ -468,6 +472,24 @@ class PropSession extends ChangeNotifier {
     if (r == null) return;
     _log('radio link through the pod');
     unawaited(l.attachRadio(r, hello: link?.hello ?? const {}));
+  }
+
+  /// The pod took the settings the field controller pushed over the radio
+  /// (EVT pod.config {"rev"}, protocol/pod-config.md): said over the radio
+  /// as node.setup_applied, the acknowledgement the boxes' setups use, so
+  /// the controller stops sending them again. The radio's own ACKs and
+  /// resends carry it (normal priority).
+  void _podSettingsTaken(Map<String, Object?> data) {
+    final rev = data['rev'];
+    if (rev is! int) return;
+    _log('pod settings rev $rev taken');
+    _link?.sendEvent(
+      seq: ++_shellSeq,
+      tMs: gameTimeMs,
+      type: 'node.setup_applied',
+      prio: 'normal',
+      data: {'kind': 'pod_config', 'rev': rev},
+    );
   }
 
   /// The pod's enclosure was opened during the game (node.tamper, critical).

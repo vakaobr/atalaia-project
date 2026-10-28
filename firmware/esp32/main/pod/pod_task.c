@@ -28,7 +28,9 @@
 #include "freertos/task.h"
 #include "pod.h"
 #include "pod_ble.h"
+#include "nvs.h"
 #include "pod_config.h"
+#include "pod_settings.h"
 #include "radio/radio_task.h"
 
 #if POD_BLE_ENABLED
@@ -57,6 +59,8 @@ static const char *TAG = "pod";
 static const hal_t *hw;
 static pod_t pod;
 static pod_caps_t caps;
+static pod_caps_config_t build_cfg; /* what the Kconfig and the boot gave (pod_settings_apply) */
+static pod_settings_t settings;     /* what the field controller pushed (NVS "pod"/"settings") */
 static pod_ble_t ble;
 static bool ble_on;
 static QueueHandle_t audio_q;
@@ -143,6 +147,41 @@ static bool io_command(void *ctx, const atalaia_proxy_msg_t *cmd)
 {
     (void)ctx;
     return pod_caps_command(&caps, cmd);
+}
+
+/* ---- The settings pushed over the radio (pod_settings.h), kept in NVS ---------------- */
+
+#define SETTINGS_NS  "pod"
+#define SETTINGS_KEY "settings"
+
+static void settings_save(void)
+{
+    char json[POD_SETTINGS_JSON_MAX];
+    nvs_handle_t h;
+    if (pod_settings_to_json(&settings, json, sizeof(json)) == 0) return;
+    if (nvs_open(SETTINGS_NS, NVS_READWRITE, &h) != ESP_OK) return;
+    if (nvs_set_str(h, SETTINGS_KEY, json) == ESP_OK) nvs_commit(h);
+    nvs_close(h);
+}
+
+static void settings_load(void)
+{
+    char json[POD_SETTINGS_JSON_MAX] = "";
+    nvs_handle_t h;
+    if (nvs_open(SETTINGS_NS, NVS_READONLY, &h) == ESP_OK) {
+        size_t len = sizeof(json);
+        if (nvs_get_str(h, SETTINGS_KEY, json, &len) != ESP_OK) json[0] = '\0';
+        nvs_close(h);
+    }
+    pod_settings_load(&settings, json);
+}
+
+static pod_config_result_t io_config(void *ctx, const char *params_json, uint32_t *rev)
+{
+    (void)ctx;
+    pod_config_result_t r = pod_settings_handle(&settings, params_json, &caps, &build_cfg, rev);
+    if (r == POD_CONFIG_APPLIED) settings_save();
+    return r;
 }
 
 static int battery_pct(void)
@@ -322,6 +361,11 @@ void pod_task_start(const hal_t *hal, const pod_caps_config_t *cfg)
             xTaskCreatePinnedToCore(audio_task, "audio", 4096, NULL, AUDIO_TASK_PRIO, NULL, 0);
     }
     pod_caps_init(&caps, cfg, hal, audio_q != NULL ? &audio : NULL);
+    /* The settings pushed over the radio last time, on top of the build's (caps now has the
+     * parts that answered at boot). */
+    build_cfg = caps.cfg;
+    settings_load();
+    pod_settings_apply(&settings, &caps, &build_cfg);
     tamper_start();
 
     pod_io_t io = {
@@ -332,6 +376,7 @@ void pod_task_start(const hal_t *hal, const pod_caps_config_t *cfg)
         .link_active = io_link_active,
         .log = io_log,
         .ctx = NULL,
+        .config = io_config,
     };
     modem_io_t radio = {
         .radio_send = io_radio_send,

@@ -559,6 +559,11 @@ void modem_on_air_rx(modem_t *m, const uint8_t *pkt, size_t len, int8_t rssi, in
         return;
     }
 
+    if (m->io.rx_filter != NULL && m->io.rx_filter(m->io.filter_ctx, &hdr, plain, plain_len)) {
+        m->count.rx_taken++;
+        return;
+    }
+
     /* RX payload: header (as received) + plaintext + rssi + snr + epoch. */
     uint8_t frame[ATALAIA_RF_HEADER_SIZE + ATALAIA_RF_PAYLOAD_MAX + 4];
     memcpy(frame, pkt, ATALAIA_RF_HEADER_SIZE);

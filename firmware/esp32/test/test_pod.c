@@ -23,6 +23,7 @@
 #include "pod/pod.h"
 #include "pod/pod_caps.h"
 #include "pod/pod_json.h"
+#include "pod/pod_settings.h"
 #include "proxy_vectors.h"
 
 /* ---- A phone on each link ------------------------------------------------------- */
@@ -289,7 +290,7 @@ static void setup_with(const pod_caps_config_t *cfg, bool radio)
     hal.leds = &led_ops;
     pod_audio_t audio = {tone, stop, volume, NULL};
     pod_caps_init(&caps, cfg, &hal, &audio);
-    pod_io_t io = {link_write, now, command, ident, link_active, NULL, NULL};
+    pod_io_t io = {link_write, now, command, ident, link_active, NULL, NULL, NULL};
     modem_io_t rio = {
         .radio_send = radio_send,
         .set_channel = set_channel,
@@ -1019,6 +1020,146 @@ static void test_update_relay(void)
           phone[POD_LINK_USB].payload[i][2] == MODEM_TX_NOT_CONFIGURED);
 }
 
+/* ---- Settings pushed over the radio (CMD pod, decision PODC) -------------------------------- */
+
+static pod_settings_t pushed;
+static pod_caps_config_t build_config;
+static int config_calls, config_saves;
+
+static pod_config_result_t test_config(void *ctx, const char *params_json, uint32_t *rev)
+{
+    (void)ctx;
+    config_calls++;
+    pod_config_result_t r = pod_settings_handle(&pushed, params_json, &caps, &build_config, rev);
+    if (r == POD_CONFIG_APPLIED) config_saves++;
+    return r;
+}
+
+/* A sealed game packet from the controller (node 1): CMD with the opcode, params and dest. */
+static size_t controller_cmd(uint8_t opcode, const char *params, uint16_t dest, uint16_t seq,
+                             uint8_t *pkt, size_t cap)
+{
+    static const uint8_t game_key[16] = {0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
+                                         0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c};
+    atalaia_cmd_msg_t cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.cmd = opcode;
+    cmd.dest = dest;
+    snprintf(cmd.params_json, sizeof(cmd.params_json), "%s", params);
+    uint8_t body[128];
+    size_t body_len = atalaia_cmd_encode(&cmd, body, sizeof(body));
+    CHECK(body_len > 0);
+    atalaia_header_t h = {
+        ATALAIA_VF_MAKE(1, ATALAIA_PRIO_CRITICAL, 0, 1), 4242, 1, seq, 2, ATALAIA_MSG_CMD};
+    return atalaia_packet_encrypt(&h, 2, game_key, body, body_len, pkt, cap,
+                                  &atalaia_crypto_test_stub);
+}
+
+static void test_config_over_radio(void)
+{
+    pod_caps_config_t cfg = full_config();
+    cfg.team[1] = "green"; /* the build's colour of button 2 */
+    build_config = cfg;
+    setup_with(&cfg, true);
+    memset(&pushed, 0, sizeof(pushed));
+    config_calls = config_saves = 0;
+    pod.io.config = test_config;
+    phone_send_vector(POD_LINK_USB, "cmd_configure"); /* game 4242, the key above */
+    pod.radio.node_id = 7;                            /* the phone's node id in this game */
+    phone_send_vector(POD_LINK_USB, "cmd_ident");
+    pod_set_link_active(&pod, POD_LINK_USB);
+    int idents = count_type(POD_LINK_USB, ATALAIA_PROXY_IDENT);
+    uint8_t pkt[ATALAIA_RF_HEADER_SIZE + ATALAIA_RF_PAYLOAD_MAX + ATALAIA_RF_MIC_SIZE];
+
+    /* Before anything is pushed: the build's colours. */
+    char json[ATALAIA_PROXY_JSON_MAX];
+    pod_caps_descriptors(&caps, json, sizeof(json), true);
+    CHECK(strstr(json, "\"team\":\"green\"") != NULL && strstr(json, "\"team\":\"red\"") == NULL);
+
+    /* A sealed CMD pod to this node: taken by the pod, not passed to the phone, applied, the
+     * IDENT sent again, the EVT pod.config {"rev"} sent for the phone to acknowledge on air. */
+    size_t n = controller_cmd(
+        POD_CMD_POD,
+        "{\"v\":1,\"rev\":5,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":40,\"vol\":70,"
+        "\"tamper\":false}",
+        7, 30, pkt, sizeof(pkt));
+    CHECK(n > 0);
+    pod_on_air_rx(&pod, pkt, n, -80, 5);
+    CHECK(config_calls == 1 && config_saves == 1 && pod.count.config_applied == 1);
+    CHECK(count_type(POD_LINK_USB, ATALAIA_PROXY_RADIO_RX) == 0 && pod.radio.count.rx_taken == 1);
+    CHECK(count_type(POD_LINK_USB, ATALAIA_PROXY_IDENT) == idents + 1);
+    atalaia_proxy_msg_t m;
+    CHECK(last_msg(POD_LINK_USB, &m) && strcmp(m.cap_id, "pod") == 0 &&
+          strcmp(m.name, "config") == 0 && strcmp(m.data_json, "{\"rev\":5}") == 0);
+    pod_caps_descriptors(&caps, json, sizeof(json), true);
+    CHECK(strstr(json, "\"team\":\"red\"") != NULL && strstr(json, "\"team\":\"blue\"") != NULL &&
+          strstr(json, "\"team\":\"green\"") == NULL && strstr(json, "\"id\":\"case\"") == NULL);
+    CHECK(led_brightness == 40 && caps.brightness == 40 && audio_volume == 70);
+
+    /* The controller's repeat (the phone's ACK was lost; a new packet, the same rev): taken
+     * before, acknowledged again, nothing saved twice. */
+    n = controller_cmd(POD_CMD_POD,
+                       "{\"v\":1,\"rev\":5,\"btn\":[\"red\",\"\",\"\",\"blue\"],\"bright\":40,"
+                       "\"vol\":70,\"tamper\":false}",
+                       7, 31, pkt, sizeof(pkt));
+    pod_on_air_rx(&pod, pkt, n, -80, 5);
+    CHECK(config_saves == 1 && pod.count.config_repeats == 1 &&
+          count_type(POD_LINK_USB, ATALAIA_PROXY_IDENT) == idents + 1);
+    CHECK(last_msg(POD_LINK_USB, &m) && strcmp(m.data_json, "{\"rev\":5}") == 0);
+
+    /* A stale rev, an invalid one: ignored without an answer. */
+    int evts = count_type(POD_LINK_USB, ATALAIA_PROXY_EVT);
+    n = controller_cmd(POD_CMD_POD, "{\"v\":1,\"rev\":4,\"bright\":10}", 7, 32, pkt, sizeof(pkt));
+    pod_on_air_rx(&pod, pkt, n, -80, 5);
+    n = controller_cmd(POD_CMD_POD, "{\"v\":1,\"rev\":6,\"bright\":101}", 7, 33, pkt, sizeof(pkt));
+    pod_on_air_rx(&pod, pkt, n, -80, 5);
+    CHECK(pod.count.config_ignored == 2 && count_type(POD_LINK_USB, ATALAIA_PROXY_EVT) == evts &&
+          pushed.rev == 5 && led_brightness == 40);
+
+    /* Not for this pod: to another node, to every node, another opcode: passed to the phone
+     * like any packet (it ignores what is not its own). */
+    n = controller_cmd(POD_CMD_POD, "{\"v\":1,\"rev\":9,\"bright\":10}", 8, 34, pkt, sizeof(pkt));
+    pod_on_air_rx(&pod, pkt, n, -80, 5);
+    n = controller_cmd(POD_CMD_POD, "{\"v\":1,\"rev\":9,\"bright\":10}", 0xFFFF, 35, pkt,
+                       sizeof(pkt));
+    pod_on_air_rx(&pod, pkt, n, -80, 5);
+    n = controller_cmd(9, "{\"id\":\"0123456789abcdef\",\"version\":\"0.3.0\"}", 7, 36, pkt,
+                       sizeof(pkt));
+    pod_on_air_rx(&pod, pkt, n, -80, 5);
+    CHECK(config_calls == 4 && count_type(POD_LINK_USB, ATALAIA_PROXY_RADIO_RX) == 3);
+
+    /* A packet sealed with another key is nothing: the CMD is authenticated like every other. */
+    static const uint8_t other_key[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    atalaia_cmd_msg_t cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.cmd = POD_CMD_POD;
+    cmd.dest = 7;
+    snprintf(cmd.params_json, sizeof(cmd.params_json), "{\"v\":1,\"rev\":99,\"vol\":1}");
+    uint8_t body[128];
+    size_t body_len = atalaia_cmd_encode(&cmd, body, sizeof(body));
+    atalaia_header_t h = {
+        ATALAIA_VF_MAKE(1, ATALAIA_PRIO_CRITICAL, 0, 1), 4242, 1, 40, 2, ATALAIA_MSG_CMD};
+    n = atalaia_packet_encrypt(&h, 2, other_key, body, body_len, pkt, sizeof(pkt),
+                               &atalaia_crypto_test_stub);
+    pod_on_air_rx(&pod, pkt, n, -80, 5);
+    CHECK(config_calls == 4 && pushed.rev == 5 && pod.radio.count.rx_auth_fail >= 1);
+
+    /* reset: the build's settings are back (button 2 green, the switch on, the ring at 100). */
+    n = controller_cmd(POD_CMD_POD, "{\"v\":1,\"rev\":6,\"reset\":true}", 7, 41, pkt, sizeof(pkt));
+    pod_on_air_rx(&pod, pkt, n, -80, 5);
+    pod_caps_descriptors(&caps, json, sizeof(json), true);
+    CHECK(pod.count.config_applied == 2 && strstr(json, "\"team\":\"green\"") != NULL &&
+          strstr(json, "\"id\":\"case\"") != NULL && led_brightness == 100);
+
+    /* A pod without the hook (an older build) passes the CMD on like any packet. */
+    setup_with(&cfg, true);
+    phone_send_vector(POD_LINK_USB, "cmd_configure");
+    pod.radio.node_id = 7;
+    n = controller_cmd(POD_CMD_POD, "{\"v\":1,\"rev\":1,\"bright\":10}", 7, 50, pkt, sizeof(pkt));
+    pod_on_air_rx(&pod, pkt, n, -80, 5);
+    CHECK(count_type(POD_LINK_USB, ATALAIA_PROXY_RADIO_RX) == 1);
+}
+
 /* ---- Capabilities ---------------------------------------------------------------------- */
 
 static void test_caps_inputs(void)
@@ -1199,6 +1340,7 @@ void run_pod_tests(void)
     test_radio();
     test_field_relay();
     test_update_relay();
+    test_config_over_radio();
     test_caps_inputs();
     test_caps_commands();
     test_json();

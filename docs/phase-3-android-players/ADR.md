@@ -435,7 +435,7 @@ the proxy, the USB-Serial-JTAG link, the capabilities and the radio results
 run on one task (core 1, priority 5), the NimBLE host on its own task (core
 0), tones on an audio task; there is no separate `usb_cdc_task` or
 `radio_task` of the pod's own (the Field Box's radio task is reused). The
-configuration is Kconfig, not NVS over CMD `config` (PF15). The image is
+configuration is Kconfig, not NVS over CMD `config` (PF15; **built 2026-10-28**: the field controller pushes the pod's button colours, ring brightness, volume and enclosure-switch setting over Skirmesh-RF as CMD pod, opcode 10, kept in NVS: `protocol/pod-config.md`, decision PODC. Not in it: the admin PIN, which a pod without an admin menu has no use for, and the LED count, which is wiring). The image is
 about 650 KB with NimBLE (this ADR guessed ~300 KB without it). Not run on
 a board yet (plan phase G).
 

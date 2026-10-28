@@ -71,6 +71,7 @@ import 'controller_field.dart';
 import 'controller_firmware.dart';
 import 'controller_mode_fetch.dart';
 import 'controller_pairing.dart';
+import 'controller_pod_config.dart';
 import 'controller_radio.dart';
 import 'controller_mqtt.dart';
 import 'controller_positions.dart';
@@ -394,6 +395,7 @@ class ControllerHost {
       firmwareDir(dir.path),
       keys: validReleaseKeys(boot.firmwareKeys),
     );
+    ControllerPodConfig(engine);
     if (boot.joinKey.length == 32) {
       ControllerBoxes(engine);
       ControllerPairing(engine);

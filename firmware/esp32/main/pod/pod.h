@@ -50,6 +50,14 @@ typedef enum {
 #define POD_RETRIES  3   /* ... up to 3 times */
 #define POD_SEEN     16  /* CMD seqs remembered per link */
 
+/* What the pod's settings made of a CMD pod (pod_settings.h). */
+typedef enum {
+    POD_CONFIG_APPLIED = 0, /* new settings taken: the pod acknowledges */
+    POD_CONFIG_SAME = 1,    /* this rev was taken already: acknowledged again, nothing changes */
+    POD_CONFIG_STALE = 2,   /* an older rev: ignored, not acknowledged */
+    POD_CONFIG_REFUSED = 3, /* not valid (or a format newer than 1): not acknowledged */
+} pod_config_result_t;
+
 typedef struct {
     /* Writes a whole frame on a link. Returns 0 on success. */
     int (*link_write)(void *ctx, pod_link_t link, const uint8_t *frame, size_t len);
@@ -68,6 +76,12 @@ typedef struct {
     /* A log line (may be NULL). */
     void (*log)(void *ctx, const char *line);
     void *ctx;
+    /* A CMD pod (opcode 10) from the field controller, heard on the radio, authenticated with
+     * the game key and addressed to this node: the settings it pushes (a JSON object). On
+     * APPLIED and SAME *rev is the rev taken, and the pod says so with the EVT "pod" "config"
+     * {"rev"}; on APPLIED it also sends its IDENT again (the buttons' colours). May be NULL:
+     * the CMD is then passed to the phone like any other packet. */
+    pod_config_result_t (*config)(void *ctx, const char *params_json, uint32_t *rev);
 } pod_io_t;
 
 typedef struct {
@@ -101,6 +115,9 @@ typedef struct {
     uint32_t ignored;      /* frame types the pod does not take from a phone */
     uint32_t links_broken; /* links made inactive by an EVT nobody acknowledged */
     uint32_t radio_cleared;
+    uint32_t config_applied; /* CMD pod: new settings taken */
+    uint32_t config_repeats; /* CMD pod: a rev taken already, acknowledged again */
+    uint32_t config_ignored; /* CMD pod: stale, invalid or newer than this pod knows */
 } pod_counters_t;
 
 typedef struct {
