@@ -149,9 +149,9 @@ Uma caixa precisa do nome e da palavra-passe do Wi-Fi do campo na sua configura�
 
 Nas **Definições**:
 
-- **Língua das caixas**: a língua dos ecrãs das caixas. Um jogo mantém a língua com que foi criado. Por omissão é a língua da consola.
-- **Identidade do campo**: o nome, o logótipo, a imagem de fundo e a cor do campo. Aparecem na app, no marcador, no cartaz e na consola. Carrega só imagens que possas usar. PNG, JPEG ou WebP.
-- **Equipas guardadas**: o nome e o emblema da equipa de um clube, para escolher quando crias um jogo.
+- **Língua das caixas**: a língua dos ecrãs das caixas. Um jogo mantém a língua com que foi criado. Por omissão é a língua da consola. Por baixo das caixas das equipas, das predefinições e do nome do campo, a consola avisa quando um nome tem letras que os tipos de letra das caixas não têm (a maior parte das letras chinesas, o cirílico): as caixas desenham «?» ou um quadrado vazio, enquanto a app e a consola mostram o nome como foi escrito.
+- **Identidade do campo**: o nome, o logótipo, a imagem de fundo e a cor do campo. Aparecem na app, no marcador, no cartaz e na consola. Carrega só imagens que possas usar. PNG, JPEG ou WebP. Quando o controlador recebe a identidade do servidor do campo (`[sync] branding = "site"`), este cartão diz **Vem do servidor do campo** e mostra o nome e a cor sem formulário: mudam-se no servidor do campo e o controlador recebe-os na sincronização seguinte.
+- **Equipas guardadas**: o nome e o emblema da equipa de um clube, para escolher quando crias um jogo. Com o servidor do campo, as **Equipas do servidor do campo** são uma lista à parte, com um distintivo em cada uma: não se editam nem se apagam aqui. As equipas que guardas na consola ficam por baixo.
 - **Sugestão do cartaz de check-in**: se a consola sugere imprimir o cartaz depois de criares um jogo.
 
 ### A imagem e o limite do campo
@@ -162,7 +162,7 @@ Opcional, mas o limite é o que faz os telemóveis de quem joga avisarem quando 
 2. Carrega uma imagem com **Carregar imagem do campo** (PNG, JPEG ou WebP, até 4 MB), ou toca em **Carregar o campo de um mapa**. Essa página precisa de internet enquanto preparas o jogo. Encontra o campo, marca os cantos do contorno (3 a 12) e toca em **Desenhar a imagem do campo** e depois em **Usar como campo**. Guarda a imagem, o lugar dela no mapa e o **limite do campo**. O controlador não precisa de internet para isto.
 3. **Arrasta as caixas** para o sítio onde estão no campo.
 4. **Edifício com vários pisos**: marca-o para um edifício com vários pisos. Cada piso tem a sua planta.
-5. **Quadrícula no mapa**: liga-a para teres linhas com letras e colunas com números, para as pessoas dizerem «estou em C4» no rádio. A app de quem joga desenha a mesma quadrícula sobre a planta no **Mapa do campo** e diz a cada pessoa a sua quadrícula.
+5. **Quadrícula no mapa**: liga-a para teres linhas com letras e colunas com números, para as pessoas dizerem «estou em C4» no rádio. A app de quem joga desenha a mesma quadrícula sobre a planta no **Mapa do campo** e diz a cada pessoa a sua quadrícula. **Imprimir o mapa com a quadrícula** imprime a planta sob a quadrícula com a lista do que está em cada quadrado, como cartaz ou PDF pela janela de impressão do navegador (não na consola dentro da app: abre-se a consola no navegador de um computador). No ATAK, uma caixa, uma marcação no mapa ou uma pessoa dentro de um edifício, num piso com quadrícula, diz o seu quadrado nas observações, como `grid C4`.
 6. **Marcações no mapa**: marca zonas seguras, respawns, bases, o estacionamento, primeiros socorros e objetivos. Escolhe quem vê cada uma: toda a gente, uma equipa ou só a organização.
 7. **Posição no mapa (ATAK)**: dá a dois cantos opostos da imagem a latitude e a longitude, para mostrar as caixas nos mapas ATAK.
 8. **Balizas interiores**: para um edifício com balizas Bluetooth, vê [Balizas interiores](#balizas-interiores) mais abaixo.
@@ -302,6 +302,7 @@ Abre **Check-in**. O check-in está aberto desde o momento em que um jogo é cri
 5. **Retirar** tira uma pessoa do jogo.
 6. **Check-in à mão**: para quem não tem a app. Escreve um nome, uma preferência de equipa e réplicas. O controlador cria um identificador, que se pode gravar numa etiqueta (vê [Etiquetas de quem joga](#etiquetas-de-quem-joga)).
 7. **Exportar CSV** guarda a lista. Para isto abre a consola no browser de um computador. A consola dentro da app não consegue guardá-lo.
+8. **Importar uma lista de inscrições**: para um campo sem servidor do campo, onde as pessoas se inscrevem noutro sítio. Escolhe o ficheiro CSV (ou JSON) da outra plataforma, indica a **Origem** (o nome dessa plataforma) e toca em **Verificar o ficheiro**: lista cada linha como nova, alterada, igual, ignorada ou recusada, com o motivo, e não muda nada. Só se leem as colunas `display_name`, `external_ref`, `team_preference`, `federation_number` e `replicas`, no formato de importação do servidor do campo; qualquer outra coluna (um email, um telefone) é apenas nomeada. Depois marca que o campo tem base legal própria para a lista e toca em **Importar**: as pessoas aparecem como **por chegar** e assinalas **Chegou** quando chegarem. Importar o mesmo ficheiro outra vez não muda nada, e quem já chegou nunca é alterado. A consola não retira uma inscrição que o ficheiro deixou de listar: só diz quantas são.
 
 Os nomes só aparecem aqui e aos marshals. Nada do nome de uma pessoa vai para os acontecimentos, o marcador nem as vistas de quem joga.
 

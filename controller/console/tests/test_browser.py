@@ -2419,7 +2419,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: page.evaluate("window.__printed.length") == 1, 6))
         got = page.evaluate("window.__printed[0]")
         self.assertIn("print-grid-map", got["html"])
-        self.assertTrue(got["title"].endswith(": mapa com grelha"), got)
+        self.assertTrue(got["title"].endswith(": mapa com quadrícula"), got)
         self.assertTrue(got["plan"] and got["layer"])
         self.assertEqual(got["rows"], 8)
         self.assertTrue(any(e.startswith("C4 ") and str(BOX) in e for e in got["entries"]), got["entries"])

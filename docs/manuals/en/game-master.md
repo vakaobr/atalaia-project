@@ -149,9 +149,9 @@ A box needs the field's Wi-Fi name and password in its setup, enough battery and
 
 In **Settings**:
 
-- **Box language**: the language of the boxes' screens. A game keeps the language it was created with. By default it is the console's language.
-- **Field branding**: the field's name, logo, wallpaper and colour. They show in the app, on the scoreboard, on the poster and in the console. Upload only images you may use. PNG, JPEG or WebP.
-- **Saved teams**: a club's team name and crest to pick when you create a game.
+- **Box language**: the language of the boxes' screens. A game keeps the language it was created with. By default it is the console's language. Under the team, preset and field-name boxes the console warns when a name has letters the boxes' fonts lack (most Chinese letters, Cyrillic): the boxes draw "?" or an empty square for them, while the app and the console show the name as typed.
+- **Field branding**: the field's name, logo, wallpaper and colour. They show in the app, on the scoreboard, on the poster and in the console. Upload only images you may use. PNG, JPEG or WebP. When the controller takes its branding from the site server (`[sync] branding = "site"`), this card says **From the site server** and shows the name and colour without a form: they change on the site server, and the controller takes them at its next sync.
+- **Saved teams**: a club's team name and crest to pick when you create a game. With the site server, **Teams from the site server** is a list of its own, with a badge on each: you cannot edit or delete those here. Teams you save in the console stay below it.
 - **Check-in poster suggestion**: whether the console suggests printing the poster after you create a game.
 
 ### The field's picture and boundary
@@ -162,7 +162,7 @@ Optional, but the boundary is what makes players' phones warn them when they lea
 2. Upload a picture with **Upload field image** (PNG, JPEG or WebP, up to 4 MB), or tap **Load the field from a map**. That page needs the internet while you set the game up. Find the field, mark the corners of its outline (3 to 12) and tap **Draw the field image**, then **Use as the field**. It saves the picture, its place on the map and the **field boundary**. The controller needs no internet for this.
 3. **Drag the boxes** to where they are on the field.
 4. **Multi-story building**: tick it for a building with several floors. Each floor has its own plan.
-5. **Grid on the map**: turn it on for lettered rows and numbered columns, so people can say "I'm in C4" on the radio. The players' app draws the same grid over the plan in its **Field map** and tells each player their cell.
+5. **Grid on the map**: turn it on for lettered rows and numbered columns, so people can say "I'm in C4" on the radio. The players' app draws the same grid over the plan in its **Field map** and tells each player their cell. **Print the grid map** prints the plan under its grid with a list of what is in which cell, as a poster or a PDF through the browser's print dialog (not from the app's built-in console: open the console in a computer's browser). On ATAK, a box, a map feature or an indoor player on a level with a grid says its cell in its remarks, such as `grid C4`.
 6. **Map features**: mark safe zones, respawns, HQs, the car park, first aid and objectives. Choose who sees each one: everyone, one team or the organisers only.
 7. **Map position (ATAK)**: give two opposite corners of the image their latitude and longitude, to show the boxes on ATAK maps.
 8. **Indoor beacons**: for a building with Bluetooth beacons, see [Indoor beacons](#indoor-beacons) below.
@@ -302,6 +302,7 @@ Open **Check-in**. Check-in is open from the moment a game is created. **Close c
 5. **Remove** takes a player out of the game.
 6. **Check in by hand**: for a player without the app. Type a name, a team preference and replicas. The controller makes an id, which can be written to a player tag (see [Players' tags](#players-tags)).
 7. **Export CSV** saves the list. Open the console in a computer's browser for this. The app's built-in console cannot save it.
+8. **Import a registration list**: for a field with no site server, where people register somewhere else. Pick the CSV (or JSON) file from the other platform, give the **Source** (that platform's name) and tap **Check the file**: it lists each row as new, changed, unchanged, skipped or refused, with the reason, and changes nothing. Only the columns `display_name`, `external_ref`, `team_preference`, `federation_number` and `replicas` are read, in the site server's import format; any other column (an email, a phone number) is only named. Then tick that the field has its own legal basis for the list and tap **Import**: the players show as **expected**, and you tick **Arrived** when they come. Importing the same file again changes nothing, and a player who has arrived is never changed. The console cannot remove a registration the file no longer lists: it only tells you how many there are.
 
 Names are shown only here and to marshals. Nothing about a player's name goes in events, the scoreboard or the players' views.
 
