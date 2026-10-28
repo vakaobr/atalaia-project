@@ -289,6 +289,7 @@ export class TeamFields extends Component {
                     <input maxlength="32" aria-label=${`${t('teams.display_name')} · ${tm}`} placeholder=${t('teams.display_name')}
                         data-testid=${`${prefix}-team-name-${tm}`} value=${v.display_name || ''}
                         onInput=${(e) => this.set(tm, { display_name: e.target.value, team_preset_id: null })} />
+                    <${GlyphWarning} text=${v.display_name} testid=${`${prefix}-glyph-team-name-${tm}`} />
                     ${v.crest_id && html`<img class="crest" src=${`/api/v1/crests/${v.crest_id}`} data-testid=${`${prefix}-team-crest-img-${tm}`}
                         alt=${t('teams.crest_alt', { team: v.display_name || tm })} />`}
                     <label class="button small-button">${t('teams.upload_crest')}

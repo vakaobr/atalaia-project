@@ -13,6 +13,7 @@
 
 import { html, Component, t, api, ApiError, lang, modeText } from '../ui.js';
 import { ScenarioBlocks } from './scenario-block-view.js';
+import { GlyphWarning } from './box-glyphs.js';
 import { manifestToState, NEW_MANIFEST, toYaml } from './scenario-blocks.js';
 
 const CHECK_DELAY_MS = 600;
@@ -265,6 +266,18 @@ export class ScenarioBuilder extends Component {
         </div>`;
     }
 
+    /** The scenario's and its objectives' names (also the Portuguese ones) a box may show, for the glyph warning. */
+    shownNames(r) {
+        const out = [];
+        const pt = (o) => (o && o.i18n && o.i18n.pt && o.i18n.pt.name) || '';
+        const m = r.manifest || {};
+        out.push(r.name, pt(m));
+        const list = Array.isArray(m.objectives) ? m.objectives : [];
+        for (const o of r.objectives || []) out.push(o.name);
+        for (const o of list) if (o && typeof o === 'object') out.push(pt(o));
+        return out.filter((x) => typeof x === 'string' && x);
+    }
+
     renderNames(r) {
         if (!r || !r.nodes || r.nodes.length === 0) return null;
         const boxes = r.nodes.filter((n) => !n.player);
@@ -329,6 +342,7 @@ export class ScenarioBuilder extends Component {
                     ? 'scenario.replaced' : 'scenario.installed_done', { name: named(d), version: d.version })}</p>`}
                 ${this.renderLocal()}
                 ${this.renderProblems(r)}
+                ${r && html`<${GlyphWarning} text=${this.shownNames(r)} testid="glyph-scenario" />`}
                 ${this.renderNames(r)}
             </section>
         </div>`;

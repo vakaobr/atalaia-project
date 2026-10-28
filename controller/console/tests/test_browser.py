@@ -4816,6 +4816,42 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("team-preset-name").fill("Яблоко")
         expect(page.get_by_test_id("glyph-team-preset")).to_be_visible()
 
+    def test_game_scenario_and_team_display_names_the_box_cannot_draw_are_warned_about(self):
+        """GLY-1: the game's name, a team's display name (the game form's team branding) and a scenario's and
+        its objectives' names (also the Portuguese ones) are warned about like the other names (PKE-3), with the
+        same wording; the name is still accepted (the scenario is checked, the game is made)."""
+        page = self.console()
+        page.get_by_test_id("tab-game").click()
+        expect(page.get_by_test_id("glyph-game-name")).to_have_count(0)
+        page.get_by_test_id("game-name").fill("Jogo 紅")
+        expect(page.get_by_test_id("glyph-game-name")).to_contain_text("紅")
+        expect(page.get_by_test_id("glyph-game-name")).to_contain_text("?")
+        page.get_by_test_id("game-name").fill("Jogo Águias")
+        expect(page.get_by_test_id("glyph-game-name")).to_have_count(0)
+        page.get_by_test_id("game-team-branding").locator("summary").click()
+        team = page.get_by_test_id("game-team-name-red")
+        expect(page.get_by_test_id("game-glyph-team-name-red")).to_have_count(0)
+        team.fill("Яблоко")
+        expect(page.get_by_test_id("game-glyph-team-name-red")).to_contain_text("Я")
+        expect(page.get_by_test_id("game-glyph-team-name-blue")).to_have_count(0)
+        team.fill("Lobos")
+        expect(page.get_by_test_id("game-glyph-team-name-red")).to_have_count(0)
+        page.get_by_test_id("tab-scenarios").click()
+        page.get_by_test_id("scenario-example").click()
+        expect(page.get_by_test_id("scenario-ok")).to_be_visible()
+        expect(page.get_by_test_id("glyph-scenario")).to_have_count(0)
+        editor = page.get_by_test_id("scenario-text")
+        example = editor.input_value()
+        self.assertIn("\nname:", example)
+        editor.fill(example.replace("\nname:", "\nname: 紅 ", 1))
+        expect(page.get_by_test_id("glyph-scenario")).to_contain_text("紅")
+        expect(page.get_by_test_id("scenario-ok")).to_be_visible()  # a warning only
+        editor.fill(example.replace("    name:", "    name: Ł ", 1))
+        expect(page.get_by_test_id("glyph-scenario")).to_contain_text("Ł")
+        expect(page.get_by_test_id("scenario-install")).to_be_enabled()
+        editor.fill(example)
+        expect(page.get_by_test_id("glyph-scenario")).to_have_count(0)
+
     def test_field_branding_from_settings_to_header_scoreboard_and_poster(self):
         if not ZBARIMG:
             self.skipTest("zbarimg is not installed")

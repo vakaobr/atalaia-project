@@ -127,7 +127,8 @@ class CreateGame extends Component {
             <h3>${t('game.new')}</h3>
             <div class="field"><label for="g-name">${t('game.name')}</label>
                 <input id="g-name" data-testid="game-name" required maxlength="64" value=${state.name}
-                    onInput=${(e) => this.setState({ name: e.target.value })} /></div>
+                    onInput=${(e) => this.setState({ name: e.target.value })} />
+                <${GlyphWarning} text=${state.name} testid="glyph-game-name" /></div>
             <div class="field"><label for="g-source">${t('game.source')}</label>
                 <select id="g-source" data-testid="game-source" value=${src} onChange=${(e) => this.pick(e.target.value)}>
                     <optgroup label=${t('game.modes')}>
