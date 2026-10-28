@@ -5,6 +5,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Satellite build guide
 
+Portuguese (pt-PT): [BUILD.pt.md](BUILD.pt.md).
+
 From a bag of parts to a flashed Satellite: a small secondary box with two
 team buttons and an LED ring, for the satellites of *Master and Satellites*,
 a beacon or a second capture point. Written for a club member who can solder

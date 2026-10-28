@@ -5,6 +5,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Target addon build guide (not buildable yet)
 
+Portuguese (pt-PT): [BUILD.pt.md](BUILD.pt.md).
+
 The target addon is a plate that players shoot at, with a sensor that feels
 each hit, which plugs into a box and turns it into a scoring target: the
 hardware of the *Target Windows* mode, where a hit while the target shows a

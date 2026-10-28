@@ -5,6 +5,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # I/O pod build guide
 
+Portuguese (pt-PT): [BUILD.pt.md](BUILD.pt.md).
+
 From a bag of parts to a flashed I/O pod: a box that lends an Android phone or
 tablet running an Atalaia prop the things a phone lacks: big team buttons, a
 keypad, an LED ring, sound, an NFC reader, an enclosure switch and a LoRa
