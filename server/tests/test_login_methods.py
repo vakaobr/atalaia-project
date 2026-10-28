@@ -149,13 +149,9 @@ class AppLinkTests(LoginTestCase):
     """What the Android and iOS apps need from the site (decision PKA-1): the two well-known files, only when
     configured, and a social login that returns to the app's own path."""
 
-    configured = True
-
     def settings(self) -> Settings:
-        base = super().settings()
-        if not self.configured:
-            return base
         from dataclasses import replace
+        base = super().settings()
         return replace(base, app_android_package="org.atalaia.app", app_android_sha256=(SHA, SHA.lower()),
                        app_ios_app_ids=("ABCDE12345.org.atalaia.app",))
 
@@ -180,23 +176,98 @@ class AppLinkTests(LoginTestCase):
     async def test_a_social_login_can_return_to_the_apps_path(self) -> None:
         for wanted in ("/app/oidc", f"{ORIGIN}/app/oidc", "/app/oidc?x=1"):
             with self.subTest(wanted=wanted):
-                params, r = await self.begin("google", return_to=wanted)
-                self.assertEqual(r.status_code, 200, r.text)
-                path, query, fragment = self.landed(await self.callback("google", params, f"app-{wanted}"))
+                answer = await self.app_start(return_to=wanted)
+                browser = self.other_client()
+                r = await browser.get(answer["browser_url"])
+                params = self.idp.authorize(r.headers["location"])
+                path, query, fragment = self.landed(await self.callback("google", params, f"app-{wanted}",
+                                                                        client=browser))
                 self.assertEqual(path, "/app/oidc")
                 self.assertTrue(fragment.startswith("oidc="), fragment)
                 self.assertEqual(query.get("oidc_error"), None)
-                done = await self.client.post("/api/v1/auth/oidc/complete", json={"ticket": fragment[5:]})
+                done = await browser.post("/api/v1/auth/oidc/complete", json={"ticket": fragment[5:]})
                 self.assertEqual(done.status_code, 200, done.text)
-        # Nothing else is a place to send the browser.
-        for wanted, expected in (("https://evil.example/app/oidc", "/staff/login"), ("//evil.example/app/oidc", "/staff/login"),
-                                 ("/app/oidc/../staff/x", "/staff/login"), ("/app/other", "/staff/login"),
-                                 ("/app/oidcx", "/staff/login"), ("/app/oidc#x", "/staff/login"),
-                                 ("https://evil.example.app/app/oidc", "/staff/login")):
+        # Nothing else is a place to send the browser (and it has no address of the app's browser).
+        for wanted in ("https://evil.example/app/oidc", "//evil.example/app/oidc", "/app/oidc/../staff/x",
+                       "/app/other", "/app/oidcx", "/app/oidc#x", "https://evil.example.app/app/oidc"):
             with self.subTest(wanted=wanted):
-                params, _ = await self.begin("google", return_to=wanted)
+                params, r = await self.begin("google", return_to=wanted)
+                self.assertNotIn("browser_url", r.json())
                 path, _, _ = self.landed(await self.callback("google", params, f"s-{wanted}"))
-                self.assertEqual(path, expected)
+                self.assertEqual(path, "/staff/login")
+
+    async def app_start(self, provider: str = "google", **body: Any) -> dict[str, Any]:
+        r = await self.client.post(f"/api/v1/auth/oidc/{provider}/start", json={
+            "purpose": "login", "consent": True, **{"return_to": f"{ORIGIN}/app/oidc?s=abc123", **body}})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertNotIn("set-cookie", r.headers)  # it would land in the app, not in the browser
+        return r.json()
+
+    async def test_the_apps_browser_gets_the_binding_cookie_and_goes_on(self) -> None:
+        answer = await self.app_start()
+        self.assertTrue(answer["browser_url"].startswith(f"{ORIGIN}/api/v1/auth/oidc/google/browser?"))
+        # A fresh browser: its own cookie jar, as the Custom Tab's.
+        async with self.other_client() as browser:
+            r = await browser.get(answer["browser_url"])
+            self.assertEqual(r.status_code, 303, r.text)
+            self.assertEqual(r.headers["location"], answer["authorization_url"])
+            self.assertIn("__Secure-atalaia_oidc", r.headers["set-cookie"])
+            self.assertIn("samesite=lax", r.headers["set-cookie"].lower())
+            params = self.idp.authorize(r.headers["location"])
+            path, query, fragment = self.landed(await self.callback("google", params, "app-user", client=browser))
+            self.assertEqual((path, query), ("/app/oidc", {"s": "abc123"}))
+            done = await browser.post("/api/v1/auth/oidc/complete", json={"ticket": fragment[5:]})
+            self.assertEqual(done.status_code, 200, done.text)
+        # Without the browser's cookie the callback is refused, as for the web.
+        answer = await self.app_start()
+        params = self.idp.authorize(answer["authorization_url"])
+        path, query, _ = self.landed(await self.callback("google", params, "app-user", client=self.other_client()))
+        self.assertEqual((path, query.get("oidc_error")), ("/app/oidc", "state_invalid"))
+
+    async def test_the_browser_address_is_for_the_app_that_began_it(self) -> None:
+        answer = await self.app_start()
+        url = urlsplit(answer["browser_url"])
+        query = parse_qs(url.query)
+        async with self.other_client() as browser:
+            for label, path, params in (
+                    ("wrong binding", url.path, {"x": "nope", "s": query["s"][0]}),
+                    ("wrong state", url.path, {"x": query["x"][0], "s": "nope"}),
+                    ("nothing", url.path, {}),
+                    ("another provider", "/api/v1/auth/oidc/microsoft/browser", {"x": query["x"][0], "s": query["s"][0]})):
+                with self.subTest(label):
+                    r = await browser.get(path, params=params)
+                    self.assertEqual(r.status_code, 400)
+                    self.assertNotIn("set-cookie", r.headers)
+        # A login begun on the web has no such address.
+        params, r = await self.begin("google")
+        self.assertNotIn("browser_url", r.json())
+        # An expired attempt.
+        await self.fetch("UPDATE oidc_logins SET expires_at = now() - interval '1 minute'")
+        async with self.other_client() as browser:
+            self.assertEqual((await browser.get(answer["browser_url"])).status_code, 400)
+
+    async def test_linking_from_the_app_asks_before_it_goes_on(self) -> None:
+        _, name, _ = await self.make_user()
+        login = (await self.client.post("/api/v1/auth/login", json={"username": name, "password": PASSWORD})).json()
+        r = await self.client.post("/api/v1/auth/oidc/google/start", headers=bearer(login), json={
+            "purpose": "link", "password": PASSWORD, "return_to": f"{ORIGIN}/app/oidc?s=lnk"})
+        self.assertEqual(r.status_code, 200, r.text)
+        answer = r.json()
+        async with self.other_client() as browser:
+            page = await browser.get(answer["browser_url"])
+            self.assertEqual(page.status_code, 200)
+            self.assertNotIn("set-cookie", page.headers)  # nothing is set until the person taps
+            self.assertIn(name, page.text)
+            self.assertIn("Google", page.text)
+            go = answer["browser_url"] + "&go=1"
+            r = await browser.get(go)
+            self.assertEqual(r.status_code, 303, r.text)
+            self.assertIn("__Secure-atalaia_oidc", r.headers["set-cookie"])
+            params = self.idp.authorize(r.headers["location"])
+            path, query, _ = self.landed(await self.callback("google", params, "linked-subject", client=browser))
+            self.assertEqual((path, query), ("/app/oidc", {"s": "lnk", "oidc": "linked"}))
+        user = await self.user_by("linked-subject")
+        self.assertEqual(user["username"], name)
 
     async def test_a_browser_that_lands_there_sees_a_short_page_with_no_script(self) -> None:
         r = await self.client.get("/app/oidc", params={"oidc": "linked"})
@@ -205,16 +276,13 @@ class AppLinkTests(LoginTestCase):
         self.assertNotIn("<script", r.text.lower())
 
 
-class AppLinksOffTests(AppLinkTests):
+class AppLinksOffTests(LoginTestCase):
     """With no app configured the server says nothing about one."""
 
-    configured = False
-
-    async def test_assetlinks_names_the_app_and_its_certificates(self) -> None:
-        self.assertEqual((await self.client.get("/.well-known/assetlinks.json")).status_code, 404)
-
-    async def test_the_apple_file_has_webcredentials_and_applinks(self) -> None:
-        self.assertEqual((await self.client.get("/.well-known/apple-app-site-association")).status_code, 404)
+    async def test_nothing_is_served(self) -> None:
+        for path in ("/.well-known/assetlinks.json", "/.well-known/apple-app-site-association"):
+            with self.subTest(path=path):
+                self.assertEqual((await self.client.get(path)).status_code, 404)
 
 
 class SocialLoginTests(LoginTestCase):

@@ -4,6 +4,7 @@
 
     GET    /api/v1/auth/methods                        what this server offers (the login pages' buttons)
     POST   /api/v1/auth/oidc/{provider}/start          {purpose, consent?, return_to?, password?}: the provider's URL
+    GET    /api/v1/auth/oidc/{provider}/browser        the app's browser starts here (PKA-1): sets the binding cookie
     GET    /api/v1/auth/oidc/{provider}/callback       where the provider sends the browser back
     POST   /api/v1/auth/oidc/complete                  {ticket}: a finished social login becomes a session
     POST   /api/v1/auth/passkey/login/options          a passkey login needs no username
@@ -47,6 +48,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import html
 import re
 import secrets
 import uuid
@@ -55,7 +57,7 @@ from typing import Any, Literal, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import Field
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
@@ -278,13 +280,76 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
     redirect_uri = callback_url(request, provider)
     db.add(OidcLogin(state_hash=_hash(state), binding_hash=_hash(binding), provider=provider, purpose=body.purpose,
                      user_id=user_id, session_id=session_id, nonce=nonce, code_verifier=verifier,
-                     redirect_uri=redirect_uri, return_to=safe_return_to(body.return_to, site_origin(request)), consent=body.consent,
-                     expires_at=now + timedelta(seconds=STATE_TTL_S)))
+                     redirect_uri=redirect_uri, return_to=safe_return_to(body.return_to, site_origin(request)),
+                     consent=body.consent, expires_at=now + timedelta(seconds=STATE_TTL_S)))
     await db.commit()
     url = request.app.state.oidc.authorization_url(provider, redirect_uri, state, nonce,
                                                    pkce_challenge(verifier))
+    if APP_RETURN_TO.fullmatch(safe_return_to(body.return_to, site_origin(request))):
+        # The app calls this itself, so the binding cookie would land in the app, not in the browser that goes
+        # to the provider: the app opens this address in the browser, which sets the cookie there (PKA-1).
+        query = urlencode({"x": binding, "s": state})
+        return JSONResponse({"authorization_url": url,
+                             "browser_url": f"{site_origin(request)}{BINDING_PATH}/{provider}/browser?{query}"},
+                            headers=NO_STORE)
     response = JSONResponse({"authorization_url": url}, headers=NO_STORE)
     response.set_cookie(BINDING_COOKIE, binding, max_age=STATE_TTL_S, path=BINDING_PATH, secure=True, httponly=True,
+                        samesite="lax")
+    return response
+
+
+BROWSER_GONE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer"><title>Atalaia</title></head>
+<body><h1>Atalaia</h1>
+<p>This sign-in link has expired or is not valid. Go back to the Atalaia app and start again.</p>
+<p>Este link de entrada expirou ou não é válido. Voltar à app Atalaia e começar de novo.</p>
+</body></html>
+"""
+BROWSER_CONFIRM = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer"><title>Atalaia</title></head>
+<body><h1>Atalaia</h1>
+<p>{en}</p>
+<p>{pt}</p>
+<p><a href="{href}">{provider} &rarr;</a></p>
+</body></html>
+"""
+
+
+@router.get("/auth/oidc/{provider}/browser")
+async def oidc_browser(provider: str, request: Request, x: str = "", s: str = "", go: str = "",
+                       db: AsyncSession = Depends(get_session)) -> Response:
+    """The app's way into a social login (PKA-1): its browser opens this address (from ``browser_url``, which only
+    the app that started the login holds), and gets the binding cookie that ``start`` could not set in a browser;
+    then it is sent on to the provider. A login goes straight on. A link or a reauth first says whose account
+    it is for, and goes on only on a tap: an address made by someone else for their own account must not link
+    the account of whoever opens it without their knowing."""
+    gone = HTMLResponse(BROWSER_GONE, status_code=400, headers={**NO_STORE, "Referrer-Policy": "no-referrer"})
+    if provider not in PROVIDER_LABELS or provider not in request.app.state.oidc.clients \
+            or not s or len(s) > 128 or not x or len(x) > 128:
+        return gone
+    row = await db.scalar(select(OidcLogin).where(OidcLogin.state_hash == _hash(s), OidcLogin.provider == provider))
+    if row is None or row.expires_at <= _now() or not hmac.compare_digest(_hash(x), row.binding_hash) \
+            or not APP_RETURN_TO.fullmatch(row.return_to):
+        return gone
+    if row.purpose != "login" and go != "1":
+        user = await db.get(User, row.user_id) if row.user_id else None
+        if user is None:
+            return gone
+        who = html.escape(user.username)
+        label = PROVIDER_LABELS[provider]
+        what = {"link": (f"Link {label} to the account {who}, started in the Atalaia app?",
+                         f"Ligar {label} à conta {who}, iniciado na app Atalaia?"),
+                "reauth": (f"Confirm with {label} that you are the account {who}, started in the Atalaia app?",
+                           f"Confirmar com {label} que és a conta {who}, iniciado na app Atalaia?")}[row.purpose]
+        href = html.escape(f"?{urlencode({'x': x, 's': s, 'go': '1'})}")
+        return HTMLResponse(BROWSER_CONFIRM.format(en=what[0], pt=what[1], href=href, provider=html.escape(label)),
+                            headers={**NO_STORE, "Referrer-Policy": "no-referrer"})
+    url = request.app.state.oidc.authorization_url(provider, row.redirect_uri, s, row.nonce,
+                                                   pkce_challenge(row.code_verifier))
+    response = RedirectResponse(url, status_code=303, headers={**NO_STORE, "Referrer-Policy": "no-referrer"})
+    response.set_cookie(BINDING_COOKIE, x, max_age=STATE_TTL_S, path=BINDING_PATH, secure=True, httponly=True,
                         samesite="lax")
     return response
 
