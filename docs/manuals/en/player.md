@@ -272,6 +272,8 @@ Some fields let you register for a game on their site, with an account.
 
 Do not share the ticket. Whoever has it can check in in your place. You can change or cancel a registration while it is open: **Change your registration** or **Cancel the registration**. The field erases your registration data 30 days after the game.
 
+**Your game history.** After you log in, tap **Game history** to see the games you played, newest first. Tap a game for its scores, the winner and your own events. The app keeps nothing: it asks the site each time.
+
 The app cannot create an account yet. Ask the field's organisers how to get one.
 
 ## 9. Leave a game and your data

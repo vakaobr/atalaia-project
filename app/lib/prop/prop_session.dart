@@ -40,6 +40,7 @@ import '../platform/location.dart';
 import '../platform/services.dart';
 import '../pod/pod_client.dart';
 import '../pod/pod_codec.dart';
+import '../pod/pod_reconnect.dart';
 import '../protocol/join_payload.dart';
 import '../radio/pod_radio_link.dart';
 import '../security/ndef.dart';
@@ -115,6 +116,9 @@ class PropSession extends ChangeNotifier {
     this.modeName = '',
     this.link,
     this.radioLinkFor,
+    this.reopenPod,
+    this.podBackoff = defaultPodBackoff,
+    this.podIdentWait = podIdentTimeout,
     this.location,
     this.gpsInterval = const Duration(seconds: 2),
     DateTime Function()? now,
@@ -144,6 +148,12 @@ class PropSession extends ChangeNotifier {
   /// The radio link through a pod with a radio, for a joined game (null:
   /// none; the app gives the core's event codec and the stored epochs).
   final PodRadioLink? Function(PodClient pod)? radioLinkFor;
+
+  /// Opens the linked pod again after its link broke (null: the link is
+  /// not reopened); see [PodReconnector].
+  final PodReopen? reopenPod;
+  final PodBackoff podBackoff;
+  final Duration Function(PodClient) podIdentWait;
 
   /// The phone's location, for a role that uses `gps` (null: none).
   final LocationService? location;
@@ -180,6 +190,7 @@ class PropSession extends ChangeNotifier {
   PodClient? _pod;
   PodInputs? _podInputs;
   StreamSubscription<PodEvent>? _podSub;
+  PodReconnector? _podLink;
 
   PropPhase phase = PropPhase.loading;
   String? error;
@@ -208,8 +219,17 @@ class PropSession extends ChangeNotifier {
   /// The pod's enclosure is open (its tamper switch, during the game).
   bool podOpened = false;
 
-  /// The pod linked to this prop, if any.
-  PodIdent? get pod => _pod?.ident;
+  /// The pod linked to this prop, if any (none once the person unlinked it).
+  PodIdent? get pod => podPhase == PodLinkPhase.unlinked ? null : _pod?.ident;
+
+  /// The pod link's state: up, being opened again, refused (another pod
+  /// answered) or unlinked by the person; null without a pod.
+  PodLinkPhase? get podPhase =>
+      _pod == null ? null : _podLink?.phase ?? PodLinkPhase.linked;
+
+  /// Tries made to open the pod again, and when the next one starts.
+  int get podAttempt => _podLink?.attempt ?? 0;
+  DateTime? get podRetryAt => _podLink?.retryAt;
 
   int? get remainingMs => timer.remainingMs(gameTimeMs);
 
@@ -342,57 +362,108 @@ class PropSession extends ChangeNotifier {
   }
 
   /// Links an I/O pod: its events become inputs, the mode's commands for
-  /// its capabilities go to it.
+  /// its capabilities go to it. With [reopenPod] a broken link is opened
+  /// again by itself (lib/pod/pod_reconnect.dart).
   Future<void> attachPod(PodClient client) async {
     _pod = client;
-    _podSub = client.events.listen((e) {
-      switch (e) {
-        case PodIdentified(:final ident):
-          _podInputs = PodInputs(ident, teams: setup.teams);
-          _log(
-            'pod ${ident.fwVersion}: ${ident.capabilities.length} capabilities',
-          );
-          _attachRadio(client, ident);
-          notifyListeners();
-        case PodCapabilityEvent(:final message):
-          unawaited(screenManager.activity());
-          final inputs = _podInputs;
-          if (inputs != null && inputs.caseOpened(message)) {
-            unawaited(_podCaseOpened());
-            return;
-          }
-          if (inputs != null && inputs.caseClosed(message)) {
-            podOpened = false;
-            notifyListeners();
-            return;
-          }
-          final mapped = _podInputs?.input(
-            message,
-            tagData: (uid, tag) => podTagData(
-              uid,
-              tag,
-              gameId: setup.gameId,
-              gameKey: setup.gameKey,
-              teams: setup.teams,
-            ),
-          );
-          if (mapped != null) unawaited(_input(mapped.$1, mapped.$2));
-        case PodLinkBroken(:final why):
-          _log('pod link lost: $why');
-          _podInputs = null;
-          notifyListeners();
-        case PodRadioFrame():
-          break; // the radio link (PodRadioLink) reads them
-      }
-    });
+    _listenPod(client);
+    final reopen = reopenPod;
+    if (reopen != null) {
+      _podLink = PodReconnector(
+        client: client,
+        reopen: reopen,
+        backoff: podBackoff,
+        identTimeout: podIdentWait,
+        onReplaced: _podReplaced,
+      )..addListener(notifyListeners);
+    }
     await client.start();
   }
 
+  /// The person unlinks the pod: it is closed and not opened again.
+  Future<void> unlinkPod() async {
+    final pod = _pod;
+    if (pod == null) return;
+    _log('pod unlinked');
+    _podInputs = null;
+    final link = _podLink;
+    if (link != null) {
+      await link.unlink();
+    } else {
+      await pod.close();
+    }
+    notifyListeners();
+  }
+
+  /// The reconnector opened the pod again (the same one, identified): its
+  /// events and the radio through it replace the lost link's.
+  void _podReplaced(PodClient old, PodClient next) {
+    if (_closed) {
+      unawaited(next.close());
+      return;
+    }
+    _pod = next;
+    _listenPod(next);
+    _log('pod link restored');
+    final ident = next.ident;
+    if (ident != null) _onPod(next, PodIdentified(ident), reconnected: true);
+  }
+
+  void _listenPod(PodClient client) {
+    unawaited(_podSub?.cancel());
+    _podSub = client.events.listen((e) => _onPod(client, e));
+  }
+
+  void _onPod(PodClient client, PodEvent e, {bool reconnected = false}) {
+    if (!identical(client, _pod)) return;
+    switch (e) {
+      case PodIdentified(:final ident):
+        _podInputs = PodInputs(ident, teams: setup.teams);
+        _log(
+          'pod ${ident.fwVersion}: ${ident.capabilities.length} capabilities',
+        );
+        _attachRadio(client, ident, replace: reconnected);
+        notifyListeners();
+      case PodCapabilityEvent(:final message):
+        unawaited(screenManager.activity());
+        final inputs = _podInputs;
+        if (inputs != null && inputs.caseOpened(message)) {
+          unawaited(_podCaseOpened());
+          return;
+        }
+        if (inputs != null && inputs.caseClosed(message)) {
+          podOpened = false;
+          notifyListeners();
+          return;
+        }
+        final mapped = _podInputs?.input(
+          message,
+          tagData: (uid, tag) => podTagData(
+            uid,
+            tag,
+            gameId: setup.gameId,
+            gameKey: setup.gameKey,
+            teams: setup.teams,
+          ),
+        );
+        if (mapped != null) unawaited(_input(mapped.$1, mapped.$2));
+      case PodLinkBroken(:final why):
+        _log('pod link lost: $why');
+        _podInputs = null;
+        notifyListeners();
+      case PodRadioFrame():
+        break; // the radio link (PodRadioLink) reads them
+    }
+  }
+
   /// A pod with a radio in a joined game: the field's radio joins the links.
-  void _attachRadio(PodClient client, PodIdent ident) {
+  void _attachRadio(PodClient client, PodIdent ident, {bool replace = false}) {
     final l = _link;
     final make = radioLinkFor;
-    if (!ident.hasRadio || l == null || make == null || l.radio != null) return;
+    if (!ident.hasRadio || l == null || make == null) return;
+    // After a reconnect the lost link's radio is replaced: a new one,
+    // configured again with a new epoch.
+    if (l.radio != null && !replace) return;
     final r = make(client);
     if (r == null) return;
     _log('radio link through the pod');
@@ -733,6 +804,7 @@ class PropSession extends ChangeNotifier {
     // Not awaited: a cancelled subscription has nothing left to say.
     unawaited(_sub?.cancel());
     unawaited(_podSub?.cancel());
+    _podLink?.dispose();
     unawaited(_linkSub?.cancel());
     await _link?.close();
     await _pod?.close();

@@ -16,8 +16,22 @@ import 'package:flutter/material.dart';
 import '../app.dart';
 import '../l10n/strings.dart';
 import '../pod/pod_client.dart';
+import '../pod/pod_reconnect.dart';
 import '../pod/pod_transports.dart';
 import '../ui/widgets.dart';
+
+/// Opens the pod [lost] was linked to again, over the same kind of link
+/// (the Android plugins), for [PodReconnector]; null when it cannot be
+/// opened (no plugin, the pod out of reach, USB permission refused) or when
+/// the link did not come from a scan. Not started: the reconnector waits
+/// for the IDENT as the first link does.
+PodReopen podReopenFor(AppServices services) => (lost) async {
+  final d = lost.device;
+  if (d == null) return null;
+  final transport = d.kind == 'usb' ? services.usbPods : services.blePods;
+  if (transport == null || !await transport.open(d)) return null;
+  return PodClient(transport, device: d);
+};
 
 class PodScreen extends StatefulWidget {
   const PodScreen({super.key});
@@ -66,7 +80,7 @@ class _PodScreenState extends State<PodScreen> {
       }
       return;
     }
-    final client = PodClient(transport);
+    final client = PodClient(transport, device: d);
     final identified = Completer<void>();
     final sub = client.events.listen((e) {
       if (e is PodIdentified && !identified.isCompleted) identified.complete();

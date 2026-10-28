@@ -20,6 +20,7 @@ import 'dart:typed_data';
 import '../security/bytes.dart';
 import '../security/nfc_tag_signer.dart';
 import 'pod_codec.dart';
+import 'pod_transports.dart' show PodDevice;
 
 /// A link to a pod: bytes in, bytes out. Frames may arrive split or joined.
 abstract interface class PodTransport {
@@ -62,9 +63,14 @@ class PodClient {
     this.transport, {
     this.retryAfter = const Duration(milliseconds: 500),
     this.retries = 3,
+    this.device,
   });
 
   final PodTransport transport;
+
+  /// The pod this link was opened to, when it came from a scan (the app
+  /// opens the same one again to reconnect: lib/pod/pod_reconnect.dart).
+  final PodDevice? device;
   final Duration retryAfter;
   final int retries;
 

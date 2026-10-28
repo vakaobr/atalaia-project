@@ -28,6 +28,7 @@ import '../core/node_runner.dart';
 import '../l10n/strings.dart';
 import '../platform/services.dart';
 import '../pod/pod_client.dart';
+import '../pod/pod_reconnect.dart';
 import '../radio/pod_radio_link.dart';
 import '../ui/template/template_view.dart';
 import '../ui/theme.dart';
@@ -35,6 +36,7 @@ import '../ui/widgets.dart';
 import '../version.dart';
 import 'capability_mapper.dart';
 import 'game_timer.dart';
+import 'pod_screen.dart' show podReopenFor;
 import 'prop_session.dart';
 
 PropTexts propTexts(Strings s) => PropTexts(
@@ -94,6 +96,7 @@ class _PropGameScreenState extends State<PropGameScreen> {
           modeName: widget.modeName,
           link: _linkFor(services),
           radioLinkFor: (pod) => _radioFor(services, pod),
+          reopenPod: widget.pod?.device == null ? null : podReopenFor(services),
           location: services.location,
         );
     unawaited(_open(services));
@@ -250,6 +253,14 @@ class _PropGameScreenState extends State<PropGameScreen> {
                 title: Text(s.t('prop.end')),
                 onTap: () => Navigator.pop(c, 'end'),
               ),
+            if (session.podPhase != null &&
+                session.podPhase != PodLinkPhase.unlinked)
+              ListTile(
+                key: const Key('admin-unlink-pod'),
+                leading: const Icon(Icons.link_off),
+                title: Text(s.t('prop.pod_unlink')),
+                onTap: () => Navigator.pop(c, 'unlink_pod'),
+              ),
             ListTile(
               leading: const Icon(Icons.list),
               title: Text(s.t('prop.log')),
@@ -279,6 +290,8 @@ class _PropGameScreenState extends State<PropGameScreen> {
         )) {
           await session.end();
         }
+      case 'unlink_pod':
+        await session.unlinkPod();
       case 'log':
         await _showLog();
       case 'leave':
@@ -419,6 +432,28 @@ class _PropGameScreenState extends State<PropGameScreen> {
             padding: const EdgeInsets.all(8),
             child: Text(
               s.t('prop.tamper'),
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        if (session.podPhase == PodLinkPhase.reconnecting)
+          Container(
+            width: double.infinity,
+            color: Colors.amber,
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              s.t('prop.pod_reconnecting', {'n': session.podAttempt}),
+              key: const Key('prop-pod-reconnecting'),
+              style: const TextStyle(color: Colors.black),
+            ),
+          ),
+        if (session.podPhase == PodLinkPhase.refused)
+          Container(
+            width: double.infinity,
+            color: AtalaiaColors.danger,
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              s.t('prop.pod_refused'),
+              key: const Key('prop-pod-refused'),
               style: const TextStyle(color: Colors.white),
             ),
           ),
@@ -624,9 +659,17 @@ class _TopBar extends StatelessWidget {
                 ),
               ),
               if (session.pod != null)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4),
-                  child: Icon(Icons.memory, color: AtalaiaColors.accent),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Icon(
+                    session.podPhase == PodLinkPhase.linked
+                        ? Icons.memory
+                        : Icons.link_off,
+                    key: const Key('prop-pod-icon'),
+                    color: session.podPhase == PodLinkPhase.linked
+                        ? AtalaiaColors.accent
+                        : Colors.amber,
+                  ),
                 ),
               Text(
                 clock,

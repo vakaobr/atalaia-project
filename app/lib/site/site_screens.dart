@@ -26,6 +26,7 @@ import '../l10n/strings.dart';
 import '../ui/code_kind.dart';
 import '../ui/qr_painter.dart';
 import '../ui/widgets.dart';
+import 'history_screens.dart';
 import 'site_api.dart';
 import 'site_client.dart';
 import 'site_link.dart';
@@ -397,6 +398,18 @@ class _SiteScreenState extends State<SiteScreen> {
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute<void>(builder: (_) => const KeptTicketsScreen()),
+        ),
+      ),
+      const SizedBox(height: 8),
+      OutlinedButton.icon(
+        key: const Key('site-history'),
+        icon: const Icon(Icons.history),
+        label: Text(s.t('history.title')),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => GameHistoryScreen(session: _session!),
+          ),
         ),
       ),
     ];

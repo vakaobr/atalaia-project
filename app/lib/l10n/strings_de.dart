@@ -158,6 +158,12 @@ const Map<String, String> deStrings = {
   'prop.pod_opened':
       'Jemand hat während des Spiels den I/O-Pod geöffnet. Sag der '
       'Spielleitung Bescheid.',
+  'prop.pod_reconnecting':
+      'Die Verbindung zum I/O-Pod ist abgebrochen. Verbinde neu (Versuch {n}) …',
+  'prop.pod_refused':
+      'Ein anderer Pod hat geantwortet, der I/O-Pod ist daher nicht mehr verbunden. '
+      'Verbinde einen Pod erneut.',
+  'prop.pod_unlink': 'I/O-Pod trennen',
   'prop.hold': 'Gedrückt halten\n{team}',
   'prop.nfc_hint': 'Halte den Tag an die Rückseite des Handys.',
   'prop.keypad': 'Tastenfeld',
@@ -235,6 +241,12 @@ const Map<String, String> deStrings = {
   'pod.linked': 'Pod über {kind} verbunden: Firmware {fw}, {n} Funktionen.',
   'pod.open_failed': 'Die Verbindung zum Pod ließ sich nicht öffnen.',
   'pod.no_ident': 'Der Pod hat nicht geantwortet.',
+  'pod.reconnecting':
+      'Die Verbindung zum Pod ist abgebrochen. Verbinde neu (Versuch {n}) …',
+  'pod.refused':
+      'Ein anderer Pod hat geantwortet, die Verbindung wurde daher nicht wiederhergestellt. '
+      'Verbinde einen Pod erneut.',
+  'pod.unlink': 'Pod trennen',
 
   // Capabilities
   'cap.team_input': 'Team-Tasten',
@@ -869,6 +881,32 @@ const Map<String, String> deStrings = {
       'Der Controller des Felds hat diese ID nicht bestätigt (ein anderes '
       'Handy oder ein Check-in von Hand).',
   'site.error': 'Die Website hat abgelehnt: {error}',
+
+  // Spielverlauf
+  'history.title': 'Spielverlauf',
+  'history.reload': 'Neu laden',
+  'history.intro':
+      'Die Spiele, an denen du teilgenommen hast, nach den Aufzeichnungen '
+      'der Seite von den Feldern, an denen dieses Konto eine Spieler-ID '
+      'hat: die Punktestände und deine eigenen Ereignisse.',
+  'history.none':
+      'Noch keine Spiele. Ein Spiel erscheint hier, sobald das Feld es an '
+      'die Seite geschickt hat.',
+  'history.unnamed': 'Spiel',
+  'history.at': 'Auf dem Feld {field}',
+  'history.state.ready': 'Nicht gestartet',
+  'history.state.running': 'Läuft',
+  'history.state.paused': 'Pausiert',
+  'history.state.ended': 'Beendet',
+  'history.winner': 'Sieger: {team}',
+  'history.no_winner': 'Kein Sieger (Gleichstand oder keine Punkte).',
+  'history.scores': 'Punktestände',
+  'history.no_scores': 'Die Seite hat keine Punktestände für dieses Spiel.',
+  'history.events': 'Deine Ereignisse',
+  'history.no_events':
+      'Die Seite hat keine Ereignisse von dir in diesem Spiel.',
+  'history.registered': 'Du warst in diesem Spiel eingecheckt.',
+  'history.you': 'du',
   'site.err.offline':
       'Die Website ist nicht erreichbar. Versuch es später nochmal.',
   'site.err.login_required': 'Die Sitzung ist abgelaufen: Melde dich neu an.',

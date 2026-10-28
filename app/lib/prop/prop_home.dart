@@ -14,6 +14,7 @@ import '../app.dart';
 import '../l10n/strings.dart';
 import '../platform/services.dart';
 import '../pod/pod_client.dart';
+import '../pod/pod_reconnect.dart';
 import '../protocol/join_payload.dart';
 import '../ui/widgets.dart';
 import 'battery_guide.dart';
@@ -33,6 +34,7 @@ class _PropHomeScreenState extends State<PropHomeScreen> {
   DeviceFeatures? _features;
   bool? _exempt;
   PodClient? _pod;
+  PodReconnector? _podLink;
 
   @override
   void initState() {
@@ -58,12 +60,17 @@ class _PropHomeScreenState extends State<PropHomeScreen> {
     });
   }
 
-  Future<void> _newGame({JoinPayload? join}) => Navigator.push(
-    context,
-    MaterialPageRoute<void>(
-      builder: (_) => PropSetupScreen(join: join, pod: _pod),
-    ),
-  );
+  Future<void> _newGame({JoinPayload? join}) async {
+    // The game's session takes the pod over, with its own reconnecting.
+    _podLink?.suspend();
+    await Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => PropSetupScreen(join: join, pod: _pod),
+      ),
+    );
+    _podLink?.resume();
+  }
 
   Future<void> _join() async {
     final s = context.s;
@@ -80,13 +87,38 @@ class _PropHomeScreenState extends State<PropHomeScreen> {
       MaterialPageRoute(builder: (_) => const PodScreen()),
     );
     if (client != null && mounted) {
+      _podLink?.dispose();
       await _pod?.close();
+      if (!mounted) return;
+      _podLink = PodReconnector(
+        client: client,
+        reopen: podReopenFor(context.services),
+        onReplaced: (old, next) {
+          if (mounted) setState(() => _pod = next);
+        },
+      )..addListener(_podChanged);
       setState(() => _pod = client);
     }
   }
 
+  void _podChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// The person unlinks the pod: it is closed and not opened again.
+  Future<void> _unlinkPod() async {
+    await _podLink?.unlink();
+    if (!mounted) return;
+    setState(() {
+      _podLink?.dispose();
+      _podLink = null;
+      _pod = null;
+    });
+  }
+
   @override
   void dispose() {
+    _podLink?.dispose();
     unawaited(_pod?.close());
     super.dispose();
   }
@@ -134,7 +166,19 @@ class _PropHomeScreenState extends State<PropHomeScreen> {
             onPressed: _join,
           ),
           SectionTitle(s.t('pod.title')),
-          if (_pod?.ident case final ident?)
+          if (_podLink?.phase == PodLinkPhase.reconnecting)
+            Notice(
+              s.t('pod.reconnecting', {'n': _podLink!.attempt}),
+              kind: NoticeKind.warning,
+              key: const Key('pod-reconnecting'),
+            )
+          else if (_podLink?.phase == PodLinkPhase.refused)
+            Notice(
+              s.t('pod.refused'),
+              kind: NoticeKind.error,
+              key: const Key('pod-refused'),
+            )
+          else if (_pod?.ident case final ident?)
             Notice(
               s.t('pod.linked', {
                 'kind': _pod!.transport.kind.toUpperCase(),
@@ -151,6 +195,13 @@ class _PropHomeScreenState extends State<PropHomeScreen> {
             label: Text(s.t('pod.link')),
             onPressed: _linkPod,
           ),
+          if (_pod != null)
+            TextButton.icon(
+              key: const Key('pod-unlink'),
+              icon: const Icon(Icons.link_off),
+              label: Text(s.t('pod.unlink')),
+              onPressed: _unlinkPod,
+            ),
           SectionTitle(s.t('prop.capabilities')),
           if (caps != null)
             Wrap(

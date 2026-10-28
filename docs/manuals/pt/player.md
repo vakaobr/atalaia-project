@@ -272,6 +272,8 @@ Alguns campos deixam-te inscrever num jogo no site deles, com uma conta.
 
 Não partilhes o bilhete. Quem o tiver pode fazer o check-in no teu lugar. Podes alterar ou cancelar uma inscrição enquanto estiver aberta: **Alterar a inscrição** ou **Cancelar a inscrição**. O campo apaga os dados da inscrição 30 dias depois do jogo.
 
+**O teu histórico de jogos.** Depois de entrares, toca em **Histórico de jogos** para ver os jogos em que participaste, do mais recente para o mais antigo. Toca num jogo para ver as pontuações, a equipa vencedora e os teus eventos. A app não guarda nada: pergunta ao site de cada vez.
+
 A app ainda não cria contas. Pergunta à organização do campo como obter uma.
 
 ## 9. Sair de um jogo e os teus dados

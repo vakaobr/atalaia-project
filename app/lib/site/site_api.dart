@@ -205,6 +205,83 @@ final class PlayerIds {
   }
 }
 
+/// One event of a game the player took part in: what the site server keeps
+/// of the player's own events (`game_history` in `GET /me/data`, plan
+/// phase 20, decision S20-6).
+final class HistoryEvent {
+  HistoryEvent(Map<String, Object?> j)
+    : tMs = j['t'] is int ? j['t']! as int : 0,
+      type = '${j['type']}',
+      team = _str(j['team']),
+      data = j['data'] is Map
+          ? (j['data']! as Map).cast<String, Object?>()
+          : const {},
+      receivedAt = _time(j['received_at']);
+
+  final int tMs;
+  final String type;
+  final String? team;
+  final Map<String, Object?> data;
+  final DateTime? receivedAt;
+}
+
+/// A game in the player's history: the game, its final (or latest) scores
+/// and the player's own events in it.
+final class HistoryGame {
+  HistoryGame(Map<String, Object?> j)
+    : id = '${j['game']}',
+      field = _str(j['field']) ?? '',
+      name = _str(j['name']) ?? '',
+      modeId = _str(j['mode_id']),
+      teams = _strings(j['teams']),
+      state = _str(j['state']) ?? 'ended',
+      startedAt = _time(j['started_at']),
+      endedAt = _time(j['ended_at']),
+      playerIds = _strings(j['player_ids']),
+      registered = j['registered'] == true,
+      totals = {
+        for (final e in ((j['totals'] as Map?) ?? const {}).entries)
+          '${e.key}': e.value is int ? e.value as int : 0,
+      },
+      events = [
+        for (final e in (j['events'] as List?) ?? const [])
+          if (e is Map) HistoryEvent(e.cast<String, Object?>()),
+      ];
+
+  final String id;
+  final String field;
+  final String name;
+  final String? modeId;
+  final List<String> teams;
+  final String state;
+  final DateTime? startedAt;
+  final DateTime? endedAt;
+
+  /// The player's pseudonymous ids at the field in this game.
+  final List<String> playerIds;
+
+  /// Checked in to the game through a registration.
+  final bool registered;
+
+  /// Team -> points.
+  final Map<String, int> totals;
+  final List<HistoryEvent> events;
+
+  bool get ended => state == 'ended';
+
+  /// The team with the most points, null on a tie or with no points (the
+  /// site server's rule, `services/history.winner`).
+  String? get winner {
+    if (totals.isEmpty) return null;
+    final best = totals.values.reduce((a, b) => a > b ? a : b);
+    final leaders = [
+      for (final e in totals.entries)
+        if (e.value == best) e.key,
+    ];
+    return leaders.length == 1 && best > 0 ? leaders.single : null;
+  }
+}
+
 class SiteApi {
   SiteApi(this.session);
   final SiteSession session;
@@ -261,6 +338,18 @@ class SiteApi {
   Future<Registration> newTicket(String regId) async => Registration(
     await session.call('POST', '/me/registrations/$regId/ticket'),
   );
+
+  /// The games the account played, oldest first, from the player's own
+  /// data (`GET /me/data`, its `game_history`): the site server has no
+  /// smaller answer for a player, and its other history views
+  /// (`/fields/{id}/history`, `/games/{id}/log`) need a role at the field.
+  Future<List<HistoryGame>> history() async {
+    final j = await session.call('GET', '/me/data');
+    return [
+      for (final g in (j['game_history'] as List?) ?? const [])
+        if (g is Map) HistoryGame(g.cast<String, Object?>()),
+    ];
+  }
 
   Future<PlayerIds> playerIds() async =>
       PlayerIds(await session.call('GET', '/me/player-ids'));

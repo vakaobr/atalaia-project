@@ -154,6 +154,11 @@ const Map<String, String> ptStrings = {
       'Alguém saiu do modo quiosque durante o jogo. Avisa a organização.',
   'prop.pod_opened':
       'Alguém abriu o módulo de E/S durante o jogo. Avisa a organização.',
+  'prop.pod_reconnecting':
+      'A ligação ao módulo de E/S perdeu-se. A religar (tentativa {n})…',
+  'prop.pod_refused':
+      'Respondeu outro módulo, por isso o módulo de E/S deixou de estar ligado. Liga um módulo outra vez.',
+  'prop.pod_unlink': 'Desligar o módulo de E/S',
   'prop.hold': 'Manter premido\n{team}',
   'prop.nfc_hint': 'Encosta a etiqueta às costas do telemóvel.',
   'prop.keypad': 'Teclado',
@@ -229,6 +234,11 @@ const Map<String, String> ptStrings = {
   'pod.linked': 'Módulo ligado por {kind}: firmware {fw}, {n} capacidades.',
   'pod.open_failed': 'Não foi possível abrir a ligação ao módulo.',
   'pod.no_ident': 'O módulo não respondeu.',
+  'pod.reconnecting':
+      'A ligação ao módulo perdeu-se. A religar (tentativa {n})…',
+  'pod.refused':
+      'Respondeu outro módulo, por isso a ligação não foi retomada. Liga um módulo outra vez.',
+  'pod.unlink': 'Desligar o módulo',
 
   // Capacidades
   'cap.team_input': 'botões das equipas',
@@ -853,6 +863,31 @@ const Map<String, String> ptStrings = {
       'O controlador do campo não confirmou esse ID (outro telemóvel, ou um '
       'check-in feito à mão).',
   'site.error': 'O site recusou: {error}',
+
+  // Histórico de jogos
+  'history.title': 'Histórico de jogos',
+  'history.reload': 'Atualizar',
+  'history.intro':
+      'Os jogos em que participaste, segundo os registos do site dos campos '
+      'onde esta conta tem um ID de jogador: as pontuações e os teus '
+      'próprios eventos.',
+  'history.none':
+      'Ainda não há jogos. Um jogo aparece aqui quando o campo o envia para '
+      'o site.',
+  'history.unnamed': 'Jogo',
+  'history.at': 'No campo {field}',
+  'history.state.ready': 'Por começar',
+  'history.state.running': 'A decorrer',
+  'history.state.paused': 'Em pausa',
+  'history.state.ended': 'Terminado',
+  'history.winner': 'Vencedora: {team}',
+  'history.no_winner': 'Sem vencedora (empate, ou sem pontos).',
+  'history.scores': 'Pontuações',
+  'history.no_scores': 'O site não tem pontuações deste jogo.',
+  'history.events': 'Os teus eventos',
+  'history.no_events': 'O site não tem eventos teus neste jogo.',
+  'history.registered': 'Fizeste o check-in neste jogo.',
+  'history.you': 'tu',
   'site.err.offline': 'Sem ligação ao site. Tenta outra vez daqui a pouco.',
   'site.err.login_required': 'A sessão terminou: entra outra vez.',
   'site.err.invalid_credentials':

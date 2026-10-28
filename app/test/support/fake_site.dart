@@ -103,6 +103,55 @@ class FakeSite {
       'cancelled_reason': null,
     },
   ];
+
+  /// `game_history` of `GET /me/data`: two games, the older first.
+  final history = <Map<String, Object?>>[
+    {
+      'game': '0192f3a0-0000-7000-8000-0000000000a1',
+      'field': 'Campo Norte',
+      'name': 'Sábado de Domination',
+      'mode_id': 'org.atalaia.domination',
+      'teams': ['red', 'blue'],
+      'state': 'ended',
+      'started_at': '2026-09-12T09:00:00+00:00',
+      'ended_at': '2026-09-12T11:00:00+00:00',
+      'player_ids': ['p-sitemade2345'],
+      'registered': true,
+      'events': [
+        {
+          't': 65000,
+          'type': 'player.checkin',
+          'team': 'red',
+          'squad': 0,
+          'data': {'player': 'p-sitemade2345'},
+          'received_at': '2026-09-12T09:01:10+00:00',
+        },
+        {
+          't': 3725000,
+          'type': 'score.delta',
+          'team': 'red',
+          'squad': 0,
+          'data': {'player': 'p-sitemade2345', 'amount': 5},
+          'received_at': '2026-09-12T10:02:10+00:00',
+        },
+      ],
+      'totals': {'red': 120, 'blue': 90},
+    },
+    {
+      'game': '0192f3a0-0000-7000-8000-0000000000a2',
+      'field': 'Campo Norte',
+      'name': 'Noturno',
+      'mode_id': null,
+      'teams': ['red', 'blue'],
+      'state': 'ended',
+      'started_at': '2026-10-03T20:00:00+00:00',
+      'ended_at': '2026-10-03T22:00:00+00:00',
+      'player_ids': ['p-sitemade2345'],
+      'registered': true,
+      'events': <Object?>[],
+      'totals': {'red': 40, 'blue': 40},
+    },
+  ];
   final regs = <String, Map<String, Object?>>{};
   final claims = <Map<String, Object?>>[];
   final linked = <String, String>{};
@@ -267,6 +316,10 @@ class FakeSite {
     switch ('$method $path') {
       case 'GET /fields-by-slug/campo-norte':
         return SiteResponse(200, {'field': _field(), 'games': games});
+      case 'GET /me/data':
+        // Only the part the app reads: the player's own game history
+        // (services/history.player_history), oldest first.
+        return SiteResponse(200, {'game_history': history});
       case 'GET /me/registrations':
         return SiteResponse(200, [for (final r in regs.values) _regJson(r)]);
       case 'GET /me/player-ids':

@@ -147,6 +147,10 @@ const Map<String, String> enStrings = {
       'Someone left kiosk mode during the game. Tell the game master.',
   'prop.pod_opened':
       'Someone opened the I/O pod during the game. Tell the game master.',
+  'prop.pod_reconnecting': 'The I/O pod link was lost. Reconnecting (try {n})…',
+  'prop.pod_refused':
+      'A different pod answered, so the I/O pod is not linked any more. Link a pod again.',
+  'prop.pod_unlink': 'Unlink the I/O pod',
   'prop.hold': 'Hold\n{team}',
   'prop.nfc_hint': 'Hold the tag to the back of the phone.',
   'prop.keypad': 'Keypad',
@@ -220,6 +224,10 @@ const Map<String, String> enStrings = {
   'pod.linked': 'Pod linked over {kind}: firmware {fw}, {n} capabilities.',
   'pod.open_failed': 'Could not open the link to the pod.',
   'pod.no_ident': 'The pod did not answer.',
+  'pod.reconnecting': 'The link to the pod was lost. Reconnecting (try {n})…',
+  'pod.refused':
+      'A different pod answered, so the link was not restored. Link a pod again.',
+  'pod.unlink': 'Unlink the pod',
 
   // Capabilities
   'cap.team_input': 'team buttons',
@@ -841,6 +849,30 @@ const Map<String, String> enStrings = {
       'The field\'s controller did not confirm that id (another phone, or a '
       'check-in made by hand).',
   'site.error': 'The site refused: {error}',
+
+  // Game history
+  'history.title': 'Game history',
+  'history.reload': 'Reload',
+  'history.intro':
+      'The games you played, from the site\'s records of the fields where '
+      'this account has a player id: the scores and your own events.',
+  'history.none':
+      'No games yet. A game shows here once the field has sent it to the '
+      'site.',
+  'history.unnamed': 'Game',
+  'history.at': 'At {field}',
+  'history.state.ready': 'Not started',
+  'history.state.running': 'Running',
+  'history.state.paused': 'Paused',
+  'history.state.ended': 'Ended',
+  'history.winner': 'Winner: {team}',
+  'history.no_winner': 'No winner (a tie, or no points).',
+  'history.scores': 'Scores',
+  'history.no_scores': 'The site has no scores for this game.',
+  'history.events': 'Your events',
+  'history.no_events': 'The site has no events of yours for this game.',
+  'history.registered': 'You were checked in to this game.',
+  'history.you': 'you',
   'site.err.offline': 'The site cannot be reached. Try again in a while.',
   'site.err.login_required': 'The session has ended: log in again.',
   'site.err.invalid_credentials': 'Wrong username or password.',
