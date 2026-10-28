@@ -485,7 +485,7 @@
       ]
     },
     {
-      "name": "box penalties: STATE key 9 (lost) is subtracted from the totals, merged by maximum (RFC 0001 Amendment 17, BSC-1)",
+      "name": "box penalties: STATE key 9 (lost) is subtracted from the totals, merged by maximum (RFC 0001 Amendment 18, BSC-1)",
       "steps": [
         {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Penalty", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "assignments": {"4": "zone", "5": "zone"}}}, "status": 201, "save": {"gid": "id"}},
         {"rx": {"source": 4, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},

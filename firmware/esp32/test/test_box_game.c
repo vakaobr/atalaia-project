@@ -520,7 +520,7 @@ static void test_join_play_end(void)
     CHECK(atalaia_state_decode(pl, pn, &st));
     CHECK(st.owner_team == 1 && st.counter_count == 2 && st.counters[0].team == 1);
     CHECK(st.counters[0].score >= 5 && st.phase == FIELD_GAME_RUNNING && (st.flags & 1));
-    CHECK(st.lost_count == 0); /* no penalty: the same STATE as before Amendment 17 */
+    CHECK(st.lost_count == 0); /* no penalty: the same STATE as before Amendment 18 */
 
     /* Pause: game time stands still. Resume: it moves again. */
     cmd(FIELD_CMD_PAUSE);
@@ -711,7 +711,7 @@ static void test_player_tags(void)
     CHECK(atalaia_score_net(atalaia_node_score(runner.node), 1) == 1);
     CHECK(atalaia_score_net(atalaia_node_score(runner.node), 2) == -1);
 
-    /* The periodic STATE carries the penalty as `lost` (Amendment 17): only blue lost points,
+    /* The periodic STATE carries the penalty as `lost` (Amendment 18): only blue lost points,
      * and the gains stay what they were. */
     ack_all(); /* (an unacknowledged event would be sent again within these 15 s) */
     run_ms(&now, FIELD_LINK_STATE_MS + 100);

@@ -168,7 +168,7 @@ static void test_state_minimal(void)
     CHECK(out.counter_count == 0);
 }
 
-/* Amendment 17: `lost` is optional and additive. */
+/* Amendment 18: `lost` is optional and additive. */
 static void test_state_lost(void)
 {
     atalaia_state_msg_t msg;

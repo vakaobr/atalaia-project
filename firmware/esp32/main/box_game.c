@@ -119,7 +119,7 @@ static void link_get_state(void *user, atalaia_state_msg_t *st)
             st->counters[st->counter_count].score = score->gained[t];
             st->counter_count++;
         }
-        /* Penalties (RFC 0001 Amendment 17): only the teams that lost points, so a game with no
+        /* Penalties (RFC 0001 Amendment 18): only the teams that lost points, so a game with no
          * penalty sends the same STATE as before; never decreasing, merged by maximum. */
         for (uint8_t t = 1; t <= g->join.team_count && st->lost_count < 16; t++) {
             if (score->lost[t] > 0) {

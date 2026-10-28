@@ -235,7 +235,7 @@ class EventHandlingTests(unittest.TestCase):
         self.assertEqual(scores[-1], {"red": 3, "blue": 8})
 
     def test_state_lost_is_subtracted_and_merged_by_maximum(self):
-        """RFC 0001 Amendment 17: key 9 is the box's penalties; an older STATE without it loses none."""
+        """RFC 0001 Amendment 18: key 9 is the box's penalties; an older STATE without it loses none."""
         from atalaia_sim.packet import state_encode
         scores = []
         self.ctrl.on_scores = scores.append

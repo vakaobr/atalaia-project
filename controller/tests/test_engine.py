@@ -215,7 +215,7 @@ class RadioInputTests(EngineCase):
                             for m in self.messages))
 
     def test_box_penalties_reach_the_totals_and_survive_a_restart(self):
-        """RFC 0001 Amendment 17: STATE key 9 is subtracted; it is stored with the node."""
+        """RFC 0001 Amendment 18: STATE key 9 is subtracted; it is stored with the node."""
         gid = self.gid
         lost_state = state_encode({"owner_team": 1, "phase": 1, "game_time_ms": 0, "counters": {1: 12, 2: 4},
                                    "epoch": 3, "lost": {2: 3}})

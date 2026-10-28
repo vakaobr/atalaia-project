@@ -310,7 +310,7 @@ class FieldController:
 
         # Score aggregation: team name -> node key -> max value.
         self._scores: dict[str, dict[str, int]] = {t: {} for t in self.teams}
-        # Penalties the boxes report in STATE (key 9, RFC 0001 Amendment 17): the same shape.
+        # Penalties the boxes report in STATE (key 9, RFC 0001 Amendment 18): the same shape.
         self._lost: dict[str, dict[str, int]] = {t: {} for t in self.teams}
         self._adjust: dict[str, int] = {}
         # The mode's optional scoring contract (modes/README.md "Projected score", decision BSC-2):

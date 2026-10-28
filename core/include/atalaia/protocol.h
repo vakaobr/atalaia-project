@@ -80,7 +80,7 @@ enum {
     ATALAIA_PL_STATE_BATTERY_PCT = 6,  /* 0-100 */
     ATALAIA_PL_STATE_FLAGS = 7,        /* bit 0: running, bit 1: paused */
     ATALAIA_PL_STATE_EPOCH = 8,        /* current nonce epoch */
-    ATALAIA_PL_STATE_LOST = 9,         /* per-team points lost to penalties on this node; absent = none (RFC 0001 Amendment 17) */
+    ATALAIA_PL_STATE_LOST = 9,         /* per-team points lost to penalties on this node; absent = none (RFC 0001 Amendment 18) */
 };
 
 /* CBOR keys of CMD payload fields. */

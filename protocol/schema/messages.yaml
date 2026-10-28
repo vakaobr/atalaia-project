@@ -52,7 +52,7 @@ payloads:
     - { key: 6, name: battery_pct, type: uint8, required: false, doc: "0-100" }
     - { key: 7, name: flags, type: uint8, required: false, doc: "bit 0: running, bit 1: paused" }
     - { key: 8, name: epoch, type: uint16, required: true, doc: "current nonce epoch" }
-    - { key: 9, name: lost, type: map_u8_u32, required: false, doc: "per-team points lost to penalties on this node; absent = none (RFC 0001 Amendment 17)" }
+    - { key: 9, name: lost, type: map_u8_u32, required: false, doc: "per-team points lost to penalties on this node; absent = none (RFC 0001 Amendment 18)" }
   CMD:
     - { key: 1, name: cmd, type: uint8, required: true, doc: "opcode: 0-10 (9: firmware update, RFC 0001 Amendment 6; 10: an I/O pod's settings, Amendment 17)" }
     - { key: 2, name: params, type: map, required: false, doc: "command-specific parameters" }

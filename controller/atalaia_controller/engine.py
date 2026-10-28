@@ -1651,7 +1651,7 @@ class Controller:
             # The box's stable device id (HELLO key 10, protocol/field-frames.md), as hex.
             "device_id": device.hex() if isinstance(device, (bytes, bytearray)) and len(device) == 8 else None,
             "score": {t: v.get(f"node-{node.node_id}", 0) for t, v in self.fc._scores.items()},
-            # What the box lost to penalties (STATE key 9, RFC 0001 Amendment 17); total_scores
+            # What the box lost to penalties (STATE key 9, RFC 0001 Amendment 18); total_scores
             # subtracts it.
             "lost": {t: v.get(f"node-{node.node_id}", 0) for t, v in self.fc._lost.items()},
             # Health as the controller logged it (node.online/node.offline, battery.low).

@@ -1511,7 +1511,7 @@ class ControllerEngine {
       'score': {
         for (final t in fc.teams) t: fc.counter(t, 'node-${node.nodeId}'),
       },
-      // What the box lost to penalties (STATE key 9, RFC 0001 Amendment 17).
+      // What the box lost to penalties (STATE key 9, RFC 0001 Amendment 18).
       'lost': {
         for (final t in fc.teams) t: fc.lostOf(t, 'node-${node.nodeId}'),
       },

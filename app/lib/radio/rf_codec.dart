@@ -270,7 +270,7 @@ final class RfState {
     final m = _map(payload);
     _only(m, 9);
     final counters = _teamPoints(m[4], 'counters');
-    // Key 9 (RFC 0001 Amendment 17): the points each team lost to penalties on
+    // Key 9 (RFC 0001 Amendment 18): the points each team lost to penalties on
     // the node; absent from a box that has none and from an older one.
     final lost = m.containsKey(9)
         ? _teamPoints(m[9], 'lost')

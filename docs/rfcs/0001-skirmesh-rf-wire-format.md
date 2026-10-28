@@ -199,7 +199,7 @@ Sent every 10-60 seconds (per field profile).
 | 6 | `battery_pct` | uint8 | no | 0-100 |
 | 7 | `flags` | uint8 | no | Bit 0: running, bit 1: paused |
 | 8 | `epoch` | uint16 | yes | Current nonce epoch |
-| 9 | `lost` | map[uint8->uint32] | no | Per-team points lost to penalties on this node (Amendment 17); absent = none |
+| 9 | `lost` | map[uint8->uint32] | no | Per-team points lost to penalties on this node (Amendment 18); absent = none |
 
 Typical size: 20-40 bytes (2-team game); a team with a penalty adds 2-6 bytes.
 

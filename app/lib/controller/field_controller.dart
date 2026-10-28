@@ -281,7 +281,7 @@ class FieldController {
   final _scores = <String, Map<String, int>>{};
 
   /// team -> node key ("node-4") -> highest penalty total reported (STATE key
-  /// 9, RFC 0001 Amendment 17); [totalScores] subtracts it.
+  /// 9, RFC 0001 Amendment 18); [totalScores] subtracts it.
   final _lost = <String, Map<String, int>>{};
   final _adjust = <String, int>{};
   final acks = AckTracker();
