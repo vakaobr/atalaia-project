@@ -1387,6 +1387,37 @@ class Fu8PageTests(BrowserCase):
         self.assertNotIn("Domingo secreto", await page.locator("main").inner_text())
         await self.check_page(page, 375)
 
+    async def test_a_club_page_lists_the_fields_where_it_plays(self) -> None:
+        """SV8-1: a member sees every field with a team of the club (a public one as a link to its page), in words
+        and at a phone's width; a club with no team says so."""
+        name, _ = await self.staff("player", with_totp=False)
+        user = (await self.fetch("SELECT id FROM users WHERE username = $1", name))[0][0]
+        club = (await self.fetch("INSERT INTO clubs (name, short_name, slug) VALUES ('Lobos do Pinhal', 'Lobos', "
+                                 "'lobos') RETURNING id"))[0][0]
+        empty = (await self.fetch("INSERT INTO clubs (name, short_name, slug) VALUES ('Corvos', 'Corvos', 'corvos') "
+                                  "RETURNING id"))[0][0]
+        for c in (club, empty):
+            await self.fetch("INSERT INTO club_members (club_id, user_id, role, accepted_at) "
+                             "VALUES ($1, $2, 'member', now())", c, user)
+        public = (await self.fetch("INSERT INTO fields (name, slug, public_page) VALUES ('Campo Aberto', "
+                                   "'campo-aberto', true) RETURNING id"))[0][0]
+        for field in (self.field_id, public, public):  # the default field has no public page; two teams, one entry
+            await self.fetch("INSERT INTO field_teams (field_id, club_id) VALUES ($1, $2)", field, club)
+        page = await self.new_page(lang="en")
+        await self.login(page, name, None, f"/staff/clubs/{club}")
+        items = page.locator("#club-fields-list li")
+        await expect(items).to_have_text(["Campo Aberto (public page)", "Campo Norte (no public page)"])
+        await expect(items.locator("a")).to_have_count(1)
+        self.assertEqual(await items.locator("a").get_attribute("href"), "/f/campo-aberto/")
+        await page.goto(self.base + f"/staff/clubs/{club}?lang=en")  # a language asked for in the address is kept
+        await expect(items.locator("a")).to_have_attribute("href", "/f/campo-aberto/?lang=en")
+        await expect(page.locator("#club-fields-none")).to_be_hidden()
+        await self.check_page(page)
+        await page.goto(self.base + f"/staff/clubs/{empty}")
+        await expect(page.locator("#club-fields-none")).to_have_text("It does not play at any field yet.")
+        await expect(page.locator("#club-fields-list li")).to_have_count(0)
+        await self.check_page(page)
+
     async def test_every_new_page_loads_for_its_role_at_a_phones_width(self) -> None:
         name, secret = await self.staff("admin")
         page = await self.new_page(lang="de-DE")

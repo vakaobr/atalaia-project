@@ -22,6 +22,17 @@ function details(club) {
     for (const [k, v] of rows) dl.append(el('dt', { text: k }), el('dd', { text: v }));
 }
 
+/** The fields where the club plays (GET .../clubs/{id} `fields`: a member sees all, anyone else those with a public page). */
+function fields(list) {
+    const ul = clear($('club-fields-list'));
+    for (const f of list || []) {
+        const name = f.public_page ? el('a', { href: link(`/f/${encodeURIComponent(f.slug)}/`), text: f.name })
+            : document.createTextNode(f.name);
+        ul.append(el('li', {}, name, ` (${t(f.public_page ? 'club_field_public' : 'club_field_private')})`));
+    }
+    $('club-fields-none').hidden = Boolean(list && list.length);
+}
+
 async function loadMembers(club) {
     let members;
     try {
@@ -82,6 +93,7 @@ async function load() {
     }
     $('club-heading').textContent = club.name;
     details(club);
+    fields(club.fields);
     const admin = club.my_role === 'admin';
     const member = Boolean(club.my_role);
     $('club-edit').hidden = !admin;

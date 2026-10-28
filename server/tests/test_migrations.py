@@ -504,6 +504,53 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(self.db.fetch("SELECT federation_number FROM game_registrations")[0][0], "FPA-1")
         self.db.fetch("DELETE FROM fields")
 
+    def test_0018_with_data(self) -> None:
+        """0018_chrono_violation_delta on a database with chrono violations: ``repeat_offender`` is worked out from
+        the deciding readings' times (per field and player; a tie goes by reading id), the new columns start null,
+        and back down (the three columns go, the violations stay)."""
+        command.upgrade(self.cfg, "0016_apd_membership")
+        field = self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Campo', 'campo') RETURNING id")[0][0]
+        other = self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Arena', 'arena') RETURNING id")[0][0]
+        key = ("INSERT INTO marshal_keys (field_id, marshal_id, name, public_key, source, valid_from) "
+               "VALUES ($1, 'm-ana', 'Ana', $2, 'controller', now()) RETURNING id")
+        keys = {f: self.db.fetch(key, f, bytes(32))[0][0] for f in (field, other)}
+        reading = ("INSERT INTO chrono_readings (field_id, reading_id, record_json, replica_id, player_id, type, "
+                   "velocity_mps, bb_weight_g, energy_j, chrono_id, marshal_id, record_field_id, timestamp, series_id, "
+                   "marshal_key, received_at) VALUES ($1, $2, '{}', gen_random_uuid(), $3, 'checkin', 100, 0.2, 1.9, "
+                   "'c', 'm-ana', 'f', $4, gen_random_uuid(), $5, now()) RETURNING id, series_id")
+        violation = ("INSERT INTO chrono_violations (field_id, series_id, reading, player_id, replica_id, "
+                     "violation_type, energy_j) VALUES ($1, $2, $3, $4, gen_random_uuid(), 'over_limit', 1.9) "
+                     "RETURNING id")
+        at = lambda minute: datetime.datetime(2030, 11, 9, 10, minute, tzinfo=datetime.timezone.utc)  # noqa: E731
+        low, high = uuid.UUID(int=1), uuid.UUID(int=2)
+
+        def add(f: uuid.UUID, player: str, when: datetime.datetime, reading_id: uuid.UUID | None = None) -> uuid.UUID:
+            row = self.db.fetch(reading, f, reading_id or uuid.uuid4(), player, when, keys[f])[0]
+            return self.db.fetch(violation, f, row["series_id"], row["id"], player)[0][0]
+
+        # Inserted out of order on purpose: the order that counts is the readings' time, not the insertion's.
+        later = add(field, "p-1", at(30))
+        first = add(field, "p-1", at(10))
+        last = add(field, "p-1", at(50))
+        lone = add(field, "p-2", at(20))            # another player: no earlier violation of their own
+        elsewhere = add(other, "p-1", at(5))        # earlier, but at another field: does not count
+        tie_low = add(field, "p-3", at(40), low)    # the same instant: the smaller reading id is the earlier
+        tie_high = add(field, "p-3", at(40), high)
+        command.upgrade(self.cfg, "0018_chrono_violation_delta")
+        rows = {r["id"]: tuple(r[1:]) for r in self.db.fetch(
+            "SELECT id, repeat_offender, limit_j, delta_j FROM chrono_violations")}
+        self.assertEqual(len(rows), 7)
+        self.assertEqual({k: v[0] for k, v in rows.items()},
+                         {first: False, later: True, last: True, lone: False, elsewhere: False,
+                          tie_low: False, tie_high: True})
+        self.assertTrue(all(v[1:] == (None, None) for v in rows.values()))  # no limit or excess for the old rows
+        command.downgrade(self.cfg, "0016_apd_membership")
+        columns = {r["column_name"] for r in self.db.fetch(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'chrono_violations'")}
+        self.assertFalse(columns & {"limit_j", "delta_j", "repeat_offender"})
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM chrono_violations")[0][0], 7)
+        self.db.fetch("DELETE FROM fields")
+
     def test_0019_with_data(self) -> None:
         """0019_field_country: a field in a Portuguese time zone becomes PT, any other stays unset, the code is
         checked, and back down."""

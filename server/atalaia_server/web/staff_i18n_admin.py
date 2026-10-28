@@ -293,6 +293,10 @@ PT: dict[str, str] = {
     "e_hosted_one_field": "Um hub alojado tem um campo por inquilino, criado pela operação do hub.",
     "e_field_type_invalid": "O tipo de campo não é válido.",
     "e_timezone_invalid": "O fuso horário não é válido.",
+    "club_fields_title": "Campos onde joga",
+    "club_fields_none": "Ainda não joga em nenhum campo.",
+    "club_field_public": "página pública",
+    "club_field_private": "sem página pública",
 }
 
 EN: dict[str, str] = {
@@ -568,6 +572,10 @@ EN: dict[str, str] = {
     "e_hosted_one_field": "A hosted hub has one field per tenant, made by the hub's operator.",
     "e_field_type_invalid": "The field type is not valid.",
     "e_timezone_invalid": "The time zone is not valid.",
+    "club_fields_title": "Fields where it plays",
+    "club_fields_none": "It does not play at any field yet.",
+    "club_field_public": "public page",
+    "club_field_private": "no public page",
 }
 
 DE: dict[str, str] = {
@@ -856,6 +864,10 @@ DE: dict[str, str] = {
     "e_hosted_one_field": "Ein gehosteter Hub hat ein Spielfeld pro Mandant, vom Betrieb des Hubs erstellt.",
     "e_field_type_invalid": "Die Art des Spielfelds ist nicht gültig.",
     "e_timezone_invalid": "Die Zeitzone ist nicht gültig.",
+    "club_fields_title": "Spielfelder, auf denen er spielt",
+    "club_fields_none": "Er spielt noch auf keinem Spielfeld.",
+    "club_field_public": "öffentliche Seite",
+    "club_field_private": "keine öffentliche Seite",
 }
 
 ZH_TW: dict[str, str] = {
@@ -1117,6 +1129,10 @@ ZH_TW: dict[str, str] = {
     "e_hosted_one_field": "託管的 hub 每個租戶只有一個場地，由 hub 的營運者建立。",
     "e_field_type_invalid": "場地類型無效。",
     "e_timezone_invalid": "時區無效。",
+    "club_fields_title": "活動場地",
+    "club_fields_none": "尚未在任何場地活動。",
+    "club_field_public": "公開頁面",
+    "club_field_private": "無公開頁面",
 }
 
 BY_LANGUAGE = {"pt": PT, "en": EN, "de": DE, "zh-tw": ZH_TW}
