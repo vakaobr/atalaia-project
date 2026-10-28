@@ -61,6 +61,8 @@ class FakeSite:
         self.readings: list[dict[str, Any]] = []
         self.refuse_readings: set[str] = set()  # reading ids to answer as kept apart
         self.before_pkd3 = False  # a site server that refuses a reading's ``limit_j`` (unknown_field)
+        self.erasures: list[dict[str, Any]] = []  # S14-10: what the controller said it erased
+        self.no_erasures = False  # a site server from before the endpoint (404)
         self.lock = threading.Lock()
         site = self
 
@@ -107,6 +109,8 @@ class FakeSite:
             if self.reject == kind:
                 self.reject = None
                 return 400, {"detail": "invalid_body", "error": "bad_source", "path": "counters.x"}, {}
+            if self.no_erasures and kind == "erasures":
+                return 404, {"detail": "Not Found"}, {}
             if self.before_pkd3 and kind == "chrono":
                 for i, entry in enumerate(body["readings"]):
                     if "limit_j" in entry:
@@ -153,6 +157,10 @@ class FakeSite:
             for r in body["replicas"]:
                 self.replicas[r["replica_id"]] = r
             return {"replicas": len(body["replicas"])}
+        if kind == "erasures":
+            self.erasures.extend(body["erasures"])
+            return {"players": len(body["erasures"]), "chrono_readings": 0, "chrono_rejects": 0, "replicas": 0,
+                    "identities": 0}
         refused = []
         for i, entry in enumerate(body["readings"]):
             rid = json.loads(entry["record"])["reading_id"]
@@ -487,6 +495,54 @@ class RegistryTests(SyncCase):
         self.store.add_reading(b, str(uuid.uuid4()), "fail", T0 + 60, limit_j=1.2)
         self.assertTrue(client.run_once())
         self.assertNotIn("limit_j", self.site.readings[1])  # and no more tries with it
+
+
+class ErasureSyncTests(SyncCase):
+    """S14-10, decision RET-4: a controller's erasure reaches the site server by itself."""
+
+    def test_an_erasure_is_sent_until_acknowledged(self) -> None:
+        self.store.record_erasure("p-rita", chrono=True, identity=True, now=T0)
+        self.store.record_erasure("p-bea", chrono=True, identity=False, now=T0 + 5)
+        client = self.client()
+        self.assertTrue(client.run_once(), client.last_error)
+        self.assertEqual(self.site.paths(), ["erasures"])
+        self.assertEqual(self.site.erasures, [
+            {"player_id": "p-rita", "chrono": True, "identity": True, "erased_at": T0},
+            {"player_id": "p-bea", "chrono": True, "identity": False, "erased_at": T0 + 5}])
+        self.assertEqual(self.store.erasures(), [])  # acknowledged: nothing kept
+        self.assertEqual(client.status()["erasures"], {"supported": True, "sent": 2, "pending": 0})
+        self.site.requests.clear()
+        self.assertTrue(client.run_once())
+        self.assertEqual(self.site.paths(), [])
+
+    def test_a_second_erasure_adds_to_the_first_and_a_refusal_keeps_it(self) -> None:
+        self.store.record_erasure("p-rita", chrono=True, identity=False, now=T0)
+        self.store.record_erasure("p-rita", chrono=False, identity=True, now=T0 + 9)
+        self.assertEqual(self.store.erasures(), [{"player_id": "p-rita", "chrono": True, "identity": True,
+                                                  "erased_at": T0 + 9}])
+        self.site.fail.append((503, {"detail": "unavailable"}, {}))
+        client = self.client()
+        self.assertFalse(client.run_once())
+        self.assertEqual(len(self.store.erasures()), 1)  # not lost
+        self.assertTrue(client.run_once(), client.last_error)
+        self.assertEqual(self.store.erasures(), [])
+
+    def test_a_site_server_without_the_endpoint_is_asked_once(self) -> None:
+        self.store.record_erasure("p-rita", chrono=True, identity=True, now=T0)
+        self.site.no_erasures = True
+        client = self.client()
+        self.assertTrue(client.run_once(), client.last_error)
+        self.assertFalse(client.erasures_supported)
+        self.assertEqual(len(self.store.erasures()), 1)  # kept for the retention to end
+        self.site.requests.clear()
+        self.assertTrue(client.run_once())
+        self.assertEqual(self.site.paths(), [])
+
+    def test_the_records_go_with_the_chrono_retention(self) -> None:
+        self.store.record_erasure("p-old", chrono=True, identity=True, now=T0)
+        self.store.record_erasure("p-new", chrono=True, identity=True, now=T0 + 400 * 86400)
+        self.assertEqual(self.store.purge_erasures(T0 + 366 * 86400), 1)
+        self.assertEqual([e["player_id"] for e in self.store.erasures()], ["p-new"])
 
 
 class BackoffTests(SyncCase):

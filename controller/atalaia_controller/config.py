@@ -74,6 +74,9 @@
     notice_pt = ""              # privacy notice files (Markdown); empty: the default ones
     notice_en = ""
     retention_days = 30         # a check-in's personal data after its game (ADR-P4-8's guest rule)
+    chrono_retention_days = 365 # chrono readings, other fields' readings and a marshal's earlier keys: days kept (30-3653)
+    game_retention_days = 365   # an ended game's events, scores and nodes: days kept after it ended (30-3653);
+                                # with [sync] enabled, never before the site server has all of it
 
     [mqtt]
     enabled = true
@@ -198,7 +201,7 @@ SECTIONS = {
                 "country", "apd_checkin", "apd_expiry", "apd_accepted", "max_replicas", "max_players", "chrono_valid_for",
                 "rate_per_minute", "urls",
                 "wifi_ssid", "limit_template", "notice_version", "notice_pt", "notice_en",
-                "retention_days"),
+                "retention_days", "chrono_retention_days", "game_retention_days"),
     "atak": ("enabled", "multicast", "interval_s", "staff_endpoints", "players", "remote", "remote_players"),
     "firmware": ("release_keys", "dir", "update_timeout_s", "variants"),
     "modes": ("keys", "revoked", "index", "box_keys", "fetch_timeout_s"),
@@ -274,6 +277,8 @@ class Config:
     notice_pt: str = ""
     notice_en: str = ""
     retention_days: int = 30
+    chrono_retention_days: int = 365
+    game_retention_days: int = 365
     # [sync]
     sync_enabled: bool = False
     sync_url: str = ""
@@ -406,6 +411,10 @@ def _check_checkin(cfg: "Config") -> None:
         raise ConfigError("checkin.notice_version must be a positive integer")
     if not 1 <= cfg.retention_days <= 3653:
         raise ConfigError("checkin.retention_days must be 1-3653")
+    for name in ("chrono_retention_days", "game_retention_days"):
+        value = getattr(cfg, name)
+        if isinstance(value, bool) or not isinstance(value, int) or not 30 <= value <= 3653:
+            raise ConfigError(f"checkin.{name} must be 30-3653")
 
 
 def _check_sync(cfg: "Config") -> None:

@@ -392,7 +392,8 @@ class StaffScriptTests(AppTestCase):
         self.assertIn("'/settings', 'nav_fsettings'", (STATIC / "home.js").read_text(encoding="utf-8"))
         self.assertIn("settings", staff_pages.page_names())
         r = await self.client.get(f"/staff/fields/{FIELD}/settings", params={"lang": "de"})
-        for section in ("Öffentliche Seite", "Check-in-Regeln", "Mitgliedschaft", "Chrono-Freigabe", "Land"):
+        for section in ("Öffentliche Seite", "Check-in-Regeln", "Mitgliedschaft", "Chrono-Freigabe", "Land",
+                        "Aufbewahrung von Daten"):
             self.assertIn(section, r.text)
         r = await self.client.get("/staff/fields/not-a-field/settings")
         self.assertEqual(r.status_code, 404)

@@ -406,6 +406,8 @@ class ControllerSync {
   int imagesFetched = 0;
   bool settingsFromSite = false; // the last answer carried the settings (BR24)
   int settingsApplied = 0; // settings (and limit templates) changed by them
+  bool erasuresSupported = true; // S14-10: POST /api/v1/sync/erasures
+  int erasuresSent = 0;
   bool limitJSupported = true; // PKD-3: an older site server refuses `limit_j`
   int fieldChanges = 0; // stream notes that the field's branding changed
   int libraryChanges = 0; // ... its scenarios or presets (PKD-1)
@@ -778,6 +780,36 @@ class ControllerSync {
       env,
     );
     await _pushReadings(env);
+    await _pushErasures(env);
+  }
+
+  /// Players this controller erased on request, for the site server to erase
+  /// its copies (S14-10, decision RET-4): sent until acknowledged, in
+  /// batches. A site server without the endpoint (404) is not asked again
+  /// until this controller restarts; the records stay until the chrono
+  /// retention deletes them.
+  Future<void> _pushErasures(Map<String, Object?> env) async {
+    final checkin = engine.checkin;
+    if (checkin == null || !erasuresSupported) return;
+    for (var b = 0; b < _batchesPerKind; b++) {
+      final rows = checkin.erasures(maxErasures);
+      if (rows.isEmpty) return;
+      try {
+        await _post('/api/v1/sync/erasures', {...env, 'erasures': rows});
+      } on SyncError catch (e) {
+        if (e.status == 404 || e.status == 405) {
+          erasuresSupported = false;
+          return;
+        }
+        if (e.status == 400) {
+          _registryRefused('/api/v1/sync/erasures', e);
+          return;
+        }
+        rethrow;
+      }
+      erasuresSent += checkin.deleteErasures(rows);
+      if (rows.length < maxErasures) return;
+    }
   }
 
   void _registryRefused(String path, SyncError e) {
@@ -1636,6 +1668,11 @@ class ControllerSync {
           .length,
       'registry_error': registryError,
       'refused_readings': refusedReadings,
+      'erasures': {
+        'supported': erasuresSupported,
+        'sent': erasuresSent,
+        'pending': engine.checkin?.erasures(maxErasures).length ?? 0,
+      },
       'game_day': {
         'supported': gameDaySupported,
         'schedule_pulled_at': schedulePulledAt,

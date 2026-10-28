@@ -66,6 +66,12 @@ class FakeSite {
   final checkins = <Map<String, Object?>>[];
   final claimResults = <Map<String, Object?>>[];
 
+  /// S14-10: what the controller said it erased.
+  final erasures = <Map<String, Object?>>[];
+
+  /// A site server from before the erasures endpoint (404).
+  bool noErasures = false;
+
   /// Answers to give first: (status, body, headers).
   final fail = <(int, Map<String, Object?>, Map<String, String>)>[];
   String? lose, reject;
@@ -145,6 +151,9 @@ class FakeSite {
         {'detail': 'invalid_body', 'error': 'bad_source', 'path': 'counters.x'},
         {},
       );
+    }
+    if (noErasures && kind == 'erasures') {
+      return (404, {'detail': 'Not Found'}, {});
     }
     if (beforePkd3 && kind == 'chrono') {
       final list = (body!['readings']! as List).cast<Map<String, Object?>>();
@@ -237,6 +246,17 @@ class FakeSite {
           replicas[r['replica_id']] = r;
         }
         return {'replicas': (body['replicas']! as List).length};
+      case 'erasures':
+        final list = (body['erasures']! as List).cast<Map<String, Object?>>();
+        erasures.addAll(list);
+        return {
+          'players': list.length,
+          'chrono_readings': 0,
+          'chrono_rejects': 0,
+          'replicas': 0,
+          'identities': 0,
+          'claims': 0,
+        };
       case 'claims':
         claimResults.addAll(
           (body['results']! as List).cast<Map<String, Object?>>(),
@@ -772,6 +792,98 @@ void main() {
     });
   });
 
+  group('erasures and game retention (S14-10, decisions RET-1 to RET-4)', () {
+    test('an erasure is sent until acknowledged, then forgotten', () async {
+      final c = client(); // a sync is set up: erasures are kept for it
+      checkin.erasePlayer('p-aaaaaaaaaaaa', chronoToo: true);
+      checkin.erasePlayer('p-bbbbbbbbbbbb');
+      checkin.deletePlayerReadings('p-cccccccccccc');
+      checkin.erasePlayer(
+        'p-bbbbbbbbbbbb',
+        chronoToo: true,
+      ); // adds to the first
+      expect(checkin.erasures(), hasLength(3));
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(site.paths(), ['erasures']);
+      final sent = {
+        for (final e in site.erasures)
+          e['player_id']: (e['chrono'], e['identity']),
+      };
+      expect(sent, {
+        'p-aaaaaaaaaaaa': (true, true),
+        'p-bbbbbbbbbbbb': (true, true),
+        'p-cccccccccccc': (true, false),
+      });
+      expect(checkin.erasures(), isEmpty);
+      expect(c.status()['erasures'], {
+        'supported': true,
+        'sent': 3,
+        'pending': 0,
+      });
+      site.requests.clear();
+      expect(await c.runOnce(), isTrue);
+      expect(site.paths(), isEmpty);
+    });
+
+    test('a refusal keeps it; a site server without the endpoint is asked '
+        'once', () async {
+      final c = client();
+      checkin.erasePlayer('p-aaaaaaaaaaaa');
+      site.fail.add((503, {'detail': 'unavailable'}, {}));
+      expect(await c.runOnce(), isFalse);
+      expect(checkin.erasures(), hasLength(1)); // not lost
+      site.noErasures = true;
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(c.erasuresSupported, isFalse);
+      expect(checkin.erasures(), hasLength(1)); // kept for the retention
+      site.requests.clear();
+      expect(await c.runOnce(), isTrue);
+      expect(site.paths(), isEmpty);
+      wall += 366 * 86400; // the chrono retention ends the record
+      expect(checkin.purge(force: true)!['erasure_records'], 1);
+    });
+
+    test('with no sync nothing is kept', () {
+      checkin.erasePlayer('p-aaaaaaaaaaaa', chronoToo: true);
+      expect(checkin.erasures(), isEmpty);
+    });
+
+    test('an ended game goes after the game retention, and with a sync '
+        'only once the site server has all of it', () async {
+      final gid = play();
+      final seed = seedOf(gid);
+      wall += 400 * 86400;
+      final c = client();
+      // The site server has not confirmed it: kept, whatever its age.
+      var out = checkin.purge(force: true)!;
+      expect((out['games'], out['games_unsynced_kept']), (0, 1));
+      expect(engine.store.game(gid), isNotNull);
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(c.syncState(gid, seed)['final'], isTrue);
+      final logged = engine.store.eventLog(gid).length;
+      expect(logged, greaterThan(0));
+      out = checkin.purge(force: true)!;
+      expect((out['games'], out['game_events']), (1, logged));
+      expect(engine.store.game(gid), isNull);
+      expect(engine.store.eventLog(gid), isEmpty);
+      expect(engine.store.scores(gid), isEmpty);
+      expect(c.syncState(gid, seed)['final'], isFalse); // its bookkeeping went
+    });
+
+    test('the field\'s own days, and no sync: age alone decides', () {
+      final gid = play();
+      wall += 40 * 86400;
+      expect(checkin.purge(force: true)!['games'], 0); // a year by default
+      checkin.setSettings({'game_retention_days': 30});
+      expect(checkin.purge(force: true)!['games'], 1);
+      expect(engine.store.game(gid), isNull);
+      final live = play(end: false);
+      wall += 4000 * 86400;
+      expect(checkin.purge(force: true)!['games'], 0);
+      expect(engine.store.game(live), isNotNull); // a game not ended stays
+    });
+  });
+
   group('game day', () {
     Map<String, Object?> scheduled({String status = 'published'}) => {
       'sync_version': 1,
@@ -1270,6 +1382,35 @@ void main() {
       site.gets['/api/v1/sync/field'] = fieldAnswer(apd: <String, Object?>{});
       expect(await c.runOnce(), isTrue, reason: c.lastError);
       expect(checkin.apdRule(), ApdRule.defaults);
+    });
+
+    test('the retention days come with the settings and lock the console '
+        '(RET-2)', () async {
+      Map<String, Object?> days({int? chrono, int? game}) {
+        final a = fieldAnswer(withApd: false);
+        final st = a['settings']! as Map<String, Object?>;
+        if (chrono != null) st['chrono_retention_days'] = chrono;
+        if (game != null) st['game_retention_days'] = game;
+        return a;
+      }
+
+      site.gets['/api/v1/sync/field'] = days(chrono: 180, game: 90);
+      final c = client(branding: 'site');
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(checkin.retentionDays('chrono_retention_days'), 180);
+      expect(checkin.retentionDays('game_retention_days'), 90);
+      final locked = api.handle(
+        'PUT',
+        Uri.parse('/api/v1/checkin/settings'),
+        authorization: 'Bearer g',
+        body: jsonEncode({'game_retention_days': 400}),
+        client: 'local',
+      );
+      expect(locked.status, 409);
+      // A site server that does not send them leaves the last ones.
+      site.gets['/api/v1/sync/field'] = days();
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(checkin.retentionDays('game_retention_days'), 90);
     });
 
     test('not pulled with local branding', () async {

@@ -87,7 +87,10 @@ class Field(Base):
     slug: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     field_type: Mapped[str] = mapped_column(String(32), nullable=False, server_default="outdoor")
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, server_default="Europe/Lisbon")
+    # How long the field's controllers keep chrono records (and this server its registry, migration 0022, decision
+    # RET-2) and an ended game's events, scores and nodes (decision RET-1): 30-3653 days, 365 by default.
     default_retention_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default="365")
+    game_retention_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default="365")
     chrono_sharing_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     public_scoreboard: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     # The public field page and its feeds (ADR-P4-11, ADR-P4-12; plan phase 15): off by default.
@@ -112,7 +115,9 @@ class Field(Base):
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
     __table_args__ = (CheckConstraint("accent IS NULL OR accent ~ '^#[0-9a-f]{6}$'", name="accent"),
-                      CheckConstraint("country IS NULL OR country ~ '^[A-Z]{2}$'", name="country"))
+                      CheckConstraint("country IS NULL OR country ~ '^[A-Z]{2}$'", name="country"),
+                      CheckConstraint("default_retention_days BETWEEN 30 AND 3653", name="default_retention_days"),
+                      CheckConstraint("game_retention_days BETWEEN 30 AND 3653", name="game_retention_days"))
 
 
 # Roles that need TOTP (ADR-P4-2): granting one to an account without TOTP fails, and they

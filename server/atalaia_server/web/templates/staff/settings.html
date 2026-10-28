@@ -90,3 +90,17 @@
 </fieldset>
 </form>
 </section>
+<section aria-labelledby="fs-retention-title">
+<h2 id="fs-retention-title">$fs_retention_title</h2>
+<p>$fs_retention_intro</p>
+<form id="retention-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="f-chrono-days">$fs_chrono_days</label>
+<input id="f-chrono-days" name="chrono_retention_days" type="number" inputmode="numeric" min="$retention_min" max="$retention_max">
+<label for="f-game-days">$fs_game_days</label>
+<input id="f-game-days" name="game_retention_days" type="number" inputmode="numeric" min="$retention_min" max="$retention_max">
+<p class="hint">$fs_retention_hint</p>
+<p><button type="submit">$save</button></p>
+</fieldset>
+</form>
+</section>

@@ -795,6 +795,33 @@ def check_claims(body: Any) -> dict[str, Any]:
     return body
 
 
+MAX_ERASURES = 500
+
+
+def check_erasures(body: Any) -> dict[str, Any]:
+    """POST /api/v1/sync/erasures (S14-10, decision RET-4): the players whose data this controller erased on request
+    (the GM's erasure, a player's chrono erasure) and what it erased: ``chrono`` (their readings) and/or
+    ``identity`` (the field identity, check-ins and declarations; for the site server, the player id's link to an
+    account), at least one. ``erased_at`` is seconds since 1970. Only player ids, never a name."""
+    body = _envelope(body, ("erasures",), game=False)
+    seen: set[str] = set()
+    for i, e in enumerate(_list(body["erasures"], "erasures", MAX_ERASURES, lo=1)):
+        path = f"erasures[{i}]"
+        e = _obj(e, path)
+        _keys(e, path, ("player_id", "chrono", "identity", "erased_at"))
+        _text(e["player_id"], f"{path}.player_id", 64, pattern=chrono.ID_RE)
+        if e["player_id"] in seen:
+            _fail("duplicate_player", f"{path}.player_id")
+        seen.add(e["player_id"])
+        for flag in ("chrono", "identity"):
+            if not isinstance(e[flag], bool):
+                _fail("not_a_boolean", f"{path}.{flag}")
+        if not (e["chrono"] or e["identity"]):
+            _fail("bad_value", path)
+        _num(e["erased_at"], f"{path}.erased_at", 0, 4_102_444_800)
+    return body
+
+
 # --- branding and saved teams (plan phase 18; P4R19) -----------------------------------------
 #
 # With ``[sync] branding = "site"`` the controller pulls its field's branding and saved teams
@@ -834,6 +861,8 @@ LIMIT_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")  # its verified_date
 FIRE_MODES = ("full_auto", "semi_only", "bolt_only")
 FEDERATION_LABEL_MAX = 16  # checkin.federation_label
 MAX_REPLICAS_MAX = 20      # checkin.max_replicas
+RETENTION_DAYS_MIN = 30    # checkin.chrono_retention_days and game_retention_days, in days
+RETENTION_DAYS_MAX = 3653
 
 
 def check_field_settings(value: Any, path: str = "settings") -> Any:
@@ -844,7 +873,11 @@ def check_field_settings(value: Any, path: str = "settings") -> Any:
     if value is None:
         return None
     st = _obj(value, path)
-    _keys(st, path, ("federation_label", "max_replicas", "limit_template"), ("apd", "country"))
+    _keys(st, path, ("federation_label", "max_replicas", "limit_template"),
+          ("apd", "country", "chrono_retention_days", "game_retention_days"))
+    for key in ("chrono_retention_days", "game_retention_days"):  # absent from an older site server's (RET-2)
+        if key in st:
+            _int(st[key], f"{path}.{key}", RETENTION_DAYS_MIN, RETENTION_DAYS_MAX)
     if "country" in st:  # the field's country (protocol/apd.md): a code or null (unset); absent from an older site server's
         try:
             apdfmt.check_country(st["country"])
@@ -1416,7 +1449,7 @@ def library_removals(state: dict[str, Any], answer: dict[str, Any]) -> dict[str,
 
 CHECKS = {"games": check_game, "events": check_events, "scores": check_scores, "nodes": check_nodes,
           "marshals": check_marshals, "replicas": check_replicas, "chrono": check_chrono,
-          "checkins": check_checkins, "claims": check_claims}
+          "checkins": check_checkins, "claims": check_claims, "erasures": check_erasures}
 GAME_KINDS = ("games", "events", "scores", "nodes", "checkins")  # the bodies about one game; the rest are the field's
 # The answers of the GET endpoints the controller pulls (plan phases 16, 18 and 20).
 ANSWERS = {"schedule": check_schedule, "roster": check_roster, "shared_chrono": check_shared_chrono, "claims": check_claims_list, "field": check_field,

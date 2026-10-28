@@ -14,7 +14,7 @@ Para quê: organizar o jogo e a segurança das réplicas (o cronógrafo). Os eve
 
 Quem vê: a organização do campo. Se o controlador deste campo estiver ligado a um servidor do site, o teu identificador, os eventos do jogo e as tuas leituras de cronógrafo são enviados para lá; o teu nome e o número de associado nunca são.
 
-Durante quanto tempo: o nome, o número de associado, a preferência de equipa e as réplicas declaradas são apagados {retention_days} dias depois do jogo, ou logo que saias do jogo na app. As leituras de cronógrafo são guardadas 365 dias. O identificador do campo é apagado ao fim de um ano sem check-in.
+Durante quanto tempo: o nome, o número de associado, a preferência de equipa e as réplicas declaradas são apagados {retention_days} dias depois do jogo, ou logo que saias do jogo na app. As leituras de cronógrafo são guardadas {chrono_retention_days} dias. Os eventos do jogo, as pontuações e a lista dos seus dispositivos são guardados {game_retention_days} dias depois de o jogo terminar. O identificador do campo é apagado ao fim de um ano sem check-in.
 
 Os teus direitos: podes ver os teus dados na app; podes sair do jogo e apagá-los na app, e pedir à organização do campo que apague ou corrija o que tiver sobre ti. Reclamações: CNPD, www.cnpd.pt.
 

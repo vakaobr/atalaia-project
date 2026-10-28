@@ -66,9 +66,19 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ConfigError):
             load_config(None, env={"ATALAIA_API_PORT": "eighty"})
 
+    def test_retention_days(self):
+        cfg = load_config(self.write('[checkin]\nchrono_retention_days = 90\ngame_retention_days = 3653\n'), env={})
+        self.assertEqual((cfg.chrono_retention_days, cfg.game_retention_days), (90, 3653))
+        self.assertEqual(load_config(None, env={}).game_retention_days, 365)  # RET-1: a year by default
+        for text in ('[checkin]\ngame_retention_days = 29\n', '[checkin]\nchrono_retention_days = 3654\n',
+                     '[checkin]\nchrono_retention_days = true\n'):
+            with self.subTest(text), self.assertRaises(ConfigError):
+                load_config(self.write(text), env={})
+
     def test_example_file_loads(self):
         cfg = load_config(str(CONTROLLER_DIR / "controller.example.toml"), env={})
         self.assertEqual(cfg.port, "/dev/ttyACM0")
+        self.assertEqual((cfg.chrono_retention_days, cfg.game_retention_days), (365, 365))
 
 
 class TokenTests(unittest.TestCase):

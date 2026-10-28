@@ -162,8 +162,9 @@ async def player(field_id: uuid.UUID, player_id: str, request: Request,
 async def erase_player(field_id: uuid.UUID, player_id: str, request: Request,
                        principal: Principal = Depends(current_principal),
                        db: AsyncSession = Depends(get_session)) -> JSONResponse:
-    """A player's erasure request at the field (ADR-P3-7): the field's copy here goes too. The
-    controller's erasure does not reach the site server by itself yet (decision S14-10)."""
+    """A player's erasure request at the field (ADR-P3-7): the field's copy here goes too. A controller's own
+    erasure reaches the site server by itself (``POST /api/v1/sync/erasures``, decision RET-4); this is for a
+    request made to the field's admin here."""
     require_field_role(principal, field_id, "admin")
     await _field(db, field_id)
     if not chrono.ID_RE.fullmatch(player_id):

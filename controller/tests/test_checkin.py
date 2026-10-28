@@ -17,7 +17,7 @@ import os
 import stat
 import unittest
 
-from p3support import GM, READ, T0, P3Case, bearer, declaration, new_identity
+from p3support import GM, READ, T0, Marshal, P3Case, bearer, declaration, new_identity
 from atalaia_controller import player_token
 from atalaia_controller.mqtt import MqttBridge
 from starlette.websockets import WebSocketDisconnect
@@ -247,6 +247,96 @@ class CheckinTests(P3Case):
         self.now = T0 + 366 * 86400
         self.assertEqual(self.svc.purge(force=True)["identities"], 1)
         self.assertIsNone(self.ctrl.store.field_player(me["player_id"]))
+
+    def test_the_retention_settings_default_to_a_year_and_are_the_gms(self):
+        st = self.client.get("/api/v1/checkin/settings", headers=GM).json()
+        self.assertEqual((st["chrono_retention_days"], st["game_retention_days"]), (365, 365))
+        for bad in (29, 3654, "90", True, None):
+            r = self.client.put("/api/v1/checkin/settings", json={"game_retention_days": bad}, headers=GM)
+            self.assertEqual(r.status_code, 400, bad)
+        r = self.client.put("/api/v1/checkin/settings", json={"chrono_retention_days": 90, "game_retention_days": 400},
+                            headers=GM)
+        self.assertEqual((r.status_code, r.json()["chrono_retention_days"], r.json()["game_retention_days"]),
+                         (200, 90, 400))
+        self.restart()  # saved with the other check-in settings
+        st = self.client.get("/api/v1/checkin/settings", headers=GM).json()
+        self.assertEqual((st["chrono_retention_days"], st["game_retention_days"]), (90, 400))
+        # Not told to a player's app (like max_players), and the notice says the days.
+        self.assertNotIn("game_retention_days", self.info()["settings"])
+        self.assertNotIn("chrono_retention_days", self.info()["settings"])
+        self.assertEqual(self.client.put("/api/v1/checkin/settings", json={"federation": "off"},
+                                         headers=GM).json()["game_retention_days"], 400)
+
+    def test_chrono_readings_follow_the_fields_retention(self):
+        marshal = Marshal()
+        rec = marshal.reading("0f6e5d4c-3b2a-4198-8776-655443322110", "p-rita", 100.0, when=T0)
+        self.ctrl.store.add_reading(rec, "0f6e5d4c-3b2a-4198-8776-655443322111", "pass", T0)
+        self.now = T0 + 100 * 86400
+        self.assertEqual(self.svc.purge(force=True)["readings"], 0)  # a year by default
+        self.client.put("/api/v1/checkin/settings", json={"chrono_retention_days": 90}, headers=GM)
+        self.ctrl.store.record_erasure("p-old", chrono=True, identity=False, now=T0)
+        out = self.svc.purge(force=True)
+        self.assertEqual((out["readings"], out["erasure_records"]), (1, 1))
+
+    def test_an_ended_game_is_purged_after_the_game_retention(self):
+        old, young = self.new_game(), None
+        self.check_in(old["id"], name=NAME)
+        self.client.post(f"/api/v1/games/{old['id']}/end", json={}, headers=GM)
+        young = self.new_game()
+        self.check_in(young["id"], name=NAME)
+        self.client.post(f"/api/v1/games/{young['id']}/end", json={}, headers=GM)
+        live = self.new_game()
+        self.ctrl.store.update_game(old["id"], ended_at=T0)
+        self.ctrl.store.update_game(young["id"], ended_at=T0 + 300 * 86400)
+        store = self.ctrl.store
+        store.insert_event(old["id"], {"node": 4, "seq": 1, "t": 10, "type": "zone.captured", "team": "red"})
+        store.save_scores(old["id"], {"red": 5})
+        store.upsert_node(old["id"], 4, "alpha", "zone", {})
+        logged = store.count_events(old["id"])
+        self.assertGreaterEqual(logged, 1)
+        self.now = T0 + 364 * 86400
+        self.assertEqual(self.svc.purge(force=True)["games"], 0)
+        self.now = T0 + 366 * 86400
+        out = self.svc.purge(force=True)
+        self.assertEqual((out["games"], out["game_events"]), (1, logged))
+        self.assertIsNone(store.game(old["id"]))
+        self.assertEqual((store.count_events(old["id"]), store.scores(old["id"]), store.nodes(old["id"])), (0, {}, []))
+        self.assertEqual(store.checkins(old["id"]), [])
+        self.assertIsNone(store.token_key(old["id"]))
+        self.assertIsNotNone(store.game(young["id"]))  # not a year yet
+        self.assertIsNotNone(store.game(live["id"]))   # never a game that has not ended
+        self.client.put("/api/v1/checkin/settings", json={"game_retention_days": 30}, headers=GM)
+        self.assertEqual(self.svc.purge(force=True)["games"], 1)  # the field's own days
+
+    def test_a_game_the_site_server_has_not_confirmed_is_kept(self):
+        """RET-3: with the sync on, the controller's copy is the only one until the site server has all of it."""
+        self.cfg.sync_enabled = True
+        old = self.new_game()
+        self.client.post(f"/api/v1/games/{old['id']}/end", json={}, headers=GM)
+        done = self.new_game()
+        self.client.post(f"/api/v1/games/{done['id']}/end", json={}, headers=GM)
+        for g in (old, done):
+            self.ctrl.store.update_game(g["id"], ended_at=T0)
+        self.ctrl.store.save_sync_state(done["id"], self.ctrl.store.game(done["id"])["game_seed"], final=True)
+        self.now = T0 + 400 * 86400
+        out = self.svc.purge(force=True)
+        self.assertEqual((out["games"], out["games_unsynced_kept"]), (1, 1))
+        self.assertIsNone(self.ctrl.store.game(done["id"]))
+        self.assertIsNotNone(self.ctrl.store.game(old["id"]))
+        self.cfg.sync_enabled = False  # no site server: age alone decides
+        self.assertEqual(self.svc.purge(force=True)["games"], 1)
+
+    def test_an_erasure_is_recorded_for_the_site_server_only_with_a_sync(self):
+        g = self.new_game()
+        me = self.check_in(g["id"], name=NAME)
+        self.client.delete(f"/api/v1/players/{me['player_id']}", headers=GM)
+        self.assertEqual(self.ctrl.store.erasures(), [])  # no sync, nothing kept
+        self.cfg.sync_enabled = True
+        self.client.delete(f"/api/v1/players/{me['player_id']}/chrono", headers=GM)
+        self.client.delete("/api/v1/players/p-bea?chrono=true", headers=GM)
+        self.client.delete("/api/v1/players/p-rita", headers=GM)
+        self.assertEqual({e["player_id"]: (e["chrono"], e["identity"]) for e in self.ctrl.store.erasures()},
+                         {me["player_id"]: (True, False), "p-bea": (True, True), "p-rita": (False, True)})
 
     def test_federation_number(self):
         g = self.new_game()

@@ -1036,6 +1036,33 @@ Json checkClaims(Object? raw) {
   return body;
 }
 
+const maxErasures = 500;
+
+/// `POST /api/v1/sync/erasures` (S14-10, decision RET-4): the players whose
+/// data this controller erased on request and what it erased: `chrono` (their
+/// readings) and/or `identity` (the field identity, check-ins and
+/// declarations), at least one. Only player ids, never a name.
+Json checkErasures(Object? raw) {
+  final body = _envelope(raw, ['erasures'], game: false);
+  final seen = <Object?>{};
+  final items = _list(body['erasures'], 'erasures', maxErasures, 1);
+  for (var i = 0; i < items.length; i++) {
+    final path = 'erasures[$i]';
+    final e = _obj(items[i], path);
+    _keys(e, path, ['player_id', 'chrono', 'identity', 'erased_at']);
+    _text(e['player_id'], '$path.player_id', 64, pattern: _chronoIdRe);
+    if (!seen.add(e['player_id'])) _fail('duplicate_player', '$path.player_id');
+    for (final flag in ['chrono', 'identity']) {
+      if (e[flag] is! bool) _fail('not_a_boolean', '$path.$flag');
+    }
+    if (e['chrono'] != true && e['identity'] != true) {
+      _fail('bad_value', path);
+    }
+    _num(e['erased_at'], '$path.erased_at', 0, 4102444800);
+  }
+  return body;
+}
+
 // --- branding and saved teams (plan phase 18; P4R19) ----------------------
 
 const maxSyncTeams = 200;
@@ -1096,6 +1123,10 @@ const limitFireModes = ['full_auto', 'semi_only', 'bolt_only'];
 const _federationLabelMax = 16;
 const maxReplicasMax = 20;
 
+/// `chrono_retention_days` and `game_retention_days`, in days.
+const retentionDaysMin = 30;
+const retentionDaysMax = 3653;
+
 /// The field's check-in rules as the site server keeps them (decision
 /// S16-6, BR24): the federation label (null: the controller keeps its
 /// own), the replicas a player may declare and the limit template whole.
@@ -1107,8 +1138,14 @@ Json? checkFieldSettings(Object? value, [String path = 'settings']) {
     st,
     path,
     ['federation_label', 'max_replicas', 'limit_template'],
-    ['apd', 'country'],
+    ['apd', 'country', 'chrono_retention_days', 'game_retention_days'],
   );
+  for (final key in ['chrono_retention_days', 'game_retention_days']) {
+    // Absent from an older site server's (decision RET-2).
+    if (st.containsKey(key)) {
+      _int(st[key], '$path.$key', retentionDaysMin, retentionDaysMax);
+    }
+  }
   if (st.containsKey('apd')) st['apd'] = _checkApd(st['apd'], '$path.apd');
   if (st.containsKey('country')) {
     // The field's country (protocol/apd.md): a code or null.
@@ -2013,6 +2050,7 @@ const syncChecks = <String, Json Function(Object?)>{
   'chrono': checkChrono,
   'checkins': checkCheckins,
   'claims': checkClaims,
+  'erasures': checkErasures,
 };
 
 /// The bodies about one game; the rest are the field's.

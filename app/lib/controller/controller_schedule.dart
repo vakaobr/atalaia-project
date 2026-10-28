@@ -113,6 +113,19 @@ class ControllerSchedule {
     _put(d);
   }
 
+  /// A game is gone (the retention purge, decision RET-1): its link goes with it.
+  void forgetGame(int gameId, int gameSeed) {
+    final d = _load();
+    final links = _list(d['links']);
+    final kept = [
+      for (final l in links)
+        if (!(l['game_id'] == gameId && l['game_seed'] == gameSeed)) l,
+    ];
+    if (kept.length == links.length) return;
+    d['links'] = kept;
+    _put(d);
+  }
+
   Map<String, Object?>? scheduleLink(int gameId, int gameSeed) {
     for (final l in _list(_load()['links'])) {
       if (l['game_id'] == gameId && l['game_seed'] == gameSeed) return l;

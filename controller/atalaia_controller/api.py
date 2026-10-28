@@ -1408,9 +1408,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.delete("/api/v1/players/{player_id}/chrono")
     def player_chrono_erase(player_id: str, v: Viewer = Depends(require_read)) -> dict[str, Any]:
         own_or_gm(v, player_id)
-        svc = need_checkin()
-        svc.store.delete_shared_readings(player_id=player_id)  # other fields' copies of them (S14-5)
-        return {"player_id": player_id, "readings_deleted": svc.store.delete_readings(player_id=player_id)}
+        return need_checkin().erase_chrono(player_id)  # other fields' copies of them too (S14-5)
 
     @app.delete("/api/v1/players/{player_id}", dependencies=[Depends(require_gm)])
     def player_erase(player_id: str, chrono: bool = False) -> dict[str, Any]:

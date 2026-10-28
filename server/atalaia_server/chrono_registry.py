@@ -42,9 +42,10 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import hub_share
+from .audit import record
 from .chrono_verify import Key, same_record, verify_reading
 from .models import (ChronoReading, ChronoReject, ChronoViolation, Consent, Field, FieldPlayerId, Game, MarshalKey,
-                     Replica)
+                     PlayerIdClaim, Replica)
 
 SHARING = "chrono_sharing"
 
@@ -437,3 +438,34 @@ async def erase_player(db: AsyncSession, field_id: uuid.UUID, player_id: str) ->
                                                       Replica.owner_player_id == player_id))
     return {"chrono_readings": readings.rowcount or 0, "chrono_rejects": rejects.rowcount or 0,
             "replicas": replicas.rowcount or 0}
+
+
+async def erase_identity(db: AsyncSession, field_id: uuid.UUID, player_id: str) -> dict[str, int]:
+    """What links an account to one player id at a field: the link itself (``field_player_ids``, the only way the
+    game history's events name a person) and the claims of that id. The signed records are a chrono erasure's
+    (``erase_player``). The caller commits."""
+    links = await db.execute(delete(FieldPlayerId).where(FieldPlayerId.field_id == field_id,
+                                                         FieldPlayerId.player_id == player_id))
+    claims = await db.execute(delete(PlayerIdClaim).where(PlayerIdClaim.field_id == field_id,
+                                                          PlayerIdClaim.player_id == player_id))
+    return {"identities": links.rowcount or 0, "claims": claims.rowcount or 0}
+
+
+async def apply_erasures(db: AsyncSession, field_id: uuid.UUID, body: dict[str, Any]) -> dict[str, int]:
+    """``POST /api/v1/sync/erasures`` (decision RET-4, S14-10): the players whose data the field's controller erased
+    on request. ``chrono`` erases their readings, refused readings and replicas here (``erase_player``);
+    ``identity`` the links of the player id to an account (``erase_identity``). Idempotent: a player the server
+    has nothing of counts nothing, so a controller that sends again after a lost answer does no harm. The log
+    keeps how much, never whose."""
+    totals = {"players": 0, "chrono_readings": 0, "chrono_rejects": 0, "replicas": 0, "identities": 0, "claims": 0}
+    for entry in body["erasures"]:
+        totals["players"] += 1
+        counts: dict[str, int] = {}
+        if entry["chrono"]:
+            counts.update(await erase_player(db, field_id, entry["player_id"]))
+        if entry["identity"]:
+            counts.update(await erase_identity(db, field_id, entry["player_id"]))
+        for key, n in counts.items():
+            totals[key] += n
+    record(db, "chrono_player_erasure", resource="field", resource_id=field_id, details={**totals, "by": "controller"})
+    return totals

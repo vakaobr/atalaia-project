@@ -1642,5 +1642,10 @@
       "pink": "rosa",
       "cyan": "cyan"
     }
+  },
+  "retention": {
+    "chrono_days": "Chrono-Messungen aufbewahrt (Tage)",
+    "game_days": "Spieldaten aufbewahrt (Tage)",
+    "hint": "30 bis 3653 Tage. Chrono-Messungen (auch Kopien anderer Spielfelder) und frühere Marshal-Schlüssel werden nach der ersten Frist gelöscht; Ereignisse, Punkte und Knoten eines beendeten Spiels nach der zweiten. Ist ein Site-Server verbunden, wird ein Spiel nie gelöscht, bevor der Server alles davon hat. Beide gehören dem Site-Server, wenn das Spielfeld seine Einstellungen von dort bezieht."
   }
 }

@@ -13,6 +13,8 @@
     POST /api/v1/sync/checkins after a game made from a scheduled game: each registration's outcome and
                                its declarations' final states, the walk-ins as a count (plan phase 16)
     POST /api/v1/sync/claims   the controller's verdicts on accounts' claims of its player ids
+    POST /api/v1/sync/erasures the players whose data the controller erased on request: their chrono records
+                               and account links here go too (S14-10, decision RET-4)
     GET  /api/v1/sync/schedule?days=14         the field's published games of the coming days
     GET  /api/v1/sync/roster?scheduled_game_id= one scheduled game's live registrations
     GET  /api/v1/sync/chrono?scheduled_game_id= other fields' chrono records of that roster's players, only
@@ -133,6 +135,11 @@ async def checkins(request: Request) -> JSONResponse:
 @router.post("/claims")
 async def claims(request: Request) -> JSONResponse:
     return await _handle(request, "claims")
+
+
+@router.post("/erasures")
+async def erasures(request: Request) -> JSONResponse:
+    return await _handle(request, "erasures")
 
 
 async def _pull(request: Request, build: Callable[[Any, sync.Caller], Awaitable[Any]]) -> JSONResponse:

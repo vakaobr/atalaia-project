@@ -111,6 +111,9 @@ notice_version = 1                # raise it when the privacy notice changes
 notice_pt = ""                    # your own notice files (Markdown); empty: controller/templates/
 notice_en = ""
 retention_days = 30               # names and federation numbers are erased this long after a game
+chrono_retention_days = 365       # chrono readings (also other fields' copies) and a marshal's earlier keys, 30-3653 days
+game_retention_days = 365         # an ended game's events, scores and nodes: days after it ended, 30-3653; with [sync] on,
+                                  # never before the site server has all of it. The site server's field setting wins with branding = "site"
 
 [sync]
 # The site server (phase 4; protocol/sync.md). The controller opens every

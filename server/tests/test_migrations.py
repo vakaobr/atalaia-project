@@ -584,6 +584,29 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(self.db.fetch("SELECT data_retention_days FROM users")[0][0], None)
         self.db.fetch("DELETE FROM users")
 
+    def test_0022_with_data(self) -> None:
+        """0022_field_retention: existing fields keep 365 days for both, the range is checked, and back down."""
+        command.upgrade(self.cfg, "0019_field_country")
+        self.db.fetch("INSERT INTO fields (name, slug, default_retention_days) VALUES ('a', 'a', 365), "
+                      "('b', 'b', 3650)")
+        command.upgrade(self.cfg, "0022_field_retention")
+        got = {r["slug"]: (r["default_retention_days"], r["game_retention_days"])
+               for r in self.db.fetch("SELECT slug, default_retention_days, game_retention_days FROM fields")}
+        self.assertEqual(got, {"a": (365, 365), "b": (3650, 365)})
+        for column in ("default_retention_days", "game_retention_days"):
+            for bad in (29, 3654, 0):
+                with self.assertRaisesRegex(Exception, f"ck_fields_{column}"):
+                    self.db.fetch(f"UPDATE fields SET {column} = $1 WHERE slug = 'a'", bad)
+            self.db.fetch(f"UPDATE fields SET {column} = 30 WHERE slug = 'a'")
+            self.db.fetch(f"UPDATE fields SET {column} = 3653 WHERE slug = 'a'")
+        command.downgrade(self.cfg, "0019_field_country")
+        columns = {r["column_name"] for r in self.db.fetch(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'fields'")}
+        self.assertNotIn("game_retention_days", columns)
+        self.assertIn("default_retention_days", columns)
+        self.db.fetch("UPDATE fields SET default_retention_days = 7 WHERE slug = 'b'")  # the range is gone with it
+        self.db.fetch("DELETE FROM fields")
+
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)
         self.assertEqual(len(self.script.get_bases()), 1)

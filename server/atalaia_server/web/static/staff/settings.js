@@ -4,7 +4,7 @@
 // A field's settings, for its admin (GET /api/v1/fields for what is set now, PATCH /api/v1/fields/{field} to change
 // it, GET /api/v1/apds?country= for the shipped list of the field's country): the public page, the check-in rules, the
 // membership rule (protocol/apd.md: the accepted list or any, register, check-in, expiry, the field's own entries),
-// chrono sharing and the country. Each section is saved on its own and sends only its own members. Nothing here
+// chrono sharing, the country and how long chrono records and games are kept (decisions RET-1, RET-2). Each section is saved on its own and sends only its own members. Nothing here
 // knows a rule: every refusal is the API's, shown in words (errorText). The membership words follow the country
 // (membershipWording) and change on this page as soon as a new country is saved, with the list offered for it.
 
@@ -54,6 +54,8 @@ function fillForms() {
     $('f-replicas').value = field.max_replicas === null || field.max_replicas === undefined ? '' : field.max_replicas;
     $('f-chrono').checked = Boolean(field.chrono_sharing_enabled);
     $('f-country').value = field.country || '';
+    $('f-chrono-days').value = field.chrono_retention_days ?? '';
+    $('f-game-days').value = field.game_retention_days ?? '';
 }
 
 // ---- the membership section -----------------------------------------------------------------
@@ -178,6 +180,13 @@ function wire() {
         await loadApds();
         renderMembership();
     });
+    $('retention-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const days = (id) => ($(id).value.trim() === '' ? null : Number(($(id).value.trim())));
+        await save({ chrono_retention_days: days('f-chrono-days'), game_retention_days: days('f-game-days') },
+            'fs_saved_controllers');
+        fillForms();
+    });
     wireMembership();
 }
 
@@ -196,7 +205,7 @@ async function main() {
     await loadApds();
     renderMembership();
     wire();
-    for (const id of ['public-form', 'checkin-form', 'member-form', 'custom-form', 'chrono-form', 'country-form']) {
+    for (const id of ['public-form', 'checkin-form', 'member-form', 'custom-form', 'chrono-form', 'country-form', 'retention-form']) {
         enable($(id));
     }
 }

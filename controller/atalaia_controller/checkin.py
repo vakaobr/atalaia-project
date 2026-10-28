@@ -90,10 +90,15 @@ NOTICES = Path(__file__).resolve().parent.parent / "templates"
 TOKEN_GRACE_S = 2 * 3600
 TOKEN_MIN_S = 60
 IDENTITY_DAYS = 365
-CHRONO_RETENTION_DAYS = 365
+CHRONO_RETENTION_DAYS = 365  # the default of ``chrono_retention_days`` (the field's setting, 30-3653)
+GAME_RETENTION_DAYS = 365    # the default of ``game_retention_days`` (decision RET-1)
+RETENTION_KEYS = ("chrono_retention_days", "game_retention_days")
+RETENTION_MIN, RETENTION_MAX = 30, 3653
+PLAYER_HIDDEN = ("max_players", *RETENTION_KEYS)  # settings the player's app is not told
 SITE_LIMITS_SETTING = "checkin.site_limits"  # the limit template the site server sent (BR24), as it sent it
 SETTINGS_KEYS = ("confirm", "federation", "federation_label", "max_replicas", "max_players",
-                 "chrono_valid_for", "apd", "country")
+                 "chrono_valid_for", "apd", "country", *RETENTION_KEYS)
+RETENTION_SITE_SETTING = "checkin.retention_site"  # the retention days the site server sent (JSON: key to days)
 APD_SITE_SETTING = "checkin.apd_site"  # the field's APD rule from the site server's settings (branding = "site")
 COUNTRY_SITE_SETTING = "checkin.country_site"  # ... and its country (JSON: a code or null; empty: the site sent none)
 IMPORT_NS = uuid.UUID("6f1b5f0e-3c1d-5a7e-9b44-0a7a1a1a0001")  # registration ids of an imported list (uuid5 of source + ref)
@@ -196,6 +201,10 @@ def effective_role(token_role: str, row_role: str) -> str:
 
 def _printable(value: str) -> bool:
     return all(not (ord(c) < 0x20 or 0x7F <= ord(c) <= 0x9F or 0xD800 <= ord(c) <= 0xDFFF) for c in value)
+
+
+def _days_ok(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and RETENTION_MIN <= value <= RETENTION_MAX
 
 
 def _text(name: str, value: Any, max_chars: int, optional: bool = False) -> Optional[str]:
@@ -415,6 +424,18 @@ class Checkin:
             changed += 1
             if not spec:
                 self.ctrl._emit({"type": "checkin_settings", "settings": self.settings(), "_staff": True})
+        sent = {k: site[k] for k in RETENTION_KEYS if k in site}  # an older site server sends none
+        if sent:
+            try:
+                before = json.loads(self.store.get_setting(RETENTION_SITE_SETTING) or "{}")
+            except ValueError:
+                before = {}
+            merged = {**(before if isinstance(before, dict) else {}), **sent}
+            if merged != before:
+                self.store.set_setting(RETENTION_SITE_SETTING, json.dumps(merged, sort_keys=True))
+                changed += 1
+                if not spec:
+                    self.ctrl._emit({"type": "checkin_settings", "settings": self.settings(), "_staff": True})
         template = site["limit_template"]
         if self.store.get_setting(SITE_LIMITS_SETTING) != json.dumps(template, sort_keys=True):
             self.limits = site_limits(template)
@@ -427,7 +448,9 @@ class Checkin:
     def settings(self) -> dict[str, Any]:
         out = {"confirm": self.cfg.checkin_confirm, "federation": self.cfg.federation,
                "federation_label": self.cfg.federation_label, "max_replicas": self.cfg.max_replicas,
-               "max_players": self.cfg.max_players, "chrono_valid_for": self.cfg.chrono_valid_for}
+               "max_players": self.cfg.max_players, "chrono_valid_for": self.cfg.chrono_valid_for,
+               "chrono_retention_days": self.cfg.chrono_retention_days,
+               "game_retention_days": self.cfg.game_retention_days}
         out["apd"] = self._local_apd()
         out["country"] = self._local_country()
         saved = self.store.get_setting("checkin.settings")
@@ -436,6 +459,8 @@ class Checkin:
                 out.update({k: v for k, v in json.loads(saved).items() if k in SETTINGS_KEYS and k not in ("apd", "country")})
             except ValueError:
                 pass
+        for key, days in self._site_retention().items():
+            out[key] = days
         if getattr(self.cfg, "sync_branding", "local") == "site":
             site_country = self.store.get_setting(COUNTRY_SITE_SETTING)
             if site_country:
@@ -450,6 +475,29 @@ class Checkin:
                 except (ValueError, apdfmt.ApdError):
                     pass
         return out
+
+    def _site_retention(self) -> dict[str, int]:
+        """The retention days the site server sent (the field's own, decision RET-2), when ``[sync] branding =
+        "site"``; empty otherwise or while it has sent none."""
+        if getattr(self.cfg, "sync_branding", "local") != "site":
+            return {}
+        try:
+            raw = json.loads(self.store.get_setting(RETENTION_SITE_SETTING) or "{}")
+        except ValueError:
+            return {}
+        return {k: v for k, v in raw.items() if k in RETENTION_KEYS and _days_ok(v)} if isinstance(raw, dict) else {}
+
+    def _local_retention(self, key: str) -> int:
+        """The console's saved value of a retention key, else the configured one."""
+        try:
+            value = json.loads(self.store.get_setting("checkin.settings") or "{}").get(key)
+        except (ValueError, AttributeError):
+            value = None
+        return value if _days_ok(value) else getattr(self.cfg, key)
+
+    def retention_days(self, key: str) -> int:
+        """``chrono_retention_days`` or ``game_retention_days`` as the field has them now."""
+        return int(self.settings()[key])
 
     def _local_apd(self) -> dict[str, Any]:
         """The APD rule of [checkin] apd_* and the console's saved one (the site's is laid over it)."""
@@ -518,6 +566,10 @@ class Checkin:
         if "country" in spec and getattr(self.cfg, "sync_branding", "local") == "site" \
                 and self.store.get_setting(COUNTRY_SITE_SETTING):
             raise Conflict("the country is the site server's ([sync] branding = \"site\"): change it there")
+        if getattr(self.cfg, "sync_branding", "local") == "site":
+            held = set(spec) & set(self._site_retention())
+            if held:
+                raise Conflict(f"{sorted(held)[0]} is the site server's ([sync] branding = \"site\"): change it there")
         cur = self.settings()
         local_apd = self._local_apd()
         saved_country = None  # the console's own choice; None: the configured or default one
@@ -547,12 +599,16 @@ class Checkin:
                 v = saved_country or self._config_country()
             if k == "max_replicas" and (isinstance(v, bool) or not isinstance(v, int) or not 1 <= v <= 20):
                 raise ControllerError("max_replicas: 1-20")
+            if k in RETENTION_KEYS and not _days_ok(v):
+                raise ControllerError(f"{k}: {RETENTION_MIN}-{RETENTION_MAX}")
             if k == "max_players" and (isinstance(v, bool) or not isinstance(v, int) or not 1 <= v <= 5000):
                 raise ControllerError("max_players: 1-5000")
             cur[k] = v.strip() if isinstance(v, str) else v
         saved = {k: cur[k] for k in SETTINGS_KEYS}
         saved["apd"] = local_apd
         saved["country"] = saved_country
+        for k in RETENTION_KEYS:  # the console's own choice, not the site server's value laid over it
+            saved[k] = spec[k] if k in spec else self._local_retention(k)
         self.store.set_setting("checkin.settings", json.dumps(saved))
         self.ctrl._emit({"type": "checkin_settings", "settings": cur, "_staff": True})
         return cur
@@ -681,8 +737,11 @@ class Checkin:
             # The licence header of the default files is not part of the notice.
             text = re.sub(r"\A<!--.*?-->\s*", "", text, flags=re.S)
             operator = self.cfg.operator or self.poster_fields()["field_name"]
-            texts[lang] = text.replace("{operator}", operator).replace(
-                "{retention_days}", str(self.cfg.retention_days))
+            st = self.settings()
+            texts[lang] = (text.replace("{operator}", operator)
+                           .replace("{retention_days}", str(self.cfg.retention_days))
+                           .replace("{chrono_retention_days}", str(st["chrono_retention_days"]))
+                           .replace("{game_retention_days}", str(st["game_retention_days"])))
         return {"version": self.cfg.notice_version, **texts}
 
     # --- games open for check-in ---------------------------------------------
@@ -721,7 +780,7 @@ class Checkin:
             "version": 1,
             "field": {"id": self.cfg.field_id, "name": p["field_name"], "operator": self.cfg.operator or None},
             "notice": self.notice(),
-            "settings": {k: v for k, v in st.items() if k != "max_players"},
+            "settings": {k: v for k, v in st.items() if k not in PLAYER_HIDDEN},
             "limits": {"id": self.limits["id"], "name": self.limits["name"],
                        "status": self.limits["status"], "classes": sorted(self.limits["classes"])},
             "replica_types": list(REPLICA_TYPES),
@@ -1019,7 +1078,7 @@ class Checkin:
         out["stale_token"] = viewer.stale
         if row["role"] == "marshal":
             out["marshal"] = self.my_marshal(viewer)
-        out["settings"] = {k: v for k, v in self.settings().items() if k != "max_players"}
+        out["settings"] = {k: v for k, v in self.settings().items() if k not in PLAYER_HIDDEN}
         return out
 
     def _check_declarations(self, items: Any, st: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1308,7 +1367,7 @@ class Checkin:
         ``shared_readings``: never judged, counted for the list's states or sent back. A roster player the
         answer leaves out has none kept (a consent withdrawn). Returns ``{players, stored, dropped}``."""
         now = self._wall()
-        cutoff = datetime.datetime.fromtimestamp(now - CHRONO_RETENTION_DAYS * 86400,
+        cutoff = datetime.datetime.fromtimestamp(now - self.retention_days("chrono_retention_days") * 86400,
                                                  datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         on = set(roster_players)
         rows: dict[str, list[dict[str, Any]]] = {pid: [] for pid in roster_players}
@@ -2085,9 +2144,24 @@ class Checkin:
             games = {r["game_id"] for g in self.store.games() for r in [self.store.checkin(g["id"], pid)] if r}
             self.store.erase_player(pid)
             readings = self.store.delete_readings(player_id=pid) if chrono_too else 0
+            self._record_erasure(pid, chrono=chrono_too, identity=True)
         for gid in games:
             self.ctrl._emit({"type": "checkin", "game": gid, "player_id": pid, "erased": True, "_staff": True})
         return {"player_id": pid, "erased": True, "readings_deleted": readings}
+
+    def erase_chrono(self, pid: str) -> dict[str, Any]:
+        """DELETE /api/v1/players/{player}/chrono: the player's readings, and other fields' copies of them (S14-5)."""
+        with self._lock:
+            self.store.delete_shared_readings(player_id=pid)
+            readings = self.store.delete_readings(player_id=pid)
+            self._record_erasure(pid, chrono=True, identity=False)
+        return {"player_id": pid, "readings_deleted": readings}
+
+    def _record_erasure(self, pid: str, *, chrono: bool, identity: bool) -> None:
+        """With the site sync on, keeps that this player's data was erased until the site server has it (S14-10,
+        decision RET-4): the next sync sends ``POST /api/v1/sync/erasures``. Nothing is kept without a sync."""
+        if getattr(self.cfg, "sync_enabled", False):
+            self.store.record_erasure(pid, chrono=chrono, identity=identity, now=self._wall())
 
     # --- retention -----------------------------------------------------------------
 
@@ -2098,15 +2172,31 @@ class Checkin:
         self._last_purge = now
         out = self.store.purge_checkins(now - self.cfg.retention_days * 86400, now - IDENTITY_DAYS * 86400,
                                         now)
-        cutoff = datetime.datetime.fromtimestamp(now - CHRONO_RETENTION_DAYS * 86400, datetime.timezone.utc)
+        chrono_days = self.retention_days("chrono_retention_days")
+        cutoff = datetime.datetime.fromtimestamp(now - chrono_days * 86400, datetime.timezone.utc)
         out["readings"] = self.store.delete_readings(before=cutoff.strftime("%Y-%m-%dT%H:%M:%SZ"))
         # Other fields' records pulled from the site server (S14-5) go with the same retention.
         out["shared_readings"] = self.store.delete_shared_readings(before=cutoff.strftime("%Y-%m-%dT%H:%M:%SZ"))
         # A marshal's earlier keys outlive what they signed by the same period (schema 6).
-        out["marshal_keys"] = self.store.delete_marshal_history(now - CHRONO_RETENTION_DAYS * 86400)
+        out["marshal_keys"] = self.store.delete_marshal_history(now - chrono_days * 86400)
+        out.update(self._purge_games(now))
+        out["erasure_records"] = self.store.purge_erasures(now - chrono_days * 86400)
         if any(out.values()):
             log.info("retention purge: %s", out)
         return out
+
+    def _purge_games(self, now: float) -> dict[str, int]:
+        """Ended games older than ``game_retention_days`` go whole: events, scores, nodes, positions, their
+        check-in rows and token key and sync bookkeeping (decision RET-1). With the site sync on, a game the site
+        server has not confirmed (``sync_state.final``: ended and every event acknowledged) is never purged
+        (decision RET-3): the field's only copy would go. Without a sync, age alone decides."""
+        days = self.retention_days("game_retention_days")
+        confirmed = self.sync_confirmed if getattr(self.cfg, "sync_enabled", False) else None
+        done = self.store.purge_games(now - days * 86400, confirmed_only=confirmed)
+        return {"games": done["games"], "game_events": done["events"], "games_unsynced_kept": done["kept"]}
+
+    def sync_confirmed(self, game: dict[str, Any]) -> bool:
+        return bool(self.store.sync_state(game["id"], game["game_seed"])["final"])
 
     # --- the stream ----------------------------------------------------------------
 

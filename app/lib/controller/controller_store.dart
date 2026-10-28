@@ -41,6 +41,11 @@ abstract interface class ControllerStore {
   Set<int> gameIds();
   void updateGame(int id, Map<String, Object?> fields);
 
+  /// Deletes a game with everything stored about it: its record and key,
+  /// events, scores, nodes and the settings kept per game (the retention
+  /// purge, decision RET-1).
+  void deleteGame(int id);
+
   /// Stores one event; false when the log already had it (a replay).
   bool insertEvent(int gameId, Map<String, Object?> event);
 
@@ -144,6 +149,30 @@ class MemoryControllerStore implements ControllerStore {
     final unknown = fields.keys.toSet().difference(_gameFields);
     if (unknown.isNotEmpty) throw ArgumentError('cannot update $unknown');
     _games[id]?.addAll(_copy(fields));
+  }
+
+  /// Settings kept per game as `prefix:id` (they go with the game).
+  static const gameSettingPrefixes = [
+    'checkin.open',
+    'key_tag',
+    'game_time',
+    'field_scores',
+    'field_run',
+    'box_lang',
+    'issued_nodes',
+  ];
+
+  @override
+  void deleteGame(int id) {
+    _games.remove(id);
+    _keys.remove(id);
+    _events.remove(id);
+    _eventKeys.remove(id);
+    _scores.remove(id);
+    _nodes.remove(id);
+    for (final prefix in gameSettingPrefixes) {
+      _settings.remove('$prefix:$id');
+    }
   }
 
   @override
@@ -410,6 +439,24 @@ class FileControllerStore extends MemoryControllerStore {
   void updateGame(int id, Map<String, Object?> fields) {
     super.updateGame(id, fields);
     _saveGame(id);
+  }
+
+  @override
+  void deleteGame(int id) {
+    final hadSettings = MemoryControllerStore.gameSettingPrefixes.any(
+      (p) => _settings.containsKey('$p:$id'),
+    );
+    super.deleteGame(id);
+    for (final suffix in [
+      '.json',
+      '.events.jsonl',
+      '.scores.json',
+      '.nodes.json',
+    ]) {
+      final f = _gameFile(id, suffix);
+      if (f.existsSync()) f.deleteSync();
+    }
+    if (hadSettings) _writeJson(_file('settings.json'), _settings);
   }
 
   @override

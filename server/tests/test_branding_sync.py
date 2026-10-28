@@ -13,6 +13,7 @@ crest follows its team to a second field's controller, each controller checks ev
 from __future__ import annotations
 
 import copy
+import json
 import hashlib
 import os
 import tempfile
@@ -130,6 +131,34 @@ class FieldBrandingTests(AppTestCase):
         self.assertEqual((st["federation_label"], st["max_replicas"], st["limit_template"]["id"]), ("BAA", 3, "uk"))
         self.assertEqual(sorted(st["limit_template"]["classes"]), sorted(registration.classes("uk")))
         self.assertNotIn("settings", await self.sync_field())  # still the old shape without the query
+
+    async def test_the_retention_days_are_a_field_setting_that_travels_to_the_controllers(self) -> None:
+        """RET-1, RET-2: ``chrono_retention_days`` (the registry's ``default_retention_days``) and
+        ``game_retention_days`` are the admin's, 365 by default, in the field and in ``settings`` of the answer."""
+        st = (await self.sync_field(settings=True))["settings"]
+        self.assertEqual((st["chrono_retention_days"], st["game_retention_days"]), (365, 365))
+        stream = await self.listen()
+        r = await self.client.patch(self.url(), json={"chrono_retention_days": 180, "game_retention_days": 3653},
+                                    headers=self.admin)
+        self.assertEqual((r.status_code, r.json()["chrono_retention_days"], r.json()["game_retention_days"]),
+                         (200, 180, 3653), r.text)
+        await self.expect_note(stream, "the retention")
+        st = (await self.sync_field(settings=True))["settings"]
+        self.assertEqual((st["chrono_retention_days"], st["game_retention_days"]), (180, 3653))
+        self.assertEqual((await self.fetch("SELECT default_retention_days, game_retention_days FROM fields "
+                                           "WHERE id = $1", self.field_id))[0][:], (180, 3653))
+        await self.client.patch(self.url(), json={"game_retention_days": 3653}, headers=self.admin)  # no change
+        await self.expect_note(stream, "the same days", notes=0)
+        for bad in ({"chrono_retention_days": 29}, {"game_retention_days": 3654}, {"chrono_retention_days": 0},
+                    {"game_retention_days": -1}):
+            r = await self.client.patch(self.url(), json=bad, headers=self.admin)
+            self.assertEqual((r.status_code, r.json()["detail"]), (400, f"{next(iter(bad))}_invalid"), bad)
+        r = await self.client.patch(self.url(), json={"game_retention_days": "soon"}, headers=self.admin)
+        self.assertEqual(r.status_code, 422)
+        r = await self.client.patch(self.url(), json={"game_retention_days": 90}, headers=self.gm)
+        self.assertEqual(r.status_code, 403)  # the admin's
+        audit = await self.fetch("SELECT details FROM audit_log WHERE action = 'field_update'")
+        self.assertIn("game_retention_days", json.dumps([dict(a) for a in audit], default=str))
 
     async def test_the_apd_rule_travels_in_the_settings_and_its_change_sends_a_note(self) -> None:
         """protocol/apd.md: ``settings.apd`` (only with ``?settings=1``), and ``PATCH /fields`` of a rule sends

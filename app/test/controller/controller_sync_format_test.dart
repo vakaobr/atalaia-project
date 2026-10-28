@@ -25,11 +25,11 @@ void main() {
       (l! as List).cast<Map<String, Object?>>();
 
   test('the counts and kinds are the Pi\'s', () {
-    expect((list(v['valid']).length, list(v['invalid']).length), (14, 68));
+    expect((list(v['valid']).length, list(v['invalid']).length), (15, 76));
     final answers = v['answers']! as Map;
     expect(
       (list(answers['valid']).length, list(answers['invalid']).length),
-      (21, 78),
+      (23, 82),
     );
     expect({
       for (final c in list(answers['valid'])) c['kind'],

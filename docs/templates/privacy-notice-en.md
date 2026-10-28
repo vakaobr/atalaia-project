@@ -345,7 +345,7 @@ CHOICE]** is one the field can change; the others are fixed in the code.
 | Claims of a phone's player identifier | site server | 30 days after they were made |
 | Scheduled games and their registrations | site server | 24 months after the game ended |
 | Games, their events and scores (your game history) | site server | **[FIELD CHOICE:]** 24 months after the game ended, or less if the field sets it |
-| Chronograph readings, violations, replicas, marshal keys | site server | **[FIELD CHOICE:]** 365 days by default, per field |
+| Chronograph readings, violations, replicas, marshal keys | site server | **[FIELD CHOICE:]** 365 days by default, per field (30 to 3653 days, set by the field's administrator) |
 | Club memberships | site server | Until you leave the club or erase your account |
 | Club invitations not accepted | site server | 30 days |
 | Reports of club pages | site server | 12 months after they are decided |
@@ -355,9 +355,9 @@ CHOICE]** is one the field can change; the others are fixed in the code.
 | **Check-in: name or callsign, membership number and expiry, team preference** | field controller | **[FIELD CHOICE:]** 30 days after the game by default (`retention_days`), or at once when you leave the game in the app |
 | Declared replicas of a check-in | field controller | The same 30 days |
 | The field identifier your phone made | field controller | Deleted after **a year** without a check-in |
-| Chronograph readings, other fields' readings pulled for the roster, marshal's earlier keys | field controller | 365 days. (Fixed in the controller; it does not follow the site server's per-field setting.) |
+| Chronograph readings, other fields' readings pulled for the roster, marshal's earlier keys | field controller | **[FIELD CHOICE:]** 365 days by default (30 to 3653): the same per-field setting as on the site server, which a controller takes over from it when the field uses it for its settings |
 | Your position | field controller | Until the game ends, then deleted. Only the latest, never a track |
-| Game events | field controller | [FIELD CHOICE / LAWYER: the controller does not delete a game's events on a schedule; they name only pseudonymous player identifiers. State the field's rule.] |
+| Game events, scores and the list of a game's devices | field controller | **[FIELD CHOICE:]** 365 days by default (30 to 3653) after the game ended, then deleted whole; they name only pseudonymous player identifiers. With a site server set up, a controller never deletes a game before the site server has all of it, so a game it cannot send stays (and its erasure of a person reaches the site server by itself) |
 | Position, in memory (remote GM, remote ATAK) | site server | Not stored. Gone when the connection ends |
 
 The site server deletes what is past these periods every day (03:00 UTC); a
@@ -549,7 +549,7 @@ a screen of text.
 >
 > **How long:** name, membership number, team preference and declared
 > replicas are erased [30] days after the game, or at once if you leave the
-> game in the app. Chronograph readings: 365 days. Your field identifier:
+> game in the app. Chronograph readings: [365] days. Your field identifier:
 > a year after your last check-in.
 >
 > **Your rights:** see your data in the app; leave the game and erase it;
@@ -580,7 +580,7 @@ The draft cannot settle these. Each is marked **[LAWYER]** above.
 7. **Transfers** (5, 6): sign-in providers; the hosting country.
 8. **Minors** (11).
 9. **Data protection officer** (1).
-10. **Controller's game events** (7): no scheduled deletion today.
+10. **Controller's game events** (7): deleted 365 days by default after the game ended (a field setting, 30 to 3653 days): whether that default is proportionate, and whether a game the site server never received should be kept past it.
 11. **The project's own preview server** (a feedback form that keeps an
     optional contact for 90 days and the message for 12 months, no account,
     no address) needs a notice of its own, in the project's name. It is not

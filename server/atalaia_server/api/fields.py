@@ -44,7 +44,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from atalaia_controller import apd as apd_core
+from atalaia_controller import apd as apd_core, sync_format
 
 from .. import hub_share, sync
 from ..services import branding, registration, scheduling
@@ -84,6 +84,9 @@ class FieldPatch(BaseModel):
     max_replicas: Optional[int] = None
     apd: Optional[dict[str, Any]] = None  # the whole APD rule (protocol/apd.md); {} puts the default back
     country: Optional[str] = PydanticField(default=None, max_length=8)  # ISO 3166-1 alpha-2; null or "" unsets it
+    # Days the field's controllers keep chrono records (also this server's registry) and an ended game's data (RET-1/2).
+    chrono_retention_days: Optional[int] = None
+    game_retention_days: Optional[int] = None
 
 
 class SyncKeyIn(BaseModel):
@@ -97,12 +100,19 @@ class GrantIn(BaseModel):
     role: str = PydanticField(max_length=32)
 
 
+def _days_ok(days: Any) -> bool:
+    """A retention period the controllers take (``sync_format.RETENTION_DAYS_MIN`` to ``_MAX``)."""
+    return (isinstance(days, int) and not isinstance(days, bool)
+            and sync_format.RETENTION_DAYS_MIN <= days <= sync_format.RETENTION_DAYS_MAX)
+
+
 def field_json(f: Field, roles: Any = None) -> dict[str, Any]:
     body = {"id": str(f.id), "name": f.name, "slug": f.slug, "field_type": f.field_type, "timezone": f.timezone,
             "chrono_sharing_enabled": f.chrono_sharing_enabled, "public_page": f.public_page,
             "description": f.description, "address_text": f.address_text, "federation_label": f.federation_label,
             "limit_template": f.limit_template, "max_replicas": f.max_replicas, "apd": registration.field_rule(f),
-            "country": f.country}
+            "country": f.country, "chrono_retention_days": f.default_retention_days,
+            "game_retention_days": f.game_retention_days}
     if roles is not None:
         body["my_roles"] = sorted(roles)
     return body
@@ -212,6 +222,16 @@ async def update_field(field_id: uuid.UUID, body: FieldPatch, request: Request,
         if country != field.country:
             field.country = country
             changed["country"] = country or "cleared"
+    if body.chrono_retention_days is not None:
+        if not _days_ok(body.chrono_retention_days):
+            raise HTTPException(400, "chrono_retention_days_invalid")
+        if body.chrono_retention_days != field.default_retention_days:
+            field.default_retention_days = changed["chrono_retention_days"] = body.chrono_retention_days
+    if body.game_retention_days is not None:
+        if not _days_ok(body.game_retention_days):
+            raise HTTPException(400, "game_retention_days_invalid")
+        if body.game_retention_days != field.game_retention_days:
+            field.game_retention_days = changed["game_retention_days"] = body.game_retention_days
     if "address_text" in changed:
         await scheduling.bump_for_field_address(db, field.id, datetime.now(timezone.utc))
     if "chrono_sharing_enabled" in changed:
@@ -220,7 +240,8 @@ async def update_field(field_id: uuid.UUID, body: FieldPatch, request: Request,
         record(db, "field_update", request, user_id=principal.user.id, resource="field", resource_id=field.id,
                details=changed)
     await db.commit()
-    if changed.keys() & {"limit_template", "max_replicas", "federation_label", "apd", "country"}:
+    if changed.keys() & {"limit_template", "max_replicas", "federation_label", "apd", "country",
+                             "chrono_retention_days", "game_retention_days"}:
         branding.announce(request, [field.id])  # the controllers take over the field's check-in settings (BR24)
     await db.refresh(field)
     return JSONResponse(field_json(field, principal.roles.get(field.id, set())), headers=NO_STORE)

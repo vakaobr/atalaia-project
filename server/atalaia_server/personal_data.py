@@ -121,7 +121,7 @@ ERASED_PASSWORD = "DELETED"  # not an Argon2 hash: passwords.verify_password nev
 
 # Retention (ADR-P4-8's table; decisions S12-6, S13-10, S14-8, S16-7, S17-5). Guest data is plan phase 17's
 # imports (GUEST_RETENTION); game history is 24 months, or less per field (plan phase 20); the chrono registry
-# keeps each field's fields.default_retention_days (365 by default, the controller's CHRONO_RETENTION_DAYS).
+# keeps each field's fields.default_retention_days (365 by default; the field sets it, and its controllers follow it through the field settings sync, RET-2).
 SESSION_RETENTION = timedelta(days=30)   # after a session expired or was revoked
 AUDIT_RETENTION = timedelta(days=1095)   # 36 months
 GAME_RETENTION = timedelta(days=730)     # 24 months: game history, after the game ended (scheduled games too)

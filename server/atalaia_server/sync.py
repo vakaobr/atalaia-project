@@ -264,15 +264,20 @@ async def _claims(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dic
     return await registration.apply_claims(db, caller.field_id, body, datetime.now(timezone.utc))
 
 
+async def _erasures(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dict[str, Any]:
+    return await chrono_registry.apply_erasures(db, caller.field_id, body)
+
+
 HANDLERS = {"games": _games, "events": _events, "scores": _scores, "nodes": _nodes,
             "marshals": _marshals, "replicas": _replicas, "chrono": _chrono, "checkins": _checkins,
-            "claims": _claims}
+            "claims": _claims, "erasures": _erasures}
 
 
 async def apply(db: AsyncSession, caller: Caller, kind: str, body: dict[str, Any]) -> dict[str, Any]:
     """Stores one checked body and commits; the answer of protocol/sync.md."""
     try:
-        await quotas.check_stored(db)  # hosted mode: a field whose data take its limit stores nothing more (PKC-5)
+        if kind != "erasures":  # an erasure only frees what is stored
+            await quotas.check_stored(db)  # hosted mode: a field whose data take its limit stores nothing more (PKC-5)
     except quotas.QuotaExceeded as exc:
         raise SyncProblem(409, quotas.CODE, extra={"quota": exc.name, "limit": exc.limit}) from None
     await _seen(db, caller, body)

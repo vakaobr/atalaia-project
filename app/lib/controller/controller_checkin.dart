@@ -112,7 +112,18 @@ const _seriesMax = 50;
 const _tokenGraceS = 2 * 3600;
 const _tokenMinS = 60;
 const _identityDays = 365;
-const _chronoRetentionDays = 365;
+
+/// How long the field keeps chrono records and an ended game's data, in days
+/// (decisions RET-1, RET-2; the Pi's `chrono_retention_days` and
+/// `game_retention_days`): a setting of the field, 365 by default.
+const retentionKeys = ['chrono_retention_days', 'game_retention_days'];
+const retentionMinDays = 30;
+const retentionMaxDays = 3653;
+
+/// The settings a player's app is not told (the Pi's `PLAYER_HIDDEN`).
+const _playerHidden = ['max_players', ...retentionKeys];
+bool _daysOk(Object? v) =>
+    v is int && v >= retentionMinDays && v <= retentionMaxDays;
 const _settingsKeys = [
   'confirm',
   'federation',
@@ -122,6 +133,7 @@ const _settingsKeys = [
   'chrono_valid_for',
   'apd',
   'country',
+  ...retentionKeys,
 ];
 
 /// Who a request or a stream connection belongs to (checkin.py `Viewer`):
@@ -193,6 +205,8 @@ class CheckinConfig {
     this.noticeEn = '',
     this.apdsJson = '',
     this.retentionDays = 30,
+    this.chronoRetentionDays = 365,
+    this.gameRetentionDays = 365,
     this.utcDay = false,
   });
 
@@ -228,6 +242,11 @@ class CheckinConfig {
   /// The list of APDs (assets/apds.json, protocol/apd.md), as text.
   final String apdsJson;
   final int retentionDays;
+
+  /// The configured days chrono records, and an ended game's data, are kept
+  /// (the console's and the site server's setting wins).
+  final int chronoRetentionDays;
+  final int gameRetentionDays;
 
   /// The field's day ends at midnight UTC instead of local midnight (tests).
   final bool utcDay;
@@ -473,6 +492,11 @@ class ControllerCheckin {
   /// the site server (slice S7's sync).
   var _marshalHistory = <Map<String, Object?>>[];
 
+  /// Players whose data was erased on request and that the site server may
+  /// not know yet (the Pi's `erasures`, schema 17, decision RET-4):
+  /// `{player_id, chrono, identity, erased_at}`.
+  var _erasures = <Map<String, Object?>>[];
+
   double _wall() => engine.wallSeconds();
 
   // --- the document ---------------------------------------------------------
@@ -523,6 +547,7 @@ class ControllerCheckin {
     }
     _replicas = _mapOf(doc['replicas']);
     _marshalHistory = _listOf(doc['marshal_history']);
+    _erasures = _listOf(doc['erasures']);
     _tokenKeys = {
       if (doc['token_keys'] is Map)
         for (final e in (doc['token_keys'] as Map).entries)
@@ -542,6 +567,7 @@ class ControllerCheckin {
     'replicas': _replicas,
     'token_keys': _tokenKeys,
     'marshal_history': _marshalHistory,
+    'erasures': _erasures,
   });
 
   // --- the store's queries (store.py) ---------------------------------------
@@ -820,6 +846,37 @@ class ControllerCheckin {
         }
       }
     }
+    final sentDays = {
+      for (final k in retentionKeys)
+        if (site.containsKey(k)) k: site[k],
+    };
+    if (sentDays.isNotEmpty) {
+      // The field's retention days (decisions RET-1, RET-2); an older site
+      // server sends none.
+      Map<String, Object?> before = const {};
+      final raw = engine.store.getSetting(_retentionSiteKey);
+      if (raw != null) {
+        try {
+          final m = jsonDecode(raw);
+          if (m is Map) before = m.cast<String, Object?>();
+        } on FormatException {
+          // Replaced below.
+        }
+      }
+      final merged = {...before, ...sentDays};
+      if (jsonEncode(_sorted(merged)) != jsonEncode(_sorted(before))) {
+        engine.store.setSetting(_retentionSiteKey, jsonEncode(_sorted(merged)));
+        _save();
+        changed++;
+        if (spec.isEmpty) {
+          engine.emit({
+            'type': 'checkin_settings',
+            'settings': settings(),
+            '_staff': true,
+          });
+        }
+      }
+    }
     final template = (site['limit_template']! as Map).cast<String, Object?>();
     final encoded = jsonEncode(template);
     if (engine.store.getSetting(_siteLimitsKey) != encoded) {
@@ -846,6 +903,8 @@ class ControllerCheckin {
       'max_replicas': config.maxReplicas,
       'max_players': config.maxPlayers,
       'chrono_valid_for': config.chronoValidFor,
+      'chrono_retention_days': config.chronoRetentionDays,
+      'game_retention_days': config.gameRetentionDays,
     };
     final saved = engine.store.getSetting('checkin.settings');
     if (saved != null) {
@@ -853,9 +912,9 @@ class ControllerCheckin {
         final m = jsonDecode(saved);
         if (m is Map) {
           for (final e in m.entries) {
-            if (e.key != 'country' && _settingsKeys.contains(e.key)) {
-              out['${e.key}'] = e.value;
-            }
+            if (e.key == 'country' || !_settingsKeys.contains(e.key)) continue;
+            if (retentionKeys.contains(e.key) && !_daysOk(e.value)) continue;
+            out['${e.key}'] = e.value;
           }
         }
       } on FormatException {
@@ -864,8 +923,48 @@ class ControllerCheckin {
     }
     out['apd'] = apdRule().toJson();
     out['country'] = country();
+    out.addAll(_siteRetention());
     return out;
   }
+
+  static const _retentionSiteKey = 'checkin.retention_site';
+
+  /// The retention days the site server sent (the field's own, decision
+  /// RET-2), when managed there; empty otherwise or while it sent none.
+  Map<String, int> _siteRetention() {
+    if (!_siteManaged) return const {};
+    final raw = engine.store.getSetting(_retentionSiteKey);
+    if (raw == null) return const {};
+    try {
+      final m = jsonDecode(raw);
+      if (m is! Map) return const {};
+      return {
+        for (final k in retentionKeys)
+          if (_daysOk(m[k])) k: m[k] as int,
+      };
+    } on FormatException {
+      return const {};
+    }
+  }
+
+  /// The console's saved value of a retention key, else the configured one.
+  int _localRetention(String key) {
+    final saved = engine.store.getSetting('checkin.settings');
+    if (saved != null) {
+      try {
+        final m = jsonDecode(saved);
+        if (m is Map && _daysOk(m[key])) return m[key] as int;
+      } on FormatException {
+        // As the Pi: ignored.
+      }
+    }
+    return key == 'chrono_retention_days'
+        ? config.chronoRetentionDays
+        : config.gameRetentionDays;
+  }
+
+  /// `chrono_retention_days` or `game_retention_days` as the field has them now.
+  int retentionDays(String key) => settings()[key]! as int;
 
   // --- the field's country (protocol/apd.md, decisions MEM-2, MEM-3) ---------
 
@@ -1049,6 +1148,16 @@ class ControllerCheckin {
         'branding is "site"): change it there',
       );
     }
+    if (_siteManaged) {
+      final held = spec.keys.where(_siteRetention().containsKey).toList()
+        ..sort();
+      if (held.isNotEmpty) {
+        throw ControllerError.conflict(
+          '${held.first} comes from the site server (the sync\'s branding is '
+          '"site"): change it there',
+        );
+      }
+    }
     final cur = settings();
     var savedCountry = _savedCountry();
     const choices = {
@@ -1094,6 +1203,9 @@ class ControllerCheckin {
       if (k == 'max_replicas' && (v is! int || v < 1 || v > 20)) {
         throw ControllerError('max_replicas: 1-20');
       }
+      if (retentionKeys.contains(k) && !_daysOk(v)) {
+        throw ControllerError('$k: $retentionMinDays-$retentionMaxDays');
+      }
       if (k == 'max_players' && (v is! int || v < 1 || v > 5000)) {
         throw ControllerError('max_players: 1-5000');
       }
@@ -1106,6 +1218,9 @@ class ControllerCheckin {
           k: switch (k) {
             'apd' => (apd ?? _localApd()).toJson(),
             'country' => savedCountry,
+            // The console's own choice, not the site server's value laid over it.
+            'chrono_retention_days' || 'game_retention_days' =>
+              spec.containsKey(k) ? spec[k] : _localRetention(k),
             _ => cur[k],
           },
       }),
@@ -1312,9 +1427,15 @@ class ControllerCheckin {
       final op = config.operator.isNotEmpty
           ? config.operator
           : '${posterFields()['field_name']}';
+      final st = settings();
       texts[lang] = body
           .replaceAll('{operator}', op)
-          .replaceAll('{retention_days}', '${config.retentionDays}');
+          .replaceAll('{retention_days}', '${config.retentionDays}')
+          .replaceAll(
+            '{chrono_retention_days}',
+            '${st['chrono_retention_days']}',
+          )
+          .replaceAll('{game_retention_days}', '${st['game_retention_days']}');
     }
     return {'version': config.noticeVersion, ...texts};
   }
@@ -1376,7 +1497,7 @@ class ControllerCheckin {
       'notice': notice(),
       'settings': {
         for (final e in settings().entries)
-          if (e.key != 'max_players') e.key: e.value,
+          if (!_playerHidden.contains(e.key)) e.key: e.value,
       },
       'limits': {
         'id': limits.id,
@@ -1952,7 +2073,7 @@ class ControllerCheckin {
     final now = _wall();
     final cutoff = formatTimestamp(
       DateTime.fromMillisecondsSinceEpoch(
-        ((now - _chronoRetentionDays * 86400) * 1000).round(),
+        ((now - retentionDays('chrono_retention_days') * 86400) * 1000).round(),
         isUtc: true,
       ),
     );
@@ -2034,7 +2155,7 @@ class ControllerCheckin {
     if (!forHello) {
       out['settings'] = {
         for (final e in settings().entries)
-          if (e.key != 'max_players') e.key: e.value,
+          if (!_playerHidden.contains(e.key)) e.key: e.value,
       };
     }
     return out;
@@ -3442,6 +3563,7 @@ class ControllerCheckin {
   int deletePlayerReadings(String pid) {
     _deleteShared(playerId: pid); // other fields' copies of them (S14-5)
     final n = _deleteReadings(playerId: pid);
+    _recordErasure(pid, chrono: true, identity: false);
     _save();
     return n;
   }
@@ -3453,6 +3575,7 @@ class ControllerCheckin {
     };
     _erasePlayerRecords(pid);
     final readings = chronoToo ? _deleteReadings(playerId: pid) : 0;
+    _recordErasure(pid, chrono: chronoToo, identity: true);
     _save();
     for (final gid in games) {
       engine.emit({
@@ -4064,16 +4187,22 @@ class ControllerCheckin {
         if ((p['last_seen_at']! as num) < idleBefore) p['player_id']! as String,
     ];
     idle.forEach(_erasePlayerRecords);
+    final chronoDays = retentionDays('chrono_retention_days');
     final cutoff = formatTimestamp(
       DateTime.fromMillisecondsSinceEpoch(
-        ((now - _chronoRetentionDays * 86400) * 1000).round(),
+        ((now - chronoDays * 86400) * 1000).round(),
         isUtc: true,
       ),
     );
     final keysBefore = _marshalHistory.length;
     _marshalHistory.removeWhere(
-      (h) => (h['replaced_at']! as num) < now - _chronoRetentionDays * 86400,
+      (h) => (h['replaced_at']! as num) < now - chronoDays * 86400,
     );
+    final erasuresBefore = _erasures.length;
+    _erasures.removeWhere(
+      (e) => (e['erased_at']! as num) < now - chronoDays * 86400,
+    );
+    final games = _purgeGames(now);
     final out = {
       'checkins': erased,
       'declarations': declarations,
@@ -4082,9 +4211,108 @@ class ControllerCheckin {
       // Other fields' records pulled from the site server (S14-5): the same period.
       'shared_readings': _deleteShared(before: cutoff),
       'marshal_keys': keysBefore - _marshalHistory.length,
+      'erasure_records': erasuresBefore - _erasures.length,
+      ...games,
     };
     if (out.values.any((v) => v > 0)) _save();
     return out;
+  }
+
+  /// Ended games older than `game_retention_days` go whole: events, scores,
+  /// nodes, positions, their check-in rows and token key and sync bookkeeping
+  /// (decision RET-1). With the site sync on, a game the site server has not
+  /// confirmed (sync state `final`: ended and every event acknowledged) is
+  /// never purged (decision RET-3): the field's only copy would go. Without
+  /// a sync, age alone decides.
+  Map<String, int> _purgeGames(double now) {
+    final before = now - retentionDays('game_retention_days') * 86400;
+    final syncOn = engine.syncStatus != null;
+    final sync = engine.store.document('sync');
+    final states = sync is Map && sync['games'] is Map
+        ? (sync['games'] as Map)
+        : const <Object?, Object?>{};
+    var games = 0, events = 0, kept = 0;
+    final gone = <String>[];
+    for (final g in engine.store.games()) {
+      if (g['state'] != 'ended') continue;
+      final ended = g['ended_at'] ?? g['created_at'];
+      if (ended is! num || ended >= before) continue;
+      final gid = g['id']! as int;
+      if (syncOn) {
+        final st = states['$gid:${g['game_seed']}'];
+        if (!(st is Map && st['final'] == true)) {
+          kept++;
+          continue;
+        }
+      }
+      events += engine.store.eventLog(gid).length;
+      _checkins.removeWhere((r) => r['game_id'] == gid);
+      _declarations.removeWhere((_, d) => d['game_id'] == gid);
+      _tokenKeys.remove('$gid');
+      engine.schedule?.forgetGame(gid, g['game_seed']! as int);
+      engine.store.deleteGame(gid);
+      gone.add('$gid:${g['game_seed']}');
+      games++;
+    }
+    if (gone.isNotEmpty && sync is Map) {
+      final all = {...?(sync['games'] as Map?)?.cast<String, Object?>()}
+        ..removeWhere((k, _) => gone.contains(k));
+      engine.store.putDocument('sync', {
+        ...sync.cast<String, Object?>(),
+        'games': all,
+      });
+    }
+    return {'games': games, 'game_events': events, 'games_unsynced_kept': kept};
+  }
+
+  // --- erasure records (S14-10, decision RET-4) ---------------------------------
+
+  /// With the site sync on, keeps that this player's data was erased until
+  /// the site server has it: the next sync sends `POST
+  /// /api/v1/sync/erasures`. Nothing is kept without a sync.
+  void _recordErasure(
+    String pid, {
+    required bool chrono,
+    required bool identity,
+  }) {
+    if (engine.syncStatus == null) return;
+    final old = _erasures.where((e) => e['player_id'] == pid).firstOrNull;
+    _erasures.removeWhere((e) => e['player_id'] == pid);
+    _erasures.add({
+      'player_id': pid,
+      'chrono': chrono || old?['chrono'] == true,
+      'identity': identity || old?['identity'] == true,
+      'erased_at': _wall(),
+    });
+  }
+
+  /// The erasures the site server may not have yet, oldest first.
+  List<Map<String, Object?>> erasures([int limit = 500]) {
+    final out = [..._erasures]
+      ..sort((a, b) {
+        final c = (a['erased_at']! as num).compareTo(b['erased_at']! as num);
+        return c != 0
+            ? c
+            : (a['player_id']! as String).compareTo(b['player_id']! as String);
+      });
+    return [
+      for (final e in out.take(limit)) {...e},
+    ];
+  }
+
+  /// The records the site server acknowledged: only as they were sent (an
+  /// erasure added to since stays).
+  int deleteErasures(List<Map<String, Object?>> sent) {
+    final n = _erasures.length;
+    for (final e in sent) {
+      _erasures.removeWhere(
+        (x) =>
+            x['player_id'] == e['player_id'] &&
+            x['erased_at'] == e['erased_at'],
+      );
+    }
+    if (_erasures.length != n) _save();
+    return n - _erasures.length;
   }
 
   // --- the stream -------------------------------------------------------------------
@@ -4160,3 +4388,8 @@ String _csvCell(Object? v) {
   if (s.contains(RegExp('[",\r\n]'))) return '"${s.replaceAll('"', '""')}"';
   return s;
 }
+
+/// [m] with its keys in order, so two equal maps encode alike.
+Map<String, Object?> _sorted(Map<String, Object?> m) => {
+  for (final k in m.keys.toList()..sort()) k: m[k],
+};

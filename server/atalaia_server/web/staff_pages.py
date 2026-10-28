@@ -45,7 +45,8 @@
                                                        uses of each hosted-mode limit (PKC-1)
     GET /staff/fields/<field>/settings                 the field's settings, for its admin: public page, check-in
                                                        rules, association membership (the rule, the country's list
-                                                       and the field's own entries), chrono sharing, country (FS-*)
+                                                       and the field's own entries), chrono sharing, country,
+                                                       how long chrono records and games are kept (FS-*, RET-*)
     GET /staff/clubs, /staff/clubs/<club>              the account's clubs and invitations; one club, its images
                                                        and members (and a server administrator's moderation)
     GET /staff/firmware                                the firmware catalogue (add and withdraw: server administrator)
@@ -83,6 +84,7 @@ from pathlib import Path
 from string import Template
 from typing import Optional
 
+from atalaia_controller import sync_format
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse, Response
 
@@ -387,7 +389,9 @@ async def settings(field: str, request: Request) -> Response:
     options = "".join(f'<option value="{esc(name)}">{esc(name)}</option>' for name in registration.limit_templates())
     return _field_page(request, field, "settings", "settings", "fs_title", template_options=options,
                        description_max=str(scheduling.FIELD_DESCRIPTION_MAX), address_max=str(scheduling.LOCATION_MAX),
-                       label_max=str(scheduling.FEDERATION_LABEL_MAX), replicas_max=str(registration.MAX_REPLICAS))
+                       label_max=str(scheduling.FEDERATION_LABEL_MAX), replicas_max=str(registration.MAX_REPLICAS),
+                       retention_min=str(sync_format.RETENTION_DAYS_MIN),
+                       retention_max=str(sync_format.RETENTION_DAYS_MAX))
 
 
 def _page(request: Request, page: str, section: str, title_key: str, data: Optional[dict[str, str]] = None,

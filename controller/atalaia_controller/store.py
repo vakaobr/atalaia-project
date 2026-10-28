@@ -78,6 +78,12 @@ are never judged, never sent back, and never override a local reading. A schema 
 Schema 14 (ADR-P3-6, decisions BLE-1 to BLE-9) adds ``beacons``: the indoor iBeacon registry, one row per
 beacon (``major`` and ``minor`` are its key, ``level`` the plan it is on, the uuid, room, zone and plan place
 as JSON; beacons.py). A schema 13 file gets the empty table; nothing else changes.
+
+Schema 17 (decisions RET-1 to RET-8) adds ``erasures``: one row per player id whose data this controller erased on
+request (the GM's erasure, a player's own chrono erasure), with what was erased (``chrono`` readings and the
+shared copies, ``identity`` the field identity, check-ins and declarations) and when, until the site server has
+acknowledged it (``POST /api/v1/sync/erasures``) or the chrono retention has passed. A schema 16 file gets the
+empty table.
 """
 
 from __future__ import annotations
@@ -90,9 +96,9 @@ import sqlite3
 import threading
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 17
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes, per level's plan
 FIELD_LEVELS_MAX = 10  # levels of a multi-story field (decision ML-1)
@@ -365,6 +371,12 @@ CREATE TABLE IF NOT EXISTS beacons (
     updated_at  REAL NOT NULL,
     PRIMARY KEY (major, minor)
 );
+CREATE TABLE IF NOT EXISTS erasures (
+    player_id TEXT PRIMARY KEY,                        -- schema 17: an erasure the site server may not know yet
+    chrono    INTEGER NOT NULL DEFAULT 0,              -- 1: the player's chrono readings were erased
+    identity  INTEGER NOT NULL DEFAULT 0,              -- 1: the field identity, check-ins and declarations
+    erased_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS player_positions (
     game_id     INTEGER NOT NULL,
     player_id   TEXT NOT NULL,
@@ -410,6 +422,9 @@ CHECKIN_COLUMNS_V15 = (
 CHRONO_COLUMNS_V16 = (("limit_j", "REAL"),)
 
 LIVE_STATES = ("ready", "running", "paused")
+# Settings keys kept per game as ``prefix:game_id`` (they go with the game, purge_games).
+GAME_SETTING_PREFIXES = ("checkin.open", "key_tag", "game_time", "field_scores", "field_run", "box_lang",
+                         "issued_nodes")
 
 
 def _private(path: str) -> None:
@@ -1510,6 +1525,65 @@ class Store:
             for pid in idle:
                 self.erase_player(pid)
             return {"checkins": erased, "declarations": declarations, "identities": len(idle)}
+
+    # --- erasure records (schema 17, decision RET-4) -------------------------------------------
+
+    def record_erasure(self, player_id: str, *, chrono: bool, identity: bool, now: float) -> None:
+        """Keeps that an erasure was done, until the site server has it. A second erasure of the same player
+        adds to what the first covered."""
+        with self._lock:
+            self._exec("INSERT INTO erasures (player_id, chrono, identity, erased_at) VALUES (?, ?, ?, ?) "
+                       "ON CONFLICT(player_id) DO UPDATE SET chrono = MAX(chrono, excluded.chrono), "
+                       "identity = MAX(identity, excluded.identity), erased_at = excluded.erased_at",
+                       (player_id, 1 if chrono else 0, 1 if identity else 0, now))
+
+    def erasures(self, limit: int = 500) -> list[dict[str, Any]]:
+        rows = self._exec("SELECT * FROM erasures ORDER BY erased_at, player_id LIMIT ?", (limit,)).fetchall()
+        return [{"player_id": r["player_id"], "chrono": bool(r["chrono"]), "identity": bool(r["identity"]),
+                 "erased_at": r["erased_at"]} for r in rows]
+
+    def delete_erasures(self, sent: list[dict[str, Any]]) -> int:
+        """The records the site server acknowledged: only as they were sent (an erasure added to since stays)."""
+        n = 0
+        with self._lock:
+            for e in sent:
+                n += self._exec("DELETE FROM erasures WHERE player_id = ? AND erased_at = ?",
+                                (e["player_id"], e["erased_at"])).rowcount
+        return n
+
+    def purge_erasures(self, erased_before: float) -> int:
+        """Records older than the chrono retention go: the site server's copies are past it too."""
+        return self._exec("DELETE FROM erasures WHERE erased_at < ?", (erased_before,)).rowcount
+
+    def purge_games(self, ended_before: float, confirmed_only: Optional[Callable[[dict[str, Any]], bool]] = None
+                    ) -> dict[str, Any]:
+        """Retention of a game's data (decision RET-1): every ended game that ended before ``ended_before`` goes
+        with its events, scores, nodes, positions, check-ins, declarations, token key, plan positions, schedule
+        link, sync bookkeeping and per-game settings. ``confirmed_only``: a game it answers False for is kept
+        (the site server has not confirmed it, RET-3) and counted in ``kept``. The chrono readings, which have
+        their own retention, stay."""
+        done = {"games": 0, "events": 0, "kept": 0, "ids": []}
+        with self._lock:
+            rows = self._exec("SELECT * FROM games WHERE state = 'ended' AND COALESCE(ended_at, created_at) < ? "
+                              "ORDER BY id", (ended_before,)).fetchall()
+            for row in rows:
+                game = self._game(row)
+                if confirmed_only is not None and not confirmed_only(game):
+                    done["kept"] += 1
+                    continue
+                gid, seed = game["id"], game["game_seed"]
+                done["events"] += self._exec("DELETE FROM events WHERE game_id = ?", (gid,)).rowcount
+                for table in ("scores", "nodes", "positions", "declarations", "checkins", "player_positions",
+                              "token_keys"):
+                    self._exec(f"DELETE FROM {table} WHERE game_id = ?", (gid,))
+                self._exec("DELETE FROM sync_state WHERE game_id = ? AND game_seed = ?", (gid, seed))
+                self._exec("DELETE FROM schedule_links WHERE game_id = ? AND game_seed = ?", (gid, seed))
+                for prefix in GAME_SETTING_PREFIXES:
+                    self._exec("DELETE FROM settings WHERE key = ?", (f"{prefix}:{gid}",))
+                self._exec("DELETE FROM games WHERE id = ?", (gid,))
+                done["games"] += 1
+                done["ids"].append(gid)
+        return done
 
     def set_player_position(self, game_id: int, player_id: str, report: dict[str, Any], now: float) -> None:
         self._exec("INSERT INTO player_positions (game_id, player_id, report_json, received_at) "

@@ -275,6 +275,54 @@ void main() {
     expect(call('DELETE', '/api/v1/players/$pid?chrono=maybe').status, 422);
   });
 
+  test('the retention days: a year by default, the GM\'s to change', () {
+    Map<String, Object?> settings() =>
+        (call('GET', '/api/v1/checkin/settings').body! as Map)
+            .cast<String, Object?>();
+    expect(settings()['chrono_retention_days'], 365);
+    expect(settings()['game_retention_days'], 365);
+    for (final bad in [29, 3654, '90', true, null]) {
+      expect(
+        call(
+          'PUT',
+          '/api/v1/checkin/settings',
+          body: {'game_retention_days': bad},
+        ).status,
+        400,
+        reason: '$bad',
+      );
+    }
+    final r = call(
+      'PUT',
+      '/api/v1/checkin/settings',
+      body: {'chrono_retention_days': 90, 'game_retention_days': 400},
+    );
+    expect(r.status, 200, reason: '${r.body}');
+    expect(settings()['chrono_retention_days'], 90);
+    expect(settings()['game_retention_days'], 400);
+    // Not told to a player's app (like max_players); another setting keeps them.
+    final info = (call('GET', '/api/v1/checkin', token: null).body! as Map);
+    final shown = (info['settings']! as Map).keys;
+    expect(shown, isNot(contains('game_retention_days')));
+    expect(shown, isNot(contains('chrono_retention_days')));
+    call('PUT', '/api/v1/checkin/settings', body: {'federation': 'off'});
+    expect(settings()['game_retention_days'], 400);
+  });
+
+  test('the chrono days are the field\'s', () {
+    call(
+      'PUT',
+      '/api/v1/checkin/settings',
+      body: {'chrono_retention_days': 90},
+    );
+    wall += 100 * 86400;
+    final k = svc.purge(force: true)!;
+    // Nothing of the field's own is stored here; the old records of other
+    // players' erasures are what the period decides.
+    expect(k['erasure_records'], 0);
+    expect(svc.retentionDays('chrono_retention_days'), 90);
+  });
+
   test('retention: names after the game, identities after a year', () {
     final gid = newGame();
     final me = checkIn(

@@ -22,9 +22,10 @@ PT: dict[str, str] = {
     "nav_fsettings": "Definições",
     "fs_title": "Definições do campo",
     "fs_intro": "Tudo o que a administração do campo regula, sem passar pela API: página pública, regras de check-in, "
-                "filiação, partilha de cronos e país. Cada secção guarda-se à parte.",
-    "fs_controllers_note": "O que muda nas regras de check-in, na etiqueta de filiação, na filiação e no país chega "
-                           "logo aos controladores do campo: o servidor envia-lhes o aviso field.changed.",
+                "filiação, partilha de cronos, país e conservação de dados. Cada secção guarda-se à parte.",
+    "fs_controllers_note": "O que muda nas regras de check-in, na etiqueta de filiação, na filiação, no país e na "
+                           "conservação de dados chega logo aos controladores do campo: o servidor envia-lhes o "
+                           "aviso field.changed.",
     "fs_saved_controllers": "Guardado. Os controladores recebem a alteração de imediato.",
     "fs_public_title": "Página pública",
     "fs_public_intro": "O que a página pública do campo e os seus feeds mostram. Desligada, o campo não tem página "
@@ -83,15 +84,27 @@ PT: dict[str, str] = {
     "e_limit_template_invalid": "Modelo de limites desconhecido.",
     "e_max_replicas_invalid": "Máximo de réplicas inválido (um número inteiro, de 1 ao máximo do servidor).",
     "e_http_422": "Algum valor tem a forma errada (por exemplo, um texto demasiado longo).",
+    "fs_retention_title": "Conservação de dados",
+    "fs_retention_intro": "Durante quantos dias os controladores do campo guardam os registos de cronometragem e os "
+                          "dados de cada jogo terminado, e este servidor o seu registo de cronometragem.",
+    "fs_chrono_days": "Registos de cronometragem: dias guardados",
+    "fs_game_days": "Dados dos jogos (eventos, pontuações, nós): dias guardados depois de o jogo terminar",
+    "fs_retention_hint": "De 30 a 3653 dias; 365 por defeito. Um controlador ligado a este servidor nunca apaga um "
+                         "jogo antes de o servidor o ter recebido por inteiro. O historial de jogos deste servidor "
+                         "tem o seu próprio prazo, na página do historial. Chega logo aos controladores.",
+    "e_chrono_retention_days_invalid": "Prazo dos registos de cronometragem inválido (um número inteiro de dias, "
+                                       "de 30 a 3653).",
+    "e_game_retention_days_invalid": "Prazo dos dados dos jogos inválido (um número inteiro de dias, de 30 a 3653).",
 }
 
 EN: dict[str, str] = {
     "nav_fsettings": "Settings",
     "fs_title": "Field settings",
     "fs_intro": "Everything the field's admin sets, without the API: public page, check-in rules, membership, chrono "
-                "sharing and country. Each section is saved on its own.",
-    "fs_controllers_note": "A change to the check-in rules, the federation label, the membership or the country "
-                           "reaches the field's controllers at once: the server sends them the field.changed note.",
+                "sharing, country and data retention. Each section is saved on its own.",
+    "fs_controllers_note": "A change to the check-in rules, the federation label, the membership, the country or "
+                           "the data retention reaches the field's controllers at once: the server sends them the "
+                           "field.changed note.",
     "fs_saved_controllers": "Saved. The controllers get the change at once.",
     "fs_public_title": "Public page",
     "fs_public_intro": "What the field's public page and its feeds show. Off, the field has no public page.",
@@ -149,16 +162,26 @@ EN: dict[str, str] = {
     "e_limit_template_invalid": "Unknown limit template.",
     "e_max_replicas_invalid": "Invalid most-replicas value (a whole number, from 1 to the server's maximum).",
     "e_http_422": "A value has the wrong form (for example, a text that is too long).",
+    "fs_retention_title": "Data retention",
+    "fs_retention_intro": "How many days the field's controllers keep chrono records and the data of each ended game, "
+                          "and this server its chrono registry.",
+    "fs_chrono_days": "Chrono records: days kept",
+    "fs_game_days": "Game data (events, scores, nodes): days kept after the game ends",
+    "fs_retention_hint": "30 to 3653 days; 365 by default. A controller connected to this server never deletes a game "
+                         "before the server has all of it. This server's game history has its own period, on the "
+                         "history page. The controllers get the change at once.",
+    "e_chrono_retention_days_invalid": "Invalid chrono retention (a whole number of days, from 30 to 3653).",
+    "e_game_retention_days_invalid": "Invalid game data retention (a whole number of days, from 30 to 3653).",
 }
 
 DE: dict[str, str] = {
     "nav_fsettings": "Einstellungen",
     "fs_title": "Einstellungen des Spielfelds",
     "fs_intro": "Alles, was die Orga des Spielfelds festlegt, ohne die API: öffentliche Seite, Check-in-Regeln, "
-                "Mitgliedschaft, Chrono-Freigabe und Land. Jeder Abschnitt wird einzeln gespeichert.",
-    "fs_controllers_note": "Eine Änderung der Check-in-Regeln, der Verbandsnummer-Bezeichnung, der Mitgliedschaft "
-                           "oder des Landes erreicht die Controller des Spielfelds sofort: Der Server schickt ihnen "
-                           "den Hinweis field.changed.",
+                "Mitgliedschaft, Chrono-Freigabe, Land und Datenaufbewahrung. Jeder Abschnitt wird einzeln gespeichert.",
+    "fs_controllers_note": "Eine Änderung der Check-in-Regeln, der Verbandsnummer-Bezeichnung, der Mitgliedschaft, "
+                           "des Landes oder der Datenaufbewahrung erreicht die Controller des Spielfelds sofort: Der Server "
+                           "schickt ihnen den Hinweis field.changed.",
     "fs_saved_controllers": "Gespeichert. Die Controller erhalten die Änderung sofort.",
     "fs_public_title": "Öffentliche Seite",
     "fs_public_intro": "Was die öffentliche Seite des Spielfelds und ihre Feeds zeigen. Ausgeschaltet hat das "
@@ -219,13 +242,24 @@ DE: dict[str, str] = {
     "e_limit_template_invalid": "Unbekannte Limit-Vorlage.",
     "e_max_replicas_invalid": "Ungültige Höchstzahl Repliken (eine ganze Zahl von 1 bis zum Maximum des Servers).",
     "e_http_422": "Ein Wert hat die falsche Form (zum Beispiel ein zu langer Text).",
+    "fs_retention_title": "Aufbewahrung von Daten",
+    "fs_retention_intro": "Wie viele Tage die Controller des Spielfelds Chrono-Aufzeichnungen und die Daten jedes "
+                          "beendeten Spiels aufbewahren, und dieser Server sein Chrono-Register.",
+    "fs_chrono_days": "Chrono-Aufzeichnungen: Tage aufbewahrt",
+    "fs_game_days": "Spieldaten (Ereignisse, Punkte, Knoten): Tage aufbewahrt nach dem Spielende",
+    "fs_retention_hint": "30 bis 3653 Tage; standardmäßig 365. Ein Controller, der mit diesem Server verbunden ist, "
+                         "löscht ein Spiel nie, bevor der Server alles davon hat. Der Spielverlauf dieses Servers "
+                         "hat eine eigene Frist, auf der Verlaufsseite. Die Controller erhalten die Änderung sofort.",
+    "e_chrono_retention_days_invalid": "Ungültige Aufbewahrung der Chrono-Aufzeichnungen (eine ganze Zahl Tage, von "
+                                       "30 bis 3653).",
+    "e_game_retention_days_invalid": "Ungültige Aufbewahrung der Spieldaten (eine ganze Zahl Tage, von 30 bis 3653).",
 }
 
 ZH_TW: dict[str, str] = {
     "nav_fsettings": "設定",
     "fs_title": "場地設定",
-    "fs_intro": "場地管理員要設定的一切，不必經過 API：公開頁面、報到規則、會員資格、計時分享與國家。每個區塊各自儲存。",
-    "fs_controllers_note": "報到規則、聯盟編號標籤、會員資格或國家的變更會立刻送到場地的控制器：伺服器會傳給它們 "
+    "fs_intro": "場地管理員要設定的一切，不必經過 API：公開頁面、報到規則、會員資格、計時分享、國家與資料保存。每個區塊各自儲存。",
+    "fs_controllers_note": "報到規則、聯盟編號標籤、會員資格、國家或資料保存的變更會立刻送到場地的控制器：伺服器會傳給它們 "
                            "field.changed 通知。",
     "fs_saved_controllers": "已儲存。控制器會立刻收到變更。",
     "fs_public_title": "公開頁面",
@@ -278,6 +312,14 @@ ZH_TW: dict[str, str] = {
     "e_limit_template_invalid": "不明的限制範本。",
     "e_max_replicas_invalid": "複製槍數量上限無效（整數，從 1 到伺服器的上限）。",
     "e_http_422": "某個值的格式不對（例如文字太長）。",
+    "fs_retention_title": "資料保存",
+    "fs_retention_intro": "場地的控制器保存計時紀錄與每場已結束遊戲資料的天數，以及這台伺服器保存計時登錄資料的天數。",
+    "fs_chrono_days": "計時紀錄：保存天數",
+    "fs_game_days": "遊戲資料（事件、分數、節點）：遊戲結束後的保存天數",
+    "fs_retention_hint": "30 至 3653 天；預設 365。連上這台伺服器的控制器，在伺服器收到完整資料之前絕不會刪除遊戲。"
+                         "這台伺服器的遊戲歷史有自己的期限，在歷史頁面。控制器會立刻收到變更。",
+    "e_chrono_retention_days_invalid": "計時紀錄的保存天數無效（30 至 3653 的整數）。",
+    "e_game_retention_days_invalid": "遊戲資料的保存天數無效（30 至 3653 的整數）。",
 }
 
 BY_LANGUAGE: dict[str, dict[str, str]] = {"pt": PT, "en": EN, "de": DE, "zh-tw": ZH_TW}

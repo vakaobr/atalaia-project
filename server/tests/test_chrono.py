@@ -684,6 +684,47 @@ class FieldErasureTests(ChronoCase):
         self.assertNotIn("p-rita", logged[0][0])
 
 
+    async def test_a_controllers_erasure_reaches_the_site_server_by_itself(self) -> None:
+        """S14-10, decision RET-4: ``POST /api/v1/sync/erasures`` erases what the controller erased: the player's
+        chrono data (``chrono``) and the link of their id to an account (``identity``); idempotent; the log keeps
+        how much, never whose; other fields' and other players' records stay."""
+        ana = Marshal()
+        await self.marshals(ana.entry())
+        await self.post("replicas", field_body(replicas=[{"replica_id": REPLICA, "owner_player_id": "p-rita",
+                                                          "type": "aeg", "class": "rifle"}]))
+        await self.chrono(*[reading(ana.record(v, rtype="spotcheck"), outcome="fail") for v in (100.0, 120.0)])
+        await self.chrono(reading(ana.record(player="p-bea")))
+        for player in ("p-rita", "p-bea"):
+            user_id, _, _ = await self.make_user()
+            await self.link(user_id, player)
+        other = await self.fetch("INSERT INTO fields (name, slug) VALUES ('Outro', 'outro') RETURNING id")
+        user_id, _, _ = await self.make_user()
+        await self.link(user_id, "p-rita", other[0][0])  # the same id at another field is another person's
+        body = field_body(erasures=[{"player_id": "p-rita", "chrono": True, "identity": False, "erased_at": T0}])
+        self.assertEqual(await self.post("erasures", body), {
+            "players": 1, "chrono_readings": 2, "chrono_rejects": 0, "replicas": 1, "identities": 0, "claims": 0})
+        self.assertEqual(await self.count("field_player_ids"), 3)  # chrono only: the links stay
+        self.assertEqual([r[0] for r in await self.fetch("SELECT player_id FROM chrono_readings")], ["p-bea"])
+        self.assertEqual(await self.count("chrono_violations"), 0)
+        again = await self.post("erasures", body)  # a lost answer, sent again: nothing more to erase
+        self.assertEqual((again["players"], again["chrono_readings"], again["replicas"]), (1, 0, 0))
+        both = field_body(erasures=[
+            {"player_id": "p-rita", "chrono": False, "identity": True, "erased_at": T0},
+            {"player_id": "p-bea", "chrono": True, "identity": True, "erased_at": T0 + 1}])
+        answer = await self.post("erasures", both)
+        self.assertEqual((answer["players"], answer["chrono_readings"], answer["identities"]), (2, 1, 2))
+        self.assertEqual(await self.count("chrono_readings"), 0)
+        links = await self.fetch("SELECT field_id, player_id FROM field_player_ids")
+        self.assertEqual([(r[0], r[1]) for r in links], [(other[0][0], "p-rita")])
+        logged = await self.fetch("SELECT details FROM audit_log WHERE action = 'chrono_player_erasure'")
+        self.assertEqual(len(logged), 3)
+        self.assertNotIn("p-rita", str([r[0] for r in logged]))
+        self.assertNotIn("p-bea", str([r[0] for r in logged]))
+        # Another field's key erases nothing of this one's.
+        r = await self.client.post("/api/v1/sync/erasures", json=both, headers={"Authorization": "Bearer nope"})
+        self.assertEqual(r.status_code, 401)
+
+
 class GameLinkTests(ChronoCase):
     async def test_a_reading_names_its_game_when_the_site_server_has_it(self) -> None:
         ana = Marshal()

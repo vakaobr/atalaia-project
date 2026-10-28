@@ -352,7 +352,7 @@ DO CAMPO]** é um que o campo pode alterar; os outros estão fixos no código.
 | Reclamações de um identificador de jogador de um telemóvel | servidor | 30 dias depois de feitas |
 | Jogos marcados e as suas inscrições | servidor | 24 meses depois de o jogo terminar |
 | Jogos, os seus eventos e pontuações (o teu histórico de jogos) | servidor | **[ESCOLHA DO CAMPO:]** 24 meses depois de o jogo terminar, ou menos se o campo o definir |
-| Leituras de cronógrafo, infrações, réplicas, chaves de marshals | servidor | **[ESCOLHA DO CAMPO:]** 365 dias por omissão, por campo |
+| Leituras de cronógrafo, infrações, réplicas, chaves de marshals | servidor | **[ESCOLHA DO CAMPO:]** 365 dias por omissão, por campo (de 30 a 3653 dias, definidos por quem administra o campo) |
 | Pertença a clubes | servidor | Até saíres do clube ou apagares a conta |
 | Convites de clubes não aceites | servidor | 30 dias |
 | Denúncias de páginas de clubes | servidor | 12 meses depois de decididas |
@@ -362,9 +362,9 @@ DO CAMPO]** é um que o campo pode alterar; os outros estão fixos no código.
 | **Check-in: nome ou alcunha, número de associado e validade, preferência de equipa** | controlador | **[ESCOLHA DO CAMPO:]** 30 dias depois do jogo por omissão (`retention_days`), ou logo que saias do jogo na app |
 | Réplicas declaradas num check-in | controlador | Os mesmos 30 dias |
 | O identificador de campo que o teu telemóvel criou | controlador | Apagado ao fim de **um ano** sem check-in |
-| Leituras de cronógrafo, leituras de outros campos recebidas para a lista de inscritos, chaves antigas de marshals | controlador | 365 dias. (Fixo no controlador; não segue a definição por campo do servidor.) |
+| Leituras de cronógrafo, leituras de outros campos recebidas para a lista de inscritos, chaves antigas de marshals | controlador | **[ESCOLHA DO CAMPO:]** 365 dias por omissão (de 30 a 3653): a mesma definição por campo do servidor, que o controlador adota quando o campo lhe vai buscar as definições |
 | A tua posição | controlador | Até o jogo terminar, depois apagada. Só a última, nunca um trajeto |
-| Eventos de jogo | controlador | [ESCOLHA DO CAMPO / ADVOGADO: o controlador não apaga os eventos de um jogo num prazo; só nomeiam identificadores pseudónimos. Dizer a regra do campo.] |
+| Eventos de jogo, pontuações e a lista dos dispositivos de um jogo | controlador | **[ESCOLHA DO CAMPO:]** 365 dias por omissão (de 30 a 3653) depois de o jogo terminar, e depois são apagados por inteiro; só nomeiam identificadores pseudónimos. Com um servidor do site configurado, o controlador nunca apaga um jogo antes de o servidor o ter por inteiro, pelo que um jogo que não consiga enviar fica (e o apagamento de uma pessoa feito no controlador chega sozinho ao servidor) |
 | Posição, em memória (organização remota, ATAK remoto) | servidor | Não é guardada. Desaparece quando a ligação termina |
 
 O servidor apaga o que passou destes prazos todos os dias (03:00 UTC); um
@@ -562,7 +562,7 @@ depois de revisto. No máximo um ecrã de texto.
 >
 > **Durante quanto tempo:** o nome, o número de associado, a preferência de
 > equipa e as réplicas declaradas são apagados [30] dias depois do jogo, ou
-> logo que saias do jogo na app. Leituras de cronógrafo: 365 dias. O teu
+> logo que saias do jogo na app. Leituras de cronógrafo: [365] dias. O teu
 > identificador de campo: um ano depois do último check-in.
 >
 > **Os teus direitos:** ver os teus dados na app; sair do jogo e apagá-los;
@@ -595,8 +595,10 @@ O rascunho não os pode resolver. Cada um está marcado **[ADVOGADO]** acima.
    do alojamento.
 8. **Menores** (11).
 9. **Encarregado de proteção de dados** (1).
-10. Os **eventos de jogo do controlador** (7): hoje não há apagamento
-    programado.
+10. Os **eventos de jogo do controlador** (7): apagados 365 dias por omissão
+    depois de o jogo terminar (uma definição do campo, de 30 a 3653 dias): se esse
+    valor por omissão é proporcional, e se um jogo que o servidor nunca recebeu
+    deve ficar além dele.
 11. O **servidor de pré-visualização do próprio projeto** (um formulário de
     comentários que guarda um contacto opcional durante 90 dias e a
     mensagem durante 12 meses, sem conta nem endereço) precisa de um aviso

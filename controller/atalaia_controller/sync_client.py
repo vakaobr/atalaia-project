@@ -127,9 +127,9 @@ from atalaia_sim.mode import ModeError
 
 from . import __version__, images
 from .modes import resolve_params
-from .sync_format import (ANSWERS, MAX_EVENTS, MAX_MARSHALS, MAX_READINGS, MAX_REPLICAS, MAX_ROSTER, SYNC_VERSION,
-                          SyncFormatError, check_checkins, check_claims, check_event, check_marshal, check_nodes,
-                          check_reading, check_replica, library_removals)
+from .sync_format import (ANSWERS, MAX_ERASURES, MAX_EVENTS, MAX_MARSHALS, MAX_READINGS, MAX_REPLICAS, MAX_ROSTER,
+                          SYNC_VERSION, SyncFormatError, check_checkins, check_claims, check_event, check_marshal,
+                          check_nodes, check_reading, check_replica, library_removals)
 
 log = logging.getLogger("atalaia.sync")
 
@@ -318,6 +318,8 @@ class SyncClient:
         self.game_day_supported = True
         self.schedule_pulled_at: Optional[float] = None
         self.claims_answered = 0
+        self.erasures_supported = True  # S14-10: an older site server has no POST /api/v1/sync/erasures
+        self.erasures_sent = 0
         self.limit_j_supported = True  # PKD-3: an older site server refuses a reading's ``limit_j``
         self.shared_chrono_supported = True  # S14-5: GET /api/v1/sync/chrono
         self.shared_chrono_stored = 0  # records kept at the last pull
@@ -570,6 +572,32 @@ class SyncClient:
         self._push_items("marshal", "/api/v1/sync/marshals", "marshals", self.marshal_entries(), MAX_MARSHALS, env)
         self._push_items("replica", "/api/v1/sync/replicas", "replicas", self.replica_entries(), MAX_REPLICAS, env)
         self._push_readings(env)
+        self._push_erasures(env)
+
+    def _push_erasures(self, env: dict[str, Any]) -> None:
+        """Players this controller erased on request, for the site server to erase its copies (S14-10, decision
+        RET-4): sent until acknowledged, in batches. A site server without the endpoint (404) is not asked
+        again until this controller restarts; the records stay until the chrono retention deletes them."""
+        if not self.erasures_supported:
+            return
+        for _ in range(BATCHES_PER_KIND):
+            rows = self.store.erasures(MAX_ERASURES)
+            if not rows:
+                return
+            try:
+                self._post("/api/v1/sync/erasures", {**env, "erasures": rows})
+            except SyncError as exc:
+                if exc.status in (404, 405):
+                    log.info("the site server does not take erasures: they stay here until the retention ends them")
+                    self.erasures_supported = False
+                    return
+                if exc.status == 400:
+                    self._registry_refused("/api/v1/sync/erasures", exc)
+                    return
+                raise
+            self.erasures_sent += self.store.delete_erasures(rows)
+            if len(rows) < MAX_ERASURES:
+                return
 
     def _registry_refused(self, path: str, exc: SyncError) -> None:
         """A 400 for a registry body: logged and kept; the body counts as sent, so it never blocks the rest."""
@@ -1147,6 +1175,8 @@ class SyncClient:
                 "last_error": self.last_error, "failures": self.failures, "pending_events": pending,
                 "pending_readings": self.store.count_readings_unsynced(), "registry_error": self.registry_error,
                 "refused_readings": self.refused_readings,
+                "erasures": {"supported": self.erasures_supported, "sent": self.erasures_sent,
+                             "pending": len(self.store.erasures(MAX_ERASURES))},
                 "game_day": {"supported": self.game_day_supported, "schedule_pulled_at": self.schedule_pulled_at,
                              "linked_games": len(self.store.schedule_links()),
                              "claims_answered": self.claims_answered,

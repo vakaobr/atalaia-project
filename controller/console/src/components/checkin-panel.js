@@ -21,7 +21,8 @@ import { RegistrationImport } from './registration-import.js';
 
 const STATUSES = ['expected', 'pending', 'checked_in', 'left', 'removed'];
 // The check-in settings form's plain fields, kept as typed until saved (renderSettings).
-const SETTINGS_FIELDS = ['confirm', 'federation', 'federation_label', 'max_replicas', 'max_players', 'chrono_valid_for', 'country'];
+const SETTINGS_FIELDS = ['confirm', 'federation', 'federation_label', 'max_replicas', 'max_players', 'chrono_valid_for', 'country',
+    'chrono_retention_days', 'game_retention_days'];
 /** Portugal's field says "APD"; any other country (or none) says "association membership" (protocol/apd.md). */
 function usesApd(s) {
     return Boolean(s) && s.country === 'PT';
@@ -264,6 +265,10 @@ export class CheckinPanel extends Component {
             chrono_valid_for: f.chrono_valid_for.value,
             apd: this.apdRuleFromForm(e.target),
         };
+        for (const key of ['chrono_retention_days', 'game_retention_days']) {
+            const days = parseInt(f[key].value, 10);
+            if (days !== this.state.list.settings[key]) body[key] = days; // a site's days are not sent again
+        }
         const country = f.country.value.trim().toUpperCase();
         if (country !== (this.state.list.settings.country || '')) body.country = country; // a site's country is not sent again
         const s = await this.props.app.call('PUT', '/checkin/settings', body);
@@ -663,6 +668,11 @@ export class CheckinPanel extends Component {
                     <select id="cs-valid" name="chrono_valid_for" value=${s.chrono_valid_for}>
                         <option value="day">${t('checkin.valid_for_day')}</option>
                         <option value="game">${t('checkin.valid_for_game')}</option></select></div>
+                <div class="field"><label for="cs-chrono-days">${t('retention.chrono_days')}</label>
+                    <input id="cs-chrono-days" name="chrono_retention_days" data-testid="checkin-chrono-retention" type="number" min="30" max="3653" value=${s.chrono_retention_days} /></div>
+                <div class="field"><label for="cs-game-days">${t('retention.game_days')}</label>
+                    <input id="cs-game-days" name="game_retention_days" data-testid="checkin-game-retention" type="number" min="30" max="3653" value=${s.game_retention_days} />
+                    <p class="small muted">${t('retention.hint')}</p></div>
                 <div class="field"><label for="cs-country">${t('checkin.country')}</label>
                     <input id="cs-country" name="country" data-testid="checkin-country" maxlength="2" size="3" autocapitalize="characters"
                         pattern="[A-Za-z]{2}|" placeholder="PT" value=${s.country || ''} />

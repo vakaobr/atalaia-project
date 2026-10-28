@@ -770,3 +770,7 @@ Phase 4's site server builds on these phase 3 interfaces:
 | Field join key distribution | `protocol/join.md`, key 13 (CA fingerprint) | Site server join flow |
 | Capability proxy protocol | `protocol/capability-proxy.md`, `protocol/vectors/capability_proxy.yaml` | Pod management in the site-server inventory |
 | Field check-in and declarations (ADR-P3-13, built in plan phase E) | `protocol/checkin.md`, `controller/atalaia_controller/checkin.py`, store schema 3 | Roster sync fills the check-in list with registrations and pre-declared replicas; check-ins and chrono outcomes pushed back after the game (ADR-P4-11) |
+
+## Retention and erasure on the controllers (RET, 2026-10-28)
+
+Both controllers (the Pi's `Checkin.purge`, store schema 17, and the phone's `ControllerCheckin.purge`) follow two field settings, `chrono_retention_days` (readings, other fields' readings, a marshal's earlier keys) and `game_retention_days` (an ended game's events, scores, nodes and check-in rows), 30-3653 days, 365 by default, set in `[checkin]`, the console's check-in settings or the site server's field settings. A game is deleted only once the site server has all of it when a sync is set up. A GM erasure and a player's chrono erasure are kept as erasure records and sent to the site server (`POST /api/v1/sync/erasures`) until acknowledged. See [protocol/sync.md](../../protocol/sync.md) and `controller/README.md`.
