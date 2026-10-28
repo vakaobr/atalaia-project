@@ -80,7 +80,7 @@ header:
 hero:
   status: >-
     Pre-Alpha · Software der Phasen 1 und 2 fertig, echte Boards spielen auf dem Labortisch ganze
-    Spiele mit dem Feld-Controller, Phase 3 in Software fast fertig, Phasen 4 und 5 in Software
+    Spiele mit dem Feld-Controller, Phase 3 in Software fertig, Phasen 4 und 5 in Software
     gebaut · noch nicht feldtauglich
   title: Die offene Plattform für <span class="nowrap">Force-on-Force</span>
   lead: >-
@@ -720,7 +720,6 @@ roadmap:
   # hardware), in progress, designed (research, architecture and plan written; no code).
   done: Fertig
   software: Software fertig
-  current: In Arbeit
   # The parts of each phase on the roadmap page. Each phase: short (one line, also on the main
   # page), done (bullets), next (bullets), gate; a phase with a long done list also has groups
   # (g_*: title and items) that fold into a <details> under the first few bullets.
@@ -751,8 +750,10 @@ roadmap:
       - "Das erste Board (Heltec V4.3, 20. Oktober 2026) auf dem Labortisch: Es startet, schaltet den
         Funk ein, liest seine Knöpfe und spielt ganze Spiele, Bombe eingeschlossen (scharf machen,
         entschärfen, ablaufende Zeit), auf seinem kleinen Bildschirm."
+      - "Die Spielzeit-Leiste: Läuft ein Spiel mit Zeitlimit, zeigt ein Streifen am unteren Rand des kleinen Displays, wie viel davon übrig ist, und das OLED zeigt eine Uhr. In Software, noch nicht an einem echten Display gesehen."
     next:
       - Eine gebaute Box, die ein zweistündiges Club-Spiel ohne Neustart durchhält.
+      - "Die Zeitleiste an einem echten Display sehen."
     gate: >-
       Gate: Eine Box läuft ein zweistündiges Club-Spiel ohne Neustart. <strong>Offen</strong>, bis
       eine gebaute Box das schafft.
@@ -842,6 +843,9 @@ roadmap:
         - "Die NFC-Tags der Spielenden werden vom Feld-Controller signiert und von der Konsole der Orga, dem Handy-Controller oder der Marshal-App geschrieben. Marshals halten dafür den Feldschlüssel nicht mehr."
         - "Replik-Labels: Die App zeigt, teilt oder druckt den QR-Aufkleber jeder Replik, und die Konsole druckt sie für alle, die eingecheckt sind. Die Warteschlange der Marshals scannt sie."
         - "Positionen in Gebäuden: Die Spielleitung setzt BLE-Beacons auf den Plan, und ein Android-Handy, das eines hört, meldet seinen Raum statt GPS. In Software und mit Attrappen, nicht mit echten Beacons ausprobiert. iOS bleibt bei GPS."
+        - "Die App folgt einem Spiel über den QR-Code der Anzeigetafel, auch wenn der Handy-Controller HTTPS mit seiner eigenen Feld-CA anbietet. In Software, nicht an einem echten Handy ausprobiert."
+        - "Spielende sagen, auf welcher Ebene sie sind, und sehen den Feldplan mit den Positionen, die sie sehen dürfen."
+        - "Spielverlauf in der App: die Spiele, an denen jemand teilgenommen hat, das neueste zuerst."
     g_props:
       title: Android-Props und I/O-Pod
       items:
@@ -850,6 +854,7 @@ roadmap:
         - "Die Firmware des Pods leiht dem Handy per USB oder Bluetooth die Team-Knöpfe, das
           Tastenfeld, die Lichter, die Sirene, den NFC-Leser, den Gehäuseschalter und den LoRa-Funk
           eines Heltec-Boards."
+        - "Die App verbindet sich mit einem verlorenen I/O-Pod von selbst wieder. Nicht mit einem echten Pod ausprobiert."
     g_controller:
       title: Das Handy als Feld-Controller
       items:
@@ -896,6 +901,7 @@ roadmap:
       - "Unter iOS braucht NFC ein kostenpflichtiges Apple-Konto; der Prop und das Handy als
         Feld-Controller bleiben nur für Android."
       - "Beacons in Gebäuden brauchen unter iOS ein Swift-Plugin, das auf einem Mac geschrieben wird."
+      - "QR-Code der Anzeigetafel, Ebenenwahl, Spielverlauf und die Wiederverbindung zum Pod an einem echten Handy und Pod ausprobieren."
     gate: "Gate: Ein Spiel mischt ESP32- und Android-Props ohne Probleme."
   p4:
     title: Site-Server und erweitertes Spiel
@@ -983,6 +989,9 @@ roadmap:
           mit einem echten Chronographen."
         - "reset-totp: Der Betreiber setzt den Zwei-Faktor-Code eines Kontos zurück, das seinen Authenticator verloren hat."
         - "Feld-Controller holen die Chrono-Messwerte anderer Felder für die Spielenden auf ihrer Liste, nur mit der Einwilligung jeder Person. Sie halten sie getrennt von den eigenen Messwerten und bewerten sie nie."
+        - "Die Controller holen die Einstellungen und das Erscheinungsbild des Felds vom Site-Server, und eine Änderung kommt sofort beim Pi und beim Handy-Controller an. In Software."
+        - "Anmeldung mit Google, Microsoft oder Apple und mit Passkeys. Passwörter sind optional; das Personal braucht weiterhin einen zweiten Faktor. Auf einem Computer getestet, nicht mit den echten Anmeldediensten."
+        - "Eine Kontoseite für das Personal, auf der jede Person ihre eigenen Anmeldungen verwaltet: Passkeys, verknüpfte Konten, Passwort und Zwei-Faktor-Code."
     g_games:
       title: Spiele, Clubs und Staff-Seiten
       items:
@@ -1012,6 +1021,8 @@ roadmap:
         - "Staff-Seiten für die Anmeldungen: wer sich angemeldet hat, Name, Team oder Verbandsnummer ändern, eine Anmeldung zurückziehen sowie CSV-Export und -Import."
         - "Eine druckbare Spieltagsliste, mit der Angabe, wann ein Controller sie zuletzt geholt hat."
         - "Staff-Aktionen an einer Anmeldung: bezahlt oder nicht bezahlt (der Server nimmt kein Geld an), nicht erschienen, in ein anderes Spiel verschieben, wiederherstellen, die Repliken bearbeiten. Im Headless-Browser getestet, nicht auf einem echten Server."
+        - "Seiten für das Personal zu Rollen, Sync-Schlüsseln, Erscheinungsbild, Clubs, Plattform-Verknüpfungen, Firmware und Verwaltung."
+        - "Die Seite des Remote-GM aktualisiert sich live, ohne Neuladen."
     g_boxes:
       title: Boxen und das Feld
       items:
@@ -1061,12 +1072,15 @@ roadmap:
           unter eigener Adresse mit einem Zertifikat, das nur der Name eines aktiven Felds bekommen
           kann, und verschlüsselte Backups, wiederhergestellt mit jedem Feld getrennt von den
           anderen. In Docker getestet, nicht auf einem echten Hosted-Server mit echter Domain."
+        - "Gehosteter Modus: ein Kontingent pro Feld, ein Datenexport, den die Verwaltung eines Felds herunterladen kann, und die offenen Verbindungen eines gelöschten Felds werden sofort geschlossen."
     next:
       - Ein echter Server mit Domain.
       - Eine rechtliche Prüfung der Vorlagen, bevor der Hosted-Modus live geht. Vorher wird er nicht angeboten.
       - "Die Tests auf Hardware: echte Boards, ein echtes ATAK-Handy, eine echte 4G-Verbindung, ein
         echter Chronograph."
       - Das Ziel-Addon, auf das die Regeln von Zielfenster warten.
+      - "Die Anmeldungen mit dem echten Google, Microsoft und Apple testen."
+      - "jogarairsoft.pt: Der Maintainer hat ihnen am 28. Oktober 2026 geschrieben und eine Integration vorgeschlagen (ihre Events, Teams und APDs zu uns; unser Spiele-Feed, Feldprofile, öffentliche Clubs und Ergebnisse zu ihnen). Wir warten auf ihre Antwort; nichts ist zugesagt."
     gate: >-
       Gate: Ein Wochenend-<a href="{{ page.to.glossary }}#glossar-milsim">Milsim</a> läuft von Anfang
       bis Ende auf Atalaia.

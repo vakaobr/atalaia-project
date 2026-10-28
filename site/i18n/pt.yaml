@@ -78,7 +78,7 @@ header:
 hero:
   status: >-
     Pré-alfa · software das fases 1 e 2 pronto, placas a sério já jogam jogos inteiros com o
-    controlador de campo na bancada, fase 3 quase pronta em software, fases 4 e 5 feitas em software
+    controlador de campo na bancada, fase 3 pronta em software, fases 4 e 5 feitas em software
     · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
@@ -702,7 +702,6 @@ roadmap:
   # "Planeada", as "Desenhada" reads as a drawing in Portugal.
   done: Concluída
   software: Software pronto
-  current: Em curso
   # The parts of each phase on the roadmap page. Each phase: short (one line, also on the main
   # page), done (bullets), next (bullets), gate; a phase with a long done list also has groups
   # (g_*: title and items) that fold into a <details> under the first few bullets.
@@ -733,8 +732,10 @@ roadmap:
       - "A primeira placa (Heltec V4.3, 20 de outubro de 2026) na bancada: arranca, liga o rádio, lê
         os botões e joga jogos inteiros, a Bomba incluída (armar, desarmar, fim do tempo), no seu
         próprio ecrã pequeno."
+      - "A barra do tempo de jogo: enquanto corre um jogo com limite de tempo, uma faixa na base do ecrã pequeno mostra quanto falta, e o ecrã OLED mostra um relógio. Em software, ainda não vista num painel a sério."
     next:
       - Uma caixa montada que aguente um jogo de clube de 2 horas sem reiniciar.
+      - "Ver a barra do tempo num painel a sério."
     gate: >-
       Prova: uma caixa aguenta um jogo de clube de 2 horas sem reiniciar. <strong>Em aberto</strong>
       até haver uma caixa montada que o consiga.
@@ -821,6 +822,9 @@ roadmap:
         - "As etiquetas NFC de quem joga são assinadas pelo controlador de campo e escritas a partir da consola da organização, do controlador no telemóvel ou da app do marshal. Os marshals deixam de ter a chave do campo para isso."
         - "Etiquetas das réplicas: a app mostra, partilha ou imprime o autocolante com o QR de cada réplica, e a consola imprime-os para quem já fez check-in. A fila do marshal lê-os."
         - "Posições em interiores: a organização põe balizas BLE na planta, e um telemóvel Android que ouça uma indica a sua sala em vez do GPS. Feito em software e com simulações, sem balizas a sério. O iOS fica só com GPS."
+        - "A app segue um jogo a partir do código QR do marcador, mesmo quando o controlador no telemóvel serve HTTPS com a sua própria CA do campo. Em software, não experimentado num telemóvel a sério."
+        - "Quem joga diz em que piso está e vê a planta do campo com as posições que pode ver."
+        - "Histórico de jogos na app: os jogos em que a pessoa participou, do mais recente para o mais antigo."
     g_props:
       title: Dispositivos Android e módulo de E/S
       items:
@@ -829,6 +833,7 @@ roadmap:
         - "O firmware do módulo empresta ao telemóvel os botões das equipas, o teclado, as luzes, a
           sirene, o leitor NFC, o sensor de abertura e o rádio LoRa de uma placa Heltec, por USB ou
           Bluetooth."
+        - "A app volta a ligar-se sozinha a um módulo de E/S perdido. Não experimentado com um módulo a sério."
     g_controller:
       title: O telemóvel como controlador de campo
       items:
@@ -874,6 +879,7 @@ roadmap:
       - "No iOS, o NFC pede uma conta Apple paga; o dispositivo Android e o telemóvel como
         controlador do campo ficam só em Android."
       - "As balizas em interiores no iOS pedem um plugin em Swift, escrito num Mac."
+      - "Experimentar o código QR do marcador, a escolha do piso, o histórico de jogos e a religação ao módulo de E/S num telemóvel e num módulo a sério."
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do site e jogo avançado
@@ -961,6 +967,9 @@ roadmap:
           chaves públicas, partilha entre campos com consentimento. Ainda sem um cronógrafo real."
         - "reset-totp: quem opera o servidor repõe o código de dois fatores de uma conta que perdeu o autenticador."
         - "Os controladores de campo vão buscar os registos de cronógrafo de outros campos de quem está na sua lista de inscritos, só com o consentimento de cada pessoa. Guardam-nos à parte das suas próprias leituras e nunca os avaliam."
+        - "Os controladores recebem do servidor do site as definições e a imagem do campo, e uma alteração chega logo ao Pi e ao controlador no telemóvel. Em software."
+        - "Início de sessão com Google, Microsoft ou Apple e com passkeys (chaves de acesso). As palavras-passe são opcionais; a equipa continua a precisar de um segundo fator. Testado num computador, não com os fornecedores de início de sessão a sério."
+        - "Uma página de conta para a equipa, onde cada pessoa gere os seus inícios de sessão: passkeys, contas associadas, palavra-passe e código de dois fatores."
     g_games:
       title: Jogos, clubes e páginas da organização
       items:
@@ -989,6 +998,8 @@ roadmap:
         - "Páginas da organização para as inscrições: quem se inscreveu, alterar um nome, uma equipa ou um número de federação, retirar uma inscrição, e a exportação e importação em CSV."
         - "Uma página da lista do dia do jogo, para imprimir, com a data em que um controlador a foi buscar pela última vez."
         - "Ações da organização numa inscrição: paga ou não paga (o servidor não cobra nada), falta, mudar para outro jogo, repor, editar as réplicas. Testado num navegador sem ecrã, não num servidor a sério."
+        - "Páginas para a equipa gerir funções, chaves de sincronização, imagem do campo, clubes, ligações a plataformas, firmware e administração."
+        - "A página do GM remoto atualiza-se em direto, sem recarregar."
     g_boxes:
       title: Caixas e o campo
       items:
@@ -1035,12 +1046,15 @@ roadmap:
           seu próprio endereço com um certificado que só o nome de um campo ativo consegue obter, e
           cópias de segurança cifradas repostas com cada campo separado dos outros. Testada em
           Docker, não num servidor alojado real com um domínio real."
+        - "Modo alojado: uma quota por campo, uma exportação de dados que a administração do campo pode descarregar, e as ligações abertas de um campo apagado fecham logo."
     next:
       - Um servidor a sério com domínio.
       - A revisão jurídica dos modelos antes de o modo alojado abrir. Não é oferecido antes disso.
       - "Os testes em hardware: placas reais, um telemóvel com ATAK real, uma ligação 4G real, um
         cronógrafo real."
       - O módulo de alvo, que as regras das Janelas de Alvo esperam.
+      - "Testar os inícios de sessão com a Google, a Microsoft e a Apple a sério."
+      - "jogarairsoft.pt: o responsável do projeto escreveu-lhes a 28 de outubro de 2026 a propor uma integração (os eventos, equipas e APDs deles para nós; o nosso feed de jogos, perfis de campo, clubes públicos e resultados para eles). À espera da resposta; nada está prometido."
     gate: >-
       Prova: um <a href="{{ page.to.glossary }}#glossario-milsim">milsim</a> de fim de semana decorre
       do princípio ao fim com a Atalaia.
