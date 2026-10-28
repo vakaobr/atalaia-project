@@ -1014,6 +1014,7 @@ roadmap:
         - "Páginas para a equipa gerir funções, chaves de sincronização, imagem do campo, clubes, ligações a plataformas, firmware e administração."
         - "A página do GM remoto atualiza-se em direto, sem recarregar."
         - "A filiação numa associação é verificada no registo e no check-in: as APD nos campos em Portugal, qualquer associação ou federação noutros países."
+        - "Uma página para o pessoal do campo com as definições do campo: a página pública, as regras do check-in, a filiação, a partilha do cronógrafo e o país."
         - "Os registos de cronógrafo mostram quanto uma réplica passou do limite e assinalam reincidentes."
         - "Uma página para o pessoal do campo com a exportação dos dados e o uso das quotas."
         - "Cronologias de pontuação em tempo de jogo."
@@ -1124,8 +1125,8 @@ roadmap:
       - "<strong>Manuais de utilizador</strong> para quem joga, a organização, os marshals e quem opera a Field Box, em inglês e português."
       - "A vista web do simulador tem todas as entradas que um modo usa: tags, teclado, impactos e comandos da organização, com descarga do registo de eventos."
       - "Os blocos de cenários da consola do GM têm uma lista de línguas com as quatro."
+      - "As chaves de modos do projeto: uma chave raiz guardada offline e uma chave com que o registo assina o selo de verificado. As caixas, a app e os controladores confiam nas duas por omissão."
     next:
-      - A chave do registo do projeto, feita offline, para que os primeiros modos possam ser verificados (tarefa de quem mantém o projeto).
       - "A revisão do alemão e do chinês: se jogas em alemão ou em chinês, ajuda-nos a revê-los. As
         traduções para outras línguas começam em docs/translations (em inglês)."
       - "O hardware: a placa de suporte (PCB), uma placa feita que facilita a montagem, depois das
