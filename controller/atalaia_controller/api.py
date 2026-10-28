@@ -100,6 +100,8 @@ which browsers cannot give headers, also takes ``?token=``.
     PUT  /api/v1/checkin/me/marshal-key    a marshal registers the Ed25519 key that signs readings
     GET|POST /api/v1/games/{id}/checkins   staff: the list with names / a manual check-in
     GET  /api/v1/games/{id}/checkins.csv   GM: the list as CSV
+    POST /api/v1/games/{id}/checkins/import  GM: a registration CSV/JSON list into the expected check-ins
+                                           (dry_run first; the site server's import format; PKE-1)
     PATCH|DELETE /api/v1/games/{id}/checkins/{player}  staff changes / GM removal
     GET  /api/v1/games/{id}/chrono-list    staff: the "replicas to chrono" list
     POST /api/v1/games/{id}/checkin/open|close  GM
@@ -1226,6 +1228,17 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         return Response(text.encode("utf-8-sig"), media_type="text/csv; charset=utf-8",
                         headers={**NO_STORE,
                                  "Content-Disposition": f'attachment; filename="checkins-{game_id}.csv"'})
+
+    @app.post("/api/v1/games/{game_id}/checkins/import", dependencies=[Depends(require_gm)])
+    def checkins_import(game_id: int, body: Any = Body(None)) -> JSONResponse:
+        try:
+            answer = need_checkin().import_registrations(game_id, body_map(body))
+        except checkinmod.ImportRefused as exc:
+            out: dict[str, Any] = {"detail": exc.code}
+            if exc.line is not None:
+                out["line"] = exc.line
+            return JSONResponse(out, status_code=exc.status, headers=NO_STORE)
+        return JSONResponse(answer, headers=NO_STORE)
 
     @app.post("/api/v1/games/{game_id}/checkins", status_code=201)
     def checkins_manual(game_id: int, v: Viewer = Depends(require_read), body: Any = Body(None)) -> dict[str, Any]:

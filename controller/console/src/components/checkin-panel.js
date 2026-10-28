@@ -17,6 +17,7 @@
 
 import { html, Component, t, posterProblem, inWebView } from '../ui.js';
 import { TagWriter } from './tag-writer.js';
+import { RegistrationImport } from './registration-import.js';
 
 const STATUSES = ['expected', 'pending', 'checked_in', 'left', 'removed'];
 /** Whether the table and the hand check-in show a membership number: the federation's or the APD's. */
@@ -427,6 +428,7 @@ export class CheckinPanel extends Component {
             </table></div>`}
             ${this.renderManual(g, s)}
             ${this.renderTicket(g)}
+            <${RegistrationImport} app=${this.props.app} game=${g} onDone=${() => this.load()} />
         </section>`;
     }
 

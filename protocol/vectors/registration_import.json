@@ -1,0 +1,1516 @@
+{
+ "description": "The registration import's format (controller/atalaia_controller/import_format.py, which the site server re-exports; app/lib/controller/registration_import.dart is its port; PKE-1). Each case gives a file ('data' text, 'data_hex' bytes, or 'data_gen': head + unit x times + tail), its 'format' and the game's 'rules' (the top-level ones unless the case gives its own, merged over them); 'expect' is either {'error': code, 'line'?} (the file is refused whole) or the parse (format, columns, ignored, ignored_more) and, per row, its number and either the code it is refused with or the checked values (display_name, external_ref, team_preference, federation_number, replicas (null: no column), present (the columns the file had, sorted), warnings). 'expect' of a generated file has only a row_count. Cases whose names start with 'csv:' or 'json:' parse; 'refused' ones are refused whole. Python's csv module (strict, excel dialect) is the reference for the CSV reader.",
+ "rules": {
+  "teams": [
+   "red",
+   "blue"
+  ],
+  "federation": "optional",
+  "predeclare_replicas": true,
+  "classes": [
+   "dmr",
+   "pistol",
+   "rifle",
+   "sniper"
+  ],
+  "max_replicas": 3
+ },
+ "cases": [
+  {
+   "name": "csv: RFC 4180 records (commas, quotes, line breaks)",
+   "format": "csv",
+   "data": "display_name,external_ref,team_preference,federation_number,replicas\r\n\"Falcão, o Velho\",ref-1,red,FPA-1,\"aeg:rifle:Tokyo Marui M4|pistol:pistol\"\r\n\"Diz \"\"Lobo\"\"\",ref-2,,,\r\n\"Duas\r\nlinhas\",ref-3,blue,,\r\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "external_ref",
+     "team_preference",
+     "federation_number",
+     "replicas"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "Falcão, o Velho",
+       "external_ref": "ref-1",
+       "team_preference": "red",
+       "federation_number": "FPA-1",
+       "replicas": [
+        {
+         "type": "aeg",
+         "class": "rifle",
+         "make_model": "Tokyo Marui M4"
+        },
+        {
+         "type": "pistol",
+         "class": "pistol",
+         "make_model": null
+        }
+       ],
+       "present": [
+        "display_name",
+        "external_ref",
+        "federation_number",
+        "replicas",
+        "team_preference"
+       ],
+       "warnings": []
+      }
+     },
+     {
+      "number": 3,
+      "result": {
+       "display_name": "Diz \"Lobo\"",
+       "external_ref": "ref-2",
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": [],
+       "present": [
+        "display_name",
+        "external_ref",
+        "federation_number",
+        "replicas",
+        "team_preference"
+       ],
+       "warnings": []
+      }
+     },
+     {
+      "number": 4,
+      "result": "display_name_invalid"
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: only the listed columns are read; header case and spaces",
+   "format": "csv",
+   "data": "Email,Display_Name , telefone,,external_ref\nrita@example.pt,Rita,912345678,x,7\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "external_ref"
+    ],
+    "ignored": [
+     "Email",
+     "telefone",
+     "(column 4)"
+    ],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "Rita",
+       "external_ref": "7",
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name",
+        "external_ref"
+       ],
+       "warnings": []
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: a byte order mark, LF line ends and blank lines",
+   "format": "csv",
+   "data": "﻿display_name\nAna\n\nBea\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     },
+     {
+      "number": 4,
+      "result": {
+       "display_name": "Bea",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: a lone CR ends a record",
+   "format": "csv",
+   "data": "display_name\rAna\rBea\r",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     },
+     {
+      "number": 3,
+      "result": {
+       "display_name": "Bea",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: no newline at the end",
+   "format": "csv",
+   "data": "display_name,external_ref\nAna,1",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "external_ref"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": "1",
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name",
+        "external_ref"
+       ],
+       "warnings": []
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: a row of the wrong length",
+   "format": "csv",
+   "data": "display_name,external_ref\nAna,1,extra\nBea\nCris,3\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "external_ref"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": "row_length"
+     },
+     {
+      "number": 3,
+      "result": "row_length"
+     },
+     {
+      "number": 4,
+      "result": {
+       "display_name": "Cris",
+       "external_ref": "3",
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name",
+        "external_ref"
+       ],
+       "warnings": []
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: a quote inside an unquoted field is kept",
+   "format": "csv",
+   "data": "display_name\nAn\"a\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "An\"a",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: spaces around a quoted field are kept (then it is a quote in a field)",
+   "format": "csv",
+   "data": "display_name,external_ref\nAna, \"x\"\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "external_ref"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": "\"x\"",
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name",
+        "external_ref"
+       ],
+       "warnings": []
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: a quoted empty line is skipped",
+   "format": "csv",
+   "data": "display_name\n\"\"\nAna\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 3,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: the export's formula guard is taken off",
+   "format": "csv",
+   "data": "display_name,external_ref\n'=1+1,'-7\n'quoted,'x\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "external_ref"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "=1+1",
+       "external_ref": "-7",
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name",
+        "external_ref"
+       ],
+       "warnings": []
+      }
+     },
+     {
+      "number": 3,
+      "result": {
+       "display_name": "'quoted",
+       "external_ref": "'x",
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name",
+        "external_ref"
+       ],
+       "warnings": []
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: replicas text",
+   "format": "csv",
+   "data": "display_name,replicas\nAna,\"AEG : rifle : G&G: CM16\"\nBea,\nCris,aeg\nDina,laser:rifle\nEva,aeg:minigun\nFa,aeg:rifle|aeg:rifle|aeg:rifle|aeg:rifle\nGi,\"aeg:rifle:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"\nHe,\"aeg:rifle:a|b\"\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "replicas"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": [
+        {
+         "type": "aeg",
+         "class": "rifle",
+         "make_model": "G&G: CM16"
+        }
+       ],
+       "present": [
+        "display_name",
+        "replicas"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     },
+     {
+      "number": 3,
+      "result": {
+       "display_name": "Bea",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": [],
+       "present": [
+        "display_name",
+        "replicas"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     },
+     {
+      "number": 4,
+      "result": "replicas_invalid"
+     },
+     {
+      "number": 5,
+      "result": "replica_type_invalid"
+     },
+     {
+      "number": 6,
+      "result": "replica_class_invalid"
+     },
+     {
+      "number": 7,
+      "result": "too_many_replicas"
+     },
+     {
+      "number": 8,
+      "result": "make_model_invalid"
+     },
+     {
+      "number": 9,
+      "result": "replicas_invalid"
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: replicas not asked",
+   "format": "csv",
+   "data": "display_name,replicas\nAna,aeg:rifle\nBea,\n",
+   "rules": {
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "federation": "optional",
+    "predeclare_replicas": false,
+    "classes": [
+     "dmr",
+     "pistol",
+     "rifle",
+     "sniper"
+    ],
+    "max_replicas": 3
+   },
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "replicas"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": "replicas_not_asked"
+     },
+     {
+      "number": 3,
+      "result": {
+       "display_name": "Bea",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": [],
+       "present": [
+        "display_name",
+        "replicas"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: federation required",
+   "format": "csv",
+   "data": "display_name,federation_number\nAna,\nBea,FPA-1\n",
+   "rules": {
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "federation": "required",
+    "predeclare_replicas": true,
+    "classes": [
+     "dmr",
+     "pistol",
+     "rifle",
+     "sniper"
+    ],
+    "max_replicas": 3
+   },
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "federation_number"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": "federation_number_required"
+     },
+     {
+      "number": 3,
+      "result": {
+       "display_name": "Bea",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": "FPA-1",
+       "replicas": null,
+       "present": [
+        "display_name",
+        "federation_number"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: federation off drops the number",
+   "format": "csv",
+   "data": "display_name,federation_number,external_ref\nAna,FPA-9,r\n",
+   "rules": {
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "federation": "off",
+    "predeclare_replicas": true,
+    "classes": [
+     "dmr",
+     "pistol",
+     "rifle",
+     "sniper"
+    ],
+    "max_replicas": 3
+   },
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "external_ref",
+     "federation_number"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": "r",
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name",
+        "external_ref",
+        "federation_number"
+       ],
+       "warnings": [
+        "federation_number_dropped"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: display name limits",
+   "format": "csv",
+   "data": "display_name\n\"  Ana  \"\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\"A\tB\"\n\"AB\"\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     },
+     {
+      "number": 3,
+      "result": "display_name_invalid"
+     },
+     {
+      "number": 4,
+      "result": "display_name_invalid"
+     },
+     {
+      "number": 5,
+      "result": "display_name_invalid"
+     },
+     {
+      "number": 6,
+      "result": {
+       "display_name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: external_ref and federation limits",
+   "format": "csv",
+   "data": "display_name,external_ref,federation_number\nA,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,\nB,r,999999999999999999999999999999999\nC,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,99999999999999999999999999999999\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "external_ref",
+     "federation_number"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": "external_ref_invalid"
+     },
+     {
+      "number": 3,
+      "result": "federation_number_invalid"
+     },
+     {
+      "number": 4,
+      "result": {
+       "display_name": "C",
+       "external_ref": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+       "team_preference": null,
+       "federation_number": "99999999999999999999999999999999",
+       "replicas": null,
+       "present": [
+        "display_name",
+        "external_ref",
+        "federation_number"
+       ],
+       "warnings": []
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: team preference of the game",
+   "format": "csv",
+   "data": "display_name,team_preference\nAna,red\nBea,green\nCris, blue \n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "team_preference"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": null,
+       "team_preference": "red",
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name",
+        "team_preference"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     },
+     {
+      "number": 3,
+      "result": "team_preference_invalid"
+     },
+     {
+      "number": 4,
+      "result": {
+       "display_name": "Cris",
+       "external_ref": null,
+       "team_preference": "blue",
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name",
+        "team_preference"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: UTF-8 text",
+   "format": "csv",
+   "data": "display_name\nJoão 紅隊\nZé\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "João 紅隊",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     },
+     {
+      "number": 3,
+      "result": {
+       "display_name": "Zé",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv refused: empty",
+   "format": "csv",
+   "data_hex": "",
+   "expect": {
+    "error": "empty"
+   }
+  },
+  {
+   "name": "csv refused: no display_name column",
+   "format": "csv",
+   "data_hex": "6e616d652c656d61696c0a416e612c6140620a",
+   "expect": {
+    "error": "display_name_column_missing"
+   }
+  },
+  {
+   "name": "csv refused: a column twice",
+   "format": "csv",
+   "data_hex": "646973706c61795f6e616d652c446973706c61795f6e616d650a412c420a",
+   "expect": {
+    "error": "column_twice"
+   }
+  },
+  {
+   "name": "csv refused: not UTF-8",
+   "format": "csv",
+   "data_hex": "646973706c61795f6e616d650a4a6fe36f0a",
+   "expect": {
+    "error": "encoding_invalid"
+   }
+  },
+  {
+   "name": "csv refused: a NUL",
+   "format": "csv",
+   "data_hex": "646973706c61795f6e616d650a4100420a",
+   "expect": {
+    "error": "encoding_invalid"
+   }
+  },
+  {
+   "name": "csv refused: a quote never closed",
+   "format": "csv",
+   "data_hex": "646973706c61795f6e616d650a22416e610a",
+   "expect": {
+    "error": "csv_invalid",
+    "line": 2
+   }
+  },
+  {
+   "name": "csv refused: text after a closing quote",
+   "format": "csv",
+   "data_hex": "646973706c61795f6e616d650a22416e6122780a",
+   "expect": {
+    "error": "csv_invalid",
+    "line": 2
+   }
+  },
+  {
+   "name": "csv refused: bad quoting on a later line",
+   "format": "csv",
+   "data_hex": "646973706c61795f6e616d650a416e610a4265610a224372697322780a446f72610a",
+   "expect": {
+    "error": "csv_invalid",
+    "line": 4
+   }
+  },
+  {
+   "name": "csv refused: too large",
+   "format": "csv",
+   "data_gen": {
+    "head": "display_name\n",
+    "unit": "A",
+    "times": 1048576
+   },
+   "expect": {
+    "error": "too_large"
+   }
+  },
+  {
+   "name": "csv refused: too many rows",
+   "format": "csv",
+   "data_gen": {
+    "head": "display_name\n",
+    "unit": "A\n",
+    "times": 5001
+   },
+   "expect": {
+    "error": "too_many_rows"
+   }
+  },
+  {
+   "name": "csv: the most rows",
+   "format": "csv",
+   "data_gen": {
+    "head": "display_name\n",
+    "unit": "A\n",
+    "times": 5000
+   },
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name"
+    ],
+    "row_count": 5000
+   }
+  },
+  {
+   "name": "csv refused: a field over the limit",
+   "format": "csv",
+   "data_gen": {
+    "head": "display_name\n",
+    "unit": "A",
+    "times": 131073
+   },
+   "expect": {
+    "error": "csv_invalid",
+    "line": 2
+   }
+  },
+  {
+   "name": "csv: a field at the limit is read",
+   "format": "csv",
+   "data_gen": {
+    "head": "display_name\n",
+    "unit": "A",
+    "times": 131072
+   },
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name"
+    ],
+    "row_count": 1
+   }
+  },
+  {
+   "name": "csv: a quoted field with CRLF and CR inside",
+   "format": "csv",
+   "data": "display_name,external_ref\n\"a\r\nb\",1\n\"c\rd\",2\nok,3\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name",
+     "external_ref"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": "display_name_invalid"
+     },
+     {
+      "number": 3,
+      "result": "display_name_invalid"
+     },
+     {
+      "number": 4,
+      "result": {
+       "display_name": "ok",
+       "external_ref": "3",
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name",
+        "external_ref"
+       ],
+       "warnings": []
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: the header with a bad quote is refused before its columns are checked",
+   "format": "csv",
+   "data": "name\n\"x\"y\n",
+   "expect": {
+    "error": "display_name_column_missing"
+   }
+  },
+  {
+   "name": "csv: the row count is refused before a bad quote below",
+   "format": "csv",
+   "data_gen": {
+    "head": "display_name\n",
+    "unit": "A\n",
+    "times": 5001,
+    "tail": "\"x\"y\n"
+   },
+   "expect": {
+    "error": "too_many_rows"
+   }
+  },
+  {
+   "name": "csv: an unnamed column is listed by its place",
+   "format": "csv",
+   "data": "display_name,,x\nAna,1,2\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name"
+    ],
+    "ignored": [
+     "(column 2)",
+     "x"
+    ],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "csv: more than 50 other columns",
+   "format": "csv",
+   "data": "display_name,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,c13,c14,c15,c16,c17,c18,c19,c20,c21,c22,c23,c24,c25,c26,c27,c28,c29,c30,c31,c32,c33,c34,c35,c36,c37,c38,c39,c40,c41,c42,c43,c44,c45,c46,c47,c48,c49,c50,c51,c52,c53,c54\nAna,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1\n",
+   "expect": {
+    "format": "csv",
+    "columns": [
+     "display_name"
+    ],
+    "ignored": [
+     "c0",
+     "c1",
+     "c2",
+     "c3",
+     "c4",
+     "c5",
+     "c6",
+     "c7",
+     "c8",
+     "c9",
+     "c10",
+     "c11",
+     "c12",
+     "c13",
+     "c14",
+     "c15",
+     "c16",
+     "c17",
+     "c18",
+     "c19",
+     "c20",
+     "c21",
+     "c22",
+     "c23",
+     "c24",
+     "c25",
+     "c26",
+     "c27",
+     "c28",
+     "c29",
+     "c30",
+     "c31",
+     "c32",
+     "c33",
+     "c34",
+     "c35",
+     "c36",
+     "c37",
+     "c38",
+     "c39",
+     "c40",
+     "c41",
+     "c42",
+     "c43",
+     "c44",
+     "c45",
+     "c46",
+     "c47",
+     "c48",
+     "c49"
+    ],
+    "ignored_more": 5,
+    "rows": [
+     {
+      "number": 2,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "json: objects",
+   "format": "json",
+   "data": "[{\"display_name\": \"Ana\", \"external_ref\": 12, \"federation_number\": 345, \"email\": \"a@b.pt\", \"replicas\": [{\"type\": \"dmr\", \"class\": \"dmr\", \"make_model\": \"VFC\"}]}, {\"display_name\": \"Bea\", \"team_preference\": \"green\"}, \"Cris\", {\"display_name\": \"Dina\", \"replicas\": \"aeg:rifle\"}, {\"display_name\": \"Eva\", \"replicas\": [{\"type\": \"aeg\", \"class\": \"rifle\", \"fps\": 350}]}, {\"display_name\": \"F\\u00e1\", \"external_ref\": true}, {\"display_name\": \"Gi\", \"external_ref\": 1.5}, {\"display_name\": \"Ha\", \"external_ref\": null}]",
+   "expect": {
+    "format": "json",
+    "columns": [
+     "display_name",
+     "external_ref",
+     "team_preference",
+     "federation_number",
+     "replicas"
+    ],
+    "ignored": [
+     "email"
+    ],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 1,
+      "result": {
+       "display_name": "Ana",
+       "external_ref": "12",
+       "team_preference": null,
+       "federation_number": "345",
+       "replicas": [
+        {
+         "type": "dmr",
+         "class": "dmr",
+         "make_model": "VFC"
+        }
+       ],
+       "present": [
+        "display_name",
+        "external_ref",
+        "federation_number",
+        "replicas"
+       ],
+       "warnings": []
+      }
+     },
+     {
+      "number": 2,
+      "result": "team_preference_invalid"
+     },
+     {
+      "number": 3,
+      "result": "row_not_object"
+     },
+     {
+      "number": 4,
+      "result": {
+       "display_name": "Dina",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": [
+        {
+         "type": "aeg",
+         "class": "rifle",
+         "make_model": null
+        }
+       ],
+       "present": [
+        "display_name",
+        "replicas"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     },
+     {
+      "number": 5,
+      "result": "replicas_invalid"
+     },
+     {
+      "number": 6,
+      "result": "external_ref_invalid"
+     },
+     {
+      "number": 7,
+      "result": "external_ref_invalid"
+     },
+     {
+      "number": 8,
+      "result": {
+       "display_name": "Ha",
+       "external_ref": null,
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name",
+        "external_ref"
+       ],
+       "warnings": [
+        "no_external_ref"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "json: a key twice in another case is a row error",
+   "format": "json",
+   "data": "[{\"display_name\": \"A\", \"Display_Name\": \"B\"}]",
+   "expect": {
+    "format": "json",
+    "columns": [
+     "display_name"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 1,
+      "result": "column_twice"
+     }
+    ]
+   }
+  },
+  {
+   "name": "json: surrounding whitespace and escapes",
+   "format": "json",
+   "data": " \n[ {\"display_name\": \"J\\u00e3o \\ud83d\\ude00\", \"external_ref\": \"a\\\"b\\n\"} ]\t",
+   "expect": {
+    "format": "json",
+    "columns": [
+     "display_name",
+     "external_ref"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 1,
+      "result": {
+       "display_name": "Jão 😀",
+       "external_ref": "a\"b",
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name",
+        "external_ref"
+       ],
+       "warnings": []
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "json: a lone surrogate escape is not printable",
+   "format": "json",
+   "data": "[{\"display_name\": \"A\\ud800\"}]",
+   "expect": {
+    "format": "json",
+    "columns": [
+     "display_name"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 1,
+      "result": "display_name_invalid"
+     }
+    ]
+   }
+  },
+  {
+   "name": "json refused: not an array",
+   "format": "json",
+   "data": "{\"display_name\": \"Ana\"}",
+   "expect": {
+    "error": "json_invalid"
+   }
+  },
+  {
+   "name": "json refused: cut off",
+   "format": "json",
+   "data": "[",
+   "expect": {
+    "error": "json_invalid"
+   }
+  },
+  {
+   "name": "json refused: a key twice",
+   "format": "json",
+   "data": "[{\"display_name\": \"A\", \"display_name\": \"B\"}]",
+   "expect": {
+    "error": "json_invalid"
+   }
+  },
+  {
+   "name": "json refused: NaN",
+   "format": "json",
+   "data": "[NaN]",
+   "expect": {
+    "error": "json_invalid"
+   }
+  },
+  {
+   "name": "json refused: Infinity",
+   "format": "json",
+   "data": "[Infinity]",
+   "expect": {
+    "error": "json_invalid"
+   }
+  },
+  {
+   "name": "json refused: a trailing comma",
+   "format": "json",
+   "data": "[{\"display_name\": \"A\"},]",
+   "expect": {
+    "error": "json_invalid"
+   }
+  },
+  {
+   "name": "json refused: single quotes",
+   "format": "json",
+   "data": "[{'display_name': 'A'}]",
+   "expect": {
+    "error": "json_invalid"
+   }
+  },
+  {
+   "name": "json refused: a control character in a string",
+   "format": "json",
+   "data": "[{\"display_name\": \"A\tB\"}]",
+   "expect": {
+    "error": "json_invalid"
+   }
+  },
+  {
+   "name": "json refused: a leading zero",
+   "format": "json",
+   "data": "[{\"display_name\": \"A\", \"external_ref\": 01}]",
+   "expect": {
+    "error": "json_invalid"
+   }
+  },
+  {
+   "name": "json refused: text after the array",
+   "format": "json",
+   "data": "[] x",
+   "expect": {
+    "error": "json_invalid"
+   }
+  },
+  {
+   "name": "json refused: empty",
+   "format": "json",
+   "data": "",
+   "expect": {
+    "error": "json_invalid"
+   }
+  },
+  {
+   "name": "json refused: not UTF-8",
+   "format": "json",
+   "data_hex": "ff5b5d",
+   "expect": {
+    "error": "encoding_invalid"
+   }
+  },
+  {
+   "name": "json refused: too many rows",
+   "format": "json",
+   "data_gen": {
+    "head": "[",
+    "unit": "{},",
+    "times": 5001,
+    "tail": "{}]"
+   },
+   "expect": {
+    "error": "too_many_rows"
+   }
+  },
+  {
+   "name": "json refused: a nested key twice",
+   "format": "json",
+   "data": "[{\"display_name\": \"A\", \"replicas\": [{\"type\": \"aeg\", \"type\": \"gbb\"}]}]",
+   "expect": {
+    "error": "json_invalid"
+   }
+  },
+  {
+   "name": "json: nothing at all is an empty list",
+   "format": "json",
+   "data": "[]",
+   "expect": {
+    "format": "json",
+    "columns": [],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": []
+   }
+  },
+  {
+   "name": "json: a big number is text for an id",
+   "format": "json",
+   "data": "[{\"display_name\": \"A\", \"external_ref\": 12345678901234567890}]",
+   "expect": {
+    "format": "json",
+    "columns": [
+     "display_name",
+     "external_ref"
+    ],
+    "ignored": [],
+    "ignored_more": 0,
+    "rows": [
+     {
+      "number": 1,
+      "result": {
+       "display_name": "A",
+       "external_ref": "12345678901234567890",
+       "team_preference": null,
+       "federation_number": null,
+       "replicas": null,
+       "present": [
+        "display_name",
+        "external_ref"
+       ],
+       "warnings": []
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "format: unknown",
+   "format": "xml",
+   "data": "x",
+   "expect": {
+    "error": "format_invalid"
+   }
+  }
+ ]
+}

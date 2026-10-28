@@ -3864,6 +3864,55 @@ class ConsoleBrowserTests(unittest.TestCase):
         read.get_by_test_id("tab-checkin").click()
         expect(read.locator("main.content")).not_to_contain_text("Coruja")
 
+    def test_checkin_tab_imports_a_registration_list(self):
+        """PKE-1 (decision F23): a CSV from another platform is checked (a dry run changes nothing), then imported
+        as expected players, ticked by name at the desk; the same file again changes nothing, a bad file is
+        refused with its reason in words."""
+        game = self.field.create_game()
+        csv_text = ("display_name,external_ref,team_preference,federation_number,replicas,email\r\n"
+                    "Rita Falc\u00e3o,r-1,red,,aeg:rifle:Tokyo Marui M4,rita@example.pt\r\n"
+                    "Z\u00e9 Coruja,r-2,verde,,,ze@example.pt\r\n")
+        tmp = Path(tempfile.mkdtemp())
+        good, bad = tmp / "inscricoes.csv", tmp / "mau.csv"
+        good.write_text(csv_text, encoding="utf-8")
+        bad.write_bytes(b"display_name\n\xe3\n")
+        page = self.console()
+        page.get_by_test_id("tab-checkin").click()
+        expect(page.get_by_test_id("checkin-empty")).to_be_visible()
+        page.get_by_test_id("import-open").click()
+        expect(page.get_by_test_id("import-check")).to_be_disabled()
+        page.get_by_test_id("import-file").set_input_files(str(bad))
+        expect(page.get_by_test_id("import-error")).to_contain_text("UTF-8")
+        page.get_by_test_id("import-file").set_input_files(str(good))
+        page.get_by_test_id("import-source").fill("clube.exemplo")
+        expect(page.get_by_test_id("import-run")).to_be_disabled()
+        page.get_by_test_id("import-check").click()
+        expect(page.get_by_test_id("import-result")).to_contain_text("Verificado, ainda nada importado")
+        expect(page.get_by_test_id("import-result")).to_contain_text("1 nova")
+        expect(page.get_by_test_id("import-result")).to_contain_text("1 recusada")
+        expect(page.get_by_test_id("import-row-3")).to_contain_text("não é uma equipa deste jogo")
+        expect(page.get_by_test_id("import-ignored")).to_contain_text("email")
+        self.assertEqual(self.field.bundle.store.checkins(game["id"]), [])  # a dry run writes nothing
+        expect(page.get_by_test_id("import-run")).to_be_disabled()  # the basis is not confirmed yet
+        page.get_by_test_id("import-basis").check()
+        page.get_by_test_id("import-run").click()
+        row = page.get_by_test_id("checkin-table").locator("tr", has_text="Rita Falc\u00e3o")
+        expect(row).to_contain_text("por chegar")
+        expect(row.get_by_test_id("checkin-registered-badge")).to_be_visible()
+        expect(row.get_by_test_id("checkin-replicas")).to_contain_text("1")
+        self.assertEqual([r["display_name"] for r in self.field.bundle.store.checkins(game["id"])], ["Rita Falc\u00e3o"])
+        row.get_by_test_id("checkin-arrived").click()  # ticked by name, as a registered player from a site
+        expect(row).to_contain_text("com check-in")
+        # The same file again: nothing is added twice, the arrived player is left alone.
+        page.get_by_test_id("import-check").click()
+        expect(page.get_by_test_id("import-result")).to_contain_text("1 ignorada")
+        expect(page.get_by_test_id("import-row-2")).to_contain_text("já chegou")
+        self.assertEqual(len(self.field.bundle.store.checkins(game["id"])), 1)
+        # The read token never sees this tab's content.
+        read = self.console(READ)
+        read.get_by_test_id("tab-checkin").click()
+        expect(read.locator("main.content")).not_to_contain_text("Rita")
+
     def test_checkin_tab_shows_the_apd_verdict_and_edits_the_rule(self):
         """APD membership (protocol/apd.md): the GM sets the rule in the settings (an own APD included), the table
         shows the declared APD, the expiry and a verdict, and a check-in the rule does not accept waits for a marshal."""

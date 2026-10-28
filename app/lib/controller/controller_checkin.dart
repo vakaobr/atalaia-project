@@ -53,6 +53,7 @@ import '../security/bytes.dart';
 import '../security/player_token.dart';
 import 'controller_engine.dart';
 import 'field_addresses.dart';
+import 'registration_import.dart';
 
 final _playerIdRe = RegExp(r'^p-[a-z2-7]{12}$');
 final _secretRe = RegExp(r'^[A-Za-z0-9_-]{43}$');
@@ -3435,6 +3436,295 @@ class ControllerCheckin {
       },
   ];
 
+  /// The namespace of an imported list's registration ids (uuid5 of source +
+  /// reference; checkin.py `IMPORT_NS`).
+  static const _importNamespace = '6f1b5f0e-3c1d-5a7e-9b44-0a7a1a1a0001';
+  static const _importListed = 100;
+
+  /// `POST /api/v1/games/{id}/checkins/import` (checkin.py
+  /// `import_registrations`, PKE-1): a CSV or JSON list of registrations (the
+  /// site server's import format, registration_import.dart) becomes this
+  /// game's expected check-ins, for a field with no site server. Body:
+  /// `format` (csv or json), `data` (the file's text), `source`, `dry_run`
+  /// and, for a real import, `basis_confirmed`. A row the field's rules refuse
+  /// is listed with a code and the others still go in; an imported
+  /// registration has no ticket and no app identity (a marshal ticks it by
+  /// name); a player who has arrived is never changed; a registration the file
+  /// no longer lists is reported (`missing`), never removed.
+  Map<String, Object?> importRegistrations(
+    int gameId,
+    Map<String, Object?> body,
+  ) {
+    const allowed = {'format', 'data', 'source', 'dry_run', 'basis_confirmed'};
+    final unknown = body.keys.where((k) => !allowed.contains(k)).toList()
+      ..sort();
+    if (unknown.isNotEmpty) throw ControllerError('unknown fields $unknown');
+    final game = engine.store.game(gameId);
+    if (game == null) throw ControllerError.notFound('no game $gameId');
+    if (game['state'] == 'ended') throw ControllerError.conflict('game_ended');
+    final dryRun = body['dry_run'] ?? false;
+    final confirmed = body['basis_confirmed'] ?? false;
+    if (dryRun is! bool || confirmed is! bool) {
+      throw ControllerError('dry_run and basis_confirmed: true or false');
+    }
+    final ParsedImport parsed;
+    final String source;
+    try {
+      source = checkImportSource(body['source'] ?? 'csv');
+      final data = body['data'];
+      if (data is! String) throw ImportFileError('empty');
+      if (!dryRun && !confirmed) {
+        throw ControllerError('basis_not_confirmed');
+      }
+      final bytes = importBytes(data);
+      if (bytes == null) throw ImportFileError('encoding_invalid');
+      parsed = parseImport(bytes, body['format']);
+    } on ImportFileError catch (e) {
+      throw ControllerError(
+        e.code,
+        status: e.code == 'too_large' || e.code == 'too_many_rows' ? 413 : 400,
+        extra: {if (e.line != null) 'line': e.line},
+      );
+    }
+    final st = settings();
+    final asked = st['federation'] != 'off' || apdRule().checkin;
+    final rules = ImportRules(
+      teams: (game['teams']! as List).cast<String>(),
+      // A field whose APD rule asks at check-in keeps the number an import
+      // carries even when the federation setting asks for none.
+      federation: st['federation'] == 'off' && apdRule().checkin
+          ? 'optional'
+          : st['federation']! as String,
+      predeclareReplicas: true,
+      classes: limits.classes.keys.toList(),
+      maxReplicas: st['max_replicas']! as int,
+    );
+    final now = _wall();
+    final counts = {
+      'created': 0,
+      'updated': 0,
+      'unchanged': 0,
+      'skipped': 0,
+      'refused': 0,
+    };
+    final results = <Map<String, Object?>>[];
+    final seen = <String>{};
+    final byRef = <String, Map<String, Object?>>{
+      for (final r in _rows(gameId))
+        if (r['registration_id'] != null &&
+            r['registration_id'] != '' &&
+            r['from_roster'] != true &&
+            (r['ticket_sha256'] == null || r['ticket_sha256'] == ''))
+          r['registration_id']! as String: r,
+    };
+    for (final raw in parsed.rows) {
+      final entry = <String, Object?>{'row': raw.number};
+      final ImportRow row;
+      try {
+        row = checkImportRow(raw, rules);
+      } on ImportRowError catch (e) {
+        entry
+          ..['result'] = 'refused'
+          ..['code'] = e.code;
+        counts['refused'] = counts['refused']! + 1;
+        results.add(entry);
+        continue;
+      }
+      entry
+        ..['external_ref'] = row.externalRef
+        ..['display_name'] = row.displayName
+        ..['warnings'] = List.of(row.warnings);
+      String? rid;
+      if (row.externalRef != null) {
+        rid = uuid5(_importNamespace, '$source\u0000${row.externalRef}');
+        if (!seen.add(rid)) {
+          entry
+            ..['result'] = 'refused'
+            ..['code'] = 'external_ref_twice';
+          counts['refused'] = counts['refused']! + 1;
+          results.add(entry);
+          continue;
+        }
+      }
+      final existing = rid == null ? null : byRef[rid];
+      if (existing == null) {
+        entry['result'] = 'created';
+        if (!dryRun) _importNew(game, row, rid ?? uuid4(_random), now, asked);
+      } else if (existing['status'] != 'expected') {
+        entry
+          ..['result'] = 'skipped'
+          ..['code'] = existing['status'] == 'removed'
+              ? 'removed'
+              : 'already_arrived';
+      } else {
+        final changed = _importChanges(gameId, existing, row, asked);
+        entry['result'] = changed.isEmpty ? 'unchanged' : 'updated';
+        if (changed.isNotEmpty) {
+          entry['changed'] = changed;
+          if (!dryRun) _importUpdate(game, existing, row, now, asked);
+        }
+      }
+      final result = entry['result']! as String;
+      counts[result] = counts[result]! + 1;
+      results.add(entry);
+    }
+    final missing = [
+      for (final e in byRef.entries)
+        if (e.value['status'] == 'expected' && !seen.contains(e.key))
+          e.value['player_id']! as String,
+    ]..sort();
+    if (!dryRun && (counts['created']! > 0 || counts['updated']! > 0)) {
+      _save();
+      engine.emit({
+        'type': 'roster',
+        'game': gameId,
+        'counts': Map.of(counts),
+        '_staff': true,
+      });
+      developer.log(
+        'registration import for game $gameId: $counts (source $source)',
+        name: 'atalaia.checkin',
+        level: 800,
+      );
+    }
+    return {
+      'dry_run': dryRun,
+      'format': parsed.format,
+      'source': source,
+      'game_id': gameId,
+      'columns': parsed.columns,
+      'not_imported_columns': parsed.ignored,
+      'not_imported_more': parsed.ignoredMore,
+      'rows': parsed.rows.length,
+      'counts': counts,
+      'missing': {
+        'count': missing.length,
+        'player_ids': missing.take(_importListed).toList(),
+      },
+      'results': results,
+    };
+  }
+
+  void _importNew(
+    Map<String, Object?> game,
+    ImportRow row,
+    String rid,
+    double now,
+    bool asked,
+  ) {
+    var pid = _newPlayerId();
+    while (_fieldPlayers.containsKey(pid)) {
+      pid = _newPlayerId();
+    }
+    final teams = (game['teams']! as List).cast<String>();
+    _fieldPlayers[pid] = {
+      'player_id': pid,
+      'secret_sha256': null,
+      'created_at': now,
+      'last_seen_at': now,
+    };
+    _addCheckin(game['id']! as int, pid, {
+      'status': 'expected',
+      'display_name': row.displayName,
+      'federation_number': asked ? row.federationNumber : null,
+      'team_preference': teams.contains(row.teamPreference)
+          ? row.teamPreference
+          : null,
+      'registration_id': rid,
+      'from_roster': false,
+    }, now);
+    _replaceDeclarations(
+      game,
+      pid,
+      _importDeclarations(rid, row),
+      staff: true,
+      now: now,
+    );
+  }
+
+  void _importUpdate(
+    Map<String, Object?> game,
+    Map<String, Object?> existing,
+    ImportRow row,
+    double now,
+    bool asked,
+  ) {
+    final pid = existing['player_id']! as String;
+    final fields = <String, Object?>{'updated_at': now};
+    if (row.present.contains('display_name')) {
+      fields['display_name'] = row.displayName;
+    }
+    if (row.present.contains('team_preference')) {
+      fields['team_preference'] = row.teamPreference;
+    }
+    if (row.present.contains('federation_number')) {
+      fields['federation_number'] = asked ? row.federationNumber : null;
+    }
+    _update(game['id']! as int, pid, fields);
+    if (row.replicas != null) {
+      _replaceDeclarations(
+        game,
+        pid,
+        _importDeclarations(existing['registration_id']! as String, row),
+        staff: true,
+        now: now,
+      );
+    }
+  }
+
+  List<Map<String, Object?>> _importDeclarations(String rid, ImportRow row) => [
+    for (final (i, r) in (row.replicas ?? const []).indexed)
+      {
+        'declaration_id': uuid5(rid, 'declaration-$i'),
+        'replica_id': null,
+        'type': r['type'],
+        'class': r['class'],
+        'make_model': r['make_model'],
+      },
+  ];
+
+  /// The names of what the row changes, among the columns the file has.
+  List<String> _importChanges(
+    int gameId,
+    Map<String, Object?> existing,
+    ImportRow row,
+    bool asked,
+  ) {
+    final changed = <String>[];
+    if (row.present.contains('display_name') &&
+        row.displayName != existing['display_name']) {
+      changed.add('display_name');
+    }
+    if (row.present.contains('team_preference') &&
+        row.teamPreference != existing['team_preference']) {
+      changed.add('team_preference');
+    }
+    if (row.present.contains('federation_number') &&
+        (asked ? row.federationNumber : null) !=
+            existing['federation_number']) {
+      changed.add('federation_number');
+    }
+    final replicas = row.replicas;
+    if (replicas != null) {
+      final old = [
+        for (final d in _decls(gameId, existing['player_id']! as String))
+          if (d['state'] != 'withdrawn')
+            '${d['type']}|${d['class']}|${d['make_model']}',
+      ];
+      final wanted = [
+        for (final r in replicas)
+          '${r['type']}|${r['class']}|${r['make_model']}',
+      ];
+      if (old.length != wanted.length ||
+          [
+            for (var i = 0; i < old.length; i++) old[i] != wanted[i],
+          ].any((x) => x)) {
+        changed.add('replicas');
+      }
+    }
+    return changed;
+  }
+
   /// A roster pulled from the site server (checked by
   /// controller_sync_format.dart's `checkRoster`) becomes this game's
   /// expected check-ins until the game starts (ADR-P4-11; checkin.py
@@ -3531,6 +3821,7 @@ class ControllerCheckin {
     }
     for (final row in _rows(gameId)) {
       if (row['status'] == 'expected' &&
+          row['from_roster'] == true &&
           !listed.contains(row['registration_id'])) {
         final pid = row['player_id'];
         _declarations.removeWhere(

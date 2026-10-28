@@ -61,6 +61,7 @@ from . import apd as apdfmt
 from . import checkin_poster as posterfmt
 from .addresses import FieldAddresses, saved_poster_urls, warn_dropped
 from . import checkin_ticket as ticketfmt
+from . import import_format as importfmt
 from .engine import Conflict, ControllerError, NotFound
 
 if TYPE_CHECKING:
@@ -93,6 +94,8 @@ SITE_LIMITS_SETTING = "checkin.site_limits"  # the limit template the site serve
 SETTINGS_KEYS = ("confirm", "federation", "federation_label", "max_replicas", "max_players",
                  "chrono_valid_for", "apd")
 APD_SITE_SETTING = "checkin.apd_site"  # the field's APD rule from the site server's settings (branding = "site")
+IMPORT_NS = uuid.UUID("6f1b5f0e-3c1d-5a7e-9b44-0a7a1a1a0001")  # registration ids of an imported list (uuid5 of source + ref)
+IMPORT_LISTED = 100  # external refs listed as missing in an import's answer
 
 
 class Unauthorized(ControllerError):
@@ -105,6 +108,18 @@ class Forbidden(ControllerError):
 
 class TooMany(ControllerError):
     status = 429
+
+
+class ImportRefused(ControllerError):
+    """A registration list refused whole (``import_format.FileError``): the message is its code."""
+
+    @property
+    def status(self) -> int:  # type: ignore[override]
+        return 413 if str(self) in ("too_large", "too_many_rows") else 400
+
+    def __init__(self, code: str, line: Optional[int] = None) -> None:
+        super().__init__(code)
+        self.code, self.line = code, line
 
 
 class Refused(ControllerError):
@@ -1271,6 +1286,160 @@ class Checkin:
                  "energy_j": r["record"]["energy_j"], "marshal_name": r["record"]["marshal_name"]}
                 for r in self.store.shared_readings(pid)]
 
+    # --- a registration list imported by the GM (PKE-1) -------------------------------------
+
+    def import_rules(self, game: dict[str, Any]) -> importfmt.Rules:
+        st = self.settings()
+        # A field whose APD rule asks at check-in keeps the number an import carries even when the
+        # federation setting asks for none (never required by an import: protocol/apd.md).
+        federation = "optional" if st["federation"] == "off" and st["apd"]["checkin"] else st["federation"]
+        return importfmt.Rules(teams=tuple(game["teams"]), federation=federation, predeclare_replicas=True,
+                               classes=tuple(self.limits["classes"]), max_replicas=st["max_replicas"])
+
+    def import_registrations(self, game_id: int, body: dict[str, Any]) -> dict[str, Any]:
+        """``POST /api/v1/games/{id}/checkins/import``: a CSV or JSON list of registrations (the site
+        server's import format, ``import_format.py``) becomes this game's expected check-ins, for a field
+        with no site server. Body: ``format`` (csv or json), ``data`` (the file's text), ``source`` (the
+        other platform's name; rows upsert by source + ``external_ref``), ``dry_run`` and, for a real
+        import, ``basis_confirmed`` (the field is the data controller of the list it imports). A row the
+        field's rules refuse is listed with a code and the others still go in. An imported registration
+        has no ticket and no app identity: a marshal ticks it by name (``patch_checkin``), as a registered
+        player from the site. A player who has arrived is never changed; a registration the file no
+        longer lists is reported (``missing``), never removed."""
+        unknown = set(body) - {"format", "data", "source", "dry_run", "basis_confirmed"}
+        if unknown:
+            raise ControllerError(f"unknown fields {sorted(unknown)}")
+        game = self.store.game(game_id)
+        if game is None:
+            raise NotFound(f"no game {game_id}")
+        if game["state"] == "ended":
+            raise Conflict("game_ended")
+        dry_run, confirmed = body.get("dry_run", False), body.get("basis_confirmed", False)
+        if not isinstance(dry_run, bool) or not isinstance(confirmed, bool):
+            raise ControllerError("dry_run and basis_confirmed: true or false")
+        try:
+            source = importfmt.check_source(body.get("source", "csv"))
+            data = body.get("data")
+            if not isinstance(data, str):
+                raise importfmt.FileError("empty")
+            if not dry_run and not confirmed:
+                raise ControllerError("basis_not_confirmed")
+            try:
+                raw_bytes = data.encode("utf-8")
+            except UnicodeEncodeError:
+                raise importfmt.FileError("encoding_invalid") from None
+            parsed = importfmt.parse(raw_bytes, body.get("format"))
+        except importfmt.FileError as exc:
+            raise ImportRefused(exc.code, exc.line) from None
+        rules, now = self.import_rules(game), self._wall()
+        st = self.settings()
+        asked = st["federation"] != "off" or st["apd"]["checkin"]
+        counts = {"created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "refused": 0}
+        results: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        with self._lock:
+            by_ref = {r["registration_id"]: r for r in self.store.checkins(game_id)
+                      if r.get("registration_id") and not r["from_roster"] and not r["ticket_sha256"]}
+            for raw in parsed.rows:
+                entry: dict[str, Any] = {"row": raw.number}
+                try:
+                    row = importfmt.check_row(raw, rules)
+                except importfmt.RowError as exc:
+                    entry.update(result="refused", code=exc.code)
+                    counts["refused"] += 1
+                    results.append(entry)
+                    continue
+                entry.update(external_ref=row.external_ref, display_name=row.display_name,
+                             warnings=list(row.warnings))
+                rid = None
+                if row.external_ref is not None:
+                    rid = str(uuid.uuid5(IMPORT_NS, f"{source}\0{row.external_ref}"))
+                    if rid in seen:
+                        entry.update(result="refused", code="external_ref_twice")
+                        counts["refused"] += 1
+                        results.append(entry)
+                        continue
+                    seen.add(rid)
+                existing = by_ref.get(rid) if rid else None
+                if existing is None:
+                    entry["result"] = "created"
+                    if not dry_run:
+                        self._import_new(game, st, row, str(uuid.uuid4()) if rid is None else rid, now, asked)
+                elif existing["status"] != "expected":
+                    entry.update(result="skipped", code="removed" if existing["status"] == "removed"
+                                 else "already_arrived")
+                else:
+                    changed = self._import_changes(game_id, existing, row, asked)
+                    entry["result"] = "updated" if changed else "unchanged"
+                    if changed:
+                        entry["changed"] = changed
+                        if not dry_run:
+                            self._import_update(game, st, existing, row, now, asked)
+                counts[entry["result"]] += 1
+                results.append(entry)
+            ours = {rid for rid, r in by_ref.items() if r["status"] == "expected"}
+            missing = sorted(by_ref[r]["player_id"] for r in ours - seen)
+        if not dry_run and (counts["created"] or counts["updated"]):
+            self.ctrl._emit({"type": "roster", "game": game_id, "counts": dict(counts), "_staff": True})
+            log.info("registration import for game %d: %s (source %s)", game_id, counts, source)  # never a name
+        return {"dry_run": dry_run, "format": parsed.format, "source": source, "game_id": game_id,
+                "columns": list(parsed.columns), "not_imported_columns": parsed.ignored,
+                "not_imported_more": parsed.ignored_more, "rows": len(parsed.rows), "counts": counts,
+                "missing": {"count": len(missing), "player_ids": missing[:IMPORT_LISTED]}, "results": results}
+
+    def _import_new(self, game: dict[str, Any], st: dict[str, Any], row: importfmt.Row, rid: str, now: float,
+                    asked: bool) -> None:
+        pid = new_player_id()
+        while self.store.field_player(pid) is not None:
+            pid = new_player_id()
+        pref = row.team_preference if row.team_preference in game["teams"] else None
+        self.store.add_field_player(pid, None, now)
+        self.store.add_checkin(game["id"], pid, {
+            "status": "expected", "display_name": row.display_name,
+            "federation_number": row.federation_number if asked else None, "team_preference": pref,
+            "registration_id": rid, "from_roster": 0}, now)
+        self._replace_declarations(game, pid, self._import_declarations(rid, row), staff=True, now=now)
+
+    def _import_update(self, game: dict[str, Any], st: dict[str, Any], existing: dict[str, Any], row: importfmt.Row,
+                       now: float, asked: bool) -> None:
+        fields: dict[str, Any] = {"updated_at": now}
+        if "display_name" in row.present:
+            fields["display_name"] = row.display_name
+        if "team_preference" in row.present:
+            fields["team_preference"] = row.team_preference
+        if "federation_number" in row.present:
+            fields["federation_number"] = row.federation_number if asked else None
+        self.store.update_checkin(game["id"], existing["player_id"], **fields)
+        if row.replicas is not None:
+            self._replace_declarations(game, existing["player_id"],
+                                       self._import_declarations(existing["registration_id"], row), staff=True,
+                                       now=now)
+
+    @staticmethod
+    def _import_declarations(rid: str, row: importfmt.Row) -> list[dict[str, Any]]:
+        base = uuid.UUID(rid)
+        return [{"declaration_id": str(uuid.uuid5(base, f"declaration-{i}")), "replica_id": None,
+                 "type": r["type"], "class": r["class"], "make_model": r["make_model"]}
+                for i, r in enumerate(row.replicas or [])]
+
+    def _import_changes(self, game_id: int, existing: dict[str, Any], row: importfmt.Row,
+                        asked: bool) -> list[str]:
+        """The names of what the row changes, among the columns the file has."""
+        changed = []
+        if "display_name" in row.present and row.display_name != existing["display_name"]:
+            changed.append("display_name")
+        if "team_preference" in row.present and row.team_preference != existing["team_preference"]:
+            changed.append("team_preference")
+        wanted = row.federation_number if asked else None
+        if "federation_number" in row.present and wanted != existing["federation_number"]:
+            changed.append("federation_number")
+        if row.replicas is not None:
+            old = [(d["type"], d["class"], d["make_model"]) for d in self.store.declarations(game_id, existing["player_id"])
+                   if d["state"] != "withdrawn"]
+            if old != [(r["type"], r["class"], r["make_model"]) for r in row.replicas]:
+                changed.append("replicas")
+        return changed
+
     def apply_roster(self, game_id: int, roster: dict[str, Any]) -> dict[str, Any]:
         """A roster pulled from the site server (checked by ``sync_format.check_roster``) becomes this
         game's expected check-ins, until the game starts (ADR-P4-11): new registrations are added with
@@ -1324,7 +1493,7 @@ class Checkin:
                                                   ticket_sha256=reg.get("ticket_sha256"), updated_at=now)
                     out["kept"] += 1
             for row in self.store.checkins(game_id):
-                if row["status"] == "expected" and row["registration_id"] not in listed:
+                if row["status"] == "expected" and row["from_roster"] and row["registration_id"] not in listed:
                     self.store.delete_checkin(game_id, row["player_id"])
                     out["removed"] += 1
         if any(out[k] for k in ("added", "updated", "removed")):

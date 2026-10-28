@@ -62,6 +62,8 @@
 ///     PUT  /api/v1/checkin/me/marshal-key    a marshal registers the Ed25519 key that signs readings
 ///     GET|POST /api/v1/games/{id}/checkins   staff: the list with names / a manual check-in
 ///     GET  /api/v1/games/{id}/checkins.csv   GM: the list as CSV
+///     POST /api/v1/games/{id}/checkins/import  GM: a registration CSV/JSON list into the expected
+///                                            check-ins (dry_run first; PKE-1)
 ///     PATCH|DELETE /api/v1/games/{id}/checkins/{player}  staff changes / GM removal
 ///     POST /api/v1/games/{id}/checkins/ticket  staff: a registered player's ticket, scanned
 ///     GET  /api/v1/games/{id}/chrono-list    staff: the "replicas to chrono" list
@@ -993,6 +995,17 @@ class ControllerApi {
           'Content-Disposition': 'attachment; filename="checkins-$id.csv"',
         });
       }),
+    ),
+    _route(
+      'POST',
+      r'/api/v1/games/([^/]+)/checkins/import',
+      _gm(
+        (r) => ApiResponse(
+          200,
+          _svc().importRegistrations(r.pathInt(1), r.body),
+          _noStore,
+        ),
+      ),
     ),
     _route(
       'POST',
