@@ -93,6 +93,7 @@ final class ControllerBoot {
     required this.limitsYaml,
     this.noticePt = '',
     this.noticeEn = '',
+    this.apdsJson = '',
     this.console = const {},
     this.coreLibrary,
     this.open = true,
@@ -124,6 +125,9 @@ final class ControllerBoot {
   /// The check-in privacy notices (controller/templates/checkin-notice-*.md).
   final String noticePt;
   final String noticeEn;
+
+  /// The list of APDs (assets/apds.json, protocol/apd.md), as text.
+  final String apdsJson;
 
   /// The GM console's files by path (console_files.dart).
   final Map<String, Uint8List> console;
@@ -371,6 +375,7 @@ class ControllerHost {
         fieldName: boot.fieldName,
         noticePt: boot.noticePt,
         noticeEn: boot.noticeEn,
+        apdsJson: boot.apdsJson,
       ),
       caSha256: tls.caSha256,
     );

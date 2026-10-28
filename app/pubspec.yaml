@@ -70,3 +70,5 @@ flutter:
     - assets/console/lib/blockly/media/
     - assets/console/lib/blockly/msg/
     - assets/notices/
+    # The list of APDs (registry/apds/apds.json, copied byte for byte; protocol/apd.md).
+    - assets/apds.json

@@ -106,6 +106,7 @@ process.
 | map grid / grid square ("C4") | quadrícula / quadrícula C4 | Gitter / Planquadrat C4 | 方格 / 方格 C4 | rows are letters (zh-tw: 列), columns numbers (欄); "grelha" stays the boxes' plain placeholder grid (MF-91) |
 | crest | emblema | Wappen | 隊徽 | |
 | federation number | número de federado | Verbandsnummer | 協會會員編號 | |
+| APD (membership) | APD (filiação) | APD (Mitgliedschaft) | APD（會員資格） | APD stays as is in every language; pt-PT: "número de filiação", never gendered "sócio" |
 | callsign | alcunha | Callsign | 呼號 | |
 | spot check | verificação aleatória (check) | Stichprobe | 抽查 | |
 | bolt action | ferrolho | Repetierer | 手拉 | Sniper, Shotgun kept; zh-tw: 「手拉狙」；Sniper、Shotgun 照用 |

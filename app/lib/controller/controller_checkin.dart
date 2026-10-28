@@ -46,6 +46,7 @@ import '../chrono/energy.dart';
 import '../chrono/limit_template.dart';
 import '../chrono/reading.dart';
 import '../chrono/record_signer.dart';
+import '../protocol/apd.dart';
 import '../protocol/checkin_poster.dart';
 import '../protocol/checkin_ticket.dart';
 import '../security/bytes.dart';
@@ -105,6 +106,7 @@ const staffRoles = ['marshal', 'gm'];
 const marshalValidForSeconds = 2 * 3600;
 const _nameMax = 32;
 const _federationMax = 32;
+final _apdIdRe = RegExp(r'^[a-z0-9][a-z0-9-]{0,31}$');
 const _seriesMax = 50;
 const _tokenGraceS = 2 * 3600;
 const _tokenMinS = 60;
@@ -117,6 +119,7 @@ const _settingsKeys = [
   'max_replicas',
   'max_players',
   'chrono_valid_for',
+  'apd',
 ];
 
 /// Who a request or a stream connection belongs to (checkin.py `Viewer`):
@@ -184,6 +187,7 @@ class CheckinConfig {
     this.noticeVersion = 1,
     this.noticePt = '',
     this.noticeEn = '',
+    this.apdsJson = '',
     this.retentionDays = 30,
     this.utcDay = false,
   });
@@ -209,6 +213,9 @@ class CheckinConfig {
   /// controller/templates/checkin-notice-*.md).
   final String noticePt;
   final String noticeEn;
+
+  /// The list of APDs (assets/apds.json, protocol/apd.md), as text.
+  final String apdsJson;
   final int retentionDays;
 
   /// The field's day ends at midnight UTC instead of local midnight (tests).
@@ -418,6 +425,12 @@ class ControllerCheckin {
   /// (BR24).
   LimitTemplate get limits => _limits;
   bool _siteManaged = false;
+
+  /// Where a marshal's override of a membership that does not pass is logged
+  /// (the player id and the verdict, never the number).
+  void Function(String message) audit = _auditDefault;
+  static void _auditDefault(String m) =>
+      developer.log(m, name: 'atalaia.checkin', level: 800);
   final RateLimit rate;
   final RateLimit infoRate;
   final Random _random;
@@ -582,6 +595,9 @@ class ControllerCheckin {
       'display_name': null,
       'federation_number': null,
       'federation_seen': false,
+      'apd_id': null,
+      'membership_expires': null,
+      'apd_override': false,
       'team_preference': null,
       'team': 0,
       'squad': 0,
@@ -800,7 +816,144 @@ class ControllerCheckin {
         // As the Pi: a setting that is not JSON is ignored.
       }
     }
+    out['apd'] = apdRule().toJson();
     return out;
+  }
+
+  // --- APD membership (protocol/apd.md) --------------------------------------
+
+  /// `[sync] apd = "site"`: the field's rule comes from the site server
+  /// ([applySiteApd]) and the console cannot change it (409).
+  bool apdSiteManaged = false;
+
+  ApdRule _localApd() {
+    final saved = engine.store.getSetting('checkin.settings');
+    if (saved == null) return ApdRule.defaults;
+    try {
+      final m = jsonDecode(saved);
+      return m is Map ? ApdRule.parse(m['apd']) : ApdRule.defaults;
+    } on Object {
+      return ApdRule.defaults; // not JSON, or a rule that no longer parses
+    }
+  }
+
+  /// The rule in force: the site's when managed there, else the console's.
+  ApdRule apdRule() {
+    if (apdSiteManaged) {
+      final raw = engine.store.getSetting('checkin.apd_site');
+      if (raw != null) {
+        try {
+          return ApdRule.parse(jsonDecode(raw));
+        } on Object {
+          return ApdRule.defaults;
+        }
+      }
+    }
+    return _localApd();
+  }
+
+  /// The rule the site server's field answer carried (null: none).
+  void applySiteApd(ApdRule? rule) {
+    engine.store.setSetting('checkin.apd_site', jsonEncode(rule?.toJson()));
+    _save();
+  }
+
+  List<ApdEntry>? _projectApds;
+
+  /// The project's list of APDs (the shipped file).
+  List<ApdEntry> projectApds() {
+    if (_projectApds != null) return _projectApds!;
+    try {
+      return _projectApds = config.apdsJson.isEmpty
+          ? const []
+          : parseApdList(config.apdsJson);
+    } on Object {
+      return _projectApds = const [];
+    }
+  }
+
+  /// What a form offers: the project's list, then the field's own entries.
+  List<Map<String, Object?>> apdChoices() => [
+    for (final e in apdRule().choices(projectApds())) e.toJson(),
+  ];
+
+  /// The local date a membership is checked against (the field's day).
+  String _apdToday() => apdDateOf(
+    DateTime.fromMillisecondsSinceEpoch(
+      (_wall() * 1000).round(),
+      isUtc: config.utcDay,
+    ),
+  );
+
+  /// The verdict for a check-in's membership; null when the rule does not
+  /// ask at check-in.
+  String? _apdVerdict(
+    String? apd,
+    String? number,
+    String? expires, [
+    ApdRule? rule,
+  ]) {
+    final r = rule ?? apdRule();
+    if (!r.checkin) return null;
+    return apdStatus(
+      r,
+      ApdMembership(apd: apd, number: number, expires: expires),
+      _apdToday(),
+    );
+  }
+
+  /// What a request body declares: the APD, the number (as
+  /// `membership_number` or the old `federation_number`; both must agree)
+  /// and the expiry. Each null when not sent.
+  ({String? apd, String? number, String? expires}) _declared(
+    Map<String, Object?> body,
+  ) {
+    final fed = _text(
+      'federation_number',
+      _truthy(body['federation_number']) ? body['federation_number'] : null,
+      _federationMax,
+      optional: true,
+    );
+    final mem = _text(
+      'membership_number',
+      _truthy(body['membership_number']) ? body['membership_number'] : null,
+      _federationMax,
+      optional: true,
+    );
+    if (fed != null && mem != null && fed != mem) {
+      throw ControllerError(
+        'membership_number: federation_number says another number',
+      );
+    }
+    final apd = body['apd_id'];
+    if (_truthy(apd) && (apd is! String || !_apdIdRe.hasMatch(apd))) {
+      throw ControllerError('apd_id: a-z, 0-9 and -, 1-32 characters');
+    }
+    final exp = body['membership_expires'];
+    if (_truthy(exp) && (exp is! String || !validApdDate(exp))) {
+      throw ControllerError('membership_expires: a date, YYYY-MM-DD');
+    }
+    return (
+      apd: _truthy(apd) ? apd as String : null,
+      number: mem ?? fed,
+      expires: _truthy(exp) ? exp as String : null,
+    );
+  }
+
+  /// A marshal's confirmation of a check-in whose membership does not
+  /// pass is never refused, but it is logged (no number) and marked.
+  bool _apdOverride(Map<String, Object?> row) {
+    final verdict = _apdVerdict(
+      row['apd_id'] as String?,
+      row['federation_number'] as String?,
+      row['membership_expires'] as String?,
+    );
+    if (verdict == null || verdict == 'valid') return false;
+    audit(
+      'apd override: ${row['player_id']} confirmed in game '
+      '${row['game_id']} with membership $verdict',
+    );
+    return true;
   }
 
   Map<String, Object?> setSettings(Map<String, Object?> spec) {
@@ -815,8 +968,23 @@ class ControllerCheckin {
       'federation': ['off', 'optional', 'required'],
       'chrono_valid_for': ['day', 'game'],
     };
+    ApdRule? apd;
+    if (spec.containsKey('apd')) {
+      if (apdSiteManaged) {
+        throw ControllerError.conflict(
+          "the field's APD rule comes from the site server (the sync's "
+          'apd is "site"): change it there',
+        );
+      }
+      try {
+        apd = ApdRule.parse(spec['apd']);
+      } on ApdError catch (e) {
+        throw ControllerError('apd: ${e.code}');
+      }
+    }
     for (final e in spec.entries) {
       final k = e.key, v = e.value;
+      if (k == 'apd') continue;
       final c = choices[k];
       if (c != null && !c.contains(v)) {
         throw ControllerError('$k: one of ${c.join(', ')}');
@@ -832,8 +1000,12 @@ class ControllerCheckin {
     }
     engine.store.setSetting(
       'checkin.settings',
-      jsonEncode({for (final k in _settingsKeys) k: cur[k]}),
+      jsonEncode({
+        for (final k in _settingsKeys)
+          k: k == 'apd' ? (apd ?? _localApd()).toJson() : cur[k],
+      }),
     );
+    cur['apd'] = apdRule().toJson();
     engine.emit({'type': 'checkin_settings', 'settings': cur, '_staff': true});
     return cur;
   }
@@ -1108,6 +1280,7 @@ class ControllerCheckin {
         'classes': limits.classes.keys.toList()..sort(),
       },
       'replica_types': replicaTypes,
+      'apds': apdChoices(),
       'games': openGames(),
     };
   }
@@ -1247,6 +1420,9 @@ class ControllerCheckin {
       'player_secret',
       'display_name',
       'federation_number',
+      'membership_number',
+      'apd_id',
+      'membership_expires',
       'team_preference',
       'notice_version',
       'replicas',
@@ -1275,12 +1451,8 @@ class ControllerCheckin {
     final (regId, ticketHex) = _registrationProof(body);
     final st = settings();
     final name = _text('display_name', body['display_name'], _nameMax);
-    final fedIn = _text(
-      'federation_number',
-      _truthy(body['federation_number']) ? body['federation_number'] : null,
-      _federationMax,
-      optional: true,
-    );
+    final declared = _declared(body);
+    final fedIn = declared.number;
     var pref = body['team_preference'];
     if (pref != null) _teamId(game, pref, 'team_preference');
     final notice = body['notice_version'];
@@ -1318,14 +1490,23 @@ class ControllerCheckin {
         (game['teams']! as List).contains(expected['team_preference'])) {
       pref = expected['team_preference'];
     }
-    if (st['federation'] == 'off') {
+    var apdId = declared.apd ?? expected?['apd_id'] as String?;
+    var expires =
+        declared.expires ?? expected?['membership_expires'] as String?;
+    final rule = apdRule();
+    if (st['federation'] == 'off' && !rule.checkin) {
       fed = null;
+      apdId = null;
+      expires = null;
     } else if (st['federation'] == 'required' && fed == null) {
       throw ControllerError(
         'federation_number: this field asks for your '
         '${st['federation_label']} number',
       );
     }
+    // A membership that does not pass leaves the check-in to a marshal.
+    final apdPending =
+        (_apdVerdict(apdId, fed, expires, rule) ?? 'valid') != 'valid';
     final created = row == null || row['status'] == 'expected';
     var emit = false;
     if (created) {
@@ -1340,11 +1521,15 @@ class ControllerCheckin {
           'last_seen_at': now,
         };
       }
-      final status = st['confirm'] == 'auto' ? 'checked_in' : 'pending';
+      final status = st['confirm'] == 'auto' && !apdPending
+          ? 'checked_in'
+          : 'pending';
       final fields = <String, Object?>{
         'status': status,
         'display_name': name,
         'federation_number': fed,
+        'apd_id': apdId,
+        'membership_expires': expires,
         'team_preference': pref,
         'notice_version': notice,
         'checked_in_at': status == 'checked_in' ? now : null,
@@ -1363,7 +1548,9 @@ class ControllerCheckin {
     } else {
       var status = row['status']! as String;
       if (status == 'left') {
-        status = st['confirm'] == 'auto' ? 'checked_in' : 'pending';
+        status = st['confirm'] == 'auto' && !apdPending
+            ? 'checked_in'
+            : 'pending';
         emit = status == 'checked_in';
       }
       final fields = <String, Object?>{
@@ -1376,6 +1563,10 @@ class ControllerCheckin {
       if (fed != row['federation_number']) {
         fields['federation_number'] = fed;
         fields['federation_seen'] = false;
+      }
+      if (apdId != row['apd_id']) fields['apd_id'] = apdId;
+      if (expires != row['membership_expires']) {
+        fields['membership_expires'] = expires;
       }
       if (emit) fields['checked_in_at'] = now;
       if (regId != null && row['registration_id'] == null) {
@@ -1558,6 +1749,15 @@ class ControllerCheckin {
         'federation_number': row['federation_number'],
         'federation_seen': row['federation_seen'],
         'team_preference': row['team_preference'],
+        'apd_id': row['apd_id'],
+        'membership_number': row['federation_number'],
+        'membership_expires': row['membership_expires'],
+        'apd_override': row['apd_override'] == true,
+        'apd_status': _apdVerdict(
+          row['apd_id'] as String?,
+          row['federation_number'] as String?,
+          row['membership_expires'] as String?,
+        ),
       });
     }
     if (declarations) {
@@ -1879,6 +2079,9 @@ class ControllerCheckin {
       'display_name': null,
       'federation_number': null,
       'federation_seen': false,
+      'apd_id': null,
+      'membership_expires': null,
+      'apd_override': false,
       'team_preference': null,
       'updated_at': now,
       'erased_at': now,
@@ -1940,6 +2143,9 @@ class ControllerCheckin {
     const allowed = {
       'display_name',
       'federation_number',
+      'membership_number',
+      'apd_id',
+      'membership_expires',
       'team_preference',
       'replicas',
     };
@@ -1948,14 +2154,14 @@ class ControllerCheckin {
     if (unknown.isNotEmpty) throw ControllerError('unknown fields $unknown');
     final st = settings();
     final name = _text('display_name', body['display_name'], _nameMax);
-    var fed = _text(
-      'federation_number',
-      _truthy(body['federation_number']) ? body['federation_number'] : null,
-      _federationMax,
-      optional: true,
-    );
-    if (st['federation'] == 'off') {
+    final declared = _declared(body);
+    var fed = declared.number;
+    var apdId = declared.apd;
+    var expires = declared.expires;
+    if (st['federation'] == 'off' && !apdRule().checkin) {
       fed = null;
+      apdId = null;
+      expires = null;
     } else if (st['federation'] == 'required' && fed == null) {
       throw ControllerError(
         'federation_number: this field asks for the '
@@ -1987,10 +2193,13 @@ class ControllerCheckin {
       'display_name': name,
       'federation_number': fed,
       'federation_seen': fed != null,
+      'apd_id': apdId,
+      'membership_expires': expires,
       'team_preference': pref,
       'manual': true,
       'checked_in_at': now,
     }, now);
+    _update(gameId, pid, {'apd_override': _apdOverride(_row(gameId, pid)!)});
     _replaceDeclarations(game, pid, decls, staff: true, now: now);
     final row = _row(gameId, pid)!;
     _save();
@@ -2011,7 +2220,15 @@ class ControllerCheckin {
       throw ControllerError.notFound('$pid is not checked in to game $gameId');
     }
     const gmFields = {'team', 'squad', 'role'};
-    const marshalFields = {'status', 'federation_seen', 'replicas'};
+    const marshalFields = {
+      'status',
+      'federation_seen',
+      'replicas',
+      'federation_number',
+      'membership_number',
+      'apd_id',
+      'membership_expires',
+    };
     final unknown =
         body.keys
             .where((k) => !gmFields.contains(k) && !marshalFields.contains(k))
@@ -2080,13 +2297,35 @@ class ControllerCheckin {
       }
       fields['federation_seen'] = body['federation_seen'];
     }
+    if (const [
+      'federation_number',
+      'membership_number',
+      'apd_id',
+      'membership_expires',
+    ].any(body.containsKey)) {
+      // The marshal corrects what the card shows (an empty value clears it).
+      final d = _declared(body);
+      if (body.containsKey('federation_number') ||
+          body.containsKey('membership_number')) {
+        fields['federation_number'] = d.number;
+        fields['federation_seen'] = false;
+      }
+      if (body.containsKey('apd_id')) fields['apd_id'] = d.apd;
+      if (body.containsKey('membership_expires')) {
+        fields['membership_expires'] = d.expires;
+      }
+    }
     if (body.containsKey('replicas')) {
       final decls = _checkDeclarations(body['replicas'], settings());
       _replaceDeclarations(game, pid, decls, staff: true, now: now);
     }
     _update(gameId, pid, fields);
+    var after = _row(gameId, pid)!;
+    if (emit && _apdOverride(after)) {
+      _update(gameId, pid, {'apd_override': true});
+      after = _row(gameId, pid)!;
+    }
     _save();
-    final after = _row(gameId, pid)!;
     if (emit) _emitCheckinEvent(game, after);
     _notify(gameId, pid, assignment: assignment);
     return rowView(game, after);
@@ -2189,6 +2428,9 @@ class ControllerCheckin {
       'squad',
       'role',
       'federation_number',
+      'apd_id',
+      'membership_expires',
+      'apd_status',
       'card_seen',
       'manual',
       'checked_in_at',
@@ -2208,6 +2450,14 @@ class ControllerCheckin {
         _truthy(r['squad']) ? r['squad'] : '',
         r['role'],
         _csvSafe(r['federation_number'] as String?),
+        r['apd_id'] ?? '',
+        r['membership_expires'] ?? '',
+        _apdVerdict(
+              r['apd_id'] as String?,
+              r['federation_number'] as String?,
+              r['membership_expires'] as String?,
+            ) ??
+            '',
         r['federation_seen'] == true ? 'yes' : '',
         r['manual'] == true ? 'yes' : '',
         _iso(r['checked_in_at'] as num?),
@@ -2334,6 +2584,15 @@ class ControllerCheckin {
         'squad': r['squad'],
         'seq': r['seq'],
         'pending': decls.where((d) => d['state'] == 'pending').length,
+        'apd_id': r['apd_id'],
+        'membership_number': r['federation_number'],
+        'membership_expires': r['membership_expires'],
+        'apd_override': r['apd_override'] == true,
+        'apd_status': _apdVerdict(
+          r['apd_id'] as String?,
+          r['federation_number'] as String?,
+          r['membership_expires'] as String?,
+        ),
         'declarations': decls,
         'shared_readings': sharedView(r['player_id']! as String),
       });
@@ -3210,7 +3469,10 @@ class ControllerCheckin {
         inc('conflicts');
         continue;
       }
-      final fed = st['federation'] != 'off' ? reg['federation_number'] : null;
+      final asked = st['federation'] != 'off' || apdRule().checkin;
+      final fed = asked ? reg['federation_number'] : null;
+      final apdId = asked ? reg['apd_id'] : null;
+      final expires = asked ? reg['membership_expires'] : null;
       final pref = teams.contains(reg['team_preference'])
           ? reg['team_preference']
           : null;
@@ -3224,6 +3486,8 @@ class ControllerCheckin {
       final fields = <String, Object?>{
         'display_name': name,
         'federation_number': fed,
+        'apd_id': apdId,
+        'membership_expires': expires,
         'team_preference': pref,
         'registration_id': rid,
         'ticket_sha256': reg['ticket_sha256'],
@@ -3365,6 +3629,8 @@ class ControllerCheckin {
           r
             ..['display_name'] = null
             ..['federation_number'] = null
+            ..['apd_id'] = null
+            ..['membership_expires'] = null
             ..['team_preference'] = null
             ..['erased_at'] = now;
           erased++;

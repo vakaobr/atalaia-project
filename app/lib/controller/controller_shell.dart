@@ -32,12 +32,16 @@ final class ControllerAssets {
     required this.limitsYaml,
     this.noticePt = '',
     this.noticeEn = '',
+    this.apdsJson = '',
   });
 
   final Map<String, Uint8List> console;
   final String limitsYaml;
   final String noticePt;
   final String noticeEn;
+
+  /// The list of APDs (assets/apds.json, protocol/apd.md), as text.
+  final String apdsJson;
 }
 
 typedef ControllerAssetsLoader =
@@ -47,6 +51,12 @@ typedef ControllerAssetsLoader =
 Future<ControllerAssets> bundledControllerAssets(String limitTemplate) async {
   final console = await loadConsoleFiles(rootBundle);
   final (pt, en) = await loadNotices(rootBundle);
+  var apds = '';
+  try {
+    apds = await rootBundle.loadString('assets/apds.json');
+  } on Object {
+    // built without it: the list is empty, a field still adds its own entries
+  }
   String limits;
   try {
     limits = await rootBundle.loadString(
@@ -62,6 +72,7 @@ Future<ControllerAssets> bundledControllerAssets(String limitTemplate) async {
     limitsYaml: limits,
     noticePt: pt,
     noticeEn: en,
+    apdsJson: apds,
   );
 }
 
@@ -194,6 +205,7 @@ class ControllerShell extends ChangeNotifier {
         limitsYaml: assets.limitsYaml,
         noticePt: assets.noticePt,
         noticeEn: assets.noticeEn,
+        apdsJson: assets.apdsJson,
         console: assets.console,
         open: how.open,
         pod: how.pod != null,

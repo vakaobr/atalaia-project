@@ -1,4 +1,27 @@
 {
   "format": 1,
-  "apds": []
+  "note": "Started on 2026-10-28 from the associations jogarairsoft.pt names as partners; each entry is kept only where the association's own site confirms it (see its source). Not a directory and not a verification of any member.",
+  "apds": [
+    {
+      "id": "ala",
+      "name": "Associação Lusitana de Airsoft, APD",
+      "short_name": "ALA",
+      "website": "https://ala-airsoft.com/",
+      "source": "https://ala-airsoft.com/"
+    },
+    {
+      "id": "apacorp",
+      "name": "Associação Portuguesa de Airsoft Corporativo, APD",
+      "short_name": "APACORP",
+      "website": "https://www.apacorp.org/",
+      "source": "https://www.apacorp.org/"
+    },
+    {
+      "id": "apap",
+      "name": "APAP-APD",
+      "short_name": "APAP",
+      "website": "https://www.apap-apd.com/",
+      "source": "https://www.apap-apd.com/"
+    }
+  ]
 }

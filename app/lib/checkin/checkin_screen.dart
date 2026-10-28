@@ -28,6 +28,7 @@ import '../protocol/checkin_poster.dart';
 import '../site/site_api.dart';
 import '../ui/code_kind.dart';
 import '../ui/widgets.dart';
+import 'apd_fields.dart';
 import 'checkin_client.dart';
 import 'declare_replicas_screen.dart';
 import 'failure_details.dart';
@@ -51,6 +52,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
   final _text = TextEditingController();
   final _name = TextEditingController();
   final _fed = TextEditingController();
+  final _apd = ApdInput();
   _Step _step = _Step.scan;
   String? _error;
   Map<String, Object?> _errorArgs = const {};
@@ -91,6 +93,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
     _text.dispose();
     _name.dispose();
     _fed.dispose();
+    _apd.dispose();
     super.dispose();
   }
 
@@ -203,10 +206,23 @@ class _CheckinScreenState extends State<CheckinScreen> {
     final info = _info!;
     final field = _field!;
     final name = _name.text.trim();
-    final fed = _fed.text.trim();
+    final rule = info.apdRule;
+    final withApd = apdAsked(rule);
+    // The APD block carries the number when the rule asks; else the old field.
+    final fed = withApd ? (_apd.numberOrNull ?? '') : _fed.text.trim();
     if (name.isEmpty) {
       setState(() => _error = 'checkin.need_name');
       return;
+    }
+    if (withApd) {
+      final bad = _apd.problem(rule, needNumber: info.federation == 'required');
+      if (bad != null) {
+        setState(() {
+          _error = bad;
+          _errorArgs = const {};
+        });
+        return;
+      }
     }
     if (info.federation == 'required' && fed.isEmpty) {
       setState(() {
@@ -269,7 +285,12 @@ class _CheckinScreenState extends State<CheckinScreen> {
         secret: id.secret,
         displayName: name,
         noticeVersion: info.noticeVersion,
-        federationNumber: info.federation == 'off' || fed.isEmpty ? null : fed,
+        federationNumber:
+            (info.federation == 'off' && !rule.checkin) || fed.isEmpty
+            ? null
+            : fed,
+        apdId: withApd ? _apd.apd : null,
+        membershipExpires: withApd ? _apd.expiresOrNull : null,
         teamPreference: _team,
         replicas: decls.isEmpty ? null : decls,
         registrationId: kept?.registrationId,
@@ -445,7 +466,15 @@ class _CheckinScreenState extends State<CheckinScreen> {
             helperMaxLines: 3,
           ),
         ),
-        if (info.federation != 'off') ...[
+        if (apdAsked(info.apdRule))
+          ApdFields(
+            input: _apd,
+            rule: info.apdRule,
+            choices: info.apds,
+            numberRequired: info.federation == 'required',
+            keyPrefix: 'checkin-apd',
+          )
+        else if (info.federation != 'off') ...[
           const SizedBox(height: 16),
           TextField(
             key: const Key('checkin-federation'),
@@ -770,6 +799,28 @@ class _CheckinStatusScreenState extends State<CheckinStatusScreen> {
               kind: c.status == 'checked_in' ? NoticeKind.ok : NoticeKind.info,
               key: const Key('checkin-status'),
             ),
+            if (me?['apd_status'] != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    ApdBadge(
+                      status: me!['apd_status'] as String?,
+                      overridden: me['apd_override'] == true,
+                    ),
+                    if (me['apd_status'] != 'valid')
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: Text(
+                            s.t('apd.hint_marshal'),
+                            key: const Key('checkin-apd-hint'),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             Wrap(
               spacing: 8,
               children: [

@@ -153,6 +153,58 @@ void main() {
     expect(field.rows.values.single['status'], 'left');
   });
 
+  testWidgets('with an APD rule: the picker, the number, the expiry, sent', (
+    tester,
+  ) async {
+    final field = FakeField()
+      ..apd = {
+        'accepted': ['apd-a'],
+        'register': false,
+        'checkin': true,
+        'expiry': true,
+        'custom': <Object?>[],
+      }
+      ..apds = [
+        {'id': 'apd-a', 'name': 'APD Alfa', 'short_name': 'Alfa'},
+        {'id': 'apd-b', 'name': 'APD Beta', 'short_name': 'Beta'},
+      ]
+      ..verdict = 'expired';
+    await start(tester, language: AppLanguage.en, field: field);
+    await tapKey(tester, 'checkin-scan');
+    await tapKey(tester, 'checkin-notice-ok');
+    expect(find.text('APD membership'), findsOneWidget);
+    expect(find.text('Accepted APDs: Alfa'), findsOneWidget);
+    expect(find.byKey(const Key('checkin-federation')), findsNothing);
+    await tester.enterText(find.byKey(const Key('checkin-name')), 'Hawk');
+    await tester.enterText(find.byKey(const Key('checkin-apd-number')), 'A-77');
+    await tester.enterText(
+      find.byKey(const Key('checkin-apd-expires')),
+      '31/01/2027',
+    );
+    await tapKey(tester, 'checkin-submit');
+    await tester.scrollUntilVisible(
+      find.text('Write the date as YYYY-MM-DD, for instance 2027-01-31.'),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(field.rows, isEmpty);
+    await tester.enterText(
+      find.byKey(const Key('checkin-apd-expires')),
+      '2026-12-31',
+    );
+    await tapKey(tester, 'checkin-apd-pick');
+    await tester.tap(find.text('APD Alfa').last);
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'checkin-submit');
+    final row = field.rows.values.single;
+    expect(row['apd_id'], 'apd-a');
+    expect(row['federation_number'], 'A-77');
+    expect(row['membership_expires'], '2026-12-31');
+    // The verdict the controller gave, and what happens next.
+    expect(find.byKey(const Key('apd-badge-expired')), findsOneWidget);
+    expect(find.byKey(const Key('checkin-apd-hint')), findsOneWidget);
+  });
+
   testWidgets('the notice is shown again only when its version changes', (
     tester,
   ) async {

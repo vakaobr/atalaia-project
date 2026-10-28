@@ -16,6 +16,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../checkin/apd_fields.dart';
 import '../checkin/checkin_client.dart';
 import '../checkin/checkin_screen.dart'
     show ChronoStateChip, replicaLabel, teamAndSquad;
@@ -26,6 +27,7 @@ import '../chrono/limit_template.dart';
 import '../chrono/reading.dart';
 import '../chrono/replica.dart';
 import '../l10n/strings.dart';
+import '../protocol/apd.dart';
 import '../ui/code_kind.dart';
 import '../ui/replica_label.dart';
 import '../ui/widgets.dart';
@@ -118,7 +120,11 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
     unawaited(_init());
   }
 
+  List<ApdEntry> _apds = const [];
+
   Future<void> _init() async {
+    _apds = await loadProjectApds();
+    if (!mounted) return;
     _records = widget.records ?? await marshalRecordsFor(context);
     await _load();
   }
@@ -233,6 +239,17 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
       _highlight = hit;
       _error = hit != null ? null : s.t('queue.not_found');
     });
+  }
+
+  /// A marshal lets a pending player in, whatever the membership verdict
+  /// says (the controller logs it when the verdict is not `valid`).
+  Future<void> _confirm(String playerId) async {
+    try {
+      await _client.confirm(c.token, c.gameId, playerId);
+      await _load();
+    } on CheckinException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    }
   }
 
   Future<void> _manual() async {
@@ -403,6 +420,41 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
               Text(
                 s.t('queue.waiting_confirmation'),
                 style: TextStyle(color: Theme.of(context).hintColor),
+              ),
+            if (p['apd_status'] != null ||
+                p['apd_id'] != null ||
+                p['membership_number'] != null)
+              Padding(
+                key: Key('queue-apd-${p['player_id']}'),
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Wrap(
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    ApdBadge(
+                      status: p['apd_status'] as String?,
+                      overridden: p['apd_override'] == true,
+                    ),
+                    Text(
+                      apdLine(
+                        s,
+                        _apds,
+                        apd: p['apd_id'] as String?,
+                        number: p['membership_number'] as String?,
+                        expires: p['membership_expires'] as String?,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (p['status'] == 'pending')
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton(
+                  key: Key('queue-confirm-${p['player_id']}'),
+                  onPressed: () => _confirm('${p['player_id']}'),
+                  child: Text(s.t('queue.confirm')),
+                ),
               ),
             for (final d in decls)
               ListTile(

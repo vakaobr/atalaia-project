@@ -1441,18 +1441,22 @@ button.fm-use {
 }
 
 .chrono-pending,
+.apd-expired,
+.apd-not_accepted,
 .status-pending {
     background: var(--warn-bg);
     border-color: var(--warn);
 }
 
 .chrono-passed,
+.apd-valid,
 .status-checked_in {
     background: var(--info-bg);
     border-color: var(--ok);
 }
 
 .chrono-refused,
+.apd-missing,
 .status-removed {
     background: var(--crit-bg);
     border-color: var(--danger);

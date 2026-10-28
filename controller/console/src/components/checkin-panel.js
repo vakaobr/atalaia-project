@@ -19,6 +19,16 @@ import { html, Component, t, posterProblem, inWebView } from '../ui.js';
 import { TagWriter } from './tag-writer.js';
 
 const STATUSES = ['expected', 'pending', 'checked_in', 'left', 'removed'];
+/** Whether the table and the hand check-in show a membership number: the federation's or the APD's. */
+function showMembership(s) {
+    return s.federation !== 'off' || (s.apd && s.apd.checkin);
+}
+
+/** What a player may pick: the project's list as the controller sent it, then the rule's own entries. */
+function apdChoices(apds, rule) {
+    return [...(apds || []).filter((a) => !a.id.startsWith('x-')), ...((rule && rule.custom) || [])];
+}
+
 const ROLES = ['player', 'squad_leader', 'vip', 'marshal', 'gm', 'spectator'];
 
 /** A game's squads are sub-groups inside each team, and only some games have them (decision PE25). */
@@ -108,7 +118,7 @@ export class CheckinPanel extends Component {
         const [poster, info, schedule, marshals] = await Promise.all([app.call('GET', '/checkin/poster'), app.call('GET', '/checkin'),
             app.serves('schedule') ? app.call('GET', '/schedule') : null, app.call('GET', '/marshals')]);
         if (seq !== this.loadSeq) return;
-        this.setState({ poster, classes: info ? info.limits.classes : [], schedule, marshals: marshals || [] });
+        this.setState({ poster, classes: info ? info.limits.classes : [], schedule, marshals: marshals || [], apdDraft: null });
         if (!g) {
             this.setState({ list: null, chrono: null });
             return;
@@ -239,12 +249,51 @@ export class CheckinPanel extends Component {
             confirm: f.confirm.value, federation: f.federation.value, federation_label: f.federation_label.value.trim(),
             max_replicas: parseInt(f.max_replicas.value, 10), max_players: parseInt(f.max_players.value, 10),
             chrono_valid_for: f.chrono_valid_for.value,
+            apd: this.apdRuleFromForm(e.target),
         };
         const s = await this.props.app.call('PUT', '/checkin/settings', body);
         if (s && this.state.list) {
-            this.setState({ list: { ...this.state.list, settings: s } });
+            this.setState({ list: { ...this.state.list, settings: s, apds: apdChoices(this.state.list.apds, s.apd) },
+                apdDraft: null });
             this.props.app.showToast(t('checkin.saved'));
         }
+    }
+
+    /** The APD rule the settings form describes: the ticked ones are accepted (none ticked: any) (protocol/apd.md). */
+    apdRuleFromForm(form) {
+        const rule = this.apdDraft();
+        const ticked = Array.from(form.querySelectorAll('input[name=apd_accepted]:checked')).map((el) => el.value);
+        return { ...rule, checkin: form.elements.apd_checkin.checked, expiry: form.elements.apd_expiry.checked,
+            accepted: ticked.length ? ticked : null };
+    }
+
+    /** The rule being edited: the saved one until the GM adds or removes an entry of their own. */
+    apdDraft() {
+        const list = this.state.list;
+        return this.state.apdDraft || (list && list.settings.apd) || { accepted: null, register: false, checkin: false, expiry: false, custom: [] };
+    }
+
+    addApdEntryFrom(e) {
+        const form = e.target.form;
+        const f = form.elements;
+        const name = f.apd_name.value.trim();
+        const short = f.apd_short.value.trim();
+        const site = f.apd_site.value.trim();
+        if (!name || !short) return;
+        const rule = this.apdRuleFromForm(form); // keeps what is ticked
+        let id = `x-${short.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`.slice(0, 32).replace(/-+$/, '');
+        if (id === 'x') id = `x-${rule.custom.length + 1}`;
+        while (rule.custom.some((c) => c.id === id)) id = `${id.slice(0, 29)}-${rule.custom.length + 1}`;
+        const entry = { id, name, short_name: short, website: site || null };
+        this.setState({ apdDraft: { ...rule, custom: [...rule.custom, entry] } });
+        f.apd_name.value = f.apd_short.value = f.apd_site.value = '';
+    }
+
+    removeApdEntry(e, id) {
+        const rule = this.apdRuleFromForm(e.target.form);
+        const accepted = rule.accepted && rule.accepted.filter((a) => a !== id);
+        this.setState({ apdDraft: { ...rule, custom: rule.custom.filter((c) => c.id !== id),
+            accepted: accepted && accepted.length ? accepted : null } });
     }
 
     async savePoster(e) {
@@ -328,7 +377,9 @@ export class CheckinPanel extends Component {
         const body = { display_name: m.name.trim(), replicas: m.replicas.map((r) => ({
             declaration_id: r.id, type: r.type, class: r.cls, ...(r.mm.trim() ? { make_model: r.mm.trim() } : {}),
         })) };
-        if (m.fed.trim()) body.federation_number = m.fed.trim();
+        if (m.fed.trim()) body.membership_number = m.fed.trim();
+        if (m.apd) body.apd_id = m.apd;
+        if (m.exp) body.membership_expires = m.exp;
         if (m.team) body.team_preference = m.team;
         const row = await this.props.app.call('POST', `/games/${g.id}/checkins`, body);
         if (row) {
@@ -363,13 +414,14 @@ export class CheckinPanel extends Component {
     renderList(g, list) {
         const s = list.settings;
         const rows = list.checkins;
+        this.apdNames = Object.fromEntries((list.apds || []).map((a) => [a.id, a.short_name]));
         return html`<section class="card" aria-labelledby="cil-h">
             <h2 id="cil-h">${t('checkin.list')}</h2>
             ${rows.length === 0 && html`<p class="muted" data-testid="checkin-empty">${t('checkin.empty')}</p>`}
             ${rows.length > 0 && html`<div class="table-wrap"><table class="table stack" role="table" data-testid="checkin-table">
                 <thead role="rowgroup"><tr role="row"><th role="columnheader">${t('checkin.name')}</th><th role="columnheader">${t('checkin.status')}</th>
                     <th role="columnheader">${squadsOf(g) ? t('checkin.team_squad') : t('checkin.team')}</th><th role="columnheader">${t('checkin.role')}</th>
-                    ${s.federation !== 'off' && html`<th role="columnheader">${s.federation_label}</th>`}
+                    ${showMembership(s) && html`<th role="columnheader">${s.apd.checkin ? t('checkin.apd_column') : s.federation_label}</th>`}
                     <th role="columnheader">${t('checkin.replicas')}</th><th role="columnheader"><span class="sr-only">${t('checkin.actions')}</span></th></tr></thead>
                 <tbody role="rowgroup">${rows.map((r) => this.renderRow(g, s, r))}</tbody>
             </table></div>`}
@@ -405,7 +457,8 @@ export class CheckinPanel extends Component {
                     onChange=${(e) => this.patch(r.player_id, { role: e.target.value })}>
                     ${ROLES.filter((ro) => ro !== 'squad_leader' || squadsOf(g) || r.role === ro)
         .map((ro) => html`<option value=${ro}>${t(`checkin.roles.${ro}`)}</option>`)}</select>` : t(`checkin.roles.${r.role}`)}</td>
-            ${s.federation !== 'off' && html`<td role="cell" data-label=${s.federation_label}>${r.federation_number || '–'}
+            ${showMembership(s) && html`<td role="cell" data-label=${s.apd.checkin ? t('checkin.apd_column') : s.federation_label}>${
+                s.apd.checkin && this.renderApd(r)} ${r.federation_number || '–'}
                 ${r.federation_number && html`<label class="check small"><input type="checkbox" data-testid="checkin-card-seen"
                     checked=${r.federation_seen} disabled=${!active}
                     onChange=${(e) => this.patch(r.player_id, { federation_seen: e.target.checked })} /> ${
@@ -420,11 +473,22 @@ export class CheckinPanel extends Component {
         </tr>`;
     }
 
+    /** The declared APD, expiry and the verdict (valid, expired, not accepted, missing) of one row. */
+    renderApd(r) {
+        const names = this.apdNames || {};
+        const apd = r.apd_id ? (names[r.apd_id] || r.apd_id) : t('checkin.apd_unknown');
+        return html`<span data-testid="checkin-apd"><span class="small muted">${apd}${
+            r.membership_expires ? ` · ${t('checkin.apd_expires_on', { date: r.membership_expires })}` : ''}</span>
+            ${r.apd_status && html` <span class=${`badge apd-${r.apd_status}`} data-testid="checkin-apd-status">${
+                t(`checkin.apd_status.${r.apd_status}`)}</span>`}
+            ${r.apd_override && html` <span class="badge" data-testid="checkin-apd-override">${t('checkin.apd_override')}</span>`}</span>`;
+    }
+
     renderManual(g, s) {
         const m = this.state.manual;
         if (!m) {
             return html`<div class="actions"><button type="button" data-testid="checkin-manual"
-                onClick=${() => this.setState({ manual: { name: '', fed: '', team: '', replicas: [] } })}>${t('checkin.manual')}</button></div>`;
+                onClick=${() => this.setState({ manual: { name: '', fed: '', apd: '', exp: '', team: '', replicas: [] } })}>${t('checkin.manual')}</button></div>`;
         }
         const set = (k, v) => this.setState({ manual: { ...m, [k]: v } });
         const setR = (i, k, v) => set('replicas', m.replicas.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
@@ -435,9 +499,14 @@ export class CheckinPanel extends Component {
             <div class="field"><label for="cm-name">${t('checkin.name')}</label>
                 <input id="cm-name" data-testid="checkin-manual-name" required maxlength="32" value=${m.name}
                     onInput=${(e) => set('name', e.target.value)} /></div>
-            ${s.federation !== 'off' && html`<div class="field"><label for="cm-fed">${s.federation_label}</label>
-                <input id="cm-fed" maxlength="32" required=${s.federation === 'required'} value=${m.fed}
+            ${s.apd.checkin && html`<div class="field"><label for="cm-apd">${t('checkin.apd_pick')}</label>
+                <select id="cm-apd" data-testid="checkin-manual-apd" value=${m.apd} onChange=${(e) => set('apd', e.target.value)}>
+                    <option value="">${t('checkin.apd_unknown')}</option>${(this.state.list.apds || []).map((a) => html`<option value=${a.id}>${a.short_name}</option>`)}</select></div>`}
+            ${showMembership(s) && html`<div class="field"><label for="cm-fed">${s.apd.checkin ? t('checkin.apd_number') : s.federation_label}</label>
+                <input id="cm-fed" data-testid="checkin-manual-fed" maxlength="32" required=${s.federation === 'required'} value=${m.fed}
                     onInput=${(e) => set('fed', e.target.value)} /></div>`}
+            ${s.apd.checkin && s.apd.expiry && html`<div class="field"><label for="cm-exp">${t('checkin.apd_expires')}</label>
+                <input id="cm-exp" data-testid="checkin-manual-expires" type="date" value=${m.exp} onInput=${(e) => set('exp', e.target.value)} /></div>`}
             <div class="field"><label for="cm-team">${t('checkin.team_preference')}</label>
                 <select id="cm-team" value=${m.team} onChange=${(e) => set('team', e.target.value)}>
                     <option value="">–</option>${g.teams.map((tm) => html`<option value=${tm}>${tm}</option>`)}</select></div>
@@ -571,10 +640,39 @@ export class CheckinPanel extends Component {
                     <select id="cs-valid" name="chrono_valid_for" value=${s.chrono_valid_for}>
                         <option value="day">${t('checkin.valid_for_day')}</option>
                         <option value="game">${t('checkin.valid_for_game')}</option></select></div>
+                ${this.renderApdSettings(list)}
                 <p class="muted small">${t('checkin.federation_note')}</p>
                 <button type="submit" data-testid="checkin-settings-save">${t('common.save')}</button>
             </form>
         </section>`;
+    }
+
+    renderApdSettings(list) {
+        const rule = this.apdDraft();
+        const choices = apdChoices(list.apds, rule);
+        return html`<fieldset class="field" data-testid="checkin-apd-settings"><legend>${t('checkin.apd_title')}</legend>
+            <label class="check"><input type="checkbox" name="apd_checkin" data-testid="checkin-apd-checkin" checked=${rule.checkin} /> ${t('checkin.apd_checkin')}</label>
+            <label class="check"><input type="checkbox" name="apd_expiry" data-testid="checkin-apd-expiry" checked=${rule.expiry} /> ${t('checkin.apd_expiry')}</label>
+            <p class="small muted">${t('checkin.apd_accepted')}</p>
+            ${choices.length === 0 && html`<p class="small muted">${t('checkin.apd_no_list')}</p>`}
+            ${choices.map((a) => html`<div><label class="check"><input type="checkbox" name="apd_accepted" value=${a.id}
+                data-testid=${`checkin-apd-accept-${a.id}`} checked=${!!rule.accepted && rule.accepted.includes(a.id)} /> ${a.name}
+                <span class="small muted">(${a.short_name})</span></label>${a.id.startsWith('x-') && html` <button type="button" class="link danger"
+                    data-testid=${`checkin-apd-remove-${a.id}`} onClick=${(e) => this.removeApdEntry(e, a.id)}>${t('checkin.apd_custom_remove')}</button>`}</div>`)}
+            <details data-testid="checkin-apd-custom"><summary>${t('checkin.apd_custom')}</summary>
+                <p class="small muted">${t('checkin.apd_custom_hint')}</p>
+                <div class="form inline">
+                    <div class="field"><label for="ca-name">${t('checkin.apd_custom_name')}</label>
+                        <input id="ca-name" name="apd_name" data-testid="checkin-apd-name" maxlength="96" /></div>
+                    <div class="field"><label for="ca-short">${t('checkin.apd_custom_short')}</label>
+                        <input id="ca-short" name="apd_short" data-testid="checkin-apd-short" maxlength="16" /></div>
+                    <div class="field"><label for="ca-site">${t('checkin.apd_custom_site')}</label>
+                        <input id="ca-site" name="apd_site" type="url" maxlength="128" placeholder="https://" /></div>
+                    <button type="button" data-testid="checkin-apd-add" onClick=${(e) => this.addApdEntryFrom(e)}>${t('checkin.apd_custom_add')}</button>
+                </div>
+            </details>
+            <p class="small muted">${t('checkin.apd_note')}</p>
+        </fieldset>`;
     }
 
     renderPoster() {

@@ -61,6 +61,13 @@ class FakeField {
 
   // --- what the controller holds ---------------------------------------------
   var federation = 'off';
+
+  /// The field's APD rule and the APDs it offers (protocol/apd.md).
+  Map<String, Object?>? apd;
+
+  /// The verdict this fake gives a check-in (the controller's job).
+  String? verdict;
+  List<Map<String, Object?>> apds = [];
   var confirm = 'auto';
   var notice = 1;
   final games = <Map<String, Object?>>[
@@ -192,6 +199,23 @@ class FakeField {
     final who = token == null ? null : tokens[token];
     FieldResponse err(int status, String detail) =>
         FieldResponse(status, {'detail': detail});
+    final confirmPath = RegExp(
+      r'^/games/42/checkins/(p-[a-z0-9]+)$',
+    ).firstMatch(path);
+    if (method == 'PATCH' && confirmPath != null) {
+      if (who == null || _role(token!, who) != 'marshal') {
+        return err(403, 'staff only');
+      }
+      final r = rows[confirmPath.group(1)];
+      if (r == null) return err(404, 'no');
+      if (b['status'] == 'checked_in') {
+        if (r['status'] == 'pending' && r['apd_status'] != null) {
+          r['apd_override'] = r['apd_status'] != 'valid';
+        }
+        r['status'] = 'checked_in';
+      }
+      return FieldResponse(200, r);
+    }
     switch ('$method $path') {
       case 'GET /checkin':
         return FieldResponse(200, {
@@ -208,7 +232,9 @@ class FakeField {
             'federation_label': 'FPA',
             'max_replicas': 5,
             'chrono_valid_for': 'day',
+            if (apd != null) 'apd': apd,
           },
+          'apds': apds,
           'limits': {
             'classes': ['cqb', 'dmr', 'rifle', 'sniper'],
           },
@@ -238,7 +264,11 @@ class FakeField {
           },
         );
         row['display_name'] = b['display_name'];
-        row['federation_number'] = b['federation_number'];
+        row['federation_number'] =
+            b['membership_number'] ?? b['federation_number'];
+        row['apd_id'] = b['apd_id'];
+        row['membership_expires'] = b['membership_expires'];
+        row['apd_status'] = verdict;
         // A site server registration's id and ticket (decision S16-8).
         row['registration_id'] = b['registration_id'];
         row['registration_ticket'] = b['ticket'];
@@ -343,6 +373,11 @@ class FakeField {
                 'display_name': r['display_name'],
                 'status': r['status'],
                 'team': r['team'],
+                'apd_id': r['apd_id'],
+                'membership_number': r['federation_number'],
+                'membership_expires': r['membership_expires'],
+                'apd_status': r['apd_status'],
+                'apd_override': r['apd_override'] == true,
                 'declarations': r['declarations'],
               },
         ];

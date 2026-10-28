@@ -262,6 +262,70 @@ void main() {
     });
   });
 
+  testWidgets('with an APD rule: the picker, the number and the expiry '
+      'replace the federation field; the server\'s refusals are told', (
+    tester,
+  ) async {
+    final site = FakeSite()
+      ..apdRule = {
+        'accepted': ['x-own'],
+        'register': true,
+        'checkin': true,
+        'expiry': true,
+        'custom': [
+          {
+            'id': 'x-own',
+            'name': 'Clube Próprio, APD',
+            'short_name': 'Próprio',
+            'website': null,
+          },
+        ],
+      };
+    final h = harness(language: AppLanguage.en, siteHttp: site.http);
+    await tester.pumpWidget(h.app(home: const SiteScreen()));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('site-address')),
+      'https://campo.example.pt/f/campo-norte',
+    );
+    await tapKey(tester, 'site-open');
+    await tapKey(tester, 'site-confirm');
+    await login(tester, site);
+    await tapKey(tester, 'site-game-$game1');
+    expect(find.byKey(const Key('reg-federation')), findsNothing);
+    expect(find.text('APD membership'), findsOneWidget);
+    expect(find.text('Accepted APDs: Próprio'), findsOneWidget);
+    await enter(tester, 'reg-name', 'Falcão');
+    await tapKey(tester, 'reg-submit');
+    expect(
+      find.text('This field asks for your APD membership number.'),
+      findsOneWidget,
+    );
+    await enter(tester, 'reg-apd-number', 'N-1');
+    await enter(tester, 'reg-apd-expires', '2027-13-01');
+    await tapKey(tester, 'reg-submit');
+    expect(
+      find.text('Write the date as YYYY-MM-DD, for instance 2027-01-31.'),
+      findsOneWidget,
+    );
+    await enter(tester, 'reg-apd-expires', '2027-06-30');
+    // An APD the field does not accept: the server says so.
+    await tapKey(tester, 'reg-submit');
+    expect(find.text('This field does not accept that APD.'), findsOneWidget);
+    await tapKey(tester, 'reg-apd-pick');
+    await tester.tap(find.text('Clube Próprio, APD').last);
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'reg-submit');
+    final sent =
+        site.bodies['POST /fields/${site.fieldId}/scheduled-games/$game1/registrations']!
+            as Map;
+    expect(sent['apd_id'], 'x-own');
+    expect(sent['membership_number'], 'N-1');
+    expect(sent['federation_number'], 'N-1');
+    expect(sent['membership_expires'], '2027-06-30');
+    expect(site.regs.values.single['apd_id'], 'x-own');
+  });
+
   testWidgets('a kept ticket goes with the check-in, with its player id', (
     tester,
   ) async {
@@ -361,6 +425,14 @@ void main() {
       for (final st in ['registered', 'checked_in', 'no_show', 'cancelled'])
         'site.reg.$st',
       for (final c in ['pending', 'confirmed', 'refused']) 'site.claim.$c',
+      for (final c in [
+        'membership_missing',
+        'apd_not_accepted',
+        'membership_expired',
+      ])
+        'site.err.$c',
+      for (final st in ['valid', 'expired', 'not_accepted', 'missing'])
+        'apd.status.$st',
     ]) {
       expect(ptStrings.containsKey(k), isTrue, reason: k);
       expect(enStrings.containsKey(k), isTrue, reason: k);

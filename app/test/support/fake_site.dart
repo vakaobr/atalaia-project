@@ -152,6 +152,8 @@ class FakeSite {
       'totals': {'red': 40, 'blue': 40},
     },
   ];
+  /// The field's APD rule (protocol/apd.md), sent with the field; null: none.
+  Map<String, Object?>? apdRule;
   final regs = <String, Map<String, Object?>>{};
   final claims = <Map<String, Object?>>[];
   final linked = <String, String>{};
@@ -162,6 +164,7 @@ class FakeSite {
     'name': 'Campo Norte',
     'timezone': 'Europe/Lisbon',
     'federation_label': 'FPA',
+    if (apdRule != null) 'apd': apdRule,
     'limit_template': 'portugal',
     'classes': ['cqb', 'dmr', 'rifle', 'sniper'],
     'max_replicas': 3,
@@ -265,6 +268,16 @@ class FakeSite {
       if (g['federation'] == 'required' && b['federation_number'] == null) {
         return err(400, 'federation_number_required');
       }
+      final rule = apdRule;
+      if (rule != null && rule['register'] == true) {
+        final accepted = rule['accepted'] as List?;
+        if (b['membership_number'] == null && b['federation_number'] == null) {
+          return err(400, 'membership_missing');
+        }
+        if (accepted != null && !accepted.contains(b['apd_id'])) {
+          return err(400, 'apd_not_accepted');
+        }
+      }
       final id =
           '0192f3a0-0000-7000-8000-0000000a${(++_n).toString().padLeft(4, '0')}';
       final r = <String, Object?>{
@@ -273,7 +286,9 @@ class FakeSite {
         'player_id': linked[fieldId] ??= 'p-sitemade2345',
         'display_name': b['display_name'],
         'team_preference': b['team_preference'],
-        'federation_number': b['federation_number'],
+        'federation_number': b['membership_number'] ?? b['federation_number'],
+        'apd_id': b['apd_id'],
+        'membership_expires': b['membership_expires'],
         'status': 'registered',
         'replicas': [
           for (final x in (b['replicas'] as List?) ?? const [])
@@ -297,6 +312,8 @@ class FakeSite {
           'display_name',
           'team_preference',
           'federation_number',
+          'apd_id',
+          'membership_expires',
         ]) {
           if (b.containsKey(k)) r[k] = b[k];
         }

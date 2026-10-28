@@ -8,6 +8,7 @@
   "required": ["format", "apds"],
   "properties": {
     "format": {"const": 1},
+    "note": {"type": "string", "maxLength": 400},
     "apds": {
       "type": "array",
       "maxItems": 256,

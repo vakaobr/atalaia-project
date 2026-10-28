@@ -57,6 +57,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 import yaml
 
 from . import REPO_ROOT, chrono, player_token
+from . import apd as apdfmt
 from . import checkin_poster as posterfmt
 from .addresses import FieldAddresses, saved_poster_urls, warn_dropped
 from . import checkin_ticket as ticketfmt
@@ -90,7 +91,8 @@ IDENTITY_DAYS = 365
 CHRONO_RETENTION_DAYS = 365
 SITE_LIMITS_SETTING = "checkin.site_limits"  # the limit template the site server sent (BR24), as it sent it
 SETTINGS_KEYS = ("confirm", "federation", "federation_label", "max_replicas", "max_players",
-                 "chrono_valid_for")
+                 "chrono_valid_for", "apd")
+APD_SITE_SETTING = "checkin.apd_site"  # the field's rule, pulled from the site server (sync.apd = "site")
 
 
 class Unauthorized(ControllerError):
@@ -188,6 +190,25 @@ def _text(name: str, value: Any, max_chars: int, optional: bool = False) -> Opti
     if not 1 <= len(value) <= max_chars or not _printable(value):
         raise ControllerError(f"{name}: 1-{max_chars} characters without control characters")
     return value
+
+
+def declared_membership(body: dict[str, Any]) -> dict[str, Optional[str]]:
+    """The membership a body declares: ``apd_id``, ``membership_number`` (or the old ``federation_number``, the
+    same value: both must agree) and ``membership_expires``; missing and null are None (protocol/apd.md)."""
+    number = _text("membership_number", body.get("membership_number") or None, FEDERATION_MAX, optional=True)
+    old = _text("federation_number", body.get("federation_number") or None, FEDERATION_MAX, optional=True)
+    if number is not None and old is not None and number != old:
+        raise ControllerError("membership_number and federation_number are the same value: send one")
+    value = {"apd": body.get("apd_id"), "number": number if number is not None else old,
+             "expires": body.get("membership_expires")}
+    if value["apd"] == "":
+        value["apd"] = None
+    if value["expires"] == "":
+        value["expires"] = None
+    try:
+        return apdfmt.check_membership(value)
+    except apdfmt.ApdError as exc:
+        raise ControllerError(f"apd_id, membership_number, membership_expires: {exc}") from None
 
 
 def player_id_ok(value: Any) -> bool:
@@ -380,19 +401,54 @@ class Checkin:
         out = {"confirm": self.cfg.checkin_confirm, "federation": self.cfg.federation,
                "federation_label": self.cfg.federation_label, "max_replicas": self.cfg.max_replicas,
                "max_players": self.cfg.max_players, "chrono_valid_for": self.cfg.chrono_valid_for}
+        out["apd"] = self._local_apd()
         saved = self.store.get_setting("checkin.settings")
         if saved:
             try:
-                out.update({k: v for k, v in json.loads(saved).items() if k in SETTINGS_KEYS})
+                out.update({k: v for k, v in json.loads(saved).items() if k in SETTINGS_KEYS and k != "apd"})
             except ValueError:
                 pass
+        if self.cfg.sync_apd == "site":
+            raw = self.store.get_setting(APD_SITE_SETTING)
+            if raw:
+                try:
+                    out["apd"] = apdfmt.check_rule(json.loads(raw))
+                except (ValueError, apdfmt.ApdError):
+                    pass
         return out
+
+    def _local_apd(self) -> dict[str, Any]:
+        """The APD rule of [checkin] apd_* and the console's saved one (the site's is laid over it)."""
+        rule = apdfmt.check_rule({"accepted": list(self.cfg.apd_accepted) or None, "checkin": self.cfg.apd_checkin,
+                                  "expiry": self.cfg.apd_expiry})
+        saved = self.store.get_setting("checkin.settings")
+        if saved:
+            try:
+                rule = apdfmt.check_rule(json.loads(saved).get("apd", rule))
+            except (ValueError, apdfmt.ApdError, AttributeError):
+                pass
+        return rule
+
+    def set_site_apd(self, rule: Optional[dict[str, Any]]) -> None:
+        """The field's APD rule from the site server (None: it sent none)."""
+        self.store.set_setting(APD_SITE_SETTING, json.dumps(rule) if rule is not None else "")
+
+    def _verdict(self, st: dict[str, Any], apd: Optional[str], number: Optional[str], expires: Optional[str],
+                 now: float) -> Optional[str]:
+        """The membership's verdict, or None when the rule does not check at check-in."""
+        rule = st["apd"]
+        if not rule["checkin"]:
+            return None
+        return apdfmt.status(rule, apd, number, expires, self.local_day(now).isoformat())
 
     def set_settings(self, spec: dict[str, Any]) -> dict[str, Any]:
         unknown = set(spec) - set(SETTINGS_KEYS)
         if unknown:
             raise ControllerError(f"unknown check-in settings {sorted(unknown)}")
+        if "apd" in spec and self.cfg.sync_apd == "site":
+            raise Conflict("the APD rule is the site server's ([sync] apd = \"site\"): change it there")
         cur = self.settings()
+        local_apd = self._local_apd()
         choices = {"confirm": ("auto", "staff"), "federation": ("off", "optional", "required"),
                    "chrono_valid_for": ("day", "game")}
         for k, v in spec.items():
@@ -400,12 +456,19 @@ class Checkin:
                 raise ControllerError(f"{k}: one of {', '.join(choices[k])}")
             if k == "federation_label":
                 _text(k, v, 16)
+            if k == "apd":
+                try:
+                    v = local_apd = apdfmt.check_rule(v)
+                except apdfmt.ApdError as exc:
+                    raise ControllerError(f"apd: {exc}") from None
             if k == "max_replicas" and (isinstance(v, bool) or not isinstance(v, int) or not 1 <= v <= 20):
                 raise ControllerError("max_replicas: 1-20")
             if k == "max_players" and (isinstance(v, bool) or not isinstance(v, int) or not 1 <= v <= 5000):
                 raise ControllerError("max_players: 1-5000")
             cur[k] = v.strip() if isinstance(v, str) else v
-        self.store.set_setting("checkin.settings", json.dumps({k: cur[k] for k in SETTINGS_KEYS}))
+        saved = {k: cur[k] for k in SETTINGS_KEYS}
+        saved["apd"] = local_apd
+        self.store.set_setting("checkin.settings", json.dumps(saved))
         self.ctrl._emit({"type": "checkin_settings", "settings": cur, "_staff": True})
         return cur
 
@@ -576,8 +639,12 @@ class Checkin:
             "limits": {"id": self.limits["id"], "name": self.limits["name"],
                        "status": self.limits["status"], "classes": sorted(self.limits["classes"])},
             "replica_types": list(REPLICA_TYPES),
+            "apds": apdfmt.choices(self._settings_apd()),
             "games": self.open_games(),
         }
+
+    def _settings_apd(self) -> dict[str, Any]:
+        return self.settings()["apd"]
 
     # --- tokens ----------------------------------------------------------------
 
@@ -658,7 +725,8 @@ class Checkin:
         if not self.rate.allow(client):
             raise TooMany("too many check-ins from this address; wait a minute")
         allowed = {"game_id", "player_id", "player_secret", "display_name", "federation_number",
-                   "team_preference", "notice_version", "replicas", "registration_id", "ticket"}
+                   "team_preference", "notice_version", "replicas", "registration_id", "ticket", "apd_id",
+                   "membership_number", "membership_expires"}
         unknown = set(body) - allowed
         if unknown:
             raise ControllerError(f"unknown fields {sorted(unknown)}")
@@ -680,7 +748,8 @@ class Checkin:
         reg_id, ticket_hex = self._registration_proof(body)
         st = self.settings()
         name = _text("display_name", body.get("display_name"), NAME_MAX)
-        fed_in = _text("federation_number", body.get("federation_number") or None, FEDERATION_MAX, optional=True)
+        decl_m = declared_membership(body)
+        fed_in, apd_in, exp_in = decl_m["number"], decl_m["apd"], decl_m["expires"]
         pref = body.get("team_preference")
         if pref is not None:
             self._team_id(game, pref, "team_preference")
@@ -704,13 +773,20 @@ class Checkin:
             if row is not None and row["status"] == "removed":
                 raise Forbidden("staff removed this check-in; ask at the desk")
             # A registered player's roster entry fills in what the app did not send.
-            fed = fed_in if fed_in is not None or expected is None else expected["federation_number"]
+            if expected is None or any(v is not None for v in (fed_in, apd_in, exp_in)):
+                fed, apd_id, exp = fed_in, apd_in, exp_in
+            else:
+                fed, apd_id, exp = expected["federation_number"], expected.get("apd_id"), \
+                    expected.get("membership_expires")
             if pref is None and expected is not None and expected["team_preference"] in game["teams"]:
                 pref = expected["team_preference"]
-            if st["federation"] == "off":
-                fed = None
+            if st["federation"] == "off" and not st["apd"]["checkin"]:
+                fed = apd_id = exp = None
             elif st["federation"] == "required" and fed is None:
                 raise ControllerError(f"federation_number: this field asks for your {st['federation_label']} number")
+            # A membership the rule does not accept waits for a marshal, who decides (protocol/apd.md).
+            verdict = self._verdict(st, apd_id, fed, exp, now)
+            auto_ok = verdict in (None, "valid")
             created = row is None or row["status"] == "expected"  # an expected player arriving is a new check-in
             emit = False
             if created:
@@ -718,9 +794,9 @@ class Checkin:
                     raise Forbidden(f"game {game_id} is full ({st['max_players']} players)")
                 if known is None:
                     self.store.add_field_player(pid, digest, now)
-                status = "checked_in" if st["confirm"] == "auto" else "pending"
+                status = "checked_in" if st["confirm"] == "auto" and auto_ok else "pending"
                 fields = {"status": status, "display_name": name, "federation_number": fed,
-                          "team_preference": pref, "notice_version": notice,
+                          "apd_id": apd_id, "membership_expires": exp, "team_preference": pref, "notice_version": notice,
                           "checked_in_at": now if status == "checked_in" else None}
                 if row is None:
                     if reg_id is not None:  # no roster here: kept, so the site server can match it later
@@ -732,13 +808,14 @@ class Checkin:
             else:
                 status = row["status"]
                 if status == "left":
-                    status = "checked_in" if st["confirm"] == "auto" else "pending"
+                    status = "checked_in" if st["confirm"] == "auto" and auto_ok else "pending"
                     emit = status == "checked_in"
                 fields = {"status": status, "display_name": name, "team_preference": pref,
                           "notice_version": notice, "updated_at": now}
-                if fed != row["federation_number"]:
-                    fields["federation_number"] = fed
-                    fields["federation_seen"] = False
+                if (fed, apd_id, exp) != (row["federation_number"], row.get("apd_id"),
+                                          row.get("membership_expires")):
+                    fields.update(federation_number=fed, apd_id=apd_id, membership_expires=exp,
+                                  federation_seen=False)
                 if emit:
                     fields["checked_in_at"] = now
                 if reg_id is not None and row["registration_id"] is None:
@@ -834,7 +911,12 @@ class Checkin:
                "registered": bool(row.get("registration_id"))}
         if names:
             out.update({"display_name": row["display_name"], "federation_number": row["federation_number"],
-                        "federation_seen": row["federation_seen"], "team_preference": row["team_preference"]})
+                        "federation_seen": row["federation_seen"], "team_preference": row["team_preference"],
+                        "membership_number": row["federation_number"], "apd_id": row.get("apd_id"),
+                        "membership_expires": row.get("membership_expires"),
+                        "apd_override": bool(row.get("apd_override")),
+                        "apd_status": self._verdict(self.settings(), row.get("apd_id"), row["federation_number"],
+                                                    row.get("membership_expires"), self._wall())})
         if declarations:
             out["declarations"] = self._decl_views(game["id"], row["player_id"])
             if names:
@@ -921,6 +1003,7 @@ class Checkin:
         now = self._wall()
         with self._lock:
             self.store.update_checkin(gid, pid, status="left", display_name=None, federation_number=None,
+                                      apd_id=None, membership_expires=None, apd_override=False,
                                       federation_seen=False, team_preference=None, updated_at=now,
                                       erased_at=now)
             for d in self.store.declarations(gid, pid):
@@ -943,8 +1026,9 @@ class Checkin:
         rows = [self.row_view(game, r) for r in self.store.checkins(game_id)]
         counts = collections.Counter(r["status"] for r in rows)
         arrived = [r for r in rows if r["status"] in ("pending", "checked_in")]
-        return {"game_id": game_id, "open": self.is_open(game_id), "settings": self.settings(),
-                "squads": int(game.get("squads") or 0),
+        st = self.settings()
+        return {"game_id": game_id, "open": self.is_open(game_id), "settings": st,
+                "apds": apdfmt.choices(st["apd"]), "squads": int(game.get("squads") or 0),
                 "counts": {s: counts.get(s, 0) for s in STATUSES}, "checkins": rows,
                 # Plan phase 16: registered players expected and arrived, and walk-ins (not registered).
                 "registrations": {"expected": counts.get("expected", 0),
@@ -956,14 +1040,16 @@ class Checkin:
         game = self._staff(viewer, game_id)
         if game["state"] == "ended":
             raise Conflict("the game has ended")
-        unknown = set(body) - {"display_name", "federation_number", "team_preference", "replicas"}
+        unknown = set(body) - {"display_name", "federation_number", "team_preference", "replicas", "apd_id",
+                               "membership_number", "membership_expires"}
         if unknown:
             raise ControllerError(f"unknown fields {sorted(unknown)}")
         st = self.settings()
         name = _text("display_name", body.get("display_name"), NAME_MAX)
-        fed = _text("federation_number", body.get("federation_number") or None, FEDERATION_MAX, optional=True)
-        if st["federation"] == "off":
-            fed = None
+        decl_m = declared_membership(body)
+        fed, apd_id, exp = decl_m["number"], decl_m["apd"], decl_m["expires"]
+        if st["federation"] == "off" and not st["apd"]["checkin"]:
+            fed = apd_id = exp = None
         elif st["federation"] == "required" and fed is None:
             raise ControllerError(f"federation_number: this field asks for the {st['federation_label']} number")
         pref = body.get("team_preference")
@@ -971,6 +1057,8 @@ class Checkin:
             self._team_id(game, pref, "team_preference")
         decls = self._check_declarations(body.get("replicas") or [], st)
         now = self._wall()
+        verdict = self._verdict(st, apd_id, fed, exp, now)
+        override = verdict not in (None, "valid")  # never refused: a marshal decides, and it is logged
         with self._lock:
             if self.store.count_checkins(game_id) >= st["max_players"]:
                 raise Forbidden(f"game {game_id} is full ({st['max_players']} players)")
@@ -980,8 +1068,11 @@ class Checkin:
             self.store.add_field_player(pid, None, now)
             self.store.add_checkin(game_id, pid, {
                 "status": "checked_in", "display_name": name, "federation_number": fed,
+                "apd_id": apd_id, "membership_expires": exp, "apd_override": override,
                 "federation_seen": fed is not None, "team_preference": pref, "manual": 1,
                 "checked_in_at": now}, now)
+            if override:
+                log.info("apd override: game %d, %s checked in by staff with membership %s", game_id, pid, verdict)
             self._replace_declarations(game, pid, decls, staff=True, now=now)
             row = self.store.checkin(game_id, pid)
             assert row is not None
@@ -995,7 +1086,8 @@ class Checkin:
         if row is None:
             raise NotFound(f"{pid} is not checked in to game {game_id}")
         gm_fields = {"team", "squad", "role"}
-        marshal_fields = {"status", "federation_seen", "replicas"}
+        marshal_fields = {"status", "federation_seen", "replicas", "apd_id", "membership_number",
+                          "membership_expires", "federation_number"}
         unknown = set(body) - gm_fields - marshal_fields
         if unknown:
             raise ControllerError(f"unknown fields {sorted(unknown)}")
@@ -1037,6 +1129,20 @@ class Checkin:
             if not isinstance(body["federation_seen"], bool):
                 raise ControllerError("federation_seen: true or false")
             fields["federation_seen"] = body["federation_seen"]
+        if {"apd_id", "membership_number", "membership_expires", "federation_number"} & set(body):
+            m = declared_membership(body)  # what a marshal sends replaces the three; null clears
+            if (m["number"], m["apd"], m["expires"]) != (row["federation_number"], row.get("apd_id"),
+                                                          row.get("membership_expires")):
+                fields.update(federation_number=m["number"], apd_id=m["apd"], membership_expires=m["expires"],
+                              federation_seen=False)
+        if emit:  # a confirmation over a verdict other than valid is the marshal's call: kept and logged
+            st = self.settings()
+            verdict = self._verdict(st, fields.get("apd_id", row.get("apd_id")),
+                                    fields.get("federation_number", row["federation_number"]),
+                                    fields.get("membership_expires", row.get("membership_expires")), now)
+            if verdict not in (None, "valid"):
+                fields["apd_override"] = True
+                log.info("apd override: game %d, %s confirmed by staff with membership %s", game_id, pid, verdict)
         with self._lock:
             if "replicas" in body:
                 decls = self._check_declarations(body["replicas"], self.settings())
@@ -1059,7 +1165,8 @@ class Checkin:
         now = self._wall()
         with self._lock:
             self.store.update_checkin(game_id, pid, status="removed", display_name=None,
-                                      federation_number=None, federation_seen=False, team_preference=None,
+                                      federation_number=None, apd_id=None, membership_expires=None,
+                                      apd_override=False, federation_seen=False, team_preference=None,
                                       updated_at=now, erased_at=now)
             for d in self.store.declarations(game_id, pid):
                 if d["state"] == "pending":
@@ -1189,11 +1296,14 @@ class Checkin:
                 except ControllerError:
                     out["conflicts"] += 1
                     continue
-                fed = reg.get("federation_number") if st["federation"] != "off" else None
+                asked = st["federation"] != "off" or st["apd"]["checkin"]
+                fed = reg.get("federation_number") if asked else None
+                apd_id = reg.get("apd_id") if asked else None
+                exp = reg.get("membership_expires") if asked else None
                 pref = reg.get("team_preference") if reg.get("team_preference") in game["teams"] else None
                 decls = self._roster_declarations(game_id, pid, reg["replicas"], st, out)
-                fields = {"display_name": name, "federation_number": fed, "team_preference": pref,
-                          "registration_id": rid, "ticket_sha256": reg.get("ticket_sha256"), "from_roster": 1}
+                fields = {"display_name": name, "federation_number": fed, "apd_id": apd_id,
+                          "membership_expires": exp, "team_preference": pref, "registration_id": rid, "ticket_sha256": reg.get("ticket_sha256"), "from_roster": 1}
                 if row is None:
                     self.store.add_checkin(game_id, pid, {"status": "expected", **fields}, now)
                     self._replace_declarations(game, pid, decls, staff=True, now=now)
@@ -1262,12 +1372,16 @@ class Checkin:
         out = io.StringIO()
         w = csv.writer(out, lineterminator="\r\n")
         w.writerow(["player_id", "display_name", "status", "team", "squad", "role", "federation_number",
-                    "card_seen", "manual", "checked_in_at", "declaration_id", "replica_id", "type", "class",
+                    "apd_id", "membership_expires", "apd_status", "card_seen", "manual", "checked_in_at", "declaration_id", "replica_id", "type", "class",
                     "make_model", "chrono"])
+        st, now = self.settings(), self._wall()
         for r in self.store.checkins(game_id):
             base = [r["player_id"], _csv_safe(r["display_name"]), r["status"],
                     self._team_name(game, r["team"]) or "", r["squad"] or "", r["role"],
-                    _csv_safe(r["federation_number"]), "yes" if r["federation_seen"] else "",
+                    _csv_safe(r["federation_number"]), r.get("apd_id") or "", r.get("membership_expires") or "",
+                    self._verdict(st, r.get("apd_id"), r["federation_number"], r.get("membership_expires"), now)
+                    or "",
+                    "yes" if r["federation_seen"] else "",
                     "yes" if r["manual"] else "",
                     _iso(r["checked_in_at"])]
             decls = self.store.declarations(game_id, r["player_id"]) or [None]

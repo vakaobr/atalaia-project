@@ -13,9 +13,15 @@ the membership number and its expiry are what the player declares and the marsha
 
 ## Status of the list
 
-The list is **empty** on purpose: no entry is added without an official public source that shows the
-association exists and is recognised for airsoft (decision APD-1). A field is not blocked meanwhile: it adds
-its own entries (site server field settings, or the controller's console; their ids start with `x-`).
+Started on 2026-10-28 from the associations that jogarairsoft.pt names as partners (ALA, ADAPT, APAP, APACORP;
+decision APD-1). An entry is kept only where the association's own site confirms it (`source`). Left out for
+now, until its own official page can be read: **ADAPT** (Associação Desportiva de Airsoft Português; its site
+answered 503 when checked) and **T13** (nothing found). **APAP**'s own site shows only "APAP-APD" and says it is
+"Reconhecida no IPDJ"; its full name is in the statutes PDF it links, which has no text layer, so the entry
+carries the name as the site writes it until someone supplies the full one by pull request. ALA's and APACORP's
+sites show the APD designation; neither states a recognition in words (ALA shows the IPDJ's logo).
+A field is never blocked by a missing entry: it adds its own (site server field settings, or the controller's
+console; their ids start with `x-`).
 
 ## Adding an APD by pull request
 

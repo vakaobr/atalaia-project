@@ -29,6 +29,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
   GM), the Flutter screen-template renderer, join by QR/NFC/text, European
   Portuguese and English, the Kotlin plugins, the emulator CI job; iOS not
   built (see below)
+- [x] APD membership at check-in (2026-10-28, decisions APD-1 to APD-14, protocol/apd.md): the Pi controller (`apd.py`, `[checkin] apd_*`, `[sync] apd`, store schema 15, the roster and `GET /api/v1/sync/field` carry the rule and the membership) and the GM console (verdict badge per row, rule editor, own APDs); a self check-in the rule does not accept waits for a marshal, whose confirmation is never refused and is logged. Nothing is verified automatically and the project's list of APDs is empty until an entry has an official public source.
 - [x] Plan phase E (2026-10-19): field check-in with the printed poster,
   player tokens and the role-filtered stream, signed chrono readings and the
   "replicas to chrono" list, HTTPS with the field CA, Android props on Wi-Fi,
@@ -519,6 +520,10 @@ font's Chinese subset made again. Python: the contract runner's new steps,
 `test_sync_client.py` and `test_remote_gm.py` for the two fixes; the Pi's
 code changed only for them (`engine.py`, `sync_client.py`, `remote_gm.py`).
 Not run: the real site server against the phone (PE24-129).
+
+## APD membership checks (2026-10-28)
+
+[protocol/apd.md](../../protocol/apd.md) on the phone, decisions APD-40 to APD-49 (the maintainer chose membership checks for registration and check-in, not a national directory). `lib/protocol/apd.dart` (rule, membership, verdict, list; vectors `apd.json`), `assets/apds.json` (copy of the registry's list, empty for now), `lib/checkin/apd_fields.dart` (the form part and the verdict badge). **Phone controller:** the rule is the check-in setting `apd` (GET/PUT `/api/v1/checkin/settings`, `settings.apd` and `apds` in GET `/api/v1/checkin`) or the site server's with the sync option `apd = "site"` (`field.apd` of `GET /api/v1/sync/field`, pulled when branding or apd is `site`; the console then gets 409); the check-in, the hand check-in and the marshal's PATCH take `apd_id`, `membership_number` (alias `federation_number`, both must agree) and `membership_expires`; with `checkin` a self check-in whose verdict is not `valid` stays `pending` for a marshal, and a marshal's confirmation or hand check-in is never refused but marked `apd_override` and logged without the number; staff rows, the chrono list and the CSV carry the APD, expiry and `apd_status`; the roster and the field answer take the additive `apd`; the three fields are erased with the federation number (leaving, removal, retention). **App:** the registration and check-in forms show the picker, number and expiry when the field's rule asks (the old federation field otherwise), the server's `membership_missing`, `apd_not_accepted` and `membership_expired` are told, the player's status and the marshal's queue show the verdict. Texts in pt, en, de and zh-TW. Not done: the marshal's manual check-in dialog still asks only for the name (the APD can be set with PATCH), and the queue lists only players with replicas to chrono, so a pending player without replicas is confirmed from the GM console; the Pi and the console do the same on their side.
 
 ## Medic Kit (2026-10-19)
 

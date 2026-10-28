@@ -95,6 +95,9 @@ operator = ""                     # who runs the field: the data controller in t
 confirm = "auto"                  # or "staff": a marshal or the GM confirms each check-in
 federation = "off"                # or "optional", "required": the federation number, never verified
 federation_label = "FPA"
+apd_checkin = false               # check the player's APD membership (association, number, expiry) at check-in
+apd_expiry = false                # ... and require its expiry date and check it
+apd_accepted = []                 # APD ids accepted, e.g. ["x-meu-clube"]; empty: any (protocol/apd.md)
 max_replicas = 5                  # per player and game
 max_players = 300                 # per game
 chrono_valid_for = "day"          # or "game"
@@ -122,6 +125,7 @@ timeout_s = 15.0                  # per request
 # commands, over a WebSocket this controller opens; every command is logged on both
 # sides (plan phase 19). Off by default.
 remote_gm = false
+apd = "local"                     # or "site": the field's APD rule from the site server (needs the field's key)
 library = true                    # the field's scenario library and game presets from the site server,
                                   # installed (and checked again) on every controller of the field
 

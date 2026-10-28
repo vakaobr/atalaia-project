@@ -12,6 +12,7 @@
 /// before anything else happens, so a lost answer screen never loses one.
 library;
 
+import '../protocol/apd.dart';
 import '../storage/app_store.dart';
 import 'site_client.dart';
 
@@ -28,6 +29,7 @@ final class SiteField {
       name = '${j['name']}',
       timezone = _str(j['timezone']) ?? 'UTC',
       federationLabel = _str(j['federation_label']) ?? '',
+      apd = ApdRule.lenient(j['apd']),
       classes = _strings(j['classes']),
       maxReplicas = j['max_replicas'] is int ? j['max_replicas']! as int : 5;
 
@@ -36,6 +38,9 @@ final class SiteField {
   final String name;
   final String timezone;
   final String federationLabel;
+
+  /// The field's APD rule (protocol/apd.md); the default when it sends none.
+  final ApdRule apd;
   final List<String> classes;
   final int maxReplicas;
 }
@@ -112,7 +117,10 @@ final class Registration {
       playerId = '${j['player_id']}',
       displayName = _str(j['display_name']),
       teamPreference = _str(j['team_preference']),
-      federationNumber = _str(j['federation_number']),
+      federationNumber =
+          _str(j['membership_number']) ?? _str(j['federation_number']),
+      apdId = _str(j['apd_id']),
+      membershipExpires = _str(j['membership_expires']),
       status = _str(j['status']) ?? 'registered',
       hasTicket = j['has_ticket'] == true,
       replicas = [
@@ -139,7 +147,11 @@ final class Registration {
   final String playerId;
   final String? displayName;
   final String? teamPreference;
+
+  /// The membership number (the old federation number).
   final String? federationNumber;
+  final String? apdId;
+  final String? membershipExpires;
   final String status;
   final bool hasTicket;
   final List<RegReplica> replicas;
@@ -162,11 +174,20 @@ final class RegistrationForm {
     required this.displayName,
     this.teamPreference,
     this.federationNumber,
+    this.apdId,
+    this.membershipExpires,
     this.replicas,
   });
   final String displayName;
   final String? teamPreference;
+
+  /// The membership number (sent as `membership_number` and, for an older
+  /// server, `federation_number`).
   final String? federationNumber;
+  final String? apdId;
+
+  /// `YYYY-MM-DD`.
+  final String? membershipExpires;
 
   /// Null: not sent (the game does not ask for replicas).
   final List<RegReplica>? replicas;
@@ -175,6 +196,9 @@ final class RegistrationForm {
     'display_name': displayName,
     'team_preference': teamPreference,
     'federation_number': federationNumber,
+    'membership_number': federationNumber,
+    'apd_id': apdId,
+    'membership_expires': membershipExpires,
     if (replicas != null)
       'replicas': [for (final r in replicas!) r.toRequest()],
   };

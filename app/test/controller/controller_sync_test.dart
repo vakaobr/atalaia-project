@@ -29,6 +29,7 @@ import 'package:atalaia_app/controller/controller_store.dart';
 import 'package:atalaia_app/controller/controller_sync.dart';
 import 'package:atalaia_app/controller/controller_sync_format.dart';
 import 'package:atalaia_app/ffi/bindings.dart';
+import 'package:atalaia_app/protocol/apd.dart';
 import 'package:atalaia_app/radio/rf_codec.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -333,6 +334,7 @@ void main() {
 
   ControllerSync client({
     String branding = 'local',
+    String apd = 'local',
     bool library = false,
     String? url,
   }) {
@@ -343,6 +345,7 @@ void main() {
         apiKey: key,
         timeoutS: 10,
         branding: branding,
+        apd: apd,
         library: library,
       ),
       schedule: schedule,
@@ -1157,6 +1160,62 @@ void main() {
             .status,
         409,
       );
+    });
+  });
+
+  group('the APD rule from the site (protocol/apd.md)', () {
+    Map<String, Object?> fieldAnswer(Object? apd) => {
+      'sync_version': 1,
+      'field': {
+        'field_name': null,
+        'accent': null,
+        'logo': null,
+        'wallpaper': null,
+        'apd': ?apd,
+      },
+      'teams': <Object?>[],
+    };
+
+    test('pulled with [sync] apd = site, alone: the branding stays the '
+        'console\'s, and the console cannot change the rule', () async {
+      site.gets['/api/v1/sync/field'] = fieldAnswer({
+        'accepted': ['apd-a'],
+        'checkin': true,
+        'expiry': true,
+      });
+      final c = client(apd: 'site');
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      final rule = checkin.apdRule();
+      expect(rule.accepted, ['apd-a']);
+      expect((rule.checkin, rule.expiry), (true, true));
+      expect(c.brandingPulledAt, isNull, reason: 'branding is local');
+      final put = api.handle(
+        'PUT',
+        Uri.parse('/api/v1/checkin/settings'),
+        authorization: 'Bearer g',
+        body: jsonEncode({'apd': ApdRule.defaults.toJson()}),
+        client: 'local',
+      );
+      expect(put.status, 409);
+      // The site drops its rule: the default is in force.
+      site.gets['/api/v1/sync/field'] = fieldAnswer(null);
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(checkin.apdRule(), ApdRule.defaults);
+    });
+
+    test('not pulled with apd = local', () async {
+      site.gets['/api/v1/sync/field'] = fieldAnswer({'checkin': true});
+      final c = client();
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(site.requests.where((r) => r.$2 == '/api/v1/sync/field'), isEmpty);
+      expect(checkin.apdRule(), ApdRule.defaults);
+    });
+
+    test('a rule the controller cannot read refuses the answer', () async {
+      site.gets['/api/v1/sync/field'] = fieldAnswer({'checkin': 'yes'});
+      final c = client(apd: 'site');
+      await c.runOnce();
+      expect(checkin.apdRule(), ApdRule.defaults);
     });
   });
 

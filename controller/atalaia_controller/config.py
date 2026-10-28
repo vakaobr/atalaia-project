@@ -58,6 +58,9 @@
     confirm = "auto"            # or "staff": a check-in waits until a marshal or the GM confirms it
     federation = "off"          # or "optional", "required": the federation number (never verified)
     federation_label = "FPA"
+    apd_checkin = false         # check the player's APD membership at check-in (protocol/apd.md)
+    apd_expiry = false          # ... and its expiry date
+    apd_accepted = []           # APD ids accepted; empty: any
     max_replicas = 5            # per player and game, 1-20
     max_players = 300           # per game
     chrono_valid_for = "day"    # or "game": how long a chrono pass counts
@@ -176,9 +179,10 @@ SECTIONS = {
     "mqtt": ("enabled", "host", "port", "username", "password"),
     "join": ("key",),
     "sync": ("enabled", "url", "api_key", "ca_file", "interval_game_s", "interval_idle_s", "timeout_s",
-             "branding", "remote_gm", "library"),
+             "branding", "remote_gm", "library", "apd"),
     "checkin": ("field_id", "field_name", "operator", "confirm", "federation", "federation_label",
-                "max_replicas", "max_players", "chrono_valid_for", "rate_per_minute", "urls",
+                "apd_checkin", "apd_expiry", "apd_accepted", "max_replicas", "max_players", "chrono_valid_for",
+                "rate_per_minute", "urls",
                 "wifi_ssid", "limit_template", "notice_version", "notice_pt", "notice_en",
                 "retention_days"),
     "atak": ("enabled", "multicast", "interval_s", "staff_endpoints", "players", "remote", "remote_players"),
@@ -241,6 +245,9 @@ class Config:
     checkin_confirm: str = "auto"
     federation: str = "off"
     federation_label: str = "FPA"
+    apd_checkin: bool = False
+    apd_expiry: bool = False
+    apd_accepted: list[str] = field(default_factory=list)
     max_replicas: int = 5
     max_players: int = 300
     chrono_valid_for: str = "day"
@@ -261,6 +268,7 @@ class Config:
     sync_interval_idle_s: float = 300.0
     sync_timeout_s: float = 15.0
     sync_branding: str = "local"  # "local" (the console's) or "site" (pulled from the site server)
+    sync_apd: str = "local"  # "local" (the console's APD rule) or "site" (the field's, pulled from the site server)
     sync_remote_gm: bool = False  # the remote GM through the site server's stream (plan phase 19)
     sync_library: bool = True  # pull the field's scenarios and presets from the site server (plan phase 20)
     # [atak]
@@ -358,6 +366,13 @@ def _check_checkin(cfg: "Config") -> None:
         raise ConfigError(f"checkin.field_name: 1-{FIELD_NAME_MAX} characters")
     if not 1 <= len(cfg.federation_label) <= 16:
         raise ConfigError("checkin.federation_label: 1-16 characters")
+    try:
+        from .apd import check_rule  # noqa: PLC0415
+
+        check_rule({"accepted": list(cfg.apd_accepted) or None, "checkin": cfg.apd_checkin,
+                    "expiry": cfg.apd_expiry})
+    except ValueError as exc:
+        raise ConfigError(f"checkin.apd_accepted: 1-32 distinct ids of a-z 0-9 - ({exc})") from None
     if not 1 <= cfg.max_replicas <= 20:
         raise ConfigError("checkin.max_replicas must be 1-20")
     if not 1 <= cfg.max_players <= 5000:
@@ -392,6 +407,8 @@ def _check_sync(cfg: "Config") -> None:
         raise ConfigError("sync.timeout_s must be 1-300 seconds")
     if cfg.sync_branding not in ("local", "site"):
         raise ConfigError("sync.branding must be 'local' (the console's) or 'site' (the site server's)")
+    if cfg.sync_apd not in ("local", "site"):
+        raise ConfigError("sync.apd must be 'local' (the console's) or 'site' (the site server's)")
     if cfg.sync_remote_gm and not cfg.sync_enabled:
         raise ConfigError("sync.remote_gm needs sync.enabled (the remote GM rides the sync's link)")
 

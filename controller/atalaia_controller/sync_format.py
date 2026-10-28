@@ -62,6 +62,7 @@ import uuid
 import xml.etree.ElementTree as ET
 from typing import Any
 
+from . import apd as apdfmt
 from . import chrono, images
 
 SYNC_VERSION = 1
@@ -624,13 +625,26 @@ def check_declaration(d: Any, path: str) -> dict[str, Any]:
     return d
 
 
+def check_apd_rule(value: Any, path: str) -> dict[str, Any]:
+    """An APD rule (protocol/apd.md), normalised; null is the default rule."""
+    try:
+        return apdfmt.check_rule(value)
+    except apdfmt.ApdError:
+        _fail("bad_apd_rule", path)
+        raise  # unreachable: _fail raises
+
+
 def check_roster(body: Any) -> dict[str, Any]:
     """GET /api/v1/sync/roster's answer: a scheduled game's live registrations, with what the check-in
     list needs and nothing more (ADR-P4-11): the player's id at the field, the display name, the team
     preference, the federation number only when the game asks for one, the ticket's SHA-256 and the
     pre-declared replicas."""
-    body = _answer_envelope(body, ("scheduled_game_id", "status", "federation", "registrations"))
+    body = _answer_envelope(body, ("scheduled_game_id", "status", "federation", "registrations"), ("apd",))
     _uuid(body["scheduled_game_id"], "scheduled_game_id")
+    rule = check_apd_rule(body.get("apd"), "apd")
+    if "apd" in body:
+        body["apd"] = rule
+    asked = body["federation"] != "off" or rule["register"] or rule["checkin"]
     if body["status"] not in ROSTER_STATES:
         _fail("bad_state", "status")
     if body["federation"] not in ("off", "optional", "required"):
@@ -640,7 +654,7 @@ def check_roster(body: Any) -> dict[str, Any]:
         path = f"registrations[{i}]"
         r = _obj(r, path)
         _keys(r, path, ("registration_id", "player_id", "display_name", "replicas"),
-              ("team_preference", "federation_number", "ticket_sha256"))
+              ("team_preference", "federation_number", "ticket_sha256", "apd_id", "membership_expires"))
         _uuid(r["registration_id"], f"{path}.registration_id")
         _text(r["player_id"], f"{path}.player_id", 14, pattern=PLAYER_ID)
         if r["registration_id"] in regs or r["player_id"] in players:
@@ -650,8 +664,14 @@ def check_roster(body: Any) -> dict[str, Any]:
         _text(r["display_name"], f"{path}.display_name", 32)
         _text(r.setdefault("team_preference", None), f"{path}.team_preference", SCHEDULE_TEAM_MAX, null=True)
         fed = _text(r.setdefault("federation_number", None), f"{path}.federation_number", 32, null=True)
-        if fed is not None and body["federation"] == "off":
+        if fed is not None and not asked:
             _fail("not_asked", f"{path}.federation_number")
+        try:
+            apdfmt.check_membership({"apd": r.get("apd_id"), "expires": r.get("membership_expires")})
+        except apdfmt.ApdError:
+            _fail("bad_membership", f"{path}.apd_id")
+        if (r.get("apd_id") is not None or r.get("membership_expires") is not None) and not asked:
+            _fail("not_asked", f"{path}.apd_id")
         _text(r.setdefault("ticket_sha256", None), f"{path}.ticket_sha256", 64, null=True, pattern=SHA256_HEX)
         for j, d in enumerate(_list(r["replicas"], f"{path}.replicas", MAX_DECLARATIONS)):
             check_declaration(d, f"{path}.replicas[{j}]")
@@ -858,7 +878,9 @@ def check_field(body: Any) -> dict[str, Any]:
     body = _answer_envelope(body, ("field", "teams"), ("settings",))
     check_field_settings(body.get("settings"))
     f = _obj(body["field"], "field")
-    _keys(f, "field", (), ("field_name", "accent", "logo", "wallpaper"))
+    _keys(f, "field", (), ("field_name", "accent", "logo", "wallpaper", "apd"))
+    if "apd" in f:
+        f["apd"] = check_apd_rule(f["apd"], "field.apd")
     name = _text(f.setdefault("field_name", None), "field.field_name", FIELD_NAME_MAX, null=True)
     if name is not None and name != name.strip():
         _fail("bad_text", "field.field_name")

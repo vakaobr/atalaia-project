@@ -26,6 +26,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
+import '../protocol/apd.dart';
 import 'controller_images.dart' show ImageLimits, imageTypes;
 import 'controller_modes.dart' show compareCodePoints;
 
@@ -786,13 +787,29 @@ Json checkDeclaration(Object? raw, String path) {
   return d;
 }
 
+/// A field's APD rule as an answer carries it (protocol/apd.md), normalised.
+Json _checkApd(Object? value, String path) {
+  try {
+    return ApdRule.parse(value).toJson();
+  } on ApdError {
+    _fail('bad_value', path);
+  }
+}
+
+final _apdIdRe = RegExp(r'^[a-z0-9][a-z0-9-]{0,31}$');
+
 Json checkRoster(Object? raw) {
-  final body = _answerEnvelope(raw, [
-    'scheduled_game_id',
-    'status',
-    'federation',
-    'registrations',
-  ]);
+  final body = _answerEnvelope(
+    raw,
+    ['scheduled_game_id', 'status', 'federation', 'registrations'],
+    ['apd'],
+  );
+  var apdAsks = false;
+  if (body.containsKey('apd')) {
+    final rule = _checkApd(body['apd'], 'apd');
+    body['apd'] = rule;
+    apdAsks = rule['checkin'] == true || rule['register'] == true;
+  }
   _uuid(body['scheduled_game_id'], 'scheduled_game_id');
   if (!_scheduledStates.contains(body['status'])) _fail('bad_state', 'status');
   if (!_federations.contains(body['federation'])) {
@@ -808,7 +825,13 @@ Json checkRoster(Object? raw) {
       r,
       path,
       ['registration_id', 'player_id', 'display_name', 'replicas'],
-      ['team_preference', 'federation_number', 'ticket_sha256'],
+      [
+        'team_preference',
+        'federation_number',
+        'ticket_sha256',
+        'apd_id',
+        'membership_expires',
+      ],
     );
     _uuid(r['registration_id'], '$path.registration_id');
     _text(r['player_id'], '$path.player_id', 14, pattern: playerIdRe);
@@ -831,8 +854,24 @@ Json checkRoster(Object? raw) {
       32,
       nullable: true,
     );
-    if (fed != null && body['federation'] == 'off') {
+    if (fed != null && body['federation'] == 'off' && !apdAsks) {
       _fail('not_asked', '$path.federation_number');
+    }
+    final apdId = _text(
+      _default(r, 'apd_id', null),
+      '$path.apd_id',
+      32,
+      nullable: true,
+      pattern: _apdIdRe,
+    );
+    final expires = _default(r, 'membership_expires', null);
+    if (expires != null && (expires is! String || !validApdDate(expires))) {
+      _fail('bad_value', '$path.membership_expires');
+    }
+    if ((apdId != null || expires != null) &&
+        body['federation'] == 'off' &&
+        !apdAsks) {
+      _fail('not_asked', '$path.apd_id');
     }
     _text(
       _default(r, 'ticket_sha256', null),
@@ -1108,7 +1147,14 @@ Json checkField(Object? raw) {
   checkFieldSettings(body['settings']);
   final f = _obj(body['field'], 'field');
   body['field'] = f;
-  _keys(f, 'field', const [], ['field_name', 'accent', 'logo', 'wallpaper']);
+  _keys(f, 'field', const [], [
+    'field_name',
+    'accent',
+    'logo',
+    'wallpaper',
+    'apd',
+  ]);
+  if (f.containsKey('apd')) f['apd'] = _checkApd(f['apd'], 'field.apd');
   final name = _text(
     _default(f, 'field_name', null),
     'field.field_name',

@@ -1170,4 +1170,35 @@ const Map<String, String> deStrings = {
   'ctl_site.remote_players': 'Auch Spielerpositionen über den Site-Server',
   'ctl_site.bad_sync': 'Site-Server: {why}',
   'ctl_site.bad_atak': 'ATAK: {why}',
+  'apd.section': 'APD-Mitgliedschaft',
+  'apd.accepts_any': 'Jede APD wird akzeptiert.',
+  'apd.accepts': 'Akzeptierte APDs: {list}',
+  'apd.pick': 'Deine APD',
+  'apd.unlisted': 'Nicht in der Liste',
+  'apd.number': 'Mitgliedsnummer',
+  'apd.number_required': 'Mitgliedsnummer (erforderlich)',
+  'apd.expires': 'Gültig bis (JJJJ-MM-TT)',
+  'apd.expires_required': 'Gültig bis, JJJJ-MM-TT (erforderlich)',
+  'apd.date_format': '2027-01-31',
+  'apd.hint':
+      'Die App prüft sie nicht: Ein Marshal vergleicht sie mit deinem Ausweis.',
+  'apd.need_number': 'Dieses Feld verlangt deine APD-Mitgliedsnummer.',
+  'apd.need_expiry':
+      'Dieses Feld verlangt das Ablaufdatum deiner Mitgliedschaft.',
+  'apd.bad_date':
+      'Das Datum als JJJJ-MM-TT schreiben, zum Beispiel 2027-01-31.',
+  'apd.until': 'bis {date}',
+  'apd.overridden': 'von einem Marshal zugelassen',
+  'apd.status.valid': 'Mitgliedschaft gültig',
+  'apd.status.expired': 'Mitgliedschaft abgelaufen',
+  'apd.status.not_accepted': 'APD hier nicht akzeptiert',
+  'apd.status.missing': 'Mitgliedschaft fehlt',
+  'apd.hint_marshal': 'Ein Marshal sieht sich deinen Mitgliedsausweis an.',
+  'queue.confirm': 'Zulassen',
+  'site.err.membership_missing':
+      'Dieses Feld braucht für die Anmeldung deine APD-Mitgliedsnummer.',
+  'site.err.apd_not_accepted': 'Dieses Feld akzeptiert diese APD nicht.',
+  'site.err.membership_expired':
+      'Die Mitgliedschaft ist am Tag dieses Spiels abgelaufen.',
+  'ctl_site.apd': 'Die APD-Regel des Felds vom Site-Server',
 };

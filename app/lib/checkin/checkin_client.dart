@@ -17,6 +17,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import '../chrono/replica.dart' show Replica;
+import '../protocol/apd.dart';
 import 'field_route.dart';
 import 'field_trust.dart';
 
@@ -331,6 +332,27 @@ final class FieldInfo {
   String get federation => (settings['federation'] as String?) ?? 'off';
   String get federationLabel =>
       (settings['federation_label'] as String?) ?? 'FPA';
+
+  /// The field's APD rule (protocol/apd.md); the default from an older
+  /// controller or one this build cannot read.
+  ApdRule get apdRule => ApdRule.lenient(settings['apd']);
+
+  /// The APDs to offer: the project's list and the field's own entries.
+  List<ApdEntry> get apds {
+    final raw = json['apds'];
+    if (raw is! List) return const [];
+    return [
+      for (final e in raw)
+        if (e is Map)
+          ApdEntry(
+            id: '${e['id']}',
+            name: '${e['name']}',
+            shortName: '${e['short_name'] ?? e['name']}',
+            website: e['website'] as String?,
+          ),
+    ];
+  }
+
   int get maxReplicas => (settings['max_replicas'] as int?) ?? 5;
   String get confirm => (settings['confirm'] as String?) ?? 'auto';
 
@@ -395,6 +417,8 @@ class CheckinClient {
     required String displayName,
     required int noticeVersion,
     String? federationNumber,
+    String? apdId,
+    String? membershipExpires,
     String? teamPreference,
     List<Declaration>? replicas,
     String? registrationId,
@@ -416,6 +440,9 @@ class CheckinClient {
         'display_name': displayName,
         'notice_version': noticeVersion,
         'federation_number': ?federationNumber,
+        'membership_number': ?federationNumber,
+        'apd_id': ?apdId,
+        'membership_expires': ?membershipExpires,
         'team_preference': ?teamPreference,
         if (replicas != null)
           'replicas': [for (final d in replicas) d.toRequest()],

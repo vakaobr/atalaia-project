@@ -3864,6 +3864,37 @@ class ConsoleBrowserTests(unittest.TestCase):
         read.get_by_test_id("tab-checkin").click()
         expect(read.locator("main.content")).not_to_contain_text("Coruja")
 
+    def test_checkin_tab_shows_the_apd_verdict_and_edits_the_rule(self):
+        """APD membership (protocol/apd.md): the GM sets the rule in the settings (an own APD included), the table
+        shows the declared APD, the expiry and a verdict, and a check-in the rule does not accept waits for a marshal."""
+        game = self.field.create_game()
+        self.field.http.put("/api/v1/checkin/settings", json={"apd": {
+            "checkin": True, "expiry": True, "accepted": ["x-clube"],
+            "custom": [{"id": "x-clube", "name": "Clube Teste, APD", "short_name": "Clube", "website": None}]}})
+        late = self.check_in(game["id"], "Atrasada", apd_id="x-clube", membership_number="12", membership_expires="2020-01-01")
+        good = self.check_in(game["id"], "Pontual", apd_id="x-clube", membership_number="13", membership_expires="2099-01-01")
+        self.assertEqual((late["status"], good["status"]), ("pending", "checked_in"))
+        page = self.console()
+        page.get_by_test_id("tab-checkin").click()
+        row = page.get_by_test_id(f"checkin-row-{late['player_id']}")
+        expect(row.get_by_test_id("checkin-apd-status")).to_have_text("caducada")
+        expect(row.get_by_test_id("checkin-apd")).to_contain_text("Clube")
+        expect(page.get_by_test_id(f"checkin-row-{good['player_id']}").get_by_test_id("checkin-apd-status")).to_have_text("válida")
+        row.get_by_test_id("checkin-confirm").click()
+        expect(row.get_by_test_id("checkin-apd-override")).to_be_visible()
+        # The rule's own entry is listed in the settings, ticked; add another and save.
+        expect(page.get_by_test_id("checkin-apd-accept-x-clube")).to_be_checked()
+        page.get_by_test_id("checkin-apd-custom").locator("summary").click()
+        page.get_by_test_id("checkin-apd-name").fill("Outra Associação, APD")
+        page.get_by_test_id("checkin-apd-short").fill("Outra")
+        page.get_by_test_id("checkin-apd-add").click()
+        expect(page.get_by_test_id("checkin-apd-accept-x-outra")).to_be_visible()
+        expect(page.get_by_test_id("checkin-apd-accept-x-clube")).to_be_checked()  # what was ticked stays
+        page.get_by_test_id("checkin-apd-accept-x-outra").check()
+        page.get_by_test_id("checkin-settings-save").click()
+        self.assertTrue(wait_for(lambda: self.field.http.get("/api/v1/checkin/settings").json()["apd"]["accepted"]
+                                 == ["x-clube", "x-outra"], 5))
+
     def test_marshal_list_in_the_checkin_tab(self):
         """Decisions MR-1 to MR-14: the GM adds a checked-in player to the marshal list (the controller gives the
         id and the role), sees when the player's app has registered its key, renames and removes."""

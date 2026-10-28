@@ -250,6 +250,55 @@ void main() {
     expect(classifyCode(label), isNull);
   });
 
+  testWidgets('the marshal sees the APD verdict and lets a pending player in', (
+    tester,
+  ) async {
+    field
+      ..confirm = 'staff'
+      ..verdict = 'expired';
+    field.handle('POST', '/checkin', {
+      'game_id': 42,
+      'player_id': 'p-lapsedlapsed',
+      'player_secret': 'z',
+      'display_name': 'Gaio',
+      'notice_version': 1,
+      'apd_id': 'apd-a',
+      'membership_number': 'A-1',
+      'membership_expires': '2026-01-01',
+      'replicas': [
+        {
+          'declaration_id': '7a1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b',
+          'type': 'aeg',
+          'class': 'rifle',
+        },
+      ],
+    }, null);
+    final h = harness(fieldHttp: field.http);
+    final r = await records(h.store, h.settings);
+    await tester.pumpWidget(
+      h.app(
+        home: ChronoQueueScreen(
+          checkin: marshal,
+          field: pinned,
+          records: r,
+          templates: templates,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('queue-apd-p-lapsedlapsed')), findsOneWidget);
+    expect(find.byKey(const Key('apd-badge-expired')), findsOneWidget);
+    expect(find.textContaining('A-1'), findsOneWidget);
+    expect(find.textContaining('2026-01-01'), findsOneWidget);
+    // Never blocked: a marshal lets the player in, the verdict notwithstanding.
+    await tapKey(tester, 'queue-confirm-p-lapsedlapsed');
+    final row = field.rows['p-lapsedlapsed']!;
+    expect(row['status'], 'checked_in');
+    expect(row['apd_override'], true);
+    expect(find.byKey(const Key('queue-confirm-p-lapsedlapsed')), findsNothing);
+    expect(find.textContaining('admitido por um marshal'), findsOneWidget);
+  });
+
   testWidgets('out of reach: the series waits on the phone, then goes', (
     tester,
   ) async {

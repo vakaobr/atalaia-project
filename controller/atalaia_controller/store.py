@@ -92,7 +92,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes, per level's plan
 FIELD_LEVELS_MAX = 10  # levels of a multi-story field (decision ML-1)
@@ -397,6 +397,13 @@ CHECKIN_COLUMNS_V7 = (
     ("from_roster", "INTEGER NOT NULL DEFAULT 0"),  # 1: the roster brought it (the registration is verified)
 )
 
+# Columns added to checkins in schema 15 (APD membership, protocol/apd.md): personal data like federation_number.
+CHECKIN_COLUMNS_V15 = (
+    ("apd_id", "TEXT"),                           # the APD the player declared (NULL: unknown)
+    ("membership_expires", "TEXT"),               # YYYY-MM-DD
+    ("apd_override", "INTEGER NOT NULL DEFAULT 0"),  # 1: staff let the check-in through with a verdict other than valid
+)
+
 LIVE_STATES = ("ready", "running", "paused")
 
 
@@ -445,6 +452,10 @@ class Store:
                     self._db.execute(f"ALTER TABLE games ADD COLUMN {name} {decl}")
             have = {r["name"] for r in self._db.execute("PRAGMA table_info(checkins)").fetchall()}
             for name, decl in CHECKIN_COLUMNS_V7:
+                if name not in have:
+                    self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
+            have = {r["name"] for r in self._db.execute("PRAGMA table_info(checkins)").fetchall()}
+            for name, decl in CHECKIN_COLUMNS_V15:
                 if name not in have:
                     self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
             have = {r["name"] for r in self._db.execute("PRAGMA table_info(modes)").fetchall()}
@@ -1140,7 +1151,8 @@ class Store:
 
     CHECKIN_FIELDS = ("status", "display_name", "federation_number", "federation_seen", "team_preference",
                       "team", "squad", "role", "manual", "notice_version", "updated_at", "checked_in_at",
-                      "erased_at", "registration_id", "ticket_sha256", "from_roster")
+                      "erased_at", "registration_id", "ticket_sha256", "from_roster", "apd_id", "membership_expires",
+                      "apd_override")
 
     @staticmethod
     def _checkin(row: sqlite3.Row) -> dict[str, Any]:
@@ -1148,6 +1160,7 @@ class Store:
         out["federation_seen"] = bool(out["federation_seen"])
         out["manual"] = bool(out["manual"])
         out["from_roster"] = bool(out.get("from_roster"))
+        out["apd_override"] = bool(out.get("apd_override"))
         return out
 
     def checkin_by_registration(self, game_id: int, registration_id: str) -> Optional[dict[str, Any]]:
@@ -1477,7 +1490,7 @@ class Store:
             for gid in games:
                 erased += self._exec(
                     "UPDATE checkins SET display_name = NULL, federation_number = NULL, "
-                    "team_preference = NULL, erased_at = ? WHERE game_id = ? AND erased_at IS NULL",
+                    "apd_id = NULL, membership_expires = NULL, team_preference = NULL, erased_at = ? WHERE game_id = ? AND erased_at IS NULL",
                     (now, gid)).rowcount
                 declarations += self._exec("DELETE FROM declarations WHERE game_id = ?", (gid,)).rowcount
             idle = [r["player_id"] for r in self._exec(

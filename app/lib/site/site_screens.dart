@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app.dart';
+import '../checkin/apd_fields.dart';
 import '../checkin/checkin_screen.dart' show replicaLabel;
 import '../checkin/declare_replicas_screen.dart' show NewReplicaDialog;
 import '../checkin/field_identity.dart';
@@ -480,6 +481,7 @@ class SiteGameScreen extends StatefulWidget {
 class _SiteGameScreenState extends State<SiteGameScreen> {
   final _name = TextEditingController();
   final _fed = TextEditingController();
+  final _apd = ApdInput();
   String? _team;
   final _picked = <String>{};
   Registration? _reg;
@@ -502,6 +504,11 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
         widget.session.username ??
         '';
     _fed.text = r?.federationNumber ?? '';
+    _apd.load(
+      apd: r?.apdId,
+      number: r?.federationNumber,
+      expires: r?.membershipExpires,
+    );
     _team = r?.teamPreference;
     final services = context.services;
     unawaited(services.checkins.load().then((_) => _pickDeclared()));
@@ -535,6 +542,7 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
   void dispose() {
     _name.dispose();
     _fed.dispose();
+    _apd.dispose();
     super.dispose();
   }
 
@@ -543,10 +551,22 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
   RegistrationForm? _form() {
     final s = context.s;
     final name = _name.text.trim();
-    final fed = _fed.text.trim();
+    final rule = f.apd;
+    final withApd = apdAsked(rule);
+    final fed = withApd ? (_apd.numberOrNull ?? '') : _fed.text.trim();
     if (name.isEmpty) {
       setState(() => _error = s.t('checkin.need_name'));
       return null;
+    }
+    if (withApd) {
+      final bad = _apd.problem(
+        rule,
+        needNumber: g.federation == 'required' || rule.register,
+      );
+      if (bad != null) {
+        setState(() => _error = s.t(bad));
+        return null;
+      }
     }
     if (g.federation == 'required' && fed.isEmpty) {
       setState(
@@ -573,7 +593,11 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
     return RegistrationForm(
       displayName: name,
       teamPreference: _team,
-      federationNumber: g.federation == 'off' || fed.isEmpty ? null : fed,
+      federationNumber: (g.federation == 'off' && !withApd) || fed.isEmpty
+          ? null
+          : fed,
+      apdId: withApd ? _apd.apd : null,
+      membershipExpires: withApd ? _apd.expiresOrNull : null,
       replicas: g.predeclareReplicas ? picked : null,
     );
   }
@@ -775,7 +799,14 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
           helperMaxLines: 3,
         ),
       ),
-      if (g.federation != 'off') ...[
+      if (apdAsked(f.apd))
+        ApdFields(
+          input: _apd,
+          rule: f.apd,
+          numberRequired: g.federation == 'required' || f.apd.register,
+          keyPrefix: 'reg-apd',
+        )
+      else if (g.federation != 'off') ...[
         const SizedBox(height: 16),
         TextField(
           key: const Key('reg-federation'),
