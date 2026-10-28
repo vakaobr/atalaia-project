@@ -88,6 +88,9 @@ SKIPPED: dict[str, str] = {
     "alembic_version": "the schema's migration bookkeeping (its revision is in the manifest)",
     "sessions": "logins: addresses and security credentials of the persons' own accounts",
     "refresh_tokens": "security credentials",
+    "user_identities": "the persons' own social logins: GET /api/v1/me/data",
+    "passkeys": "security credentials",
+    "oidc_logins": "logins in progress: security credentials",
     "firmware_releases": "the server's firmware catalogue, not a field's data",
     "preview_feedback": "a preview server's visitor feedback, belongs to no field",
 }

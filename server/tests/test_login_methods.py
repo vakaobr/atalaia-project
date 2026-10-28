@@ -13,11 +13,12 @@ import uuid
 import zipfile
 from pathlib import Path
 from typing import Any, Optional
+from unittest import mock
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
 
-from atalaia_server import personal_data
+from atalaia_server import personal_data, quotas
 from atalaia_server.config import OidcClient, Settings
 
 from .base import METRICS_TOKEN, PASSWORD, SECRET_KEY, AppTestCase
@@ -217,6 +218,16 @@ class SocialLoginTests(LoginTestCase):
         params, _ = await self.begin("google")
         _, query, _ = self.landed(await self.callback("google", params, "sub-1"))
         self.assertEqual(query, {"oidc_error": "too_many_attempts"})
+        self.assertEqual((await self.fetch("SELECT count(*) FROM users"))[0][0], 0)
+
+    async def test_the_hosted_accounts_quota_applies(self) -> None:
+        async def full(db, name, field_id, adding=1):
+            raise quotas.QuotaExceeded(name, 1)
+
+        params, _ = await self.begin("google")
+        with mock.patch("atalaia_server.api.login_methods.quotas.check", full):
+            _, query, _ = self.landed(await self.callback("google", params, "sub-1"))
+        self.assertEqual(query, {"oidc_error": "quota_exceeded"})
         self.assertEqual((await self.fetch("SELECT count(*) FROM users"))[0][0], 0)
 
     async def test_the_state_is_used_once_and_belongs_to_one_browser(self) -> None:

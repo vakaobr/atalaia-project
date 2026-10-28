@@ -61,7 +61,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import passkeys, personal_data, tenancy
+from .. import passkeys, personal_data, quotas, tenancy
 from ..audit import record
 from ..auth import Principal, bearer, current_principal, principal_from_token
 from ..db import get_session
@@ -327,6 +327,10 @@ async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provid
     # registration limit. Never matched to an existing account by email (the server never asks for one).
     if not row.consent:
         return _back(row.return_to, error="consent_required")
+    try:
+        await quotas.check(db, "accounts", None)  # hosted mode: the field's account quota, as for registering
+    except quotas.QuotaExceeded:
+        return _back(row.return_to, error="quota_exceeded")
     limits, address = request.app.state.limits, _ip_key(request)
     if limits.register.retry_after(address):
         return _back(row.return_to, error="too_many_attempts")
