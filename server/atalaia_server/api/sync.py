@@ -79,8 +79,15 @@ async def _handle(request: Request, kind: str) -> JSONResponse:
             answer = await sync.apply(db, caller, kind, body)
         except sync.SyncProblem as exc:
             await db.rollback()
+            await _quota_note(request.app.state, exc)
             return JSONResponse(exc.body(), status_code=exc.status, headers=NO_STORE)
     return JSONResponse(answer, headers=NO_STORE)
+
+
+async def _quota_note(state: Any, exc: sync.SyncProblem) -> None:
+    """A refusal for a quota is left as a note for the hub operator (``quotas.report``)."""
+    if exc.detail == quotas.CODE and exc.extra:
+        await quotas.report(state, str(exc.extra["quota"]), int(exc.extra["limit"]))
 
 
 @router.post("/games")
@@ -320,6 +327,7 @@ async def stream(ws: WebSocket) -> None:
     watch: tenant_watch.TenantWatch = ws.app.state.tenant_watch
     tenant = tenancy.current()
     if tenant is not None and quotas.streams_full(watch.count(tenant.schema, caller.field_id)):
+        await quotas.report(ws.app.state, "streams", quotas.limit("streams"))
         await ws.close(code=quotas.STREAM_CLOSE)
         return
     session = _Session(ws, caller)
@@ -376,6 +384,7 @@ async def _message(ws: WebSocket, caller: sync.Caller, raw: str,
             answer = await sync.apply(db, caller, kind, sync.check(kind, msg))
         except sync.SyncProblem as exc:
             await db.rollback()
+            await _quota_note(ws.app.state, exc)
             return {"type": "error", **exc.body()}
     return {"type": f"{kind}.ack", **answer}
 

@@ -80,7 +80,7 @@ from sqlalchemy.exc import IntegrityError
 from . import atak_pki, demo_data, hosted, passwords, personal_data, tenancy, totp
 from .api.auth import EMAIL, username_problem
 from .audit import record
-from .config import ConfigError, Settings, database_url_from_env
+from .config import QUOTA_DEFAULTS, ConfigError, Settings, database_url_from_env
 from .db import make_engine, make_sessionmaker
 from .models import Field, User, UserSession
 from .services import atak as enrolment
@@ -471,6 +471,22 @@ def _parser() -> argparse.ArgumentParser:
         p.add_argument("slug")
         p.add_argument("--reason", required=True)
         p.add_argument("--actor")
+    p = hsub.add_parser("quota", help="give one field its own limit on a resource, over the hub's (PKC-5)")
+    p.add_argument("slug")
+    p.add_argument("name", help=f"one of {', '.join(QUOTA_DEFAULTS)}")
+    p.add_argument("value", help="a whole number of 1 or more, off (no limit) or default (the hub's own)")
+    p.add_argument("--reason", required=True)
+    p.add_argument("--actor")
+    p = hsub.add_parser("usage", help="what each field (or one) uses against its limits")
+    p.add_argument("slug", nargs="?")
+    p = hsub.add_parser("quota-hits", help="the fields the server refused for a quota: into the audit log, shown")
+    p.add_argument("--actor")
+    p = hsub.add_parser("domain", help="a field's custom host name: set, verify (DNS TXT challenge), remove (PKC-6)")
+    p.add_argument("domain_action", choices=hosted.DOMAIN_ACTIONS)
+    p.add_argument("slug")
+    p.add_argument("host", nargs="?", help="the name (set only), such as jogos.example.pt")
+    p.add_argument("--reason", help="who asked, or why (set and remove)")
+    p.add_argument("--actor")
     p = hsub.add_parser("export", help="the field's whole dataset as a ZIP (mode 0600)")
     p.add_argument("slug")
     p.add_argument("--out", required=True)
@@ -482,6 +498,36 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--reason", required=True)
     p.add_argument("--actor")
     return parser
+
+
+def _say_quota_hits(waiting: int, out: TextIO) -> None:
+    if waiting:
+        print(f"{waiting} note(s) of fields refused for a quota are waiting: python -m atalaia_server hosted "
+              "quota-hits", file=out)
+
+
+def _run_domain(args: argparse.Namespace, url: str, actor: Optional[str], out: TextIO) -> None:
+    if args.domain_action == "set":
+        domain = os.environ.get("ATALAIA_HOSTED_DOMAIN", "").strip().lower()
+        if not domain:
+            raise hosted.HostedError("ATALAIA_HOSTED_DOMAIN is not set: the hub's domain is needed to refuse names "
+                                     "under it")
+        if not args.host:
+            raise hosted.HostedError("the host name is missing: hosted domain set SLUG HOST --reason TEXT")
+        name, value = asyncio.run(hosted.set_custom_domain(url, args.slug, args.host, domain, args.reason or "",
+                                                           actor))
+        print(f"Custom host name pending for {args.slug}. The field publishes, at its DNS provider:\n"
+              f"  TXT {name}  \"{value}\"\n"
+              f"and points {args.host.strip().lower().rstrip('.')} at this hub (an A/AAAA or CNAME record). Then: "
+              f"python -m atalaia_server hosted domain verify {args.slug}", file=out)
+    elif args.domain_action == "verify":
+        host = asyncio.run(hosted.verify_custom_domain(url, args.slug, actor))
+        print(f"Verified: {host} now serves the field {args.slug}; its certificate is issued by Caddy at the first "
+              "request.", file=out)
+    else:
+        host = asyncio.run(hosted.remove_custom_domain(url, args.slug, args.reason or "", actor))
+        print(f"Removed {host} from {args.slug}." if host else f"The field {args.slug} had no custom host name.",
+              file=out)
 
 
 def run_hosted(args: argparse.Namespace, url: str, out: TextIO) -> None:
@@ -504,8 +550,10 @@ def run_hosted(args: argparse.Namespace, url: str, out: TextIO) -> None:
               f"python -m atalaia_server create-admin --field {tenant.slug} --username NAME", file=out)
     elif action == "list":
         for row in asyncio.run(hosted.list_tenants(url)):
+            extra = f"\t{row['custom_host']} ({row['custom_host_status']})" if row["custom_host"] else ""
             print(f"{row['slug']}\t{row['status']}\t{row['schema_name']}\t{row['field_id']}\t"
-                  f"{row['created_at'].isoformat()}", file=out)
+                  f"{row['created_at'].isoformat()}{extra}", file=out)
+        _say_quota_hits(asyncio.run(hosted.waiting_quota_hits(url)), out)
     elif action == "migrate":
         done = hosted.migrate_all(url, app_role, actor)
         print(f"Migrated {len(done)} fields: {', '.join(done) or '-'}", file=out)
@@ -517,6 +565,29 @@ def run_hosted(args: argparse.Namespace, url: str, out: TextIO) -> None:
         print(f"Hub check passed: {report.fields} fields, {report.tables} tables, each owned by the owner role "
               f"with row-level security forced and its one policy; {app_role} has exactly the server's grants.",
               file=out)
+        _say_quota_hits(report.quota_hits, out)
+    elif action == "quota":
+        change = asyncio.run(hosted.set_quota(url, args.slug, args.name, args.value, args.reason, actor))
+        was = "the hub's" if change["old"] is None else ("no limit" if change["old"] == 0 else change["old"])
+        now = "the hub's" if change["new"] is None else ("no limit" if change["new"] == 0 else change["new"])
+        print(f"Field {args.slug}: {args.name} limit {was} -> {now}. It applies from the next request.", file=out)
+    elif action == "usage":
+        for row in asyncio.run(hosted.usage(url, args.slug)):
+            print(f"{row['slug']} ({row['status']})", file=out)
+            for q in row["quotas"]:
+                used = "-" if q["used"] is None else q["used"]
+                lim = "no limit" if q["limit"] is None else q["limit"]
+                own = "  (this field's own)" if q["own"] else ""
+                print(f"  {q['name']:<16}{used!s:>8} / {lim}{own}", file=out)
+    elif action == "quota-hits":
+        groups = asyncio.run(hosted.collect_quota_hits(url, actor))
+        if not groups:
+            print("No field was refused for a quota since the last look.", file=out)
+        for g in groups:
+            print(f"{g['slug']}: refused for {g['quota']} (limit {g['limit']}), {g['count']} note(s), "
+                  f"{g['first'].isoformat()} to {g['last'].isoformat()}; recorded in the hub's audit log.", file=out)
+    elif action == "domain":
+        _run_domain(args, url, actor, out)
     elif action in ("suspend", "resume"):
         asyncio.run(hosted.set_status(url, args.slug, "suspended" if action == "suspend" else "active", args.reason,
                                       actor))

@@ -42,6 +42,8 @@ PAGES = {
     "synckeys": f"/staff/fields/{FIELD}/sync-keys", "branding": f"/staff/fields/{FIELD}/branding",
     "platforms": f"/staff/fields/{FIELD}/platforms", "clubs": "/staff/clubs", "club": f"/staff/clubs/{GAME}",
     "firmware": "/staff/firmware", "admin": "/staff/admin",
+    # PKC-1
+    "data": f"/staff/fields/{FIELD}/data",
 }
 
 
@@ -271,6 +273,8 @@ class StaffScriptTests(AppTestCase):
                  "replica_state_": ("pending", "passed", "refused", "withdrawn"),
                  "io_res_": ("created", "updated", "unchanged", "skipped", "refused"),
                  "io_warn_": ("same_name", "no_external_ref", "federation_number_dropped"),
+                 "quota_name_": ("accounts", "scheduled_games", "registrations", "games", "atak_certs", "streams",
+                                 "stored_mb"),
                  "image_": ("logo", "wallpaper"), "club_image_": ("logo", "crest"), "club_make_": ("admin", "member"),
                  "club_role_": ("admin", "member"),                  "report_reason_": ("rights", "offensive", "impersonation", "other"),
                  "report_status_": ("open", "dismissed", "actioned", "all"),
@@ -290,7 +294,7 @@ class StaffScriptTests(AppTestCase):
         """The codes the APIs the new pages call can answer (read from their source) have a text in every language."""
         api = Path(staff_pages.__file__).resolve().parents[1] / "api"
         codes: set[str] = set()
-        for module in ("fields", "branding", "clubs", "integrations", "firmware", "games"):
+        for module in ("fields", "branding", "clubs", "integrations", "firmware", "games", "export"):
             text = (api / f"{module}.py").read_text(encoding="utf-8")
             codes |= set(re.findall(r'HTTPException\(\d+, "([a-z_]+)"', text))
         branding = (api.parent / "services" / "branding.py").read_text(encoding="utf-8")
@@ -308,7 +312,7 @@ class StaffScriptTests(AppTestCase):
     async def test_every_api_path_a_new_script_names_exists(self) -> None:
         """A page is its API (FU2-2): the paths the FU9 scripts call are routes of the application, with that method."""
         scripts = ("roles", "rolestable", "gameroles", "synckeys", "branding", "clubs", "club", "platforms", "firmware",
-                   "admin", "imageblock", "remote")
+                   "admin", "imageblock", "remote", "data")
         field = "00000000-0000-0000-0000-000000000000"
         found: set[tuple[str, str]] = set()
         for name in scripts:

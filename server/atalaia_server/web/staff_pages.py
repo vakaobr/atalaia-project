@@ -41,6 +41,8 @@
     GET /staff/fields/<field>/branding                 the field's name, accent colour, logo and wallpaper, and its
                                                        saved teams with their crests
     GET /staff/fields/<field>/platforms                the links to third-party platforms: on or off, configured
+    GET /staff/fields/<field>/data                     the field's data export (a ZIP, with its SHA-256) and what it
+                                                       uses of each hosted-mode limit (PKC-1)
     GET /staff/clubs, /staff/clubs/<club>              the account's clubs and invitations; one club, its images
                                                        and members (and a server administrator's moderation)
     GET /staff/firmware                                the firmware catalogue (add and withdraw: server administrator)
@@ -147,7 +149,7 @@ class StaffPage:
                       ("remote", f"{base}/remote-gm", "nav_remote"), ("atak", f"{base}/atak", "nav_atak"),
                       ("roles", f"{base}/roles", "nav_roles"), ("synckeys", f"{base}/sync-keys", "nav_synckeys"),
                       ("branding", f"{base}/branding", "nav_branding"),
-                      ("platforms", f"{base}/platforms", "nav_platforms")]
+                      ("platforms", f"{base}/platforms", "nav_platforms"), ("data", f"{base}/data", "nav_data")]
         # Not of one field: any account's clubs, the firmware list, the server administrator's page.
         items += [("clubs", "/staff/clubs", "nav_clubs"), ("firmware", "/staff/firmware", "nav_firmware"),
                   ("admin", "/staff/admin", "nav_admin")]
@@ -368,6 +370,11 @@ async def branding(field: str, request: Request) -> Response:
 @router.api_route("/staff/fields/{field}/platforms", methods=GET_HEAD)
 async def platforms(field: str, request: Request) -> Response:
     return _field_page(request, field, "platforms", "platforms", "platforms_title")
+
+
+@router.api_route("/staff/fields/{field}/data", methods=GET_HEAD)
+async def data(field: str, request: Request) -> Response:
+    return _field_page(request, field, "data", "data", "data_title")
 
 
 def _page(request: Request, page: str, section: str, title_key: str, data: Optional[dict[str, str]] = None,

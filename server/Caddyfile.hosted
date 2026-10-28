@@ -16,6 +16,12 @@
 #   ATALAIA_DOMAIN  the hub's domain (hub.example.pt)
 #   ATALAIA_TLS     acme (default: public certificates, HTTP-01 or TLS-ALPN-01
 #                   per name) or internal (Caddy's own CA: the deployment test)
+# A field may also have one custom host name (decisions PKC-6; DEPLOY.md,
+# "Custom domains"): the operator sets it (`hosted domain set`), proves the
+# field controls it by a DNS TXT record (`hosted domain verify`), and only then
+# does the `ask` endpoint say yes to it, so the second site block below (any
+# other name that reaches this machine) can get a certificate for exactly the
+# registered, verified names and no others.
 # A wildcard certificate from a DNS challenge instead needs a Caddy built with
 # that DNS provider's plugin: server/docs/DEPLOY.md, "One wildcard certificate".
 
@@ -40,7 +46,7 @@
 	}
 }
 
-*.{$ATALAIA_DOMAIN} {
+(hub-site) {
 	import tls-{$ATALAIA_TLS:acme}
 
 	# As server/Caddyfile: the server sends its own security headers; Caddy
@@ -60,4 +66,15 @@
 	reverse_proxy server:8000 {
 		stream_close_delay 5m
 	}
+}
+
+*.{$ATALAIA_DOMAIN} {
+	import hub-site
+}
+
+# A field's custom host name: any name that is not <slug>.ATALAIA_DOMAIN. It
+# gets a certificate only if the `ask` endpoint knows it as an active field's
+# verified name; any other name fails the TLS handshake as it did before.
+https:// {
+	import hub-site
 }

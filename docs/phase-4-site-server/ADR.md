@@ -16,7 +16,8 @@ Two more, ADR-P4-11 (game scheduling, publication and registration)
 and ADR-P4-12 (open feeds, registration import and platform adapters),
 were added on 2026-10-19 at the maintainer's request; both are
 proposed, with their open questions in `docs/review/decisions-to-review.md`
-(F13-F23).
+(F13-F23). ADR-P4-13 (the hub-level OIDC callback relay for hosted mode) was added on 2026-10-28 as a
+design only: nothing is built.
 
 ---
 
@@ -3214,6 +3215,69 @@ export one (unknown).  Nothing will be scraped.
 - Specific platforms are an extension point with clear rules, not a
   promise; nothing is said about a third party that is not known.
 - The feeds are public and hold no personal data.
+
+---
+
+### ADR-P4-13: The hub-level OIDC callback relay (design only, not built)
+
+**Date:** 2026-10-28. **Status:** proposed, to be built with the legal review of hosted mode (P4-6); no code yet.
+**Decided by the maintainer** (S21-12's follow-up, 2026-10-28): hosted mode gets one callback address for social login
+(Google, Microsoft, Apple) instead of one per field.
+
+**Problem.** A social-login provider only redirects the browser to addresses registered in advance, one by one
+(no wildcards for Google or Apple; Microsoft allows few). Hosted mode today builds the redirect URI from the
+field's own address (`<slug>.<hub domain>`, or its custom host name since PKC-6), so every new field, and every custom
+name, needs its address registered at three providers by the operator before its members can use social login. That
+does not scale to the hundreds of fields ADR-P4-4 plans for.
+
+**Decision.** One callback on the hub, `https://<hub domain>/api/v1/auth/oidc/callback`, registered once per provider,
+and a relay that sends the browser on to the field that started the login.
+
+1. *Start (at the field, as today).* `POST /api/v1/auth/oidc/{provider}/start` is served at the field's own host. It
+   makes the login row in the field's schema (state hash, binding hash, nonce, PKCE verifier, purpose, return path)
+   and sets the HttpOnly binding cookie **on the field's host**. The redirect URI it sends to the provider is the
+   hub's, and the `state` it sends is **signed state** instead of a bare random value:
+   `state = base64url(slug ‖ host ‖ nonce) ‖ "." ‖ HMAC-SHA256(relay key, slug ‖ host ‖ nonce ‖ provider ‖ expiry)`,
+   where `nonce` is today's random state, `host` is the exact name the login started on (the field's own or its custom
+   host name) and `expiry` is the login's expiry (10 minutes). The relay key is derived from `ATALAIA_SECRET_KEY`
+   with HKDF and its own label (never the key itself, never shared with another use).
+2. *Relay (at the hub, no tenant).* The hub's callback runs outside any tenant (like the health check) and reads
+   nothing from a database. It checks the signature and the expiry, that the slug is syntactically valid and that
+   the provider matches, and answers `303` to
+   `https://<host>/api/v1/auth/oidc/{provider}/callback?code=…&state=<nonce>` (or the provider's `error` and
+   `error_description`), with no body and no cookie. It never sees a token: the authorisation code is single use, bound
+   to the PKCE challenge the field made, and only the field holds the verifier.
+3. *Completion (at the field, as today).* The field's existing callback checks the binding cookie (present, because the
+   browser is back at the host that set it), finds the login row by the state, exchanges the code (with the hub's
+   redirect URI, which the provider insists on matching), checks the ID token and nonce, and signs the person in.
+   Nothing about accounts, linking, consent or reauthentication changes.
+
+Hosted fields keep working without the relay while it is off (a per-hub setting): the per-field redirect URI is used.
+
+**Threats and mitigations.**
+
+| Threat | Mitigation |
+| --- | --- |
+| Open redirect: the relay sends a browser to an attacker's host | The target host is not in the query: it is inside the signed state. The relay redirects only to a host it signed itself, 10 minutes earlier, and (belt and braces) only to a name under the hub domain or a registered, verified custom host name (one registry read of a name, not of data). |
+| Forged or altered state (a login for another field, another host) | HMAC over the slug, host, nonce, provider and expiry; constant-time compare; the nonce is also the login row's key at the field, which checks its own state hash, so a state the field did not make finds no row. |
+| Replay of a state or a code | Single use: the field deletes the login row when it completes (as today); the code is single use at the provider; the signature carries an expiry. The relay is stateless, so a replay reaches the field, which refuses it. |
+| Login CSRF / a victim logged in as the attacker | The binding cookie stays at the field's host and must match the login row (as today); the relay sets and reads no cookie. A callback that does not come back to the browser that started it is refused at the field. |
+| The relay as an oracle or a way to probe fields | The answer is the same for a field that does not exist, is suspended or has no login: a `303` to the signed host, or a plain `400` for a bad signature; it makes no registry lookup of the slug. The hub-level callback is rate limited per address like the other login endpoints. |
+| Cross-field substitution (a code meant for field A delivered to field B) | The host in the state is where the browser goes; the code is bound to A's PKCE verifier, which B does not have: B's exchange fails. A field's login row also holds its own provider and redirect URI. |
+| Leaking the code in a `Referer` or logs | The code is in the redirect's query, so the relay answers `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, and never logs the query string; the hub's reverse proxy must not either (deployment note). The field's callback removes it from the address with a redirect to the page (as today). |
+| Compromise of the relay key | The relay key only signs routing information, not sessions or tokens, and is derived with its own label; rotating `ATALAIA_SECRET_KEY` invalidates logins in flight (10 minutes) and nothing else. |
+| Custom host names | The relay sends to the custom host the state names, but only if the registry still holds it as that field's active name; a removed name falls back to the field's own host. The provider sees one redirect URI whatever the name. |
+| A provider that checks the redirect URI per tenant (Microsoft work accounts) | The hub's single URI is registered once on the hub's own application; the per-field Microsoft tenant setting is unchanged. |
+
+**What this does not change.** Passkeys stay per host (the relying-party id is the host the person is at), so a custom
+host name has its own passkeys; sessions, tokens and the per-field accounts (a person at two fields has two accounts)
+are untouched; the relay holds no data and adds no table.
+
+**Consequences.** One registration per provider for the whole hub, whatever the number of fields and custom names.
+One more public endpoint, outside the tenant routing, with a small, testable surface: the signature check, the expiry
+and the redirect. The legal review has to cover that the hub operator now sees, in transit, the provider's code and
+the field's name for each social login (not the person's identity: the code is useless without the field's verifier).
+Build it after the legal review (P4-6) and test it with the provider's sandbox clients.
 
 ---
 

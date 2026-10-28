@@ -33,6 +33,7 @@ from pydantic import BaseModel, ConfigDict, Field as PydanticField
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import quotas
 from ..audit import record
 from ..auth import Principal, current_principal, require_field_role
 from ..db import get_session
@@ -93,6 +94,7 @@ async def read_upload(request: Request, kind: str) -> tuple[bytes, str]:
 async def checked_image(db: AsyncSession, request: Request, kind: str) -> str:
     """The upload checked and stored: its SHA-256 (ImageError becomes its 413, 415 or 422)."""
     data, content_type = await read_upload(request, kind)
+    await quotas.check_stored(db, len(data))  # hosted mode: the field's stored-bytes quota (409 quota_exceeded)
     try:
         row = await svc.store_image(db, data, content_type, kind)
     except images.ImageError as exc:

@@ -1,0 +1,26 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$data_title</h1>
+<section aria-labelledby="export-title">
+<h2 id="export-title">$export_title</h2>
+<p>$export_intro</p>
+<p>$export_personal</p>
+<p><button type="button" id="export-run" disabled>$export_run</button></p>
+<p id="export-working" class="hint" role="status" hidden>$export_working</p>
+<div id="export-done" class="status ok" role="status" hidden>
+<p><a id="export-download" href="#" download>$export_download</a></p>
+<p class="hint">$export_hash <code id="export-sha" class="data"></code></p>
+</div>
+</section>
+<section aria-labelledby="quotas-title">
+<h2 id="quotas-title">$quotas_title</h2>
+<p>$quotas_intro</p>
+<p id="quotas-none" hidden>$quotas_none</p>
+<div class="table-wrap">
+<table id="quotas-table" class="data" hidden>
+<thead><tr><th scope="col">$col_quota</th><th scope="col" class="num">$col_used</th><th scope="col" class="num">$col_limit</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p class="hint">$quotas_refused</p>
+</section>

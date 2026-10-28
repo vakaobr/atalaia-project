@@ -884,6 +884,8 @@ class HubCheckTests(HubCase):
             (f"GRANT SELECT ON field_campo_a.alembic_version TO {app}", "field_campo_a.alembic_version"),
             (f"GRANT SELECT ON public.atalaia_hub_audit TO {app}", "public.atalaia_hub_audit"),
             (f"GRANT UPDATE ON public.atalaia_tenants TO {app}", "public.atalaia_tenants"),
+            (f"GRANT SELECT ON public.atalaia_quota_hits TO {app}", "public.atalaia_quota_hits"),
+            (f"REVOKE INSERT ON public.atalaia_quota_hits FROM {app}", "public.atalaia_quota_hits"),
             (f"REVOKE USAGE ON SCHEMA field_campo_b FROM {app}", f"{app} has no USAGE on field_campo_b"),
             ("CREATE SCHEMA field_orphan", "field_orphan is not registered"),
         ]

@@ -155,6 +155,50 @@ class ClubTests(ClubCase):
         self.assertEqual((await self.fetch("SELECT count(*) FROM field_teams"))[0][0], 0)
 
 
+class ClubFieldsTests(ClubCase):
+    """A club's list of the fields it plays at, derived from the teams those fields saved for it (PKC-3)."""
+
+    async def field(self, slug: str, name: str, public: bool) -> Any:
+        return (await self.fetch("INSERT INTO fields (name, slug, public_page) VALUES ($2, $1, $3) RETURNING id",
+                                 slug, name, public))[0][0]
+
+    async def test_the_fields_a_club_plays_at(self) -> None:
+        club = await self.create()
+        await self.make_public(club["id"])
+        open_field = await self.field("arena-aberta", "Arena Aberta", True)
+        quiet_field = await self.field("campo-privado", "Campo Privado", False)
+        await self.field("sem-equipas", "Sem Equipas", True)
+        for field in (open_field, quiet_field, open_field):  # two teams at one field: it is listed once
+            await self.fetch("INSERT INTO field_teams (field_id, club_id) VALUES ($1, $2)", field, club["id"])
+        await self.fetch("INSERT INTO field_teams (field_id, name) VALUES ($1, 'Sem clube')", open_field)
+        await self.fetch("INSERT INTO fields (name, slug, public_page) VALUES ('Outro', 'outro', true)")
+        # A member sees every field with a team of the club; anyone else only those with a public page.
+        mine = (await self.client.get(f"/api/v1/clubs/{club['id']}", headers=self.owner)).json()["fields"]
+        self.assertEqual([(f["slug"], f["public_page"]) for f in mine],
+                         [("arena-aberta", True), ("campo-privado", False)])
+        await self.make_user("ze")  # anyone with an account: a public club, so only the fields with a public page
+        ze = (await self.client.get(f"/api/v1/clubs/{club['id']}", headers=await self.auth("ze"))).json()["fields"]
+        self.assertEqual([(f["name"], f["slug"]) for f in ze], [("Arena Aberta", "arena-aberta")])
+        page = await self.client.get("/c/lobos-do-pinhal/?lang=en")
+        self.assertIn("Plays at these fields", page.text)
+        self.assertIn('<a href="/f/arena-aberta/?lang=en">Arena Aberta</a>', page.text)
+        self.assertNotIn("Campo Privado", page.text)
+        self.assertNotIn("Sem Equipas", page.text)
+        de = await self.client.get("/c/lobos-do-pinhal/", params={"lang": "de"})
+        self.assertIn("Spielt auf diesen Spielfeldern", de.text)
+
+    async def test_a_club_with_no_public_field_has_no_list(self) -> None:
+        club = await self.create()
+        await self.make_public(club["id"])
+        field = await self.field("campo-privado", "Campo Privado", False)
+        await self.fetch("INSERT INTO field_teams (field_id, club_id) VALUES ($1, $2)", field, club["id"])
+        page = await self.client.get("/c/lobos-do-pinhal/?lang=en")
+        self.assertNotIn("Plays at these fields", page.text)
+        await self.make_user("ze")
+        ze = await self.client.get(f"/api/v1/clubs/{club['id']}", headers=await self.auth("ze"))
+        self.assertEqual(ze.json()["fields"], [])
+
+
 class PublicPageTests(ClubCase):
     async def test_off_by_default_then_on(self) -> None:
         club = await self.create()

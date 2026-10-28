@@ -9,6 +9,10 @@
     python -m atalaia_server hosted check    [--app-role ROLE]
     python -m atalaia_server hosted suspend  SLUG --reason TEXT
     python -m atalaia_server hosted resume   SLUG --reason TEXT
+    python -m atalaia_server hosted quota    SLUG NAME VALUE --reason TEXT      (VALUE: a number, off or default)
+    python -m atalaia_server hosted usage    [SLUG]
+    python -m atalaia_server hosted quota-hits
+    python -m atalaia_server hosted domain   set SLUG HOST --reason TEXT | verify SLUG | remove SLUG --reason TEXT
     python -m atalaia_server hosted export   SLUG --out FILE.zip --reason TEXT
     python -m atalaia_server hosted delete   SLUG --confirm SLUG --reason TEXT
     python -m atalaia_server import-field    FILE.zip          (into a single-field server)
@@ -32,6 +36,14 @@ role that is no superuser, has no BYPASSRLS and owns nothing.
   forced row-level security and the one policy on every table, the server
   role's exact privileges) and exits 1 on any problem; ``server/restore.sh``
   runs it after restoring a hosted hub (Phase 4 follow-up, decisions FU4-*).
+- ``quota`` gives one field its own limit on one resource (``config.QUOTA_DEFAULTS`` names them) in the registry,
+  over the hub's ``ATALAIA_QUOTA_*``: a whole number, ``off`` (no limit) or ``default`` (the hub's again). ``usage``
+  prints what each field (or one) uses against its effective limits. ``quota-hits`` moves the notes the server left
+  when a field was refused for a quota (``public.atalaia_quota_hits``, which the server may only add to) into the
+  hub's audit log and prints them; ``list`` and ``check`` say how many wait (decisions PKC-5).
+- ``domain`` gives a field one custom host name besides ``<slug>.<domain>`` (decisions PKC-6): ``set`` records it as
+  *pending* and prints the DNS TXT record the field must publish, ``verify`` reads that record and, only if it is
+  there, turns the name on (routing, and a certificate through the ``ask`` endpoint), ``remove`` takes it away.
 - ``export`` writes one ZIP: ``manifest.json`` (format, revision, tables in load
   order, row counts, SHA-256 of each file) and ``tables/<table>.csv`` for every
   table of the tenant's schema (``COPY ... TO STDOUT``), read in one
@@ -60,6 +72,7 @@ import io
 import json
 import os
 import re
+import secrets
 import uuid
 import zipfile
 from dataclasses import dataclass
@@ -71,7 +84,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import asyncpg
 from sqlalchemy.engine import make_url
 
-from .tenancy import STATUSES, Tenant, TenantError, check_schema, check_slug, schema_for
+from . import dnsquery
+from .config import MAX_QUOTA, QUOTA_DEFAULTS, quotas_from_env
+from .tenancy import (CHALLENGE_PREFIX, COLUMNS, STATUSES, Tenant, TenantError, challenge_name, check_custom_host,
+                      check_schema, check_slug, from_row, schema_for)
 
 EXPORT_FORMAT = "atalaia-field-export"
 EXPORT_VERSION = 1
@@ -118,6 +134,26 @@ CREATE TABLE IF NOT EXISTS public.atalaia_hub_audit (
 );
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE ALL ON public.atalaia_tenants, public.atalaia_hub_audit FROM PUBLIC;
+"""
+
+# What later releases added to the registry (PKC-5, PKC-6); idempotent, run by ``init`` and by ``migrate``.
+REGISTRY_UPGRADE_DDL = """
+ALTER TABLE public.atalaia_tenants
+    ADD COLUMN IF NOT EXISTS quotas jsonb NOT NULL DEFAULT '{}'::jsonb,
+    ADD COLUMN IF NOT EXISTS custom_host text
+        CHECK (custom_host IS NULL OR custom_host ~ '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$'),
+    ADD COLUMN IF NOT EXISTS custom_host_status text CHECK (custom_host_status IN ('pending', 'active')),
+    ADD COLUMN IF NOT EXISTS custom_host_token text,
+    ADD COLUMN IF NOT EXISTS custom_host_verified_at timestamptz;
+CREATE UNIQUE INDEX IF NOT EXISTS atalaia_tenants_custom_host ON public.atalaia_tenants (custom_host);
+CREATE TABLE IF NOT EXISTS public.atalaia_quota_hits (
+    id          bigserial PRIMARY KEY,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    slug        text NOT NULL,
+    quota       text NOT NULL,
+    limit_value bigint NOT NULL
+);
+REVOKE ALL ON public.atalaia_quota_hits FROM PUBLIC;
 """
 
 
@@ -178,12 +214,11 @@ async def _check_app_role(conn: asyncpg.Connection, app_role: str) -> None:
 
 async def _tenant(conn: asyncpg.Connection, slug: str, lock: bool = False) -> Tenant:
     await _need_registry(conn)
-    row = await conn.fetchrow("SELECT slug, schema_name, field_id, status FROM public.atalaia_tenants "
-                              "WHERE slug = $1" + (" FOR UPDATE" if lock else ""), check_slug(slug))
+    row = await conn.fetchrow(f"SELECT {COLUMNS} FROM public.atalaia_tenants WHERE slug = $1"
+                              + (" FOR UPDATE" if lock else ""), check_slug(slug))
     if row is None:
         raise HostedError(f"no field {slug!r} on this hub")
-    return Tenant(slug=row["slug"], schema=check_schema(row["schema_name"]), field_id=row["field_id"],
-                  status=row["status"])
+    return from_row(row)
 
 
 def _q(identifier: str) -> str:
@@ -272,9 +307,33 @@ async def init_hub(url: str, app_role: str = DEFAULT_APP_ROLE, actor: Optional[s
                               "needs a database of its own")
         async with conn.transaction():
             await conn.execute(REGISTRY_DDL)
-            await conn.execute(f"GRANT USAGE ON SCHEMA public TO {_q(app_role)}; "
-                               f"GRANT SELECT ON public.atalaia_tenants TO {_q(app_role)}")
+            await _upgrade_registry(conn, app_role)
             await _audit(conn, "hub_init", actor or default_actor(), details={"app_role": app_role})
+    finally:
+        await conn.close()
+
+
+async def _upgrade_registry(conn: asyncpg.Connection, app_role: str) -> None:
+    """The registry's later columns and tables, and the server role's exact rights on the hub's tables: it reads the
+    registry, only adds to the quota inbox, and touches nothing else."""
+    role = _q(check_role(app_role))
+    await conn.execute(REGISTRY_UPGRADE_DDL)
+    await conn.execute(
+        f"GRANT USAGE ON SCHEMA public TO {role}; "
+        f"REVOKE ALL ON public.atalaia_tenants, public.atalaia_quota_hits, public.atalaia_hub_audit FROM {role}; "
+        f"GRANT SELECT ON public.atalaia_tenants TO {role}; "
+        f"GRANT INSERT ON public.atalaia_quota_hits TO {role}; "
+        f"GRANT USAGE ON SEQUENCE public.atalaia_quota_hits_id_seq TO {role}")
+
+
+async def upgrade_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> None:
+    """Brings the registry of a hub made by an older release up to date (``migrate`` does this first)."""
+    conn = await _connect(url)
+    try:
+        await _need_registry(conn)
+        await _check_app_role(conn, app_role)
+        async with conn.transaction():
+            await _upgrade_registry(conn, app_role)
     finally:
         await conn.close()
 
@@ -373,8 +432,8 @@ async def list_tenants(url: str) -> list[dict[str, Any]]:
     conn = await _connect(url)
     try:
         await _need_registry(conn)
-        rows = await conn.fetch("SELECT slug, schema_name, field_id, status, created_at FROM public.atalaia_tenants "
-                                "ORDER BY slug")
+        rows = await conn.fetch("SELECT slug, schema_name, field_id, status, created_at, quotas, custom_host, "
+                                "custom_host_status FROM public.atalaia_tenants ORDER BY slug")
         return [dict(r) for r in rows]
     finally:
         await conn.close()
@@ -383,6 +442,7 @@ async def list_tenants(url: str) -> list[dict[str, Any]]:
 def migrate_all(url: str, app_role: str = DEFAULT_APP_ROLE, actor: Optional[str] = None) -> list[str]:
     """Every tenant (active or suspended) to the newest revision, grants and policies again; the slugs done."""
     check_role(app_role)
+    asyncio.run(upgrade_hub(url, app_role))
     tenants = asyncio.run(list_tenants(url))
     done = []
     for row in tenants:
@@ -417,6 +477,7 @@ class HubCheck:
     fields: int
     tables: int
     problems: list[str]
+    quota_hits: int = 0  # notes of refused quotas waiting for ``hosted quota-hits``
 
 
 async def check_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> HubCheck:
@@ -426,7 +487,8 @@ async def check_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> HubCheck:
     every schema and table; every table has ENABLE and FORCE ROW LEVEL SECURITY and exactly one policy,
     ``atalaia_tenant`` for that schema; the server's role is no superuser, has no BYPASSRLS, owns nothing, has
     exactly SELECT, INSERT, UPDATE and DELETE on each field table, nothing on ``alembic_version``, only SELECT
-    on the registry and nothing on the hub's audit log. Reads only; returns the problems found."""
+    on the registry, only INSERT on the quota inbox and nothing on the hub's audit log. Reads only; returns the
+    problems found (and how many quota notes wait)."""
     check_role(app_role)
     conn = await _connect(url)
     try:
@@ -444,7 +506,12 @@ async def check_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> HubCheck:
             + await conn.fetchval("SELECT count(*) FROM pg_namespace WHERE nspowner = $1", role["oid"])
         if owned:
             problems.append(f"{app_role} owns {owned} schemas or relations")
-        for table, allowed in (("public.atalaia_tenants", {"SELECT"}), ("public.atalaia_hub_audit", set())):
+        if not await conn.fetchval("SELECT to_regclass('public.atalaia_quota_hits') IS NOT NULL"):
+            problems.append("the registry is of an older release (no public.atalaia_quota_hits): run hosted migrate")
+        for table, allowed in (("public.atalaia_tenants", {"SELECT"}), ("public.atalaia_hub_audit", set()),
+                               ("public.atalaia_quota_hits", {"INSERT"})):
+            if not await conn.fetchval("SELECT to_regclass($1) IS NOT NULL", table):
+                continue
             have = {p for p in TABLE_PRIVILEGES
                     if await conn.fetchval("SELECT has_table_privilege($1, $2, $3)", app_role, table, p)}
             if have != allowed:
@@ -491,7 +558,13 @@ async def check_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> HubCheck:
                                     "DELETE")
                 if list(r["policies"] or []) != [f"atalaia_tenant|*|true|{expected}|{expected}|{{0}}"]:
                     problems.append(f"{qualified}: the policies are not exactly atalaia_tenant for {schema}")
-        return HubCheck(fields=len(registered), tables=tables, problems=problems)
+        waiting = 0
+        try:
+            if await conn.fetchval("SELECT to_regclass('public.atalaia_quota_hits') IS NOT NULL"):
+                waiting = int(await conn.fetchval("SELECT count(*) FROM public.atalaia_quota_hits"))
+        except asyncpg.InsufficientPrivilegeError:
+            pass  # run as the wrong role (the check says so): it cannot read the inbox
+        return HubCheck(fields=len(registered), tables=tables, problems=problems, quota_hits=waiting)
     finally:
         await conn.close()
 
@@ -509,6 +582,215 @@ async def set_status(url: str, slug: str, status: str, reason: str, actor: Optio
                                tenant.slug, status)
             await _audit(conn, "tenant_suspend" if status == "suspended" else "tenant_resume",
                          actor or default_actor(), tenant.slug, tenant.schema, tenant.field_id, {"reason": reason})
+    finally:
+        await conn.close()
+
+
+# quotas -------------------------------------------------------------------------------------------
+
+def check_quota_value(name: str, value: str) -> Optional[int]:
+    """``--NAME VALUE``: a whole number of 1 or more, ``off`` (0: no limit) or ``default`` (None: the hub's own)."""
+    if name not in QUOTA_DEFAULTS:
+        raise HostedError(f"unknown quota {name!r} (known: {', '.join(QUOTA_DEFAULTS)})")
+    word = value.strip().lower()
+    if word == "default":
+        return None
+    if word == "off":
+        return 0
+    if not word.isdigit() or not 1 <= int(word) <= MAX_QUOTA:
+        raise HostedError(f"a quota is a whole number from 1 to {MAX_QUOTA}, off or default, not {value!r}")
+    return int(word)
+
+
+async def set_quota(url: str, slug: str, name: str, value: str, reason: str,
+                    actor: Optional[str] = None) -> dict[str, Any]:
+    """Gives one field its own limit on one resource, over the hub's; returns {old, new} (None: the hub's own)."""
+    new = check_quota_value(name, value)
+    if not reason.strip():
+        raise HostedError("--reason is required (who asked, or why)")
+    conn = await _connect(url)
+    try:
+        async with conn.transaction():
+            tenant = await _tenant(conn, slug, lock=True)
+            quotas = dict(tenant.quotas)
+            old = quotas.get(name)
+            if new is None:
+                quotas.pop(name, None)
+            else:
+                quotas[name] = new
+            await conn.execute("UPDATE public.atalaia_tenants SET quotas = $2::jsonb, updated_at = now() "
+                               "WHERE slug = $1", tenant.slug, json.dumps(quotas, sort_keys=True))
+            await _audit(conn, "tenant_quota", actor or default_actor(), tenant.slug, tenant.schema, tenant.field_id,
+                         {"quota": name, "old": old, "new": new, "reason": reason})
+        return {"old": old, "new": new}
+    finally:
+        await conn.close()
+
+
+_COUNTS = {
+    "accounts": "SELECT count(*) FROM users",
+    "scheduled_games": "SELECT count(*) FROM scheduled_games",
+    "registrations": "SELECT count(*) FROM game_registrations",
+    "games": "SELECT count(*) FROM games",
+    "atak_certs": "SELECT count(*) FROM atak_certs WHERE revoked_at IS NULL AND not_after > now()",
+}
+
+
+async def usage(url: str, slug: Optional[str] = None,
+                env: Optional[dict[str, str]] = None) -> list[dict[str, Any]]:
+    """For each field (or one): what it uses against its effective limits (the hub's environment, then its own
+    overrides). ``streams`` are open sockets of the running server, which this command cannot see (``None``)."""
+    base = quotas_from_env(os.environ if env is None else env)
+    conn = await _connect(url)
+    try:
+        await _need_registry(conn)
+        rows = [await _tenant(conn, slug)] if slug else [from_row(r) for r in await conn.fetch(
+            f"SELECT {COLUMNS} FROM public.atalaia_tenants ORDER BY slug")]
+        out = []
+        for tenant in rows:
+            limits = {**base, **tenant.quotas}
+            used: dict[str, Optional[int]] = {}
+            async with conn.transaction(isolation="repeatable_read", readonly=True):
+                await _scope(conn, tenant.schema)
+                for name, query in _COUNTS.items():
+                    used[name] = int(await conn.fetchval(query))
+                size = await conn.fetchval(
+                    "SELECT coalesce(sum(pg_total_relation_size(c.oid)), 0) FROM pg_class c "
+                    "JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1 AND c.relkind IN ('r', 'm', 't')",
+                    tenant.schema)
+                used["stored_mb"] = -(-int(size) // (1024 * 1024))
+            used["streams"] = None
+            out.append({"slug": tenant.slug, "status": tenant.status,
+                        "quotas": [{"name": n, "used": used[n], "limit": limits[n] or None,
+                                    "own": n in tenant.quotas} for n in QUOTA_DEFAULTS]})
+        return out
+    finally:
+        await conn.close()
+
+
+async def collect_quota_hits(url: str, actor: Optional[str] = None) -> list[dict[str, Any]]:
+    """The notes the server left for refused quotas, grouped per field and quota (count, first and last time), moved
+    into the hub's audit log (``quota_hit``) in one transaction; returns the groups."""
+    conn = await _connect(url)
+    try:
+        await _need_registry(conn)
+        async with conn.transaction():
+            rows = await conn.fetch(
+                "DELETE FROM public.atalaia_quota_hits RETURNING slug, quota, limit_value, created_at")
+            groups: dict[tuple[str, str], dict[str, Any]] = {}
+            for r in sorted(rows, key=lambda r: r["created_at"]):
+                g = groups.setdefault((r["slug"], r["quota"]), {"slug": r["slug"], "quota": r["quota"], "count": 0,
+                                                                 "limit": r["limit_value"], "first": r["created_at"]})
+                g["count"] += 1
+                g["limit"], g["last"] = r["limit_value"], r["created_at"]
+            for g in groups.values():
+                tenant = await conn.fetchrow("SELECT schema_name, field_id FROM public.atalaia_tenants "
+                                             "WHERE slug = $1", g["slug"])
+                await _audit(conn, "quota_hit", actor or default_actor(), g["slug"],
+                             tenant["schema_name"] if tenant else None, tenant["field_id"] if tenant else None,
+                             {"quota": g["quota"], "limit": g["limit"], "notes": g["count"],
+                              "first": g["first"].isoformat(), "last": g["last"].isoformat()})
+        return list(groups.values())
+    finally:
+        await conn.close()
+
+
+async def waiting_quota_hits(url: str) -> int:
+    conn = await _connect(url)
+    try:
+        if not await conn.fetchval("SELECT to_regclass('public.atalaia_quota_hits') IS NOT NULL"):
+            return 0
+        return int(await conn.fetchval("SELECT count(*) FROM public.atalaia_quota_hits"))
+    finally:
+        await conn.close()
+
+
+# custom host names --------------------------------------------------------------------------------
+
+DOMAIN_ACTIONS = ("set", "verify", "remove")
+Resolver = Any  # (name) -> list of TXT strings; dnsquery.txt by default
+
+
+def challenge_record(host: str, token: str) -> tuple[str, str]:
+    """(the TXT record's name, its value) a field publishes to prove it controls ``host``."""
+    return challenge_name(host), CHALLENGE_PREFIX + token
+
+
+async def set_custom_domain(url: str, slug: str, host: str, domain: str, reason: str,
+                            actor: Optional[str] = None) -> tuple[str, str]:
+    """Records ``host`` as the field's custom host name, *pending*: it routes nowhere and gets no certificate until
+    ``verify_custom_domain`` finds the challenge. Replaces the field's earlier name. Returns the TXT record."""
+    host = check_custom_host(host, domain)
+    if not reason.strip():
+        raise HostedError("--reason is required (who asked, or why)")
+    token = secrets.token_hex(16)
+    conn = await _connect(url)
+    try:
+        async with conn.transaction():
+            tenant = await _tenant(conn, slug, lock=True)
+            taken = await conn.fetchval("SELECT slug FROM public.atalaia_tenants WHERE custom_host = $1 AND slug <> $2",
+                                        host, tenant.slug)
+            if taken:
+                raise HostedError(f"{host} is already the custom host name of the field {taken}")
+            await conn.execute("UPDATE public.atalaia_tenants SET custom_host = $2, custom_host_status = 'pending', "
+                               "custom_host_token = $3, custom_host_verified_at = NULL, updated_at = now() "
+                               "WHERE slug = $1", tenant.slug, host, token)
+            await _audit(conn, "tenant_domain_set", actor or default_actor(), tenant.slug, tenant.schema,
+                         tenant.field_id, {"host": host, "previous": tenant.custom_host, "status": "pending",
+                                           "reason": reason})
+        return challenge_record(host, token)
+    finally:
+        await conn.close()
+
+
+async def verify_custom_domain(url: str, slug: str, actor: Optional[str] = None,
+                               resolver: Optional[Resolver] = None) -> str:
+    """Reads the pending name's TXT challenge and, if it holds the field's token, turns the name on; returns it."""
+    conn = await _connect(url)
+    try:
+        async with conn.transaction():
+            tenant = await _tenant(conn, slug, lock=True)
+            token = await conn.fetchval("SELECT custom_host_token FROM public.atalaia_tenants WHERE slug = $1",
+                                        tenant.slug)
+            if not tenant.custom_host:
+                raise HostedError(f"the field {slug} has no custom host name: hosted domain set {slug} HOST")
+            if tenant.custom_host_status == "active":
+                raise HostedError(f"{tenant.custom_host} is already verified and on")
+            name, value = challenge_record(tenant.custom_host, token or "")
+            try:
+                found = await asyncio.to_thread(resolver or dnsquery.txt, name)
+            except dnsquery.DnsError as e:
+                raise HostedError(f"the DNS lookup of {name} failed: {e}") from None
+            if not token or value not in [f.strip() for f in found]:
+                seen = ", ".join(repr(f) for f in found) or "no TXT record"
+                raise HostedError(f"not verified: expected a TXT record at {name} with the value {value}; found "
+                                  f"{seen}. DNS changes can take a while; try again.")
+            await conn.execute("UPDATE public.atalaia_tenants SET custom_host_status = 'active', "
+                               "custom_host_verified_at = now(), updated_at = now() WHERE slug = $1", tenant.slug)
+            await _audit(conn, "tenant_domain_verify", actor or default_actor(), tenant.slug, tenant.schema,
+                         tenant.field_id, {"host": tenant.custom_host})
+        return str(tenant.custom_host)
+    finally:
+        await conn.close()
+
+
+async def remove_custom_domain(url: str, slug: str, reason: str, actor: Optional[str] = None) -> Optional[str]:
+    """Takes the field's custom host name away (it routes nowhere at once); returns it, None if there was none."""
+    if not reason.strip():
+        raise HostedError("--reason is required (who asked, or why)")
+    conn = await _connect(url)
+    try:
+        async with conn.transaction():
+            tenant = await _tenant(conn, slug, lock=True)
+            if not tenant.custom_host:
+                return None
+            await conn.execute("UPDATE public.atalaia_tenants SET custom_host = NULL, custom_host_status = NULL, "
+                               "custom_host_token = NULL, custom_host_verified_at = NULL, updated_at = now() "
+                               "WHERE slug = $1", tenant.slug)
+            await _audit(conn, "tenant_domain_remove", actor or default_actor(), tenant.slug, tenant.schema,
+                         tenant.field_id, {"host": tenant.custom_host, "status": tenant.custom_host_status,
+                                           "reason": reason})
+        return tenant.custom_host
     finally:
         await conn.close()
 
@@ -676,5 +958,7 @@ async def delete_tenant(url: str, slug: str, confirm: str, reason: str, actor: O
         await conn.close()
 
 
-__all__ = ["HostedError", "TenantError", "apply_security", "check_hub", "create_tenant", "delete_tenant",
-           "export_tenant", "import_field", "init_hub", "list_tenants", "migrate_all", "set_status"]
+__all__ = ["HostedError", "TenantError", "apply_security", "challenge_record", "check_hub", "collect_quota_hits",
+           "create_tenant", "delete_tenant", "export_tenant", "import_field", "init_hub", "list_tenants", "migrate_all",
+           "remove_custom_domain", "set_custom_domain", "set_quota", "set_status", "upgrade_hub", "usage",
+           "verify_custom_domain", "waiting_quota_hits"]

@@ -83,6 +83,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "club_footer": "Página pública do clube, feita pelo servidor Atalaia.",
         "club_logo": "Logótipo de {club}",
         "club_crest": "Emblema de {club}",
+        "club_fields": "Joga nos campos",
         "report": "Denunciar esta página",
         "report_title": "Denunciar: {club}",
         "report_intro": "Se esta página usa imagens ou nomes sem autorização, é ofensiva ou se faz passar por outra "
@@ -159,6 +160,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "club_footer": "The club's public page, made by the Atalaia server.",
         "club_logo": "{club}'s logo",
         "club_crest": "{club}'s crest",
+        "club_fields": "Plays at these fields",
         "report": "Report this page",
         "report_title": "Report: {club}",
         "report_intro": "If this page uses images or names without permission, is offensive or impersonates another "
@@ -238,6 +240,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "club_footer": "Die öffentliche Seite des Clubs, erstellt vom Atalaia-Server.",
         "club_logo": "Logo von {club}",
         "club_crest": "Wappen von {club}",
+        "club_fields": "Spielt auf diesen Spielfeldern",
         "report": "Diese Seite melden",
         "report_title": "Melden: {club}",
         "report_intro": "Wenn diese Seite Bilder oder Namen ohne Erlaubnis verwendet, beleidigend ist oder sich als "
@@ -313,6 +316,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "club_footer": "社團的公開頁面，由 Atalaia 伺服器產生。",
         "club_logo": "{club} 的標誌",
         "club_crest": "{club} 的隊徽",
+        "club_fields": "活動場地",
         "report": "檢舉這個頁面",
         "report_title": "檢舉：{club}",
         "report_intro": "如果這個頁面未經授權使用圖片或名稱、內容冒犯他人，或冒充其他人或社團，請通知這台伺服器的管理員，"

@@ -34,6 +34,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import quotas
 from ..audit import record
 from ..auth import Principal, current_principal, require_field_role
 from ..db import get_session
@@ -102,6 +103,7 @@ async def save_scenario(field_id: uuid.UUID, request: Request, body: Any = Body(
                         principal: Principal = Depends(current_principal),
                         db: AsyncSession = Depends(get_session)) -> JSONResponse:
     await _staff(principal, db, field_id)
+    await quotas.check_stored(db)  # hosted mode: the field's stored-bytes quota (409 quota_exceeded)
     try:
         saved, outcome = await library.save(db, core_holder(request), field_id, _text(body))
     except library.LibraryProblem as exc:

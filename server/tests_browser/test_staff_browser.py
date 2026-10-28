@@ -1178,11 +1178,62 @@ class Fu8PageTests(BrowserCase):
         self.assertEqual(await self.fetch("SELECT 1 FROM user_field_roles WHERE role_id = $1", ROLE["player"]), [])
         await self.check_page(page)
 
+    async def test_the_data_page_exports_the_field_and_shows_its_limits(self) -> None:
+        """PKC-1: the export is the API's (a ZIP read with the bearer token, offered from a blob: address, its
+        SHA-256 shown); a single-field server says it has no limits; a refusal is shown in words."""
+        await self.make_game(GAME, "Domingo")
+        name, secret = await self.staff("admin")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path("/data"))
+        await expect(page.locator("#export-run")).to_be_enabled()
+        await expect(page.locator("#quotas-none")).to_be_visible()
+        await expect(page.locator("#quotas-table")).to_be_hidden()
+        async with page.expect_download() as download:
+            await page.click("#export-run")
+            await expect(page.locator("#export-done")).to_be_visible()
+            await page.click("#export-download")
+        saved = Path(await (await download.value).path())
+        with zipfile.ZipFile(saved) as zf:
+            self.assertIn("manifest.json", zf.namelist())
+        sha = (await page.locator("#export-sha").text_content() or "").strip()
+        self.assertRegex(sha, r"^[0-9a-f]{64}$")
+        import hashlib
+
+        self.assertEqual(sha, hashlib.sha256(saved.read_bytes()).hexdigest())
+        logged = (await self.fetch("SELECT details FROM audit_log WHERE action = 'field_export'"))[0][0]
+        self.assertIn(sha, str(logged))
+        # A second one at once is refused by the API's rate rule, in words.
+        await page.click("#export-run")
+        await expect(page.locator("#status")).to_contain_text("Too many requests")
+        await self.check_page(page, 375)
+        await page.goto(self.base + self.field_path("/data") + "?lang=pt")
+        await expect(page.locator("h1")).to_have_text("Dados e limites do campo")
+        await self.check_page(page, 375)
+        # A gm has no data page: the API's refusal.
+        gm, gm_secret = await self.staff("gm")
+        other = await self.new_page(lang="en-GB")
+        await self.login(other, gm, gm_secret, self.field_path("/data"))
+        await expect(other.locator("#status")).to_contain_text("This part needs")
+
+    async def test_a_game_page_under_another_fields_address_shows_nothing(self) -> None:
+        """PKC-4 (FU2-12): access is checked per game by the API, which does not look at the address; the page does."""
+        game = await self.make_game(GAME, "Domingo secreto", state="ended", ended_at=1792003700.0)
+        other = (await self.fetch("INSERT INTO fields (name, slug) VALUES ('Campo Sul', 'campo-sul') RETURNING id"))[0][0]
+        name, secret = await self.staff("admin", "gm")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path(f"/games/{game}"))
+        await expect(page.locator("#game-name")).to_have_text("Domingo secreto")
+        await page.goto(f"{self.base}/staff/fields/{other}/games/{game}")
+        await expect(page.locator("#status")).to_have_text("Not found.")
+        await expect(page.locator("main section").first).to_be_hidden()
+        self.assertNotIn("Domingo secreto", await page.locator("main").inner_text())
+        await self.check_page(page, 375)
+
     async def test_every_new_page_loads_for_its_role_at_a_phones_width(self) -> None:
         name, secret = await self.staff("admin")
         page = await self.new_page(lang="de-DE")
         await self.login(page, name, secret, self.field_path("/branding"))
-        for path in ("/branding", "/platforms", "/roles", "/sync-keys"):
+        for path in ("/branding", "/platforms", "/roles", "/sync-keys", "/data"):
             await page.goto(self.base + self.field_path(path))
             await expect(page.locator("h1")).to_be_visible()
             await expect(page.locator("#status")).to_be_empty()

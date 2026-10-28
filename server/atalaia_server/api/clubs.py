@@ -5,7 +5,9 @@
     POST   /api/v1/clubs                                 any account: {name, short_name, slug, description?,
                                                          colour?}; it becomes the club's admin
     GET    /api/v1/clubs                                 the caller's clubs (every club, for a server administrator)
-    GET    /api/v1/clubs/{club_id}                       a member (or a server administrator); a public club: anyone
+    GET    /api/v1/clubs/{club_id}                       a member (or a server administrator); a public club: anyone;
+                                                         ``fields``: where it plays (the fields that saved a team of
+                                                         it; anyone but a member sees only fields with a public page)
     PATCH  /api/v1/clubs/{club_id}                       club admin: {name, short_name, description, colour,
                                                          public_page}
     DELETE /api/v1/clubs/{club_id}                       club admin (its saved teams at fields go with it)
@@ -205,7 +207,8 @@ async def get_club(club_id: uuid.UUID, principal: Principal = Depends(current_pr
     role = await _role(db, principal, club)
     if role is None and not svc.club_visible(club):
         raise HTTPException(404, "club_not_found")
-    return await _answer(db, club, role)
+    # The fields where it plays: a member sees them all, anyone else only those with a public page (PKC-3).
+    return await _answer(db, club, role, extra={"fields": await svc.club_fields(db, club, role is None)})
 
 
 @router.patch("/clubs/{club_id}")

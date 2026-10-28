@@ -172,6 +172,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 async def _quota_exceeded(request: Request, exc: Exception) -> JSONResponse:
     """409 ``quota_exceeded`` with the quota's name and limit (hosted mode's per-field quotas)."""
     assert isinstance(exc, quotas.QuotaExceeded)
+    await quotas.report(request.app.state, exc.name, exc.limit)  # hosted mode: a note for the hub operator
     return JSONResponse(exc.body(), status_code=409, headers={"Cache-Control": "no-store"})
 
 

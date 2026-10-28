@@ -97,8 +97,8 @@ def json_ld(document: dict[str, Any]) -> str:
 def base_url(request: Request) -> str:
     settings = request.app.state.settings
     tenant = tenancy.current()
-    if settings.hosted and tenant is not None:  # hosted mode: the field's own address (plan phase 21)
-        return f"https://{tenant.host(settings.hosted_domain)}"
+    if settings.hosted and tenant is not None:  # hosted mode: the field's own address (plan phase 21), or its custom one
+        return f"https://{tenant.serving_host(settings.hosted_domain, request.headers.get('host', ''))}"
     return settings.public_url or str(request.base_url).rstrip("/")
 
 

@@ -121,8 +121,8 @@ async def game_timeline(game_id: uuid.UUID, principal: Principal = Depends(curre
     cut = history.cutoff(game, delay, staff)
     points = await history.timeline(db, game, cut)
     totals = await history.totals_until(db, game, cut)
-    return JSONResponse({"game": history.game_summary(game, totals), "points": points,
-                         "delayed_until": cut.isoformat() if cut else None}, headers=NO_STORE)
+    return JSONResponse({"game": {**history.game_summary(game, totals), "field_id": str(game.field_id)},
+                         "points": points, "delayed_until": cut.isoformat() if cut else None}, headers=NO_STORE)
 
 
 @router.get("/games/{game_id}/log")

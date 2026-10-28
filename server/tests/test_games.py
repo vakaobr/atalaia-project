@@ -108,6 +108,43 @@ class TimelineTests(HistoryCase):
         self.assertEqual(await self.count("game_score_samples"), 3)
 
 
+    async def test_points_are_in_game_time_and_pauses_do_not_count(self) -> None:
+        """PKC-2: ``t`` is game time; the arrival time stays in ``at``. A delta carries its own game time; a counter's
+        rise is placed from the arrival times and game times of the event batches around it."""
+        start = 1792000100  # META's started_at
+        game = await self.make_game()
+        await self.events([event(1, t=60_000)])                     # arrives 60 s in, game time 60 s
+        await self.events([event(2, t=70_000)], after=1)            # arrives 120 s in, game time 70 s: paused 50 s
+        await self.scores({"node-3": {"red": 10}})
+        await self.events([adjustment(3, "red", 4)], after=2)       # its own game time: 3 s
+        await self.scores({"node-3": {"red": 20}})
+        for seq, wall in ((1, 60), (2, 120), (3, 125)):
+            await self.fetch("UPDATE game_events SET received_at = to_timestamp($1) WHERE seq = $2", start + wall, seq)
+        for value, wall in ((10, 120), (20, 300)):
+            await self.fetch("UPDATE game_score_samples SET received_at = to_timestamp($1) WHERE value = $2",
+                             start + wall, value)
+        _, gm = await self.role("gm")
+        body = await self.get(f"/api/v1/games/{game}/timeline", gm)
+        self.assertEqual(body["game"]["field_id"], str(self.field_id))
+        self.assertEqual([(p["t"], p["totals"]["red"]) for p in body["points"]],
+                         [(0, 0), (70, 10), (70, 14), (250, 24)])  # 70 s of game by 120 s of waiting; 250 = 70 + 180
+        arrivals = [datetime.fromisoformat(p["at"]).timestamp() - start for p in body["points"]]
+        self.assertEqual(arrivals, [0, 120, 125, 300])
+
+    async def test_the_game_clock(self) -> None:
+        from atalaia_server.services.history import game_clock
+
+        start = datetime(2026, 10, 28, 12, 0, tzinfo=timezone.utc)
+
+        def at(seconds: float) -> datetime:
+            return start + timedelta(seconds=seconds)
+
+        clock = game_clock(start, [(at(120), 70_000), (at(60), 60_000), (at(125), 3_000)])
+        self.assertEqual([round(clock(at(s)), 1) for s in (-5, 0, 30, 60, 90, 120, 200)],
+                         [0.0, 0.0, 30.0, 60.0, 65.0, 70.0, 150.0])  # the anchor that goes back in game time is left out
+        self.assertEqual(game_clock(start, [])(at(42)), 42.0)  # no events: the arrival time, as before
+
+
 class SpectatorTests(HistoryCase):
     async def test_a_live_game_is_delayed_and_redacted_for_spectators(self) -> None:
         game = await self.make_game()

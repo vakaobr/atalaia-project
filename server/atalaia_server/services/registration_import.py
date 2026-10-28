@@ -81,6 +81,8 @@ async def run(db: AsyncSession, field: Field, game: ScheduledGame, parsed: fmt.P
     """Applies (or, with ``dry_run``, only previews) the file in the caller's transaction, ``game``
     locked by ``registration.lock_game``. The caller commits or rolls back."""
     check_game(game, now)
+    if not dry_run:
+        await quotas.check_stored(db)  # hosted mode: the field's stored-bytes quota (409 quota_exceeded)
     rules = rules_for(field, game)
     regs = list(await db.scalars(select(GameRegistration).where(GameRegistration.scheduled_game == game.id)
                                  .with_for_update()))

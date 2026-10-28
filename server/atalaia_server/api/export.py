@@ -4,6 +4,10 @@
 
     GET /api/v1/fields/{field_id}/export     the field's ``admin`` in a TOTP session (a server administrator counts
                                              as one): the field's own data as a ZIP of JSON Lines files
+    GET /api/v1/fields/{field_id}/quotas     the same caller: what the field uses of each hosted-mode limit
+                                             (``{"hosted": bool, "quotas": [{name, used, limit}]}``; ``limit`` is
+                                             null when there is none, ``used`` null when it is not counted; a
+                                             single-field server has no quotas: ``hosted`` false and no rows)
 
 Answers ``200`` with ``application/zip`` (``Content-Disposition: attachment``, ``Cache-Control: no-store``,
 ``X-Content-SHA256`` of the file, also in the audit log's ``field_export`` row), or:
@@ -33,7 +37,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import field_export, tenancy
+from .. import field_export, quotas, tenancy
 from ..audit import record
 from ..auth import Principal, current_principal, require_field_role
 from ..db import get_session
@@ -42,6 +46,7 @@ from ..models import Field
 router = APIRouter(prefix="/api/v1", tags=["fields"])
 
 CHUNK = 256 * 1024
+NO_STORE = {"Cache-Control": "no-store"}
 
 
 def _chunks(built: field_export.Built) -> Iterator[bytes]:
@@ -50,6 +55,21 @@ def _chunks(built: field_export.Built) -> Iterator[bytes]:
             yield block
     finally:
         built.file.close()
+
+
+@router.get("/fields/{field_id}/quotas")
+async def field_quotas(field_id: uuid.UUID, request: Request, principal: Principal = Depends(current_principal),
+                       db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    """What the field uses of each quota, for its administrator (decision PKC-1)."""
+    require_field_role(principal, field_id, "admin")
+    if await db.get(Field, field_id) is None:
+        raise HTTPException(404, "field_not_found")
+    tenant = tenancy.current()
+    if tenant is None:
+        return JSONResponse({"hosted": False, "quotas": []}, headers=NO_STORE)
+    watch = request.app.state.tenant_watch
+    rows = await quotas.usage(db, field_id, watch.count(tenant.schema, field_id))
+    return JSONResponse({"hosted": True, "quotas": rows}, headers=NO_STORE)
 
 
 @router.get("/fields/{field_id}/export")

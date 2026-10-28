@@ -120,15 +120,15 @@ class CodeIn(Strict):
 
 
 def site_origin(request: Request) -> str:
-    """The address this site's pages are served from: ATALAIA_PUBLIC_URL, a hosted field's own host name, else
-    what the request says (a trial on this computer). It is the WebAuthn origin and the OpenID redirect URI's
-    base, so ATALAIA_PUBLIC_URL should be set behind a proxy."""
+    """The address this site's pages are served from: ATALAIA_PUBLIC_URL, a hosted field's own host name (its custom
+    one when the request came by it), else what the request says (a trial on this computer). It is the WebAuthn origin
+    and the OpenID redirect URI's base, so ATALAIA_PUBLIC_URL should be set behind a proxy."""
     settings = request.app.state.settings
     if settings.public_url:
         return settings.public_url
     tenant = tenancy.current()
     if settings.hosted and tenant is not None:
-        return f"https://{tenant.host(settings.hosted_domain)}"
+        return f"https://{tenant.serving_host(settings.hosted_domain, request.headers.get('host', ''))}"
     return f"{request.url.scheme}://{request.url.netloc}"
 
 

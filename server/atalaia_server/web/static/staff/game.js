@@ -88,6 +88,13 @@ async function summary() {
         return false;
     }
     const g = body.game;
+    // The page is its game's own field's (the API checks the account's access to the game, not the address): under
+    // another field's address it shows nothing of the game.
+    if (g.field_id !== page.field) {
+        for (const node of document.querySelectorAll('main > section, #game-name, #game-roles, #back')) node.hidden = true;
+        status(t('err_not_found'), 'error');
+        return false;
+    }
     teams = g.teams;
     document.title = `${g.name} · ${document.title}`;
     $('game-name').textContent = g.name;

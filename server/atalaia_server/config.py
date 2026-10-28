@@ -62,8 +62,10 @@
 
     ATALAIA_QUOTA_<NAME>    hosted mode only: one field's limit on a resource (``QUOTA_DEFAULTS`` lists the names
                             and defaults: ACCOUNTS, SCHEDULED_GAMES, REGISTRATIONS, GAMES,
-                            ATAK_CERTS, STREAMS), a whole number of 1 or more, or "off" for no limit; past it
-                            the API answers 409 ``quota_exceeded`` (atalaia_server/quotas.py)
+                            ATAK_CERTS, STREAMS, STORED_MB), a whole number of 1 or more, or "off" for no
+                            limit; past it the API answers 409 ``quota_exceeded`` (atalaia_server/quotas.py).
+                            The operator may give one field its own limits in the hub's registry
+                            (``hosted quota``), which override these for that field
     ATALAIA_EXPORT_MIN_INTERVAL_S
                             seconds between two data exports of the same field (default 300, 0-86400); a
                             field's administrator may download the field's data
@@ -115,6 +117,7 @@ QUOTA_DEFAULTS: dict[str, int] = {
     "games": 20000,             # games synced from the field's controllers (the retention purge frees room)
     "atak_certs": 200,          # live (not revoked, not expired) ATAK certificates
     "streams": 8,               # open WebSocket streams of the field's controllers
+    "stored_mb": 2048,          # what the field's schema takes in the database, in MiB (tables, indexes, TOAST)
 }
 MAX_QUOTA = 100_000_000
 DEFAULT_EXPORT_INTERVAL_S = 300
@@ -276,7 +279,7 @@ def _on_off(env: Mapping[str, str], name: str, default: bool = False) -> bool:
     raise ConfigError(f"{name} must be on or off, not {raw}")
 
 
-def _quotas(env: Mapping[str, str]) -> dict[str, int]:
+def quotas_from_env(env: Mapping[str, str]) -> dict[str, int]:
     """The per-field quotas: each default, or ATALAIA_QUOTA_<NAME> (a number of 1 or more, or "off" = 0)."""
     out = dict(QUOTA_DEFAULTS)
     for name in QUOTA_DEFAULTS:
@@ -449,7 +452,7 @@ class Settings:
             atak_relay_host=env.get("ATALAIA_ATAK_RELAY_HOST", "").strip() or None,
             atak_relay_public_port=(int(_number(env, "ATALAIA_ATAK_RELAY_PUBLIC_PORT", 0, 1, 65535, int))
                                     if env.get("ATALAIA_ATAK_RELAY_PUBLIC_PORT", "").strip() else None),
-            quotas=_quotas(env),
+            quotas=quotas_from_env(env),
             export_min_interval_s=int(_number(env, "ATALAIA_EXPORT_MIN_INTERVAL_S", DEFAULT_EXPORT_INTERVAL_S,
                                               0, 86400, int)),
             export_max_mb=int(_number(env, "ATALAIA_EXPORT_MAX_MB", DEFAULT_EXPORT_MAX_MB, 1, 10240, int)),

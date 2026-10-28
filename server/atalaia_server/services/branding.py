@@ -154,6 +154,16 @@ async def club_json(db: AsyncSession, club: Club, my_role: Optional[str] = None)
     return out
 
 
+async def club_fields(db: AsyncSession, club: Club, public_only: bool) -> list[dict[str, Any]]:
+    """The fields where a club plays, from the teams those fields saved for it (``field_teams``): id, name and slug,
+    by name. ``public_only``: only fields with a public page (what anyone may be told); a member sees them all."""
+    stmt = select(Field).join(FieldTeam, FieldTeam.field_id == Field.id).where(FieldTeam.club_id == club.id)
+    if public_only:
+        stmt = stmt.where(Field.public_page.is_(True))
+    fields = (await db.scalars(stmt.distinct().order_by(Field.name, Field.id))).all()
+    return [{"id": str(f.id), "name": f.name, "slug": f.slug, "public_page": bool(f.public_page)} for f in fields]
+
+
 # --- a field's branding and saved teams -------------------------------------------------------
 
 async def field_teams(db: AsyncSession, field_id: uuid.UUID) -> list[tuple[FieldTeam, Optional[Club]]]:

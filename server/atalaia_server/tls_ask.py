@@ -16,8 +16,11 @@ proxies to it, so it cannot be reached from outside.
 
 - 200 ``yes`` only for ``<slug>.<domain>`` (case and one trailing dot
   ignored) where the slug is in the registry (``public.atalaia_tenants``) and
-  ``active``; a suspended field, any other name, the hub's own name and a
-  name under a field's (``x.<slug>.<domain>``) get 404;
+  ``active``, or for a field's **custom host name** (PKC-6) that the registry
+  holds as that *active* field's and whose DNS challenge the operator verified
+  (``hosted domain verify``): a name still pending, a suspended field, any
+  other name, the hub's own name and a name under a field's
+  (``x.<slug>.<domain>``) get 404;
 - every check is counted against one token bucket (``RATE`` a second, bursts
   of ``BURST``): past it, 429 without touching the database, so a flood of
   TLS handshakes with made-up names cannot flood PostgreSQL;
@@ -94,13 +97,25 @@ def slug_for(name: str, domain: str) -> Optional[str]:
     return label if tenancy.TENANT_SLUG.fullmatch(label) else None
 
 
+def custom_host_for(name: str, domain: str) -> Optional[str]:
+    """``name`` as a field's custom host name (lower case, no trailing dot), else None: it must be a plain DNS name and
+    neither the hub's domain nor under it."""
+    if not name or len(name) > MAX_NAME + 1:
+        return None
+    try:
+        return tenancy.check_custom_host(name, domain)
+    except tenancy.TenantError:
+        return None
+
+
 class AskApp:
     """The ASGI app: ``GET /check?domain=NAME`` and ``GET /health``."""
 
     def __init__(self, domain: str, lookup: Lookup, bucket: Optional[TokenBucket] = None,
-                 close: Optional[Callable[[], Awaitable[None]]] = None) -> None:
+                 close: Optional[Callable[[], Awaitable[None]]] = None, lookup_host: Optional[Lookup] = None) -> None:
         self.domain = check_domain(domain)
         self.lookup = lookup
+        self.lookup_host = lookup_host
         self.bucket = bucket or TokenBucket(RATE, BURST)
         self._close = close
 
@@ -140,10 +155,11 @@ class AskApp:
         if len(names) != 1:
             return 400, b"one domain, please\n"
         slug = slug_for(names[0], self.domain)
-        if slug is None:
+        host = custom_host_for(names[0], self.domain) if slug is None else None
+        if slug is None and (host is None or self.lookup_host is None):
             return 404, b"no\n"
         try:
-            tenant = await self.lookup(slug)
+            tenant = await self.lookup(slug) if slug is not None else await self.lookup_host(host)  # type: ignore[misc,arg-type]
         except Exception:  # noqa: BLE001  (the database is down: no certificate, the safe side)
             log.warning("tls-ask: the registry cannot be read")
             return 503, b"registry unavailable\n"
@@ -173,7 +189,10 @@ def create_app(env: Optional[Mapping[str, str]] = None) -> AskApp:
     async def lookup(slug: str) -> Optional[tenancy.Tenant]:
         return await tenancy.lookup(engine, slug)
 
-    return AskApp(domain, lookup, close=engine.dispose)
+    async def lookup_host(host: str) -> Optional[tenancy.Tenant]:
+        return await tenancy.lookup_host(engine, host)
+
+    return AskApp(domain, lookup, close=engine.dispose, lookup_host=lookup_host)
 
 
-__all__ = ["AskApp", "TokenBucket", "create_app", "slug_for"]
+__all__ = ["AskApp", "TokenBucket", "create_app", "custom_host_for", "slug_for"]

@@ -5,9 +5,11 @@
 - **The score timeline** is derived from the per-node counters: every rise of a counter the site server
   receives is kept (``game_score_samples``, written by ``record_samples`` when ``POST /api/v1/sync/scores``
   raises a counter), and the totals at each moment are the controller's rule (``sync_format.totals``: the
-  counters' sum per team plus every ``score.delta`` received by then, negative ones included). Its times are
-  when the site server received them (the controller syncs every 30 s during a game), counted from the game's
-  start (decision S20-3).
+  counters' sum per team plus every ``score.delta`` received by then, negative ones included). Which totals come
+  after which batch follows arrival (the controller syncs every 30 s during a game), but each point's ``t`` is in
+  **game time**, pauses not counted (decision PKC-2, which refines S20-3): a ``score.delta`` has its own game time;
+  a counter's rise has none on the wire, so its game time is read off the arrival times and the game times of the
+  event batches received around it (``game_clock``). ``at`` stays the arrival time.
 - **Who sees what.** Staff (the field's admin, gm and marshal, the game's gm and marshal) see everything as
   it is. Anyone else with a role on the field or the game (players, spectators) sees a live game's log, totals
   and timeline ``spectator_delay_s`` behind (the field's setting, 60 s by default), and a log without the
@@ -74,29 +76,66 @@ def _adjustment(team: Optional[str], data: Any) -> Optional[tuple[str, int]]:
     return None
 
 
+def game_clock(start: datetime, anchors: list[tuple[datetime, int]]) -> Any:
+    """A function from an arrival time to the game time in seconds, from ``anchors``: (arrival time, the latest game
+    time in that batch of events), in arrival order. The game started at ``start`` at game time 0. Between two
+    anchors the clock is interpolated (a pause between them stretches the arrival time over less game time); before
+    the first it runs from the start and after the last it runs on at the pace of real time. It never goes back and
+    is an estimate: a ``score.delta`` event carries its own exact game time, which ``timeline`` uses instead."""
+    points: list[tuple[float, float]] = [(0.0, 0.0)]
+    for at, ms in sorted(anchors):
+        wall = (at - start).total_seconds()
+        # An anchor that does not move forward in both clocks (a restarted game, a clock step) is left out.
+        if wall > points[-1][0] and ms / 1000 >= points[-1][1]:
+            points.append((wall, ms / 1000))
+
+    def clock(at: datetime) -> float:
+        wall = (at - start).total_seconds()
+        if wall <= 0:
+            return 0.0
+        for (w0, g0), (w1, g1) in zip(points, points[1:]):
+            if wall <= w1:
+                return g0 + (g1 - g0) * (wall - w0) / (w1 - w0)
+        w, g = points[-1]
+        return g + (wall - w)
+
+    return clock
+
+
 async def timeline(db: AsyncSession, game: Game, until: Optional[datetime]) -> list[dict[str, Any]]:
-    """The totals after each batch of changes the site server received, up to ``until`` (None: all)."""
+    """The totals after each batch of changes the site server received, up to ``until`` (None: all); each point's
+    ``t`` is game time in seconds (see the module's note)."""
     samples = select(GameScoreSample.received_at, GameScoreSample.id, GameScoreSample.source, GameScoreSample.team,
                      GameScoreSample.value).where(GameScoreSample.game == game.id)
-    deltas = select(GameEvent.received_at, GameEvent.id, GameEvent.team, GameEvent.data).where(
+    deltas = select(GameEvent.received_at, GameEvent.id, GameEvent.team, GameEvent.data, GameEvent.game_time_ms).where(
         GameEvent.game == game.id, GameEvent.event_type == "score.delta")
     if until is not None:
         samples = samples.where(GameScoreSample.received_at <= until)
         deltas = deltas.where(GameEvent.received_at <= until)
+    batches = select(GameEvent.received_at, func.max(GameEvent.game_time_ms)).where(GameEvent.game == game.id)
+    if until is not None:
+        batches = batches.where(GameEvent.received_at <= until)
+    anchors = [(at, int(ms)) for at, ms in await db.execute(batches.group_by(GameEvent.received_at))]
     changes: list[tuple[datetime, int, int, Any]] = []
+    exact: dict[tuple[int, int], int] = {}  # (kind, id) -> game time in ms where the event carries its own
     for at, sid, source, team, value in await db.execute(samples):
         changes.append((at, 0, sid, ("counter", source, team, int(value))))
-    for at, eid, team, data in await db.execute(deltas):
+    for at, eid, team, data, ms in await db.execute(deltas):
         adj = _adjustment(team, data)
         if adj is not None:
             changes.append((at, 1, eid, ("delta", *adj)))
+            exact[(1, eid)] = int(ms)
     changes.sort(key=lambda c: (c[0], c[1], c[2]))
     teams = list(game.teams)
     start = game.started_at or (changes[0][0] if changes else game.controller_created_at)
+    clock = game_clock(start, anchors)
     points = [{"t": 0, "at": start.isoformat(), "totals": {t: 0 for t in teams}}]
     counters: dict[str, dict[str, int]] = {}
     adjustments: list[tuple[str, int]] = []
-    for i, (at, _, _, change) in enumerate(changes):
+    latest = 0.0  # the game time of the last point: never goes back
+    batch = 0.0   # the latest game time among the changes of one arrival
+    for i, (at, kind, cid, change) in enumerate(changes):
+        batch = max(batch, exact[(kind, cid)] / 1000 if (kind, cid) in exact else clock(at))
         if change[0] == "counter":
             _, source, team, value = change
             row = counters.setdefault(source, {})
@@ -105,7 +144,9 @@ async def timeline(db: AsyncSession, game: Game, until: Optional[datetime]) -> l
             adjustments.append((change[1], change[2]))
         if i + 1 < len(changes) and changes[i + 1][0] == at:
             continue  # one point per arrival
-        points.append({"t": max(0, round((at - start).total_seconds())), "at": at.isoformat(),
+        latest = max(latest, batch)
+        batch = 0.0
+        points.append({"t": round(latest), "at": at.isoformat(),
                        "totals": sync_format.totals(teams, counters, adjustments)})
     if len(points) > MAX_POINTS:
         step = len(points) / (MAX_POINTS - 1)

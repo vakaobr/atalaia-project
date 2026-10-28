@@ -103,7 +103,7 @@ paste it into a chat.
 The server's other settings (`ATALAIA_PURGE_HOUR`,
 `ATALAIA_PRIVACY_NOTICE_VERSION`, `ATALAIA_EXPORT_MIN_INTERVAL_S`, `ATALAIA_EXPORT_MAX_MB` and, for a hub,
 the per-field limits `ATALAIA_QUOTA_ACCOUNTS`, `_SCHEDULED_GAMES`, `_REGISTRATIONS`, `_GAMES`, `_ATAK_CERTS`,
-`_STREAMS` and `ATALAIA_HOSTED_WATCH_S`) can be added to `.env` too; the list, with the defaults, is in
+`_STREAMS`, `_STORED_MB` and `ATALAIA_HOSTED_WATCH_S`) can be added to `.env` too; the list, with the defaults, is in
 [server/README.md](../README.md). After a change: `docker compose up -d`
 (from `server/`). Not for a real deployment: `ATALAIA_TEST_ADAPTER`.
 Optional, for the ports: `ATALAIA_BIND` (`0.0.0.0`), `ATALAIA_HTTP_PORT`
@@ -521,7 +521,22 @@ under the DPA):
   encrypted. On the field's own server, at the same release,
   with an empty migrated database: `python -m atalaia_server import-field
   campo-tejo.zip`; everyone logs in and enrols TOTP again.
-- **A field's own export, without the operator.** The field's administrator can download the field's own data from `GET /api/v1/fields/<field id>/export` (their TOTP session's bearer token; a ZIP of JSON Lines files, documented in its `README.txt` and `manifest.json`): everything except credentials, e-mail and IP addresses. It is audit-logged in the field, limited to one every 5 minutes (`ATALAIA_EXPORT_MIN_INTERVAL_S`) and 512 MB (`ATALAIA_EXPORT_MAX_MB`). It is not the data return the DPA asks for on the controller's instruction: that is `hosted export` above, which holds every credential hash. For a field too big for the limit, use `hosted export`.
+- **A field's own export, without the operator.** The field's administrator can download the field's own data from `GET /api/v1/fields/<field id>/export` (their TOTP session's bearer token; a ZIP of JSON Lines files, documented in its `README.txt` and `manifest.json`): everything except credentials, e-mail and IP addresses. The staff page `/staff/fields/<field id>/data` ("Dados e limites") does the download in the browser (and shows its SHA-256, which the audit log holds too). It is audit-logged in the field, limited to one every 5 minutes (`ATALAIA_EXPORT_MIN_INTERVAL_S`) and 512 MB (`ATALAIA_EXPORT_MAX_MB`). It is not the data return the DPA asks for on the controller's instruction: that is `hosted export` above, which holds every credential hash. For a field too big for the limit, use `hosted export`.
+- **Per-field limits (decisions PKC-5).** The hub's limits are `ATALAIA_QUOTA_*` (accounts, scheduled games,
+  registrations, synced games, live ATAK certificates, controller streams and, new, `STORED_MB`: what the field's
+  schema takes in the database, 2048 MiB by default, read from the catalogue at most every 30 s, so a burst can pass it
+  a little; checked on the controllers' sync, an image, a scenario and a registration import). One field may have its
+  own: `hosted quota campo-tejo games 40000 --reason "bigger plan"` (a number of 1 or more, `off` for none, `default`
+  to give the hub's back); it is read from the registry on every request, so it applies at once, and is audit-logged
+  (`tenant_quota`). `hosted usage [campo-tejo]` prints what each field uses against its effective limits (open
+  streams are the running server's: shown as `-`). The field's administrator sees the same numbers, read-only, on
+  `/staff/fields/<field id>/data` (`GET /api/v1/fields/<field id>/quotas`).
+- **Being told when a field hits a limit.** When the server refuses a field for a quota it leaves a note in
+  `public.atalaia_quota_hits` (the server's role may only add to it, never read or change it; at most one note per
+  field and quota every 10 minutes). `hosted list` and `hosted check` say how many notes wait; `hosted quota-hits`
+  moves them into the hub's audit log (`quota_hit`: field, quota, limit, how many notes, first and last time) and prints
+  them. There is no e-mail: run it from a cron job or look at `hosted list`, and raise the limit with `hosted quota`.
+- **A custom host name per field** (decisions PKC-6): see [Custom domains](#custom-domains-per-field).
 - `hosted suspend campo-tejo --reason "..."` and `hosted resume ...`: every
   request refused, data kept. A suspended field gets no **new** certificate;
   one it already has stays in Caddy's store until it expires.
@@ -546,7 +561,11 @@ cd server && docker compose up -d --build --wait caddy server tls-ask
 ```
 
 `hub` runs `hosted migrate` before the new server starts; if a migration
-fails, the server does not start (`docker compose logs hub`).
+fails, the server does not start (`docker compose logs hub`). `hosted migrate` also brings the registry up to
+date (the per-field limits, the custom host names and the quota-note table of PKC-5 and PKC-6 are added to a hub made
+by an older release, idempotently), and a server that finds the older registry refuses to start and says so: run
+`docker compose run --rm hub hosted migrate`. `Caddyfile.hosted` changed in the same release (a second site block for
+custom host names): `docker compose up -d --build` picks it up.
 
 ### Backups and restore of a hub
 
@@ -604,8 +623,49 @@ image pinned and tested here. To do it:
 3. give the token only the right to edit that zone's TXT records, put it in
    `.env` (mode 0600) and pass it to the Caddy container only.
 
-This is not tested here (decision FU4-2). Custom domains per field (a field's
-own name instead of a sub-domain of the hub) are not built.
+This is not tested here (decision FU4-2). A wildcard certificate covers the hub's own sub-domains only: a field's
+custom host name (next) still needs its own certificate on demand, so keep the `ask` endpoint and the second site
+block of `Caddyfile.hosted` for those.
+
+### Custom domains per field
+
+A field may have **one custom host name** besides `<slug>.hub.example.pt`, such as `jogos.clube.example.pt`
+(decisions PKC-6; S21-12 had left it for later). It is kept in the hub's registry, set by the operator, routed by the
+host name (the same way as the field's own name, so the field's data never depend on which name reached it), and its
+certificate is issued by Caddy through the same `ask` endpoint, **only** for a name the registry holds as a registered,
+active field's whose control the field proved. There are no wildcard custom names and no second name per field.
+
+1. The field decides the name and gives it to the operator. The operator records it:
+   `docker compose run --rm hub hosted domain set campo-tejo jogos.clube.example.pt --reason "club's request" --actor ana`.
+   It refuses a name that is not a plain DNS name of two labels or more (no scheme, port, wildcard or IP address), the
+   hub's own domain or a name under it, and a name another field has. The command prints the TXT record to publish
+   (the hub's `ATALAIA_HOSTED_DOMAIN` is read from `.env` for the check):
+   `_atalaia-challenge.jogos.clube.example.pt  TXT  "atalaia-verify=<32 hex digits>"`. The name is *pending*: it routes
+   nowhere and gets no certificate, and the same command for another name replaces it (and starts again).
+2. The field publishes that TXT record at its DNS provider **and** points the name at the hub: an `A`/`AAAA` record
+   to the hub's address, or a `CNAME` to `<slug>.hub.example.pt` (Caddy's validation of the name needs it).
+3. The operator runs `hosted domain verify campo-tejo`. It asks the machine's own resolver (`/etc/resolv.conf`; the
+   `hub` container has none of its own to configure: it uses Docker's) for the TXT record and turns the name on only if
+   the record holds the field's token (audit-logged: `tenant_domain_set`, `tenant_domain_verify`). A DNS change can take
+   minutes to hours: run it again later. It does not check the `A`/`CNAME` record.
+4. From then on `https://jogos.clube.example.pt` serves the field. Caddy gets the certificate at the first request
+   (`https://` catch-all block of `Caddyfile.hosted`, `on_demand_tls` `ask`): the `ask` endpoint says yes to the name
+   while the field is active and the name is on, and to nothing else (a pending name, another name, a suspended field).
+   The ask endpoint now looks a name that is not `<slug>.hub.example.pt` up in the registry, still at most 5 checks a
+   second.
+5. `hosted domain remove campo-tejo --reason "..."` takes it away: it stops routing at once (404 `unknown_field`) and
+   gets no new certificate; the one Caddy has stays in its store until it expires. `hosted list` shows each field's name
+   and whether it is pending.
+
+What changes on the custom name: the page addresses the field makes (the public pages' links and feeds, the game
+pages' addresses) and a passkey's origin follow the name the request came by, so **passkeys are per name** (an account's
+passkeys made at `<slug>.hub.example.pt` do not work at the custom name, and the other way round; passwords and TOTP do).
+The remote ATAK relay's devices and the controllers keep using `<slug>.hub.example.pt` (its certificate covers the hub's
+sub-domains only). **Social login** (Google, Microsoft, Apple) uses a redirect address that each provider registers one
+by one: the custom name needs its address registered at the provider, as every field's own address does today; the
+hub-level callback relay that will remove that work is a design only (docs/phase-4-site-server/ADR.md, ADR-P4-13). Like
+the rest of hosted mode, this has not run on a real hub with real DNS; the tests cover the registry, the routing, the
+`ask` endpoint and the challenge with a fake resolver and a resolver of their own on localhost.
 
 ## Monitoring
 

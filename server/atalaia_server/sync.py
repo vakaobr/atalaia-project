@@ -271,6 +271,10 @@ HANDLERS = {"games": _games, "events": _events, "scores": _scores, "nodes": _nod
 
 async def apply(db: AsyncSession, caller: Caller, kind: str, body: dict[str, Any]) -> dict[str, Any]:
     """Stores one checked body and commits; the answer of protocol/sync.md."""
+    try:
+        await quotas.check_stored(db)  # hosted mode: a field whose data take its limit stores nothing more (PKC-5)
+    except quotas.QuotaExceeded as exc:
+        raise SyncProblem(409, quotas.CODE, extra={"quota": exc.name, "limit": exc.limit}) from None
     await _seen(db, caller, body)
     answer = await HANDLERS[kind](db, caller, body)
     await db.commit()

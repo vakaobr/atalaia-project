@@ -434,6 +434,7 @@ const SECTIONS = {
     synckeys: (r) => r.has('admin'),
     branding: (r) => r.has('admin') || r.has('gm'),
     platforms: (r) => r.has('admin'),
+    data: (r) => r.has('admin'),
     // The pages not of one field: any account's clubs and the firmware list; the server administrator's page.
     clubs: () => true,
     firmware: () => true,

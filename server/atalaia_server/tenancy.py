@@ -13,7 +13,8 @@ commands that make, migrate, export and delete tenants are in ``hosted.py``.
 Per request:
 
 1. ``TenantMiddleware`` takes the field from the host name,
-   ``<slug>.<ATALAIA_HOSTED_DOMAIN>``, and looks it up in the registry. An
+   ``<slug>.<ATALAIA_HOSTED_DOMAIN>`` (or the field's custom host name, once the operator verified it by a DNS
+   TXT challenge: ``hosted domain``, decisions PKC-6), and looks it up in the registry. An
    unknown host gets 404 ``unknown_field`` (a WebSocket is closed with 4404), a
    suspended field 403 ``field_suspended``; only ``GET /api/v1/health`` answers
    without a field (the container's health check). The tenant is put in a
@@ -49,8 +50,8 @@ import re
 import uuid
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Iterator, Optional
+from dataclasses import dataclass, field as dc_field
+from typing import Any, Awaitable, Callable, Iterator, Mapping, Optional
 
 from sqlalchemy import event, text
 from sqlalchemy.engine import Connection
@@ -67,10 +68,32 @@ NO_TENANT_PATH = "pg_catalog"
 # Answered without a tenant: the container's health check calls 127.0.0.1, not a field's name.
 OPEN_PATHS = frozenset({"/api/v1/health"})
 STATUSES = ("active", "suspended")
+HOST_STATUSES = ("pending", "active")
+# A field's custom host name (PKC-6): two or more DNS labels, lower case, the last one letters (so never an address).
+CUSTOM_HOST = re.compile(r"(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?")
+CHALLENGE_LABEL = "_atalaia-challenge"
+CHALLENGE_PREFIX = "atalaia-verify="
 
 
 class TenantError(ValueError):
     """A slug or schema name that is not valid."""
+
+
+def check_custom_host(host: str, domain: str) -> str:
+    """A field's custom host name, lower case with no trailing dot; ``TenantError`` unless it is a plain DNS name of
+    two labels or more that is not the hub's domain or a name under it (those are the fields' own addresses)."""
+    name = (host or "").strip().lower().rstrip(".") if isinstance(host, str) else ""
+    if not CUSTOM_HOST.fullmatch(name):
+        raise TenantError("a custom host name is a DNS name such as jogos.example.pt: two or more labels of lower-case "
+                          "letters, digits and hyphens, no scheme, port, path or wildcard")
+    if name == domain or name.endswith("." + domain):
+        raise TenantError(f"{name} is the hub's own domain or under it: a field's own address is <slug>.{domain}")
+    return name
+
+
+def challenge_name(host: str) -> str:
+    """Where the field puts its proof of control: a TXT record at this name."""
+    return f"{CHALLENGE_LABEL}.{host}"
 
 
 def check_slug(slug: str) -> str:
@@ -97,9 +120,21 @@ class Tenant:
     schema: str
     field_id: uuid.UUID
     status: str = "active"
+    # The operator's per-field quota overrides (name -> limit, 0 for none), and the field's custom host name, which
+    # routes only once its DNS challenge passed (``custom_host_status`` ``active``).
+    quotas: Mapping[str, int] = dc_field(default_factory=dict, hash=False, compare=False)
+    custom_host: Optional[str] = dc_field(default=None, compare=False)
+    custom_host_status: Optional[str] = dc_field(default=None, compare=False)
 
     def host(self, domain: str) -> str:
         return f"{self.slug}.{domain}"
+
+    def serving_host(self, domain: str, request_host: str = "") -> str:
+        """The name this request reached the field by: its custom host name when it came that way (and the name is
+        on), else ``<slug>.<domain>`` (the page addresses, a passkey's origin and the like follow it)."""
+        if self.custom_host and self.custom_host_status == "active" and host_name(request_host) == self.custom_host:
+            return self.custom_host
+        return self.host(domain)
 
 
 _current: ContextVar[Optional[Tenant]] = ContextVar("atalaia_tenant", default=None)
@@ -138,23 +173,51 @@ def slug_from_host(host: str, domain: str) -> Optional[str]:
     return label if TENANT_SLUG.fullmatch(label) else None
 
 
-_REGISTRY_ROW = text("SELECT slug, schema_name, field_id, status FROM public.atalaia_tenants WHERE slug = :slug")
-_REGISTRY_ALL = text("SELECT slug, schema_name, field_id, status FROM public.atalaia_tenants "
-                     "WHERE status = 'active' ORDER BY slug")
+COLUMNS = "slug, schema_name, field_id, status, quotas, custom_host, custom_host_status"
+_REGISTRY_ROW = text(f"SELECT {COLUMNS} FROM public.atalaia_tenants WHERE slug = :slug")
+_REGISTRY_HOST = text(f"SELECT {COLUMNS} FROM public.atalaia_tenants "
+                      "WHERE custom_host = :host AND custom_host_status = 'active'")
+_REGISTRY_ALL = text(f"SELECT {COLUMNS} FROM public.atalaia_tenants WHERE status = 'active' ORDER BY slug")
+
+
+def host_name(value: str) -> str:
+    """A Host header's name alone: lower case, no port, no trailing dot ('' for an IPv6 literal)."""
+    value = (value or "").strip().lower()
+    if not value or value.startswith("["):
+        return ""
+    return value.rsplit(":", 1)[0].rstrip(".")
+
+
+def from_row(row: Any) -> Tenant:
+    """A tenant from a registry row (``COLUMNS``); the quotas column is jsonb, which a driver may hand over as text."""
+    quotas = row[4]
+    if isinstance(quotas, (str, bytes)):
+        quotas = json.loads(quotas)
+    return Tenant(slug=row[0], schema=check_schema(row[1]), field_id=row[2], status=row[3],
+                  quotas={str(k): int(v) for k, v in (quotas or {}).items()}, custom_host=row[5],
+                  custom_host_status=row[6])
 
 
 async def lookup(engine: AsyncEngine, slug: str) -> Optional[Tenant]:
     async with engine.connect() as conn:
         row = (await conn.execute(_REGISTRY_ROW, {"slug": slug})).first()
-    if row is None:
+    return from_row(row) if row is not None else None
+
+
+async def lookup_host(engine: AsyncEngine, host: str) -> Optional[Tenant]:
+    """The field whose custom host name is ``host`` and has passed its DNS challenge (a pending name routes nowhere)."""
+    name = host_name(host)
+    if not CUSTOM_HOST.fullmatch(name):
         return None
-    return Tenant(slug=row[0], schema=check_schema(row[1]), field_id=row[2], status=row[3])
+    async with engine.connect() as conn:
+        row = (await conn.execute(_REGISTRY_HOST, {"host": name})).first()
+    return from_row(row) if row is not None else None
 
 
 async def active_tenants(engine: AsyncEngine) -> list[Tenant]:
     async with engine.connect() as conn:
         rows = (await conn.execute(_REGISTRY_ALL)).all()
-    return [Tenant(slug=r[0], schema=check_schema(r[1]), field_id=r[2], status=r[3]) for r in rows]
+    return [from_row(r) for r in rows]
 
 
 # Sessions -------------------------------------------------------------------------------------
@@ -190,7 +253,10 @@ SELECT r.rolsuper, r.rolbypassrls,
        (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
          WHERE c.relowner = r.oid AND (n.nspname LIKE 'field\_%' OR c.relname LIKE 'atalaia\_%')) AS tables_owned,
        (SELECT count(*) FROM pg_namespace n WHERE n.nspowner = r.oid AND n.nspname LIKE 'field\_%') AS schemas_owned,
-       to_regclass('public.atalaia_tenants') IS NOT NULL AS registry
+       to_regclass('public.atalaia_tenants') IS NOT NULL AS registry,
+       EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public'
+                  AND table_name = 'atalaia_tenants' AND column_name = 'custom_host') AS current_registry,
+       to_regclass('public.atalaia_quota_hits') IS NOT NULL AS hits
   FROM pg_roles r WHERE r.rolname = current_user
 """)
 _REGISTRY_WRITE = text("SELECT has_table_privilege('public.atalaia_tenants', 'INSERT, UPDATE, DELETE, TRUNCATE')")
@@ -205,7 +271,7 @@ async def check_app_role(engine: AsyncEngine) -> None:
     or may change the registry, and a database with no registry (``hosted init`` not run)."""
     async with engine.connect() as conn:
         row = (await conn.execute(_ROLE_CHECK)).one()
-        superuser, bypass, tables, schemas, registry = row
+        superuser, bypass, tables, schemas, registry, current_registry, hits = row
         problems = []
         if superuser:
             problems.append("is a superuser")
@@ -215,6 +281,8 @@ async def check_app_role(engine: AsyncEngine) -> None:
             problems.append("owns tenant tables or schemas (it must not be the migrations' owner role)")
         if not registry:
             problems.append("finds no public.atalaia_tenants (run: python -m atalaia_server hosted init)")
+        elif not (current_registry and hits):
+            problems.append("finds the registry of an older release (run: python -m atalaia_server hosted migrate)")
         elif await conn.scalar(_REGISTRY_WRITE):
             problems.append("may change public.atalaia_tenants")
     if problems:
@@ -252,7 +320,8 @@ class TenantMiddleware:
                 break
         slug = slug_from_host(host, state.settings.hosted_domain)
         try:
-            tenant = await lookup(state.engine, slug) if slug else None
+            # <slug>.<domain>, else a field's custom host name that passed its DNS challenge (PKC-6).
+            tenant = await lookup(state.engine, slug) if slug else await lookup_host(state.engine, host)
         except Exception:  # noqa: BLE001  (the database is down: no tenant can be found)
             await _refuse(scope, receive, send, 503, "database_unreachable")
             return
@@ -262,7 +331,8 @@ class TenantMiddleware:
         if tenant.status != "active":
             await _refuse(scope, receive, send, 403, "field_suspended")
             return
-        with use(tenant), quotas.use(state.settings.quotas):
+        # The hub's limits (the environment's), with the operator's own for this field over them (PKC-5).
+        with use(tenant), quotas.use({**state.settings.quotas, **tenant.quotas}):
             await self.app(scope, receive, send)
 
 

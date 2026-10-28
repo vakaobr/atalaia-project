@@ -2946,11 +2946,13 @@ STRINGS: dict[str, dict[str, str]] = {
 # The texts of the pages for roles, sync keys, branding and clubs, platform links, the firmware catalogue and server
 # administration (FU9) are in their own module; every key is new (a clash would silently change another page's text).
 from .staff_i18n_admin import BY_LANGUAGE as _ADMIN  # noqa: E402
+from .staff_i18n_data import BY_LANGUAGE as _DATA  # noqa: E402  (the data export and quota page, PKC-1)
 
-for _lang, _texts in _ADMIN.items():
-    _clash = set(STRINGS[_lang]) & set(_texts)
-    assert not _clash, sorted(_clash)
-    STRINGS[_lang].update(_texts)
+for _more in (_ADMIN, _DATA):
+    for _lang, _texts in _more.items():
+        _clash = set(STRINGS[_lang]) & set(_texts)
+        assert not _clash, sorted(_clash)
+        STRINGS[_lang].update(_texts)
 
 # The remote GM page's list of the players' positions (PKD-5); every key is new, as above.
 _POSITIONS: dict[str, dict[str, str]] = {

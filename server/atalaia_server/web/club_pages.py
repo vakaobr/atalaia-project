@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The public club pages (P4R19; plan phase 18).
 
-    GET  /c/<slug>/                 the club: its colour, crest, logo, name, short name and description
+    GET  /c/<slug>/                 the club: its colour, crest, logo, name, short name, description and the fields
+                                    with a public page where it plays (from the teams those fields saved for it)
     GET  /c/<slug>/logo, /crest     its images, as stored (checked, metadata stripped)
     GET  /c/<slug>/report           the report button's form
     POST /c/<slug>/report           a report (reason and text; form-encoded, no JavaScript, no login)
@@ -68,8 +69,16 @@ async def club_page(slug: str, request: Request, db: AsyncSession = Depends(get_
                         f'alt="{esc(page.t[label].format(club=club.name))}">')
     images = f'<p class="club-images">{"".join(imgs)}</p>\n' if imgs else ""
     short = f'<p class="short-name">{esc(club.short_name)}</p>\n' if club.short_name != club.name else ""
+    played = await svc.club_fields(db, club, True)  # only fields with a public page are named (PKC-3)
+    fields = ""
+    if played:
+        links = "".join(f'<li><a href="{esc(page.link("/f/" + f["slug"] + "/"))}">{esc(f["name"])}</a></li>\n'
+                        for f in played)
+        fields = (f'<section class="club-fields">\n<h2>{esc(page.t["club_fields"])}</h2>\n<ul>\n{links}</ul>\n'
+                  '</section>\n')
     content = TEMPLATES["club"].substitute(
-        band=band, images=images, name=esc(club.name), short_name=short, description=paragraphs(club.description),
+        band=band, images=images, fields=fields, name=esc(club.name), short_name=short,
+        description=paragraphs(club.description),
         report_url=esc(page.link(f"/c/{club.slug}/report")), report=esc(page.t["report"]))
     return page.render(request, club.name, content, club.updated_at, footer=_footer(page))
 
