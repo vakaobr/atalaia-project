@@ -691,6 +691,15 @@ This section gives the short Windows steps. The
 Windows, macOS and Linux, and everything after the flash (setup, adoption,
 updates, recovery).
 
+**Easiest: use a release.** The project publishes ready-made firmware on
+[GitHub's Releases page](https://github.com/vakaobr/atalaia-project/releases)
+(pre-alpha, not field-tested). Download `atalaia-field-box-<version>-usb.zip`
+and `SHA256SUMS`, check the sum, unzip, and go to step 2 below: the zip has
+the `flash_args` file in place of the build folder
+([firmware guide, section 2.1](../../docs/manuals/en/firmware.md#21-download-a-release-the-easy-way)).
+It is built for a V4.3 board and EU868; for a V4.2, for Taiwan or for your own
+keys, build it yourself as step 1 says.
+
 The firmware is built in Docker; flashing runs on your computer, because
 Docker on Windows cannot reach USB serial ports. The commands below are for
 **Windows `cmd`**, run from the repository folder. Docker Desktop must be

@@ -768,6 +768,16 @@ class ConfigTests(unittest.TestCase):
                 with self.subTest(variants=bad), self.assertRaises(ConfigError):
                     config(tmp, firmware_variants=bad)
 
+    def test_default_is_the_projects_release_keys(self) -> None:
+        from atalaia_controller.config import PROJECT_RELEASE_KEYS, load_config  # noqa: PLC0415
+        from atalaia_controller.firmware_release import key_id  # noqa: PLC0415
+
+        # docs/community/keys.md: root 424d053af5cdbc35, CI 32b3c815ac30ad43.
+        self.assertEqual([key_id(k) for k in PROJECT_RELEASE_KEYS], ["424d053af5cdbc35", "32b3c815ac30ad43"])
+        self.assertEqual(load_config(None, {}).firmware_release_keys, list(PROJECT_RELEASE_KEYS))
+        self.assertEqual(load_config(None, {"ATALAIA_FIRMWARE_RELEASE_KEYS": SIGNING["public_key_b64"]}
+                                     ).firmware_release_keys, [SIGNING["public_key_b64"]])
+
     def test_from_the_environment(self) -> None:
         from atalaia_controller.config import load_config  # noqa: PLC0415
 

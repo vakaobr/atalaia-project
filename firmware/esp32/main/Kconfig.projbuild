@@ -697,7 +697,7 @@ menu "Atalaia Field Box Configuration"
 
         config ATALAIA_OTA_RELEASE_KEYS
             string "Release public keys (64 hex digits each, separated by spaces)"
-            default ""
+            default "e6dccf90dd002529fe837e023f9f658a70917ff7dc69615cec600083bab360d7 ac83bca20314dcb44b2ed9ede91cacf9445d2987e636fe66c6fb91250b17f53c"
             help
                 The Ed25519 public keys whose signatures this firmware accepts
                 on a firmware release (up to 4, so a key can be rotated: ship a
@@ -708,6 +708,8 @@ menu "Atalaia Field Box Configuration"
                 Empty: the box refuses every update ("no_key"), and an image
                 without a key never confirms itself after an update, so the
                 bootloader goes back to the previous one.
+                Default: the project's two release keys, root 424d053af5cdbc35
+                and CI 32b3c815ac30ad43 (docs/community/keys.md).
 
         config ATALAIA_OTA_VARIANT
             string "Variant name in the image's descriptor (at most 11 characters)"

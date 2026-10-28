@@ -10,7 +10,7 @@ Code: the box's checks and update job `firmware/esp32/main/fw_update.c` (platfor
 
 ## Trust
 
-- A **release key** (Ed25519, RFC 8032) signs each release. Its private half stays offline with the maintainer (`firmware/esp32/docs/RELEASE_SIGNING.md`); its public half is built into the firmware (`CONFIG_ATALAIA_OTA_RELEASE_KEYS`, up to 4 keys so that one can be rotated), set on the controllers (`[firmware] release_keys`) and on the site server (`ATALAIA_FIRMWARE_KEYS`, the catalogue of plan phase 19).
+- A **release key** (Ed25519, RFC 8032) signs each release. Its private half stays offline with the maintainer, except the project's CI release key, a repository secret that signs the GitHub releases (`firmware/esp32/docs/RELEASE_SIGNING.md`); its public half is built into the firmware (`CONFIG_ATALAIA_OTA_RELEASE_KEYS`, up to 4 keys so that one can be rotated), set on the controllers (`[firmware] release_keys`) and on the site server (`ATALAIA_FIRMWARE_KEYS`, the catalogue of plan phase 19).
 - **The box decides.** The controller and the site server check the signature too, but only to keep a bad release out of their lists; the box checks everything again with the keys in its own firmware before it writes a byte of the image to flash (decision S19-8).
 - The image travels over **HTTPS pinned to the field CA**: the box trusts exactly the certificate authority whose SHA-256 its signed join payload carries (key 13), for the addresses the payload lists (key 14). It needs no clock (mbedTLS's validity dates are not checked without one) and no other trust store. The signature, not the channel, is what makes the image safe; the channel keeps a stranger on the field network from feeding the box garbage that it would only download to refuse.
 

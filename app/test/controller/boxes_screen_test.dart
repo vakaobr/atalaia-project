@@ -15,6 +15,7 @@ import 'package:atalaia_app/controller/controller_boxes_screen.dart';
 import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/platform/services.dart';
 import 'package:atalaia_app/protocol/field_card.dart';
+import 'package:atalaia_app/protocol/firmware_release.dart';
 import 'package:atalaia_app/security/ndef.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -139,7 +140,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text(s.t('ctl.fw_keys_none')), findsOneWidget);
+    // The default is the project's two release keys (docs/community/keys.md).
+    expect(h.settings.firmwareKeys, projectReleaseKeys);
+    expect(find.text(s.t('ctl.fw_keys_set', {'n': 2})), findsOneWidget);
     // Not a key: refused, nothing kept.
     await tester.tap(find.byKey(const Key('ctl-fw-keys')));
     await tester.pumpAndSettle();
@@ -150,7 +153,7 @@ void main() {
     await tester.tap(find.text(s.t('common.save')));
     await tester.pumpAndSettle();
     expect(find.text(s.t('ctl.fw_keys_bad')), findsOneWidget);
-    expect(h.settings.firmwareKeys, isEmpty);
+    expect(h.settings.firmwareKeys, projectReleaseKeys);
     expect(given, isEmpty);
     // Two keys, one per line.
     const a = '11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=';

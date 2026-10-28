@@ -24,6 +24,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 
 import '../l10n/strings.dart';
+import '../protocol/firmware_release.dart' show projectReleaseKeys;
 import '../security/bytes.dart';
 import 'secret_vault.dart';
 
@@ -147,7 +148,7 @@ final class AppSettings {
   /// The firmware release keys a phone controller trusts (slice S7c,
   /// decision PE24-96; the Pi's `[firmware] release_keys`): the public
   /// halves, standard base64 of 32 bytes, at most 8.
-  List<String> firmwareKeys = [];
+  List<String> firmwareKeys = [...projectReleaseKeys];
 
   /// The mode keys an Android prop trusts for the signed mode packages it
   /// fetches from its controller (PKF-2; a Field Box's
@@ -259,10 +260,12 @@ final class AppSettings {
           if (e.value is int) '${e.key}': e.value as int,
       }
       ..sharePosition = j['share_position'] == true
-      ..firmwareKeys = [
-        for (final k in (j['firmware_keys'] as List?) ?? const [])
-          if (k is String) k,
-      ]
+      ..firmwareKeys = j.containsKey('firmware_keys')
+          ? [
+              for (final k in (j['firmware_keys'] as List?) ?? const [])
+                if (k is String) k,
+            ]
+          : [...projectReleaseKeys]
       ..modeKeys = [
         for (final k in (j['mode_keys'] as List?) ?? const [])
           if (k is String) k,

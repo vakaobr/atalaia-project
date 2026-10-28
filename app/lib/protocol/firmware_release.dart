@@ -338,3 +338,12 @@ parseReport(List<int> body) {
     version: out['version']!,
   );
 }
+
+/// The project's release keys (docs/community/keys.md): root
+/// 424d053af5cdbc35, held offline, and CI 32b3c815ac30ad43, which signs the
+/// GitHub releases. The default of a phone controller's release keys, as the
+/// Pi's `PROJECT_RELEASE_KEYS` in config.py and the boxes' firmware.
+const projectReleaseKeys = [
+  '5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=',
+  'rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=',
+];

@@ -327,7 +327,11 @@ free.
    the board's battery lead in.
 2. **USB only**, switch off: plug the computer into the USB-C port; the board
    starts; 3.3 V on the hub's 3V3 rail.
-3. **Flash the Field Box firmware** exactly as the
+3. **Flash the Field Box firmware**: download `atalaia-field-box-<version>-usb.zip`
+   from [GitHub's Releases page](https://github.com/vakaobr/atalaia-project/releases) (pre-alpha, not
+   field-tested; V4.3, EU868) and flash it as the
+   [firmware guide, section 2.1](../../docs/manuals/en/firmware.md#21-download-a-release-the-easy-way)
+   says, or build and flash it yourself exactly as the
    [Field Box manual, section 11](../field-box/BUILD.md#11-first-flash) says:
    `python tools\docker_fw.py build`, then esptool from your computer (Docker
    on Windows cannot reach USB ports). Build it for your board revision

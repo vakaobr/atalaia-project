@@ -155,7 +155,9 @@ remote_players = false            # with remote: player positions too, which the
 # The GM uploads a signed release (the image and its .release.json from
 # tools/firmware_release.py) in the console's Boxes tab and starts an update per box
 # or for all, only while the live game has not started. Overridable as ATALAIA_FIRMWARE_*.
-release_keys = []                 # the release keys' public halves, ["<44 base64 characters>"];
+release_keys = ["5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=", "rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw="]
+                                  # the release keys' public halves, ["<44 base64 characters>"];
+                                  # default: the project's two release keys (docs/community/keys.md);
                                   # empty: no release is accepted. Each box checks the
                                   # signature again with the keys built into its firmware
 dir = ""                          # where the images are kept; empty: "firmware" next to db_path

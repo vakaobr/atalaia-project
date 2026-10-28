@@ -276,9 +276,13 @@ less its display line.
 
 ## 9. First flash
 
-The pod firmware is built in Docker and flashed from your computer, like the
-Field Box's ([manual, section 11](../field-box/BUILD.md#11-first-flash)), with
-two differences: the build command and the build folder.
+The pod firmware is flashed from your computer, like the Field Box's
+([manual, section 11](../field-box/BUILD.md#11-first-flash)). **Easiest:
+download `atalaia-io-pod-<version>-usb.zip` from
+[GitHub's Releases page](https://github.com/vakaobr/atalaia-project/releases)** (pre-alpha, not field-tested; V4.3, EU868; check
+`SHA256SUMS`), unzip it and flash from that folder as steps 2 onward say. Or
+build it in Docker, with two differences from the Field Box: the build command
+and the build folder.
 
 1. **Build** (add `--region=as923-tw` for Taiwan: the pod, the modem, the
    boxes and the controller must share one region):

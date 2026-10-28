@@ -1,0 +1,213 @@
+name: Release
+
+# A pushed tag v* builds the firmware images, signs them with the CI release key and publishes a
+# GitHub pre-release (docs/manuals/en/firmware.md, firmware/esp32/docs/RELEASE_SIGNING.md).
+# "Run workflow" (workflow_dispatch) is a dry run: the same builds and packaging, signed with a
+# throw-away key made on the runner, uploaded as a workflow artifact, no release, no secret used.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+# Nothing by default; each job asks for what it needs. Only the publish job writes (contents).
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # The project's CI release key (docs/community/keys.md): the signature is checked against it,
+  # so a wrong secret fails the release instead of publishing something no box accepts.
+  CI_KEY_ID: 32b3c815ac30ad43
+  CI_KEY_PUBLIC: rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=
+  # The firmware's default trusted keys (Kconfig): root then CI, mode keys and release keys.
+  RELEASE_KEYS_HEX: >-
+    e6dccf90dd002529fe837e023f9f658a70917ff7dc69615cec600083bab360d7
+    ac83bca20314dcb44b2ed9ede91cacf9445d2987e636fe66c6fb91250b17f53c
+  MODE_KEYS_HEX: >-
+    23e9b7acefbe4dc54d86f0c7cc8dbca64340f141a84c94a2f38216420baae0ca
+    d27329d0e19ba0625950cb1b73fca4aa4c5014d76623f6b69389d0e98b1d4c86
+
+jobs:
+  version:
+    name: Version of this release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the whole history and tags: the version counts commits since v<X.Y.Z> (FV-9)
+      - name: The firmware version is the tag's
+        id: v
+        run: |
+          built="$(python3 tools/docker_fw.py version)"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+            # A plain vX.Y.Z tag must be the commit that says so (version.h, no pre-release), or the
+            # release tool refuses the images; a tag with a pre-release (v0.5.0-rc.1) names its own.
+            if [ "${version#*-}" = "$version" ] && [ "$built" != "$version" ]; then
+              echo "::error::tag $GITHUB_REF_NAME, but this commit builds version $built (core/include/atalaia/version.h)"
+              exit 1
+            fi
+          else
+            version="$built" # a dry run: this commit's own development version
+          fi
+          echo "Firmware version: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.variant }}
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: espressif/idf:v5.3.2 # as CI's esp32-build jobs and tools/docker_fw.py
+    strategy:
+      fail-fast: true # one image failing fails the release: no partial release
+      matrix:
+        include:
+          - variant: field-box # the Field Box and the Satellite
+            dir: build
+            defaults: sdkconfig.defaults
+          - variant: modem
+            dir: build-modem
+            defaults: sdkconfig.defaults;sdkconfig.modem
+          - variant: io-pod
+            dir: build-pod
+            defaults: sdkconfig.defaults;sdkconfig.pod
+    env:
+      FW_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Build, with no warnings
+        working-directory: firmware/esp32
+        shell: bash # -eo pipefail: the build's own exit code counts through tee
+        run: |
+          # The checkout belongs to the runner's user, not the container's root.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          . "$IDF_PATH/export.sh"
+          # The defaults of docker_fw.py: the sdkconfig lives in the build folder, EU868, listen
+          # before talk on, the project's two mode keys and two release keys (Kconfig), no bench option.
+          idf.py -B ${{ matrix.dir }} -D SDKCONFIG=${{ matrix.dir }}/sdkconfig \
+            -D "SDKCONFIG_DEFAULTS=${{ matrix.defaults }}" -D "ATALAIA_FW_VERSION=$FW_VERSION" \
+            build 2>&1 | tee build.log
+          if grep -E 'warning:' build.log; then echo "::error::the build has warnings"; exit 1; fi
+      - name: Check the image is the release configuration
+        working-directory: firmware/esp32
+        run: |
+          d=${{ matrix.dir }}
+          grep '"project_version"' "$d/project_description.json" | grep -qF "\"$FW_VERSION\""
+          if grep -Eq '^CONFIG_ATALAIA_(SERIAL_KEYS|SKIP_SETUP|RADIO_LOG_PACKETS|LBT_BENCH)=y' "$d/sdkconfig"; then
+            echo "::error::a bench option is on in a release build"; exit 1
+          fi
+          grep -q '^CONFIG_ATALAIA_RADIO_REGION_EU868=y' "$d/sdkconfig"
+          grep -q '^CONFIG_ATALAIA_LBT=y' "$d/sdkconfig"
+          if [ "${{ matrix.variant }}" = field-box ]; then
+            grep -qxF "CONFIG_ATALAIA_OTA_RELEASE_KEYS=\"$RELEASE_KEYS_HEX\"" "$d/sdkconfig"
+            grep -qxF "CONFIG_ATALAIA_MODE_KEYS=\"$MODE_KEYS_HEX\"" "$d/sdkconfig"
+          fi
+          ls -l "$d/atalaia_esp32.bin"
+      - name: Package (USB bundle, merged image, app image)
+        run: |
+          . "$IDF_PATH/export.sh"
+          python3 tools/release_package.py package --variant ${{ matrix.variant }} \
+            --build-dir firmware/esp32/${{ matrix.dir }} --version "$FW_VERSION" --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.variant }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Sign and publish
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the release and its assets; nothing else
+    env:
+      FW_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python3 -m pip install cryptography
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: firmware-*
+          merge-multiple: true
+          path: dist
+      - name: Sign the app images (CI key on a tag; a throw-away key on a dry run)
+        env:
+          # Only this step sees the secrets; they are never echoed, and the key file lives in
+          # RUNNER_TEMP, outside the repository (the tool refuses a key inside it), and is deleted.
+          CI_KEY_PEM: ${{ github.ref_type == 'tag' && secrets.ATALAIA_RELEASE_CI_KEY || '' }}
+          ATALAIA_RELEASE_KEY_PASSPHRASE: ${{ github.ref_type == 'tag' && secrets.ATALAIA_RELEASE_CI_KEY_PASSPHRASE || '' }}
+        run: |
+          set -eu
+          umask 077
+          keydir="$(mktemp -d "$RUNNER_TEMP/releasekey.XXXXXX")"
+          trap 'rm -rf "$keydir"' EXIT
+          key="$keydir/release.pem"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            test -n "$CI_KEY_PEM" || { echo "::error::the secret ATALAIA_RELEASE_CI_KEY is not set"; exit 1; }
+            printf '%s\n' "$CI_KEY_PEM" > "$key"
+            expect="$CI_KEY_PUBLIC"
+            # The secret must be the CI key the firmware trusts: its id, before anything is signed.
+            python3 tools/firmware_release.py pubkey --key "$key" | grep -q "key id: *$CI_KEY_ID"
+          else
+            unset ATALAIA_RELEASE_KEY_PASSPHRASE
+            python3 tools/firmware_release.py keygen --unencrypted --out "$key" > /dev/null
+            expect="$(python3 tools/firmware_release.py pubkey --key "$key" | sed -n 's/^public key (base64): *//p')"
+            echo "Dry run: signed with a throw-away key; boxes do not trust it."
+          fi
+          # Only the Field Box image is updated over the air (the modem and the pod have no
+          # Atalaia descriptor, which the release tool needs), so only it has a release.
+          for image in dist/atalaia-field-box-*[0-9].bin; do
+            python3 tools/firmware_release.py sign "$image" --key "$key" --version "$FW_VERSION"
+            python3 tools/firmware_release.py verify "$image" "$image.release.json" --keys "$expect"
+          done
+          rm -rf "$keydir"
+      - name: Checksums
+        working-directory: dist
+        run: |
+          set -eu
+          sha256sum atalaia-* > SHA256SUMS
+          cat SHA256SUMS
+          # usb.zip and merged.bin of three images, the Field Box's .bin and .release.json, the sums.
+          test "$(find . -type f | wc -l)" -eq 9
+      - name: On a dry run, keep the files as a workflow artifact
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-dry-run
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Create the pre-release (a draft until every asset is up)
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          python3 tools/release_package.py notes --version "$FW_VERSION" --tag "$TAG" --out "$RUNNER_TEMP/notes.md"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::a release for $TAG already exists; delete it (and the tag, if it is wrong) first"; exit 1
+          fi
+          # No partial release: a draft, published only when everything uploaded; a failure deletes it.
+          trap 'gh release delete "$TAG" --yes >/dev/null 2>&1 || true' ERR
+          gh release create "$TAG" dist/* --draft --prerelease --verify-tag \
+            --title "$TAG (pre-alpha)" --notes-file "$RUNNER_TEMP/notes.md"
+          gh release edit "$TAG" --draft=false --prerelease
+          trap - ERR
+          rm -f "$RUNNER_TEMP/notes.md"

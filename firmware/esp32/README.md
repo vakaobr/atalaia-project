@@ -455,7 +455,7 @@ Field game options (under "Field network games"):
 - `ATALAIA_DEV_JOIN_KEY` -- a development field join key, used only when none is stored (set in `sdkconfig.wokwi` only); a box with only this key counts as unadopted
 
 Firmware update options (under "Firmware updates (OTA)", the Field Box only):
-- `ATALAIA_OTA_RELEASE_KEYS` -- the Ed25519 public keys (64 hex digits each, up to 4) whose releases the box installs; empty (the default until the project's release key exists): every update is refused
+- `ATALAIA_OTA_RELEASE_KEYS` -- the Ed25519 public keys (64 hex digits each, up to 4) whose releases the box installs; the default is the project's two release keys, root `424d053af5cdbc35` and CI `32b3c815ac30ad43` ([RELEASE_SIGNING.md](docs/RELEASE_SIGNING.md), [docs/community/keys.md](../../docs/community/keys.md)); empty: every update is refused
 - `ATALAIA_OTA_VARIANT` -- the variant written into the image (`box`, `box-bench`, `box-dev`); a box installs only its own variant and board
 - `ATALAIA_OTA_MIN_BATTERY_PCT` -- refuse an update below this level (default 30; with a MAX17048 only)
 

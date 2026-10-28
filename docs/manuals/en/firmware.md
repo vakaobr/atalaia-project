@@ -7,14 +7,14 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 For the person who builds a box or a prop and has to put the software on it. You do not need to write code. You need a computer, a USB-C data cable and the board. The steps are the same for every kind of board in the project: the Field Box, the Satellite, the I/O pod and the controller's modem board.
 
-> **Not field-ready yet.** Atalaia is pre-alpha. Real Heltec V4.3 boards have been flashed and used on a bench with the field controller: boot, radio, buttons, the board's own OLED, adoption by USB cable and by code, and an update over the air. Nothing else in this guide has run on a real board. Steps that depend on hardware that was not tried say **Not yet tested on a real board**.
+> **Not field-ready yet.** The firmware releases on GitHub are marked pre-release for that reason. Atalaia is pre-alpha. Real Heltec V4.3 boards have been flashed and used on a bench with the field controller: boot, radio, buttons, the board's own OLED, adoption by USB cable and by code, and an update over the air. Nothing else in this guide has run on a real board. Steps that depend on hardware that was not tried say **Not yet tested on a real board**.
 
 The hardware is in the build manuals: [Field Box](../../../hardware/field-box/BUILD.md), [Satellite](../../../hardware/satellite/BUILD.md), [I/O pod](../../../hardware/io-pod/BUILD.md). The controller is in the [controller setup guide](controller-setup.md).
 
 ## Contents
 
 1. [What you flash](#1-what-you-flash)
-2. [Get the firmware](#2-get-the-firmware)
+2. [Get the firmware: download a release, or build it](#2-get-the-firmware-download-a-release-or-build-it)
 3. [Flash it](#3-flash-it)
 4. [The options a builder sets](#4-the-options-a-builder-sets)
 5. [First boot and setup](#5-first-boot-and-setup)
@@ -37,9 +37,40 @@ There is one firmware project and four images you can build from it.
 
 All of them are made for the **Heltec WiFi LoRa 32 V4** (revision V4.3 by default, V4.2 with one change, see [section 4](#4-the-options-a-builder-sets)). Do not flash a build for one kind of board onto another. A box will refuse an update made for another variant or board anyway.
 
-## 2. Get the firmware
+## 2. Get the firmware: download a release, or build it
 
-**Today there is no ready-made firmware file to download.** The project has not published binaries, and it has no release signing key yet. You build the image yourself. It takes about ten minutes the first time.
+Two ways. Download a release if you only want to put the project's firmware on a board. Build it yourself if you changed the code, or want to choose build options (the radio region, the board revision, your own keys).
+
+### 2.1 Download a release (the easy way)
+
+The project publishes firmware on GitHub: [the Releases page](https://github.com/vakaobr/atalaia-project/releases). The first one is **v0.4.0**, marked **pre-release**: pre-alpha and **not field-tested**. Read its notes first.
+
+Pick the files for your board:
+
+| You are building | Download | Notes |
+| --- | --- | --- |
+| A Field Box, or a Satellite (same image) | `atalaia-field-box-<version>-usb.zip` (esptool over USB) or `atalaia-field-box-<version>-merged.bin` (browser flasher) | The plain `atalaia-field-box-<version>.bin` and its `.bin.release.json` are for updates over the air ([section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)); you do not need them to flash |
+| The controller's USB radio modem | `atalaia-modem-<version>-usb.zip` or `-merged.bin` | The second board, plugged into the controller |
+| An I/O pod | `atalaia-io-pod-<version>-usb.zip` or `-merged.bin` | |
+| Never for a game | (the bench image is not released) | Build it yourself if you need it |
+
+All of them are for the Heltec WiFi LoRa 32 V4.3, European radio region (EU868), listen before talk on, with the project's keys built in. For V4.2, for Taiwan (AS923) or for your own keys, build it yourself ([2.2](#22-build-it-yourself)).
+
+**Check what you downloaded.** Download `SHA256SUMS` too, and compare. On Linux and macOS, in the folder of the files (`shasum -a 256 -c SHA256SUMS` on macOS; files you did not download are reported missing, ignore them):
+
+```
+sha256sum -c --ignore-missing SHA256SUMS
+```
+
+On Windows `cmd`: `certutil -hashfile atalaia-field-box-0.4.0-usb.zip SHA256` and compare the line with the one in `SHA256SUMS`. The sums prove the file is the one the release page lists. The signature proves who made a Field Box image: the `.release.json` is signed with the project's CI release key, which every box trusts by default (`firmware/esp32/docs/RELEASE_SIGNING.md`). A box and a controller check it for you before they install an update.
+
+**Flash the zip.** Unzip it. In that folder follow [section 3](#3-flash-it) from 3.1 on: the commands are the same, and the `README.txt` inside the zip repeats them. The folder has the `flash_args` file the command uses, so skip the build and the `cd firmware/esp32/build` step.
+
+**Flash the merged file from a browser** (Chrome or Edge, no Python): open Espressif's web flasher, [https://espressif.github.io/esptool-js/](https://espressif.github.io/esptool-js/), connect the board (download mode if it does not appear, [3.2](#32-find-the-boards-port)), set the flash address to `0x0`, choose the `-merged.bin` file and program. Not tried by the project with a real board yet; the file is the same one the esptool command produces from the zip.
+
+The version on the release is the version the box shows at boot (`0.4.0`).
+
+### 2.2 Build it yourself
 
 You need:
 
@@ -54,11 +85,11 @@ cd atalaia-project
 python tools/docker_fw.py build
 ```
 
-On macOS and Linux, use `python3` if `python` is not found. The first build downloads the build tools and takes several minutes. It ends with a line that names the file `firmware/esp32/build/atalaia_esp32.bin`. The other files you need are in the same folder. You do not need to read them.
+On macOS and Linux, use `python3` if `python` is not found. The first build downloads the build tools and takes several minutes (about ten the first time). It ends with a line that names the file `firmware/esp32/build/atalaia_esp32.bin`. The other files you need are in the same folder. You do not need to read them.
 
-The build prints a version such as `0.4.0-dev.12+g1a2b3c4`. That is the next release's number, the number of changes since the last release, and the code's identifier. It is also on the board's small screen at boot. Keep a note of it with the box.
+A build from a checkout prints a version such as `0.4.0+12.g1a2b3c4` (or `0.5.0-dev.12+g1a2b3c4` between releases): the release's number, the number of changes since, and the code's identifier. It is also on the board's small screen at boot. Keep a note of it with the box. To get exactly a release's firmware, check out its tag (`git checkout v0.4.0`) and build there: a clean checkout of a tag says plain `0.4.0`.
 
-**What a release will change.** A release is a tagged version, built from a clean copy of the code, with its version shown plain (`0.4.0`), signed with the project's release key, and published as files you can download. Then you will not need to build anything for a standard box. Boxes built from today's code cannot install a project release over the air until they are built with the project's release key, because the key does not exist yet ([section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)). Check the project's Releases page on GitHub: if it lists firmware files, they come with a `.release.json` file, and the steps below work the same with them. If it lists none, build.
+**Keys.** A build you make trusts the project's two release keys and two mode keys by default, the same as the released files, so a controller you run accepts the project's signed releases. Your own builds are not signed by the project: sign them with your own key and give the boxes its public half (`--release-keys=`, [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)).
 
 ## 3. Flash it
 
@@ -228,12 +259,14 @@ Three things use the field's Wi-Fi, and only between games: **firmware updates**
 **The rules for firmware updates.** The box installs an update only if all of these are true:
 
 - No game is being played.
-- The update is signed by a **release key built into the box's own firmware** (`--release-keys`). Boxes built from today's code have **no** key, so they refuse every update. You make your own key, build the boxes with its public half, and sign your releases with its private half. The steps are in [RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md).
+- The update is signed by a **release key built into the box's own firmware** (`--release-keys`). By default that is the project's two release keys, so the Field Box files from a GitHub release can be installed as updates; a box built with `--release-keys=` your own key trusts only that. The project's keys and what happens if one leaks are in [RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md).
 - The version is higher than the one it runs.
 - It is the same variant and board (a V4.2 image never goes on a V4.3).
 - The battery is at 30 % or more, if the box has a gauge.
 
 **The short path.**
+
+**With the project's releases:** flash a box once over USB with a release, then upload a later release's `atalaia-field-box-<version>.bin` and its `.bin.release.json` in the console's **Boxes** tab. The controller's `[firmware] release_keys` already holds the project's keys by default. Press **Update to** (step 5). **With your own key:**
 
 1. Make a key with `tools/firmware_release.py keygen`. Keep the private file safe and out of the repository.
 2. Build the boxes with `--release-keys=<the public key>`. Flash them over USB, once. Updates cannot install a new bootloader.

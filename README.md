@@ -162,7 +162,7 @@ sh tools/check.sh
 
 You need a C11 compiler, CMake 3.16 or newer, Python 3.10 or newer and PyYAML. No compiler? Use the [dev container](tools/README.md). To play a mode in your browser, holding team buttons and watching the props' screens and the event log, see the [simulator](simulator/README.md#play-a-mode-in-the-browser). To write a mode, start with [modes/README.md](modes/README.md).
 
-**Build the Field Box firmware** (cross-compiles in Docker, no toolchain needed locally; works from `cmd`, PowerShell or bash):
+**Get the firmware.** Ready-made images (Field Box and Satellite, the controller's USB modem, the I/O pod) are on the [Releases page](https://github.com/vakaobr/atalaia-project/releases), signed by the project's release keys: pre-alpha and not field-tested ([firmware guide](docs/manuals/en/firmware.md#2-get-the-firmware-download-a-release-or-build-it)). Or build the Field Box firmware yourself (cross-compiles in Docker, no toolchain needed locally; works from `cmd`, PowerShell or bash):
 
 ```sh
 python tools/docker_fw.py build    # the firmware, in firmware/esp32/build/

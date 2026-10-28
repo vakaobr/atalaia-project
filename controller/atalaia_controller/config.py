@@ -116,9 +116,10 @@
     [firmware]                  # firmware updates for the Field Boxes (protocol/firmware-update.md,
                                 # firmware_updates.py): the GM uploads a signed release in the console
                                 # and starts an update per box or for all, never during a game
-    release_keys = []           # Ed25519 public keys (standard base64, 44 characters each, at most 8;
+    release_keys = [...]        # Ed25519 public keys (standard base64, 44 characters each, at most 8;
                                 # from the environment, separated by commas) whose releases the
-                                # controller accepts; empty: no release is accepted. A box checks the
+                                # controller accepts; default: the project's two release keys
+                                # (docs/community/keys.md); empty: no release is accepted. A box checks the
                                 # signature again with the keys built into its own firmware
     dir = ""                    # where the images are kept; empty: "firmware" next to db_path
     update_timeout_s = 600.0    # an update not heard of (report or HELLO) this long counts as timed out
@@ -176,6 +177,10 @@ from . import REPO_ROOT
 # maintainer, and CI 7275108d2e3fe583, which signs the registry's verified badges. They are the
 # default of the boxes' CONFIG_ATALAIA_MODE_KEYS, so they are the default of [modes] box_keys too.
 # A field trusts them for its own installs only by listing them in [modes] keys.
+# The project's release keys (docs/community/keys.md): root 424d053af5cdbc35, held offline by the
+# maintainer, and CI 32b3c815ac30ad43, which signs the GitHub releases. They are the default of the
+# boxes' CONFIG_ATALAIA_OTA_RELEASE_KEYS, so the default of [firmware] release_keys too.
+PROJECT_RELEASE_KEYS = ("5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=", "rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=")
 PROJECT_MODE_KEYS = ("I+m3rO++TcVNhvDHzI28pkNA8UGoTJSi84IWQguq4Mo=", "0nMp0OGboGJZUMsbc/ykqkxQFNdmI/a2k4nQ6YsdTIY=")
 
 SECTIONS = {
@@ -289,7 +294,7 @@ class Config:
     atak_remote: bool = False  # the remote ATAK relay through the site server (Phase 4 follow-up FU5)
     atak_remote_players: bool = False
     # [firmware]
-    firmware_release_keys: list[str] = field(default_factory=list)
+    firmware_release_keys: list[str] = field(default_factory=lambda: list(PROJECT_RELEASE_KEYS))
     firmware_dir: str = ""
     firmware_update_timeout_s: float = 600.0
     firmware_variants: list[str] = field(default_factory=lambda: ["box"])
