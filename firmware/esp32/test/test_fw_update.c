@@ -9,17 +9,22 @@
  * leaves the boot partition alone, and only a complete, hashed, signed image
  * of this variant and board is activated.
  */
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "check.h"
 #include "firmware_vectors.h"
+#include "fw_layout.h"
 #include "fw_update.h"
 #include "monocypher-ed25519.h"
 
 /* The running image's descriptor (fw_desc.c on the device). */
-const fw_desc_t atalaia_fw_desc = {
-    .magic = {'A', 'T', 'F', 'W'}, .format = 1, .variant = "box", .board = "heltec_v4_3"};
+const fw_desc_t atalaia_fw_desc = {.magic = {'A', 'T', 'F', 'W'},
+                                   .format = 1,
+                                   .layout = FW_LAYOUT_VERSION,
+                                   .variant = "box",
+                                   .board = "heltec_v4_3"};
 
 /* ---- the shared vectors -------------------------------------------------------------- */
 
@@ -395,6 +400,7 @@ static void make_image(const char *version, const char *variant, const char *boa
     uint8_t *a = F.image + FW_DESC_OFFSET;
     memcpy(a, "ATFW", 4);
     a[4] = 1;
+    a[5] = FW_LAYOUT_VERSION;
     memcpy(a + 8, variant, strlen(variant));
     memcpy(a + 20, board, strlen(board));
     F.image_len = IMG_SIZE;
@@ -452,7 +458,8 @@ static void setup(fw_job_t *job)
     job->desc = &atalaia_fw_desc;
     job->keys = (const uint8_t(*)[32])fw_signing_key;
     job->key_count = 1;
-    job->slot_size = 0x200000;
+    job->slot_size = 0x400000;
+    job->layout = FW_LAYOUT_VERSION;
     job->battery_pct = -1;
     job->min_battery_pct = 30;
     job_join = link_join();
@@ -655,6 +662,21 @@ static void test_job_image_checks(void)
     make_image("0.3.0", "box-bench", "heltec_v4_3");
     make_release("esp32s3", "0.3.0", IMG_SIZE, job.id);
     CHECK(fw_update_run(&job, &IO) == FW_WRONG_BOARD && F.begins == 0);
+    /* An image for a newer partition table than the box runs on (the old one: 2 MB slots) is
+     * refused before the slot is touched; an older image is fine on the new table. */
+    setup(&job);
+    job.layout = 0;
+    CHECK(fw_update_run(&job, &IO) == FW_LAYOUT && F.begins == 0 && untouched());
+    CHECK(strcmp(fw_result_name(FW_LAYOUT), "layout") == 0);
+    setup(&job);
+    job.layout = 0;
+    F.image[FW_DESC_OFFSET + 5] = 0; /* an image from before the layout byte */
+    make_release("esp32s3", "0.3.0", IMG_SIZE, job.id);
+    CHECK(fw_update_run(&job, &IO) == FW_INSTALLED);
+    setup(&job);
+    F.image[FW_DESC_OFFSET + 5] = 0;
+    make_release("esp32s3", "0.3.0", IMG_SIZE, job.id);
+    CHECK(fw_update_run(&job, &IO) == FW_INSTALLED);
     /* Not an Atalaia image. */
     setup(&job);
     F.image[FW_DESC_OFFSET] = 'X';
@@ -718,6 +740,80 @@ static void test_self_test(void)
     CHECK(!fw_update_self_test(NULL, 1));
 }
 
+/* ---- the partition table check ------------------------------------------------------- */
+
+/* partitions.csv, read from the source tree: the expected table in fw_layout.c must equal it. */
+static size_t read_csv(fw_part_t *out, size_t cap)
+{
+    FILE *f = fopen(PARTITIONS_CSV, "r");
+    CHECK(f != NULL);
+    size_t n = 0;
+    char line[160];
+    while (f != NULL && fgets(line, sizeof(line), f) != NULL && n < cap) {
+        if (line[0] == '#' || line[0] == '\n') continue;
+        char name[FW_PART_NAME_MAX + 1], type[16], sub[16];
+        unsigned off, size;
+        if (sscanf(line, " %16[^,], %15[^,], %15[^,], %x, %x", name, type, sub, &off, &size) != 5)
+            continue;
+        fw_part_t *p = &out[n++];
+        memset(p, 0, sizeof(*p));
+        snprintf(p->name, sizeof(p->name), "%s", name);
+        p->type = strcmp(type, "app") == 0 ? 0 : 1;
+        if (strcmp(sub, "nvs") == 0)
+            p->subtype = 0x02;
+        else if (strcmp(sub, "ota") == 0)
+            p->subtype = 0x00;
+        else if (strcmp(sub, "phy") == 0)
+            p->subtype = 0x01;
+        else if (strcmp(sub, "nvs_keys") == 0)
+            p->subtype = 0x04;
+        else if (strcmp(sub, "ota_0") == 0)
+            p->subtype = 0x10;
+        else if (strcmp(sub, "ota_1") == 0)
+            p->subtype = 0x11;
+        else
+            p->subtype = (uint8_t)strtoul(sub, NULL, 0);
+        p->offset = off;
+        p->size = size;
+    }
+    if (f != NULL) fclose(f);
+    return n;
+}
+
+static void test_layout(void)
+{
+    fw_part_t t[16];
+    char why[96];
+    size_t n = read_csv(t, 16);
+    CHECK(n == 7);
+    CHECK(fw_layout_check(t, n, why, sizeof(why)) == 0 && why[0] == '\0');
+    /* The rows the box's data lives in never move; ota_0 starts where it always did. */
+    CHECK(t[0].offset == 0x9000 && t[1].offset == 0xf000 && t[2].offset == 0x11000 &&
+          t[3].offset == 0x12000 && t[4].offset == 0x20000);
+    /* The old table (2 MB slots, storage at 0x420000) is refused, with the first difference. */
+    fw_part_t old[16];
+    memcpy(old, t, sizeof(t));
+    old[4].size = 0x200000;
+    old[5].offset = 0x220000;
+    old[5].size = 0x200000;
+    old[6].offset = 0x420000;
+    old[6].size = 0x200000;
+    CHECK(fw_layout_check(old, n, why, sizeof(why)) == 5);
+    CHECK(strstr(why, "ota_0") != NULL && strstr(why, "0x200000") != NULL);
+    memcpy(old, t, sizeof(t));
+    old[6].offset = 0x420000;
+    CHECK(fw_layout_check(old, n, why, sizeof(why)) == 7 && strstr(why, "storage") != NULL);
+    /* A missing partition, a wrong type, an extra partition (ignored). */
+    CHECK(fw_layout_check(t, n - 1, why, sizeof(why)) == 7 && strstr(why, "missing") != NULL);
+    memcpy(old, t, sizeof(t));
+    old[4].type = 1;
+    CHECK(fw_layout_check(old, n, NULL, 0) == 5);
+    memcpy(old, t, sizeof(t));
+    snprintf(old[n].name, sizeof(old[n].name), "factory");
+    CHECK(fw_layout_check(old, n + 1, why, sizeof(why)) == 0);
+    CHECK(fw_layout_check(NULL, 0, why, sizeof(why)) == 1);
+}
+
 void run_fw_update_tests(void)
 {
     uint8_t seed[32]; /* Monocypher wipes the seed it is given */
@@ -738,4 +834,5 @@ void run_fw_update_tests(void)
     test_job_image_checks();
     test_job_interrupted();
     test_self_test();
+    test_layout();
 }

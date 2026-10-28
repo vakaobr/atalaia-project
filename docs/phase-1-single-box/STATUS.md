@@ -105,6 +105,14 @@ BRING_UP.md steps 2-14, and the 2-hour game.
   already grown from 1.5 MB to 2 MB (`partitions.csv`); the 16 MB flash
   still has about 10 MB unpartitioned (ADR-P1-4), so a further growth is a
   partition-table change, which a box takes by USB only (the OTA slots move).
+  **Done (decision PART-1, built; host tests and builds only, not flashed on a
+  board):** the OTA slots are 4 MB (ota_0 0x20000, ota_1 0x420000, storage 4 MB at
+  0x820000; the first four partitions did not move), the Field Box image is 1,952,160
+  bytes with 53 % of its slot free. **USB flash required once** for a box on the old
+  table; the new firmware refuses to run on it (screen *Flash over USB*, log
+  `WRONG PARTITION TABLE`), an update over the air refuses an image that needs the
+  new layout (`layout`), and `release_package.py` checks the built table. Still to do on a board: the
+  USB flash of a box with an adoption (it keeps it), the first mount of the new storage, and an old-table box.
 
 Done since this list was written (2026-10-27):
 

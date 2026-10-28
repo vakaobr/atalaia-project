@@ -59,7 +59,7 @@ SIGNATURE_LEN = 64
 # 8-byte segment header, then the first segment, which starts with esp_app_desc_t
 # (256 bytes: magic, secure version, two reserved words, version[32],
 # project_name[32], ...) and, right after it, the Atalaia descriptor
-# (firmware/esp32/main/fw_desc.c: "ATFW", a format byte, three reserved, variant[12],
+# (firmware/esp32/main/fw_desc.c: "ATFW", a format byte, the partition table layout, two reserved, variant[12],
 # board[16]).
 ESP_IMAGE_MAGIC = 0xE9
 APP_DESC_OFFSET = 32
@@ -76,7 +76,7 @@ PROJECT_NAME = "atalaia_esp32"
 REPORT_HEADER = "atalaia-firmware-report-v1"
 REPORT_RESULTS = ("installed", "busy", "bad_offer", "no_key", "no_link", "no_wifi", "unreachable",
                   "bad_release", "bad_signature", "wrong_platform", "not_newer", "too_big",
-                  "bad_image", "wrong_board", "download", "bad_hash", "flash", "battery", "cancelled")
+                  "bad_image", "wrong_board", "download", "bad_hash", "flash", "battery", "cancelled", "layout")
 RELEASE_ID = re.compile(r"[0-9a-f]{16}")
 
 
@@ -202,6 +202,7 @@ class ImageInfo:
     project: str
     variant: str
     board: str
+    layout: int = 0  # the partition table layout it needs (main/fw_layout.h); 0 = the old 2 MB-slot table
 
 
 def _cstr(raw: bytes) -> Optional[str]:
@@ -231,7 +232,7 @@ def image_info(head: bytes) -> ImageInfo:
     variant, board = _cstr(d[8:20]), _cstr(d[20:36])
     if version is None or project is None or variant is None or board is None:
         raise ReleaseError("bad_image", "a descriptor field is not plain text")
-    return ImageInfo(version, project, variant, board)
+    return ImageInfo(version, project, variant, board, d[5])
 
 
 # ---- a box's report ------------------------------------------------------------------------------

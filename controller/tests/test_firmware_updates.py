@@ -136,7 +136,7 @@ class VectorTests(unittest.TestCase):
 # ---- the controller's service and API ---------------------------------------------------------
 
 def box_image(version: str, size: int = 4096, variant: str = "box", board: str = "heltec_v4_3",
-              salt: int = 0) -> bytes:
+              salt: int = 0, layout: int = 0) -> bytes:
     """A stand-in for a Field Box image: the ESP-IDF headers and the descriptors a box and the
     controller read, then filler."""
     head = bytearray(fr.IMAGE_HEAD)
@@ -145,6 +145,7 @@ def box_image(version: str, size: int = 4096, variant: str = "box", board: str =
     head[48:48 + len(version)] = version.encode()
     head[80:80 + len(fr.PROJECT_NAME)] = fr.PROJECT_NAME.encode()
     head[288:292], head[292] = fr.ATALAIA_DESC_MAGIC, fr.ATALAIA_DESC_FORMAT
+    head[293] = layout  # the partition table layout the image needs (main/fw_layout.h)
     head[296:296 + len(variant)] = variant.encode()
     head[308:308 + len(board)] = board.encode()
     body = bytes((i * 7 + salt) & 0xFF for i in range(size - len(head)))
@@ -257,6 +258,16 @@ class ReleaseTests(FirmwareCase):
         self.assertEqual(self.client.get(f"/api/v1/firmware/{rel['id']}/release").status_code, 404)
         self.assertEqual(self.client.get("/api/v1/firmware", headers=GM).json()["releases"], [])
 
+    def test_layout_is_read_from_the_descriptor(self) -> None:
+        """An image says which partition table it needs; the release lists it (0: images before it)."""
+        self.assertEqual(fr.image_info(box_image("0.3.0", layout=1)[:fr.IMAGE_HEAD]).layout, 1)
+        self.assertEqual(fr.image_info(box_image("0.3.0")[:fr.IMAGE_HEAD]).layout, 0)
+        image = box_image("0.3.0", layout=1)
+        self.assertEqual(self.upload(image, "0.3.0").status_code, 201)
+        self.assertEqual(self.client.get("/api/v1/firmware", headers=GM).json()["releases"][0]["layout"], 1)
+        self.assertEqual(self.client.get("/api/v1/firmware", headers=GM).json()["slot_size"], 0x400000)
+        self.assertIn("layout", fr.REPORT_RESULTS)
+
     def test_upload_refusals(self) -> None:
         image = box_image("0.3.0")
         cases = [
@@ -267,7 +278,7 @@ class ReleaseTests(FirmwareCase):
             ("the image says another version", self.upload(box_image("0.2.9"), "0.3.0"), 400),
             ("a bench build", self.upload(box_image("0.3.0", variant="box-bench"), "0.3.0"), 400),
             ("not an image", self.upload(b"\x00" * 4096, "0.3.0"), 400),
-            ("too big", self.upload(box_image("0.3.0", size=0x200001), "0.3.0"), 413),
+            ("too big", self.upload(box_image("0.3.0", size=0x400001), "0.3.0"), 413),
             ("bad version", self.upload(image, "0.3", sign(image, "0.3")), 400),
             ("bad signature", self.upload(image, "0.3.0", "AAAA"), 400),
         ]

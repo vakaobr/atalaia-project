@@ -770,7 +770,12 @@ log both go over it.
    ```
 
    `flash_args` (written by the build) lists the bootloader, partition
-   table and application with their addresses. If the connection fails,
+   table and application with their addresses. **USB flash required once
+   from v0.5:** a box flashed with v0.4.0 or earlier has the old partition
+   table (2 MB slots); an update over the air cannot change it, so write
+   it with this command, without the erase step (the settings and the
+   adoption stay; the box fetches its modes and logo again). A box still
+   on the old table shows "Flash over USB". If the connection fails,
    put the board in download mode by hand (hold its PRG/BOOT button, press
    and release RST, release PRG; or hold PRG while plugging the cable in)
    and run the command again, or try `-b 460800` or `-b 115200`. The COM

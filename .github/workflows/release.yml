@@ -126,6 +126,9 @@ jobs:
           fi
           grep -q '^CONFIG_ATALAIA_RADIO_REGION_EU868=y' "$d/sdkconfig"
           grep -q '^CONFIG_ATALAIA_LBT=y' "$d/sdkconfig"
+          # The custom table with the 4 MB OTA slots (partitions.csv, layout 1); release_package.py then
+          # checks the built table and that the app fits its slot, and the README says USB flash once.
+          grep -qxF 'CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"' "$d/sdkconfig"
           if [ "${{ matrix.variant }}" = field-box ]; then
             grep -qxF "CONFIG_ATALAIA_OTA_RELEASE_KEYS=\"$RELEASE_KEYS_HEX\"" "$d/sdkconfig"
             grep -qxF "CONFIG_ATALAIA_MODE_KEYS=\"$MODE_KEYS_HEX\"" "$d/sdkconfig"

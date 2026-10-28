@@ -161,7 +161,7 @@ def cmd_sign(args: argparse.Namespace) -> int:
     public = public_forms(raw_public(key))
     release = {"format": fr.MANIFEST_HEADER, "platform": args.platform, "version": version, "size": len(image),
                "sha256": sha, "signature": signature, "key_id": public["key_id"], "variant": info.variant,
-               "board": info.board}
+               "board": info.board, "layout": info.layout}
     out = Path(args.out) if args.out else image_path.with_name(image_path.name + ".release.json")
     out.write_text(json.dumps(release, indent=2) + "\n", encoding="utf-8")
     print(f"{out}: {args.platform} {version}, {len(image)} bytes, sha256 {sha[:16]}..., "

@@ -55,6 +55,7 @@ add_executable(box_host
     ${MAIN_DIR}/hal/stub/hal_stub.c
     ${MAIN_DIR}/hal/stub/hal_radio_stub.c
     ${MAIN_DIR}/fw_update.c
+    ${MAIN_DIR}/fw_layout.c
     ${MAIN_DIR}/mode_package.c
     ${MAIN_DIR}/mode_store.c
     ${MAIN_DIR}/mode_fetch.c

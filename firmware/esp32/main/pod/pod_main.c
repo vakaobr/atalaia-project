@@ -18,6 +18,7 @@
 #include "atalaia/version.h"
 #include "esp_app_desc.h"
 #include "esp_log.h"
+#include "fw_layout_esp.h"
 #include "hal/hal.h"
 #include "hal/esp/hal_esp.h"
 #include "nvs_flash.h"
@@ -47,6 +48,9 @@ void app_main(void)
     memset(&hal, 0, sizeof(hal));
     ESP_LOGI(TAG, "Atalaia I/O pod %s, core %s", esp_app_get_description()->version,
              atalaia_version());
+
+    /* A pod has no storage to lose: a table other than this firmware's is logged only. */
+    fw_layout_esp_check(NULL, 0);
 
     /* NVS: NimBLE keeps its bonds there, the PHY its calibration. */
     esp_err_t err = nvs_flash_init();

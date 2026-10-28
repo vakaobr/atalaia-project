@@ -553,12 +553,38 @@ Custom layout for 16 MB flash (`partitions.csv`):
 | otadata | 8 KB | A/B OTA bookkeeping: which slot boots, and whether a new image has confirmed itself |
 | phy_init | 4 KB | PHY calibration data |
 | nvs_keys | 4 KB | Encryption keys for NVS (Phase 2; see BRING_UP.md step 0) |
-| ota_0 | 2 MB | Application slot A (the USB flash writes this one) |
-| ota_1 | 2 MB | Application slot B (a firmware update writes the slot not running) |
-| storage | 2 MB | LittleFS: presets, modes, state, audio |
+| ota_0 | 4 MB | Application slot A (the USB flash writes this one), at 0x20000 |
+| ota_1 | 4 MB | Application slot B (a firmware update writes the slot not running), at 0x420000 |
+| storage | 4 MB | LittleFS (at 0x820000): presets, modes, state, event log, the field's logo |
 
-The Field Box image is 1,735,824 bytes (17% of its slot free) since firmware updates
-brought the Wi-Fi station, the HTTPS client and Monocypher in (+153 KB).
+Offsets: nvs 0x9000, otadata 0xf000, phy_init 0x11000, nvs_keys 0x12000, ota_0 0x20000, ota_1
+0x420000, storage 0x820000; 0xc20000 to the end of the flash (0x3e0000, 3.875 MB) is unallocated.
+
+**Table layout 1 (decision PART-1).** The OTA slots were 2 MB (the Field Box image was at 93 % of
+one); they are 4 MB since v0.5 (the image is 1,952,160 bytes: 53 % free). The first four rows did not
+move, so a box re-flashed over USB keeps its adoption, keys and settings; `storage` moved (it was at
+0x420000) and starts empty: the box formats it on the first mount (`format_if_mount_failed`) and
+fetches the game modes and the field's logo again; the event log and a stored game to resume are
+lost. **An update over the air cannot change the partition table: USB flash required once** for a
+box on the old table (v0.4.0 or earlier; BRING_UP, `docs/manuals/en/firmware.md` section 3.3). The
+firmware guards this three ways:
+
+- At boot (`fw_layout_esp.c`, before anything else) the running partition table is compared with
+  the expected one (`fw_layout.c`, kept equal to `partitions.csv` by a host test). On another table
+  the box logs `WRONG PARTITION TABLE: ota_0 is 0x200000 bytes, expected 0x400000...`, shows *Flash
+  over USB* on the screen (four languages), does not start the radio or the game and repeats the log
+  line every 30 s. An image an update had just installed on such a table (an older firmware does not
+  know the layout) rolls back to the previous image at once. The modem and the pod only log it (they
+  have no storage to lose).
+- Every image's Atalaia descriptor carries the layout it needs (`fw_desc_t.layout`, byte 5, was
+  reserved and 0): a box reads it with the first 324 bytes, before the slot is opened, and refuses an
+  image for a newer layout than its own (`layout`; additive: no manifest or wire change). A 2 MB slot
+  also refuses an image over 2 MB (`too_big`), as before.
+- `tools/release_package.py` fails a package whose built partition table is not `partitions.csv` or
+  whose app does not fit ota_0, and its README and the release notes say *USB flash required once*.
+
+Images (ESP-IDF v5.3.2, 0 warnings): Field Box 1,952,160 bytes (0x1dc9a0), 2,242,144 bytes free
+(53 %) of its 4 MB slot; modem 0x8aea0 (86 % free); pod 0xa4e10 (84 % free).
 
 ## Firmware updates over the air
 
@@ -637,14 +663,14 @@ image decoder.
   failure of any kind keeps what the box had; a `404` (no logo, or a JPEG or WebP one the controller
   cannot convert) removes it. A box adopted to another field forgets it.
 - **Storage**: `/littlefs/logo.bin` on the existing `storage` partition (the 64 hex digits of the key,
-  then the bytes). The partition table is unchanged.
+  then the bytes). Its place moved with the 4 MB slots (above): it is fetched again after a re-flash.
 - **Screen** (`screen_renderer.c`): the 96 x 96 image is loaded from the file only while a screen that
   draws it is built (`box_logo_load` / `box_logo_unload`, 18 KB), and drawn by LVGL as it is: the
   **READY** screen (no game) and the *waiting* screen of a bomb that is not armed show it, with the
   Atalaia towers of the OLED, scaled up and in the accent colour, when the box keeps no logo. The
   OLED keeps the Atalaia tower.
-- **Image size**: the Field Box image is 1,949,264 bytes of its 2,097,152-byte OTA slot (92.95 %, 3,328
-  bytes more than before the logo).
+- **Image size**: the Field Box image was 1,949,264 bytes of its then 2,097,152-byte OTA slot (92.95 %,
+  3,328 bytes more than before the logo); the slots are 4 MB now (Partition Table above).
 
 ## IDF Component Dependencies
 

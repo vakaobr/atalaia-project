@@ -13,6 +13,7 @@
 #include "atalaia/version.h"
 #include "esp_app_desc.h"
 #include "esp_log.h"
+#include "fw_layout_esp.h"
 #include "hal/hal.h"
 #include "hal_esp.h"
 #include "modem_display.h"
@@ -33,6 +34,8 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Atalaia USB radio modem %s, core %s", esp_app_get_description()->version,
              atalaia_version());
+    /* A modem has no storage to lose: a table other than this firmware's is logged only. */
+    fw_layout_esp_check(NULL, 0);
     hal_esp_board_power_on();
     if (hal.radio->init() != 0) {
         ESP_LOGW(TAG, "radio: not available (no SX1262); TX frames get status no_radio");

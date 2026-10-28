@@ -60,6 +60,35 @@ def flash_files(build: Path) -> list[tuple[str, str]]:
     return out
 
 
+def table_problem(build: Path) -> str | None:
+    """None if the build's partition table is the one firmware/esp32/partitions.csv says (the 4 MB OTA
+    slots of table layout 1, decision PART-1) and the app image fits its slot; else what is wrong.
+
+    A release with the wrong table would be flashed by every builder and could not be put right over
+    the air: the table is only ever changed over USB."""
+    csv = {}
+    for line in (REPO / "firmware/esp32/partitions.csv").read_text(encoding="utf-8").splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        f = [x.strip() for x in line.split(",")]
+        csv[f[0]] = (int(f[3], 16), int(f[4], 16))
+    data = (build / "partition_table" / "partition-table.bin").read_bytes()
+    built = {}
+    for i in range(0, len(data) - 31, 32):
+        entry = data[i:i + 32]
+        if entry[:2] != b"\xaa\x50":
+            break
+        name = entry[12:28].split(b"\0")[0].decode("ascii")
+        built[name] = (int.from_bytes(entry[4:8], "little"), int.from_bytes(entry[8:12], "little"))
+    if built != csv:
+        return f"the build's partition table {built} is not partitions.csv {csv}"
+    slot = built["ota_0"][1]
+    size = (build / "atalaia_esp32.bin").stat().st_size
+    if size > slot:
+        return f"atalaia_esp32.bin is {size} bytes, the OTA slot {slot}"
+    return None
+
+
 def readme(variant: str, version: str, files: list[tuple[str, str]]) -> str:
     listing = "\n".join(f"  {offset}  {path}" for offset, path in files)
     return f"""Atalaia {version} firmware: {VARIANTS[variant]}
@@ -82,6 +111,12 @@ Use your board's port instead of COM5 (/dev/ttyACM0 on Linux). In this folder:
   Write the image:
     python3 -m esptool --chip esp32s3 -p COM5 -b 921600 write_flash "@flash_args"
 
+USB FLASH REQUIRED ONCE when you come from v0.4.0 or earlier: this release has a new partition
+table (4 MB OTA slots, the first four partitions where they were), which an update over the air
+cannot change, so write the files above over USB with the command above (no erase_flash: the
+settings and the adoption stay; the field's logo and the fetched modes are fetched again). A box
+still on the old table refuses to run this firmware and says so on its screen.
+
 If the connection fails, hold PRG, press and release RST, release PRG (download
 mode), or use -b 460800 or -b 115200. To flash from a browser instead, use the
 -merged.bin file from the release at address 0x0.
@@ -98,6 +133,9 @@ def cmd_package(args: argparse.Namespace) -> int:
     app = build / "atalaia_esp32.bin"
     if not app.is_file() or not (build / "flash_args").is_file():
         return fail(f"{build}: no atalaia_esp32.bin and flash_args (is the build done?)")
+    problem = table_problem(build)
+    if problem:
+        return fail(problem)
     files = flash_files(build)
     if not files or any(not (build / path).is_file() for _, path in files):
         return fail("flash_args names a file the build folder does not have")
@@ -151,6 +189,8 @@ def cmd_notes(args: argparse.Namespace) -> int:
 how) and `-merged.bin` (one file for a browser flasher, written at address 0x0). The Field Box also has the plain
 `.bin` with its signed `.release.json`, what a controller or a box checks for an update over the air (the modem and
 the pod are not updated that way). Check what you downloaded against `SHA256SUMS`.
+
+**USB flash required once** when you come from v0.4.0 or earlier: the Field Box, modem and pod images of this release have a new partition table (4 MB OTA slots instead of 2 MB), and an update over the air cannot change the partition table. Flash the `-usb.zip` over USB once (write, no erase: the settings and the adoption stay; the cached game modes and the field's logo are fetched again). A box still on the old table refuses to run the new firmware and shows "Flash over USB" on its screen; one that gets it over the air from an older firmware goes back to the old one by itself. Later updates over the air work as before.
 
 **Signed with two release keys:** root `424d053af5cdbc35` (held offline by the maintainer) and CI
 `32b3c815ac30ad43` (this release is signed with the CI key; both are built into the firmware).

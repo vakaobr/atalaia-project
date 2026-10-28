@@ -95,6 +95,7 @@
 #include "box_pair.h"
 #include "builtin_presets.h"
 #include "button_tracker.h"
+#include "fw_layout.h"
 #include "fw_update.h"
 #include "radio/radio_lbt.h"
 #include "mode_fetch.h"
@@ -454,8 +455,11 @@ static bool adopt_store(void *ctx, const uint8_t key[ADOPTION_KEY_SIZE], const c
            write_file("field_name", (const uint8_t *)name, strlen(name)) == 0;
 }
 
-const fw_desc_t atalaia_fw_desc = {
-    .magic = {'A', 'T', 'F', 'W'}, .format = 1, .variant = "box", .board = "heltec_v4_3"};
+const fw_desc_t atalaia_fw_desc = {.magic = {'A', 'T', 'F', 'W'},
+                                   .format = 1,
+                                   .layout = FW_LAYOUT_VERSION,
+                                   .variant = "box",
+                                   .board = "heltec_v4_3"};
 static char fw_version[32] = "host"; /* HELLO's fw_version, as esp_app_desc_t's */
 static uint8_t release_keys[FW_KEYS_MAX][32];
 static int release_key_count;
@@ -482,7 +486,8 @@ static void shell_update(void *user, const char *params)
     job.desc = &atalaia_fw_desc;
     job.keys = (const uint8_t(*)[32])release_keys;
     job.key_count = (size_t)release_key_count;
-    job.slot_size = 0x200000;
+    job.slot_size = 0x400000;
+    job.layout = FW_LAYOUT_VERSION;
     job.playing = box_game_playing(&game);
     job.battery_pct = battery;
     job.min_battery_pct = 30;

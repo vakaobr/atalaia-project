@@ -13,6 +13,7 @@
  * "box-dev" for the Wokwi build (GPIO keypad, public development join key). An image
  * installs only on a box of its own variant and board.
  */
+#include "fw_layout.h"
 #include "fw_update.h"
 #include "sdkconfig.h"
 
@@ -28,7 +29,8 @@ _Static_assert(sizeof(CONFIG_ATALAIA_OTA_VARIANT) <= sizeof(((fw_desc_t *)0)->va
 const __attribute__((section(".rodata_custom_desc"))) fw_desc_t atalaia_fw_desc = {
     .magic = {'A', 'T', 'F', 'W'},
     .format = 1,
-    .reserved = {0, 0, 0},
+    .layout = FW_LAYOUT_VERSION,
+    .reserved = {0, 0},
     .variant = CONFIG_ATALAIA_OTA_VARIANT,
     .board = FW_BOARD,
 };

@@ -6,6 +6,8 @@ if(CONFIG_ATALAIA_MODEM_MODE)
     # the on-board OLED's status screen (modem_screen.c, LVGL).
     set(ATALAIA_SRCS
         "modem/modem_main.c"
+        "fw_layout.c"
+        "fw_layout_esp.c"
         "modem/modem_task.c"
         "modem/modem.c"
         "modem/modem_framing.c"
@@ -39,6 +41,8 @@ elseif(CONFIG_ATALAIA_POD_MODE)
     # radio logic. No Lua, screens, presets or Wi-Fi.
     set(ATALAIA_SRCS
         "pod/pod_main.c"
+        "fw_layout.c"
+        "fw_layout_esp.c"
         "pod/pod_task.c"
         "pod/pod.c"
         "pod/pod_caps.c"
@@ -127,6 +131,8 @@ else()
         "box_lobby.c"
         "serial_console.c"
         "fw_update.c"
+        "fw_layout.c"
+        "fw_layout_esp.c"
         "fw_update_esp.c"
         "fw_desc.c"
         "mode_package.c"

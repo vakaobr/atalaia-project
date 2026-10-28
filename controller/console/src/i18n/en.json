@@ -1184,6 +1184,7 @@
       "too_big": "too big for the box",
       "bad_image": "not a valid image",
       "wrong_board": "built for another board",
+      "layout": "needs a newer partition table: USB flash required once",
       "download": "the download broke off",
       "bad_hash": "the image was not the signed one",
       "flash": "writing the flash failed",

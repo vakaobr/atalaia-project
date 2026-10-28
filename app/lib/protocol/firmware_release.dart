@@ -69,6 +69,7 @@ const reportResults = [
   'flash',
   'battery',
   'cancelled',
+  'layout',
 ];
 
 class ReleaseException implements Exception {

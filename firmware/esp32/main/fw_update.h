@@ -53,7 +53,8 @@
 typedef struct {
     uint8_t magic[4]; /* "ATFW" */
     uint8_t format;   /* 1 */
-    uint8_t reserved[3];
+    uint8_t layout;   /* the partition table layout the image needs (fw_layout.h); 0 before it */
+    uint8_t reserved[2];
     char variant[12]; /* "box", "box-bench", "box-dev": an image installs only on its own variant */
     char board[16];   /* "heltec_v4_3", "heltec_v4_2" */
 } fw_desc_t;
@@ -81,6 +82,7 @@ typedef enum {
     FW_FLASH,          /* writing, validating or activating the slot failed */
     FW_BATTERY,        /* the battery is too low to start */
     FW_CANCELLED,      /* a game started during the download */
+    FW_LAYOUT,         /* the image needs a newer partition table: USB flash required once */
 } fw_result_t;
 
 /* The report's code for a result ("installed", "bad_signature", ...). */
@@ -139,6 +141,7 @@ typedef struct {
     char project[33];
     char variant[13];
     char board[17];
+    uint8_t layout; /* the partition table layout it needs (fw_layout.h); 0 = the old one */
 } fw_image_info_t;
 
 /* What an image's first FW_IMAGE_HEAD bytes declare; false if they are not an Atalaia image. */
@@ -186,6 +189,7 @@ typedef struct {
     const uint8_t (*keys)[32];
     size_t key_count;
     uint32_t slot_size; /* bytes of the inactive OTA slot */
+    uint8_t layout;     /* the partition table layout this box runs on (0: the old one) */
     bool playing;       /* a game is being played (BOX_PLAYING) */
     int battery_pct;    /* -1 if unknown */
     int min_battery_pct;

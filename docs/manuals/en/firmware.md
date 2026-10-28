@@ -152,6 +152,8 @@ Keep the quotes: PowerShell reads a bare `@` differently. `flash_args` is a file
 
 For the modem and the pod, go to `build-modem` or `build-pod` instead.
 
+**USB flash required once, from v0.5.** A box flashed with v0.4.0 or earlier has the old partition table (2 MB program slots). From v0.5 the program slots are 4 MB, and an update over the air cannot change the partition table, so flash such a box over USB once, with the command above and **without** `erase_flash`: the settings, the keys and the adoption stay where they are (the table's first four partitions did not move). What is lost is the storage partition, which moved: the box formats it on the first start and fetches the game modes and the field's logo again at the next join. A box still on the old table refuses to run the new firmware: its screen says *Flash over USB* and the log says `WRONG PARTITION TABLE`. A box that was offered the new image over the air by an older firmware goes back to its old one by itself. After the one USB flash, updates over the air work as before.
+
 ### 3.4 Restart and watch
 
 Restart the board with this command. It is the reliable way. A serial program's own reset is not:
@@ -274,7 +276,7 @@ Three things use the field's Wi-Fi, and only between games: **firmware updates**
 4. For an update, build a higher version (`--fw-version=0.4.1`), sign it with `tools/firmware_release.py sign`, and upload the image and its `.release.json` in the console's **Boxes** tab. Press **Update to**.
 5. The box downloads it, checks it again, installs it and restarts. If the new image fails its self-test, the box goes back to the old one by itself.
 
-Done once on a real board on a bench, with a throw-away key, sent by the controller over the radio, on a home Wi-Fi network (about 11 seconds). Not yet tested on a field. A box flashed with firmware from before updates over the air existed needs one USB flash first.
+Done once on a real board on a bench, with a throw-away key, sent by the controller over the radio, on a home Wi-Fi network (about 11 seconds). Not yet tested on a field. A box flashed with firmware from before updates over the air existed needs one USB flash first, and so does a box on the old partition table (v0.4.0 or earlier) before it takes v0.5 ([section 3.3](#33-write-the-image)).
 
 ## 8. A box that does not boot
 
@@ -283,15 +285,16 @@ Go down the list. Stop when the box works.
 1. **The cable and the port.** Use a data cable, a PC's own USB-C port, no hub. Close any other program that holds the port (a serial monitor, esptool).
 2. **Power.** A weak port or a low battery gives restarts and `brownout` in the log. Try another port, with the switch off.
 3. **Download mode by hand.** Hold **PRG**, press and release **RST**, release PRG. Flash again ([section 3](#3-flash-it)).
-4. **Wrong build.** Check you flashed `build`, not `build-bench`, `build-modem` or `build-pod`.
-5. **Update that went wrong.** A new image that cannot confirm itself is replaced by the old one at the next restart. You need do nothing. If it keeps looping, flash over USB.
-6. **Erase the settings** (name, PIN, adoption, Wi-Fi) and keep the program:
+4. **Wrong partition table.** A screen that says *Flash over USB* (log: `WRONG PARTITION TABLE`) means the box has the old table: flash it over USB once ([section 3.3](#33-write-the-image)).
+5. **Wrong build.** Check you flashed `build`, not `build-bench`, `build-modem` or `build-pod`.
+6. **Update that went wrong.** A new image that cannot confirm itself is replaced by the old one at the next restart. You need do nothing. If it keeps looping, flash over USB.
+7. **Erase the settings** (name, PIN, adoption, Wi-Fi) and keep the program:
 
    ```
    PY -m esptool --chip esp32s3 -p COM5 erase_region 0x9000 0x6000
    ```
 
-7. **Erase everything and flash again.** `erase_flash`, then write ([section 3.3](#33-write-the-image)). The box is then new: set it up and adopt it again.
+8. **Erase everything and flash again.** `erase_flash`, then write ([section 3.3](#33-write-the-image)). The box is then new: set it up and adopt it again.
 
 If the radio does not work, check the board revision first ([section 4](#4-the-options-a-builder-sets)), then the antenna. The [Field Box manual](../../../hardware/field-box/BUILD.md#13-troubleshooting) has a table of faults for each part.
 

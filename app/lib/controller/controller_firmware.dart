@@ -39,7 +39,7 @@ import 'controller_engine.dart';
 const maxReleases = 4;
 
 /// Bytes of a Field Box's OTA slot (firmware/esp32/partitions.csv).
-const slotSize = 0x200000;
+const slotSize = 0x400000;
 const boxPlatforms = ['esp32', 'esp32s3'];
 const boxTiers = [0, 1];
 const reportMax = 512;

@@ -1301,6 +1301,12 @@ void app_main(void)
     ESP_LOGI(TAG, "Atalaia firmware v%s (core v%s)  tier=%s", esp_app_get_description()->version,
              atalaia_version(), tier);
 
+    /* The partition table first: an over-the-air update cannot change it, so a box still on the
+     * old one (2 MB OTA slots) must be re-flashed over USB once (decision PART-1). An image an
+     * update just put on such a table rolls back to the previous one right here. */
+    char layout_why[96];
+    bool layout_ok = fw_update_esp_layout_boot(layout_why, sizeof(layout_why));
+
     /* NVS init (needed for config_store and Wi-Fi). */
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -1318,6 +1324,23 @@ void app_main(void)
     /* HAL init: power the peripherals (Vext), assign the drivers, then bring up each part. */
     hal_esp_board_power_on();
     hal_esp_init(&hal);
+    if (!layout_ok) {
+        /* Refuse to run: the storage and the next update would land in the wrong places. Show
+         * it (the display, no radio, no game) and say it in the log until flashed. */
+        screen_queue = xQueueCreate(CMD_SCREEN_QUEUE_MAX, sizeof(screen_update_t));
+        char data[SCREEN_DATA_MAX];
+        snprintf(data, sizeof(data), "{\"title\":\"%s\",\"mode\":\"%s\"}",
+                 box_text(TX_LAYOUT_TITLE), box_text(TX_LAYOUT_TEXT));
+        send_screen("status", data);
+        xTaskCreatePinnedToCore(task_lvgl, "lvgl", 8192, NULL, 4, NULL, 1);
+        for (;;) {
+            ESP_LOGE(TAG,
+                     "refusing to run on the old partition table (%s): USB flash required "
+                     "once",
+                     layout_why);
+            vTaskDelay(pdMS_TO_TICKS(30000));
+        }
+    }
     hal_start();
     key_filter_init(&key_filter);
 #if SERIAL_INPUT

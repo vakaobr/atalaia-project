@@ -1184,6 +1184,7 @@
       "too_big": "zu groß für die Box",
       "bad_image": "kein gültiges Image",
       "wrong_board": "für ein anderes Board gebaut",
+      "layout": "braucht eine neuere Partitionstabelle: einmal per USB flashen",
       "download": "der Download brach ab",
       "bad_hash": "das Image war nicht das signierte",
       "flash": "Schreiben in den Flash fehlgeschlagen",

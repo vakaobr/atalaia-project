@@ -172,6 +172,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/box_lobby.c
     ${SHELL_DIR}/serial_console.c
     ${SHELL_DIR}/fw_update.c
+    ${SHELL_DIR}/fw_layout.c
     ${SHELL_DIR}/mode_package.c
     ${SHELL_DIR}/mode_store.c
     ${SHELL_DIR}/mode_fetch.c
@@ -269,6 +270,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 # test_wifi_setup.c reads the setup page to check its texts.
+target_compile_definitions(firmware_test PRIVATE "PARTITIONS_CSV=\"${CMAKE_CURRENT_SOURCE_DIR}/../partitions.csv\"")
 target_compile_definitions(firmware_test PRIVATE "WIFI_SETUP_HTML=\"${SHELL_DIR}/wifi_setup.html\"")
 
 # MODES_DIR is needed by test_game_loop.c to find the real mode scripts.

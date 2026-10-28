@@ -813,7 +813,13 @@ como o registo de arranque passam por ela.
    ```
 
    O `flash_args` (escrito pela compilação) lista o bootloader, a tabela de
-   partições e a aplicação com os endereços deles. Se a ligação falhar, põe a
+   partições e a aplicação com os endereços deles. **É preciso instalar
+   por USB uma vez, a partir da v0.5:** uma caixa gravada com a v0.4.0 ou
+   anterior tem a tabela de partições antiga (espaços de 2 MB); uma
+   atualização pelo ar não a consegue mudar, por isso escreve-a com este
+   comando, sem o passo de apagar (as definições e a adoção ficam; a caixa
+   volta a obter os modos e o logótipo). Uma caixa ainda com a tabela antiga
+   mostra «Instala por USB». Se a ligação falhar, põe a
    placa em modo de gravação à mão (mantém premido o botão PRG/BOOT, carrega e
    larga o RST, larga o PRG; ou mantém o PRG premido enquanto ligas o cabo) e
    corre o comando outra vez, ou experimenta `-b 460800` ou `-b 115200`. A

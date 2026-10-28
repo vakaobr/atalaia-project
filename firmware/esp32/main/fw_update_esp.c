@@ -32,6 +32,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
+#include "fw_layout.h"
+#include "fw_layout_esp.h"
 #include "fw_update.h"
 #include "mbedtls/md.h"
 #include "mbedtls/pk.h"
@@ -45,6 +47,9 @@ static const char *TAG = "fw_update";
 #define WIFI_GOT_IP  BIT0
 #define WIFI_FAILED  BIT1
 #define WIFI_RETRIES 5
+
+/* The partition table layout this box runs on: FW_LAYOUT_VERSION, or 0 (the old table). */
+static uint8_t s_layout;
 
 static box_game_t *s_box;
 static void (*s_screen)(const char *tmpl, const char *data_json);
@@ -526,6 +531,7 @@ void fw_update_esp_offer(const char *params_json)
     s_job.desc = &atalaia_fw_desc;
     s_job.keys = (const uint8_t(*)[32])s_keys;
     s_job.key_count = release_keys();
+    s_job.layout = s_layout;
     s_job.slot_size = next != NULL ? (uint32_t)next->size : 0;
     s_job.playing = box_game_playing(s_box);
     s_job.battery_pct = s_battery != NULL ? s_battery() : -1;
@@ -559,6 +565,25 @@ bool fw_update_esp_set_wifi(const char *ssid, const char *password)
     config_store_set_str("wifi_ssid", ssid);
     config_store_set_str("wifi_pass", password);
     return true;
+}
+
+bool fw_update_esp_layout_boot(char *why, unsigned why_cap)
+{
+    bool ok = fw_layout_esp_check(why, why_cap);
+    s_layout = ok ? FW_LAYOUT_VERSION : 0;
+    if (ok) return true;
+    /* An image an over-the-air update just installed on an old table (an older firmware that
+     * does not know the layout accepted it): the previous image runs on that table, so go
+     * back to it. A box flashed over USB with a wrong table has nothing to go back to: the
+     * caller shows the screen and stops. */
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t state;
+    if (running != NULL && esp_ota_get_state_partition(running, &state) == ESP_OK &&
+        state == ESP_OTA_IMG_PENDING_VERIFY) {
+        ESP_LOGE(TAG, "rolling back to the previous firmware: it fits this partition table");
+        esp_ota_mark_app_invalid_rollback_and_reboot();
+    }
+    return false;
 }
 
 void fw_update_esp_boot(bool radio_ok, bool storage_ok)

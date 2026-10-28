@@ -152,6 +152,8 @@ Mantém as aspas: o PowerShell lê um `@` solto de maneira diferente. O `flash_a
 
 Para o modem e para o módulo de E/S, vai a `build-modem` ou a `build-pod`.
 
+**É preciso instalar por USB uma vez, a partir da v0.5.** Uma caixa gravada com a v0.4.0 ou anterior tem a tabela de partições antiga (espaços de programa de 2 MB). A partir da v0.5 os espaços de programa têm 4 MB e uma atualização pelo ar não consegue mudar a tabela de partições, por isso grava essa caixa por USB uma vez, com o comando acima e **sem** `erase_flash`: as definições, as chaves e a adoção ficam onde estavam (as primeiras quatro partições da tabela não mudaram de sítio). Perde-se a partição de armazenamento, que mudou de sítio: a caixa formata-a no primeiro arranque e volta a obter os modos de jogo e o logótipo do campo na associação seguinte. Uma caixa ainda com a tabela antiga recusa-se a correr o firmware novo: o ecrã mostra *Instala por USB* e o registo diz `WRONG PARTITION TABLE`. Uma caixa a quem um firmware mais antigo ofereceu a imagem nova pelo ar volta sozinha à antiga. Depois dessa gravação por USB, as atualizações pelo ar funcionam como antes.
+
 ### 3.4 Reiniciar e observar
 
 Reinicia a placa com este comando. É a maneira fiável. O reinício de um programa de série não é:
@@ -274,7 +276,7 @@ Três coisas usam o Wi-Fi do campo, e só entre jogos: as **atualizações de fi
 4. Para uma atualização, compila uma versão mais alta (`--fw-version=0.4.1`), assina-a com `tools/firmware_release.py sign` e carrega a imagem e o seu `.release.json` no separador **Caixas** da consola. Carrega em **Atualizar para**.
 5. A caixa descarrega-a, volta a verificá-la, instala-a e reinicia. Se a imagem nova falhar o autoteste, a caixa volta sozinha à antiga.
 
-Feito uma vez numa placa real numa bancada, com uma chave descartável, enviada pelo controlador pelo rádio, numa rede Wi-Fi doméstica (cerca de 11 segundos). Ainda não testado num campo. Uma caixa gravada com firmware anterior às atualizações pelo ar precisa primeiro de uma gravação por USB.
+Feito uma vez numa placa real numa bancada, com uma chave descartável, enviada pelo controlador pelo rádio, numa rede Wi-Fi doméstica (cerca de 11 segundos). Ainda não testado num campo. Uma caixa gravada com firmware anterior às atualizações pelo ar precisa primeiro de uma gravação por USB, e uma caixa com a tabela de partições antiga (v0.4.0 ou anterior) também, antes de receber a v0.5 ([secção 3.3](#33-escrever-a-imagem)).
 
 ## 8. Uma caixa que não arranca
 
@@ -283,15 +285,16 @@ Segue a lista. Pára quando a caixa funcionar.
 1. **O cabo e a porta.** Usa um cabo de dados, a própria porta USB-C do PC, sem hub. Fecha qualquer outro programa que tenha a porta (um monitor de série, o esptool).
 2. **Energia.** Uma porta fraca ou uma bateria fraca dão reinícios e `brownout` no registo. Experimenta outra porta, com o interruptor desligado.
 3. **Modo de gravação à mão.** Mantém premido o **PRG**, carrega e larga o **RST**, larga o PRG. Grava outra vez ([secção 3](#3-grava-o)).
-4. **Compilação errada.** Confirma que gravaste `build`, e não `build-bench`, `build-modem` ou `build-pod`.
-5. **Uma atualização que correu mal.** Uma imagem nova que não consegue confirmar-se é substituída pela antiga no reinício seguinte. Não precisas de fazer nada. Se ficar em ciclo, grava por USB.
-6. **Apaga as definições** (nome, PIN, adoção, Wi-Fi) e mantém o programa:
+4. **Tabela de partições errada.** Um ecrã que diz *Instala por USB* (registo: `WRONG PARTITION TABLE`) quer dizer que a caixa tem a tabela antiga: grava-a por USB uma vez ([secção 3.3](#33-escrever-a-imagem)).
+5. **Compilação errada.** Confirma que gravaste `build`, e não `build-bench`, `build-modem` ou `build-pod`.
+6. **Uma atualização que correu mal.** Uma imagem nova que não consegue confirmar-se é substituída pela antiga no reinício seguinte. Não precisas de fazer nada. Se ficar em ciclo, grava por USB.
+7. **Apaga as definições** (nome, PIN, adoção, Wi-Fi) e mantém o programa:
 
    ```
    PY -m esptool --chip esp32s3 -p COM5 erase_region 0x9000 0x6000
    ```
 
-7. **Apaga tudo e grava outra vez.** `erase_flash` e depois escreve ([secção 3.3](#33-escrever-a-imagem)). A caixa fica então nova: configura-a e adota-a outra vez.
+8. **Apaga tudo e grava outra vez.** `erase_flash` e depois escreve ([secção 3.3](#33-escrever-a-imagem)). A caixa fica então nova: configura-a e adota-a outra vez.
 
 Se o rádio não funcionar, confirma primeiro a revisão da placa ([secção 4](#4-as-opções-de-quem-monta)) e depois a antena. O [manual da Field Box](../../../hardware/field-box/BUILD.pt.md#13-resolução-de-problemas) tem uma tabela de avarias para cada peça.
 

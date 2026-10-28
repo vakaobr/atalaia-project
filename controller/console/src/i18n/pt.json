@@ -1184,6 +1184,7 @@
       "too_big": "demasiado grande para a caixa",
       "bad_image": "imagem inválida",
       "wrong_board": "feita para outra placa",
+      "layout": "precisa de uma tabela de partições nova: é preciso instalar por USB uma vez",
       "download": "a transferência foi interrompida",
       "bad_hash": "a imagem não era a assinada",
       "flash": "a escrita na memória falhou",

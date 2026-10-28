@@ -16,6 +16,16 @@
 #include "fw_update.h"
 
 /*
+ * The first thing at boot: compares the partition table the box booted from with the one this
+ * firmware is built for (fw_layout.h). False: it is the old table (2 MB OTA slots), which an
+ * over-the-air update cannot change; `why` holds the first difference, and the caller shows
+ * it on the screen and does not run the game (USB flash required once). An image an update
+ * just installed on such a table rolls back to the previous one at once instead. Also sets the
+ * layout a later offer is checked against (fw_job_t.layout).
+ */
+bool fw_update_esp_layout_boot(char *why, unsigned why_cap);
+
+/*
  * At boot, once the storage and the radio have come up: an image an update just
  * installed (ESP_OTA_IMG_PENDING_VERIFY) confirms itself if the radio and the
  * storage work and fw_update_self_test passes; otherwise it marks itself invalid and

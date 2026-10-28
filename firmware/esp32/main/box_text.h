@@ -143,6 +143,8 @@ typedef enum {
     TX_RESTARTING,
     TX_UPDATE_FAILED,
     TX_UPDATE_REFUSED,
+    TX_LAYOUT_TITLE, /* the partition table is the old one: USB flash required once */
+    TX_LAYOUT_TEXT,
     /* mode packages fetched for a game (mode_fetch.h) */
     TX_MODES_FETCHING,
     TX_MODES_FAILED,

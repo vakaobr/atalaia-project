@@ -46,7 +46,7 @@ from .engine import Conflict, Controller, ControllerError, NotFound, Unavailable
 log = logging.getLogger("atalaia.firmware")
 
 MAX_RELEASES = 4
-SLOT_SIZE = 0x200000  # bytes of a Field Box's OTA slot (firmware/esp32/partitions.csv)
+SLOT_SIZE = 0x400000  # bytes of a Field Box's OTA slot (firmware/esp32/partitions.csv; 2 MB before layout 1)
 BOX_PLATFORMS = ("esp32", "esp32s3")  # platforms whose boxes take firmware updates
 BOX_TIERS = (0, 1)  # HELLO's tier: full, reduced (2 = proxy: a phone, never updated this way)
 VARIANTS = ("box",)  # the Field Box's images ([firmware] variants: "box-bench" for a test on the desk)
@@ -101,7 +101,7 @@ class FirmwareUpdates:
         key = self._signer(e)
         return {"id": e["sha256"][:16], "platform": e["platform"], "version": e["version"], "size": e["size"],
                 "sha256": e["sha256"], "signature": e["signature"], "variant": e["variant"], "board": e["board"],
-                "uploaded_at": e["uploaded_at"], "key_id": key, "verified": key is not None}
+                "layout": e.get("layout", 0), "uploaded_at": e["uploaded_at"], "key_id": key, "verified": key is not None}
 
     def releases(self) -> list[dict[str, Any]]:
         """Every kept release; ``verified`` is False once its key left ``release_keys``."""
@@ -149,7 +149,7 @@ class FirmwareUpdates:
             if len(entries) >= MAX_RELEASES:
                 raise Conflict(f"at most {MAX_RELEASES} releases are kept: delete one first")
             entry = {"platform": platform, "version": version, "size": len(image), "sha256": sha,
-                     "signature": signature, "variant": info.variant, "board": info.board,
+                     "signature": signature, "variant": info.variant, "board": info.board, "layout": info.layout,
                      "uploaded_at": round(self.clock(), 3)}
             _write(self.dir / f"{sha}.bin", image)
             _write(self.dir / f"{sha}.json", json.dumps(entry, sort_keys=True).encode("utf-8"))

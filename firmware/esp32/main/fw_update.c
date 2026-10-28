@@ -21,7 +21,7 @@ static const char *const RESULT_NAMES[] = {
     "installed", "busy",        "bad_offer",   "no_key",        "no_link",
     "no_wifi",   "unreachable", "bad_release", "bad_signature", "wrong_platform",
     "not_newer", "too_big",     "bad_image",   "wrong_board",   "download",
-    "bad_hash",  "flash",       "battery",     "cancelled",
+    "bad_hash",  "flash",       "battery",     "cancelled",     "layout",
 };
 
 const char *fw_result_name(fw_result_t r)
@@ -374,6 +374,7 @@ bool fw_image_info(const uint8_t *head, size_t len, fw_image_info_t *out)
     if (magic != 0xABCD5432u) return false;
     const uint8_t *a = head + FW_DESC_OFFSET;
     if (memcmp(a, "ATFW", 4) != 0 || a[4] != 1) return false;
+    out->layout = a[5];
     return c_field(d + 16, 32, out->version) && c_field(d + 48, 32, out->project) &&
            c_field(a + 8, 12, out->variant) && c_field(a + 20, 16, out->board);
 }
@@ -437,6 +438,9 @@ static fw_result_t check_head(const fw_job_t *job, const uint8_t *head)
         strncmp(info.board, job->desc->board, sizeof(job->desc->board)) != 0) {
         return FW_WRONG_BOARD;
     }
+    /* An update cannot change the partition table: an image that needs a newer one than this
+     * box runs on is refused before the slot is touched (USB flash required once). */
+    if (info.layout > job->layout) return FW_LAYOUT;
     return FW_INSTALLED;
 }
 
