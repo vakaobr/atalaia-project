@@ -84,7 +84,8 @@
             "node.update_failed",
             "node.modes_failed",
             "progressive.activated",
-            "progressive.completed"
+            "progressive.completed",
+            "node.setup_applied"
           ]
         },
         {
@@ -1691,6 +1692,34 @@
               },
               "step": {
                 "$ref": "#/$defs/data/step"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "node.setup_applied"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "kind": {
+                "$ref": "#/$defs/data/kind"
               }
             },
             "additionalProperties": false

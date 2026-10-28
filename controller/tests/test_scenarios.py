@@ -507,6 +507,30 @@ class FoxhoundTests(unittest.TestCase):
                 played += 1
         self.assertGreaterEqual(played, 6)
 
+    def test_a_lost_setup_is_sent_again_until_the_box_confirms(self):
+        """PKB-3 in the compiled runtime: a setup the box never heard is sent again (8, 16, 32, 64 and 128 s,
+        then no more), one it confirmed (node.setup_applied) is not."""
+        from atalaia_sim.mode import compose
+        from atalaia_sim.sim import Simulation
+        package = compile_scenario(load((MANIFESTS / "foxhound.yaml").read_text(encoding="utf-8")))
+        with tempfile.TemporaryDirectory() as tmp:
+            package.write(Path(tmp) / "foxhound")
+            game = compose(load_mode(Path(tmp) / "foxhound"), [load_mode(OBJECTIVES_DIR)])
+
+            def play(lost: bool, seconds: int) -> list[dict]:
+                sim = Simulation(CORE, game, {"alpha": "objective"}, ["red", "blue"], game.resolve_params({}, ["red", "blue"]))
+                self.addCleanup(sim.close)
+                if lost:
+                    sim.set_reachable("alpha", False)
+                sim.start()
+                sim.wait(seconds)
+                self.assertEqual(sim.problems, [])
+                return [p for _, node, cmd, p in sim.field_commands if node == "alpha" and cmd == "mode"]
+
+            self.assertEqual(len(play(False, 600)), 1)  # confirmed: sent once
+            self.assertEqual(len(play(True, 9)), 2)  # lost: the first repeat 8 s later
+            self.assertEqual(len(play(True, 2000)), 1 + 5)  # never confirmed: bounded
+
     def test_the_package_installs_on_the_controller(self):
         package = compile_scenario(load((MANIFESTS / "foxhound.yaml").read_text(encoding="utf-8")))
         with tempfile.TemporaryDirectory() as tmp:

@@ -965,6 +965,8 @@
       "scenario_lang": "盒子畫面語言 %1 每隊小隊數 %2",
       "lang_pt": "葡萄牙文",
       "lang_en": "英文",
+      "lang_de": "德文",
+      "lang_zh-tw": "繁體中文（台灣）",
       "scenario_rules": "任務目標 %1 揭露，告知 %2",
       "reveal_all": "從一開始",
       "reveal_active": "一次一個",

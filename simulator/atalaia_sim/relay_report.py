@@ -426,6 +426,44 @@ def render(results: list[Result]) -> str:
     return "\n".join(out) + "\n"
 
 
+SETUP_MODES = [("oneshot", "one shot (before PKB-3)"), ("resend", "re-sent 5 times, no box ACK"),
+               ("resend_ack", "re-sent until the box's ACK")]
+
+
+def run_setup_study(lib: Optional[str] = None, seeds: Optional[list[int]] = None, minutes: int = 90,
+                    workers: int = 0, sizes: Optional[list[int]] = None) -> list[Result]:
+    """The scenario's setup commands in each ``cmd_mode`` (PKB-3): the Foxhound scenario on the built radio rules
+    (``A_backoff``, and ``H_paced``, the controller's pacing as built), every layout, EU868."""
+    from .relay_study import LAYOUTS, run_matrix
+    out: list[Result] = []
+    for mode, _label in SETUP_MODES:
+        for r in run_matrix(["scenario"], sizes or [10, 20, 30], list(LAYOUTS), ["eu868"], ["A_backoff", "H_paced"],
+                            minutes, seeds or [1, 2, 3, 4, 5], lib, workers, cmd_mode=mode):
+            r["set"] = "setup:" + mode
+            out.append(r)
+    return out
+
+
+def setup_table(results: list[Result]) -> str:
+    """Setup commands reaching their box, whether the scenario knew, and what it cost, median over the seeds."""
+    g = group([r for r in results if "setups" in r])
+    rows = []
+    for layout in LAYOUT_NAMES:
+        for n in sorted({r["n"] for r in results}):
+            for pol in ("A_backoff", "H_paced"):
+                for mode, label in SETUP_MODES:
+                    grp = [r for r in g.get(("scenario", layout, n, "eu868", pol), []) if r["setups"]["mode"] == mode]
+                    if not grp:
+                        continue
+                    rows.append([LAYOUT_NAMES[layout], n, pol, label, med(grp, "setups.reached_pct"),
+                                 med(grp, "setups.acked_pct"), med(grp, "setups.latency_p50_s"),
+                                 med(grp, "setups.latency_p95_s"), med(grp, "setups.frames_per_setup"),
+                                 med(grp, "setups.confirmations"), med(grp, "controller.airtime_pct")])
+    return table(["layout", "N", "rule", "setup commands", "reaching their box %", "known to the scenario %",
+                  "time to reach p50 s", "p95 s", "CMD frames per setup", "box confirmations (events)",
+                  "controller air %"], rows)
+
+
 def build_report(lib: Optional[str] = None, seeds: Optional[list[int]] = None, minutes: int = 90,
                  workers: int = 0, quick: bool = False) -> tuple[str, list[Result]]:
     results = run_all(lib, seeds, minutes, workers, quick)
@@ -449,10 +487,19 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("--out", default=None, help="write the Markdown here (default: stdout)")
     ap.add_argument("--json", default=None, help="also write every result as JSON here")
     ap.add_argument("--from-json", default=None, help="do not run anything: render the report from this JSON")
+    ap.add_argument("--setup-study", action="store_true",
+                    help="only the scenario's setup commands with and without the box's ACK (PKB-3), as a table")
     ap.add_argument("--lbt-json", default=None, help="print SL-25's listen-before-talk tables from this JSON")
     args = ap.parse_args(argv)
     if args.lbt_json:
         print(lbt_section(load(args.lbt_json)))
+        return 0
+    if args.setup_study:
+        res = run_setup_study(args.lib, [int(x) for x in args.seeds.split(",")], args.minutes, args.workers)
+        if args.json:
+            with open(args.json, "w", encoding="utf-8") as fh:
+                json.dump(res, fh)
+        print(setup_table(res))
         return 0
     if args.from_json:
         text, results = render(load(args.from_json)), []

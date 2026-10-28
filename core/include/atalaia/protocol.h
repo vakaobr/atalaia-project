@@ -237,6 +237,7 @@ enum {
     ATALAIA_EV_NODE_MODES_FAILED = 53,            /* node.modes_failed */
     ATALAIA_EV_PROGRESSIVE_ACTIVATED = 54,        /* progressive.activated */
     ATALAIA_EV_PROGRESSIVE_COMPLETED = 55,        /* progressive.completed */
+    ATALAIA_EV_NODE_SETUP_APPLIED = 56,           /* node.setup_applied */
 };
 
 typedef enum {

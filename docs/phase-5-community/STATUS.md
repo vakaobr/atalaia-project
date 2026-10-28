@@ -359,3 +359,7 @@ section 16).
 | `python3 tools/check_wiring.py` | OK; mutated pins in each guide and in the page fail as expected |
 | `python3 tools/build_site.py --check` | OK (18 pages, the new page in three languages) |
 | Every page in Chromium at 320, 360 and 1200 px | no horizontal scroll (the German main page's hero fixed, P5J-14) |
+
+## A scenario's `lang`: German and Traditional Chinese (2026-10-28, decision PKB-9)
+
+`core/scenario/manifest.lua` lists `pt`, `en`, `de` and `zh-tw` for a scenario's `lang` (the objectives package's templates have had `de` and `zh-tw` since P5H-12); the validator, the compiler, the shared vectors (`scenario.json`: two new valid cases; `scenario_compile.json` regenerated), the console's scenario blocks (a four-language dropdown and the four consoles' texts), `controller/README.md` and `modes/README.md` follow. Old manifests are unchanged. Not done: texts of a scenario in German or Chinese (`i18n.de`, `i18n.zh-tw`: the block editor has no blocks for them, so the format keeps `i18n.pt` only and a German or Chinese box shows the objective's English name), and the box shows a Chinese name only with letters its font has.

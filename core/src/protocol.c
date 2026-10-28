@@ -55,6 +55,7 @@ static const uint8_t data_node_update_failed[] = {37, 3, 21};
 static const uint8_t data_node_modes_failed[] = {38, 3};
 static const uint8_t data_progressive_activated[] = {5, 39};
 static const uint8_t data_progressive_completed[] = {5, 39};
+static const uint8_t data_node_setup_applied[] = {11};
 
 const atalaia_event_def_t atalaia_event_defs[] = {
     {"game.start", ATALAIA_EV_GAME_START, ATALAIA_PRIO_CRITICAL, data_game_start, 1},
@@ -110,6 +111,7 @@ const atalaia_event_def_t atalaia_event_defs[] = {
     {"node.modes_failed", ATALAIA_EV_NODE_MODES_FAILED, ATALAIA_PRIO_CRITICAL, data_node_modes_failed, 2},
     {"progressive.activated", ATALAIA_EV_PROGRESSIVE_ACTIVATED, ATALAIA_PRIO_CRITICAL, data_progressive_activated, 2},
     {"progressive.completed", ATALAIA_EV_PROGRESSIVE_COMPLETED, ATALAIA_PRIO_CRITICAL, data_progressive_completed, 2},
+    {"node.setup_applied", ATALAIA_EV_NODE_SETUP_APPLIED, ATALAIA_PRIO_NORMAL, data_node_setup_applied, 1},
 };
 const size_t atalaia_event_def_count =
     sizeof(atalaia_event_defs) / sizeof(atalaia_event_defs[0]);

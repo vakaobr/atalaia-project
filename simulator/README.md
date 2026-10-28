@@ -87,6 +87,8 @@ cd simulator
 python -m atalaia_sim.relay_study --games domination --sizes 20 --layouts all_in_range --regions eu868 \
     --policies firmware,A_backoff --seeds 1,2,3 --minutes 90      # a table, a few seconds a run
 python -m atalaia_sim.relay_study --list-policies                  # the rules compared
+python -m atalaia_sim.relay_study --games scenario --sizes 20 --cmd-mode resend_ack   # the scenario's setup commands sent again until the box confirms (PKB-3; also oneshot, resend)
+python -m atalaia_sim.relay_report --setup-study --seeds 1,2,3,4,5                    # those three side by side
 python -m atalaia_sim.relay_report --out relay-study-results.md   # everything the decisions quote (about 10 minutes on 32 cores)
 ```
 

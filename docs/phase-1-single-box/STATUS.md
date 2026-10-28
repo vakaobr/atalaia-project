@@ -124,3 +124,7 @@ Done since this list was written (2026-10-27):
   SX1262 (phase 2), the Heltec V4.3's Vext rail (the firmware does not
   switch it yet; polarity to check), the real panel's orientation and
   colours, power, the captive portal on real phones. See BRING_UP.md.
+
+## Admin menu: moving an adopted box to another field by code (2026-10-28, decision PKB-4)
+
+Built (host tests only; **not flashed, no bench, no radio transmission**): the picker's last entry **Change field** (after **Wi-Fi setup**), behind the admin PIN with a confirmation, arms one move (`adoption_allow_move`) and shows the pairing code of an unadopted box; the box keeps its field until another one has paired it (decision AD-16's "left for later", `protocol/adoption.md` section 7). The entry shows only on an adopted box with a radio and an admin PIN. New `start_confirm` variant `{"adopt":true}` on the TFT and the OLED in four languages (eight reference images). Host tests: `test_preset_ui.c`, `test_adoption.c`, `test_box_pair.c` (the vectors' run moving an adopted box, its cancellation by `*`, the five minutes and another adoption), `test_screens.c`, `test_oled_screens.c`; ASan and UBSan clean. Builds (ESP-IDF v5.3.2, 0 warnings): the Field Box image is 0x1db150 bytes (1,945,936) in the 0x200000-byte OTA slot (7 %, 151,216 bytes free), the modem 0x86ba0 (74 % free) and the pod 0xa4830 (68 % free). Still to do on a board: the key sequence on the real keypad and screen, and the whole move against a real field controller (BRING_UP step 10a.5).

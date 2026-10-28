@@ -177,7 +177,59 @@ class ScenarioRunTests(unittest.TestCase):
         sim.reboot("alpha")
         self.assertEqual(len(self.setups(sim)["alpha"]), 2)
         self.assertEqual(sim.node("alpha").last_command("ui", "screen").args[0], "obj_capture")
-        self.assertEqual([e.type for e in sim.events if e.node == "alpha"], ["node.rebooted"])
+        self.assertEqual([e.type for e in sim.events if e.node == "alpha"],
+                         ["node.setup_applied", "node.rebooted", "node.setup_applied"])
+        self.assertEqual(sim.problems, [])
+
+    def test_a_box_that_took_its_setup_says_so_and_is_not_sent_it_again(self):
+        """PKB-3: the objectives package confirms each setup (node.setup_applied, with its kind), and the
+        scenario stops repeating it when it hears that."""
+        sim = self.game({"alpha": "objective"})
+        sim.start()
+        confirmed = [e for e in sim.events if e.node == "alpha" and e.type == "node.setup_applied"]
+        self.assertEqual([e.data for e in confirmed], [{"kind": "capture"}])
+        sim.wait(600)  # well past every wait of the repeats
+        self.assertEqual(len(self.setups(sim)["alpha"]), 1)
+        self.assertEqual(sim.problems, [])
+
+    def test_a_lost_setup_is_sent_again_until_the_box_confirms(self):
+        sim = self.game({"alpha": "objective"})
+        sim.set_reachable("alpha", False)  # the controller's commands to it are lost
+        sim.start()
+        self.assertEqual(len(self.setups(sim)["alpha"]), 1)
+        sim.wait(9)  # the first repeat, 8 s later (the runtime's every-second tick)
+        self.assertEqual(len(self.setups(sim)["alpha"]), 2)
+        sim.set_reachable("alpha", True)
+        sim.wait(20)  # the next repeat, 16 s after that one, reaches it
+        self.assertEqual(len(self.setups(sim)["alpha"]), 3)
+        self.assertEqual(sim.node("alpha").last_command("ui", "screen").args[0], "obj_capture")
+        sim.wait(600)  # and it confirmed: no more
+        self.assertEqual(len(self.setups(sim)["alpha"]), 3)
+        self.assertEqual(sim.problems, [])
+
+    def test_a_box_that_never_confirms_gets_a_bounded_number_of_repeats(self):
+        """An older firmware never says node.setup_applied: five repeats (8, 16, 32, 64 and 128 s), then none."""
+        sim = self.game({"alpha": "objective"})
+        sim.set_reachable("alpha", False)
+        sim.start()
+        sim.wait(1000)
+        self.assertEqual(len(self.setups(sim)["alpha"]), 1 + 5)
+        sim.wait(1000)
+        self.assertEqual(len(self.setups(sim)["alpha"]), 1 + 5)
+
+    def test_a_repeat_never_takes_back_what_happened_since(self):
+        """The objective moved on while the first setup was lost: the repeats say what is true now."""
+        sim = self.game({"alpha": "objective"})
+        sim.set_reachable("alpha", False)
+        sim.start()
+        sim.wait(9)
+        sim.set_reachable("alpha", True)
+        sim.wait(20)  # the second repeat reaches it
+        sim.hold("alpha", "red", 3)  # the bridge is taken: the scenario sets the box up as done
+        sim.wait(600)
+        kinds = [p["kind"] for p in self.setups(sim)["alpha"]]
+        self.assertEqual(kinds[-1], "done")
+        self.assertNotIn("capture", kinds[kinds.index("done"):])
         self.assertEqual(sim.problems, [])
 
     def test_a_reboot_keeps_the_holder(self):

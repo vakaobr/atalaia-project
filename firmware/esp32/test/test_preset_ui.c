@@ -277,8 +277,75 @@ static void test_setup_entry_pages(void)
     CHECK(ui.page == 0);
 }
 
+/* "Adopt to another field" (decision PKB-4): behind the admin PIN, asks once, off unless the box is
+ * adopted and has a radio; after "Wi-Fi setup" when both are on. */
+static void test_adopt_entry(void)
+{
+    static const char *const labels[] = {"Bomb", "Domination"};
+    preset_ui_t ui;
+    screen_update_t su;
+
+    /* Off: nothing past the games. */
+    preset_ui_init(&ui, "4711", 2);
+    preset_ui_enable_setup(&ui, true);
+    enter_keys(&ui, "4711#4");
+    CHECK(preset_ui_selected_preset(&ui) == 1);
+
+    /* On alone: entry 3, in the box's language; it asks with its own screen. */
+    preset_ui_init(&ui, "4711", 2);
+    preset_ui_enable_adopt(&ui, true);
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_PIN_ENTRY); /* behind the PIN */
+    enter_keys(&ui, "4711#");
+    CHECK(preset_ui_screen(&ui, labels, 2, &su));
+    CHECK(strcmp(su.data_json, "{\"presets\":[\"Bomb\",\"Domination\",\"Change field\"],"
+                               "\"selected\":1}") == 0);
+    box_lang_set(BOX_LANG_PT);
+    CHECK(preset_ui_screen(&ui, labels, 2, &su));
+    CHECK(strstr(su.data_json, "\"Mudar de campo\"") != NULL);
+    box_lang_set(BOX_LANG_EN);
+    enter_keys(&ui, "3#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_ADOPT_CONFIRM);
+    CHECK(preset_ui_screen(&ui, labels, 2, &su));
+    CHECK(strcmp(su.template_name, "start_confirm") == 0);
+    CHECK(strcmp(su.data_json, "{\"adopt\":true}") == 0);
+    /* '*' goes back with the entry selected; only '#' confirms. */
+    enter_keys(&ui, "*");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_PRESET_LIST);
+    CHECK(preset_ui_selected_preset(&ui) == 3);
+    enter_keys(&ui, "#");
+    CHECK(!preset_ui_handle_key(&ui, '5'));
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_ADOPT_CONFIRM);
+    enter_keys(&ui, "#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_ADOPT_REQUESTED);
+    CHECK(!preset_ui_screen(&ui, labels, 2, &su));
+    CHECK(!preset_ui_handle_key(&ui, '#'));
+
+    /* With "Wi-Fi setup" too: setup is entry 3 and asks to set up, adopt is entry 4. */
+    preset_ui_init(&ui, "4711", 2);
+    preset_ui_enable_setup(&ui, true);
+    preset_ui_enable_adopt(&ui, true);
+    enter_keys(&ui, "4711#");
+    CHECK(preset_ui_screen(&ui, labels, 2, &su));
+    CHECK(strstr(su.data_json, "\"Wi-Fi setup\",\"Change field\"") != NULL);
+    enter_keys(&ui, "3#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_SETUP_CONFIRM);
+    enter_keys(&ui, "*4#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_ADOPT_CONFIRM);
+
+    /* With no games the entry is the whole list; and a game's '#' is still the timer. */
+    preset_ui_init(&ui, "4711", 2);
+    preset_ui_enable_adopt(&ui, true);
+    enter_keys(&ui, "4711#2#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_TIMER_ADJUST);
+    preset_ui_init(&ui, "4711", 0);
+    preset_ui_enable_adopt(&ui, true);
+    enter_keys(&ui, "4711##");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_ADOPT_CONFIRM);
+}
+
 void run_preset_ui_tests(void)
 {
+    test_adopt_entry();
     test_setup_entry();
     test_setup_entry_pages();
     test_correct_pin_accepted();

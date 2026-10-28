@@ -332,7 +332,59 @@
     ],
     "description": "\ud83d\udca3 and \u00e9"
    }
+  },
+ {
+  "name": "The boxes' screens in German (PKB-9)",
+  "manifest": {
+   "id": "org.club.vectors",
+   "version": "1",
+   "name": "Vectors",
+   "teams": [
+    "red",
+    "blue"
+   ],
+   "nodes": {
+    "a": {
+     "role": "objective"
+    }
+   },
+   "objectives": [
+    {
+     "id": "hill",
+     "name": "Hill",
+     "type": "capture_and_hold",
+     "target": "a"
+    }
+   ],
+   "lang": "de"
   }
+ },
+ {
+  "name": "The boxes' screens in Traditional Chinese as written in Taiwan (PKB-9)",
+  "manifest": {
+   "id": "org.club.vectors",
+   "version": "1",
+   "name": "Vectors",
+   "teams": [
+    "red",
+    "blue"
+   ],
+   "nodes": {
+    "a": {
+     "role": "objective"
+    }
+   },
+   "objectives": [
+    {
+     "id": "hill",
+     "name": "Hill",
+     "type": "capture_and_hold",
+     "target": "a"
+    }
+   ],
+   "lang": "zh-tw"
+  }
+ }
  ],
  "invalid": [
   {

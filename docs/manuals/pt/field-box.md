@@ -81,6 +81,7 @@ Quando resulta, a caixa mostra **Adotada**, o nome do campo e uma impressão dig
 - Um código errado muda o código da caixa. Lê o novo. Três códigos errados fazem a caixa esperar um minuto. Dez códigos errados param o emparelhamento até a caixa reiniciar. Carrega em `#` no teclado para um código novo.
 - Uma caixa que pertence a **outro campo** pede o seu **PIN de administração** (**PIN para mudar de campo**) no teclado. Depois de cinco PIN errados, obriga-te a esperar 1, 2, 4 … até 60 minutos. A espera sobrevive a um reinício. O ecrã mostra **PIN bloqueado** e os minutos de espera.
 - Uma caixa sem PIN de administração não pode passar para outro campo. Mostra **Consola USB: @admin-pin**. Quem a montou pode definir um PIN.
+- **Passar uma caixa adotada para outro campo por código.** Na caixa que pertence a um campo, carrega numa tecla, marca o PIN de administração e `#`, escolhe **Mudar de campo** (a entrada a seguir aos jogos e a **Configurar o Wi-Fi**; só aparece numa caixa adotada, com rádio e com PIN de administração) e carrega em `#`. O ecrã pergunta **MUDAR DE CAMPO?**: `#` continua e `*` volta atrás. A caixa passa a mostrar **PAIR THIS BOX** (em português, **Emparelhar caixa**) e um código, como uma caixa nova, e a organização do outro campo emparelha-a na sua consola como na tabela acima. A caixa fica com o campo antigo até o novo a emparelhar: `*`, cinco minutos sem emparelhamento ou um jogo em que entre deixam-na como estava.
 
 Ainda não testado num campo: o cartão de campo NFC e o emparelhamento por rádio.
 

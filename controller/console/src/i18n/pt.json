@@ -965,6 +965,8 @@
       "scenario_lang": "ecrãs das caixas em %1 squads por equipa %2",
       "lang_pt": "português",
       "lang_en": "inglês",
+      "lang_de": "alemão",
+      "lang_zh-tw": "chinês tradicional (Taiwan)",
       "scenario_rules": "os objetivos são conhecidos %1 e ditos a %2",
       "reveal_all": "desde o início",
       "reveal_active": "um de cada vez",

@@ -241,6 +241,10 @@ static void start_picker(void)
     preset_ui_init(&preset_ui, NULL, preset_count);
     preset_ui_set_guard(&preset_ui, &admin_guard);
     preset_ui_enable_setup(&preset_ui, HAS_SETUP_PORTAL);
+    /* An adopted box with a radio and an admin PIN can be moved to another field by a pairing code.
+     */
+    preset_ui_enable_adopt(&preset_ui,
+                           adopt.adopted && hal.radio != NULL && admin_pin_is_set(&admin_guard));
     /* A wait still running, or no PIN set: said at once (decisions AD-28, AD-29). */
     preset_ui.locked_min = admin_pin_wait_min(&admin_guard);
     preset_ui.no_pin = !admin_pin_is_set(&admin_guard);
@@ -1007,7 +1011,16 @@ static void task_game(void *arg)
                 if (preset_ui_get_state(&preset_ui) == PRESET_UI_STATE_SETUP_REQUESTED) {
                     setup_again("picker"); /* does not return */
                 }
-                show_picker();
+                if (preset_ui_get_state(&preset_ui) == PRESET_UI_STATE_ADOPT_REQUESTED) {
+                    /* "Adopt to another field" (decision PKB-4): the admin PIN and the confirmation
+                     * are done. The box keeps its field until another one has paired it. */
+                    preset_ui.state =
+                        PRESET_UI_STATE_PRESET_LIST; /* the picker, when the code goes */
+                    if (adoption_allow_move(&adopt, true)) {
+                        if (!box_pair_start(&pairing, now)) adoption_allow_move(&adopt, false);
+                    }
+                }
+                if (!box_pair_showing(&pairing)) show_picker(); /* else the code is on the screen */
             } else if (runner.running) {
                 char json[64];
                 snprintf(json, sizeof(json), "{\"key\":\"%c\"}", key);

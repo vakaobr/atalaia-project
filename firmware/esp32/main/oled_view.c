@@ -178,6 +178,13 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
             set_text(out->foot, sizeof(out->foot), TXO_KEYS_SETUP);
             return true;
         }
+        if (screen_json_true(data,
+                             "adopt")) { /* the picker's "Adopt to another field" asks first */
+            set_text(out->head, sizeof(out->head), TXO_CHANGE_FIELD);
+            set_text(out->big, sizeof(out->big), TXO_CHANGE_FIELD_Q);
+            set_text(out->foot, sizeof(out->foot), TXO_KEYS_SETUP);
+            return true;
+        }
         set_text(out->head, sizeof(out->head), TXO_START_Q);
         if (screen_json_str(data, "label", s, sizeof(s)) && s[0]) {
             set(out->big, sizeof(out->big), s);

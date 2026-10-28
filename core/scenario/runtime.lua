@@ -32,7 +32,8 @@
 -- depends on it ("blocked"). Events about an objective that was never
 -- revealed are not sent (P4R24). The boxes only report; this script decides,
 -- scores and tells each box what it is for (the mode command "setup") at the
--- start, when the box first appears, and again after a reboot. Nothing
+-- start, when the box first appears, again after a reboot, and again a few
+-- times until the box confirms it (PKB-3). Nothing
 -- secret goes into state.field (players read it); positions stay in this
 -- script (P4R6).
 -- @runtime
@@ -47,6 +48,7 @@ local revealed = {} -- id -> true once scenario.objective.revealed was sent
 local started = {} -- id -> true once its time window started
 local winner = {} -- id -> the team that completed it
 local configured = {} -- id -> the node id its setup reached
+local sent = {} -- id -> { kind, tries, due, acked }: the last setup sent, how often again, when next, confirmed
 local holder = {} -- capture_and_hold, defend: id -> the team holding its node
 local scanned = {} -- scan_tags: id -> { counts = { team -> n }, team -> { tag -> true } }
 local armed = {} -- destroy: id -> { team, explode_at }
@@ -91,7 +93,14 @@ local function open_at(id, type_)
   end
 end
 
-local function setup(o)
+-- A setup command is one shot on the radio (no ACK, no repeat), and the radio model says 0-78 % of them reach
+-- their box (decision SL-13), so a setup is sent again after these many seconds, one wait per try, until the box
+-- says node.setup_applied for it (PKB-3); a box that never says it (an older firmware) gets the same few
+-- tries and then none. Each one carries the state as the runtime knows it now (the reboot path's fields), so a
+-- box that already had it is left as it was: sending it again is idempotent.
+local RESEND_S = { 8, 16, 32, 64, 128 }
+
+local function setup(o, again)
   local id = node_id(o)
   if id == nil then
     return
@@ -118,6 +127,14 @@ local function setup(o)
   end
   if field.send(id, "mode", p) then
     configured[o.id] = id
+    local s = sent[o.id]
+    if again and s and s.kind == p.kind then
+      s.tries = s.tries + 1
+    else
+      s = { kind = p.kind, tries = 0, acked = false }
+      sent[o.id] = s
+    end
+    s.due = game.time() + (RESEND_S[s.tries + 1] or 0)
   end
 end
 
@@ -294,12 +311,28 @@ on("game.start", function()
   end
 end)
 
--- A node that joins later is set up when it first appears.
+-- A node that joins later is set up when it first appears, and one that has not said it took its setup is
+-- sent it again (bounded, with a growing wait).
 every(1, function()
   for _, o in ipairs(OBJ) do
-    if o.node and status[o.id] and not configured[o.id] then
-      setup(o)
+    if o.node and status[o.id] then
+      local s = sent[o.id]
+      if not configured[o.id] then
+        setup(o)
+      elseif s and not s.acked and s.tries < #RESEND_S and game.time() >= s.due then
+        setup(o, true)
+      end
     end
+  end
+end)
+
+-- The box took the setup (the node script of the objectives package says so): no more repeats. A
+-- confirmation of an older kind (a setup the objective has moved on from) does not count.
+on("node.setup_applied", function(e)
+  local o = objective_at(e.node)
+  local s = o and sent[o.id]
+  if s and e.kind == s.kind then
+    s.acked = true
   end
 end)
 

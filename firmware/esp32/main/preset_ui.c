@@ -9,16 +9,28 @@
 
 #include "box_text.h"
 
-/* Entries of the list: the games, and "Wi-Fi setup" after them when it is on. */
+/* Entries of the list: the games, then "Wi-Fi setup" and "Adopt to another field" when on. */
+static int extra_count(const preset_ui_t *ui)
+{
+    return (ui->setup_entry ? 1 : 0) + (ui->adopt_entry ? 1 : 0);
+}
+
 static int entry_count(const preset_ui_t *ui)
 {
-    return ui->preset_count + (ui->setup_entry ? 1 : 0);
+    return ui->preset_count + extra_count(ui);
 }
 
 /* Is the selected entry "Wi-Fi setup"? */
 static bool setup_selected(const preset_ui_t *ui)
 {
     return ui->setup_entry && ui->selected_preset == ui->preset_count + 1;
+}
+
+/* Is the selected entry "Adopt to another field"? */
+static bool adopt_selected(const preset_ui_t *ui)
+{
+    return ui->adopt_entry &&
+           ui->selected_preset == ui->preset_count + (ui->setup_entry ? 1 : 0) + 1;
 }
 
 /* Pages of the preset list (at least one, which may be empty). */
@@ -32,6 +44,11 @@ static int page_count(const preset_ui_t *ui)
 void preset_ui_enable_setup(preset_ui_t *ui, bool on)
 {
     ui->setup_entry = on;
+}
+
+void preset_ui_enable_adopt(preset_ui_t *ui, bool on)
+{
+    ui->adopt_entry = on;
 }
 
 void preset_ui_init(preset_ui_t *ui, const char *admin_pin, int preset_count)
@@ -119,8 +136,9 @@ bool preset_ui_handle_key(preset_ui_t *ui, char key)
             return true;
         }
         if (key == '#') {
-            ui->state =
-                setup_selected(ui) ? PRESET_UI_STATE_SETUP_CONFIRM : PRESET_UI_STATE_TIMER_ADJUST;
+            ui->state = setup_selected(ui)   ? PRESET_UI_STATE_SETUP_CONFIRM
+                        : adopt_selected(ui) ? PRESET_UI_STATE_ADOPT_CONFIRM
+                                             : PRESET_UI_STATE_TIMER_ADJUST;
             return true;
         }
         if (key == '*') {
@@ -178,8 +196,20 @@ bool preset_ui_handle_key(preset_ui_t *ui, char key)
         }
         return false;
 
+    case PRESET_UI_STATE_ADOPT_CONFIRM:
+        if (key == '#') {
+            ui->state = PRESET_UI_STATE_ADOPT_REQUESTED;
+            return true;
+        }
+        if (key == '*') {
+            ui->state = PRESET_UI_STATE_PRESET_LIST;
+            return true;
+        }
+        return false;
+
     case PRESET_UI_STATE_GAME_STARTED:
-    case PRESET_UI_STATE_SETUP_REQUESTED: return false;
+    case PRESET_UI_STATE_SETUP_REQUESTED:
+    case PRESET_UI_STATE_ADOPT_REQUESTED: return false;
     }
 
     return false;
@@ -243,13 +273,16 @@ bool preset_ui_screen(const preset_ui_t *ui, const char *const *labels, int labe
         size_t pos = (size_t)snprintf(data, sz, "{\"presets\":[");
         /* The keypad picks entries 1-9, so the list holds one page of at most nine. */
         int first = ui->page * PRESET_UI_PAGE_SIZE;
-        int total = label_count + (ui->setup_entry ? 1 : 0);
+        int total = label_count + extra_count(ui);
         int n = total - first;
         if (n > PRESET_UI_PAGE_SIZE) n = PRESET_UI_PAGE_SIZE;
         for (int i = 0; i < n && pos + 48 < sz; i++) {
-            const char *label = first + i >= label_count      ? box_text(TX_SETUP_ITEM)
-                                : labels && labels[first + i] ? labels[first + i]
-                                                              : "";
+            int at = first + i;
+            const char *label =
+                at >= label_count ? (ui->setup_entry && at == label_count ? box_text(TX_SETUP_ITEM)
+                                                                          : box_text(TX_ADOPT_ITEM))
+                : labels && labels[at] ? labels[at]
+                                       : "";
             if (i > 0) data[pos++] = ',';
             data[pos++] = '"';
             pos = json_append_escaped(data, pos, sz - 40, label);
@@ -288,8 +321,14 @@ bool preset_ui_screen(const preset_ui_t *ui, const char *const *labels, int labe
         snprintf(data, sz, "{\"setup\":true}");
         break;
 
+    case PRESET_UI_STATE_ADOPT_CONFIRM:
+        tmpl = "start_confirm";
+        snprintf(data, sz, "{\"adopt\":true}");
+        break;
+
     case PRESET_UI_STATE_GAME_STARTED:
-    case PRESET_UI_STATE_SETUP_REQUESTED: return false;
+    case PRESET_UI_STATE_SETUP_REQUESTED:
+    case PRESET_UI_STATE_ADOPT_REQUESTED: return false;
     }
 
     snprintf(out->template_name, sizeof(out->template_name), "%s", tmpl);

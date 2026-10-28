@@ -81,6 +81,7 @@ When it works, the box shows **ADOPTED**, the field's name and a short fingerpri
 - A wrong code changes the box's code. Read the new one. Three wrong codes make the box wait one minute. Ten wrong codes stop pairing until the box restarts. Press `#` on the keypad for a new code.
 - A box that belongs to **another field** asks for its **admin PIN** (**PIN to change field**) on the keypad. After five wrong PINs it makes you wait 1, 2, 4 … up to 60 minutes. The wait survives a restart. The screen shows **PIN locked** and the minutes to wait.
 - A box with no admin PIN set cannot move to another field. It shows **USB console: @admin-pin**. Whoever built it can set a PIN.
+- **Moving an adopted box to another field by code.** On the box that belongs to a field, press any key, type the admin PIN and `#`, pick **Change field** (the entry after the games and **Wi-Fi setup**; it shows only on an adopted box with a radio and an admin PIN) and press `#`. The screen asks **CHANGE FIELD?**: `#` continues, `*` goes back. The box then shows **PAIR THIS BOX** and a code, as a new box does, and the other field's organisers pair it from their console as in the table above. The box keeps its old field until the new one has paired it: `*`, five minutes without a pairing, or a game joined leave it as it was.
 
 Not yet tested on a field: the NFC field card and pairing over the radio.
 

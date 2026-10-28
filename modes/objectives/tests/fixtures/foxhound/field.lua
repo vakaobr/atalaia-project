@@ -47,6 +47,7 @@ local OBJECTIVES = {
 local status = {} -- objective id -> hidden, open, done, failed
 local winner = {} -- objective id -> the team that completed it
 local configured = {} -- objective id -> the node id its setup reached
+local sent = {} -- objective id -> { kind, tries, due, acked }: the last setup sent (as the runtime's, PKB-3)
 local holder = {} -- capture: objective id -> the team holding its node
 local scanned = {} -- tags: objective id -> { team -> { tag -> true }, counts }
 local armed = {} -- bomb: objective id -> { team, explode_at }
@@ -67,7 +68,10 @@ local function objective_at(id)
   end
 end
 
-local function setup(o)
+-- The waits, in seconds, before a setup is sent again until the box says node.setup_applied.
+local RESEND_S = { 8, 16, 32, 64, 128 }
+
+local function setup(o, again)
   local id = node_id(o)
   if id == nil then
     return
@@ -94,6 +98,14 @@ local function setup(o)
   end
   if field.send(id, "mode", p) then
     configured[o.id] = id
+    local s = sent[o.id]
+    if again and s and s.kind == p.kind then
+      s.tries = s.tries + 1
+    else
+      s = { kind = p.kind, tries = 0, acked = false }
+      sent[o.id] = s
+    end
+    s.due = game.time() + (RESEND_S[s.tries + 1] or 0)
   end
 end
 
@@ -138,12 +150,27 @@ on("game.start", function()
   end
 end)
 
--- A node that joins later is set up when it first appears.
+-- A node that joins later is set up when it first appears, and one that has not said it took its setup
+-- is sent it again, a bounded number of times.
 every(1, function()
   for _, o in ipairs(OBJECTIVES) do
-    if status[o.id] and not configured[o.id] then
-      setup(o)
+    if status[o.id] then
+      local s = sent[o.id]
+      if not configured[o.id] then
+        setup(o)
+      elseif s and not s.acked and s.tries < #RESEND_S and game.time() >= s.due then
+        setup(o, true)
+      end
     end
+  end
+end)
+
+-- The box took the setup: no more repeats of it.
+on("node.setup_applied", function(e)
+  local o = objective_at(e.node)
+  local s = o and sent[o.id]
+  if s and e.kind == s.kind then
+    s.acked = true
   end
 end)
 

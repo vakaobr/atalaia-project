@@ -142,7 +142,7 @@ void main() {
     final cases = _cases(_golden, 'compile');
 
     test('has cases that compile and cases that do not', () {
-      expect(cases.where((c) => c.containsKey('field_lua')), hasLength(17));
+      expect(cases.where((c) => c.containsKey('field_lua')), hasLength(19));
       expect(cases, hasLength(greaterThanOrEqualTo(20)));
     });
 

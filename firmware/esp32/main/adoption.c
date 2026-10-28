@@ -203,12 +203,16 @@ adopt_result_t adoption_offer(adoption_t *a, const uint8_t key[ADOPTION_KEY_SIZE
          * refuses before anything is compared or counted. */
         if (!admin_pin_is_set(a->pin)) return ADOPT_NO_PIN;
         if (admin_pin_wait_ms(a->pin) > 0) return ADOPT_LOCKED;
-        if (pin == NULL || pin[0] == '\0') return ADOPT_NEED_PIN;
-        switch (admin_pin_check(a->pin, pin)) {
-        case ADMIN_PIN_OK: break;
-        case ADMIN_PIN_STORE_FAILED: return ADOPT_STORE_FAILED;
-        case ADMIN_PIN_NOT_SET: return ADOPT_NO_PIN;
-        default: return admin_pin_wait_ms(a->pin) > 0 ? ADOPT_LOCKED : ADOPT_BAD_PIN;
+        if (a->move_now && a->move_armed) {
+            /* The admin PIN was typed for the menu entry that armed this (PKB-4). */
+        } else {
+            if (pin == NULL || pin[0] == '\0') return ADOPT_NEED_PIN;
+            switch (admin_pin_check(a->pin, pin)) {
+            case ADMIN_PIN_OK: break;
+            case ADMIN_PIN_STORE_FAILED: return ADOPT_STORE_FAILED;
+            case ADMIN_PIN_NOT_SET: return ADOPT_NO_PIN;
+            default: return admin_pin_wait_ms(a->pin) > 0 ? ADOPT_LOCKED : ADOPT_BAD_PIN;
+            }
         }
         ok = ADOPT_READOPTED;
     }
@@ -217,7 +221,28 @@ adopt_result_t adoption_offer(adoption_t *a, const uint8_t key[ADOPTION_KEY_SIZE
     memcpy(a->key, key, ADOPTION_KEY_SIZE);
     set_name(a->name, nm);
     adoption_fingerprint(a->key, a->fingerprint);
+    a->move_armed = false; /* one move per arming */
     return ok;
+}
+
+bool adoption_allow_move(adoption_t *a, bool on)
+{
+    if (!on) {
+        a->move_armed = false;
+        return true;
+    }
+    if (!a->adopted || !admin_pin_is_set(a->pin) || admin_pin_wait_ms(a->pin) > 0) return false;
+    a->move_armed = true;
+    return true;
+}
+
+adopt_result_t adoption_offer_pairing(adoption_t *a, const uint8_t key[ADOPTION_KEY_SIZE],
+                                      const char *name)
+{
+    a->move_now = true;
+    adopt_result_t r = adoption_offer(a, key, name, NULL);
+    a->move_now = false;
+    return r;
 }
 
 /* ---- what the box shows -------------------------------------------------- */

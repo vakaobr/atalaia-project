@@ -202,3 +202,68 @@ reuse lint                                   611/611 files compliant
 | AC-8 | Partition recovery zero lost captures in sim | Met |
 | AC-9 | Failover election in simulator | Met |
 | AC-10 | Field test 5 boxes zero lost captures | Phase F |
+
+## A scenario's setup commands, sent again until the box confirms (2026-10-28, decisions PKB-1 to PKB-3)
+
+Built (software, the simulator's radio model; **not run on the radio**): the scenario's runtime sends each box's `setup` again after 8, 16, 32, 64 and 128 s until the box says `node.setup_applied` (new standard event id 56, `kind`; RFC 0001 Amendment 16), five repeats at most, each carrying the state the runtime knows then (idempotent), and the objectives package says it each time it takes a setup. A box that never says it (an older firmware) gets the five repeats and no more. Tests: `simulator/tests/test_scenario.py` (a lost setup sent again and then stopped by the confirmation, the bounded fallback, a repeat that never takes back what happened since), `controller/tests/test_scenarios.py` (the same on the compiled Foxhound package), `firmware/esp32/test/test_builtin_presets.c`, the event's vector in C and Python.
+
+Measured with `python -m atalaia_sim.relay_report --setup-study --seeds 1,2,3,4,5` (the Foxhound scenario, EU868, the built rules `A_backoff` and `H_paced`, 90 minutes; every cell the median over five seeds; the traffic is the real core's, the events and CMDs of `relay_traces.py`). "one shot" is the controller before this work and reproduces SL-13's table 7; "re-sent 5 times" repeats without a box ACK (what an older firmware gets); "re-sent until the box's ACK" is the built behaviour. *Reaching their box* counts each setup command once (the first time its box hears any copy of it), *known to the scenario* those whose `node.setup_applied` the controller heard.
+
+| layout | N | rule | setup commands | reaching their box % | known to the scenario % | time to reach p50 s | p95 s | CMD frames per setup | box confirmations (events) | controller air % |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| all in range | 10 | A_backoff | one shot (before PKB-3) | 66.7 | 0.0 | 0.2 | 0.5 | 1.0 | 0 | 0.3 |
+| all in range | 10 | A_backoff | re-sent 5 times, no box ACK | 100.0 | 0.0 | 0.5 | 57.6 | 6.0 | 0 | 0.5 |
+| all in range | 10 | A_backoff | re-sent until the box's ACK | 100.0 | 100.0 | 0.5 | 57.6 | 1.8 | 9 | 0.3 |
+| all in range | 10 | H_paced | one shot (before PKB-3) | 77.8 | 0.0 | 0.8 | 2.3 | 1.0 | 0 | 0.3 |
+| all in range | 10 | H_paced | re-sent 5 times, no box ACK | 100.0 | 0.0 | 3.0 | 11.4 | 6.0 | 0 | 0.5 |
+| all in range | 10 | H_paced | re-sent until the box's ACK | 100.0 | 100.0 | 2.8 | 57.3 | 1.7 | 9 | 0.3 |
+| all in range | 20 | A_backoff | one shot (before PKB-3) | 44.4 | 0.0 | 0.2 | 0.7 | 1.0 | 0 | 0.3 |
+| all in range | 20 | A_backoff | re-sent 5 times, no box ACK | 100.0 | 0.0 | 8.7 | 58.4 | 6.0 | 0 | 0.5 |
+| all in range | 20 | A_backoff | re-sent until the box's ACK | 100.0 | 100.0 | 8.9 | 57.4 | 2.1 | 9 | 0.4 |
+| all in range | 20 | H_paced | one shot (before PKB-3) | 44.4 | 0.0 | 0.9 | 2.1 | 1.0 | 0 | 0.3 |
+| all in range | 20 | H_paced | re-sent 5 times, no box ACK | 100.0 | 0.0 | 8.6 | 60.8 | 6.0 | 0 | 0.5 |
+| all in range | 20 | H_paced | re-sent until the box's ACK | 100.0 | 100.0 | 8.8 | 57.6 | 2.0 | 9 | 0.4 |
+| all in range | 30 | A_backoff | one shot (before PKB-3) | 22.2 | 0.0 | 0.3 | 0.4 | 1.0 | 0 | 0.4 |
+| all in range | 30 | A_backoff | re-sent 5 times, no box ACK | 88.9 | 0.0 | 25.3 | 121.9 | 6.0 | 0 | 0.5 |
+| all in range | 30 | A_backoff | re-sent until the box's ACK | 88.9 | 88.9 | 9.1 | 250.4 | 2.8 | 8 | 0.4 |
+| all in range | 30 | H_paced | one shot (before PKB-3) | 22.2 | 0.0 | 1.1 | 1.7 | 1.0 | 0 | 0.4 |
+| all in range | 30 | H_paced | re-sent 5 times, no box ACK | 100.0 | 0.0 | 10.1 | 121.8 | 6.0 | 0 | 0.5 |
+| all in range | 30 | H_paced | re-sent until the box's ACK | 100.0 | 100.0 | 10.4 | 249.9 | 2.8 | 9 | 0.5 |
+| long field | 10 | A_backoff | one shot (before PKB-3) | 66.7 | 0.0 | 0.3 | 0.7 | 1.0 | 0 | 0.3 |
+| long field | 10 | A_backoff | re-sent 5 times, no box ACK | 100.0 | 0.0 | 0.5 | 122.2 | 6.0 | 0 | 0.5 |
+| long field | 10 | A_backoff | re-sent until the box's ACK | 100.0 | 100.0 | 9.1 | 121.9 | 2.6 | 9 | 0.4 |
+| long field | 10 | H_paced | one shot (before PKB-3) | 66.7 | 0.0 | 0.9 | 3.0 | 1.0 | 0 | 0.3 |
+| long field | 10 | H_paced | re-sent 5 times, no box ACK | 100.0 | 0.0 | 2.5 | 24.8 | 6.0 | 0 | 0.5 |
+| long field | 10 | H_paced | re-sent until the box's ACK | 100.0 | 100.0 | 1.2 | 26.3 | 1.4 | 9 | 0.3 |
+| long field | 20 | A_backoff | one shot (before PKB-3) | 0.0 | 0.0 | 0.7 | 0.9 | 1.0 | 0 | 0.5 |
+| long field | 20 | A_backoff | re-sent 5 times, no box ACK | 55.6 | 0.0 | 26.4 | 251.6 | 6.0 | 0 | 0.7 |
+| long field | 20 | A_backoff | re-sent until the box's ACK | 55.6 | 55.6 | 58.0 | 251.7 | 5.0 | 5 | 0.6 |
+| long field | 20 | H_paced | one shot (before PKB-3) | 22.2 | 0.0 | 1.2 | 1.2 | 1.0 | 0 | 0.5 |
+| long field | 20 | H_paced | re-sent 5 times, no box ACK | 66.7 | 0.0 | 26.3 | 122.5 | 6.0 | 0 | 0.6 |
+| long field | 20 | H_paced | re-sent until the box's ACK | 55.6 | 55.6 | 25.9 | 251.1 | 4.7 | 5 | 0.6 |
+| long field | 30 | A_backoff | one shot (before PKB-3) | 0.0 | 0.0 | - | - | 1.0 | 0 | 0.8 |
+| long field | 30 | A_backoff | re-sent 5 times, no box ACK | 11.1 | 0.0 | 123.7 | 123.7 | 6.0 | 0 | 0.9 |
+| long field | 30 | A_backoff | re-sent until the box's ACK | 11.1 | 11.1 | 122.3 | 123.2 | 6.0 | 1 | 0.9 |
+| long field | 30 | H_paced | one shot (before PKB-3) | 0.0 | 0.0 | - | - | 1.0 | 0 | 0.7 |
+| long field | 30 | H_paced | re-sent 5 times, no box ACK | 11.1 | 0.0 | 58.5 | 58.5 | 6.0 | 0 | 0.8 |
+| long field | 30 | H_paced | re-sent until the box's ACK | 11.1 | 11.1 | 58.0 | 58.0 | 5.9 | 1 | 0.8 |
+| CQB (walls) | 10 | A_backoff | one shot (before PKB-3) | 77.8 | 0.0 | 0.2 | 0.7 | 1.0 | 0 | 0.3 |
+| CQB (walls) | 10 | A_backoff | re-sent 5 times, no box ACK | 100.0 | 0.0 | 0.9 | 57.8 | 6.0 | 0 | 0.4 |
+| CQB (walls) | 10 | A_backoff | re-sent until the box's ACK | 100.0 | 100.0 | 0.5 | 56.3 | 1.7 | 9 | 0.3 |
+| CQB (walls) | 10 | H_paced | one shot (before PKB-3) | 77.8 | 0.0 | 0.8 | 3.0 | 1.0 | 0 | 0.3 |
+| CQB (walls) | 10 | H_paced | re-sent 5 times, no box ACK | 100.0 | 0.0 | 1.5 | 9.7 | 6.0 | 0 | 0.5 |
+| CQB (walls) | 10 | H_paced | re-sent until the box's ACK | 100.0 | 100.0 | 1.5 | 27.4 | 1.4 | 9 | 0.3 |
+| CQB (walls) | 20 | A_backoff | one shot (before PKB-3) | 44.4 | 0.0 | 0.3 | 0.8 | 1.0 | 0 | 0.3 |
+| CQB (walls) | 20 | A_backoff | re-sent 5 times, no box ACK | 100.0 | 0.0 | 0.5 | 24.7 | 6.0 | 0 | 0.5 |
+| CQB (walls) | 20 | A_backoff | re-sent until the box's ACK | 100.0 | 100.0 | 0.7 | 122.4 | 2.1 | 9 | 0.4 |
+| CQB (walls) | 20 | H_paced | one shot (before PKB-3) | 66.7 | 0.0 | 1.1 | 3.0 | 1.0 | 0 | 0.3 |
+| CQB (walls) | 20 | H_paced | re-sent 5 times, no box ACK | 100.0 | 0.0 | 3.5 | 58.4 | 6.0 | 0 | 0.5 |
+| CQB (walls) | 20 | H_paced | re-sent until the box's ACK | 100.0 | 100.0 | 2.5 | 26.9 | 2.0 | 9 | 0.4 |
+| CQB (walls) | 30 | A_backoff | one shot (before PKB-3) | 11.1 | 0.0 | 0.2 | 0.2 | 1.0 | 0 | 0.4 |
+| CQB (walls) | 30 | A_backoff | re-sent 5 times, no box ACK | 88.9 | 0.0 | 25.6 | 123.3 | 6.0 | 0 | 0.6 |
+| CQB (walls) | 30 | A_backoff | re-sent until the box's ACK | 88.9 | 88.9 | 57.3 | 250.3 | 3.9 | 8 | 0.5 |
+| CQB (walls) | 30 | H_paced | one shot (before PKB-3) | 22.2 | 0.0 | 1.4 | 1.7 | 1.0 | 0 | 0.4 |
+| CQB (walls) | 30 | H_paced | re-sent 5 times, no box ACK | 88.9 | 0.0 | 11.3 | 122.3 | 6.0 | 0 | 0.5 |
+| CQB (walls) | 30 | H_paced | re-sent until the box's ACK | 88.9 | 88.9 | 9.4 | 122.8 | 2.7 | 8 | 0.5 |
+
+Reading it: the one-shot numbers are 0-78 % (all in range 22-78 %, the long field 0-67 %); with the box ACK every setup reaches its box in the meshes and the CQB layout up to 20 boxes and in the long field of 10, and 89-100 % at 30 boxes in the meshes and CQB; the long field of 20 and 30 boxes stays poor (56 % and 11 %; the radio itself loses what the repeats resend, as it loses events there: SL-13), and there the repeats cost the full six frames. A setup that does arrive does so in a median 0.5-58 s (p95 up to about four minutes where it took the later repeats, as the waits double). The box's confirmation is a normal event (about 9 per run, one per setup that arrived) and the controller's airtime does not move (0.3-0.9 %). The frames per setup are 1.4-2.8 with the ACK where it works, against 6.0 for repeating blindly (the fallback for an older box), and 1.0 for one shot. Without the ACK the repeats reach about as many boxes but cost six frames each and the scenario never knows. Not measured: the radio on a field; the confirmation event's effect on a 30-box field's duty cycle beyond the study (it adds about one 23-byte event per setup).

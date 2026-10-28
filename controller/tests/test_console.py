@@ -340,6 +340,7 @@ class ConsoleFilesTests(unittest.TestCase):
         keys |= {f"type_{v}" for v in re.search(r"export const TYPES = \[(.*?)\];", js).group(1)
                  .replace("'", "").replace(" ", "").split(",")}
         keys |= {f"visibility_{v}" for v in ("public", "team", "squad", "hidden")}
+        keys |= {f"lang_{v}" for v in ("pt", "en", "de", "zh-tw")}  # the language dropdown (PKB-9)
         self.assertGreater(len(keys), 60)
         for lang in ("pt", "en"):
             d = json.loads((SRC / "i18n" / f"{lang}.json").read_text(encoding="utf-8"))["scenario_blocks"]

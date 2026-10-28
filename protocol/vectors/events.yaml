@@ -88,6 +88,10 @@ valid:
   - name: "Blue fails an objective with a reason (id 43)"
     event: {"node": 0, "seq": 4, "t": 1200000, "type": "scenario.objective.failed", "team": 2, "data": {"objective": "site_a", "reason": "exploded", "team": "blue"}}
     cbor: "a6 01 00 02 04 03 1a 00 12 4f 80 04 18 2b 05 02 08 a3 18 22 66 73 69 74 65 5f 61 03 68 65 78 70 6c 6f 64 65 64 01 64 62 6c 75 65"
+  # A box confirms it applied the scenario's setup command (id 56, normal by default; kind, key 11; PKB-3).
+  - name: "A box confirms a capture setup (id 56; kind, key 11)"
+    event: {"node": 3, "seq": 7, "t": 1000, "type": "node.setup_applied", "data": {"kind": "capture"}}
+    cbor: "a5 01 03 02 07 03 19 03 e8 04 18 38 08 a1 0b 67 63 61 70 74 75 72 65"
   # Node health (decisions S19-9, FU1-1 to FU1-6): a box's own battery.low (the link's event
   # seq 0, telemetry by default so no prio key), and the link events the controller logs about a
   # box (the box's node id). Bytes worked out by hand from RFC 8949 (major types 0, 3 and 5).

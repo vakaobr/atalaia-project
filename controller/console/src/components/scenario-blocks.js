@@ -111,7 +111,7 @@ export function blockDefinitions(tr) {
         def('scn_scenario', C.scenario, [
             [tr('scenario'), [text('NAME')]],
             [tr('scenario_id'), [text('ID', 'org.club.'), text('VERSION', '1')]],
-            [tr('scenario_lang'), [{ type: 'field_dropdown', name: 'LANG', options: [[tr('lang_pt'), 'pt'], [tr('lang_en'), 'en']] },
+            [tr('scenario_lang'), [{ type: 'field_dropdown', name: 'LANG', options: LANG_CHOICES.map((l) => [tr(`lang_${l}`), l]) },
                 num('SQUADS', 0)]],
             [tr('scenario_rules'), [
                 { type: 'field_dropdown', name: 'REVEAL', options: [[tr('reveal_all'), 'all'], [tr('reveal_active'), 'active']] },
@@ -217,6 +217,9 @@ function block(type, fields = {}, inputs = {}) {
     return out;
 }
 
+/** The languages of the boxes' screens a scenario may ask for (core/scenario/manifest.lua LANGS). */
+const LANG_CHOICES = ['pt', 'en', 'de', 'zh-tw'];
+
 /** A scenario to start from: the defaults a new manifest would get. The id, the name and the
  * objectives are the GM's to give, and the controller's checks say so until they are given. */
 export const NEW_MANIFEST = { id: 'org.club.', version: '1', lang: 'pt', teams: ['red', 'blue'], objectives: [] };
@@ -257,7 +260,7 @@ export function manifestToState(m) {
     root.NAME = textOf(m, 'name', '') ?? '';
     for (const key of ['id', 'version', 'name']) if (m[key] === '') lost.push(key); // the blocks would leave it out
     if ('lang' in m) {
-        if (m.lang === 'pt' || m.lang === 'en') root.LANG = m.lang;
+        if (LANG_CHOICES.includes(m.lang)) root.LANG = m.lang;
         else lost.push('lang');
     }
     if ('squads' in m) root.SQUADS = intOf(m, 'squads', '') ?? 0;

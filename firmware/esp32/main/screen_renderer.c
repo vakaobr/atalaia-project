@@ -843,6 +843,15 @@ static void update_start_confirm(const char *data)
         lv_label_set_text(slot[3], box_text(TX_KEYS_SETUP));
         return;
     }
+    /* "adopt": the picker's "Adopt to another field" entry asks before the box shows a code. */
+    if (screen_json_true(data, "adopt")) {
+        lv_label_set_text(slot[2], box_text(TX_ADOPT_AGAIN_UP));
+        lv_label_set_text(slot[0], box_text(TX_ADOPT_ITEM));
+        lv_obj_set_width(slot[1], SCREEN_W - 20);
+        lv_label_set_text(slot[1], box_text(TX_ADOPT_WARNING));
+        lv_label_set_text(slot[3], box_text(TX_KEYS_ADOPT));
+        return;
+    }
     lv_obj_set_width(slot[1], LV_SIZE_CONTENT);
     lv_label_set_text(slot[2], box_text(TX_START_GAME_UP));
     lv_label_set_text(slot[3], box_text(TX_KEYS_START));

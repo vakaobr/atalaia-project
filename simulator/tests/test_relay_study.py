@@ -416,6 +416,29 @@ class RealCoreTraceTests(unittest.TestCase):
         self.assertGreaterEqual(len(tr.commands), 4)  # a setup command per objective box
         self.assertFalse(tr.scores)
 
+    def test_setup_commands_sent_again_and_confirmed(self):
+        """PKB-3: the scenario's setup commands as logical commands in each cmd_mode: sent once, five repeats
+        whatever happens, or repeated until the box's node.setup_applied is heard (and then no more)."""
+        from atalaia_sim.relay_traces import scenario_trace
+        tr = scenario_trace(10, 12, 1, LIB)
+        setups = sum(1 for c in tr.commands if c.dest is not None)
+        self.assertGreaterEqual(setups, 4)
+        res = {m: run_one("scenario", 10, "all_in_range", "eu868", "A_backoff", 12, 1, LIB, trace=tr, cmd_mode=m)
+               for m in ("oneshot", "resend", "resend_ack")}
+        for m, r in res.items():
+            self.assertEqual(r["setups"]["mode"], m)
+            self.assertEqual(r["setups"]["n"], setups)
+        one, blind, ack = (res[m]["setups"] for m in ("oneshot", "resend", "resend_ack"))
+        self.assertEqual((one["cmd_frames"], one["confirmations"], one["acked_pct"]), (setups, 0, 0.0))
+        self.assertEqual(blind["cmd_frames"], setups * 6)  # the first and the five repeats, always
+        self.assertEqual(blind["confirmations"], 0)
+        self.assertEqual(ack["acked_pct"], 100.0)  # every box heard it, said so, and the ACK came back
+        self.assertLess(ack["cmd_frames"], blind["cmd_frames"])  # the confirmation stops the repeats
+        self.assertGreaterEqual(ack["confirmations"], setups)
+        self.assertGreaterEqual(ack["reached_pct"], one["reached_pct"])
+        with self.assertRaises(ValueError):
+            run_one("scenario", 10, "all_in_range", "eu868", "A_backoff", 1, 1, LIB, trace=tr, cmd_mode="never")
+
     def test_state_changed_follows_owner_and_events(self):
         tr = Trace("domination", 2, 10, 3, owned={0: [(0, 600_000)]})
         tr.events = [TraceEvent(100_000, 1, "zone.captured", "normal", 30)]

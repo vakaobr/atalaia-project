@@ -155,6 +155,12 @@ typedef enum {
     TX_SETUP_AGAIN_UP,
     TX_SETUP_WARNING,
     TX_KEYS_SETUP,
+    /* the picker's "Adopt to another field" entry: a pairing code for another field (preset_ui.h)
+     */
+    TX_ADOPT_ITEM,
+    TX_ADOPT_AGAIN_UP,
+    TX_ADOPT_WARNING,
+    TX_KEYS_ADOPT,
     /* the keypad screen's headers a mode's script sends in English (box_text_title) */
     TX_TITLE_ARM,
     TX_TITLE_DEFUSE,
@@ -186,6 +192,8 @@ typedef enum {
     TXO_SET_PIN,
     TXO_SETUP_Q,
     TXO_KEYS_SETUP,
+    TXO_CHANGE_FIELD,
+    TXO_CHANGE_FIELD_Q,
     TXO_POINTS,   /* "%ld": a team's points on this box (the captured screen's header) */
     TXO_HELD_FOR, /* %s: how long the team has held the zone (game time since its capture) */
     /* the built-in modes' names in the OLED's header (box_text_mode_name) */

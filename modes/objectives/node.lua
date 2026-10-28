@@ -15,7 +15,7 @@
 --             team credited); bomb: the attackers, who arm (any other team
 --             defuses). Empty: every team.
 --   label     the objective's short name, in the scenario's language
---   lang      pt (the default) or en: the screen's texts
+--   lang      pt (the default), en, de or zh-tw: the screen's texts
 --   hold_ms   capture and arm: how long a team holds its input (3000)
 --   defuse_ms bomb: how long a team holds to defuse (hold_ms)
 --   code      code: the digits to type, then #
@@ -31,8 +31,9 @@
 -- Reports: zone.captured / zone.neutralized (capture, and the GM's owner
 -- override), code.used (code: no code in the event, only the team), tag.scanned
 -- (tags: tag, the card's uid; owner, the player; team), bomb.armed / bomb.defused /
--- bomb.exploded (bomb). A script does not know its role (decision M5-5): the
--- setup's kind is what the node does, so one script serves both roles.
+-- bomb.exploded (bomb), node.setup_applied (kind: every setup it took). A script does not
+-- know its role (decision M5-5): the setup's kind is what the node does, so one script serves
+-- both roles.
 
 local cfg = {} -- the last setup
 local holder -- capture: the team holding the node
@@ -140,6 +141,12 @@ on("cmd.mode", function(e)
   end
   if holder then
     cap("team_display"):show(holder)
+  end
+  -- Tell the scenario the setup arrived (decision PKB-3): its field.lua stops sending it again when it
+  -- hears this. The event is acknowledged and repeated by the radio link like any other, so a lost
+  -- setup is sent again by the scenario and a lost confirmation by the box.
+  if type(cfg.kind) == "string" then
+    emit("node.setup_applied", { kind = cfg.kind })
   end
   if cfg.kind == "bomb" and type(e.armed) == "string" then
     return arm(e.armed, int(e.left, 1, 3600, cfg.fuse_s), true)

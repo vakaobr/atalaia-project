@@ -297,7 +297,7 @@ The manifest ([tests/scenarios/foxhound.yaml](tests/scenarios/foxhound.yaml) and
 | --- | --- |
 | `id`, `version`, `name`, `description`, `author` | The package's id (`org.club.name`, at most 40 bytes so the game's id fits a join; not `org.atalaia.`), its version, its texts in English |
 | `i18n.pt` | `name`, `description` and `params` labels in Portuguese |
-| `lang` | The boxes' screens: `pt` (the default) or `en`; each box shows the objective's name in that language |
+| `lang` | The boxes' screens: `pt` (the default), `en`, `de` or `zh-tw` (PKB-9; an older manifest with `pt` or `en` is unchanged); each box shows the objective's name in that language |
 | `teams`, `squads` | The game's team names the scenario uses (default `[red, blue]`) and its squads per team (numbers 1 to `squads`, 0: none) |
 | `reveal`, `disclosure` | Per-squad chains (decisions SQ-1 to SQ-8). `reveal: all` (the default) shows an objective that depends on others from the start unless it is `hidden`; `reveal: active` makes every objective with `depends_on` and no `visibility` of its own `hidden`, so a squad knows only its active objective and the ones it has done, and the next is revealed when the one before it is completed. `disclosure: members` (the default) tells every member of the assignee squad or team; `leader` tells the squad leaders only, the other members hear that their leader has new orders |
 | `params` | Whole-number parameters for the GM (`{ type: int, min, max, default, label }`), for points: `effect.points: { param: name }` |

@@ -419,8 +419,62 @@ static void test_limits(void)
     CHECK(!box_pair_tick(&pair, 1100) && !box_pair_showing(&pair));
 }
 
+/* An adopted box shows a pairing code only while the admin menu has armed a move (decision PKB-4);
+ * the vectors' whole run then moves it to the vectors' field, and the old one is kept until then.
+ */
+static void test_move_to_another_field(void)
+{
+    uint8_t key_frame[ATALAIA_PF_MAX];
+    size_t key_len = stub_key_frame(key_frame);
+    uint8_t old_key[32];
+    memset(old_key, 0x42, sizeof(old_key));
+
+    /* Adopted and not armed: no code (as before). */
+    fresh(1000);
+    box_pair_stop(&pair, "test");
+    adoption_restore(&adopt, old_key, "Campo velho");
+    CHECK(!box_pair_start(&pair, 2000) && !box_pair_showing(&pair));
+    /* Armed: the code shows and offers go out. */
+    CHECK(adoption_allow_move(&adopt, true));
+    CHECK(box_pair_start(&pair, 2000) && box_pair_showing(&pair));
+    memcpy(pair.code, PV_CODE, 7);
+    memcpy(pair.pair_id, pv_run_pair_id, 8);
+    box_pair_tick(&pair, 2100);
+    CHECK(box_pair_showing(&pair)); /* adopted, but armed: the code stays */
+    box_pair_tick(&pair, 5000);
+    CHECK(t.sends >= 1);
+    /* The run: the vectors' START, then the KEY moves the box; the old key was there until it. */
+    CHECK(box_pair_on_packet(&pair, pv_frame_start, pv_frame_start_len, 6000));
+    CHECK(t.stores == 0 && memcmp(adopt.key, old_key, 32) == 0);
+    CHECK(box_pair_on_packet(&pair, key_frame, key_len, 7000));
+    CHECK(t.stores == 1 && memcmp(t.key, pv_run_join_key, 32) == 0 &&
+          strcmp(t.name, PV_FIELD_NAME) == 0);
+    CHECK(adopt.adopted && memcmp(adopt.key, pv_run_join_key, 32) == 0 && !adopt.move_armed);
+    CHECK(strcmp(adopt.fingerprint, "604A-0A95") == 0 && !box_pair_showing(&pair));
+    /* Done: it is an ordinary adopted box again, so no code without a new arming. */
+    CHECK(!box_pair_start(&pair, 8000));
+
+    /* Armed and cancelled with '*': the old field stays and the arming is gone. */
+    fresh(1000);
+    box_pair_stop(&pair, "test");
+    adoption_restore(&adopt, old_key, "Campo velho");
+    CHECK(adoption_allow_move(&adopt, true) && box_pair_start(&pair, 2000));
+    CHECK(box_pair_key(&pair, '*', 2500) && !adopt.move_armed);
+    CHECK(memcmp(adopt.key, old_key, 32) == 0 && !box_pair_start(&pair, 3000));
+    /* The code timing out disarms it too. */
+    CHECK(adoption_allow_move(&adopt, true) && box_pair_start(&pair, 4000));
+    box_pair_tick(&pair, 4000 + BOX_PAIR_SHOW_MS + 1);
+    CHECK(!box_pair_showing(&pair) && !adopt.move_armed && memcmp(adopt.key, old_key, 32) == 0);
+    /* Another field's card taken while armed (with its PIN) ends the code. */
+    CHECK(adoption_allow_move(&adopt, true) && box_pair_start(&pair, 400000));
+    CHECK(adoption_offer(&adopt, pv_run_join_key, "Campo", "4321") == ADOPT_READOPTED);
+    box_pair_tick(&pair, 400100);
+    CHECK(!box_pair_showing(&pair) && !adopt.move_armed);
+}
+
 void run_box_pair_tests(void)
 {
+    test_move_to_another_field();
     test_cpace_draft();
     test_run_math();
     test_vector_run();

@@ -173,6 +173,7 @@ EVENTS = {
     'node.modes_failed': EventDef(53, 'critical', ('mode', 'reason')),
     'progressive.activated': EventDef(54, 'critical', ('zone', 'step')),
     'progressive.completed': EventDef(55, 'critical', ('zone', 'step')),
+    'node.setup_applied': EventDef(56, 'normal', ('kind',)),
 }
 
 PAYLOAD_FIELDS = {

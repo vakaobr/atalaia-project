@@ -22,6 +22,13 @@
  * no other field. Nothing is adopted while a field game is joined.
  * "@joinkey <64 hex>" follows the same rules without a PIN.
  *
+ * The admin menu's "Adopt to another field" (decision PKB-4) is the PIN given once, on the keypad
+ * (the menu is behind it): adoption_allow_move arms one pairing run, and only the pairing code's
+ * offer (adoption_offer_pairing) skips the PIN; a card or "@adopt" of another field still asks.
+ * Nothing is forgotten when it is armed: the box keeps its field until another field's key has
+ * arrived and been stored, and the arming ends with the code (box_pair_stop) or the first
+ * success.
+ *
  * Replies on the console are one line, "ATALAIA-ADOPT {json}", which the
  * controller reads. Platform-free: the shell gives the storage, the screen
  * and the log; the host tests and the host box run it as the box does.
@@ -125,6 +132,8 @@ typedef struct {
     admin_pin_t *pin;    /* the admin PIN's check: the shell's (shared with the picker) */
     admin_pin_t own_pin; /* adoption_init's, in RAM, until adoption_set_pin */
     bool adopted;
+    bool move_armed; /* the admin menu allowed one pairing to another field (adoption_allow_move) */
+    bool move_now;   /* inside adoption_offer_pairing: the PIN is the menu's */
     uint8_t key[ADOPTION_KEY_SIZE];
     char name[ADOPTION_NAME_MAX + 1];
     char fingerprint[ADOPTION_FP_SIZE];
@@ -153,6 +162,19 @@ void adoption_restore(adoption_t *a, const uint8_t key[ADOPTION_KEY_SIZE], const
  */
 adopt_result_t adoption_offer(adoption_t *a, const uint8_t key[ADOPTION_KEY_SIZE], const char *name,
                               const char *pin);
+
+/*
+ * Allows (or stops allowing) the pairing code to move an adopted box to another field without the
+ * PIN being typed again: the picker's "Adopt to another field" entry calls it after the admin PIN
+ * and its confirmation. Refused (false) on a box that is not adopted, has no admin PIN set or is
+ * in a PIN wait; the shell calls it with false when the code goes away.
+ */
+bool adoption_allow_move(adoption_t *a, bool on);
+
+/* adoption_offer for a key that came over the pairing code: the armed move takes the place of the
+ * PIN. */
+adopt_result_t adoption_offer_pairing(adoption_t *a, const uint8_t key[ADOPTION_KEY_SIZE],
+                                      const char *name);
 
 /*
  * A tag read by the NFC reader (its memory from page 4). Returns false if it

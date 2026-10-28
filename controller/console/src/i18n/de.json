@@ -965,6 +965,8 @@
       "scenario_lang": "Bildschirme der Boxen auf %1 Squads pro Team %2",
       "lang_pt": "Portugiesisch",
       "lang_en": "Englisch",
+      "lang_de": "Deutsch",
+      "lang_zh-tw": "Traditionelles Chinesisch (Taiwan)",
       "scenario_rules": "Ziele sind bekannt %1 und gesagt %2",
       "reveal_all": "von Anfang an",
       "reveal_active": "eines nach dem anderen",

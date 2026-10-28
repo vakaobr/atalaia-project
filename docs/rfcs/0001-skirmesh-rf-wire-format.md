@@ -773,6 +773,22 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 
 **Reason:** the controller's frames were the one flood nobody spaced: a burst of four setup CMDs lands its own relays on the next, and the study measured (table 7, five seeds) that a 0.8 s gap adds 0 to 22 points to the CMDs that reach their box, on top of Amendment 13's rules. It does not make the CMD reliable (**still one shot, no ACK, no resend on the air**: 0-78 % reach their box; that needs a box ACK, a wire change, or the scenario's own re-send, and stays open).
 
+## Amendment 16 (2026-10-28): A box says it took a scenario's setup command
+
+**Status:** built (decision PKB-3 of the maintainer's 2026-10-28 choice to build the box ACK that Amendment 15 and decisions SL-13 and SL-39 left open). The objectives package (`modes/objectives/node.lua`, built into the Field Box and the app) says it; the scenario runtime (`core/scenario/runtime.lua`, and the hand-written example's `field.lua`) hears it; the shared case is the event vector "A box confirms a capture setup" in `protocol/vectors/events.yaml`.
+
+**Supersedes:** nothing. It adds one standard event and a rule to the scenario's script; the radio, the CMD (opcode 8) and the box's ACK and retry rules are unchanged.
+
+**Change:**
+
+1. **A new standard event, `node.setup_applied`** (id 56, normal priority, data `kind`, key 11 as for the other events that carry it: the setup's `kind`). A box running the objectives package sends it each time it takes the mode command `setup`, once the setup is in force. As a normal-priority event it is what the link already does with one: an ACK is asked for and the packet is repeated until the controller's ACK arrives (up to ten tries). No new frame, opcode or ACK: the CMD stays one shot on the air, and its acknowledgement is an event going the other way.
+2. **The scenario sends a setup again until it hears it**: after a setup the runtime waits 8, 16, 32, 64 and 128 s (the tick is each second, so up to a second more) and sends it again if `node.setup_applied` with the same `kind` has not come from that objective's node, at most five times; a new setup (the objective moved on, a reboot) starts again. Each repeat carries the state the runtime knows then (holder, tags counted, the bomb's fuse left: what the reboot path already sends), so a box that had it already is left as it was.
+3. **A box that never says it** (an older firmware, or a script that is not the objectives package) gets the same five repeats and then none: the fallback is the bounded re-send itself.
+
+**Compatibility:** an older box ignores nothing and breaks nothing (it never sends the event); an older controller logs an event of an id it does not know as any other. A new box with an older scenario or controller sends one extra normal event per setup. The event shows in the GM's feed and the staff's event pages (it names a kind, never a code).
+
+**Reason:** the model measured (decision SL-13, table 7) that 0-78 % of a scenario's setup CMDs reach their box and, with the scenario's repeats and the box's confirmation in the same model (`python -m atalaia_sim.relay_report --setup-study`; `docs/phase-2-field-network/STATUS.md`), every setup reaches its box in the meshes and the CQB layout up to 20 boxes (89-100 % at 30), in the long field at 10 boxes, and 56 % and 11 % in the long field of 20 and 30 (one shot: 0-78 %), at 1.4-2.8 CMD frames per setup in the cases that work; the repeats without the confirmation reach about the same fraction and always cost six.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit

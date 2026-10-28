@@ -128,7 +128,8 @@ static uint32_t offer_interval(box_pair_t *p)
 bool box_pair_start(box_pair_t *p, uint32_t now_ms)
 {
     p->now_ms = now_ms;
-    if (p->adopt != NULL && p->adopt->adopted) return false;
+    /* An adopted box shows a code only when the admin menu armed a move (adoption_allow_move). */
+    if (p->adopt != NULL && p->adopt->adopted && !p->adopt->move_armed) return false;
     if (p->locked) {
         say(p, "pairing: locked after %u failed runs; restart the box", BOX_PAIR_RUNS_MAX);
         return false;
@@ -158,6 +159,8 @@ void box_pair_stop(box_pair_t *p, const char *why)
     p->waiting = false;
     wipe(p->code, sizeof(p->code));
     p->redraw = true;
+    if (p->adopt != NULL)
+        p->adopt->move_armed = false; /* the admin menu's move ends with the code */
     say(p, "pairing: stopped (%s)", why);
 }
 
@@ -309,7 +312,7 @@ static void on_key(box_pair_t *p, const atalaia_pf_msg_t *m)
         return;
     }
     adopt_result_t r =
-        p->adopt != NULL ? adoption_offer(p->adopt, key, name, NULL) : ADOPT_STORE_FAILED;
+        p->adopt != NULL ? adoption_offer_pairing(p->adopt, key, name) : ADOPT_STORE_FAILED;
     atalaia_pf_msg_t d;
     memset(&d, 0, sizeof(d));
     d.kind = ATALAIA_PF_DONE;
@@ -381,7 +384,9 @@ bool box_pair_key(box_pair_t *p, char key, uint32_t now_ms)
 bool box_pair_tick(box_pair_t *p, uint32_t now_ms)
 {
     p->now_ms = now_ms;
-    if (p->active && p->adopt != NULL && p->adopt->adopted) {
+    if (p->active && p->adopt != NULL && p->adopt->adopted && !p->adopt->move_armed) {
+        /* An armed move (the admin menu) keeps the code up on an adopted box; any adoption disarms
+         * it. */
         box_pair_stop(p, "adopted"); /* by a field card, the cable or this run */
         p->redraw = false;           /* adoption shows its own result */
     }

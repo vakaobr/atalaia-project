@@ -157,7 +157,9 @@ def scenario_trace(n_boxes: int, minutes: int = 90, seed: int = 1, lib: Optional
         index = {n: i for i, n in enumerate(roles)}
         trace = Trace("scenario", n_boxes, minutes, len(teams), scores=False)
         for e in sim.events:
-            if e.node in index:
+            # the boxes' node.setup_applied are the radio model's own to make (relay_study's cmd_mode), so that
+            # the setup commands can be measured with and without them (PKB-3)
+            if e.node in index and e.type != "node.setup_applied":
                 trace.events.append(TraceEvent(e.t_ms, index[e.node], e.type, e.prio, int(e.wire_bytes or 0)))
         for t_ms, node, _cmd, params in sim.field_commands:
             trace.commands.append(TraceCommand(

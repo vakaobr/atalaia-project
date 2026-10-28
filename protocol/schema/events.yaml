@@ -149,3 +149,7 @@ events:
   # controller: zone is the box's name, step its place in the order (1 to the number of boxes).
   progressive.activated:      { id: 54, prio: critical,  data: [zone, step] }  # the box that is now the only one capturable; no team
   progressive.completed:      { id: 55, prio: critical,  data: [zone, step] }  # team: the team that held it long enough
+  # A box tells its scenario that it applied a setup command (the mode command "setup" of the objectives package, decision PKB-3):
+  # kind is the setup's kind (capture, code, tags, bomb, off, done, failed). Normal priority: the scenario re-sends its setup
+  # until it hears this, and stops after a few tries for a box that never does (an older firmware).
+  node.setup_applied:         { id: 56, prio: normal,    data: [kind] }

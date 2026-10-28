@@ -338,8 +338,69 @@ static void test_commands(void)
     CHECK(strstr(reply, "\"busy\":true") && strstr(reply, "\"state\":\"adopted\""));
 }
 
+/* The admin menu's "Adopt to another field" (decision PKB-4): the pairing code may move an adopted
+ * box without the PIN only while the menu armed it, once; nothing else skips the PIN. */
+static void test_move_armed(void)
+{
+    adoption_t a;
+    uint8_t mine[32], other[32], third[32];
+    key_of(mine, 0);
+    key_of(other, 1);
+    key_of(third, 2);
+    fresh(&a);
+    /* Not adopted, or no admin PIN: nothing to arm. */
+    CHECK(!adoption_allow_move(&a, true) && !a.move_armed);
+    CHECK(adoption_offer(&a, mine, "Campo", NULL) == ADOPT_ADOPTED);
+    {
+        adoption_t nopin;
+        memset(&sh, 0, sizeof(sh));
+        adoption_init(&nopin, &OPS, NULL);
+        nopin.adopted = true;
+        CHECK(!adoption_allow_move(&nopin, true));
+        fresh(&a);
+        CHECK(adoption_offer(&a, mine, "Campo", NULL) == ADOPT_ADOPTED);
+    }
+    /* Unarmed: the pairing code needs the PIN, as before. */
+    CHECK(adoption_offer_pairing(&a, other, "Outro") == ADOPT_NEED_PIN &&
+          memcmp(a.key, mine, 32) == 0);
+    /* Armed: the field's key is kept until another arrives; a card or the cable still ask for the
+     * PIN. */
+    CHECK(adoption_allow_move(&a, true) && a.move_armed);
+    CHECK(memcmp(a.key, mine, 32) == 0 && sh.stores == 1);
+    CHECK(adoption_offer(&a, other, "Outro", NULL) == ADOPT_NEED_PIN);
+    CHECK(adoption_offer(&a, other, "Outro", "1234") == ADOPT_BAD_PIN);
+    CHECK(a.move_armed && memcmp(a.key, mine, 32) == 0);
+    /* A game joined: refused, still armed, still the old field. */
+    sh.busy = true;
+    CHECK(adoption_offer_pairing(&a, other, "Outro") == ADOPT_BUSY && memcmp(a.key, mine, 32) == 0);
+    sh.busy = false;
+    /* The pairing code's key moves it, once. */
+    CHECK(adoption_offer_pairing(&a, other, "Outro") == ADOPT_READOPTED);
+    CHECK(memcmp(a.key, other, 32) == 0 && strcmp(a.name, "Outro") == 0 && sh.stores == 2);
+    CHECK(!a.move_armed && !a.move_now);
+    CHECK(adoption_offer_pairing(&a, third, "Terceiro") == ADOPT_NEED_PIN &&
+          memcmp(a.key, other, 32) == 0);
+    /* Disarmed again by the shell when the code goes. */
+    CHECK(adoption_allow_move(&a, true) && a.move_armed);
+    CHECK(adoption_allow_move(&a, false) && !a.move_armed);
+    CHECK(adoption_offer_pairing(&a, third, "Terceiro") == ADOPT_NEED_PIN);
+    /* A store that fails keeps the old field and the arming. */
+    CHECK(adoption_allow_move(&a, true));
+    sh.store_fails = true;
+    CHECK(adoption_offer_pairing(&a, third, "Terceiro") == ADOPT_STORE_FAILED);
+    CHECK(memcmp(a.key, other, 32) == 0 && a.move_armed);
+    sh.store_fails = false;
+    /* The PIN's wait refuses before anything: no arming in one, and an armed move stops in one. */
+    for (int i = 0; i < ADOPTION_PIN_TRIES; i++) adoption_offer(&a, third, "", "0000");
+    CHECK(adoption_offer_pairing(&a, third, "Terceiro") == ADOPT_LOCKED);
+    CHECK(!adoption_allow_move(&a, true)); /* no arming during a wait */
+    CHECK(adoption_offer_pairing(&a, third, "Terceiro") == ADOPT_LOCKED);
+    CHECK(memcmp(a.key, other, 32) == 0);
+}
+
 void run_adoption_tests(void)
 {
+    test_move_armed();
     test_card_vectors();
     test_join_card_is_no_field_card();
     test_names();

@@ -547,12 +547,14 @@ static void test_objectives_from_the_picker(void)
     node_runner_input(&runner, "cmd.mode",
                       "{\"name\":\"setup\",\"kind\":\"capture\",\"team\":\"red\",\"hold_ms\":3000,"
                       "\"label\":\"Ponte\"}");
+    /* The node says it took the setup (PKB-3): the scenario stops sending it again. */
+    CHECK(runner.event_count == 1 && strcmp(runner.last_event_type, "node.setup_applied") == 0);
     su = last_screen(&runner);
     CHECK(su && strcmp(su->template_name, "obj_capture") == 0);
     CHECK(su && strstr(su->data_json, "\"only\":\"red\"") != NULL);
     if (su) CHECK(screen_render(su->template_name, su->data_json));
     hold(&runner, &buttons, 0x2, 3100); /* blue: not its objective */
-    CHECK(runner.event_count == 0);
+    CHECK(runner.event_count == 1);
     hold(&runner, &buttons, 0x1, 3100);
     CHECK(strcmp(runner.last_event_type, "zone.captured") == 0);
     su = last_screen(&runner);

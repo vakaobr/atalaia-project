@@ -81,6 +81,9 @@ CAD_US = 2_100  # two symbols (SF7/125 kHz and SF9/500 kHz both 1.024 ms): when 
 CAPTURE_DB = 6.0  # LoRa co-channel rejection: the stronger frame survives from here
 SENS_DBM = -105.0  # a frame is heard above this (the model's link budget, see Layout)
 MAX_HOPS = 2  # the join's max_hops default (RFC 0001 section 5)
+SETUP_ACK_BYTES = 23  # a node.setup_applied event's CBOR (protocol/vectors/events.yaml)
+RESEND_S = (8, 16, 32, 64, 128)  # the scenario's waits between a setup and its repeats (core/scenario/runtime.lua, PKB-3)
+CMD_MODES = ("oneshot", "resend", "resend_ack")  # a setup is sent once | again 5 times | again until the box says so
 HELLO_BYTES = 80  # HELLO payload: RFC 0001 section 4, 60-150 bytes typical
 GAME_T0_US = 30_000_000  # the boxes join over the first 30 s; the game starts then
 
@@ -1060,6 +1063,18 @@ class GapSkippingAckTracker(AckTracker):
             self._contig[key] = contig
 
 
+@dataclass
+class Setup:
+    """One setup command of the scenario (a trace command for one box) and what became of it."""
+    dest: int
+    t_us: int
+    params_len: int
+    frames: int = 0  # CMD frames the controller sent for it (the first and the repeats)
+    reached_us: Optional[int] = None  # the first time its box heard one of them
+    acked_us: Optional[int] = None  # when the controller heard the box say node.setup_applied
+    confirmations: int = 0  # node.setup_applied events the box sent for it
+
+
 class Controller(Node):
     def __init__(self, eng: "Engine") -> None:
         super().__init__(eng, CONTROLLER)
@@ -1100,11 +1115,13 @@ class Controller(Node):
         self.enqueue(f, "time", t_us)
         self.eng.at(t_us + int(TIME_MS * 1000 * self.drift), self.send_time)
 
-    def send_cmd(self, t_us: int, dest: Optional[int], params_len: int) -> None:
+    def send_cmd(self, t_us: int, dest: Optional[int], params_len: int, setup: Optional["Setup"] = None) -> None:
         body = cmd_encode({"cmd": 8, "params": {"p": "x" * max(params_len - 8, 0)}, "dest": dest or 0xFFFF})
         f = Frame(CONTROLLER, self.next_seq(), "CMD", HEADER + len(body) + MIC, False, MAX_HOPS,
-                  ("cmd", dest), t_us)
+                  ("cmd", dest, setup), t_us)
         self.eng.cmd_sent.append((dest, t_us))
+        if setup is not None:
+            setup.frames += 1
         self.enqueue(f, "cmd", t_us)
 
 
@@ -1116,7 +1133,13 @@ class Controller(Node):
 class Engine:
     def __init__(self, layout: Layout, trace: Any, region: str, policy: Policy, seed: int = 1,
                  minutes: Optional[int] = None, ideal_channel: bool = False, loss: float = 0.0,
-                 drift_ppm: float = 20.0, capture_db: float = CAPTURE_DB, lib: Optional[str] = None) -> None:
+                 drift_ppm: float = 20.0, capture_db: float = CAPTURE_DB, lib: Optional[str] = None,
+                 cmd_mode: str = "oneshot") -> None:
+        if cmd_mode not in CMD_MODES:
+            raise ValueError(f"cmd_mode is one of {CMD_MODES}")
+        self.cmd_mode = cmd_mode
+        self.setups: list[Setup] = []
+        self.ack_events: list[EventRec] = []
         self.lib = lib
         self.drift_ppm = drift_ppm
         self.layout, self.trace, self.policy = layout, trace, policy
@@ -1166,11 +1189,25 @@ class Engine:
             ev: EventRec = ref[1]
             if ev.delivered_us is None:
                 ev.delivered_us = t_us
+            setup = getattr(ev, "setup", None)
+            if setup is not None and setup.acked_us is None:
+                setup.acked_us = t_us  # the scenario hears node.setup_applied: no more repeats of this setup
 
     def on_cmd_rx(self, idx: int, f: Frame, t_us: int) -> None:
         dest = f.ref[1]
         if dest is None or dest == idx:
             self.cmd_rx.setdefault((idx, f.seq), t_us)
+        setup = f.ref[2] if len(f.ref) > 2 else None
+        if setup is not None and dest == idx:
+            if setup.reached_us is None:
+                setup.reached_us = t_us
+            if self.cmd_mode == "resend_ack":
+                # the box's script says it took the setup: an event like any other (ACK requested, repeated)
+                rec = EventRec(len(self.ack_events), idx, "node.setup_applied", "normal", t_us)
+                rec.setup = setup  # type: ignore[attr-defined]
+                setup.confirmations += 1
+                self.ack_events.append(rec)
+                self.nodes[idx].new_event(rec, SETUP_ACK_BYTES, "EVENT", t_us)  # type: ignore[attr-defined]
 
     def setup(self) -> None:
         n = self.layout.n
@@ -1196,9 +1233,30 @@ class Engine:
             # a command answers an event the controller has to hear first, and its field script runs on
             # 100 ms steps: 0.3-1.5 s after the trace's time (the first, at the game's start, is not an answer)
             lag = self.rng.randint(300, 1500) * 1000 if c.t_ms > 0 else 0
-            self.at(c.t_ms * 1000 + GAME_T0_US + lag, lambda t, c=c: self.ctl.send_cmd(
-                t, None if c.dest is None else c.dest + 1, c.params_len))
+            self.at(c.t_ms * 1000 + GAME_T0_US + lag, lambda t, c=c: self.send_setup(t, c))
         self.at(GAME_T0_US, self.ctl.send_time)
+
+    def send_setup(self, t_us: int, c: Any) -> None:
+        """A command of the scenario. For one box it is a setup; in the repeating modes the controller sends it
+        again after each wait of RESEND_S (the runtime's every-second tick, so up to a second late) until the box's
+        node.setup_applied is heard (``resend_ack``) or the waits are used (``resend``, a box that never says it)."""
+        if c.dest is None:
+            self.ctl.send_cmd(t_us, None, c.params_len)
+            return
+        setup = Setup(c.dest + 1, t_us, c.params_len)
+        self.setups.append(setup)
+        self.ctl.send_cmd(t_us, setup.dest, c.params_len, setup)
+        if self.cmd_mode == "oneshot":
+            return
+        due = t_us
+        for wait in RESEND_S:
+            due += wait * 1_000_000 + self.rng.randrange(0, 1_000_000)
+            self.at(due, lambda t, s=setup, n=c.params_len: self.repeat_setup(t, s, n))
+
+    def repeat_setup(self, t_us: int, setup: Setup, params_len: int) -> None:
+        if self.cmd_mode == "resend_ack" and setup.acked_us is not None:
+            return
+        self.ctl.send_cmd(t_us, setup.dest, params_len, setup)
 
     def run(self) -> dict[str, Any]:
         self.setup()
@@ -1291,6 +1349,7 @@ class Engine:
         res["states"] = self._state_metrics(end_us, t0)
         if self.cmd_sent:
             res["cmds"] = self._cmd_metrics()
+            res["setups"] = self._setup_metrics()
         # TIME every 30 s keeps the boxes' clocks together: a box that went over two minutes without one
         # (or never got one) is at risk of drifting off the game clock
         gaps = [max(b.max_time_gap_us, end_us - (b.last_time_us or GAME_T0_US)) for b in boxes]
@@ -1356,6 +1415,25 @@ class Engine:
                 "stale_over_60s_pct": round(100.0 * sum(1 for a in ages if a > 60) / max(1, len(ages)), 2),
                 "period_s": self.state_interval / 1000}
 
+    def _setup_metrics(self) -> dict[str, Any]:
+        """The scenario's setup commands as logical commands (one per box and trace command, whatever the number
+        of repeats): how many reached their box, how long it took, what they cost, and how many the scenario
+        knew had arrived (the box's own node.setup_applied, heard)."""
+        n = len(self.setups)
+        lat = sorted((x.reached_us - x.t_us) / 1e6 for x in self.setups if x.reached_us is not None)
+        def q(p: float) -> Optional[float]:
+            return round(lat[min(len(lat) - 1, int(p * len(lat)))], 2) if lat else None
+        acks = [e for e in self.ack_events]
+        return {"mode": self.cmd_mode, "n": n,
+                "reached_pct": round(100.0 * len(lat) / max(1, n), 1),
+                "acked_pct": round(100.0 * sum(1 for x in self.setups if x.acked_us is not None) / max(1, n), 1),
+                "latency_p50_s": q(0.5), "latency_p95_s": q(0.95),
+                "cmd_frames": sum(x.frames for x in self.setups),
+                "frames_per_setup": round(sum(x.frames for x in self.setups) / max(1, n), 2),
+                "confirmations": len(acks),
+                "confirmations_heard_pct": round(100.0 * sum(1 for e in acks if e.delivered_us is not None)
+                                                 / max(1, len(acks)), 1)}
+
     def _cmd_metrics(self) -> dict[str, Any]:
         sent = len(self.cmd_sent)
         # a CMD for one box is delivered if that box heard it; a broadcast if each box did
@@ -1377,12 +1455,12 @@ class Engine:
 
 def run_one(game: str, n: int, layout: str, region: str, policy: str, minutes: int = 90, seed: int = 1,
             lib: Optional[str] = None, ideal_channel: bool = False, loss: float = 0.0, capture_db: float = CAPTURE_DB,
-            drift_ppm: float = 20.0, trace: Any = None, **trace_kw: Any) -> dict[str, Any]:
+            drift_ppm: float = 20.0, trace: Any = None, cmd_mode: str = "oneshot", **trace_kw: Any) -> dict[str, Any]:
     from .relay_traces import get_trace
     tr = trace or get_trace(game, n, minutes, seed, lib, **trace_kw)
     lay = LAYOUTS[layout](n, seed)
     eng = Engine(lay, tr, region, POLICIES[policy], seed=seed, minutes=minutes, ideal_channel=ideal_channel,
-                 loss=loss, capture_db=capture_db, drift_ppm=drift_ppm, lib=lib)
+                 loss=loss, capture_db=capture_db, drift_ppm=drift_ppm, lib=lib, cmd_mode=cmd_mode)
     res = eng.run()
     res["seed"] = seed
     return res
@@ -1429,6 +1507,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("--loss", type=float, default=0.0, help="random loss of each reception (0.05 = 5 %%)")
     ap.add_argument("--drift-ppm", type=float, default=20.0)
     ap.add_argument("--captures-per-box-per-min", type=float, default=0.33)
+    ap.add_argument("--cmd-mode", default="oneshot", choices=CMD_MODES,
+                    help="the scenario's setup commands: sent once (the controller as built before PKB-3), again "
+                         "after 8, 16, 32, 64 and 128 s whatever happens, or again until the box confirms it")
     ap.add_argument("--workers", type=int, default=0, help="processes (default: all cores; 1: in this one)")
     ap.add_argument("--out", default=None, help="write the results as JSON here")
     ap.add_argument("--report", default=None, metavar="FILE", help="write the decision tables (Markdown) here")
@@ -1442,7 +1523,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                          _csv(args.regions), _csv(args.policies), args.minutes, [int(x) for x in _csv(args.seeds)],
                          args.lib, args.workers, ideal_channel=args.ideal_channel, loss=args.loss,
                          capture_db=args.capture_db, drift_ppm=args.drift_ppm,
-                         captures_per_box_per_min=args.captures_per_box_per_min)
+                         captures_per_box_per_min=args.captures_per_box_per_min, cmd_mode=args.cmd_mode)
     if args.out:
         with open(args.out, "w", encoding="utf-8") as fh:
             json.dump(results, fh)
