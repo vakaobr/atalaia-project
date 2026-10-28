@@ -492,7 +492,7 @@ try:
   manuals:
     title: 使用與主辦
     text: >-
-      給使用 Atalaia 的人看的手冊，不是給開發者看的：給<a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/README.md">玩家、主辦、裁判和盒子操作員</a>，有英文和葡萄牙文版本，另附一頁式快速入門。內容照軟體現在實際顯示的寫，還沒在場地上試過的部分會特別標明。目前還沒有中文版。
+      給使用 Atalaia 的人看的手冊，不是給開發者看的：給<a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/README.md">玩家、主辦、裁判、盒子操作員和組裝盒子的人</a>，有英文和葡萄牙文版本，另附一頁式快速入門。內容照軟體現在實際顯示的寫，還沒在場地上試過的部分會特別標明。目前還沒有中文版。
 
 roadmap:
   title: 路線圖
@@ -773,6 +773,7 @@ build:
   intro: >-
     Atalaia 的道具是用現成零件圍繞著一塊 ESP32 開發板組裝而成，不需要訂製電路板。這一頁有 Field Box 的腳位表和接線圖，以及衛星盒、I/O
     模組和標靶擴充模組的精簡版指南；完整指南附有每一項檢查和故障排除表，放在程式庫中（英文）。
+    要把韌體燒進板子，可以<a href="https://github.com/vakaobr/atalaia-project/releases">下載已發佈的版本</a>或自行編譯：<a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">韌體指南</a>（英文）兩種方式都有說明。場地控制器另有<a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">安裝指南</a>（英文）。
   status: >-
     <strong>目前還沒有人照這些指南組裝出任何一種盒子。</strong>指南中的腳位會自動和韌體核對，但每一個實體步驟（外殼、電源、續航時間、無線電距離）都還沒測試過，照片要等第一批成品才會有。如果你做了一個，請告訴我們你發現了什麼。
   toc: 本頁內容

@@ -530,6 +530,18 @@ def resolve(address: str, here: str) -> tuple[str, str | None]:
     return target, (fragment if hash_sign else None)
 
 
+# A manual's language versions are one document: a page may link the Portuguese guide
+# (docs/manuals/pt/..., hardware/*/BUILD.pt.md) where another language links the English one.
+_LANGUAGE_VERSION = (("/docs/manuals/pt/", "/docs/manuals/en/"), (".pt.md", ".md"))
+
+
+def same_document(url: str) -> str:
+    """The address of a manual's English version, so that the languages' pages compare equal."""
+    for local, english in _LANGUAGE_VERSION:
+        url = url.replace(local, english)
+    return url
+
+
 def check_addresses(rendered: dict[str, tuple[Links, str, str]], generated: set[str]) -> None:
     """Fails unless every address that stays on the site leads to a page or a published file,
     and every #id to an id on that page. rendered maps each page's site path to its links,
@@ -911,9 +923,11 @@ def build() -> dict[Path, str]:
     first = LANGUAGES[0]
     for page in PAGES:
         for lang in LANGUAGES[1:]:
-            if external[page.name, lang] != external[page.name, first]:
-                only = sorted(external[page.name, first] - external[page.name, lang])
-                extra = sorted(external[page.name, lang] - external[page.name, first])
+            mine = {same_document(u) for u in external[page.name, lang]}
+            theirs = {same_document(u) for u in external[page.name, first]}
+            if mine != theirs:
+                only = sorted(theirs - mine)
+                extra = sorted(mine - theirs)
                 raise SiteError(
                     f"the {lang.code} and {first.code} {page.name} pages link to different places"
                     + "".join(f"\n  only in {first.code}: {u}" for u in only)

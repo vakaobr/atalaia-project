@@ -706,7 +706,7 @@ try:
     title: Spielen und ausrichten
     text: >-
       Handbücher für alle, die Atalaia benutzen, nicht für Entwickelnde: für
-      <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/README.md">Spielende, Orga, Marshals und Box-Betreuende</a>, auf Englisch und
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/README.md">Spielende, Orga, Marshals, Box-Betreuende und alle, die Boxen bauen</a>, auf Englisch und
       Portugiesisch, mit einer Kurzanleitung auf einer Seite. Sie beschreiben, was die Software
       heute zeigt, und markieren, was noch nicht auf einem Feld erprobt wurde. Auf Deutsch gibt es
       sie noch nicht.
@@ -1171,6 +1171,7 @@ build:
     eigens gefertigte Leiterplatte. Hier stehen die Pins und Schaltpläne der Field Box sowie die Anleitungen für den Satelliten, den I/O-Pod und
     das Ziel-Addon, gekürzt; die vollständigen Anleitungen mit allen Prüfungen und den Tabellen zur
     Fehlersuche liegen im Repository (auf Englisch).
+    Um die Firmware auf eine Platine zu bringen, <a href="https://github.com/vakaobr/atalaia-project/releases">lade eine fertige Version herunter</a> oder baue sie selbst: die <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">Firmware-Anleitung</a> (Englisch) erklärt beides. Der Feld-Controller hat eine eigene <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">Einrichtungsanleitung</a> (Englisch).
   status: >-
     <strong>Nach diesen Anleitungen wurde noch keine einzige Box gebaut.</strong> Ihre Pins werden
     automatisch mit der Firmware abgeglichen, aber jeder Schritt am echten Teil (Gehäuse,

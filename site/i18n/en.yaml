@@ -670,7 +670,7 @@ try:
     title: Playing and running it
     text: >-
       Manuals for the people who use Atalaia, not for developers: for
-      <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/README.md">players, organisers, marshals and box operators</a>, in English
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/README.md">players, organisers, marshals, box operators and the people who build the boxes</a>, in English
       and Portuguese, with a one-page quick start. They say what the software shows today and mark
       what has not been tried on a field.
 
@@ -1104,6 +1104,7 @@ build:
     circuit board. This page has the Field Box's pins and wiring diagrams and the guides for the Satellite, the I/O pod and the target addon,
     shortened; the full guides, with every check and the troubleshooting tables, are in the
     repository.
+    To put the firmware on a board, <a href="https://github.com/vakaobr/atalaia-project/releases">download a ready-made release</a> or build it yourself: the <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">firmware guide</a> explains both. The field controller has its own <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">setup guide</a>.
   status: >-
     <strong>No box of any kind has been built from these guides yet.</strong> Their pins are checked
     automatically against the firmware, but every physical step (enclosure, power, runtime, radio
