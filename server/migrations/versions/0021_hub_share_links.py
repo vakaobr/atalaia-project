@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Hosted chrono sharing across tenants: an account's link to a person (SVX-2).
 
-Revision ID: 0020_hub_share_links
+Revision ID: 0021_hub_share_links
 Revises: 0019_field_country
 Created: 2026-10-28
 
@@ -20,8 +20,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0020_hub_share_links"
-down_revision = "0019_field_country"
+revision = "0021_hub_share_links"
+down_revision = "0020_drop_user_retention"
 branch_labels = None
 depends_on = None
 
