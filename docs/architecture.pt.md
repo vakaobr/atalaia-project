@@ -28,8 +28,8 @@ linha tracejada precisa de internet. Os nomes das ligações são sempre os mesm
 | LoRa (Skirmesh-RF) | O rádio do campo, um canal partilhado, 869,525 MHz por omissão na Europa. Pacotes pequenos e cifrados. |
 | Wi-Fi HTTPS, fixado | O Wi-Fi do próprio campo. O controlador serve HTTPS com a sua própria autoridade de certificação (a *CA do campo*). As apps e as caixas só confiam nessa autoridade, para os endereços do controlador e para mais nada. |
 | USB série | Um cabo entre um computador ou um telemóvel e uma placa (o modem de rádio, ou uma caixa durante a adoção). |
-| BLE | Bluetooth Low Energy: entre um telemóvel e um pod de E/S, e dos beacons de interior para um telemóvel. |
-| NFC | Um toque: cartões de adesão, o cartão do campo, as etiquetas de quem joga, os autocolantes das réplicas. |
+| BLE | Bluetooth Low Energy: entre um telemóvel e um módulo de E/S, e dos beacons de interior para um telemóvel. |
+| NFC | Um toque: cartões de entrada, o cartão do campo, as etiquetas de quem joga, os autocolantes das réplicas. |
 | WebSocket stream | Uma ligação duradoura para dados em direto: a vista de quem joga, a consola do GM, o GM remoto. |
 | HTTPS para a internet | HTTPS normal, com as autoridades de certificação habituais. Abre-se sempre do campo para fora. |
 
@@ -48,7 +48,7 @@ flowchart TB
 ESP32, rádio LoRa, NFC`"]
         modem["`**Modem LoRa USB**
 segunda placa ESP32`"]
-        pod["`**Pod de E/S**
+        pod["`**Módulo de E/S**
 ESP32, LoRa, NFC, botões`"]
         ctrl["`**Controlador de campo**
 Raspberry Pi ou um telemóvel controlador`"]
@@ -94,7 +94,7 @@ falam por LoRa através do modem: eventos, pontos, o relógio e comandos. O cont
 serve tudo o resto no Wi-Fi do campo: a consola do GM, a vista em direto para quem
 joga, os props Android e os ficheiros que uma caixa vai buscar (firmware, modos de
 jogo, o logótipo do campo). Um telemóvel que é o controlador de campo substitui o
-Raspberry Pi e o modem: usa um modem ou um pod de E/S ligado a ele, ou não tem
+Raspberry Pi e o modem: usa um modem ou um módulo de E/S ligado a ele, ou não tem
 LoRa nenhum e serve só props Android no Wi-Fi.
 
 **O que não circula.**
@@ -122,7 +122,7 @@ programa de servidor, desligado por omissão e que só entra no ar depois da rev
 jurídica dos modelos.
 
 Ainda não testado em hardware real: o telemóvel controlador, os props Android, o
-pod de E/S com um telemóvel, o ATAK e tudo o que está do lado da internet.
+módulo de E/S com um telemóvel, o ATAK e tudo o que está do lado da internet.
 
 ## 2. As camadas de rádio
 
@@ -141,7 +141,7 @@ flowchart TB
         mnet["Firmware do modem: AES-CCM,<br/>filtro de duplicados, duty cycle"]
         mphy["Rádio LoRa SX1262"]
     end
-    subgraph pd["Pod de E/S (ESP32)"]
+    subgraph pd["Módulo de E/S (ESP32)"]
         pnet["O código do modem,<br/>tramas deslocadas em 3"]
         pphy["Rádio LoRa SX1262"]
     end
@@ -170,11 +170,11 @@ compacto. Usam-se estes tipos de mensagem:
 | CMD | Uma instrução do controlador ou do GM: iniciar, pausar, terminar, uma mensagem, um comando de modo (opcode 8, que leva o `setup` de um cenário), uma oferta de atualização de firmware (opcode 9). |
 | TIME | O relógio do jogo. É também o batimento do controlador. |
 | CLAIM | A eleição do controlador responsável, para a passagem de testemunho entre dois controladores. |
-| CONFIG | Definida no esquema, para enviar uma predefinição. A configuração do jogo, o seu canal e as suas equipas chegam de facto a uma caixa na sua **carga de adesão**, e não em CONFIG. |
-| FIELD, PAIR | Entre jogos, fora de qualquer jogo (id de jogo 0). FIELD (selada com uma chave derivada da chave de adesão do campo): o anúncio de uma caixa livre, a descoberta pelo controlador, um convite, GAME_OVER. PAIR (em claro, CPace): adotar uma caixa pelo seu código. |
+| CONFIG | Definida no esquema, para enviar uma predefinição. A configuração do jogo, o seu canal e as suas equipas chegam de facto a uma caixa na sua **carga de entrada**, e não em CONFIG. |
+| FIELD, PAIR | Entre jogos, fora de qualquer jogo (id de jogo 0). FIELD (selada com uma chave derivada da chave de entrada do campo): o anúncio de uma caixa livre, a descoberta pelo controlador, um convite, GAME_OVER. PAIR (em claro, CPace): adotar uma caixa pelo seu código. |
 
 As caixas repetem os pacotes umas das outras (uma inundação com um limite de
-saltos, de 1 a 3, definido na adesão). O modem e o controlador nunca retransmitem.
+saltos, de 1 a 3, definido na entrada no jogo). O modem e o controlador nunca retransmitem.
 O controlador espaça as suas próprias tramas (RFC 0001, Emenda 15), os rádios
 escutam antes de falar (Emenda 14), e o orçamento de duty cycle da subbanda do
 canal é aplicado no modem, no pod e nas caixas.
@@ -183,7 +183,7 @@ canal é aplicado no modem, no pod e nas caixas.
 com um CRC-16 ([`protocol/usb-modem.md`](../protocol/usb-modem.md)). O modem sela-os
 e abre-os, por isso a chave do jogo vive no modem para os pacotes de jogo. As
 tramas de campo são diferentes: é o controlador que as sela, e o modem nunca tem a
-chave do campo. Um pod de E/S corre o mesmo código e usa as mesmas tramas (tipos
+chave do campo. Um módulo de E/S corre o mesmo código e usa as mesmas tramas (tipos
 deslocados em 3) por USB-OTG ou BLE até um telemóvel
 ([`protocol/capability-proxy.md`](../protocol/capability-proxy.md)).
 
@@ -212,7 +212,7 @@ sequenceDiagram
     M-->>C: USB série: FIELD_RX
     C-->>GM: WebSocket: as caixas livres
     GM->>C: HTTPS: convidar estas caixas
-    C->>M: USB série: FIELD_TX, INVITE com a carga de adesão em partes
+    C->>M: USB série: FIELD_TX, INVITE com a carga de entrada em partes
     M->>B: LoRa: INVITE
     B-->>C: ANNOUNCE: aceite (a caixa verifica a carga como um cartão)
     B-->>C: HELLO (no novo jogo, pede ACK)
@@ -237,14 +237,14 @@ sequenceDiagram
     B-->>C: ANNOUNCE (livre outra vez)
 ```
 
-**O que circula.** A carga de adesão leva o id e a chave do jogo, o id e o papel do
+**O que circula.** A carga de entrada leva o id e a chave do jogo, o id e o papel do
 nó da caixa, as equipas, o canal e o limite de saltos, assinados com a chave de
-adesão do campo. Depois do convite, a caixa envia HELLO. O controlador só inicia o
-jogo quando cada papel de que o modo precisa tem um nó aderido, a não ser que o GM
+entrada do campo. Depois do convite, a caixa envia HELLO. O controlador só inicia o
+jogo quando cada papel de que o modo precisa tem um nó que entrou, a não ser que o GM
 force. Os comandos de configuração são enviados outra vez até a caixa dizer
 `node.setup_applied`, no máximo cinco vezes; cada repetição leva o que o controlador
 sabe nesse momento, por isso repetir não faz mal. Os pontos de uma caixa chegam ao
-controlador com o seu STATE, por isso o placar pode ficar atrás do ecrã da própria
+controlador com o seu STATE, por isso o marcador pode ficar atrás do ecrã da própria
 caixa até cerca de 15 s.
 
 **O que não circula.** A consola do GM nunca fala LoRa: só fala com o controlador.
@@ -266,7 +266,7 @@ sequenceDiagram
     participant K as Telemóvel do marshal (app)
     participant BC as Beacons BLE
     participant C as Controlador de campo
-    participant S as Placar e consola
+    participant S as Marcador e consola
 
     Note over P,C: O Wi-Fi do campo. HTTPS fixado na CA do campo.
     P->>P: Ler o cartaz impresso (QR): endereços e impressão digital da CA
@@ -284,7 +284,7 @@ sequenceDiagram
     end
     P->>C: WebSocket: a transmissão em direto, com o token
     C-->>P: Pontos, objetivos, eventos e só as posições que este papel pode ver
-    C-->>S: Página do placar e MQTT: pontos e eventos, nunca posições
+    C-->>S: Página do marcador e MQTT: pontos e eventos, nunca posições
 ```
 
 **O que circula.** O cartaz leva só os endereços do campo e o SHA-256 da CA, nenhum
@@ -304,7 +304,7 @@ seu squad, se o jogo o permitir), a chefia de um squad vê o seu squad, um VIP v
 sua equipa, os marshals e o GM veem todas, e o código de leitura nenhuma.
 
 **O que não circula.** As posições nunca vão por LoRa nem por MQTT, e nunca chegam a
-quem tem outro papel. O placar e o MQTT recebem pontos e eventos, não posições. Neste
+quem tem outro papel. O marcador e o MQTT recebem pontos e eventos, não posições. Neste
 diagrama não há internet: tudo funciona com o servidor do site desligado.
 
 Ainda não testado em hardware real: tudo isto com um telemóvel a sério (a lista de
@@ -357,7 +357,7 @@ verificá-lo, recusa um com mais de 60 s e regista-o.
 
 **O que não circula.** O servidor do site nunca se liga ao controlador e nunca tem
 os seus tokens de GM ou de leitura. Nunca se envia: a chave do jogo, a chave de
-adesão, tokens, nomes de presença e números de federação, nem qualquer posição
+entrada, tokens, nomes de presença e números de federação, nem qualquer posição
 dentro de um evento (um evento cujos dados tenham uma chave `lat`, `lon` ou
 parecida é recusado). Duas exceções opcionais enviam posições, em memória e sem
 nunca as guardar: a mensagem `positions` do GM remoto (`remote_gm` ligado) e os
@@ -404,7 +404,7 @@ verifica tudo sozinha`"]
     ctrl <-->|"LoRa: código de emparelhamento, tramas PAIR"| box
 ```
 
-**Adoção.** Uma caixa nova é adotada uma vez pelo campo e recebe a *chave de adesão
+**Adoção.** Uma caixa nova é adotada uma vez pelo campo e recebe a *chave de entrada
 do campo*, que é também o segredo mestre do campo. Há três maneiras: o cabo USB (o
 controlador encontra a porta USB da caixa e envia a chave), o cartão NFC do campo
 (um cartão, tocado uma vez em cada caixa nova; guarda-o trancado, pois é o segredo
@@ -414,7 +414,7 @@ pelo ar em claro). Toda a adoção fica registada, nunca com a chave nem com um 
 
 **Firmware e modos.** O controlador oferece a atualização num pacote LoRa curto. A
 caixa vai então buscar a versão assinada e a imagem pelo Wi-Fi do campo, ao HTTPS
-do controlador, confiando só na CA do campo cujo hash a sua carga de adesão leva
+do controlador, confiando só na CA do campo cujo hash a sua carga de entrada leva
 (por isso não precisa de relógio nem de outro repositório de confiança), e
 comunica o resultado por HTTPS (ou por um evento LoRa, se o HTTPS falhar). Um modo
 que falta a uma caixa vai buscar-se da mesma maneira, depois de um convite que o
@@ -502,8 +502,8 @@ Onde a especificação de design e o código discordam, esta página segue o có
 | Tema | O que o design diz | O que o código faz |
 | --- | --- | --- |
 | Ligação ao servidor do site | A secção 4 do design desenha uma "ponte" (normalmente um dispositivo Android com 4G) e uma ligação chamada "internet" entre o servidor do site e o controlador. | Não há programa de ponte. É o próprio controlador que abre HTTPS (e um WebSocket) para o servidor do site, pela internet que o campo tiver, incluindo o hotspot de um telemóvel. |
-| Props Android | O design desenha um prop a chegar ao controlador pela malha LoRa, através de um pod de E/S. | Por omissão, um prop Android liga-se ao controlador por Wi-Fi (`WS /api/v1/prop`). O pod acrescenta o rádio quando está ligado um, e um prop com um pod usa os dois. |
-| Configuração de rádio de um jogo | A Emenda 1 da RFC 0001 dizia primeiro que o canal de um jogo é definido pela mensagem CONFIG. | CONFIG não tem campo de canal (Emenda 3). O canal, as equipas e o limite de saltos chegam a uma caixa na carga de adesão. |
+| Props Android | O design desenha um prop a chegar ao controlador pela malha LoRa, através de um módulo de E/S. | Por omissão, um prop Android liga-se ao controlador por Wi-Fi (`WS /api/v1/prop`). O pod acrescenta o rádio quando está ligado um, e um prop com um pod usa os dois. |
+| Configuração de rádio de um jogo | A Emenda 1 da RFC 0001 dizia primeiro que o canal de um jogo é definido pela mensagem CONFIG. | CONFIG não tem campo de canal (Emenda 3). O canal, as equipas e o limite de saltos chegam a uma caixa na carga de entrada. |
 | Hub | O design fala de um hub da comunidade com servidores de site alojados. | O hub é uma página do projeto e o registo. Um servidor de site alojado é um modo do programa do servidor do site (`hosted`), desligado por omissão. |
 | Firmware no controlador | O catálogo do servidor do site podia parecer uma fonte de firmware. | O catálogo lista versões assinadas mas não guarda nenhuma imagem. O controlador não vai buscar ao GitHub: uma pessoa carrega a imagem e o seu `.release.json`. |
 | Sincronização pelo fluxo | Um texto mais antigo diz que os corpos do controlador podem viajar no fluxo. | Os corpos da sincronização vão como pedidos HTTPS. O fluxo serve a nota `field.changed`, a vista em direto, as posições, os comandos e a retransmissão ATAK. |
@@ -515,7 +515,7 @@ Encontraste outra coisa que não bate certo? Abre uma issue, ou diz-nos nas
 ## Onde ler mais
 
 - [`protocol/README.md`](../protocol/README.md) e os documentos ao lado: as
-  mensagens, a carga de adesão, as tramas de campo, a adoção, as atualizações de
+  mensagens, a carga de entrada, as tramas de campo, a adoção, as atualizações de
   firmware, os pacotes de modos, a sincronização do controlador e os registos do
   cronógrafo.
 - [`controller/README.md`](../controller/README.md), [`server/README.md`](../server/README.md),

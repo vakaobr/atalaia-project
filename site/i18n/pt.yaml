@@ -1986,7 +1986,7 @@ architecture:
       - "Os ficheiros grandes vão buscar-se por HTTPS. Só uma oferta curta ou um relatório de falha usa o LoRa."
   d3:
     title: "Um jogo, do convite ao fim"
-    flows: "Uma caixa livre anuncia-se e o GM convida-a. A carga de adesão (id e chave do jogo, papel, equipas, canal) chega selada. O jogo só começa quando cada papel tem uma caixa. Depois as caixas enviam eventos e um STATE de 15 em 15 s."
+    flows: "Uma caixa livre anuncia-se e o GM convida-a. A carga de entrada (id e chave do jogo, papel, equipas, canal) chega selada. O jogo só começa quando cada papel tem uma caixa. Depois as caixas enviam eventos e um STATE de 15 em 15 s."
     not:
       - "A consola do GM nunca fala LoRa: só fala com o controlador."
       - "A chave do jogo só viaja dentro do convite selado (ou num cartão), nunca num anúncio."
@@ -2000,7 +2000,7 @@ architecture:
     title: "Controlador e servidor do site"
     flows: "O controlador envia jogos, eventos, pontos, nós e registos do cronógrafo de 30 em 30 s durante um jogo e de 5 em 5 min entre jogos. Vai buscar agendas, inscritos e definições. Um fluxo leva a vista em direto e os comandos do GM remoto, que o controlador volta a verificar."
     not:
-      - "O servidor do site nunca se liga ao controlador e nunca tem a chave do jogo, a chave de adesão nem tokens."
+      - "O servidor do site nunca se liga ao controlador e nunca tem a chave do jogo, a chave de entrada nem tokens."
       - "Estar sem ligação é normal: os eventos esperam e seguem depois, por ordem."
       - "As posições só saem do controlador em dois casos opcionais (GM remoto, retransmissão ATAK remota), em memória."
   d6:
@@ -2019,7 +2019,7 @@ architecture:
 arch:
   t001: "**Field Boxes e Satellites**\nESP32, rádio LoRa, NFC"
   t002: "**Modem LoRa USB**\nsegunda placa ESP32"
-  t003: "**Pod de E/S**\nESP32, LoRa, NFC, botões"
+  t003: "**Módulo de E/S**\nESP32, LoRa, NFC, botões"
   t004: "**Controlador de campo**\nRaspberry Pi ou um telemóvel controlador"
   t005: "**Consola do GM**\num navegador"
   t006: "**Quem joga e marshals**\na app Atalaia"
@@ -2055,7 +2055,7 @@ arch:
   t036: "Enquadramento do modem:<br/>pacotes em claro"
   t037: "Modem LoRa USB (ESP32)"
   t038: "Firmware do modem: AES-CCM,<br/>filtro de duplicados, duty cycle"
-  t039: "Pod de E/S (ESP32)"
+  t039: "Módulo de E/S (ESP32)"
   t040: "O código do modem,<br/>tramas deslocadas em 3"
   t041: "Canal LoRa partilhado"
   t042: "USB série, tramas A5, CRC-16"
@@ -2070,7 +2070,7 @@ arch:
   t051: "USB série: FIELD_RX"
   t052: "WebSocket: as caixas livres"
   t053: "HTTPS: convidar estas caixas"
-  t054: "USB série: FIELD_TX, INVITE com a carga de adesão em partes"
+  t054: "USB série: FIELD_TX, INVITE com a carga de entrada em partes"
   t055: "LoRa: INVITE"
   t056: "ANNOUNCE: aceite (a caixa verifica a carga como um cartão)"
   t057: "HELLO (no novo jogo, pede ACK)"
@@ -2092,7 +2092,7 @@ arch:
   t073: "Telemóvel de quem joga (app)"
   t074: "Telemóvel do marshal (app)"
   t075: "Beacons BLE"
-  t076: "Placar e consola"
+  t076: "Marcador e consola"
   t077: "O Wi-Fi do campo. HTTPS fixado na CA do campo."
   t078: "Ler o cartaz impresso (QR): endereços e impressão digital da CA"
   t079: "HTTPS: obter a CA e comparar a impressão digital com a do cartaz"
@@ -2108,7 +2108,7 @@ arch:
   t089: "HTTPS: posição GPS ou o beacon registado mais forte"
   t090: "WebSocket: a transmissão em direto, com o token"
   t091: "Pontos, objetivos, eventos e só as posições que este papel pode ver"
-  t092: "Página do placar e MQTT: pontos e eventos, nunca posições"
+  t092: "Página do marcador e MQTT: pontos e eventos, nunca posições"
   t093: "Administração do campo (equipa do local)"
   t094: "Servidor do site"
   t095: "GM remoto (navegador)"
