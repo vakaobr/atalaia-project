@@ -96,6 +96,12 @@ abstract class ControllerModem {
   /// Tunes the modem outside a game (CONFIGURE carries the game's channel).
   bool setChannel(int channelHz);
 
+  /// The language of the modem board's own OLED ("pt", "en", "de", "zh-tw";
+  /// null: its build's), kept and sent again whenever the modem identifies
+  /// itself (decision MOD-2, protocol/usb-modem.md SET_LANG). A radio with no
+  /// screen of its own (an I/O pod), or a firmware without SET_LANG, ignores it.
+  void setLanguage(String? code) {}
+
   /// Queues a packet: the modem encrypts it under the game key and sends
   /// it. False when the link is not up.
   bool sendPacket(RfHeader header, Uint8List payload);

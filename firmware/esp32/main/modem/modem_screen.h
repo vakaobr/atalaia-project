@@ -17,6 +17,14 @@
  * "RADIO FAULT" and the reason. A line that needs attention (link down, a
  * fault, no duty-cycle budget left) is drawn inverted.
  *
+ * The texts are in the controller's language (decision MOD-1): English,
+ * Portuguese and German in these same lines (the 8-pixel font is ASCII, so no
+ * accents), Chinese in a layout of its own because a Han letter needs the
+ * 14-pixel font: the link state goes right in the header bar, the game line
+ * is a 16-pixel row, and the channel, counters and duty budget stay 8-pixel
+ * lines (with the counters' English words). The modem learns the language
+ * from SET_LANG (protocol/usb-modem.md) or from its build (Kconfig).
+ *
  * modem_screen_state() and modem_screen_text() are plain C for the host
  * tests; the LVGL part (ATALAIA_SCREEN_LVGL) draws the text and the splash.
  */
@@ -27,10 +35,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "box_text.h"
 #include "modem.h"
 
 #define MODEM_SCREEN_LINES 6
 #define MODEM_SCREEN_COLS  16
+/* Bytes of a line's text: 16 ASCII columns, or Han letters of 3 bytes in a row of their own. */
+#define MODEM_SCREEN_LINE_BYTES 24
 
 typedef enum {
     MODEM_LINK_WAITING = 0, /* no frame from the host since boot */
@@ -49,10 +60,18 @@ typedef struct {
     bool radio_ok;
     uint32_t duty_ms; /* duty-cycle budget left */
     char fault[40];   /* why the radio is missing ("" when radio_ok) */
+    box_lang_t lang;  /* the language of the texts (the modem's SET_LANG, else the build's) */
 } modem_screen_state_t;
 
 typedef struct {
-    char line[MODEM_SCREEN_LINES][MODEM_SCREEN_COLS + 1];
+    char title[MODEM_SCREEN_LINE_BYTES];      /* the header bar's text */
+    char head_right[MODEM_SCREEN_LINE_BYTES]; /* Chinese only: the link state, right in the bar */
+    int rows;                                 /* the lines in use (6; Chinese 4 or 5) */
+    /* A row is one 8-pixel line, its text already set out in two columns (line); or, in Chinese,
+     * a 16-pixel row (tall) with its left text in line and its right text in right. */
+    char line[MODEM_SCREEN_LINES][MODEM_SCREEN_LINE_BYTES];
+    char right[MODEM_SCREEN_LINES][MODEM_SCREEN_LINE_BYTES];
+    bool tall[MODEM_SCREEN_LINES];
     bool inverted[MODEM_SCREEN_LINES];
 } modem_screen_text_t;
 
@@ -66,7 +85,7 @@ void modem_screen_state(const modem_t *m, uint32_t now_ms, uint32_t link_timeout
                         uint32_t idle_channel_hz, uint32_t duty_ms, const char *fault,
                         modem_screen_state_t *out);
 
-/* The six lines for s. */
+/* The lines for s, in its language. */
 void modem_screen_text(const modem_screen_state_t *s, modem_screen_text_t *out);
 
 /* n in at most width characters: 1234, then 12k, 4M, 4G. */
@@ -75,8 +94,8 @@ void modem_screen_count(uint32_t n, int width, char *out, size_t out_sz);
 #if ATALAIA_SCREEN_LVGL
 #include "lvgl.h"
 
-/* The boot splash: the tower, "ATALAIA", "MODEM MODE" and the version. */
-void modem_screen_splash(lv_obj_t *scr, const char *version);
+/* The boot splash: the tower, "ATALAIA", "MODEM MODE" (in lang) and the version. */
+void modem_screen_splash(lv_obj_t *scr, const char *version, box_lang_t lang);
 
 /* Draws t on scr (builds the layout on first use, or after the splash). */
 void modem_screen_draw(lv_obj_t *scr, const modem_screen_text_t *t);

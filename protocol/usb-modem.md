@@ -16,7 +16,7 @@ A receiver skips bytes until a `0xA5`, reads the length, and accepts the frame o
 
 | Type | Direction | Payload |
 | --- | --- | --- |
-| `0x01` IDENT | modem → controller | JSON: `fw`, `fw_version`, `core_version`, `framing`, `radio` (`"sx1262"` or `"none"`), `payload_max`, `epoch_window`, `measure` (true when the modem can answer MEASURE: it has a radio and its firmware knows the command), `field` (true: the firmware carries field frames), `pair` (true: and pair frames, type 10), `region` (`"eu868"` or `"as923-tw"`: the radio region the firmware is built for, RFC 0001 Amendment 12; a modem without the key is an EU868 build) |
+| `0x01` IDENT | modem → controller | JSON: `fw`, `fw_version`, `core_version`, `framing`, `radio` (`"sx1262"` or `"none"`), `payload_max`, `epoch_window`, `measure` (true when the modem can answer MEASURE: it has a radio and its firmware knows the command), `field` (true: the firmware carries field frames), `pair` (true: and pair frames, type 10), `lang` (true: the firmware takes SET_LANG; a modem without the key does not), `region` (`"eu868"` or `"as923-tw"`: the radio region the firmware is built for, RFC 0001 Amendment 12; a modem without the key is an EU868 build) |
 | `0x02` RX | modem → controller | header (9) + plaintext payload + rssi (int8) + snr (int8) + epoch (uint16 BE) |
 | `0x03` TX | controller → modem | header (9) + plaintext payload (up to 200) |
 | `0x04` TX_ACK | modem → controller | seq (uint16 BE) + status (1) |
@@ -79,6 +79,9 @@ Every command except PING, IDENT and MEASURE is answered by a STATUS frame when 
 | `0x06` | CLEAR | none: forget the key and the game (sent when the game ends) |
 | `0x07` | IDENT | none: answered with IDENT |
 | `0x08` | MEASURE | channel_hz (uint32 BE), dwell_ms (uint16 BE, 10-10000), flags (1; bit 0: also count LoRa channel-activity detections): answered with NOISE |
+| `0x09` | SET_LANG | the language code, ASCII, 0-8 bytes (`pt`, `en`, `de`, `zh-tw`; none: the firmware's own): answered with STATUS |
+
+**SET_LANG** (opcode `0x09`, additive: framing stays version 1; decision MOD-2) tells the modem which language its own OLED shows (box texts: `pt`, `en`, `de`, `zh-tw`). The parameter is the language code in ASCII, 0-8 bytes of letters, digits and `-` (kept in lower case), with no terminator: `09 70 74` is `pt`. It is answered with STATUS (`"cmd": 9`); a code that is longer, or has another byte, is ERROR `bad_params` and the language stays. A code the screen has no texts for (`fr`, `zh-cn`) is accepted and shows English, as the boxes do (`box_lang_from_code`); no code at all goes back to the language the firmware was built with (Kconfig `ATALAIA_MODEM_LANG`, `en` by default). The modem keeps it in RAM only, so it forgets it on every reboot, like the game key: **a controller sends SET_LANG when it sees an IDENT that says `"lang": true`**, after every connect and after every IDENT the modem sends by itself (it sends one at boot), and again whenever its own language changes. It never sends it to a modem whose IDENT has no `lang`: that firmware would answer ERROR `unknown_cmd`. Both controllers send the language of the boxes' screens: the field's `box_language` setting, or with `auto` the language of the console that created the live game (the Pi: `radio_modem.py` `set_language`; the phone: `serial_modem.dart` `setLanguage`). An I/O pod has no screen of its own and takes no part.
 
 Field frames go and come in their own frame types (FIELD_TX, FIELD_RX, FIELD_ACK, above), not as commands.
 

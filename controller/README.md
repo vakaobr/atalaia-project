@@ -71,7 +71,7 @@ python3 -m atalaia_controller join-key --fingerprint                # its finger
 python3 -m atalaia_controller join-key --rotate                     # a new key, after a field card is lost
 ```
 
-Flash the modem board with the modem firmware first (`python tools/docker_fw.py modem`, then the `esptool` command it prints, or `idf.py -B build-modem flash`). Its own OLED then shows whether the controller is talking to it (`LINK OK`, `DOWN`, `waiting`), the game it is configured for, the channel, the TX and RX counts with their failures, the duty-cycle budget left and any radio fault, so a GM can tell a working modem from a stuck one without a laptop ([firmware/esp32/README.md](../firmware/esp32/README.md#the-modems-oled)). [`deploy/`](deploy/) has a systemd unit and a Mosquitto configuration with users and topic permissions.
+Flash the modem board with the modem firmware first (`python tools/docker_fw.py modem`, then the `esptool` command it prints, or `idf.py -B build-modem flash`). Its own OLED then shows whether the controller is talking to it (`LINK OK`, `DOWN`, `waiting`), the game it is configured for, the channel, the TX and RX counts with their failures, the duty-cycle budget left and any radio fault, so a GM can tell a working modem from a stuck one without a laptop, in the boxes' language (the controller sends it over the serial link with `SET_LANG`, [protocol/usb-modem.md](../protocol/usb-modem.md); [firmware/esp32/README.md](../firmware/esp32/README.md#the-modems-oled)). [`deploy/`](deploy/) has a systemd unit and a Mosquitto configuration with users and topic permissions.
 
 Without a modem (`[modem] port = ""`) the controller still runs: games can be created and the API works, but nothing reaches the boxes.
 

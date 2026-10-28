@@ -22,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yaml/yaml.dart';
 
 import '../support/core_libs.dart';
+import '../support/recording_modem.dart';
 import '../support/recording_radio.dart';
 
 const _fieldOpsMode = {
@@ -229,6 +230,26 @@ void main() {
       'console_lang': 'pt',
     });
     expect((dom['params'] as Map).containsKey('lang'), isFalse);
+    engine.close();
+  });
+
+  test("the modem's own screen follows the boxes' language (MOD-2)", () {
+    final modem = RecordingModem();
+    final engine = ControllerEngine(core: core, modem: modem);
+    expect(modem.languages, isEmpty); // "auto" and no game: the modem's build
+    engine.setBoxLanguage('de');
+    expect(modem.languages, ['de']);
+    engine.setBoxLanguage('auto');
+    expect(modem.languages, ['de']); // no game: it keeps what it has
+    final game = engine.createGame({
+      'name': 'x',
+      'mode_id': 'org.atalaia.domination',
+      'console_lang': 'pt',
+    });
+    expect(modem.languages, ['de', 'pt']);
+    engine.endGame(game['id'] as int);
+    engine.setBoxLanguage('zh-tw');
+    expect(modem.languages.last, 'zh-tw');
     engine.close();
   });
 

@@ -44,6 +44,8 @@ CMD_SET_PEER_EPOCH = 0x05
 CMD_CLEAR = 0x06
 CMD_IDENT = 0x07
 CMD_MEASURE = 0x08
+CMD_SET_LANG = 0x09  # the language of the modem's own screen (IDENT "lang": true)
+LANG_MAX = 8
 
 MEASURE_CAD = 0x01
 MEASURE_DWELL_MIN_MS = 10
@@ -78,6 +80,14 @@ ERRORS = {
 
 class FrameError(ValueError):
     pass
+
+
+def set_lang_payload(code: str) -> bytes:
+    """SET_LANG: the language code ("pt", "de", "zh-tw"...: letters, digits and '-', up to 8,
+    sent in lower case); "" sends the modem back to its build's language."""
+    if len(code) > LANG_MAX or not all(c.isascii() and (c.isalnum() or c == "-") for c in code):
+        raise ValueError(f"a language code is up to {LANG_MAX} letters, digits or '-': {code!r}")
+    return bytes([CMD_SET_LANG]) + code.lower().encode("ascii")
 
 
 def crc16(data: bytes) -> int:

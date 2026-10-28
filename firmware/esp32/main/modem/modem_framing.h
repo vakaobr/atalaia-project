@@ -61,7 +61,12 @@ typedef enum {
     MODEM_CMD_IDENT = 0x07,          /* reply IDENT */
     MODEM_CMD_MEASURE = 0x08,        /* channel_hz u32, dwell_ms u16, flags u8 (bit 0: CAD);
                                         reply NOISE when done */
+    MODEM_CMD_SET_LANG = 0x09,       /* the language of the modem's own screen: 0-8 ASCII bytes
+                                        (a code like "pt", "zh-tw"; none: the build's default) */
 } modem_cmd_t;
+
+/* Longest language code of a SET_LANG, without the opcode. */
+#define MODEM_LANG_MAX 8
 
 /* Payload length of MODEM_CMD_MEASURE, opcode included. */
 #define MODEM_MEASURE_LEN 8

@@ -315,6 +315,25 @@ static const char *const texts[TX_COUNT][BOX_LANG_COUNT] = {
     [TXO_S_HELD] = {"HELD", "OCUPADO", "BESETZT", "已佔領"},
     [TXO_S_INACTIVE] = {"INACTIVE", "INATIVA", "INAKTIV", "未啟用"},
     [TXO_S_COMPLETED] = {"COMPLETED", "COMPLETA", "FERTIG", "已完成"},
+    /* The USB radio modem's OLED (modem_screen.c). Its 8-pixel font has ASCII only, so the Latin
+     * texts have no accents ("DC" is the duty cycle: "DUTY" and the budget do not fit in
+     * Portuguese); the Chinese ones are drawn in 16-pixel rows, and keep the counters' English
+     * words in the 8-pixel rows below. */
+    [TXM_TITLE] = {"MODEM MODE", "MODO MODEM", "USB-MODEM", "數據機模式"},
+    [TXM_LINK] = {"LINK", "LINK", "LINK", "LINK"},
+    [TXM_OK] = {"OK", "OK", "OK", "正常"},
+    [TXM_DOWN] = {"DOWN", "PERDIDO", "GETRENNT", "離線"},
+    [TXM_WAITING] = {"waiting", "aguarda", "wartet", "等待"},
+    [TXM_GAME] = {"GAME", "JOGO", "SPIEL", "遊戲"},
+    [TXM_IDLE] = {"IDLE", "PARADO", "RUHE", "待命"},
+    [TXM_NO_GAME] = {"no game", "sem jogo", "kein Spiel", "無遊戲"},
+    [TXM_MEASURING] = {"measuring", "a medir", "misst", "確認中"},
+    [TXM_RADIO_FAULT] = {"RADIO FAULT", "FALHA NO LORA", "FUNKFEHLER", "無線電錯誤"},
+    [TXM_NO_TX_RX] = {"no TX, no RX", "sem TX, sem RX", "kein TX, kein RX", "已停用"},
+    [TXM_DUTY] = {"DUTY", "DC", "DUTY", "DUTY"},
+    [TXM_LEFT] = {"%s left", "%s resta", "%s frei", "%s left"},
+    [TXM_FAIL] = {"fail", "falha", "Fehl", "fail"},
+    [TXM_AUTH] = {"auth", "aut", "auth", "auth"},
 };
 
 typedef struct {

@@ -87,7 +87,11 @@ static void display_loop(void *arg)
     lv_obj_t *scr = lv_display_get_screen_active(disp);
 
     if (CONFIG_ATALAIA_OLED_SPLASH_MS > 0) {
-        modem_screen_splash(scr, fw_version); /* the whole version, shown short (FV-8) */
+        modem_screen_state_t first_state;
+        modem_task_screen_state(&first_state, fault);
+        /* The whole version, shown short (FV-8); in the build's language: the controller has not
+         * said one yet. */
+        modem_screen_splash(scr, fw_version, first_state.lang);
         lv_refr_now(disp);
         vTaskDelay(pdMS_TO_TICKS(CONFIG_ATALAIA_OLED_SPLASH_MS));
     }

@@ -317,6 +317,32 @@ DUTY 341.2s left     the duty-cycle budget left (inverted at 0.0s)
   The modem still talks to the controller but cannot send or receive: the
   board needs a look (or another board).
 
+**Language** (decision MOD-1; the box's four languages, `main/box_text.c`'s
+`TXM_*` entries). The screen is in English, Portuguese, German or Traditional
+Chinese, the controller's choice: the field's *box language* setting, or with
+`auto` the language of the console that created the live game. The modem learns
+it from the controller over the serial link it already has (decision MOD-2:
+the `SET_LANG` command, opcode 9, announced by `"lang": true` in IDENT,
+[protocol/usb-modem.md](../../protocol/usb-modem.md); both the Pi and the phone
+controller send it after every connect, since the modem keeps it in RAM only),
+and until then, and on the boot splash, it uses the build's language: Kconfig
+`ATALAIA_MODEM_LANG` (`"en"`; edit `build-modem/sdkconfig` and build again), so
+a modem that serves a Portuguese field can say so from power-on. A language the
+screen lacks shows English. Portuguese and German use the same six lines with
+their own words, in the 8-pixel font's ASCII only (so no accents: `LINK
+PERDIDO`, `JOGO`, `FALHA NO LORA`, `FUNKFEHLER`; `DC` is the duty cycle, as
+`DUTY` and the budget do not fit a Portuguese line); `DUTY` and the counters'
+`TX`, `RX`, `CH` stay. Chinese needs the 14-pixel font, so it has a layout of
+its own: the link state (`正常`, `離線`, `等待`) goes in the right of the header
+bar, the game line (`遊戲 4660`, `待命 無遊戲`) is one 16-pixel row, and the
+channel, counters and duty budget stay 8-pixel lines with their English words
+(`fail`, `auth`, `left`); a radio fault takes two rows (`無線電錯誤`, `已停用`)
+and the reason. The Chinese words use only letters the box's fonts already
+carry (`tools/gen_box_fonts.py --check` stays green, no font was made again and
+the image did not grow for letters); `測量中` was not one of them, so the noise
+measurement says `確認中`. The host tests compare the screens in every
+language with `test/screens/oled/modem_*_{pt,de,zh-tw}.png`.
+
 The modem task publishes a copy of its state five times a second; the
 display task (priority 1, below the radio's 3 and the modem's 4) reads it
 twice a second and redraws only when a line changed, and only the changed

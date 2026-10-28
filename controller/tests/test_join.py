@@ -234,6 +234,29 @@ class BoxLanguageTests(unittest.TestCase):
         r = c.post("/api/v1/games", headers=GM, json={"name": "x", "mode_id": DOMINATION, "console_lang": "xx"})
         self.assertEqual(r.status_code, 400)
 
+    def test_the_modems_screen_follows_the_boxes_language(self):
+        """The modem board's OLED (decision MOD-2): the fixed setting at once and at a restart,
+        with "auto" the live game's language, and nothing to say when no game says one."""
+        c, modem = self.a.client, self.a.modem
+        modem.languages.clear()
+        c.put("/api/v1/settings/box-language", headers=GM, json={"box_language": "de"})
+        self.assertEqual(modem.languages, ["de"])
+        c.put("/api/v1/settings/box-language", headers=GM, json={"box_language": "auto"})
+        self.assertEqual(modem.languages, ["de"])  # no game: it keeps what it has
+        gid = self.game(console_lang="pt")
+        self.assertEqual(modem.languages, ["de", "pt"])
+        self.end(gid)
+        c.put("/api/v1/settings/box-language", headers=GM, json={"box_language": "zh-tw"})
+        self.assertEqual(modem.languages[-1], "zh-tw")
+        # A restart: the setting is read again and the modem told.
+        self.a.close()
+        self.a = Side(self.tmp.name, "keep", persist_game_key=True)
+        self.assertEqual(self.a.modem.languages, [])  # a new store: no setting yet
+        self.a.client.put("/api/v1/settings/box-language", headers=GM, json={"box_language": "en"})
+        self.a.close()
+        self.a = Side(self.tmp.name, "keep", persist_game_key=True)
+        self.assertEqual(self.a.modem.languages, ["en"])
+
     def test_the_setting_survives_a_restart(self):
         self.a.close()
         self.a = Side(self.tmp.name, "keep", persist_game_key=True)

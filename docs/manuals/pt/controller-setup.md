@@ -34,7 +34,7 @@ Põe a antena do modem na vertical, ao ar livre, longe de metal e do powerbank. 
 ## 3. Preparar a placa modem
 
 1. Compila o firmware do modem e grava a placa. Os passos estão no [guia do firmware, secção 9](firmware.md#9-a-placa-modem). Usa a mesma região das tuas caixas.
-2. Liga-a ao Pi. O ecrã pequeno dela mostra **MODEM MODE**. Ao início diz `LINK waiting`. Está certo: o controlador ainda não está a correr. (Estes textos só existem em inglês no software.)
+2. Liga-a ao Pi. O ecrã pequeno dela mostra **MODEM MODE**. Ao início diz `LINK waiting` (a língua da compilação, inglês por omissão). Está certo: o controlador ainda não está a correr. Quando o controlador arranca, o ecrã passa para a língua das tuas caixas (a definição **língua das caixas**): em português vês `LINK aguarda`, em alemão `LINK wartet`, em chinês `等待` na barra de cima. O resto deste guia usa as palavras em inglês.
 
 ## 4. Instalar o controlador
 

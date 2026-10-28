@@ -79,13 +79,48 @@ static void send_status(modem_t *m, int cmd, bool has_token, uint32_t token)
     send_frame(m, MODEM_FRAME_STATUS, (const uint8_t *)json, (size_t)n);
 }
 
+static bool lang_code_ok(const char *code, size_t n)
+{
+    if (n > MODEM_LANG_MAX) return false;
+    for (size_t i = 0; i < n; i++) {
+        char c = code[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+              c == '-'))
+            return false;
+    }
+    return true;
+}
+
+static void lang_copy(char *dst, const char *code, size_t n)
+{
+    for (size_t i = 0; i < n; i++) {
+        char c = code[i];
+        dst[i] = (c >= 'A' && c <= 'Z') ? (char)(c - 'A' + 'a') : c;
+    }
+    dst[n] = '\0';
+}
+
+bool modem_set_lang(modem_t *m, const char *code)
+{
+    size_t n = code != NULL ? strlen(code) : 0;
+    if (!lang_code_ok(code, n)) return false;
+    lang_copy(m->lang, code, n);
+    return true;
+}
+
+void modem_set_default_lang(modem_t *m, const char *code)
+{
+    size_t n = code != NULL ? strlen(code) : 0;
+    if (lang_code_ok(code, n)) lang_copy(m->lang_default, code, n);
+}
+
 void modem_send_ident(modem_t *m)
 {
     char json[MODEM_FRAME_PAYLOAD_MAX];
     int n = snprintf(json, sizeof(json),
                      "{\"fw\":\"atalaia-modem\",\"fw_version\":\"%s\",\"core_version\":\"%s\","
                      "\"framing\":%d,\"radio\":\"%s\",\"payload_max\":%d,\"epoch_window\":%u,"
-                     "\"measure\":%s,\"field\":true,\"pair\":true,\"region\":\"%s\"}",
+                     "\"measure\":%s,\"field\":true,\"pair\":true,\"lang\":true,\"region\":\"%s\"}",
                      m->fw_version != NULL ? m->fw_version : "unknown", atalaia_version(),
                      MODEM_PROTOCOL_VERSION, m->radio_present ? "sx1262" : "none",
                      ATALAIA_RF_PAYLOAD_MAX, (unsigned)m->epoch_window,
@@ -327,6 +362,21 @@ static void handle_cmd(modem_t *m, const uint8_t *p, size_t len)
         break;
     case MODEM_CMD_IDENT: modem_send_ident(m); return;
     case MODEM_CMD_MEASURE: cmd_measure(m, p, len); return;
+    case MODEM_CMD_SET_LANG: {
+        /* The payload's bytes after the opcode, which a C string must not hold. */
+        char code[MODEM_LANG_MAX + 2];
+        if (len - 1 > MODEM_LANG_MAX) {
+            send_error(m, MODEM_ERR_BAD_PARAMS, "SET_LANG: a code of up to 8 letters");
+            return;
+        }
+        memcpy(code, p + 1, len - 1);
+        code[len - 1] = '\0';
+        if (strlen(code) != len - 1 || !modem_set_lang(m, code)) {
+            send_error(m, MODEM_ERR_BAD_PARAMS, "SET_LANG: a code of up to 8 letters");
+            return;
+        }
+        break;
+    }
     default: send_error(m, MODEM_ERR_UNKNOWN_CMD, "unknown CMD opcode"); return;
     }
     send_status(m, op, false, 0);

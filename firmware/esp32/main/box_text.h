@@ -235,6 +235,23 @@ typedef enum {
     TXO_S_HELD,
     TXO_S_INACTIVE,
     TXO_S_COMPLETED,
+    /* the USB radio modem's own OLED (modem/modem_screen.c; decision MOD-1, 16 columns a line,
+     * ASCII only except in Chinese, which the modem draws in its Han rows) */
+    TXM_TITLE, /* "MODEM MODE", the header */
+    TXM_LINK,
+    TXM_OK,
+    TXM_DOWN,
+    TXM_WAITING,
+    TXM_GAME,
+    TXM_IDLE,
+    TXM_NO_GAME,
+    TXM_MEASURING,
+    TXM_RADIO_FAULT,
+    TXM_NO_TX_RX,
+    TXM_DUTY,
+    TXM_LEFT, /* %s: the duty-cycle budget left, "359.9s" */
+    TXM_FAIL,
+    TXM_AUTH,
     TX_COUNT,
 } box_text_id_t;
 

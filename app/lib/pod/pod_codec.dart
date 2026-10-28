@@ -57,6 +57,8 @@ abstract final class RadioOp {
   static const clear = 6;
   static const ident = 7;
   static const measure = 8;
+  static const setLang =
+      9; // the language of a USB modem's own OLED (IDENT `lang`)
 }
 
 const int capabilitiesMax = 16;

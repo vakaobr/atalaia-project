@@ -242,6 +242,7 @@ static void test_ident_and_ping(void)
     CHECK(strstr(json, "\"radio\":\"sx1262\"") != NULL);
     CHECK(strstr(json, "\"epoch_window\":16") != NULL);
     CHECK(strstr(json, "\"region\":\"eu868\"") != NULL); /* the build's region (RF-AS923-2) */
+    CHECK(strstr(json, "\"lang\":true") != NULL);        /* SET_LANG (decision MOD-2) */
 
     uint8_t ping[5] = {MODEM_CMD_PING};
     put32(ping + 1, 4242);
@@ -943,6 +944,72 @@ static void test_taiwan_modem(void)
     CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS && modem.channel_hz == 924750000u);
 }
 
+/* SET_LANG (decision MOD-2): the language of the modem's own screen, a STATUS reply like any
+ * command, an ERROR for what is not a code; the build's language until one comes. */
+static void set_lang(const char *code)
+{
+    uint8_t cmd[1 + MODEM_LANG_MAX + 4] = {MODEM_CMD_SET_LANG};
+    size_t n = strlen(code);
+    memcpy(cmd + 1, code, n);
+    clear_out();
+    host_send(MODEM_FRAME_CMD, cmd, 1 + n);
+}
+
+static void test_set_lang(void)
+{
+    setup(true, 16);
+    CHECK(strcmp(modem_lang(&modem), "") == 0);
+    modem_set_default_lang(&modem, "pt");
+    CHECK(strcmp(modem_lang(&modem), "pt") == 0);
+
+    set_lang("zh-tw");
+    CHECK(status_has("\"cmd\":9"));
+    CHECK(strcmp(modem_lang(&modem), "zh-tw") == 0);
+    set_lang("DE"); /* kept in lower case */
+    CHECK(strcmp(modem_lang(&modem), "de") == 0 && last_of(MODEM_FRAME_STATUS) >= 0);
+    /* No code: back to the build's. */
+    set_lang("");
+    CHECK(status_has("\"cmd\":9") && strcmp(modem_lang(&modem), "pt") == 0);
+    /* A language the screen lacks is accepted: it shows English. */
+    set_lang("fr");
+    CHECK(strcmp(modem_lang(&modem), "fr") == 0 && last_of(MODEM_FRAME_ERROR) < 0);
+
+    /* Not a code: too long, a space, a NUL, a byte that is not ASCII. The language stays. */
+    set_lang("zh-tw-hant");
+    CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS);
+    set_lang("p t");
+    CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS);
+    uint8_t nul[3] = {MODEM_CMD_SET_LANG, 'p', 0};
+    clear_out();
+    host_send(MODEM_FRAME_CMD, nul, sizeof(nul));
+    CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS);
+    uint8_t high[3] = {MODEM_CMD_SET_LANG, 'p', 0xC3};
+    clear_out();
+    host_send(MODEM_FRAME_CMD, high, sizeof(high));
+    CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS);
+    CHECK(strcmp(modem_lang(&modem), "fr") == 0);
+
+    /* A measurement does not hold it back; CLEAR (the game) does not reset it. */
+    modem.measuring = true;
+    set_lang("de");
+    CHECK(strcmp(modem_lang(&modem), "de") == 0);
+    modem.measuring = false;
+    host_send(MODEM_FRAME_CMD, (const uint8_t[]){MODEM_CMD_CLEAR}, 1);
+    CHECK(strcmp(modem_lang(&modem), "de") == 0);
+    CHECK(!modem_set_lang(&modem, "a_b") && strcmp(modem_lang(&modem), "de") == 0);
+}
+
+/* IDENT must still be sent whole with the longest version a development build has. */
+static void test_ident_with_a_long_version(void)
+{
+    setup(true, 16);
+    modem.fw_version = "0.4.0-dev.164+g8560d54.dirty-with-a-longer-suffix";
+    clear_out();
+    modem_send_ident(&modem);
+    CHECK(io_state.frames == 1 && io_state.type[0] == MODEM_FRAME_IDENT);
+    CHECK(io_state.len[0] > 0 && io_state.payload[0][io_state.len[0] - 1] == '}');
+}
+
 void run_modem_tests(void)
 {
     test_ident_and_ping();
@@ -958,4 +1025,6 @@ void run_modem_tests(void)
     test_measure();
     test_field_frames();
     test_pair_frames();
+    test_set_lang();
+    test_ident_with_a_long_version();
 }

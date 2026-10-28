@@ -80,6 +80,8 @@ class SerialModem extends ControllerModem {
   var _fieldId = 0;
   var _closed = false;
   _Measure? _measuring;
+  String? _lang; // the screen language to give the modem (setLanguage)
+  var _langSent = false; // the modem holds a language of ours
 
   @override
   String get state => _state;
@@ -98,6 +100,29 @@ class SerialModem extends ControllerModem {
 
   @override
   bool get hasPairFrames => _ident?['pair'] == true;
+
+  /// The firmware takes a screen language (IDENT `lang`, SET_LANG).
+  bool get hasLanguage => _ident?['lang'] == true;
+
+  /// SET_LANG (opcode 9): the modem's OLED in [code], sent when IDENT says
+  /// the firmware knows it, and again on every IDENT (a rebooted modem forgot
+  /// it); null sends the modem back to its build's language.
+  @override
+  void setLanguage(String? code) {
+    if (code != null && !_langCode.hasMatch(code)) {
+      throw ArgumentError.value(code, 'code', 'a language code');
+    }
+    _lang = code == null || code.isEmpty ? null : code.toLowerCase();
+    if (isUp && hasLanguage) _sendLanguage();
+  }
+
+  static final _langCode = RegExp(r'^[A-Za-z0-9-]{0,8}$');
+
+  void _sendLanguage() {
+    if (_lang == null && !_langSent) return;
+    _write(ModemFrame.cmd, [RadioOp.setLang, ...ascii.encode(_lang ?? '')]);
+    _langSent = _lang != null;
+  }
 
   Future<void> start() async {
     _sub = link.incoming.listen(
@@ -187,6 +212,9 @@ class SerialModem extends ControllerModem {
         final again = _ident != null;
         _ident = id.cast<String, Object?>();
         if (again) linkRestarted();
+        // A modem that identifies itself shows its build's language until told.
+        _langSent = false;
+        if (hasLanguage && _lang != null) _sendLanguage();
       case ModemFrame.rx:
         if (p.length < 9 + 4) return;
         final RfHeader header;

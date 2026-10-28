@@ -106,6 +106,8 @@ class RadioModem:
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._config: Optional[bytes] = None
+        self._lang_sent = False  # the modem holds a language of ours (to send "" when cleared)
+        self._lang: Optional[str] = None  # the screen language to give the modem (set_language)
         self._peers: dict[int, int] = {}
         self._ping_token = 0
         self._pending_ping: Optional[int] = None
@@ -159,6 +161,26 @@ class RadioModem:
         pairs = sorted(epochs.items())
         for i in range(0, len(pairs), 60):  # 60 pairs = 241 bytes, under the 256-byte limit
             self._write(mf.CMD, mf.peer_epoch_payload(pairs[i:i + 60]))
+
+    @property
+    def has_language(self) -> bool:
+        """The modem's firmware takes a screen language (IDENT "lang": true, SET_LANG)."""
+        return (self.ident or {}).get("lang") is True
+
+    def set_language(self, code: Optional[str]) -> None:
+        """The language of the modem's own OLED ("pt", "en", "de", "zh-tw"; protocol/usb-modem.md
+        SET_LANG). Kept and sent again whenever the modem identifies itself (it forgets on every
+        reboot); None or "" sends the modem back to its build's language. A modem whose firmware
+        has no SET_LANG is never sent one (its IDENT lacks "lang")."""
+        mf.set_lang_payload(code or "")  # refuses what is not a code, before it is kept
+        self._lang = code or None
+        if self.is_up and self.has_language:
+            self._send_language()
+
+    def _send_language(self) -> None:
+        if self._lang is not None or self._lang_sent:
+            self._write(mf.CMD, mf.set_lang_payload(self._lang or ""))
+            self._lang_sent = self._lang is not None
 
     def request_status(self, timeout: float = 5.0, retry_s: float = 1.0) -> Optional[dict[str, Any]]:
         """Sends STATUS and returns the modem's answer to it (None after ``timeout``).
@@ -392,6 +414,11 @@ class RadioModem:
             elif frame_type == mf.IDENT:
                 self.ident = json.loads(payload.decode("utf-8"))
                 log.info("modem: %s", self.ident)
+                # A modem that identifies itself has just booted or been asked: its screen's
+                # language is its build's until told. Only an older firmware has no "lang".
+                self._lang_sent = False
+                if self.has_language and self._lang is not None:
+                    self._send_language()
             elif frame_type == mf.NOISE:
                 self._measure_result = mf.decode_noise(payload)
                 self._measure_done.set()

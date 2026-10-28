@@ -419,6 +419,7 @@ class Controller:
                 modem.on_field_rx = self._on_field_rx
                 modem.on_field_ack = self._on_field_ack
         self._restore()
+        self._tell_modem_language()
 
     # --- plumbing -----------------------------------------------------------
 
@@ -794,6 +795,7 @@ class Controller:
             self.store.create_game(game, key if self.cfg.persist_game_key else None)
             if box_lang is not None:
                 self.store.set_setting(f"box_lang:{game_id}", box_lang)
+                self._tell_modem_language(box_lang)
             if disclosure is not None:
                 scenarios.store_disclosure(self, game_id, disclosure)
             self._activate(self.store.game(game_id) or game, key, 1)
@@ -935,7 +937,26 @@ class Controller:
             raise ControllerError(f"box_language: one of {', '.join(BOX_LANGUAGES)}")
         with self._lock:
             self.store.set_setting("box_language", value)
+            self._tell_modem_language()
         return self.box_language()
+
+    def _tell_modem_language(self, lang: Optional[str] = None) -> None:
+        """The language of the modem board's own OLED (decision MOD-2): the field's box-language
+        setting; with "auto" the language the live game's boxes got (the console's that created
+        it), else the modem keeps what it has (its build's language, or the last one sent). The
+        modem's own screen is staff-facing, so it follows the boxes' language, not each
+        console's."""
+        if self.modem is None:
+            return
+        if lang is None:
+            setting = self.store.get_setting("box_language") or "auto"
+            if setting != "auto":
+                lang = setting
+            elif self.game is None:
+                return
+            else:
+                lang = self.store.get_setting(f"box_lang:{self.game['id']}")
+        self.modem.set_language(lang)
 
     def _box_lang_for(self, console_lang: Any) -> Optional[str]:
         """A new game's box language: the setting, or with "auto" the console's ("pt", "en", "de", "zh-tw");

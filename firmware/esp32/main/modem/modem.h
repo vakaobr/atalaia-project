@@ -104,8 +104,10 @@ typedef struct {
     modem_dedupe_entry_t dedupe[MODEM_DEDUPE_SIZE];
     modem_counters_t count;
     uint32_t boot_ms;
-    bool host_seen;        /* a frame from the host has arrived since boot */
-    uint32_t last_host_ms; /* when the last one did (the OLED's link state) */
+    char lang[MODEM_LANG_MAX + 1];         /* the controller's SET_LANG ("" until it sends one) */
+    char lang_default[MODEM_LANG_MAX + 1]; /* the build's language, for a modem told none */
+    bool host_seen;                        /* a frame from the host has arrived since boot */
+    uint32_t last_host_ms;                 /* when the last one did (the OLED's link state) */
 } modem_t;
 
 /*
@@ -115,6 +117,21 @@ typedef struct {
  */
 void modem_init(modem_t *m, const modem_io_t *io, const atalaia_crypto_ops_t *crypto,
                 const char *fw_version, bool radio_present, uint16_t epoch_window);
+
+/*
+ * The language of the modem's own screen (SET_LANG): a code like "pt", "de", "zh-tw" (letters,
+ * digits and '-', up to MODEM_LANG_MAX, kept in lower case); "" goes back to the build's. A
+ * language the screen does not have shows in English (box_lang_from_code). False when code is
+ * not a code.
+ */
+bool modem_set_lang(modem_t *m, const char *code);
+/* The build's language, shown until the controller sends one (the Kconfig option). */
+void modem_set_default_lang(modem_t *m, const char *code);
+/* The language in force: the controller's, else the build's ("" when neither). */
+static inline const char *modem_lang(const modem_t *m)
+{
+    return m->lang[0] ? m->lang : m->lang_default;
+}
 
 /* Sends an IDENT frame (on boot and on MODEM_CMD_IDENT). */
 void modem_send_ident(modem_t *m);

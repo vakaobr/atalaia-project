@@ -302,10 +302,12 @@ O rádio do controlador é uma segunda Heltec V4 ligada à porta USB dele. Corre
 1. Monta a **antena LoRa**. O modem não tem Wi-Fi, por isso não precisa de antena de 2,4 GHz.
 2. Compila-o para a mesma revisão de placa e para a mesma região das caixas: `python tools/docker_fw.py modem` (com `--region=as923-tw` para Taiwan). Para uma V4.2, edita `firmware/esp32/build-modem/sdkconfig` como na [secção 4](#4-as-opções-de-quem-monta).
 3. Grava a partir de `firmware/esp32/build-modem` como na [secção 3](#3-grava-o). Se a placa já estiver ligada a um controlador em funcionamento, pára primeiro o controlador: ele tem a porta.
-4. Liga-a ao controlador. O ecrã pequeno dela mostra a torre e **MODEM MODE**, e depois o estado (estes textos só existem em inglês no software e ficam em inglês):
+4. Liga-a ao controlador. O ecrã pequeno dela mostra a torre e **MODO MODEM**, e depois o estado:
    - **LINK**: `waiting` (o controlador ainda não falou com ela: não está a correr, ou o modem está noutra porta), `OK`, ou `DOWN` (falou e depois parou durante 12 segundos).
    - O número do jogo, o canal, os pacotes enviados e recebidos com as falhas, e o tempo de emissão que resta.
-   - **RADIO FAULT** se o chip de rádio não arrancou.
+   - **FALHA NO LORA** se o chip de rádio não arrancou.
+
+   O ecrã está na língua das tuas caixas (inglês, português, alemão ou chinês tradicional). O controlador diz ao modem qual é de cada vez que se liga: a definição **língua das caixas** na consola da organização, ou, com `auto`, a língua da consola que criou o jogo. Antes de o controlador lhe ter falado, e no primeiro ecrã de arranque, o modem usa a língua da compilação, `en` por omissão. Para ser outra, põe `CONFIG_ATALAIA_MODEM_LANG="pt"` (ou `de`, `zh-tw`) em `firmware/esp32/build-modem/sdkconfig` e compila outra vez, como na [secção 4](#4-as-opções-de-quem-monta). Em português as palavras são `aguarda`, `OK`, `PERDIDO` e `FALHA NO LORA` (o tipo de letra pequeno não tem acentos); em alemão `wartet`, `OK`, `GETRENNT` e `FUNKFEHLER`; em chinês a ligação está na barra de cima (`等待`, `正常`, `離線`) e uma falha do rádio é `無線電錯誤`. Uma imagem de modem mais antiga, compilada antes disto, fica em inglês.
 5. Põe a porta dela na definição `[modem] port` do controlador. No Linux costuma ser `/dev/ttyACM0`. O [guia de montagem do controlador](controller-setup.md) mostra como.
 
 O modem é a única imagem cuja porta USB leva tramas de dados, por isso o registo dele está na UART0, e não no USB. Um modem assim já correu com o controlador e caixas reais numa bancada (2026-10-21). Ainda não testado num Raspberry Pi.

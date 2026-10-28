@@ -775,6 +775,15 @@ menu "Atalaia Field Box Configuration"
                 DOWN has really stopped, and the screen says so before the
                 controller gives up. Only the OLED uses it.
 
+        config ATALAIA_MODEM_LANG
+            string "Language of the modem's OLED until the controller says one"
+            default "en"
+            depends on ATALAIA_MODEM_MODE
+            help
+                "en", "pt", "de" or "zh-tw" (anything else shows English). The
+                controller sends its own language with SET_LANG after every
+                connect (protocol/usb-modem.md); this one shows on the boot
+                splash and while no controller has talked to the modem yet.
     endmenu
 
     config ATALAIA_MODEM_EPOCH_WINDOW

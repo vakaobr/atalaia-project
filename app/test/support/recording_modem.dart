@@ -122,6 +122,13 @@ class RecordingModem extends ControllerModem {
   @override
   void clear() => log.add({'kind': 'clear'});
 
+  /// The languages given for the modem's own OLED (decision MOD-2); not in [log], which the
+  /// shared contract cases read.
+  final languages = <String?>[];
+
+  @override
+  void setLanguage(String? code) => languages.add(code);
+
   @override
   bool setChannel(int channelHz) {
     log.add({'kind': 'channel', 'channel_hz': channelHz});

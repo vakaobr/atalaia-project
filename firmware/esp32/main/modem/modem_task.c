@@ -267,6 +267,7 @@ bool modem_task_start(const hal_t *hal)
     const esp_app_desc_t *app = esp_app_get_description();
     modem_init(&modem, &io, &atalaia_crypto_mbedtls, app->version, hal->radio != NULL,
                CONFIG_ATALAIA_MODEM_EPOCH_WINDOW);
+    modem_set_default_lang(&modem, CONFIG_ATALAIA_MODEM_LANG);
     /* The radio's boot channel (hal_esp_radio.c), shown until the controller sets one. */
     idle_channel_hz =
         atalaia_region_channel_ok(RADIO_REGION, CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ)

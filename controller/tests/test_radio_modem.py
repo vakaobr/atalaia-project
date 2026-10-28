@@ -24,8 +24,9 @@ KEY = bytes(range(16))
 class Ports:
     """A factory handing out FakeSerial ports; can be told to fail."""
 
-    def __init__(self, mute: bool = False) -> None:
+    def __init__(self, mute: bool = False, lang: bool = False) -> None:
         self.mute = mute
+        self.lang = lang
         self.fail = False
         self.opened: list[FakeSerial] = []
         self.lock = threading.Lock()
@@ -34,7 +35,7 @@ class Ports:
         with self.lock:
             if self.fail:
                 raise OSError("no such device")
-            port = FakeSerial(mute=self.mute)
+            port = FakeSerial(mute=self.mute, lang=self.lang)
             self.opened.append(port)
             return port
 
@@ -82,6 +83,47 @@ class RadioModemTests(unittest.TestCase):
             self.assertEqual(len(second.frames(mf.CMD, mf.CMD_CONFIGURE)), 1)
             self.assertEqual(second.frames(mf.CMD, mf.CMD_SET_PEER_EPOCH), [mf.peer_epoch_payload([(7, 4)])])
             self.assertGreaterEqual(modem.reconnects, 1)
+        finally:
+            modem.stop()
+
+    def test_the_screen_language_goes_to_a_modem_that_takes_it(self):
+        """SET_LANG (decision MOD-2): sent after IDENT says "lang", again on every IDENT (a modem
+        that rebooted has forgotten it), cleared with ""; never to a firmware without it."""
+        ports = Ports(lang=True)
+        modem, _ = make(ports)
+        modem.set_language("pt")  # before start: kept for the port
+        modem.start()
+        try:
+            self.assertTrue(modem.wait_up(2))
+            self.assertTrue(wait_for(lambda: modem.has_language))
+            first = ports.current
+            self.assertTrue(wait_for(lambda: first.frames(mf.CMD, mf.CMD_SET_LANG) == [b"\x09pt"]))
+            modem.set_language("zh-tw")  # while up: at once
+            self.assertTrue(wait_for(lambda: first.frames(mf.CMD, mf.CMD_SET_LANG)[-1] == b"\x09zh-tw"))
+            first.mute = True  # the modem hangs: reconnects, and the language goes again
+            self.assertTrue(wait_for(lambda: len(ports.opened) >= 2, 3))
+            self.assertTrue(modem.wait_up(2))
+            self.assertTrue(wait_for(lambda: ports.current.frames(mf.CMD, mf.CMD_SET_LANG) == [b"\x09zh-tw"]))
+            modem.set_language(None)  # back to the build's
+            self.assertTrue(wait_for(lambda: ports.current.frames(mf.CMD, mf.CMD_SET_LANG)[-1] == b"\x09"))
+            with self.assertRaises(ValueError):
+                modem.set_language("zh-tw-hant")
+            with self.assertRaises(ValueError):
+                modem.set_language("p t")
+        finally:
+            modem.stop()
+
+    def test_no_screen_language_for_an_older_modem(self):
+        ports = Ports()  # its IDENT has no "lang"
+        modem, _ = make(ports)
+        modem.set_language("de")
+        modem.start()
+        try:
+            self.assertTrue(modem.wait_up(2))
+            self.assertTrue(wait_for(lambda: modem.ident is not None))
+            self.assertFalse(modem.has_language)
+            modem.set_language("pt")
+            self.assertFalse(ports.current.frames(mf.CMD, mf.CMD_SET_LANG))
         finally:
             modem.stop()
 

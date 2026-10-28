@@ -4,7 +4,9 @@
  *
  * The USB radio modem's on-board OLED (modem_screen.h): a 16-pixel header
  * bar (the tower icon and "MODEM MODE", Montserrat 14, dark on lit) and six
- * 8-pixel lines of unscii 8, 16 characters each.
+ * 8-pixel lines of unscii 8, 16 characters each; in Chinese the header also
+ * holds the link state and the game line is a 16-pixel Montserrat 14 row
+ * (modem_screen.h).
  */
 #include "modem_screen.h"
 
@@ -31,6 +33,7 @@ void modem_screen_state(const modem_t *m, uint32_t now_ms, uint32_t link_timeout
     out->rx_auth_fail = m->count.rx_auth_fail;
     out->tx = m->count.tx_ok;
     out->tx_fail = m->count.tx_fail;
+    out->lang = box_lang_from_code(modem_lang(m));
     out->radio_ok = m->radio_present;
     out->duty_ms = m->radio_present ? duty_ms : 0;
     if (!m->radio_present) {
@@ -133,45 +136,103 @@ static void counts(char *out, const char *label, uint32_t n, const char *bad_lab
     two_col(out, left, right);
 }
 
+static const char *tx(const modem_screen_state_t *s, box_text_id_t id)
+{
+    return box_text_in(s->lang, id);
+}
+
+/* The link's state word. */
+static const char *link_word(const modem_screen_state_t *s)
+{
+    switch (s->link) {
+    case MODEM_LINK_UP: return tx(s, TXM_OK);
+    case MODEM_LINK_DOWN: return tx(s, TXM_DOWN);
+    default: return tx(s, TXM_WAITING);
+    }
+}
+
+/* The game's state: "GAME" and its id, or "IDLE" and why. */
+static void game_texts(const modem_screen_state_t *s, const char **left, char *id, size_t id_sz,
+                       const char **right)
+{
+    if (s->configured) {
+        snprintf(id, id_sz, "%u", (unsigned)s->game_id);
+        *left = tx(s, TXM_GAME);
+        *right = id;
+    } else {
+        *left = tx(s, TXM_IDLE);
+        *right = tx(s, s->measuring ? TXM_MEASURING : TXM_NO_GAME);
+    }
+}
+
+/* The channel, the counters and the duty budget: 8-pixel lines in every language. */
+static void numbers(const modem_screen_state_t *s, modem_screen_text_t *out, int first)
+{
+    char v[24];
+    mhz(s->channel_hz, v, sizeof(v));
+    two_col(out->line[first], "CH", v);
+    counts(out->line[first + 1], "TX", s->tx, tx(s, TXM_FAIL), s->tx_fail);
+    counts(out->line[first + 2], "RX", s->rx, tx(s, TXM_AUTH), s->rx_auth_fail);
+    char left[12];
+    seconds(s->duty_ms, left, sizeof(left));
+    snprintf(v, sizeof(v), tx(s, TXM_LEFT), left);
+    two_col(out->line[first + 3], tx(s, TXM_DUTY), v);
+    out->inverted[first + 3] = s->duty_ms == 0;
+}
+
+/* Chinese: a Han letter needs the 14-pixel font, 16 pixels a row, so the link state goes into the
+ * header bar and the game line is the one tall row; the radio fault takes two. */
+static void text_han(const modem_screen_state_t *s, modem_screen_text_t *out)
+{
+    snprintf(out->head_right, sizeof(out->head_right), "%s", link_word(s));
+    if (!s->radio_ok) {
+        snprintf(out->line[0], sizeof(out->line[0]), "%s", tx(s, TXM_RADIO_FAULT));
+        out->tall[0] = true;
+        out->inverted[0] = true;
+        snprintf(out->line[1], sizeof(out->line[1]), "%s", tx(s, TXM_NO_TX_RX));
+        out->tall[1] = true;
+        const char *rest = wrap(s->fault, out->line[2]);
+        wrap(rest, out->line[3]);
+        out->rows = 4;
+        return;
+    }
+    char id[8];
+    const char *left, *right;
+    game_texts(s, &left, id, sizeof(id), &right);
+    snprintf(out->line[0], sizeof(out->line[0]), "%s", left);
+    snprintf(out->right[0], sizeof(out->right[0]), "%s", right);
+    out->tall[0] = true;
+    numbers(s, out, 1);
+    out->rows = 5;
+}
+
 void modem_screen_text(const modem_screen_state_t *s, modem_screen_text_t *out)
 {
     memset(out, 0, sizeof(*out));
-    char v[24];
-
-    switch (s->link) {
-    case MODEM_LINK_UP: two_col(out->line[0], "LINK", "OK"); break;
-    case MODEM_LINK_DOWN:
-        two_col(out->line[0], "LINK", "DOWN");
-        out->inverted[0] = true;
-        break;
-    default: two_col(out->line[0], "LINK", "waiting"); break;
+    snprintf(out->title, sizeof(out->title), "%s", tx(s, TXM_TITLE));
+    if (s->lang == BOX_LANG_ZH_TW) {
+        text_han(s, out);
+        return;
     }
+    out->rows = MODEM_SCREEN_LINES;
 
-    if (s->configured) {
-        snprintf(v, sizeof(v), "%u", (unsigned)s->game_id);
-        two_col(out->line[1], "GAME", v);
-    } else {
-        two_col(out->line[1], "IDLE", s->measuring ? "measuring" : "no game");
-    }
+    two_col(out->line[0], tx(s, TXM_LINK), link_word(s));
+    out->inverted[0] = s->link == MODEM_LINK_DOWN;
+
+    char id[8];
+    const char *left, *right;
+    game_texts(s, &left, id, sizeof(id), &right);
+    two_col(out->line[1], left, right);
 
     if (!s->radio_ok) {
-        two_col(out->line[2], "RADIO FAULT", "");
+        two_col(out->line[2], tx(s, TXM_RADIO_FAULT), "");
         out->inverted[2] = true;
         const char *rest = wrap(s->fault, out->line[3]);
         wrap(rest, out->line[4]);
-        two_col(out->line[5], "no TX, no RX", "");
+        two_col(out->line[5], tx(s, TXM_NO_TX_RX), "");
         return;
     }
-
-    mhz(s->channel_hz, v, sizeof(v));
-    two_col(out->line[2], "CH", v);
-    counts(out->line[3], "TX", s->tx, "fail", s->tx_fail);
-    counts(out->line[4], "RX", s->rx, "auth", s->rx_auth_fail);
-    char left[12];
-    seconds(s->duty_ms, left, sizeof(left));
-    snprintf(v, sizeof(v), "%s left", left);
-    two_col(out->line[5], "DUTY", v);
-    out->inverted[5] = s->duty_ms == 0;
+    numbers(s, out, 2);
 }
 
 /* ---- Drawing (LVGL) ------------------------------------------------------ */
@@ -186,7 +247,11 @@ void modem_screen_text(const modem_screen_state_t *s, modem_screen_text_t *out)
 #define BAR_H  16
 #define LINE_H 8
 
+#define TALL_H 16 /* a Han row: Montserrat 14's line */
+
+static lv_obj_t *title_label, *head_right_label;
 static lv_obj_t *lines[MODEM_SCREEN_LINES];
+static lv_obj_t *rights[MODEM_SCREEN_LINES]; /* a tall row's right text */
 static bool built;
 
 static void clean(lv_obj_t *scr)
@@ -239,15 +304,20 @@ static void build(lv_obj_t *scr)
     static lv_image_dsc_t icon;
     lv_obj_t *img = image(bar, &icon, oled_icon_a8, OLED_ICON_W, OLED_ICON_H, lv_color_black());
     lv_obj_align(img, LV_ALIGN_LEFT_MID, 2, 0);
-    lv_obj_t *title = label(bar, &lv_font_atalaia_14, "MODEM MODE");
-    lv_obj_set_style_text_color(title, lv_color_black(), 0);
-    lv_obj_align(title, LV_ALIGN_LEFT_MID, OLED_ICON_W + 5, 0);
+    title_label = label(bar, &lv_font_atalaia_14, "");
+    lv_obj_set_style_text_color(title_label, lv_color_black(), 0);
+    lv_obj_align(title_label, LV_ALIGN_LEFT_MID, OLED_ICON_W + 5, 0);
+    head_right_label = label(bar, &lv_font_atalaia_14, "");
+    lv_obj_set_style_text_color(head_right_label, lv_color_black(), 0);
+    lv_obj_align(head_right_label, LV_ALIGN_RIGHT_MID, -3, 0);
 
     for (int i = 0; i < MODEM_SCREEN_LINES; i++) {
         lines[i] = label(scr, &lv_font_unscii_8, "");
-        lv_obj_set_size(lines[i], OLED_W, LINE_H);
         lv_obj_set_style_bg_color(lines[i], lv_color_white(), 0);
-        lv_obj_align(lines[i], LV_ALIGN_TOP_LEFT, 0, BAR_H + i * LINE_H);
+    }
+    for (int i = 0; i < MODEM_SCREEN_LINES; i++) {
+        rights[i] = label(scr, &lv_font_atalaia_14, "");
+        lv_obj_set_width(rights[i], LV_SIZE_CONTENT);
     }
     built = true;
 }
@@ -256,15 +326,28 @@ void modem_screen_draw(lv_obj_t *scr, const modem_screen_text_t *t)
 {
     if (!scr) return;
     if (!built) build(scr);
+    lv_label_set_text(title_label, t->title);
+    lv_label_set_text(head_right_label, t->head_right);
+    int32_t y = BAR_H;
     for (int i = 0; i < MODEM_SCREEN_LINES; i++) {
-        lv_label_set_text(lines[i], t->line[i]);
-        lv_obj_set_style_bg_opa(lines[i], t->inverted[i] ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
-        lv_obj_set_style_text_color(lines[i], t->inverted[i] ? lv_color_black() : lv_color_white(),
-                                    0);
+        bool used = i < t->rows;
+        bool tall = used && t->tall[i];
+        lv_color_t ink = t->inverted[i] ? lv_color_black() : lv_color_white();
+        lv_obj_set_style_text_font(lines[i], tall ? &lv_font_atalaia_14 : &lv_font_unscii_8, 0);
+        lv_obj_set_style_pad_left(lines[i], tall ? 2 : 0, 0);
+        lv_obj_set_size(lines[i], OLED_W, tall ? TALL_H : LINE_H);
+        lv_obj_set_pos(lines[i], 0, y);
+        lv_label_set_text(lines[i], used ? t->line[i] : "");
+        lv_obj_set_style_bg_opa(lines[i], used && t->inverted[i] ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+        lv_obj_set_style_text_color(lines[i], ink, 0);
+        lv_label_set_text(rights[i], tall ? t->right[i] : "");
+        lv_obj_set_style_text_color(rights[i], ink, 0);
+        lv_obj_align(rights[i], LV_ALIGN_TOP_RIGHT, -2, y);
+        y += tall ? TALL_H : LINE_H;
     }
 }
 
-void modem_screen_splash(lv_obj_t *scr, const char *version)
+void modem_screen_splash(lv_obj_t *scr, const char *version, box_lang_t lang)
 {
     if (!scr) return;
     clean(scr);
@@ -279,15 +362,19 @@ void modem_screen_splash(lv_obj_t *scr, const char *version)
     oled_version_lines(version, line1, sizeof(line1), line2, sizeof(line2));
     const int32_t x = OLED_SPLASH_TEXT_X;
     const int32_t w = HAL_OLED_WIDTH - x;
+    /* The mode's name in the language: unscii 8 (ASCII), or in Chinese Montserrat 14, which is
+     * taller, so everything sits closer. */
+    const bool han = lang == BOX_LANG_ZH_TW;
     lv_obj_t *name = label(scr, &lv_font_atalaia_20, "ATALAIA");
-    lv_obj_align(name, LV_ALIGN_TOP_LEFT, x, line2[0] ? 1 : 6);
-    lv_obj_t *mode = label(scr, &lv_font_unscii_8, "MODEM MODE");
-    lv_obj_align_to(mode, name, LV_ALIGN_OUT_BOTTOM_LEFT, 0, line2[0] ? 2 : 4);
+    lv_obj_align(name, LV_ALIGN_TOP_LEFT, x, han ? 0 : line2[0] ? 1 : 6);
+    lv_obj_t *mode =
+        label(scr, han ? &lv_font_atalaia_14 : &lv_font_unscii_8, box_text_in(lang, TXM_TITLE));
+    lv_obj_align_to(mode, name, LV_ALIGN_OUT_BOTTOM_LEFT, 0, han ? 0 : line2[0] ? 2 : 4);
     lv_obj_t *ver =
         label(scr, &lv_font_atalaia_14, oled_version_fit(line1, &lv_font_atalaia_14, w));
     lv_label_set_long_mode(ver, LV_LABEL_LONG_DOT);
     lv_obj_set_width(ver, w);
-    lv_obj_align_to(ver, mode, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 2);
+    lv_obj_align_to(ver, mode, LV_ALIGN_OUT_BOTTOM_LEFT, 0, han ? 0 : 2);
     if (line2[0]) {
         lv_obj_t *commit = label(scr, &lv_font_unscii_8, line2);
         lv_obj_set_width(commit, w);

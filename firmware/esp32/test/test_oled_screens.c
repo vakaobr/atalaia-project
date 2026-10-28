@@ -226,7 +226,8 @@ static const oled_case_t cases[] = {
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 
-/* The USB radio modem's screens: the modem_splash* cases are modem_screen_splash(). */
+/* The USB radio modem's screens: the modem_splash* cases are modem_screen_splash(); a case whose
+ * name ends in "_pt", "_de" or "_zh-tw" is in that language (decision MOD-1). */
 typedef struct {
     const char *name;
     const char *version; /* the splashes': the firmware's version; NULL a status screen */
@@ -269,6 +270,100 @@ static const modem_case_t modem_cases[] = {
       .radio_ok = true,
       .duty_ms = 0}},
     {"modem_radio_fault",
+     NULL,
+     {.link = MODEM_LINK_UP,
+      .channel_hz = 869525000u,
+      .radio_ok = false,
+      .fault = "SX1262 errors 0x0020 (TCXO)"}},
+    /* The same screens in the other languages (the state's lang is set from the name). */
+    {"modem_splash_pt", "0.2.0", {0}},
+    {"modem_splash_de", "0.2.0", {0}},
+    {"modem_splash_zh-tw", "0.2.0", {0}},
+    {"modem_splash_dev_zh-tw", "0.4.0-dev.12+gabc1234", {0}},
+    {"modem_splash_dev_dirty_zh-tw", "0.4.0-dev.164+g8560d54.dirty", {0}},
+    {"modem_waiting_pt",
+     NULL,
+     {.link = MODEM_LINK_WAITING, .channel_hz = 869525000u, .radio_ok = true, .duty_ms = 360000}},
+    {"modem_game_pt",
+     NULL,
+     {.link = MODEM_LINK_UP,
+      .configured = true,
+      .game_id = 4660,
+      .channel_hz = 869525000u,
+      MODEM_COUNTS,
+      .radio_ok = true,
+      .duty_ms = 341200}},
+    {"modem_link_down_pt",
+     NULL,
+     {.link = MODEM_LINK_DOWN,
+      .configured = true,
+      .game_id = 4660,
+      .channel_hz = 869525000u,
+      MODEM_COUNTS,
+      .radio_ok = true,
+      .duty_ms = 341200}},
+    {"modem_radio_fault_pt",
+     NULL,
+     {.link = MODEM_LINK_UP,
+      .channel_hz = 869525000u,
+      .radio_ok = false,
+      .fault = "SX1262 errors 0x0020 (TCXO)"}},
+    {"modem_waiting_de",
+     NULL,
+     {.link = MODEM_LINK_WAITING, .channel_hz = 869525000u, .radio_ok = true, .duty_ms = 360000}},
+    {"modem_game_de",
+     NULL,
+     {.link = MODEM_LINK_UP,
+      .configured = true,
+      .game_id = 4660,
+      .channel_hz = 869525000u,
+      MODEM_COUNTS,
+      .radio_ok = true,
+      .duty_ms = 341200}},
+    {"modem_link_down_de",
+     NULL,
+     {.link = MODEM_LINK_DOWN,
+      .measuring = true,
+      .channel_hz = 869525000u,
+      MODEM_COUNTS,
+      .radio_ok = true,
+      .duty_ms = 341200}},
+    {"modem_radio_fault_de",
+     NULL,
+     {.link = MODEM_LINK_UP,
+      .channel_hz = 869525000u,
+      .radio_ok = false,
+      .fault = "SX1262 errors 0x0020 (TCXO)"}},
+    {"modem_waiting_zh-tw",
+     NULL,
+     {.link = MODEM_LINK_WAITING, .channel_hz = 869525000u, .radio_ok = true, .duty_ms = 360000}},
+    {"modem_game_zh-tw",
+     NULL,
+     {.link = MODEM_LINK_UP,
+      .configured = true,
+      .game_id = 4660,
+      .channel_hz = 869525000u,
+      MODEM_COUNTS,
+      .radio_ok = true,
+      .duty_ms = 341200}},
+    {"modem_link_down_zh-tw",
+     NULL,
+     {.link = MODEM_LINK_DOWN,
+      .measuring = true,
+      .channel_hz = 869525000u,
+      MODEM_COUNTS,
+      .radio_ok = true,
+      .duty_ms = 341200}},
+    {"modem_no_duty_zh-tw",
+     NULL,
+     {.link = MODEM_LINK_UP,
+      .configured = true,
+      .game_id = 4660,
+      .channel_hz = 868100000u,
+      MODEM_COUNTS,
+      .radio_ok = true,
+      .duty_ms = 0}},
+    {"modem_radio_fault_zh-tw",
      NULL,
      {.link = MODEM_LINK_UP,
       .channel_hz = 869525000u,
@@ -376,15 +471,53 @@ static void render(const oled_case_t *c)
     capture(scr);
 }
 
+/* The language a modem case is in, from its name's ending. */
+static box_lang_t modem_case_lang(const modem_case_t *c)
+{
+    size_t n = strlen(c->name);
+    if (n > 6 && strcmp(c->name + n - 6, "_zh-tw") == 0) return BOX_LANG_ZH_TW;
+    if (n > 3 && strcmp(c->name + n - 3, "_pt") == 0) return BOX_LANG_PT;
+    if (n > 3 && strcmp(c->name + n - 3, "_de") == 0) return BOX_LANG_DE;
+    return BOX_LANG_EN;
+}
+
+static int32_t text_w(const char *s, const lv_font_t *font)
+{
+    return lv_text_get_width(s, (uint32_t)strlen(s), font, 0);
+}
+
+/* The 16-pixel rows' two texts and the header's two do not meet (modem_screen.c: 2 pixels in,
+ * the right text 2 in from the edge; the bar's title starts at 14, its state ends 3 in). */
+static void check_modem_rows(const modem_case_t *c, const modem_screen_text_t *t)
+{
+    extern const lv_font_t lv_font_atalaia_14;
+    for (int i = 0; i < t->rows; i++) {
+        if (!t->tall[i]) continue;
+        if (2 + text_w(t->line[i], &lv_font_atalaia_14) + 4 +
+                text_w(t->right[i], &lv_font_atalaia_14) + 2 >
+            W)
+            fail(c->name, "the two texts of a tall row meet");
+    }
+    /* The title (from 14) ends before the state, or before the bar's edge. */
+    int32_t title_end = 14 + text_w(t->title, &lv_font_atalaia_14);
+    int32_t limit =
+        t->head_right[0] ? W - 3 - text_w(t->head_right, &lv_font_atalaia_14) - 4 : W - 2;
+    if (title_end > limit) fail(c->name, "the header's title and the link state meet");
+}
+
 static void render_modem(const modem_case_t *c)
 {
     lv_obj_t *scr = lv_screen_active();
+    box_lang_t lang = modem_case_lang(c);
     if (c->version) {
-        modem_screen_splash(scr, c->version);
+        modem_screen_splash(scr, c->version, lang);
     } else {
+        modem_screen_state_t state = c->state;
+        state.lang = lang;
         modem_screen_text_t t;
-        modem_screen_text(&c->state, &t);
+        modem_screen_text(&state, &t);
         modem_screen_draw(scr, &t);
+        check_modem_rows(c, &t);
     }
     capture(scr);
 }
@@ -566,12 +699,15 @@ static void check_labels_fit(const char *name)
         lv_obj_t *l = lv_obj_get_child(scr, (int32_t)i);
         if (!lv_obj_check_type(l, &lv_label_class)) continue;
         const char *s = lv_label_get_text(l);
+        if (s[0] == '\0') continue; /* a modem line with nothing in it */
         const lv_font_t *font = lv_obj_get_style_text_font(l, LV_PART_MAIN);
         int32_t tw = lv_text_get_width(s, (uint32_t)strlen(s), font, 0);
         lv_area_t a;
         lv_obj_get_coords(l, &a);
+        /* unscii 8 says its line is 9 pixels; its glyphs are 8 (the modem's six lines fill 48). */
+        const int32_t lh = font == &lv_font_unscii_8 ? 8 : lv_font_get_line_height(font);
         if (tw > lv_area_get_width(&a)) fail(name, "a line of the splash is clipped");
-        if (a.x1 < 0 || a.y1 < 0 || a.x1 + tw > W || a.y1 + lv_font_get_line_height(font) > H)
+        if (a.x1 < 0 || a.y1 < 0 || a.x1 + tw > W || a.y1 + lh > H)
             fail(name, "a line of the splash leaves the screen");
     }
 }
@@ -642,7 +778,12 @@ int main(void)
     check_button_hold();
     for (int i = 0; i < MODEM_CASE_COUNT; i++) {
         render_modem(&modem_cases[i]);
-        if (modem_cases[i].version) check_labels_fit(modem_cases[i].name);
+        /* Every letter in its own label's font (the header bar's included), and every line whole
+         * and on the screen. */
+        char msg[200] = "";
+        if (font_check_labels(lv_screen_active(), msg, sizeof(msg)) > 0)
+            fail(modem_cases[i].name, msg);
+        check_labels_fit(modem_cases[i].name);
         compare_with_reference(modem_cases[i].name);
     }
     check_splash_hold();

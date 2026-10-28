@@ -306,6 +306,8 @@ The controller's radio is a second Heltec V4 plugged into its USB port. It runs 
    - **LINK**: `waiting` (the controller has not talked to it yet: it is not running, or the modem is on another port), `OK`, or `DOWN` (it talked, then stopped for 12 seconds).
    - The game number, the channel, the packets sent and received with their failures, and the airtime left.
    - **RADIO FAULT** if the radio chip did not start.
+
+   The screen is in the language of your boxes (English, Portuguese, German or Traditional Chinese). The controller tells the modem which one every time it connects: the **box language** setting in the GM console, or with `auto` the language of the console that created the game. Before the controller has talked to it, and on the first splash, the modem uses its build's language, `en` by default. To make it another one, set `CONFIG_ATALAIA_MODEM_LANG="pt"` (or `de`, `zh-tw`) in `firmware/esp32/build-modem/sdkconfig` and build again, as in [section 4](#4-the-options-a-builder-sets). In Portuguese the words are `aguarda`, `OK`, `PERDIDO` and `FALHA NO LORA` (the small font has no accents); in German `wartet`, `OK`, `GETRENNT` and `FUNKFEHLER`; in Chinese the link is in the top bar (`等待`, `正常`, `離線`) and a radio fault is `無線電錯誤`. An older modem image, built before this, stays in English.
 5. Put its port into the controller's `[modem] port` setting. On Linux it is usually `/dev/ttyACM0`. The [controller setup guide](controller-setup.md) shows how.
 
 The modem is the only image whose USB port carries data frames, so its log is on UART0, not on USB. A modem like this has run with the controller and real boxes on a bench (2026-10-21). Not yet tested on a Raspberry Pi.

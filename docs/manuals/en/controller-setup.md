@@ -34,7 +34,7 @@ Put the modem's antenna upright, in the open, away from metal and from the power
 ## 3. Prepare the modem board
 
 1. Build the modem firmware and flash the board. The steps are in the [firmware guide, section 9](firmware.md#9-the-modem-board). Use the same region as your boxes.
-2. Plug it into the Pi. Its small screen shows **MODEM MODE**. At first it says `LINK waiting`. That is right: the controller is not running yet.
+2. Plug it into the Pi. Its small screen shows **MODEM MODE**. At first it says `LINK waiting`. That is right: the controller is not running yet. Once the controller runs, the screen switches to the language of your boxes (the **box language** setting), so in Portuguese you will see `LINK aguarda`, in German `LINK wartet`, in Chinese `等待` in the top bar; the rest of this guide uses the English words.
 
 ## 4. Install the controller
 

@@ -354,6 +354,7 @@ class ControllerEngine {
         });
     }
     _restore();
+    _tellModemLanguage();
   }
 
   final ControllerConfig config;
@@ -817,7 +818,10 @@ class ControllerEngine {
       'team_info': teamInfo,
     };
     store.createGame(game, key: config.persistGameKey ? key : null);
-    if (boxLang != null) store.setSetting('box_lang:$id', boxLang);
+    if (boxLang != null) {
+      store.setSetting('box_lang:$id', boxLang);
+      _tellModemLanguage(boxLang);
+    }
     if (disclosure != null) scenarios?.storeDisclosure(id, disclosure);
     _activate(store.game(id)!, key);
     final out = getGame(id);
@@ -1554,7 +1558,27 @@ class ControllerEngine {
       throw ControllerError('box_language: one of ${boxLanguages.join(', ')}');
     }
     store.setSetting('box_language', value);
+    _tellModemLanguage();
     return boxLanguage();
+  }
+
+  /// The language of the USB modem's own OLED (decision MOD-2; the Pi's
+  /// `_tell_modem_language`): the field's setting, with "auto" the live
+  /// game's boxes' language, and nothing while no game says one.
+  void _tellModemLanguage([String? lang]) {
+    final m = modem;
+    if (m == null) return;
+    if (lang == null) {
+      final setting = store.getSetting('box_language') ?? 'auto';
+      if (setting != 'auto') {
+        lang = setting;
+      } else if (_game == null) {
+        return;
+      } else {
+        lang = store.getSetting('box_lang:${_game!['id']}');
+      }
+    }
+    m.setLanguage(lang);
   }
 
   String? _boxLangFor(Object? consoleLang) {

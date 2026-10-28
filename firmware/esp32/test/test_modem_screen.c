@@ -221,6 +221,143 @@ static void test_text_radio_fault(void)
     CHECK(strcmp(t.line[4], "20longword") == 0);
 }
 
+/* The language comes from SET_LANG, else the build's (decision MOD-2). */
+static void test_state_language(void)
+{
+    static modem_t m;
+    start(&m, true);
+    CHECK(state_of(&m, 0, NULL).lang == BOX_LANG_EN);
+    modem_set_default_lang(&m, "de");
+    CHECK(state_of(&m, 0, NULL).lang == BOX_LANG_DE);
+    modem_set_lang(&m, "zh-tw");
+    CHECK(state_of(&m, 0, NULL).lang == BOX_LANG_ZH_TW);
+    modem_set_lang(&m, "pt");
+    CHECK(state_of(&m, 0, NULL).lang == BOX_LANG_PT);
+    modem_set_lang(&m, "fr"); /* a language the screen lacks */
+    CHECK(state_of(&m, 0, NULL).lang == BOX_LANG_EN);
+    modem_set_lang(&m, "");
+    CHECK(state_of(&m, 0, NULL).lang == BOX_LANG_DE);
+}
+
+static void test_text_portuguese_and_german(void)
+{
+    modem_screen_state_t s = sample();
+    modem_screen_text_t t;
+    s.lang = BOX_LANG_PT;
+    modem_screen_text(&s, &t);
+    CHECK(strcmp(t.title, "MODO MODEM") == 0 && t.rows == MODEM_SCREEN_LINES);
+    CHECK(strcmp(t.line[0], "LINK          OK") == 0);
+    CHECK(strcmp(t.line[1], "JOGO        4660") == 0);
+    CHECK(strcmp(t.line[3], "TX 1234  falha 3") == 0);
+    CHECK(strcmp(t.line[4], "RX 56k     aut 0") == 0);
+    CHECK(strcmp(t.line[5], "DC  359.9s resta") == 0);
+    s.link = MODEM_LINK_DOWN;
+    s.configured = false;
+    modem_screen_text(&s, &t);
+    CHECK(strcmp(t.line[0], "LINK     PERDIDO") == 0 && t.inverted[0]);
+    CHECK(strcmp(t.line[1], "PARADO  sem jogo") == 0);
+    s.link = MODEM_LINK_WAITING;
+    modem_screen_text(&s, &t);
+    CHECK(strcmp(t.line[0], "LINK     aguarda") == 0);
+
+    s = sample();
+    s.lang = BOX_LANG_DE;
+    modem_screen_text(&s, &t);
+    CHECK(strcmp(t.title, "USB-MODEM") == 0);
+    CHECK(strcmp(t.line[1], "SPIEL       4660") == 0);
+    CHECK(strcmp(t.line[3], "TX 1234   Fehl 3") == 0);
+    CHECK(strcmp(t.line[5], "DUTY 359.9s frei") == 0);
+    s.link = MODEM_LINK_DOWN;
+    s.configured = false;
+    s.measuring = true;
+    modem_screen_text(&s, &t);
+    CHECK(strcmp(t.line[0], "LINK    GETRENNT") == 0);
+    CHECK(strcmp(t.line[1], "RUHE       misst") == 0);
+    s.radio_ok = false;
+    strcpy(s.fault, "SX1262 not found");
+    modem_screen_text(&s, &t);
+    CHECK(strcmp(t.line[2], "FUNKFEHLER") == 0 && t.inverted[2]);
+    CHECK(strcmp(t.line[5], "kein TX, kein RX") == 0);
+}
+
+/* Every line of every language fits its 16 columns, and has only ASCII (unscii 8) except in
+ * Chinese's tall rows and header. */
+static void test_every_language_fits(void)
+{
+    static const uint32_t duties[] = {0, 1500, 359900, 999900, 3600000, 4294967295u};
+    for (int lang = 0; lang < BOX_LANG_COUNT; lang++) {
+        for (int link = MODEM_LINK_WAITING; link <= MODEM_LINK_DOWN; link++) {
+            for (int variant = 0; variant < 5; variant++) {
+                for (size_t d = 0; d < sizeof(duties) / sizeof(duties[0]); d++) {
+                    modem_screen_state_t s = sample();
+                    s.lang = (box_lang_t)lang;
+                    s.link = (modem_link_t)link;
+                    s.configured = variant == 0;
+                    s.measuring = variant == 2;
+                    s.radio_ok = variant != 3;
+                    s.duty_ms = duties[d];
+                    s.tx = s.rx = variant == 4 ? 4294967295u : 1234;
+                    s.tx_fail = s.rx_auth_fail = variant == 4 ? 4294967295u : 3;
+                    strcpy(s.fault, "SX1262 errors 0x0020 (TCXO)");
+                    modem_screen_text_t t;
+                    modem_screen_text(&s, &t);
+                    CHECK(t.rows >= 4 && t.rows <= MODEM_SCREEN_LINES && t.title[0] != '\0');
+                    for (int i = 0; i < t.rows; i++) {
+                        CHECK(t.line[i][0] != '\0');
+                        if (t.tall[i]) {
+                            CHECK(lang == BOX_LANG_ZH_TW && strlen(t.line[i]) < sizeof(t.line[i]));
+                            continue;
+                        }
+                        CHECK(strlen(t.line[i]) <= MODEM_SCREEN_COLS);
+                        for (const char *c = t.line[i]; *c; c++) CHECK((unsigned char)*c < 0x80);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* Chinese: the link state in the header, the game line a tall row, the numbers 8-pixel lines. */
+static void test_text_chinese(void)
+{
+    modem_screen_state_t s = sample();
+    modem_screen_text_t t;
+    s.lang = BOX_LANG_ZH_TW;
+    modem_screen_text(&s, &t);
+    CHECK(strcmp(t.title, "數據機模式") == 0 && strcmp(t.head_right, "正常") == 0);
+    CHECK(t.rows == 5 && t.tall[0] && !t.tall[1] && !t.inverted[0]);
+    CHECK(strcmp(t.line[0], "遊戲") == 0 && strcmp(t.right[0], "4660") == 0);
+    CHECK(strcmp(t.line[1], "CH   869.525 MHz") == 0);
+    CHECK(strcmp(t.line[2], "TX 1234   fail 3") == 0);
+    CHECK(strcmp(t.line[4], "DUTY 359.9s left") == 0);
+
+    s.link = MODEM_LINK_DOWN;
+    s.configured = false;
+    modem_screen_text(&s, &t);
+    CHECK(strcmp(t.head_right, "離線") == 0);
+    CHECK(strcmp(t.line[0], "待命") == 0 && strcmp(t.right[0], "無遊戲") == 0);
+    s.link = MODEM_LINK_WAITING;
+    s.measuring = true;
+    modem_screen_text(&s, &t);
+    CHECK(strcmp(t.head_right, "等待") == 0 && strcmp(t.right[0], "確認中") == 0);
+
+    s = sample();
+    s.lang = BOX_LANG_ZH_TW;
+    s.duty_ms = 0;
+    modem_screen_text(&s, &t);
+    CHECK(t.inverted[4] && !t.tall[4]);
+
+    s = sample();
+    s.lang = BOX_LANG_ZH_TW;
+    s.radio_ok = false;
+    strcpy(s.fault, "SX1262 not found (BUSY stuck)");
+    modem_screen_text(&s, &t);
+    CHECK(t.rows == 4 && t.tall[0] && t.tall[1] && !t.tall[2] && !t.tall[3]);
+    CHECK(strcmp(t.line[0], "無線電錯誤") == 0 && t.inverted[0]);
+    CHECK(strcmp(t.line[1], "已停用") == 0);
+    CHECK(strcmp(t.line[2], "SX1262 not found") == 0 && strcmp(t.line[3], "(BUSY stuck)") == 0);
+}
+
 void run_modem_screen_tests(void)
 {
     test_link_follows_host_frames();
@@ -229,4 +366,8 @@ void run_modem_screen_tests(void)
     test_text_in_game();
     test_text_states();
     test_text_radio_fault();
+    test_state_language();
+    test_text_portuguese_and_german();
+    test_every_language_fits();
+    test_text_chinese();
 }

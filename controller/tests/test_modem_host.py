@@ -62,6 +62,27 @@ class ModemHostTests(unittest.TestCase):
         self.assertEqual(ident["epoch_window"], 16)
         self.assertIn("ping", self.modem.status)
 
+    def test_screen_language_over_the_c_modem(self):
+        """SET_LANG against the C logic (decision MOD-2): IDENT says "lang", the code is taken
+        (a STATUS for it) and anything that is not a code is an ERROR."""
+        self.assertTrue(wait_for(lambda: self.modem.has_language))
+        replies: list[dict] = []
+        dispatch = self.modem._dispatch
+
+        def spy(frame_type, payload):
+            if frame_type == mf.STATUS:
+                replies.append(json.loads(payload))
+            dispatch(frame_type, payload)
+
+        self.modem._dispatch = spy
+        self.modem.set_language("zh-tw")
+        self.assertTrue(wait_for(lambda: any(r.get("cmd") == mf.CMD_SET_LANG for r in replies)))
+        self.assertEqual(self.errors, [])
+        self.modem._write(mf.CMD, bytes([mf.CMD_SET_LANG]) + b"zh-tw-hant")
+        self.modem._write(mf.CMD, bytes([mf.CMD_SET_LANG]) + b"p\x00")
+        self.assertTrue(wait_for(lambda: len(self.errors) >= 2))
+        self.assertEqual({code for code, _ in self.errors}, {"bad_params"})
+
     def test_c_encrypts_python_decrypts(self):
         self.configure(epoch=3)
         payload = time_encode({"game_time_ms": 1234, "game_state": 1, "duration_ms": 0,

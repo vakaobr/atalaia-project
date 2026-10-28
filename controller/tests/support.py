@@ -511,8 +511,9 @@ class FakeSerial:
     and records every frame the controller sends.
     """
 
-    def __init__(self, mute: bool = False) -> None:
+    def __init__(self, mute: bool = False, lang: bool = False) -> None:
         self.mute = mute
+        self.lang = lang  # the modem's IDENT says it takes SET_LANG
         self.decoder = mf.FrameDecoder()
         self.received: list[tuple[int, bytes]] = []
         self._out = bytearray()
@@ -532,7 +533,10 @@ class FakeSerial:
                 token = int.from_bytes(payload[1:5], "big")
                 self.push(mf.STATUS, f'{{"cmd":1,"configured":false,"ping":{token}}}'.encode())
             elif op == mf.CMD_IDENT:
-                self.push(mf.IDENT, b'{"fw":"atalaia-modem","fw_version":"fake"}')
+                lang = b',"lang":true' if self.lang else b""
+                self.push(mf.IDENT, b'{"fw":"atalaia-modem","fw_version":"fake"' + lang + b"}")
+            elif op == mf.CMD_SET_LANG:
+                self.push(mf.STATUS, b'{"cmd":9,"configured":false}')
         return len(data)
 
     def push(self, frame_type: int, payload: bytes) -> None:
@@ -586,6 +590,10 @@ class FakeModem:
         self.noise: dict[int, tuple[int, int]] = {}  # channel -> (p90 dBm, CAD detections of 10)
         self.measure_gate = None                  # a threading.Event a measurement waits for
         self.can_measure = True
+        self.languages: list = []                 # set_language() calls (the modem's OLED)
+
+    def set_language(self, code) -> None:
+        self.languages.append(code)
 
     @property
     def is_up(self) -> bool:
