@@ -186,29 +186,41 @@ static const oled_case_t cases[] = {
     /* Sabotage: the standby with its score, the pause (a countdown) and the game's end (the
        winner). */
     {"sab_standby", SAB, "standby",
-     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":754}"},
+     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":"
+     "754}"},
     {"sab_pause", SAB, "pause",
-     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,\"exploded\":true,\"game_left\":754}"},
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,"
+     "\"exploded\":true,\"game_left\":754}"},
     {"sab_game_over", SAB, "game_over",
-     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":1}"},
+     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":"
+     "1}"},
     {"sab_standby_pt", SAB, "standby",
-     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":754}"},
+     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":"
+     "754}"},
     {"sab_pause_pt", SAB, "pause",
-     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,\"exploded\":true,\"game_left\":754}"},
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,"
+     "\"exploded\":true,\"game_left\":754}"},
     {"sab_game_over_pt", SAB, "game_over",
-     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":1}"},
+     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":"
+     "1}"},
     {"sab_standby_de", SAB, "standby",
-     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":754}"},
+     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":"
+     "754}"},
     {"sab_pause_de", SAB, "pause",
-     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,\"exploded\":true,\"game_left\":754}"},
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,"
+     "\"exploded\":true,\"game_left\":754}"},
     {"sab_game_over_de", SAB, "game_over",
-     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":1}"},
+     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":"
+     "1}"},
     {"sab_standby_zh-tw", SAB, "standby",
-     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":754}"},
+     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":"
+     "754}"},
     {"sab_pause_zh-tw", SAB, "pause",
-     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,\"exploded\":true,\"game_left\":754}"},
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,"
+     "\"exploded\":true,\"game_left\":754}"},
     {"sab_game_over_zh-tw", SAB, "game_over",
-     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":1}"},
+     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":"
+     "1}"},
     /* A built-in mode's end screens, its header and the keypad's titles in the box's language
      * (the template's name and the mode's were English whatever the language). */
     {"defused_pt", BOMB, "defused", "{\"team\":\"blue\"}"},

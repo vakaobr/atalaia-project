@@ -13,7 +13,16 @@
 
 local RESULT_S = 5 -- how long the result of a round stays on the screen
 
-local s = state.node { phase = "standby", explode_at = 0, resume_at = 0, armed_by = nil, defused_by = nil, round = 0, over = false, last = "" }
+local s = state.node {
+  phase = "standby",
+  explode_at = 0,
+  resume_at = 0,
+  armed_by = nil,
+  defused_by = nil,
+  round = 0,
+  over = false,
+  last = "",
+}
 local fuse_timer, phase_timer
 
 local team_of = {} -- code -> team
@@ -71,12 +80,23 @@ end
 local function show_standby()
   local a, d = points()
   if use_codes then
-    local message = string.upper(params.attackers) .. " " .. a .. " - " .. d .. " " .. string.upper(params.defenders)
+    local message = string.upper(params.attackers)
+      .. " "
+      .. a
+      .. " - "
+      .. d
+      .. " "
+      .. string.upper(params.defenders)
     ui.screen("code_entry", { title = "ARM", digits = 0, message = message })
   else
     ui.screen("standby", {
-      arm = params.attackers, defend = params.defenders, progress = holding,
-      a_points = a, d_points = d, round = s.round + 1, game_left = game_left(),
+      arm = params.attackers,
+      defend = params.defenders,
+      progress = holding,
+      a_points = a,
+      d_points = d,
+      round = s.round + 1,
+      game_left = game_left(),
     })
   end
 end
@@ -84,8 +104,12 @@ end
 local function show_pause()
   local a, d = points()
   ui.screen("pause", {
-    a_points = a, d_points = d, attackers = params.attackers, defenders = params.defenders,
-    left = math.max(0, math.ceil(s.resume_at - game.time())), exploded = s.last == "exploded",
+    a_points = a,
+    d_points = d,
+    attackers = params.attackers,
+    defenders = params.defenders,
+    left = math.max(0, math.ceil(s.resume_at - game.time())),
+    exploded = s.last == "exploded",
     game_left = game_left(),
   })
 end
@@ -182,7 +206,11 @@ local function finish()
   end
   local a, d = points()
   ui.screen("game_over", {
-    winner = leader(), attackers = params.attackers, defenders = params.defenders, a_points = a, d_points = d,
+    winner = leader(),
+    attackers = params.attackers,
+    defenders = params.defenders,
+    a_points = a,
+    d_points = d,
   })
 end
 

@@ -83,7 +83,7 @@ static const timer_bar_case_t timer_bars[] = {
 #define OBJ      "org.atalaia.objectives {}"
 #define MONEY    "org.atalaia.money_factory {\"capacity\":50,\"capture_hold_ms\":3000}"
 #define PROG     "org.atalaia.progressive_domination {\"capture_hold_ms\":3000,\"complete_min\":10}"
-#define SAB "org.atalaia.sabotage {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
+#define SAB      "org.atalaia.sabotage {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
 
 /* Data as the modes (modes/bomb, modes/domination, modes/codes) and the shell send it. */
 static const screen_case_t cases[] = {
