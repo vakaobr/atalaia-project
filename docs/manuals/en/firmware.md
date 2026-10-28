@@ -202,7 +202,7 @@ Then a box with no field shows **PAIR THIS BOX** and a 6-digit code ([section 6]
 
 **Open the setup page again.** On a box that was set up, there are two ways. Neither works during a game.
 
-- On the keypad: press a key, type the admin PIN and `#`, go to the list's last entry **Wi-Fi setup**, press `#`, then `#` again to confirm.
+- On the keypad: press a key, type the admin PIN and `#`, go to the entry **Wi-Fi setup** (after the games), press `#`, then `#` again to confirm.
 - On the USB console (a serial monitor on the box's port, 115200): type `@setup` and the admin PIN, then Enter.
 
 The box keeps its adoption and its field key. It replaces what the page asks for. The bench build has no setup page.

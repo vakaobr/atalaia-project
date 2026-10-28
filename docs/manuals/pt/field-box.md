@@ -64,7 +64,7 @@ Uma caixa nova mostra **PRIMEIRA CONFIGURAÇÃO** com o nome de uma rede Wi-Fi c
 
 A caixa reinicia. Uma caixa ainda sem campo mostra **Emparelhar caixa** e um código de 6 algarismos ([secção 4](#4-adota-a-caixa-no-campo)).
 
-A página de configuração só abre numa caixa que ainda não foi configurada. Para mudar estas definições numa caixa já configurada, fala com quem a montou. Ainda não testado num campo.
+A página de configuração só abre sozinha numa caixa que ainda não foi configurada. Para a abrir de novo numa caixa já configurada: carrega numa tecla, escreve o PIN de administração e `#`, escolhe **Configurar o Wi-Fi** (a seguir aos jogos) e confirma com `#`. A caixa reinicia na página de configuração; guarda o campo, a chave de entrada e os jogos, e volta a pedir o resto (nome, PIN de administração, Wi-Fi). Uma caixa sem teclado faz o mesmo a partir de um computador por USB (o guia do firmware, em inglês: [firmware.md](../en/firmware.md)). Ainda não testado num campo.
 
 ## 4. Adota a caixa no campo
 

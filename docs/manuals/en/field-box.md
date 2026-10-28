@@ -64,7 +64,7 @@ A new box shows **FIRST-TIME SETUP** with a Wi-Fi name like `atalaia-1A2B`.
 
 The box restarts. A box with no field yet shows **PAIR THIS BOX** and a 6-digit code ([section 4](#4-adopt-the-box-into-the-field)).
 
-The setup page opens only on a box that has not been set up. To change these settings on a box that is already set up, ask the person who built it. Not yet tested on a field.
+The setup page opens by itself only on a box that has not been set up. To open it again on a box that is already set up: press any key, type the admin PIN and `#`, pick **Wi-Fi setup** (after the games) and confirm with `#`. The box restarts into the setup page; it keeps its field, its join key and its games, and asks again for the rest (name, admin PIN, Wi-Fi). A box with no keypad does it from a computer over USB (the [firmware guide](firmware.md)). Not yet tested on a field.
 
 ## 4. Adopt the box into the field
 
