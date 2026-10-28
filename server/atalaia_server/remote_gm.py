@@ -83,6 +83,7 @@ class RemoteHub:
     def __init__(self, timeout_s: float = COMMAND_TIMEOUT_S) -> None:
         self.timeout_s = timeout_s
         self._links: dict[tuple[Optional[str], uuid.UUID, str], Link] = {}
+        self._notes: set["asyncio.Task[None]"] = set()  # the ``field.changed`` sends under way
 
     def attach(self, link: Link) -> None:
         old = self._links.get(link.key)
@@ -105,6 +106,26 @@ class RemoteHub:
         tenant = tenancy.current_schema()
         return sorted((lk for (t, f, _), lk in self._links.items() if t == tenant and f == field_id),
                       key=lambda lk: lk.controller_id)
+
+    def announce_field(self, field_id: uuid.UUID) -> None:
+        """``field.changed`` to every controller of the field connected on a stream (BR24): its branding, saved
+        teams or check-in settings changed and it should pull them now. Sent in the background (the request that
+        changed them does not wait), once per link, whatever the controller's settings: one that does not keep
+        the site's branding ignores it, as an older one that does not know the type does."""
+        for link in self.links(field_id):
+            task = asyncio.get_running_loop().create_task(self._note(link))
+            self._notes.add(task)
+            task.add_done_callback(self._notes.discard)
+
+    async def settle(self) -> None:
+        """Waits for the notes under way (the tests')."""
+        while self._notes:
+            await asyncio.gather(*list(self._notes), return_exceptions=True)
+
+    @staticmethod
+    async def _note(link: Link) -> None:
+        with contextlib.suppress(Exception):  # the socket went away: the controller pulls at its next cycle
+            await asyncio.wait_for(link.send({"type": "field.changed", "sync_version": 1}), 5.0)
 
     def pick(self, field_id: uuid.UUID, controller_id: Optional[str]) -> Link:
         """The link a command goes to: the one named, or the only one that takes commands and is in charge

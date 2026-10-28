@@ -461,13 +461,18 @@ class ControllerHost {
       }
     }
     RemoteGm? r;
-    if (s != null && cfg != null && (cfg.remoteGm || a?.remote == true)) {
+    if (s != null &&
+        cfg != null &&
+        (cfg.remoteGm || a?.remote == true || cfg.branding == 'site')) {
+      // With branding "site" alone the stream carries only the site
+      // server's field.changed note (BR24): nothing of the game leaves.
       r = remote = RemoteGm(
         engine,
         s,
         remoteGm: cfg.remoteGm,
         atakRemote: a?.remote == true,
-      )..start();
+      )..onFieldChanged = s.fieldChanged;
+      r.start();
     }
     if (a != null && a.enabled) {
       final emitter = atak = AtakEmitter(engine, a, fieldId: boot.fieldId);

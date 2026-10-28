@@ -25,7 +25,11 @@
 ///   `conflict` with those roles in `missing`, so the site server's page can
 ///   ask *Start anyway?* and send it again with `force`); `cot` for the ATAK relay once the site
 ///   server's `hello.ack` says `atak_relay: true` (controller_atak.dart's
-///   events, at most 100 a message, 500 waiting).
+///   events, at most 100 a message, 500 waiting);
+/// - with `[sync] branding = "site"` the socket opens even with both of
+///   those off (BR24): only `hello` (`remote_gm: false`) and pings leave,
+///   and the site server's `field.changed` note (the field's branding, saved
+///   teams or check-in settings changed) makes the sync pull them at once.
 ///
 /// Every command, carried out or refused, is logged in the store (one
 /// document, "remote_commands", kept 365 days) and shown to the GM by
@@ -144,6 +148,10 @@ class RemoteGm {
   /// Called when the site server says it relays CoT (the emitter sends its
   /// whole picture again) and with false when the socket goes.
   void Function(bool ready)? onRelay;
+
+  /// Called on the site server's `field.changed` note (BR24): the sync
+  /// pulls the field's branding and settings now.
+  void Function()? onFieldChanged;
 
   final _cot = Queue<String>();
   RemoteSocket? _socket;
@@ -381,6 +389,13 @@ class RemoteGm {
     final kind = msg.remove('type');
     if (kind == 'hello.ack') {
       _setRelay(atakRemote && msg['atak_relay'] == true);
+    } else if (kind == 'field.changed') {
+      try {
+        checkFieldChanged(msg);
+      } on SyncFormatError {
+        return; // not in a form this controller knows: ignored
+      }
+      onFieldChanged?.call();
     } else if (kind == 'command') {
       final result = handleCommand(msg);
       _send(ws, 'command.result', {...sync.envelope(), ...result});

@@ -27,6 +27,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import BrandingImage, Club, ClubMember, Field, FieldTeam
+from . import registration
 
 RIGHTS_NOTICE = {
     "pt": "Carregue apenas imagens que tem o direito de usar: quem as carrega é responsável por elas.",
@@ -199,8 +200,20 @@ async def field_branding(db: AsyncSession, field: Field) -> dict[str, Any]:
             "logo": await image_ref(db, field.logo_sha256), "wallpaper": await image_ref(db, field.wallpaper_sha256)}
 
 
-async def field_answer(db: AsyncSession, field_id: uuid.UUID) -> dict[str, Any]:
-    """``GET /api/v1/sync/field``: the field's branding and saved teams (protocol/sync.md, plan phase 18)."""
+def field_settings(field: Field) -> Optional[dict[str, Any]]:
+    """The field's check-in rules a controller takes over (decision S16-6, BR24): its federation label (null
+    when it has none), ``max_replicas`` and limit template whole; None when the template's file is gone."""
+    template = registration.limit_template_body(field.limit_template)
+    if template is None:
+        return None
+    return {"federation_label": field.federation_label, "max_replicas": field.max_replicas,
+            "limit_template": template}
+
+
+async def field_answer(db: AsyncSession, field_id: uuid.UUID, settings: bool = False) -> dict[str, Any]:
+    """``GET /api/v1/sync/field``: the field's branding and saved teams (protocol/sync.md, plan phase 18) and,
+    only for a controller that asked (``?settings=1``: an older controller checks the answer strictly and
+    would refuse a key it does not know), the field's check-in ``settings``."""
     field = await db.get(Field, field_id)
     assert field is not None
     teams, names = [], set()
@@ -210,7 +223,25 @@ async def field_answer(db: AsyncSession, field_id: uuid.UUID) -> dict[str, Any]:
             continue  # a club renamed to another saved team's name: the first one keeps it (decision S18-7)
         names.add(name)
         teams.append(await team_json(db, t, c, sync=True))
-    return {"sync_version": sync_format.SYNC_VERSION, "field": await field_branding(db, field), "teams": teams}
+    out = {"sync_version": sync_format.SYNC_VERSION, "field": await field_branding(db, field), "teams": teams}
+    if settings and (st := field_settings(field)) is not None:
+        out["settings"] = st
+    return out
+
+
+async def fields_of_club(db: AsyncSession, club_id: uuid.UUID) -> list[uuid.UUID]:
+    """The fields that have a saved team of the club (a change of the club's name or crest reaches them)."""
+    return list(await db.scalars(select(FieldTeam.field_id).where(FieldTeam.club_id == club_id).distinct()))
+
+
+def announce(request: Any, field_ids: Any) -> None:
+    """Tells the controllers of these fields that are connected on the stream that their branding, saved teams
+    or settings changed (``field.changed``; they pull ``GET /api/v1/sync/field`` at once). Call it after the
+    change is committed; it never fails a request and never waits for a socket."""
+    hub = getattr(request.app.state, "remote_hub", None)
+    if hub is not None:
+        for field_id in set(field_ids):
+            hub.announce_field(field_id)
 
 
 async def field_image(db: AsyncSession, field_id: uuid.UUID, sha: str) -> Optional[BrandingImage]:

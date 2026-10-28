@@ -465,6 +465,34 @@ class AtakStreamTests(RemoteCase):
         self.assertNotIn("atak", site.next("hello"))  # an older site server would refuse the field
 
 
+class BrandingStreamTests(RemoteCase):
+    """BR24: with ``[sync] branding = "site"`` the stream opens for the site server's ``field.changed`` note alone."""
+
+    remote_gm = False
+
+    def test_only_the_note_travels(self) -> None:
+        self.cfg.sync_branding = "site"
+        site = FakeStream()
+        self.cfg.sync_url = site.url
+        remote = RemoteGm(self.cfg, self.store, self.ctrl, api_key=KEY, controller_id=lambda: CONTROLLER_ID)
+        notes: list[int] = []
+        remote.on_field_changed = lambda: notes.append(1)
+        self.ctrl.add_listener(remote.on_controller_message)
+        remote.start()
+        self.addCleanup(remote.stop)
+        self.addCleanup(site.close)
+        hello = site.next("hello")
+        self.assertEqual((hello["remote_gm"], "atak" in hello), (False, False))
+        site.send({"type": "field.changed", "sync_version": 1})
+        self.assertTrue(wait_for(lambda: notes == [1], 5))
+        site.send({"type": "field.changed", "sync_version": 1, "etag": "x"})  # not in the form: ignored
+        site.send({"type": "field.changed", "sync_version": 2})
+        site.send({"type": "field.changed", "sync_version": 1})
+        self.assertTrue(wait_for(lambda: notes == [1, 1], 5))
+        self.assertFalse(any(m.get("type") == "live" for m in list(site.received.queue)))  # nothing of the game
+        self.assertFalse(remote.status()["enabled"])  # the remote GM stays off
+
+
 def _cot_events() -> list[str]:
     from atalaia_controller import atak  # noqa: PLC0415
 

@@ -228,6 +228,8 @@ async def update_club(club_id: uuid.UUID, body: ClubPatch, request: Request,
         record(db, "club_update", request, user_id=principal.user.id, resource="club", resource_id=club.id,
                details=changed)
     await db.commit()
+    if changed.keys() & {"name", "short_name", "slug"}:
+        svc.announce(request, await svc.fields_of_club(db, club.id))  # their saved teams carry them (BR24)
     await db.refresh(club)
     return await _answer(db, club, await _role(db, principal, club))
 
@@ -238,8 +240,10 @@ async def delete_club(club_id: uuid.UUID, request: Request, principal: Principal
     club = await _admin(db, principal, club_id)
     record(db, "club_delete", request, user_id=principal.user.id, resource="club", resource_id=club.id,
            details={"slug": club.slug})
+    fields = await svc.fields_of_club(db, club.id)
     await db.delete(club)
     await db.commit()
+    svc.announce(request, fields)
     return Response(status_code=204)
 
 
@@ -260,6 +264,8 @@ async def put_club_image(club_id: uuid.UUID, slot: str, request: Request,
     record(db, "club_image", request, user_id=principal.user.id, resource="club", resource_id=club.id,
            details={"slot": slot, "sha256": sha})
     await db.commit()
+    if slot == "crest":  # a club's logo is not sent to controllers, its crest follows its teams
+        svc.announce(request, await svc.fields_of_club(db, club.id))
     await db.refresh(club)
     return await _answer(db, club, "admin", extra={"rights_notice": svc.RIGHTS_NOTICE})
 
@@ -270,11 +276,14 @@ async def delete_club_image(club_id: uuid.UUID, slot: str, request: Request,
                             db: AsyncSession = Depends(get_session)) -> JSONResponse:
     _club_slot(slot)
     club = await _admin(db, principal, club_id)
-    if getattr(club, f"{slot}_sha256") is not None:
+    removed = getattr(club, f"{slot}_sha256") is not None
+    if removed:
         setattr(club, f"{slot}_sha256", None)
         record(db, "club_image", request, user_id=principal.user.id, resource="club", resource_id=club.id,
                details={"slot": slot, "sha256": None})
     await db.commit()
+    if removed and slot == "crest":
+        svc.announce(request, await svc.fields_of_club(db, club.id))
     await db.refresh(club)
     return await _answer(db, club, "admin")
 

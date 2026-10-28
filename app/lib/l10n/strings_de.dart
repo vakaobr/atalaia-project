@@ -1116,7 +1116,7 @@ const Map<String, String> deStrings = {
   'ctl_site.key_set':
       'API-Schlüssel {fp}… (einen neuen eingeben, um ihn zu ersetzen)',
   'ctl_site.branding':
-      'Branding und gespeicherte Teams des Felds vom Site-Server',
+      'Branding, gespeicherte Teams und Check-in-Einstellungen des Felds vom Site-Server',
   'ctl_site.library': 'Szenarien und Spielvorlagen des Felds vom Site-Server',
   'ctl_site.remote_gm': 'Remote-Spielleitung',
   'ctl_site.remote_gm_hint':

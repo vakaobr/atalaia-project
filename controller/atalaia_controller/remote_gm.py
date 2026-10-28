@@ -38,6 +38,12 @@ site server relays them to the field's enrolled ATAK devices; it never connects
 to the controller. With ``remote_gm`` off no ``live`` view is sent and every
 command is refused, as before.
 
+With ``[sync] branding = "site"`` the controller opens the stream too (BR24), even with both of those
+off: it then sends only ``hello`` (``remote_gm: false``) and pings, and the site server sends a
+``field.changed`` note whenever the field's branding, saved teams or check-in settings change, on which the
+sync client pulls them at once instead of at its next cycle. A site server that never sends it (an older
+one) leaves the pull to the cycle, as before.
+
 Every command, carried out or refused, is in the store's ``remote_commands``
 (store schema 8): who sent it (the site server's account id and username),
 what it asked for, the game and the result; ``GET /api/v1/remote-gm`` shows
@@ -62,7 +68,7 @@ from urllib.parse import urlsplit, urlunsplit
 from . import __version__
 from .engine import Conflict, ControllerError, NotFound, StartBlocked, Unavailable
 from .sync_format import (MAX_COT_EVENTS, MAX_LIVE_EVENTS, MISSING_MAX, NODE_INFO, ROLE_MAX, STALE_S, SYNC_VERSION, SyncFormatError,
-                          check_command, check_event, check_live, check_nodes)
+                          check_command, check_event, check_field_changed, check_live, check_nodes)
 from .ws_client import WebSocket, WsError
 
 log = logging.getLogger("atalaia.remote_gm")
@@ -111,6 +117,8 @@ class RemoteGm:
         self._cot: collections.deque[str] = collections.deque(maxlen=COT_QUEUE_MAX)
         self.atak_relay = False
         self.on_relay_open: Optional[Callable[[], None]] = None
+        # The site server's ``field.changed`` (BR24): the sync client pulls the field's branding at once.
+        self.on_field_changed: Optional[Callable[[], None]] = None
         self.cot_sent = 0
 
     # --- the thread ------------------------------------------------------------------------
@@ -122,6 +130,8 @@ class RemoteGm:
         if self.cfg.sync_remote_gm:
             log.warning("remote GM is on: users with the gm role on this field at %s may act on the live game",
                         self.cfg.sync_url)
+        if self.cfg.sync_branding == "site" and not self.cfg.sync_remote_gm and not self.cfg.atak_remote:
+            log.info("stream open for the site server's notes on the field's branding (nothing of the game leaves)")
         if self.cfg.atak_remote:
             log.warning("remote ATAK is on: this field's CoT events go to %s for its enrolled ATAK devices%s",
                         self.cfg.sync_url, ", player positions included"
@@ -229,6 +239,14 @@ class RemoteGm:
                 log.warning("remote ATAK: the site server does not relay CoT (its ATAK relay is off): nothing sent")
             elif self.atak_relay and self.on_relay_open is not None:
                 self.on_relay_open()  # the emitter sends its whole picture again
+        elif kind == "field.changed":
+            try:
+                check_field_changed(msg)
+            except SyncFormatError:
+                log.warning("remote GM stream: a field.changed note in a form this controller does not know")
+            else:
+                if self.on_field_changed is not None:
+                    self.on_field_changed()
         elif kind == "command":
             result = self.handle_command(msg)
             self._send(ws, "command.result", {**self.envelope(), **result})

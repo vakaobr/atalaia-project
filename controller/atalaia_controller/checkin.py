@@ -88,6 +88,7 @@ TOKEN_GRACE_S = 2 * 3600
 TOKEN_MIN_S = 60
 IDENTITY_DAYS = 365
 CHRONO_RETENTION_DAYS = 365
+SITE_LIMITS_SETTING = "checkin.site_limits"  # the limit template the site server sent (BR24), as it sent it
 SETTINGS_KEYS = ("confirm", "federation", "federation_label", "max_replicas", "max_players",
                  "chrono_valid_for")
 
@@ -255,6 +256,14 @@ def load_limits(template: str) -> dict[str, Any]:
             "status": data.get("status"), "classes": out}
 
 
+def site_limits(template: dict[str, Any]) -> dict[str, Any]:
+    """A limit template as the site server sends it (``sync_format.check_field_settings``), in the shape
+    ``load_limits`` returns."""
+    return {"id": template["id"], "name": template["name"], "status": template.get("status"),
+            "classes": {str(n): {"max_energy_j": float(c["max_energy_j"]), "med_m": c.get("med_m"),
+                                 "fire_mode": c.get("fire_mode")} for n, c in template["classes"].items()}}
+
+
 class RateLimit:
     """At most ``per_minute`` calls per key in any 60 s."""
 
@@ -324,12 +333,48 @@ class Checkin:
         self._tz = tz  # None: the controller's local time zone
         self._lock = threading.RLock()
         self.limits = load_limits(self.cfg.limit_template)
+        self._use_site_limits()
         self.rate = RateLimit(self.cfg.rate_per_minute)
         self.info_rate = RateLimit(max(60, self.cfg.rate_per_minute * 6))
         self._last_purge = 0.0
         controller.checkin = self
 
     # --- settings and the poster -----------------------------------------------
+
+    def _use_site_limits(self) -> None:
+        """With ``[sync] branding = "site"``: the limit template the site server sent last, kept in the store,
+        instead of the configured one (so a controller that restarts offline keeps the field's rules)."""
+        if getattr(self.cfg, "sync_branding", "local") != "site":
+            return
+        try:
+            saved = json.loads(self.store.get_setting(SITE_LIMITS_SETTING) or "null")
+            if isinstance(saved, dict):
+                self.limits = site_limits(saved)
+        except (ValueError, KeyError, TypeError):
+            log.warning("the limit template saved from the site server is unreadable: the configured one is used")
+
+    def apply_site_settings(self, site: dict[str, Any]) -> int:
+        """The field's check-in settings from the site server (``GET /api/v1/sync/field``, with ``[sync] branding
+        = "site"``; checked by ``sync_format.check_field_settings``): its federation label (when it has one),
+        ``max_replicas`` and limit template replace this controller's, so a registration the site server accepted
+        is one this controller accepts (decision S16-6, BR24). Returns how many of the three changed."""
+        changed = 0
+        cur = self.settings()
+        spec: dict[str, Any] = {"max_replicas": site["max_replicas"]}
+        if site["federation_label"] is not None:
+            spec["federation_label"] = site["federation_label"]
+        spec = {k: v for k, v in spec.items() if cur[k] != v}
+        if spec:
+            self.set_settings(spec)
+            changed += len(spec)
+        template = site["limit_template"]
+        if self.store.get_setting(SITE_LIMITS_SETTING) != json.dumps(template, sort_keys=True):
+            self.limits = site_limits(template)
+            self.store.set_setting(SITE_LIMITS_SETTING, json.dumps(template, sort_keys=True))
+            changed += 1
+            if not spec:  # set_settings told the console about the others
+                self.ctrl._emit({"type": "checkin_settings", "settings": self.settings(), "_staff": True})
+        return changed
 
     def settings(self) -> dict[str, Any]:
         out = {"confirm": self.cfg.checkin_confirm, "federation": self.cfg.federation,

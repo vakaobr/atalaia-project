@@ -898,7 +898,7 @@ const Map<String, String> zhTwStrings = {
   'ctl_site.url': '網址（https://…）',
   'ctl_site.key': '場地的 API 金鑰（來自場地伺服器）',
   'ctl_site.key_set': 'API 金鑰 {fp}…（輸入新的即可取代）',
-  'ctl_site.branding': '從場地伺服器取得場地品牌與已存隊伍',
+  'ctl_site.branding': '從場地伺服器取得場地品牌、已存隊伍與報到設定',
   'ctl_site.library': '從場地伺服器取得場地的劇本與遊戲預設',
   'ctl_site.remote_gm': '遠端 GM',
   'ctl_site.remote_gm_hint': '場地伺服器上的場地 GM 可以開始、暫停和結束進行中的遊戲。預設關閉。',

@@ -571,5 +571,29 @@ void main() {
       expect(r.atakRelay, isFalse);
       expect(r.pushCot(['x']), 0);
     });
+
+    test('field.changed alone (branding "site", BR24): only the note '
+        'travels, in its own form', () async {
+      final site = FakeStream();
+      await site.start();
+      cleanups.add(site.close);
+      final r = remote(on: false, url: site.url);
+      var notes = 0;
+      r
+        ..onFieldChanged = (() => notes++)
+        ..start();
+      cleanups.add(r.stop);
+      final hello = await site.next('hello');
+      expect((hello['remote_gm'], hello.containsKey('atak')), (false, false));
+      site.send({'type': 'field.changed', 'sync_version': 1});
+      expect(await waitFor(() => notes == 1), isTrue);
+      // Not in the form: ignored.
+      site.send({'type': 'field.changed', 'sync_version': 1, 'etag': 'x'});
+      site.send({'type': 'field.changed', 'sync_version': 2});
+      site.send({'type': 'field.changed', 'sync_version': 1});
+      expect(await waitFor(() => notes == 2), isTrue);
+      expect(site.received.where((m) => m['type'] == 'live'), isEmpty);
+      expect(r.status()['enabled'], isFalse);
+    });
   });
 }

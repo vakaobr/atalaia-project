@@ -1090,7 +1090,7 @@ const Map<String, String> ptStrings = {
   'ctl_site.key': 'Chave de API do campo (do servidor do site)',
   'ctl_site.key_set': 'Chave de API {fp}… (escreve outra para a substituir)',
   'ctl_site.branding':
-      'Imagem do campo e equipas guardadas do servidor do site',
+      'Imagem do campo, equipas guardadas e definições do check-in do servidor do site',
   'ctl_site.library':
       'Cenários e predefinições de jogo do campo do servidor do site',
   'ctl_site.remote_gm': 'GM remoto',

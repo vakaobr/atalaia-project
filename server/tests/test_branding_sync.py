@@ -28,9 +28,11 @@ from atalaia_controller.store import Store
 from atalaia_controller.sync_client import SyncClient
 
 from atalaia_server import sync
+from atalaia_server.services import registration
 
 from .base import AppTestCase, TempDatabase
 from .pngs import png
+from .test_remote_gm import Stream
 from .test_sync_e2e import CORE, REPO, SiteServer
 
 
@@ -80,8 +82,9 @@ class FieldBrandingTests(AppTestCase):
             self.assertEqual(r.status_code, 200, r.text)
         return club
 
-    async def sync_field(self, key: Optional[str] = None) -> dict[str, Any]:
-        r = await self.client.get("/api/v1/sync/field", headers={"Authorization": f"Bearer {key or self.key}"})
+    async def sync_field(self, key: Optional[str] = None, settings: bool = False) -> dict[str, Any]:
+        r = await self.client.get("/api/v1/sync/field" + ("?settings=1" if settings else ""),
+                                  headers={"Authorization": f"Bearer {key or self.key}"})
         self.assertEqual(r.status_code, 200, r.text)
         return sync_format.check_field(copy.deepcopy(r.json()))
 
@@ -110,6 +113,117 @@ class FieldBrandingTests(AppTestCase):
         self.assertEqual((r.status_code, r.headers["content-type"]), (200, "image/png"))
         self.assertEqual(hashlib.sha256(r.content).hexdigest(), out["logo"]["sha256"])
         self.assertNotIn(b"exif-like", r.content)
+
+    async def test_the_settings_come_only_to_a_controller_that_asks(self) -> None:
+        """BR24: an older controller checks the answer strictly, so the settings are an opt-in (``?settings=1``)."""
+        self.assertNotIn("settings", await self.sync_field())
+        st = (await self.sync_field(settings=True))["settings"]
+        self.assertEqual((st["federation_label"], st["max_replicas"], st["limit_template"]["id"]),
+                         (None, 5, "portugal"))
+        self.assertEqual(sorted(st["limit_template"]["classes"]), ["cqb", "dmr", "rifle", "sniper"])
+        self.assertEqual(st["limit_template"]["classes"]["dmr"], {"max_energy_j": 1.88, "med_m": 20,
+                                                                  "fire_mode": "semi_only"})
+        r = await self.client.patch(self.url(), json={"limit_template": "uk", "max_replicas": 3,
+                                                      "federation_label": "BAA"}, headers=self.admin)
+        self.assertEqual(r.status_code, 200, r.text)
+        st = (await self.sync_field(settings=True))["settings"]
+        self.assertEqual((st["federation_label"], st["max_replicas"], st["limit_template"]["id"]), ("BAA", 3, "uk"))
+        self.assertEqual(sorted(st["limit_template"]["classes"]), sorted(registration.classes("uk")))
+        self.assertNotIn("settings", await self.sync_field())  # still the old shape without the query
+
+    async def test_every_limit_template_passes_the_controllers_check(self) -> None:
+        from atalaia_controller import checkin  # noqa: PLC0415
+
+        names = sorted(registration.limit_templates())
+        self.assertGreaterEqual(len(names), 4)
+        for name in names:
+            with self.subTest(template=name):
+                body = registration.limit_template_body(name)
+                assert body is not None
+                st = {"federation_label": None, "max_replicas": 5, "limit_template": body}
+                sync_format.check_field_settings(copy.deepcopy(st))
+                # The controller's own loader reads the same file into the same classes and limits.
+                local = checkin.load_limits(name)
+                self.assertEqual({n: c["max_energy_j"] for n, c in local["classes"].items()},
+                                 {n: c["max_energy_j"] for n, c in checkin.site_limits(body)["classes"].items()})
+        self.assertIsNone(registration.limit_template_body("nope"))
+        self.assertIsNone(registration.limit_template_body("../portugal"))
+
+    async def listen(self) -> Stream:
+        """A controller of the field connected on the stream (it only said ``hello``)."""
+        stream = Stream(self.app, self.key)
+        self.addAsyncCleanup(stream.close)
+        self.assertEqual((await stream.open())["type"], "websocket.accept")
+        await stream.send({"type": "hello", "sync_version": 1, "remote_gm": False,
+                           "controller": {"id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd", "version": "0.1.0"}})
+        self.assertEqual((await stream.receive())["type"], "hello.ack")
+        return stream
+
+    async def expect_note(self, stream: Stream, what: str, notes: int = 1) -> None:
+        await self.app.state.remote_hub.settle()
+        for _ in range(notes):
+            self.assertEqual(await stream.receive(), {"type": "field.changed", "sync_version": 1}, what)
+        self.assertEqual(stream.pending(), 0, what)
+
+    async def test_a_change_reaches_the_controllers_on_the_stream(self) -> None:
+        """BR24: branding, saved teams, a club's crest and the check-in settings each send ``field.changed``."""
+        stream = await self.listen()
+        patch = self.client.patch
+        r = await patch(self.url("/branding"), json={"accent": "#C0FFEE"}, headers=self.admin)
+        self.assertEqual(r.status_code, 200)
+        await self.expect_note(stream, "accent")
+        await patch(self.url("/branding"), json={"accent": "#c0ffee"}, headers=self.admin)  # no change
+        await self.expect_note(stream, "same accent", notes=0)
+        await self.put_image("/branding/logo", png(64, 32), self.admin)
+        await self.expect_note(stream, "logo")
+        await self.client.delete(self.url("/branding/logo"), headers=self.admin)
+        await self.expect_note(stream, "logo removed")
+        await self.client.delete(self.url("/branding/logo"), headers=self.admin)  # nothing there
+        await self.expect_note(stream, "no logo to remove", notes=0)
+        club = await self.club("lobos", public=True, crest=png(64, 64, (30, 30, 200)), headers=self.gm)
+        r = await self.client.post(self.url("/teams"), json={"club_slug": "lobos", "colour": "red"}, headers=self.gm)
+        team = r.json()["team_id"]
+        await self.expect_note(stream, "a team")
+        await patch(self.url(f"/teams/{team}"), json={"colour": "blue"}, headers=self.gm)
+        await self.expect_note(stream, "its colour")
+        await self.put_image(f"/teams/{team}/crest", png(48, 48), self.gm)
+        await self.expect_note(stream, "its own crest")
+        await self.client.delete(self.url(f"/teams/{team}/crest"), headers=self.gm)
+        await self.expect_note(stream, "its crest removed")
+        # The club's crest and name reach the field because its team carries them.
+        r = await self.client.put(f"/api/v1/clubs/{club}/images/crest?rights_confirmed=true", content=png(80, 80),
+                                  headers={**self.gm, "Content-Type": "image/png"})
+        self.assertEqual(r.status_code, 200, r.text)
+        await self.expect_note(stream, "the club's crest")
+        await patch(f"/api/v1/clubs/{club}", json={"short_name": "Lobitos"}, headers=self.gm)
+        await self.expect_note(stream, "the club's short name")
+        await patch(f"/api/v1/clubs/{club}", json={"description": "Só texto"}, headers=self.gm)
+        await self.expect_note(stream, "a club description is not sent to controllers", notes=0)
+        # The check-in settings change; a field page toggle does not.
+        await patch(self.url(), json={"max_replicas": 2}, headers=self.admin)
+        await self.expect_note(stream, "max_replicas")
+        await patch(self.url(), json={"public_page": True}, headers=self.admin)
+        await self.expect_note(stream, "public page", notes=0)
+        await self.client.delete(self.url(f"/teams/{team}"), headers=self.gm)
+        await self.expect_note(stream, "a team removed")
+        r = await self.client.delete(f"/api/v1/clubs/{club}", headers=self.gm)
+        self.assertEqual(r.status_code, 204)
+
+    async def test_another_fields_change_does_not_reach_this_stream(self) -> None:
+        stream = await self.listen()
+        other = await self.make_field("campo-sado")
+        admin = await self.staff("admin", other)
+        r = await self.client.patch(self.url("/branding", other), json={"accent": "#112233"}, headers=admin)
+        self.assertEqual(r.status_code, 200, r.text)
+        await self.expect_note(stream, "another field", notes=0)
+
+    async def test_a_gone_controller_does_not_fail_the_change(self) -> None:
+        stream = await self.listen()
+        assert stream.task is not None
+        stream.task.cancel()  # the socket is gone without a disconnect: the link is still registered
+        r = await self.client.patch(self.url("/branding"), json={"accent": "#C0FFEE"}, headers=self.admin)
+        self.assertEqual(r.status_code, 200, r.text)
+        await self.app.state.remote_hub.settle()
 
     async def test_saved_teams(self) -> None:
         crest = png(64, 64, (30, 30, 200))

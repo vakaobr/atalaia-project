@@ -42,6 +42,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
+import '../chrono/energy.dart';
 import '../chrono/limit_template.dart';
 import '../chrono/reading.dart';
 import '../chrono/record_signer.dart';
@@ -379,7 +380,7 @@ class ControllerCheckin {
     List<String> defaultUrls = const [],
     Random? random,
   }) : defaultUrls = List.of(defaultUrls),
-       limits = LimitTemplate.parse(config.limitsYaml),
+       _limits = LimitTemplate.parse(config.limitsYaml),
        rate = RateLimit(config.ratePerMinute),
        infoRate = RateLimit(max(60, config.ratePerMinute * 6)),
        _random = random ?? Random.secure() {
@@ -410,7 +411,13 @@ class ControllerCheckin {
   void Function(String message) warn = _warnDefault;
   static void _warnDefault(String m) =>
       developer.log(m, name: 'atalaia.addresses', level: 900);
-  final LimitTemplate limits;
+  LimitTemplate _limits;
+
+  /// The chrono limit template the classes come from: the configured one, or
+  /// with `[sync] branding = "site"` the one the site server sent last
+  /// (BR24).
+  LimitTemplate get limits => _limits;
+  bool _siteManaged = false;
   final RateLimit rate;
   final RateLimit infoRate;
   final Random _random;
@@ -687,6 +694,89 @@ class ControllerCheckin {
   }
 
   // --- settings and the poster ------------------------------------------------
+
+  static const _siteLimitsKey = 'checkin.site_limits';
+
+  /// With `[sync] branding = "site"` (set by the sync): the limit template
+  /// the site server sent last, kept in the store, replaces the configured
+  /// one, so a controller that restarts offline keeps the field's rules.
+  set siteManaged(bool on) {
+    _siteManaged = on;
+    if (!on) return;
+    final saved = engine.store.getSetting(_siteLimitsKey);
+    if (saved == null) return;
+    try {
+      final t = jsonDecode(saved);
+      if (t is Map<String, Object?>) _limits = _siteTemplate(t);
+    } on Object {
+      // As the Pi: the saved template is unreadable, the configured one stays.
+    }
+  }
+
+  bool get siteManaged => _siteManaged;
+
+  /// A limit template as the site server sends it (`checkFieldSettings`).
+  static LimitTemplate _siteTemplate(Map<String, Object?> t) {
+    final verified = t['status'] == 'verified';
+    final classes = <String, ClassLimit>{};
+    for (final e in (t['classes']! as Map).entries) {
+      final c = e.value as Map;
+      final energy = (c['max_energy_j']! as num).toDouble();
+      classes['${e.key}'] = ClassLimit(
+        name: '${e.key}',
+        maxEnergyJ: energy,
+        maxFps020: fpsWith020(energy).round(),
+        medM: c['med_m'] as int?,
+        fireMode: FireMode.fromWire(c['fire_mode']! as String)!,
+      );
+    }
+    return LimitTemplate(
+      id: t['id']! as String,
+      name: t['name']! as String,
+      verified: verified,
+      warning: verified ? null : "From the field's site server.",
+      source: "the field's site server",
+      verifiedDate: verified ? t['verified_date'] as String? : null,
+      notes: null,
+      classes: classes,
+    );
+  }
+
+  /// The field's check-in settings from the site server (`GET
+  /// /api/v1/sync/field`, with `[sync] branding = "site"`; checked by
+  /// `checkFieldSettings`): its federation label (when it has one),
+  /// `max_replicas` and limit template replace this controller's, so a
+  /// registration the site server accepted is one this controller accepts
+  /// (decision S16-6, BR24). Returns how many of the three changed.
+  int applySiteSettings(Map<String, Object?> site) {
+    var changed = 0;
+    final cur = settings();
+    final spec = <String, Object?>{'max_replicas': site['max_replicas']};
+    if (site['federation_label'] != null) {
+      spec['federation_label'] = site['federation_label'];
+    }
+    spec.removeWhere((k, v) => cur[k] == v);
+    if (spec.isNotEmpty) {
+      setSettings(spec);
+      changed += spec.length;
+    }
+    final template = (site['limit_template']! as Map).cast<String, Object?>();
+    final encoded = jsonEncode(template);
+    if (engine.store.getSetting(_siteLimitsKey) != encoded) {
+      _limits = _siteTemplate(template);
+      engine.store.setSetting(_siteLimitsKey, encoded);
+      changed++;
+      if (spec.isEmpty) {
+        // setSettings told the console about the others.
+        engine.emit({
+          'type': 'checkin_settings',
+          'settings': settings(),
+          '_staff': true,
+        });
+      }
+    }
+    return changed;
+  }
 
   Map<String, Object?> settings() {
     final out = <String, Object?>{

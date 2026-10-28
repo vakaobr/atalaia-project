@@ -143,6 +143,8 @@ async def patch_branding(field_id: uuid.UUID, body: BrandingPatch, request: Requ
         record(db, "field_branding_update", request, user_id=principal.user.id, resource="field",
                resource_id=field.id, details=changed)
     await db.commit()
+    if changed:
+        svc.announce(request, [field_id])
     await db.refresh(field)
     return await _answer(db, field)
 
@@ -164,6 +166,7 @@ async def put_field_image(field_id: uuid.UUID, slot: str, request: Request,
     record(db, "field_branding_image", request, user_id=principal.user.id, resource="field", resource_id=field.id,
            details={"slot": slot, "sha256": sha})
     await db.commit()
+    svc.announce(request, [field_id])
     await db.refresh(field)
     return await _answer(db, field, {"rights_notice": svc.RIGHTS_NOTICE})
 
@@ -174,11 +177,14 @@ async def delete_field_image(field_id: uuid.UUID, slot: str, request: Request,
                              db: AsyncSession = Depends(get_session)) -> JSONResponse:
     require_field_role(principal, field_id, "admin")
     field = await _field(db, field_id)
-    if getattr(field, f"{_slot(slot)}_sha256") is not None:
+    removed = getattr(field, f"{_slot(slot)}_sha256") is not None
+    if removed:
         setattr(field, f"{slot}_sha256", None)
         record(db, "field_branding_image", request, user_id=principal.user.id, resource="field",
                resource_id=field.id, details={"slot": slot, "sha256": None})
     await db.commit()
+    if removed:
+        svc.announce(request, [field_id])
     await db.refresh(field)
     return await _answer(db, field)
 
@@ -197,15 +203,16 @@ async def _team(db: AsyncSession, field_id: uuid.UUID, team_id: uuid.UUID) -> tu
     return team, club
 
 
-async def _saved(db: AsyncSession, team: FieldTeam, club: Optional[Club], status: int = 200,
+async def _saved(db: AsyncSession, team: FieldTeam, club: Optional[Club], request: Request, status: int = 200,
                  extra: Optional[dict[str, Any]] = None) -> JSONResponse:
-    """Checks the field's names are still unique, commits and answers the team."""
+    """Checks the field's names are still unique, commits, tells the field's controllers and answers the team."""
     try:
         await svc.check_team_names(db, team.field_id)
     except svc.BrandingError as exc:
         await db.rollback()
         raise problem(exc) from None
     await db.commit()
+    svc.announce(request, [team.field_id])
     await db.refresh(team)
     return JSONResponse({**await svc.team_json(db, team, club), **(extra or {})}, status_code=status,
                         headers=NO_STORE)
@@ -245,7 +252,7 @@ async def add_team(field_id: uuid.UUID, body: TeamIn, request: Request,
     await db.flush()
     record(db, "field_team_create", request, user_id=principal.user.id, resource="field", resource_id=field_id,
            details={"team_id": str(team.id), "club": club.slug if club else None})
-    return await _saved(db, team, club, status=201)
+    return await _saved(db, team, club, request, status=201)
 
 
 @router.patch("/fields/{field_id}/teams/{team_id}")
@@ -271,7 +278,7 @@ async def patch_team(field_id: uuid.UUID, team_id: uuid.UUID, body: TeamPatch, r
     if changed:
         record(db, "field_team_update", request, user_id=principal.user.id, resource="field", resource_id=field_id,
                details={"team_id": str(team.id), **changed})
-    return await _saved(db, team, club)
+    return await _saved(db, team, club, request)
 
 
 @router.delete("/fields/{field_id}/teams/{team_id}", status_code=204)
@@ -284,6 +291,7 @@ async def delete_team(field_id: uuid.UUID, team_id: uuid.UUID, request: Request,
     record(db, "field_team_delete", request, user_id=principal.user.id, resource="field", resource_id=field_id,
            details={"team_id": str(team_id)})
     await db.commit()
+    svc.announce(request, [field_id])
     return Response(status_code=204)
 
 
@@ -296,7 +304,7 @@ async def put_team_crest(field_id: uuid.UUID, team_id: uuid.UUID, request: Reque
     team.crest_sha256 = await checked_image(db, request, "crest")
     record(db, "field_team_crest", request, user_id=principal.user.id, resource="field", resource_id=field_id,
            details={"team_id": str(team.id), "sha256": team.crest_sha256})
-    return await _saved(db, team, club, extra={"rights_notice": svc.RIGHTS_NOTICE})
+    return await _saved(db, team, club, request, extra={"rights_notice": svc.RIGHTS_NOTICE})
 
 
 @router.delete("/fields/{field_id}/teams/{team_id}/crest")
@@ -309,4 +317,4 @@ async def delete_team_crest(field_id: uuid.UUID, team_id: uuid.UUID, request: Re
         team.crest_sha256 = None
         record(db, "field_team_crest", request, user_id=principal.user.id, resource="field",
                resource_id=field_id, details={"team_id": str(team.id), "sha256": None})
-    return await _saved(db, team, club)
+    return await _saved(db, team, club, request)

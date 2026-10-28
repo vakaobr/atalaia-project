@@ -101,6 +101,38 @@ def classes(template: str) -> tuple[str, ...]:
     return limit_templates().get(template, ())
 
 
+def limit_template_body(template: str) -> Optional[dict[str, Any]]:
+    """A limit template whole, as ``GET /api/v1/sync/field`` sends it to the field's controllers (checked by
+    ``sync_format.check_field_settings``): its id (the file's name), name, status and each class's energy
+    limit, minimum engagement distance and fire mode. None when the file is gone or unreadable."""
+    if not TEMPLATE_NAME.fullmatch(template):
+        return None
+    try:
+        data = yaml.safe_load((Path(LIMIT_TEMPLATES) / f"{template}.yaml").read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return None
+    raw = data.get("classes") if isinstance(data, dict) else None
+    if not isinstance(raw, dict) or not raw:
+        return None
+    out: dict[str, Any] = {}
+    for name, spec in raw.items():
+        if not isinstance(spec, dict) or isinstance(spec.get("max_energy_j"), bool) \
+                or not isinstance(spec.get("max_energy_j"), (int, float)):
+            return None
+        out[str(name)] = {"max_energy_j": float(spec["max_energy_j"]), "med_m": spec.get("med_m"),
+                          "fire_mode": spec.get("fire_mode")}
+    status, verified = data.get("status"), data.get("verified_date")
+    body = {"id": template, "name": str(data.get("name") or template),
+            "status": status if isinstance(status, str) else None,
+            "verified_date": verified.isoformat() if hasattr(verified, "isoformat") else
+            (verified if isinstance(verified, str) else None), "classes": out}
+    try:  # what a controller would refuse is not sent: it keeps its own template
+        sync_format.check_field_settings({"federation_label": None, "max_replicas": 1, "limit_template": body})
+    except sync_format.SyncFormatError:
+        return None
+    return body
+
+
 # --- checks ----------------------------------------------------------------------------------
 
 def _printable(value: str) -> bool:

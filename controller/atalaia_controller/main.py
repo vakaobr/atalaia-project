@@ -181,12 +181,15 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
         controller.add_listener(sync.on_controller_message)
     remote = None
     key, _ = resolve_api_key(cfg, store)
-    if sync is not None and (cfg.sync_remote_gm or cfg.atak_remote) and key:
+    if sync is not None and (cfg.sync_remote_gm or cfg.atak_remote or cfg.sync_branding == "site") and key:
         # The remote GM (plan phase 19, P4R12) and the remote ATAK relay (FU5): only with [sync] remote_gm
         # or [atak] remote on, on a socket this controller opens; the site server never holds the GM token.
+        # With [sync] branding = "site" the socket carries only the site server's note that the field's
+        # branding changed (BR24): no live view, no command, no CoT leaves this controller.
         client = sync
         remote = RemoteGm(cfg, store, controller, api_key=key, controller_id=lambda: client.controller_id)
         sync.remote = remote
+        remote.on_field_changed = sync.field_changed
         controller.add_listener(remote.on_controller_message)
     atak = AtakEmitter(cfg, controller, remote=remote) if cfg.atak_enabled else None
 

@@ -45,7 +45,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import sync
-from ..services import registration, scheduling
+from ..services import branding, registration, scheduling
 from ..audit import record
 from ..auth import Principal, current_principal, require_field_role, server_admin
 from ..db import get_session
@@ -193,6 +193,8 @@ async def update_field(field_id: uuid.UUID, body: FieldPatch, request: Request,
         record(db, "field_update", request, user_id=principal.user.id, resource="field", resource_id=field.id,
                details=changed)
     await db.commit()
+    if changed.keys() & {"limit_template", "max_replicas", "federation_label"}:
+        branding.announce(request, [field.id])  # the controllers take over the field's check-in settings (BR24)
     await db.refresh(field)
     return JSONResponse(field_json(field, principal.roles.get(field.id, set())), headers=NO_STORE)
 

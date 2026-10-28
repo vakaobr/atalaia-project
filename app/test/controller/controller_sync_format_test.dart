@@ -29,7 +29,7 @@ void main() {
     final answers = v['answers']! as Map;
     expect(
       (list(answers['valid']).length, list(answers['invalid']).length),
-      (11, 46),
+      (15, 67),
     );
     expect({
       for (final c in list(answers['valid'])) c['kind'],
@@ -40,7 +40,7 @@ void main() {
     final stream = v['stream']! as Map;
     expect(
       (list(stream['valid']).length, list(stream['invalid']).length),
-      (18, 48),
+      (19, 51),
     );
     expect({
       for (final c in list(stream['valid'])) c['kind'],

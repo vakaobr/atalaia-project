@@ -16,15 +16,18 @@ from __future__ import annotations
 import copy
 import hashlib
 import logging
+import tempfile
 from pathlib import Path
 from typing import Any, Optional
 
-from p3support import GM, P3Case
+from p3support import DOMINATION, GM, P3Case
 
-from atalaia_controller import images, sync_format
+from atalaia_controller import checkin, images, sync_format
 from atalaia_controller.config import ConfigError
+from atalaia_controller.engine import Controller
+from atalaia_controller.store import Store
 from atalaia_controller.sync_client import SyncClient, SyncError
-from support import config
+from support import CORE, FakeModem, config
 
 logging.getLogger("atalaia.sync").setLevel(logging.CRITICAL)
 logging.getLogger("atalaia.branding").setLevel(logging.CRITICAL)
@@ -49,6 +52,7 @@ class FakeSite:
         self.images: dict[str, bytes] = {}
         self.gets: list[str] = []
         self.no_branding = False
+        self.settings: Optional[dict[str, Any]] = None  # the check-in settings (BR24), when the site has them
 
     def add(self, name: str, kind: str) -> dict[str, Any]:
         data, ref = stored(name, kind)
@@ -57,10 +61,12 @@ class FakeSite:
 
     def get(self, path: str) -> dict[str, Any]:
         self.gets.append(path)
-        if path == "/api/v1/sync/field":
+        if path.split("?")[0] == "/api/v1/sync/field":
             if self.no_branding:
                 raise SyncError("Not Found", 404)
             answer = {"sync_version": 1, "field": copy.deepcopy(self.field), "teams": copy.deepcopy(self.teams)}
+            if self.settings is not None and path.endswith("?settings=1"):  # an older site ignores the query
+                answer["settings"] = copy.deepcopy(self.settings)
             sync_format.check_field(copy.deepcopy(answer))
             return answer
         if path.startswith("/api/v1/sync/schedule"):
@@ -191,6 +197,94 @@ class SiteBrandingTests(SiteBrandingCase):
         self.cycle()
         self.assertFalse(self.sync.status()["branding"]["supported"])
         self.assertEqual(self.presets(), {})
+
+
+LIMITS = {"id": "uk", "name": "UK", "status": "unverified",
+          "classes": {"rifle": {"max_energy_j": 1.3, "med_m": 0, "fire_mode": "full_auto"},
+                      "dmr": {"max_energy_j": 2.5, "med_m": 30, "fire_mode": "semi_only"}}}
+SETTINGS = {"federation_label": "BAA", "max_replicas": 3, "limit_template": LIMITS}
+
+
+class SiteSettingsTests(SiteBrandingCase):
+    """BR24: the field's check-in settings and limit template come in the same answer."""
+
+    cfg_overrides = {**SiteBrandingCase.cfg_overrides, "join_key": bytes(range(32)).hex()}
+
+    def test_the_site_settings_replace_the_controllers(self) -> None:
+        self.assertEqual(self.svc.settings()["max_replicas"], 5)
+        self.site.settings = copy.deepcopy(SETTINGS)
+        self.cycle()
+        self.assertIn("/api/v1/sync/field?settings=1", self.site.gets)
+        st = self.svc.settings()
+        self.assertEqual((st["federation_label"], st["max_replicas"]), ("BAA", 3))
+        info = self.info()
+        self.assertEqual((info["limits"]["id"], info["limits"]["classes"]), ("uk", ["dmr", "rifle"]))
+        self.assertEqual(self.svc.limits["classes"]["dmr"]["max_energy_j"], 2.5)
+        status = self.sync.status()["branding"]
+        self.assertEqual((status["settings"], status["settings_applied"]), (True, 3))
+        self.cycle()  # nothing changed: nothing is applied again
+        self.assertEqual(self.sync.status()["branding"]["settings_applied"], 3)
+        # A site without a federation label leaves the controller's own; a new template replaces the old.
+        open_class = {"max_energy_j": 9, "med_m": None, "fire_mode": "bolt_only"}
+        self.site.settings = {**SETTINGS, "federation_label": None, "max_replicas": 4,
+                              "limit_template": {"id": "x", "name": "X", "classes": {"open": open_class}}}
+        self.cycle()
+        st = self.svc.settings()
+        self.assertEqual((st["federation_label"], st["max_replicas"], sorted(self.svc.limits["classes"])),
+                         ("BAA", 4, ["open"]))
+
+    def test_the_site_limits_survive_a_restart_and_only_with_site(self) -> None:
+        self.site.settings = copy.deepcopy(SETTINGS)
+        self.cycle()
+        self.restart()
+        self.assertEqual(sorted(self.svc.limits["classes"]), ["dmr", "rifle"])
+        self.assertEqual(self.svc.limits["id"], "uk")
+        self.assertEqual(self.svc.limits["classes"]["dmr"]["fire_mode"], "semi_only")
+        self.cfg.sync_branding = "local"  # the field went back to its own rules
+        self.svc.limits = checkin.load_limits(self.cfg.limit_template)
+        self.svc._use_site_limits()
+        self.assertEqual(self.svc.limits["id"], "portugal")
+
+    def test_an_older_site_server_sends_none(self) -> None:
+        self.cycle()  # no settings in the answer
+        self.assertEqual((self.svc.settings()["max_replicas"], self.svc.limits["id"]), (5, "portugal"))
+        self.assertFalse(self.sync.status()["branding"]["settings"])
+
+    def test_field_changed_pulls_at_once_with_site_branding_only(self) -> None:
+        self.assertFalse(self.sync._wake.is_set())
+        self.sync.field_changed()
+        self.assertTrue(self.sync._wake.is_set())
+        self.assertEqual(self.sync.status()["branding"]["field_changes"], 1)
+        self.sync._wake.clear()
+        self.cfg.sync_branding = "local"
+        self.sync.field_changed()
+        self.assertFalse(self.sync._wake.is_set())
+        self.assertEqual(self.sync.status()["branding"]["field_changes"], 1)
+
+    def test_a_standby_gets_the_field_from_its_own_sync(self) -> None:
+        """BR24: a standby controller has its own ``[sync]``: it pulls the branding and the settings itself."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        pcfg = config(tmp.name)
+        pstore = Store(pcfg.db_path)
+        self.addCleanup(pstore.close)
+        primary = Controller(pcfg, pstore, modem=FakeModem(), core=CORE, join_key=bytes(range(32)))
+        self.addCleanup(primary.stop)
+        primary.create_game({"name": "Domingo", "mode_id": DOMINATION, "teams": ["red", "blue"],
+                             "assignments": {"4": "zone"}})
+        text = primary.issue_join({"kind": "controller"})["text"]
+        self.site.field.update(field_name="Campo do Pinhal", accent="#1e6b3a")
+        self.site.settings = copy.deepcopy(SETTINGS)
+        self.cycle()  # a standby has the library before the join (M6-1); it has the branding the same way
+        r = self.client.post("/api/v1/controller/join", headers=GM, json={"text": text})
+        self.assertEqual(r.status_code, 201, r.text)
+        self.assertEqual(self.bundle.store.game(r.json()["id"])["joined"], 1)
+        self.site.field.update(accent="#123456")
+        self.site.settings = {**SETTINGS, "max_replicas": 2}
+        self.cycle()  # while it follows the game
+        view = self.client.get("/api/v1/field/branding").json()
+        self.assertEqual((view["field_name"], view["accent"]), ("Campo do Pinhal", "#123456"))
+        self.assertEqual(self.svc.settings()["max_replicas"], 2)
 
 
 class LocalBrandingTests(SiteBrandingCase):

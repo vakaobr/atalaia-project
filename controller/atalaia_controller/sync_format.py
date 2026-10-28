@@ -566,9 +566,9 @@ def _list(value: Any, path: str, hi: int, lo: int = 0) -> list[Any]:
     return value
 
 
-def _answer_envelope(body: Any, required: tuple[str, ...]) -> dict[str, Any]:
+def _answer_envelope(body: Any, required: tuple[str, ...], optional: tuple[str, ...] = ()) -> dict[str, Any]:
     body = _obj(body, "")
-    _keys(body, "", ("sync_version", *required))
+    _keys(body, "", ("sync_version", *required), optional)
     if body["sync_version"] != SYNC_VERSION or isinstance(body["sync_version"], bool):
         _fail("unsupported_version", "sync_version")
     return body
@@ -798,10 +798,65 @@ def check_image_ref(value: Any, path: str, kind: str) -> Any:
     return ref
 
 
+LIMIT_ID = re.compile(r"[a-z0-9_]{1,32}")  # a limit template's id: its file name in app/lib/chrono/limit_templates
+MAX_LIMIT_CLASSES = 64
+LIMIT_CLASS_MAX = 32       # characters of a class's name
+LIMIT_NAME_MAX = 64
+LIMIT_STATUSES = ("verified", "unverified")  # the template file's status
+LIMIT_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")  # its verified_date
+FIRE_MODES = ("full_auto", "semi_only", "bolt_only")
+FEDERATION_LABEL_MAX = 16  # checkin.federation_label
+MAX_REPLICAS_MAX = 20      # checkin.max_replicas
+
+
+def check_field_settings(value: Any, path: str = "settings") -> Any:
+    """The field's check-in rules as the site server keeps them (decision S16-6, BR24): the federation label
+    (null: the controller keeps its own), the replicas a player may declare, and the limit template whole (its
+    classes with their energy limit), so a controller needs no copy of the template's file. ``null``: the
+    site server did not send them."""
+    if value is None:
+        return None
+    st = _obj(value, path)
+    _keys(st, path, ("federation_label", "max_replicas", "limit_template"))
+    label = _text(st["federation_label"], f"{path}.federation_label", FEDERATION_LABEL_MAX, null=True)
+    if label is not None and label != label.strip():
+        _fail("bad_text", f"{path}.federation_label")
+    _int(st["max_replicas"], f"{path}.max_replicas", 1, MAX_REPLICAS_MAX)
+    lt = _obj(st["limit_template"], f"{path}.limit_template")
+    lpath = f"{path}.limit_template"
+    _keys(lt, lpath, ("id", "name", "classes"), ("status", "verified_date"))
+    _text(lt["id"], f"{lpath}.id", 32, pattern=LIMIT_ID)
+    status = lt.setdefault("status", None)
+    if status is not None and status not in LIMIT_STATUSES:
+        _fail("bad_value", f"{lpath}.status")
+    verified_date = _text(lt.setdefault("verified_date", None), f"{lpath}.verified_date", 10, null=True,
+                          pattern=LIMIT_DATE)
+    if status == "verified" and verified_date is None:  # the app's own rule for a verified template
+        _fail("bad_value", f"{lpath}.verified_date")
+    _text(lt["name"], f"{lpath}.name", LIMIT_NAME_MAX)
+    classes = _obj(lt["classes"], f"{lpath}.classes")
+    if not 1 <= len(classes) <= MAX_LIMIT_CLASSES:
+        _fail("bad_batch_size", f"{lpath}.classes")
+    for name, spec in classes.items():
+        cpath = f"{lpath}.classes.{name}"
+        _text(name, cpath, LIMIT_CLASS_MAX, pattern=REPLICA_CLASS)
+        spec = _obj(spec, cpath)
+        _keys(spec, cpath, ("max_energy_j", "med_m", "fire_mode"))
+        if _num(spec["max_energy_j"], f"{cpath}.max_energy_j", 0, 100) <= 0:
+            _fail("out_of_range", f"{cpath}.max_energy_j")
+        _int(spec["med_m"], f"{cpath}.med_m", 0, 500, null=True)
+        if spec["fire_mode"] not in FIRE_MODES:
+            _fail("bad_value", f"{cpath}.fire_mode")
+    return st
+
+
 def check_field(body: Any) -> dict[str, Any]:
     """GET /api/v1/sync/field's answer: the field's branding (name, accent, logo, wallpaper) and its saved teams
-    (a display name, the colour they usually play, a crest, the club they are), images by SHA-256."""
-    body = _answer_envelope(body, ("field", "teams"))
+    (a display name, the colour they usually play, a crest, the club they are), images by SHA-256; and, only
+    when the controller asked for them (``?settings=1``) and the site server knows them, the field's check-in
+    ``settings`` (absent otherwise)."""
+    body = _answer_envelope(body, ("field", "teams"), ("settings",))
+    check_field_settings(body.get("settings"))
     f = _obj(body["field"], "field")
     _keys(f, "field", (), ("field_name", "accent", "logo", "wallpaper"))
     name = _text(f.setdefault("field_name", None), "field.field_name", FIELD_NAME_MAX, null=True)
@@ -1137,8 +1192,18 @@ def check_cot(body: Any) -> dict[str, Any]:
 
 
 # The stream's own messages (``type`` taken out): what the controller sends, and the command it gets.
+def check_field_changed(body: Any) -> dict[str, Any]:
+    """The site server's note that the field's branding, saved teams or check-in settings changed (it carries
+    nothing else): the controller pulls ``GET /api/v1/sync/field`` at once instead of at its next cycle."""
+    body = _obj(body, "")
+    _keys(body, "", ("sync_version",))
+    if body["sync_version"] != SYNC_VERSION or isinstance(body["sync_version"], bool):
+        _fail("unsupported_version", "sync_version")
+    return body
+
+
 STREAM = {"hello": check_hello, "live": check_live, "command.result": check_result, "command": check_command,
-          "cot": check_cot}
+          "cot": check_cot, "field.changed": check_field_changed}
 
 
 # --- the scenario library and presets (plan phase 20) -------------------------------------

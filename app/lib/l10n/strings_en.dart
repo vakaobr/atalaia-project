@@ -1064,7 +1064,7 @@ const Map<String, String> enStrings = {
   'ctl_site.key': 'The field\'s API key (from the site server)',
   'ctl_site.key_set': 'API key {fp}… (type a new one to replace it)',
   'ctl_site.branding':
-      'The field\'s branding and saved teams from the site server',
+      'The field\'s branding, saved teams and check-in settings from the site server',
   'ctl_site.library':
       'The field\'s scenarios and game presets from the site server',
   'ctl_site.remote_gm': 'Remote GM',

@@ -26,7 +26,11 @@
 /// (the schedule, each linked game's roster until it starts, with it other fields'
 /// chrono records of its players that their person shared (S14-5), the claims'
 /// verdicts, the outcomes after the game), with branding "site" the
-/// field's branding and saved teams with their images, with the library on
+/// field's branding and saved teams with their images and its check-in
+/// settings (`?settings=1`, applied by `ControllerCheckin.applySiteSettings`;
+/// the site server's `field.changed` note on the stream, see
+/// controller_remote_gm.dart, calls [fieldChanged] to pull at once; a
+/// standby controller does this by its own sync, BR24), with the library on
 /// the field's scenarios and game presets (a scenario the site archives and a
 /// preset it deletes are removed again, decision S20-8). Every 30 s while a game runs and
 /// every 5 min between games; a failure doubles the wait up to 5 min; a
@@ -375,6 +379,7 @@ class ControllerSync {
         ..syncEnabled = true;
     }
     engine.branding?.siteManaged = config.branding == 'site';
+    engine.checkin?.siteManaged = config.branding == 'site';
   }
 
   final ControllerEngine engine;
@@ -399,6 +404,9 @@ class ControllerSync {
   double? brandingPulledAt;
   String? brandingError;
   int imagesFetched = 0;
+  bool settingsFromSite = false; // the last answer carried the settings (BR24)
+  int settingsApplied = 0; // settings (and limit templates) changed by them
+  int fieldChanges = 0; // stream notes that the field's branding changed
   bool librarySupported = true;
   double? libraryPulledAt;
   String? libraryError;
@@ -1153,7 +1161,10 @@ class ControllerSync {
     pulls++;
     Map<String, Object?> answer;
     try {
-      answer = await transport.get('/api/v1/sync/field');
+      // `settings=1`: an older site server ignores it; one that knows it adds
+      // the field's check-in settings (BR24). Without it the answer is the
+      // old one, which an older controller checks strictly.
+      answer = await transport.get('/api/v1/sync/field?settings=1');
     } on SyncError catch (e) {
       if (_unsupported.contains(e.status) &&
           _unsupportedCodes.contains(e.code)) {
@@ -1203,7 +1214,21 @@ class ControllerSync {
         ? null
         : '${failed.length} images not fetched yet';
     branding.applySite(answer, unavailable: failed);
+    final settings = answer['settings'];
+    if (settings is Map<String, Object?>) {
+      settingsApplied += engine.checkin?.applySiteSettings(settings) ?? 0;
+    }
+    settingsFromSite = settings != null;
     brandingPulledAt = _wall();
+  }
+
+  /// The site server's note on the stream that the field's branding, saved
+  /// teams or settings changed (`field.changed`): pull them at once, unless
+  /// this controller keeps its own branding or is backing off (BR24).
+  void fieldChanged() {
+    if (config.branding != 'site') return;
+    fieldChanges++;
+    kick();
   }
 
   Future<bool> _fetchImage(
@@ -1586,6 +1611,9 @@ class ControllerSync {
         'pulled_at': brandingPulledAt,
         'error': brandingError,
         'images_fetched': imagesFetched,
+        'settings': settingsFromSite,
+        'settings_applied': settingsApplied,
+        'field_changes': fieldChanges,
       },
       'remote_gm': remoteStatus?.call() ?? {'enabled': false},
       'library': {

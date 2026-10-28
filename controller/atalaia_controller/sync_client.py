@@ -65,7 +65,13 @@ an upload to the console, stripped bytes unchanged; then ``Branding.apply_site``
 makes the field's branding and the site's team presets match the answer.
 With ``"local"`` (the default) nothing is pulled and the console's branding
 stays the controller's own. A site server without these endpoints is
-skipped quietly, as for game day.
+skipped quietly, as for game day. The pull asks for ``?settings=1`` (BR24):
+a site server that knows it adds the field's check-in settings (``max_replicas``,
+the federation label, the limit template whole), which ``Checkin.apply_site_settings``
+makes this controller's; an older one ignores the query and the settings stay
+the controller's own. The site server's ``field.changed`` note on the stream
+(``remote_gm.py``) calls ``field_changed``, which runs the cycle at once.
+A standby controller has its own sync and does all this by itself.
 
 **The scenario library** (plan phase 20; ADR-P4-6 as amended, P4R9): with
 ``[sync] library = true`` (the default) the client then pulls the field's
@@ -317,6 +323,9 @@ class SyncClient:
         self.branding_pulled_at: Optional[float] = None
         self.branding_error: Optional[str] = None
         self.images_fetched = 0
+        self.settings_from_site = False  # the last answer carried the field's check-in settings (BR24)
+        self.settings_applied = 0        # settings (and limit templates) changed by them
+        self.field_changes = 0           # stream notes that the field's branding changed (BR24)
         self.remote: Optional[Any] = None  # remote_gm.RemoteGm, with [sync] remote_gm = true (plan phase 19)
         self.library_supported = True
         self.library_pulled_at: Optional[float] = None
@@ -368,6 +377,14 @@ class SyncClient:
         """Sync soon (a game started, paused or ended), unless the client is backing off."""
         if self.failures == 0:
             self._wake.set()
+
+    def field_changed(self) -> None:
+        """The site server's note on the stream that the field's branding, teams or settings changed
+        (``field.changed``): pull them at once, unless this controller keeps its own branding or is
+        backing off."""
+        if getattr(self.cfg, "sync_branding", "local") == "site":
+            self.field_changes += 1
+            self.kick()
 
     def on_controller_message(self, msg: dict[str, Any]) -> None:
         """The engine's listener: a game's state changed, or a chrono series was judged."""
@@ -810,7 +827,9 @@ class SyncClient:
             return
         self.pulls += 1
         try:
-            answer = self.transport.get("/api/v1/sync/field")
+            # ``settings=1``: an older site server ignores it; one that knows it adds the field's check-in
+            # settings (BR24). Without it the answer is the old one, which an older controller checks strictly.
+            answer = self.transport.get("/api/v1/sync/field?settings=1")
         except SyncError as exc:
             if exc.status in UNSUPPORTED and exc.code in UNSUPPORTED_CODES:
                 if self.branding_supported:
@@ -839,6 +858,9 @@ class SyncClient:
         failed |= set(missing[IMAGES_PER_CYCLE:])
         self.branding_error = f"{len(failed)} images not fetched yet" if failed else None
         self.branding.apply_site(answer, unavailable=failed)
+        if answer.get("settings") is not None and self.checkin is not None:
+            self.settings_applied += self.checkin.apply_site_settings(answer["settings"])
+        self.settings_from_site = answer.get("settings") is not None
         self.branding_pulled_at = self._wall()
 
     def _fetch_image(self, sha: str, kind: str, ref: dict[str, Any]) -> bool:
@@ -1104,7 +1126,9 @@ class SyncClient:
                                                "stored": self.shared_chrono_stored}},
                 "branding": {"source": getattr(self.cfg, "sync_branding", "local"),
                              "supported": self.branding_supported, "pulled_at": self.branding_pulled_at,
-                             "error": self.branding_error, "images_fetched": self.images_fetched},
+                             "error": self.branding_error, "images_fetched": self.images_fetched,
+                             "settings": self.settings_from_site, "settings_applied": self.settings_applied,
+                             "field_changes": self.field_changes},
                 "remote_gm": self.remote.status() if self.remote is not None else {"enabled": False},
                 "library": {"enabled": bool(getattr(self.cfg, "sync_library", True)),
                             "supported": self.library_supported, "pulled_at": self.library_pulled_at,

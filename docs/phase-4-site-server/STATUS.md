@@ -719,6 +719,26 @@ in-memory site server; the shared vectors gain 2 valid and 9 invalid field
 answers. Not yet: a real deployment, the console's "from the site server"
 label. Decisions S18-1 to S18-12, all open.
 
+### Follow-up: the field's settings and branding changes on the stream (BR24, S18-11; 2026-10-27, in software)
+
+`GET /api/v1/sync/field?settings=1` also carries the field's check-in settings
+(`federation_label`, `max_replicas` and the limit template whole; decision
+S16-6's "so they cannot differ") for a controller that asks; the answer
+without the query is unchanged, because an older controller checks it
+strictly. Every change to the field's branding, saved teams (a club's name,
+short name or crest reaches each field with a team of the club) or those
+settings sends `field.changed` on the stream to the field's connected
+controllers (`RemoteHub.announce_field`), which pull at once. With
+`[sync] branding = "site"` a controller (the Pi and the phone, the same
+behaviour) applies the settings, keeps the template in its store and opens the
+stream for the note alone; a standby controller does this by its own sync.
+Tests: `test_branding_sync.py` (the opt-in, every template through the
+controller's check, each kind of change on a stream, other fields' and gone
+sockets), the controller's `test_sync_branding.py` and `test_remote_gm.py`,
+the phone's `controller_sync_test.dart` and `controller_remote_gm_test.dart`,
+and the shared vectors (`answers`: 15 valid, 67 invalid; `stream`: 19 valid,
+51 invalid). Decisions BR24-1 to BR24-6.
+
 ## Plan phase 19: device health, firmware catalogue and remote GM (built 2026-10-20, in software)
 
 What exists: on the site server, **device health** read from what the

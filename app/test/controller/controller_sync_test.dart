@@ -14,6 +14,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:atalaia_app/chrono/limit_template.dart';
 import 'package:atalaia_app/chrono/reading.dart';
 import 'package:atalaia_app/chrono/record_signer.dart';
 import 'package:atalaia_app/controller/controller_api.dart';
@@ -72,6 +73,9 @@ class FakeSite {
 
   /// GET answers by path (without the query); null: 404 Not Found.
   final gets = <String, Object?>{};
+
+  /// The query of each GET, by path.
+  final queries = <String, List<String>>{};
   final images = <String, Uint8List>{};
 
   String get url => 'http://127.0.0.1:${server.port}';
@@ -89,6 +93,9 @@ class FakeSite {
         ? null
         : (jsonDecode(utf8.decode(raw)) as Map).cast<String, Object?>();
     requests.add((req.method, req.uri.path, req.headers, body));
+    if (req.method == 'GET') {
+      queries.putIfAbsent(req.uri.path, () => []).add(req.uri.query);
+    }
     final (status, answer, headers) = _handle(req, body);
     req.response.statusCode = status;
     headers.forEach(req.response.headers.set);
@@ -1205,6 +1212,119 @@ void main() {
       (site.gets['/api/v1/sync/field']! as Map)['teams'] = <Object?>[];
       expect(await c.runOnce(), isTrue);
       expect(b.teamPresets(), isEmpty);
+    });
+
+    Map<String, Object?> fieldAnswer([Map<String, Object?>? settings]) => {
+      'sync_version': 1,
+      'field': {'field_name': 'Campo do Sul', 'accent': '#123456'},
+      'teams': <Object?>[],
+      'settings': ?settings,
+    };
+    Map<String, Object?> ukSettings() => {
+      'federation_label': 'BAA',
+      'max_replicas': 3,
+      'limit_template': {
+        'id': 'uk',
+        'name': 'UK',
+        'status': 'unverified',
+        'classes': {
+          'rifle': {'max_energy_j': 1.3, 'med_m': 0, 'fire_mode': 'full_auto'},
+          'dmr': {'max_energy_j': 2.5, 'med_m': 30, 'fire_mode': 'semi_only'},
+        },
+      },
+    };
+
+    test('the field\'s check-in settings and limit template come in the same '
+        'answer (BR24); they survive a restart', () async {
+      expect(checkin.settings()['max_replicas'], 5);
+      site.gets['/api/v1/sync/field'] = fieldAnswer(ukSettings());
+      final c = client(branding: 'site');
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(site.queries['/api/v1/sync/field'], ['settings=1']);
+      final st = checkin.settings();
+      expect((st['federation_label'], st['max_replicas']), ('BAA', 3));
+      expect(checkin.limits.id, 'uk');
+      expect(checkin.limits.classes.keys.toSet(), {'rifle', 'dmr'});
+      expect(checkin.limits.classes['dmr']!.maxEnergyJ, 2.5);
+      expect(checkin.limits.classes['dmr']!.fireMode, FireMode.semiOnly);
+      final status = c.status()['branding']! as Map;
+      expect((status['settings'], status['settings_applied']), (true, 3));
+      // Nothing changed: nothing is applied again.
+      expect(await c.runOnce(), isTrue);
+      expect((c.status()['branding']! as Map)['settings_applied'], 3);
+      // A site without a federation label leaves the controller's own; a new
+      // template replaces the old.
+      site.gets['/api/v1/sync/field'] = fieldAnswer({
+        ...ukSettings(),
+        'federation_label': null,
+        'max_replicas': 4,
+        'limit_template': {
+          'id': 'x',
+          'name': 'X',
+          'classes': {
+            'open': {
+              'max_energy_j': 9,
+              'med_m': null,
+              'fire_mode': 'bolt_only',
+            },
+          },
+        },
+      });
+      expect(await c.runOnce(), isTrue);
+      expect(checkin.settings()['federation_label'], 'BAA');
+      expect(checkin.settings()['max_replicas'], 4);
+      expect(checkin.limits.classes.keys.toList(), ['open']);
+      // A restart keeps the field's rules, while the site keeps the branding.
+      engine.close();
+      engine = boot();
+      expect(checkin.limits.id, 'portugal');
+      client(branding: 'site');
+      expect(checkin.limits.id, 'x');
+      expect(checkin.settings()['max_replicas'], 4);
+    });
+
+    test('with local branding the settings are not asked for, nor kept '
+        '(BR24)', () async {
+      site.gets['/api/v1/sync/field'] = fieldAnswer(ukSettings());
+      final c = client(); // branding stays local: nothing is pulled
+      expect(await c.runOnce(), isTrue);
+      expect(site.queries['/api/v1/sync/field'], isNull);
+      expect(checkin.limits.id, 'portugal');
+      expect(checkin.settings()['max_replicas'], 5);
+    });
+
+    test('an older site server sends no settings (BR24)', () async {
+      site.gets['/api/v1/sync/field'] = fieldAnswer();
+      final c = client(branding: 'site');
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(checkin.limits.id, 'portugal');
+      expect(checkin.settings()['max_replicas'], 5);
+      expect((c.status()['branding']! as Map)['settings'], false);
+      expect(engine.branding!.view()['accent'], '#123456');
+    });
+
+    test('a settings block out of form is refused, nothing applied', () async {
+      final bad = ukSettings();
+      ((bad['limit_template']! as Map)['classes']! as Map)['rifle'] = {
+        'max_energy_j': 0,
+        'med_m': 0,
+        'fire_mode': 'full_auto',
+      };
+      site.gets['/api/v1/sync/field'] = fieldAnswer(bad);
+      final c = client(branding: 'site');
+      expect(await c.runOnce(), isFalse);
+      expect(c.lastError, 'bad_answer');
+      expect(checkin.settings()['max_replicas'], 5);
+    });
+
+    test('field.changed pulls at once, only with the site\'s branding '
+        '(BR24)', () async {
+      final c = client(branding: 'site');
+      c.fieldChanged();
+      expect((c.status()['branding']! as Map)['field_changes'], 1);
+      final local = client();
+      local.fieldChanged();
+      expect((local.status()['branding']! as Map)['field_changes'], 0);
     });
 
     test('an image that does not hash to its name is refused', () async {

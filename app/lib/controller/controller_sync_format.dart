@@ -693,9 +693,13 @@ List<Object?> _list(Object? value, String path, int hi, [int lo = 0]) {
   return value;
 }
 
-Json _answerEnvelope(Object? raw, List<String> required) {
+Json _answerEnvelope(
+  Object? raw,
+  List<String> required, [
+  List<String> optional = const [],
+]) {
   final body = _obj(raw, '');
-  _keys(body, '', ['sync_version', ...required]);
+  _keys(body, '', ['sync_version', ...required], optional);
   if (body['sync_version'] != syncVersion) {
     _fail('unsupported_version', 'sync_version');
   }
@@ -1030,8 +1034,78 @@ Json? checkImageRef(Object? value, String path, String kind) {
   return ref;
 }
 
+final _limitIdRe = _full(r'[a-z0-9_]{1,32}');
+const _maxLimitClasses = 64;
+const _limitClassMax = 32;
+const _limitNameMax = 64;
+const _limitStatuses = ['verified', 'unverified'];
+final _limitDateRe = _full(r'\d{4}-\d{2}-\d{2}');
+const limitFireModes = ['full_auto', 'semi_only', 'bolt_only'];
+const _federationLabelMax = 16;
+const maxReplicasMax = 20;
+
+/// The field's check-in rules as the site server keeps them (decision
+/// S16-6, BR24): the federation label (null: the controller keeps its
+/// own), the replicas a player may declare and the limit template whole.
+/// Null: the site server did not send them.
+Json? checkFieldSettings(Object? value, [String path = 'settings']) {
+  if (value == null) return null;
+  final st = _obj(value, path);
+  _keys(st, path, ['federation_label', 'max_replicas', 'limit_template']);
+  final label = _text(
+    st['federation_label'],
+    '$path.federation_label',
+    _federationLabelMax,
+    nullable: true,
+  );
+  if (label != null && label != _pyStrip(label)) {
+    _fail('bad_text', '$path.federation_label');
+  }
+  _int(st['max_replicas'], '$path.max_replicas', 1, maxReplicasMax);
+  final lt = _obj(st['limit_template'], '$path.limit_template');
+  st['limit_template'] = lt;
+  final lpath = '$path.limit_template';
+  _keys(lt, lpath, ['id', 'name', 'classes'], ['status', 'verified_date']);
+  _text(lt['id'], '$lpath.id', 32, pattern: _limitIdRe);
+  final status = _default(lt, 'status', null);
+  if (status != null && !_limitStatuses.contains(status)) {
+    _fail('bad_value', '$lpath.status');
+  }
+  final verifiedDate = _text(
+    _default(lt, 'verified_date', null),
+    '$lpath.verified_date',
+    10,
+    nullable: true,
+    pattern: _limitDateRe,
+  );
+  if (status == 'verified' && verifiedDate == null) {
+    _fail('bad_value', '$lpath.verified_date');
+  }
+  _text(lt['name'], '$lpath.name', _limitNameMax);
+  final classes = _obj(lt['classes'], '$lpath.classes');
+  lt['classes'] = classes;
+  if (classes.isEmpty || classes.length > _maxLimitClasses) {
+    _fail('bad_batch_size', '$lpath.classes');
+  }
+  for (final e in classes.entries.toList()) {
+    final cpath = '$lpath.classes.${e.key}';
+    _text(e.key, cpath, _limitClassMax, pattern: _replicaClassRe);
+    final spec = _obj(e.value, cpath);
+    classes[e.key] = spec;
+    _keys(spec, cpath, ['max_energy_j', 'med_m', 'fire_mode']);
+    final energy = _num(spec['max_energy_j'], '$cpath.max_energy_j', 0, 100)!;
+    if (energy <= 0) _fail('out_of_range', '$cpath.max_energy_j');
+    _int(spec['med_m'], '$cpath.med_m', 0, 500, nullable: true);
+    if (!limitFireModes.contains(spec['fire_mode'])) {
+      _fail('bad_value', '$cpath.fire_mode');
+    }
+  }
+  return st;
+}
+
 Json checkField(Object? raw) {
-  final body = _answerEnvelope(raw, ['field', 'teams']);
+  final body = _answerEnvelope(raw, ['field', 'teams'], ['settings']);
+  checkFieldSettings(body['settings']);
   final f = _obj(body['field'], 'field');
   body['field'] = f;
   _keys(f, 'field', const [], ['field_name', 'accent', 'logo', 'wallpaper']);
@@ -1626,6 +1700,18 @@ Json checkCot(Object? raw) {
   return body;
 }
 
+/// The site server's note that the field's branding, saved teams or
+/// check-in settings changed (it carries nothing else): the controller
+/// pulls `GET /api/v1/sync/field` at once instead of at its next cycle.
+Json checkFieldChanged(Object? raw) {
+  final body = _obj(raw, '');
+  _keys(body, '', ['sync_version']);
+  if (body['sync_version'] != syncVersion) {
+    _fail('unsupported_version', 'sync_version');
+  }
+  return body;
+}
+
 /// The stream's own messages (`type` taken out).
 const streamChecks = <String, Json Function(Object?)>{
   'hello': checkHello,
@@ -1633,6 +1719,7 @@ const streamChecks = <String, Json Function(Object?)>{
   'command.result': checkResult,
   'command': checkCommand,
   'cot': checkCot,
+  'field.changed': checkFieldChanged,
 };
 
 // --- the scenario library and presets (plan phase 20) ---------------------

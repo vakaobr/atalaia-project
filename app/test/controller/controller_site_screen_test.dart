@@ -61,6 +61,11 @@ void main() {
       );
       expect(h.settings.failoverMode, 'auto');
       expect(h.settings.controllerAtak, isNull);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('sync-key')),
+        -200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.textContaining(keyFingerprint(key)), findsOneWidget);
       expect(find.text(key), findsNothing);
       expect((await h.store.loadSettings()).controllerSync?['api_key'], key);

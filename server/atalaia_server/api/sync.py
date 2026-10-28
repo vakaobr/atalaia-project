@@ -18,7 +18,8 @@
     GET  /api/v1/sync/chrono?scheduled_game_id= other fields' chrono records of that roster's players, only
                                with the person's consent for both fields (S14-5)
     GET  /api/v1/sync/claims                   accounts' claims of player ids, waiting for this field's verdict
-    GET  /api/v1/sync/field                    the field's branding and saved teams, images by SHA-256 (plan phase 18)
+    GET  /api/v1/sync/field                    the field's branding and saved teams, images by SHA-256 (plan phase 18);
+                               with ?settings=1 also its check-in settings and limit template (BR24)
     GET  /api/v1/sync/images/{sha256}          one of those images, as stored (checked, metadata stripped)
     GET  /api/v1/sync/presets                  the field's scenario library (id, revision, SHA-256) and game
                                                presets (plan phase 20), the same for every controller of the field
@@ -27,7 +28,9 @@
                                controller's [sync] remote_gm on, also its hello, live view and
                                command results, and the remote GM's commands the other way (plan phase 19);
                                with its [atak] remote on, its CoT events for the remote ATAK relay
-                               (``cot``, Phase 4 follow-up FU5, ``atak_relay.py``)
+                               (``cot``, Phase 4 follow-up FU5, ``atak_relay.py``); to every controller
+                               connected, a ``field.changed`` note when the field's branding, saved teams or
+                               settings change (BR24; ``services/branding.announce``)
 
 The controller opens every connection (P4R12); nothing here connects to it.
 Bodies are checked by ``atalaia_controller.sync_format``, the code the
@@ -201,8 +204,12 @@ async def pending_claims(request: Request) -> JSONResponse:
 
 @router.get("/field")
 async def field_branding(request: Request) -> JSONResponse:
+    """The field's branding and saved teams; with ``?settings=1`` (a controller of BR24 onwards; an older one
+    does not send it and gets the old shape, which it checks strictly) also its check-in settings."""
+    settings = request.query_params.get("settings") == "1"
+
     async def build(db: Any, caller: sync.Caller) -> Any:
-        return await branding.field_answer(db, caller.field_id)
+        return await branding.field_answer(db, caller.field_id, settings=settings)
     return await _pull(request, build)
 
 
