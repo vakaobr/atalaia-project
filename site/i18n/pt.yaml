@@ -733,9 +733,13 @@ roadmap:
         os botões e joga jogos inteiros, a Bomba incluída (armar, desarmar, fim do tempo), no seu
         próprio ecrã pequeno."
       - "A barra do tempo de jogo: enquanto corre um jogo com limite de tempo, uma faixa na base do ecrã pequeno mostra quanto falta, e o ecrã OLED mostra um relógio. Em software, ainda não vista num painel a sério."
+      - "A configuração que um cenário envia às caixas é enviada outra vez até cada caixa a confirmar, e a caixa já envia essa confirmação. Só em software e testes no computador, não numa placa a sério."
+      - "Mudar de campo, no menu de administração da caixa, passa uma caixa adotada para outro campo, pelo código. Só testes no computador, não numa placa a sério."
+      - "O logótipo do campo no ecrã grande da caixa. Em software, ainda não visto num painel a sério."
     next:
       - Uma caixa montada que aguente um jogo de clube de 2 horas sem reiniciar.
       - "Ver a barra do tempo num painel a sério."
+      - "Experimentar o reenvio da configuração, o Mudar de campo e o logótipo numa placa a sério."
     gate: >-
       Prova: uma caixa aguenta um jogo de clube de 2 horas sem reiniciar. <strong>Em aberto</strong>
       até haver uma caixa montada que o consiga.
@@ -766,6 +770,7 @@ roadmap:
       - "O controlador Pi falha logo uma atualização de firmware quando o rádio recusa a oferta."
       - "Uma caixa já configurada pode voltar à configuração do Wi-Fi, por uma entrada de menu atrás do PIN de administração ou por um comando na consola USB. A página de configuração está em inglês, português, alemão e chinês tradicional, e os telemóveis abrem-na sozinhos."
       - "O separador Jogo da consola mostra um código QR do marcador para quem joga."
+      - "Os cenários podem estar em alemão e em chinês tradicional; os nomes dos objetivos ficam por agora em português e inglês."
     next:
       - As placas de rádio e 5 caixas montadas para o teste no campo.
       - Um teste no campo com 20 caixas, com e sem escuta antes de falar.
@@ -818,13 +823,16 @@ roadmap:
           e a cor na app, no marcador e no cartaz, e dar nomes e emblemas às equipas."
         - "A consola da organização avisa quando o cartaz de check-in mudou depois de impresso."
         - "Os ecrãs do marshal e do cronógrafo dizem o que a app faz de facto, e as listas de limites estão traduzidas."
-        - "A app guarda os seus segredos selados com o Keystore do Android."
+        - "A app guarda mais segredos selados com o Keystore do Android: a chave do servidor do site, os segredos dos jogadores e a sessão no site."
         - "As etiquetas NFC de quem joga são assinadas pelo controlador de campo e escritas a partir da consola da organização, do controlador no telemóvel ou da app do marshal. Os marshals deixam de ter a chave do campo para isso."
         - "Etiquetas das réplicas: a app mostra, partilha ou imprime o autocolante com o QR de cada réplica, e a consola imprime-os para quem já fez check-in. A fila do marshal lê-os."
         - "Posições em interiores: a organização põe balizas BLE na planta, e um telemóvel Android que ouça uma indica a sua sala em vez do GPS. Feito em software e com simulações, sem balizas a sério. O iOS fica só com GPS."
         - "A app segue um jogo a partir do código QR do marcador, mesmo quando o controlador no telemóvel serve HTTPS com a sua própria CA do campo. Em software, não experimentado num telemóvel a sério."
         - "Quem joga diz em que piso está e vê a planta do campo com as posições que pode ver."
         - "Histórico de jogos na app: os jogos em que a pessoa participou, do mais recente para o mais antigo."
+        - "Início de sessão com Google, Microsoft, Apple ou uma chave de acesso (passkey) na app, com um ecrã de conta. Só Android; não experimentado num telemóvel a sério nem com os fornecedores reais."
+        - "O plano do campo do jogador pode mostrar a quadrícula do campo e a célula do próprio jogador."
+        - "Quem é árbitro pode associar um autocolante NFC a uma réplica ao registá-la."
     g_props:
       title: Dispositivos Android e módulo de E/S
       items:
@@ -834,6 +842,7 @@ roadmap:
           sirene, o leitor NFC, o sensor de abertura e o rádio LoRa de uma placa Heltec, por USB ou
           Bluetooth."
         - "A app volta a ligar-se sozinha a um módulo de E/S perdido. Não experimentado com um módulo a sério."
+        - "Os props Android vão buscar pacotes de modo assinados ao seu controlador, como as caixas. Em software."
     g_controller:
       title: O telemóvel como controlador de campo
       items:
@@ -880,6 +889,7 @@ roadmap:
         controlador do campo ficam só em Android."
       - "As balizas em interiores no iOS pedem um plugin em Swift, escrito num Mac."
       - "Experimentar o código QR do marcador, a escolha do piso, o histórico de jogos e a religação ao módulo de E/S num telemóvel e num módulo a sério."
+      - "Experimentar o início de sessão da app num telemóvel a sério e com os fornecedores reais."
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do site e jogo avançado
@@ -953,6 +963,8 @@ roadmap:
         - "Uma caixa que o Domínio Progressivo tornou a ativa di-lo no ATAK."
         - "A página do mapa do campo funciona também no telemóvel como controlador de campo."
         - "O ATAK mostra quem está em interiores no sítio da sua baliza, com a sala nas observações."
+        - "A quadrícula no ATAK e um mapa de quadrícula para imprimir."
+        - "O GM remoto vê as posições dos jogadores quando estes as partilham."
     g_server:
       title: Servidor do site, contas e dados
       items:
@@ -970,6 +982,7 @@ roadmap:
         - "Os controladores recebem do servidor do site as definições e a imagem do campo, e uma alteração chega logo ao Pi e ao controlador no telemóvel. Em software."
         - "Início de sessão com Google, Microsoft ou Apple e com passkeys (chaves de acesso). As palavras-passe são opcionais; a equipa continua a precisar de um segundo fator. Testado num computador, não com os fornecedores de início de sessão a sério."
         - "Uma página de conta para a equipa, onde cada pessoa gere os seus inícios de sessão: passkeys, contas associadas, palavra-passe e código de dois fatores."
+        - "As alterações a cenários, predefinições e calendário chegam logo aos controladores."
     g_games:
       title: Jogos, clubes e páginas da organização
       items:
@@ -1000,6 +1013,13 @@ roadmap:
         - "Ações da organização numa inscrição: paga ou não paga (o servidor não cobra nada), falta, mudar para outro jogo, repor, editar as réplicas. Testado num navegador sem ecrã, não num servidor a sério."
         - "Páginas para a equipa gerir funções, chaves de sincronização, imagem do campo, clubes, ligações a plataformas, firmware e administração."
         - "A página do GM remoto atualiza-se em direto, sem recarregar."
+        - "A filiação na APD é verificada no registo e no check-in."
+        - "Os registos de cronógrafo mostram quanto uma réplica passou do limite e assinalam reincidentes."
+        - "Uma página para o pessoal do campo com a exportação dos dados e o uso das quotas."
+        - "Cronologias de pontuação em tempo de jogo."
+        - "A página de um clube lista os campos onde joga."
+        - "O controlador importa sozinho um CSV de inscrições, sem servidor do site."
+        - "A consola avisa quando um nome tem letras que as caixas não conseguem desenhar."
     g_boxes:
       title: Caixas e o campo
       items:
@@ -1047,6 +1067,7 @@ roadmap:
           cópias de segurança cifradas repostas com cada campo separado dos outros. Testada em
           Docker, não num servidor alojado real com um domínio real."
         - "Modo alojado: uma quota por campo, uma exportação de dados que a administração do campo pode descarregar, e as ligações abertas de um campo apagado fecham logo."
+        - "Modo alojado: uma quota de armazenamento e domínios próprios por campo."
     next:
       - Um servidor a sério com domínio.
       - A revisão jurídica dos modelos antes de o modo alojado abrir. Não é oferecido antes disso.
@@ -1102,6 +1123,7 @@ roadmap:
         módulo de alvo, em texto. Ainda não se montou nenhuma caixa com eles.
       - "<strong>Manuais de utilizador</strong> para quem joga, a organização, os marshals e quem opera a Field Box, em inglês e português."
       - "A vista web do simulador tem todas as entradas que um modo usa: tags, teclado, impactos e comandos da organização, com descarga do registo de eventos."
+      - "Os blocos de cenários da consola do GM têm uma lista de línguas com as quatro."
     next:
       - A chave do registo do projeto, feita offline, para que os primeiros modos possam ser verificados (tarefa de quem mantém o projeto).
       - "A revisão do alemão e do chinês: se jogas em alemão ou em chinês, ajuda-nos a revê-los. As

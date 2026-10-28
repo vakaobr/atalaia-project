@@ -751,9 +751,13 @@ roadmap:
         Funk ein, liest seine Knöpfe und spielt ganze Spiele, Bombe eingeschlossen (scharf machen,
         entschärfen, ablaufende Zeit), auf seinem kleinen Bildschirm."
       - "Die Spielzeit-Leiste: Läuft ein Spiel mit Zeitlimit, zeigt ein Streifen am unteren Rand des kleinen Displays, wie viel davon übrig ist, und das OLED zeigt eine Uhr. In Software, noch nicht an einem echten Display gesehen."
+      - "Das Setup, das ein Szenario an die Boxen schickt, wird erneut gesendet, bis jede Box es bestätigt, und die Box sendet diese Bestätigung jetzt. Nur in Software und Host-Tests, nicht auf einem echten Board."
+      - "Feld wechseln im Admin-Menü der Box verschiebt eine angemeldete Box über ihren Code auf ein anderes Feld. Nur Host-Tests, nicht auf einem echten Board."
+      - "Das Logo des Feldes auf dem großen Bildschirm der Box. In Software, noch nicht an einem echten Display gesehen."
     next:
       - Eine gebaute Box, die ein zweistündiges Club-Spiel ohne Neustart durchhält.
       - "Die Zeitleiste an einem echten Display sehen."
+      - "Das erneute Senden des Setups, Feld wechseln und das Logo auf einem echten Board ausprobieren."
     gate: >-
       Gate: Eine Box läuft ein zweistündiges Club-Spiel ohne Neustart. <strong>Offen</strong>, bis
       eine gebaute Box das schafft.
@@ -785,6 +789,7 @@ roadmap:
       - "Der Pi-Controller lässt ein Firmware-Update sofort scheitern, wenn das Funkmodul das Angebot ablehnt."
       - "Eine eingerichtete Box kann zurück in die WLAN-Einrichtung, über einen Menüeintrag hinter der Admin-PIN oder einen Befehl an der USB-Konsole. Die Einrichtungsseite gibt es auf Englisch, Portugiesisch, Deutsch und Traditionellem Chinesisch, und Handys öffnen sie von selbst."
       - "Der Tab Spiel der Konsole zeigt einen QR-Code der Anzeigetafel für Spielende."
+      - "Szenarien können auf Deutsch und Traditionell Chinesisch sein; die Namen ihrer Ziele bleiben vorerst Portugiesisch und Englisch."
     next:
       - Die Funk-Boards und 5 gebaute Boxen für den Feldtest.
       - Ein Feldtest mit 20 Boxen, mit und ohne Hören vor dem Senden.
@@ -839,13 +844,16 @@ roadmap:
           Wappen geben."
         - "Die Konsole der Orga meldet, wenn sich der Check-in-Aushang nach dem Druck geändert hat."
         - "Die Marshal- und Chrono-Bildschirme sagen, was die App wirklich tut, und die Limitlisten sind übersetzt."
-        - "Die App hält ihre Geheimnisse mit dem Android Keystore versiegelt."
+        - "Die App hält mehr ihrer Geheimnisse mit dem Android Keystore versiegelt: den Schlüssel des Site-Servers, die Geheimnisse der Spieler und die Anmeldung am Site-Server."
         - "Die NFC-Tags der Spielenden werden vom Feld-Controller signiert und von der Konsole der Orga, dem Handy-Controller oder der Marshal-App geschrieben. Marshals halten dafür den Feldschlüssel nicht mehr."
         - "Replik-Labels: Die App zeigt, teilt oder druckt den QR-Aufkleber jeder Replik, und die Konsole druckt sie für alle, die eingecheckt sind. Die Warteschlange der Marshals scannt sie."
         - "Positionen in Gebäuden: Die Spielleitung setzt BLE-Beacons auf den Plan, und ein Android-Handy, das eines hört, meldet seinen Raum statt GPS. In Software und mit Attrappen, nicht mit echten Beacons ausprobiert. iOS bleibt bei GPS."
         - "Die App folgt einem Spiel über den QR-Code der Anzeigetafel, auch wenn der Handy-Controller HTTPS mit seiner eigenen Feld-CA anbietet. In Software, nicht an einem echten Handy ausprobiert."
         - "Spielende sagen, auf welcher Ebene sie sind, und sehen den Feldplan mit den Positionen, die sie sehen dürfen."
         - "Spielverlauf in der App: die Spiele, an denen jemand teilgenommen hat, das neueste zuerst."
+        - "Anmeldung mit Google, Microsoft, Apple oder einem Passkey in der App, mit einem Kontobildschirm. Nur Android; nicht auf einem echten Handy und nicht mit den echten Anbietern ausprobiert."
+        - "Der Feldplan des Spielers kann das Raster des Feldes und die eigene Zelle des Spielers zeigen."
+        - "Schiedsrichter können beim Registrieren einen NFC-Sticker an eine Replik binden."
     g_props:
       title: Android-Props und I/O-Pod
       items:
@@ -855,6 +863,7 @@ roadmap:
           Tastenfeld, die Lichter, die Sirene, den NFC-Leser, den Gehäuseschalter und den LoRa-Funk
           eines Heltec-Boards."
         - "Die App verbindet sich mit einem verlorenen I/O-Pod von selbst wieder. Nicht mit einem echten Pod ausprobiert."
+        - "Android-Props holen signierte Modus-Pakete von ihrem Controller, wie die Boxen. In Software."
     g_controller:
       title: Das Handy als Feld-Controller
       items:
@@ -902,6 +911,7 @@ roadmap:
         Feld-Controller bleiben nur für Android."
       - "Beacons in Gebäuden brauchen unter iOS ein Swift-Plugin, das auf einem Mac geschrieben wird."
       - "QR-Code der Anzeigetafel, Ebenenwahl, Spielverlauf und die Wiederverbindung zum Pod an einem echten Handy und Pod ausprobieren."
+      - "Die Anmeldung der App auf einem echten Handy und mit den echten Anbietern ausprobieren."
     gate: "Gate: Ein Spiel mischt ESP32- und Android-Props ohne Probleme."
   p4:
     title: Site-Server und erweitertes Spiel
@@ -975,6 +985,8 @@ roadmap:
         - "Eine Box, die Progressive Domination zur aktiven gemacht hat, sagt das auf ATAK."
         - "Die Feldkarten-Seite läuft auch auf dem Handy als Feld-Controller."
         - "ATAK zeigt Spielende in Gebäuden am Ort ihres Beacons, mit dem Raum in den Bemerkungen."
+        - "Das Raster in ATAK und eine druckbare Rasterkarte."
+        - "Der Remote-GM sieht die Positionen der Spieler, wenn sie sie teilen."
     g_server:
       title: Site-Server, Konten und Daten
       items:
@@ -992,6 +1004,7 @@ roadmap:
         - "Die Controller holen die Einstellungen und das Erscheinungsbild des Felds vom Site-Server, und eine Änderung kommt sofort beim Pi und beim Handy-Controller an. In Software."
         - "Anmeldung mit Google, Microsoft oder Apple und mit Passkeys. Passwörter sind optional; das Personal braucht weiterhin einen zweiten Faktor. Auf einem Computer getestet, nicht mit den echten Anmeldediensten."
         - "Eine Kontoseite für das Personal, auf der jede Person ihre eigenen Anmeldungen verwaltet: Passkeys, verknüpfte Konten, Passwort und Zwei-Faktor-Code."
+        - "Änderungen an Szenarien, Presets und Terminen erreichen die Controller sofort."
     g_games:
       title: Spiele, Clubs und Staff-Seiten
       items:
@@ -1023,6 +1036,13 @@ roadmap:
         - "Staff-Aktionen an einer Anmeldung: bezahlt oder nicht bezahlt (der Server nimmt kein Geld an), nicht erschienen, in ein anderes Spiel verschieben, wiederherstellen, die Repliken bearbeiten. Im Headless-Browser getestet, nicht auf einem echten Server."
         - "Seiten für das Personal zu Rollen, Sync-Schlüsseln, Erscheinungsbild, Clubs, Plattform-Verknüpfungen, Firmware und Verwaltung."
         - "Die Seite des Remote-GM aktualisiert sich live, ohne Neuladen."
+        - "Die APD-Mitgliedschaft wird bei der Anmeldung und beim Check-in geprüft."
+        - "Chrono-Einträge zeigen, wie weit eine Replik über dem Limit lag, und markieren Wiederholungstäter."
+        - "Eine Seite für das Personal des Feldes mit dem Datenexport und dem Verbrauch der Kontingente."
+        - "Punkteverläufe in Spielzeit."
+        - "Die Seite eines Clubs listet die Felder auf, auf denen er spielt."
+        - "Der Controller importiert eine Anmelde-CSV selbst, ganz ohne Site-Server."
+        - "Die Konsole warnt, wenn ein Name Buchstaben hat, die die Boxen nicht zeichnen können."
     g_boxes:
       title: Boxen und das Feld
       items:
@@ -1073,6 +1093,7 @@ roadmap:
           kann, und verschlüsselte Backups, wiederhergestellt mit jedem Feld getrennt von den
           anderen. In Docker getestet, nicht auf einem echten Hosted-Server mit echter Domain."
         - "Gehosteter Modus: ein Kontingent pro Feld, ein Datenexport, den die Verwaltung eines Felds herunterladen kann, und die offenen Verbindungen eines gelöschten Felds werden sofort geschlossen."
+        - "Hosted-Modus: ein Speicherkontingent und eigene Domains pro Feld."
     next:
       - Ein echter Server mit Domain.
       - Eine rechtliche Prüfung der Vorlagen, bevor der Hosted-Modus live geht. Vorher wird er nicht angeboten.
@@ -1131,6 +1152,7 @@ roadmap:
         Text. Noch keine Box wurde danach gebaut.
       - "<strong>Benutzerhandbücher</strong> für Spielende, Spielleitung, Marshals und Field-Box-Betreibende, auf Englisch und Portugiesisch."
       - "Die Web-Ansicht des Simulators hat jede Eingabe, die ein Modus nutzt: Tags, Tastenfeld, Treffer und GM-Befehle, mit Download des Ereignisprotokolls."
+      - "Die Szenario-Blöcke der GM-Konsole haben eine Sprachliste mit allen vier Sprachen."
     next:
       - Den Registry-Schlüssel des Projekts offline erzeugen, damit die ersten Modi verifiziert werden können (Aufgabe der Projektbetreuung).
       - "Die Prüfung des Deutschen und des Chinesischen: Wenn du auf Deutsch oder Chinesisch
