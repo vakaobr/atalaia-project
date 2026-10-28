@@ -52,15 +52,15 @@ Uma caixa nova mostra **PRIMEIRA CONFIGURAÇÃO** com o nome de uma rede Wi-Fi c
 
 1. No telemóvel, liga-te a essa rede Wi-Fi.
 2. Se a página de configuração não abrir sozinha, abre um browser e vai a `192.168.4.1`.
-3. Preenche a página **Atalaia Node Setup**. Os campos estão em inglês:
-   - **Node Name**: um nome para esta caixa, por exemplo `field-box-01`.
-   - **Radio Region**: escolhe a região para que esta caixa foi feita (**EU868** ou **AS923-TW**). A caixa só aceita a sua.
-   - **Number of Teams**: 2, 3 ou 4.
-   - **Admin PIN**: 4 a 8 algarismos. **Não há PIN por omissão.** PIN fáceis como 1234, 0000, 9876 ou 1212 são recusados. Anota-o e guarda-o em segurança.
-   - **Display Brightness** e **Audio Volume**.
-   - **Field join key** (opcional): a chave de 64 algarismos que a organização te dá. Também a podes juntar depois ([secção 4](#4-adota-a-caixa-no-campo)).
-   - **Field Wi-Fi name** e **password** (opcionais): precisos para as atualizações de firmware ([secção 9](#9-atualizações-pelo-ar)).
-4. Toca em **Save & Reboot**.
+3. Preenche a página **Configuração da caixa Atalaia**. Abre na língua da caixa; os links no fundo (**English**, **Português**, **Deutsch**, **繁體中文**) mudam a língua:
+   - **Nome da caixa**: um nome para esta caixa, por exemplo `field-box-01`.
+   - **Região de rádio**: escolhe a região para que esta caixa foi feita (**EU868** ou **AS923-TW**). A caixa só aceita a sua.
+   - **Número de equipas**: 2, 3 ou 4.
+   - **PIN de administração**: 4 a 8 algarismos. **Não há PIN por omissão.** PIN fáceis como 1234, 0000, 9876 ou 1212 são recusados. Anota-o e guarda-o em segurança.
+   - **Brilho do ecrã** e **Volume do som**.
+   - **Chave de ligação ao campo** (opcional): a chave de 64 algarismos que a organização te dá. Também a podes juntar depois ([secção 4](#4-adota-a-caixa-no-campo)).
+   - **Nome do Wi-Fi do campo** e **Palavra-passe do Wi-Fi do campo** (opcionais): precisos para as atualizações de firmware ([secção 9](#9-atualizações-pelo-ar)).
+4. Toca em **Guardar e reiniciar**.
 
 A caixa reinicia. Uma caixa ainda sem campo mostra **Emparelhar caixa** e um código de 6 algarismos ([secção 4](#4-adota-a-caixa-no-campo)).
 
@@ -172,7 +172,7 @@ As *Ligaduras*, o *Hackeia o terminal* e o *VIP / Carga* não seguem a língua d
 
 A organização pode atualizar o firmware de uma caixa pelo Wi-Fi do campo, entre jogos. Nada corre enquanto há um jogo a decorrer.
 
-1. A caixa precisa do **Field Wi-Fi name** e da **password** (definidos na página de configuração, [secção 3](#3-primeira-configuração-caixa-nova)) e de um jogo a que se tenha juntado.
+1. A caixa precisa do **Nome do Wi-Fi do campo** e da **Palavra-passe do Wi-Fi do campo** (definidos na página de configuração, [secção 3](#3-primeira-configuração-caixa-nova)) e de um jogo a que se tenha juntado.
 2. A organização carrega uma versão assinada no separador **Caixas** da consola (**Atualizações de firmware**) e depois carrega em **Atualizar todas as caixas** ou em **Atualizar para** *versão* numa caixa. A caixa descarrega-a, volta a verificar a assinatura, instala-a e reinicia.
 3. Se a versão nova falhar o autoteste, a caixa volta sozinha à antiga.
 4. A consola mostra **enviada, à espera da caixa**, **instalada, a reiniciar**, **concluída**, **falhou**, **revertida** ou **sem notícias da caixa**.

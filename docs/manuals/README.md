@@ -25,9 +25,7 @@ For people who **build** things (not for players or organisers on game day):
 | --- | --- | --- |
 | **Builders**: get, flash and set up the firmware of a box, a pod or the modem board | [Firmware guide](en/firmware.md) | [Guia do firmware](pt/firmware.md) |
 | **Organisers**: set up the field controller on a Raspberry Pi, with its modem board | [Controller setup guide](en/controller-setup.md) | [Guia de montagem do controlador](pt/controller-setup.md) |
-| **Builders**: the hardware, with a pin reference for each board | [Field Box](../../hardware/field-box/BUILD.md), [Satellite](../../hardware/satellite/BUILD.md), [I/O pod](../../hardware/io-pod/BUILD.md), [Target addon](../../hardware/target-addon/BUILD.md) | [Field Box](../../hardware/field-box/BUILD.pt.md); em inglês: [Satellite](../../hardware/satellite/BUILD.md), [I/O pod](../../hardware/io-pod/BUILD.md), [Target addon](../../hardware/target-addon/BUILD.md) |
-
-The guides for the satellite, the I/O pod and the target addon are in English only for now. Portuguese follows.
+| **Builders**: the hardware, with a pin reference for each board | [Field Box](../../hardware/field-box/BUILD.md), [Satellite](../../hardware/satellite/BUILD.md), [I/O pod](../../hardware/io-pod/BUILD.md), [Target addon](../../hardware/target-addon/BUILD.md) | [Field Box](../../hardware/field-box/BUILD.pt.md), [caixa Satélite](../../hardware/satellite/BUILD.pt.md), [módulo de E/S](../../hardware/io-pod/BUILD.pt.md), [módulo de alvo](../../hardware/target-addon/BUILD.pt.md) |
 
 Each manual has a **Troubleshooting** section at the end.
 

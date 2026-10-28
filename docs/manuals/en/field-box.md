@@ -52,7 +52,7 @@ A new box shows **FIRST-TIME SETUP** with a Wi-Fi name like `atalaia-1A2B`.
 
 1. On your phone, join that Wi-Fi network.
 2. If the setup page does not open by itself, open a browser and go to `192.168.4.1`.
-3. Fill in the page **Atalaia Node Setup**:
+3. Fill in the page **Atalaia Node Setup**. It opens in the box's language; the links at the bottom (**English**, **Português**, **Deutsch**, **繁體中文**) change it:
    - **Node Name**: a name for this box, for example `field-box-01`.
    - **Radio Region**: choose the region this box was built for (**EU868** or **AS923-TW**). The box accepts only its own.
    - **Number of Teams**: 2, 3 or 4.

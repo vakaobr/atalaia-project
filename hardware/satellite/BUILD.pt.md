@@ -137,7 +137,7 @@ um ferro de soldar com controlo de temperatura, um multímetro com apito de
 continuidade, descarnadores de fio, alicate de crimpar ou solda, manga
 termorretrátil, um berbequim com broca escalonada, e um saco à prova de fogo
 para a célula enquanto trabalhas. Lê as
-[regras de segurança](../field-box/BUILD.pt.md) da Field Box (secção 4); aplicam-se
+[regras de segurança](../field-box/BUILD.pt.md#4-regras-de-segurança) da Field Box (secção 4); aplicam-se
 todas. As que mais importam aqui:
 
 1. **Nunca alimentes a placa sem a antena LoRa ligada**, nem sequer por USB:
@@ -189,7 +189,7 @@ dos botões, GND do medidor e GND do anel ao GND (preto); 5V do anel, VIN do
 amplificador e LED dos botões ao trilho de 5 V (laranja, 5 V); o CELL+ do
 medidor à derivação BAT+ (vermelho, 3,0-4,2 V). O endereço I2C do medidor é
 0x36 e o do OLED da placa é 0x3C. A lista completa de pinos está na
-[referência de pinos da Field Box](../field-box/BUILD.pt.md) (secção 15).
+[referência de pinos da Field Box](../field-box/BUILD.pt.md#15-referência-de-pinos) (secção 15).
 
 Deixa todos os outros pinos da placa sem ligação. O firmware ainda comanda os
 pinos do ecrã da Field Box (GPIO 1, 3, 33, 47) como saídas, por isso nada mais
@@ -223,7 +223,7 @@ eletrónica entrar, sela os furos que não usares, um saquinho de sílica gel
 dentro. Os botões arcade não são à prova de água: mantém a eletrónica abaixo
 deles, para que as gotas não caiam sobre uma placa.
 
-**Verificar na primeira montagem:** a caixa mais pequena em que tudo cabe; o
+**Verifica na primeira montagem:** a caixa mais pequena em que tudo cabe; o
 sinal LoRa e de 2,4 GHz através da sua parede; que o OLED da placa se consegue
 ler (através de uma tampa transparente ou de uma janela) onde está montado.
 
@@ -280,7 +280,7 @@ interruptor principal **ligado** (interruptor desligado: a célula está
 desligada e não carrega). As peças de 3,3 V (a lógica do medidor) tiram a
 energia do pino 3V3 da placa, não do seu trilho Vext comutável.
 
-**Verificar na primeira montagem:** a corrente em repouso e com o anel aceso, a
+**Verifica na primeira montagem:** a corrente em repouso e com o anel aceso, a
 autonomia de um jogo com uma célula (o firmware acende o anel a 40 % por
 omissão, `CONFIG_ATALAIA_LED_BRIGHTNESS_PCT`), e o tempo de carga.
 

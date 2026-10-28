@@ -65,7 +65,7 @@ expansor do teclado na
 
 **Referência de pinos da porta.** A porta não usa nenhum GPIO próprio. É o
 barramento I2C e os trilhos da caixa, por isso segue a
-[referência de pinos da Field Box](../field-box/BUILD.pt.md) (secção 15):
+[referência de pinos da Field Box](../field-box/BUILD.pt.md#15-referência-de-pinos) (secção 15):
 
 | Sinal da porta | Pino da placa | Opção do firmware | Nível |
 | --- | --- | --- | --- |
@@ -77,7 +77,7 @@ barramento I2C e os trilhos da caixa, por isso segue a
 Verificado contra o firmware em 2026-10-28: o controlador de consulta
 (`firmware/esp32/main/target_addon.c`) ainda não é chamado pela caixa e não tem
 endereço I2C, por isso uma Field Box ainda não consegue falar com um módulo.
-**Ainda não testado numa placa a sério**: a porta, o fusível e o cabo.
+**Ainda não testado numa placa real**: a porta, o fusível e o cabo.
 
 SDA e SCL estão nos pinos 2 e 4, em lados opostos do conector e não lado a lado
 (decisão P5J-20). A porta espera pelo primeiro módulo: uma Field Box montada
@@ -109,7 +109,7 @@ mA num jogo, com picos perto de 750 mA
 medições). O anel de luzes, o amplificador e os LED dos botões estão no
 conversor elevador de 5 V, não nos 3,3 V. O limite do próprio regulador não está
 documentado aqui, e saber se aguenta o TFT e o leitor NFC continua a ser um item
-**Verificar na primeira montagem** da Field Box. Por isso a porta promete só uma
+**Verifica na primeira montagem** da Field Box. Por isso a porta promete só uma
 parte pequena e fixa: 25 mA são cerca de 3 % desses picos, e o fusível impede que
 um curto-circuito no cabo ou no conector deixe a caixa sem energia. Um só LED
 WS2812 consome até 60 mA, por isso luzes na porta estão fora de questão.

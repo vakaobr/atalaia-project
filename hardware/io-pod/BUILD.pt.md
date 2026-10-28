@@ -26,7 +26,7 @@ segue e a que recorre em todos os passos que as duas montagens partilham.
 > telemóvel a sério, o emparelhamento e o rádio no ar estão **por testar**
 > ([BRING_UP.md, "The I/O pod"](../../firmware/esp32/docs/BRING_UP.md#the-io-pod-phase-3-plan-phase-f)
 > (em inglês) lista as verificações que faltam). Os passos marcados
-> **Verificar na primeira montagem** são perguntas em aberto; diz-nos o que
+> **Verifica na primeira montagem** são perguntas em aberto; diz-nos o que
 > encontrares, numa issue. As fotografias entram depois da primeira montagem
 > (fase HW2 do plano); este guia nunca usa fotografias de maquetas nem geradas.
 
@@ -144,7 +144,7 @@ as armadilhas de cada uma), menos o ecrã e a sua janela, mais:
 ## 4. Ferramentas e segurança
 
 As ferramentas são as da Field Box ([manual, secção 3](../field-box/BUILD.pt.md)).
-Lê as suas [regras de segurança](../field-box/BUILD.pt.md) (secção 4); aplicam-se todas.
+Lê as suas [regras de segurança](../field-box/BUILD.pt.md#4-regras-de-segurança) (secção 4); aplicam-se todas.
 Para um módulo em particular:
 
 1. **Nunca alimentes a placa sem a antena LoRa ligada**, nem sequer pelo cabo do
@@ -193,7 +193,7 @@ falha se esta tabela divergir.
 Trilhos, não GPIO: 3V3 (violeta) para as peças I2C e para o expansor do
 teclado; GND (preto); o trilho de 5 V (laranja) para o anel, o amplificador e
 os LED dos botões. A lista completa dos pinos que nunca deves ligar está na
-[referência de pinos da Field Box](../field-box/BUILD.pt.md) (secção 15).
+[referência de pinos da Field Box](../field-box/BUILD.pt.md#15-referência-de-pinos) (secção 15).
 
 Os outros pinos do ecrã de uma Field Box (GPIO 1, 3, 33) não são usados pelo
 módulo: deixa-os sem ligação. O GPIO 0, 45 e 46 são pinos de arranque (boot
@@ -220,7 +220,7 @@ montado sem interruptor nunca comunica uma abertura. Um interruptor ligado ao
 contrário (aberto enquanto fechado) exige desligar
 `CONFIG_ATALAIA_POD_TAMPER_OPEN_HIGH`.
 
-**Verificar na primeira montagem:** que a tampa carrega o interruptor sem falhas
+**Verifica na primeira montagem:** que a tampa carrega o interruptor sem falhas
 em todos os fechos, e que ele não larga quando a caixa leva uma pancada; o
 alcance do Bluetooth através da parede.
 
@@ -247,7 +247,7 @@ Exatamente como na Field Box:
    medição de bateria do medidor em BAT+; o cabo de bateria da placa por
    último, depois de verificada a polaridade.
 
-**Verificar na primeira montagem:** o que a placa consome da porta USB-C OTG do
+**Verifica na primeira montagem:** o que a placa consome da porta USB-C OTG do
 telemóvel com o interruptor desligado e ligado (a carregar), a autonomia de um
 jogo de 2 horas por Bluetooth (BRING_UP.md, "The I/O pod", passo 10).
 
@@ -258,7 +258,7 @@ jogo de 2 horas por Bluetooth (BRING_UP.md, "The I/O pod", passo 10).
 > acabado, com as ligações encaminhadas.
 
 Célula fora, fusível fora, interruptor desligado. Segue as
-[ligações passo a passo](../field-box/BUILD.pt.md) da Field Box (secção 9) e o seu
+[ligações passo a passo](../field-box/BUILD.pt.md#9-ligações-passo-a-passo) da Field Box (secção 9) e o seu
 [esquema de sinais](../field-box/wiring/field-box-wiring.svg), **deixando de
 fora o ecrã** (secção 9.4 do manual) e os seus fios para os GPIO 1, 3, 33 e 47,
 e depois junta o interruptor da caixa:
@@ -324,7 +324,7 @@ comando de compilação e a pasta de compilação.
    cd ..\..\..
    ```
    Reinicia-o com `%FLASH% -m esptool --chip esp32s3 -p COM5 --after hard_reset chip_id`.
-   O [guia de firmware](../../docs/manuals/pt/firmware.md) (secção 10, os
+   O [guia de firmware](../../docs/manuals/pt/firmware.md#10-as-variantes-do-módulo-de-es) (secção 10, os
    módulos de E/S) tem os passos para macOS e Linux e o que mais é diferente
    num módulo.
 3. **Lê o registo** no GPIO 43 com o adaptador USB-UART de 3,3 V (o seu RX ao
