@@ -932,6 +932,8 @@
     "qr_label": "QR-Etikett {code}"
   },
   "branding": {
+    "from_site": "Vom Feldserver.",
+    "from_site_hint": "Name, Akzentfarbe, Logo und Hintergrund des Feldes kommen vom Feldserver und werden dort geändert; dieser Controller übernimmt sie bei der nächsten Synchronisierung.",
     "title": "Branding des Felds",
     "intro": "Wie Spielende dieses Feld sehen: Name, Logo, Hintergrundbild und Farbe, in der App, auf der Anzeigetafel, auf dem Check-in-Plakat und in dieser Konsole. Alle im Netz des Felds können sie sehen; sie enthalten keine personenbezogenen Daten.",
     "field_name": "Name des Felds",
@@ -954,6 +956,10 @@
     "read_only": "Nur die GM kann das Branding des Felds ändern."
   },
   "teams": {
+    "from_site": "vom Feldserver",
+    "site_title": "Teams vom Feldserver ({n})",
+    "site_hint": "Die gespeicherten Teams des Feldes kommen vom Feldserver und werden dort geändert: Sie lassen sich hier weder bearbeiten noch löschen. Wappen und Farben erreichen diesen Controller bei der nächsten Synchronisierung.",
+    "local_title": "In dieser Konsole gespeicherte Teams",
     "title": "Gespeicherte Teams",
     "intro": "Teams, die wiederkommen: ein Name und ein Wappen zur Auswahl, wenn du ein Spiel erstellst. Die Farbe bleibt die Farbe des Teams auf den Boxen und Tasten.",
     "name": "Teamname",

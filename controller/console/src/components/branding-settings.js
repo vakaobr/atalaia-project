@@ -119,10 +119,18 @@ export class BrandingSettings extends Component {
         if (!b) return html`<section class="card"><p class="muted">…</p></section>`;
         const name = state.name !== null ? state.name : b.field_name;
         const accent = state.accent !== null ? state.accent : b.accent;
+        // PKE-4 (S18-11): with [sync] branding = "site" the controller's branding is the site server's: shown as
+        // it is, with where it comes from, and not editable here (the controller would refuse with a 409).
+        const site = b.source === 'site';
         return html`<section class="card" aria-labelledby="branding-h" data-testid="branding-settings">
             <h2 id="branding-h">${t('branding.title')}</h2>
             <p class="muted small">${t('branding.intro')}</p>
-            ${gm ? html`<form class="form" onSubmit=${(e) => this.save(e)} data-testid="branding-form">
+            ${site && html`<p class="notice" role="status" data-testid="branding-from-site"><strong>${t('branding.from_site')}</strong>
+                ${' '}${t('branding.from_site_hint')}</p>`}
+            ${site && html`<dl class="small" data-testid="branding-site-values">
+                <dt>${t('branding.field_name')}</dt><dd data-testid="branding-site-name">${b.field_name}</dd>
+                <dt>${t('branding.accent')}</dt><dd>${b.accent || t('branding.accent_default')}</dd></dl>`}
+            ${site ? null : gm ? html`<form class="form" onSubmit=${(e) => this.save(e)} data-testid="branding-form">
                 <div class="field"><label for="b-name">${t('branding.field_name')}</label>
                     <input id="b-name" data-testid="branding-name" required maxlength="48" value=${name}
                         onInput=${(e) => this.setState({ name: e.target.value, saved: false })} />
@@ -140,10 +148,10 @@ export class BrandingSettings extends Component {
                 <div class="actions"><button type="submit" class="primary" data-testid="branding-save">${t('common.save')}</button>
                     ${state.saved && html`<span class="ok" role="status">${t('branding.saved')}</span>`}</div>
             </form>` : html`<p class="muted">${t('branding.read_only')}</p>`}
-            <${ImageSlot} app=${app} branding=${b} slot="logo" gm=${gm} />
-            <${ImageSlot} app=${app} branding=${b} slot="wallpaper" gm=${gm} />
+            <${ImageSlot} app=${app} branding=${b} slot="logo" gm=${gm && !site} />
+            <${ImageSlot} app=${app} branding=${b} slot="wallpaper" gm=${gm && !site} />
             <p class="muted small">${t('branding.limits')}</p>
-            ${gm && html`<p class="small" data-testid="branding-rights">${t('branding.rights')}</p>`}
+            ${gm && !site && html`<p class="small" data-testid="branding-rights">${t('branding.rights')}</p>`}
         </section>`;
     }
 }
@@ -181,25 +189,39 @@ export class TeamPresets extends Component {
         if (await app.call('DELETE', `/team-presets/${p.id}`)) app.loadTeamPresets();
     }
 
+    renderPreset(p, gm) {
+        const site = p.source === 'site';
+        return html`<li class="team-preset" data-testid=${`team-preset-${p.id}`}>
+            ${p.crest_url ? html`<img class="crest" src=${p.crest_url} alt=${t('teams.crest_alt', { team: p.name })} />`
+                : html`<span class="crest crest-empty" aria-hidden="true"></span>`}
+            <strong>${p.name}</strong>
+            ${p.colour && html`<span class="swatch" aria-hidden="true"
+                ref=${(el) => { if (el) el.style.background = teamColour(p.colour); }}></span>`}
+            <span class="muted small">${p.colour || ''}</span>
+            ${site && html` <span class="badge" data-testid="team-preset-site-badge">${t('teams.from_site')}</span>`}
+            ${gm && !site && html`<${ConfirmButton} label=${t('teams.delete')} question=${t('teams.confirm_delete')}
+                testid=${`team-preset-delete-${p.id}`} onConfirm=${() => this.remove(p)} />`}
+        </li>`;
+    }
+
     render(props, state) {
         const app = props.app;
         const gm = app.state.role === 'gm';
         const presets = app.state.teamPresets || [];
+        // PKE-4 (S18-11): the site server's saved teams are a list of their own, read-only (change them there).
+        const fromSite = presets.filter((p) => p.source === 'site');
+        const local = presets.filter((p) => p.source !== 'site');
         return html`<section class="card" aria-labelledby="teams-h" data-testid="team-presets">
             <h2 id="teams-h">${t('teams.title')}</h2>
             <p class="muted small">${t('teams.intro')}</p>
-            ${presets.length === 0 ? html`<p class="muted">${t('teams.none')}</p>` : html`<ul class="team-presets">
-                ${presets.map((p) => html`<li class="team-preset" data-testid=${`team-preset-${p.id}`}>
-                    ${p.crest_url ? html`<img class="crest" src=${p.crest_url} alt=${t('teams.crest_alt', { team: p.name })} />`
-                        : html`<span class="crest crest-empty" aria-hidden="true"></span>`}
-                    <strong>${p.name}</strong>
-                    ${p.colour && html`<span class="swatch" aria-hidden="true"
-                        ref=${(el) => { if (el) el.style.background = teamColour(p.colour); }}></span>`}
-                    <span class="muted small">${p.colour || ''}</span>
-                    ${gm && html`<${ConfirmButton} label=${t('teams.delete')} question=${t('teams.confirm_delete')}
-                        testid=${`team-preset-delete-${p.id}`} onConfirm=${() => this.remove(p)} />`}
-                </li>`)}
-            </ul>`}
+            ${fromSite.length > 0 && html`<div data-testid="site-teams">
+                <h3>${t('teams.site_title', { n: fromSite.length })}</h3>
+                <p class="muted small">${t('teams.site_hint')}</p>
+                <ul class="team-presets">${fromSite.map((p) => this.renderPreset(p, gm))}</ul>
+            </div>`}
+            ${local.length === 0 && fromSite.length === 0 && html`<p class="muted">${t('teams.none')}</p>`}
+            ${local.length > 0 && html`${fromSite.length > 0 && html`<h3>${t('teams.local_title')}</h3>`}
+                <ul class="team-presets">${local.map((p) => this.renderPreset(p, gm))}</ul>`}
             ${gm && html`<form class="form" onSubmit=${(e) => this.add(e)} data-testid="team-preset-form">
                 <div class="field"><label for="tp-name">${t('teams.name')}</label>
                     <input id="tp-name" data-testid="team-preset-name" required maxlength="32" value=${state.name}

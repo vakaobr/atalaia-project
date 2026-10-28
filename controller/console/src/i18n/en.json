@@ -932,6 +932,8 @@
     "qr_label": "QR label {code}"
   },
   "branding": {
+    "from_site": "From the site server.",
+    "from_site_hint": "The field's name, accent colour, logo and wallpaper come from the site server and change there; this controller takes them at its next sync.",
     "title": "Field branding",
     "intro": "How players see this field: its name, logo, wallpaper and colour, in the app, on the scoreboard, on the check-in poster and in this console. Anyone on the field's network can see them; they hold no personal data.",
     "field_name": "Field name",
@@ -954,6 +956,10 @@
     "read_only": "Only the GM can change the field's branding."
   },
   "teams": {
+    "from_site": "from the site server",
+    "site_title": "Teams from the site server ({n})",
+    "site_hint": "The field's saved teams come from the site server and change there: they cannot be edited or deleted here. Crests and colours reach this controller at its next sync.",
+    "local_title": "Teams saved in this console",
     "title": "Saved teams",
     "intro": "Teams that come back: a name and a crest to pick when you create a game. The colour stays the team's colour on the boxes and buttons.",
     "name": "Team name",

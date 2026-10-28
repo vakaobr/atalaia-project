@@ -4699,6 +4699,37 @@ class ConsoleBrowserTests(unittest.TestCase):
         """A refusal the test asked for is not a page error."""
         self.errors = [e for e in self.errors if path not in e and "status of 4" not in e]
 
+    def test_branding_from_the_site_server_is_labelled_and_read_only(self):
+        """PKE-4 (S18-11): with [sync] branding = "site" the Settings tab says the field's name, accent and images come
+        from the site server and offers no form for them; the site's saved teams are a list of their own with a badge
+        and no delete button, the console's own presets below them as before."""
+        from atalaia_controller import sync_format
+        self.field.close()
+        self.field = Field(cfg={"sync_url": "https://site.example.org", "sync_enabled": True, "sync_branding": "site"})
+        answer = sync_format.check_field({"sync_version": 1, "field": {
+            "field_name": "Campo do Sul", "accent": "#1e6b3a", "logo": None, "wallpaper": None},
+            "teams": [{"team_id": "0e000000-0000-4000-8000-000000000001", "name": "Lobos", "colour": "red",
+                       "crest": None, "club": {"slug": "lobos", "name": "Clube Lobos"}}]})
+        self.field.bundle.controller.branding.apply_site(answer)
+        page = self.console()
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("branding-from-site")).to_contain_text("servidor do campo")
+        expect(page.get_by_test_id("branding-site-name")).to_have_text("Campo do Sul")
+        expect(page.get_by_test_id("branding-form")).to_have_count(0)
+        expect(page.get_by_test_id("branding-logo-upload")).to_have_count(0)
+        expect(page.get_by_test_id("branding-rights")).to_have_count(0)
+        site = page.get_by_test_id("site-teams")
+        expect(site).to_contain_text("Lobos")
+        expect(site.get_by_test_id("team-preset-site-badge")).to_be_visible()
+        expect(site.locator("[data-testid^=team-preset-delete-]")).to_have_count(0)
+        page.get_by_test_id("team-preset-name").fill("Corvos")
+        page.get_by_test_id("team-preset-add").click()
+        local = page.locator("[data-testid=team-presets] ul").nth(1)
+        expect(local).to_contain_text("Corvos")
+        expect(local.locator("[data-testid^=team-preset-delete-]")).to_have_count(1)
+        presets = {p["name"]: p for p in self.field.http.get("/api/v1/team-presets").json()}
+        self.assertEqual((presets["Lobos"]["source"], "source" in presets["Corvos"]), ("site", False))
+
     def test_names_the_box_cannot_draw_are_warned_about(self):
         """PKE-3 (follow-up of P5K-5): a team, preset or field name with a letter the box's fonts lack is warned
         about where it is typed, with the letters; Portuguese and German letters, and Chinese ones the box's texts

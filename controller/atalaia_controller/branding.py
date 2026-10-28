@@ -113,6 +113,8 @@ class Branding:
             "logo": self._image_ref("logo", saved.get("logo")),
             "wallpaper": self._image_ref("wallpaper", saved.get("wallpaper")),
         }
+        if self.from_site():
+            out["source"] = "site"  # PKE-4: the console says so and does not offer to edit it (absent when local)
         digest = hashlib.sha256(json.dumps(out, sort_keys=True).encode()).hexdigest()[:32]
         out["etag"] = etag(digest)
         return out

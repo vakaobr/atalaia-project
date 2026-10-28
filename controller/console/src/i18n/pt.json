@@ -932,6 +932,8 @@
     "qr_label": "Etiqueta QR {code}"
   },
   "branding": {
+    "from_site": "Vem do servidor do campo.",
+    "from_site_hint": "O nome do campo, a cor de destaque, o logótipo e o fundo vêm do servidor do campo e mudam-se lá; este controlador recebe-os na sincronização seguinte.",
     "title": "Identidade do campo",
     "intro": "Como quem joga vê este campo: o nome, o logótipo, a imagem de fundo e a cor, na app, no marcador, no cartaz de check-in e nesta consola. Qualquer pessoa na rede do campo os pode ver; não levam dados pessoais.",
     "field_name": "Nome do campo",
@@ -954,6 +956,10 @@
     "read_only": "Só a organização pode mudar a identidade do campo."
   },
   "teams": {
+    "from_site": "do servidor do campo",
+    "site_title": "Equipas do servidor do campo ({n})",
+    "site_hint": "As equipas guardadas do campo vêm do servidor do campo e mudam-se lá: não se editam nem se apagam aqui. Os emblemas e as cores chegam a este controlador na sincronização seguinte.",
+    "local_title": "Equipas guardadas nesta consola",
     "title": "Equipas guardadas",
     "intro": "Equipas que voltam: um nome e um emblema para escolher ao criar um jogo. A cor continua a ser a da equipa nas caixas e nos botões.",
     "name": "Nome da equipa",

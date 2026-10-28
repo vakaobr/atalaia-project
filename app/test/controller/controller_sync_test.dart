@@ -1324,6 +1324,7 @@ void main() {
       final b = engine.branding!;
       expect(b.view()['field_name'], 'Campo do Sul');
       expect(b.view()['accent'], '#123456');
+      expect(b.view()['source'], 'site'); // PKE-4: the console says so
       expect((b.view()['logo']! as Map)['id'], sha);
       final presets = b.teamPresets();
       expect(presets.single['name'], 'Lobos');

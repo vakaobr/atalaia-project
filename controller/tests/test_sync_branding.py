@@ -124,6 +124,7 @@ class SiteBrandingTests(SiteBrandingCase):
                          ("Campo do Pinhal", "#1e6b3a", logo["sha256"], wall["sha256"]))
         self.assertEqual(self.client.get("/api/v1/field/branding/logo").content, self.site.images[logo["sha256"]])
         self.assertEqual(self.svc.poster_fields()["field_name"], "Campo do Pinhal")  # one name (BR4)
+        self.assertEqual(view["source"], "site")  # PKE-4: the console says where it comes from
         presets = self.presets()
         self.assertEqual((presets["Lobos"]["colour"], presets["Lobos"]["crest_id"], presets["Lobos"]["source"]),
                          ("red", red["sha256"], "site"))
@@ -318,6 +319,7 @@ class LocalBrandingTests(SiteBrandingCase):
         r = self.client.put("/api/v1/field/branding", json={"accent": "#123456"}, headers=GM)
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual(self.sync.status()["branding"]["source"], "local")
+        self.assertNotIn("source", self.client.get("/api/v1/field/branding").json())  # PKE-4: only a site's carries it
 
     def test_the_setting(self) -> None:
         with self.assertRaisesRegex(ConfigError, "sync.branding"):

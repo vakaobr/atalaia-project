@@ -265,6 +265,8 @@ class ControllerBranding {
       'logo': _imageRef('logo', saved['logo']),
       'wallpaper': _imageRef('wallpaper', saved['wallpaper']),
     };
+    // PKE-4: the console says so and does not offer to edit it (absent when local).
+    if (siteManaged) out['source'] = 'site';
     final digest = sha256.convert(utf8.encode(_pyJson(out))).toString();
     out['etag'] = etagOf(digest.substring(0, 32));
     return out;
