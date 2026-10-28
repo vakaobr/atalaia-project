@@ -940,6 +940,10 @@ The relay that M9-10 deferred and S19-10 declined, built with client-certificate
 
 The maintainer's request of 2026-10-26 (decisions SQ-1 to SQ-10, open): a squad gets only its active objective and the next when it is completed (`reveal: active` in the manifest; nothing about a later objective reaches a player's phone), and the objective goes to the whole squad or to the squad leader alone (`disclosure: members | leader`, the GM's choice per game in the console and the API; the members of a leader-only squad hear that their leader has new orders). The compiler, the Pi's controller, the phone's controller (which also now gives a scenario's script the Join tab's box names), the player app (pt, en, de, zh-tw; a short vibration on new orders) and the console follow; the leader-absent case and the boxes' screens are for the maintainer.
 
+## Follow-up: the remaining staff pages and the pushed remote GM view (FU9, 2026-10-28)
+
+Pages for the APIs that still had none: a field's roles and a game's roles, sync (API) keys (labelled, up to two live, fingerprint shown), branding and clubs, platform links, the firmware catalogue and server administration, by the FU2 rules (a page is its API, four languages, `no-store`, `noindex`, CSP unchanged, bearer token, 375 px). The remote GM page (S19-11) reads a server-sent-events stream (`GET .../remote-gm/stream`) and polls only while no stream delivers. Tests: `server/tests/test_staff_pages.py`, `test_remote_gm_push.py`, `server/tests_browser/` (`Fu8PageTests`, `RemoteGmTests`).
+
 ## Dependencies
 
 | Dependency | Status (2026-10-19) | Impact on Phase 4 |

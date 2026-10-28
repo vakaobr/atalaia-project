@@ -10,7 +10,8 @@ const SECTIONS = [
     ['history', '/history', 'nav_history'], ['schedule', '/schedule', 'nav_schedule'],
     ['scenarios', '/scenarios', 'nav_scenarios'],
     ['presets', '/presets', 'nav_presets'], ['devices', '/devices', 'nav_devices'], ['remote', '/remote-gm', 'nav_remote'],
-    ['atak', '/atak', 'nav_atak'],
+    ['atak', '/atak', 'nav_atak'], ['roles', '/roles', 'nav_roles'], ['synckeys', '/sync-keys', 'nav_synckeys'],
+    ['branding', '/branding', 'nav_branding'], ['platforms', '/platforms', 'nav_platforms'],
 ];
 
 async function main() {

@@ -323,6 +323,72 @@ export async function api(method, path, body, options = {}) {
     throw new ApiError(401, { detail: 'not_authenticated' });
 }
 
+/** Follows a server-sent event stream (text/event-stream) with the session's access token: fetch, not
+ * EventSource, because EventSource cannot send Authorization, so no cookie ever authorises it. onEvent(name,
+ * data) is called for each event (data parsed as JSON) and with ('beat', null) for each comment line the server
+ * sends to keep the connection; resolves when the server ends the stream, rejects with an ApiError when it
+ * cannot be opened (status 0 and detail 'no_stream' when the browser cannot read a body as it arrives) and with
+ * the AbortError of signal when the caller stops it. A 401 gets one refresh and one retry, as api() does. */
+export async function stream(path, onEvent, signal) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        const s = await session(attempt > 0);
+        if (!s) {
+            toLogin();
+            throw new ApiError(401, { detail: 'not_authenticated' });
+        }
+        let r;
+        try {
+            r = await fetch(path, {
+                headers: { Authorization: `Bearer ${s.token}`, Accept: 'text/event-stream' },
+                credentials: 'same-origin', cache: 'no-store', signal,
+            });
+        } catch (e) {
+            if (e && e.name === 'AbortError') throw e;
+            throw new ApiError(0, { detail: 'network' });
+        }
+        if (r.status === 401 && attempt === 0) continue;
+        if (!r.ok) {
+            let body = null;
+            try {
+                body = await r.json();
+            } catch (e) {
+                body = null;
+            }
+            if (r.status === 401) forget();
+            throw new ApiError(r.status, body, r.headers.get('Retry-After'));
+        }
+        if (!r.body || !r.body.getReader) throw new ApiError(0, { detail: 'no_stream' });
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        try {
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) return;
+                buffer += decoder.decode(value, { stream: true });
+                let cut = buffer.indexOf('\n\n');
+                while (cut >= 0) {
+                    const block = buffer.slice(0, cut);
+                    buffer = buffer.slice(cut + 2);
+                    cut = buffer.indexOf('\n\n');
+                    let name = 'message';
+                    const data = [];
+                    for (const line of block.split('\n')) {
+                        if (line.startsWith(':')) onEvent('beat', null);
+                        else if (line.startsWith('event:')) name = line.slice(6).trim();
+                        else if (line.startsWith('data:')) data.push(line.slice(5).trimStart());
+                    }
+                    if (data.length) onEvent(name, JSON.parse(data.join('\n')));
+                }
+            }
+        } catch (e) {
+            if (e && e.name === 'AbortError') throw e;
+            throw new ApiError(0, { detail: 'network' });
+        }
+    }
+    throw new ApiError(401, { detail: 'not_authenticated' });
+}
+
 /** A failed call in words. roles: the roles its API wants, for a 403. */
 export function errorText(err, roles) {
     if (!(err instanceof ApiError)) return t('err_generic', { code: String(err && err.message) });
@@ -358,10 +424,19 @@ const SECTIONS = {
     devices: (r) => r.has('admin') || r.has('gm'),
     remote: (r) => r.has('admin') || r.has('gm'),
     atak: (r) => r.has('admin') || r.has('gm'),
+    roles: (r) => r.has('admin') || r.has('gm'),
+    synckeys: (r) => r.has('admin'),
+    branding: (r) => r.has('admin') || r.has('gm'),
+    platforms: (r) => r.has('admin'),
+    // The pages not of one field: any account's clubs and the firmware list; the server administrator's page.
+    clubs: () => true,
+    firmware: () => true,
+    admin: (r, s) => Boolean(s && s.mfa && s.user.server_admin),
 };
 
-export function sectionAllowed(name, roles) {
-    return !SECTIONS[name] || SECTIONS[name](roles);
+/** Whether the navigation shows a section: a hint only, the API is what refuses (decision FU2-2). */
+export function sectionAllowed(name, roles, s) {
+    return !SECTIONS[name] || SECTIONS[name](roles, s);
 }
 
 /**
@@ -404,9 +479,9 @@ export async function boot() {
         }
         roles = effectiveRoles(field, s);
         if (field) $('field-name').textContent = t('field_heading', { field: field.name });
-        for (const item of document.querySelectorAll('#sections li[data-section]')) {
-            item.hidden = !sectionAllowed(item.dataset.section, roles);
-        }
+    }
+    for (const item of document.querySelectorAll('#sections li[data-section]')) {
+        item.hidden = !sectionAllowed(item.dataset.section, roles, s);
     }
     return { session: s, field, roles, zone: field ? field.timezone : undefined };
 }

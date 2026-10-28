@@ -1,0 +1,25 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$keys_title</h1>
+<p>$keys_intro_text</p>
+<form id="key-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<legend>$keys_new</legend>
+<label for="k-label">$keys_label</label>
+<input id="k-label" name="label" maxlength="$label_max" autocomplete="off">
+<p class="hint">$keys_label_hint</p>
+<p><button type="submit">$keys_create</button></p>
+</fieldset>
+</form>
+<div id="key-issued" class="status ok" role="status" hidden>
+<p>$keys_issued</p>
+<p><code id="key-value" class="data"></code></p>
+<p>$keys_once</p>
+</div>
+<div class="table-wrap">
+<table id="keys-table" class="data" hidden>
+<thead><tr><th scope="col">$col_fingerprint</th><th scope="col">$col_label</th><th scope="col">$col_created</th><th scope="col">$col_last_used</th><th scope="col">$col_state</th><th scope="col"><span class="visually-hidden">$col_actions</span></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="keys-none" hidden>$keys_none</p>

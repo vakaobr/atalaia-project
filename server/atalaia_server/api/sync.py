@@ -357,7 +357,7 @@ async def _remote(session: _Session, db: Any, kind: str, msg: dict[str, Any]) ->
     if body["controller"]["id"] != link.controller_id:
         raise sync.SyncProblem(400, "invalid_body", "not_this_controller", "controller.id")
     if kind == "live":
-        link.live, link.live_at = body["live"], datetime.now(timezone.utc)
+        hub.set_live(link, body["live"])
     elif kind == "cot":
         if link.atak and relay is not None:  # else dropped: the hello.ack said the relay does not take them
             # At most ``atak_cot`` messages a minute per field, whatever its streams (FU5-15).

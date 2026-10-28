@@ -1,0 +1,48 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$fw_title</h1>
+<p>$fw_intro</p>
+<section aria-labelledby="fw-latest-title">
+<h2 id="fw-latest-title">$fw_latest_title</h2>
+<ul id="fw-latest" class="compact"></ul>
+<p id="fw-latest-none" hidden>$fw_latest_none</p>
+<p>$fw_keys <span id="fw-keys"></span></p>
+</section>
+<section aria-labelledby="fw-releases-title">
+<h2 id="fw-releases-title">$fw_releases</h2>
+<div id="fw-withdraw" hidden>
+<label for="fw-reason">$fw_withdraw_reason</label>
+<input id="fw-reason" maxlength="200" autocomplete="off">
+</div>
+<div class="table-wrap">
+<table id="fw-table" class="data" hidden>
+<thead><tr><th scope="col">$col_platform</th><th scope="col">$col_version</th><th scope="col">$col_state</th><th scope="col" class="num">$col_size</th><th scope="col">$col_sha256</th><th scope="col">$col_key</th><th scope="col">$col_released</th><th scope="col">$fw_notes</th><th scope="col"><span class="visually-hidden">$col_actions</span></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="fw-none" hidden>$fw_none</p>
+</section>
+<section id="fw-add" aria-labelledby="fw-add-title" hidden>
+<h2 id="fw-add-title">$fw_add</h2>
+<p>$fw_add_intro</p>
+<form id="fw-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="f-platform">$col_platform</label>
+<select id="f-platform" name="platform">$platform_options</select>
+<label for="f-version">$col_version</label>
+<input id="f-version" name="version" maxlength="64" autocapitalize="none" spellcheck="false" autocomplete="off" required>
+<label for="f-size">$fw_size_bytes</label>
+<input id="f-size" name="size" type="number" required>
+<label for="f-sha256">$col_sha256</label>
+<input id="f-sha256" name="sha256" maxlength="64" autocapitalize="none" spellcheck="false" autocomplete="off" required>
+<label for="f-signature">$fw_signature</label>
+<input id="f-signature" name="signature" autocapitalize="none" spellcheck="false" autocomplete="off" required>
+<label for="f-released">$fw_released_at</label>
+<input id="f-released" name="released_at" type="datetime-local">
+<p class="hint">$fw_released_hint</p>
+<label for="f-notes">$fw_notes</label>
+<textarea id="f-notes" name="notes" rows="4" maxlength="2000"></textarea>
+<p><button type="submit">$fw_add_button</button></p>
+</fieldset>
+</form>
+</section>

@@ -1,0 +1,21 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$roles_title</h1>
+<p>$roles_intro</p>
+<form id="grant-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<legend>$roles_grant</legend>
+<label for="g-user">$username</label>
+<input id="g-user" name="username" maxlength="64" autocapitalize="none" spellcheck="false" autocomplete="off" required>
+<label for="g-role">$col_role</label>
+<select id="g-role" name="role"></select>
+<p><button type="submit">$roles_grant_button</button></p>
+</fieldset>
+</form>
+<div class="table-wrap">
+<table id="roles-table" class="data" hidden>
+<thead><tr><th scope="col">$username</th><th scope="col">$col_role</th><th scope="col">$col_granted</th><th scope="col"><span class="visually-hidden">$col_actions</span></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="roles-none" hidden>$roles_none</p>

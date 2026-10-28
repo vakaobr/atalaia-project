@@ -500,6 +500,25 @@ class RemoteGmTests(BrowserCase):
         await expect(page.locator("#remote-log tbody tr").first).to_contain_text("conflict")
         await self.check_page(page)
 
+    async def test_the_view_is_pushed_and_not_polled(self) -> None:
+        """S19-11: a stream delivers the view; the page's polling (GET .../remote-gm) stays silent meanwhile."""
+        stream = await self.controller(LIVE)
+        name, secret = await self.staff("gm")
+        page = await self.new_page()
+        polls: list[str] = []
+        streams: list[str] = []
+        page.on("request", lambda r: (polls if r.url.endswith("/api/v1/fields/" + str(self.field_id) + "/remote-gm") else streams).append(r.url)
+                if "/api/v1/" in r.url and "/remote-gm" in r.url and not r.url.endswith("/log") else None)
+        await self.login(page, name, secret, self.field_path("/remote-gm"))
+        card = page.locator("article.controller")
+        await expect(card).to_have_count(1)
+        await stream.send({"type": "live", "sync_version": 1, "controller": CTRL,
+                           "live": {**LIVE, "state": "running", "game_time_ms": 65000, "duration_ms": 1800000}})
+        await expect(card).to_contain_text("a decorrer", timeout=3000)  # well under the 5 s polling period
+        await asyncio.sleep(6)
+        self.assertTrue(any(u.endswith("/remote-gm/stream") for u in streams), streams)
+        self.assertLessEqual(len(polls), 1, polls)  # at most the first look, before the stream was open
+
     async def test_a_start_refused_for_missing_roles_asks_start_anyway(self) -> None:
         """Decision RG-1: the controller refuses the start naming the roles; the page asks (the console's
         "Start anyway?", with the roles) and sends the same start again with force."""
@@ -1062,6 +1081,73 @@ class ScheduleTests(BrowserCase):
         await expect(page.locator("#roster-pull")).to_contain_text("Key: Pi do campo (")
         await expect(page.locator("#roster-pull")).to_contain_text("Program: atalaia-controller/1.0.")
         await self.check_page(page, 375)
+
+
+class Fu8PageTests(BrowserCase):
+    """The pages FU9 added for APIs that had none (decisions FU9-1 to FU9-7): each is its API."""
+
+    async def test_sync_keys_are_labelled_shown_once_and_revoked(self) -> None:
+        name, secret = await self.staff("admin")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path("/sync-keys"))
+        rows = page.locator("#keys-table tbody tr")
+        await expect(rows).to_have_count(1)  # the key the test made
+        await page.fill("#k-label", EVIL)
+        await page.click("#key-form button[type=submit]")
+        await expect(page.locator("#key-issued")).to_be_visible()
+        key = await page.locator("#key-value").text_content() or ""
+        self.assertTrue(key.startswith("atk_") or len(key) >= 20, key)
+        await expect(rows).to_have_count(2)
+        await expect(rows.nth(1)).to_contain_text(EVIL)  # text, never markup
+        self.assertIsNone(await page.evaluate("() => window.pwned"))
+        self.assertNotIn(key, await rows.nth(1).text_content() or "")  # only the fingerprint afterwards
+        await page.fill("#k-label", "third")  # the API allows two live keys
+        await page.click("#key-form button[type=submit]")
+        await expect(page.locator("#status")).not_to_be_empty()
+        await expect(rows).to_have_count(2)
+        await rows.nth(1).get_by_role("button").click()  # confirmation accepted
+        await expect(page.locator("#status")).to_contain_text("revoked")
+        await self.check_page(page)
+
+    async def test_roles_are_granted_and_revoked(self) -> None:
+        name, secret = await self.staff("admin")
+        other, _ = await self.staff(with_totp=False)
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path("/roles"))
+        await expect(page.locator("#roles-table tbody tr")).to_have_count(1)
+        await page.fill("#g-user", other)
+        await page.select_option("#g-role", "player")
+        await page.click("#grant-form button[type=submit]")
+        await expect(page.locator("#roles-table tbody tr")).to_have_count(2)
+        self.assertEqual(len(await self.fetch("SELECT 1 FROM user_field_roles WHERE role_id = $1", ROLE["player"])), 1)
+        await page.locator("#roles-table tbody tr", has_text=other).get_by_role("button").click()
+        await expect(page.locator("#roles-table tbody tr")).to_have_count(1)
+        self.assertEqual(await self.fetch("SELECT 1 FROM user_field_roles WHERE role_id = $1", ROLE["player"]), [])
+        await self.check_page(page)
+
+    async def test_every_new_page_loads_for_its_role_at_a_phones_width(self) -> None:
+        name, secret = await self.staff("admin")
+        page = await self.new_page(lang="de-DE")
+        await self.login(page, name, secret, self.field_path("/branding"))
+        for path in ("/branding", "/platforms", "/roles", "/sync-keys"):
+            await page.goto(self.base + self.field_path(path))
+            await expect(page.locator("h1")).to_be_visible()
+            await expect(page.locator("#status")).to_be_empty()
+            await self.check_page(page)
+        await page.goto(self.base + "/staff/clubs")
+        await expect(page.locator("h1")).to_be_visible()
+        await self.check_page(page)
+        await page.goto(self.base + "/staff/firmware")
+        await expect(page.locator("#fw-latest-none, #fw-latest li").first).to_be_visible()
+        await self.check_page(page)
+        # Server administration is the server administrator's: this account meets the API's refusal.
+        await page.goto(self.base + "/staff/admin")
+        await expect(page.locator("#status")).not_to_be_empty()
+        # A player meets the API's refusal on the key page.
+        player, _ = await self.staff("player", with_totp=False)
+        other = await self.new_page()
+        await self.login(other, player, None, self.field_path("/sync-keys"))
+        await expect(other.locator("#status")).to_contain_text("neste campo")
 
 
 class RoleTests(BrowserCase):

@@ -1,0 +1,37 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$branding_title</h1>
+<p>$branding_intro</p>
+<section aria-labelledby="branding-field-title">
+<h2 id="branding-field-title">$branding_field</h2>
+<form id="branding-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="b-name">$branding_name</label>
+<input id="b-name" name="field_name" maxlength="$field_name_max" autocomplete="off">
+<p class="hint">$branding_name_hint</p>
+<label for="b-accent">$branding_accent</label>
+<input id="b-accent" name="accent" maxlength="16" placeholder="#rrggbb" autocapitalize="none" spellcheck="false" autocomplete="off">
+<p><button type="submit">$save</button></p>
+</fieldset>
+</form>
+<div id="branding-images"></div>
+</section>
+<section aria-labelledby="teams-title">
+<h2 id="teams-title">$teams_title</h2>
+<p>$teams_intro</p>
+<form id="team-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<legend>$team_new</legend>
+<label for="t-name">$team_name</label>
+<input id="t-name" name="name" maxlength="$team_name_max" autocomplete="off">
+<label for="t-colour">$team_colour</label>
+<input id="t-colour" name="colour" maxlength="$team_colour_max" autocapitalize="none" spellcheck="false" autocomplete="off">
+<label for="t-club">$team_club</label>
+<input id="t-club" name="club_slug" maxlength="128" autocapitalize="none" spellcheck="false" autocomplete="off">
+<p class="hint">$team_club_hint</p>
+<p><button type="submit">$team_add</button></p>
+</fieldset>
+</form>
+<ul id="teams" class="plain"></ul>
+<p id="teams-none" hidden>$teams_none</p>
+</section>

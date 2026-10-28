@@ -37,6 +37,11 @@ PAGES = {
     "atak": f"/staff/fields/{FIELD}/atak", "schedule": f"/staff/fields/{FIELD}/schedule",
     "registrations": f"/staff/fields/{FIELD}/schedule/{GAME}/registrations",
     "roster": f"/staff/fields/{FIELD}/schedule/{GAME}/roster",
+    # Phase 4 follow-up FU9
+    "roles": f"/staff/fields/{FIELD}/roles", "gameroles": f"/staff/fields/{FIELD}/games/{GAME}/roles",
+    "synckeys": f"/staff/fields/{FIELD}/sync-keys", "branding": f"/staff/fields/{FIELD}/branding",
+    "platforms": f"/staff/fields/{FIELD}/platforms", "clubs": "/staff/clubs", "club": f"/staff/clubs/{GAME}",
+    "firmware": "/staff/firmware", "admin": "/staff/admin",
 }
 
 
@@ -142,6 +147,8 @@ class StaffPageTests(AppTestCase):
         for path in ("/staff/fields/nope/history", f"/staff/fields/{FIELD}/games/nope",
                      f"/staff/fields/{FIELD}/scenarios/Not-An-Id", f"/staff/fields/{FIELD}/scenarios/x" + "a.b" * 20,
                      f"/staff/fields/{FIELD}/schedule/nope/registrations", f"/staff/fields/{FIELD}/schedule/nope/roster",
+                     f"/staff/fields/{FIELD}/games/nope/roles", f"/staff/fields/nope/roles", "/staff/clubs/nope",
+                     "/staff/clubs/%3Cscript%3E", f"/staff/fields/%22onmouseover%3D/branding",
                      f"/staff/fields/{FIELD}/scenarios/%3Cscript%3E.x", "/staff/fields/%22onmouseover%3D/devices"):
             with self.subTest(path=path):
                 r = await self.client.get(path)
@@ -169,7 +176,10 @@ class StaffPageTests(AppTestCase):
                      f"/staff/fields/{field_id}/devices", f"/staff/fields/{field_id}/remote-gm",
                      f"/staff/fields/{field_id}/atak", f"/staff/fields/{field_id}/schedule",
                      f"/staff/fields/{field_id}/schedule/{game}/registrations",
-                     f"/staff/fields/{field_id}/schedule/{game}/roster"):
+                     f"/staff/fields/{field_id}/schedule/{game}/roster", f"/staff/fields/{field_id}/roles",
+                     f"/staff/fields/{field_id}/games/{game}/roles", f"/staff/fields/{field_id}/sync-keys",
+                     f"/staff/fields/{field_id}/branding", f"/staff/fields/{field_id}/platforms",
+                     "/staff/clubs", f"/staff/clubs/{game}", "/staff/firmware", "/staff/admin"):
             r = await self.client.get(path)
             self.assertEqual(r.status_code, 200)
             self.assertNotIn("Operação Noturna", r.text)
@@ -258,6 +268,9 @@ class StaffScriptTests(AppTestCase):
                  "replica_state_": ("pending", "passed", "refused", "withdrawn"),
                  "io_res_": ("created", "updated", "unchanged", "skipped", "refused"),
                  "io_warn_": ("same_name", "no_external_ref", "federation_number_dropped"),
+                 "image_": ("logo", "wallpaper"), "club_image_": ("logo", "crest"), "club_make_": ("admin", "member"),
+                 "club_role_": ("admin", "member"),                  "report_reason_": ("rights", "offensive", "impersonation", "other"),
+                 "report_status_": ("open", "dismissed", "actioned", "all"),
                  "e_": ("cancelled", "external_ref_invalid", "external_ref_twice", "row_length", "row_not_object",
                         "display_name_invalid", "team_preference_invalid", "federation_number_invalid",
                         "federation_number_required", "replicas_invalid", "replicas_not_asked",
@@ -269,6 +282,55 @@ class StaffScriptTests(AppTestCase):
             for lang, strings in STRINGS.items():
                 for value in values:
                     self.assertIn(prefix + value, strings, (lang, prefix + value))
+
+    async def test_every_answer_code_of_the_fu8_apis_has_words(self) -> None:
+        """The codes the APIs the new pages call can answer (read from their source) have a text in every language."""
+        api = Path(staff_pages.__file__).resolve().parents[1] / "api"
+        codes: set[str] = set()
+        for module in ("fields", "branding", "clubs", "integrations", "firmware", "games"):
+            text = (api / f"{module}.py").read_text(encoding="utf-8")
+            codes |= set(re.findall(r'HTTPException\(\d+, "([a-z_]+)"', text))
+        branding = (api.parent / "services" / "branding.py").read_text(encoding="utf-8")
+        codes |= set(re.findall(r'BrandingError\("([a-z_]+)"', branding))
+        codes |= {f"{name}_invalid" for name in ("field_name", "accent", "name", "short_name", "colour", "slug",
+                                                  "reason", "description")}
+        # Answers of calls these pages do not make (a field's settings, a scheduled game's pushes to a platform).
+        codes -= {"already_cancelled", "capability_missing", "config_unreadable", "game_not_published",
+                  "integration_disabled", "limit_template_invalid", "max_replicas_invalid", "not_published_there"}
+        self.assertGreater(len(codes), 30)
+        for lang, strings in STRINGS.items():
+            missing = sorted(c for c in codes if f"e_{c}" not in strings)
+            self.assertEqual(missing, [], lang)
+
+    async def test_every_api_path_a_new_script_names_exists(self) -> None:
+        """A page is its API (FU2-2): the paths the FU9 scripts call are routes of the application, with that method."""
+        scripts = ("roles", "rolestable", "gameroles", "synckeys", "branding", "clubs", "club", "platforms", "firmware",
+                   "admin", "imageblock", "remote")
+        field = "00000000-0000-0000-0000-000000000000"
+        found: set[tuple[str, str]] = set()
+        for name in scripts:
+            text = (STATIC / f"{name}.js").read_text(encoding="utf-8")
+            for method, path in re.findall(r"(?:api|act)\('(GET|POST|PUT|PATCH|DELETE)',\s*[`']([^`']+)[`']", text):
+                found.add((method, path))
+            for method, path in re.findall(r"api\('(GET|POST|PUT|PATCH|DELETE)',\s*fieldApi\([`']([^`']+)[`']\)", text):
+                found.add((method, f"/api/v1/fields/{field}{path}"))
+            for path in re.findall(r"stream\(fieldApi\('([^']+)'\)", text):
+                found.add(("GET", f"/api/v1/fields/{field}{path}"))
+        self.assertGreater(len(found), 25)
+        schema = self.app.openapi()["paths"]  # the API's routes (the staff pages are not in it)
+        bases = {"${base}": (f"/api/v1/fields/{field}/roles", f"/api/v1/games/{field}/roles"),
+                 "${CLUB}": (f"/api/v1/clubs/{field}",)}  # the variables the scripts build their paths from
+        for method, path in sorted(found):
+            if path.startswith("${put}"):  # imageblock.js's slot: its callers (branding, club) pass the real path
+                continue
+            starts = next(((prefix, options) for prefix, options in bases.items() if path.startswith(prefix)), None)
+            options = [path.replace(starts[0], o, 1) for o in starts[1]] if starts else [path]
+            matched = []
+            for option in options:
+                concrete = re.sub(r"\$\{[^}]*\}", "x1", option).split("?")[0]
+                matched += [p for p, ops in schema.items() if method.lower() in ops
+                            and re.fullmatch(re.sub(r"\{[^}]+\}", "[^/]+", p), concrete)]
+            self.assertTrue(matched, f"{method} {path}")
 
     async def test_the_roster_has_a_print_style_sheet(self) -> None:
         css = (STATIC / "staff.css").read_text(encoding="utf-8")

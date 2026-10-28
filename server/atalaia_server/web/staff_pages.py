@@ -25,6 +25,17 @@
                                                        device's certificate (its TAK data package, made in the
                                                        page from the API's answer), the field's certificates,
                                                        revoking one, the devices connected now, the log
+    GET /staff/fields/<field>/roles                    who holds which role at the field: grant, revoke (FU9)
+    GET /staff/fields/<field>/games/<game>/roles       the roles held in one game only
+    GET /staff/fields/<field>/sync-keys                the controllers' API keys: labelled, fingerprint shown,
+                                                       made and revoked (the key is shown once)
+    GET /staff/fields/<field>/branding                 the field's name, accent colour, logo and wallpaper, and its
+                                                       saved teams with their crests
+    GET /staff/fields/<field>/platforms                the links to third-party platforms: on or off, configured
+    GET /staff/clubs, /staff/clubs/<club>              the account's clubs and invitations; one club, its images
+                                                       and members (and a server administrator's moderation)
+    GET /staff/firmware                                the firmware catalogue (add and withdraw: server administrator)
+    GET /staff/admin                                   server administration: fields, the reports of clubs' pages
     GET /static/staff/<file>                           the pages' scripts and style sheet
 
 How they work (FU2-1, FU2-2): each page is rendered here, in the field pages' languages (pt-PT, English,
@@ -39,6 +50,10 @@ origin: no cookie authorises one, so there is nothing for a cross-site request t
 refresh token stays the HttpOnly, SameSite=Strict cookie on ``/api/v1/auth/refresh``, which the script
 calls with ``X-Atalaia-Refresh: 1``; the access token lives in the tab's ``sessionStorage`` (FU2-4). The
 script writes every value with ``textContent`` and DOM nodes, never as HTML (FU2-5).
+
+FU9 added the pages for the APIs that still had none (roles, sync keys, branding and clubs, platform links, the
+firmware catalogue, server administration; decisions FU9-1 to FU9-7) by the same rules, and the remote GM's view is
+pushed to the browser (server-sent events, ``GET .../remote-gm/stream``) with the polling kept as the fallback.
 
 The pages are ``no-store`` and ``noindex``; a page whose path names no valid field, game or scenario id
 is a 404. The texts are in ``staff_i18n.py``.
@@ -57,7 +72,10 @@ from typing import Optional
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse, Response
 
+from .. import firmware, sync
+from ..api import fields as fields_api
 from ..history_models import DEFAULT_RETENTION_DAYS, MAX_DELAY_S, MIN_RETENTION_DAYS
+from ..services import branding as branding_svc
 from ..services import devices
 from . import i18n, preview_texts
 from .field_pages import GET_HEAD, HERE, HTML_TYPE, STARTED, answer, esc, switcher
@@ -117,7 +135,13 @@ class StaffPage:
             items += [("history", f"{base}/history", "nav_history"), ("schedule", f"{base}/schedule", "nav_schedule"),
                       ("scenarios", f"{base}/scenarios", "nav_scenarios"),
                       ("presets", f"{base}/presets", "nav_presets"), ("devices", f"{base}/devices", "nav_devices"),
-                      ("remote", f"{base}/remote-gm", "nav_remote"), ("atak", f"{base}/atak", "nav_atak")]
+                      ("remote", f"{base}/remote-gm", "nav_remote"), ("atak", f"{base}/atak", "nav_atak"),
+                      ("roles", f"{base}/roles", "nav_roles"), ("synckeys", f"{base}/sync-keys", "nav_synckeys"),
+                      ("branding", f"{base}/branding", "nav_branding"),
+                      ("platforms", f"{base}/platforms", "nav_platforms")]
+        # Not of one field: any account's clubs, the firmware list, the server administrator's page.
+        items += [("clubs", "/staff/clubs", "nav_clubs"), ("firmware", "/staff/firmware", "nav_firmware"),
+                  ("admin", "/staff/admin", "nav_admin")]
         out = []
         for name, href, label in items:
             here = ' aria-current="page"' if name == current else ""
@@ -169,6 +193,8 @@ def _field_page(request: Request, field_text: str, page: str, section: str, titl
     base = f"/staff/fields/{field}"
     links = {"history_href": esc(p.link(f"{base}/history")), "scenarios_href": esc(p.link(f"{base}/scenarios")),
              "new_href": esc(p.link(f"{base}/scenarios/new")), "schedule_href": esc(p.link(f"{base}/schedule"))}
+    if data and "game" in data:
+        links["game_roles_href"] = esc(p.link(f"{base}/games/{data['game']}/roles"))
     content = TEMPLATES[page].substitute(p.texts(**links, **values))
     return p.render(request, page, p.t[title_key], content, field=field, section=section, data=data)
 
@@ -289,6 +315,84 @@ async def remote_gm(field: str, request: Request) -> Response:
 @router.api_route("/staff/fields/{field}/atak", methods=GET_HEAD)
 async def atak(field: str, request: Request) -> Response:
     return _field_page(request, field, "atak", "atak", "atak_title")
+
+
+@router.api_route("/staff/fields/{field}/games/{game}/roles", methods=GET_HEAD)
+async def game_roles(field: str, game: str, request: Request) -> Response:
+    game_id = _uuid(game)
+    field_id = _uuid(field)
+    if game_id is None or field_id is None:
+        return StaffPage(request).not_found(request)
+    href = esc(StaffPage(request).link(f"/staff/fields/{field_id}/games/{game_id}"))
+    return _field_page(request, field, "gameroles", "history", "gameroles_title", data={"game": str(game_id)},
+                       game_href=href)
+
+
+@router.api_route("/staff/fields/{field}/roles", methods=GET_HEAD)
+async def roles(field: str, request: Request) -> Response:
+    return _field_page(request, field, "roles", "roles", "roles_title")
+
+
+@router.api_route("/staff/fields/{field}/sync-keys", methods=GET_HEAD)
+async def sync_keys(field: str, request: Request) -> Response:
+    t = STRINGS[StaffPage(request).lang]
+    return _field_page(request, field, "synckeys", "synckeys", "keys_title",
+                       keys_intro_text=esc(t["keys_intro"].format(n=sync.MAX_LIVE_KEYS)),
+                       label_max=str(fields_api.SYNC_LABEL_MAX))
+
+
+@router.api_route("/staff/fields/{field}/branding", methods=GET_HEAD)
+async def branding(field: str, request: Request) -> Response:
+    return _field_page(request, field, "branding", "branding", "branding_title",
+                       field_name_max=str(branding_svc.FIELD_NAME_MAX), team_name_max=str(branding_svc.TEAM_NAME_MAX),
+                       team_colour_max=str(branding_svc.TEAM_COLOUR_MAX))
+
+
+@router.api_route("/staff/fields/{field}/platforms", methods=GET_HEAD)
+async def platforms(field: str, request: Request) -> Response:
+    return _field_page(request, field, "platforms", "platforms", "platforms_title")
+
+
+def _page(request: Request, page: str, section: str, title_key: str, data: Optional[dict[str, str]] = None,
+          **values: str) -> Response:
+    """A page that is not one field's (clubs, firmware, server administration)."""
+    p = StaffPage(request)
+    content = TEMPLATES[page].substitute(p.texts(**values))
+    return p.render(request, page, p.t[title_key], content, section=section, data=data)
+
+
+def _club_limits() -> dict[str, str]:
+    return {"club_name_max": str(branding_svc.CLUB_NAME_MAX), "team_name_max": str(branding_svc.TEAM_NAME_MAX),
+            "club_description_max": str(branding_svc.CLUB_DESCRIPTION_MAX)}
+
+
+@router.api_route("/staff/clubs", methods=GET_HEAD)
+async def clubs(request: Request) -> Response:
+    return _page(request, "clubs", "clubs", "clubs_title", **_club_limits())
+
+
+@router.api_route("/staff/clubs/{club}", methods=GET_HEAD)
+async def club(club: str, request: Request) -> Response:
+    club_id = _uuid(club)
+    if club_id is None:
+        return StaffPage(request).not_found(request)
+    p = StaffPage(request)
+    return _page(request, "club", "clubs", "club_title", data={"club": str(club_id)},
+                 clubs_href=esc(p.link("/staff/clubs")), **_club_limits())
+
+
+@router.api_route("/staff/firmware", methods=GET_HEAD)
+async def firmware_page(request: Request) -> Response:
+    options = "".join(f'<option value="{esc(name)}">{esc(name)}</option>' for name in firmware.PLATFORM_NAMES)
+    return _page(request, "firmware", "firmware", "fw_title", platform_options=options)
+
+
+@router.api_route("/staff/admin", methods=GET_HEAD)
+async def admin(request: Request) -> Response:
+    options = "".join(f'<option value="{esc(name)}">{esc(StaffPage(request).t["field_type_" + name])}</option>'
+                      for name in fields_api.FIELD_TYPES)
+    zone = fields_api.FieldIn.model_fields["timezone"].default
+    return _page(request, "admin", "admin", "admin_title", type_options=options, default_zone=esc(zone))
 
 
 def page_names() -> list[str]:

@@ -1,14 +1,16 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The remote GM (plan phase 19's API): each connected controller's live view, polled every few seconds
-// (GET /api/v1/fields/{field}/remote-gm, the field's gm in a TOTP session), the commands the site server
+// The remote GM (plan phase 19's API): each connected controller's live view, pushed by the server as it changes
+// (GET /api/v1/fields/{field}/remote-gm/stream, server-sent events read with fetch and the bearer token; decision
+// FU9-6) and, while no stream delivers (the browser cannot read one, the connection failed), polled every few
+// seconds (GET .../remote-gm, the field's gm in a TOTP session), the commands the site server
 // may send (start, pause, resume, end, a GM message, a mode command the live game declares; POST
 // .../remote-gm/commands, answered with the controller's own result) and the remote GM log (GET
-// .../remote-gm/log, the field's admin or gm). Polling stops while the tab is hidden.
+// .../remote-gm/log, the field's admin or gm). Both stop while the tab is hidden.
 
 import {
-    $, api, boot, brief, clear, el, errorText, fieldApi, fillRows, gameTime, page, stateName, status, t, when,
+    $, api, boot, brief, clear, el, errorText, fieldApi, fillRows, gameTime, page, stateName, status, stream, t, when,
 } from './staff.js';
 
 const POLL_S = Math.max(2, Number.parseInt(page.poll, 10) || 5);
@@ -22,7 +24,13 @@ const CAN = {
     resume: (s) => s === 'paused',
     end: (s) => s === 'running' || s === 'paused',
 };
+const RETRY_S = 30;          // after a failed stream, until the next try (the polling covers the time)
+const STALE_MS = 45000;      // a stream silent this long (the server sends a line every 15 s) is replaced
 let ctx = null;
+let pushing = false;         // a stream is delivering the view: no polling
+let following = false;
+let abort = null;
+let lastBeat = 0;
 let busy = false;
 let viewAllowed = true;
 const shown = new Map();
@@ -221,6 +229,10 @@ async function poll() {
         return;
     }
     status('');
+    showView(body);
+}
+
+function showView(body) {
     const ids = new Set(body.controllers.map((c) => c.controller_id));
     for (const [id, entry] of shown) {
         if (!ids.has(id)) {
@@ -230,6 +242,41 @@ async function poll() {
     }
     body.controllers.forEach(render);
     $('controllers-none').hidden = body.controllers.length > 0;
+}
+
+/** The push: one stream at a time while the tab is visible, a new one when the server ends it (it does after five
+ * minutes) and, after a failure, again after RETRY_S; meanwhile the polling shows the view. */
+async function follow() {
+    if (following || document.hidden || !viewAllowed) return;
+    following = true;
+    try {
+        while (!document.hidden && viewAllowed) {
+            abort = new AbortController();
+            let got = false;
+            try {
+                await stream(fieldApi('/remote-gm/stream'), (name, data) => {
+                    lastBeat = Date.now();
+                    if (name !== 'view') return;
+                    got = true;
+                    pushing = true;
+                    status('');
+                    showView(data);
+                }, abort.signal);
+            } catch (err) {
+                if (err.status === 403) {
+                    status(errorText(err, ['gm']), 'error');
+                    viewAllowed = false;
+                }
+            }
+            pushing = false;
+            if (!got && !document.hidden && viewAllowed) {
+                await new Promise((resolve) => window.setTimeout(resolve, RETRY_S * 1000));
+            }
+        }
+    } finally {
+        pushing = false;
+        following = false;
+    }
 }
 
 function logRow(row) {
@@ -261,15 +308,23 @@ async function main() {
     await loadLog();
     $('log-refresh').addEventListener('click', loadLog);
     let ticks = 0;
+    // The polling below is the fallback: it asks only while no stream is delivering (S19-11, FU9-6).
     window.setInterval(() => {
         if (document.hidden || busy) return;
         ticks += 1;
-        poll();
+        if (pushing && Date.now() - lastBeat > STALE_MS && abort) abort.abort(); // silent too long: open a new one
+        if (!pushing) poll();
         if ((ticks * POLL_S) % LOG_S < POLL_S) loadLog();
     }, POLL_S * 1000);
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) poll();
+        if (document.hidden) {
+            if (abort) abort.abort();
+        } else {
+            poll();
+            follow();
+        }
     });
+    follow();
 }
 
 main();

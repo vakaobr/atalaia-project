@@ -87,6 +87,14 @@ ul.compact li { margin: 0.15rem 0; overflow-wrap: anywhere; }
 .message { white-space: pre-wrap; overflow-wrap: anywhere; display: block; max-width: 32rem; }
 /* The schedule's row buttons, which wrap inside their cell */
 .actions { display: inline-flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; }
+/* The roles, keys, branding, clubs, platforms and firmware pages */
+ul.plain { list-style: none; margin: 0; padding: 0; }
+fieldset.team, fieldset.image-slot { border: 1px solid var(--line); border-radius: 0.3rem; padding: 0.5rem 1rem 1rem; margin: 1rem 0;
+                                     min-width: 0; }
+fieldset.team label, fieldset.image-slot label { display: block; margin: 0.75rem 0 0.25rem; }
+fieldset.image-slot .check label { display: inline; margin: 0; }
+fieldset.image-slot input[type="file"] { padding: 0.5rem; }
+#key-value { display: block; font-size: 1rem; }
 /* The registration form's replicas: one row each, wrapping on a phone */
 ul.replicas { list-style: none; margin: 0.5rem 0; padding: 0; }
 ul.replicas li.replica-row { display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; align-items: center; margin: 0.5rem 0; }

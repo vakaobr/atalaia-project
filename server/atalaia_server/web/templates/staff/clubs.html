@@ -1,0 +1,42 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$clubs_title</h1>
+<p>$clubs_intro</p>
+<section id="invites" aria-labelledby="invites-title" hidden>
+<h2 id="invites-title">$clubs_invites</h2>
+<div class="table-wrap">
+<table id="invites-table" class="data">
+<thead><tr><th scope="col">$col_club</th><th scope="col">$col_role</th><th scope="col"><span class="visually-hidden">$col_actions</span></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+</section>
+<section aria-labelledby="mine-title">
+<h2 id="mine-title">$clubs_mine</h2>
+<div class="table-wrap">
+<table id="clubs-table" class="data" hidden>
+<thead><tr><th scope="col">$col_club</th><th scope="col">$col_slug</th><th scope="col">$col_role</th><th scope="col">$col_public</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="clubs-none" hidden>$clubs_none</p>
+</section>
+<section aria-labelledby="new-club-title">
+<h2 id="new-club-title">$clubs_new</h2>
+<form id="club-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="c-name">$club_name</label>
+<input id="c-name" name="name" maxlength="$club_name_max" autocomplete="off" required>
+<label for="c-short">$club_short</label>
+<input id="c-short" name="short_name" maxlength="$team_name_max" autocomplete="off" required>
+<label for="c-slug">$club_slug</label>
+<input id="c-slug" name="slug" maxlength="128" autocapitalize="none" spellcheck="false" autocomplete="off" required>
+<p class="hint">$club_slug_hint</p>
+<label for="c-colour">$club_colour</label>
+<input id="c-colour" name="colour" maxlength="16" placeholder="#rrggbb" autocapitalize="none" spellcheck="false" autocomplete="off">
+<label for="c-description">$club_description</label>
+<textarea id="c-description" name="description" rows="4" maxlength="$club_description_max"></textarea>
+<p><button type="submit">$clubs_create</button></p>
+</fieldset>
+</form>
+</section>

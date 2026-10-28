@@ -7,7 +7,9 @@
     POST /api/v1/fields/{field_id}/remote-gm/commands   the field's gm: {game: {game_id, game_seed}, command,
                                                         params?, controller_id?}: one command, sent on the
                                                         controller's own socket; answers the controller's result
-    GET  /api/v1/fields/{field_id}/remote-gm/log        the field's admin or gm: the audit log's remote GM rows
+    GET  /api/v1/fields/{field_id}/remote-gm/stream     the same view, pushed (server-sent events), for the staff
+                                                        page: see ``remote_stream``
+    GET  /api/v1/fields/{field_id}/remote-gm/log       the field's admin or gm: the audit log's remote GM rows
 
 Who may: a user with the ``gm`` role on that field, in a session that passed
 the TOTP step (``gm`` counts only then, ADR-P4-2); not the field's admin, not a
@@ -24,6 +26,7 @@ and why); the controller logs each command it gets on its side too.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 import uuid
@@ -31,7 +34,7 @@ from typing import Any, Optional
 
 from atalaia_controller import sync_format
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,6 +49,9 @@ router = APIRouter(prefix="/api/v1/fields/{field_id}/remote-gm", tags=["remote g
 NO_STORE = {"Cache-Control": "no-store"}
 ACTIONS = ("remote_gm_command", "remote_gm_denied")
 MAX_BODY = 4096
+STREAM_MAX_S = 300.0    # one stream's life: the page opens a new one (and so the roles are checked again)
+STREAM_BEAT_S = 15.0    # a comment line when nothing changed, so proxies and phones keep the connection
+STREAM_GAP_S = 0.5      # at most two views a second, whatever the controllers send (``live`` comes about 1 a second)
 
 
 def _hub(request: Request) -> RemoteHub:
@@ -61,8 +67,50 @@ async def remote_view(field_id: uuid.UUID, request: Request,
                       principal: Principal = Depends(current_principal)) -> JSONResponse:
     if not _is_gm(principal, field_id):
         raise HTTPException(403, "role_required")
-    return JSONResponse({"controllers": [link.json() for link in _hub(request).links(field_id)],
-                         "commands": list(sync_format.REMOTE_COMMANDS)}, headers=NO_STORE)
+    return JSONResponse(_view(request, field_id), headers=NO_STORE)
+
+
+def _view(request: Request, field_id: uuid.UUID) -> dict[str, Any]:
+    return {"controllers": [link.json() for link in _hub(request).links(field_id)],
+            "commands": list(sync_format.REMOTE_COMMANDS)}
+
+
+@router.get("/stream")
+async def remote_stream(field_id: uuid.UUID, request: Request,
+                        principal: Principal = Depends(current_principal)) -> StreamingResponse:
+    """The remote GM's view pushed to a browser (plan phase 19's S19-11; decision FU9-6): ``text/event-stream``,
+    one ``view`` event with exactly the body of ``GET .../remote-gm`` now and again whenever a controller of the
+    field connects, leaves or sends a new live view (at most two a second), a comment line every 15 s, and an
+    ``end`` event after five minutes, when the page opens a new stream. The same rules as the view (the field's
+    ``gm`` in a TOTP session, checked when the stream opens; a stream outlives a changed role by at most its five
+    minutes, like an access token by at most its fifteen); the page needs ``fetch`` with the bearer token, as
+    ``EventSource`` cannot send one, so no cookie authorises it. Nothing is stored; polling the view stays."""
+    if not _is_gm(principal, field_id):
+        raise HTTPException(403, "role_required")
+    watcher = _hub(request).watch(field_id)
+
+    def frame(event: str, body: Any) -> str:
+        return f"event: {event}\ndata: {json.dumps(body, separators=(',', ':'))}\n\n"
+
+    async def events() -> Any:
+        loop = asyncio.get_running_loop()
+        end = loop.time() + STREAM_MAX_S
+        with watcher:
+            while True:
+                yield frame("view", _view(request, field_id))
+                changed = False
+                while not changed:
+                    left = end - loop.time()
+                    if left <= 0:
+                        yield frame("end", {})
+                        return
+                    changed = await watcher.wait(min(STREAM_BEAT_S, left))
+                    if not changed:
+                        yield ": keep-alive\n\n"
+                await asyncio.sleep(STREAM_GAP_S)
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={**NO_STORE, "X-Accel-Buffering": "no"})
 
 
 def _deny(db: AsyncSession, request: Request, principal: Principal, field_id: uuid.UUID, reason: str,

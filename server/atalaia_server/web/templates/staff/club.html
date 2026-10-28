@@ -1,0 +1,55 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1 id="club-heading">$club_title</h1>
+<p><a href="$clubs_href">$club_back</a></p>
+<dl id="club-details" class="details"></dl>
+<section id="club-edit" aria-labelledby="club-edit-title" hidden>
+<h2 id="club-edit-title">$club_edit</h2>
+<form id="club-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="c-name">$club_name</label>
+<input id="c-name" name="name" maxlength="$club_name_max" autocomplete="off" required>
+<label for="c-short">$club_short</label>
+<input id="c-short" name="short_name" maxlength="$team_name_max" autocomplete="off" required>
+<label for="c-colour">$club_colour</label>
+<input id="c-colour" name="colour" maxlength="16" placeholder="#rrggbb" autocapitalize="none" spellcheck="false" autocomplete="off">
+<label for="c-description">$club_description</label>
+<textarea id="c-description" name="description" rows="5" maxlength="$club_description_max"></textarea>
+<p class="check"><input type="checkbox" id="c-public" name="public_page"> <label for="c-public">$club_public</label></p>
+<p class="hint">$club_public_hint</p>
+<p><button type="submit">$save</button></p>
+</fieldset>
+</form>
+<div id="club-images"></div>
+</section>
+<section id="club-members" aria-labelledby="members-title" hidden>
+<h2 id="members-title">$club_members</h2>
+<div class="table-wrap">
+<table id="members-table" class="data" hidden>
+<thead><tr><th scope="col">$username</th><th scope="col">$col_role</th><th scope="col">$col_state</th><th scope="col"><span class="visually-hidden">$col_actions</span></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<form id="invite-form" class="staff-form" method="post" novalidate hidden>
+<fieldset disabled>
+<legend>$club_invite</legend>
+<label for="i-user">$username</label>
+<input id="i-user" name="username" maxlength="64" autocapitalize="none" spellcheck="false" autocomplete="off" required>
+<label for="i-role">$col_role</label>
+<select id="i-role" name="role"></select>
+<p><button type="submit">$club_invite_button</button></p>
+</fieldset>
+</form>
+</section>
+<section id="club-delete" aria-labelledby="club-delete-title" hidden>
+<h2 id="club-delete-title">$club_delete_title</h2>
+<p>$club_delete_intro</p>
+<p><button type="button" id="club-delete-button" class="danger">$club_delete</button></p>
+</section>
+<section id="club-moderation" aria-labelledby="moderation-title" hidden>
+<h2 id="moderation-title">$club_moderation</h2>
+<p>$club_moderation_intro</p>
+<label for="m-reason">$club_hide_reason</label>
+<input id="m-reason" maxlength="512" autocomplete="off">
+<p><button type="button" id="club-hide" class="danger">$club_hide</button> <button type="button" id="club-show">$club_show</button></p>
+</section>

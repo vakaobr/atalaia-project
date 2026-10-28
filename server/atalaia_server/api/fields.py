@@ -55,6 +55,7 @@ router = APIRouter(prefix="/api/v1", tags=["fields"])
 
 FIELD_TYPES = ("outdoor", "cqb", "indoor")
 SLUG = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?")
+SYNC_LABEL_MAX = 64   # a sync key's label (the staff page's input shows the same limit)
 GM_GRANTS = frozenset({"player", "squad_leader", "vip", "spectator"})
 NO_STORE = {"Cache-Control": "no-store"}
 
@@ -82,7 +83,7 @@ class FieldPatch(BaseModel):
 
 class SyncKeyIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    label: Optional[str] = PydanticField(default=None, max_length=64)
+    label: Optional[str] = PydanticField(default=None, max_length=SYNC_LABEL_MAX)
 
 
 class GrantIn(BaseModel):

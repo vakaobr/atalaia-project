@@ -84,17 +84,34 @@ class RemoteHub:
         self.timeout_s = timeout_s
         self._links: dict[tuple[Optional[str], uuid.UUID, str], Link] = {}
         self._notes: set["asyncio.Task[None]"] = set()  # the ``field.changed`` sends under way
+        # The browsers watching a field's view (S19-11): one event each, set whenever that field's links change.
+        self._watchers: dict[tuple[Optional[str], uuid.UUID], set[asyncio.Event]] = {}
 
     def attach(self, link: Link) -> None:
         old = self._links.get(link.key)
         self._links[link.key] = link
         if old is not None and old is not link:
             self._fail_pending(old, "controller_offline")
+        self._changed(link)
 
     def detach(self, link: Link) -> None:
         if self._links.get(link.key) is link:
             del self._links[link.key]
         self._fail_pending(link, "controller_offline")
+        self._changed(link)
+
+    def set_live(self, link: Link, live: dict[str, Any]) -> None:
+        """A controller's new live view (its ``live`` message): kept, and the watchers of its field told."""
+        link.live, link.live_at = live, datetime.now(timezone.utc)
+        self._changed(link)
+
+    def watch(self, field_id: uuid.UUID) -> "Watcher":
+        """A watcher of a field's links (in the current tenant): ``wait`` returns when they change."""
+        return Watcher(self, (tenancy.current_schema(), field_id))
+
+    def _changed(self, link: Link) -> None:
+        for event in self._watchers.get((link.tenant, link.field_id), ()):
+            event.set()
 
     def detach_key(self, key_id: uuid.UUID) -> None:
         """A revoked API key: its links can no longer take commands."""
@@ -182,3 +199,32 @@ class RemoteHub:
             if not future.done():
                 with contextlib.suppress(asyncio.InvalidStateError):
                     future.set_exception(RemoteProblem(409, detail))
+
+
+class Watcher:
+    """One browser's watch on a field's remote GM view (the server-to-browser push, decisions S19-11 and FU9-6): a context
+    manager whose ``wait`` ends when a link of the field was attached, detached or sent a new live view, or
+    after ``timeout`` seconds (False then)."""
+
+    def __init__(self, hub: RemoteHub, key: tuple[Optional[str], uuid.UUID]) -> None:
+        self._hub, self._key = hub, key
+        self._event = asyncio.Event()
+
+    def __enter__(self) -> "Watcher":
+        self._hub._watchers.setdefault(self._key, set()).add(self._event)
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        group = self._hub._watchers.get(self._key)
+        if group is not None:
+            group.discard(self._event)
+            if not group:
+                del self._hub._watchers[self._key]
+
+    async def wait(self, timeout: float) -> bool:
+        try:
+            await asyncio.wait_for(self._event.wait(), timeout)
+        except asyncio.TimeoutError:
+            return False
+        self._event.clear()
+        return True

@@ -228,7 +228,8 @@ STRINGS: dict[str, dict[str, str]] = {
         # Remote GM
         "remote_title": "GM remoto",
         "remote_intro": "Os controladores do campo ligados a este servidor com a função de GM remoto ativa. A vista "
-                        "atualiza a cada {s} s; cada comando fica no registo, aqui e no controlador.",
+                        "muda assim que o servidor recebe uma novidade; se a ligação direta falhar, atualiza a cada "
+                        "{s} s. Cada comando fica no registo, aqui e no controlador.",
         "remote_none": "Nenhum controlador ligado.",
         "controller": "Controlador {id}",
         "takes_commands": "Aceita comandos",
@@ -825,8 +826,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "flag_ok": "no alerts",
         "fw_latest": "latest: {v}",
         "remote_title": "Remote GM",
-        "remote_intro": "The field's controllers connected to this server with the remote GM on. The view refreshes "
-                        "every {s} s; every command is logged, here and on the controller.",
+        "remote_intro": "The field's controllers connected to this server with the remote GM on. The view changes "
+                        "as soon as the server hears something new; if the live connection fails, it refreshes "
+                        "every {s} s. Every command is logged, here and on the controller.",
         "remote_none": "No controller is connected.",
         "controller": "Controller {id}",
         "takes_commands": "Takes commands",
@@ -1424,8 +1426,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "fw_latest": "neueste: {v}",
         "remote_title": "Remote-Spielleitung",
         "remote_intro": "Die Controller des Spielfelds, die mit eingeschalteter Remote-Spielleitung mit diesem Server "
-                        "verbunden sind. Die Ansicht aktualisiert sich alle {s} s; jeder Befehl wird protokolliert, "
-                        "hier und auf dem Controller.",
+                        "verbunden sind. Die Ansicht ändert sich, sobald der Server etwas Neues erfährt; "
+                        "fällt die Direktverbindung aus, aktualisiert sie sich alle {s} s. Jeder Befehl wird "
+                        "protokolliert, hier und auf dem Controller.",
         "remote_none": "Kein Controller verbunden.",
         "controller": "Controller {id}",
         "takes_commands": "Nimmt Befehle an",
@@ -2017,8 +2020,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "flag_ok": "無警報",
         "fw_latest": "最新：{v}",
         "remote_title": "遠端 GM",
-        "remote_intro": "已連線到這台伺服器、並啟用遠端 GM 的場地控制器。畫面每 {s} 秒更新一次；每個指令都會記錄下來，"
-                        "在這裡和控制器上都有。",
+        "remote_intro": "已連線到這台伺服器、並啟用遠端 GM 的場地控制器。畫面會在伺服器收到新訊息時立即更新；若即時連線中斷，則每 {s} 秒更新一次。"
+                        "每個指令都會記錄下來，在這裡和控制器上都有。",
         "remote_none": "沒有已連線的控制器。",
         "controller": "控制器 {id}",
         "takes_commands": "接受指令",
@@ -2411,3 +2414,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "e_status_invalid": "無效的狀態。",
     },
 }
+
+# The texts of the pages for roles, sync keys, branding and clubs, platform links, the firmware catalogue and server
+# administration (FU9) are in their own module; every key is new (a clash would silently change another page's text).
+from .staff_i18n_admin import BY_LANGUAGE as _ADMIN  # noqa: E402
+
+for _lang, _texts in _ADMIN.items():
+    _clash = set(STRINGS[_lang]) & set(_texts)
+    assert not _clash, sorted(_clash)
+    STRINGS[_lang].update(_texts)

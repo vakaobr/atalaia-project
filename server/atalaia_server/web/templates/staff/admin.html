@@ -1,0 +1,49 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$admin_title</h1>
+<p>$admin_intro</p>
+<section aria-labelledby="admin-fields-title">
+<h2 id="admin-fields-title">$admin_fields</h2>
+<div class="table-wrap">
+<table id="fields-table" class="data" hidden>
+<thead><tr><th scope="col">$col_name</th><th scope="col">$col_slug</th><th scope="col">$col_field_type</th><th scope="col">$col_zone</th><th scope="col">$col_public</th><th scope="col">$admin_open</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="fields-none" hidden>$admin_fields_none</p>
+<form id="field-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<legend>$admin_field_new</legend>
+<label for="n-name">$col_name</label>
+<input id="n-name" name="name" maxlength="128" autocomplete="off" required>
+<label for="n-slug">$col_slug</label>
+<input id="n-slug" name="slug" maxlength="128" autocapitalize="none" spellcheck="false" autocomplete="off" required>
+<p class="hint">$admin_slug_hint</p>
+<label for="n-type">$col_field_type</label>
+<select id="n-type" name="field_type">$type_options</select>
+<label for="n-zone">$col_zone</label>
+<input id="n-zone" name="timezone" maxlength="64" value="$default_zone" autocapitalize="none" spellcheck="false" autocomplete="off" required>
+<p><button type="submit">$admin_field_create</button></p>
+</fieldset>
+</form>
+</section>
+<section aria-labelledby="admin-reports-title">
+<h2 id="admin-reports-title">$admin_reports</h2>
+<p>$admin_reports_intro</p>
+<label for="r-status">$col_state</label>
+<select id="r-status">
+<option value="open">$report_status_open</option>
+<option value="dismissed">$report_status_dismissed</option>
+<option value="actioned">$report_status_actioned</option>
+<option value="all">$report_status_all</option>
+</select>
+<label for="r-reason">$club_hide_reason</label>
+<input id="r-reason" maxlength="512" autocomplete="off">
+<div class="table-wrap">
+<table id="reports-table" class="data" hidden>
+<thead><tr><th scope="col">$col_club</th><th scope="col">$col_reason</th><th scope="col">$col_text</th><th scope="col">$col_when</th><th scope="col">$col_state</th><th scope="col"><span class="visually-hidden">$col_actions</span></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="reports-none" hidden>$admin_reports_none</p>
+</section>
