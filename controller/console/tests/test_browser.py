@@ -4200,8 +4200,17 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("tab-checkin").click()
         row = page.get_by_test_id(f"checkin-row-{me['player_id']}")
         expect(row).to_be_visible()
+        def mine():
+            body = self.field.http.get(f"/api/v1/games/{game['id']}/checkins").json()
+            return next(r for r in body["checkins"] if r["player_id"] == me["player_id"])
+
         row.get_by_test_id("checkin-confirm").click()
+        # The row is drawn again when the confirm comes back on the stream: change the team only after that,
+        # or the select can be replaced under the change and the change never sent.
+        self.assertTrue(wait_for(lambda: mine()["status"] == "checked_in", 5))
+        expect(row.get_by_test_id("checkin-confirm")).to_have_count(0)
         row.get_by_test_id("checkin-team").select_option("blue")
+        self.assertTrue(wait_for(lambda: mine().get("team") == "blue", 5))
         expect(row.get_by_test_id("checkin-squad")).to_be_visible()
         page.get_by_test_id("marshal-add-player").select_option(label="Gaivota")
         page.get_by_test_id("marshal-add").click()
