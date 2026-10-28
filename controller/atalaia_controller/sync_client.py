@@ -821,12 +821,9 @@ class SyncClient:
     # --- branding and saved teams (plan phase 18) ------------------------------------------
 
     def _site_branding(self) -> None:
-        """With ``[sync] branding = "site"``: the field's branding and saved teams, then the images missing here.
-        With ``[sync] apd = "site"`` the same answer carries the field's APD rule (protocol/apd.md)."""
-        branding_on = getattr(self.cfg, "sync_branding", "local") == "site" and self.branding is not None
-        apd_on = getattr(self.cfg, "sync_apd", "local") == "site" \
-            and self.checkin is not None
-        if not (branding_on or apd_on) or not hasattr(self.transport, "get"):
+        """With ``[sync] branding = "site"``: the field's branding and saved teams, then the images missing here."""
+        if getattr(self.cfg, "sync_branding", "local") != "site" or self.branding is None \
+                or not hasattr(self.transport, "get"):
             return
         self.pulls += 1
         try:
@@ -845,10 +842,6 @@ class SyncClient:
             answer = ANSWERS["field"](answer)
         except SyncFormatError as exc:
             raise SyncError("bad_answer", detail=str(exc)) from None
-        if apd_on:
-            self.checkin.set_site_apd(answer["field"].get("apd"))
-        if not branding_on:
-            return
         wanted: dict[str, tuple[str, dict[str, Any]]] = {}  # sha256 -> (kind, ref)
         for slot in ("logo", "wallpaper"):
             if answer["field"][slot] is not None:

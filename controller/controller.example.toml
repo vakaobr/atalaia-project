@@ -125,7 +125,6 @@ timeout_s = 15.0                  # per request
 # commands, over a WebSocket this controller opens; every command is logged on both
 # sides (plan phase 19). Off by default.
 remote_gm = false
-apd = "local"                     # or "site": the field's APD rule from the site server (needs the field's key)
 library = true                    # the field's scenario library and game presets from the site server,
                                   # installed (and checked again) on every controller of the field
 

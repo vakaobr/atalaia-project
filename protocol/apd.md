@@ -10,7 +10,7 @@ teams, fields or events and **never verifies** a membership: the player declares
 it needs, and the marshal sees a verdict and decides. Everything here is additive: a peer that knows nothing of
 it keeps working, and `federation_number` stays.
 
-Vectors: [`vectors/apd.json`](vectors/apd.json), run by the server, the Pi controller, the phone controller and the app.
+Vectors: [`vectors/apd.json`](vectors/apd.json), run by the server, the Pi controller, the phone controller and the app; the sync bodies that carry a rule (`settings.apd` of the field answer, the roster's `apd`) are in [`vectors/sync.json`](vectors/sync.json) (`answers`, `field_settings_*apd*` and `roster_*apd*`; error `bad_apd_rule`).
 
 ## The list
 
@@ -73,9 +73,10 @@ worked out when shown, so a changed rule or a new day changes it.
 | --- | --- |
 | a registration or a check-in body (player to server or controller) | `apd_id`, `membership_number`, `membership_expires`; the old `federation_number` is the same value as `membership_number` (both sent: they must agree, else 400; either alone is accepted) |
 | a registration or check-in row (staff views, roster, exports) | `apd_id`, `membership_expires`, `membership_number` **and** `federation_number` (same value), and `apd_status` (null when no rule asks) |
-| site server: the field's rule | `apd` (the rule): set by the field's admin with `PATCH /api/v1/fields/{field}` (`{"apd": {...}}`, a whole rule; `{}` puts the default back; 400 `apd_rule_invalid`), shown in the field's JSON, in `GET /api/v1/fields-by-slug/{slug}`'s `field`, in the staff's registration list (with `apds`, the project list) and in `GET /api/v1/sync/field` as `field.apd` (always sent; the default when none is set) |
+| site server: the field's rule | `apd` (the rule): set by the field's admin with `PATCH /api/v1/fields/{field}` (`{"apd": {...}}`, a whole rule; `{}` puts the default back; 400 `apd_rule_invalid`), shown in the field's JSON, in `GET /api/v1/fields-by-slug/{slug}`'s `field`, in the staff's registration list (with `apds`, the project list) and in `GET /api/v1/sync/field?settings=1` as `settings.apd` (BR24's check-in settings: only for a request with the query, so the answer without it is unchanged; always sent there, the default rule when none is set). A change through `PATCH` sends the same `field.changed` note on the stream as the other settings |
 | `GET /api/v1/sync/roster` | optional top-level `apd` (the rule); a registration may carry `apd_id` and `membership_expires` beside `federation_number`, when the game asks for the federation number or the rule has `checkin` or `register` |
 | `GET /api/v1/apds` (site server, no token, cacheable) | `{"format": 1, "apds": [entry...]}` the project list |
+| controller with `[sync] branding = "site"` | takes `settings.apd` as its rule with the other check-in settings (no separate switch: decision APD-50); the console's `PUT` of `apd` is then 409 once the site has sent a rule; an older site server sends none and the local rule stays |
 | controller `GET /api/v1/checkin` | `settings.apd` (the rule) and `apds` (the choices: the project's, then `custom`) |
 | controller `PUT /api/v1/checkin/settings` | `apd` (a whole rule, replaces) |
 

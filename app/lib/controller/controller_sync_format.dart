@@ -792,7 +792,7 @@ Json _checkApd(Object? value, String path) {
   try {
     return ApdRule.parse(value).toJson();
   } on ApdError {
-    _fail('bad_value', path);
+    _fail('bad_apd_rule', path);
   }
 }
 
@@ -1090,7 +1090,13 @@ const maxReplicasMax = 20;
 Json? checkFieldSettings(Object? value, [String path = 'settings']) {
   if (value == null) return null;
   final st = _obj(value, path);
-  _keys(st, path, ['federation_label', 'max_replicas', 'limit_template']);
+  _keys(
+    st,
+    path,
+    ['federation_label', 'max_replicas', 'limit_template'],
+    ['apd'],
+  );
+  if (st.containsKey('apd')) st['apd'] = _checkApd(st['apd'], '$path.apd');
   final label = _text(
     st['federation_label'],
     '$path.federation_label',
@@ -1147,14 +1153,7 @@ Json checkField(Object? raw) {
   checkFieldSettings(body['settings']);
   final f = _obj(body['field'], 'field');
   body['field'] = f;
-  _keys(f, 'field', const [], [
-    'field_name',
-    'accent',
-    'logo',
-    'wallpaper',
-    'apd',
-  ]);
-  if (f.containsKey('apd')) f['apd'] = _checkApd(f['apd'], 'field.apd');
+  _keys(f, 'field', const [], ['field_name', 'accent', 'logo', 'wallpaper']);
   final name = _text(
     _default(f, 'field_name', null),
     'field.field_name',

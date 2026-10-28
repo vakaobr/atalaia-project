@@ -37,7 +37,6 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
   final _staff = TextEditingController();
   var _failover = 'manual';
   var _syncOn = false, _brandingSite = false, _library = true;
-  var _apdSite = false;
   var _remoteGm = false;
   var _atakOn = false, _players = false, _remote = false;
   var _remotePlayers = false;
@@ -57,7 +56,6 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
       _url.text = sync.url;
       _savedKey = sync.apiKey;
       _brandingSite = sync.branding == 'site';
-      _apdSite = sync.apd == 'site';
       _library = sync.library;
       _remoteGm = sync.remoteGm;
     }
@@ -95,7 +93,6 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
         url: _url.text.trim(),
         apiKey: typed.isEmpty ? (_savedKey ?? '') : typed,
         branding: _brandingSite ? 'site' : 'local',
-        apd: _apdSite ? 'site' : 'local',
         library: _library,
         remoteGm: _remoteGm,
       );
@@ -210,12 +207,6 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
               s.t('ctl_site.branding'),
               _brandingSite,
               (v) => _brandingSite = v,
-            ),
-            _switch(
-              'sync-apd',
-              s.t('ctl_site.apd'),
-              _apdSite,
-              (v) => _apdSite = v,
             ),
             _switch(
               'sync-library',

@@ -60,10 +60,16 @@ class ListAndRuleTests(ApdCase):
 
     async def test_the_field_answer_carries_the_rule(self) -> None:
         await self.rule({"register": True, "accepted": ["apd-a"], "custom": [OWN]})
-        answer = await self.pull("/api/v1/sync/field")
+        plain = await self.pull("/api/v1/sync/field")
+        self.assertNotIn("settings", plain)  # unchanged without the query: an older controller checks it strictly
+        self.assertNotIn("apd", plain["field"])
+        answer = await self.pull("/api/v1/sync/field?settings=1")
         sync_format.check_field(json.loads(json.dumps(answer)))
-        self.assertEqual(answer["field"]["apd"]["accepted"], ["apd-a"])
-        self.assertTrue(answer["field"]["apd"]["register"])
+        self.assertEqual(answer["settings"]["apd"]["accepted"], ["apd-a"])
+        self.assertTrue(answer["settings"]["apd"]["register"])
+        await self.rule({})
+        answer = await self.pull("/api/v1/sync/field?settings=1")
+        self.assertEqual(answer["settings"]["apd"], apd_core.default_rule())
 
     async def test_the_games_for_the_app_carry_the_rule(self) -> None:
         await self.rule({"checkin": True})

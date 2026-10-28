@@ -962,5 +962,4 @@ const Map<String, String> zhTwStrings = {
   'site.err.membership_missing': '報名需要填寫這個場地要求的 APD 會員編號。',
   'site.err.apd_not_accepted': '這個場地不接受該 APD。',
   'site.err.membership_expired': '會員在這場遊戲當天已過期。',
-  'ctl_site.apd': '從場地伺服器取得場地的 APD 會員規則',
 };

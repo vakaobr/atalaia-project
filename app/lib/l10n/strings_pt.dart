@@ -1171,6 +1171,4 @@ const Map<String, String> ptStrings = {
   'site.err.apd_not_accepted': 'Este campo não aceita essa APD.',
   'site.err.membership_expired':
       'A filiação já terá caducado no dia deste jogo.',
-  'ctl_site.apd':
-      'Regra de filiação em APD do campo, vinda do servidor do site',
 };

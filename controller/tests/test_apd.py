@@ -14,7 +14,9 @@ import unittest
 from pathlib import Path
 
 from p3support import GM, T0, P3Case, bearer
-from test_sync_branding import FakeSite
+import copy
+
+from test_sync_branding import SETTINGS, FakeSite
 from atalaia_controller.sync_client import SyncClient
 from atalaia_controller import apd, sync_format
 from atalaia_controller.checkin import declared_membership
@@ -202,8 +204,8 @@ class ApdCheckinTests(P3Case):
         rows = r if isinstance(r, list) else r["checkins"]
         self.assertEqual(rows[0]["apd_status"], "valid")
 
-    def test_the_site_rule_overrides_the_console_with_sync_apd_site(self):
-        self.cfg.sync_apd = "site"
+    def test_the_site_rule_overrides_the_console_with_branding_site(self):
+        self.cfg.sync_branding = "site"
         self.svc.set_site_apd(apd.check_rule({"checkin": True, "accepted": ["apd-a"]}))
         self.assertEqual(self.svc.settings()["apd"]["accepted"], ["apd-a"])
         r = self.client.put("/api/v1/checkin/settings", json={"apd": {}}, headers=GM)
@@ -214,21 +216,26 @@ class ApdCheckinTests(P3Case):
 
 
 class SiteRuleTests(P3Case):
-    """With ``[sync] apd = "site"`` the field answer's rule is the controller's, whatever ``[sync] branding`` says."""
+    """With ``[sync] branding = "site"`` the settings of the field answer carry the APD rule (BR24's ``settings``)."""
 
-    cfg_overrides = {"sync_url": "https://site.example.org", "sync_enabled": True, "sync_branding": "local",
-                     "sync_apd": "site"}
+    cfg_overrides = {"sync_url": "https://site.example.org", "sync_enabled": True, "sync_branding": "site"}
 
-    def test_the_pull_sets_the_rule_and_a_rule_dropped_by_the_site_goes(self):
+    def test_the_pull_sets_the_rule_and_an_older_site_server_leaves_it_alone(self):
         site = FakeSite()
-        site.field["apd"] = {"checkin": True, "expiry": True, "accepted": ["apd-a"]}
+        site.settings = copy.deepcopy(SETTINGS)
+        site.settings["apd"] = {"checkin": True, "expiry": True, "accepted": ["apd-a"]}
         sync = SyncClient(self.cfg, self.bundle.store, api_key="k" * 43, transport=site, checkin=self.svc,
                           branding=self.ctrl.branding)
         self.assertTrue(sync.run_once(), sync.last_error)
-        self.assertIn("/api/v1/sync/field", site.gets)
+        self.assertIn("/api/v1/sync/field?settings=1", site.gets)
         self.assertEqual(self.svc.settings()["apd"]["accepted"], ["apd-a"])
         self.assertTrue(self.client.get("/api/v1/checkin").json()["settings"]["apd"]["expiry"])
-        del site.field["apd"]
+        r = self.client.put("/api/v1/checkin/settings", json={"apd": {}}, headers=GM)
+        self.assertEqual(r.status_code, 409, r.text)
+        site.settings = copy.deepcopy(SETTINGS)  # a site server that sends settings without an apd key
+        self.assertTrue(sync.run_once(), sync.last_error)
+        self.assertEqual(self.svc.settings()["apd"]["accepted"], ["apd-a"])
+        site.settings["apd"] = {}  # the site's rule is the default again
         self.assertTrue(sync.run_once(), sync.last_error)
         self.assertEqual(self.svc.settings()["apd"], apd.default_rule())
 
@@ -260,14 +267,19 @@ class RosterFormatTests(unittest.TestCase):
         with self.assertRaises(sync_format.SyncFormatError):
             sync_format.check_roster(bad)
 
-    def test_the_field_answer_carries_a_rule(self):
-        ans = {"sync_version": 1, "field": {"apd": {"checkin": True, "expiry": True}}, "teams": []}
+    def test_the_settings_carry_a_rule_and_the_plain_answer_does_not(self):
+        st = copy.deepcopy(SETTINGS)
+        st["apd"] = {"checkin": True, "expiry": True}
+        ans = {"sync_version": 1, "field": {}, "teams": [], "settings": st}
         out = sync_format.check_field(ans)
-        self.assertEqual(out["field"]["apd"], rule(expiry=True) | {"accepted": None, "register": False,
-                                                                   "custom": []})
-        ans["field"]["apd"] = {"bogus": 1}
+        self.assertEqual(out["settings"]["apd"], rule(expiry=True) | {"accepted": None, "register": False,
+                                                                       "custom": []})
+        st["apd"] = {"bogus": 1}
         with self.assertRaises(sync_format.SyncFormatError):
             sync_format.check_field(ans)
+        plain = {"sync_version": 1, "field": {"apd": {"checkin": True}}, "teams": []}
+        with self.assertRaises(sync_format.SyncFormatError):  # no rule in the branding part
+            sync_format.check_field(plain)
 
 
 if __name__ == "__main__":

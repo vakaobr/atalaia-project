@@ -1141,5 +1141,4 @@ const Map<String, String> enStrings = {
   'site.err.apd_not_accepted': 'This field does not accept that APD.',
   'site.err.membership_expired':
       'The membership has expired by the day of this game.',
-  'ctl_site.apd': 'The field\'s APD membership rule from the site server',
 };

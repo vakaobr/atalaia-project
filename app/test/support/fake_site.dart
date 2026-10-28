@@ -152,6 +152,7 @@ class FakeSite {
       'totals': {'red': 40, 'blue': 40},
     },
   ];
+
   /// The field's APD rule (protocol/apd.md), sent with the field; null: none.
   Map<String, Object?>? apdRule;
   final regs = <String, Map<String, Object?>>{};

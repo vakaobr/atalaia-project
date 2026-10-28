@@ -92,7 +92,7 @@ CHRONO_RETENTION_DAYS = 365
 SITE_LIMITS_SETTING = "checkin.site_limits"  # the limit template the site server sent (BR24), as it sent it
 SETTINGS_KEYS = ("confirm", "federation", "federation_label", "max_replicas", "max_players",
                  "chrono_valid_for", "apd")
-APD_SITE_SETTING = "checkin.apd_site"  # the field's rule, pulled from the site server (sync.apd = "site")
+APD_SITE_SETTING = "checkin.apd_site"  # the field's APD rule from the site server's settings (branding = "site")
 
 
 class Unauthorized(ControllerError):
@@ -388,6 +388,11 @@ class Checkin:
         if spec:
             self.set_settings(spec)
             changed += len(spec)
+        if "apd" in site and self.store.get_setting(APD_SITE_SETTING) != json.dumps(site["apd"], sort_keys=True):
+            self.set_site_apd(site["apd"])  # the field's APD rule (protocol/apd.md); an older site server sends none
+            changed += 1
+            if not spec:
+                self.ctrl._emit({"type": "checkin_settings", "settings": self.settings(), "_staff": True})
         template = site["limit_template"]
         if self.store.get_setting(SITE_LIMITS_SETTING) != json.dumps(template, sort_keys=True):
             self.limits = site_limits(template)
@@ -408,7 +413,7 @@ class Checkin:
                 out.update({k: v for k, v in json.loads(saved).items() if k in SETTINGS_KEYS and k != "apd"})
             except ValueError:
                 pass
-        if self.cfg.sync_apd == "site":
+        if getattr(self.cfg, "sync_branding", "local") == "site":
             raw = self.store.get_setting(APD_SITE_SETTING)
             if raw:
                 try:
@@ -431,7 +436,7 @@ class Checkin:
 
     def set_site_apd(self, rule: Optional[dict[str, Any]]) -> None:
         """The field's APD rule from the site server (None: it sent none)."""
-        self.store.set_setting(APD_SITE_SETTING, json.dumps(rule) if rule is not None else "")
+        self.store.set_setting(APD_SITE_SETTING, json.dumps(rule, sort_keys=True) if rule is not None else "")
 
     def _verdict(self, st: dict[str, Any], apd: Optional[str], number: Optional[str], expires: Optional[str],
                  now: float) -> Optional[str]:
@@ -445,8 +450,9 @@ class Checkin:
         unknown = set(spec) - set(SETTINGS_KEYS)
         if unknown:
             raise ControllerError(f"unknown check-in settings {sorted(unknown)}")
-        if "apd" in spec and self.cfg.sync_apd == "site":
-            raise Conflict("the APD rule is the site server's ([sync] apd = \"site\"): change it there")
+        if "apd" in spec and getattr(self.cfg, "sync_branding", "local") == "site" \
+                and self.store.get_setting(APD_SITE_SETTING):
+            raise Conflict("the APD rule is the site server's ([sync] branding = \"site\"): change it there")
         cur = self.settings()
         local_apd = self._local_apd()
         choices = {"confirm": ("auto", "staff"), "federation": ("off", "optional", "required"),

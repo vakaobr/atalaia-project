@@ -90,8 +90,7 @@ class FieldBrandingTests(AppTestCase):
 
     async def test_branding(self) -> None:
         self.assertEqual(await self.sync_field(), {"sync_version": 1, "teams": [], "field": {
-            "field_name": None, "accent": None, "logo": None, "wallpaper": None,
-            "apd": {"accepted": None, "register": False, "checkin": False, "expiry": False, "custom": []}}})
+            "field_name": None, "accent": None, "logo": None, "wallpaper": None}})
         r = await self.client.patch(self.url("/branding"), json={"accent": "#C0FFEE"}, headers=self.gm)
         self.assertEqual(r.status_code, 403)  # the field's admin only
         r = await self.client.patch(self.url("/branding"), json={"accent": "#C0FFEE", "field_name": "Campo Tejo"},
@@ -131,6 +130,23 @@ class FieldBrandingTests(AppTestCase):
         self.assertEqual((st["federation_label"], st["max_replicas"], st["limit_template"]["id"]), ("BAA", 3, "uk"))
         self.assertEqual(sorted(st["limit_template"]["classes"]), sorted(registration.classes("uk")))
         self.assertNotIn("settings", await self.sync_field())  # still the old shape without the query
+
+    async def test_the_apd_rule_travels_in_the_settings_and_its_change_sends_a_note(self) -> None:
+        """protocol/apd.md: ``settings.apd`` (only with ``?settings=1``), and ``PATCH /fields`` of a rule sends
+        ``field.changed`` like the other settings."""
+        stream = await self.listen()
+        self.assertNotIn("apd", (await self.sync_field())["field"])
+        self.assertEqual((await self.sync_field(settings=True))["settings"]["apd"]["checkin"], False)
+        rule = {"checkin": True, "expiry": True, "accepted": ["apd-a"]}
+        r = await self.client.patch(self.url(), json={"apd": rule}, headers=self.admin)
+        self.assertEqual(r.status_code, 200, r.text)
+        await self.expect_note(stream, "the APD rule")
+        st = (await self.sync_field(settings=True))["settings"]
+        self.assertEqual((st["apd"]["accepted"], st["apd"]["checkin"]), (["apd-a"], True))
+        await self.client.patch(self.url(), json={"apd": rule}, headers=self.admin)  # no change
+        await self.expect_note(stream, "the same rule", notes=0)
+        r = await self.client.patch(self.url(), json={"apd": {"nope": 1}}, headers=self.admin)
+        self.assertEqual((r.status_code, r.json()["detail"]), (400, "apd_rule_invalid"))
 
     async def test_every_limit_template_passes_the_controllers_check(self) -> None:
         from atalaia_controller import checkin  # noqa: PLC0415

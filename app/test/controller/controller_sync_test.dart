@@ -334,7 +334,6 @@ void main() {
 
   ControllerSync client({
     String branding = 'local',
-    String apd = 'local',
     bool library = false,
     String? url,
   }) {
@@ -345,7 +344,6 @@ void main() {
         apiKey: key,
         timeoutS: 10,
         branding: branding,
-        apd: apd,
         library: library,
       ),
       schedule: schedule,
@@ -1164,47 +1162,77 @@ void main() {
   });
 
   group('the APD rule from the site (protocol/apd.md)', () {
-    Map<String, Object?> fieldAnswer(Object? apd) => {
+    // The rule rides the check-in `settings` of BR24 (`?settings=1`), so
+    // `[sync] branding = "site"` is what asks for it.
+    Map<String, Object?> fieldAnswer({Object? apd, bool withApd = true}) => {
       'sync_version': 1,
       'field': {
         'field_name': null,
         'accent': null,
         'logo': null,
         'wallpaper': null,
-        'apd': ?apd,
       },
       'teams': <Object?>[],
+      'settings': {
+        'federation_label': null,
+        'max_replicas': 5,
+        'limit_template': {
+          'id': 'uk',
+          'name': 'UK',
+          'status': 'unverified',
+          'classes': {
+            'rifle': {
+              'max_energy_j': 1.3,
+              'med_m': 0,
+              'fire_mode': 'full_auto',
+            },
+          },
+        },
+        if (withApd) 'apd': apd,
+      },
     };
 
-    test('pulled with [sync] apd = site, alone: the branding stays the '
-        'console\'s, and the console cannot change the rule', () async {
-      site.gets['/api/v1/sync/field'] = fieldAnswer({
-        'accepted': ['apd-a'],
-        'checkin': true,
-        'expiry': true,
-      });
-      final c = client(apd: 'site');
+    Map<String, Object?> put() => {
+      'status': api
+          .handle(
+            'PUT',
+            Uri.parse('/api/v1/checkin/settings'),
+            authorization: 'Bearer g',
+            body: jsonEncode({'apd': ApdRule.defaults.toJson()}),
+            client: 'local',
+          )
+          .status,
+    };
+
+    test('applied with the settings; the console cannot change the rule; '
+        'an older site server leaves it; the site\'s default puts the '
+        'default back', () async {
+      site.gets['/api/v1/sync/field'] = fieldAnswer(
+        apd: {
+          'accepted': ['apd-a'],
+          'checkin': true,
+          'expiry': true,
+        },
+      );
+      final c = client(branding: 'site');
       expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(site.queries['/api/v1/sync/field'], ['settings=1']);
       final rule = checkin.apdRule();
       expect(rule.accepted, ['apd-a']);
       expect((rule.checkin, rule.expiry), (true, true));
-      expect(c.brandingPulledAt, isNull, reason: 'branding is local');
-      final put = api.handle(
-        'PUT',
-        Uri.parse('/api/v1/checkin/settings'),
-        authorization: 'Bearer g',
-        body: jsonEncode({'apd': ApdRule.defaults.toJson()}),
-        client: 'local',
-      );
-      expect(put.status, 409);
-      // The site drops its rule: the default is in force.
-      site.gets['/api/v1/sync/field'] = fieldAnswer(null);
+      expect(put()['status'], 409);
+      // Settings without an apd key (a site server that does not know it).
+      site.gets['/api/v1/sync/field'] = fieldAnswer(withApd: false);
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(checkin.apdRule().accepted, ['apd-a']);
+      // The site's rule is the default again.
+      site.gets['/api/v1/sync/field'] = fieldAnswer(apd: <String, Object?>{});
       expect(await c.runOnce(), isTrue, reason: c.lastError);
       expect(checkin.apdRule(), ApdRule.defaults);
     });
 
-    test('not pulled with apd = local', () async {
-      site.gets['/api/v1/sync/field'] = fieldAnswer({'checkin': true});
+    test('not pulled with local branding', () async {
+      site.gets['/api/v1/sync/field'] = fieldAnswer(apd: {'checkin': true});
       final c = client();
       expect(await c.runOnce(), isTrue, reason: c.lastError);
       expect(site.requests.where((r) => r.$2 == '/api/v1/sync/field'), isEmpty);
@@ -1212,8 +1240,8 @@ void main() {
     });
 
     test('a rule the controller cannot read refuses the answer', () async {
-      site.gets['/api/v1/sync/field'] = fieldAnswer({'checkin': 'yes'});
-      final c = client(apd: 'site');
+      site.gets['/api/v1/sync/field'] = fieldAnswer(apd: {'checkin': 'yes'});
+      final c = client(branding: 'site');
       await c.runOnce();
       expect(checkin.apdRule(), ApdRule.defaults);
     });

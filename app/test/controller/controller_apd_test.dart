@@ -318,7 +318,7 @@ void main() {
 
   test('the site server\'s rule applies, and the console cannot change it', () {
     final gid = newGame();
-    svc.apdSiteManaged = true;
+    svc.siteManaged = true;
     // Nothing from the site yet: the local rule (the default).
     expect(svc.apdRule(), ApdRule.defaults);
     svc.applySiteApd(
@@ -337,7 +337,7 @@ void main() {
     );
     expect(r.status, 409);
     // Not managed any more: the console's own rule (the default) again.
-    svc.apdSiteManaged = false;
+    svc.siteManaged = false;
     expect(svc.apdRule(), ApdRule.defaults);
   });
 

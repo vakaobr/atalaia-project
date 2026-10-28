@@ -776,6 +776,22 @@ class ControllerCheckin {
       setSettings(spec);
       changed += spec.length;
     }
+    if (site.containsKey('apd')) {
+      // The field's APD rule (protocol/apd.md); an older site server sends none.
+      final rule = ApdRule.parse(site['apd']);
+      if (engine.store.getSetting('checkin.apd_site') !=
+          jsonEncode(rule.toJson())) {
+        applySiteApd(rule);
+        changed++;
+        if (spec.isEmpty) {
+          engine.emit({
+            'type': 'checkin_settings',
+            'settings': settings(),
+            '_staff': true,
+          });
+        }
+      }
+    }
     final template = (site['limit_template']! as Map).cast<String, Object?>();
     final encoded = jsonEncode(template);
     if (engine.store.getSetting(_siteLimitsKey) != encoded) {
@@ -822,10 +838,6 @@ class ControllerCheckin {
 
   // --- APD membership (protocol/apd.md) --------------------------------------
 
-  /// `[sync] apd = "site"`: the field's rule comes from the site server
-  /// ([applySiteApd]) and the console cannot change it (409).
-  bool apdSiteManaged = false;
-
   ApdRule _localApd() {
     final saved = engine.store.getSetting('checkin.settings');
     if (saved == null) return ApdRule.defaults;
@@ -839,9 +851,9 @@ class ControllerCheckin {
 
   /// The rule in force: the site's when managed there, else the console's.
   ApdRule apdRule() {
-    if (apdSiteManaged) {
+    if (_siteManaged) {
       final raw = engine.store.getSetting('checkin.apd_site');
-      if (raw != null) {
+      if (raw != null && raw != 'null') {
         try {
           return ApdRule.parse(jsonDecode(raw));
         } on Object {
@@ -970,10 +982,11 @@ class ControllerCheckin {
     };
     ApdRule? apd;
     if (spec.containsKey('apd')) {
-      if (apdSiteManaged) {
+      final site = engine.store.getSetting('checkin.apd_site');
+      if (_siteManaged && site != null && site != 'null') {
         throw ControllerError.conflict(
           "the field's APD rule comes from the site server (the sync's "
-          'apd is "site"): change it there',
+          'branding is "site"): change it there',
         );
       }
       try {

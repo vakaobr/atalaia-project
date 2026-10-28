@@ -55,7 +55,6 @@ import 'package:crypto/crypto.dart';
 
 import '../chrono/reading.dart' show newUuid;
 import '../modes/mode_catalog.dart' show ModeException;
-import '../protocol/apd.dart';
 import 'controller_branding.dart';
 import 'controller_engine.dart';
 import 'controller_images.dart';
@@ -143,7 +142,6 @@ class SyncConfig {
     this.intervalIdleS = 300,
     this.timeoutS = 15,
     this.branding = 'local',
-    this.apd = 'local',
     this.library = true,
     this.remoteGm = false,
     this.caPem,
@@ -160,10 +158,6 @@ class SyncConfig {
 
   /// "local" (the console's branding) or "site" (the site server's).
   final String branding;
-
-  /// "local" (the console's APD rule) or "site" (the site server's, from
-  /// the field answer; protocol/apd.md).
-  final String apd;
 
   /// Pull the field's scenarios and game presets.
   final bool library;
@@ -185,7 +179,6 @@ class SyncConfig {
     if (branding != 'local' && branding != 'site') {
       return "branding: 'local' or 'site'";
     }
-    if (apd != 'local' && apd != 'site') return "apd: 'local' or 'site'";
     if (intervalGameS < 5 || intervalIdleS < intervalGameS) {
       return 'intervals: at least 5 s while a game runs, and no less between games';
     }
@@ -199,7 +192,6 @@ class SyncConfig {
     'interval_idle_s': intervalIdleS,
     'timeout_s': timeoutS,
     'branding': branding,
-    'apd': apd,
     'library': library,
     'remote_gm': remoteGm,
     if (caPem != null) 'ca_pem': caPem,
@@ -217,7 +209,6 @@ class SyncConfig {
       intervalIdleS: n(j['interval_idle_s'], 300),
       timeoutS: n(j['timeout_s'], 15),
       branding: j['branding'] == 'site' ? 'site' : 'local',
-      apd: j['apd'] == 'site' ? 'site' : 'local',
       library: j['library'] != false,
       remoteGm: j['remote_gm'] == true,
       caPem: j['ca_pem'] as String?,
@@ -1166,9 +1157,7 @@ class ControllerSync {
 
   Future<void> _siteBranding() async {
     final branding = engine.branding;
-    final withBranding = config.branding == 'site' && branding != null;
-    final withApd = config.apd == 'site' && engine.checkin != null;
-    if (!withBranding && !withApd) return;
+    if (config.branding != 'site' || branding == null) return;
     pulls++;
     Map<String, Object?> answer;
     try {
@@ -1190,12 +1179,6 @@ class ControllerSync {
     } on SyncFormatError catch (e) {
       throw SyncError('bad_answer', detail: '$e');
     }
-    if (withApd) {
-      // The field's own rule, or the default when the site has none set.
-      final rule = (answer['field']! as Map)['apd'];
-      engine.checkin!.applySiteApd(ApdRule.parse(rule));
-    }
-    if (!withBranding) return;
     final wanted = <String, (String, Map<String, Object?>)>{};
     final field = answer['field']! as Map;
     for (final slot in const ['logo', 'wallpaper']) {
@@ -1623,7 +1606,6 @@ class ControllerSync {
         },
       },
       'branding': {
-        'apd': config.apd,
         'source': config.branding,
         'supported': brandingSupported,
         'pulled_at': brandingPulledAt,

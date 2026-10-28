@@ -1200,5 +1200,4 @@ const Map<String, String> deStrings = {
   'site.err.apd_not_accepted': 'Dieses Feld akzeptiert diese APD nicht.',
   'site.err.membership_expired':
       'Die Mitgliedschaft ist am Tag dieses Spiels abgelaufen.',
-  'ctl_site.apd': 'Die APD-Regel des Felds vom Site-Server',
 };
