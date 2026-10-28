@@ -31,6 +31,7 @@ import 'platform/links.dart';
 import 'player/field_feed.dart';
 import 'pod/pod_transports.dart';
 import 'site/site_api.dart';
+import 'site/site_auth.dart';
 import 'site/site_client.dart';
 import 'site/site_link.dart';
 import 'site/site_screens.dart';
@@ -75,6 +76,8 @@ class AppServices {
     BrandingSourceFor? brandingSource,
     SiteHttp Function(Uri origin)? siteHttp,
     this.links,
+    this.authBrowser,
+    this.passkeys,
     this.share,
     this.wifi,
     ControllerLauncher? controllerLauncher,
@@ -116,6 +119,8 @@ class AppServices {
         location: ChannelLocationService(),
         beacons: ChannelBeaconScanService(),
         links: ChannelAppLinks(),
+        authBrowser: ChannelAuthBrowser(),
+        passkeys: ChannelPasskeyService(),
         share: ChannelFileSharer(),
         wifi: ChannelFieldWifi(),
       );
@@ -167,6 +172,22 @@ class AppServices {
   final SiteSessions sites;
   final TicketStore tickets;
   final AppLinks? links;
+
+  /// Logging in without a password (decision PKA-1): the system browser for
+  /// a social login, passkeys through the Credential Manager (null: not
+  /// available), and the returns from the browser the link handler gives.
+  final AuthBrowser? authBrowser;
+  final PasskeyService? passkeys;
+  final authReturns = AuthReturns();
+
+  /// The login methods of [session]'s site, with this phone's browser and
+  /// passkeys.
+  SiteAuth authOf(SiteSession session) => SiteAuth(
+    session,
+    browser: authBrowser,
+    passkeys: passkeys,
+    returns: authReturns,
+  );
 
   /// The share sheet, for a replica's QR label as a PNG (null: none).
   final FileSharer? share;
@@ -251,6 +272,11 @@ class _AtalaiaAppState extends State<AtalaiaApp> {
   /// A link to a field's games (`atalaia://register?...`): its screen on
   /// top of whatever is open; anything else is ignored.
   void _open(String text) {
+    final back = OidcReturn.parse(text);
+    if (back != null) {
+      widget.services.authReturns.add(back); // whoever waits for it
+      return;
+    }
     final link = SiteGameLink.parse(text);
     final nav = _navigator.currentState;
     if (link == null || nav == null) return;

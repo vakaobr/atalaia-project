@@ -15,7 +15,8 @@ import io.flutter.embedding.engine.FlutterEngineCache
  * channels.dart, lib/pod/pod_transports.dart), and forwards the activity
  * events they need: resume and pause (NFC reader mode), permission answers
  * and activity results (the QR scanner), and links that open the app
- * (LinkPlugin: the site server's register page, decision S16-13).
+ * (LinkPlugin: the site server's register page, decision S16-13, and a
+ * social login's return, decision PKA-1).
  *
  * While the foreground service runs (a prop's game, a player sharing their
  * position, the phone being the field controller), the Flutter engine, and
@@ -59,6 +60,8 @@ class MainActivity : FlutterActivity() {
         KeystorePlugin(messenger)
         links = LinkPlugin(messenger, intent)
         ShareFilePlugin(this, messenger)
+        BrowserPlugin(this, messenger)
+        PasskeyPlugin(this, messenger)
         // The pod's links and the local hotspot belong to the engine: an
         // engine an earlier activity left running keeps the ones it has, so
         // a controller's or a prop's pod stays linked (decision PE24-64).

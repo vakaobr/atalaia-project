@@ -274,6 +274,11 @@ class SiteSession {
     _expires = _now().add(Duration(seconds: s > 60 ? s - 30 : s));
   }
 
+  /// A session that another way of logging in gave (a social login's ticket
+  /// or a passkey, lib/site/site_auth.dart): the same answer as a password
+  /// login's. Returns the user name.
+  Future<String> adopt(SiteResponse r) => _start(r, username ?? '');
+
   /// A new access token from the stored refresh token; one at a time.
   Future<void> refresh() =>
       _refreshing ??= _refresh().whenComplete(() => _refreshing = null);

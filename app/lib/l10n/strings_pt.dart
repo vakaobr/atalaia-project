@@ -1180,4 +1180,167 @@ const Map<String, String> ptStrings = {
   // The remote GM may see shared positions (PKD-5)
   'player.share_remote_gm':
       'Se o campo tiver um GM remoto com sessão iniciada no servidor do site, o GM remoto também vê a tua posição enquanto a partilhares. O servidor do site não a guarda.',
+  // The account's login methods and the login without a password (PKA-1);
+  // the texts are the site server's own (staff_i18n.py) where the same.
+  'acct.passkey_cancelled':
+      'A chave de acesso não foi usada (pedido cancelado ou expirado).',
+  'acct.passkey_failed': 'Não foi possível entrar com a chave de acesso.',
+  'acct.passkey_none': 'Esta conta não tem chaves de acesso.',
+  'acct.oidc.state_invalid':
+      'Este pedido de entrada expirou ou não foi feito por esta app. Tentar de novo.',
+  'acct.oidc.denied': 'A entrada foi recusada no fornecedor.',
+  'acct.oidc.consent_required':
+      'Para criar uma conta nova, marcar primeiro a autorização acima.',
+  'acct.oidc.too_many_attempts':
+      'Demasiadas contas novas a partir deste endereço. Tentar mais tarde.',
+  'acct.oidc.quota_exceeded':
+      'Este campo chegou ao limite de contas. Falar com a organização do campo.',
+  'acct.oidc.id_token_invalid':
+      'A resposta do fornecedor não foi aceite. Tentar de novo.',
+  'acct.oidc.token_exchange_failed':
+      'O fornecedor recusou o pedido. Tentar de novo.',
+  'acct.oidc.provider_unreachable':
+      'Sem ligação ao fornecedor. Tentar de novo dentro de momentos.',
+  'acct.oidc.try_again': 'Tentar de novo.',
+  'acct.oidc.other': 'Não foi possível entrar com o fornecedor.',
+  'acct.title': 'Formas de entrar',
+  'acct.intro':
+      'As formas de entrar nesta conta: palavra-passe, Google, Microsoft ou Apple, chaves de acesso e o código TOTP. Cada alteração fica no registo de auditoria do servidor.',
+  'acct.confirm_title': 'Confirmar que é esta conta',
+  'acct.confirm_password': 'Palavra-passe atual',
+  'acct.confirm_password_hint':
+      'As alterações abaixo pedem a palavra-passe atual. Escrevê-la aqui antes de as fazer.',
+  'acct.confirm_recent':
+      'Esta conta não tem palavra-passe: as alterações pedem uma confirmação feita nos últimos 10 minutos (entrar também conta). Confirmar com uma das formas abaixo e repetir a ação.',
+  'acct.confirm_with': 'Confirmar com {provider}',
+  'acct.confirmed': 'Confirmado. Repetir a ação.',
+  'acct.reauthed': 'Confirmado com o fornecedor. Repetir a ação.',
+  'acct.providers_title': 'Google, Microsoft e Apple',
+  'acct.providers_none': 'Nenhum login ligado a esta conta.',
+  'acct.providers_off':
+      'Este servidor não tem entrada com Google, Microsoft ou Apple.',
+  'acct.provider_linked_at': 'ligado em {when}',
+  'acct.provider_last_login': 'última entrada {when}',
+  'acct.link': 'Ligar {provider}',
+  'acct.unlink': 'Desligar',
+  'acct.unlink_confirm': 'Desligar {provider} desta conta?',
+  'acct.linked': 'Login ligado à conta.',
+  'acct.unlinked': 'Login desligado.',
+  'acct.passkeys_title': 'Chaves de acesso',
+  'acct.passkeys_intro':
+      'Uma chave de acesso entra sem palavra-passe nem código e conta como segundo fator para as funções de administração, GM e marshal.',
+  'acct.passkeys_none': 'Sem chaves de acesso.',
+  'acct.passkey_name': 'Nome da nova chave de acesso',
+  'acct.passkey_add': 'Adicionar chave de acesso',
+  'acct.passkey_added': 'Chave de acesso adicionada.',
+  'acct.passkey_unsupported':
+      'Este telemóvel não suporta chaves de acesso (precisa do Android 14 ou mais recente).',
+  'acct.passkey_synced': 'sincronizada',
+  'acct.passkey_device': 'só neste dispositivo',
+  'acct.passkey_created': 'criada {when}',
+  'acct.passkey_used': 'usada {when}',
+  'acct.passkey_unused': 'nunca usada',
+  'acct.rename': 'Mudar o nome',
+  'acct.passkey_rename_label': 'Novo nome da chave de acesso',
+  'acct.passkey_renamed': 'Nome guardado.',
+  'acct.passkey_remove': 'Remover',
+  'acct.passkey_remove_confirm': 'Remover a chave de acesso {name}?',
+  'acct.passkey_removed': 'Chave de acesso removida.',
+  'acct.pw_title': 'Palavra-passe',
+  'acct.pw_state_set': 'Esta conta tem palavra-passe.',
+  'acct.pw_state_none': 'Esta conta não tem palavra-passe.',
+  'acct.pw_off':
+      'Neste servidor a entrada com palavra-passe está desligada: não se pode definir nem mudar uma.',
+  'acct.pw_new': 'Nova palavra-passe',
+  'acct.pw_set_button': 'Definir palavra-passe',
+  'acct.pw_change_button': 'Mudar palavra-passe',
+  'acct.pw_changed':
+      'Palavra-passe guardada. As outras sessões desta conta terminaram.',
+  'acct.pw_remove': 'Entrar sem palavra-passe',
+  'acct.pw_remove_confirm': 'Remover a palavra-passe desta conta?',
+  'acct.pw_removed': 'Palavra-passe removida.',
+  'acct.totp_title': 'Código TOTP',
+  'acct.totp_on': 'O TOTP está ativo nesta conta.',
+  'acct.totp_off': 'O TOTP não está ativo nesta conta.',
+  'acct.totp_enable': 'Ativar TOTP',
+  'acct.totp_enrol_intro':
+      'Juntar este segredo à app de autenticação ({digits} algarismos, um código novo a cada {s} s) e escrever abaixo o código que a app mostra.',
+  'acct.totp_secret': 'Segredo',
+  'acct.totp_uri': 'Endereço otpauth (para apps que o aceitam)',
+  'acct.totp_confirm': 'Ativar com este código',
+  'acct.totp_enabled': 'TOTP ativado.',
+  'acct.totp_disable_intro':
+      'Para desativar: o código atual da app, mais a palavra-passe acima se a conta a tiver.',
+  'acct.totp_disable': 'Desativar TOTP',
+  'acct.totp_disabled': 'TOTP desativado.',
+  'acct.oidc.already_linked': 'Esta conta já tem esse login ligado.',
+  'acct.oidc.identity_taken': 'Esse login já está ligado a outra conta.',
+  'acct.oidc.provider_already_linked':
+      'Esta conta já tem um login deste fornecedor. Desligar primeiro o que existe.',
+  'acct.oidc.identity_mismatch':
+      'Esse não é o login ligado a esta conta. Usar a mesma conta do fornecedor.',
+  'acct.e.last_login_method':
+      'Essa é a última forma de entrar nesta conta: acrescentar primeiro outra.',
+  'acct.e.second_factor_required_by_role':
+      'Uma função desta conta precisa de segundo fator (TOTP ou chave de acesso): ficar com pelo menos um.',
+  'acct.e.totp_required_by_role':
+      'Uma função desta conta precisa de segundo fator: adicionar primeiro uma chave de acesso.',
+  'acct.e.password_login_disabled':
+      'Neste servidor a entrada com palavra-passe está desligada: não se pode definir nem mudar uma.',
+  'acct.e.confirmation_required':
+      'Confirmar primeiro que é esta conta (ver a confirmação acima) e repetir a ação.',
+  'acct.e.invalid_password': 'Palavra-passe errada.',
+  'acct.e.invalid_code': 'Código errado.',
+  'acct.e.no_password': 'Esta conta não tem palavra-passe.',
+  'acct.e.identity_not_found': 'Esse login não está ligado a esta conta.',
+  'acct.e.passkey_not_found': 'Essa chave de acesso já não existe.',
+  'acct.e.too_many_passkeys':
+      'Chaves de acesso a mais nesta conta. Remover uma primeiro.',
+  'acct.e.passkey_exists': 'Esta chave de acesso já está registada.',
+  'acct.e.passkey_invalid': 'O servidor não aceitou esta chave de acesso.',
+  'acct.e.invalid_passkey': 'A chave de acesso não foi aceite.',
+  'acct.e.invalid_challenge':
+      'O pedido da chave de acesso expirou. Tentar de novo.',
+  'acct.e.name_invalid': 'Esse nome não é válido.',
+  'acct.e.totp_already_enabled': 'O TOTP já está ativo.',
+  'acct.e.totp_not_pending': 'Começar primeiro a ativação do TOTP.',
+  'acct.e.totp_not_enabled': 'O TOTP não está ativo.',
+  'acct.e.no_passkey': 'Esta conta não tem chaves de acesso.',
+  'acct.e.password_too_short': 'A palavra-passe é curta demais.',
+  'acct.e.password_too_long': 'A palavra-passe é longa demais.',
+  'acct.e.password_is_username':
+      'A palavra-passe não pode ser igual ao nome da conta.',
+  'acct.e.password_breached':
+      'Esta palavra-passe consta de fugas de dados conhecidas. Escolher outra.',
+  'acct.e.provider_not_configured': 'Este servidor não tem esse login.',
+  'acct.browser_unavailable':
+      'Não foi possível abrir o navegador do telemóvel.',
+  'acct.oidc.cancelled': 'A entrada foi cancelada.',
+  'acct.oidc.browser_unavailable':
+      'Não foi possível abrir o navegador do telemóvel, ou este servidor não aceita a entrada pela app.',
+  'acct.waiting': 'À espera de {provider} no navegador…',
+  'acct.waiting_cancel': 'Cancelar',
+  'acct.open': 'Formas de entrar na conta',
+  'acct.confirm_passkey': 'Confirmar com chave de acesso',
+  'acct.confirm_code': 'Código TOTP',
+  'acct.confirm_code_button': 'Confirmar com o código',
+  'acct.passkey_name_hint': 'Nome da nova chave de acesso (opcional)',
+  'acct.passkey_here':
+      'A chave de acesso fica no gestor de chaves do telemóvel.',
+  'acct.code': 'Código da app de autenticação',
+  'acct.save': 'Guardar',
+  'acct.cancel': 'Cancelar',
+  'acct.remove_confirm_yes': 'Remover',
+  'acct.unlink_yes': 'Desligar',
+  'acct.pw_remove_yes': 'Remover',
+  'acct.copy': 'Copiar',
+  'acct.error_generic': 'Não foi possível: {error}',
+  'site.login_or': 'ou',
+  'site.login_with': 'Entrar com {provider}',
+  'site.login_passkey': 'Entrar com uma chave de acesso',
+  'site.login_consent':
+      'Se esta for a primeira entrada, autorizo criar uma conta nova (só se guarda o identificador que o fornecedor dá; ver o aviso de privacidade do campo).',
+  'site.login_waiting': 'À espera da entrada no navegador…',
+  'site.login_waiting_cancel': 'Cancelar',
+  'site.account': 'Formas de entrar na conta',
 };

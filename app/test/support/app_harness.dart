@@ -42,6 +42,8 @@ class Harness {
     this.brandingSource,
     this.siteHttp,
     this.links,
+    this.authBrowser,
+    this.passkeys,
     this.share,
     this.location,
     this.beacons,
@@ -69,6 +71,8 @@ class Harness {
   /// A fake site server (test/support/fake_site.dart); none: offline.
   final SiteHttp Function(Uri origin)? siteHttp;
   final AppLinks? links;
+  final AuthBrowser? authBrowser;
+  final PasskeyService? passkeys;
   final FileSharer? share;
 
   /// A fake field controller for check-in (test/support/fake_field.dart).
@@ -107,6 +111,8 @@ class Harness {
     brandingSource: brandingSource ?? (_, _) => const _NoBranding(),
     siteHttp: siteHttp ?? (_) => const _NoSite(),
     links: links,
+    authBrowser: authBrowser,
+    passkeys: passkeys,
     share: share,
     location: location,
     beacons: beacons,
@@ -179,6 +185,8 @@ Harness harness({
   BrandingSourceFor? brandingSource,
   SiteHttp Function(Uri origin)? siteHttp,
   AppLinks? links,
+  AuthBrowser? authBrowser,
+  PasskeyService? passkeys,
   FileSharer? share,
   LocationService? location,
   BeaconScanService? beacons,
@@ -195,6 +203,8 @@ Harness harness({
   brandingSource: brandingSource,
   siteHttp: siteHttp,
   links: links,
+  authBrowser: authBrowser,
+  passkeys: passkeys,
   share: share,
   location: location,
   beacons: beacons,

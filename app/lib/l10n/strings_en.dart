@@ -1151,4 +1151,162 @@ const Map<String, String> enStrings = {
   // The remote GM may see shared positions (PKD-5)
   'player.share_remote_gm':
       'If the field has a remote GM signed in on the site server, the remote GM sees your position too while you share it. The site server does not keep it.',
+  // The account's login methods and the login without a password (PKA-1);
+  // the texts are the site server's own (staff_i18n.py) where the same.
+  'acct.passkey_cancelled':
+      'The passkey was not used (the request was cancelled or timed out).',
+  'acct.passkey_failed': 'Could not log in with the passkey.',
+  'acct.passkey_none': 'This account has no passkeys.',
+  'acct.oidc.state_invalid':
+      'This login request expired or was not made by this app. Try again.',
+  'acct.oidc.denied': 'The login was refused at the provider.',
+  'acct.oidc.consent_required':
+      'To make a new account, tick the agreement above first.',
+  'acct.oidc.too_many_attempts':
+      'Too many new accounts from this address. Try again later.',
+  'acct.oidc.quota_exceeded':
+      'This field has reached its limit of accounts. Talk to the field\'s staff.',
+  'acct.oidc.id_token_invalid':
+      'The provider\'s answer was not accepted. Try again.',
+  'acct.oidc.token_exchange_failed':
+      'The provider refused the request. Try again.',
+  'acct.oidc.provider_unreachable':
+      'Could not reach the provider. Try again in a moment.',
+  'acct.oidc.try_again': 'Try again.',
+  'acct.oidc.other': 'Could not log in with the provider.',
+  'acct.title': 'Ways to log in',
+  'acct.intro':
+      'The ways to log in to this account: password, Google, Microsoft or Apple, passkeys and the TOTP code. Every change is recorded in the server\'s audit log.',
+  'acct.confirm_title': 'Confirm it is you',
+  'acct.confirm_password': 'Current password',
+  'acct.confirm_password_hint':
+      'The changes below ask for the current password. Type it here before making them.',
+  'acct.confirm_recent':
+      'This account has no password: the changes ask for a confirmation made in the last 10 minutes (logging in counts too). Confirm with one of the ways below, then repeat the action.',
+  'acct.confirm_with': 'Confirm with {provider}',
+  'acct.confirmed': 'Confirmed. Repeat the action.',
+  'acct.reauthed': 'Confirmed with the provider. Repeat the action.',
+  'acct.providers_title': 'Google, Microsoft and Apple',
+  'acct.providers_none': 'No login is linked to this account.',
+  'acct.providers_off': 'This server has no Google, Microsoft or Apple login.',
+  'acct.provider_linked_at': 'linked {when}',
+  'acct.provider_last_login': 'last login {when}',
+  'acct.link': 'Link {provider}',
+  'acct.unlink': 'Unlink',
+  'acct.unlink_confirm': 'Unlink {provider} from this account?',
+  'acct.linked': 'Login linked to the account.',
+  'acct.unlinked': 'Login unlinked.',
+  'acct.passkeys_title': 'Passkeys',
+  'acct.passkeys_intro':
+      'A passkey logs in with no password and no code, and counts as the second factor for the admin, GM and marshal roles.',
+  'acct.passkeys_none': 'No passkeys.',
+  'acct.passkey_name': 'Name of the new passkey',
+  'acct.passkey_add': 'Add a passkey',
+  'acct.passkey_added': 'Passkey added.',
+  'acct.passkey_unsupported':
+      'This phone does not support passkeys (it needs Android 14 or newer).',
+  'acct.passkey_synced': 'synced',
+  'acct.passkey_device': 'this device only',
+  'acct.passkey_created': 'created {when}',
+  'acct.passkey_used': 'used {when}',
+  'acct.passkey_unused': 'never used',
+  'acct.rename': 'Rename',
+  'acct.passkey_rename_label': 'New name of the passkey',
+  'acct.passkey_renamed': 'Name saved.',
+  'acct.passkey_remove': 'Remove',
+  'acct.passkey_remove_confirm': 'Remove the passkey {name}?',
+  'acct.passkey_removed': 'Passkey removed.',
+  'acct.pw_title': 'Password',
+  'acct.pw_state_set': 'This account has a password.',
+  'acct.pw_state_none': 'This account has no password.',
+  'acct.pw_off':
+      'Password login is turned off on this server: a password cannot be set or changed.',
+  'acct.pw_new': 'New password',
+  'acct.pw_set_button': 'Set a password',
+  'acct.pw_change_button': 'Change the password',
+  'acct.pw_changed': 'Password saved. The account\'s other sessions ended.',
+  'acct.pw_remove': 'Log in without a password',
+  'acct.pw_remove_confirm': 'Remove this account\'s password?',
+  'acct.pw_removed': 'Password removed.',
+  'acct.totp_title': 'TOTP code',
+  'acct.totp_on': 'TOTP is on for this account.',
+  'acct.totp_off': 'TOTP is not on for this account.',
+  'acct.totp_enable': 'Turn TOTP on',
+  'acct.totp_enrol_intro':
+      'Add this secret to the authenticator app ({digits} digits, a new code every {s} s) and type the code the app shows below.',
+  'acct.totp_secret': 'Secret',
+  'acct.totp_uri': 'otpauth address (for apps that take one)',
+  'acct.totp_confirm': 'Turn on with this code',
+  'acct.totp_enabled': 'TOTP turned on.',
+  'acct.totp_disable_intro':
+      'To turn it off: the app\'s current code, plus the password above if the account has one.',
+  'acct.totp_disable': 'Turn TOTP off',
+  'acct.totp_disabled': 'TOTP turned off.',
+  'acct.oidc.already_linked': 'This account already has that login linked.',
+  'acct.oidc.identity_taken':
+      'That login is already linked to another account.',
+  'acct.oidc.provider_already_linked':
+      'This account already has a login from that provider. Unlink the existing one first.',
+  'acct.oidc.identity_mismatch':
+      'That is not the login linked to this account. Use the same provider account.',
+  'acct.e.last_login_method':
+      'That is the account\'s last way to log in: add another one first.',
+  'acct.e.second_factor_required_by_role':
+      'A role on this account needs a second factor (TOTP or a passkey): keep at least one.',
+  'acct.e.totp_required_by_role':
+      'A role on this account needs a second factor: add a passkey before turning TOTP off.',
+  'acct.e.password_login_disabled':
+      'Password login is turned off on this server, so a password cannot be set or changed.',
+  'acct.e.confirmation_required':
+      'Confirm it is you first (see the confirmation above), then repeat the action.',
+  'acct.e.invalid_password': 'Wrong password.',
+  'acct.e.invalid_code': 'Wrong code.',
+  'acct.e.no_password': 'This account has no password.',
+  'acct.e.identity_not_found': 'That login is not linked to this account.',
+  'acct.e.passkey_not_found': 'That passkey no longer exists.',
+  'acct.e.too_many_passkeys':
+      'Too many passkeys on this account. Remove one first.',
+  'acct.e.passkey_exists': 'This passkey is already registered.',
+  'acct.e.passkey_invalid': 'The server did not accept this passkey.',
+  'acct.e.invalid_passkey': 'The passkey was not accepted.',
+  'acct.e.invalid_challenge': 'The passkey request expired. Try again.',
+  'acct.e.name_invalid': 'That name is not valid.',
+  'acct.e.totp_already_enabled': 'TOTP is already on.',
+  'acct.e.totp_not_pending': 'Start turning TOTP on first.',
+  'acct.e.totp_not_enabled': 'TOTP is not on.',
+  'acct.e.no_passkey': 'This account has no passkeys.',
+  'acct.e.password_too_short': 'The password is too short.',
+  'acct.e.password_too_long': 'The password is too long.',
+  'acct.e.password_is_username': 'The password cannot be the account name.',
+  'acct.e.password_breached':
+      'This password appears in known data breaches. Choose another.',
+  'acct.e.provider_not_configured': 'This server does not offer that login.',
+  'acct.browser_unavailable': 'Could not open the phone\'s browser.',
+  'acct.oidc.cancelled': 'The login was cancelled.',
+  'acct.oidc.browser_unavailable':
+      'Could not open the phone\'s browser, or this server does not take a login through the app.',
+  'acct.waiting': 'Waiting for {provider} in the browser…',
+  'acct.waiting_cancel': 'Cancel',
+  'acct.open': 'Ways to log in to the account',
+  'acct.confirm_passkey': 'Confirm with a passkey',
+  'acct.confirm_code': 'TOTP code',
+  'acct.confirm_code_button': 'Confirm with the code',
+  'acct.passkey_name_hint': 'Name of the new passkey (optional)',
+  'acct.passkey_here': 'The passkey is kept by the phone\'s password manager.',
+  'acct.code': 'Code from the authenticator app',
+  'acct.save': 'Save',
+  'acct.cancel': 'Cancel',
+  'acct.remove_confirm_yes': 'Remove',
+  'acct.unlink_yes': 'Unlink',
+  'acct.pw_remove_yes': 'Remove',
+  'acct.copy': 'Copy',
+  'acct.error_generic': 'That did not work: {error}',
+  'site.login_or': 'or',
+  'site.login_with': 'Log in with {provider}',
+  'site.login_passkey': 'Log in with a passkey',
+  'site.login_consent':
+      'If this is a first login, I agree to a new account being made (only the identifier the provider gives is kept; see the field\'s privacy notice).',
+  'site.login_waiting': 'Waiting for the login in the browser…',
+  'site.login_waiting_cancel': 'Cancel',
+  'site.account': 'Ways to log in to the account',
 };

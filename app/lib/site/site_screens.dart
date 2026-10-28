@@ -27,8 +27,10 @@ import '../l10n/strings.dart';
 import '../ui/code_kind.dart';
 import '../ui/qr_painter.dart';
 import '../ui/widgets.dart';
+import 'account_screen.dart';
 import 'history_screens.dart';
 import 'site_api.dart';
+import 'site_auth.dart';
 import 'site_client.dart';
 import 'site_link.dart';
 
@@ -45,7 +47,7 @@ String siteMoment(DateTime t) {
   return '${two(l.day)}/${two(l.month)}/${l.year} ${two(l.hour)}:${two(l.minute)}';
 }
 
-enum _Step { address, confirm, login, totp, busy, field }
+enum _Step { address, confirm, login, totp, busy, waiting, field }
 
 class SiteScreen extends StatefulWidget {
   const SiteScreen({this.link, super.key});
@@ -71,6 +73,13 @@ class _SiteScreenState extends State<SiteScreen> {
   String? _error;
   bool _openedGame = false;
 
+  /// What the site offers besides the password, and whether this phone can
+  /// use passkeys (decision PKA-1); read when the login is shown.
+  AuthMethods _methods = AuthMethods.passwordOnly;
+  bool _passkeys = false;
+  bool _consent = false;
+  PendingReturn? _waiting;
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +90,7 @@ class _SiteScreenState extends State<SiteScreen> {
 
   @override
   void dispose() {
+    _waiting?.cancel();
     _address.dispose();
     _user.dispose();
     _password.dispose();
@@ -90,6 +100,7 @@ class _SiteScreenState extends State<SiteScreen> {
 
   void _fail(SiteException e, _Step back) {
     if (!mounted) return;
+    if (e.loginRequired || back == _Step.login) unawaited(_loadMethods());
     setState(() {
       _error = siteError(context.s, e);
       _step = e.loginRequired ? _Step.login : back;
@@ -125,6 +136,7 @@ class _SiteScreenState extends State<SiteScreen> {
   Future<void> _load() async {
     final session = _session!;
     if (!await session.hasAccount) {
+      await _loadMethods();
       if (mounted) setState(() => _step = _Step.login);
       return;
     }
@@ -152,6 +164,64 @@ class _SiteScreenState extends State<SiteScreen> {
       _fail(e, _Step.login);
     }
   }
+
+  /// What the site offers to log in with; the password alone when it does
+  /// not say (an older server, or out of reach).
+  Future<void> _loadMethods() async {
+    final auth = context.services.authOf(_session!);
+    var methods = AuthMethods.passwordOnly;
+    try {
+      methods = await auth.methods();
+    } on SiteException {
+      // the password form stays
+    }
+    final passkeys = methods.passkeys && await auth.passkeysAvailable();
+    if (mounted) {
+      setState(() {
+        _methods = methods;
+        _passkeys = passkeys;
+      });
+    }
+  }
+
+  /// A social login or a passkey: ends in a session like the password does.
+  Future<void> _signInWith(Future<String?> Function(SiteAuth auth) how) async {
+    final auth = context.services.authOf(_session!);
+    setState(() {
+      _step = _Step.busy;
+      _error = null;
+    });
+    try {
+      await how(auth);
+      await _load();
+    } on SiteException catch (e) {
+      _fail(e, _Step.login);
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = accountError(context.s, e);
+        _step = _Step.login;
+      });
+    } finally {
+      _waiting = null;
+    }
+  }
+
+  Future<void> _signInOidc(String provider) => _signInWith(
+    (auth) => auth.oidc(
+      provider,
+      consent: _consent,
+      onOpened: (w) {
+        if (!mounted) return;
+        setState(() {
+          _waiting = w;
+          _step = _Step.waiting;
+        });
+      },
+    ),
+  );
+
+  Future<void> _signInPasskey() => _signInWith((a) => a.passkeyLogin());
 
   Future<void> _login() async {
     final user = _user.text.trim();
@@ -230,26 +300,50 @@ class _SiteScreenState extends State<SiteScreen> {
             ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: Column(
         children: [
+          // Outside the list: a refusal stays in view wherever the person
+          // has scrolled to (the login has several buttons).
           if (_error != null)
-            Notice(
-              _error!,
-              kind: NoticeKind.error,
-              key: const Key('site-error'),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Notice(
+                _error!,
+                kind: NoticeKind.error,
+                key: const Key('site-error'),
+              ),
             ),
-          ...switch (_step) {
-            _Step.address => _addressStep(s),
-            _Step.confirm => _confirmStep(s),
-            _Step.login => _loginStep(s),
-            _Step.totp => _totpStep(s),
-            _Step.busy => [
-              const SizedBox(height: 24),
-              const Center(child: CircularProgressIndicator()),
-            ],
-            _Step.field => _fieldStep(s),
-          },
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                ...switch (_step) {
+                  _Step.address => _addressStep(s),
+                  _Step.confirm => _confirmStep(s),
+                  _Step.login => _loginStep(s),
+                  _Step.totp => _totpStep(s),
+                  _Step.busy => [
+                    const SizedBox(height: 24),
+                    const Center(child: CircularProgressIndicator()),
+                  ],
+                  _Step.waiting => [
+                    const SizedBox(height: 24),
+                    Text(
+                      s.t('site.login_waiting'),
+                      key: const Key('site-waiting'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      key: const Key('site-waiting-cancel'),
+                      onPressed: () => _waiting?.cancel(),
+                      child: Text(s.t('site.login_waiting_cancel')),
+                    ),
+                  ],
+                  _Step.field => _fieldStep(s),
+                },
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -317,29 +411,66 @@ class _SiteScreenState extends State<SiteScreen> {
       style: Theme.of(context).textTheme.titleMedium,
     ),
     const SizedBox(height: 8),
-    Text(s.t('site.login_hint')),
-    const SizedBox(height: 8),
-    TextField(
-      key: const Key('site-user'),
-      controller: _user,
-      autofillHints: const [AutofillHints.username],
-      decoration: InputDecoration(labelText: s.t('site.username')),
-    ),
-    const SizedBox(height: 8),
-    TextField(
-      key: const Key('site-password'),
-      controller: _password,
-      obscureText: true,
-      autofillHints: const [AutofillHints.password],
-      decoration: InputDecoration(labelText: s.t('site.password')),
-      onSubmitted: (_) => _login(),
-    ),
-    const SizedBox(height: 12),
-    FilledButton(
-      key: const Key('site-login'),
-      onPressed: _login,
-      child: Text(s.t('site.login')),
-    ),
+    if (_methods.passwordLogin) ...[
+      Text(s.t('site.login_hint')),
+      const SizedBox(height: 8),
+      TextField(
+        key: const Key('site-user'),
+        controller: _user,
+        autofillHints: const [AutofillHints.username],
+        decoration: InputDecoration(labelText: s.t('site.username')),
+      ),
+      const SizedBox(height: 8),
+      TextField(
+        key: const Key('site-password'),
+        controller: _password,
+        obscureText: true,
+        autofillHints: const [AutofillHints.password],
+        decoration: InputDecoration(labelText: s.t('site.password')),
+        onSubmitted: (_) => _login(),
+      ),
+      const SizedBox(height: 12),
+      FilledButton(
+        key: const Key('site-login'),
+        onPressed: _login,
+        child: Text(s.t('site.login')),
+      ),
+    ],
+    if (_passkeys || _methods.oidc.isNotEmpty) ...[
+      if (_methods.passwordLogin) ...[
+        const SizedBox(height: 16),
+        Center(child: Text(s.t('site.login_or'))),
+      ],
+      const SizedBox(height: 8),
+      if (_passkeys)
+        OutlinedButton.icon(
+          key: const Key('site-login-passkey'),
+          icon: const Icon(Icons.key),
+          label: Text(s.t('site.login_passkey')),
+          onPressed: _signInPasskey,
+        ),
+      for (final o in _methods.oidc)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: OutlinedButton(
+            key: Key('site-login-${o.provider}'),
+            onPressed: () => _signInOidc(o.provider),
+            child: Text(s.t('site.login_with', {'provider': o.label})),
+          ),
+        ),
+      if (_methods.oidc.isNotEmpty)
+        CheckboxListTile(
+          key: const Key('site-login-consent'),
+          contentPadding: EdgeInsets.zero,
+          controlAffinity: ListTileControlAffinity.leading,
+          value: _consent,
+          onChanged: (v) => setState(() => _consent = v ?? false),
+          title: Text(
+            s.t('site.login_consent'),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+    ],
   ];
 
   List<Widget> _totpStep(Strings s) => [
@@ -399,6 +530,18 @@ class _SiteScreenState extends State<SiteScreen> {
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute<void>(builder: (_) => const KeptTicketsScreen()),
+        ),
+      ),
+      const SizedBox(height: 8),
+      OutlinedButton.icon(
+        key: const Key('site-account'),
+        icon: const Icon(Icons.manage_accounts_outlined),
+        label: Text(s.t('site.account')),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => SiteAccountScreen(session: _session!),
+          ),
         ),
       ),
       const SizedBox(height: 8),

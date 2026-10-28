@@ -1210,4 +1210,169 @@ const Map<String, String> deStrings = {
   // The remote GM may see shared positions (PKD-5)
   'player.share_remote_gm':
       'Hat das Feld eine Remote-Spielleitung, die im Site-Server angemeldet ist, sieht die Remote-Spielleitung deine Position ebenfalls, solange du sie teilst. Der Site-Server speichert sie nicht.',
+  // The account's login methods and the login without a password (PKA-1);
+  // the texts are the site server's own (staff_i18n.py) where the same.
+  'acct.passkey_cancelled':
+      'Der Passkey wurde nicht verwendet (Anfrage abgebrochen oder abgelaufen).',
+  'acct.passkey_failed': 'Die Anmeldung mit dem Passkey hat nicht geklappt.',
+  'acct.passkey_none': 'Dieses Konto hat keine Passkeys.',
+  'acct.oidc.state_invalid':
+      'Diese Anmeldeanfrage ist abgelaufen oder wurde nicht von dieser App gestellt. Versuch es noch einmal.',
+  'acct.oidc.denied': 'Die Anmeldung wurde beim Anbieter abgelehnt.',
+  'acct.oidc.consent_required':
+      'Um ein neues Konto anzulegen, setze zuerst das Häkchen oben.',
+  'acct.oidc.too_many_attempts':
+      'Zu viele neue Konten von dieser Adresse. Versuch es später noch einmal.',
+  'acct.oidc.quota_exceeded':
+      'Dieses Spielfeld hat seine Höchstzahl an Konten erreicht. Wende dich an das Team des Spielfelds.',
+  'acct.oidc.id_token_invalid':
+      'Die Antwort des Anbieters wurde nicht akzeptiert. Versuch es noch einmal.',
+  'acct.oidc.token_exchange_failed':
+      'Der Anbieter hat die Anfrage abgelehnt. Versuch es noch einmal.',
+  'acct.oidc.provider_unreachable':
+      'Der Anbieter ist nicht erreichbar. Versuch es gleich noch einmal.',
+  'acct.oidc.try_again': 'Versuch es noch einmal.',
+  'acct.oidc.other': 'Die Anmeldung beim Anbieter hat nicht geklappt.',
+  'acct.title': 'Anmeldemöglichkeiten',
+  'acct.intro':
+      'Die Möglichkeiten, sich bei diesem Konto anzumelden: Passwort, Google, Microsoft oder Apple, Passkeys und der TOTP-Code. Jede Änderung steht im Audit-Protokoll des Servers.',
+  'acct.confirm_title': 'Bestätige, dass du es bist',
+  'acct.confirm_password': 'Aktuelles Passwort',
+  'acct.confirm_password_hint':
+      'Die Änderungen unten verlangen das aktuelle Passwort. Gib es hier ein, bevor du sie machst.',
+  'acct.confirm_recent':
+      'Dieses Konto hat kein Passwort: Die Änderungen verlangen eine Bestätigung aus den letzten 10 Minuten (auch eine Anmeldung zählt). Bestätige auf einem der Wege unten und wiederhole dann die Aktion.',
+  'acct.confirm_with': 'Mit {provider} bestätigen',
+  'acct.confirmed': 'Bestätigt. Wiederhole die Aktion.',
+  'acct.reauthed': 'Beim Anbieter bestätigt. Wiederhole die Aktion.',
+  'acct.providers_title': 'Google, Microsoft und Apple',
+  'acct.providers_none': 'Mit diesem Konto ist kein Login verknüpft.',
+  'acct.providers_off':
+      'Dieser Server bietet keine Anmeldung mit Google, Microsoft oder Apple an.',
+  'acct.provider_linked_at': 'verknüpft am {when}',
+  'acct.provider_last_login': 'zuletzt angemeldet {when}',
+  'acct.link': '{provider} verknüpfen',
+  'acct.unlink': 'Verknüpfung lösen',
+  'acct.unlink_confirm': 'Die Verknüpfung mit {provider} lösen?',
+  'acct.linked': 'Login mit dem Konto verknüpft.',
+  'acct.unlinked': 'Verknüpfung gelöst.',
+  'acct.passkeys_title': 'Passkeys',
+  'acct.passkeys_intro':
+      'Ein Passkey meldet ohne Passwort und ohne Code an und zählt als zweiter Faktor für die Rollen Admin, GM und Marshal.',
+  'acct.passkeys_none': 'Keine Passkeys.',
+  'acct.passkey_name': 'Name des neuen Passkeys',
+  'acct.passkey_add': 'Passkey hinzufügen',
+  'acct.passkey_added': 'Passkey hinzugefügt.',
+  'acct.passkey_unsupported':
+      'Dieses Telefon unterstützt keine Passkeys (es braucht Android 14 oder neuer).',
+  'acct.passkey_synced': 'synchronisiert',
+  'acct.passkey_device': 'nur dieses Gerät',
+  'acct.passkey_created': 'erstellt {when}',
+  'acct.passkey_used': 'verwendet {when}',
+  'acct.passkey_unused': 'noch nie verwendet',
+  'acct.rename': 'Umbenennen',
+  'acct.passkey_rename_label': 'Neuer Name des Passkeys',
+  'acct.passkey_renamed': 'Name gespeichert.',
+  'acct.passkey_remove': 'Entfernen',
+  'acct.passkey_remove_confirm': 'Den Passkey {name} entfernen?',
+  'acct.passkey_removed': 'Passkey entfernt.',
+  'acct.pw_title': 'Passwort',
+  'acct.pw_state_set': 'Dieses Konto hat ein Passwort.',
+  'acct.pw_state_none': 'Dieses Konto hat kein Passwort.',
+  'acct.pw_off':
+      'Die Anmeldung mit Passwort ist auf diesem Server abgeschaltet: Ein Passwort kann nicht gesetzt oder geändert werden.',
+  'acct.pw_new': 'Neues Passwort',
+  'acct.pw_set_button': 'Passwort setzen',
+  'acct.pw_change_button': 'Passwort ändern',
+  'acct.pw_changed':
+      'Passwort gespeichert. Die anderen Sitzungen des Kontos sind beendet.',
+  'acct.pw_remove': 'Ohne Passwort anmelden',
+  'acct.pw_remove_confirm': 'Das Passwort dieses Kontos entfernen?',
+  'acct.pw_removed': 'Passwort entfernt.',
+  'acct.totp_title': 'TOTP-Code',
+  'acct.totp_on': 'TOTP ist für dieses Konto aktiv.',
+  'acct.totp_off': 'TOTP ist für dieses Konto nicht aktiv.',
+  'acct.totp_enable': 'TOTP aktivieren',
+  'acct.totp_enrol_intro':
+      'Füge dieses Geheimnis deiner Authenticator-App hinzu ({digits} Ziffern, alle {s} s ein neuer Code) und gib unten den Code ein, den die App zeigt.',
+  'acct.totp_secret': 'Geheimnis',
+  'acct.totp_uri': 'otpauth-Adresse (für Apps, die eine annehmen)',
+  'acct.totp_confirm': 'Mit diesem Code aktivieren',
+  'acct.totp_enabled': 'TOTP aktiviert.',
+  'acct.totp_disable_intro':
+      'Zum Abschalten: der aktuelle Code der App, dazu das Passwort oben, wenn das Konto eines hat.',
+  'acct.totp_disable': 'TOTP abschalten',
+  'acct.totp_disabled': 'TOTP abgeschaltet.',
+  'acct.oidc.already_linked': 'Dieses Konto hat diesen Login schon verknüpft.',
+  'acct.oidc.identity_taken':
+      'Dieser Login ist schon mit einem anderen Konto verknüpft.',
+  'acct.oidc.provider_already_linked':
+      'Dieses Konto hat schon einen Login von diesem Anbieter. Löse zuerst die bestehende Verknüpfung.',
+  'acct.oidc.identity_mismatch':
+      'Das ist nicht der mit diesem Konto verknüpfte Login. Nimm dasselbe Anbieterkonto.',
+  'acct.e.last_login_method':
+      'Das ist die letzte Möglichkeit, sich bei diesem Konto anzumelden: Füge zuerst eine andere hinzu.',
+  'acct.e.second_factor_required_by_role':
+      'Eine Rolle dieses Kontos braucht einen zweiten Faktor (TOTP oder Passkey): Behalte mindestens einen.',
+  'acct.e.totp_required_by_role':
+      'Eine Rolle dieses Kontos braucht einen zweiten Faktor: Füge einen Passkey hinzu, bevor du TOTP abschaltest.',
+  'acct.e.password_login_disabled':
+      'Die Anmeldung mit Passwort ist auf diesem Server abgeschaltet, ein Passwort kann nicht gesetzt oder geändert werden.',
+  'acct.e.confirmation_required':
+      'Bestätige zuerst, dass du es bist (siehe Bestätigung oben), und wiederhole dann die Aktion.',
+  'acct.e.invalid_password': 'Falsches Passwort.',
+  'acct.e.invalid_code': 'Falscher Code.',
+  'acct.e.no_password': 'Dieses Konto hat kein Passwort.',
+  'acct.e.identity_not_found':
+      'Dieser Login ist mit diesem Konto nicht verknüpft.',
+  'acct.e.passkey_not_found': 'Diesen Passkey gibt es nicht mehr.',
+  'acct.e.too_many_passkeys':
+      'Zu viele Passkeys für dieses Konto. Entferne zuerst einen.',
+  'acct.e.passkey_exists': 'Dieser Passkey ist schon registriert.',
+  'acct.e.passkey_invalid': 'Der Server hat diesen Passkey nicht akzeptiert.',
+  'acct.e.invalid_passkey': 'Der Passkey wurde nicht akzeptiert.',
+  'acct.e.invalid_challenge':
+      'Die Passkey-Anfrage ist abgelaufen. Versuch es noch einmal.',
+  'acct.e.name_invalid': 'Dieser Name ist ungültig.',
+  'acct.e.totp_already_enabled': 'TOTP ist schon aktiv.',
+  'acct.e.totp_not_pending': 'Starte zuerst die Aktivierung von TOTP.',
+  'acct.e.totp_not_enabled': 'TOTP ist nicht aktiv.',
+  'acct.e.no_passkey': 'Dieses Konto hat keine Passkeys.',
+  'acct.e.password_too_short': 'Das Passwort ist zu kurz.',
+  'acct.e.password_too_long': 'Das Passwort ist zu lang.',
+  'acct.e.password_is_username':
+      'Das Passwort darf nicht dem Kontonamen entsprechen.',
+  'acct.e.password_breached':
+      'Dieses Passwort taucht in bekannten Datenlecks auf. Wähle ein anderes.',
+  'acct.e.provider_not_configured':
+      'Diesen Login bietet dieser Server nicht an.',
+  'acct.browser_unavailable':
+      'Der Browser des Telefons konnte nicht geöffnet werden.',
+  'acct.oidc.cancelled': 'Die Anmeldung wurde abgebrochen.',
+  'acct.oidc.browser_unavailable':
+      'Der Browser des Telefons konnte nicht geöffnet werden, oder dieser Server nimmt keine Anmeldung über die App an.',
+  'acct.waiting': 'Warten auf {provider} im Browser …',
+  'acct.waiting_cancel': 'Abbrechen',
+  'acct.open': 'Anmeldemöglichkeiten des Kontos',
+  'acct.confirm_passkey': 'Mit einem Passkey bestätigen',
+  'acct.confirm_code': 'TOTP-Code',
+  'acct.confirm_code_button': 'Mit dem Code bestätigen',
+  'acct.passkey_name_hint': 'Name des neuen Passkeys (optional)',
+  'acct.passkey_here': 'Der Passkey liegt im Passwortmanager des Telefons.',
+  'acct.code': 'Code der Authenticator-App',
+  'acct.save': 'Speichern',
+  'acct.cancel': 'Abbrechen',
+  'acct.remove_confirm_yes': 'Entfernen',
+  'acct.unlink_yes': 'Verknüpfung lösen',
+  'acct.pw_remove_yes': 'Entfernen',
+  'acct.copy': 'Kopieren',
+  'acct.error_generic': 'Das hat nicht geklappt: {error}',
+  'site.login_or': 'oder',
+  'site.login_with': 'Mit {provider} anmelden',
+  'site.login_passkey': 'Mit einem Passkey anmelden',
+  'site.login_consent':
+      'Bei der ersten Anmeldung stimme ich zu, dass ein neues Konto angelegt wird (gespeichert wird nur die Kennung des Anbieters; siehe die Datenschutzerklärung des Spielfelds).',
+  'site.login_waiting': 'Warten auf die Anmeldung im Browser …',
+  'site.login_waiting_cancel': 'Abbrechen',
+  'site.account': 'Anmeldemöglichkeiten des Kontos',
 };

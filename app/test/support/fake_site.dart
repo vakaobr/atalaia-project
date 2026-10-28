@@ -37,6 +37,41 @@ class FakeSite {
   var sessionEnded = false;
   var refreshes = 0;
 
+  // --- login methods (the site server's LG-* and ACC-*) -------------------------
+  /// What `GET /auth/methods` says.
+  Map<String, Object?> offers = {
+    'password_login': true,
+    'passkeys': true,
+    'oidc': [
+      {'provider': 'google', 'label': 'Google'},
+      {'provider': 'microsoft', 'label': 'Microsoft'},
+    ],
+  };
+
+  /// The account's linked providers, passkeys, password and TOTP.
+  final identities = <Map<String, Object?>>[];
+  final passkeys = <Map<String, Object?>>[];
+  var passwordSet = true;
+  var totpEnabled = false;
+  var totpPending = false;
+  var accountPassword = 'correct horse battery';
+
+  /// A proof from the last ten minutes (an account with no password).
+  var confirmed = false;
+
+  /// The ticket the next social login completes with, and the passkey the
+  /// phone's Credential Manager "uses".
+  var goodTicket = 'good-ticket';
+  var goodCredential = 'cred-1';
+
+  /// A refusal the next call to this `METHOD /path` gets: its status, code.
+  final refusals = <String, (int, String)>{};
+
+  /// The `return_to` of the last `start`, to see that it is the app's own.
+  String? lastReturnTo;
+  String? lastStartPurpose;
+  bool? lastStartConsent;
+
   /// Ends every access token (as if they had expired).
   void expireAccess() => _access.clear();
 
@@ -198,6 +233,145 @@ class FakeSite {
     };
   }
 
+  /// The account's own login methods (api/login_methods.py, api/me.py,
+  /// api/auth.py), or null for any other request.
+  SiteResponse? _loginMethods(
+    String method,
+    String path,
+    Map<String, Object?> b,
+    String? bearer,
+  ) {
+    SiteResponse err(int status, String detail) =>
+        SiteResponse(status, {'detail': detail});
+    // A change with a password sends it; without one it needs a proof.
+    SiteResponse? checkConfirm() {
+      if (passwordSet) {
+        return b['password'] == accountPassword
+            ? null
+            : err(403, 'invalid_password');
+      }
+      return confirmed ? null : err(403, 'confirmation_required');
+    }
+
+    const ok = SiteResponse(204, null);
+    final id = RegExp(r'^/me/passkeys/([^/]+)$').firstMatch(path)?.group(1);
+    final provider = RegExp(
+      r'^/me/identities/([a-z]+)$',
+    ).firstMatch(path)?.group(1);
+    switch ('$method $path') {
+      case 'GET /me/login-methods':
+        return SiteResponse(200, {
+          'password': {'set': passwordSet, 'login_enabled': true},
+          'identities': identities,
+          'passkeys': passkeys,
+          'totp_enabled': totpEnabled,
+          'available_providers': offers['oidc'],
+          'mfa': false,
+        });
+      case 'POST /me/passkeys/options':
+        return checkConfirm() ??
+            const SiteResponse(200, {
+              'options': {'challenge': 'chal-new', 'rpId': 'site.test'},
+              'challenge_token': 'tok-add',
+            });
+      case 'POST /me/passkeys':
+        final c = b['credential'];
+        if (b['challenge_token'] != 'tok-add' || c is! Map) {
+          return err(400, 'passkey_invalid');
+        }
+        passkeys.add({
+          'id': 'k${++_n}',
+          'name': b['name'] ?? 'Passkey ${passkeys.length + 1}',
+          'backed_up': true,
+          'created_at': '2026-10-28T10:00:00+00:00',
+          'last_used_at': null,
+        });
+        return SiteResponse(201, passkeys.last);
+      case 'POST /auth/stepup/passkey/options':
+        return const SiteResponse(200, {
+          'options': {'challenge': 'chal-up', 'rpId': 'site.test'},
+          'challenge_token': 'tok-up',
+        });
+      case 'POST /auth/stepup/passkey':
+        confirmed = true;
+        return const SiteResponse(200, {'mfa': true});
+      case 'POST /auth/stepup/totp':
+        if (b['code'] != code) return err(401, 'invalid_code');
+        confirmed = true;
+        return const SiteResponse(200, {'mfa': true});
+      case 'POST /me/password':
+        if (passwordSet && b['password'] != accountPassword) {
+          return err(403, 'invalid_password');
+        }
+        if (!passwordSet && !confirmed) {
+          return err(403, 'confirmation_required');
+        }
+        if ('${b['new_password']}'.length < 10) {
+          return err(400, 'password_too_short');
+        }
+        passwordSet = true;
+        accountPassword = '${b['new_password']}';
+        return ok;
+      case 'DELETE /me/password':
+        final bad = checkConfirm();
+        if (bad != null) return bad;
+        if (identities.isEmpty && passkeys.isEmpty) {
+          return err(409, 'last_login_method');
+        }
+        passwordSet = false;
+        return ok;
+      case 'POST /auth/totp/enrol':
+        final bad = checkConfirm();
+        if (bad != null) return bad;
+        totpPending = true;
+        return const SiteResponse(200, {
+          'secret': 'JBSWY3DPEHPK3PXP',
+          'otpauth_uri':
+              'otpauth://totp/Atalaia:falcao?secret=JBSWY3DPEHPK3PXP',
+          'digits': 6,
+          'period_s': 30,
+        });
+      case 'POST /auth/totp/confirm':
+        if (!totpPending) return err(409, 'totp_not_pending');
+        if (b['code'] != code) return err(401, 'invalid_code');
+        totpEnabled = true;
+        totpPending = false;
+        return ok;
+      case 'POST /auth/totp/disable':
+        final bad = checkConfirm();
+        if (bad != null) return bad;
+        if (b['code'] != code) return err(401, 'invalid_code');
+        totpEnabled = false;
+        return ok;
+    }
+    if (provider != null && method == 'DELETE') {
+      final bad = checkConfirm();
+      if (bad != null) return bad;
+      final i = identities.indexWhere((x) => x['provider'] == provider);
+      if (i < 0) return err(404, 'identity_not_found');
+      if (!passwordSet && identities.length + passkeys.length < 2) {
+        return err(409, 'last_login_method');
+      }
+      identities.removeAt(i);
+      return ok;
+    }
+    if (id != null) {
+      final i = passkeys.indexWhere((x) => x['id'] == id);
+      if (i < 0) return err(404, 'passkey_not_found');
+      if (method == 'PATCH') {
+        passkeys[i] = {...passkeys[i], 'name': b['name']};
+        return SiteResponse(200, passkeys[i]);
+      }
+      if (method == 'DELETE') {
+        final bad = checkConfirm();
+        if (bad != null) return bad;
+        passkeys.removeAt(i);
+        return ok;
+      }
+    }
+    return null;
+  }
+
   SiteHttp http(Uri origin) => _FakeSiteHttp(this);
 
   SiteResponse handle(
@@ -212,7 +386,47 @@ class FakeSite {
     final b = body is Map ? body.cast<String, Object?>() : <String, Object?>{};
     SiteResponse err(int status, String detail) =>
         SiteResponse(status, {'detail': detail});
+    final refused = refusals.remove('$method $path');
+    if (refused != null) return err(refused.$1, refused.$2);
     switch ('$method $path') {
+      case 'GET /auth/methods':
+        return SiteResponse(200, offers);
+      case 'POST /auth/oidc/google/start':
+      case 'POST /auth/oidc/microsoft/start':
+        if (b['purpose'] != 'login' &&
+            (bearer == null || !_access.contains(bearer))) {
+          return err(401, 'not_authenticated');
+        }
+        if (b['purpose'] == 'link' &&
+            passwordSet &&
+            b['password'] != accountPassword) {
+          return err(403, 'invalid_password');
+        }
+        lastReturnTo = '${b['return_to']}';
+        lastStartPurpose = '${b['purpose']}';
+        lastStartConsent = b['consent'] == true;
+        final p = path.split('/')[3];
+        return SiteResponse(200, {
+          'authorization_url': 'https://accounts.example/auth?p=$p',
+          'browser_url':
+              '${Uri.parse('${b['return_to']}').origin}/api/v1/auth/oidc/$p/browser?x=bind&s=state',
+        });
+      case 'POST /auth/oidc/complete':
+        if (b['ticket'] != goodTicket) return err(401, 'invalid_ticket');
+        return _session();
+      case 'POST /auth/passkey/login/options':
+        return const SiteResponse(200, {
+          'options': {'challenge': 'chal', 'rpId': 'site.test'},
+          'challenge_token': 'tok-login',
+        });
+      case 'POST /auth/passkey/login':
+        final c = b['credential'];
+        if (b['challenge_token'] != 'tok-login' ||
+            c is! Map ||
+            c['id'] != goodCredential) {
+          return err(401, 'invalid_passkey');
+        }
+        return _session();
       case 'POST /auth/login':
         if (b['username'] != username || b['password'] != password) {
           return err(401, 'invalid_credentials');
@@ -251,6 +465,8 @@ class FakeSite {
     if (bearer == null || !_access.contains(bearer)) {
       return err(401, 'not_authenticated');
     }
+    final login = _loginMethods(method, path, b, bearer);
+    if (login != null) return login;
     final regPath = RegExp(
       r'^/fields/([0-9a-f-]+)/scheduled-games/([0-9a-f-]+)/registrations$',
     ).firstMatch(path);

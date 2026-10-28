@@ -35,7 +35,8 @@ site server's register page, opens the app at that field's games
 link through its LinkPlugin and checks it itself. Field check-in, the player token and
 the prop's Wi-Fi link use HTTPS with the field's own CA, pinned by the app
 (ADR-P3-9, ADR-P3-13; decision PE3). Backups are off: the settings hold the
-field join key, the marshal's private key and the field identities.
+field join key, the marshal's private key and the field identities (sealed
+with the Keystore on Android, decisions PD6 and PKA-4).
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
@@ -96,6 +97,22 @@ field join key, the marshal's private key and the field identities.
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="atalaia" android:host="register" />
+            </intent-filter>
+            <!-- A social login's return (decision PKA-1): the site server redirects
+                 the Custom Tab to https://<its host>/app/oidc, an App Link that opens
+                 here once the site's /.well-known/assetlinks.json names this app
+                 (ATALAIA_APP_ANDROID_PACKAGE and _SHA256 on the server). Android
+                 wants the hosts in the manifest: build with
+                 -Patalaia.appLinkHost=<host> (or a wildcard such as *.hub.example.pt
+                 for a hosted hub; see app/README.md). The default is an address no
+                 server has, so a build with none opens no link. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https"
+                    android:host="${appLinkHost}"
+                    android:path="/app/oidc" />
             </intent-filter>
             <meta-data
                 android:name="flutter_deeplinking_enabled"

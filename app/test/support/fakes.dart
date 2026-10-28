@@ -379,3 +379,47 @@ class FakeControllerRun implements ControllerRun {
     await _changes.close();
   }
 }
+
+/// The phone's browser for a social login: remembers what was opened and
+/// lets a test play the return (what the site's `/app/oidc` link does).
+class FakeAuthBrowser implements AuthBrowser {
+  final opened = <Uri>[];
+  bool works = true;
+
+  /// Called when an address is opened; a test makes the return happen here.
+  void Function(Uri url)? onOpen;
+
+  @override
+  Future<bool> open(Uri url) async {
+    if (!works) return false;
+    opened.add(url);
+    onOpen?.call(url);
+    return true;
+  }
+}
+
+/// Android's Credential Manager: answers with the credential JSON a test
+/// gives, or throws [PasskeyException].
+class FakePasskeys implements PasskeyService {
+  bool present = true;
+  String? failWith;
+  final requests = <String>[];
+  String credentialId = 'cred-1';
+
+  @override
+  Future<bool> available() async => present;
+
+  Future<String> _answer(String request) async {
+    requests.add(request);
+    final f = failWith;
+    if (f != null) throw PasskeyException(f);
+    return '{"id":"$credentialId","rawId":"$credentialId","type":"public-key",'
+        '"response":{}}';
+  }
+
+  @override
+  Future<String> create(String optionsJson) => _answer(optionsJson);
+
+  @override
+  Future<String> get(String optionsJson) => _answer(optionsJson);
+}

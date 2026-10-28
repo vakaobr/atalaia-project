@@ -330,8 +330,9 @@ void _putSettingsSecrets(
   }
   final key = secrets[_syncKeyName];
   final sync = json['controller_sync'];
-  if (key is String && sync is Map)
+  if (key is String && sync is Map) {
     json['controller_sync'] = {...sync, 'api_key': key};
+  }
 }
 
 class FileAppStore implements AppStore {

@@ -271,3 +271,53 @@ class ChannelSecretVault implements SecretVault {
     }
   }
 }
+
+/// BrowserPlugin.kt on Android (Custom Tabs). Not available elsewhere.
+class ChannelAuthBrowser implements AuthBrowser {
+  static const _ch = MethodChannel('$_prefix/browser');
+
+  @override
+  Future<bool> open(Uri url) async {
+    if (url.scheme != 'https') return false;
+    try {
+      return await _call<bool>(_ch, 'open', false, {'url': '$url'});
+    } on PlatformException {
+      return false;
+    }
+  }
+}
+
+/// PasskeyPlugin.kt on Android (androidx.credentials). A missing plugin is
+/// "not available".
+class ChannelPasskeyService implements PasskeyService {
+  static const _ch = MethodChannel('$_prefix/passkeys');
+
+  @override
+  Future<bool> available() async {
+    try {
+      return await _call<bool>(_ch, 'available', false);
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  @override
+  Future<String> create(String optionsJson) => _go('create', optionsJson);
+
+  @override
+  Future<String> get(String optionsJson) => _go('get', optionsJson);
+
+  Future<String> _go(String method, String optionsJson) async {
+    try {
+      final r = await _ch.invokeMethod<String>(method, {
+        'request': optionsJson,
+      });
+      if (r == null) throw PasskeyException('failed');
+      return r;
+    } on MissingPluginException {
+      throw PasskeyException('unsupported');
+    } on PlatformException catch (e) {
+      throw PasskeyException(e.code);
+    }
+  }
+}

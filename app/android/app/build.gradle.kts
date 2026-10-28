@@ -31,6 +31,12 @@ android {
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // The host the site server's social-login return link (an App Link,
+        // https://<host>/app/oidc) opens the app for (decision PKA-1; the
+        // manifest needs it at build time): -Patalaia.appLinkHost=campo.example.pt,
+        // or a wildcard such as *.hub.example.pt. The default matches nothing.
+        manifestPlaceholders["appLinkHost"] =
+            (project.findProperty("atalaia.appLinkHost") as String?) ?: "app-links.invalid"
 
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
@@ -74,6 +80,11 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.6.2")
     implementation("androidx.camera:camera-view:1.6.2")
     implementation("com.google.zxing:core:3.5.4")
+    // The social login's Custom Tab (BrowserPlugin.kt) and passkeys through the
+    // Credential Manager (PasskeyPlugin.kt; the system's own providers from
+    // Android 14, no Google Play services: decision PKA-1). AndroidX, Apache-2.0.
+    implementation("androidx.browser:browser:1.9.0")
+    implementation("androidx.credentials:credentials:1.5.0")
 }
 
 flutter {

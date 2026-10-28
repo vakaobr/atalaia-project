@@ -281,3 +281,43 @@ final class LocalHotspot {
     error: m['error'] as String?,
   );
 }
+
+/// The system browser for a social login (decision PKA-1): a Custom Tab on
+/// Android. The person signs in at the provider there; the site's redirect
+/// to its `/app/oidc` App Link brings the answer back to the app
+/// (lib/site/site_auth.dart).
+abstract interface class AuthBrowser {
+  /// Opens [url] (https only); false when no browser could be opened.
+  Future<bool> open(Uri url);
+}
+
+/// Why a passkey could not be made or used: `cancelled` (the person closed
+/// the sheet), `no_credential` (none for this site on the phone),
+/// `unsupported` (no credential provider: Android before 14, or none set
+/// up), `failed`.
+class PasskeyException implements Exception {
+  PasskeyException(this.reason);
+
+  final String reason;
+
+  bool get cancelled => reason == 'cancelled';
+
+  @override
+  String toString() => 'PasskeyException($reason)';
+}
+
+/// Passkeys through Android's Credential Manager (PasskeyPlugin.kt). The
+/// request is the WebAuthn options JSON the site server made, the answer the
+/// credential JSON the site server verifies; the app holds no key.
+abstract interface class PasskeyService {
+  /// Whether this phone can make and use passkeys.
+  Future<bool> available();
+
+  /// Registers a passkey: [optionsJson] is `navigator.credentials.create`'s
+  /// public-key options as JSON; the answer is the registration response.
+  Future<String> create(String optionsJson);
+
+  /// Uses a passkey: [optionsJson] is the request options as JSON; the
+  /// answer is the authentication response.
+  Future<String> get(String optionsJson);
+}
