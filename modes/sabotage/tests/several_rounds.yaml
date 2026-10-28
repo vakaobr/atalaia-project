@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Rounds follow each other, and the points add up
+params: { fuse_s: 30, pause_s: 5, game_time_min: 20 }
+steps:
+  # round 1: explosion, red 1
+  - hold: { team: red, s: 5 }
+  - wait: 30
+  - expect: { type: bomb.exploded, at: 35 }
+  - wait: 10
+  # round 2 (ready at 45): defuse, blue 1
+  - expect_screen: { template: standby, data: { round: 2, a_points: 1 } }
+  - hold: { team: red, s: 5 }
+  - hold: { team: blue, s: 10 }
+  - expect: { type: bomb.defused, team: blue, at: 60 }
+  - wait: 10
+  # round 3: defuse again, blue 2
+  - expect_screen: { template: standby, data: { round: 3, a_points: 1, d_points: 1 } }
+  - hold: { team: red, s: 5 }
+  - hold: { team: blue, s: 10 }
+  - expect: { type: bomb.defused, team: blue }
+  - expect_score: { team: red, points: 1 }
+  - expect_score: { team: blue, points: 2 }
+  - expect_no: script.error

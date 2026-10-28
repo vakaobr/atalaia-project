@@ -30,6 +30,7 @@ The GM console builds its settings form from `params` in `mode.yaml`, so GMs nev
 | [VIP / Payload](vip_payload/) (VIP / Carga) | main mode | checkpoint boxes and Android props, a payload prop with GPS (Android), the VIP's phone through the controller (`field.lua`) | Phase 4 plan phase 5, in software (not yet with real GPS in the field: HW3); 8 tests, plus simulator, controller, host-box, Field Box preset, browser and Dart tests |
 | [Money Factory](money_factory/) (Fábrica de Dinheiro) | main mode | factory and bank boxes and Android props with NFC + controller (`field.lua`) | Phase 3, built after the maintainer's go-ahead of 2026-10-23 (decision A1's blocker solved by the controller, MF-A1 to MF-A12), in software (not yet on radio hardware); 10 tests, plus simulator, controller, host-box, Field Box preset, browser and Dart tests |
 | [Progressive Domination](progressive_domination/) (Domínio Progressivo) | main mode | boxes + controller (`field.lua`) | Maintainer's request of 2026-10-26, in software (not yet on radio hardware); 8 tests, plus simulator, controller, firmware and Dart tests |
+| [Sabotage](sabotage/) (Sabotagem) | main mode | boxes | Maintainer's request of 2026-10-28, in software (not yet on radio hardware); 13 tests, plus simulator, firmware (host box and picker, reference images) and Dart tests |
 | [Objectives](objectives/) (Objetivos) | role package for custom scenarios | boxes and Android props, set up by a scenario's `field.lua` on the controller | Phase 4 plan phase 6, in software (not yet on radio hardware); 9 tests, 7 of them with a hand-written example scenario, plus simulator, controller, host-box, Field Box preset, browser and Dart tests; the scenario compiler (plan phase 7, in software) writes scenario packages from a YAML manifest and plays the same tests with its own Foxhound |
 
 The script API is described in the "Game runtime and scripting" section of the [design specification](../docs/design-spec.md), and implemented in [`core/src/script_api.c`](../core/src/script_api.c).
@@ -373,3 +374,16 @@ Decisions PD-MODE-1 to PD-MODE-20 in `docs/review/decisions-to-review.md`. Needs
 - **The word to the boxes:** the mode command `pd` (`phase` wait, active or done; `step`, `of`, `done`, `team`; `n` grows with each change, so an older word is ignored), said again every 10 s and to a box that rebooted.
 
 It is the fifteenth built-in preset, on the second page of the box's keypad picker (`0` turns the page, then `6`); picked on its own a box only waits for a controller.
+
+## Sabotage (Sabotagem, 2026-10-28)
+
+Decisions SAB-1 to SAB-10 in `docs/review/decisions-to-review.md`. One bomb box (role `bomb`, as in Bomb / Rush), runs without a controller. It reuses Bomb's mechanics and its standard events (`bomb.armed`, `bomb.defused`, `bomb.exploded`); it adds no event.
+
+- **Roles and rounds:** `attackers` arm the bomb (hold their button `arm_hold_ms`), `defenders` defuse it (hold `defuse_hold_ms`) before the fuse (`fuse_s`) runs out. After an explosion or a defuse the result stays on the screen for 5 s, then the box rests for `pause_s` seconds (default 10, `0`: none) and goes back to standby for the next round. As in Bomb, optional `team_codes` (`red=1234,blue=5678`) make the keypad arm (a team's code) and defuse (another team's code) instead of the buttons; during the result and the pause a code arms nothing (`Next round soon`).
+- **Both score:** an explosion scores 1 for the attackers, a defuse 1 for the defenders (`score.add`, so the points are the counters of the box's STATE and the field total; no `score.delta` event, which is for penalties). The standby and pause screens show the score.
+- **The end:** `game_time_min` (default 20) is the game's time limit, kept by the box's own script. At it the game ends: the team with more points wins (`game.win`), equal points end it as a draw (`game.finish("draw")`). A bomb armed at that moment is dropped and does not count (decision SAB-3); a game the GM ends earlier shows the same game-over screen.
+- **Screens** (texts in the box's language, as in Bomb): `standby` (the score, the game time left, the round, the hold bar), `countdown`, `defused`, `exploded` (each naming the team that scored), `pause` (the score, the last result, the time to the next round), `game_over` (the winner, or a draw, and the score); with team codes the standby is the keypad prompt with the score as its message.
+- **After a power loss** (a game picked on the box itself): the armed bomb's fuse, the result or the pause go on, and the score and the time limit follow the game's clock; in a field game the box starts afresh.
+- Made for one box. With several boxes each keeps its own rounds and score and decides the winner on its own total at the time limit; the field total adds them.
+
+It is the sixteenth built-in preset, on the second page of the box's keypad picker (`0` turns the page, then `7`).

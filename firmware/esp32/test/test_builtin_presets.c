@@ -320,6 +320,7 @@ static const char *const builtin_folders[][2] = {
     {"objectives", "org.atalaia.objectives"},
     {"money_factory", "org.atalaia.money_factory"},
     {"progressive_domination", "org.atalaia.progressive_domination"},
+    {"sabotage", "org.atalaia.sabotage"},
 };
 enum { BUILTIN_N = sizeof(builtin_folders) / sizeof(builtin_folders[0]) };
 
@@ -733,6 +734,73 @@ static void test_progressive_domination_from_the_picker(void)
     node_runner_stop(&runner);
 }
 
+/* Sabotage, the sixteenth slot (second page, seventh entry): the Bomb's rounds. The attackers arm
+ * and let the fuse run out (a point for them), the box shows the result then the pause with the
+ * score, and goes back to standby for the next round; every one of its templates renders. */
+static void test_sabotage_from_the_picker(void)
+{
+    preset_summary_t list[PRESET_MAX_SLOTS];
+    seed_every_builtin(list);
+    CHECK(strcmp(list[15].mode_id, "org.atalaia.sabotage") == 0);
+    CHECK(strcmp(list[15].label, "Sabotage") == 0);
+
+    preset_ui_t ui;
+    preset_ui_init(&ui, "1234", BUILTIN_N);
+    for (const char *k = "1234#07###"; *k; k++) preset_ui_handle_key(&ui, *k);
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_GAME_STARTED);
+    CHECK(preset_ui_selected_preset(&ui) == 16);
+
+    static preset_t p;
+    CHECK(preset_store_load(list[preset_ui_selected_preset(&ui) - 1].index, &p));
+    CHECK(strcmp(p.mode_id, "org.atalaia.sabotage") == 0);
+    CHECK(strstr(p.params_json, "\"game_time_min\":20") != NULL);
+    CHECK(strstr(p.params_json, "\"pause_s\":10") != NULL);
+
+    hal_t hal;
+    hal_stub_init(&hal);
+    static node_runner_t runner;
+    node_runner_init(&runner, &hal, 0);
+    const char *teams[] = {"red", "blue"};
+    CHECK(node_runner_start(&runner, &p, teams, 2));
+    CHECK(strcmp(runner.queues.screens[0].template_name, SCREEN_MODE_MESSAGE) == 0);
+    CHECK(screen_render(SCREEN_MODE_MESSAGE, runner.queues.screens[0].data_json));
+    button_tracker_t buttons;
+    button_tracker_init(&buttons, teams, 2);
+    const screen_update_t *su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "standby") == 0);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+
+    hold(&runner, &buttons, 0x1, 5100); /* red arms */
+    CHECK(strcmp(runner.last_event_type, "bomb.armed") == 0);
+    su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "countdown") == 0);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+    for (int i = 0; i < 40000 && strcmp(runner.last_event_type, "bomb.exploded") != 0; i++) {
+        node_runner_tick(&runner, 10); /* the fuse runs out, 300 s after arming */
+        if (runner.queues.screen_count >= 8) runner.queues.screen_count = 0; /* a short queue */
+    }
+    CHECK(strcmp(runner.last_event_type, "bomb.exploded") == 0);
+    su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "exploded") == 0);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+    const atalaia_score_t *score = atalaia_node_score(runner.node);
+    CHECK(score && score->gained[1] == 1 && score->gained[2] == 0);
+
+    runner.queues.screen_count = 0;
+    for (int i = 0; i < 600; i++) node_runner_tick(&runner, 10); /* 6 s: the pause */
+    su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "pause") == 0);
+    CHECK(su && strstr(su->data_json, "\"a_points\":1") != NULL);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+    runner.queues.screen_count = 0;
+    for (int i = 0; i < 1000; i++) node_runner_tick(&runner, 10); /* 10 s more: standby again */
+    su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "standby") == 0);
+    CHECK(su && strstr(su->data_json, "\"round\":2") != NULL);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+    node_runner_stop(&runner);
+}
+
 void run_builtin_presets_tests(void)
 {
     test_seed_empty_store();
@@ -748,4 +816,5 @@ void run_builtin_presets_tests(void)
     test_objectives_from_the_picker();
     test_money_factory_from_the_picker();
     test_progressive_domination_from_the_picker();
+    test_sabotage_from_the_picker();
 }

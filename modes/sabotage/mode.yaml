@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.sabotage
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+kind: mode
+name: Sabotage
+description: Bomb rounds until the game time runs out. Attackers arm the bomb, defenders defuse it; an explosion scores for the attackers, a defuse for the defenders, then the box rests and the next round starts. The team with more points wins.
+roles:
+  bomb: { requires: [team_input], optional: [keypad, audio, led, display] }
+params:
+  attackers:          { type: team, default: red }
+  defenders:          { type: team, default: blue }
+  fuse_s:             { type: int, min: 10, max: 3600, default: 300, label: "Fuse (s)" }
+  arm_hold_ms:        { type: int, default: 5000, label: "Hold time to arm (ms)" }
+  defuse_hold_ms:     { type: int, default: 10000, label: "Hold time to defuse (ms)" }
+  pause_s:            { type: int, min: 0, max: 600, default: 10, label: "Pause between rounds (s)" }
+  game_time_min:      { type: int, min: 1, max: 600, default: 20, label: "Game time (min)" }
+  team_codes:         { type: string, optional: true, max: 60, gm_only: true, label: "Team codes, e.g. red=1234,blue=5678: the keypad arms (a team's code) and defuses (another team's code) instead of the buttons" }
+i18n:
+  pt:
+    name: Sabotagem
+    description: Rondas da bomba até acabar o tempo de jogo. Os atacantes armam a bomba, os defensores desarmam-na; uma explosão pontua para os atacantes, um desarme para os defensores; depois a caixa descansa e começa a ronda seguinte. Vence a equipa com mais pontos.
+    params:
+      attackers: Atacantes
+      defenders: Defensores
+      fuse_s: Rastilho (s)
+      arm_hold_ms: Tempo a premir para armar (ms)
+      defuse_hold_ms: Tempo a premir para desarmar (ms)
+      pause_s: Pausa entre rondas (s)
+      game_time_min: Tempo de jogo (min)
+      team_codes: "Códigos de equipa, ex.: red=1234,blue=5678: o teclado arma (o código de uma equipa) e desarma (o código de outra equipa) em vez dos botões"
+  de:
+    name: Sabotage
+    description: >-
+      Bombenrunden, bis die Spielzeit abläuft. Die Angreifenden machen die Bombe scharf, die Verteidigenden
+      entschärfen sie; eine Explosion zählt für die Angreifenden, eine Entschärfung für die Verteidigenden,
+      dann ruht die Box und die nächste Runde beginnt. Das Team mit mehr Punkten gewinnt.
+    params:
+      attackers: Angreifende
+      defenders: Verteidigende
+      fuse_s: Zünder (s)
+      arm_hold_ms: Haltezeit zum Schärfen (ms)
+      defuse_hold_ms: Haltezeit zum Entschärfen (ms)
+      pause_s: Pause zwischen den Runden (s)
+      game_time_min: Spielzeit (min)
+      team_codes: "Team-Codes, z. B. red=1234,blue=5678: das Tastenfeld macht scharf (der Code eines Teams) und entschärft (der Code eines anderen Teams) statt der Knöpfe"
+  zh-tw:
+    name: 破壞
+    description: 一回合接一回合，直到遊戲時間結束。進攻方啟動炸彈，防守方拆除；爆炸為進攻方得分，拆除為防守方得分，之後裝置休息，下一回合開始。得分較多的隊伍獲勝。
+    params:
+      attackers: 進攻方
+      defenders: 防守方
+      fuse_s: 引信（秒）
+      arm_hold_ms: 啟動需按住的時間（毫秒）
+      defuse_hold_ms: 拆除需按住的時間（毫秒）
+      pause_s: 回合間暫停（秒）
+      game_time_min: 遊戲時間（分鐘）
+      team_codes: 隊伍密碼，例如 red=1234,blue=5678：改用按鍵啟動（某一隊的密碼）與拆除（另一隊的密碼），不用按鈕

@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: During the pause a code arms nothing
+params: { fuse_s: 20, pause_s: 30, team_codes: "red=1234,blue=5678" }
+steps:
+  - keys: "1234#"
+  - wait: 20
+  - expect: { type: bomb.exploded, team: red }
+  - wait: 10
+  - keys: "1234#"
+  - expect_no: bomb.armed
+  - expect_screen: { template: code_entry, data: { error: true } }
+  - wait: 26
+  - keys: "1234#"
+  - expect: { type: bomb.armed, team: red }
+  - expect_no: script.error

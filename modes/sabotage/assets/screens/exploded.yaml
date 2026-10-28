@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The bomb exploded: the whole screen in the scoring team's colour.
+# Data: team (the arming team; the point goes to it); lang (pt, en, de or zh-tw) from the box.
+template: exploded
+style: { background: "{team || 'panel'}" }
+layout:
+  - type: icon
+    icon: warning
+    style: { font_size: 48, color: contrast }
+  - type: label
+    text: "{lang == 'pt' && 'EXPLODIU' || lang == 'zh-tw' && '已爆炸' || 'EXPLODED'}"
+    style: { font_size: 48, color: contrast, visible: "{lang != 'de'}" }
+  # German's word is wider than the screen at 48 px: 28, as the box's own screen fits it.
+  - type: label
+    text: EXPLODIERT
+    style: { font_size: 28, color: contrast, visible: "{lang == 'de'}" }
+  - type: label
+    text: "Point for team {team|upper}"
+    style: { font_size: 28, color: contrast, visible: "{team && lang != 'pt' && lang != 'de' && lang != 'zh-tw'}" }
+  - type: label
+    text: "Ponto para {team|upper}"
+    style: { font_size: 28, color: contrast, visible: "{team && lang == 'pt'}" }
+  - type: label
+    text: "Punkt für Team {team|upper}"
+    style: { font_size: 28, color: contrast, visible: "{team && lang == 'de'}" }
+  - type: label
+    text: "{team|upper} 隊得分"
+    style: { font_size: 28, color: contrast, visible: "{team && lang == 'zh-tw'}" }

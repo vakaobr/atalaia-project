@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The game ends at the time limit and the team with more points wins
+params: { fuse_s: 30, pause_s: 5, game_time_min: 3 }
+steps:
+  - hold: { team: red, s: 5 }
+  - wait: 30
+  - expect: { type: bomb.exploded, team: red }
+  - wait: 20
+  - expect_status: running
+  - expect_screen: { template: standby, data: { game_left: 125 } }
+  - wait: 130
+  - expect: { type: game.end, at: 180, data: { reason: win, winner: red } }
+  - expect_status: ended
+  - expect_screen: { template: game_over, data: { winner: red, a_points: 1, d_points: 0 } }

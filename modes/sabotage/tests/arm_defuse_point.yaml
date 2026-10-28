@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A defuse is a point for the defenders
+params: { fuse_s: 60, pause_s: 10 }
+steps:
+  - hold: { team: red, s: 5 }
+  - expect: { type: bomb.armed, at: 5 }
+  - wait: 10
+  - hold: { team: blue, s: 10 }
+  - expect: { type: bomb.defused, team: blue, at: 25 }
+  - expect_score: { team: blue, points: 1 }
+  - expect_score: { team: red, points: 0 }
+  - expect_screen: { template: defused, data: { team: blue } }
+  - wait: 5
+  - expect_screen: { template: pause, data: { a_points: 0, d_points: 1, exploded: false } }
+  - wait: 10
+  - expect_screen: { template: standby, data: { d_points: 1 } }
+  - wait: 200
+  - expect_no: bomb.exploded
+  - expect_no: script.error

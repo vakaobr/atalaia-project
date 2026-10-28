@@ -234,6 +234,7 @@ Todos os modos incluídos aparecem em **Modo ou predefinição**. Os nomes em in
 | Domination | Domínio | Uma caixa ou várias. O tempo a premir e os pontos são parâmetros. |
 | Hold-All Domination | Domínio Total | Uma equipa só pontua enquanto tiver todas as caixas. |
 | Bomb / Rush | Bomba / Rush | Rastilho, tempos a premir para armar e desarmar. **Códigos de equipa** opcionais, por exemplo `red=1234,blue=5678`. |
+| Sabotage | Sabotagem | Rondas da bomba até acabar o tempo de jogo: uma explosão pontua para os atacantes, um desarme para os defensores, e há uma pausa curta. Vence a equipa com mais pontos. Pausa, tempo de jogo e **Códigos de equipa** opcionais são parâmetros. |
 | Last Stand | Último Elemento | Atacantes, defensores, contagem para a derrota. |
 | Kill Confirmed | Baixa Confirmada | Precisa de etiquetas de quem joga. |
 | Respawn and Lives | Reentradas e Vidas | Precisa de etiquetas, ou de botões de equipa. |

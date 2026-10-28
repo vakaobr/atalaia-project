@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The pause between two rounds. Data: attackers, defenders (the teams),
+# a_points and d_points (their points), left (seconds until the next round),
+# exploded (the round that ended exploded, else it was defused), game_left
+# (seconds of game time left); lang (pt, en, de or zh-tw) from the box.
+template: pause
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: panel }
+    children:
+      - type: label
+        text: "{lang == 'pt' && 'PAUSA' || lang == 'de' && 'PAUSE' || lang == 'zh-tw' && '暫停' || 'PAUSE'}"
+        style: { font_size: 20, width: fill, align: center }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{attackers|upper} {a_points|int} : {d_points|int} {defenders|upper}"
+    style: { font_size: 28, color: white }
+  - type: label
+    text: "{lang == 'pt' && (exploded && 'A bomba explodiu' || 'A bomba foi desarmada') || lang == 'de' && (exploded && 'Die Bombe ist explodiert' || 'Die Bombe wurde entschärft') || lang == 'zh-tw' && (exploded && '炸彈已爆炸' || '炸彈已拆除') || (exploded && 'The bomb exploded' || 'The bomb was defused')}"
+    style: { font_size: 14, color: muted }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{lang == 'pt' && 'Próxima ronda em' || lang == 'de' && 'Nächste Runde in' || lang == 'zh-tw' && '下一回合' || 'Next round in'}"
+    style: { font_size: 20, color: muted }
+  - type: label
+    text: "{left|clock}"
+    style: { font_size: 48, color: white }
+  - type: label
+    text: "{lang == 'pt' && 'Tempo de jogo' || lang == 'de' && 'Spielzeit' || lang == 'zh-tw' && '遊戲時間' || 'Game time'} {game_left|clock}"
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

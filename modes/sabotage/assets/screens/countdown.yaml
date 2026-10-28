@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Seconds left until the bomb explodes, red for the last ten.
+# Data: left (seconds), team (with team codes: the arming team), defuse (0-1
+# while the defenders hold their button: the defuse bar fills);
+# lang (pt, en, de or zh-tw) from the box.
+template: countdown
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: danger }
+    children:
+      - type: label
+        text: "{lang == 'pt' && 'ARMADA' || lang == 'de' && 'SCHARF' || lang == 'zh-tw' && '已啟動' || 'ARMED'}"
+        style: { font_size: 20, width: fill, align: center }
+  - type: spacer
+    height: fill
+  - type: label
+    id: time_left
+    text: "{left|clock}"
+    style: { font_size: 48, color: "{left <= 10 && 'danger' || 'white'}" }
+  - type: label
+    text: "{lang == 'pt' && 'até à explosão' || lang == 'de' && 'bis zur Explosion' || lang == 'zh-tw' && '後引爆' || 'until detonation'}"
+    style: { font_size: 20, color: muted }
+  - type: progress_bar
+    id: fuse_bar
+    value: "{left / params.fuse_s}"
+    style: { width: 240, height: 10, color: "{team || 'danger'}" }
+  - type: label
+    text: "{lang == 'pt' && 'A desarmar... não largues' || lang == 'de' && 'Entschärfen... nicht loslassen' || lang == 'zh-tw' && '拆除中，別放手' || 'Defusing... keep holding'}"
+    style:
+      font_size: 14
+      color: white
+      padding: { top: 8 }
+      visible: "{defuse}"
+  - type: progress_bar
+    id: defuse_bar
+    value: "{defuse}"
+    style: { width: 240, height: 12, color: "{params.defenders || 'blue'}", visible: "{defuse}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{lang == 'pt' && 'Armada por' || lang == 'de' && 'Scharf gemacht von' || lang == 'zh-tw' && '啟動隊伍' || 'Armed by'} {team|upper}"
+    style:
+      font_size: 14
+      color: team
+      visible: "{team}"
+      padding: { bottom: 10 }

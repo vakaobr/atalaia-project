@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: With no pause the box goes back to standby after the result
+params: { fuse_s: 20, pause_s: 0 }
+steps:
+  - hold: { team: red, s: 5 }
+  - wait: 20
+  - expect: { type: bomb.exploded }
+  - wait: 1
+  - expect_screen: { template: standby, data: { round: 2, a_points: 1 } }

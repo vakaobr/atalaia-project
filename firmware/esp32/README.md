@@ -717,10 +717,11 @@ waits for a scenario), and Money Factory (a box is a factory, or a bank once
 the controller's `field.lua` says so; picked on its own a factory captures and
 makes money, but tags need a controller's game, decision MF-A8), and Progressive Domination (any box of
 the game; the controller's `field.lua` picks the active one, so picked on its own a box waits, decision
-PD-MODE-13).
+PD-MODE-13), and Sabotage (the Bomb's rounds until the game time runs out, the box ends
+the game itself).
 At boot the firmware stores a preset, with the defaults from its
 `mode.yaml`, for each built-in mode that no stored preset uses yet (a new
-or erased box and every Wokwi run get all fifteen, in that order; a box
+or erased box and every Wokwi run get all sixteen, in that order; a box
 updated to a firmware with more modes gets the new ones in free slots), and
 replaces the stored script of a built-in mode when the image has a
 different one (`main/builtin_presets.c`). A Field Box has no default admin

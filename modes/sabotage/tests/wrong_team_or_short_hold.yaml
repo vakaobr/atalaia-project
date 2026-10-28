@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Only the attackers arm, only the defenders defuse, and a short hold does nothing
+params: { fuse_s: 60 }
+steps:
+  - hold: { team: blue, s: 6 }
+  - expect_no: bomb.armed
+  - hold: { team: red, s: 2 }
+  - expect_no: bomb.armed
+  - hold: { team: red, s: 5 }
+  - expect: { type: bomb.armed }
+  - hold: { team: red, s: 12 }
+  - hold: { team: blue, s: 3 }
+  - expect_no: bomb.defused
+  - expect_score: { team: blue, points: 0 }

@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: An explosion is a point for the attackers, and the box rests then goes back to standby
+params: { fuse_s: 60, pause_s: 10, game_time_min: 20 }
+steps:
+  - expect_screen: { template: standby, data: { arm: red, a_points: 0, d_points: 0, round: 1 } }
+  - hold: { team: red, s: 5 }
+  - expect: { type: bomb.armed, team: red, at: 5, data: { fuse_s: 60 } }
+  - wait: 60
+  - expect: { type: bomb.exploded, team: red, at: 65 }
+  - expect_score: { team: red, points: 1 }
+  - expect_score: { team: blue, points: 0 }
+  - expect_screen: { template: exploded, data: { team: red } }
+  - wait: 5
+  - expect_screen: { template: pause, data: { a_points: 1, d_points: 0, exploded: true, left: 10 } }
+  - wait: 10
+  - expect_screen: { template: standby, data: { a_points: 1, d_points: 0, round: 2 } }
+  - expect_no: script.error

@@ -182,6 +182,7 @@ extern const char objectives_node_lua_start[] asm("_binary_objectives_node_lua_s
 extern const char money_factory_node_lua_start[] asm("_binary_money_factory_node_lua_start");
 extern const char
     progressive_domination_node_lua_start[] asm("_binary_progressive_domination_node_lua_start");
+extern const char sabotage_node_lua_start[] asm("_binary_sabotage_node_lua_start");
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -1274,6 +1275,7 @@ static void seed_presets(void)
          strlen(money_factory_node_lua_start)},
         {"org.atalaia.progressive_domination", progressive_domination_node_lua_start,
          strlen(progressive_domination_node_lua_start)},
+        {"org.atalaia.sabotage", sabotage_node_lua_start, strlen(sabotage_node_lua_start)},
     };
     int n = builtin_presets_seed(sources, (int)(sizeof(sources) / sizeof(sources[0])));
     if (n > 0) ESP_LOGI(TAG, "stored %d built-in preset(s)", n);

@@ -63,6 +63,10 @@ static const struct {
     {"Progressive Domination", "org.atalaia.progressive_domination",
      "{\"capture_hold_ms\":3000,\"complete_min\":10,\"points_per_min\":6,\"complete_bonus\":0,"
      "\"random_order\":false,\"order\":\"\",\"target_score\":0}"},
+    /* Bomb rounds until the game time runs out; the box ends the game itself. */
+    {"Sabotage", "org.atalaia.sabotage",
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300,\"arm_hold_ms\":5000,"
+     "\"defuse_hold_ms\":10000,\"pause_s\":10,\"game_time_min\":20}"},
 };
 
 bool builtin_presets_has(const char *mode_id)

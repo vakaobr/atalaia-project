@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The bomb waits to be armed, with the score. Data: arm (the attacking team),
+# defend (the defending team), progress (0-1 while the attackers hold their
+# button; the bar fills, letting go empties it), a_points and d_points (the
+# teams' points), round (the coming round), game_left (seconds of game time
+# left); lang (pt, en, de or zh-tw) from the box.
+template: standby
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: panel }
+    children:
+      - type: label
+        text: "{lang == 'pt' && 'PRONTA' || lang == 'de' && 'BEREIT' || lang == 'zh-tw' && '就緒' || 'READY'}"
+        style: { font_size: 20, width: fill, align: center }
+  - type: label
+    text: "{arm|upper} {a_points|int} : {d_points|int} {defend|upper}"
+    style:
+      font_size: 20
+      color: white
+      padding: { top: 6 }
+  - type: label
+    text: "{lang == 'pt' && 'Tempo de jogo' || lang == 'de' && 'Spielzeit' || lang == 'zh-tw' && '遊戲時間' || 'Game time'} {game_left|clock}"
+    style: { font_size: 14, color: muted }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{lang == 'pt' && (progress && 'A armar... não largues' || 'Mantém premido para armar') || lang == 'de' && (progress && 'Schärfen... nicht loslassen' || 'Halten zum Schärfen') || lang == 'zh-tw' && (progress && '啟動中，別放手' || '按住以啟動') || (progress && 'Arming... keep holding' || 'Hold to arm')}"
+    style: { font_size: 20, color: "{progress && 'white' || 'muted'}", visible: "{arm}" }
+  - type: label
+    text: "{arm|upper}"
+    style: { font_size: 48, color: "{arm}", visible: "{arm}" }
+  - type: progress_bar
+    value: "{progress}"
+    style: { width: 220, height: 12, color: "{arm}", visible: "{arm}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{lang == 'pt' && 'Ronda' || lang == 'de' && 'Runde' || lang == 'zh-tw' && '回合' || 'Round'} {round|int}"
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

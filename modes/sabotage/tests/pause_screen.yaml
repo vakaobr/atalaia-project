@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The pause shows the score and the time to the next round; no hold counts during it
+params: { fuse_s: 20, pause_s: 20 }
+steps:
+  - hold: { team: red, s: 5 }
+  - wait: 20
+  - expect: { type: bomb.exploded }
+  - wait: 5
+  - expect_screen: { template: pause, data: { a_points: 1, d_points: 0, left: 20, attackers: red, defenders: blue } }
+  - wait: 5
+  - expect_screen: { template: pause, data: { left: 15 } }
+  - hold: { team: red, s: 6 }
+  - expect_no: bomb.armed
+  - wait: 15
+  - expect_screen: { template: standby, data: { round: 2 } }
+  - hold: { team: red, s: 5 }
+  - expect: { type: bomb.armed }

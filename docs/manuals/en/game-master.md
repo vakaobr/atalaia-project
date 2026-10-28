@@ -234,6 +234,7 @@ Every built-in mode is listed in **Mode or preset**. Their English and Portugues
 | Domination | Domínio | One box or many. Hold time and points are parameters. |
 | Hold-All Domination | Domínio Total | A team scores only while it holds every box. |
 | Bomb / Rush | Bomba / Rush | Fuse, arm and defuse hold times. Optional **Team codes**, for example `red=1234,blue=5678`. |
+| Sabotage | Sabotagem | Bomb rounds until the game time runs out: an explosion scores for the attackers, a defuse for the defenders, then a short pause. The team with more points wins. Pause, game time and optional **Team codes** are parameters. |
 | Last Stand | Último Elemento | Attackers, defenders, countdown to defeat. |
 | Kill Confirmed | Baixa Confirmada | Needs player tags. |
 | Respawn and Lives | Reentradas e Vidas | Needs tags, or team buttons. |

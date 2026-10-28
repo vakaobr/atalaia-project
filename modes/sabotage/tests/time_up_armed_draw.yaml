@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: With no point scored, an armed bomb at the time limit leaves a draw
+params: { fuse_s: 120, pause_s: 5, game_time_min: 3 }
+steps:
+  - wait: 100
+  - hold: { team: red, s: 5 }
+  - expect: { type: bomb.armed, at: 105 }
+  - wait: 100
+  - expect: { type: game.end, at: 180, data: { reason: draw } }
+  - expect_no: bomb.exploded
+  - expect_score: { team: red, points: 0 }
+  - expect_screen: { template: game_over, data: { winner: null } }

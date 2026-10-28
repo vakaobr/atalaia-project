@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: With team codes the keypad arms and defuses, and each result scores
+params: { fuse_s: 60, pause_s: 5, team_codes: "red=1234,blue=5678" }
+steps:
+  - expect_screen: { template: code_entry, data: { title: ARM, digits: 0 } }
+  - keys: "1234#"
+  - expect: { type: bomb.armed, team: red, at: 0, data: { reason: code } }
+  - expect_screen: { template: countdown, data: { left: 60, team: red } }
+  - wait: 10
+  - keys: "1234#"
+  - expect_no: bomb.defused
+  - keys: "5678#"
+  - expect: { type: bomb.defused, team: blue, at: 10, data: { reason: code } }
+  - expect_score: { team: blue, points: 1 }
+  - wait: 10
+  - expect_screen: { template: code_entry, data: { title: ARM, digits: 0 } }
+  - keys: "5678#"
+  - expect: { type: bomb.armed, team: blue, data: { reason: code } }
+  - wait: 60
+  - expect: { type: bomb.exploded, team: blue }
+  - expect_score: { team: blue, points: 2 }
+  - expect_no: script.error

@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The game's end: the winner in its colour, or a draw. Data: winner (the team
+# with more points; absent for a draw), attackers, defenders (the teams),
+# a_points and d_points (their points); lang (pt, en, de or zh-tw) from the box.
+template: game_over
+style: { background: "{winner || 'panel'}" }
+layout:
+  - type: icon
+    icon: ok
+    style: { font_size: 48, color: contrast }
+  - type: label
+    text: "{lang == 'pt' && 'FIM DE JOGO' || lang == 'de' && 'SPIELENDE' || lang == 'zh-tw' && '遊戲結束' || 'GAME OVER'}"
+    style: { font_size: 28, color: contrast }
+  - type: label
+    text: "Vence a equipa {winner|upper}"
+    style: { font_size: 28, color: contrast, visible: "{winner && lang == 'pt'}" }
+  - type: label
+    text: "Team {winner|upper} gewinnt"
+    style: { font_size: 28, color: contrast, visible: "{winner && lang == 'de'}" }
+  - type: label
+    text: "{winner|upper} 隊獲勝"
+    style: { font_size: 28, color: contrast, visible: "{winner && lang == 'zh-tw'}" }
+  - type: label
+    text: "{winner|upper} team wins"
+    style: { font_size: 28, color: contrast, visible: "{winner && lang != 'pt' && lang != 'de' && lang != 'zh-tw'}" }
+  - type: label
+    text: "{lang == 'pt' && 'EMPATE' || lang == 'de' && 'UNENTSCHIEDEN' || lang == 'zh-tw' && '平手' || 'DRAW'}"
+    style: { font_size: 28, color: contrast, visible: "{!winner}" }
+  - type: label
+    text: "{attackers|upper} {a_points|int} : {d_points|int} {defenders|upper}"
+    style: { font_size: 20, color: contrast }

@@ -215,6 +215,7 @@ typedef enum {
     TXO_M_MONEY,
     TXO_M_TARGETS,
     TXO_M_PROGDOM,
+    TXO_M_SABOTAGE,
     /* the built-in templates' names on the OLED's middle line (box_text_screen_name) */
     TXO_S_TAGS,
     TXO_S_RESPAWN,
@@ -237,6 +238,7 @@ typedef enum {
     TXO_S_HELD,
     TXO_S_INACTIVE,
     TXO_S_COMPLETED,
+    TXO_S_BREAK,
     /* the USB radio modem's own OLED (modem/modem_screen.c; decision MOD-1, 16 columns a line,
      * ASCII only except in Chinese, which the modem draws in its Han rows) */
     TXM_TITLE, /* "MODEM MODE", the header */

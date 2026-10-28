@@ -134,6 +134,31 @@ void main() {
       pd.params.firstWhere((p) => p.name == 'complete_min').label('pt'),
       'Minutos que uma equipa mantém a caixa ativa para a completar',
     );
+    // Sabotage: Bomb's rounds until the game time runs out; one box, no
+    // controller needed.
+    final sab = catalog.byId('org.atalaia.sabotage')!;
+    expect(sab.needsController, isFalse);
+    expect(sab.name('pt'), 'Sabotagem');
+    expect(sab.name('en'), 'Sabotage');
+    expect(sab.name('de'), 'Sabotage');
+    expect(sab.name('zh-tw'), '破壞');
+    expect(sab.roles.map((r) => r.name), ['bomb']);
+    expect(sab.role('bomb')!.requires, ['team_input']);
+    expect(
+      sab.screens.keys,
+      containsAll([
+        'standby',
+        'countdown',
+        'defused',
+        'exploded',
+        'pause',
+        'game_over',
+      ]),
+    );
+    expect(
+      sab.params.firstWhere((p) => p.name == 'game_time_min').label('pt'),
+      'Tempo de jogo (min)',
+    );
     expect(catalog.byId('org.atalaia.respawn')!.needsController, isFalse);
   });
 

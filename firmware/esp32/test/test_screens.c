@@ -83,6 +83,7 @@ static const timer_bar_case_t timer_bars[] = {
 #define OBJ      "org.atalaia.objectives {}"
 #define MONEY    "org.atalaia.money_factory {\"capacity\":50,\"capture_hold_ms\":3000}"
 #define PROG     "org.atalaia.progressive_domination {\"capture_hold_ms\":3000,\"complete_min\":10}"
+#define SAB "org.atalaia.sabotage {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
 
 /* Data as the modes (modes/bomb, modes/domination, modes/codes) and the shell send it. */
 static const screen_case_t cases[] = {
@@ -514,6 +515,76 @@ static const screen_case_t cases[] = {
      PROG},
     {"yaml_prog_completed_zh-tw", "completed", "{\"team\":\"blue\",\"step\":1,\"of\":4,\"done\":1}",
      PROG},
+    /* Sabotage: the bomb's rounds with the score: standby, the pause, the game's end (winner or
+     * draw) and the round's result, in every language. */
+    {"yaml_sab_standby", "standby",
+     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":"
+     "754}",
+     SAB},
+    {"yaml_sab_pause", "pause",
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,"
+     "\"exploded\":true,\"game_left\":754}",
+     SAB},
+    {"yaml_sab_game_over", "game_over",
+     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":"
+     "1}",
+     SAB},
+    {"yaml_sab_defused", "defused", "{\"team\":\"blue\"}", SAB},
+    {"yaml_sab_exploded", "exploded", "{\"team\":\"red\"}", SAB},
+    {"yaml_sab_standby_pt", "standby",
+     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":"
+     "754}",
+     SAB},
+    {"yaml_sab_pause_pt", "pause",
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,"
+     "\"exploded\":true,\"game_left\":754}",
+     SAB},
+    {"yaml_sab_game_over_pt", "game_over",
+     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":"
+     "1}",
+     SAB},
+    {"yaml_sab_defused_pt", "defused", "{\"team\":\"blue\"}", SAB},
+    {"yaml_sab_exploded_pt", "exploded", "{\"team\":\"red\"}", SAB},
+    {"yaml_sab_standby_de", "standby",
+     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":"
+     "754}",
+     SAB},
+    {"yaml_sab_pause_de", "pause",
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,"
+     "\"exploded\":true,\"game_left\":754}",
+     SAB},
+    {"yaml_sab_game_over_de", "game_over",
+     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":"
+     "1}",
+     SAB},
+    {"yaml_sab_defused_de", "defused", "{\"team\":\"blue\"}", SAB},
+    {"yaml_sab_exploded_de", "exploded", "{\"team\":\"red\"}", SAB},
+    {"yaml_sab_standby_zh-tw", "standby",
+     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":"
+     "754}",
+     SAB},
+    {"yaml_sab_pause_zh-tw", "pause",
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,"
+     "\"exploded\":true,\"game_left\":754}",
+     SAB},
+    {"yaml_sab_game_over_zh-tw", "game_over",
+     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":"
+     "1}",
+     SAB},
+    {"yaml_sab_defused_zh-tw", "defused", "{\"team\":\"blue\"}", SAB},
+    {"yaml_sab_exploded_zh-tw", "exploded", "{\"team\":\"red\"}", SAB},
+    {"yaml_sab_standby_holding", "standby",
+     "{\"arm\":\"red\",\"defend\":\"blue\",\"progress\":0.4,\"a_points\":0,\"d_points\":0,"
+     "\"round\":1,\"game_left\":1200}",
+     SAB},
+    {"yaml_sab_pause_defused_pt", "pause",
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":0,\"d_points\":1,\"left\":10,"
+     "\"exploded\":false,\"game_left\":900}",
+     SAB},
+    {"yaml_sab_game_over_draw", "game_over",
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":2}", SAB},
+    {"yaml_sab_game_over_draw_zh-tw", "game_over",
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":2}", SAB},
     /* Kill Confirmed, Respawn and Player Check-in in the box's language (their templates'
      * own texts; what their scripts write, "message", stays English). */
     {"yaml_kill_confirmed_pt", "tags", "{\"error\":false}", KILL},

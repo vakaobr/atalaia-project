@@ -845,6 +845,7 @@ int main(int argc, char **argv)
         {"objectives", "org.atalaia.objectives"},
         {"money_factory", "org.atalaia.money_factory"},
         {"progressive_domination", "org.atalaia.progressive_domination"},
+        {"sabotage", "org.atalaia.sabotage"},
     };
     enum { BUILTIN_COUNT = sizeof(builtin_modes) / sizeof(builtin_modes[0]) };
     builtin_source_t sources[BUILTIN_COUNT];

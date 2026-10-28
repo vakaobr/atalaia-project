@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Equal points at the time limit are a draw
+params: { fuse_s: 30, pause_s: 5, game_time_min: 3 }
+steps:
+  - hold: { team: red, s: 5 }
+  - wait: 30
+  - wait: 10
+  - hold: { team: red, s: 5 }
+  - hold: { team: blue, s: 10 }
+  - expect: { type: bomb.defused, team: blue }
+  - wait: 200
+  - expect: { type: game.end, at: 180, data: { reason: draw } }
+  - expect_screen: { template: game_over, data: { winner: null, a_points: 1, d_points: 1 } }
+  - expect_status: ended

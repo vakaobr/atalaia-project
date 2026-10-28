@@ -296,6 +296,7 @@ static const char *const texts[TX_COUNT][BOX_LANG_COUNT] = {
     [TXO_M_MONEY] = {"MONEY FACTORY", "FÁBRICA", "MONEY FACTORY", "印鈔廠"},
     [TXO_M_TARGETS] = {"TARGET WINDOWS", "JANELAS DE ALVO", "ZIELFENSTER", "標靶時窗"},
     [TXO_M_PROGDOM] = {"PROGRESSIVE DOMINATION", "PROGRESSIVO", "PROGRESSIVE", "漸進佔點"},
+    [TXO_M_SABOTAGE] = {"SABOTAGE", "SABOTAGEM", "SABOTAGE", "破壞"},
     /* The OLED's middle line: a built-in template's name where it has no countdown. */
     [TXO_S_TAGS] = {"TAGS", "ETIQUETAS", "TAGS", "標籤"},
     [TXO_S_RESPAWN] = {"RESPAWN", "REENTRADA", "RESPAWN", "復活"},
@@ -318,6 +319,7 @@ static const char *const texts[TX_COUNT][BOX_LANG_COUNT] = {
     [TXO_S_HELD] = {"HELD", "OCUPADO", "BESETZT", "已佔領"},
     [TXO_S_INACTIVE] = {"INACTIVE", "INATIVA", "INAKTIV", "未啟用"},
     [TXO_S_COMPLETED] = {"COMPLETED", "COMPLETA", "FERTIG", "已完成"},
+    [TXO_S_BREAK] = {"BREAK", "PAUSA", "PAUSE", "暫停"},
     /* The USB radio modem's OLED (modem_screen.c). Its 8-pixel font has ASCII only, so the Latin
      * texts have no accents ("DC" is the duty cycle: "DUTY" and the budget do not fit in
      * Portuguese); the Chinese ones are drawn in 16-pixel rows, and keep the counters' English
@@ -361,6 +363,7 @@ static const name_map_t mode_names[] = {
     {"MONEY FACTORY", TXO_M_MONEY},
     {"TARGET WINDOWS", TXO_M_TARGETS},
     {"PROGRESSIVE DOMINATION", TXO_M_PROGDOM},
+    {"SABOTAGE", TXO_M_SABOTAGE},
 };
 
 /* Every built-in template the OLED's generic line names (final_score, the countdowns and the
@@ -397,6 +400,8 @@ static const name_map_t screen_names[] = {
     {"checkpoint_held", TXO_S_HELD},
     {"inactive", TXO_S_INACTIVE},
     {"completed", TXO_S_COMPLETED},
+    {"pause", TXO_S_BREAK},
+    {"game_over", TX_GAME_OVER_UP},
 };
 
 static const char *lookup(const name_map_t *map, size_t n, const char *name)

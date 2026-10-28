@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A bomb armed when the time runs out does not count (decision SAB-3)
+params: { fuse_s: 60, pause_s: 5, game_time_min: 3 }
+steps:
+  - hold: { team: red, s: 5 }
+  - wait: 60
+  - expect: { type: bomb.exploded, team: red, at: 65 }
+  - wait: 70
+  # armed at 140 s; its 60 s fuse would end at 200, after the limit
+  - hold: { team: red, s: 5 }
+  - expect: { type: bomb.armed, at: 140 }
+  - wait: 100
+  - expect: { type: game.end, at: 180, data: { winner: red } }
+  - expect_no: bomb.exploded
+  - expect_score: { team: red, points: 1 }
+  - expect_screen: { template: game_over, data: { winner: red, a_points: 1 } }

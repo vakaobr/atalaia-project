@@ -48,6 +48,7 @@ typedef struct {
 #define MEDIC_ZH "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"zh-tw\"}"
 #define MONEY    "org.atalaia.money_factory {\"capacity\":50,\"capture_hold_ms\":3000}"
 #define PROG     "org.atalaia.progressive_domination {\"capture_hold_ms\":3000,\"complete_min\":10}"
+#define SAB      "org.atalaia.sabotage {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
 #define KILL     "org.atalaia.kill_confirmed {\"turn_in_s\":20}"
 #define RESPAWN  "org.atalaia.respawn {\"lives\":20,\"per_player\":false}"
 #define CHECKIN  "org.atalaia.player_checkin {\"points\":1}"
@@ -182,6 +183,32 @@ static const oled_case_t cases[] = {
     {"prog_captured", PROG, "captured",
      "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"held_min\":1,\"points\":6}"},
     {"prog_completed", PROG, "completed", "{\"team\":\"blue\",\"step\":1,\"of\":4,\"done\":1}"},
+    /* Sabotage: the standby with its score, the pause (a countdown) and the game's end (the
+       winner). */
+    {"sab_standby", SAB, "standby",
+     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":754}"},
+    {"sab_pause", SAB, "pause",
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,\"exploded\":true,\"game_left\":754}"},
+    {"sab_game_over", SAB, "game_over",
+     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":1}"},
+    {"sab_standby_pt", SAB, "standby",
+     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":754}"},
+    {"sab_pause_pt", SAB, "pause",
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,\"exploded\":true,\"game_left\":754}"},
+    {"sab_game_over_pt", SAB, "game_over",
+     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":1}"},
+    {"sab_standby_de", SAB, "standby",
+     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":754}"},
+    {"sab_pause_de", SAB, "pause",
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,\"exploded\":true,\"game_left\":754}"},
+    {"sab_game_over_de", SAB, "game_over",
+     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":1}"},
+    {"sab_standby_zh-tw", SAB, "standby",
+     "{\"arm\":\"red\",\"defend\":\"blue\",\"a_points\":2,\"d_points\":1,\"round\":4,\"game_left\":754}"},
+    {"sab_pause_zh-tw", SAB, "pause",
+     "{\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":2,\"d_points\":1,\"left\":7,\"exploded\":true,\"game_left\":754}"},
+    {"sab_game_over_zh-tw", SAB, "game_over",
+     "{\"winner\":\"red\",\"attackers\":\"red\",\"defenders\":\"blue\",\"a_points\":3,\"d_points\":1}"},
     /* A built-in mode's end screens, its header and the keypad's titles in the box's language
      * (the template's name and the mode's were English whatever the language). */
     {"defused_pt", BOMB, "defused", "{\"team\":\"blue\"}"},
