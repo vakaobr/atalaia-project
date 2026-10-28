@@ -187,8 +187,10 @@ class ApdCheckinTests(P3Case):
     def test_the_verdicts_wait_for_a_marshal_and_staff_may_override(self):
         g = self.new_game()
         self.put_rule(checkin=True, expiry=True, accepted=["apd-a"])
-        cases = {"missing": dict(), "expired": dict(apd_id="apd-a", membership_number="1", membership_expires=PAST),
-                 "not_accepted": dict(apd_id="apd-b", membership_number="1", membership_expires=FUTURE)}
+        # Membership numbers no random id or timestamp can contain, so the "never logged" check means something.
+        cases = {"missing": dict(),
+                 "expired": dict(apd_id="apd-a", membership_number="MBR-QX71", membership_expires=PAST),
+                 "not_accepted": dict(apd_id="apd-b", membership_number="MBR-QX72", membership_expires=FUTURE)}
         m, mtoken = self.make_marshal(g["id"])
         for want, body in cases.items():
             with self.subTest(want):
@@ -202,7 +204,7 @@ class ApdCheckinTests(P3Case):
                 self.assertEqual((r.json()["status"], r.json()["apd_status"], r.json()["apd_override"]),
                                  ("checked_in", want, True))
                 self.assertTrue(any("apd override" in line and want in line for line in logs.output))
-                self.assertFalse(any("123" in line for line in logs.output))
+                self.assertFalse(any("MBR-QX" in line for line in logs.output))  # the number is never logged
 
     def test_a_hand_check_in_is_never_refused_and_is_logged(self):
         g = self.new_game()
