@@ -1,0 +1,896 @@
+{
+ "description": "APD membership vectors (protocol/apd.md). rule_valid: a rule as given (null or missing keys allowed) and the normalised rule every implementation must produce; rule_invalid: refused with the error given. membership_valid / membership_invalid likewise for {apd, number, expires} (missing keys are null). status: the verdict for a rule, a membership and the local date the check is for: missing, not_accepted, expired, valid, in that order of precedence. Written by hand from protocol/apd.md; the server, the Pi controller and the Dart controller and app all run these.",
+ "rule_valid": [
+  {
+   "name": "empty_is_the_default",
+   "input": {},
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": false,
+    "expiry": false,
+    "custom": []
+   }
+  },
+  {
+   "name": "null_is_the_default",
+   "input": null,
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": false,
+    "expiry": false,
+    "custom": []
+   }
+  },
+  {
+   "name": "partial",
+   "input": {
+    "checkin": true
+   },
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": true,
+    "expiry": false,
+    "custom": []
+   }
+  },
+  {
+   "name": "full",
+   "input": {
+    "accepted": [
+     "apd-a",
+     "x-clube-norte"
+    ],
+    "register": true,
+    "checkin": true,
+    "expiry": true,
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte, APD",
+      "short_name": "Norte",
+      "website": "https://clube.example/"
+     }
+    ]
+   },
+   "rule": {
+    "accepted": [
+     "apd-a",
+     "x-clube-norte"
+    ],
+    "register": true,
+    "checkin": true,
+    "expiry": true,
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte, APD",
+      "short_name": "Norte",
+      "website": "https://clube.example/"
+     }
+    ]
+   }
+  },
+  {
+   "name": "own_entry_website_null",
+   "input": {
+    "custom": [
+     {
+      "id": "x-a",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     }
+    ]
+   },
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": false,
+    "expiry": false,
+    "custom": [
+     {
+      "id": "x-a",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "own_entry_website_omitted",
+   "input": {
+    "custom": [
+     {
+      "id": "x-a",
+      "name": "A",
+      "short_name": "A"
+     }
+    ]
+   },
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": false,
+    "expiry": false,
+    "custom": [
+     {
+      "id": "x-a",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "accepted_may_name_an_id_this_list_lacks",
+   "input": {
+    "accepted": [
+     "newer-apd"
+    ]
+   },
+   "rule": {
+    "accepted": [
+     "newer-apd"
+    ],
+    "register": false,
+    "checkin": false,
+    "expiry": false,
+    "custom": []
+   }
+  }
+ ],
+ "rule_invalid": [
+  {
+   "name": "not_an_object",
+   "input": [],
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "unknown_key",
+   "input": {
+    "checkin": true,
+    "extra": 1
+   },
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "flag_not_bool",
+   "input": {
+    "checkin": "yes"
+   },
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "flag_int",
+   "input": {
+    "expiry": 1
+   },
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "accepted_empty_list",
+   "input": {
+    "accepted": []
+   },
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "accepted_not_list",
+   "input": {
+    "accepted": "apd-a"
+   },
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "accepted_bad_id",
+   "input": {
+    "accepted": [
+     "Apd A"
+    ]
+   },
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "accepted_duplicate",
+   "input": {
+    "accepted": [
+     "apd-a",
+     "apd-a"
+    ]
+   },
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "accepted_too_many",
+   "input": {
+    "accepted": [
+     "a0",
+     "a1",
+     "a2",
+     "a3",
+     "a4",
+     "a5",
+     "a6",
+     "a7",
+     "a8",
+     "a9",
+     "a10",
+     "a11",
+     "a12",
+     "a13",
+     "a14",
+     "a15",
+     "a16",
+     "a17",
+     "a18",
+     "a19",
+     "a20",
+     "a21",
+     "a22",
+     "a23",
+     "a24",
+     "a25",
+     "a26",
+     "a27",
+     "a28",
+     "a29",
+     "a30",
+     "a31",
+     "a32"
+    ]
+   },
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "custom_not_x_prefixed",
+   "input": {
+    "custom": [
+     {
+      "id": "apd-a",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     }
+    ]
+   },
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "custom_duplicate",
+   "input": {
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte, APD",
+      "short_name": "Norte",
+      "website": "https://clube.example/"
+     },
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte, APD",
+      "short_name": "Norte",
+      "website": "https://clube.example/"
+     }
+    ]
+   },
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "custom_name_empty",
+   "input": {
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "",
+      "short_name": "Norte",
+      "website": "https://clube.example/"
+     }
+    ]
+   },
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "custom_short_name_long",
+   "input": {
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte, APD",
+      "short_name": "xxxxxxxxxxxxxxxxx",
+      "website": "https://clube.example/"
+     }
+    ]
+   },
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "custom_website_http",
+   "input": {
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte, APD",
+      "short_name": "Norte",
+      "website": "http://clube.example/"
+     }
+    ]
+   },
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "custom_extra_key",
+   "input": {
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte, APD",
+      "short_name": "Norte",
+      "website": "https://clube.example/",
+      "note": "x"
+     }
+    ]
+   },
+   "error": "apd_rule_invalid"
+  },
+  {
+   "name": "custom_too_many",
+   "input": {
+    "custom": [
+     {
+      "id": "x-0",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-1",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-2",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-3",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-4",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-5",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-6",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-7",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-8",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-9",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-10",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-11",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-12",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-13",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-14",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-15",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     },
+     {
+      "id": "x-16",
+      "name": "A",
+      "short_name": "A",
+      "website": null
+     }
+    ]
+   },
+   "error": "apd_rule_invalid"
+  }
+ ],
+ "membership_valid": [
+  {
+   "name": "all",
+   "input": {
+    "apd": "apd-a",
+    "number": "FPA-1234",
+    "expires": "2027-01-31"
+   },
+   "membership": {
+    "apd": "apd-a",
+    "number": "FPA-1234",
+    "expires": "2027-01-31"
+   }
+  },
+  {
+   "name": "number_only",
+   "input": {
+    "number": "12345"
+   },
+   "membership": {
+    "apd": null,
+    "number": "12345",
+    "expires": null
+   }
+  },
+  {
+   "name": "empty",
+   "input": {},
+   "membership": {
+    "apd": null,
+    "number": null,
+    "expires": null
+   }
+  }
+ ],
+ "membership_invalid": [
+  {
+   "name": "bad_date_format",
+   "input": {
+    "expires": "31/01/2027"
+   },
+   "error": "apd_membership_invalid"
+  },
+  {
+   "name": "impossible_date",
+   "input": {
+    "expires": "2027-02-30"
+   },
+   "error": "apd_membership_invalid"
+  },
+  {
+   "name": "year_out_of_range",
+   "input": {
+    "expires": "1999-01-01"
+   },
+   "error": "apd_membership_invalid"
+  },
+  {
+   "name": "number_empty",
+   "input": {
+    "number": ""
+   },
+   "error": "apd_membership_invalid"
+  },
+  {
+   "name": "number_too_long",
+   "input": {
+    "number": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   "error": "apd_membership_invalid"
+  },
+  {
+   "name": "number_control_char",
+   "input": {
+    "number": "12\n3"
+   },
+   "error": "apd_membership_invalid"
+  },
+  {
+   "name": "apd_bad_id",
+   "input": {
+    "apd": "APD A"
+   },
+   "error": "apd_membership_invalid"
+  },
+  {
+   "name": "unknown_key",
+   "input": {
+    "x": 1
+   },
+   "error": "apd_membership_invalid"
+  },
+  {
+   "name": "number_not_text",
+   "input": {
+    "number": 12345
+   },
+   "error": "apd_membership_invalid"
+  }
+ ],
+ "status": [
+  {
+   "name": "valid_any_apd",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": true,
+    "expiry": false,
+    "custom": []
+   },
+   "membership": {
+    "apd": "apd-a",
+    "number": "12345",
+    "expires": null
+   },
+   "on": "2026-11-15",
+   "status": "valid"
+  },
+  {
+   "name": "valid_apd_unknown_migrated_number",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": true,
+    "expiry": false,
+    "custom": []
+   },
+   "membership": {
+    "apd": null,
+    "number": "12345",
+    "expires": null
+   },
+   "on": "2026-11-15",
+   "status": "valid"
+  },
+  {
+   "name": "missing_number",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": true,
+    "expiry": false,
+    "custom": []
+   },
+   "membership": {
+    "apd": "apd-a",
+    "number": null,
+    "expires": "2027-01-01"
+   },
+   "on": "2026-11-15",
+   "status": "missing"
+  },
+  {
+   "name": "missing_everything",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": true,
+    "expiry": false,
+    "custom": []
+   },
+   "membership": {
+    "apd": null,
+    "number": null,
+    "expires": null
+   },
+   "on": "2026-11-15",
+   "status": "missing"
+  },
+  {
+   "name": "missing_expiry_when_checked",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": true,
+    "expiry": true,
+    "custom": []
+   },
+   "membership": {
+    "apd": "apd-a",
+    "number": "12345",
+    "expires": null
+   },
+   "on": "2026-11-15",
+   "status": "missing"
+  },
+  {
+   "name": "expiry_not_checked_ignores_it",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": true,
+    "expiry": false,
+    "custom": []
+   },
+   "membership": {
+    "apd": "apd-a",
+    "number": "12345",
+    "expires": "2020-01-01"
+   },
+   "on": "2026-11-15",
+   "status": "valid"
+  },
+  {
+   "name": "expired",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": true,
+    "expiry": true,
+    "custom": []
+   },
+   "membership": {
+    "apd": "apd-a",
+    "number": "12345",
+    "expires": "2026-11-14"
+   },
+   "on": "2026-11-15",
+   "status": "expired"
+  },
+  {
+   "name": "expires_on_the_day_is_valid",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": true,
+    "expiry": true,
+    "custom": []
+   },
+   "membership": {
+    "apd": "apd-a",
+    "number": "12345",
+    "expires": "2026-11-15"
+   },
+   "on": "2026-11-15",
+   "status": "valid"
+  },
+  {
+   "name": "valid_future_expiry",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": true,
+    "expiry": true,
+    "custom": []
+   },
+   "membership": {
+    "apd": "apd-a",
+    "number": "12345",
+    "expires": "2027-12-31"
+   },
+   "on": "2026-11-15",
+   "status": "valid"
+  },
+  {
+   "name": "accepted_in_list",
+   "rule": {
+    "accepted": [
+     "apd-a",
+     "x-clube-norte"
+    ],
+    "register": false,
+    "checkin": true,
+    "expiry": false,
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte, APD",
+      "short_name": "Norte",
+      "website": "https://clube.example/"
+     }
+    ]
+   },
+   "membership": {
+    "apd": "apd-a",
+    "number": "1",
+    "expires": null
+   },
+   "on": "2026-11-15",
+   "status": "valid"
+  },
+  {
+   "name": "accepted_own_entry",
+   "rule": {
+    "accepted": [
+     "apd-a",
+     "x-clube-norte"
+    ],
+    "register": false,
+    "checkin": true,
+    "expiry": false,
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte, APD",
+      "short_name": "Norte",
+      "website": "https://clube.example/"
+     }
+    ]
+   },
+   "membership": {
+    "apd": "x-clube-norte",
+    "number": "1",
+    "expires": null
+   },
+   "on": "2026-11-15",
+   "status": "valid"
+  },
+  {
+   "name": "not_accepted_other_apd",
+   "rule": {
+    "accepted": [
+     "apd-a",
+     "x-clube-norte"
+    ],
+    "register": false,
+    "checkin": true,
+    "expiry": false,
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte, APD",
+      "short_name": "Norte",
+      "website": "https://clube.example/"
+     }
+    ]
+   },
+   "membership": {
+    "apd": "apd-b",
+    "number": "1",
+    "expires": null
+   },
+   "on": "2026-11-15",
+   "status": "not_accepted"
+  },
+  {
+   "name": "not_accepted_unknown_apd_with_list",
+   "rule": {
+    "accepted": [
+     "apd-a",
+     "x-clube-norte"
+    ],
+    "register": false,
+    "checkin": true,
+    "expiry": false,
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte, APD",
+      "short_name": "Norte",
+      "website": "https://clube.example/"
+     }
+    ]
+   },
+   "membership": {
+    "apd": null,
+    "number": "1",
+    "expires": null
+   },
+   "on": "2026-11-15",
+   "status": "not_accepted"
+  },
+  {
+   "name": "missing_beats_not_accepted",
+   "rule": {
+    "accepted": [
+     "apd-a",
+     "x-clube-norte"
+    ],
+    "register": false,
+    "checkin": true,
+    "expiry": false,
+    "custom": [
+     {
+      "id": "x-clube-norte",
+      "name": "Clube Norte, APD",
+      "short_name": "Norte",
+      "website": "https://clube.example/"
+     }
+    ]
+   },
+   "membership": {
+    "apd": "apd-b",
+    "number": null,
+    "expires": null
+   },
+   "on": "2026-11-15",
+   "status": "missing"
+  },
+  {
+   "name": "not_accepted_beats_expired",
+   "rule": {
+    "accepted": [
+     "apd-a"
+    ],
+    "register": false,
+    "checkin": true,
+    "expiry": true,
+    "custom": []
+   },
+   "membership": {
+    "apd": "apd-b",
+    "number": "1",
+    "expires": "2020-01-01"
+   },
+   "on": "2026-11-15",
+   "status": "not_accepted"
+  },
+  {
+   "name": "expired_in_list",
+   "rule": {
+    "accepted": [
+     "apd-a"
+    ],
+    "register": false,
+    "checkin": true,
+    "expiry": true,
+    "custom": []
+   },
+   "membership": {
+    "apd": "apd-a",
+    "number": "1",
+    "expires": "2020-01-01"
+   },
+   "on": "2026-11-15",
+   "status": "expired"
+  },
+  {
+   "name": "leap_day_expiry",
+   "rule": {
+    "accepted": null,
+    "register": false,
+    "checkin": true,
+    "expiry": true,
+    "custom": []
+   },
+   "membership": {
+    "apd": "apd-a",
+    "number": "1",
+    "expires": "2028-02-29"
+   },
+   "on": "2028-02-29",
+   "status": "valid"
+  }
+ ]
+}

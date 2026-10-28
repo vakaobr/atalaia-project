@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atalaia.example/schema/apds.schema.json",
+  "title": "List of APDs (Associacoes Promotoras de Desporto) recognised for airsoft",
+  "description": "registry/apds/apds.json (protocol/apd.md). Every entry cites its official public source.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "apds"],
+  "properties": {
+    "format": {"const": 1},
+    "apds": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "short_name", "website", "source"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"},
+          "name": {"type": "string", "minLength": 1, "maxLength": 96},
+          "short_name": {"type": "string", "minLength": 1, "maxLength": 16},
+          "website": {"type": ["string", "null"], "pattern": "^https://[^\\s]{1,120}$"},
+          "source": {"type": "string", "pattern": "^https://[^\\s]{1,200}$", "description": "Official public page that shows the APD exists and is recognised for airsoft (its own site or a public register)."}
+        }
+      }
+    }
+  }
+}
