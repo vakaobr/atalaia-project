@@ -10,6 +10,10 @@ origin and RP ID checks, the signature counter); this module fixes the choices t
 - **User verification is required** (PIN, biometric) at registration and at every use, and the credential is
   discoverable (a resident key), so a login needs no username. A passkey login therefore proves two factors, and
   counts as both for the roles that need a second factor (LG-4).
+- **The app** (decision PKA-1): a passkey made or used from the Android app carries the origin
+  ``android:apk-key-hash:<signing certificate>`` instead of the site's address; the certificates the operator
+  gave (ATALAIA_APP_ANDROID_SHA256, the same ones that go in assetlinks.json) are accepted as origins besides
+  the site's own. The RP ID stays the site's host name, so the same passkey works in the browser and in the app.
 - **No attestation**: the server does not ask which authenticator model it is, so it keeps nothing that
   identifies the device (``attestation: none``).
 - The **challenge** is made here and carried in a signed token (``tokens.make_webauthn_challenge``), not kept in
@@ -20,9 +24,10 @@ origin and RP ID checks, the signature counter); this module fixes the choices t
 
 from __future__ import annotations
 
+import base64
 import json
 import secrets
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 from urllib.parse import urlsplit
 
 from webauthn import (generate_authentication_options, generate_registration_options, options_to_json,
@@ -61,13 +66,21 @@ def registration_options(origin: str, user_id: bytes, username: str,
     return json.loads(options_to_json(options)), challenge
 
 
-def verify_registration(credential: dict[str, Any], challenge: bytes, origin: str) -> Any:
+def android_origin(sha256_fingerprint: str) -> str:
+    """The origin Android's Credential Manager writes into a passkey's clientDataJSON for an app: the SHA-256 of
+    its signing certificate (as keytool prints it, hex pairs with colons), base64url without padding."""
+    digest = bytes.fromhex(sha256_fingerprint.replace(":", ""))
+    return "android:apk-key-hash:" + base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+
+def verify_registration(credential: dict[str, Any], challenge: bytes, origin: str,
+                        app_origins: Sequence[str] = ()) -> Any:
     """The library's ``VerifiedRegistration`` (credential id, public key, sign count...) or ``PasskeyError``."""
     _check_size(credential)
     try:
         return verify_registration_response(credential=credential, expected_challenge=challenge,
-                                            expected_rp_id=rp_id_of(origin), expected_origin=origin,
-                                            require_user_verification=True)
+                                            expected_rp_id=rp_id_of(origin),
+                                            expected_origin=[origin, *app_origins], require_user_verification=True)
     except Exception as e:  # noqa: BLE001  (the library raises its own and parsing errors; all mean "refused")
         raise PasskeyError(type(e).__name__) from None
 
@@ -103,13 +116,13 @@ def user_handle_of(credential: dict[str, Any]) -> Optional[bytes]:
 
 
 def verify_authentication(credential: dict[str, Any], challenge: bytes, origin: str, public_key: bytes,
-                          sign_count: int) -> Any:
+                          sign_count: int, app_origins: Sequence[str] = ()) -> Any:
     """The library's ``VerifiedAuthentication`` (``new_sign_count``...) or ``PasskeyError``."""
     _check_size(credential)
     try:
         return verify_authentication_response(
             credential=credential, expected_challenge=challenge, expected_rp_id=rp_id_of(origin),
-            expected_origin=origin, credential_public_key=public_key, credential_current_sign_count=sign_count,
+            expected_origin=[origin, *app_origins], credential_public_key=public_key, credential_current_sign_count=sign_count,
             require_user_verification=True)
     except Exception as e:  # noqa: BLE001
         raise PasskeyError(type(e).__name__) from None

@@ -269,6 +269,33 @@ class AppLinkTests(LoginTestCase):
         user = await self.user_by("linked-subject")
         self.assertEqual(user["username"], name)
 
+    async def test_a_passkey_made_and_used_in_the_app_is_accepted(self) -> None:
+        """The origin Credential Manager gives an app is the hash of its signing certificate, from the settings."""
+        from atalaia_server.passkeys import android_origin
+        origin = android_origin(SHA)
+        self.assertEqual(origin, "android:apk-key-hash:" + "q83vAavN7wGrze8Bq83vAavN7wGrze8Bq83vAavN7wE")
+        self.assertEqual(self.app.state.settings.app_origins, (origin, origin))
+        _, name, _ = await self.make_user()
+        headers = bearer((await self.client.post("/api/v1/auth/login", json={"username": name, "password": PASSWORD})).json())
+        authenticator = SoftAuthenticator()
+        r = await self.client.post("/api/v1/me/passkeys/options", json={"password": PASSWORD}, headers=headers)
+        self.assertEqual(r.status_code, 200, r.text)
+        options = r.json()
+        r = await self.client.post("/api/v1/me/passkeys", headers=headers, json={
+            "challenge_token": options["challenge_token"], "credential": authenticator.create(options["options"], origin)})
+        self.assertEqual(r.status_code, 201, r.text)
+        parts = await self.passkey_login_parts()
+        r = await self.client.post("/api/v1/auth/passkey/login", json={
+            "challenge_token": parts["challenge_token"], "credential": authenticator.get(parts["options"], origin)})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json()["mfa"])
+        # Any other app origin is refused.
+        other = android_origin(":".join(["11"] * 32))
+        parts = await self.passkey_login_parts()
+        r = await self.client.post("/api/v1/auth/passkey/login", json={
+            "challenge_token": parts["challenge_token"], "credential": authenticator.get(parts["options"], other)})
+        self.assertEqual(r.status_code, 401, r.text)
+
     async def test_a_browser_that_lands_there_sees_a_short_page_with_no_script(self) -> None:
         r = await self.client.get("/app/oidc", params={"oidc": "linked"})
         self.assertEqual(r.status_code, 200)
@@ -278,6 +305,18 @@ class AppLinkTests(LoginTestCase):
 
 class AppLinksOffTests(LoginTestCase):
     """With no app configured the server says nothing about one."""
+
+    async def test_an_app_origin_is_not_accepted(self) -> None:
+        from atalaia_server.passkeys import android_origin
+        self.assertEqual(self.app.state.settings.app_origins, ())
+        _, name, _ = await self.make_user()
+        headers = bearer((await self.client.post("/api/v1/auth/login", json={"username": name, "password": PASSWORD})).json())
+        r = await self.client.post("/api/v1/me/passkeys/options", json={"password": PASSWORD}, headers=headers)
+        options = r.json()
+        r = await self.client.post("/api/v1/me/passkeys", headers=headers, json={
+            "challenge_token": options["challenge_token"],
+            "credential": SoftAuthenticator().create(options["options"], android_origin(SHA))})
+        self.assertEqual(r.status_code, 400, r.text)
 
     async def test_nothing_is_served(self) -> None:
         for path in ("/.well-known/assetlinks.json", "/.well-known/apple-app-site-association"):

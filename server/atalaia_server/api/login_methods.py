@@ -557,7 +557,8 @@ async def passkey_register(body: AddPasskeyIn, request: Request, principal: Prin
         raise HTTPException(400, "invalid_challenge")
     user = await _user_for_update(db, principal)
     try:
-        verified = passkeys.verify_registration(body.credential, challenge.challenge, site_origin(request))
+        verified = passkeys.verify_registration(body.credential, challenge.challenge, site_origin(request),
+                                                request.app.state.settings.app_origins)
     except passkeys.PasskeyError:
         raise HTTPException(400, "passkey_invalid") from None
     count = await passkey_count(db, user.id)
@@ -647,7 +648,7 @@ async def _verify_assertion(db: AsyncSession, request: Request, token: str, cred
                 handle is not None and handle != key.user_id.bytes):
             raise passkeys.PasskeyError("unknown credential")
         verified = passkeys.verify_authentication(credential, challenge.challenge, origin, bytes(key.public_key),
-                                                  int(key.sign_count))
+                                                  int(key.sign_count), request.app.state.settings.app_origins)
     except passkeys.PasskeyError:
         locked = limits.login_address.fail(address)
         record(db, "login_failed", request, user_id=key.user_id if key is not None else None,

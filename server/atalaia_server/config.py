@@ -399,6 +399,12 @@ class Settings:
     def oidc_client(self, provider: str) -> Optional[OidcClient]:
         return next((c for c in self.oidc if c.provider == provider), None)
 
+    @property
+    def app_origins(self) -> tuple[str, ...]:
+        """The origins a passkey made or used in the Android app carries (passkeys.android_origin)."""
+        from .passkeys import android_origin
+        return tuple(android_origin(h) for h in self.app_android_sha256)
+
     def _check_app(self) -> None:
         """The app's identity for App Links and passkeys (PKA-1): the package and its certificates go together;
         a typo must not turn the file off silently."""
