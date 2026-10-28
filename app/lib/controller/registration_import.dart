@@ -660,8 +660,9 @@ String? _text(Object? value, String code, int limit, {bool integers = false}) {
   if (value is! String) throw ImportRowError(code);
   final text = _strip(value);
   if (text.isEmpty) return null;
-  if (text.runes.length > limit || !_printable(text))
+  if (text.runes.length > limit || !_printable(text)) {
     throw ImportRowError(code);
+  }
   return text;
 }
 
