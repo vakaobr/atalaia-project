@@ -306,7 +306,7 @@ static void test_join_and_storage(void)
     FILE *cut = fopen(p, "wb");
     CHECK(cut != NULL);
     if (cut) {
-        CHECK(fwrite(buf, 1, 5000, cut) == 5000);
+        CHECK(fwrite(buf, 1, sizeof(buf), cut) == sizeof(buf)); /* shorter than a logo: truncated */
         fclose(cut);
     }
     CHECK(!box_logo_kept(NULL) && box_logo_load() == NULL);
