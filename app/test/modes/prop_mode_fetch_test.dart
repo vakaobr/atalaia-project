@@ -181,9 +181,16 @@ void main() {
 
   test('the keys: built in and the settings, valid, once each', () {
     final s = AppSettings()..modeKeys = [trusted, 'nonsense', otherKey];
-    expect(propModeKeys(s), [trusted, otherKey]);
+    // The default build carries the project's two registry keys
+    // (docs/community/keys.md), first.
+    expect(builtInModeKeys.split(' '), [
+      'I+m3rO++TcVNhvDHzI28pkNA8UGoTJSi84IWQguq4Mo=',
+      '0nMp0OGboGJZUMsbc/ykqkxQFNdmI/a2k4nQ6YsdTIY=',
+    ]);
+    expect(propModeKeys(s), [...builtInModeKeys.split(' '), trusted, otherKey]);
+    expect(propModeKeys(s, builtIn: ''), [trusted, otherKey]);
     expect(propModeKeys(s, builtIn: '$otherKey $trusted'), [otherKey, trusted]);
-    expect(propModeKeys(AppSettings()), isEmpty);
+    expect(propModeKeys(AppSettings(), builtIn: ''), isEmpty);
   });
 
   test(
