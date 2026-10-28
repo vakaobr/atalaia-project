@@ -142,7 +142,6 @@ class User(Base):
     totp_last_step: Mapped[Optional[int]] = mapped_column(BigInteger)
     server_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     gdpr_consent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    data_retention_days: Mapped[Optional[int]] = mapped_column(Integer)
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()

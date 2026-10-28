@@ -15,7 +15,13 @@
                             "off" when something else runs `python -m atalaia_server purge`
     ATALAIA_PRIVACY_NOTICE_VERSION
                             the version of the privacy notice the field shows (default
-                            "template-2026-10-19"), stored with every consent
+                            "template-2026-10-19"), stored with every consent; an account whose
+                            consent is for another version is asked to consent again (CONS-*)
+    ATALAIA_PRIVACY_NOTICE_DIR
+                            optional: the folder with the operator's privacy notice, one Markdown file per
+                            language and version, ``privacy-notice-<lang>-<version>.md`` (lang pt, en, de or
+                            zh-tw); the current version's files are served at /privacy and
+                            GET /api/v1/privacy-notice; unset, no notice is published
     ATALAIA_PUBLIC_URL      the site's public origin (https://campo.example.pt): the links in
                             the field pages and feeds and the host name in iCalendar UIDs;
                             unset, they follow the request (a local trial only)
@@ -320,6 +326,7 @@ class Settings:
     log_level: str = "info"
     purge_hour: Optional[int] = 3
     privacy_notice_version: str = DEFAULT_NOTICE_VERSION
+    privacy_notice_dir: Optional[str] = None
     public_url: Optional[str] = None
     test_adapter: bool = False
     firmware_keys: tuple[str, ...] = ()
@@ -355,6 +362,9 @@ class Settings:
         if not NOTICE_VERSION.fullmatch(self.privacy_notice_version):
             raise ConfigError("ATALAIA_PRIVACY_NOTICE_VERSION must be 1-64 characters: letters, digits and . _ : + -, "
                               "starting with a letter or digit")
+        if self.privacy_notice_dir is not None and (not self.privacy_notice_dir.strip()
+                                                    or "\0" in self.privacy_notice_dir):
+            raise ConfigError("ATALAIA_PRIVACY_NOTICE_DIR must be a folder path")
         if self.public_url is not None:
             object.__setattr__(self, "public_url", check_public_url(self.public_url))
         if len(self.firmware_keys) > MAX_FIRMWARE_KEYS:
@@ -484,6 +494,7 @@ class Settings:
             log_level=env.get("ATALAIA_LOG_LEVEL", "info").strip().lower() or "info",
             purge_hour=_purge_hour(env),
             privacy_notice_version=env.get("ATALAIA_PRIVACY_NOTICE_VERSION", "").strip() or DEFAULT_NOTICE_VERSION,
+            privacy_notice_dir=env.get("ATALAIA_PRIVACY_NOTICE_DIR", "").strip() or None,
             public_url=env.get("ATALAIA_PUBLIC_URL", "").strip() or None,
             test_adapter=_on_off(env, "ATALAIA_TEST_ADAPTER"),
             firmware_keys=tuple(k for k in env.get("ATALAIA_FIRMWARE_KEYS", "").split(",") if k.strip()),

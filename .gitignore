@@ -57,3 +57,6 @@ HANDOVER.md
 
 # Claude Code worktrees (agents work on copies of the repository here)
 .claude/
+
+# The operator's own privacy notice files (server/privacy-notice/README.md)
+server/privacy-notice/privacy-notice-*.md

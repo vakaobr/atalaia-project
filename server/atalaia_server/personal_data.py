@@ -152,6 +152,36 @@ def give_consent(db: AsyncSession, user_id: uuid.UUID, purpose: str, notice_vers
                    given_at=given_at or datetime.now(timezone.utc)))
 
 
+async def account_consent(db: AsyncSession, user_id: uuid.UUID, current_version: str) -> dict[str, Any]:
+    """Where the account's ``account`` consent stands against the privacy notice's current version (CONS-2):
+    ``status`` is ``current`` (given for the current version), ``outdated`` (given for another version: the account
+    is asked to consent again) or ``missing`` (no live consent)."""
+    live = await db.scalar(select(Consent).where(Consent.user_id == user_id, Consent.purpose == ACCOUNT,
+                                                 Consent.field_id.is_(None), Consent.withdrawn_at.is_(None)))
+    status = "missing" if live is None else ("current" if live.notice_version == current_version else "outdated")
+    return {"status": status, "version": live.notice_version if live is not None else None,
+            "current_version": current_version, "given_at": _iso(live.given_at) if live is not None else None}
+
+
+async def renew_account_consent(db: AsyncSession, user: User, version: str) -> Optional[str]:
+    """Consent again, to ``version``, in the caller's transaction (the caller locked ``user`` and commits): the live
+    consent for another version ends (``withdrawn_at``: it was replaced, not taken back) and a new one is
+    recorded; ``users.gdpr_consent_at`` becomes its time. Returns the version replaced, None when the account had no
+    live consent. Already consented to ``version``: nothing changes."""
+    live = await db.scalar(select(Consent).where(Consent.user_id == user.id, Consent.purpose == ACCOUNT,
+                                                 Consent.field_id.is_(None), Consent.withdrawn_at.is_(None))
+                           .with_for_update())
+    if live is not None and live.notice_version == version:
+        return version
+    now = datetime.now(timezone.utc)
+    if live is not None:
+        live.withdrawn_at = now
+        await db.flush()  # the one live consent per purpose: the old one ends before the new one starts
+    give_consent(db, user.id, ACCOUNT, version, now)
+    user.gdpr_consent_at = now
+    return live.notice_version if live is not None else None
+
+
 async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.UUID] = None) -> dict[str, Any]:
     """Everything the server holds about the account (GDPR Art. 15), as JSON-ready data."""
     roles = await db.execute(
@@ -204,7 +234,7 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
             "id": str(user.id), "username": user.username, "email": user.email,
             "created_at": _iso(user.created_at), "updated_at": _iso(user.updated_at),
             "last_login_at": _iso(user.last_login_at), "gdpr_consent_at": _iso(user.gdpr_consent_at),
-            "data_retention_days": user.data_retention_days, "totp_enabled": user.totp_enabled,
+            "totp_enabled": user.totp_enabled,
             "has_password": user.password_hash is not None, "server_admin": user.server_admin,
         },
         # Login methods (LG-1, LG-2): the social logins linked (provider and the subject it gave) and the
@@ -388,7 +418,7 @@ async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_reques
     tombstone = ERASED_PREFIX + secrets.token_hex(8)
     await db.execute(update(User).where(User.id == user_id).values(
         username=tombstone, email=None, password_hash=ERASED_PASSWORD, totp_secret_enc=None, totp_enabled=False,
-        totp_last_step=None, server_admin=False, gdpr_consent_at=None, data_retention_days=None,
+        totp_last_step=None, server_admin=False, gdpr_consent_at=None,
         last_login_at=None).execution_options(synchronize_session=False))
     await db.execute(delete(UserFieldRole).where(UserFieldRole.user_id == user_id))
     await db.execute(delete(UserSession).where(UserSession.user_id == user_id))  # refresh tokens cascade

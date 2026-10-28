@@ -37,7 +37,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import passwords, personal_data, quotas, tenancy, totp
+from .. import passwords, personal_data, privacy_notice, quotas, tenancy, totp
 from ..audit import record, request_ip
 from ..auth import Principal, current_principal, load_roles
 from ..db import get_session
@@ -65,6 +65,9 @@ class RegisterIn(Strict):
     password: str = Field(max_length=4096)
     email: Optional[str] = Field(default=None, max_length=320)
     consent: bool = False
+    # The version of the privacy notice the person was shown (GET /api/v1/privacy-notice); when given and not the
+    # current one, 409 notice_version_changed (CONS-4).
+    notice_version: Optional[str] = Field(default=None, max_length=64)
 
 
 class LoginIn(Strict):
@@ -269,6 +272,10 @@ async def register(body: RegisterIn, request: Request, db: AsyncSession = Depend
         raise HTTPException(400, problem)
     if not body.consent:
         raise HTTPException(400, "consent_required")
+    current = request.app.state.settings.privacy_notice_version
+    if body.notice_version is not None and body.notice_version != current:
+        return JSONResponse({"detail": "notice_version_changed", "current_version": current}, status_code=409,
+                            headers=NO_STORE)
     problem = passwords.policy_problem(body.password, username)
     if problem:
         raise HTTPException(400, problem)
@@ -386,8 +393,17 @@ async def logout(request: Request, principal: Principal = Depends(current_princi
 
 
 @router.get("/me")
-async def me(principal: Principal = Depends(current_principal)) -> JSONResponse:
-    return JSONResponse({**user_json(principal.user, principal.roles), "mfa": principal.mfa}, headers=NO_STORE)
+async def me(request: Request, principal: Principal = Depends(current_principal),
+             db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    """The account, its roles and where its consent stands (CONS-2): ``consent.status`` is ``current``, ``outdated``
+    (for another version of the privacy notice: show it and ``POST /api/v1/me/consents/account``) or ``missing``;
+    ``consent.notice_published`` says whether ``GET /api/v1/privacy-notice`` has a text to show."""
+    settings = request.app.state.settings
+    consent = await personal_data.account_consent(db, principal.user.id, settings.privacy_notice_version)
+    consent["notice_published"] = bool(privacy_notice.available(settings.privacy_notice_dir,
+                                                                settings.privacy_notice_version))
+    return JSONResponse({**user_json(principal.user, principal.roles), "mfa": principal.mfa, "consent": consent},
+                        headers=NO_STORE)
 
 
 async def _user_for_update(db: AsyncSession, principal: Principal) -> User:

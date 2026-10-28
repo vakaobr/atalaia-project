@@ -25,7 +25,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 > Pt-PT and English are kept in step: `privacy-notice-pt.md` says the same.
 > When you change the notice, raise the version the server records with each
 > consent (`ATALAIA_PRIVACY_NOTICE_VERSION`) and the check-in notice's
-> `notice_version` on the field controller.
+> `notice_version` on the field controller. The server publishes the notice
+> the field adopted (one file per language and version, in
+> `ATALAIA_PRIVACY_NOTICE_DIR`: `server/privacy-notice/README.md`) and asks
+> accounts to consent again when the version changes; the text stays the
+> field's.
 >
 > Version: [draft-2026-10-28]
 
@@ -444,8 +448,11 @@ use], or with the authority of the EU country where you live or work.
 If this notice changes, we tell you [FIELD CHOICE: HOW: by email, on the
 field's page, in the app] before the change applies. The server records
 which version of the notice each consent was given under; a changed notice
-that needs a new consent asks for it. (Asking existing accounts to consent
-again is not yet built.)
+that needs a new consent asks for it: with the new version (and the new
+notice's files in the `ATALAIA_PRIVACY_NOTICE_DIR` folder), each account is
+invited to read the notice and consent again at its next sign-in, and the app
+can do the same (`GET /api/v1/me` says whether the consent is for the current
+version).
 
 ## 14. Contact
 

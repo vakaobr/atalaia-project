@@ -3065,3 +3065,11 @@ for _lang, _texts in _MEMBERSHIP.items():
     _clash = set(STRINGS[_lang]) & set(_texts)
     assert not _clash, sorted(_clash)
     STRINGS[_lang].update(_texts)
+
+# The "consent again" panel of the privacy notice (CONS-*); every key is new, as above.
+from .consent_i18n import STAFF as _CONSENT  # noqa: E402
+
+for _lang, _texts in _CONSENT.items():
+    _clash = set(STRINGS[_lang]) & set(_texts)
+    assert not _clash, sorted(_clash)
+    STRINGS[_lang].update(_texts)

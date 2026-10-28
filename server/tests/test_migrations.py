@@ -571,6 +571,19 @@ class MigrationTests(unittest.TestCase):
         self.assertNotIn("country", columns)
         self.db.fetch("DELETE FROM fields")
 
+    def test_0020_drops_the_unused_retention_column(self) -> None:
+        """0020_drop_user_retention: ``users.data_retention_days`` goes, the accounts stay, and back down it returns empty."""
+        command.upgrade(self.cfg, "0019_field_country")
+        self.db.fetch("INSERT INTO users (username, data_retention_days) VALUES ('ana', 30)")
+        command.upgrade(self.cfg, "0020_drop_user_retention")
+        columns = {r["column_name"] for r in self.db.fetch(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'users'")}
+        self.assertNotIn("data_retention_days", columns)
+        self.assertEqual([r["username"] for r in self.db.fetch("SELECT username FROM users")], ["ana"])
+        command.downgrade(self.cfg, "0019_field_country")
+        self.assertEqual(self.db.fetch("SELECT data_retention_days FROM users")[0][0], None)
+        self.db.fetch("DELETE FROM users")
+
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)
         self.assertEqual(len(self.script.get_bases()), 1)

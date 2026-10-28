@@ -45,7 +45,7 @@ from fastapi.responses import JSONResponse
 from . import __version__, atak_pki, integrations, personal_data, quotas, tenancy, tenant_watch
 from .api import (app_links, atak, auth, branding, chrono, clubs, devices, export, feedback, fields, firmware, games,
                   health, history, integrations as integrations_api, me, registration_import, registrations,
-                  remote_gm, scenarios, login_methods, scheduling, sync)
+                  privacy as privacy_api, remote_gm, scenarios, login_methods, scheduling, sync)
 from .atak_relay import AtakRelay
 from .config import Settings, redact_url
 from .db import make_engine, make_sessionmaker
@@ -55,7 +55,7 @@ from .remote_gm import RemoteHub
 from .security_headers import SecurityHeadersMiddleware
 from .tokens import Keys, UsedTokens
 from .totp import SeedBox
-from .web import club_pages, field_pages, preview, scoreboard, staff_pages
+from .web import club_pages, field_pages, preview, privacy_pages, scoreboard, staff_pages
 
 log = logging.getLogger("atalaia.server")
 
@@ -145,6 +145,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(fields.router)
     app.include_router(export.router)  # a field's data export for its administrator (S21-12)
     app.include_router(me.router)
+    app.include_router(privacy_api.router)  # the published privacy notice (CONS-1)
     app.include_router(games.router)
     app.include_router(chrono.router)
     app.include_router(sync.router)
@@ -160,6 +161,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(atak.router)  # the remote ATAK relay's enrolment (Phase 4 follow-up FU5)
     app.include_router(field_pages.router)
     app.include_router(club_pages.router)
+    app.include_router(privacy_pages.router)  # /privacy: the same notice as a page (CONS-1)
     app.include_router(history.router)  # plan phase 20: game history, the scenario library, the scoreboard
     app.include_router(scenarios.router)
     app.include_router(scoreboard.router)

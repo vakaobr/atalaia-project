@@ -109,3 +109,9 @@ form.feedback button { margin-top: 1rem; padding: 0.5rem 1.25rem; border: 0; bor
                        background: var(--accent); color: var(--ground); font: inherit; font-weight: 600; }
 form.feedback .hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 ul.preview-list li { padding: 0.6rem 0; }
+
+/* The privacy notice's text (the operator's Markdown, rendered by the server: web/privacy_pages.py) */
+.privacy { overflow-wrap: anywhere; }
+.privacy table { border-collapse: collapse; width: 100%; margin-block: 1rem; }
+.privacy th, .privacy td { border: 1px solid var(--line); padding: 0.35rem 0.5rem; text-align: left; vertical-align: top; }
+.privacy blockquote { border-left: 4px solid var(--line); margin-inline: 0; padding: 0.1rem 1rem; color: var(--muted); }

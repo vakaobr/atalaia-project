@@ -109,6 +109,19 @@ the per-field limits `ATALAIA_QUOTA_ACCOUNTS`, `_SCHEDULED_GAMES`, `_REGISTRATIO
 Optional, for the ports: `ATALAIA_BIND` (`0.0.0.0`), `ATALAIA_HTTP_PORT`
 (80), `ATALAIA_HTTPS_PORT` (443).
 
+## The privacy notice
+
+The notice is the field operator's text (the project's templates in `docs/templates/` are drafts, to be filled in and
+reviewed by a lawyer first). Put the adopted notice in `server/privacy-notice/` on the host, one Markdown file per
+language and version: `privacy-notice-pt-<version>.md`, `privacy-notice-en-<version>.md`, `-de-` and `-zh-tw-`, where
+`<version>` is `ATALAIA_PRIVACY_NOTICE_VERSION` in `.env` (`server/privacy-notice/README.md` says the same). The folder
+is mounted read-only in the server's container (`ATALAIA_PRIVACY_NOTICE_DIR=/privacy-notice`); a file is read at each
+request, so there is nothing to restart, and the files are not in the backups (keep them with `.env`). The server then
+serves it at `https://DOMAIN/privacy` and `GET /api/v1/privacy-notice`. **To change the notice:** add the new files, set
+the new `ATALAIA_PRIVACY_NOTICE_VERSION` in `.env` and run `docker compose up -d`; each account is asked to consent again
+at its next sign-in. Keep the older files: they are the record of what accounts agreed to. A hub (hosted mode) has one
+folder for all its fields.
+
 ## What runs, and what can be reached
 
 | Service | Image | Networks | Reachable from outside |

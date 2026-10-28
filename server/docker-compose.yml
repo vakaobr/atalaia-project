@@ -68,6 +68,8 @@ services:
       ATALAIA_LOG_LEVEL: "${ATALAIA_LOG_LEVEL:-info}"
       ATALAIA_PURGE_HOUR: "${ATALAIA_PURGE_HOUR:-}"
       ATALAIA_PRIVACY_NOTICE_VERSION: "${ATALAIA_PRIVACY_NOTICE_VERSION:-}"
+      # The operator's privacy notice (CONS-*): server/privacy-notice/ on the host, read-only in the container.
+      ATALAIA_PRIVACY_NOTICE_DIR: /privacy-notice
       # The field's data export for its administrator (S21-12): empty means the server's defaults.
       ATALAIA_EXPORT_MIN_INTERVAL_S: "${ATALAIA_EXPORT_MIN_INTERVAL_S:-}"
       ATALAIA_EXPORT_MAX_MB: "${ATALAIA_EXPORT_MAX_MB:-}"
@@ -79,6 +81,8 @@ services:
       # Trust X-Forwarded-For/-Proto from any peer: only Caddy can reach this
       # port (the internal "app" network), and it replaces what clients send.
       FORWARDED_ALLOW_IPS: "*"
+    volumes:
+      - ./privacy-notice:/privacy-notice:ro
     ports:
       - "${ATALAIA_BIND:-0.0.0.0}:${ATALAIA_ATAK_PORT:-8089}:8089"
     networks: [app, db, atak]

@@ -27,7 +27,10 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 > O português europeu e o inglês acompanham-se: `privacy-notice-en.md` diz o
 > mesmo. Quando alterar o aviso, suba a versão que o servidor guarda com cada
 > consentimento (`ATALAIA_PRIVACY_NOTICE_VERSION`) e a `notice_version` do
-> check-in no controlador do campo.
+> check-in no controlador do campo. O servidor publica o aviso que o campo
+> adotou (um ficheiro por língua e versão, em `ATALAIA_PRIVACY_NOTICE_DIR`:
+> `server/privacy-notice/README.md`) e pede às contas que consintam de novo
+> quando a versão muda; o texto continua a ser do campo.
 >
 > Versão: [draft-2026-10-28]
 
@@ -457,8 +460,10 @@ de usar], ou à autoridade do país da UE onde vives ou trabalhas.
 Se este aviso mudar, dizemos-to [ESCOLHA DO CAMPO: COMO: por email, na
 página do campo, na app] antes de a alteração se aplicar. O servidor regista
 a versão do aviso em que cada consentimento foi dado; um aviso alterado que
-precise de novo consentimento pede-o. (Pedir às contas existentes que
-consintam de novo ainda não está feito.)
+precise de novo consentimento pede-o: com a versão nova (e os ficheiros do
+aviso novo na pasta `ATALAIA_PRIVACY_NOTICE_DIR`), cada conta é convidada a
+ler o aviso e a consentir de novo na entrada seguinte, e a app pode fazer o
+mesmo (`GET /api/v1/me` diz se o consentimento é da versão atual).
 
 ## 14. Contacto
 

@@ -449,8 +449,7 @@ administrator, the purge's periods, its command and its daily task, 0003
 with data, the new lockouts); 22 (no database, no server dependencies) also
 run in tools/check.sh. Not yet: the tables of later plan phases (games,
 chrono, registrations), each added to `personal_data.py` with its plan
-phase; a flow asking existing accounts to consent to a changed notice; the
-legal review of the templates. Decisions S12-1 to S12-8, all open.
+phase; the legal review of the templates. Decisions S12-1 to S12-8, all open.
 
 **The templates, first full draft (2026-10-28, decisions PRIV-1 to PRIV-8).**
 `docs/templates/privacy-notice-pt.md` and `-en.md` were rewritten to cover
@@ -461,6 +460,18 @@ the app's storage, third parties), with a short in-app notice for account
 creation (S17-16) and a short check-in poster notice; `dpa-template.md` was
 brought up to date. All three are marked as drafts not yet reviewed by a
 lawyer; the review (P4-6) is still open and still blocks hosted mode.
+
+**The notice is published, and consent is asked again (2026-10-28, decisions
+CONS-1 to CONS-6).** `ATALAIA_PRIVACY_NOTICE_DIR` holds the operator's
+notice, one Markdown file per language and version; the server serves the
+current version's files at `/privacy` and `GET /api/v1/privacy-notice`
+(S17-16's missing endpoint); `GET /api/v1/me` says whether the account's
+consent is for the current version (`consent.status`), `POST
+/api/v1/me/consents/account` consents again, and the staff pages prompt for it
+after login. Re-consent is not enforced (the API does not refuse other calls
+meanwhile). `users.data_retention_days` was dropped (migration 0020). Not done:
+the app's own screens for the notice and for consenting again; the social
+login's sign-up (`oidc/.../start`) does not yet take a `notice_version`.
 
 ## Plan phase 13: controller sync (built 2026-10-20, in software)
 
