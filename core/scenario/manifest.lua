@@ -179,15 +179,17 @@ function m.translated(entry, lang, key)
   return type(value) == "string" and value or nil
 end
 
--- An objective's visibility when the manifest gives none.
+-- Whether an objective follows the game's reveal setting (RVL-1): it depends on others and gives
+-- no visibility of its own. The runtime (and the controllers' views) hide it until it opens when
+-- the game's reveal is "active"; an explicit visibility always wins.
+function m.follows_reveal(objective)
+  return py.truthy(py.get(objective, "depends_on")) and py.get(objective, "visibility") == nil
+end
+
+-- An objective's visibility when the manifest gives none (what it is once revealed: "hidden" is
+-- only ever written by a manifest, the game's reveal setting does not change this).
 function m.default_visibility(objective, manifest)
-  if
-    manifest ~= nil
-    and py.get(manifest, "reveal") == "active"
-    and py.truthy(py.get(objective, "depends_on"))
-  then
-    return "hidden"
-  end
+  local _ = manifest
   local assignee = py.get(objective, "assignee")
   if not py.truthy(assignee) then
     assignee = py.map()

@@ -48,6 +48,8 @@ if TYPE_CHECKING:
 MANIFEST_KEY = "scenario.manifest:"
 NODES_KEY = "scenario.nodes:"
 DISCLOSURE_KEY = "scenario.disclosure:"  # the GM's choice for one game (SQ-4)
+REVEAL_KEY = "scenario.reveal:"  # the GM's choice for one game, made when it is created (RVL-1)
+REVEALS = ("all", "active")
 REVEALED = "scenario.objective.revealed"
 # What a player's view of an objective carries: never its target, dependencies or reveals (the
 # ids of hidden objectives), and never a code or a destination (those are only in field.lua).
@@ -68,7 +70,7 @@ class Meta:
     squads: int
     nodes: dict[str, dict[str, Any]]
     objectives: dict[str, dict[str, Any]] = field(default_factory=dict)  # by id, in the manifest's order
-    reveal: str = "all"  # "active": a dependent objective is known only when it opens (SQ-1)
+    reveal: Optional[str] = None  # the manifest's own: "active": a dependent objective is known only when it opens (SQ-1); None: the game decides (RVL-1)
     disclosure: str = "members"  # "leader": only the assignee squad's leaders get the details (SQ-3)
 
     @staticmethod
@@ -88,7 +90,7 @@ class Meta:
                     description=str(doc.get("description") or ""), i18n=dict(doc.get("i18n") or {}),
                     lang=str(block.get("lang", "pt")), teams=list(block.get("teams") or []),
                     squads=int(block.get("squads") or 0), nodes=nodes, objectives=objectives,
-                    reveal="active" if block.get("reveal") == "active" else "all",
+                    reveal=block.get("reveal") if block.get("reveal") in REVEALS else None,
                     disclosure="leader" if block.get("disclosure") == "leader" else "members")
 
     def box_nodes(self) -> dict[str, str]:
@@ -105,20 +107,32 @@ class Meta:
             out["i18n"] = {lang: t for lang, t in texts.items() if t}
         return out
 
-    def staff_view(self, disclosure: Optional[str] = None) -> dict[str, Any]:
-        """Everything mode.yaml says (the console's Join tab and feed); ``disclosure`` is the game's
-        (the GM's choice or the manifest's), ``disclosure_default`` the manifest's (SQ-4)."""
+    def known_when_open(self, objective: dict[str, Any], reveal: str = "all") -> bool:
+        """Whether an objective is known only once it opens in a game whose reveal is ``reveal``: an
+        explicit ``hidden``, or one that follows the game's setting (RVL-1) and it is "active"."""
+        return objective.get("visibility") == "hidden" or (bool(objective.get("follows_reveal")) and reveal == "active")
+
+    def resolved(self, reveal: str = "all") -> list[dict[str, Any]]:
+        """The objectives as this game has them: those that follow its reveal setting say
+        ``visibility: hidden`` when it is "active"."""
+        return [{**o, "visibility": "hidden"} if o.get("visibility") != "hidden" and self.known_when_open(o, reveal)
+                else o for o in self.objectives.values()]
+
+    def staff_view(self, disclosure: Optional[str] = None, reveal: str = "all") -> dict[str, Any]:
+        """Everything mode.yaml says (the console's Join tab and feed); ``disclosure`` and ``reveal``
+        are the game's (the GM's choice or the manifest's, and for the reveal else "active" in a game
+        with squads), ``disclosure_default`` and ``reveal_default`` the manifest's own (SQ-4, RVL-1)."""
         return {**self.header(), "lang": self.lang, "teams": self.teams, "squads": self.squads,
-                "reveal": self.reveal, "disclosure": disclosure or self.disclosure,
+                "reveal": reveal, "reveal_default": self.reveal, "disclosure": disclosure or self.disclosure,
                 "disclosure_default": self.disclosure,
-                "nodes": self.nodes, "objectives": list(self.objectives.values())}
+                "nodes": self.nodes, "objectives": self.resolved(reveal)}
 
     def player_view(self, viewer: Optional["Viewer"], game: dict[str, Any], revealed: set[str],
-                    disclosure: str = "members") -> dict[str, Any]:
+                    disclosure: str = "members", reveal: str = "all") -> dict[str, Any]:
         """The objectives this viewer may know (P4R24): a hidden one only once it is revealed, and
         with ``disclosure`` "leader" only a squad leader gets the squad's (SQ-3)."""
         staff = visibility.is_staff(viewer, game.get("id"))
-        objectives = [{k: o[k] for k in PLAYER_FIELDS if k in o} for o in self.objectives.values()
+        objectives = [{k: o[k] for k in PLAYER_FIELDS if k in o} for o in self.resolved(reveal)
                       if visibility.objective_visible(viewer, o, game, disclosure)
                       and (staff or o.get("visibility") != "hidden" or o["id"] in revealed)]
         return {**self.header(), "objectives": objectives}
@@ -324,6 +338,34 @@ def disclosure(ctrl: "Controller", game_id: int, meta: Optional[Meta]) -> str:
     if raw in visibility.DISCLOSURES:
         return str(raw)
     return meta.disclosure if meta is not None else "members"
+
+
+def reveal(ctrl: "Controller", game: dict[str, Any], meta: Optional[Meta]) -> str:
+    """When an objective that depends on others and says nothing about its visibility becomes known in
+    this game (RVL-1): the GM's choice for the game, else the manifest's own, else "active" in a game
+    with squads and "all" in one without."""
+    raw = ctrl.store.get_setting(f"{REVEAL_KEY}{game['id']}")
+    if raw in REVEALS:
+        return str(raw)
+    if meta is not None and meta.reveal is not None:
+        return meta.reveal
+    return "active" if int(game.get("squads") or 0) > 0 else "all"
+
+
+def check_reveal(value: Any) -> Optional[str]:
+    """The GM's choice from a request: "all", "active", or null for the scenario's own (else by squads)."""
+    from .engine import ControllerError  # noqa: PLC0415
+
+    if value is not None and value not in REVEALS:
+        raise ControllerError(f"objective_reveal: one of {list(REVEALS)}, or null for the scenario's own")
+    return value
+
+
+def store_reveal(ctrl: "Controller", game_id: int, value: Optional[str]) -> None:
+    if value is None:
+        ctrl.store.delete_setting(f"{REVEAL_KEY}{game_id}")
+    else:
+        ctrl.store.set_setting(f"{REVEAL_KEY}{game_id}", value)
 
 
 def check_disclosure(value: Any) -> Optional[str]:

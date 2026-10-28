@@ -49,7 +49,7 @@ class DisclosureEditor extends Component {
 class CreateGame extends Component {
     constructor(props) {
         super(props);
-        this.state = { name: '', source: '', teams: 'red, blue', minutes: '20', squads: '0', disclosure: '', values: null, mods: [],
+        this.state = { name: '', source: '', teams: 'red, blue', minutes: '20', squads: '0', disclosure: '', reveal: '', values: null, mods: [],
                        teamInfo: {} };
     }
 
@@ -92,6 +92,9 @@ class CreateGame extends Component {
         if (mode.kind === 'scenario' && body.squads > 0 && this.state.disclosure) {
             body.objective_disclosure = this.state.disclosure;
         }
+        // Whether the objectives that say nothing start visible or hidden (RVL-1): left out, the
+        // scenario's own, else only the active ones in a game with squads.
+        if (mode.kind === 'scenario' && this.state.reveal) body.objective_reveal = this.state.reveal;
         // The boxes' screens take this console's language unless the field fixes one (Settings).
         body.console_lang = lang();
         const info = teamInfoBody(this.state.teamInfo, teams);
@@ -167,6 +170,15 @@ class CreateGame extends Component {
                     <option value="leader">${t('game.disclosure_leader')}</option>
                 </select>
                 <small class="muted">${t('game.disclosure_hint')}</small></div>`}
+            ${mode && mode.kind === 'scenario' && html`<div class="field">
+                <label for="g-reveal">${t('objective_reveal.label')}</label>
+                <select id="g-reveal" data-testid="game-reveal" value=${state.reveal}
+                    onChange=${(e) => this.setState({ reveal: e.target.value })}>
+                    <option value="">${t('objective_reveal.default')}</option>
+                    <option value="all">${t('objective_reveal.all')}</option>
+                    <option value="active">${t('objective_reveal.active')}</option>
+                </select>
+                <small class="muted">${t('objective_reveal.hint')}</small></div>`}
             ${mode && !preset && html`<${ModifierPicker} modes=${modes} main=${mode} selected=${state.mods} prefix="game"
                 onChange=${(mods) => this.setState({ mods, values: null })} />`}
             ${mode && html`<details open=${!preset}>
@@ -348,6 +360,7 @@ export class GameControl extends Component {
                 ${game.channel_hz && html`<dt>${t('radio.channel')}</dt><dd data-testid="game-channel">${mhz(game.channel_hz)} MHz</dd>`}
             </dl>
             <${GameSettings} app=${app} game=${game} review=${app.state.reviewSettings || 0} />
+            ${game.scenario && game.scenario.reveal && html`<p class="muted small" data-testid="game-reveal-live">${t('objective_reveal.live', { value: t(`objective_reveal.live_${game.scenario.reveal}`) })}</p>`}
             ${gm && s !== 'ended' && game.scenario && game.squads > 0 && html`<${DisclosureEditor} app=${app} game=${game} />`}
             ${game.joined && html`<p class="notice">${t('game.standby_notice')}</p>`}
             ${game.key_lost && html`<p class="notice" data-testid="game-key-lost">${t('game.key_lost_notice')}</p>`}

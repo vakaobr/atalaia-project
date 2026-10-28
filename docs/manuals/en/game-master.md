@@ -216,6 +216,7 @@ Each QR holds only the label code (**ATL-** and eight characters), nothing about
    - **Team names and crests** (optional): a display name and a crest for each team colour. The boxes keep showing the colour;
    - **Duration (minutes)**: `0` means no limit. At the end, the game ends by itself;
    - **Squads per team**: `0` means teams only. In a milsim or a big game each team splits into squads (up to 16). With a scenario you can choose **Who a squad's objectives go to**;
+   - **Objectives at the start** (a scenario's game): whether the objectives that depend on others, and say nothing about it themselves, are visible from the start (**All visible from the start**) or hidden until they open (**Only the active ones**: the next one is revealed when the one before it is completed). Left on the default, a game with squads shows only the active objectives and a game without squads shows them all, unless the scenario's own `reveal` says otherwise; an objective's own `visibility` in the scenario always wins. It is fixed when the game is made, and the game's page says which one applies. On the phone controller the same choice is in the new-game form;
    - **Modifiers**: tick **Codes**, for example, to run keypad codes next to the mode;
    - **Props with a role of their own**: for example **Medic Kit**;
    - **Mode parameters**: the mode's settings, with a short description.

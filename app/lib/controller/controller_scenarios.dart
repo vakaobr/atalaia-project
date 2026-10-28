@@ -46,6 +46,14 @@ const scenarioNodesKey = 'scenario.nodes:';
 /// (SQ-4).
 const scenarioDisclosureKey = 'scenario.disclosure:';
 
+/// The GM's choice for one game, made when it is created, of when an objective
+/// that depends on others and says nothing about its visibility becomes known
+/// (RVL-1).
+const scenarioRevealKey = 'scenario.reveal:';
+
+/// `all`: known from the start; `active`: only when it opens.
+const reveals = ['all', 'active'];
+
 /// Who of an objective's assignee is told it (SQ-3): every member, or only
 /// the squad leaders.
 const disclosures = ['members', 'leader'];
@@ -114,7 +122,7 @@ final class ScenarioMeta {
     required this.squads,
     required this.nodes,
     required this.objectives,
-    this.reveal = 'all',
+    this.reveal,
     this.disclosure = 'members',
   });
 
@@ -130,8 +138,9 @@ final class ScenarioMeta {
   /// By id, in the manifest's order.
   final Map<String, Map<String, Object?>> objectives;
 
-  /// `active`: a dependent objective is known only when it opens (SQ-1).
-  final String reveal;
+  /// The manifest's own: `active`: a dependent objective is known only when it
+  /// opens (SQ-1); null: the game decides (RVL-1).
+  final String? reveal;
 
   /// `leader`: only the assignee squad's leaders get the details (SQ-3).
   final String disclosure;
@@ -170,7 +179,9 @@ final class ScenarioMeta {
       squads: squads is int ? squads : 0,
       nodes: nodes,
       objectives: objectives,
-      reveal: block['reveal'] == 'active' ? 'active' : 'all',
+      reveal: reveals.contains(block['reveal'])
+          ? block['reveal']! as String
+          : null,
       disclosure: block['disclosure'] == 'leader' ? 'leader' : 'members',
     );
   }
@@ -198,19 +209,41 @@ final class ScenarioMeta {
     return out;
   }
 
+  /// Whether an objective is known only once it opens in a game whose reveal
+  /// is [gameReveal]: an explicit `hidden`, or one that follows the game's
+  /// setting (RVL-1) when it is `active` (engine.py `known_when_open`).
+  bool knownWhenOpen(Map<String, Object?> o, [String gameReveal = 'all']) =>
+      o['visibility'] == 'hidden' ||
+      (_truthy(o['follows_reveal']) && gameReveal == 'active');
+
+  /// The objectives as this game has them: those that follow its reveal
+  /// setting say `visibility: hidden` when it is `active`.
+  List<Map<String, Object?>> resolved([String gameReveal = 'all']) => [
+    for (final o in objectives.values)
+      o['visibility'] != 'hidden' && knownWhenOpen(o, gameReveal)
+          ? {...o, 'visibility': 'hidden'}
+          : o,
+  ];
+
   /// Everything mode.yaml says (the console's Join tab and feed);
-  /// [gameDisclosure] is the game's (the GM's choice or the manifest's),
-  /// `disclosure_default` the manifest's (SQ-4).
-  Map<String, Object?> staffView([String? gameDisclosure]) => {
+  /// [gameDisclosure] and [gameReveal] are the game's (the GM's choice or the
+  /// manifest's; for the reveal else `active` in a game with squads),
+  /// `disclosure_default` and `reveal_default` the manifest's own (SQ-4,
+  /// RVL-1).
+  Map<String, Object?> staffView([
+    String? gameDisclosure,
+    String gameReveal = 'all',
+  ]) => {
     ...header(),
     'lang': lang,
     'teams': teams,
     'squads': squads,
-    'reveal': reveal,
+    'reveal': gameReveal,
+    'reveal_default': reveal,
     'disclosure': gameDisclosure ?? disclosure,
     'disclosure_default': disclosure,
     'nodes': nodes,
-    'objectives': objectives.values.toList(),
+    'objectives': resolved(gameReveal),
   };
 
   /// The objectives this viewer may know (P4R24): a hidden one only once it
@@ -221,12 +254,13 @@ final class ScenarioMeta {
     Map<String, Object?> game,
     Set<String> revealed, [
     String gameDisclosure = 'members',
+    String gameReveal = 'all',
   ]) {
     final staff = viewer != null && viewer.isStaffOf(game['id'] as int?);
     return {
       ...header(),
       'objectives': [
-        for (final o in objectives.values)
+        for (final o in resolved(gameReveal))
           if (objectiveVisible(viewer, o, game, gameDisclosure) &&
               (staff ||
                   o['visibility'] != 'hidden' ||
@@ -652,6 +686,37 @@ class ControllerScenarios {
     final raw = engine.store.getSetting('$scenarioDisclosureKey$gameId');
     if (raw != null && disclosures.contains(raw)) return raw;
     return meta?.disclosure ?? 'members';
+  }
+
+  /// When an objective that says nothing about its visibility becomes known in
+  /// this game (RVL-1): the GM's choice for the game, else the manifest's own,
+  /// else `active` in a game with squads and `all` in one without.
+  String reveal(Map<String, Object?> game, ScenarioMeta? meta) {
+    final raw = engine.store.getSetting('$scenarioRevealKey${game['id']}');
+    if (raw != null && reveals.contains(raw)) return raw;
+    final own = meta?.reveal;
+    if (own != null) return own;
+    final squads = game['squads'];
+    return squads is int && squads > 0 ? 'active' : 'all';
+  }
+
+  /// The GM's choice from a request: `all`, `active`, or null for the
+  /// scenario's own (else by squads).
+  static String? checkReveal(Object? value) {
+    if (value != null && !reveals.contains(value)) {
+      throw ControllerError(
+        'objective_reveal: one of $reveals, or null for the scenario\'s own',
+      );
+    }
+    return value as String?;
+  }
+
+  void storeReveal(int gameId, String? value) {
+    if (value == null) {
+      engine.store.deleteSetting('$scenarioRevealKey$gameId');
+    } else {
+      engine.store.setSetting('$scenarioRevealKey$gameId', value);
+    }
   }
 
   /// The GM's choice from a request: `members`, `leader`, or null to go back

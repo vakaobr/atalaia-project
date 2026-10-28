@@ -22,7 +22,8 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/presets                   saved presets
     POST /api/v1/presets                   save a preset {"name", "mode_id", "params"}
     GET  /api/v1/games                     every game
-    POST /api/v1/games                     create a game from a mode or preset
+    POST /api/v1/games                     create a game from a mode or preset (a scenario's game takes
+                                           objective_disclosure and objective_reveal: "all"|"active", RVL-1)
     GET  /api/v1/games/{id}                one game
     PUT  /api/v1/games/{id}/objective-disclosure   GM: who of a squad is told its scenario objectives
                                            ({"disclosure": "members"|"leader"|null}, SQ-4)

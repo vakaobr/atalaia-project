@@ -71,6 +71,9 @@ local function objective_meta(o, manifest)
   if py.truthy(py.get(o, "depends_on")) then
     py.put(meta, "depends_on", copy_list(py.get(o, "depends_on")))
   end
+  if m.follows_reveal(o) then
+    py.put(meta, "follows_reveal", true)
+  end
   if py.truthy(py.get(effect, "reveal")) then
     py.put(meta, "reveals", copy_list(py.get(effect, "reveal")))
   end

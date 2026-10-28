@@ -122,7 +122,7 @@ export function blockDefinitions(tr) {
             [tr('scenario_lang'), [{ type: 'field_dropdown', name: 'LANG', options: LANG_CHOICES.map((l) => [tr(`lang_${l}`), l]) },
                 num('SQUADS', 0)]],
             [tr('scenario_rules'), [
-                { type: 'field_dropdown', name: 'REVEAL', options: [[tr('reveal_all'), 'all'], [tr('reveal_active'), 'active']] },
+                { type: 'field_dropdown', name: 'REVEAL', options: [[tr('reveal_game'), 'game'], [tr('reveal_all'), 'all'], [tr('reveal_active'), 'active']] },
                 { type: 'field_dropdown', name: 'DISCLOSURE',
                   options: [[tr('disclosure_members'), 'members'], [tr('disclosure_leader'), 'leader']] }]],
             [tr('scenario_texts'), [statement('INFO')]],
@@ -262,7 +262,7 @@ export function manifestToState(m) {
     only(m, ['id', 'version', 'name', 'description', 'author', 'lang', 'teams', 'squads', 'reveal', 'disclosure', 'params',
         'i18n', 'nodes', 'objectives'], '');
 
-    const root = { ID: '', VERSION: '', NAME: '', LANG: 'pt', SQUADS: 0, REVEAL: 'all', DISCLOSURE: 'members' };
+    const root = { ID: '', VERSION: '', NAME: '', LANG: 'pt', SQUADS: 0, REVEAL: 'game', DISCLOSURE: 'members' };
     if ('id' in m) root.ID = textOf(m, 'id', '') ?? '';
     if ('version' in m) {
         if (isText(m.version) || isNumber(m.version)) root.VERSION = String(m.version);
@@ -276,10 +276,14 @@ export function manifestToState(m) {
     }
     if ('squads' in m) root.SQUADS = intOf(m, 'squads', '') ?? 0;
     // A squad's chain and who is told (SQ-1, SQ-3); said as the default, the blocks would leave it out.
-    for (const [key, field, words] of [['reveal', 'REVEAL', ['all', 'active']], ['disclosure', 'DISCLOSURE', ['members', 'leader']]]) {
-        if (!(key in m)) continue;
-        if (words.includes(m[key]) && m[key] !== words[0]) root[field] = m[key];
-        else lost.push(key);
+    // The reveal has no default of the scenario's own (RVL-1): left out, the game decides.
+    if ('reveal' in m) {
+        if (['all', 'active'].includes(m.reveal)) root.REVEAL = m.reveal;
+        else lost.push('reveal');
+    }
+    if ('disclosure' in m) {
+        if (m.disclosure === 'leader') root.DISCLOSURE = m.disclosure;
+        else lost.push('disclosure');
     }
 
     const info = [];
@@ -624,7 +628,7 @@ export function workspaceToManifest(ws) {
     m.teams = put('teams', placed(root, 'TEAMS').map((b) => field(b, 'TEAM')), root);
     const squads = Number(field(root, 'SQUADS'));
     if (squads !== 0) m.squads = put('squads', squads, root);
-    if (field(root, 'REVEAL') !== 'all') m.reveal = put('reveal', field(root, 'REVEAL'), root);
+    if (field(root, 'REVEAL') !== 'game') m.reveal = put('reveal', field(root, 'REVEAL'), root);
     if (field(root, 'DISCLOSURE') !== 'members') m.disclosure = put('disclosure', field(root, 'DISCLOSURE'), root);
     const params = {};
     for (const b of placed(root, 'PARAMS')) {

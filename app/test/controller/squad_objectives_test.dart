@@ -10,6 +10,7 @@
 // scenario's; a hidden objective is nothing to a squad before it is revealed.
 
 import 'package:atalaia_app/controller/controller_checkin.dart';
+import 'package:atalaia_app/controller/controller_engine.dart';
 import 'package:atalaia_app/controller/controller_scenarios.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -70,18 +71,81 @@ void main() {
 
   test('the manifest settings come with the package', () {
     expect((meta.reveal, meta.disclosure), ('active', 'leader'));
-    final staff = meta.staffView('members');
+    final staff = meta.staffView('members', 'active');
     expect(
       (staff['disclosure'], staff['disclosure_default']),
       ('members', 'leader'),
     );
-    expect(staff['reveal'], 'active');
+    expect((staff['reveal'], staff['reveal_default']), ('active', 'active'));
     final plain = ScenarioMeta.parse(
       _modeYaml
           .replaceAll('  reveal: active\n', '')
           .replaceAll('  disclosure: leader\n', ''),
     )!;
-    expect((plain.reveal, plain.disclosure), ('all', 'members'));
+    // Silent about it, the scenario leaves the choice to the game (RVL-1).
+    expect((plain.reveal, plain.disclosure), (null, 'members'));
+    expect(plain.staffView(null, 'all')['reveal_default'], null);
+  });
+
+  group('the game decides when a dependent objective is known (RVL-1)', () {
+    // a2 and a3 depend on others and say nothing about their visibility (they
+    // follow the game's setting); a4 says `team`, which always wins.
+    final silent = ScenarioMeta.parse('''
+id: org.club.dflt
+kind: scenario
+name: Default
+scenario:
+  lang: en
+  teams: [red, blue]
+  squads: 2
+  nodes: {}
+  objectives:
+    - { id: a1, type: capture_and_hold, name: One, team: red, squad: 1, visibility: squad }
+    - { id: a2, type: capture_and_hold, name: Two, team: red, squad: 1, visibility: squad, depends_on: [a1], follows_reveal: true }
+    - { id: a4, type: capture_and_hold, name: Four, team: red, squad: 1, visibility: team, depends_on: [a1] }
+''')!;
+    List<String> known(String reveal, Set<String> revealed) => [
+      for (final o
+          in (silent.playerView(
+                    leader1,
+                    _game,
+                    revealed,
+                    'members',
+                    reveal,
+                  )['objectives']!
+                  as List<Object?>)
+              .cast<Map<String, Object?>>())
+        o['id']! as String,
+    ];
+
+    test('active hides the ones that follow the setting until they open', () {
+      expect(known('active', {}), ['a1', 'a4']);
+      expect(known('active', {'a2'}), ['a1', 'a2', 'a4']);
+      expect(known('all', {}), ['a1', 'a2', 'a4']);
+      expect(silent.knownWhenOpen(silent.objectives['a2']!, 'active'), isTrue);
+      expect(silent.knownWhenOpen(silent.objectives['a2']!, 'all'), isFalse);
+      expect(silent.knownWhenOpen(silent.objectives['a4']!, 'active'), isFalse);
+    });
+
+    test('the staff view says what the game has', () {
+      List<Object?> vis(String reveal) => [
+        for (final o
+            in (silent.staffView(null, reveal)['objectives']! as List<Object?>)
+                .cast<Map<String, Object?>>())
+          o['visibility'],
+      ];
+      expect(vis('active'), ['squad', 'hidden', 'team']);
+      expect(vis('all'), ['squad', 'squad', 'team']);
+    });
+
+    test('the choice is checked', () {
+      expect(ControllerScenarios.checkReveal('all'), 'all');
+      expect(ControllerScenarios.checkReveal(null), isNull);
+      expect(
+        () => ControllerScenarios.checkReveal('later'),
+        throwsA(isA<ControllerError>()),
+      );
+    });
   });
 
   test('a squad knows its active objective, and a hidden one only once '

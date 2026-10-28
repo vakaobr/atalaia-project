@@ -2069,6 +2069,22 @@
       ]
     },
     {
+      "name": "RVL objective reveal default: active in a game with squads, the GM chooses visible or hidden",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/scenarios", "token": "gm", "body": {"manifest": "id: org.club.dflt\nversion: 1\nname: Default\nlang: en\nteams: [red, blue]\nsquads: 2\nnodes:\n  n1: { role: objective }\n  n2: { role: objective }\nobjectives:\n  - { id: a1, name: One, type: capture_and_hold, target: n1, assignee: { team: red, squad: 1 } }\n  - { id: a2, name: Two, type: capture_and_hold, target: n2, assignee: { team: red, squad: 1 }, depends_on: [a1] }\n"}}, "status": 201},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Squads", "mode_id": "org.club.dflt+org.atalaia.objectives", "teams": ["red", "blue"], "squads": 2}}, "status": 201, "json": {"scenario": {"reveal": "active", "reveal_default": null, "objectives": [{"id": "a1", "visibility": "squad"}, {"id": "a2", "visibility": "hidden"}]}}, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Squads, visible", "mode_id": "org.club.dflt+org.atalaia.objectives", "teams": ["red", "blue"], "squads": 2, "objective_reveal": "all"}}, "status": 201, "json": {"scenario": {"reveal": "all", "objectives": [{"id": "a1", "visibility": "squad"}, {"id": "a2", "visibility": "squad"}]}}, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "No squads", "mode_id": "org.club.dflt+org.atalaia.objectives", "teams": ["red", "blue"]}}, "status": 201, "json": {"scenario": {"reveal": "all", "objectives": [{"id": "a1", "visibility": "squad"}, {"id": "a2", "visibility": "squad"}]}}, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "No squads, hidden", "mode_id": "org.club.dflt+org.atalaia.objectives", "teams": ["red", "blue"], "objective_reveal": "active"}}, "status": 201, "json": {"scenario": {"reveal": "active", "objectives": [{"id": "a1", "visibility": "squad"}, {"id": "a2", "visibility": "hidden"}]}}, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Bad", "mode_id": "org.club.dflt+org.atalaia.objectives", "teams": ["red", "blue"], "objective_reveal": "later"}}, "status": 400},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Plain", "mode_id": "org.atalaia.domination", "objective_reveal": "all"}}, "status": 400}
+      ]
+    },
+    {
       "name": "S7b whoami: presets, branding, scenarios and mode packages are served by both controllers",
       "steps": [
         {"request": {"method": "GET", "path": "/api/v1/whoami", "token": "read"}, "status": 200, "json": {"features": {"$contains": ["presets", "branding", "scenarios", "mode_packages"]}}}

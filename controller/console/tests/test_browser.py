@@ -4333,6 +4333,32 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: self.field.http.get(f"/api/v1/games/{game['id']}").json()
                                  ["scenario"]["disclosure"] == "members", 5))
 
+    def test_the_gm_chooses_whether_objectives_start_visible_or_hidden(self):
+        """RVL-1: a scenario game offers when the objectives that say nothing about it become known;
+        left alone a game with squads has only the active ones, the GM's choice is kept for the game
+        and shown on its panel; another mode offers nothing."""
+        text = (HERE.parents[1] / "tests" / "scenarios" / "squad_chains.yaml").read_text(encoding="utf-8")
+        text = text.replace("id: org.club.squad-chains", "id: org.club.silent-chains").replace("reveal: active\n", "")
+        self.assertNotIn("\nreveal:", text)
+        self.assertEqual(self.field.http.post("/api/v1/scenarios", json={"manifest": text}).status_code, 201)
+        page = self.console()
+        page.get_by_test_id("game-name").fill("Silencioso")
+        page.get_by_test_id("game-source").select_option(f"mode:{DOMINATION}")
+        expect(page.get_by_test_id("game-reveal")).to_have_count(0)  # not a scenario
+        page.get_by_test_id("game-source").select_option("mode:org.club.silent-chains")
+        page.get_by_test_id("game-roles").locator('input[value="org.atalaia.objectives"]').check()
+        select = page.get_by_test_id("game-reveal")
+        expect(select).to_be_visible()
+        expect(select).to_have_value("")
+        select.select_option("all")
+        page.get_by_test_id("game-squads").fill("2")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+        game = self.field.bundle.controller.game
+        seen = self.field.http.get(f"/api/v1/games/{game['id']}").json()["scenario"]
+        self.assertEqual((seen["reveal"], seen["reveal_default"]), ("all", None))
+        expect(page.get_by_test_id("game-reveal-live")).to_contain_text("todos visíveis desde o início")
+
     # --- the check-in poster suggestion after a game is created (check-R10 to check-R17) ---------------------
 
     def create_game_in_console(self, page, name: str = "Domingo", enter: bool = False) -> None:

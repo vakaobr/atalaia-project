@@ -649,7 +649,8 @@ class Controller:
         meta = self.scenario_meta(game.get("mode_id"))
         if meta is not None:
             # The staff's view: every objective, and the boxes the GM named (Join tab).
-            out["scenario"] = meta.staff_view(scenarios.disclosure(self, game["id"], meta))
+            out["scenario"] = meta.staff_view(scenarios.disclosure(self, game["id"], meta),
+                                              scenarios.reveal(self, game, meta))
             names = self.scenario_names if live else scenarios.node_names(self, game["id"])
             out["scenario_nodes"] = {str(k): v for k, v in sorted(names.items())}
         if live and self.fc is not None:
@@ -676,7 +677,8 @@ class Controller:
         meta = self.scenario_meta(game.get("mode_id"))
         if meta is not None:
             out["scenario"] = meta.player_view(viewer, game, scenarios.revealed(self, game["id"]),
-                                               scenarios.disclosure(self, game["id"], meta))
+                                               scenarios.disclosure(self, game["id"], meta),
+                                               scenarios.reveal(self, game, meta))
         return out
 
     def scenario_meta(self, mode_id: Any) -> Optional[scenarios.Meta]:
@@ -781,6 +783,10 @@ class Controller:
             disclosure = scenarios.check_disclosure(spec.get("objective_disclosure"))
             if disclosure is not None and self.scenario_meta(pkg.id) is None:
                 raise ControllerError("objective_disclosure: only a scenario's game has objectives to disclose")
+            # Whether the objectives that say nothing start visible or hidden: the GM's choice (RVL-1).
+            reveal = scenarios.check_reveal(spec.get("objective_reveal"))
+            if reveal is not None and self.scenario_meta(pkg.id) is None:
+                raise ControllerError("objective_reveal: only a scenario's game has objectives to reveal")
             if not 0 <= squads <= SQUADS_MAX:
                 raise ControllerError(f"squads: 0 (none) to {SQUADS_MAX} per team")
             # Team branding (decisions BR12-BR15): display names and crests next to the colours,
@@ -825,6 +831,8 @@ class Controller:
                 self._tell_modem_language(box_lang)
             if disclosure is not None:
                 scenarios.store_disclosure(self, game_id, disclosure)
+            if reveal is not None:
+                scenarios.store_reveal(self, game_id, reveal)
             self._activate(self.store.game(game_id) or game, key, 1)
             out = self.get_game(game_id)
             self._emit({"type": "game", "game": out})
@@ -1928,7 +1936,7 @@ class Controller:
             # A hidden objective's names reach its players with the game (P4R24): send it again.
             meta = self.scenario_meta(self.game["mode_id"])
             objective = meta.objectives.get((record.get("data") or {}).get("objective")) if meta else None
-            if objective is not None and objective.get("visibility") == "hidden":
+            if objective is not None and meta.known_when_open(objective, scenarios.reveal(self, self.game, meta)):
                 self._emit({"type": "game", "game": self.public_game(self.game)})
         if self.positions is not None:
             self.positions.on_event(self.game["id"], record)
@@ -2011,8 +2019,12 @@ class Controller:
         gid = self.game["id"]
         run = int(self.store.get_setting(f"field_run:{gid}") or 0) + 1
         self.store.set_setting(f"field_run:{gid}", str(run))
+        params = self.game["params"]
+        meta = self.scenario_meta(self.game["mode_id"])
+        if meta is not None:  # the runtime hides the objectives that follow the game's reveal (RVL-1)
+            params = {**params, "scenario_reveal": scenarios.reveal(self, self.game, meta)}
         self.field = FieldScript(self.core, self, pkg.field_script, f"{pkg.id}/field.lua",
-                                 self.game["teams"], self.game["params"], self.game["game_seed"],
+                                 self.game["teams"], params, self.game["game_seed"],
                                  score_key=f"field-{run}")
         if self.fc.game_time_ms > 0:
             self.field.advance(self.fc.game_time_ms)  # a restart or a takeover joins mid-game

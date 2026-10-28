@@ -1058,6 +1058,7 @@
       "lang_de": "alemão",
       "lang_zh-tw": "chinês tradicional (Taiwan)",
       "scenario_rules": "os objetivos são conhecidos %1 e ditos a %2",
+      "reveal_game": "como o jogo decidir",
       "reveal_all": "desde o início",
       "reveal_active": "um de cada vez",
       "disclosure_members": "todo o squad",
@@ -1651,5 +1652,15 @@
   "projected_score": {
     "label": "estimado {n}",
     "explain": "Entre os relatórios das caixas (de 15 em 15 s), a estimativa soma os pontos que uma caixa ocupada já fez, nos modos que dizem como pontuam. Só o número sem «estimado» é a pontuação oficial."
+  },
+  "objective_reveal": {
+    "label": "Objetivos no início",
+    "default": "Como o cenário diz; num jogo com squads, só os ativos",
+    "all": "Todos visíveis desde o início",
+    "active": "Só os ativos; o seguinte é revelado quando abre",
+    "hint": "Vale para os objetivos que dependem de outros e nada dizem sobre isso. A definição própria de um objetivo no cenário prevalece sempre. Fica fixa quando o jogo é criado.",
+    "live": "Objetivos: {value}",
+    "live_all": "todos visíveis desde o início",
+    "live_active": "só os ativos são mostrados"
   }
 }

@@ -11,6 +11,11 @@
 --   id, type      the objective's id (data key 34) and type
 --   team, squad   the assignee (squad as text, as events carry it); nil: any
 --   hidden        revealed only when it opens, or by another's reveals
+--   follows_reveal  it depends on others and says nothing about its visibility: it is hidden
+--                 (as above) when the game's reveal is "active", the setting `scenario_reveal`
+--                 in params ("all" or "active", from the GM's choice for the game, else the
+--                 scenario's own `reveal`, else "active" in a game with squads; SCENARIO.reveal,
+--                 else "all", when the controller gives none)
 --   depends_on    ids that must be completed before it opens
 --   reveals       ids revealed when it is completed
 --   start_s       it opens no earlier than this (time_window.start_min)
@@ -41,6 +46,18 @@ local OBJ = SCENARIO.objectives
 local by_id = {}
 for _, o in ipairs(OBJ) do
   by_id[o.id] = o
+end
+
+-- Whether an objective is known only when it opens (an explicit hidden, or one that follows the
+-- game's reveal setting and that is "active").
+local function is_hidden(o)
+  if o.hidden then
+    return true
+  end
+  if o.follows_reveal then
+    return (params.scenario_reveal or SCENARIO.reveal or "all") == "active"
+  end
+  return false
 end
 
 local status = {} -- id -> waiting, open, done, failed, off
@@ -286,7 +303,7 @@ on("game.start", function()
     end
   end
   for _, o in ipairs(OBJ) do
-    if status[o.id] == "waiting" and not o.hidden then
+    if status[o.id] == "waiting" and not is_hidden(o) then
       reveal(o)
     end
   end

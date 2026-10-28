@@ -112,13 +112,15 @@ class Chains(Case):
 
     # --- the compiler ----------------------------------------------------------------------
 
-    def test_a_dependent_objective_is_hidden_by_default_when_reveal_is_active(self):
+    def test_a_dependent_objective_follows_the_games_reveal_setting(self):
         files = self.client.get(f"/api/v1/scenarios/{SCENARIO}", headers=GM).json()["files"]
         block = yaml.safe_load(files["mode.yaml"])["scenario"]
         self.assertEqual((block["reveal"], block["disclosure"]), ("active", "leader"))
-        self.assertEqual([(o["id"], o["visibility"]) for o in block["objectives"]],
-                         [("a1", "squad"), ("a2", "hidden"), ("a3", "hidden"), ("b1", "squad"),
-                          ("b2", "hidden"), ("c1", "team")])
+        # The package no longer decides: a dependent objective without a visibility of its own says it
+        # follows the game's setting (RVL-1), and its visibility is what it is once known.
+        self.assertEqual([(o["id"], o["visibility"], o.get("follows_reveal")) for o in block["objectives"]],
+                         [("a1", "squad", None), ("a2", "squad", True), ("a3", "squad", True),
+                          ("b1", "squad", None), ("b2", "squad", True), ("c1", "team", None)])
 
     def test_the_two_settings_are_checked_and_optional(self):
         for key, value, code in (("reveal", "later", "bad_reveal"), ("disclosure", "nobody", "bad_disclosure")):
@@ -138,6 +140,8 @@ class Chains(Case):
         self.assertNotIn("disclosure", block)
         self.assertEqual([o["visibility"] for o in block["objectives"]],
                          ["squad", "squad", "squad", "squad", "squad", "team"])
+        # ... and the game decides when the later steps are known (RVL-1: active in a game with squads).
+        self.assertEqual(self.create(mode_id=SCENARIO)["scenario"]["reveal"], "active")
 
     # --- one at a time ---------------------------------------------------------------------
 
@@ -270,6 +274,86 @@ class Chains(Case):
         r = self.client.post("/api/v1/games", headers=GM, json={
             "name": "plain", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"],
             "objective_disclosure": "leader"})
+        self.assertEqual(r.status_code, 400, r.text)
+        self.assertIn("scenario", r.json()["detail"])
+
+
+NO_REVEAL = MANIFEST.replace("reveal: active\n", "")
+NO_REVEAL_EXPLICIT = NO_REVEAL.replace("assignee: { team: red, squad: 1 },\n      depends_on: [a1] }",
+                                       "assignee: { team: red, squad: 1 },\n      depends_on: [a1], visibility: team }")
+
+
+@unittest.skipIf(CORE is None, "the shared core library is not built")
+class RevealDefault(Case):
+    """The scenario says nothing about ``reveal``: the game decides (RVL-1). In a game with squads
+    the objectives are active (known when they open) unless the GM chooses otherwise; without squads
+    they all show from the start."""
+
+    start, capture, ids, seen, everything = (Chains.start, Chains.capture, Chains.ids, Chains.seen,
+                                             Chains.everything)
+
+    def setUp(self):
+        super().setUp()
+        self.install(NO_REVEAL)
+        self.route = make_route(self.ctrl)
+        self.read = Viewer("read")
+
+    def new_game(self, **spec) -> int:
+        self.gid = self.create(mode_id=SCENARIO, **spec)["id"]
+        self.red1_leader = player(self.gid, RED, 1, role="squad_leader")
+        return self.gid
+
+    def revealed_at_start(self) -> list[str]:
+        self.start()
+        return sorted(e["data"]["objective"] for e in self.ctrl.log(self.gid)
+                      if e["type"] == "scenario.objective.revealed")
+
+    def test_squad_games_are_active_by_default(self):
+        game = self.ctrl.get_game(self.new_game())
+        self.assertEqual((game["scenario"]["reveal"], game["scenario"]["reveal_default"]), ("active", None))
+        self.assertEqual(self.revealed_at_start(), ["a1", "b1", "c1"])
+        self.assertEqual(self.ids(self.red1_leader), ["a1"])
+        self.assertNotIn("a2", self.everything(self.red1_leader))
+        self.capture(4)
+        self.assertEqual(self.ids(self.red1_leader), ["a1", "a2"])
+
+    def test_a_game_without_squads_shows_every_objective_from_the_start(self):
+        game = self.ctrl.get_game(self.new_game(squads=0))
+        self.assertEqual(game["scenario"]["reveal"], "all")
+        self.assertEqual(self.revealed_at_start(), ["a1", "a2", "a3", "b1", "b2", "c1"])
+
+    def test_the_gm_chooses_visible_or_hidden_for_the_game(self):
+        game = self.ctrl.get_game(self.new_game(objective_reveal="all"))
+        self.assertEqual(game["scenario"]["reveal"], "all")
+        self.assertEqual(self.revealed_at_start(), ["a1", "a2", "a3", "b1", "b2", "c1"])
+        self.assertEqual(self.ids(self.red1_leader), ["a1", "a2", "a3"])
+        self.client.post(f"/api/v1/games/{self.gid}/end", headers=GM)
+        game = self.ctrl.get_game(self.new_game(squads=0, objective_reveal="active"))
+        self.assertEqual(game["scenario"]["reveal"], "active")
+        self.assertEqual(self.revealed_at_start(), ["a1", "b1", "c1"])
+
+    def test_the_gms_choice_wins_over_the_scenarios_own_reveal(self):
+        self.install(MANIFEST)  # reveal: active
+        self.assertEqual(self.ctrl.get_game(self.new_game())["scenario"]["reveal"], "active")
+        self.client.post(f"/api/v1/games/{self.gid}/end", headers=GM)
+        game = self.ctrl.get_game(self.new_game(objective_reveal="all"))
+        self.assertEqual((game["scenario"]["reveal"], game["scenario"]["reveal_default"]), ("all", "active"))
+        self.assertEqual(self.revealed_at_start(), ["a1", "a2", "a3", "b1", "b2", "c1"])
+
+    def test_an_objectives_own_visibility_wins_over_the_game(self):
+        self.install(NO_REVEAL_EXPLICIT)  # a2 says visibility: team
+        self.new_game(objective_reveal="active")
+        self.assertEqual(self.revealed_at_start(), ["a1", "a2", "b1", "c1"])  # not a3, b2
+
+    def test_the_choice_is_checked_and_only_for_a_scenario(self):
+        r = self.client.post("/api/v1/games", headers=GM, json={
+            "name": "x", "mode_id": SCENARIO, "modifiers": [OBJECTIVES], "teams": ["red", "blue"],
+            "squads": 2, "objective_reveal": "later"})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("objective_reveal", r.json()["detail"])
+        r = self.client.post("/api/v1/games", headers=GM, json={
+            "name": "plain", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"],
+            "objective_reveal": "all"})
         self.assertEqual(r.status_code, 400, r.text)
         self.assertIn("scenario", r.json()["detail"])
 

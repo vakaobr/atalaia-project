@@ -216,6 +216,7 @@ Cada QR leva só o código da etiqueta (**ATL-** e oito caracteres), nada sobre 
    - **Nomes e emblemas das equipas** (opcional): um nome para mostrar e um emblema para cada cor de equipa. As caixas continuam a mostrar a cor;
    - **Duração (minutos)**: `0` quer dizer sem limite. No fim, o jogo termina sozinho;
    - **Squads por equipa**: `0` quer dizer só equipas. Num milsim ou num jogo grande, cada equipa divide-se em squads (até 16). Com um cenário podes escolher **A quem vão os objetivos de um squad**;
+   - **Objetivos no início** (num jogo de cenário): se os objetivos que dependem de outros, e nada dizem sobre isso, ficam visíveis desde o início (**Todos visíveis desde o início**) ou escondidos até abrirem (**Só os ativos**: o seguinte é revelado quando o anterior é concluído). Na opção por omissão, um jogo com squads mostra só os objetivos ativos e um jogo sem squads mostra-os todos, a não ser que o `reveal` do próprio cenário diga outra coisa; a `visibility` própria de um objetivo no cenário prevalece sempre. Fica fixo quando o jogo é criado, e a página do jogo diz qual vale. No controlador do telemóvel a mesma escolha está no formulário de novo jogo;
    - **Modificadores**: marca **Códigos**, por exemplo, para correr códigos no teclado ao lado do modo;
    - **Props com uma função própria**: por exemplo **Ligaduras**;
    - **Parâmetros do modo**: as definições do modo, com uma descrição curta.

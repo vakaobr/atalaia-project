@@ -1058,6 +1058,7 @@
       "lang_de": "Deutsch",
       "lang_zh-tw": "Traditionelles Chinesisch (Taiwan)",
       "scenario_rules": "Ziele sind bekannt %1 und gesagt %2",
+      "reveal_game": "wie das Spiel es bestimmt",
       "reveal_all": "von Anfang an",
       "reveal_active": "eines nach dem anderen",
       "disclosure_members": "dem ganzen Squad",
@@ -1651,5 +1652,15 @@
   "projected_score": {
     "label": "geschätzt {n}",
     "explain": "Zwischen den Meldungen der Boxen (alle 15 s) addiert die Schätzung die Punkte, die eine gehaltene Box seither gemacht hat, für Modi, die ihre Wertung angeben. Nur die Zahl ohne „geschätzt“ ist die offizielle Wertung."
+  },
+  "objective_reveal": {
+    "label": "Ziele zu Beginn",
+    "default": "Wie das Szenario es sagt; in einem Spiel mit Squads nur die aktiven",
+    "all": "Alle von Anfang an sichtbar",
+    "active": "Nur die aktiven; das nächste wird aufgedeckt, wenn es öffnet",
+    "hint": "Gilt für Ziele, die von anderen abhängen und selbst nichts dazu sagen. Die eigene Einstellung eines Ziels im Szenario gilt immer. Sie steht fest, sobald das Spiel angelegt ist.",
+    "live": "Ziele: {value}",
+    "live_all": "alle von Anfang an sichtbar",
+    "live_active": "nur die aktiven werden gezeigt"
   }
 }

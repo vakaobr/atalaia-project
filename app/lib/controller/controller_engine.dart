@@ -207,8 +207,9 @@ class _FieldScript implements FieldOperations {
     String source,
     String chunk,
     Map<String, Object?> game,
-    this.scoreKey,
-  ) : teams = (game['teams']! as List).cast<String>() {
+    this.scoreKey, {
+    String? scenarioReveal,
+  }) : teams = (game['teams']! as List).cast<String>() {
     node = CoreNode.create(
       core,
       NodeSpec(
@@ -217,7 +218,12 @@ class _FieldScript implements FieldOperations {
         nodeId: engine.nodeId,
         gameSeed: game['game_seed']! as int,
         teams: teams,
-        params: (game['params']! as Map).cast<String, Object?>(),
+        params: {
+          ...(game['params']! as Map).cast<String, Object?>(),
+          // The runtime hides the objectives that follow the game's reveal
+          // setting (RVL-1).
+          'scenario_reveal': ?scenarioReveal,
+        },
       ),
       handlers: NodeHandlers(onEvent: _onEvent, onFieldState: _onFieldState),
       fieldOps: this,
@@ -575,6 +581,7 @@ class ControllerEngine {
       // The staff's view: every objective, and the boxes the GM named.
       out['scenario'] = meta.staffView(
         svc.disclosure(game['id']! as int, meta),
+        svc.reveal(game, meta),
       );
       final names = svc.nodeNames(game['id']! as int);
       final ids = names.keys.toList()..sort();
@@ -618,6 +625,7 @@ class ControllerEngine {
         game,
         svc.revealed(game['id']! as int),
         svc.disclosure(game['id']! as int, meta),
+        svc.reveal(game, meta),
       );
     }
     return out;
@@ -776,6 +784,14 @@ class ControllerEngine {
         'objective_disclosure: only a scenario\'s game has objectives to disclose',
       );
     }
+    // Whether the objectives that say nothing start visible or hidden: the
+    // GM's choice (RVL-1).
+    final reveal = ControllerScenarios.checkReveal(spec['objective_reveal']);
+    if (reveal != null && scenarioMeta(mode.id) == null) {
+      throw ControllerError(
+        'objective_reveal: only a scenario\'s game has objectives to reveal',
+      );
+    }
     // Team branding (decisions BR12-BR15): display names and crests next to
     // the colours, which stay the team names the boxes and the radio know.
     final b = branding;
@@ -827,6 +843,7 @@ class ControllerEngine {
       _tellModemLanguage(boxLang);
     }
     if (disclosure != null) scenarios?.storeDisclosure(id, disclosure);
+    if (reveal != null) scenarios?.storeReveal(id, reveal);
     _activate(store.game(id)!, key);
     final out = getGame(id);
     _emit({'type': 'game', 'game': out});
@@ -2410,7 +2427,8 @@ class ControllerEngine {
       // A hidden objective's names reach its players with the game (P4R24).
       final meta = scenarioMeta(game['mode_id']);
       final o = meta?.objectives[(record['data'] as Map?)?['objective']];
-      if (o != null && o['visibility'] == 'hidden') {
+      if (o != null &&
+          meta!.knownWhenOpen(o, scenarios?.reveal(game, meta) ?? 'all')) {
         _emit({'type': 'game', 'game': publicGame(game)});
       }
     }
@@ -2489,6 +2507,9 @@ class ControllerEngine {
       '${mode.id}/field.lua',
       game,
       'field-$run',
+      scenarioReveal: scenarioMeta(game['mode_id']) == null
+          ? null
+          : scenarios?.reveal(game, scenarioMeta(game['mode_id'])),
     );
     _field = field;
     if (fc.gameTimeMs > 0) field.advance(fc.gameTimeMs);

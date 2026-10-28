@@ -25,6 +25,9 @@ from atalaia_sim.sim import CONTROLLER, Simulation
 REPO = Path(__file__).resolve().parents[2]
 MODES = REPO / "modes"
 FOXHOUND = MODES / "objectives" / "tests" / "fixtures" / "foxhound"
+# A compiled scenario (not hand-written) with a chain: `second` depends on `first` and says nothing about its
+# visibility (it follows the game's reveal setting, RVL-1); `third` depends on `first` and says `visibility: team`.
+CHAIN = MODES / "objectives" / "tests" / "fixtures" / "chain"
 VECTORS = yaml.safe_load((REPO / "protocol" / "vectors" / "composition.yaml").read_text(encoding="utf-8"))
 TEAMS = ["red", "blue"]
 NODES = {"alpha": "objective", "bravo": "objective", "charlie": "objective", "site": "bomb_site"}
@@ -275,6 +278,34 @@ class ScenarioRunTests(unittest.TestCase):
         self.assertEqual(runtime.status, "running", runtime.last_error)
         self.assertEqual([e for e in sim.events if e.type == "script.error"], [])
         self.assertEqual(sim.problems, [])
+
+
+@unittest.skipIf(CORE is None, "the shared core library is not built")
+class ScenarioRevealTests(unittest.TestCase):
+    """What the game's ``scenario_reveal`` setting (the controller's, RVL-1) does to the runtime: an
+    objective that depends on others and says nothing about its visibility is known at the start
+    ("all") or only when it opens ("active"); an explicit visibility always wins."""
+
+    def revealed(self, params: dict, capture_first: bool = False) -> list[str]:
+        game = compose(load_mode(CHAIN), [load_mode(MODES / "objectives")])
+        sim = Simulation(CORE, game, {"alpha": "objective", "bravo": "objective", "charlie": "objective"},
+                         TEAMS, params)
+        self.addCleanup(sim.close)
+        sim.start()
+        if capture_first:
+            sim.hold("alpha", "red", 3)
+        self.assertEqual(sim.problems, [])
+        return [e.data["objective"] for e in sim.events if e.type == "scenario.objective.revealed"]
+
+    def test_all_shows_every_objective_from_the_start(self):
+        self.assertEqual(self.revealed({"scenario_reveal": "all"}), ["first", "second", "third"])
+
+    def test_active_reveals_a_followed_objective_only_when_it_opens(self):
+        self.assertEqual(self.revealed({"scenario_reveal": "active"}), ["first", "third"])
+        self.assertEqual(self.revealed({"scenario_reveal": "active"}, True), ["first", "third", "second"])
+
+    def test_without_the_setting_every_objective_shows(self):
+        self.assertEqual(self.revealed({}), ["first", "second", "third"])
 
 
 if __name__ == "__main__":

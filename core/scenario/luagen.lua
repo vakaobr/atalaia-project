@@ -284,6 +284,8 @@ function luagen.objective_data(o, manifest)
     squad ~= nil and py.str(squad) or nil, -- the events' squad is text (data key 2)
     "hidden",
     py.getd(o, "visibility", m.default_visibility(o, manifest)) == "hidden",
+    "follows_reveal",
+    m.follows_reveal(o) and true or nil,
     "depends_on",
     copy_list(py.truthy(py.get(o, "depends_on")) and py.get(o, "depends_on") or nil),
     "reveals",
@@ -334,6 +336,8 @@ function luagen.field_lua(manifest, runtime)
     sid,
     "teams",
     teams ~= nil and copy_list(teams) or py.list({ "red", "blue" }, 2),
+    "reveal",
+    py.get(manifest, "reveal"),
     "objectives",
     objectives
   )

@@ -1058,6 +1058,7 @@
       "lang_de": "German",
       "lang_zh-tw": "Traditional Chinese (Taiwan)",
       "scenario_rules": "objectives are known %1 and told to %2",
+      "reveal_game": "as the game decides",
       "reveal_all": "from the start",
       "reveal_active": "one at a time",
       "disclosure_members": "the whole squad",
@@ -1651,5 +1652,15 @@
   "projected_score": {
     "label": "estimated {n}",
     "explain": "Between the boxes' reports (every 15 s) the estimate adds the points a held box has made since, for modes that say how they score. Only the number without \"estimated\" is the official score."
+  },
+  "objective_reveal": {
+    "label": "Objectives at the start",
+    "default": "As the scenario says; in a game with squads, only the active ones",
+    "all": "All visible from the start",
+    "active": "Only the active ones; the next is revealed when it opens",
+    "hint": "For the objectives that depend on others and say nothing about it themselves. An objective's own setting in the scenario always wins. Fixed when the game is made.",
+    "live": "Objectives: {value}",
+    "live_all": "all visible from the start",
+    "live_active": "only the active ones are shown"
   }
 }
