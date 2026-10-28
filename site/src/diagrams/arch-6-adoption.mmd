@@ -1,0 +1,30 @@
+%% SPDX-FileCopyrightText: 2026 The Atalaia contributors
+%% SPDX-License-Identifier: CC-BY-SA-4.0
+%%
+%% Template of one diagram of docs/architecture.md (filled with the English texts it is that
+%% diagram exactly: tools/build_site.py --check compares). Every label is a key of site/i18n/*.yaml
+%% (arch.tNNN). tools/render_diagrams.py draws the SVGs site/img/diagrams/arch-6-adoption-<language>.svg.
+flowchart LR
+    subgraph keys["{{ arch.t118 }}"]
+        rk["`{{ arch.t114 }}`"]
+        mk["`{{ arch.t115 }}`"]
+    end
+    gh["{{ arch.t119 }}"]
+    reg["{{ arch.t120 }}"]
+    op["{{ arch.t121 }}"]
+    ctrl["`{{ arch.t116 }}`"]
+    box["`{{ arch.t117 }}`"]
+    card["{{ arch.t122 }}"]
+    rk -->|"{{ arch.t123 }}"| gh
+    mk -->|"{{ arch.t124 }}"| reg
+    rk -.->|"{{ arch.t125 }}"| box
+    mk -.->|"{{ arch.t125 }}"| box
+    gh -.->|"{{ arch.t126 }}"| op
+    op -->|"{{ arch.t127 }}"| ctrl
+    reg -.->|"{{ arch.t027 }}"| ctrl
+    ctrl -->|"{{ arch.t128 }}"| box
+    box -->|"{{ arch.t129 }}"| ctrl
+    ctrl ---|"{{ arch.t130 }}"| box
+    ctrl -->|"{{ arch.t131 }}"| card
+    card -->|"{{ arch.t132 }}"| box
+    ctrl <-->|"{{ arch.t133 }}"| box

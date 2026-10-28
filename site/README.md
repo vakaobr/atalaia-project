@@ -27,6 +27,7 @@ which keeps English's ASCII folders (Han letters in an address are percent-encod
 | Radio | `/radio/` | `/en/radio/` | `/de/funk/` | `/zh-tw/radio/` | `src/radio.html` | How the radio works: both diagrams with their lead-ins, and the channel |
 | Roadmap | `/roadmap/` | `/en/roadmap/` | `/de/roadmap/` | `/zh-tw/roadmap/` | `src/roadmap.html` | The six phases, each as a one-line summary, bullets of what is done (the long lists fold into a `<details>`), bullets of what is next or waiting, and its gate, with a link to the phase's `STATUS.md`. "Roadmap" stays in English in Portuguese too |
 | Build guides | `/montagem/` | `/en/build-guides/` | `/de/bauen/` | `/zh-tw/build-guides/` | `src/build.html` | Safety rules for every build; the Satellite, the I/O pod and the target addon shortened from `hardware/<node>/BUILD.md` (the full guides, in English), with their pin tables and photo placeholders; a pointer to the Field Box's build manual (phase 5 plan phase 12, decisions P5J-1 to P5J-13) |
+| How it fits together | `/como-se-liga/` | `/en/how-it-fits/` | `/de/zusammenspiel/` | `/zh-tw/how-it-fits/` | `src/architecture.html` | The seven architecture diagrams of `docs/architecture.md` as SVG, each with a short "what flows / what does not" text and a link to the doc (decision SITEARCH-1). Linked from the navigation, the roadmap and the build guides |
 | Glossary | `/glossario/` | `/en/glossary/` | `/de/glossar/` | `/zh-tw/glossary/` | `src/glossary.html` | Every glossary entry; the glossary links of every page lead here |
 
 | Path | What it is |
@@ -56,6 +57,25 @@ twins) still land on the main page's short sections, each with a link to its pag
 glossary anchors (`/#glossario-lora`, `/en/#glossary-lora`) now only open the main page; the
 glossary page keeps the same ids (`/glossario/#glossario-lora`), so a link moves to the new page
 and keeps its id. Keep these ids, the page folders in `PAGES` and the glossary ids stable.
+
+## Architecture diagrams (Mermaid)
+
+The diagrams on the "How it fits together" page are the Mermaid diagrams of `docs/architecture.md`,
+drawn once per language:
+
+- `src/diagrams/arch-<n>-<name>.mmd` is the diagram with every label a `{{ arch.tNNN }}` key of
+  `i18n/*.yaml`. Filled in with the English texts it is the doc's block exactly, and `build_site.py --check`
+  fails if it is not, so the doc (for GitHub) and the page cannot show different diagrams. To change a
+  diagram, change the doc block, the template and the labels together.
+- Mermaid cannot run in CI, so `python3 tools/render_diagrams.py` (Docker, the Mermaid CLI image) draws
+  `img/diagrams/arch-<n>-<name>-<language>.svg` and the SVGs are committed. Each holds a fingerprint (the
+  SHA-256 of the filled source and of `render_diagrams.py`'s own text); `build_site.py --check` fails, and
+  names the tool, when a template, a label or the tool changed and the SVGs were not drawn again.
+  `--png DIR` writes light and dark PNGs to look at (do not commit them).
+- The SVGs are plain: text as `<text>`, no script, no outside address, no font loaded. Colours are CSS
+  variables with a `prefers-color-scheme: dark` override inside the SVG, from the site's palette
+  (`PALETTE` in the tool), so each follows the reader's light or dark setting when shown in an `<img>`.
+- A label may not hold `"`, a backtick, `;` or `#` (Mermaid reads them as syntax).
 
 ## Images
 

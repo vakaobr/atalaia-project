@@ -13,7 +13,9 @@ follows the code and the protocol documents where they differ from the design
 (see [Where the documents and the code differ](#where-the-documents-and-the-code-differ)).
 
 The diagrams are [Mermaid](https://mermaid.js.org/), which GitHub draws in the
-browser. Each one has a short text under it that says what flows on the links
+browser. The project page shows the same diagrams as SVG in four languages
+(its templates are `site/src/diagrams/arch-*.mmd`: change a diagram here and there
+together, then run `python3 tools/render_diagrams.py`). Each one has a short text under it that says what flows on the links
 and what does **not**.
 
 **Reading the diagrams.** A solid line works with no internet at the field. A
@@ -40,21 +42,33 @@ section says what has not been seen on real hardware.
 ```mermaid
 flowchart TB
     subgraph field["At the field: works with no internet"]
-        boxes["<b>Field Boxes and Satellites</b><br/>ESP32, LoRa radio, NFC"]
-        modem["<b>USB LoRa modem</b><br/>second ESP32 board"]
-        pod["<b>I/O pod</b><br/>ESP32, LoRa, NFC, buttons"]
-        ctrl["<b>Field controller</b><br/>Raspberry Pi, or a phone controller"]
-        gm["<b>GM console</b><br/>a browser"]
-        phones["<b>Players and marshals</b><br/>the Atalaia app"]
-        props["<b>Android props</b><br/>the app in kiosk mode"]
-        atak["<b>ATAK devices</b>"]
+        boxes["`**Field Boxes and Satellites**
+ESP32, LoRa radio, NFC`"]
+        modem["`**USB LoRa modem**
+second ESP32 board`"]
+        pod["`**I/O pod**
+ESP32, LoRa, NFC, buttons`"]
+        ctrl["`**Field controller**
+Raspberry Pi, or a phone controller`"]
+        gm["`**GM console**
+a browser`"]
+        phones["`**Players and marshals**
+the Atalaia app`"]
+        props["`**Android props**
+the app in kiosk mode`"]
+        atak["`**ATAK devices**`"]
     end
     subgraph net["Needs the internet"]
-        site["<b>Site server</b> (optional)<br/>self-hosted, or hosted by the hub"]
-        rgm["<b>Remote GM</b><br/>a browser"]
-        reg["<b>Community mode registry</b><br/>GitHub Pages"]
-        gh["<b>GitHub Releases</b><br/>signed firmware"]
-        maps["<b>OpenStreetMap and DGT tiles</b><br/>used while loading a field map"]
+        site["`**Site server** (optional)
+self-hosted, or hosted by the hub`"]
+        rgm["`**Remote GM**
+a browser`"]
+        reg["`**Community mode registry**
+GitHub Pages`"]
+        gh["`**GitHub Releases**
+signed firmware`"]
+        maps["`**OpenStreetMap and DGT tiles**
+used while loading a field map`"]
     end
     boxes <-->|"LoRa"| modem
     modem <-->|"USB serial"| ctrl
@@ -355,14 +369,18 @@ the real site server and PostgreSQL in Docker only.
 ```mermaid
 flowchart LR
     subgraph keys["The project's keys"]
-        rk["<b>Release keys</b><br/>root (offline) and CI"]
-        mk["<b>Mode keys</b><br/>root (offline) and CI"]
+        rk["`**Release keys**
+root (offline) and CI`"]
+        mk["`**Mode keys**
+root (offline) and CI`"]
     end
     gh["GitHub Releases:<br/>signed firmware"]
     reg["Mode registry:<br/>signed packages"]
     op["Operator:<br/>downloads, then uploads"]
-    ctrl["<b>Field controller</b><br/>keeps releases, packages, logo"]
-    box["<b>Field Box</b><br/>checks everything itself"]
+    ctrl["`**Field controller**
+keeps releases, packages, logo`"]
+    box["`**Field Box**
+checks everything itself`"]
     card["NFC field card"]
     rk -->|"signs"| gh
     mk -->|"signs the verified badge"| reg

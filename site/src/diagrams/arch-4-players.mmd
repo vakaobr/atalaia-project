@@ -1,0 +1,31 @@
+%% SPDX-FileCopyrightText: 2026 The Atalaia contributors
+%% SPDX-License-Identifier: CC-BY-SA-4.0
+%%
+%% Template of one diagram of docs/architecture.md (filled with the English texts it is that
+%% diagram exactly: tools/build_site.py --check compares). Every label is a key of site/i18n/*.yaml
+%% (arch.tNNN). tools/render_diagrams.py draws the SVGs site/img/diagrams/arch-4-players-<language>.svg.
+sequenceDiagram
+    autonumber
+    participant P as {{ arch.t073 }}
+    participant K as {{ arch.t074 }}
+    participant BC as {{ arch.t075 }}
+    participant C as {{ arch.t045 }}
+    participant S as {{ arch.t076 }}
+
+    Note over P,C: {{ arch.t077 }}
+    P->>P: {{ arch.t078 }}
+    P->>C: {{ arch.t079 }}
+    P->>C: {{ arch.t080 }}
+    C-->>P: {{ arch.t081 }}
+    K->>C: {{ arch.t082 }}
+    K->>K: {{ arch.t083 }}
+    K->>K: {{ arch.t084 }}
+    K->>C: {{ arch.t085 }}
+    C-->>P: {{ arch.t086 }}
+    loop {{ arch.t087 }}
+        BC-->>P: {{ arch.t088 }}
+        P->>C: {{ arch.t089 }}
+    end
+    P->>C: {{ arch.t090 }}
+    C-->>P: {{ arch.t091 }}
+    C-->>S: {{ arch.t092 }}

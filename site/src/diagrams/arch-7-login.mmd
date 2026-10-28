@@ -1,0 +1,28 @@
+%% SPDX-FileCopyrightText: 2026 The Atalaia contributors
+%% SPDX-License-Identifier: CC-BY-SA-4.0
+%%
+%% Template of one diagram of docs/architecture.md (filled with the English texts it is that
+%% diagram exactly: tools/build_site.py --check compares). Every label is a key of site/i18n/*.yaml
+%% (arch.tNNN). tools/render_diagrams.py draws the SVGs site/img/diagrams/arch-7-login-<language>.svg.
+flowchart TB
+    who["{{ arch.t134 }}"]
+    pw["{{ arch.t135 }}"]
+    totp["{{ arch.t136 }}"]
+    pk["{{ arch.t137 }}"]
+    oidc["{{ arch.t138 }}"]
+    s0["{{ arch.t139 }}"]
+    s1["{{ arch.t140 }}"]
+    player["{{ arch.t141 }}"]
+    staff["{{ arch.t142 }}"]
+    who --> pw
+    pw -->|"{{ arch.t143 }}"| totp
+    pw -->|"{{ arch.t144 }}"| s0
+    totp --> s1
+    who --> pk
+    pk -->|"{{ arch.t145 }}"| s1
+    who --> oidc
+    oidc -->|"{{ arch.t146 }}"| s0
+    s0 -->|"{{ arch.t147 }}"| s1
+    s0 --> player
+    s1 --> player
+    s1 --> staff

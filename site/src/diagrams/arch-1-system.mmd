@@ -1,0 +1,39 @@
+%% SPDX-FileCopyrightText: 2026 The Atalaia contributors
+%% SPDX-License-Identifier: CC-BY-SA-4.0
+%%
+%% Template of one diagram of docs/architecture.md (filled with the English texts it is that
+%% diagram exactly: tools/build_site.py --check compares). Every label is a key of site/i18n/*.yaml
+%% (arch.tNNN). tools/render_diagrams.py draws the SVGs site/img/diagrams/arch-1-system-<language>.svg.
+flowchart TB
+    subgraph field["{{ arch.t014 }}"]
+        boxes["`{{ arch.t001 }}`"]
+        modem["`{{ arch.t002 }}`"]
+        pod["`{{ arch.t003 }}`"]
+        ctrl["`{{ arch.t004 }}`"]
+        gm["`{{ arch.t005 }}`"]
+        phones["`{{ arch.t006 }}`"]
+        props["`{{ arch.t007 }}`"]
+        atak["`{{ arch.t008 }}`"]
+    end
+    subgraph net["{{ arch.t015 }}"]
+        site["`{{ arch.t009 }}`"]
+        rgm["`{{ arch.t010 }}`"]
+        reg["`{{ arch.t011 }}`"]
+        gh["`{{ arch.t012 }}`"]
+        maps["`{{ arch.t013 }}`"]
+    end
+    boxes <-->|"{{ arch.t016 }}"| modem
+    modem <-->|"{{ arch.t017 }}"| ctrl
+    pod <-->|"{{ arch.t016 }}"| modem
+    boxes -->|"{{ arch.t018 }}"| ctrl
+    props <-->|"{{ arch.t019 }}"| ctrl
+    props <-->|"{{ arch.t020 }}"| pod
+    gm <-->|"{{ arch.t021 }}"| ctrl
+    phones <-->|"{{ arch.t022 }}"| ctrl
+    ctrl -->|"{{ arch.t023 }}"| atak
+    ctrl -.->|"{{ arch.t024 }}"| site
+    phones -.->|"{{ arch.t025 }}"| site
+    rgm -.->|"{{ arch.t026 }}"| site
+    ctrl -.->|"{{ arch.t027 }}"| reg
+    gm -.->|"{{ arch.t028 }}"| gh
+    gm -.->|"{{ arch.t029 }}"| maps

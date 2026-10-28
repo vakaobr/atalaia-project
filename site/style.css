@@ -628,6 +628,15 @@ html:has(.viewer[open]) { overflow: hidden; }
 .photo { margin: 24px 0 0; padding: 18px 16px; border: 2px dashed var(--muted); border-radius: var(--radius); color: var(--muted); font-size: 0.95rem; }
 .photo figcaption { max-width: 70ch; }
 
+/* The architecture diagrams (site/img/diagrams/arch-*.svg, drawn by tools/render_diagrams.py): wide, so each
+   scrolls sideways inside its own box instead of shrinking its text; the SVG follows the light or dark setting
+   itself (a prefers-color-scheme rule inside it) and paints the page's own background (--bg). */
+.arch figure { margin: 18px 0 0; }
+.arch-scroll { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
+.arch-scroll:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.arch-scroll img { display: block; max-width: none; height: auto; }
+.arch figcaption { margin-top: 6px; color: var(--muted); font-size: 0.95rem; }
+
 /* The AI-drafted translations ask for reviewers (P5H-11, P5K-12). */
 .translation-notice {
   margin: 0;

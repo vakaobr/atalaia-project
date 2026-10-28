@@ -57,6 +57,15 @@ not fit, measuring it with the widest of the common fallback fonts
 image cannot use the page's fonts. The font size and weight come from the
 font-size and font-weight attributes of the text or its parents.
 
+The architecture diagrams are Mermaid, not SVG templates: site/src/diagrams/arch-*.mmd are
+the diagrams of docs/architecture.md (the English text filled in gives that file's blocks
+exactly, and --check fails if it does not) with every label a {{ key }}. Mermaid cannot run in
+CI, so tools/render_diagrams.py (Docker, the Mermaid CLI) writes the SVGs
+site/img/diagrams/arch-*-<code>.svg, and each holds a fingerprint, the SHA-256 of the filled
+source and of the tool's own text; --check fails when a template, a label or the tool changed
+and the SVG was not drawn again. A page reads the drawn size from the SVG
+({{ page.arch.<number>.width }} and .height, the architecture page only).
+
 The wiring drawings (WIRING below) are not translated: WireViz bakes its labels, which are pin
 names, GPIO numbers and signal names, into the SVG, and those are the same in every language, so
 each page only translates the caption and the alt text. The copy gets a font stack with
@@ -76,6 +85,7 @@ diagram that nothing makes any more. Needs only PyYAML.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import posixpath
 import re
@@ -96,6 +106,12 @@ PARTIALS = SRC / "partials"
 DIAGRAMS = SRC / "diagrams"
 DIAGRAM_OUT = SITE / "img" / "diagrams"
 WIRING_OUT = SITE / "img" / "wiring"
+ARCH_DOC = REPO / "docs" / "architecture.md"
+RENDER_TOOL = REPO / "tools" / "render_diagrams.py"
+# The size a drawn architecture diagram is shown at, relative to its own size: Mermaid draws
+# wide, and the page scrolls sideways rather than make the text unreadable.
+ARCH_SCALE = 0.8
+FINGERPRINT = re.compile(r"<!-- atalaia-mermaid-fingerprint: sha256=([0-9a-f]{64}) -->")
 # The Field Box's wiring drawings (WireViz output, hardware/field-box/wiring/*.svg, rendered by
 # tools/docker_hw.py): published name -> source. The build page shows them; the copies are
 # written by this script and checked by --check, so they cannot drift from the hardware folder.
@@ -167,6 +183,7 @@ PAGES = (
     Page("radio", {"pt": "radio/", "en": "radio/", "de": "funk/", "zh-tw": "radio/"}),
     Page("roadmap", {"pt": "roadmap/", "en": "roadmap/", "de": "roadmap/", "zh-tw": "roadmap/"}),
     Page("build", {"pt": "montagem/", "en": "build-guides/", "de": "bauen/", "zh-tw": "build-guides/"}),
+    Page("architecture", {"pt": "como-se-liga/", "en": "how-it-fits/", "de": "zusammenspiel/", "zh-tw": "how-it-fits/"}),
     Page("glossary", {"pt": "glossario/", "en": "glossary/", "de": "glossar/", "zh-tw": "glossary/"}),
 )
 
@@ -440,6 +457,11 @@ def page_values(page: Page, lang: Language, texts: dict[str, str], file_name: st
     for target in PAGES:
         values[f"page.to.{target.name}"] = relative(here, folder(target, lang))
         values[f"page.nav.{target.name}"] = ' aria-current="page"' if target is page else ""
+    if page.name == "architecture":
+        for template in arch_templates():
+            width, height = arch_size(arch_path(template, lang))
+            values[f"page.arch.{arch_number(template)}.width"] = str(width)
+            values[f"page.arch.{arch_number(template)}.height"] = str(height)
     for value, (key, fallback) in META_VALUES.items():
         name = f"meta.{page.name}.{key}"
         if name not in texts and fallback:
@@ -791,6 +813,112 @@ def render_diagram(template: str, source: Path, texts: dict[str, str], lang: Lan
     return header + "\n" + ET.tostring(root, encoding="unicode") + "\n"
 
 
+# The licence lines at the top of a Mermaid template: Mermaid comments, dropped before filling.
+MERMAID_HEADER = re.compile(r"\A(?:%%[^\n]*\n)+")
+MERMAID_BLOCK = re.compile(r"```mermaid\n(.*?)```", re.S)
+# What Mermaid would read as syntax inside a label (or a sequence message): no text may hold it.
+MERMAID_BAD = ('"', "`", ";", "#", "%%")
+
+
+def arch_templates() -> dict[Path, str]:
+    """The Mermaid templates site/src/diagrams/arch-<n>-<name>.mmd, in order, without their header."""
+    paths = sorted(DIAGRAMS.glob("arch-*.mmd")) if DIAGRAMS.is_dir() else []
+    return {path: MERMAID_HEADER.sub("", strip_comments(path.read_text(encoding="utf-8"), path))
+            for path in paths}
+
+
+def arch_path(template: Path, lang: Language) -> Path:
+    return DIAGRAM_OUT / f"{template.stem}-{lang.code}.svg"
+
+
+def arch_number(template: Path) -> str:
+    match = re.fullmatch(r"arch-(\d+)-[a-z0-9-]+", template.stem)
+    if not match:
+        raise SiteError(f"{rel(template)}: the name must be arch-<number>-<name>.mmd")
+    return match.group(1)
+
+
+def mermaid_source(template: str, texts: dict[str, str], lang: Language, source: Path) -> str:
+    """A Mermaid template with its labels filled in from one language's texts."""
+    file_name = rel(I18N / f"{lang.code}.yaml")
+    values = language_values(lang)
+
+    def substitute(match: re.Match[str]) -> str:
+        key = match.group(1)
+        if match.group(2) or key.startswith("page."):
+            raise SiteError(f"{rel(source)}: write {{{{ {key} }}}} with no filter and no page value: "
+                            f"a Mermaid label is plain text")
+        value = fill(texts[key], values, key, file_name)
+        for bad in MERMAID_BAD:
+            if bad in value:
+                raise SiteError(f"{file_name}: {key} holds {bad!r}, which Mermaid reads as syntax in a label")
+        return value
+
+    return PLACEHOLDER.sub(substitute, template)
+
+
+def render_tool_version() -> str:
+    """The Mermaid tool's version: its own text, which holds the image tag, the Mermaid
+    configuration, the palette and the post-processing."""
+    text = RENDER_TOOL.read_text(encoding="utf-8").replace("\r\n", "\n")
+    return f"{rel(RENDER_TOOL)} sha256:{hashlib.sha256(text.encode('utf-8')).hexdigest()}"
+
+
+def arch_fingerprint(source: str) -> str:
+    return hashlib.sha256(f"{source}\0{render_tool_version()}".encode("utf-8")).hexdigest()
+
+
+def arch_renders(all_texts: dict[Language, dict[str, str]]) -> list[tuple[Path, Path, str]]:
+    """Every architecture SVG that should exist: (its path, its template, its filled Mermaid source)."""
+    renders = []
+    for template, text in arch_templates().items():
+        arch_number(template)
+        for lang in LANGUAGES:
+            renders.append((arch_path(template, lang), template, mermaid_source(text, all_texts[lang], lang, template)))
+    return renders
+
+
+def arch_stale() -> list[str]:
+    """The architecture SVGs that are missing or were not drawn from today's template, labels and tool."""
+    all_texts = {lang: load_texts(lang) for lang in LANGUAGES}
+    stale = []
+    for path, _, source in arch_renders(all_texts):
+        found = FINGERPRINT.search(path.read_text(encoding="utf-8")) if path.is_file() else None
+        if not found or found.group(1) != arch_fingerprint(source):
+            stale.append(f"{rel(path)}" + ("" if found else " (missing)"))
+    return stale
+
+
+def arch_size(path: Path) -> tuple[int, int]:
+    """The size an architecture SVG is shown at: its viewBox, scaled by ARCH_SCALE."""
+    if not path.is_file():
+        raise SiteError(f"{rel(path)} is missing: run python3 tools/render_diagrams.py")
+    box = re.search(r'<svg\b[^>]*\bviewBox="[-\d.]+ [-\d.]+ ([\d.]+) ([\d.]+)"', path.read_text(encoding="utf-8"))
+    if not box:
+        raise SiteError(f"{rel(path)}: no viewBox; draw it again with python3 tools/render_diagrams.py")
+    return round(float(box.group(1)) * ARCH_SCALE), round(float(box.group(2)) * ARCH_SCALE)
+
+
+def check_arch_doc(en_texts: dict[str, str]) -> list[str]:
+    """Problems if the English Mermaid templates, filled in, are not the diagrams of docs/architecture.md."""
+    en = LANGUAGES[1]
+    blocks = MERMAID_BLOCK.findall(ARCH_DOC.read_text(encoding="utf-8").replace("\r\n", "\n"))
+    templates = arch_templates()
+    if len(blocks) != len(templates):
+        return [f"{rel(ARCH_DOC)} has {len(blocks)} Mermaid diagrams and {rel(DIAGRAMS)} has "
+                f"{len(templates)} arch-*.mmd templates; they must be the same diagrams, in the same order"]
+    problems = []
+    for (path, text), block in zip(templates.items(), blocks):
+        filled = mermaid_source(text, en_texts, en, path)
+        if filled != block:
+            old, new = block.split("\n"), filled.split("\n")
+            line = next((n for n, (a, b) in enumerate(zip(old, new), 1) if a != b), min(len(old), len(new)) + 1)
+            problems.append(f"{rel(path)} filled with the English texts differs from the doc's diagram "
+                            f"{arch_number(path)} at its line {line}: change {rel(ARCH_DOC)}, the template "
+                            f"or the English texts so that they stay the same diagram")
+    return problems
+
+
 def sitemap() -> str:
     """Every page in every language, each with the addresses of its translations."""
     lines = [
@@ -851,6 +979,7 @@ def build() -> dict[Path, str]:
     page_templates: dict[tuple[str, Language], str] = {}
     variants: dict[Language, list[tuple[Path, Path, str]]] = {}
     users = "site/src/*.html, site/src/partials/*.html" + (f" or a diagram in {rel(DIAGRAMS)}" if diagrams else "")
+    arch_files = {path for template in arch_templates() for path in (arch_path(template, lang) for lang in LANGUAGES)}
     for lang in LANGUAGES:
         file_name = rel(I18N / f"{lang.code}.yaml")
         texts = load_texts(lang)
@@ -881,6 +1010,11 @@ def build() -> dict[Path, str]:
                 for key in keys - texts.keys():
                     missing.setdefault(key, []).append(rel(source))
                 used |= keys
+        for source, text in arch_templates().items():
+            keys = template_keys(text, texts)
+            for key in keys - texts.keys():
+                missing.setdefault(key, []).append(rel(source))
+            used |= keys
         for key, where in sorted(missing.items()):
             where = list(dict.fromkeys(where))
             problems.append(f"{file_name}: {key} is missing (used by "
@@ -896,6 +1030,7 @@ def build() -> dict[Path, str]:
             if first_lengths.get(name) != lengths.get(name):
                 problems.append(f"{rel(I18N / f'{lang.code}.yaml')}: the list {name} has "
                                 f"{lengths.get(name, 0)} items, {LANGUAGES[0].code} has {first_lengths.get(name, 0)}")
+    problems += check_arch_doc(all_texts[LANGUAGES[1]])
     if problems:
         raise SiteError("\n".join(problems))
 
@@ -918,7 +1053,8 @@ def build() -> dict[Path, str]:
             pages[out] = text
     wiring = wiring_copies()
     check_addresses(rendered, {out.relative_to(SITE).as_posix() for lang in LANGUAGES for out, _, _ in variants[lang]}
-                    | {path.relative_to(SITE).as_posix() for path in wiring})
+                    | {path.relative_to(SITE).as_posix() for path in wiring}
+                    | {path.relative_to(SITE).as_posix() for path in arch_files})
 
     first = LANGUAGES[0]
     for page in PAGES:
@@ -941,7 +1077,7 @@ def build() -> dict[Path, str]:
         pages[path] = text
     pages[SITEMAP] = sitemap()
 
-    strays = sorted(path for path in DIAGRAM_OUT.glob("*.svg") if path not in pages) if DIAGRAM_OUT.is_dir() else []
+    strays = sorted(path for path in DIAGRAM_OUT.glob("*.svg") if path not in pages and path not in arch_files) if DIAGRAM_OUT.is_dir() else []
     if strays:
         raise SiteError("no diagram template makes these files; delete them, or restore their template:"
                         + "".join(f"\n  {rel(path)}" for path in strays))
@@ -978,10 +1114,21 @@ def main(argv: list[str] | None = None) -> int:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8", newline="\n")
 
-    if args.check and stale:
-        print("build_site: these files are out of date; run python3 tools/build_site.py:", file=sys.stderr)
-        for p in stale:
+    try:
+        drawn = arch_stale()
+    except (SiteError, OSError) as exc:
+        print(f"build_site: {exc}", file=sys.stderr)
+        return 1
+    if drawn:
+        print("build_site: these architecture diagrams were not drawn from the current Mermaid templates, "
+              "labels and tool; run python3 tools/render_diagrams.py (needs Docker):", file=sys.stderr)
+        for p in drawn:
             print(f"  {p}", file=sys.stderr)
+    if args.check and (stale or drawn):
+        if stale:
+            print("build_site: these files are out of date; run python3 tools/build_site.py:", file=sys.stderr)
+            for p in stale:
+                print(f"  {p}", file=sys.stderr)
         return 1
     for p in stale:
         print(f"wrote {p}")

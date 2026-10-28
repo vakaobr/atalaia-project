@@ -1,0 +1,141 @@
+{#
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+The "How it fits together" page: the seven architecture diagrams of docs/architecture.md as SVG
+(decision SITEARCH-1), each with a short "what flows / what does not" text. The SVGs are drawn by
+tools/render_diagrams.py from site/src/diagrams/arch-*.mmd and the labels in site/i18n/*.yaml;
+they follow the reader's light or dark setting by themselves. See site/README.md.
+#}
+<html lang="{{ page.lang }}">
+<head>
+{% include head %}
+</head>
+<body>
+{% include header %}
+
+  <main id="main">
+    <section class="page-head" aria-labelledby="architecture">
+      <div class="wrap">
+        <h1 id="architecture">{{ architecture.title }}</h1>
+        <p class="lead">{{ architecture.intro }}</p>
+      </div>
+    </section>
+
+    <div class="content band">
+      <div class="wrap guide">
+        <p class="status-note">{{ architecture.status }}</p>
+        <p class="status-note">{{ architecture.reading }}</p>
+        <section class="arch" id="arch-1" aria-labelledby="arch-1-title">
+          <h2 id="arch-1-title">1 · {{ architecture.d1.title }}</h2>
+          <figure>
+            <div class="arch-scroll" role="group" tabindex="0" aria-label="{{ architecture.d1.title|text }}">
+              <img src="{{ page.root }}img/diagrams/arch-1-system-{{ page.code }}.svg" width="{{ page.arch.1.width }}" height="{{ page.arch.1.height }}" loading="lazy" decoding="async" alt="{{ architecture.d1.flows|text }}">
+            </div>
+            <figcaption><a href="{{ page.root }}img/diagrams/arch-1-system-{{ page.code }}.svg">{{ architecture.full }}</a> · {{ architecture.scroll }}</figcaption>
+          </figure>
+          <h3>{{ architecture.flows }}</h3>
+          <p>{{ architecture.d1.flows }}</p>
+          <h3>{{ architecture.not }}</h3>
+          <ul>
+{{ architecture.d1.not|list }}
+          </ul>
+        </section>
+        <section class="arch" id="arch-2" aria-labelledby="arch-2-title">
+          <h2 id="arch-2-title">2 · {{ architecture.d2.title }}</h2>
+          <figure>
+            <div class="arch-scroll" role="group" tabindex="0" aria-label="{{ architecture.d2.title|text }}">
+              <img src="{{ page.root }}img/diagrams/arch-2-radio-{{ page.code }}.svg" width="{{ page.arch.2.width }}" height="{{ page.arch.2.height }}" loading="lazy" decoding="async" alt="{{ architecture.d2.flows|text }}">
+            </div>
+            <figcaption><a href="{{ page.root }}img/diagrams/arch-2-radio-{{ page.code }}.svg">{{ architecture.full }}</a> · {{ architecture.scroll }}</figcaption>
+          </figure>
+          <h3>{{ architecture.flows }}</h3>
+          <p>{{ architecture.d2.flows }}</p>
+          <h3>{{ architecture.not }}</h3>
+          <ul>
+{{ architecture.d2.not|list }}
+          </ul>
+        </section>
+        <section class="arch" id="arch-3" aria-labelledby="arch-3-title">
+          <h2 id="arch-3-title">3 · {{ architecture.d3.title }}</h2>
+          <figure>
+            <div class="arch-scroll" role="group" tabindex="0" aria-label="{{ architecture.d3.title|text }}">
+              <img src="{{ page.root }}img/diagrams/arch-3-game-{{ page.code }}.svg" width="{{ page.arch.3.width }}" height="{{ page.arch.3.height }}" loading="lazy" decoding="async" alt="{{ architecture.d3.flows|text }}">
+            </div>
+            <figcaption><a href="{{ page.root }}img/diagrams/arch-3-game-{{ page.code }}.svg">{{ architecture.full }}</a> · {{ architecture.scroll }}</figcaption>
+          </figure>
+          <h3>{{ architecture.flows }}</h3>
+          <p>{{ architecture.d3.flows }}</p>
+          <h3>{{ architecture.not }}</h3>
+          <ul>
+{{ architecture.d3.not|list }}
+          </ul>
+        </section>
+        <section class="arch" id="arch-4" aria-labelledby="arch-4-title">
+          <h2 id="arch-4-title">4 · {{ architecture.d4.title }}</h2>
+          <figure>
+            <div class="arch-scroll" role="group" tabindex="0" aria-label="{{ architecture.d4.title|text }}">
+              <img src="{{ page.root }}img/diagrams/arch-4-players-{{ page.code }}.svg" width="{{ page.arch.4.width }}" height="{{ page.arch.4.height }}" loading="lazy" decoding="async" alt="{{ architecture.d4.flows|text }}">
+            </div>
+            <figcaption><a href="{{ page.root }}img/diagrams/arch-4-players-{{ page.code }}.svg">{{ architecture.full }}</a> · {{ architecture.scroll }}</figcaption>
+          </figure>
+          <h3>{{ architecture.flows }}</h3>
+          <p>{{ architecture.d4.flows }}</p>
+          <h3>{{ architecture.not }}</h3>
+          <ul>
+{{ architecture.d4.not|list }}
+          </ul>
+        </section>
+        <section class="arch" id="arch-5" aria-labelledby="arch-5-title">
+          <h2 id="arch-5-title">5 · {{ architecture.d5.title }}</h2>
+          <figure>
+            <div class="arch-scroll" role="group" tabindex="0" aria-label="{{ architecture.d5.title|text }}">
+              <img src="{{ page.root }}img/diagrams/arch-5-sync-{{ page.code }}.svg" width="{{ page.arch.5.width }}" height="{{ page.arch.5.height }}" loading="lazy" decoding="async" alt="{{ architecture.d5.flows|text }}">
+            </div>
+            <figcaption><a href="{{ page.root }}img/diagrams/arch-5-sync-{{ page.code }}.svg">{{ architecture.full }}</a> · {{ architecture.scroll }}</figcaption>
+          </figure>
+          <h3>{{ architecture.flows }}</h3>
+          <p>{{ architecture.d5.flows }}</p>
+          <h3>{{ architecture.not }}</h3>
+          <ul>
+{{ architecture.d5.not|list }}
+          </ul>
+        </section>
+        <section class="arch" id="arch-6" aria-labelledby="arch-6-title">
+          <h2 id="arch-6-title">6 · {{ architecture.d6.title }}</h2>
+          <figure>
+            <div class="arch-scroll" role="group" tabindex="0" aria-label="{{ architecture.d6.title|text }}">
+              <img src="{{ page.root }}img/diagrams/arch-6-adoption-{{ page.code }}.svg" width="{{ page.arch.6.width }}" height="{{ page.arch.6.height }}" loading="lazy" decoding="async" alt="{{ architecture.d6.flows|text }}">
+            </div>
+            <figcaption><a href="{{ page.root }}img/diagrams/arch-6-adoption-{{ page.code }}.svg">{{ architecture.full }}</a> · {{ architecture.scroll }}</figcaption>
+          </figure>
+          <h3>{{ architecture.flows }}</h3>
+          <p>{{ architecture.d6.flows }}</p>
+          <h3>{{ architecture.not }}</h3>
+          <ul>
+{{ architecture.d6.not|list }}
+          </ul>
+        </section>
+        <section class="arch" id="arch-7" aria-labelledby="arch-7-title">
+          <h2 id="arch-7-title">7 · {{ architecture.d7.title }}</h2>
+          <figure>
+            <div class="arch-scroll" role="group" tabindex="0" aria-label="{{ architecture.d7.title|text }}">
+              <img src="{{ page.root }}img/diagrams/arch-7-login-{{ page.code }}.svg" width="{{ page.arch.7.width }}" height="{{ page.arch.7.height }}" loading="lazy" decoding="async" alt="{{ architecture.d7.flows|text }}">
+            </div>
+            <figcaption><a href="{{ page.root }}img/diagrams/arch-7-login-{{ page.code }}.svg">{{ architecture.full }}</a> · {{ architecture.scroll }}</figcaption>
+          </figure>
+          <h3>{{ architecture.flows }}</h3>
+          <p>{{ architecture.d7.flows }}</p>
+          <h3>{{ architecture.not }}</h3>
+          <ul>
+{{ architecture.d7.not|list }}
+          </ul>
+        </section>
+        <p class="status-link"><a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/architecture.md">{{ architecture.doc }}</a></p>
+      </div>
+    </div>
+  </main>
+
+{% include footer %}
+</body>
+</html>

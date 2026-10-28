@@ -1,0 +1,34 @@
+%% SPDX-FileCopyrightText: 2026 The Atalaia contributors
+%% SPDX-License-Identifier: CC-BY-SA-4.0
+%%
+%% Template of one diagram of docs/architecture.md (filled with the English texts it is that
+%% diagram exactly: tools/build_site.py --check compares). Every label is a key of site/i18n/*.yaml
+%% (arch.tNNN). tools/render_diagrams.py draws the SVGs site/img/diagrams/arch-2-radio-<language>.svg.
+flowchart TB
+    subgraph bx["{{ arch.t030 }}"]
+        bgame["{{ arch.t031 }}"]
+        bnet["{{ arch.t032 }}"]
+        bphy["{{ arch.t033 }}"]
+    end
+    subgraph ct["{{ arch.t034 }}"]
+        cgame["{{ arch.t035 }}"]
+        cser["{{ arch.t036 }}"]
+    end
+    subgraph md["{{ arch.t037 }}"]
+        mnet["{{ arch.t038 }}"]
+        mphy["{{ arch.t033 }}"]
+    end
+    subgraph pd["{{ arch.t039 }}"]
+        pnet["{{ arch.t040 }}"]
+        pphy["{{ arch.t033 }}"]
+    end
+    air(("{{ arch.t041 }}"))
+    bgame --- bnet --- bphy
+    mnet --- mphy
+    pnet --- pphy
+    cgame --- cser
+    bphy <-->|"{{ arch.t016 }}"| air
+    mphy <-->|"{{ arch.t016 }}"| air
+    pphy <-->|"{{ arch.t016 }}"| air
+    cser <-->|"{{ arch.t042 }}"| mnet
+    cser <-.->|"{{ arch.t043 }}"| pnet

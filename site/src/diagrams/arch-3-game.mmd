@@ -1,0 +1,42 @@
+%% SPDX-FileCopyrightText: 2026 The Atalaia contributors
+%% SPDX-License-Identifier: CC-BY-SA-4.0
+%%
+%% Template of one diagram of docs/architecture.md (filled with the English texts it is that
+%% diagram exactly: tools/build_site.py --check compares). Every label is a key of site/i18n/*.yaml
+%% (arch.tNNN). tools/render_diagrams.py draws the SVGs site/img/diagrams/arch-3-game-<language>.svg.
+sequenceDiagram
+    autonumber
+    participant GM as {{ arch.t044 }}
+    participant C as {{ arch.t045 }}
+    participant M as {{ arch.t046 }}
+    participant B as {{ arch.t047 }}
+
+    Note over C,B: {{ arch.t048 }}
+    GM->>C: {{ arch.t049 }}
+    B-->>M: {{ arch.t050 }}
+    M-->>C: {{ arch.t051 }}
+    C-->>GM: {{ arch.t052 }}
+    GM->>C: {{ arch.t053 }}
+    C->>M: {{ arch.t054 }}
+    M->>B: {{ arch.t055 }}
+    B-->>C: {{ arch.t056 }}
+    B-->>C: {{ arch.t057 }}
+    C-->>B: {{ arch.t058 }}
+    Note over GM,C: {{ arch.t059 }}
+    GM->>C: {{ arch.t060 }}
+    C-->>B: {{ arch.t061 }}
+    loop {{ arch.t062 }}
+        C-->>B: {{ arch.t063 }}
+        B-->>C: {{ arch.t064 }}
+        C-->>B: {{ arch.t058 }}
+    end
+    loop {{ arch.t065 }}
+        B-->>C: {{ arch.t066 }}
+        C-->>B: {{ arch.t058 }}
+        B-->>C: {{ arch.t067 }}
+        C-->>GM: {{ arch.t068 }}
+    end
+    GM->>C: {{ arch.t069 }}
+    C-->>B: {{ arch.t070 }}
+    C-->>B: {{ arch.t071 }}
+    B-->>C: {{ arch.t072 }}
