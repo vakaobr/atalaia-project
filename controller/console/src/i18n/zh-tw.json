@@ -201,6 +201,7 @@
       "game_pause": "遊戲暫停",
       "game_resume": "遊戲繼續",
       "game_end": "遊戲結束",
+      "game_end_by": "遊戲結束：由盒子 {by} 結束",
       "zone_captured": "{team}佔領了{zone}",
       "zone_neutralized": "{zone}變為中立",
       "bomb_armed": "{team}啟動了炸彈（{fuse} 秒）",

@@ -109,6 +109,8 @@ export function eventWords(e) {
     }
     // VIP / Payload: the VIP (a player id) from the controller, or the payload prop.
     if (e.type === 'vip.extracted' && d.player) key += '_vip';
+    // The game's end a box asked for (the controller's game.end carries the box: GE-5).
+    if (e.type === 'game.end' && d.by_node !== undefined) key += '_by';
     // A box's failed firmware update said over the radio: why, in words (firmware.reasons).
     let reason = d.reason || '';
     if (e.type === 'node.update_failed') {
@@ -127,7 +129,7 @@ export function eventWords(e) {
                        objective: d.objective || '', scenario: d.scenario || '', reason,
                        zone: d.zone || (e.node === undefined ? '' : `${t('nodes.node')} ${e.node}`), step: d.step,
                        lives: d.lives_left === undefined ? '' : d.lives_left, fuse: d.fuse_s === undefined ? '' : d.fuse_s,
-                       text: d.text || '' });
+                       text: d.text || '', by: d.by_name || (d.by_node === undefined ? '' : d.by_node) });
     return s === key ? '' : s;
 }
 

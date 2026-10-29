@@ -411,7 +411,7 @@ To let players follow the game in the app without checking in, open the **Game**
 
 ## 10. End the game, and the logs
 
-1. Tap **End**, then **Yes**. Or let the **Duration** run out.
+1. Tap **End**, then **Yes**. Or let the **Duration** run out. Some modes end the game themselves: in Sabotage, for example, the box's own game-time limit ends it, and the game then ends on the controller with the box's winner (or as a draw). The **Log** tab says **The game ended: ended by box** *name*. This works only while the game runs, and only for a box that is in the game: if you have paused the game, a box that announces the end during the pause does not end it, so end the game yourself with **End**.
 2. The controller tells the boxes over the radio that the game is over. If it cannot, it says **The boxes could not be told over the radio**: restart each box or join it to the next game with a card.
 3. The boxes show **GAME OVER**. After 30 seconds they show **READY**.
 4. The **Game** tab says **The game "…" has ended.** The scoreboard and the players' phones show the winner.

@@ -4842,9 +4842,23 @@ class ConsoleBrowserTests(unittest.TestCase):
             await m.loadLanguage('en');
             return [m.eventWords({ type: 'zone.captured', team: 'red', node: 3, data: { zone: 'Alpha' } }),
                     m.eventWords({ type: 'player.respawn', node: 3, data: { player: 'P1', lives_left: 2 } }),
-                    m.eventWords({ type: 'bomb.armed', team: 'blue', node: 4, data: { fuse_s: 30 } })];
+                    m.eventWords({ type: 'bomb.armed', team: 'blue', node: 4, data: { fuse_s: 30 } }),
+                    m.eventWords({ type: 'game.end', node: 0, data: { reason: 'win', by_node: 5, by_name: 'Gate' } }),
+                    m.eventWords({ type: 'game.end', node: 0, data: { by_node: 5 } }),
+                    m.eventWords({ type: 'game.end', node: 0, data: { reason: 'time' } })];
         }""")
-        self.assertEqual(one, ["red captured Alpha", "P1 is back in (2 lives)", "Bomb armed by blue (30 s)"])
+        self.assertEqual(one, ["red captured Alpha", "P1 is back in (2 lives)", "Bomb armed by blue (30 s)",
+                               "The game ended: ended by box Gate", "The game ended: ended by box 5",
+                               "The game ended"])
+        # "ended by box <name or node id>" in every language (GE-5).
+        for lang in ("pt", "de", "zh-tw"):
+            text = page.evaluate("""async (lang) => {
+                const m = await import('/console/ui.js');
+                await m.loadLanguage(lang);
+                return m.eventWords({ type: 'game.end', node: 0, data: { by_node: 5, by_name: 'Gate' } });
+            }""", lang)
+            self.assertIn("Gate", text, lang)
+            self.assertNotIn("feed.events", text)
 
     # --- field and team branding (decisions BR1-BR24) -------------------------------
 

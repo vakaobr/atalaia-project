@@ -201,6 +201,7 @@
       "game_pause": "Jogo em pausa",
       "game_resume": "O jogo recomeçou",
       "game_end": "O jogo terminou",
+      "game_end_by": "O jogo terminou: terminado pela caixa {by}",
       "zone_captured": "A equipa {team} capturou {zone}",
       "zone_neutralized": "{zone} ficou livre",
       "bomb_armed": "Bomba armada pela equipa {team} ({fuse} s)",
