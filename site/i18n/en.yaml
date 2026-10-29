@@ -1065,7 +1065,7 @@ roadmap:
         - "Hosted mode: a storage quota, and custom domains per field."
         - "Hosted mode: every field has a database role of its own, so a SQL injection can no longer switch to another field's data by changing the setting that row-level security used. One gap that needs a second SQL statement stays open and is written down. Tested against PostgreSQL in Docker."
         - "Hosted mode: fields that share chrono records now do so across a hub's fields, through a read-only view that needs consent; a person links their accounts at two fields with a one-time code, and nothing is matched by e-mail or name. Tested against PostgreSQL in Docker."
-        - "A read-only live demo for the preview server: the real field controller with three simulated Field Boxes plays Domination games forever, and visitors see the GM console, the scoreboard and a player's view, with nothing to change and no personal data. Built and tested in Docker; it goes online once its address is set up."
+        - "A read-only live demo for the preview server: the real field controller with three simulated Field Boxes plays Domination games forever, and visitors see the GM console, the scoreboard and a player's view, with nothing to change and no personal data. Online since 29 October 2026 at demo.atalaia-project.link."
     next:
       - A real server with its domain.
       - A legal review of the templates before hosted mode goes live. It is not offered before.

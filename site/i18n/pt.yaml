@@ -1099,7 +1099,7 @@ roadmap:
         - "Modo alojado: uma quota de armazenamento e domínios próprios por campo."
         - "Modo alojado: cada campo tem um papel de base de dados só seu, e por isso uma injeção de SQL já não consegue passar para os dados de outro campo mudando a definição que a segurança ao nível da linha usava. Uma lacuna que exige uma segunda instrução SQL continua aberta e está escrita. Testado contra o PostgreSQL em Docker."
         - "Modo alojado: os campos que partilham registos de cronografagem passam a fazê-lo entre os campos de um centro, por uma vista só de leitura que exige consentimento; uma pessoa liga as suas contas em dois campos com um código de uso único, e nada é associado por e-mail ou nome. Testado contra o PostgreSQL em Docker."
-        - "Uma demonstração em direto, só de leitura, para o servidor de pré-visualização: o controlador de campo a sério, com três Field Box simuladas, joga jogos de Domínio sem parar, e quem visita vê a consola de GM, o marcador e a vista de quem joga, sem nada para alterar e sem dados pessoais. Feita e testada em Docker; fica no ar quando o seu endereço estiver configurado."
+        - "Uma demonstração em direto, só de leitura, para o servidor de pré-visualização: o controlador de campo a sério, com três Field Box simuladas, joga jogos de Domínio sem parar, e quem visita vê a consola de GM, o marcador e a vista de quem joga, sem nada para alterar e sem dados pessoais. No ar desde 29 de outubro de 2026, em demo.atalaia-project.link."
     next:
       - Um servidor a sério com domínio.
       - A revisão jurídica dos modelos antes de o modo alojado abrir. Não é oferecido antes disso.

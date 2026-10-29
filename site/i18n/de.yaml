@@ -1125,7 +1125,7 @@ roadmap:
         - "Hosted-Modus: ein Speicherkontingent und eigene Domains pro Feld."
         - "Hosted-Modus: Jedes Feld hat eine eigene Datenbankrolle, so dass eine SQL-Injection nicht mehr auf die Daten eines anderen Feldes umschalten kann, indem sie die Einstellung ändert, die die Zeilensicherheit nutzte. Eine Lücke, die eine zweite SQL-Anweisung braucht, bleibt offen und ist dokumentiert. Gegen PostgreSQL in Docker getestet."
         - "Hosted-Modus: Felder, die Chrono-Einträge teilen, tun das jetzt auch zwischen den Feldern eines Hubs, über eine schreibgeschützte Ansicht, die eine Einwilligung braucht; eine Person verknüpft ihre Konten bei zwei Feldern mit einem Einmalcode, und nichts wird über E-Mail oder Namen zugeordnet. Gegen PostgreSQL in Docker getestet."
-        - "Eine schreibgeschützte Live-Demo für den Vorschau-Server: Der echte Feld-Controller mit drei simulierten Field Boxen spielt endlos Domination-Spiele, und Besuchende sehen die GM-Konsole, die Anzeigetafel und eine Spielendenansicht, ohne etwas ändern zu können und ohne personenbezogene Daten. In Docker gebaut und getestet; sie geht online, sobald ihre Adresse eingerichtet ist."
+        - "Eine schreibgeschützte Live-Demo für den Vorschau-Server: Der echte Feld-Controller mit drei simulierten Field Boxen spielt endlos Domination-Spiele, und Besuchende sehen die GM-Konsole, die Anzeigetafel und eine Spielendenansicht, ohne etwas ändern zu können und ohne personenbezogene Daten. Seit dem 29. Oktober 2026 online unter demo.atalaia-project.link."
     next:
       - Ein echter Server mit Domain.
       - Eine rechtliche Prüfung der Vorlagen, bevor der Hosted-Modus live geht. Vorher wird er nicht angeboten.
