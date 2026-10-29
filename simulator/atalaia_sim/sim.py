@@ -241,6 +241,10 @@ class Simulation:
             self.owners[ev.node] = team
         elif ev.type == "zone.neutralized":
             self.owners[ev.node] = None
+        if (ev.type == "game.end" and self.field is None and self._started and not self._ended
+                and self._field_end is None):
+            # No field.lua: the first box's game.end ends the game, as the controller does (GE-1).
+            self._field_end = (ev.t_ms, {**ev.data, "by_node": ev.node, "by_name": vnode.name})
         if self.field is not None:
             data = dict(ev.data)
             data.setdefault("node", ev.node)
@@ -322,7 +326,8 @@ class Simulation:
             elif self._field_end is not None:
                 (t_ms, data), self._field_end = self._field_end, None
                 if not self._ended:
-                    self.end(data.get("reason", "finished"), data.get("winner"), t_ms=t_ms)
+                    self.end(data.get("reason", "finished"), data.get("winner") if "by_node" not in data or data.get("winner") in self.teams else None,
+                             t_ms=t_ms, by=(data["by_node"], data["by_name"]) if "by_node" in data else None)
             else:
                 return
         raise SimError("the nodes and the field script keep sending each other events")
@@ -394,10 +399,14 @@ class Simulation:
         self.broadcast("game.start", {"preset": self.mode.id})
 
     def end(self, reason: str = "time", winner: Optional[str] = None,
-            t_ms: Optional[int] = None) -> None:
-        data = {"reason": reason}
+            t_ms: Optional[int] = None, by: Optional[tuple[int, str]] = None) -> None:
+        """The game's end, as the controller logs it; ``by`` is the (node id, name) of the box
+        whose game.end ended it (GE-1)."""
+        data: dict[str, Any] = {"reason": reason}
         if winner:
             data["winner"] = winner
+        if by is not None:
+            data["by_node"], data["by_name"] = by
         self.broadcast("game.end", data, t_ms)
 
     def wait(self, seconds: float) -> None:
@@ -408,8 +417,15 @@ class Simulation:
             raise SimError("time cannot go backwards")
         self._deliver_pending(t_ms)
         if self.field is None:
-            for vnode in self.nodes.values():
-                vnode.runtime.advance(t_ms)
+            # Without a field.lua the first box's game.end ends the game (GE-1): step the clock
+            # as with one, so the end reaches every box at its own moment, not at the end of the wait.
+            step = self.time_ms
+            while step < t_ms and not self._ended:
+                step = min(t_ms, step - step % FIELD_STEP_MS + FIELD_STEP_MS)
+                self.time_ms = step
+                for vnode in self.nodes.values():
+                    vnode.runtime.advance(step)
+                self._pump()
             self.time_ms = t_ms
             return
         step = self.time_ms

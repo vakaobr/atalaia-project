@@ -12,7 +12,7 @@
 
 static const uint8_t data_game_start[] = {9};
 static const uint8_t data_game_pause[] = {3};
-static const uint8_t data_game_end[] = {3, 8};
+static const uint8_t data_game_end[] = {3, 8, 40, 41};
 static const uint8_t data_zone_captured[] = {5, 4};
 static const uint8_t data_zone_neutralized[] = {5, 4};
 static const uint8_t data_bomb_armed[] = {7, 3};
@@ -61,7 +61,7 @@ const atalaia_event_def_t atalaia_event_defs[] = {
     {"game.start", ATALAIA_EV_GAME_START, ATALAIA_PRIO_CRITICAL, data_game_start, 1},
     {"game.pause", ATALAIA_EV_GAME_PAUSE, ATALAIA_PRIO_CRITICAL, data_game_pause, 1},
     {"game.resume", ATALAIA_EV_GAME_RESUME, ATALAIA_PRIO_CRITICAL, NULL, 0},
-    {"game.end", ATALAIA_EV_GAME_END, ATALAIA_PRIO_CRITICAL, data_game_end, 2},
+    {"game.end", ATALAIA_EV_GAME_END, ATALAIA_PRIO_CRITICAL, data_game_end, 4},
     {"zone.captured", ATALAIA_EV_ZONE_CAPTURED, ATALAIA_PRIO_NORMAL, data_zone_captured, 2},
     {"zone.neutralized", ATALAIA_EV_ZONE_NEUTRALIZED, ATALAIA_PRIO_NORMAL, data_zone_neutralized, 2},
     {"bomb.armed", ATALAIA_EV_BOMB_ARMED, ATALAIA_PRIO_CRITICAL, data_bomb_armed, 2},
@@ -156,6 +156,8 @@ const atalaia_data_field_def_t atalaia_data_field_defs[] = {
     {"release", ATALAIA_DATA_RELEASE, ATALAIA_FIELD_STRING, false},
     {"mode", ATALAIA_DATA_MODE, ATALAIA_FIELD_STRING, false},
     {"step", ATALAIA_DATA_STEP, ATALAIA_FIELD_INTEGER, false},
+    {"by_node", ATALAIA_DATA_BY_NODE, ATALAIA_FIELD_INTEGER, false},
+    {"by_name", ATALAIA_DATA_BY_NAME, ATALAIA_FIELD_STRING, false},
 };
 const size_t atalaia_data_field_def_count =
     sizeof(atalaia_data_field_defs) / sizeof(atalaia_data_field_defs[0]);

@@ -359,6 +359,9 @@ class Controller:
         self.fc: Optional[FieldController] = None
         self.transport: Optional[ModemTransport] = None
         self.field: Optional[FieldScript] = None
+        # The first game.end of a box in a game whose mode has no field.lua (GE-1): it ends the game
+        # at the next tick, not from inside the radio receive path.
+        self._box_end: Optional[dict[str, Any]] = None
         self._field_scores: dict[str, dict[str, int]] = {}  # field.lua points per run
         self.scenario_names: dict[int, str] = {}  # the live game's box names for its scenario (Join tab)
         self._devices: dict[int, str] = {}  # the live game's device ids by node id (BN-18)
@@ -629,6 +632,7 @@ class Controller:
             self.field.close()
             self.field = None
         self._field_scores = {}
+        self._box_end = None
         if self.transport is not None:
             self.transport.flush()  # frames still waiting for their gap go now: the key goes next
         if self.modem is not None:
@@ -1516,7 +1520,8 @@ class Controller:
                 self.field.input("game.resume")
             return self._set_state(game_id, "running")
 
-    def end_game(self, game_id: int, reason: str = "", winner: Optional[str] = None) -> dict[str, Any]:
+    def end_game(self, game_id: int, reason: str = "", winner: Optional[str] = None,
+                 by_node: Optional[int] = None) -> dict[str, Any]:
         with self._lock:
             game = self.store.game(game_id)
             if game is None:
@@ -1533,9 +1538,16 @@ class Controller:
                 fc.end_game(now_ms=self.now_ms(), reason=reason or None)
                 data = {"reason": reason} if reason else {}
                 if winner not in fc.teams:
-                    winner = _winner(fc.total_scores, fc.teams)
+                    # A box that ended the game named its winner or it is a draw: points do not decide.
+                    winner = _winner(fc.total_scores, fc.teams) if by_node is None else None
                 if winner:
                     data["winner"] = winner
+                if by_node is not None:
+                    data["by_node"] = by_node
+                    box = fc.nodes.get(by_node)
+                    name = self.scenario_names.get(by_node) or (box.name if box else "")
+                    if name:
+                        data["by_name"] = name
                 fc.controller_event("game.end", data, prio="critical")
                 if self.field is not None:
                     self.field.input("game.end", {"reason": reason} if reason else None)
@@ -1815,6 +1827,8 @@ class Controller:
                 self.field.advance(fc.game_time_ms)
                 if self._after_field():
                     return
+            if self._box_end is not None and self._after_box_end():
+                return
             if (self.game is not None and fc.is_controller and fc.game_state == GAME_RUNNING
                     and fc.duration_ms and fc.game_time_ms >= fc.duration_ms):
                 self.end_game(self.game["id"], "time")
@@ -1953,6 +1967,33 @@ class Controller:
             self.field.input(record["type"], data)
             # Inside the radio receive path: an end the script asks for waits for the tick.
             self._after_field(may_end=False)
+        elif (self.field is None and record.get("type") == "game.end" and record["node"] != self.node_id
+              and record.get("origin") != "controller"):
+            self._note_box_end(record)
+
+    def _note_box_end(self, record: dict[str, Any]) -> None:
+        """A box's game.end in a mode without a field.lua (GE-1..GE-6): the first one from a box
+        assigned in this game, while the game runs and this controller leads it, ends the game at the
+        next tick. Any other is only logged (it already is). In a paused game it does not count: the
+        GM stopped the game and the box's clock stands still too, so what arrives is at most an end
+        that was on its way when the pause came; the GM ends the game by hand."""
+        fc, game = self.fc, self.game
+        if (fc is None or game is None or not fc.is_controller or fc.game_state != GAME_RUNNING
+                or self._box_end is not None or str(record["node"]) not in game["assignments"]):
+            return
+        data = record.get("data") or {}
+        self._box_end = {"node": int(record["node"]), "reason": str(data.get("reason") or ""),
+                         "winner": data.get("winner")}
+
+    def _after_box_end(self) -> bool:
+        """Ends the game for the box that asked to (see _note_box_end). True when the game ended."""
+        asked, self._box_end = self._box_end, None
+        fc, game = self.fc, self.game
+        if (asked is None or fc is None or game is None or not fc.is_controller
+                or fc.game_state != GAME_RUNNING):
+            return False
+        self.end_game(game["id"], asked["reason"] or "box", winner=asked["winner"], by_node=asked["node"])
+        return True
 
     def _on_node(self, node: FieldNode, kind: str) -> None:
         if self.game is None:

@@ -117,13 +117,15 @@ DATA_FIELDS = {
     'release': DataField(37, 'string', False),
     'mode': DataField(38, 'string', False),
     'step': DataField(39, 'integer', False),
+    'by_node': DataField(40, 'integer', False),
+    'by_name': DataField(41, 'string', False),
 }
 
 EVENTS = {
     'game.start': EventDef(1, 'critical', ('preset',)),
     'game.pause': EventDef(2, 'critical', ('reason',)),
     'game.resume': EventDef(3, 'critical', ()),
-    'game.end': EventDef(4, 'critical', ('reason', 'winner')),
+    'game.end': EventDef(4, 'critical', ('reason', 'winner', 'by_node', 'by_name')),
     'zone.captured': EventDef(5, 'normal', ('zone', 'previous_team')),
     'zone.neutralized': EventDef(6, 'normal', ('zone', 'previous_team')),
     'bomb.armed': EventDef(7, 'critical', ('fuse_s', 'reason')),

@@ -223,6 +223,12 @@
               },
               "winner": {
                 "$ref": "#/$defs/data/winner"
+              },
+              "by_node": {
+                "$ref": "#/$defs/data/by_node"
+              },
+              "by_name": {
+                "$ref": "#/$defs/data/by_name"
               }
             },
             "additionalProperties": false
@@ -1885,6 +1891,14 @@
       "step": {
         "type": "integer",
         "description": "a box's place in a sequence of boxes, from 1 (Progressive Domination)"
+      },
+      "by_node": {
+        "type": "integer",
+        "description": "node id of the box whose game.end ended the game (the controller's own game.end only)"
+      },
+      "by_name": {
+        "type": "string",
+        "description": "name of that box, when it has one"
       }
     }
   }

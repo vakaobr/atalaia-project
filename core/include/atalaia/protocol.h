@@ -181,6 +181,8 @@ enum {
     ATALAIA_DATA_RELEASE = 37,           /* firmware release id: the first 16 hex digits of the image's SHA-256 */
     ATALAIA_DATA_MODE = 38,              /* mode package id: one part of a game's mode id */
     ATALAIA_DATA_STEP = 39,              /* a box's place in a sequence of boxes, from 1 (Progressive Domination) */
+    ATALAIA_DATA_BY_NODE = 40,           /* node id of the box whose game.end ended the game (the controller's own game.end only) */
+    ATALAIA_DATA_BY_NAME = 41,           /* name of that box, when it has one */
 };
 
 /* Standard event ids: the CBOR value of the type field. */

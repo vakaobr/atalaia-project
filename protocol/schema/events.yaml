@@ -74,6 +74,8 @@ data_fields:
   release:       { key: 37, type: string,  doc: "firmware release id: the first 16 hex digits of the image's SHA-256" }
   mode:          { key: 38, type: string,  doc: "mode package id: one part of a game's mode id" }
   step:          { key: 39, type: integer, doc: "a box's place in a sequence of boxes, from 1 (Progressive Domination)" }
+  by_node:       { key: 40, type: integer, doc: "node id of the box whose game.end ended the game (the controller's own game.end only)" }
+  by_name:       { key: 41, type: string,  doc: "name of that box, when it has one" }
 
 # id: CBOR value of the type field (1-23 take one byte). prio: the default
 # priority. data: the fields this event may carry besides the common ones.
@@ -86,7 +88,7 @@ events:
   game.start:       { id: 1,  prio: critical,  data: [preset] }
   game.pause:       { id: 2,  prio: critical,  data: [reason] }
   game.resume:      { id: 3,  prio: critical,  data: [] }
-  game.end:         { id: 4,  prio: critical,  data: [reason, winner] }
+  game.end:         { id: 4,  prio: critical,  data: [reason, winner, by_node, by_name] }
   zone.captured:    { id: 5,  prio: normal,    data: [zone, previous_team] }
   zone.neutralized: { id: 6,  prio: normal,    data: [zone, previous_team] }
   bomb.armed:       { id: 7,  prio: critical,  data: [fuse_s, reason] }   # reason "code": armed with a team code

@@ -589,6 +589,57 @@
       ]
     },
     {
+      "name": "a box's game.end ends a game whose mode has no field.lua: the first one from an assigned box, with its winner and who ended it (GE-1..GE-6)",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Boxes", "mode_id": "org.atalaia.domination", "assignments": {"4": "zone", "5": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"rx": {"source": 4, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"rx": {"source": 5, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-5", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"rx": {"source": 9, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-9", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 200},
+        {"rx": {"source": 9, "seq": 11, "epoch": 1, "type": "EVENT", "event": {"node": 9, "seq": 1, "t": 500, "type": "game.end", "data": {"reason": "win", "winner": "red"}}}},
+        {"advance_ms": 1000},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "read"}, "status": 200, "json": {"state": "running"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/pause", "token": "gm"}, "status": 200, "json": {"state": "paused"}},
+        {"rx": {"source": 4, "seq": 11, "epoch": 1, "type": "EVENT", "event": {"node": 4, "seq": 1, "t": 1500, "type": "game.end", "data": {"reason": "win", "winner": "red"}}}},
+        {"advance_ms": 1000},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "read"}, "status": 200, "json": {"state": "paused"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/resume", "token": "gm"}, "status": 200, "json": {"state": "running"}},
+        {"advance_ms": 1000},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "read"}, "status": 200, "json": {"state": "running"}},
+        {"rx": {"source": 5, "seq": 11, "epoch": 1, "type": "EVENT", "event": {"node": 5, "seq": 1, "t": 3000, "type": "game.end", "data": {"reason": "win", "winner": "blue"}}}},
+        {"rx": {"source": 4, "seq": 12, "epoch": 1, "type": "EVENT", "event": {"node": 4, "seq": 2, "t": 3000, "type": "game.end", "data": {"reason": "win", "winner": "red"}}}},
+        {"advance_ms": 1000},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "read"}, "status": 200, "json": {"state": "ended", "live": false}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/log", "token": "read"}, "status": 200, "json": {"$contains": [{"type": "game.end", "node": 9, "data": {"winner": "red"}}, {"type": "game.end", "node": 5, "data": {"winner": "blue"}}, {"type": "game.end", "node": 4, "data": {"winner": "red"}}, {"type": "game.end", "node": 0, "data": {"reason": "win", "winner": "blue", "by_node": 5, "by_name": "box-5"}}]}}
+      ]
+    },
+    {
+      "name": "a box's game.end with no team of the game as winner is a draw, whatever the points (GE-2)",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Draw", "mode_id": "org.atalaia.domination", "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"rx": {"source": 4, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 200},
+        {"rx": {"source": 4, "seq": 1, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 10, "counters": {"1": 9}, "epoch": 1}}},
+        {"rx": {"source": 4, "seq": 11, "epoch": 1, "type": "EVENT", "event": {"node": 4, "seq": 1, "t": 2000, "type": "game.end", "data": {"reason": "draw"}}}},
+        {"advance_ms": 1000},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "read"}, "status": 200, "json": {"state": "ended", "live": false}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/log", "token": "read"}, "status": 200, "json": {"$contains": [{"type": "game.end", "node": 0, "data": {"reason": "draw", "winner": "$absent", "by_node": 4, "by_name": "box-4"}}]}}
+      ]
+    },
+    {
+      "name": "in a mode with a field.lua a box's game.end stays an event for the script: the game does not end (GE-1)",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Stand", "mode_id": "org.atalaia.laststand", "assignments": {"4": "zone", "5": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"rx": {"source": 4, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"rx": {"source": 5, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-5", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 200},
+        {"rx": {"source": 4, "seq": 11, "epoch": 1, "type": "EVENT", "event": {"node": 4, "seq": 1, "t": 500, "type": "game.end", "data": {"reason": "win", "winner": "red"}}}},
+        {"advance_ms": 2000},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "read"}, "status": 200, "json": {"state": "running"}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/log", "token": "read"}, "status": 200, "json": {"$contains": [{"type": "game.end", "node": 4}]}}
+      ]
+    },
+    {
       "name": "a game ends by itself at its time limit",
       "steps": [
         {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Short", "mode_id": "org.atalaia.domination", "duration_ms": 5000}}, "status": 201, "json": {"duration_ms": 5000, "start_check": {"needed": ["zone"], "missing": ["zone"]}}, "save": {"gid": "id"}},

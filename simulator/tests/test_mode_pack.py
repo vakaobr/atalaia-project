@@ -138,6 +138,51 @@ class FieldScriptSimTests(unittest.TestCase):
         sim.wait(60)
         self.assertEqual(len([e for e in sim.events if e.type == "game.end"]), 1)
 
+    def test_a_box_game_end_ends_a_game_without_field_script(self):
+        # Sabotage has no field.lua: its box's game.win at the time limit ends the game on every
+        # box, the controller's own game.end saying which box ended it (GE-1, GE-5).
+        sim = self.sim("sabotage", {"bomb1": "bomb"}, {"game_time_min": 1, "fuse_s": 10, "pause_s": 5})
+        sim.hold("bomb1", "red", 5)
+        sim.wait(70)
+        ends = [e for e in sim.events if e.type == "game.end"]
+        self.assertEqual([(e.node == CONTROLLER, e.data.get("by_node")) for e in ends][-1],
+                         (True, sim.node("bomb1").runtime.node_id))
+        ctl = [e for e in ends if e.node == CONTROLLER]
+        self.assertEqual(len(ctl), 1)
+        self.assertEqual(ctl[0].t_ms, 60_000)
+        self.assertEqual(ctl[0].data, {"reason": "win", "winner": "red", "by_node": ctl[0].data["by_node"],
+                                       "by_name": "bomb1"})
+        self.assertEqual(sim.node("bomb1").runtime.status, "ended")
+        self.assertEqual(sim.problems, [])
+
+    def test_a_box_game_end_without_a_team_is_a_draw(self):
+        sim = self.sim("sabotage", {"bomb1": "bomb"}, {"game_time_min": 1})
+        sim.wait(70)
+        ctl = [e for e in sim.events if e.type == "game.end" and e.node == CONTROLLER]
+        self.assertEqual([e.data["reason"] for e in ctl], ["draw"])
+        self.assertNotIn("winner", ctl[0].data)
+        self.assertEqual(ctl[0].data["by_name"], "bomb1")
+
+    def test_the_first_box_game_end_counts_and_a_field_script_keeps_the_decision(self):
+        mode = load_mode(MODES / "domination")
+        mode.node_script += ('\nevery(1, function() game.finish("late") end)\n')
+        sim = Simulation(CORE, mode, {"a": "zone", "b": "zone"}, TEAMS, mode.resolve_params({}, TEAMS))
+        self.addCleanup(sim.close)
+        sim.start()
+        sim.wait(3)
+        ctl = [e for e in sim.events if e.type == "game.end" and e.node == CONTROLLER]
+        self.assertEqual(len(ctl), 1)  # a and b both emit game.end at 1 s: only the first counts
+        self.assertEqual(ctl[0].data["by_name"], "a")
+        # With a field.lua the controller's end is the script's alone: a box's game.end is only an event it gets.
+        mode = load_mode(MODES / "holdall")
+        mode.node_script += ('\nevery(1, function() game.finish("late") end)\n')
+        boxes = {"a": "zone", "b": "zone"}
+        sim = Simulation(CORE, mode, boxes, TEAMS, mode.resolve_params({}, TEAMS))
+        self.addCleanup(sim.close)
+        sim.start()
+        sim.wait(3)
+        self.assertEqual([e for e in sim.events if e.type == "game.end" and e.node == CONTROLLER], [])
+
     def test_field_send_reaches_the_box(self):
         mode = load_mode(MODES / "holdall")
         mode.field_script = ('on("game.start", function()\n'
