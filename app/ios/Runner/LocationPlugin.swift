@@ -42,7 +42,10 @@ final class LocationPlugin: NSObject {
 
   /// The Android permission names this plugin answers on the device channel.
   static func handles(permission name: String) -> Bool {
+    // BLUETOOTH_SCAN is the permission Dart asks before listening for beacons
+    // (BLE-9): on iOS ranging beacons needs the location, so it is the same.
     name == "ACCESS_FINE_LOCATION" || name == "ACCESS_COARSE_LOCATION"
+      || name == "BLUETOOTH_SCAN"
   }
 
   /// Asks for the location permission (when in use) if it is not decided

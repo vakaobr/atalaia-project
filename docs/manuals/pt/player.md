@@ -226,12 +226,12 @@ Partilhar a posição é opcional. A tua posição vai só para o controlador do
 3. Autoriza a localização quando o telemóvel perguntar. No iPhone, escolhe **Ao Usar a Aplicação**. No Android 13 ou mais recente, autoriza também as notificações.
 4. Uma notificação **Atalaia: a partilhar a posição** fica visível. Desliga **Partilhar a minha posição** para parar. Pára também quando o jogo acaba.
 
-**No interior, se o campo tiver balizas.** Alguns campos põem pequenas balizas Bluetooth nos edifícios. Se este tiver, a app pergunta primeiro, com **Posições no interior**: pode ouvir as balizas do campo enquanto partilhas, e envia apenas qual é a mais forte. Toca em **Continuar** e o Android pede **Bluetooth** (dispositivos próximos) e a **localização**. Toca em **Agora não**, ou recusa, e o resto não muda: a app diz que **as posições no interior estão desligadas** e continua a partilhar a posição por GPS. O Bluetooth tem de estar ligado.
+**No interior, se o campo tiver balizas.** Alguns campos põem pequenas balizas Bluetooth nos edifícios. Se este tiver, a app pergunta primeiro, com **Posições no interior**: pode ouvir as balizas do campo enquanto partilhas, e envia apenas qual é a mais forte. Toca em **Continuar** e o Android pede **Bluetooth** (dispositivos próximos) e a **localização** (o iPhone pede só a localização). Toca em **Agora não**, ou recusa, e o resto não muda: a app diz que **as posições no interior estão desligadas** e continua a partilhar a posição por GPS. O Bluetooth tem de estar ligado.
 
 - No interior a tua posição passa a ser a **divisão**. Por baixo do botão diz **A tua posição: Átrio (Rés do chão)**. A organização vê a divisão, não um ponto no chão.
 - A app só ouve as balizas do campo e não guarda nada do que ouve. Só ouve enquanto partilhas, e pára quando paras.
 - Quando estás fora do alcance de todas as balizas durante alguns segundos, volta a ser partilhada a tua posição por GPS.
-- No iPhone as balizas ainda não são usadas: a posição continua a ser por GPS.
+- No iPhone as balizas só funcionam **enquanto a Atalaia está aberta no ecrã**. Com o telemóvel bloqueado, ou outra aplicação à frente, a posição volta ao GPS e mantém o último piso; volta a abrir a app e as balizas continuam. O iPhone pede só a **localização** (**Ao Usar a Aplicação**), não o Bluetooth, e o Bluetooth tem de estar ligado. Ainda não testado num iPhone real.
 
 **Em que piso estás?** Se o campo tiver vários pisos, enquanto partilhas aparece por baixo do botão uma fila de botões: os nomes dos pisos (por exemplo **R/C**, **Piso 1**) e **Não sei**. O telemóvel não distingue os pisos, por isso dizes uma vez; fica guardado enquanto jogas e vai com a tua posição por GPS, para a tua equipa te ver no piso certo. Escolhe **Não sei** se não souberes: ninguém o adivinha por ti. No interior, a baliza da sala dá o piso e os botões dão lugar a *O teu piso vem da baliza da sala*.
 

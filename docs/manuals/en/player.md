@@ -226,12 +226,12 @@ Sharing your position is optional. Your position goes to the field controller on
 3. Allow the location when the phone asks. Choose **While using the app** on an iPhone. On Android 13 or later also allow notifications.
 4. A notification **Atalaia: sharing your position** stays on. Switch **Share my position** off to stop. It also stops when the game ends.
 
-**Indoors, if the field has beacons.** Some fields put small Bluetooth beacons in their buildings. If this one does, the app asks first, with **Indoor positions**: it can listen for the field's own beacons while you share, and it sends only which one is strongest. Tap **Continue** and Android asks for **Bluetooth** (nearby devices) and the **location**. Tap **Not now**, or refuse, and nothing else changes: the app says **Indoor positions are off** and keeps sharing your GPS position. Bluetooth has to be switched on.
+**Indoors, if the field has beacons.** Some fields put small Bluetooth beacons in their buildings. If this one does, the app asks first, with **Indoor positions**: it can listen for the field's own beacons while you share, and it sends only which one is strongest. Tap **Continue** and Android asks for **Bluetooth** (nearby devices) and the **location** (an iPhone asks only for the location). Tap **Not now**, or refuse, and nothing else changes: the app says **Indoor positions are off** and keeps sharing your GPS position. Bluetooth has to be switched on.
 
 - Indoors your position becomes the **room**. Under the switch it says **Your position: Lobby (Ground floor)**. The organisers see the room, not a point on the floor.
 - The app listens only for the field's beacons and keeps nothing it hears. It listens only while you share, and stops when you stop.
 - When you are out of every beacon's range for a few seconds, your GPS position is shared again.
-- On an iPhone the beacons are not used yet: the position stays GPS.
+- On an iPhone the beacons work only **while Atalaia is open on the screen**. With the phone locked, or another app in front, your position goes back to GPS and keeps the last floor; open the app again and the beacons go on. The iPhone asks only for the **location** (**While using the app**), not for Bluetooth, and Bluetooth has to be switched on. Not yet tested on a real iPhone.
 
 **Which floor are you on?** If the field has several floors, a row of buttons appears under the switch while you share: the floors' names (for example **Ground**, **Level 1**) and **Not sure**. Your phone cannot tell floors apart, so say it once; it is kept while you play, and it goes with your GPS position so your team sees you on the right floor. Choose **Not sure** if you do not know: nobody guesses it for you. Indoors, the room's beacon gives the floor and the buttons give way to *Your floor comes from the room beacon*.
 

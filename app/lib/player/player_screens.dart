@@ -623,10 +623,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
         ?RegisteredBeacon.fromApi(b),
     ];
     if (registry.isEmpty) return null;
-    if (isIOS) {
-      _beaconNote = 'player.beacons_ios';
-      return null;
-    }
     if (!await scan.available()) {
       _beaconNote = 'player.beacons_unavailable';
       return null;
@@ -638,7 +634,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       builder: (context) => AlertDialog(
         key: const Key('player-beacons-why'),
         title: Text(s.t('player.beacons_why_title')),
-        content: Text(s.t('player.beacons_why')),
+        content: Text(
+          s.t(isIOS ? 'player.beacons_why_ios' : 'player.beacons_why'),
+        ),
         actions: [
           TextButton(
             key: const Key('player-beacons-skip'),
@@ -667,7 +665,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       return null;
     }
     final every = reg['ble_interval_s'];
-    _beaconNote = 'player.beacons_on';
+    // iOS ranges only with the app in front: say so, once, in the note.
+    _beaconNote = isIOS ? 'player.beacons_on_ios' : 'player.beacons_on';
     return BeaconScanner(
       service: scan,
       registry: registry,

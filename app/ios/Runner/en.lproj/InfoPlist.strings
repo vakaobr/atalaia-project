@@ -5,4 +5,4 @@
 "NFCReaderUsageDescription" = "Atalaia reads NFC tags to join a game and to check players' tags.";
 "NSCameraUsageDescription" = "Atalaia uses the camera only to scan the QR codes of join cards and field posters.";
 "NSLocalNetworkUsageDescription" = "Atalaia talks to the field controller on the field's Wi-Fi network: the game's feed, the GM console and check-in.";
-"NSLocationWhenInUseUsageDescription" = "Atalaia uses your location only while you are in a game and have chosen to share your position with the organisers.";
+"NSLocationWhenInUseUsageDescription" = "Atalaia uses your location, and the field's Bluetooth beacons indoors, only while you are in a game with the app open and have chosen to share your position with the organisers.";

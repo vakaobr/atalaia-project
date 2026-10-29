@@ -629,7 +629,10 @@ const Map<String, String> zhTwStrings = {
   'player.beacons_denied': '場地內部的位置已關閉：沒有藍牙權限。仍會分享你的 GPS 位置。',
   'player.beacons_off': '場地內部的位置已關閉：藍牙沒有開啟。請開啟後再重新分享。',
   'player.beacons_unavailable': '這支手機無法掃描場地的信標。仍會分享你的 GPS 位置。',
-  'player.beacons_ios': 'iPhone 目前還不使用場地內部的信標：你的位置只有 GPS。',
+  'player.beacons_why_ios':
+      '這個場地的內部裝了藍牙信標。為了知道你在哪個空間，Atalaia 可以在你分享位置時掃描它們：只掃描場地自己的信標，只送出哪一個最近。iPhone 會為此詢問定位權限（藍牙由信標使用，不會詢問）。沒有這個權限，你的位置就只有 GPS。',
+  'player.beacons_on_ios':
+      '正在掃描場地的信標，僅限 Atalaia 在螢幕上開啟時：在場地內部時，你的位置就是那個空間。手機鎖定或其他 App 在前景時，你的位置會回到 GPS，並保留最後的級別。',
   'player.my_room': '你的位置：{room}',
   'player.map_title': '場地地圖',
   'player.map_semantics': '場地地圖，{level}：{n} 個位置',

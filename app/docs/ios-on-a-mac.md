@@ -513,6 +513,26 @@ internet, item 7's lock screen and app switching, the feel of the buzz patterns
 and the Chinese glyphs in item 1, a console over HTTPS (item 10), and
 everything under "Needs a paid account".
 
+### Indoor beacons (decisions IOSB-1 to IOSB-8), when in use only
+
+The same *Share my position* switch, on a field whose controller lists beacons
+(a Field Box with its box beacon on, or GM tags). Full checklist:
+[docs/runbooks/ios-beacons-iphone.md](../../docs/runbooks/ios-beacons-iphone.md).
+
+- **First use**: after the location prompt, the app explains (*Indoor
+  positions*, naming the iPhone) with **Continue** / **Not now**; *Continue*
+  asks nothing new if the location is already allowed (iOS ranges beacons with
+  the same *While Using the App* permission; there is no Bluetooth prompt and
+  no *Always*).
+- **Where it works**: only with the app on the screen. A locked phone, or
+  another app in front, stops the beacons: the position falls back to GPS and
+  keeps the last floor. The note under the switch says so.
+- **No simulator test**: the iOS Simulator has no Bluetooth and cannot see
+  beacons. Test on an iPhone with a beacon (a phone app that transmits an
+  iBeacon will do for the first check, with the field's UUID).
+- Bluetooth off cannot be detected without a Bluetooth permission the app does
+  not ask for: the beacons are simply not heard and the position stays GPS.
+
 ## What does not work on iOS, and why
 
 - **A prop** (the phone as a game box: the core, the game loop, kiosk, the
@@ -543,12 +563,7 @@ everything under "Needs a paid account".
   single-label hosts, nothing else), so a console on `http://192.168.x.x` works;
   an `https://` console with the field CA's certificate, or `http://` to a
   public host name, is refused by iOS.
-- **Bluetooth**: nothing on iOS uses it (the I/O pod's BLE link is Android's), and
-  the indoor beacon positions (decisions BLE-1 to BLE-9) are Android's too: iOS does
-  not hand iBeacon advertisements to CoreBluetooth, they are ranged through
-  CoreLocation (a Swift plugin of its own, not written: it could not be built or
-  run without a Mac), so on an iPhone the app says the field's beacons are not
-  used yet and the position stays GPS. The app asks for no Bluetooth permission. **mDNS**: the app does not use it
+- **Bluetooth**: the I/O pod's BLE link is Android's. The indoor beacon positions (decisions BLE-1 to BLE-9) work on iOS through CoreLocation, not CoreBluetooth (iOS does not hand iBeacon advertisements to apps otherwise): `BeaconScanPlugin.swift`, IOSB-1 to IOSB-8, only with the app on the screen (a locked phone is GPS and the last floor), and not run on an iPhone yet. The app asks for no Bluetooth permission. **mDNS**: the app does not use it
   (the controller's address comes from the join), so no Bonjour entry.
 - **Background**: no background modes. A position or a feed is live only while the
   app is on the screen: the position stops when the app leaves it and goes on
