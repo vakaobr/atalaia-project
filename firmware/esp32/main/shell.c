@@ -162,12 +162,12 @@ static bool uart_input;
 #if SERIAL_USB
 static serial_console_t console_usb;
 static bool usb_input;
+#endif
 #if CONFIG_ATALAIA_SERIAL_KEYS
 /* "@hold <button 1-4> <ms>" (bench builds only): the button reads as pressed for that long, so a
  * bench run can hold a team button without hands on the board (projected-score runbook). */
 static uint8_t serial_hold_mask;
 static uint32_t serial_hold_until;
-#endif
 #endif
 
 /* Mode sources built into the firmware (main/CMakeLists.txt, from modes/). */
