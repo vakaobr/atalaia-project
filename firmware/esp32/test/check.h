@@ -63,6 +63,7 @@ void run_box_beacon_tests(void);
 void run_adoption_tests(void);
 void run_admin_pin_tests(void);
 void run_box_pair_tests(void);
+void run_status_hold_tests(void);
 void run_target_addon_tests(void);
 
 #endif /* ATALAIA_FW_TEST_CHECK_H */

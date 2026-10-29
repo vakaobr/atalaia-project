@@ -27,6 +27,7 @@
 #include "adoption.h"
 #include "atalaia/join.h"
 #include "box_pair.h"
+#include "status_hold.h"
 #include "box_text.h"
 #include "atalaia/packet.h"
 #include "atalaia/version.h"
@@ -129,6 +130,8 @@ static screen_update_t picker_screen; /* last picker screen sent */
 static preset_t game_preset ATALAIA_PSRAM_BSS;
 
 static QueueHandle_t screen_queue;
+/* The update tasks' status screens are shown for a while, then the state's screen returns. */
+static status_hold_t status_hold;
 static QueueHandle_t audio_queue;
 
 /* Default teams until the config store provides configurable team names. */
@@ -199,6 +202,7 @@ static void send_screen(const char *template_name, const char *data_json)
     screen_update_t su;
     snprintf(su.template_name, sizeof(su.template_name), "%s", template_name);
     snprintf(su.data_json, sizeof(su.data_json), "%s", data_json);
+    status_hold_state(&status_hold, su.template_name, su.data_json);
     xQueueSend(screen_queue, &su, 0);
 }
 
@@ -212,6 +216,7 @@ static void show_picker(void)
         return;
     }
     picker_screen = su;
+    status_hold_state(&status_hold, su.template_name, su.data_json);
     xQueueSend(screen_queue, &su, 0);
 }
 
@@ -651,9 +656,15 @@ static void box_fetch_modes(void *user, const atalaia_join_t *join)
     mode_fetch_esp_start(join);
 }
 
+/* A status screen of an update or a mode fetch (any task): a refusal or a failure would stay up
+ * on an idle box, so it is held STATUS_HOLD_MS and the state's screen comes back (main loop). */
 static void update_screen(const char *tmpl, const char *data_json)
 {
-    send_screen(tmpl, data_json);
+    screen_update_t su;
+    snprintf(su.template_name, sizeof(su.template_name), "%s", tmpl);
+    snprintf(su.data_json, sizeof(su.data_json), "%s", data_json);
+    xQueueSend(screen_queue, &su, 0);
+    status_hold_transient(&status_hold, now_ms());
 }
 
 static int update_battery(void)
@@ -1080,6 +1091,13 @@ static void task_game(void *arg)
         bool field_game = box_game_active(&box);
         fw_update_esp_poll();  /* a failed update the controller has not heard of: over LoRa */
         mode_fetch_esp_poll(); /* a mode fetch that is over: join its game, or say why not */
+        {
+            /* A refusal or failure screen has had its time: the state's screen again. */
+            screen_update_t back;
+            if (status_hold_due(&status_hold, now, fw_update_esp_net_busy(), &back)) {
+                xQueueSend(screen_queue, &back, 0);
+            }
+        }
         box_game_tick(&box, delta_ms, now);
         /* The box's iBeacon (decisions BBC-1 to BBC-12): on while joined to a game whose join did
          * not turn it off, the Bluetooth stack taken down again after it. */
@@ -1105,6 +1123,8 @@ static void task_game(void *arg)
         if (runner.running || runner.queues.screen_count || runner.queues.audio_count) {
             /* Forward screen updates to the LVGL queue. */
             for (int i = 0; i < runner.queues.screen_count; i++) {
+                status_hold_state(&status_hold, runner.queues.screens[i].template_name,
+                                  runner.queues.screens[i].data_json);
                 xQueueSend(screen_queue, &runner.queues.screens[i], 0);
             }
             runner.queues.screen_count = 0;

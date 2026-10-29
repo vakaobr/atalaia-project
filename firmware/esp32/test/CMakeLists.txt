@@ -184,6 +184,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/adoption.c
     ${SHELL_DIR}/cpace.c
     ${SHELL_DIR}/box_pair.c
+    ${SHELL_DIR}/status_hold.c
     ${SHELL_DIR}/target_addon.c
     ${SHELL_DIR}/hal/board_fem.c
     ${SHELL_DIR}/modem/modem.c
@@ -247,6 +248,7 @@ set(TEST_SOURCES
     test_adoption.c
     test_admin_pin.c
     test_box_pair.c
+    test_status_hold.c
     test_target_addon.c
 )
 
