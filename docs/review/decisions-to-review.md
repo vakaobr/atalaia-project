@@ -2747,3 +2747,164 @@ The first bench run of Sabotage (board 1, v0.5.0-dev.55, team codes red=1234 and
 | # | Question | Answer chosen | Why | Status |
 | --- | --- | --- | --- | --- |
 | SAB-11 | Which team's code arms and which defuses? | Only the attackers' code arms (standby), only the defenders' defuses (armed); the other team's code shows "Not your team's code" for 3 s. One message for both cases keeps the script inside a Reduced box's heap with the Codes modifier (57,147 of 57,344 bytes). | SAB-1 (fixed roles, the maintainer's choice) must hold whichever input arms. | built (2026-10-29); open for the maintainer's review |
+
+## The docs and project page after 27 and 28 October (DOC-1 to DOC-3, 2026-10-29)
+
+A review of the README, STATUS files, manuals and the project page in four languages.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| DOC-1 | The firmware and build guides say "from v0.5" for the one USB flash: is v0.5.0 the release with the 4 MB partition table? | Assumed yes (next after 0.4.0). | The text names a version. | built (2026-10-29); open for the maintainer's review |
+| DOC-2 | Should the page mention the live demo before its hostname is set up? | Kept as "built and tested, not online". | No promise of a public demo yet. | built (2026-10-29); open for the maintainer's review |
+| DOC-3 | How many modes does the page count? | 14 (every kind: mode folder, Sabotage included; the old "eleven" was already stale). | Matches the 14 cards on the modes page. | built (2026-10-29); open for the maintainer's review |
+
+## Projected score: following a capture; the nodes view's lost map (BSC-4, BSC-5, 2026-10-29)
+
+From the bench run of the projected-score runbook.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| BSC-4 | What does the projected score do when a box captures and its STATE is lost? | The projection follows a zone.captured (and zone.neutralized) event from a box that has reported: the old owner keeps the ticks up to the event's game time t, the new owner gets those after it, until that box's next STATE (which clears it and stays the authority). An event not newer than the last STATE is ignored; one dated after the controller's game time counts from now; previous_team is not used; at most 8 changes chained. | The capture is sent at once and ACKed, so the estimate no longer depends on the STATE after it (bench 2026-10-29: +13 ticks at tick_s=2 with that STATE lost). Display only; one shared vector case for both controllers. | built (2026-10-29); open for the maintainer's review |
+| BSC-5 | Does GET /api/v1/nodes always carry a box's lost map? | Yes: a stored row with no lost (written before STATE key 9, or read without a live game) gets an all-zero per-team map. Stored/restored lost was already right; the bench symptom was not reproduced. | The view should not change shape across restarts; restart tests in Python and Dart. | built (2026-10-29); open for the maintainer's review |
+
+## Social login: usernames, renaming, merging two accounts, the consent error (LG-10 to LG-13, 2026-10-29)
+
+After the maintainer's first Google sign-in on the preview server.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| LG-10 | How does a social account get a real username, and what happens to the provider's name? | A skippable "Choose your username" step on the Account page right after a new social account; "Use my Google/Microsoft name" (only the sign-up provider, never Apple) runs a round with scope openid profile (purpose name, migration 0024) only when pressed; the username is derived server-side and returned in the URL fragment; the name is never stored (users, audit log). | Maintainer 2026-10-29 "both: pre-fill only if they agree". Apple gives a name only once in a form post this flow does not use. Normal logins stay openid-only; Google's consent screen must list profile (non-sensitive). | built (2026-10-29); open for the maintainer's review |
+| LG-11 | How does any account rename itself, and how are two accounts of one person merged? | Rename: PATCH /me confirmed with the account's own method (password if it has one, else a fresh passkey/provider/TOTP login within 10 min). Merge: linking a login that belongs to another account issues a 5-minute single-use ticket; the signed-in account confirms on the Account page; everything pointing at B moves into A (A's stays on conflicts); B anonymised (deleted-xxxx), sessions revoked; B's password never carried; both audited; nothing merges on login. | The provider round proves control of B's login, A's confirmation proves A. Per field in hosted mode, under the field's role. | built (2026-10-29); open for the maintainer's review |
+| LG-12 | Does a B with a staff role merge, and what else refuses a merge? | Refused (merge_staff_account): server admin or admin/gm/marshal on a field or game; also a provider both accounts already have (merge_provider_conflict) and more than 20 passkeys together (merge_too_many_passkeys). A with a staff role is fine. | Taking over a 2FA-protected role through a social round would weaken LG-4; the operator can change roles first. | built (2026-10-29); open for the maintainer's review |
+| LG-13 | Where does the consent-required error show? | A role=alert box right above the new-account checkbox, highlighted and focused; the text says the box is below the provider buttons; pt, en, de, zh-tw and the app's four strings. | The maintainer found it easy to miss and saying "above". | built (2026-10-29); open for the maintainer's review |
+
+## Retention: anonymised accounts are purged when nothing refers to them (RET-9 to RET-12, 2026-10-29)
+
+Erased and merged accounts' leftover rows.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| RET-9 | When is an anonymised user row deleted? | Once no row of any table has a foreign key to it (audit entries included), so at the latest when the last audit entry naming it passes 36 months; the same purge pass that deletes those audit entries frees it. | The row only exists so foreign keys hold and identifies nobody. | built (2026-10-29); open for the maintainer's review |
+| RET-10 | How does the purge know which rows are anonymised? | username starting with deleted- (the prefix erasure sets, registration reserves, and the merge uses). | One marker for erased and merged rows; independent of password_hash. | built (2026-10-29); open for the maintainer's review |
+| RET-11 | Which references count? | All foreign keys to users.id read from the models' metadata (CASCADE and SET NULL included); audit_log.resource_id (not a foreign key) does not. | A table added later is covered without touching the purge. | built (2026-10-29); open for the maintainer's review |
+| RET-12 | What if a reference appears while the purge runs? | The delete runs in a savepoint; on IntegrityError the row is kept and the next purge retries. | One racing insert must not fail the whole purge. | built (2026-10-29); open for the maintainer's review |
+
+## A box's game end ends the game (GE-1 to GE-6, 2026-10-29)
+
+The maintainer's decision after the Sabotage bench run.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| GE-1 | Which modes does a box's game.end end the game in? | Only a mode with no field.lua, in a game this controller leads; with a field.lua the node's game.end stays an event for the script. | The maintainer's decision of 2026-10-29; one place decides a game's end. | built (2026-10-29); open for the maintainer's review |
+| GE-2 | Winner and reason when a box ends the game? | The event's winner if it is one of the game's teams, otherwise a draw (never the score leader); the reason is the event's, or "box". | Sabotage's draw has no winner; falling back to points would turn a draw into a win. | built (2026-10-29); open for the maintainer's review |
+| GE-3 | Does a box end a paused game? | No: logged and ignored; the GM uses End. | The GM's pause is authoritative and the box's script clock is stopped too. | built (2026-10-29); open for the maintainer's review |
+| GE-4 | Which box counts, and when does the end happen? | The first game.end from a node in the game's assignments while running and led by this controller; applied at the next tick; later ones only logged. | Events are authenticated by the game key; assignments say who belongs; the tick keeps it out of the radio path. | built (2026-10-29); open for the maintainer's review |
+| GE-5 | How is "who ended it" carried? | The controller's game.end gets by_node (key 40) and by_name (key 41); the console shows "ended by box <name or id>" (4 languages). | In history, sync and the remote GM without name lookups. | built (2026-10-29); open for the maintainer's review |
+| GE-6 | Does the simulator end the game on a box's game.end? | Yes, without a field.lua (stepped clock). | Mode tests see the end as the controller does. | built (2026-10-29); open for the maintainer's review |
+
+## App follow-ups: privacy notice, chrono link, penalties over the prop link (APF-1 to APF-6, 2026-10-29)
+
+Left from the night of 28 October.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| APF-1 | How does the app ask for consent again, and does it block anything? | A "Read and confirm" banner on the signed-in field screen from GET /me consent.status; the notice opens in the app (tick + Confirm) and posts the version shown; it stays until consent is current; nothing is blocked. | CONS-4: no gate (export/erasure must stay possible); a 409 reloads the text and clears the tick. | built (2026-10-29); open for the maintainer's review |
+| APF-2 | How does the app carry the notice version on social sign-up while the server does not take it yet? | notice_version in the OIDC start body only with the ticked consent; a 422 gets one retry without it. | StartIn is extra=forbid today; the retry decouples app and server until the server change lands (dispatched 2026-10-29). | built (2026-10-29); open for the maintainer's review |
+| APF-3 | How is the notice rendered, in which language? | A small built-in Markdown renderer (plain widgets, nothing opens); the app's language = the server's lang; a server fallback is named on screen. | No dependency; the operator's text can open or run nothing. | built (2026-10-29); open for the maintainer's review |
+| APF-4 | How does the app show the chrono link? | A button on the signed-in field screen only when GET /me/hub-share answers (404 not_hosted hides it); state, one-time code, enter a code, unlink with confirm. | SVX-2: hidden when not hosted; the rules stay the server's. | built (2026-10-29); open for the maintainer's review |
+| APF-5 | How does a prop's box penalty reach the controller over the Android link? | STATE counters are the gains (not the net) and lost (key 9) goes when nonzero, on the Wi-Fi JSON and radio links. | Counters merge by maximum, so the net could never apply a penalty (BSC-1, Amendment 18). | built (2026-10-29); open for the maintainer's review |
+| APF-6 | Does each step of the site screen keep its own scroll position? | Yes, the list is keyed by step. | The login's scroll offset hid the field screen's first lines. | built (2026-10-29); open for the maintainer's review |
+
+## The live demo's three-storey building (DEMO-10 to DEMO-18, 2026-10-29)
+
+A first test field is a three-storey building.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| DEMO-10 | How does the demo show a multi-story building? | The director alternates the open-field game and a three-storey building game in the same field (plans, levels and beacons swapped at each game's start); DEMO_SCENARIOS can restrict it. | One proxy, home page, site field and player's view show both; a second field would need a second container, controller, slug and hostname. | built (2026-10-29); open for the maintainer's review |
+| DEMO-11 | What is the building? | Invented R/C, 1.º andar, 2.º andar; a labelled PNG plan per level drawn by building.py; 48 x 36 m in the open sea, one georeference shared by the levels. | No real plan or place. | built (2026-10-29); open for the maintainer's review |
+| DEMO-12 | Beacons? | 15 registered (room + stairs per level, one invented UUID, major = level+1); the read token sees only id and uuid (BLE-2); room names reach the player's view from the demo's own invented registry file. | Shows the registry and ble positions without staff rights. | built (2026-10-29); open for the maintainer's review |
+| DEMO-13 | How are the simulated players located? | Of 12: six by beacon, five by GPS with a picked floor, one GPS "Not sure" (hollow, PM-6), on the VIP's team so the player's view shows it. | All three kinds the app sends. | built (2026-10-29); open for the maintainer's review |
+| DEMO-14 | How do the players move? | Through doors and the corridor, stairs one floor at a time; 65 % towards a box, else any room; 1.2-1.9 m/s. | Believable movement across every floor. | built (2026-10-29); open for the maintainer's review |
+| DEMO-15 | Boxes? | One per level (alpha R/C "Oficina", bravo 1.º andar "Sala B", charlie 2.º andar "Sala C"). | Boxes on different levels in the console tabs and the player's map. | built (2026-10-29); open for the maintainer's review |
+| DEMO-16 | What changes in the proxy? | No allow-list change; /player/field.png?level=N (single digit 1-9) and /player/data.json adds levels, plan stamps and beacons. | Visitors still write nothing that reaches a controller path. | built (2026-10-29); open for the maintainer's review |
+| DEMO-17 | The player's view on a multi-story field? | Floor buttons, opens on the player's floor; plan, beacon dots, boxes, positions of that level (square beacon, circle GPS, hollow unknown floor), the player's room; 4 languages. | Same rules as the app's map (PM-*). | built (2026-10-29); open for the maintainer's review |
+| DEMO-18 | What did the work find in the deployed demo? | Every game logged as failed (checkin/close of an ended game -> 409), skipping the final-score pause and restarting the container after five; fixed by ignoring that 409. The player's view drew every position white (team is a number); fixed. | Found in the live demo's logs and screenshots. | built (2026-10-29); open for the maintainer's review |
+
+## The privacy-notice version on a social sign-up (CONS-7 to CONS-9, 2026-10-29)
+
+The app sends the version shown; the server checks and records it.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| CONS-7 | Which privacy-notice version does a social sign-up record? | The one shown: /start takes an optional notice_version, 409 notice_version_changed when stale (consent ticked only), stored on oidc_logins (0025), rechecked at account creation in the callback (redirect with oidc_error=notice_version_changed). | Recording the callback-time version would claim consent to text never seen; the recheck covers a notice published while at the provider. | built (2026-10-29); open for the maintainer's review |
+| CONS-8 | What if a client names no version, or no notice is published? | As before: the callback records the current version; the staff page sends a version only if GET /privacy-notice returned one; an unticked box never carries one. | Old apps and pages keep working; nothing claimed about an unpublished notice. | built (2026-10-29); open for the maintainer's review |
+| CONS-9 | Does the callback recheck apply to a known subject logging in? | No, only when an account is about to be made. | Consent is recorded at account creation; outdated consent of an existing account goes through the consent-again panel. | built (2026-10-29); open for the maintainer's review |
+
+## Bench radio fixes: a channel change keeps the free boxes, a start reaches them in seconds (RB-1 to RB-12, 2026-10-29)
+
+RFC 0001 Amendment 19.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| RB-1 | How do idle boxes follow a field channel change? | A new sealed field-frame kind MOVE (channel + rising revision) sent on the old channel. | One small authenticated frame; no scanning, no per-box retune, no new key. | built (2026-10-29); open for the maintainer's review |
+| RB-2 | Why not box-side scanning or controller invite sweeps without a wire change? | Rejected. | A scan leaves boxes deaf with nobody saying which channel; invite sweeps need each box's channel and strand it for later games. | built (2026-10-29); open for the maintainer's review |
+| RB-3 | How is a replayed or old MOVE stopped? | rev must exceed the last taken (serial arithmetic), kept in NVS; the controller uses max(last+1, wall-clock s). | Replay cannot move a box back; a restored backup still rises. | built (2026-10-29); open for the maintainer's review |
+| RB-4 | How often and how long is MOVE said? | 3 times, 2.5 s apart, on the old channel, then retune and DISCOVER. | ~0.27 s of air; repeats repair a lost frame. | built (2026-10-29); open for the maintainer's review |
+| RB-5 | When does a moved box announce itself? | 6-15 s after the MOVE; a DISCOVER on the new channel is answered at once. | The controller is still on the old channel during the repeats. | built (2026-10-29); open for the maintainer's review |
+| RB-6 | Boxes that were off or away? | The controller remembers the last 4 channels; Find boxes sweeps them (2 MOVEs each, 4 s after DISCOVER, at most once a minute), then DISCOVERs again. | Repairs missed MOVEs without a standing sweep; rate-limited. | built (2026-10-29); open for the maintainer's review |
+| RB-7 | What does an idle box listen on after a reboot? | The stored channel (last game's or the field's), not the region default. | Same stranding as the bench finding; one NVS write per change. | built (2026-10-29); open for the maintainer's review |
+| RB-8 | Why did the start take ~21 s, and the fix? | Start was one CMD + one TIME, each sent once; both lost -> wait for the 30 s beacon. TIME now repeats at +1, +2.5, +5, +10 s. | TIME carries the state; no wire change, ~0.36 s of air. | built (2026-10-29); open for the maintainer's review |
+| RB-9 | Repeat the CMD too? | No, TIME only; an end is not repeated. | A late repeated PAUSE could undo a RESUME; GAME_OVER repeats the end. | built (2026-10-29); open for the maintainer's review |
+| RB-10 | A START arriving while the box could not act? | The box tick reconciles: a joined box whose link says running/paused starts; a playing box follows pause/resume. | The link thought it already knew the state. | built (2026-10-29); open for the maintainer's review |
+| RB-11 | Phone controller too? | Yes: same repeats, MOVE, history and sweep in Dart, shared vectors. | It owns the channel too. | built (2026-10-29); open for the maintainer's review |
+| RB-12 | Modem without field frames, or an old box? | The controller retunes at once as before; an old box refuses kind 5 and needs a card once. | Compatibility, in the amendment. | built (2026-10-29); open for the maintainer's review |
+
+## Field Boxes as iBeacons, and the box's memory budget (BBC-1 to BBC-18, 2026-10-29)
+
+RFC 0001 Amendment 20. The first build ran out of internal RAM on the bench (BBC-13 to BBC-18 are the fix, checked on the board).
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| BBC-1 | Tags, boxes, or both? | Both: a placed box of the live game registers itself as a beacon of kind box beside the GM's tags; strongest/most recent wins. | The maintainer's decision of 2026-10-29. | built (2026-10-29); open for the maintainer's review |
+| BBC-2 | Whose UUID, and how does the phone know it? | Per field: HMAC-SHA256(join key, "atalaia box beacon uuid v1")[:16] with v8/RFC 4122 bits; nothing pushed. | Box and controller hold the join key; the phone filters by one UUID. | built (2026-10-29); open for the maintainer's review |
+| BBC-3 | Major/minor without colliding with tags? | Major 45253 (0xB0C5), refused for GM tags (400); minor = the box's node id. | A report carries major:minor only; node id keys positions. | built (2026-10-29); open for the maintainer's review |
+| BBC-4 | In a game only, or also idle? | From join to game end (paused included); never idle, fetching or after the end. | Phones share only in a running game; frees BT memory for Wi-Fi fetches. | built (2026-10-29); open for the maintainer's review |
+| BBC-5 | The GM's per-field off switch and the wire? | Join key 19 box_beacon (false only, omitted when on), Amendment 20, field setting box_beacons; read when the join is made. | No new frame; old payloads byte-identical. | built (2026-10-29); open for the maintainer's review |
+| BBC-6 | Interval, power, coexistence? | 500 ms, 0 dBm, measured power -59, Kconfig. | Android low-power scans listen ~0.5 s per 5 s; SX1262 is a separate radio, only Wi-Fi shares 2.4 GHz. | built (2026-10-29); open for the maintainer's review |
+| BBC-7 | Stack and cost? | NimBLE (peripheral role compiled in, unused), host heap in PSRAM, on demand, torn down; waits while Wi-Fi is used. Image +161,632 B (49 % slot free); static internal RAM +25,144 B. | Internal RAM is tight; runtime RAM measured on the bench. | built (2026-10-29); open for the maintainer's review |
+| BBC-8 | Which boxes are registered, with what room? | Placed boxes of the live game only, never stored; room = scenario/node name or GM-given. | A node id belongs to a game; an unplaced box has no level/place. | built (2026-10-29); open for the maintainer's review |
+| BBC-9 | What does the console show? | Field Box rows in the beacons panel (no pin, not editable as a tag), disable, room, field switch; 4 languages. | The box's own marker shows its place. | built (2026-10-29); open for the maintainer's review |
+| BBC-10 | Disabled and off? | Disabled: left out of the registry, its reports refused. Off: all boxes removed at once, the next join carries key 19. | No per-box radio command. | built (2026-10-29); open for the maintainer's review |
+| BBC-11 | App changes? | None: the box UUID is one more filter entry; tested with the box's real advertisement bytes. | The plugin has no unit-test harness. | built (2026-10-29); open for the maintainer's review |
+| BBC-12 | Which builds advertise? | ATALAIA_BOX_BEACON default on for the Field Box; Wokwi and modem turn BT off; the pod keeps its stack. | Modem and pod are not boxes in a game. | built (2026-10-29); open for the maintainer's review |
+| BBC-13 | Where does the Field Box's internal RAM go, and what moves? | LVGL's 48 KB heap and ~62 KB of the game's zero-init statics to PSRAM (ATALAIA_PSRAM_BSS, SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY); the BT controller sized for one advertiser; stacks stay internal; Wokwi/modem/pod keep the old layout. | Static free 45.7 KB -> 194 KB; stacks internal because flash-writing tasks cannot run on PSRAM stacks. | built (2026-10-29); open for the maintainer's review |
+| BBC-14 | Is the beacon back on? | Yes (BT_ENABLED=y, BOX_BEACON=y in sdkconfig.defaults; Kconfig default stays n). | Bench: 241 KB free at boot, 102 KB lowest in a game with the beacon on. | built (2026-10-29); open for the maintainer's review |
+| BBC-15 | How do Wi-Fi and Bluetooth coexist? | Never together: the beacon stays off while Wi-Fi is claimed; the Wi-Fi start waits up to 5 s for the controller to be down. | The bench panic came from both wanting the internal RAM. | built (2026-10-29); open for the maintainer's review |
+| BBC-16 | What if the controller cannot start? | Gate at 40 KB free + a 12 KB block; clean up a half-started controller; 3 retries 20 s apart, then no beacon that game; never a panic. | The bench's BLE_INIT Malloc failed -> watchdog reset. | built (2026-10-29); open for the maintainer's review |
+| BBC-17 | How is a regression caught? | CI fails when static internal RAM left < 120 KiB (tools/check_fw_ram.py). | 194 KB measured; runtime needs ~27 KB + Wi-Fi 47 KB or BT ~25 KB. | built (2026-10-29); open for the maintainer's review |
+| BBC-18 | No DMA memory for the draw buffers? | One buffer, then fewer lines. | The bench showed a blank screen after the failed start. | built (2026-10-29); open for the maintainer's review |
+
+## Indoor beacons on iPhone (IOSB-1 to IOSB-8, 2026-10-29)
+
+Compiled on CI's macOS runner; not yet run on an iPhone.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| IOSB-1 | How does iOS read iBeacons, and how much of Dart changes? | CoreLocation ranging in BeaconScanPlugin.swift, one CLBeaconIdentityConstraint per registered UUID (tags and boxes), on Android's channel names and message shapes; Dart shared, only the "iOS: not available" branch goes. | iOS gives iBeacons only through ranging; one contract keeps one scanner, one -95 dBm floor, shared tests. | built (2026-10-29); open for the maintainer's review |
+| IOSB-2 | Which permission? | Location "When In Use" only; Dart's BLUETOOTH_SCAN request answered by LocationPlugin as the location request; no Bluetooth permission, no Always; usage texts mention beacons. | Ranging needs only location; fewer prompts (iOS-5). | built (2026-10-29); open for the maintainer's review |
+| IOSB-3 | Locked phone and background? | Ranging only while the app is on screen; locked/other app -> GPS and the last floor; the player screen says so once. | Always/background would cost App Store review and battery. | built (2026-10-29); open for the maintainer's review |
+| IOSB-4 | Bluetooth off? | Not detectable without a Bluetooth permission; beacons simply not heard, GPS stays; no message on iOS. | An extra prompt for a notice is a worse trade. | built (2026-10-29); open for the maintainer's review |
+| IOSB-5 | How are readings grouped? | Per uuid/major/minor per window, mean rssi and count; rssi 0 dropped; at most 20 UUIDs ranged. | Same window semantics as Android. | built (2026-10-29); open for the maintainer's review |
+| IOSB-6 | Tags vs Field Boxes? | Same: registry entries, strongest above -95 dBm wins, one scan lists both UUIDs. | box-beacon.md: nothing special on the phone. | built (2026-10-29); open for the maintainer's review |
+| IOSB-7 | How is the unverifiable Swift kept safe? | Small code on LocationPlugin's pattern; pbxproj edited by hand; checklist says send compile errors verbatim; CI ios-build compiles it. | No Mac here. | built (2026-10-29); open for the maintainer's review |
+| IOSB-8 | When can the "not run on an iPhone" notes go? | After the iPhone checklist passes. | Written, not proven. | built (2026-10-29); open for the maintainer's review |
+
+## The Field Box shows only the Atalaia logo (LOGO-5, LOGO-6, 2026-10-29)
+
+The maintainer's decision after the bench memory finding.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| LOGO-5 | Does the Field Box fetch and show the field's logo? | No: only the Atalaia tower; the fetch, the box-logo endpoints on both controllers, the console's JPEG/WebP conversion for boxes, their vectors and tests removed; the field logo stays in the app, console, scoreboard, poster and sync. Supersedes PKG-1 and LOGO-1..4. | The maintainer's call (2026-10-29); the fetch was what ran out of memory. No wire key was ever carried. | built (2026-10-29); open for the maintainer's review |
+| LOGO-6 | How does a builder get their own splash? | assets/splash.pgm (30x60 plain PGM) embedded by main/splash_logo.cmake; CONFIG_ATALAIA_SPLASH_LOGO points at another file; release images always carry the Atalaia tower. | One replaceable file, no Python at build time. | built (2026-10-29); open for the maintainer's review |
