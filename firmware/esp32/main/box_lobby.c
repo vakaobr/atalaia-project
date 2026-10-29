@@ -351,6 +351,73 @@ static void on_game_over(box_game_t *g, const atalaia_ff_msg_t *m)
     box_game_end_by_field(g);
 }
 
+/* The stored idle channel and MOVE revision, read once (the first time anything needs them): a join
+ * that resumes after a reboot must not write the channel over a revision it has not read yet. */
+static void load_move(box_game_t *g)
+{
+    box_lobby_t *l = &g->lobby;
+    if (l->move_loaded) return;
+    l->move_loaded = true;
+    uint32_t ch = 0, rev = 0;
+    if (g->store.load_field_move != NULL &&
+        g->store.load_field_move(g->store.ctx, &ch, &rev) == 0) {
+        l->move_rev = rev;
+        l->saved_channel_hz = ch;
+    }
+}
+
+/* Writes the box's idle channel and the revision of the MOVE that set it, only when the channel
+ * changes (NVS wear): after a game's join and after a MOVE. */
+void box_lobby_remember_channel(box_game_t *g)
+{
+    box_lobby_t *l = &g->lobby;
+    load_move(g);
+    if (g->store.save_field_move == NULL || l->channel_hz == 0 ||
+        l->channel_hz == l->saved_channel_hz) {
+        return;
+    }
+    if (g->store.save_field_move(g->store.ctx, l->channel_hz, l->move_rev) == 0) {
+        l->saved_channel_hz = l->channel_hz;
+    } else {
+        say(g, "the idle channel could not be stored (the default after a reboot)");
+    }
+}
+
+/* "The field is on channel C now" (RFC 0001 Amendment 19). Only a free box takes it (a box in a
+ * game keeps the game's channel), only with a revision above the last it took (serial arithmetic: a
+ * recorded MOVE played back later is older, so it changes nothing) and only a channel of its own
+ * region. It then listens there and announces itself soon, so the controller finds it. */
+static void on_move(box_game_t *g, const atalaia_ff_msg_t *m)
+{
+    box_lobby_t *l = &g->lobby;
+    if (!box_lobby_available(g)) return;
+    load_move(g);
+    uint32_t ahead = m->rev - l->move_rev;
+    if (ahead == 0 || ahead >= 0x80000000u ||
+        !atalaia_region_channel_ok(g->region, m->channel_hz)) {
+        l->moves_refused++;
+        say(g, "move to %lu Hz refused (revision %lu, have %lu)", (unsigned long)m->channel_hz,
+            (unsigned long)m->rev, (unsigned long)l->move_rev);
+        return;
+    }
+    l->move_rev = m->rev;
+    if (m->channel_hz != l->channel_hz) {
+        l->channel_hz = m->channel_hz;
+        l->moves_taken++;
+        if (g->shell.set_channel != NULL && !g->shell.set_channel(g->shell.user, m->channel_hz)) {
+            say(g, "radio: cannot tune to %lu Hz (no radio, or refused)",
+                (unsigned long)m->channel_hz);
+        }
+        say(g, "the field moved to %lu Hz (revision %lu)", (unsigned long)m->channel_hz,
+            (unsigned long)m->rev);
+        l->announced =
+            false; /* nothing was said on this channel yet: a DISCOVER is answered at once */
+        schedule_announce(g, BOX_MOVE_ANNOUNCE_MIN_MS, BOX_MOVE_ANNOUNCE_MAX_MS, true);
+    }
+    l->saved_channel_hz = 0; /* write the revision too, even when the channel was already the one */
+    box_lobby_remember_channel(g);
+}
+
 bool box_lobby_on_packet(box_game_t *g, const uint8_t *pkt, size_t len)
 {
     if (!atalaia_ff_is_frame(pkt, len)) return false;
@@ -373,6 +440,7 @@ bool box_lobby_on_packet(box_game_t *g, const uint8_t *pkt, size_t len)
     }
     case ATALAIA_FF_INVITE: on_invite(g, &m); break;
     case ATALAIA_FF_GAME_OVER: on_game_over(g, &m); break;
+    case ATALAIA_FF_MOVE: on_move(g, &m); break;
     default: break; /* other boxes' announcements */
     }
     memset(&m, 0, sizeof(m));
@@ -442,6 +510,18 @@ void box_lobby_tick(box_game_t *g, uint32_t now_ms)
         if (box_lobby_available(g)) show_ready(g);
     }
     if (!l->ready) return;
+    if (!l->move_tuned) {
+        /* Where the box listened last (its last game's channel, or the field's after a MOVE): the
+         * radio comes up on the region's default, so a free box tunes there once, at the first tick
+         * (a box that resumes a game is tuned by its join instead). */
+        l->move_tuned = true;
+        load_move(g);
+        if (g->phase == BOX_IDLE && l->saved_channel_hz != 0 &&
+            atalaia_region_channel_ok(g->region, l->saved_channel_hz)) {
+            l->channel_hz = l->saved_channel_hz;
+            if (g->shell.set_channel != NULL) g->shell.set_channel(g->shell.user, l->channel_hz);
+        }
+    }
     if ((int32_t)(now_ms - l->rotate_ms) >= 0) new_token(g, true);
     if (l->answer_due && (int32_t)(now_ms - l->answer_ms) >= 0) {
         l->answer_due = false;

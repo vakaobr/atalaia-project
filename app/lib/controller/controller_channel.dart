@@ -398,11 +398,48 @@ class ControllerChannel {
       'quiet_threshold_dbm': quietThresholdDbm,
       'scan': scanStatus(),
       'game_channel_hz': game?['channel_hz'],
+      'previous_channels_hz': history(),
     };
   }
 
+  /// Earlier field channels remembered for the sweep (RFC 0001 Amendment 19).
+  static const historyMax = 4;
+
+  /// The field's earlier channels, newest first, never the current one:
+  /// where boxes that missed a MOVE may still listen (engine.py
+  /// `channel_history`).
+  List<int> history() {
+    final now = engine.fieldChannel;
+    final out = <int>[];
+    try {
+      final v = jsonDecode(
+        engine.store.getSetting('radio.channel_history') ?? '[]',
+      );
+      if (v is List) {
+        for (final h in v) {
+          if (h is int && h != now) out.add(h);
+        }
+      }
+    } on FormatException {
+      return [];
+    }
+    return out.take(historyMax).toList();
+  }
+
+  /// The revision of the field's last change of channel (MOVE key 5): it
+  /// only rises.
+  int moveRev() =>
+      int.tryParse(engine.store.getSetting('radio.move_rev') ?? '') ?? 0;
+
+  /// A revision above every earlier one, and at least the wall clock in
+  /// seconds, so a restored backup (an older counter) still gives boxes a
+  /// number above what they hold.
+  int _nextMoveRev() =>
+      min(0xffffffff, max(moveRev() + 1, engine.wallSeconds().toInt()));
+
   /// PUT /api/v1/radio/channel: the GM's choice (accepting the default
-  /// counts), stored and sent to an idle radio.
+  /// counts), stored and sent to an idle radio. A new channel is first said
+  /// on the old one (MOVE), so the free boxes follow it.
   Map<String, Object?> setChannel(Object? channelHz, Object? source) {
     final reason = _lockReason();
     if (reason != null) {
@@ -419,13 +456,27 @@ class ControllerChannel {
     if (!channelSources.contains(source)) {
       throw ControllerError('source: one of ${channelSources.join(', ')}');
     }
+    final old = engine.fieldChannel;
     engine.store
       ..setSetting('radio.channel_hz', '$hz')
       ..setSetting('radio.channel_source', '$source')
       ..setSetting('radio.channel_confirmed', '1')
       ..setSetting('radio.channel_set_at', '${engine.wallSeconds()}');
+    var moved = false;
+    if (hz != old) {
+      final earlier = [
+        old,
+        for (final h in history())
+          if (h != old && h != hz) h,
+      ].take(historyMax).toList();
+      final rev = _nextMoveRev();
+      engine.store
+        ..setSetting('radio.channel_history', jsonEncode(earlier))
+        ..setSetting('radio.move_rev', '$rev');
+      moved = engine.boxes?.fieldMoved(old, hz, rev) ?? false;
+    }
     final m = engine.modem;
-    if (m != null && m.isUp) {
+    if (m != null && m.isUp && !moved) {
       m.setChannel(hz);
       engine.modemMoved("the field's channel changed");
     }
@@ -456,7 +507,11 @@ class ControllerChannel {
         ..setSetting('radio.channel_source', 'default')
         ..setSetting('radio.channel_confirmed', '0')
         ..setSetting('radio.channel_set_at', '${engine.wallSeconds()}')
-        ..setSetting('radio.last_scan', '');
+        ..setSetting('radio.last_scan', '')
+        ..setSetting(
+          'radio.channel_history',
+          '[]',
+        ); // another region's channels
       _lastScan = null;
       scan = null;
       final m = engine.modem;

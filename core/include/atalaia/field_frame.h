@@ -4,13 +4,15 @@
  *
  * Field frames (protocol/field-frames.md, RFC 0001 Amendment 7): what travels
  * on a field's radio outside any game, between boxes that have no game and the
- * field controllers. Four kinds, in one message type (FIELD, 9):
+ * field controllers. Five kinds, in one message type (FIELD, 9):
  *
  *   ANNOUNCE  box -> controllers   "I am free": device id, a fresh token, name, last role
  *   DISCOVER  controller -> boxes  "who is free?": free boxes answer with an ANNOUNCE
  *   INVITE    controller -> a box  a join payload for the box's device id and token, in 1-3 parts
  *   GAME_OVER controller -> boxes  "game N (its key's tag T) is over": a box in that game leaves it
  *                                  (decision OT-13; for a controller that lost the game's key)
+ *   MOVE      controller -> boxes  "the field is on channel C now (revision R)": a free box listens
+ *                                  there (RFC 0001 Amendment 19)
  *
  * On air:
  *
@@ -62,6 +64,7 @@ typedef enum {
     ATALAIA_FF_DISCOVER = 2,
     ATALAIA_FF_INVITE = 3,
     ATALAIA_FF_GAME_OVER = 4, /* RFC 0001 Amendment 7, addendum of 2026-10-22 */
+    ATALAIA_FF_MOVE = 5,      /* RFC 0001 Amendment 19: the field's channel changed */
 } atalaia_ff_kind_t;
 
 /* What a box answers to an invite (ANNOUNCE key 10). */
@@ -97,6 +100,9 @@ enum {
     /* GAME_OVER */
     ATALAIA_FF_K_GAME = 4,
     ATALAIA_FF_K_KEY_TAG = 5,
+    /* MOVE */
+    ATALAIA_FF_K_CHANNEL = 4, /* the field's channel, Hz */
+    ATALAIA_FF_K_REV = 5,     /* rises with every change of channel */
 };
 
 typedef struct {
@@ -121,6 +127,9 @@ typedef struct {
     /* GAME_OVER */
     uint16_t game_id;                     /* 1-65534 */
     uint8_t key_tag[ATALAIA_FF_TAG_SIZE]; /* the game key's tag (its epoch store's) */
+    /* MOVE */
+    uint32_t channel_hz; /* 1-0xFFFFFFFF; the box checks it against its region */
+    uint32_t rev;        /* 1-0xFFFFFFFF; a box takes only one above the last it took */
 } atalaia_ff_msg_t;
 
 /* HKDF-SHA256 (RFC 5869): extract with salt (NULL or empty: 32 zero bytes), then

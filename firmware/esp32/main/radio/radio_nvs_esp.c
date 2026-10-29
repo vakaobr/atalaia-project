@@ -215,6 +215,29 @@ static int store_save_ff_boot(void *ctx, uint32_t boot)
     return 0;
 }
 
+/* Where a free box listens (RFC 0001 Amendment 19): channel and the last MOVE's revision, 8 bytes.
+ */
+static int store_load_field_move(void *ctx, uint32_t *channel_hz, uint32_t *rev)
+{
+    (void)ctx;
+    uint8_t b[8];
+    int n = store_load_blob("field_move", b, sizeof(b));
+    if (n != (int)sizeof(b)) return -1; /* none stored yet, or unreadable: the default channel */
+    *channel_hz = (uint32_t)b[0] << 24 | (uint32_t)b[1] << 16 | (uint32_t)b[2] << 8 | b[3];
+    *rev = (uint32_t)b[4] << 24 | (uint32_t)b[5] << 16 | (uint32_t)b[6] << 8 | b[7];
+    return 0;
+}
+
+static int store_save_field_move(void *ctx, uint32_t channel_hz, uint32_t rev)
+{
+    (void)ctx;
+    uint8_t b[8] = {(uint8_t)(channel_hz >> 24), (uint8_t)(channel_hz >> 16),
+                    (uint8_t)(channel_hz >> 8),  (uint8_t)channel_hz,
+                    (uint8_t)(rev >> 24),        (uint8_t)(rev >> 16),
+                    (uint8_t)(rev >> 8),         (uint8_t)rev};
+    return store_save_blob("field_move", b, sizeof(b));
+}
+
 /* The screens' language, the last game's (join key 15; box_text.h): "" when it gave none. */
 static int store_load_lang(void *ctx, char *code, size_t cap)
 {
@@ -247,6 +270,8 @@ static const box_store_ops_t esp_box_store = {
     .save_device_id = store_save_device_id,
     .load_ff_boot = store_load_ff_boot,
     .save_ff_boot = store_save_ff_boot,
+    .load_field_move = store_load_field_move,
+    .save_field_move = store_save_field_move,
     .load_lang = store_load_lang,
     .save_lang = store_save_lang,
     .ctx = NULL,

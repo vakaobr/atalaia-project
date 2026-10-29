@@ -54,6 +54,8 @@ class Reinvite:
         self.inviter = lobby.Inviter(controller.join_key, self._send, nonces=self._nonces())
         self.inviter.on_change = self._changed
         self.inviter.tune = self._tune
+        self.inviter.on_orders_done = self._orders_done
+        self._discover_after = False  # a DISCOVER on the field's channel once the MOVEs are said
         self._pending_emit: set[str] = set()
         self._tuned: Optional[int] = None  # the channel a GAME_OVER took the modem to
 
@@ -90,6 +92,8 @@ class Reinvite:
     def tick(self, now_ms: int) -> None:
         with self.ctl._lock:
             self.inviter.tick(now_ms)
+            if self._discover_after and not self.inviter.moves and not self.inviter.games_over:
+                self._discover_after = False  # the MOVEs were dropped (a game took the radio): no DISCOVER
             self._flush()
 
     def on_hello(self, node_id: int, device_hex: Optional[str]) -> None:
@@ -111,6 +115,29 @@ class Reinvite:
         log.info("game %d: GAME_OVER to its boxes (%d times, on %s Hz)", game_id, ff_repeats(), channel_hz)
         self.inviter.tick(self.ctl.now_ms())  # the first one at once
         return True
+
+    def field_moved(self, old_hz: int, new_hz: int, rev: int) -> bool:
+        """The field's channel changed: says so on the old one (MOVE, three times, RFC 0001 Amendment
+        19) before the modem goes to the new one, then asks the boxes there. False when it cannot
+        (no modem with field frames): the caller retunes at once."""
+        modem = self.ctl.modem
+        if modem is None or not modem.is_up or not getattr(modem, "has_field_frames", False):
+            return False
+        self.inviter.move(old_hz, new_hz, rev, self.ctl.now_ms())
+        self._discover_after = True
+        self.inviter.tick(self.ctl.now_ms())  # the first one at once
+        log.info("the field moves from %d to %d Hz (revision %d): MOVE on the old channel", old_hz, new_hz, rev)
+        return True
+
+    def _orders_done(self) -> None:
+        """The GAME_OVERs and MOVEs are said and the modem is back on the field's channel: after a MOVE,
+        a DISCOVER there makes every free box announce itself (they answer within 3 s)."""
+        if not self._discover_after:
+            return
+        self._discover_after = False
+        modem = self.ctl.modem
+        if modem is not None and modem.is_up and self.ctl.fc is None:
+            self.inviter.discover(self.ctl.now_ms(), force=True)
 
     def _tune(self, channel_hz: Optional[int]) -> bool:
         """The modem on a GAME_OVER's channel (its game's) while no game is live, then back on the
@@ -225,8 +252,17 @@ class Reinvite:
             modem = self.ctl.modem
             if modem is None or not modem.is_up:
                 raise Unavailable(f"the radio modem is {self.ctl.radio_state}: no DISCOVER sent")
-            sent = self.inviter.discover(self.ctl.now_ms())
-            return {"sent": sent}
+            now = self.ctl.now_ms()
+            sent = self.inviter.discover(now)
+            # Boxes that were away when the field's channel changed still listen on an earlier one: a MOVE
+            # on each (a few seconds after the DISCOVER, so its answers are heard first), then another
+            # DISCOVER here. Only between games, and at most once a minute.
+            history = self.ctl.channel_history() if self.ctl.fc is None else []
+            sweep = bool(history) and self.inviter.sweep(history, self.ctl.field_channel, self.ctl.move_rev() or 1,
+                                                         now)
+            if sweep:
+                self._discover_after = True
+            return {"sent": sent, "sweep": history if sweep else []}
 
     def invite(self, game_id: int, specs: Any) -> dict[str, Any]:
         """Invites boxes into the live game: [{"device_id", "role"?, "name"?, "fetch_modes"?}, ...].

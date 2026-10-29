@@ -79,6 +79,30 @@ void main() {
       );
     });
 
+    test('MOVE (RFC 0001 Amendment 19): the new channel and a revision', () {
+      final msg = {'kind': 'move', 'channel_hz': 869925000, 'rev': 7};
+      final body = encodeFieldBody(msg);
+      expect(plain(decodeFieldBody(body)), msg);
+      for (final bad in [
+        {'channel_hz': 0},
+        {'rev': 0},
+        {'channel_hz': 4294967296},
+        {'rev': -1},
+        {'channel_hz': '869925000'},
+      ]) {
+        expect(
+          () => encodeFieldBody({...msg, ...bad}),
+          throwsA(isA<FieldFrameException>()),
+          reason: '$bad',
+        );
+      }
+      // Kind 6 is still unknown.
+      expect(
+        () => decodeFieldBody(h('a30106041a33da00880503')),
+        throwsA(isA<FieldFrameException>()),
+      );
+    });
+
     test('frames and bodies that must be refused', () {
       for (final c in cases(v, 'invalid_frames')) {
         final frame = h(c['frame']);
@@ -95,7 +119,7 @@ void main() {
         );
       }
       final bodies = cases(v, 'invalid_bodies');
-      expect(bodies, hasLength(37));
+      expect(bodies, hasLength(49));
       for (final c in bodies) {
         expect(
           () => decodeFieldBody(h(c['body'])),

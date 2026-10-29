@@ -852,7 +852,11 @@ controller's game.
   byte for byte, the limits). In software and with the host box through the
   host modem; not yet on the air.
 - **The game** -- on the controller's CMD start (or a TIME beacon that shows
-  the game running), the box loads the mode for its role with the join's
+  the game running: the controller repeats every start, pause and resume as
+  TIME at +1, +2.5, +5 and +10 s, so a lost first frame costs a second, not the
+  30 s to the next beacon; the box's tick also starts or pauses a game its link
+  already knows is running or paused, RFC 0001 Amendment 19 part 2), the box
+  loads the mode for its role with the join's
   teams, parameters, node id and seed; CMD pause, resume and end, TIME, and
   the buttons drive it. `set_owner` and `message` reach the mode as the input
   events `cmd.set_owner` and `gm.message`, and a mode command (opcode 8: a
@@ -952,7 +956,16 @@ controller's game.
   tag, which a controller sends when a game ends, also one whose key it lost in
   a restart: the box ends the game as on CMD end; another game's, or one for
   its game id under another key (played back), changes nothing (decisions
-  OT-7, OT-13; no timeout ever ends a game on the box). 30 s
+  OT-7, OT-13; no timeout ever ends a game on the box). A free box also takes
+  a **MOVE** (kind 5, RFC 0001 Amendment 19): when the field's channel changes
+  the controller says so on the old channel, and a box with no game (or a game
+  that is over) listens on the new one, keeps it in NVS (`field_move`: the
+  channel and the MOVE's revision, which must rise, so a recorded MOVE played
+  back later changes nothing) and announces itself 6-15 s later; a box in a
+  game, a revision it has taken, or another region's channel changes nothing
+  (`moves_taken` and `moves_refused` in `@lobby`). The box's idle channel (its
+  last game's, or the field's) now also survives a reboot, where it used to
+  fall back to the region's default. 30 s
   after a game ends the final screen gives way to "Ready / next game". `@lobby`
   on the serial console prints the device id, whether the box is free, its
   channel and its invites. A field frame's nonce is the device id's pseudonym,

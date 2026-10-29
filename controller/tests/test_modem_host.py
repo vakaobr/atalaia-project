@@ -351,7 +351,9 @@ class EngineOverHostModemTests(unittest.TestCase):
 
         # A node command goes out as a unicast CMD.
         result = self.ctrl.send_node_cmd(7, "message", {"text": "hold"})
-        [air] = self.host.transmitted_all()
+        # (A TIME repeating the start may be on the air too, RFC 0001 Amendment 19: only the CMD is looked at.)
+        [air] = [a for a in self.host.transmitted_all()
+                 if packet_decrypt(a, epoch, key)[0].type == MESSAGE_TYPES["CMD"]]
         hdr, plain = packet_decrypt(air, epoch, key)
         self.assertEqual(hdr.seq, result["seq"])
         self.assertEqual(cmd_decode(plain), {"cmd": 5, "params": {"text": "hold"}, "dest": 7})

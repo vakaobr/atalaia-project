@@ -464,13 +464,16 @@ static void serial_command(const char *cmd)
         box_lobby_device_hex(&box, hex);
         ESP_LOGI(TAG,
                  "lobby: device %s, %s, channel %lu Hz, last game %u (%s), invites %lu "
-                 "accepted, %lu refused, %lu frames ignored",
+                 "accepted, %lu refused, %lu frames ignored, field move revision %lu (%lu taken, "
+                 "%lu refused)",
                  hex[0] ? hex : "none (no join key)",
                  box_lobby_available(&box) ? "free for an invite" : "in a game",
                  (unsigned long)box.lobby.channel_hz, box.lobby.last_game,
                  box.lobby.last_role[0] ? box.lobby.last_role : "-",
                  (unsigned long)box.lobby.invites_accepted,
-                 (unsigned long)box.lobby.invites_refused, (unsigned long)box.lobby.frames_ignored);
+                 (unsigned long)box.lobby.invites_refused, (unsigned long)box.lobby.frames_ignored,
+                 (unsigned long)box.lobby.move_rev, (unsigned long)box.lobby.moves_taken,
+                 (unsigned long)box.lobby.moves_refused);
         return;
     }
 #endif

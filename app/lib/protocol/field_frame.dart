@@ -60,7 +60,13 @@ const ffResults = [
   'ended',
 ];
 
-const _kinds = {'announce': 1, 'discover': 2, 'invite': 3, 'game_over': 4};
+const _kinds = {
+  'announce': 1,
+  'discover': 2,
+  'invite': 3,
+  'game_over': 4,
+  'move': 5,
+};
 final _kindNames = {for (final e in _kinds.entries) e.value: e.key};
 
 // Body keys.
@@ -69,6 +75,8 @@ const _kName = 4, _kTier = 5, _kLastGame = 6, _kLastRole = 7;
 const _kBattery = 8, _kAnswer = 9, _kResult = 10;
 const _kInvite = 4, _kPart = 5, _kParts = 6, _kChunk = 7;
 const _kGame = 4, _kKeyTag = 5;
+// MOVE (RFC 0001 Amendment 19): the field's new channel (Hz) and a revision.
+const _kChannel = 4, _kRev = 5;
 
 /// The header every field frame carries: version 1, normal priority, no
 /// ACK, encrypted (0x2A), game 0, source 0, seq 0, hop_limit 0, type 9.
@@ -246,6 +254,13 @@ Map<String, Object?> validateFieldMessage(Map<String, Object?> msg) {
       if (!_fixed(msg['key_tag'], ffTagSize)) {
         throw FieldFrameException('key_tag: 8 bytes');
       }
+    case 'move':
+      if (!_uint(msg['channel_hz'], 1, 0xffffffff)) {
+        throw FieldFrameException('channel_hz: 1-4294967295');
+      }
+      if (!_uint(msg['rev'], 1, 0xffffffff)) {
+        throw FieldFrameException('rev: 1-4294967295');
+      }
     case 'invite':
       if (!_fixed(msg['device_id'], ffDeviceSize) ||
           !_fixed(msg['token'], ffTokenSize)) {
@@ -302,6 +317,9 @@ Uint8List encodeFieldBody(Map<String, Object?> msg) {
     case 'game_over':
       out[_kGame] = msg['game_id'];
       out[_kKeyTag] = b(msg['key_tag']);
+    case 'move':
+      out[_kChannel] = msg['channel_hz'];
+      out[_kRev] = msg['rev'];
   }
   final body = cborEncode(out);
   if (body.length > ffBodyMax) {
@@ -334,6 +352,7 @@ const _inviteKeys = {
   _kChunk,
 };
 const _gameOverKeys = {_kKind, _kGame, _kKeyTag};
+const _moveKeys = {_kKind, _kChannel, _kRev};
 
 /// Reads a body as the C decoder does (refusing what it refuses).
 Map<String, Object?> decodeFieldBody(List<int> data) {
@@ -362,6 +381,7 @@ Map<String, Object?> decodeFieldBody(List<int> data) {
     'discover' => const {_kKind},
     'invite' => _inviteKeys,
     'game_over' => _gameOverKeys,
+    'move' => _moveKeys,
     _ => null,
   };
   if (allowed == null) throw FieldFrameException('unknown kind ${raw[_kKind]}');
@@ -411,6 +431,9 @@ Map<String, Object?> decodeFieldBody(List<int> data) {
     case 'game_over':
       need(_kGame, 'game_id');
       need(_kKeyTag, 'key_tag');
+    case 'move':
+      need(_kChannel, 'channel_hz');
+      need(_kRev, 'rev');
   }
   return validateFieldMessage(msg);
 }

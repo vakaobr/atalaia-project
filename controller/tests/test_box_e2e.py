@@ -412,6 +412,59 @@ class FieldTests(unittest.TestCase):
         self.assertEqual(self.node(nid)["link"], "online")
         self.assertEqual(self.log_types(gid, nid).count("battery.low"), 1)
 
+    def lose_next(self, *types: str):
+        """The air loses the controller's next CMD and next TIME (one of each), as the first frames
+        of a state change are on a bad day; returns the list of what was lost."""
+        from atalaia_sim.protocol import MESSAGE_TYPES  # noqa: PLC0415
+
+        wanted = {MESSAGE_TYPES[t] for t in types}
+        lost: list[int] = []
+
+        def drop(packet: bytes) -> bool:
+            # header: version_flags, game_id (2), source (2), seq (2), hop_limit, type
+            if len(packet) > 8 and int.from_bytes(packet[3:5], "big") == 0 and packet[8] in wanted:
+                wanted.discard(packet[8])
+                lost.append(packet[8])
+                return True
+            return False
+        self.hub.drop = drop
+        return lost
+
+    def test_a_started_game_reaches_the_box_in_about_a_second_when_the_first_frames_are_lost(self):
+        """Bench finding of 2026-10-29: the box logged the start 21 s after the GM pressed it. CMD start
+        and the TIME beside it go once; when both are lost the box waited for the next 30 s beacon.
+        Now a state change is repeated as TIME after 1, 2.5, 5 and 10 s (RFC 0001 Amendment 19): the box
+        starts within about a second (and within 2.5 s if the first repeat is lost too). Pause and
+        resume are the same path."""
+        gid = self.game()
+        box = self.box("alpha")
+        nid = self.join(box)
+        self.assertTrue(wait_for(lambda: self.node(nid).get("link") == "online", 5))
+
+        def phase_within(phase: int, paused: bool, limit: float) -> float:
+            t0 = time.monotonic()
+            self.assertTrue(wait_for(lambda: (lambda s: s["phase"] == phase and s["paused"] == paused)(box.status()),
+                                     limit), (box.status(), box.lines[-6:]))
+            return time.monotonic() - t0
+
+        lost = self.lose_next("CMD", "TIME")
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
+        took = phase_within(2, False, 4.0)
+        self.assertEqual(sorted(lost), [5, 6], "the CMD and the TIME were lost")
+        self.assertLess(took, 2.0, f"the box started {took:.1f} s after the start")
+        self.assertTrue(box.logged("started (node"))
+
+        # The same for a pause and a resume.
+        lost = self.lose_next("CMD", "TIME")
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/pause", headers=GM, json={}).status_code, 200)
+        took = phase_within(2, True, 4.0)
+        self.assertLess(took, 2.0, f"the box paused {took:.1f} s after the pause")
+        lost = self.lose_next("CMD", "TIME")
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/resume", headers=GM, json={}).status_code, 200)
+        took = phase_within(2, False, 4.0)
+        self.assertLess(took, 2.0, f"the box resumed {took:.1f} s after the resume")
+        self.hub.drop = None
+
     def test_relay_through_another_box(self):
         """A box out of the modem's range is heard, and hears the controller, through another box."""
         gid = self.game()

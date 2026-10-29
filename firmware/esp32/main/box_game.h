@@ -53,6 +53,12 @@ typedef struct {
      * first frame of every run. NULL, or a failed save: the box sends no field frame. */
     int (*load_ff_boot)(void *ctx, uint32_t *boot); /* 0 = ok, -1 = none stored yet */
     int (*save_ff_boot)(void *ctx, uint32_t boot);  /* 0 = ok */
+    /* Where a free box listens (RFC 0001 Amendment 19): the channel of its last game, or of the
+     * last MOVE that moved it, and that MOVE's revision (a box takes only a higher one). Both
+     * survive a reboot, so an idle box does not go back to the region's default channel. NULL:
+     * not kept. load: 0 = ok, -1 = none stored yet. */
+    int (*load_field_move)(void *ctx, uint32_t *channel_hz, uint32_t *rev);
+    int (*save_field_move)(void *ctx, uint32_t channel_hz, uint32_t rev); /* 0 = ok */
     /* The box's screen language, the last game's (join key 15; box_text.h): "en", "pt". NULL: not
      * kept (English after a reboot until the next game). */
     int (*load_lang)(void *ctx, char *code, size_t cap); /* 0 = ok */
@@ -123,11 +129,14 @@ typedef enum {
 #define BOX_DISCOVER_ANSWER_MAX_MS 3000
 #define BOX_INVITE_ANSWER_MIN_MS   100
 #define BOX_INVITE_ANSWER_MAX_MS   600
-#define BOX_TOKEN_ROTATE_MS        600000
-#define BOX_ANSWER_REPEAT_MS       10000
-#define BOX_ANSWER_IDS             8 /* invites answered lately: one answer each in 10 s */
-#define BOX_ANSWERS_PER_MIN        6 /* and at most this many answers a minute in all */
-#define BOX_ENDED_GAMES            4
+#define BOX_MOVE_ANNOUNCE_MIN_MS                                                                   \
+    6000 /* a box that took a MOVE announces itself on the new channel */
+#define BOX_MOVE_ANNOUNCE_MAX_MS 15000 /* once the controller's MOVEs are over (Amendment 19) */
+#define BOX_TOKEN_ROTATE_MS      600000
+#define BOX_ANSWER_REPEAT_MS     10000
+#define BOX_ANSWER_IDS           8 /* invites answered lately: one answer each in 10 s */
+#define BOX_ANSWERS_PER_MIN      6 /* and at most this many answers a minute in all */
+#define BOX_ENDED_GAMES          4
 
 typedef struct {
     bool ready; /* device id and key: field frames can be sent and read */
@@ -166,6 +175,12 @@ typedef struct {
     /* GAME_OVER frames (decision OT-13): one that ended this box's game; ones for its game id
      * under another key (an old game's, recorded and played back), refused. */
     uint32_t games_over_heard, games_over_refused;
+    /* MOVE frames (Amendment 19): the revision of the last one taken, how many moved this box
+     * or were refused (old revision, a channel of another region, or a box in a game). */
+    uint32_t move_rev, moves_taken, moves_refused;
+    uint32_t saved_channel_hz; /* what the store holds, so it is written only when it changes */
+    bool move_loaded;          /* the stored channel and revision were read (once) */
+    bool move_tuned;           /* a free box went to the stored channel (once, at its first tick) */
     /* The timings (box_game_init sets the BOX_ANNOUNCE_* values; the host box shortens them). */
     uint32_t first_min_ms, first_max_ms, interval_min_ms;
     uint32_t interval_fixed_ms; /* the host box's tests: this interval, not the computed one */
@@ -311,6 +326,10 @@ void box_lobby_free_again(box_game_t *g);
 /* The box joined a game (a card, a QR code, the serial console, an invite): its tokens go,
  * so no invite recorded before can work afterwards (box_game.c). */
 void box_lobby_joined(box_game_t *g);
+
+/* Stores the idle channel (and the revision of the MOVE that set it) when it changed: after a
+ * game's join and after a MOVE, so a rebooted free box listens where its field is. */
+void box_lobby_remember_channel(box_game_t *g);
 
 /* The shell drew something else (the preset picker): no ready screen over it. */
 void box_lobby_cancel_ready_screen(box_game_t *g);

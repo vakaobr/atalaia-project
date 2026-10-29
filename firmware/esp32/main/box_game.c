@@ -557,6 +557,7 @@ static bool link_up(box_game_t *g, const atalaia_join_t *j, bool fresh)
     g->hello.has_device_id = g->lobby.ready;
     if (g->lobby.ready) memcpy(g->hello.device_id, g->lobby.device_id, ATALAIA_FF_DEVICE_SIZE);
     g->lobby.channel_hz = j->channel_hz; /* where it listens between games, from now on */
+    box_lobby_remember_channel(g);       /* and after a reboot (RFC 0001 Amendment 19) */
     g->lobby.ready_screen_due = false;
     g->battery_low = false; /* a new game, or a reboot: battery.low may be sent again */
     g->battery_next_ms = g->now_ms;
@@ -845,11 +846,36 @@ static void check_battery(box_game_t *g, uint32_t now_ms)
     }
 }
 
+/* What the link last heard of the game (a CMD or a TIME) and what the box does must agree: a
+ * START or PAUSE that came while the box could not act on it (still fetching its modes) would
+ * otherwise be "already known" to the link, and the TIME beacons that repeat the state would
+ * never start the game (RFC 0001 Amendment 19, part 2). */
+static void follow_link_state(box_game_t *g)
+{
+    uint8_t state = g->link.game_state;
+    if (g->phase == BOX_JOINED && (state == FIELD_GAME_RUNNING || state == FIELD_GAME_PAUSED)) {
+        say(g, "the game is already %s: starting",
+            state == FIELD_GAME_RUNNING ? "running" : "paused");
+        start_mode(g);
+    }
+    if (g->phase != BOX_PLAYING) return;
+    if (state == FIELD_GAME_PAUSED && !g->paused) {
+        node_runner_input(g->runner, "game.pause", NULL);
+        g->paused = true;
+        field_link_state_now(&g->link);
+    } else if (state == FIELD_GAME_RUNNING && g->paused) {
+        node_runner_input(g->runner, "game.resume", NULL);
+        g->paused = false;
+        field_link_state_now(&g->link);
+    }
+}
+
 void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms)
 {
     g->now_ms = now_ms;
     box_lobby_tick(g, now_ms);
     if (g->phase == BOX_IDLE || g->phase == BOX_FETCHING) return;
+    follow_link_state(g);
     if (g->phase == BOX_PLAYING && !g->paused && g->runner->running) {
         node_runner_tick(g->runner, field_link_adjust_delta(&g->link, raw_delta_ms));
     }

@@ -323,9 +323,9 @@ class ReinviteTests(Case):
         self.pump(21)
         self.assertEqual(len(self.client.get("/api/v1/boxes", headers=GM).json()["boxes"]), 1)
         self.modem.fields.clear()
-        self.assertEqual(self.client.post("/api/v1/boxes/discover", headers=GM).json(), {"sent": True})
+        self.assertEqual(self.client.post("/api/v1/boxes/discover", headers=GM).json(), {"sent": True, "sweep": []})
         self.assertEqual(ff.decode(ff.field_key(JOIN_KEY), self.modem.fields[0]), {"kind": "discover"})
-        self.assertEqual(self.client.post("/api/v1/boxes/discover", headers=GM).json(), {"sent": False})
+        self.assertEqual(self.client.post("/api/v1/boxes/discover", headers=GM).json(), {"sent": False, "sweep": []})
         self.assertEqual(self.client.get("/api/v1/boxes", headers=READ).status_code, 403)
         # No live game, a box nobody heard, a bad device id.
         device = self.box.device_id.hex()
@@ -484,3 +484,123 @@ class GameOverTests(ReinviteTests):
         self.modem.state = "down"
         self.assertEqual(self.ctrl.end_game(gid)["game_over_frame"], "no_radio")
         self.assertEqual(self.modem.fields, [])
+
+
+NEW_HZ, OLD_HZ, OLDER_HZ = 869_925_000, 869_525_000, 868_100_000
+
+
+class MoveTests(Case):
+    """RFC 0001 Amendment 19 (the bench finding of 2026-10-29): a change of the field's channel is said on
+    the old channel (MOVE, three times) before the modem goes to the new one, then a DISCOVER there asks
+    the boxes; a GM's discover sweeps the earlier channels for boxes that were away."""
+
+    def setUp(self):
+        super().setUp()
+        self.boxes = [lobby.IdleBox(JOIN_KEY, f"box-{i}", rng=random.Random(i), now_ms=0) for i in range(2)]
+        self.on_air = OLD_HZ        # the channel the modem is tuned to (SET_CHANNEL, else its own)
+        self.asleep: set[int] = set()
+        self.heard_by_box: list[tuple[int, str]] = []
+
+    def pump(self, seconds: float = 1.0, step: float = 0.05) -> None:
+        for _ in range(int(round(seconds / step))):
+            self.clock.advance(step)
+            now = self.ctrl.now_ms()
+            self.ctrl.tick()
+            while self.modem.channels:
+                self.on_air = self.modem.channels.pop(0)
+            while self.modem.fields:
+                frame = self.modem.fields.pop(0)
+                kind = ff.decode(ff.field_key(JOIN_KEY), frame)["kind"]
+                self.heard_by_box.append((self.on_air, kind))
+                for i, box in enumerate(self.boxes):
+                    if i not in self.asleep and box.channel_hz == self.on_air:
+                        box.on_frame(frame, now)
+            for box in self.boxes:
+                for frame in box.tick(now):
+                    if box.channel_hz == self.on_air:
+                        self.modem.on_field_rx(frame, -71, 6)
+
+    def names(self) -> list[str]:
+        return sorted(b["name"] for b in self.client.get("/api/v1/boxes", headers=GM).json()["boxes"])
+
+    def settle(self):
+        """The boxes announce themselves on the old channel: listed."""
+        self.pump(25)
+        self.assertEqual(self.names(), ["box-0", "box-1"])
+
+    def test_the_boxes_follow_the_field_to_its_new_channel(self):
+        self.settle()
+        out = self.ctrl.set_field_channel(NEW_HZ, "scan")
+        self.assertEqual(out["channel"]["channel_hz"], NEW_HZ)
+        self.assertEqual(out["previous_channels_hz"], [OLD_HZ])
+        # The modem stays on the old channel to say it: the SET_CHANNEL for the new one waits.
+        self.assertNotIn(NEW_HZ, self.modem.channels)
+        self.pump(20)
+        kinds = [(hz, k) for hz, k in self.heard_by_box if k in ("move", "discover")]
+        self.assertEqual(kinds[:3], [(OLD_HZ, "move")] * 3)
+        self.assertEqual(kinds[3:], [(NEW_HZ, "discover")])  # then the modem is on the new channel: DISCOVER
+        self.assertEqual(self.on_air, NEW_HZ)
+        self.assertEqual([b.channel_hz for b in self.boxes], [NEW_HZ, NEW_HZ])
+        self.assertEqual(self.names(), ["box-0", "box-1"])  # found again on the new channel
+        # A new game is made on the new channel, and its boxes can be invited there.
+        gid = self.game()
+        self.assertEqual(self.ctrl.get_game(gid)["channel_hz"], NEW_HZ)
+
+    def test_the_revision_rises_with_every_change(self):
+        self.ctrl.set_field_channel(NEW_HZ)
+        first = self.ctrl.move_rev()
+        self.assertGreater(first, 0)
+        self.pump(10)
+        self.ctrl.set_field_channel(OLDER_HZ)
+        self.assertEqual(self.ctrl.move_rev(), first + 1)  # the wall clock is not above it: +1
+        self.assertEqual(self.ctrl.channel_history(), [NEW_HZ, OLD_HZ])
+        self.pump(10)
+        self.ctrl.set_field_channel(OLD_HZ)
+        self.assertEqual(self.ctrl.channel_history(), [OLDER_HZ, NEW_HZ])  # the current one is never in it
+        self.pump(10)
+        # The same channel again (accepting it): nothing to say.
+        n, rev = len(self.heard_by_box), self.ctrl.move_rev()
+        self.ctrl.set_field_channel(OLD_HZ)
+        self.pump(10)
+        self.assertEqual((len(self.heard_by_box), self.ctrl.move_rev()), (n, rev))
+
+    def test_history_is_short_and_a_region_change_forgets_it(self):
+        for hz in (868_100_000, 868_300_000, 868_500_000, NEW_HZ, 869_850_000):
+            self.ctrl.set_field_channel(hz)
+            self.pump(10)
+        self.assertEqual(len(self.ctrl.channel_history()), self.ctrl.CHANNEL_HISTORY_MAX)
+        self.assertEqual(self.ctrl.channel_history()[0], NEW_HZ)
+        self.assertNotIn(OLD_HZ, self.ctrl.channel_history())
+        self.ctrl.set_field_region("as923-tw")
+        self.assertEqual(self.ctrl.channel_history(), [])
+
+    def test_a_box_that_was_away_is_found_by_the_gms_discover(self):
+        self.settle()
+        self.asleep = {1}
+        self.ctrl.set_field_channel(NEW_HZ)
+        self.pump(20)
+        self.assertEqual([b.channel_hz for b in self.boxes], [NEW_HZ, OLD_HZ])
+        self.asleep = set()
+        self.heard_by_box.clear()
+        r = self.client.post("/api/v1/boxes/discover", headers=GM)
+        self.assertEqual(r.json(), {"sent": True, "sweep": [OLD_HZ]})
+        self.pump(25)
+        self.assertEqual([b.channel_hz for b in self.boxes], [NEW_HZ, NEW_HZ])
+        # DISCOVER on the new channel, then (4 s later) the MOVE twice on the old one, then DISCOVER again.
+        self.assertEqual(self.heard_by_box, [(NEW_HZ, "discover"), (OLD_HZ, "move"), (OLD_HZ, "move"),
+                                             (NEW_HZ, "discover")])
+        self.assertEqual(self.names(), ["box-0", "box-1"])
+        # At most one sweep a minute.
+        self.assertEqual(self.client.post("/api/v1/boxes/discover", headers=GM).json()["sweep"], [])
+
+    def test_without_a_modem_that_carries_field_frames_the_channel_changes_at_once(self):
+        self.modem.has_field_frames = False
+        self.ctrl.set_field_channel(NEW_HZ)
+        self.assertEqual(self.modem.channels, [NEW_HZ])
+        self.assertEqual(self.modem.fields, [])
+
+    def test_no_sweep_while_a_game_is_live(self):
+        self.ctrl.set_field_channel(NEW_HZ)
+        self.pump(10)
+        self.game()
+        self.assertEqual(self.client.post("/api/v1/boxes/discover", headers=GM).json()["sweep"], [])

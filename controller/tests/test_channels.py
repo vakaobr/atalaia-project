@@ -158,7 +158,9 @@ class FieldChannelTests(EngineChannelCase):
         self.assertEqual((out["channel"]["channel_hz"], out["source"], out["confirmed"]),
                          (868_300_000, "manual", True))
         self.assertEqual(out["channel"]["erp_mw"], 25)
-        self.assertEqual(self.modem.channels, [868_300_000])  # SET_CHANNEL
+        # The modem stays on the old channel to say MOVE there first (test_reinvite.MoveTests): SET_CHANNEL follows.
+        self.assertEqual(self.modem.channels, [869_525_000])
+        self.assertEqual(len(self.modem.fields), 1)  # the first MOVE
         self.assertTrue(any(m["type"] == "radio" for m in self.messages))
         # A restart keeps it (a field setting in the store), and new games use it.
         self.reopen()

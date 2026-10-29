@@ -974,11 +974,19 @@
         ]},
         {"request": {"method": "POST", "path": "/api/v1/nodes/4/cmd", "token": "gm", "body": {"cmd": "message", "params": {"text": "go"}}}, "status": 202, "json": {"seq": 5}},
         {"tx": [{"kind": "CMD", "seq": 5, "fields": {"cmd": 5, "params": {"text": "go"}, "dest": 4}}]},
+        {"advance_ms": 1000},
+        {"tx": [{"kind": "TIME", "seq": 6, "fields": {"game_time_ms": 1000, "game_state": 1}}]},
+        {"advance_ms": 1500},
+        {"tx": [{"kind": "TIME", "seq": 7, "fields": {"game_time_ms": 2500, "game_state": 1}}]},
+        {"advance_ms": 2500},
+        {"tx": [{"kind": "TIME", "seq": 8, "fields": {"game_time_ms": 5000, "game_state": 1}}]},
+        {"advance_ms": 5000},
+        {"tx": [{"kind": "TIME", "seq": 9, "fields": {"game_time_ms": 10000, "game_state": 1}}]},
         {"advance_ms": 29000},
         {"tx": []},
         {"advance_ms": 1000},
-        {"tx": [{"kind": "TIME", "seq": 6, "fields": {"game_time_ms": 30000, "game_state": 1}}]},
-        {"tx_ack": {"seq": 6, "status": "duty_cycle"}},
+        {"tx": [{"kind": "TIME", "seq": 10, "fields": {"game_time_ms": 40000, "game_state": 1}}]},
+        {"tx_ack": {"seq": 10, "status": "duty_cycle"}},
         {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"tx_status": {"duty_cycle": 1}}},
         {"radio_state": "down"},
         {"request": {"method": "POST", "path": "/api/v1/nodes/4/cmd", "token": "gm", "body": {"cmd": "message", "params": {"text": "go"}}}, "status": 503},
@@ -1029,8 +1037,8 @@
         {"tx": [{"kind": "CMD", "seq": 3, "fields": {"cmd": 0}}]},
         {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
         {"tx": [
-          {"kind": "CMD", "seq": 5, "fields": {"cmd": 3}},
-          {"kind": "TIME", "seq": 6, "fields": {"game_state": 3}},
+          {"kind": "CMD", "seq": 6, "fields": {"cmd": 3}},
+          {"kind": "TIME", "seq": 7, "fields": {"game_state": 3}},
           {"kind": "clear"}
         ]}
       ]

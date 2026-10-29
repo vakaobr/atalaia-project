@@ -114,6 +114,103 @@ class TimeBeaconTests(unittest.TestCase):
         self.assertGreater(len(node_1_deliveries), 0)
 
 
+class _Recorder:
+    """A transport that only notes what the controller sends: (ms, type, payload)."""
+
+    def __init__(self) -> None:
+        self.sent: list[tuple[int, int, bytes]] = []
+        self.seq = 0
+
+    def send(self, msg_type, payload, *, priority, ack_req, hop_limit, now_ms):
+        self.sent.append((now_ms, msg_type, payload))
+        self.seq += 1
+        return self.seq - 1
+
+
+class StateRepeatTests(unittest.TestCase):
+    """A start, pause or resume is repeated as TIME beacons for ten seconds (RFC 0001 Amendment 19),
+    so a lost frame costs a second or two, not the 30 s to the next beacon."""
+
+    TIME = MESSAGE_TYPES["TIME"]
+    CMD = MESSAGE_TYPES["CMD"]
+
+    def make(self):
+        rec = _Recorder()
+        ctrl = FieldController(transport=rec, game_id=1, teams=["red", "blue"], beacon_interval_ms=30_000)
+        return ctrl, rec
+
+    def run_to(self, ctrl, start_ms, end_ms, step=100):
+        for t in range(start_ms, end_ms + 1, step):
+            ctrl.tick(t)
+
+    def times(self, rec, kind=None):
+        return [(ms, time_decode(p)["game_state"]) for ms, t, p in rec.sent if t == self.TIME]
+
+    def test_start_sends_cmd_and_time_at_once_then_four_time_repeats(self):
+        ctrl, rec = self.make()
+        ctrl.start_game(now_ms=0)
+        self.assertEqual([t for _, t, _ in rec.sent], [self.CMD, self.TIME])
+        self.run_to(ctrl, 100, 12_000)
+        # +1.0, +2.5, +5.0 and +10.0 s: all four, TIME alone, all saying "running".
+        self.assertEqual(self.times(rec), [(0, GAME_RUNNING), (1000, GAME_RUNNING), (2500, GAME_RUNNING),
+                                           (5000, GAME_RUNNING), (10000, GAME_RUNNING)])
+        self.assertEqual(sum(1 for _, t, _ in rec.sent if t == self.CMD), 1)  # the CMD is not repeated
+        self.assertEqual(ctrl.state_repeats_sent, 4)
+
+    def test_the_30_second_beacon_goes_on_afterwards(self):
+        ctrl, rec = self.make()
+        ctrl.start_game(now_ms=0)
+        self.run_to(ctrl, 100, 41_000)
+        beacons = [ms for ms, _ in self.times(rec)]
+        self.assertEqual(beacons, [0, 1000, 2500, 5000, 10000, 40000])  # 30 s after the last repeat
+
+    def test_a_pause_replaces_the_repeats_of_the_start(self):
+        ctrl, rec = self.make()
+        ctrl.start_game(now_ms=0)
+        self.run_to(ctrl, 100, 1500)
+        ctrl.pause_game(now_ms=1500)
+        self.run_to(ctrl, 1600, 12_000)
+        states = self.times(rec)
+        # After the pause no TIME says "running" any more: a repeat of the start never undoes it.
+        self.assertTrue(all(state == GAME_PAUSED for ms, state in states if ms >= 1500), states)
+        self.assertEqual([ms for ms, state in states if state == GAME_PAUSED], [1500, 2500, 4000, 6500, 11500])
+
+    def test_resume_is_repeated_too(self):
+        ctrl, rec = self.make()
+        ctrl.start_game(now_ms=0)
+        self.run_to(ctrl, 100, 11_000)
+        ctrl.pause_game(now_ms=11_000)
+        self.run_to(ctrl, 11_100, 30_000)
+        ctrl.resume_game(now_ms=30_000)
+        self.run_to(ctrl, 30_100, 41_000)
+        running = [ms for ms, state in self.times(rec) if state == GAME_RUNNING and ms >= 30_000]
+        self.assertEqual(running, [30_000, 31_000, 32_500, 35_000, 40_000])
+
+    def test_an_end_is_not_repeated_by_time(self):
+        ctrl, rec = self.make()
+        ctrl.start_game(now_ms=0)
+        self.run_to(ctrl, 100, 500)
+        ctrl.end_game(now_ms=500)
+        n = len(rec.sent)
+        self.run_to(ctrl, 600, 20_000)
+        self.assertEqual(len(rec.sent), n)  # GAME_OVER (field frames) repeats the end, on the controller's side
+
+    def test_a_late_tick_sends_one_beacon_not_a_burst(self):
+        ctrl, rec = self.make()
+        ctrl.start_game(now_ms=0)
+        ctrl.tick(8_000)  # the loop stalled: three repeats are overdue
+        self.assertEqual(len(self.times(rec)), 2)  # the start's TIME and one repeat
+        ctrl.tick(10_100)
+        self.assertEqual(len(self.times(rec)), 3)  # the last one, due at +10 s
+
+    def test_the_repeat_timing_can_be_turned_off(self):
+        ctrl, rec = self.make()
+        ctrl.state_repeat_gaps_ms = ()
+        ctrl.start_game(now_ms=0)
+        self.run_to(ctrl, 100, 12_000)
+        self.assertEqual(len(self.times(rec)), 1)
+
+
 @unittest.skipUnless(_has_crypto(), "cryptography library not available")
 class ScoreMergeTests(unittest.TestCase):
     """Test conflict-free score merging."""

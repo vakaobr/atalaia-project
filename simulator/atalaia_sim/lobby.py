@@ -18,6 +18,11 @@ is over", sent GAME_OVER_REPEATS times when a game ends (decision OT-13), so
 that a box still in it leaves, also when the controller no longer has the
 game's key (a restart without persist_game_key).
 
+MOVE (RFC 0001 Amendment 19) keeps the field's boxes when its channel changes: the controller says
+on the old channel, MOVE_REPEATS times, where the field is now (the new channel and a revision that
+only rises); a free box takes it, listens there and announces itself. A sweep says it again on each
+earlier channel for the boxes that were away, which a GM's DISCOVER starts.
+
 The same timings as the firmware: an idle box announces 2-20 s after its
 game ends (spread, so a field's boxes do not all talk at once), then at an
 interval that keeps its announcements within ANNOUNCE_SHARE of its
@@ -58,6 +63,14 @@ PART_GAP_MS = 150            # between an invite's parts: the box re-arms its re
                              # each part, and back-to-back parts lost the second on the bench
 GAME_OVER_REPEATS = 3        # a GAME_OVER goes this many times (decision OT-15) ...
 GAME_OVER_GAP_MS = 4_000     # ... this far apart: 3 x 92 ms of air in all
+MOVE_REPEATS = 3             # a MOVE (the field's channel changed, Amendment 19) goes this many times ...
+MOVE_GAP_MS = 2_500          # ... this far apart, on the channel the boxes still listen on: 3 x 90 ms of air
+SWEEP_REPEATS = 2            # a sweep sends it this many times on each earlier channel ...
+SWEEP_AFTER_DISCOVER_MS = 4_000  # ... starting this long after a DISCOVER, so its answers are heard first
+SWEEP_MIN_MS = 60_000        # at most one sweep a minute (a sub-band of 0.1 % has 3.6 s of air an hour)
+MOVE_ANNOUNCE_MS = (6_000, 15_000)  # a box that moved announces itself on the new channel after the
+                                    # controller's three MOVEs are over (it is still on the old channel until
+                                    # then), unless the controller's DISCOVER there asks it first
 
 
 def announce_interval_ms(channel_hz: int, frame_len: int, region: regions.Region = regions.EU868) -> int:
@@ -136,6 +149,7 @@ class IdleBox:
         self.last_announce: Optional[int] = None
         self.next_announce: Optional[int] = now_ms + self.rng.randint(*FIRST_ANNOUNCE_MS)
         self.queue: list[tuple[int, dict[str, Any]]] = []  # (due_ms, announce fields)
+        self.move_rev = 0  # the highest MOVE revision taken (kept in NVS on the box)
 
     def _fresh(self) -> bytes:
         return bytes(self.rng.getrandbits(8) for _ in range(ff.TOKEN_SIZE))
@@ -191,6 +205,25 @@ class IdleBox:
             return False
         self.log.append(f"game {msg['game_id']} is over (said by a field controller)")
         self.end(now_ms)
+        return True
+
+    def on_move(self, msg: dict[str, Any], now_ms: int) -> bool:
+        """MOVE (Amendment 19): the field has a new channel. Only a free box takes it, only with a
+        revision above the last one it took (serial arithmetic: a recorded MOVE played back later
+        is older) and only a channel of its own region; it then listens there and announces itself
+        soon, so the controller sees it."""
+        if not self.available:
+            return False
+        if not 0 < (msg["rev"] - self.move_rev) & 0xFFFFFFFF < 0x80000000 or not self.region.channel_ok(msg["channel_hz"]):
+            self.log.append(f"move to {msg['channel_hz']} Hz refused (rev {msg['rev']}, have {self.move_rev})")
+            return False
+        self.move_rev = msg["rev"]
+        if msg["channel_hz"] != self.channel_hz:
+            self.channel_hz = msg["channel_hz"]
+            self.log.append(f"the field moved to {self.channel_hz} Hz")
+            self.last_announce = None  # nothing was said on this channel yet: a DISCOVER is answered at once
+            self.queue = [q for q in self.queue if q[1].get("answer")]
+            self.next_announce = now_ms + self.rng.randint(*MOVE_ANNOUNCE_MS)
         return True
 
     def end(self, now_ms: int = 0) -> None:
@@ -249,6 +282,9 @@ class IdleBox:
             return  # another field's, a stranger's, or not a field frame at all
         if msg["kind"] == "game_over":
             self.on_game_over(msg, now_ms)
+            return
+        if msg["kind"] == "move":
+            self.on_move(msg, now_ms)
             return
         if msg["kind"] == "discover":
             gap = self._interval() // 4
@@ -379,6 +415,19 @@ class GameOver:
     sent: int = 0
 
 
+@dataclass
+class MoveOrder:
+    """A MOVE on its way: sent on channel_hz (where the boxes still listen), naming the new one."""
+
+    channel_hz: Optional[int]
+    to_hz: int
+    rev: int
+    left: int = MOVE_REPEATS
+    next_ms: int = 0
+    sent: int = 0
+    gap_ms: int = MOVE_GAP_MS
+
+
 class Inviter:
     """A field controller's side: the free boxes heard, DISCOVER, invites with retries.
 
@@ -404,6 +453,11 @@ class Inviter:
         self._fresh: dict[str, tuple[int, int]] = {}  # device id -> highest (boot, ctr) heard
         self.on_change: Optional[Callable[[str], None]] = None  # "boxes" or "invites"
         self.games_over: list[GameOver] = []
+        self.moves: list[MoveOrder] = []
+        self.last_sweep: Optional[int] = None
+        # Called once no GAME_OVER or MOVE is left to send (and after tune(None)): the controller's
+        # next step, e.g. a DISCOVER on the field's channel after a sweep.
+        self.on_orders_done: Optional[Callable[[], None]] = None
         # Called with a GAME_OVER's channel before it is sent (False: drop it, the radio is busy
         # elsewhere), and with None once none is left (the controller's radio goes back).
         self.tune: Optional[Callable[[Optional[int]], bool]] = None
@@ -474,8 +528,8 @@ class Inviter:
             del self.boxes[hexid]
         return sorted(self.boxes.values(), key=lambda b: (b.name, b.device_id))
 
-    def discover(self, now_ms: int) -> bool:
-        if self.last_discover is not None and now_ms - self.last_discover < DISCOVER_MIN_MS:
+    def discover(self, now_ms: int, force: bool = False) -> bool:
+        if not force and self.last_discover is not None and now_ms - self.last_discover < DISCOVER_MIN_MS:
             return False
         frame = ff.encode(self.key, {"kind": "discover"}, self.nonces.next())
         self.last_discover = now_ms
@@ -504,28 +558,65 @@ class Inviter:
         self.games_over.append(go)
         return go
 
+    def move(self, channel_hz: Optional[int], to_hz: int, rev: int, now_ms: int, *, repeats: int = MOVE_REPEATS,
+             start_ms: Optional[int] = None, gap_ms: int = MOVE_GAP_MS) -> MoveOrder:
+        """Says ``repeats`` times, ``gap_ms`` apart, on ``channel_hz`` (where the boxes still listen) that the
+        field has moved to ``to_hz`` (revision ``rev``): the change itself, or one channel of a sweep."""
+        ff.validate({"kind": "move", "channel_hz": to_hz, "rev": rev})
+        order = MoveOrder(channel_hz, to_hz, rev, repeats, now_ms if start_ms is None else start_ms, gap_ms=gap_ms)
+        self.moves.append(order)
+        return order
+
+    def sweep(self, channels: list[int], to_hz: int, rev: int, now_ms: int,
+              delay_ms: int = SWEEP_AFTER_DISCOVER_MS) -> bool:
+        """MOVE on each earlier channel, one after the other (so the modem is tuned once to each), for boxes
+        that were away when the field moved: at most one sweep in SWEEP_MIN_MS. False when there is
+        nothing to do or it is too soon."""
+        channels = [c for c in channels if c != to_hz]
+        if not channels or (self.last_sweep is not None and now_ms - self.last_sweep < SWEEP_MIN_MS) or self.moves:
+            return False
+        self.last_sweep = now_ms
+        at = now_ms + delay_ms
+        for ch in channels:
+            self.move(ch, to_hz, rev, now_ms, repeats=SWEEP_REPEATS, start_ms=at)
+            at += SWEEP_REPEATS * MOVE_GAP_MS + 500
+        return True
+
     def _tick_game_over(self, now_ms: int) -> bool:
-        """Sends the next GAME_OVER that is due; True if the radio was used."""
-        done = [g for g in self.games_over if g.left == 0 and now_ms >= g.next_ms]
+        """Sends the next GAME_OVER or MOVE that is due; True if the radio was used."""
+        orders: list = [*self.games_over, *self.moves]
+        done = [o for o in orders if o.left == 0 and now_ms >= o.next_ms]
         if done:
             self.games_over = [g for g in self.games_over if g not in done]
-            if not self.games_over and self.tune is not None:
-                self.tune(None)
-        due = [g for g in self.games_over if g.left > 0 and now_ms >= g.next_ms]
+            self.moves = [m for m in self.moves if m not in done]
+            if not self.games_over and not self.moves:
+                if self.tune is not None:
+                    self.tune(None)
+                if self.on_orders_done is not None:
+                    self.on_orders_done()
+        due = [o for o in [*self.games_over, *self.moves] if o.left > 0 and now_ms >= o.next_ms]
         if not due or now_ms < self.busy_until:
             return False
-        go = due[0]
-        if self.tune is not None and not self.tune(go.channel_hz):
-            self.games_over.remove(go)
+        order = due[0]
+        if self.tune is not None and not self.tune(order.channel_hz):
+            if isinstance(order, MoveOrder):
+                self.moves.remove(order)
+            else:
+                self.games_over.remove(order)
             return False
-        frame = ff.encode(self.key, {"kind": "game_over", "game_id": go.game_id, "key_tag": go.key_tag},
-                          self.nonces.next())
+        if isinstance(order, MoveOrder):
+            msg = {"kind": "move", "channel_hz": order.to_hz, "rev": order.rev}
+            gap = order.gap_ms
+        else:
+            msg = {"kind": "game_over", "game_id": order.game_id, "key_tag": order.key_tag}
+            gap = GAME_OVER_GAP_MS
+        frame = ff.encode(self.key, msg, self.nonces.next())
         if self.send(frame) is not None:
-            go.sent += 1
-        go.left -= 1
+            order.sent += 1
+        order.left -= 1
         airtime = int(eu868.airtime_ms(len(frame)))
         self.busy_until = now_ms + airtime + GAP_MS
-        go.next_ms = now_ms + airtime + (GAME_OVER_GAP_MS if go.left else GAP_MS)
+        order.next_ms = now_ms + airtime + (gap if order.left else GAP_MS)
         return True
 
     def forget_game(self, game_id: int) -> None:

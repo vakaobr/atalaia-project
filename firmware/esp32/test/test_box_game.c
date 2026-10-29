@@ -60,6 +60,9 @@ typedef struct {
     bool have_ff_boot;
     bool ff_boot_fails;
     bool ff_boot_read_fails;
+    uint32_t move_channel, move_rev; /* the idle channel and the last MOVE's revision */
+    bool have_move;
+    int move_saves;
 } flash_t;
 
 static int st_load_join(void *ctx, uint8_t *buf, size_t cap)
@@ -107,6 +110,23 @@ static int st_save_device(void *ctx, const uint8_t id[8])
     flash_t *f = (flash_t *)ctx;
     memcpy(f->device_id, id, 8);
     f->have_device_id = true;
+    return 0;
+}
+static int st_load_field_move(void *ctx, uint32_t *channel_hz, uint32_t *rev)
+{
+    flash_t *f = (flash_t *)ctx;
+    if (!f->have_move) return -1;
+    *channel_hz = f->move_channel;
+    *rev = f->move_rev;
+    return 0;
+}
+static int st_save_field_move(void *ctx, uint32_t channel_hz, uint32_t rev)
+{
+    flash_t *f = (flash_t *)ctx;
+    f->move_channel = channel_hz;
+    f->move_rev = rev;
+    f->have_move = true;
+    f->move_saves++;
     return 0;
 }
 static int st_load_ff_boot(void *ctx, uint32_t *boot)
@@ -270,6 +290,8 @@ static void fixture(bool keep_flash)
                              .save_device_id = st_save_device,
                              .load_ff_boot = st_load_ff_boot,
                              .save_ff_boot = st_save_ff_boot,
+                             .load_field_move = st_load_field_move,
+                             .save_field_move = st_save_field_move,
                              .load_lang = st_load_lang,
                              .save_lang = st_save_lang,
                              .ctx = &flash};
@@ -1682,6 +1704,92 @@ static void test_lobby_game_over(void)
     state_persist_clear();
 }
 
+/* A MOVE field frame: the field is on channel_hz now, revision rev (RFC 0001 Amendment 19). */
+static void move_frame(const uint8_t fkey[16], uint32_t channel_hz, uint32_t rev, uint8_t *keep,
+                       size_t *keep_len)
+{
+    atalaia_ff_msg_t m;
+    memset(&m, 0, sizeof(m));
+    m.kind = ATALAIA_FF_MOVE;
+    m.channel_hz = channel_hz;
+    m.rev = rev;
+    to_box(fkey, &m, keep, keep_len);
+}
+
+/* The bench finding of 2026-10-29: a scan moved the field's channel and the idle boxes, listening
+ * on their last game's, heard neither DISCOVER nor invites. MOVE, sealed under the field key and
+ * sent by the controller on the old channel, brings a free box along: it listens on the new
+ * channel, keeps it over a reboot and announces itself there. Only a higher revision counts, so
+ * a recorded MOVE played back later changes nothing; only a channel of the box's region; never a
+ * box in a game. */
+static void test_lobby_move(void)
+{
+    lobby_fixture();
+    uint32_t now = 10;
+    run_ms(&now, 100);
+    CHECK(game.lobby.channel_hz == 869525000u && !flash.have_move);
+
+    int mark = shell.count;
+    static uint8_t rec[ATALAIA_FF_MAX];
+    size_t rec_len = 0;
+    move_frame(ff_key, 869925000u, 5, rec, &rec_len);
+    CHECK(shell.channel == 869925000u && game.lobby.channel_hz == 869925000u);
+    CHECK(game.lobby.moves_taken == 1 && game.lobby.move_rev == 5);
+    CHECK(flash.have_move && flash.move_channel == 869925000u && flash.move_rev == 5);
+    /* It announces itself on the new channel soon, so the controller finds it. */
+    run_ms(&now, BOX_MOVE_ANNOUNCE_MAX_MS + 100);
+    atalaia_ff_msg_t m;
+    CHECK(field_frames_since(mark, &m) >= 1 && m.kind == ATALAIA_FF_ANNOUNCE);
+
+    /* The same revision again (a repeat), an older one, another region's channel, another
+     * field's key, a recording played back: nothing changes. */
+    move_frame(ff_key, 869525000u, 5, NULL, NULL);
+    move_frame(ff_key, 869525000u, 4, NULL, NULL);
+    move_frame(ff_key, 921500000u, 6, NULL, NULL); /* AS923-TW's default: not this box's region */
+    CHECK(game.lobby.channel_hz == 869925000u && game.lobby.move_rev == 5);
+    CHECK(game.lobby.moves_refused == 3);
+    uint8_t other_key[16];
+    static const uint8_t other_join[32] = {9, 9, 9};
+    atalaia_ff_key(other_join, other_key);
+    uint32_t ignored = game.lobby.frames_ignored;
+    move_frame(other_key, 869525000u, 9, NULL, NULL);
+    CHECK(game.lobby.channel_hz == 869925000u && game.lobby.frames_ignored == ignored + 1);
+    box_game_on_packet(&game, rec, rec_len, -60);
+    CHECK(game.lobby.channel_hz == 869925000u && game.lobby.moves_refused == 4);
+
+    /* A higher revision moves it again (here, back); the serial arithmetic survives a wrap. */
+    move_frame(ff_key, 869525000u, 6, NULL, NULL);
+    CHECK(shell.channel == 869525000u && game.lobby.move_rev == 6);
+    game.lobby.move_rev = 0xFFFFFFFFu;
+    move_frame(ff_key, 869925000u, 1, NULL, NULL);
+    CHECK(shell.channel == 869925000u && game.lobby.move_rev == 1);
+    move_frame(ff_key, 869525000u, 0xFFFFFFFFu, NULL, NULL); /* "older" than 1 */
+    CHECK(shell.channel == 869925000u);
+
+    /* A reboot: the free box tunes to the stored channel at its first tick, not the default. */
+    CHECK(flash.move_channel == 869925000u && flash.move_rev == 1);
+    fixture(true);
+    game.shell.random = sh_random;
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    CHECK(shell.channel == 0);
+    now = 10;
+    run_ms(&now, 20);
+    CHECK(shell.channel == 869925000u && game.lobby.channel_hz == 869925000u &&
+          game.lobby.move_rev == 1);
+    move_frame(ff_key, 869525000u, 1, NULL, NULL); /* the revision survived the reboot too */
+    CHECK(game.lobby.channel_hz == 869925000u);
+
+    /* A box in a game keeps the game's channel whatever the field does. */
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    CHECK(shell.channel == 869475000u && flash.move_channel == 869475000u); /* and it is kept */
+    move_frame(ff_key, 869525000u, 8, NULL, NULL);
+    CHECK(shell.channel == 869475000u && game.lobby.move_rev == 1);
+    state_persist_clear();
+}
+
 static void test_lobby_discover_and_ready_screen(void)
 {
     lobby_fixture();
@@ -1860,6 +1968,101 @@ static void fetch_join_of(atalaia_join_t *j, const char *mode_id)
     snprintf(j->urls[0], sizeof(j->urls[0]), "https://10.42.0.1:8443");
 }
 
+/* A TIME beacon alone starts, pauses and resumes the game (RFC 0001 Amendment 19, part 2): the
+ * controller repeats a state change as TIME for ten seconds, so a box that lost the CMD is
+ * repaired by the next beacon, not 30 s later. */
+static void time_state(uint8_t state, uint32_t game_time_ms)
+{
+    atalaia_time_msg_t t;
+    memset(&t, 0, sizeof(t));
+    t.game_time_ms = game_time_ms;
+    t.game_state = state;
+    t.tx_time_us = 0xFFFF;
+    t.term = 1;
+    uint8_t buf[64];
+    size_t n = atalaia_time_encode(&t, buf, sizeof(buf));
+    CHECK(n > 0);
+    from_controller(ATALAIA_MSG_TIME, buf, n);
+}
+
+/* How many times the mode was started: each start shows the "playing" screen. */
+static int starts(void)
+{
+    int c = 0;
+    for (const char *p = shell.history; (p = strstr(p, "playing;")) != NULL; p++) c++;
+    return c;
+}
+
+static void joined_box(uint32_t *now)
+{
+    fixture(false);
+    game.state_interval_ms = 1000;
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    size_t n = encode(&j, JOIN_KEY, buf);
+    CHECK(box_game_join(&game, buf, n) == BOX_JOIN_OK);
+    *now = 100;
+    run_ms(now, 100);
+    CHECK(game.phase == BOX_JOINED);
+}
+
+static void test_state_change_by_time_alone(void)
+{
+    uint32_t now;
+    joined_box(&now);
+    /* The CMD start was lost; the first repeat, a TIME a second later, starts the game. */
+    run_ms(&now, 1000);
+    time_state(FIELD_GAME_RUNNING, 1000);
+    CHECK(game.phase == BOX_PLAYING && runner.running && !game.paused);
+    CHECK(starts() == 1);
+    /* The later repeats change nothing: the mode is not started again. */
+    run_ms(&now, 1500);
+    time_state(FIELD_GAME_RUNNING, 2500);
+    run_ms(&now, 2500);
+    time_state(FIELD_GAME_RUNNING, 5000);
+    CHECK(game.phase == BOX_PLAYING && starts() == 1);
+    /* A pause and a resume, each told by TIME alone, and told again. */
+    time_state(FIELD_GAME_PAUSED, 5000);
+    CHECK(game.paused);
+    time_state(FIELD_GAME_PAUSED, 5000);
+    CHECK(game.paused);
+    time_state(FIELD_GAME_RUNNING, 5000);
+    CHECK(!game.paused && game.phase == BOX_PLAYING && starts() == 1);
+    /* The CMD arrives after its own TIME: nothing starts twice. */
+    cmd(FIELD_CMD_START);
+    CHECK(game.phase == BOX_PLAYING && starts() == 1);
+}
+
+/* A TIME that says "paused" to a box that never started: it starts, then pauses. */
+static void test_time_paused_starts_then_pauses(void)
+{
+    uint32_t now;
+    joined_box(&now);
+    time_state(FIELD_GAME_PAUSED, 2000);
+    CHECK(game.phase == BOX_PLAYING && game.paused && starts() == 1);
+}
+
+/* A START that came while the box could not act on it (the link knows the game runs, the box is
+ * still joined, say while it fetched its modes): the next tick starts it; the TIME beacons that
+ * repeat the state would not, for the link already "knows" it. */
+static void test_link_state_reconciled(void)
+{
+    uint32_t now;
+    joined_box(&now);
+    game.link.game_state = FIELD_GAME_RUNNING;
+    CHECK(game.phase == BOX_JOINED);
+    run_ms(&now, 20);
+    CHECK(game.phase == BOX_PLAYING && starts() == 1);
+    game.link.game_state = FIELD_GAME_PAUSED;
+    run_ms(&now, 20);
+    CHECK(game.paused);
+    game.link.game_state = FIELD_GAME_RUNNING;
+    run_ms(&now, 20);
+    CHECK(!game.paused && starts() == 1);
+}
+
 static void fetch_fixture(void)
 {
     fixture(false);
@@ -1993,6 +2196,7 @@ void run_box_game_tests(void)
     test_lobby_replay_refused();
     test_lobby_game_over();
     test_lobby_discover_and_ready_screen();
+    test_lobby_move();
     test_lobby_device_id();
     test_battery_low();
     test_update_failed_over_lora();
@@ -2009,4 +2213,7 @@ void run_box_game_tests(void)
     test_old_card_refused();
     test_other_region_refused();
     test_fetch_modes();
+    test_state_change_by_time_alone();
+    test_time_paused_starts_then_pauses();
+    test_link_state_reconciled();
 }

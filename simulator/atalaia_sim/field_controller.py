@@ -55,6 +55,13 @@ GAME_RUNNING = 1
 GAME_PAUSED = 2
 GAME_ENDED = 3
 
+# A state change (start, pause, resume) goes out as CMD + TIME at once and then as TIME alone
+# again after each of these gaps (RFC 0001 Amendment 19, part 2): a TIME carries the game state
+# and a box acts on it as on the CMD, so one frame lost in a quiet field (or a box that was in
+# the middle of a frame of its own) is repaired in a second or two, not at the next 30 s beacon.
+# 4 x about 90 ms of air in all; a new state change replaces the repeats still due.
+STATE_REPEAT_GAPS_MS = (1_000, 1_500, 2_500, 5_000)  # +1.0, +2.5, +5.0, +10.0 s
+
 STATE_NAMES = {
     GAME_WAITING: "waiting",
     GAME_RUNNING: "running",
@@ -301,6 +308,9 @@ class FieldController:
         self.nodes: dict[int, FieldNode] = {}
         self.event_log: list[dict[str, Any]] = []
         self.last_beacon_ms: int = 0
+        self.state_repeat_gaps_ms: tuple[int, ...] = STATE_REPEAT_GAPS_MS
+        self._repeats: list[int] = []  # when the TIMEs repeating the last state change are due
+        self.state_repeats_sent = 0
         self._now: int = 0
         self._last_tick: Optional[int] = None
         self._role_seen = election.role
@@ -401,6 +411,7 @@ class FieldController:
         self.last_beacon_ms = now_ms
         self._send_cmd(CMD_START, now_ms=now_ms)
         self.send_time_beacon(now_ms=now_ms)
+        self._repeat_state(now_ms)
 
     def pause_game(self, now_ms: int = 0, reason: Optional[str] = None) -> None:
         """Pause the game: the game clock stops."""
@@ -409,6 +420,7 @@ class FieldController:
         self.game_state = GAME_PAUSED
         self._send_cmd(CMD_PAUSE, {"reason": reason} if reason else None, now_ms=now_ms)
         self.send_time_beacon(now_ms=now_ms)
+        self._repeat_state(now_ms)
 
     def resume_game(self, now_ms: int = 0) -> None:
         """Resume a paused game."""
@@ -417,6 +429,7 @@ class FieldController:
         self.game_state = GAME_RUNNING
         self._send_cmd(CMD_RESUME, now_ms=now_ms)
         self.send_time_beacon(now_ms=now_ms)
+        self._repeat_state(now_ms)
 
     def end_game(self, now_ms: int = 0, reason: Optional[str] = None) -> None:
         """End the game."""
@@ -425,6 +438,15 @@ class FieldController:
         self.game_state = GAME_ENDED
         self._send_cmd(CMD_END, {"reason": reason} if reason else None, now_ms=now_ms)
         self.send_time_beacon(now_ms=now_ms)
+        self._repeats = []  # the end is repeated by GAME_OVER (field frames), not by TIME
+
+    def _repeat_state(self, now_ms: int) -> None:
+        """Schedules the TIME repeats of a state change (the ones of an earlier change go)."""
+        due, at = [], now_ms
+        for gap in self.state_repeat_gaps_ms:
+            at += gap
+            due.append(at)
+        self._repeats = due
 
     # --- sending --------------------------------------------------------------
 
@@ -718,9 +740,16 @@ class FieldController:
             self._send_claim(claim, now_ms)
         self._check_role(now_ms)
 
-        if (self.election.is_leader and self.game_state in (GAME_RUNNING, GAME_PAUSED)
-                and now_ms - self.last_beacon_ms >= self.beacon_interval_ms):
-            self.send_time_beacon(now_ms=now_ms)
+        if self.election.is_leader and self.game_state in (GAME_RUNNING, GAME_PAUSED):
+            if self._repeats and now_ms >= self._repeats[0]:
+                # One TIME for every repeat that is due (a late tick does not send a burst).
+                self._repeats = [t for t in self._repeats if t > now_ms]
+                self.state_repeats_sent += 1
+                self.send_time_beacon(now_ms=now_ms)
+            elif now_ms - self.last_beacon_ms >= self.beacon_interval_ms:
+                self.send_time_beacon(now_ms=now_ms)
+        else:
+            self._repeats = []
         for node in list(self.nodes.values()):
             self._check_health(node, now_ms)
 

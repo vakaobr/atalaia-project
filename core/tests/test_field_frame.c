@@ -57,6 +57,7 @@ static bool same_msg(const atalaia_ff_msg_t *a, const atalaia_ff_msg_t *b)
     if (a->kind == ATALAIA_FF_GAME_OVER) {
         return a->game_id == b->game_id && memcmp(a->key_tag, b->key_tag, 8) == 0;
     }
+    if (a->kind == ATALAIA_FF_MOVE) return a->channel_hz == b->channel_hz && a->rev == b->rev;
     if (memcmp(a->device_id, b->device_id, 8) != 0 || memcmp(a->token, b->token, 8) != 0) {
         return false;
     }
@@ -71,7 +72,7 @@ static bool same_msg(const atalaia_ff_msg_t *a, const atalaia_ff_msg_t *b)
 
 static void test_bodies(void)
 {
-    CHECK(FF_VALID_VECTOR_COUNT >= 9);
+    CHECK(FF_VALID_VECTOR_COUNT >= 11);
     for (size_t i = 0; i < FF_VALID_VECTOR_COUNT; i++) {
         const ff_valid_vector_t *v = &ff_valid_vectors[i];
         atalaia_ff_msg_t m;
@@ -118,6 +119,14 @@ static void test_bodies(void)
     bad.game_id = 0;
     CHECK(atalaia_ff_body_encode(&bad, buf, sizeof(buf)) == 0);
     bad.game_id = 0xFFFF;
+    CHECK(atalaia_ff_body_encode(&bad, buf, sizeof(buf)) == 0);
+    /* MOVE (RFC 0001 Amendment 19): a channel and a revision, neither 0. */
+    bad = ff_valid_vectors[9].fields;
+    CHECK(bad.kind == ATALAIA_FF_MOVE && bad.channel_hz == 869925000u && bad.rev == 3);
+    bad.channel_hz = 0;
+    CHECK(atalaia_ff_body_encode(&bad, buf, sizeof(buf)) == 0);
+    bad = ff_valid_vectors[9].fields;
+    bad.rev = 0;
     CHECK(atalaia_ff_body_encode(&bad, buf, sizeof(buf)) == 0);
 }
 

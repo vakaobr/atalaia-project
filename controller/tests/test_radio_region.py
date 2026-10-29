@@ -98,7 +98,7 @@ class EngineRegionTests(unittest.TestCase):
         self.assertEqual(out["channel"]["limit_ref"], "conducted")
         self.assertEqual(len(out["candidates"]), 9)
         self.assertTrue(out["region_mismatch"])  # the fake modem is an EU868 build
-        self.assertEqual(self.modem.channels, [869_475_000])  # not retuned: the modem would refuse it
+        self.assertEqual(self.modem.channels, [869_525_000])  # the old channel (for the MOVE), not Taiwan's: the modem would refuse it
         self.assertTrue(any(m["type"] == "radio" and m["radio"]["region"]["code"] == "as923-tw"
                             for m in self.messages))
         # Only the region's channels; the scan and the random pick too.

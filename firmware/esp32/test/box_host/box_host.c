@@ -286,6 +286,27 @@ static int store_save_ff_boot(void *ctx, uint32_t boot)
     return write_file("ff_boot", b, 4);
 }
 
+/* Where a free box listens (RFC 0001 Amendment 19): the file "field_move", 8 bytes. */
+static int store_load_field_move(void *ctx, uint32_t *channel_hz, uint32_t *rev)
+{
+    (void)ctx;
+    uint8_t b[8];
+    if (read_file("field_move", b, sizeof(b)) != (int)sizeof(b)) return -1;
+    *channel_hz = (uint32_t)b[0] << 24 | (uint32_t)b[1] << 16 | (uint32_t)b[2] << 8 | b[3];
+    *rev = (uint32_t)b[4] << 24 | (uint32_t)b[5] << 16 | (uint32_t)b[6] << 8 | b[7];
+    return 0;
+}
+
+static int store_save_field_move(void *ctx, uint32_t channel_hz, uint32_t rev)
+{
+    (void)ctx;
+    uint8_t b[8] = {(uint8_t)(channel_hz >> 24), (uint8_t)(channel_hz >> 16),
+                    (uint8_t)(channel_hz >> 8),  (uint8_t)channel_hz,
+                    (uint8_t)(rev >> 24),        (uint8_t)(rev >> 16),
+                    (uint8_t)(rev >> 8),         (uint8_t)rev};
+    return write_file("field_move", b, sizeof(b));
+}
+
 /* The screens' language, the last game's (join key 15): the file "lang". */
 static int store_load_lang(void *ctx, char *code, size_t cap)
 {
@@ -884,6 +905,8 @@ int main(int argc, char **argv)
                              .save_device_id = store_save_device_id,
                              .load_ff_boot = store_load_ff_boot,
                              .save_ff_boot = store_save_ff_boot,
+                             .load_field_move = store_load_field_move,
+                             .save_field_move = store_save_field_move,
                              .load_lang = store_load_lang,
                              .save_lang = store_save_lang,
                              .ctx = NULL};

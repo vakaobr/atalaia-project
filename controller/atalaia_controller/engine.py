@@ -1033,10 +1033,33 @@ class Controller:
                 "quiet_threshold_dbm": self.cfg.quiet_threshold_dbm,
                 "scan": scan,
                 "game_channel_hz": (self.game.get("channel_hz") if self.game is not None else None),
+                "previous_channels_hz": self.channel_history(),
             }
 
+    CHANNEL_HISTORY_MAX = 4  # earlier field channels remembered for the sweep (RFC 0001 Amendment 19)
+
+    def channel_history(self) -> list[int]:
+        """The field's earlier channels, newest first, never the current one: where boxes that missed a
+        MOVE may still listen."""
+        try:
+            saved = json.loads(self.store.get_setting("radio.channel_history") or "[]")
+        except ValueError:
+            saved = []
+        now = self.field_channel
+        return [int(h) for h in saved if isinstance(h, int) and h != now][:self.CHANNEL_HISTORY_MAX]
+
+    def move_rev(self) -> int:
+        """The revision of the field's last change of channel (MOVE key 5): it only rises."""
+        return int(self.store.get_setting("radio.move_rev") or 0)
+
+    def _next_move_rev(self) -> int:
+        """A revision above every earlier one, and at least the wall clock in seconds, so a restored
+        backup (an older counter) still gives boxes a number above what they hold."""
+        return min(0xFFFFFFFF, max(self.move_rev() + 1, int(time.time())))
+
     def set_field_channel(self, channel_hz: Any, source: Any = "manual") -> dict[str, Any]:
-        """The GM's choice for the field (accepting the default counts): stored, sent to the modem."""
+        """The GM's choice for the field (accepting the default counts): stored, sent to the modem. A
+        new channel is first said on the old one (MOVE), so the free boxes follow it."""
         with self._lock:
             reason = self._channel_lock_reason()
             if reason:
@@ -1049,14 +1072,24 @@ class Controller:
                     f"{region.bw_hz / 2000:g} kHz) must fit inside one {region.code} sub-band")
             if source not in channels.SOURCES:
                 raise ControllerError(f"source: one of {', '.join(channels.SOURCES)}")
+            old = self.field_channel
             self.store.set_setting("radio.channel_hz", str(hz))
             self.store.set_setting("radio.channel_source", source)
             self.store.set_setting("radio.channel_confirmed", "1")
             self.store.set_setting("radio.channel_set_at", str(time.time()))
-            if self.modem is not None and self.modem.is_up:
+            moved = False
+            if hz != old:
+                history = [old] + [h for h in self.channel_history() if h not in (old, hz)]
+                self.store.set_setting("radio.channel_history", json.dumps(history[:self.CHANNEL_HISTORY_MAX]))
+                rev = self._next_move_rev()
+                self.store.set_setting("radio.move_rev", str(rev))
+                if self.reinvite is not None and self.fc is None:
+                    moved = self.reinvite.field_moved(old, hz, rev)
+            if self.modem is not None and self.modem.is_up and not moved:
                 self.modem.set_channel(hz)
                 self._modem_moved("the field's channel changed")
-            log.info("field channel set to %d Hz (%s)", hz, source)
+            log.info("field channel set to %d Hz (%s)%s", hz, source,
+                     ": the boxes are told on the old channel" if moved else "")
         out = self.radio_settings()
         self._emit({"type": "radio", "radio": out})
         return out
@@ -1080,6 +1113,7 @@ class Controller:
                 self.store.set_setting("radio.channel_confirmed", "0")
                 self.store.set_setting("radio.channel_set_at", str(time.time()))
                 self.store.set_setting("radio.last_scan", "")
+                self.store.set_setting("radio.channel_history", "[]")  # another region's channels
                 self._last_scan = None
                 self.scan = None
                 if self.modem is not None and self.modem.is_up and region.code == radio_region.modem_region(

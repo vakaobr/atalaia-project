@@ -157,8 +157,32 @@ class GameLifecycleTests(EngineCase):
         self.assertEqual(self.store.game(gid)["state"], "ended")
         self.assertEqual(self.ctrl.log(gid)[-1]["data"], {"reason": "time"})
 
+    def test_a_state_change_is_repeated_as_time_for_ten_seconds(self):
+        """RFC 0001 Amendment 19, part 2: CMD + TIME at once, then TIME alone at +1, +2.5, +5 and +10 s (a
+        lost first frame costs a second, not the 30 s to the next beacon); one TIME per tick at most."""
+        gid = self.create()["id"]
+        self.ctrl.start_game(gid, force=True)
+        self.assertEqual((len(self.modem.of("CMD")), len(self.modem.of("TIME"))), (1, 1))
+        seen = []
+        for step in (0.9, 0.1, 1.5, 2.5, 5.0, 10.0):
+            self.clock.advance(step)
+            self.ctrl.tick()
+            seen.append(len(self.modem.of("TIME")))
+        self.assertEqual(seen, [1, 2, 3, 4, 5, 5])  # +0.9, +1.0, +2.5, +5.0, +10.0, then nothing at +20
+        self.assertEqual(len(self.modem.of("CMD")), 1)
+        states = {time_decode(p)["game_state"] for _, p in self.modem.of("TIME")}
+        self.assertEqual(states, {1})
+        # A pause replaces what is left; its TIMEs say "paused", never "running".
+        self.ctrl.pause_game(gid)
+        n = len(self.modem.of("TIME"))
+        self.clock.advance(1.0)
+        self.ctrl.tick()
+        self.assertEqual(len(self.modem.of("TIME")), n + 1)
+        self.assertEqual(time_decode(self.modem.of("TIME")[-1][1])["game_state"], 2)
+
     def test_beacons_from_the_tick(self):
         gid = self.create()["id"]
+        self.ctrl.fc.state_repeat_gaps_ms = ()  # the repeats have their own test
         self.ctrl.start_game(gid, force=True)
         n = len(self.modem.of("TIME"))
         self.clock.advance(29)

@@ -83,6 +83,7 @@ void main() {
   ];
 
   test('start, pause, resume and end: a CMD and a TIME beacon each', () {
+    fc.stateRepeatGapsMsList = []; // the repeats have their own tests below
     fc.startGame(durationMs: 60000, nowMs: 1000);
     fc.pauseGame(nowMs: 3000, reason: 'medic');
     expect(fc.gameTimeMs, 2000);
@@ -105,11 +106,57 @@ void main() {
   });
 
   test('TIME every 30 s while the game runs', () {
+    fc.stateRepeatGapsMsList = [];
     fc.startGame(nowMs: 0);
     fc.tick(29999);
     expect(beacons(), hasLength(1));
     fc.tick(30000);
     expect(beacons(), hasLength(2));
+  });
+
+  group('a state change is repeated as TIME (RFC 0001 Amendment 19)', () {
+    void run(int from, int to) {
+      for (var t = from; t <= to; t += 100) {
+        fc.tick(t);
+      }
+    }
+
+    test('a start: CMD and TIME at once, then TIME at +1, +2.5, +5, +10 s', () {
+      fc.startGame(nowMs: 0);
+      expect(cmds().map((c) => c.name), ['start']);
+      expect(beacons(), hasLength(1));
+      run(100, 999);
+      expect(beacons(), hasLength(1));
+      run(1000, 12000);
+      expect(beacons(), hasLength(5));
+      expect(beacons().every((b) => b.stateName == 'running'), isTrue);
+      expect(cmds(), hasLength(1)); // the CMD is not repeated
+      expect(fc.stateRepeatsSent, 4);
+      run(12100, 41000);
+      expect(
+        beacons(),
+        hasLength(6),
+      ); // then the 30 s beacon, 30 s after the last
+    });
+
+    test("a pause replaces the start's repeats: no TIME undoes it", () {
+      fc.startGame(nowMs: 0);
+      run(100, 1500);
+      fc.pauseGame(nowMs: 1500);
+      run(1600, 12000);
+      expect(beacons().where((b) => b.stateName == 'paused'), hasLength(5));
+      expect(beacons().skip(2).every((b) => b.stateName == 'paused'), isTrue);
+    });
+
+    test('an end is not repeated by TIME, and a late tick sends one', () {
+      fc.startGame(nowMs: 0);
+      fc.tick(8000); // three repeats overdue: one TIME, not a burst
+      expect(beacons(), hasLength(2));
+      fc.endGame(nowMs: 8100);
+      final n = radio.sent.length;
+      run(8200, 30000);
+      expect(radio.sent.length, n);
+    });
   });
 
   test('a command to one node, and parameters too big for a CMD', () {

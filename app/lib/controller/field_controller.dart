@@ -68,6 +68,13 @@ const packetDedupeMs = 60000;
 /// [beaconIntervalFor]).
 const beaconIntervalMs = beaconIntervalManualMs;
 
+/// A state change (start, pause, resume) goes out as CMD + TIME at once and then as TIME
+/// alone again after each of these gaps (RFC 0001 Amendment 19, part 2): a TIME carries the
+/// game state and a box acts on it as on the CMD, so a frame lost in a quiet field is repaired
+/// in a second or two, not at the next 30 s beacon. A new state change replaces the repeats
+/// still due.
+const stateRepeatGapsMs = [1000, 1500, 2500, 5000]; // +1.0, +2.5, +5.0, +10.0 s
+
 /// Node health (decisions FU1-1 to FU1-3).
 const healthEvents = ['node.online', 'node.offline', 'battery.low'];
 const linkGapMs = 60000;
@@ -267,6 +274,10 @@ class FieldController {
   int gameTimeMs = 0;
   int durationMs = 0;
   int lastBeaconMs = 0;
+  List<int> stateRepeatGapsMsList = List.of(stateRepeatGapsMs);
+  List<int> _repeats =
+      []; // when the TIMEs repeating the last state change are due
+  int stateRepeatsSent = 0;
   int _now = 0;
   int? _lastTick;
   int _eventSeq = 0;
@@ -378,6 +389,7 @@ class FieldController {
     lastBeaconMs = nowMs;
     _sendCmd(cmdOpcodes['start']!);
     sendTimeBeacon(nowMs);
+    _repeatState(nowMs);
   }
 
   void pauseGame({required int nowMs, String? reason}) {
@@ -386,6 +398,7 @@ class FieldController {
     gameState = gamePaused;
     _sendCmd(cmdOpcodes['pause']!, reason == null ? null : {'reason': reason});
     sendTimeBeacon(nowMs);
+    _repeatState(nowMs);
   }
 
   void resumeGame({required int nowMs}) {
@@ -394,6 +407,7 @@ class FieldController {
     gameState = gameRunning;
     _sendCmd(cmdOpcodes['resume']!);
     sendTimeBeacon(nowMs);
+    _repeatState(nowMs);
   }
 
   void endGame({required int nowMs, String? reason}) {
@@ -402,6 +416,13 @@ class FieldController {
     gameState = gameEnded;
     _sendCmd(cmdOpcodes['end']!, reason == null ? null : {'reason': reason});
     sendTimeBeacon(nowMs);
+    _repeats =
+        []; // the end is repeated by GAME_OVER (field frames), not by TIME
+  }
+
+  void _repeatState(int nowMs) {
+    var at = nowMs;
+    _repeats = [for (final gap in stateRepeatGapsMsList) at += gap];
   }
 
   // --- sending --------------------------------------------------------------
@@ -707,9 +728,20 @@ class FieldController {
     if (claim != null) _sendClaim(claim, nowMs);
     _checkRole(nowMs);
     if (election.isLeader &&
-        (gameState == gameRunning || gameState == gamePaused) &&
-        nowMs - lastBeaconMs >= beaconInterval) {
-      sendTimeBeacon(nowMs);
+        (gameState == gameRunning || gameState == gamePaused)) {
+      if (_repeats.isNotEmpty && nowMs >= _repeats.first) {
+        // One TIME for every repeat that is due (a late tick does not send a burst).
+        _repeats = [
+          for (final t in _repeats)
+            if (t > nowMs) t,
+        ];
+        stateRepeatsSent++;
+        sendTimeBeacon(nowMs);
+      } else if (nowMs - lastBeaconMs >= beaconInterval) {
+        sendTimeBeacon(nowMs);
+      }
+    } else {
+      _repeats = [];
     }
     for (final node in nodes.values.toList()) {
       _checkHealth(node, nowMs);

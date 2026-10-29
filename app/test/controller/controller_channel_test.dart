@@ -10,7 +10,9 @@
 // firmware's own code measuring).
 
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:atalaia_app/controller/controller_boxes.dart';
 import 'package:atalaia_app/controller/controller_channel.dart';
 import 'package:atalaia_app/controller/controller_engine.dart';
 import 'package:atalaia_app/controller/controller_radio.dart';
@@ -18,6 +20,7 @@ import 'package:atalaia_app/controller/controller_store.dart';
 import 'package:atalaia_app/controller/pod_modem.dart';
 import 'package:atalaia_app/pod/pod_client.dart';
 import 'package:atalaia_app/pod/pod_codec.dart';
+import 'package:atalaia_app/protocol/field_frame.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/pod_host.dart';
@@ -165,6 +168,110 @@ void main() {
       );
     },
   );
+
+  group('a change of the field channel is told to the boxes (MOVE)', () {
+    // RFC 0001 Amendment 19, as controller/tests/test_reinvite.py MoveTests:
+    // the bench finding of 2026-10-29, a scan moved the channel and the idle
+    // boxes, listening on their last game's, were lost.
+    const oldHz = 869525000, newHz = 869925000;
+    late int now;
+    late RecordingModem radio;
+    late ControllerEngine engine;
+    late ControllerChannel ch;
+    late Uint8List key;
+
+    setUp(() {
+      now = 0;
+      radio = RecordingModem();
+      engine = ControllerEngine(modem: radio, clockMs: () => now)
+        ..joinKey = Uint8List.fromList(List.generate(32, (i) => i));
+      ControllerBoxes(engine);
+      ch = ControllerChannel(engine);
+      key = fieldKey(engine.joinKey);
+      radio.log.clear();
+    });
+
+    void run(int ms) {
+      final end = now + ms;
+      while (now < end) {
+        now += 100;
+        engine.tick();
+      }
+    }
+
+    List<String> kinds() => [
+      for (final f in radio.fields) decodeFieldFrame(key, f)['kind']! as String,
+    ];
+
+    List<int> tunes() => [
+      for (final e in radio.log)
+        if (e['kind'] == 'channel') e['channel_hz']! as int,
+    ];
+
+    test(
+      'MOVE three times on the old channel, then the new one and a DISCOVER',
+      () {
+        final out = ch.setChannel(newHz, 'scan');
+        expect((out['channel']! as Map)['channel_hz'], newHz);
+        expect(out['previous_channels_hz'], [oldHz]);
+        expect(engine.fieldChannel, newHz);
+        // The radio stays on the old channel to say it: nothing tunes to the new
+        // one yet, and the first MOVE is already out.
+        expect(tunes(), [oldHz]);
+        expect(kinds(), ['move']);
+        final move = decodeFieldFrame(key, radio.fields.first);
+        expect(move['channel_hz'], newHz);
+        expect(move['rev'], greaterThan(0));
+        expect(engine.store.getSetting('radio.move_rev'), '${move['rev']}');
+        run(12000);
+        expect(kinds(), ['move', 'move', 'move', 'discover']);
+        expect(tunes().last, newHz);
+        expect(tunes().where((hz) => hz == newHz), hasLength(1));
+      },
+    );
+
+    test(
+      'the revision rises, the same channel says nothing, a region forgets',
+      () {
+        ch.setChannel(newHz, 'scan');
+        run(12000);
+        final first = int.parse(engine.store.getSetting('radio.move_rev')!);
+        ch.setChannel(868100000, 'manual');
+        run(12000);
+        expect(
+          int.parse(engine.store.getSetting('radio.move_rev')!),
+          first + 1,
+        );
+        expect(ch.history(), [newHz, oldHz]);
+        final n = radio.fields.length;
+        ch.setChannel(868100000, 'manual'); // accepting it again
+        run(12000);
+        expect(radio.fields.length, n);
+        ch.setRegion('as923-tw');
+        expect(ch.history(), isEmpty);
+      },
+    );
+
+    test("the GM's discover sweeps the earlier channels, once a minute", () {
+      ch.setChannel(newHz, 'scan');
+      run(
+        20000,
+      ); // and the DISCOVER after the MOVEs is no longer within the 10 s minimum
+      radio.fields.clear();
+      radio.log.clear();
+      final r = engine.boxes!.discover();
+      expect(r, {
+        'sent': true,
+        'sweep': [oldHz],
+      });
+      run(15000);
+      // DISCOVER, four seconds later the MOVE twice on the old channel, then
+      // DISCOVER on the new one.
+      expect(kinds(), ['discover', 'move', 'move', 'discover']);
+      expect(tunes(), [oldHz, newHz]); // tuned once to each
+      expect(engine.boxes!.discover()['sweep'], isEmpty);
+    });
+  });
 
   test('a stored channel that is not legal falls back to the default', () {
     final store = MemoryControllerStore()

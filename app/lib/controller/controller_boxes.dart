@@ -49,6 +49,14 @@ const _partGapMs = 150; // between an invite's parts (the box re-arms)
 const gameOverRepeats = 3;
 const gameOverGapMs = 4000;
 
+// MOVE (RFC 0001 Amendment 19, lobby.py): the field's channel changed. Said on
+// the old channel three times; a sweep says it twice on each earlier channel.
+const moveRepeats = 3;
+const moveGapMs = 2500;
+const sweepRepeats = 2;
+const sweepAfterDiscoverMs = 4000;
+const sweepMinMs = 60000;
+
 /// LoRa time on air at SF7/125 kHz (explicit header, CRC, CR 4/5, an
 /// 8-symbol preamble): eu868.py `airtime_ms`, core/src/duty_cycle.c.
 double airtimeMs(int packetBytes, {int sf = 7, int bwHz = 125000}) {
@@ -153,6 +161,26 @@ class _GameOver {
   int sent = 0;
 }
 
+/// A MOVE on its way: sent on [channelHz] (where the boxes still listen),
+/// naming the new channel [toHz] and its revision [rev].
+class _Move {
+  _Move(
+    this.channelHz,
+    this.toHz,
+    this.rev,
+    this.left,
+    this.nextMs,
+    this.gapMs,
+  );
+  final int channelHz;
+  final int toHz;
+  final int rev;
+  int left;
+  int nextMs;
+  final int gapMs;
+  int sent = 0;
+}
+
 /// The controller's side of the field frames (lobby.py `Inviter`). [send]
 /// puts a frame on air and returns an id for its outcome
 /// ([onTxResult]), or null when the radio refused it at once.
@@ -188,6 +216,15 @@ class FieldInviter {
   var stale = 0;
   final _fresh = <String, (int, int)>{};
   final _gamesOver = <_GameOver>[];
+  final _moves = <_Move>[];
+  int? lastSweep;
+
+  /// A GAME_OVER or a MOVE is still to be sent.
+  bool get ordersPending => _gamesOver.isNotEmpty || _moves.isNotEmpty;
+
+  /// Called once no GAME_OVER or MOVE is left to send (after `tune(null)`):
+  /// the controller's next step, a DISCOVER on the field's channel.
+  void Function()? onOrdersDone;
 
   /// "boxes" or "invites" changed.
   void Function(String what)? onChange;
@@ -311,9 +348,9 @@ class FieldInviter {
     return out;
   }
 
-  bool discover(int nowMs) {
+  bool discover(int nowMs, {bool force = false}) {
     final last = lastDiscover;
-    if (last != null && nowMs - last < discoverMinMs) return false;
+    if (!force && last != null && nowMs - last < discoverMinMs) return false;
     final frame = encodeFieldFrame(key, {'kind': 'discover'}, nonces.next());
     lastDiscover = nowMs;
     busyUntil =
@@ -368,36 +405,112 @@ class FieldInviter {
       ..add(_GameOver(gameId, keyTag, channelHz, nowMs));
   }
 
+  /// Says [repeats] times, [gapMs] apart, on [channelHz] (where the boxes
+  /// still listen) that the field has moved to [toHz] (revision [rev]): the
+  /// change itself, or one channel of a sweep.
+  void move(
+    int channelHz,
+    int toHz,
+    int rev,
+    int nowMs, {
+    int repeats = moveRepeats,
+    int? startMs,
+    int gapMs = moveGapMs,
+  }) {
+    validateFieldMessage({'kind': 'move', 'channel_hz': toHz, 'rev': rev});
+    _moves.add(_Move(channelHz, toHz, rev, repeats, startMs ?? nowMs, gapMs));
+  }
+
+  /// MOVE on each earlier channel, one after the other (the radio is tuned
+  /// once to each), for boxes that were away when the field moved: at most
+  /// one sweep in [sweepMinMs]. False when there is nothing to do or it is
+  /// too soon.
+  bool sweep(
+    List<int> channels,
+    int toHz,
+    int rev,
+    int nowMs, {
+    int delayMs = sweepAfterDiscoverMs,
+  }) {
+    final list = [
+      for (final c in channels)
+        if (c != toHz) c,
+    ];
+    final last = lastSweep;
+    if (list.isEmpty ||
+        (last != null && nowMs - last < sweepMinMs) ||
+        _moves.isNotEmpty) {
+      return false;
+    }
+    lastSweep = nowMs;
+    var at = nowMs + delayMs;
+    for (final ch in list) {
+      move(ch, toHz, rev, nowMs, repeats: sweepRepeats, startMs: at);
+      at += sweepRepeats * moveGapMs + 500;
+    }
+    return true;
+  }
+
+  /// Sends the next GAME_OVER or MOVE that is due; true if the radio was used.
   bool _tickGameOver(int nowMs) {
-    final done = [
+    final done = <Object>[
       for (final g in _gamesOver)
         if (g.left == 0 && nowMs >= g.nextMs) g,
+      for (final m in _moves)
+        if (m.left == 0 && nowMs >= m.nextMs) m,
     ];
     if (done.isNotEmpty) {
       _gamesOver.removeWhere(done.contains);
-      if (_gamesOver.isEmpty) tune?.call(null);
+      _moves.removeWhere(done.contains);
+      if (_gamesOver.isEmpty && _moves.isEmpty) {
+        tune?.call(null);
+        onOrdersDone?.call();
+      }
     }
-    final due = [
+    final due = <Object>[
       for (final g in _gamesOver)
         if (g.left > 0 && nowMs >= g.nextMs) g,
+      for (final m in _moves)
+        if (m.left > 0 && nowMs >= m.nextMs) m,
     ];
     if (due.isEmpty || nowMs < busyUntil) return false;
-    final go = due.first;
+    final order = due.first;
     final t = tune;
-    if (t != null && !t(go.channelHz)) {
-      _gamesOver.remove(go);
+    final channel = order is _Move
+        ? order.channelHz
+        : (order as _GameOver).channelHz;
+    if (t != null && !t(channel)) {
+      if (order is _Move) {
+        _moves.remove(order);
+      } else {
+        _gamesOver.remove(order as _GameOver);
+      }
       return false;
     }
-    final frame = encodeFieldFrame(key, {
-      'kind': 'game_over',
-      'game_id': go.gameId,
-      'key_tag': go.keyTag,
-    }, nonces.next());
-    if (send(frame) != null) go.sent++;
-    go.left--;
+    final Map<String, Object?> msg;
+    final int gap;
+    if (order is _Move) {
+      msg = {'kind': 'move', 'channel_hz': order.toHz, 'rev': order.rev};
+      gap = order.gapMs;
+    } else {
+      final go = order as _GameOver;
+      msg = {'kind': 'game_over', 'game_id': go.gameId, 'key_tag': go.keyTag};
+      gap = gameOverGapMs;
+    }
+    final frame = encodeFieldFrame(key, msg, nonces.next());
+    final sent = send(frame) != null;
     final air = airtimeMs(frame.length).toInt();
     busyUntil = nowMs + air + _gapMs;
-    go.nextMs = nowMs + air + (go.left > 0 ? gameOverGapMs : _gapMs);
+    if (order is _Move) {
+      if (sent) order.sent++;
+      order.left--;
+      order.nextMs = nowMs + air + (order.left > 0 ? gap : _gapMs);
+    } else {
+      final go = order as _GameOver;
+      if (sent) go.sent++;
+      go.left--;
+      go.nextMs = nowMs + air + (go.left > 0 ? gap : _gapMs);
+    }
     return true;
   }
 
@@ -496,14 +609,16 @@ class ControllerBoxes {
     }
     inviter = FieldInviter(engine.joinKey, _send, random: random)
       ..onChange = _pending.add
-      ..tune = _tune;
+      ..tune = _tune
+      ..onOrdersDone = _ordersDone;
     engine.boxes = this;
   }
 
   final ControllerEngine engine;
   late final FieldInviter inviter;
   final _pending = <String>{};
-  int? _tuned; // the channel a GAME_OVER took the radio to
+  int? _tuned; // the channel a GAME_OVER or a MOVE took the radio to
+  bool _discoverAfter = false; // a DISCOVER on the field's channel after a MOVE
 
   int? _send(Uint8List frame) {
     final m = engine.modem;
@@ -525,6 +640,9 @@ class ControllerBoxes {
 
   void tick(int nowMs) {
     inviter.tick(nowMs);
+    if (_discoverAfter && !inviter.ordersPending) {
+      _discoverAfter = false; // the MOVEs were dropped (a game took the radio)
+    }
     _flush();
   }
 
@@ -549,6 +667,32 @@ class ControllerBoxes {
       ..tick(engine.nowMs()); // the first one at once
     _flush();
     return true;
+  }
+
+  /// The field's channel changed: says so on the old one (MOVE, three times,
+  /// RFC 0001 Amendment 19) before the radio goes to the new one, then asks the
+  /// boxes there. False when it cannot (no radio with field frames): the caller
+  /// retunes at once.
+  bool fieldMoved(int oldHz, int newHz, int rev) {
+    final m = engine.modem;
+    if (m == null || !m.isUp || !m.hasFieldFrames) return false;
+    inviter.move(oldHz, newHz, rev, engine.nowMs());
+    _discoverAfter = true;
+    inviter.tick(engine.nowMs()); // the first one at once
+    _flush();
+    return true;
+  }
+
+  /// The GAME_OVERs and MOVEs are said and the radio is back on the field's
+  /// channel: after a MOVE, a DISCOVER there makes every free box announce
+  /// itself.
+  void _ordersDone() {
+    if (!_discoverAfter) return;
+    _discoverAfter = false;
+    final m = engine.modem;
+    if (m != null && m.isUp && engine.liveGame == null) {
+      inviter.discover(engine.nowMs(), force: true);
+    }
   }
 
   bool _tune(int? channelHz) {
@@ -696,8 +840,25 @@ class ControllerBoxes {
         'the radio modem is ${engine.radioState}: no DISCOVER sent',
       );
     }
-    final sent = inviter.discover(engine.nowMs());
-    return {'sent': sent};
+    final now = engine.nowMs();
+    final sent = inviter.discover(now);
+    // Boxes that were away when the field's channel changed still listen on an
+    // earlier one: a MOVE on each (a few seconds after the DISCOVER, so its
+    // answers are heard first), then another DISCOVER here. Only between
+    // games, and at most once a minute.
+    final history = engine.liveGame == null
+        ? (engine.channel?.history() ?? <int>[])
+        : <int>[];
+    final sweep =
+        history.isNotEmpty &&
+        inviter.sweep(
+          history,
+          engine.fieldChannel,
+          engine.channel?.moveRev() ?? 1,
+          now,
+        );
+    if (sweep) _discoverAfter = true;
+    return {'sent': sent, 'sweep': sweep ? history : <int>[]};
   }
 
   /// Invites boxes into the live game: [{"device_id", "role"?, "name"?,
