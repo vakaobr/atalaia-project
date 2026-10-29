@@ -12,7 +12,7 @@ What holds personal data now (plan phases 10-12):
 
 | Table | Access / export | Erasure | Purge |
 | --- | --- | --- | --- |
-| ``users`` | the profile (never the password hash or the TOTP secret) | anonymised in place: a ``deleted-...`` name, everything else cleared | (the anonymised row stays, it identifies nobody) |
+| ``users`` | the profile (never the password hash or the TOTP secret) | anonymised in place: a ``deleted-...`` name, everything else cleared | (the anonymised row stays while the audit log or any row refers to it, then the purge deletes it) |
 | ``user_field_roles`` | the person's roles, with the field's name | deleted | (with the account) |
 | ``sessions`` (+ ``refresh_tokens``) | address, user agent, times | deleted | 30 days after expiry or revocation |
 | ``user_identities`` (LG-1) | the provider and subject of each social login linked, and when (``identities.json``) | deleted | (with the account) |
@@ -97,7 +97,8 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Optional
 
-from sqlalchemy import DateTime, cast, delete, func, literal, literal_column, or_, select, update
+from sqlalchemy import DateTime, and_, cast, delete, func, literal, literal_column, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -105,7 +106,7 @@ from . import chrono_registry, hub_share, tenancy
 from .atak_models import AtakCert
 from .preview_models import CONTACT_RETENTION, RETENTION as FEEDBACK_RETENTION, PreviewFeedback
 from .audit import record
-from .models import (ROLE_BY_ID, AuditLog, ChronoReading, ChronoReject, Club, ClubMember, ClubReport, Consent, Field,
+from .models import (ROLE_BY_ID, AuditLog, Base, ChronoReading, ChronoReject, Club, ClubMember, ClubReport, Consent, Field,
                      FieldPlayerId, FirmwareRelease, Game, GameRegistration, MarshalKey, PlayerIdClaim, RegistrationReplica, Replica,
                      ScheduledGame, User, UserFieldRole, UserGameRole, UserSession, OidcLogin, Passkey, UserIdentity)
 from .services import branding, history
@@ -561,12 +562,36 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
     counts["preview_feedback"] = feedback.rowcount or 0
     logins = await db.execute(delete(OidcLogin).where(OidcLogin.expires_at < now))  # social logins never finished
     counts["oidc_logins"] = logins.rowcount or 0
+    counts["anonymised_users"] = await _purge_anonymised_users(db)  # last: it sees what the rules above freed
     if dry_run:
         await db.rollback()
         return counts
     record(db, "retention_purge", None, details=counts)
     await db.commit()
     return counts
+
+
+def unreferenced_user(user: Any = User) -> Any:
+    """True for a user row that no row of any table points at: one NOT EXISTS per foreign key to ``users.id`` in the
+    models' metadata (the audit log's ``user_id`` among them), so a table added later is covered without touching this."""
+    checks = [~select(literal(1)).select_from(fk.parent.table).where(fk.parent == user.id).exists()
+              for table in Base.metadata.tables.values() for fk in table.foreign_keys
+              if fk.column.table.name == User.__tablename__ and fk.column.name == "id"]
+    return and_(*checks)
+
+
+async def _purge_anonymised_users(db: AsyncSession) -> int:
+    """Deletes the anonymised accounts (an erased one, and an account merged into another: both keep a ``deleted-...``
+    name, no login, no data) that nothing refers to any more: the audit entries naming them have gone by their own
+    36 months, and no other row holds their id. One statement under the field's own role (hosted mode)."""
+    marked = User.username.startswith(ERASED_PREFIX, autoescape=True)
+    try:
+        async with db.begin_nested():  # a reference added between the check and the delete: kept until tomorrow
+            result = await db.execute(delete(User).where(marked, unreferenced_user()))
+    except IntegrityError:
+        log.warning("an anonymised account gained a reference while the purge ran; kept")
+        return 0
+    return result.rowcount or 0
 
 
 def _past_retention(now: datetime, field_column: Any, when: Any) -> Any:

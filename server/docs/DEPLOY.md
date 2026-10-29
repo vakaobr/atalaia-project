@@ -100,6 +100,8 @@ paste it into a chat.
 | `COMPOSE_FILE` | with `--hosted` only | `docker-compose.yml:docker-compose.hosted.yml`: `docker compose` from `server/` uses both |
 | `ATALAIA_OWNER_DB_PASSWORD`, `ATALAIA_APP_DB_PASSWORD` | random, with `--hosted` only | The passwords of the hub's owner role and of the server's role |
 
+The daily purge at `ATALAIA_PURGE_HOUR` also deletes the empty `deleted-...` rows that erased accounts leave, once no audit entry
+(kept 36 months) and no other row refers to them; a hosted hub does it per field, under the field's role, with nothing to set up.
 The server's other settings (`ATALAIA_PURGE_HOUR`,
 `ATALAIA_PRIVACY_NOTICE_VERSION`, `ATALAIA_EXPORT_MIN_INTERVAL_S`, `ATALAIA_EXPORT_MAX_MB` and, for a hub,
 the per-field limits `ATALAIA_QUOTA_ACCOUNTS`, `_SCHEDULED_GAMES`, `_REGISTRATIONS`, `_GAMES`, `_ATAK_CERTS`,

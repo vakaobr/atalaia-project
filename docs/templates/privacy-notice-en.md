@@ -341,6 +341,7 @@ CHOICE]** is one the field can change; the others are fixed in the code.
 | Account (username, email, login methods, roles, consents) | site server | Until you erase your account |
 | Login sessions | site server | 30 days after they end or expire; a login that was never finished: 10 minutes |
 | Security log | site server | 36 months. Erasing your account removes the addresses from it |
+| What is left of an erased account (an empty row under a random `deleted-...` name: no name, email, password or roles) | site server | Until the last security log entry that names it is deleted, at most 36 months after you used the account; then the row itself is deleted |
 | Registration data of people without an account (imported guests) | site server | 30 days after the game |
 | A registration's membership number | site server | 30 days after the game |
 | Claims of a phone's player identifier | site server | 30 days after they were made |

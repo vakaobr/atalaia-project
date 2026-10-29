@@ -509,6 +509,27 @@ class SurfaceTests(HubCase):
         self.assertIn("(campo-b)", out.getvalue())
         self.assertIn("sessions", counts)
 
+    async def test_the_purge_deletes_anonymised_accounts_under_each_field_role(self) -> None:
+        """Per field, under the field's own database role: a free ``deleted-...`` row goes, a referenced one stays,
+        and the other field's rows are not touched."""
+        ids = {}
+        for tenant in (self.ta, self.tb):
+            free, kept = uuid.uuid4(), uuid.uuid4()
+            ids[tenant.slug] = (free, kept)
+            for user_id, tag in ((free, "free"), (kept, "kept")):
+                await self.sql(tenant, "INSERT INTO users (id, username, password_hash) VALUES ($1, $2, 'DELETED')",
+                               user_id, f"deleted-{tag}".ljust(24, "0"))
+            await self.sql(tenant, "INSERT INTO audit_log (user_id, action) VALUES ($1, 'login')", kept)
+        await self.sql(self.tb, "INSERT INTO users (id, username, password_hash) VALUES ($1, 'deleted-only-b-0000000', "
+                       "'DELETED')", uuid.UUID(int=7))
+        counts = await cli.run_purge(self.settings(), dry_run=False, out=io.StringIO())
+        self.assertEqual(counts["anonymised_users"], 3)
+        for tenant in (self.ta, self.tb):
+            free, kept = ids[tenant.slug]
+            self.assertEqual(await self.sql(tenant, "SELECT 1 FROM users WHERE id = $1", free), [])
+            self.assertEqual(len(await self.sql(tenant, "SELECT 1 FROM users WHERE id = $1", kept)), 1)
+        self.assertEqual(await self.sql(self.tb, "SELECT 1 FROM users WHERE id = $1", uuid.UUID(int=7)), [])
+
     async def test_create_admin_needs_a_field(self) -> None:
         def code(uri: str, secret: str) -> str:
             return totp.code_at(secret, next_time())

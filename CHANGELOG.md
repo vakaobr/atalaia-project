@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Site server: the daily retention purge deletes anonymised accounts nothing refers to any more** (`personal_data.py`, `purge`, new count `anonymised_users`): a `deleted-...` row (what erasure leaves; also what an account merge will leave) was kept forever. It now goes once no audit entry and no row of any table with a foreign key to `users.id` refers to it (the check is built from the models' foreign keys, so a later table is covered); the audit entries' own 36 months free it in the same pass. Hosted mode: per field, under the field's role. The privacy notice drafts (pt, en), README and DEPLOY say how long the remains of an erased account are kept.
+
 ### Fixed
 
 - **Preview: the live demo's `demo-init` failed on every update after the first** (`server/docker-compose.preview.yml`): it changes `/secrets`' mode, which once the folder belongs to the demo user (10001) needs the FOWNER capability it did not have. Found on the preview server on 2026-10-29.

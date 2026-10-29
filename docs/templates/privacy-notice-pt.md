@@ -349,6 +349,7 @@ DO CAMPO]** é um que o campo pode alterar; os outros estão fixos no código.
 | Conta (nome de utilizador, email, métodos de início de sessão, papéis, consentimentos) | servidor | Até apagares a conta |
 | Sessões | servidor | 30 dias depois de terminarem ou caducarem; um início de sessão nunca concluído: 10 minutos |
 | Registo de segurança | servidor | 36 meses. Apagar a conta tira-lhe os endereços |
+| O que resta de uma conta apagada (uma linha vazia com um nome aleatório `deleted-...`: sem nome, email, palavra-passe nem papéis) | servidor | Até ser apagada a última entrada do registo de segurança que a refere, no máximo 36 meses depois de usares a conta; depois a própria linha é apagada |
 | Dados de inscrição de quem não tem conta (convidados importados) | servidor | 30 dias depois do jogo |
 | O número de associado de uma inscrição | servidor | 30 dias depois do jogo |
 | Reclamações de um identificador de jogador de um telemóvel | servidor | 30 dias depois de feitas |

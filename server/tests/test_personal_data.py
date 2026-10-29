@@ -13,7 +13,7 @@ import unittest
 import uuid
 import zipfile
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 
@@ -21,6 +21,7 @@ from atalaia_server import cli, personal_data
 from atalaia_server.api.auth import COOKIE
 from atalaia_server.app import create_app
 from atalaia_server.config import DEFAULT_NOTICE_VERSION
+from atalaia_server.models import Base
 from atalaia_server.ratelimit import Limits
 
 from .base import PASSWORD, SECRET_KEY, AppTestCase
@@ -29,7 +30,7 @@ from .base import PASSWORD, SECRET_KEY, AppTestCase
 NO_CHRONO = {"chrono_readings": 0, "chrono_rejects": 0, "replicas": 0, "marshal_keys": 0, "scheduled_games": 0,
              "federation_numbers": 0, "player_id_claims": 0, "imported_registrations": 0, "club_invitations": 0,
              "club_reports": 0, "branding_images": 0, "atak_certificates": 0, "feedback_contacts": 0,
-             "preview_feedback": 0, "oidc_logins": 0}
+             "preview_feedback": 0, "oidc_logins": 0, "anonymised_users": 0}
 
 NEW_PASSWORD = "a different long passphrase 7"
 
@@ -364,6 +365,84 @@ class PurgeTests(PersonalDataTestCase):
             self.assertEqual(await personal_data.purge(db, now),
                              {"sessions": 0, "audit_log": 0, "games": 0, **NO_CHRONO})
 
+    async def anonymised(self, tag: str) -> uuid.UUID:
+        """An anonymised account as erasure leaves it (and as a merged one is to be left)."""
+        return (await self.fetch("INSERT INTO users (username, password_hash) VALUES ($1, 'DELETED') RETURNING id",
+                                 "deleted-" + tag.ljust(16, "0")))[0][0]
+
+    async def exists(self, user_id: uuid.UUID) -> bool:
+        return bool(await self.fetch("SELECT 1 FROM users WHERE id = $1", user_id))
+
+    async def purge_now(self, now: Optional[datetime] = None) -> dict[str, int]:
+        async with self.app.state.sessionmaker() as db:
+            return await personal_data.purge(db, now)
+
+    async def test_an_anonymised_account_goes_when_nothing_refers_to_it(self) -> None:
+        free = await self.anonymised("free")
+        live, _, _ = await self.make_user()  # not anonymised, nothing refers to it: stays
+        self.assertEqual((await self.purge_now())["anonymised_users"], 1)
+        self.assertFalse(await self.exists(free))
+        self.assertTrue(await self.exists(live))
+        self.assertEqual((await self.purge_now())["anonymised_users"], 0)
+
+    async def test_an_anonymised_account_stays_while_the_audit_log_names_it(self) -> None:
+        now = datetime.now(timezone.utc)
+        young, old = await self.anonymised("young"), await self.anonymised("old")
+        await self.fetch("INSERT INTO audit_log (user_id, action, created_at) VALUES ($1, 'login', $2)",
+                         young, now - timedelta(days=1094))
+        await self.fetch("INSERT INTO audit_log (user_id, action, created_at) VALUES ($1, 'login', $2), "
+                         "($1, 'login', $3)", old, now - timedelta(days=1096), now - timedelta(days=10))
+        self.assertEqual((await self.purge_now(now))["anonymised_users"], 0)
+        self.assertTrue(await self.exists(young) and await self.exists(old))
+        # 3 days on, the older entry of ``young`` is past 36 months; ``old`` still has a recent one.
+        later = now + timedelta(days=3)
+        counts = await self.purge_now(later)
+        self.assertEqual((counts["audit_log"], counts["anonymised_users"]), (1, 1))  # the same run frees the row
+        self.assertFalse(await self.exists(young))
+        self.assertTrue(await self.exists(old))
+        counts = await self.purge_now(now + timedelta(days=1200))
+        self.assertEqual(counts["anonymised_users"], 1)
+        self.assertFalse(await self.exists(old))
+
+    async def test_an_anonymised_account_stays_while_any_row_refers_to_it(self) -> None:
+        by_table = {}
+        for table, column in (("firmware_releases", "added_by"), ("scheduled_games", "created_by")):
+            by_table[table] = await self.anonymised(table)
+        await self.fetch("INSERT INTO firmware_releases (platform, version, size, sha256, signature, key_id, added_by) "
+                         "VALUES ('p', '1', 1, $1, $1, 'k', $2)", "0" * 64, by_table["firmware_releases"])
+        field_id = await self.field()
+        await self.fetch("INSERT INTO scheduled_games (field_id, title, starts_at, ends_at, created_by) "
+                         "VALUES ($1, 't', now() + interval '1 day', now() + interval '2 days', $2)",
+                         field_id, by_table["scheduled_games"])
+        self.assertEqual((await self.purge_now())["anonymised_users"], 0)
+        self.assertTrue(all([await self.exists(u) for u in by_table.values()]))
+        await self.fetch("DELETE FROM firmware_releases")
+        self.assertEqual((await self.purge_now())["anonymised_users"], 1)
+        self.assertFalse(await self.exists(by_table["firmware_releases"]))
+        self.assertTrue(await self.exists(by_table["scheduled_games"]))
+
+    async def test_the_check_covers_every_foreign_key_to_users(self) -> None:
+        """The rule reads the models' foreign keys, so a table added later is covered; the database agrees."""
+        fks = await self.fetch("SELECT conrelid::regclass::text AS t, a.attname AS c FROM pg_constraint k "
+                               "JOIN pg_attribute a ON a.attrelid = k.conrelid AND a.attnum = ANY (k.conkey) "
+                               "WHERE k.contype = 'f' AND k.confrelid = 'users'::regclass")
+        wanted = {(r["t"], r["c"]) for r in fks}
+        found = {(fk.parent.table.name, fk.parent.name) for t in Base.metadata.tables.values() for fk in t.foreign_keys
+                 if fk.column.table.name == "users"}
+        self.assertEqual(wanted, found)
+        self.assertGreater(len(found), 25)
+
+    async def test_an_erased_account_goes_once_its_audit_entries_have(self) -> None:
+        user = await self.register("rita", "rita@example.pt")
+        user_id = uuid.UUID(user["id"])
+        r = await self.client.request("DELETE", "/api/v1/me", json={"password": PASSWORD},
+                                      headers=bearer(await self.login("rita")))
+        self.assertEqual(r.status_code, 204, r.text)
+        self.assertEqual((await self.purge_now())["anonymised_users"], 0)  # register, login entries name it
+        self.assertTrue(await self.exists(user_id))
+        await self.purge_now(datetime.now(timezone.utc) + timedelta(days=1100))
+        self.assertFalse(await self.exists(user_id))
+
     async def test_the_command(self) -> None:
         user_id, _, _ = await self.make_user()
         await self.fetch("INSERT INTO sessions (user_id, expires_at) VALUES ($1, now() - interval '40 days')", user_id)
@@ -386,7 +465,7 @@ class PurgeTests(PersonalDataTestCase):
                 "0 scheduled games rows, 0 federation numbers rows, 0 player id claims rows, "
                 "0 imported registrations rows, 0 club invitations rows, 0 club reports rows, "
                 "0 branding images rows, 0 atak certificates rows, 0 feedback contacts rows, "
-                "0 preview feedback rows, 0 oidc logins rows\n")
+                "0 preview feedback rows, 0 oidc logins rows, 0 anonymised users rows\n")
         self.assertEqual(outputs, ["Retention purge would delete: 1 sessions rows, 0 audit log rows, 0 games rows" + rest,
                                    "Retention purge deleted: 1 sessions rows, 0 audit log rows, 0 games rows" + rest])
         self.assertEqual((await self.fetch("SELECT count(*) FROM sessions"))[0][0], 0)
