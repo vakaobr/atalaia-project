@@ -410,6 +410,10 @@ class ControllerEngine {
   Map<String, Object?>? _game;
   FieldController? _fc;
   _FieldScript? _field;
+  // The first game.end of a box in a game whose mode has no field.lua
+  // (GE-1): it ends the game at the next tick, not from inside the radio
+  // receive path.
+  Map<String, Object?>? _boxEnd;
   Uint8List _key = Uint8List(0);
   Map<String, Map<String, int>> _fieldScores = {};
   final _listeners = <void Function(Map<String, Object?>)>[];
@@ -992,6 +996,7 @@ class ControllerEngine {
     _field?.close();
     _field = null;
     _fieldScores = {};
+    _boxEnd = null;
     _radio
         ?.flush(); // frames still waiting for their gap go now: the key goes next
     modem?.clear(); // the modem forgets the key
@@ -1366,7 +1371,12 @@ class ControllerEngine {
   /// OT-13; slice S7c), by its key's tag, so also after a restart without
   /// the key: `game_over_frame` says whether it went (engine.py
   /// `_tell_game_over`).
-  Map<String, Object?> endGame(int id, [String reason = '', String? winner]) {
+  Map<String, Object?> endGame(
+    int id, [
+    String reason = '',
+    String? winner,
+    int? byNode,
+  ]) {
     final game = store.game(id);
     if (game == null) throw ControllerError.notFound('no game $id');
     if (_game == null || _game!['id'] != id) {
@@ -1383,10 +1393,17 @@ class ControllerEngine {
         ..flush(); // and go now, so a full queue cannot take the end's CMD and TIME
       fc.endGame(nowMs: nowMs(), reason: reason.isEmpty ? null : reason);
       final data = <String, Object?>{if (reason.isNotEmpty) 'reason': reason};
+      // A box that ended the game named its winner or it is a draw: points
+      // do not decide (GE-2).
       final win = fc.teams.contains(winner)
           ? winner
-          : _winner(fc.totalScores, fc.teams);
+          : (byNode == null ? _winner(fc.totalScores, fc.teams) : null);
       if (win != null) data['winner'] = win;
+      if (byNode != null) {
+        data['by_node'] = byNode;
+        final name = fc.nodes[byNode]?.name ?? '';
+        if (name.isNotEmpty) data['by_name'] = name;
+      }
       fc.controllerEvent('game.end', data, null, 'critical');
       _field?.input('game.end', reason.isEmpty ? null : {'reason': reason});
       store.saveScores(id, fc.totalScores);
@@ -2222,6 +2239,7 @@ class ControllerEngine {
       field.advance(fc.gameTimeMs);
       if (_afterField()) return;
     }
+    if (_boxEnd != null && _afterBoxEnd()) return;
     final game = _game;
     if (game != null &&
         fc.isController &&
@@ -2447,7 +2465,59 @@ class ControllerEngine {
       }
       field.input(record['type']! as String, data);
       _afterField(mayEnd: false);
+    } else if (field == null &&
+        record['type'] == 'game.end' &&
+        record['node'] != nodeId &&
+        record['origin'] != 'controller') {
+      _noteBoxEnd(record);
     }
+  }
+
+  /// A box's game.end in a mode without a field.lua (engine.py
+  /// `_note_box_end`, GE-1..GE-6): the first one from a box assigned in this
+  /// game, while the game runs and this controller leads it, ends the game at
+  /// the next tick. Any other is only logged. In a paused game it does not
+  /// count: the GM stopped the game and the box's clock stands still too.
+  void _noteBoxEnd(Map<String, Object?> record) {
+    final fc = _fc;
+    final game = _game;
+    if (fc == null ||
+        game == null ||
+        !fc.isController ||
+        fc.gameState != gameRunning ||
+        _boxEnd != null ||
+        !(game['assignments']! as Map).containsKey('${record['node']}')) {
+      return;
+    }
+    final data = (record['data'] as Map?) ?? const {};
+    _boxEnd = {
+      'node': record['node'],
+      'reason': '${data['reason'] ?? ''}',
+      'winner': data['winner'],
+    };
+  }
+
+  bool _afterBoxEnd() {
+    final asked = _boxEnd;
+    _boxEnd = null;
+    final fc = _fc;
+    final game = _game;
+    if (asked == null ||
+        fc == null ||
+        game == null ||
+        !fc.isController ||
+        fc.gameState != gameRunning) {
+      return false;
+    }
+    final reason = asked['reason']! as String;
+    final winner = asked['winner'];
+    endGame(
+      game['id']! as int,
+      reason.isEmpty ? 'box' : reason,
+      winner is String ? winner : null,
+      asked['node']! as int,
+    );
+    return true;
   }
 
   void _onNode(FieldNode node, String kind) {

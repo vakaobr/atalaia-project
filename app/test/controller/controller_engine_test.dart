@@ -191,6 +191,130 @@ void main() {
     engine.close();
   });
 
+  test("a box's game.end ends a game without a field.lua (GE-1..GE-6)", () {
+    var now = 0;
+    final engine = ControllerEngine(
+      core: core,
+      modes: catalog(),
+      transport: RecordingRadio(),
+      clockMs: () => now,
+    );
+    final game = engine.createGame({
+      'name': 'boxes',
+      'mode_id': 'org.atalaia.domination',
+      'teams': ['red', 'blue'],
+      'assignments': {'4': 'zone', '5': 'zone'},
+    });
+    final id = game['id']! as int;
+    var seq = 0;
+    void hello(int node) => engine.onPacket(
+      hdr(id, node, 0, RfType.hello),
+      RfHello(
+        nodeName: 'box-$node',
+        platform: 1,
+        fwVersion: '0.4.0',
+        coreVersion: '0.2.0',
+        tier: 0,
+        capabilities: const [0],
+        transports: 1,
+        epoch: 1,
+      ).encode(),
+      epoch: 1,
+    );
+    void gameEnd(int node, int tMs, Map<String, Object?> data) {
+      final ev = core.encodeEvent(
+        node: node,
+        seq: ++seq,
+        tMs: tMs,
+        type: 'game.end',
+        team: 0,
+        squad: 0,
+        prio: 2,
+        dataJson: jsonEncode(data),
+      );
+      engine.onPacket(
+        hdr(id, node, 10 + seq, RfType.event),
+        ev.bytes!,
+        epoch: 1,
+      );
+    }
+
+    for (final n in [4, 5, 9]) {
+      hello(n);
+    }
+    engine.startGame(id);
+    // A box nobody assigned in this game does not end it.
+    gameEnd(9, 500, {'reason': 'win', 'winner': 'red'});
+    now += 1000;
+    engine.tick();
+    expect(engine.getGame(id)['state'], 'running');
+    // Paused: the event is only logged (GE-3).
+    engine.pauseGame(id);
+    gameEnd(4, 1500, {'reason': 'win', 'winner': 'red'});
+    now += 1000;
+    engine.tick();
+    expect(engine.getGame(id)['state'], 'paused');
+    engine.resumeGame(id);
+    // Two in the same tick: the first one counts, with its winner; the end
+    // waits for the tick, out of the radio's receive path.
+    gameEnd(5, 3000, {'reason': 'win', 'winner': 'blue'});
+    gameEnd(4, 3000, {'reason': 'win', 'winner': 'red'});
+    expect(engine.getGame(id)['state'], 'running');
+    now += 100;
+    engine.tick();
+    expect(engine.getGame(id)['state'], 'ended');
+    final ends = engine
+        .log(id)
+        .where((e) => e['type'] == 'game.end' && e['node'] == 0)
+        .toList();
+    expect(ends.length, 1);
+    expect(ends.single['data'], {
+      'reason': 'win',
+      'winner': 'blue',
+      'by_node': 5,
+      'by_name': 'box-5',
+    });
+    engine.close();
+  });
+
+  test('a box game.end with no team as winner is a draw, not the leader', () {
+    var now = 0;
+    final engine = ControllerEngine(
+      core: core,
+      modes: catalog(),
+      transport: RecordingRadio(),
+      clockMs: () => now,
+    );
+    final game = engine.createGame({
+      'name': 'draw',
+      'mode_id': 'org.atalaia.domination',
+      'teams': ['red', 'blue'],
+      'assignments': {'4': 'zone'},
+    });
+    final id = game['id']! as int;
+    engine.startGame(id, force: true);
+    engine.adjustScore(id, 'red', 9, '');
+    final ev = core.encodeEvent(
+      node: 4,
+      seq: 1,
+      tMs: 2000,
+      type: 'game.end',
+      team: 0,
+      squad: 0,
+      prio: 2,
+      dataJson: jsonEncode({'reason': 'draw'}),
+    );
+    engine.onPacket(hdr(id, 4, 1, RfType.event), ev.bytes!, epoch: 1);
+    now += 100;
+    engine.tick();
+    expect(engine.getGame(id)['state'], 'ended');
+    final end = engine
+        .log(id)
+        .lastWhere((e) => e['type'] == 'game.end' && e['node'] == 0);
+    expect(end['data'], {'reason': 'draw', 'by_node': 4, 'by_name': 'node-4'});
+    engine.close();
+  });
+
   test("an empty `lang` parameter is the game's language (P5H-23)", () {
     final engine = ControllerEngine(core: core);
     for (final mode in [
