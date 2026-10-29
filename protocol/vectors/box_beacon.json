@@ -1,0 +1,112 @@
+{
+  "description": "The Field Box as an iBeacon (decisions BBC-1 to BBC-12; protocol/box-beacon.md): the field's proximity UUID is HMAC-SHA256(join key, label)[:16] with the version nibble 8 and the RFC 4122 variant; the major is the constant 45253 (0xB0C5), the minor the box's node id; the 30-byte advertisement is flags, Apple's manufacturer data (0x004C, type 0x02, length 0x15), UUID, major, minor (big endian) and the measured power. Made by tools/box_beacon_vectors.py; checked by firmware/esp32/test/test_box_beacon.c, controller/tests/test_box_beacons.py and app/test/controller/controller_box_beacons_test.dart.",
+  "label": "atalaia box beacon uuid v1",
+  "major": 45253,
+  "uuids": [
+    {
+      "join_key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "uuid": "5ffdab099d358a4ca19bf56711852e2d",
+      "uuid_text": "5FFDAB09-9D35-8A4C-A19B-F56711852E2D"
+    },
+    {
+      "join_key": "4242424242424242424242424242424242424242424242424242424242424242",
+      "uuid": "72e1c67ea7d98f3da259bb216fa35f07",
+      "uuid_text": "72E1C67E-A7D9-8F3D-A259-BB216FA35F07"
+    },
+    {
+      "join_key": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "uuid": "76a2ecb74dc38cf3b0deb25cadcfa35c",
+      "uuid_text": "76A2ECB7-4DC3-8CF3-B0DE-B25CADCFA35C"
+    }
+  ],
+  "adv": [
+    {
+      "join_key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "node_id": 1,
+      "measured_power": -59,
+      "major": 45253,
+      "minor": 1,
+      "id": "45253:1",
+      "adv": "0201061aff4c0002155ffdab099d358a4ca19bf56711852e2db0c50001c5"
+    },
+    {
+      "join_key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "node_id": 7,
+      "measured_power": -59,
+      "major": 45253,
+      "minor": 7,
+      "id": "45253:7",
+      "adv": "0201061aff4c0002155ffdab099d358a4ca19bf56711852e2db0c50007c5"
+    },
+    {
+      "join_key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "node_id": 258,
+      "measured_power": -70,
+      "major": 45253,
+      "minor": 258,
+      "id": "45253:258",
+      "adv": "0201061aff4c0002155ffdab099d358a4ca19bf56711852e2db0c50102ba"
+    },
+    {
+      "join_key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "node_id": 65534,
+      "measured_power": 0,
+      "major": 45253,
+      "minor": 65534,
+      "id": "45253:65534",
+      "adv": "0201061aff4c0002155ffdab099d358a4ca19bf56711852e2db0c5fffe00"
+    },
+    {
+      "join_key": "4242424242424242424242424242424242424242424242424242424242424242",
+      "node_id": 7,
+      "measured_power": -59,
+      "major": 45253,
+      "minor": 7,
+      "id": "45253:7",
+      "adv": "0201061aff4c00021572e1c67ea7d98f3da259bb216fa35f07b0c50007c5"
+    },
+    {
+      "join_key": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "node_id": 300,
+      "measured_power": -127,
+      "major": 45253,
+      "minor": 300,
+      "id": "45253:300",
+      "adv": "0201061aff4c00021576a2ecb74dc38cf3b0deb25cadcfa35cb0c5012c81"
+    }
+  ],
+  "refused_node_ids": [
+    0,
+    65535
+  ],
+  "interval_units": [
+    {
+      "ms": 5,
+      "units": 32
+    },
+    {
+      "ms": 20,
+      "units": 32
+    },
+    {
+      "ms": 100,
+      "units": 160
+    },
+    {
+      "ms": 500,
+      "units": 800
+    },
+    {
+      "ms": 1000,
+      "units": 1600
+    },
+    {
+      "ms": 10240,
+      "units": 16384
+    },
+    {
+      "ms": 20000,
+      "units": 16384
+    }
+  ]
+}

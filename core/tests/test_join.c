@@ -302,6 +302,46 @@ static void test_region_vectors(void)
     CHECK(!atalaia_join_region_channel_ok(ATALAIA_REGION_COUNT, 921500000u));
 }
 
+/* Key 19 (RFC 0001 Amendment 19): the Field Boxes' beacon, written only when turned off. */
+static void test_box_beacon_vectors(void)
+{
+    CHECK(JOIN_BEACON_VECTOR_COUNT >= 2);
+    for (size_t i = 0; i < JOIN_BEACON_VECTOR_COUNT; i++) {
+        const join_beacon_vector_t *v = &join_beacon_vectors[i];
+        int before = check_failures;
+        atalaia_join_t got;
+        CHECK(atalaia_join_decode(v->payload, v->payload_len, join_key, &got) == ATALAIA_JOIN_OK);
+        CHECK(same_join(&got, &v->fields) && strcmp(got.lang, v->fields.lang) == 0);
+        CHECK(got.box_beacon_off && got.region == v->fields.region);
+        uint8_t buf[ATALAIA_JOIN_MAX];
+        size_t n = atalaia_join_encode(&v->fields, join_key, buf, sizeof(buf));
+        CHECK(n == v->payload_len && memcmp(buf, v->payload, n) == 0);
+        char text[ATALAIA_JOIN_MAX * 2];
+        CHECK(atalaia_join_to_text(v->payload, v->payload_len, text, sizeof(text)) > 0 &&
+              strcmp(text, v->text) == 0);
+        if (check_failures != before) fprintf(stderr, "  in join beacon vector %s\n", v->name);
+    }
+    CHECK(JOIN_BEACON_BAD_VECTOR_COUNT >= 6);
+    for (size_t i = 0; i < JOIN_BEACON_BAD_VECTOR_COUNT; i++) {
+        const join_bad_vector_t *v = &join_beacon_bad_vectors[i];
+        atalaia_join_t got;
+        if (atalaia_join_decode(v->payload, v->payload_len, join_key, &got) != v->result) {
+            fprintf(stderr, "FAIL join beacon bad vector %s (%s)\n", v->name, v->why);
+            check_failures++;
+        }
+    }
+    /* No key 19: the beacon is on, and an older payload keeps its bytes. */
+    atalaia_join_t got;
+    CHECK(atalaia_join_decode(join_vectors[0].payload, join_vectors[0].payload_len, join_key,
+                              &got) == ATALAIA_JOIN_OK &&
+          !got.box_beacon_off);
+    atalaia_join_t on = join_beacon_vectors[0].fields;
+    on.box_beacon_off = false;
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    size_t n = atalaia_join_encode(&on, join_key, buf, sizeof(buf));
+    CHECK(n == join_vectors[0].payload_len && memcmp(buf, join_vectors[0].payload, n) == 0);
+}
+
 static void test_url_rule(void)
 {
     CHECK(atalaia_join_url_ok("https://10.42.0.1:8443"));
@@ -386,6 +426,7 @@ void run_join_tests(void)
     test_lang_vectors();
     test_fetch_vectors();
     test_region_vectors();
+    test_box_beacon_vectors();
     test_url_rule();
     test_text_and_tag_edges();
     test_encode_refuses_bad_fields();

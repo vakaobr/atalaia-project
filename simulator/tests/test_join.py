@@ -31,6 +31,7 @@ def fields(v: dict) -> dict:
     out.setdefault("fetch_modes", False)
     out.setdefault("forget_modes", False)
     out.setdefault("region", "eu868")
+    out.setdefault("box_beacon", True)
     return out
 
 
@@ -162,6 +163,40 @@ class ModeFetchTests(unittest.TestCase):
         for bad in (1, 0, "true", None):
             with self.subTest(bad), self.assertRaises(join.JoinError):
                 join.encode({**base, "fetch_modes": bad}, KEY)
+
+
+class BoxBeaconTests(unittest.TestCase):
+    """Optional key 19 (box_beacon), RFC 0001 Amendment 19: false when the GM turned the boxes' iBeacon
+    off, the key left out for on."""
+
+    def test_valid_round_trip(self) -> None:
+        section = VECTORS["box_beacon"]
+        self.assertGreaterEqual(len(section["valid"]), 2)
+        for v in section["valid"]:
+            with self.subTest(v["name"]):
+                payload = bytes.fromhex(v["payload"])
+                self.assertIs(join.decode(payload, KEY)["box_beacon"], False)
+                self.assertEqual(join.decode(payload, KEY), fields(v))
+                self.assertEqual(join.encode(fields(v), KEY), payload)
+                self.assertEqual(join.to_text(payload), v["text"])
+
+    def test_invalid_fail_as_body(self) -> None:
+        self.assertGreaterEqual(len(VECTORS["box_beacon"]["invalid"]), 6)
+        for v in VECTORS["box_beacon"]["invalid"]:
+            with self.subTest(v["name"]), self.assertRaises(join.JoinError) as cm:
+                join.decode(bytes.fromhex(v["payload"]), KEY)
+            self.assertEqual(cm.exception.reason, "body", f"{v['name']}: {cm.exception}")
+
+    def test_on_is_the_key_left_out(self) -> None:
+        base = fields(VECTORS["valid"][0])
+        payload = bytes.fromhex(VECTORS["valid"][0]["payload"])
+        self.assertIs(join.decode(payload, KEY)["box_beacon"], True)
+        self.assertEqual(join.encode({**base, "box_beacon": True}, KEY), payload)
+        self.assertEqual(join.encode({k: v for k, v in base.items() if k != "box_beacon"}, KEY), payload)
+        self.assertEqual(len(join.encode({**base, "box_beacon": False}, KEY)), len(payload) + 2)
+        for bad in (0, 1, "false", None):
+            with self.subTest(bad), self.assertRaises(join.JoinError):
+                join.encode({**base, "box_beacon": bad}, KEY)
 
 
 class RegionTests(unittest.TestCase):

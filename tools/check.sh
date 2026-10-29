@@ -26,6 +26,8 @@ python3 tools/atak_xml_vectors.py --check
 python3 tools/mode_package_vectors.py --check
 # The I/O pod's settings over CMD pod (decision PODC): the pod's C, both controllers and the vectors agree.
 python3 tools/pod_config_vectors.py --check
+# The Field Box's iBeacon (decisions BBC): the UUID, the advertisement bytes and the interval, from hashlib alone.
+python3 tools/box_beacon_vectors.py --check
 # The scenario compiler's Unicode classes (core/scenario/unicode.lua, decision PE24-109).
 python3 tools/scenario_unicode.py --check
 python3 tools/build_site.py --check

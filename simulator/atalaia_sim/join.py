@@ -14,7 +14,7 @@ field's 32-byte join key. A join is a dict:
      "kind": "node" or "controller",
      "ca_sha256": b"...32..." or None, "urls": ["https://10.42.0.1:8443"] or None,
      "lang": "pt" or None, "fetch_modes": False, "forget_modes": False,
-     "region": "eu868" or "as923-tw"}
+     "region": "eu868" or "as923-tw", "box_beacon": True}
 
 ca_sha256 (key 13) and urls (key 14) are optional (RFC 0001 Amendment 4,
 proposed): the field CA's fingerprint and the controller's https addresses,
@@ -29,7 +29,9 @@ controller (keys 13 and 14 give it the address and the field CA), and forgets th
 packages it fetched before. region (key 18, RFC 0001 Amendment 12, proposed) is the
 field's radio region (regions.py): the key holds the region's number (1: AS923-TW)
 and is left out for EU868 (0 is refused, so a join has one encoding); the channel
-must fit in that region. Keys 19-31 are skipped.
+must fit in that region. box_beacon (key 19, RFC 0001 Amendment 19, decision BBC-5) says whether a
+Field Box advertises as an iBeacon in this game (protocol/box-beacon.md): True (the default) is the
+key left out, False is CBOR false (true is refused, so a join has one encoding). Keys 20-31 are skipped.
 
 The codecs check protocol/vectors/join.json.
 """
@@ -63,11 +65,11 @@ KEYS = {
     "game_id": 1, "game_key": 2, "node_id": 3, "controller_id": 4, "channel_hz": 5,
     "max_hops": 6, "teams": 7, "mode_id": 8, "role": 9, "game_seed": 10, "params": 11, "kind": 12,
     "ca_sha256": 13, "urls": 14, "lang": 15, "fetch_modes": 16, "forget_modes": 17,
-    "region": 18,
+    "region": 18, "box_beacon": 19,
 }
 OPTIONAL = ("params", "ca_sha256", "urls", "lang")
 FLAGS = ("fetch_modes", "forget_modes")  # CBOR true when set, left out otherwise
-REQUIRED = set(KEYS) - set(OPTIONAL) - set(FLAGS) - {"region"}
+REQUIRED = set(KEYS) - set(OPTIONAL) - set(FLAGS) - {"region", "box_beacon"}
 URLS_MAX = 3
 URL_MAX = 64
 # The same rule as the check-in poster's urls (protocol/checkin.md): https://host[:port], no path.
@@ -186,6 +188,10 @@ def validate(j: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(flag, bool):
             raise JoinError("body", f"{name} must be true or false")
         out[name] = flag
+    beacon = j.get("box_beacon", True)
+    if not isinstance(beacon, bool):
+        raise JoinError("body", "box_beacon must be true or false")
+    out["box_beacon"] = beacon
     kind = j["kind"]
     if kind not in KINDS:
         raise JoinError("body", f"kind must be one of {sorted(KINDS)}")
@@ -201,6 +207,10 @@ def encode(j: dict[str, Any], join_key: bytes) -> bytes:
     body: dict[int, Any] = {}
     for name in KEYS:
         if (name in OPTIONAL and v[name] is None) or (name in FLAGS and not v[name]):
+            continue
+        if name == "box_beacon":
+            if not v[name]:  # on is the key's absence; only false is written
+                body[KEYS[name]] = False
             continue
         if name == "region":
             if v[name] != regions.EU868.code:  # EU868 is the key's absence
@@ -245,6 +255,8 @@ def decode(data: bytes, join_key: bytes) -> dict[str, Any]:
             raise JoinError("body", f"{name} is null: leave an optional field out instead")
         if name in FLAGS and v is not True:
             raise JoinError("body", f"{name} is only ever true: leave it out instead")
+        if name == "box_beacon" and v is not False:
+            raise JoinError("body", "box_beacon is only ever false: leave it out instead")
         if name == "region":
             if not isinstance(v, int) or isinstance(v, bool) or v not in regions.BY_NUMBER or v == 0:
                 raise JoinError("body", f"region {v!r}: a known region from 1 up (EU868 leaves the key out)")

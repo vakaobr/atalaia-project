@@ -328,7 +328,8 @@ const char *atalaia_join_result_name(atalaia_join_result_t result)
 
 /* ---- Encoding ------------------------------------------------------------- */
 
-#define JOIN_CBOR_TRUE 21u /* simple value 21: 0xf5 */
+#define JOIN_CBOR_TRUE  21u /* simple value 21: 0xf5 */
+#define JOIN_CBOR_FALSE 20u /* simple value 20: 0xf4 */
 
 size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALAIA_JOIN_KEY_SIZE],
                            uint8_t *buf, size_t cap)
@@ -345,7 +346,7 @@ size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALA
     bool lang = j->lang[0] != '\0';
     mc_put_map(&w, 11u + (params ? 1u : 0u) + (j->has_ca ? 1u : 0u) + (j->url_count ? 1u : 0u) +
                        (lang ? 1u : 0u) + (j->fetch_modes ? 1u : 0u) + (j->forget_modes ? 1u : 0u) +
-                       (j->region != 0 ? 1u : 0u));
+                       (j->region != 0 ? 1u : 0u) + (j->box_beacon_off ? 1u : 0u));
     mc_put_uint(&w, ATALAIA_JOIN_K_GAME_ID);
     mc_put_uint(&w, j->game_id);
     mc_put_uint(&w, ATALAIA_JOIN_K_GAME_KEY);
@@ -407,6 +408,11 @@ size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALA
         mc_put_uint(&w, ATALAIA_JOIN_K_REGION);
         mc_put_uint(&w, j->region);
     }
+    /* Key 19 only as false (on is the key's absence, so a join has one encoding). */
+    if (j->box_beacon_off) {
+        mc_put_uint(&w, ATALAIA_JOIN_K_BOX_BEACON);
+        mc_put_head(&w, CBOR_MAJOR_SIMPLE, JOIN_CBOR_FALSE);
+    }
     if (!w.ok) return 0;
 
     size_t signed_len = 1 + w.pos;
@@ -465,8 +471,8 @@ static bool decode_body(const uint8_t *body, size_t len, atalaia_join_t *j)
     for (uint64_t i = 0; i < count && r.ok; i++) {
         uint64_t key, v;
         /* Keys 13 and 14 are optional (RFC 0001 Amendment 4), 15 too (Amendment 10), 16 and 17
-         * too (plan phase 13), 18 too (Amendment 12); 19-31 are reserved for optional fields
-         * (skipped); 32 and up are invalid. */
+         * too (plan phase 13), 18 too (Amendment 12), 19 too (Amendment 19); 20-31 are reserved for
+         * optional fields (skipped); 32 and up are invalid. */
         if (!mc_read_uint(&r, &key) || key >= 32) return false;
         if (seen & JBIT(key)) return false; /* duplicate key */
         seen |= JBIT(key);
@@ -567,6 +573,12 @@ static bool decode_body(const uint8_t *body, size_t len, atalaia_join_t *j)
             }
             break;
         }
+        case ATALAIA_JOIN_K_BOX_BEACON:
+            /* Only CBOR false (Amendment 19): true, null or anything else is a bad body. */
+            if (mc_remaining(&r) < 1 || *r.p != 0xF4) return false;
+            r.p++;
+            j->box_beacon_off = true;
+            break;
         case ATALAIA_JOIN_K_REGION:
             /* 1 and up, a region this codec knows: EU868 is the key's absence. */
             if (!read_uint_max(&r, ATALAIA_REGION_COUNT - 1, &v) || v == 0) return false;

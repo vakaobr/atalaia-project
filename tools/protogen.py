@@ -20,6 +20,7 @@ Outputs, each marked "do not edit":
                                         (the Field Box's update checks, protocol/vectors/firmware.json)
     firmware/esp32/test/field_card_vectors.h  NFC field card vectors (adoption, protocol/vectors/field_card.json)
     firmware/esp32/test/pod_config_vectors.h  the I/O pod's settings over CMD pod (protocol/vectors/pod_config.json)
+    firmware/esp32/test/box_beacon_vectors.h  the Field Box's iBeacon (protocol/vectors/box_beacon.json)
     firmware/esp32/test/mode_package_vectors.h  signed mode package vectors (the Field Box's package
                                         checks, protocol/vectors/mode_package.json)
     simulator/atalaia_sim/protocol.py   the same tables for Python
@@ -927,7 +928,7 @@ def gen_join_vectors(jv: dict[str, Any], byte_array: Any) -> list[str]:
               f"{f['channel_hz']}u, {f['max_hops']},",
               f"      {{{teams}}}, {len(f['teams'])},",
               f"      {c_string(f['mode_id'])}, {c_string(f['role'])}, {f['game_seed']}u, "
-              f"{c_string(params)}, {kinds[f['kind']]}, false, {{0}}, 0, {{\"\"}}, \"\", false, false, 0}},",
+              f"{c_string(params)}, {kinds[f['kind']]}, false, {{0}}, 0, {{\"\"}}, \"\", false, false, 0, false}},",
               f"     join_vec_{i}, join_vec_{i}_len, {c_string(v['text'])}, "
               f"join_tag_{i}, join_tag_{i}_len}},"]
     L += ["};",
@@ -948,6 +949,48 @@ def gen_join_vectors(jv: dict[str, Any], byte_array: Any) -> list[str]:
     L += gen_join_lang_vectors(jv["box_language"], byte_array, kinds)
     L += gen_join_fetch_vectors(jv["mode_fetch"], byte_array, kinds)
     L += gen_join_region_vectors(jv["region"], byte_array, kinds)
+    L += gen_join_beacon_vectors(jv["box_beacon"], byte_array, kinds)
+    return L
+
+
+def gen_join_beacon_vectors(bv: dict[str, Any], byte_array: Any, kinds: dict[str, str]) -> list[str]:
+    """Key 19 (box_beacon) of a join payload (RFC 0001 Amendment 19): written only as false."""
+    numbers = {"eu868": 0, "as923-tw": 1}  # atalaia_region_t (core/include/atalaia/duty_cycle.h)
+    L = ["/* ---- join payloads with the Field Boxes' beacon turned off (key 19) ---- */", "",
+         "typedef struct {", "    const char *name;", "    atalaia_join_t fields;", "    const uint8_t *payload;",
+         "    size_t payload_len;", "    const char *text;", "} join_beacon_vector_t;", ""]
+    for i, v in enumerate(bv["valid"]):
+        L += byte_array(f"join_beacon_{i}", v["payload"])
+    for i, v in enumerate(bv["invalid"]):
+        require(v["reason"] == "body", f"join.json box_beacon {v['name']}: only body errors here")
+        L += byte_array(f"join_beacon_bad_{i}", v["payload"])
+    L += ["", "static const join_beacon_vector_t join_beacon_vectors[] = {"]
+    for i, v in enumerate(bv["valid"]):
+        f = v["fields"]
+        require(f.get("ca_sha256") is None and f.get("urls") is None and f["params"] is None,
+                f"join.json box_beacon {v['name']}: no link or parameters here")
+        require(f.get("box_beacon") is False and f.get("region", "eu868") in numbers,
+                f"join.json box_beacon {v['name']}: beacon off, a known region")
+        key = ", ".join(f"0x{b:02x}" for b in bytes.fromhex(f["game_key"]))
+        teams = ", ".join("{" + c_string(t) + "}" for t in f["teams"])
+        L += [f"    {{{c_string(v['name'])},",
+              f"     {{.game_id = {f['game_id']}, .game_key = {{{key}}}, .node_id = {f['node_id']},",
+              f"      .controller_id = {f['controller_id']}, .channel_hz = {f['channel_hz']}u, "
+              f".max_hops = {f['max_hops']},",
+              f"      .teams = {{{teams}}}, .team_count = {len(f['teams'])},",
+              f"      .mode_id = {c_string(f['mode_id'])}, .role = {c_string(f['role'])}, "
+              f".game_seed = {f['game_seed']}u,",
+              f"      .kind = {kinds[f['kind']]}, .lang = {c_string(f.get('lang') or '')}, "
+              f".region = {numbers[f.get('region', 'eu868')]}, .box_beacon_off = true}},",
+              f"     join_beacon_{i}, join_beacon_{i}_len, {c_string(v['text'])}}},"]
+    L += ["};", "#define JOIN_BEACON_VECTOR_COUNT (sizeof(join_beacon_vectors) / sizeof(join_beacon_vectors[0]))", "",
+          "static const join_bad_vector_t join_beacon_bad_vectors[] = {"]
+    for i, v in enumerate(bv["invalid"]):
+        L.append(f"    {{{c_string(v['name'])}, join_beacon_bad_{i}, join_beacon_bad_{i}_len, ATALAIA_JOIN_ERR_BODY, "
+                 f"{c_string(v['why'])}}},")
+    L += ["};",
+          "#define JOIN_BEACON_BAD_VECTOR_COUNT (sizeof(join_beacon_bad_vectors) / sizeof(join_beacon_bad_vectors[0]))",
+          ""]
     return L
 
 
@@ -1470,9 +1513,57 @@ def gen_pod_config_vectors(pv: dict[str, Any]) -> str:
     return "\n".join(L)
 
 
+# ---- Field Box iBeacon vectors (protocol/vectors/box_beacon.json) --------------
+
+BOX_BEACON_VECTORS = REPO / "protocol" / "vectors" / "box_beacon.json"
+
+
+def gen_box_beacon_vectors(bv: dict[str, Any]) -> str:
+    """firmware/esp32/test/box_beacon_vectors.h: the Field Box's iBeacon (box_beacon.c)."""
+    L = c_spdx("The Field Box's iBeacon test vectors (protocol/vectors/box_beacon.json).")
+    L[5] = " * Generated by tools/protogen.py from protocol/vectors/box_beacon.json. Do not edit."
+
+    def arr(name: str, hexs: str) -> list[str]:
+        data = bytes.fromhex(hexs)
+        out = [f"static const uint8_t {name}[] = {{"]
+        for j in range(0, len(data), 12):
+            out.append("    " + ", ".join(f"0x{b:02x}" for b in data[j:j + 12]) + ",")
+        return out + ["};"]
+
+    L += ["#ifndef ATALAIA_BOX_BEACON_VECTORS_H", "#define ATALAIA_BOX_BEACON_VECTORS_H", "",
+          "#include <stddef.h>", "#include <stdint.h>", "",
+          f"#define BOX_VECTOR_MAJOR {int(bv['major'])}u", ""]
+    for i, v in enumerate(bv["uuids"]):
+        L += arr(f"box_key_{i}", v["join_key"]) + arr(f"box_uuid_{i}", v["uuid"])
+    L += ["", "typedef struct {", "    const uint8_t *join_key;", "    const uint8_t *uuid;", "    const char *text;",
+          "} box_uuid_vector_t;", "", "static const box_uuid_vector_t box_uuid_vectors[] = {"]
+    for i, v in enumerate(bv["uuids"]):
+        L.append(f"    {{box_key_{i}, box_uuid_{i}, {c_string(v['uuid_text'])}}},")
+    L += ["};", "#define BOX_UUID_VECTOR_COUNT (sizeof(box_uuid_vectors) / sizeof(box_uuid_vectors[0]))", ""]
+    keys = {v["join_key"]: i for i, v in enumerate(bv["uuids"])}
+    for i, v in enumerate(bv["adv"]):
+        L += arr(f"box_adv_{i}", v["adv"])
+    L += ["", "typedef struct {", "    const uint8_t *join_key;", "    unsigned node_id;", "    int power;",
+          "    const uint8_t *adv; /* 30 bytes */", "} box_adv_vector_t;", "",
+          "static const box_adv_vector_t box_adv_vectors[] = {"]
+    for i, v in enumerate(bv["adv"]):
+        L.append(f"    {{box_key_{keys[v['join_key']]}, {int(v['node_id'])}u, {int(v['measured_power'])}, "
+                 f"box_adv_{i}}},")
+    L += ["};", "#define BOX_ADV_VECTOR_COUNT (sizeof(box_adv_vectors) / sizeof(box_adv_vectors[0]))", "",
+          "static const unsigned box_refused_node_ids[] = {" + ", ".join(f"{int(n)}u" for n in bv["refused_node_ids"])
+          + "};", "#define BOX_REFUSED_COUNT (sizeof(box_refused_node_ids) / sizeof(box_refused_node_ids[0]))", "",
+          "typedef struct {", "    unsigned ms;", "    unsigned units;", "} box_interval_vector_t;", "",
+          "static const box_interval_vector_t box_interval_vectors[] = {"]
+    for v in bv["interval_units"]:
+        L.append(f"    {{{int(v['ms'])}u, {int(v['units'])}u}},")
+    L += ["};", "#define BOX_INTERVAL_VECTOR_COUNT (sizeof(box_interval_vectors) / sizeof(box_interval_vectors[0]))",
+          "", "#endif /* ATALAIA_BOX_BEACON_VECTORS_H */", ""]
+    return "\n".join(L)
+
+
 # ---- mode package vectors (protocol/vectors/mode_package.json) -----------------
 
-MODE_PACKAGE_VECTORS = REPO / "protocol" / "vectors" / "mode_package.json"
+MODE_PACKAGE_VECTORS =REPO / "protocol" / "vectors" / "mode_package.json"
 
 def gen_mode_package_vectors(mv: dict[str, Any]) -> str:
     """firmware/esp32/test/mode_package_vectors.h: the Field Box's package checks (mode_package.c).
@@ -1853,6 +1944,8 @@ def outputs() -> dict[Path, str]:
             gen_field_card_vectors(json.loads(FIELD_CARD_VECTORS.read_text(encoding="utf-8"))),
         REPO / "firmware/esp32/test/pod_config_vectors.h":
             gen_pod_config_vectors(json.loads(POD_CONFIG_VECTORS.read_text(encoding="utf-8"))),
+        REPO / "firmware/esp32/test/box_beacon_vectors.h":
+            gen_box_beacon_vectors(json.loads(BOX_BEACON_VECTORS.read_text(encoding="utf-8"))),
         REPO / "firmware/esp32/test/mode_package_vectors.h":
             gen_mode_package_vectors(json.loads(MODE_PACKAGE_VECTORS.read_text(encoding="utf-8"))),
         REPO / "simulator/atalaia_sim/protocol.py": gen_python(schema),

@@ -30,6 +30,7 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`usb-modem.md`](usb-modem.md) | The serial link between the field controller and its USB radio modem |
 | [`capability-proxy.md`](capability-proxy.md) | The link between an I/O pod and a phone (USB-OTG and BLE), version 1 |
 | [`pod-config.md`](pod-config.md) | The I/O pod's settings pushed over the radio by the field controller: CMD pod (opcode 10, RFC 0001 Amendment 17), which settings, the revision, the pod's acknowledgement through its phone (`node.setup_applied`), the threat model; vectors in `vectors/pod_config.json` (written by `tools/pod_config_vectors.py`) |
+| [`box-beacon.md`](box-beacon.md) | The Field Box as an iBeacon: the 30-byte advertisement, the field's UUID derived from the join key, the major and the minor (the node id), when and how often a box advertises, the GM's switch (join key 19, RFC 0001 Amendment 19), how the controller registers each box's beacon from its place; vectors in `vectors/box_beacon.json` |
 | [`json/event.schema.json`](json/event.schema.json) | JSON Schema of an event in the game log and the API (generated) |
 | [`json/examples/`](json/examples/) | Events that CI validates against that schema, plus invalid ones it must reject |
 

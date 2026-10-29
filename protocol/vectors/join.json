@@ -913,5 +913,96 @@
         "why": "the 500 kHz channel ends above 925 MHz"
       }
     ]
+  },
+  "box_beacon": {
+    "description": "Optional key 19 (box_beacon), RFC 0001 Amendment 19 (decision BBC-5, protocol/box-beacon.md): whether the Field Boxes advertise as iBeacons in this game. On (the default) is the key left out, so every older payload keeps its bytes; the GM turning it off writes CBOR false; true, null, a number, text or bytes refuse the payload (body), so a join has one encoding. A reader from before key 19 skips it and (having no beacon) advertises nothing anyway. Valid ones made with the simulator's codec from node_domination_zone's fields (the fields give box_beacon false); invalid ones by hand, tagged with Python's hmac module. The simulator's, the core's (core/src/join.c) and the app's codecs decode and re-encode the valid ones byte for byte and refuse the invalid ones (body).",
+    "valid": [
+      {
+        "name": "beacon_off",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 7,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "zone",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "node",
+          "box_beacon": false
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c0013f4f119b48800990999be87d3e8316a8e8a695837b1cddb941df665668cde8b9d65",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DAAT9PEZtIgAmQmZvofT6DFqjoppWDexzduUHfZlZozei51l"
+      },
+      {
+        "name": "beacon_off_taiwan_pt",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 7,
+          "controller_id": 0,
+          "channel_hz": 921500000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "zone",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "node",
+          "box_beacon": false,
+          "lang": "pt",
+          "region": "as923-tw"
+        },
+        "payload": "01ae0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a36ecf960060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000f627074120113f4922fad21c13b30dfd682a6184ab76e7cca486cf6b6dbc85d755a3fe387c6d910",
+        "text": "atalaia:join:Aa4BGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaNuz5YAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DAAPYnB0EgET9JIvrSHBOzDf1oKmGEq3bnzKSGz2ttvIXXVaP-OHxtkQ"
+      }
+    ],
+    "invalid": [
+      {
+        "name": "beacon_true",
+        "why": "key 19 is only ever false: on is the key left out",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c0013f51c4d21cb02b94bb1048997c71426b40025b5a7efb7a6ec10e1004befa63b3528"
+      },
+      {
+        "name": "beacon_null",
+        "why": "key 19 null",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c0013f67085fbb252f39bf34b362e26dd2ccace11d1f2bd5840eeb5991ce0eb99599096"
+      },
+      {
+        "name": "beacon_zero",
+        "why": "key 19 is a bool, not 0",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c001300bd8724846eed401a60907d93b94672ef3f40d685159e82e4dbbee7d374b95a5e"
+      },
+      {
+        "name": "beacon_one",
+        "why": "key 19 is a bool, not 1",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c0013015145104bd5d7ad8c2f35e9317edafd6f3da531503c3cf4bdd12e2a8cff5b2200"
+      },
+      {
+        "name": "beacon_text",
+        "why": "key 19 is a bool, not text",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c00136566616c7365d1f26b41d96b5920a05d9c763333b99154333473857cf55f0c20a5cffb3dec3a"
+      },
+      {
+        "name": "beacon_bytes",
+        "why": "key 19 is a bool, not bytes",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c001341001a0e46835581b6589dd86fdc80f0ee856a263826e27d08068178664198828715"
+      }
+    ]
   }
 }

@@ -81,6 +81,7 @@ final class JoinPayload {
     this.fetchModes = false,
     this.forgetModes = false,
     this.region = 'eu868',
+    this.boxBeacon = true,
   });
 
   final int gameId;
@@ -119,6 +120,11 @@ final class JoinPayload {
   /// Key 18: the field's radio region's code ("eu868", "as923-tw"); a box
   /// built for another region refuses the join.
   final String region;
+
+  /// Key 19 (RFC 0001 Amendment 19): whether the Field Boxes advertise as
+  /// iBeacons in this game. The key is written, as CBOR false, only when the
+  /// GM turned it off; on is the key left out.
+  final bool boxBeacon;
 
   /// The parts of [modeId]: the main mode, then its modifiers.
   List<String> get modeParts => modeId.split('+');
@@ -263,6 +269,10 @@ JoinPayload _validate(Map<String, Object?> j) {
       throw _body('$flag: true when set, else left out');
     }
   }
+  final beacon = j['box_beacon'];
+  if (beacon != null && beacon is! bool) {
+    throw _body('box_beacon: true or false');
+  }
   final lang = j['lang'];
   if (lang != null && (lang is! String || !_lang.hasMatch(lang))) {
     throw _body(
@@ -288,6 +298,7 @@ JoinPayload _validate(Map<String, Object?> j) {
     fetchModes: j['fetch_modes'] == true,
     forgetModes: j['forget_modes'] == true,
     region: region.code,
+    boxBeacon: beacon != false,
   );
 }
 
@@ -315,6 +326,7 @@ const _keys = {
   5: 'channel_hz', 6: 'max_hops', 7: 'teams', 8: 'mode_id', 9: 'role',
   10: 'game_seed', 11: 'params', 12: 'kind', 13: 'ca_sha256', 14: 'urls',
   15: 'lang', 16: 'fetch_modes', 17: 'forget_modes', 18: 'region',
+  19: 'box_beacon',
 };
 
 bool _hasBytes(Object? v) => switch (v) {
@@ -375,6 +387,9 @@ JoinPayload decodeJoin(List<int> data, List<int> joinKey) {
     if ((name == 'fetch_modes' || name == 'forget_modes') && v != true) {
       throw _body('$name: CBOR true when set, else left out');
     }
+    if (name == 'box_beacon' && v != false) {
+      throw _body('box_beacon: CBOR false when off, else left out');
+    }
     if (name == 'region') {
       final r = v is int && v != 0 ? regionsByNumber[v] : null;
       if (r == null) {
@@ -422,6 +437,7 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
     'fetch_modes': j.fetchModes,
     'forget_modes': j.forgetModes,
     'region': j.region,
+    'box_beacon': j.boxBeacon,
   });
   final body = <int, Object?>{
     1: v.gameId,
@@ -442,6 +458,7 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
     if (v.fetchModes) 16: true,
     if (v.forgetModes) 17: true,
     if (v.region != eu868.code) 18: regionsByCode[v.region]!.number,
+    if (!v.boxBeacon) 19: false,
   };
   final signed = Uint8List.fromList([joinVersion, ...cborEncode(body)]);
   final out = Uint8List.fromList([

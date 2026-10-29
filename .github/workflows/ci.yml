@@ -372,6 +372,8 @@ jobs:
         run: python tools/mode_package_vectors.py --check
       - name: The I/O pod's settings vectors are up to date
         run: python tools/pod_config_vectors.py --check
+      - name: The Field Box's iBeacon vectors are up to date
+        run: python tools/box_beacon_vectors.py --check
       - name: The scenario compiler's Unicode table is up to date
         run: python tools/scenario_unicode.py --check
       - name: The registry's JSON Schemas accept their examples and reject the invalid ones
@@ -559,6 +561,9 @@ jobs:
           idf.py set-target esp32s3
           idf.py -D "ATALAIA_FW_VERSION=$FW_VERSION" build
           grep '"project_version"' build/project_description.json | grep -qF "\"$FW_VERSION\""
+          # The Field Box's iBeacon (decisions BBC-1 to BBC-12): NimBLE as a broadcaster, on by default.
+          grep -q '^CONFIG_ATALAIA_BOX_BEACON=y' sdkconfig
+          grep -q '^CONFIG_BT_NIMBLE_ENABLED=y' sdkconfig
 
   esp32-modem-build:
     name: ESP32 USB radio modem cross-compilation

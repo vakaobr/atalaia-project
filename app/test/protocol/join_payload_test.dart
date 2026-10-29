@@ -33,6 +33,7 @@ JoinPayload _fields(Map<String, dynamic> f) => JoinPayload(
   urls: (f['urls'] as List?)?.cast<String>(),
   lang: f['lang'] as String?,
   region: f['region'] as String? ?? 'eu868',
+  boxBeacon: f['box_beacon'] as bool? ?? true,
 );
 
 /// [text] with the last base64url character's lowest bit set: a padding bit
@@ -202,6 +203,48 @@ void main() {
       for (final c in cases(v, 'valid')) {
         final j = decodeJoin(hexDecode(c['payload'] as String), key);
         expect((j.fetchModes, j.forgetModes), (false, false));
+      }
+    });
+  });
+
+  group('box_beacon (key 19)', () {
+    final section = v['box_beacon'] as Map<String, dynamic>;
+    test('the section has its cases', () {
+      expect(cases(section, 'valid').length, greaterThanOrEqualTo(2));
+      expect(cases(section, 'invalid').length, greaterThanOrEqualTo(6));
+    });
+    for (final c in cases(section, 'valid')) {
+      test('${c['name']}', () {
+        final payload = hexDecode(c['payload'] as String);
+        final f = c['fields'] as Map<String, dynamic>;
+        final j = decodeJoin(payload, key);
+        expect(j.boxBeacon, false);
+        expect(j.region, f['region'] ?? 'eu868');
+        expect(hexEncode(encodeJoin(j, key)), c['payload']);
+        expect(hexEncode(encodeJoin(_fields(f), key)), c['payload']);
+        expect(joinToText(payload), c['text']);
+      });
+    }
+    for (final c in cases(section, 'invalid')) {
+      test('${c['name']}: body', () {
+        expect(
+          () => decodeJoin(hexDecode(c['payload'] as String), key),
+          throwsA(
+            isA<JoinException>().having(
+              (e) => e.reason,
+              'reason',
+              JoinFailure.body,
+            ),
+          ),
+        );
+      });
+    }
+    test('absent: on, and on encodes as the key left out', () {
+      for (final c in cases(v, 'valid')) {
+        final payload = hexDecode(c['payload'] as String);
+        final j = decodeJoin(payload, key);
+        expect(j.boxBeacon, true);
+        expect(hexEncode(encodeJoin(j, key)), c['payload']);
       }
     });
   });

@@ -862,6 +862,22 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 
 **Reason:** the bench of 2026-10-29. A game start that waits 21 s for a beacon is a game that starts at different times on different boxes, and a pause (safety) that waits 30 s is not one. The repeats cost four small frames per state change and need no box change to help; the reconcile closes the one case where they could not.
 
+## Amendment 20 (2026-10-29): The Field Boxes as iBeacons (join key 19)
+
+**Status:** built (the maintainer's decision of 2026-10-29 to support both iBeacon tags and the Field Boxes themselves advertising as BLE beacons; decisions BBC-1 to BBC-12). The core's join codec (`core/src/join.c`), the Python and Dart codecs (`simulator/atalaia_sim/join.py`, `app/lib/protocol/join_payload.dart`), the Field Box (`firmware/esp32/main/box_beacon.c`, `box_beacon_esp.c`, `box_game.c`) and both controllers (`controller/atalaia_controller/box_beacons.py`, `app/lib/controller/controller_box_beacons.dart`) carry it; the shared cases are the `box_beacon` section of `protocol/vectors/join.json`, `protocol/vectors/box_beacon.json` and the contract case "box beacons" in `protocol/vectors/controller_api.json`. The specification is `protocol/box-beacon.md`.
+
+**Supersedes:** nothing. The beacon is a Bluetooth LE advertisement, not a Skirmesh-RF frame: no radio frame, opcode, message, field, ACK or retry rule changes, and the LoRa radio is not used for it.
+
+**Change:**
+
+1. **A new optional join key, 19 `box_beacon`** ([protocol/join.md](../../protocol/join.md)): CBOR `false` when the GM turned the field's box beacons off, **left out** when they are on (the default); `true` is refused, so a join has one encoding. A payload without it is byte for byte the payload of before (`atalaia_join_t.box_beacon_off` is false in a zero-initialised join: boxes advertise).
+2. **What a joined box advertises** (nothing of it travels): an iBeacon whose UUID is `HMAC-SHA256(join key, "atalaia box beacon uuid v1")[:16]` with the version nibble 8 and the RFC 4122 variant, whose major is the constant 45253 (`0xB0C5`, which a GM's tag may not use) and whose minor is the box's node id in the game. The controller derives the same UUID from the join key it holds and registers each placed box's beacon by itself.
+3. **The controller reads the setting when it makes a join** (`PUT /api/v1/box-beacons`, `box_beacons` setting): a game already joined keeps what its boxes were told.
+
+**Compatibility:** a box or a reader from before skips key 19 (readers skip 20 to 31 as they skipped 19 to 31) and a box from before advertises nothing; a controller from before never writes it, so a new box advertises (the default) and an old controller does not know the boxes' beacons (no box would be in its registry, so a phone ignores them). The payload grows by 2 bytes only when the GM turned the beacons off (inside the 448 bytes).
+
+**Reason:** a Field Box doubles as a floor and room locator on a multi-story field, so the field needs tags only where no box is. Everything a phone needs is already in the box (the join key it holds), and the one thing a box cannot know by itself, that the GM switched the beacons off for this game, rides in the join the controller already makes for every game.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit
