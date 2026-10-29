@@ -166,7 +166,7 @@ body is compact CBOR. These message types are used:
 | ACK | "Received this sequence number" (a base and a bitmap). |
 | STATE | A box's snapshot: its owner team, phase, points gained per team, battery. Every 15 s and after a capture. |
 | HELLO | A node says who it is, its firmware and what it can do, after it joins or reboots. |
-| CMD | A controller or GM instruction: start, pause, end, a message, a mode command (opcode 8, which carries a scenario's `setup`), a firmware update offer (opcode 9). |
+| CMD | A controller or GM instruction: start, pause, end, a message, a mode command (opcode 8, which carries a scenario's `setup`), a firmware update offer (opcode 9), an I/O pod's settings (opcode 10, sent to the pod of one phone). |
 | TIME | The game clock. Also the controller's heartbeat. |
 | CLAIM | The election of the controller in charge, for failover between two controllers. |
 | CONFIG | Defined in the schema, for pushing a preset. The game's setup, its channel and its teams actually reach a box in its **join payload**, not in CONFIG. |

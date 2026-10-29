@@ -167,7 +167,7 @@ compacto. Usam-se estes tipos de mensagem:
 | ACK | "Recebi este número de sequência" (uma base e um mapa de bits). |
 | STATE | O retrato de uma caixa: a equipa dona, a fase, os pontos ganhos por equipa, a bateria. De 15 em 15 s e depois de uma captura. |
 | HELLO | Um nó diz quem é, o seu firmware e o que sabe fazer, depois de aderir ou de reiniciar. |
-| CMD | Uma instrução do controlador ou do GM: iniciar, pausar, terminar, uma mensagem, um comando de modo (opcode 8, que leva o `setup` de um cenário), uma oferta de atualização de firmware (opcode 9). |
+| CMD | Uma instrução do controlador ou do GM: iniciar, pausar, terminar, uma mensagem, um comando de modo (opcode 8, que leva o `setup` de um cenário), uma oferta de atualização de firmware (opcode 9), as definições de um módulo de E/S (opcode 10, enviadas ao módulo de um telemóvel). |
 | TIME | O relógio do jogo. É também o batimento do controlador. |
 | CLAIM | A eleição do controlador responsável, para a passagem de testemunho entre dois controladores. |
 | CONFIG | Definida no esquema, para enviar uma predefinição. A configuração do jogo, o seu canal e as suas equipas chegam de facto a uma caixa na sua **carga de entrada**, e não em CONFIG. |

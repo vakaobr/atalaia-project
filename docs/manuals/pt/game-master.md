@@ -145,6 +145,18 @@ Podes atualizar o firmware das caixas pelo Wi-Fi do campo, entre jogos. Ainda n�
 
 Uma caixa precisa do nome e da palavra-passe do Wi-Fi do campo na sua configuração, de bateria suficiente e da chave da versão gravada no firmware dela.
 
+**Uma exceção: uma caixa gravada com a v0.4.0 ou anterior.** A partir da v0.5 os espaços de firmware são maiores, o que é uma tabela de partições nova, e uma atualização pelo ar não a consegue mudar. A consola recusa a oferta a essa caixa (o resultado diz: precisa de uma tabela de partições nova, é preciso instalar por USB uma vez). Grava essa caixa por USB uma vez, sem a apagar (mantém o campo, as chaves e as definições): ver o [guia de firmware, secção 3.3](firmware.md#33-escrever-a-imagem). Depois disso, as atualizações pelo ar funcionam como antes.
+
+### As definições do módulo de E/S (opcional)
+
+Se um telemóvel usa um **módulo de E/S** como rádio, podes mudar as definições do módulo a partir da consola, sem cabo nem nova compilação: as cores dos quatro botões, o brilho do anel de LEDs, o volume e se o interruptor da caixa avisa. Ainda não experimentado com um módulo a sério.
+
+1. Faz isto **antes de um jogo começar ou depois de ele acabar**. O painel fica desativado durante um jogo. O telemóvel com o módulo tem de ter entrado no jogo.
+2. Abre **Caixas**, painel **Definições dos módulos de E/S**. Procura o telemóvel com o módulo, define só o que queres mudar (**Definir as cores**, o brilho, o volume, o interruptor da caixa) e toca em **Enviar ao módulo**. **Voltar primeiro às definições da compilação** anula tudo o que foi enviado antes.
+3. O painel mostra **enviado (1), a aguardar** e depois **aceite pelo módulo**. Se o módulo não responder, o controlador volta a enviar passados 8, 16, 32, 64 e 128 segundos e depois diz **sem resposta**: o telemóvel não tem módulo, o firmware do módulo é anterior a esta funcionalidade, ou está fora de alcance ou sem bateria.
+
+O módulo guarda o que enviaste, também depois de reiniciar. O guia de montagem tem os pormenores: [Módulo de E/S, Definições pelo rádio](../../../hardware/io-pod/BUILD.pt.md#definições-pelo-rádio).
+
 ### Língua das caixas, identidade do campo e equipas guardadas
 
 Nas **Definições**:

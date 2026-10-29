@@ -339,7 +339,9 @@ free.
    on Windows cannot reach USB ports). Build it for your board revision
    (V4.3 by default; V4.2 needs the change described there). The
    [firmware guide](../../docs/manuals/en/firmware.md) has the same steps
-   for Windows, macOS and Linux.
+   for Windows, macOS and Linux. A board that already ran v0.4.0 or earlier needs
+   this USB flash once more, **without** `erase_flash`, because the partition
+   table changed ([firmware guide, section 3.3](../../docs/manuals/en/firmware.md#33-write-the-image)).
 4. **Settings for a Satellite** (optional; in `firmware\esp32\build\sdkconfig` after
    one build, then build again, as the
    [manual, section 12](../field-box/BUILD.md#12-hand-off-to-bring-up) says):

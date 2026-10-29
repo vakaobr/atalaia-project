@@ -34,7 +34,7 @@ meta:
   modes:
     title: Spielmodi · Atalaia
     description: >-
-      Die Spielmodi von Atalaia für Airsoft, Paintball und Milsim: Domination, Bombe / Rush, Hold-All
+      Die Spielmodi von Atalaia für Airsoft, Paintball und Milsim: Domination, Bombe / Rush, Sabotage, Hold-All
       Domination, Last Stand, Kill Confirmed, Respawn und Leben, Check-in, der Codes-Modifikator und
       das Medic-Kit, jeweils ein kurzes Lua-Skript.
   radio:
@@ -308,11 +308,11 @@ modes:
   title: Spielmodi
   intro: >-
     Modi reagieren auf Absichten („ein Team beansprucht dieses Prop“), nicht auf Hardware, also läuft
-    dasselbe Skript auf einer Field Box, einer Box mit Tastenfeld oder einem Android-Handy. Elf Modi,
+    dasselbe Skript auf einer Field Box, einer Box mit Tastenfeld oder einem Android-Handy. Vierzehn Modi,
     ein Modifikator und das Medic-Kit sind heute in Software geschrieben und getestet; noch keiner
     lief auf einem echten Feld.
   # The main page shows three modes, then this link to the modes page.
-  more: Alle 11 Modi ansehen →
+  more: Alle 14 Modi ansehen →
   # At the end of the modes page.
   try: Probier heute einen Modus im Browser aus →
   domination:
@@ -328,6 +328,10 @@ modes:
       entschärfen, bevor die Zündzeit abläuft. Scharf machen und entschärfen durch Gedrückthalten
       eines Knopfs, oder jedes Team bekommt seinen eigenen Code fürs Tastenfeld.
     meta: Team-Knöpfe oder Tastenfeld · Zünd- und Haltezeiten einstellbar
+  sabotage:
+    title: "Sabotage"
+    text: "Bombe in Runden, bis die Spielzeit abläuft. Die Angreifenden machen die Bombe scharf, die Verteidigenden entschärfen sie. Eine Explosion ist ein Punkt für die Angreifenden, eine Entschärfung ein Punkt für die Verteidigenden; dann ruht die Box und die nächste Runde beginnt. Das Team mit mehr Punkten gewinnt."
+    meta: "Team-Knöpfe oder Tastenfeld · Zünd-, Halte-, Pausen- und Spielzeit einstellbar"
   holdall:
     title: Hold-All Domination
     text: >-
@@ -465,6 +469,9 @@ gifs:
     caption: >-
       Bombe / Rush: Scharf machen durch Gedrückthalten eines Knopfs, die Zündzeit läuft ab, die
       Verteidigenden entschärfen rechtzeitig.
+  sabotage:
+    alt: "Animation einer Field Box beim Spielen von Sabotage. Der Bildschirm zeigt die bereite Bombe mit dem Stand 0 : 0; Rot hält seinen Knopf, der Balken füllt sich und die Bombe ist scharf; sie explodiert und der Bildschirm wird rot, ein Punkt für Rot. Eine Pause zeigt 1 : 0 und die Zeit bis zur nächsten Runde, dann hält Blau seinen Knopf und entschärft die zweite Bombe, der Bildschirm wird blau, ein Punkt für Blau; der Bildschirm zum Spielende zeigt Rot als Gewinner."
+    caption: "Sabotage: Bombenrunden mit Punktestand, eine Explosion für die Angreifenden, eine Entschärfung für die Verteidigenden, bis die Zeit um ist."
   master_satellites:
     alt: >-
       Animation von Master und Satelliten: Eine Satelliten-Box wird von neutral zu rot, wenn Rot
@@ -758,10 +765,12 @@ roadmap:
       - "Das Setup, das ein Szenario an die Boxen schickt, wird erneut gesendet, bis jede Box es bestätigt, und die Box sendet diese Bestätigung jetzt. Nur in Software und Host-Tests, nicht auf einem echten Board."
       - "Feld wechseln im Admin-Menü der Box verschiebt eine angemeldete Box über ihren Code auf ein anderes Feld. Nur Host-Tests, nicht auf einem echten Board."
       - "Das Logo des Feldes auf dem großen Bildschirm der Box. In Software, noch nicht an einem echten Display gesehen."
+      - "Eine größere Partitionstabelle: die beiden Firmware-Slots der Box sind je 4 MB groß (das Image füllte 93 % von 2 MB), Einstellungen und Schlüssel bleiben, wo sie waren. Nur in Host-Tests und Builds, auf keinem Board geflasht. Eine Box mit der alten Tabelle braucht einmal ein Flashen per USB; danach gehen Over-the-Air-Updates wie bisher."
     next:
       - Eine gebaute Box, die ein zweistündiges Club-Spiel ohne Neustart durchhält.
       - "Die Zeitleiste an einem echten Display sehen."
       - "Das erneute Senden des Setups, Feld wechseln und das Logo auf einem echten Board ausprobieren."
+      - "Die neue Partitionstabelle auf einem echten Board flashen (einmal per USB, ohne Löschen, bei einer Box mit der alten)."
     gate: >-
       Gate: Eine Box läuft ein zweistündiges Club-Spiel ohne Neustart. <strong>Offen</strong>, bis
       eine gebaute Box das schafft.
@@ -793,7 +802,11 @@ roadmap:
       - "Der Pi-Controller lässt ein Firmware-Update sofort scheitern, wenn das Funkmodul das Angebot ablehnt."
       - "Eine eingerichtete Box kann zurück in die WLAN-Einrichtung, über einen Menüeintrag hinter der Admin-PIN oder einen Befehl an der USB-Konsole. Die Einrichtungsseite gibt es auf Englisch, Portugiesisch, Deutsch und Traditionellem Chinesisch, und Handys öffnen sie von selbst."
       - "Der Tab Spiel der Konsole zeigt einen QR-Code der Anzeigetafel für Spielende."
-      - "Szenarien können auf Deutsch und Traditionell Chinesisch sein; die Namen ihrer Ziele bleiben vorerst Portugiesisch und Englisch."
+      - "Szenarien können auf Deutsch und Traditionell Chinesisch sein, die Namen ihrer Ziele eingeschlossen."
+      - "<strong>Sabotage</strong>, ein neuer Modus: Bombe in Runden, bis die Spielzeit abläuft. Die Angreifenden machen scharf, die Verteidigenden entschärfen; eine Explosion ist ein Punkt für die Angreifenden, eine Entschärfung ein Punkt für die Verteidigenden, dann ruht die Box und die nächste Runde beginnt. Das Team mit mehr Punkten gewinnt, bei Gleichstand gibt es ein Unentschieden. Im Simulator und in Tests und unter den Voreinstellungen der Field Box; noch nicht auf einem echten Board."
+      - "Der kleine Bildschirm des USB-Funkmodems spricht Portugiesisch, Englisch, Deutsch und Traditionelles Chinesisch, wie der der Box. Nur Host-Tests, nicht auf einem echten Board."
+      - "Die Formulare der GM-Konsole behalten, was die Spielleitung getippt hat, bis es gespeichert ist: Ein Check-in oder die Uhr der Konsole setzt die gespeicherten Werte nicht mehr zurück."
+      - "Das Logo des Feldes lässt sich auch als JPEG oder WebP hochladen; die GM-Konsole rechnet es für die Box um. In Software, noch nicht auf einem echten Panel gesehen."
     next:
       - Die Funk-Boards und 5 gebaute Boxen für den Feldtest.
       - Ein Feldtest mit 20 Boxen, mit und ohne Hören vor dem Senden.
@@ -858,6 +871,9 @@ roadmap:
         - "Anmeldung mit Google, Microsoft, Apple oder einem Passkey in der App, mit einem Kontobildschirm. Nur Android; nicht auf einem echten Handy und nicht mit den echten Anbietern ausprobiert."
         - "Der Feldplan des Spielers kann das Raster des Feldes und die eigene Zelle des Spielers zeigen."
         - "Schiedsrichter können beim Registrieren einen NFC-Sticker an eine Replik binden."
+        - "Das Handy eines Marshals behält den Beitrittsschlüssel des Feldes nicht mehr: nur ein Prop (seine Beitrittskarte) und der Handy-Controller tun das, und ein Update löscht ihn vom Handy eines Marshals."
+        - "Scoreboard-Links, die die eigene CA des Feldes festlegen, werden pro Feld gemerkt und vergessen, wenn sich die CA ändert."
+        - "Solange ein laufendes Spiel in der Spielendenansicht offen ist, hält ein Android-Vordergrunddienst mit einer Benachrichtigung die App am Laufen, damit das Vibrieren auch bei geschlossener App oder ausgeschaltetem Bildschirm kommt. Nicht auf iOS. Nicht auf einem echten Handy probiert."
     g_props:
       title: Android-Props und I/O-Pod
       items:
@@ -868,6 +884,7 @@ roadmap:
           eines Heltec-Boards."
         - "Die App verbindet sich mit einem verlorenen I/O-Pod von selbst wieder. Nicht mit einem echten Pod ausprobiert."
         - "Android-Props holen signierte Modus-Pakete von ihrem Controller, wie die Boxen. In Software."
+        - "Die GM-Konsole kann die Einstellungen eines I/O-Pods per Funk schicken: die Farben der vier Knöpfe, die Helligkeit des LED-Rings, die Lautstärke und ob der Gehäuseschalter meldet. Der Pod prüft den Befehl wie jeden anderen, speichert die Einstellungen in seinem Flash und antwortet; der Controller sendet ihn erneut, bis er eine Antwort hört. Vorher wurden sie beim Bauen der Firmware festgelegt. In Software und gegen den Code des Pods auf einem Computer, nicht mit einem echten Pod probiert."
     g_controller:
       title: Das Handy als Feld-Controller
       items:
@@ -897,6 +914,7 @@ roadmap:
           Internet da ist; Anmeldelisten, Branding und Szenario-Bibliothek kommen von dort), die
           Remote-Spielleitung und der ATAK-Feed."
         - "Die Konsole der Orga passt auf ein Handy: Check-in- und Marshal-Tabellen stapeln sich, ohne seitliches Scrollen."
+        - "Der eigene Bildschirm des Handy-Controllers importiert eine Anmeldeliste (eine CSV- oder JSON-Datei, gewählt mit der Dateiauswahl von Android), ganz ohne GM-Konsole."
     g_ios:
       title: iOS
       items:
@@ -991,6 +1009,7 @@ roadmap:
         - "ATAK zeigt Spielende in Gebäuden am Ort ihres Beacons, mit dem Raum in den Bemerkungen."
         - "Das Raster in ATAK und eine druckbare Rasterkarte."
         - "Der Remote-GM sieht die Positionen der Spieler, wenn sie sie teilen."
+        - "ATAK-Gerätezertifikate gelten 90 Tage (vorher 7), und die ATAK-Seite für die Mitarbeitenden warnt, wenn eines in 14 Tagen abläuft."
     g_server:
       title: Site-Server, Konten und Daten
       items:
@@ -1009,6 +1028,10 @@ roadmap:
         - "Anmeldung mit Google, Microsoft oder Apple und mit Passkeys. Passwörter sind optional; das Personal braucht weiterhin einen zweiten Faktor. Auf einem Computer getestet, nicht mit den echten Anmeldediensten."
         - "Eine Kontoseite für das Personal, auf der jede Person ihre eigenen Anmeldungen verwaltet: Passkeys, verknüpfte Konten, Passwort und Zwei-Faktor-Code."
         - "Änderungen an Szenarien, Presets und Terminen erreichen die Controller sofort."
+        - "Wie lange ein Feld Daten behält, ist eine Einstellung des Feldes: Spieldaten (Ereignisse, Punkte, Protokolle) und Chrono-Einträge haben je eine Aufbewahrungsdauer, standardmäßig 365 Tage, einzustellen am Controller, in der GM-Konsole oder auf der Einstellungsseite des Site-Servers. Die tägliche Bereinigung löscht ein beendetes Spiel dieses Alters, nie bevor der Site-Server alles davon hat. Das ungenutzte Aufbewahrungsfeld pro Konto ist weg."
+        - "Die Löschung einer Person an einem Feld-Controller erreicht den Site-Server mit der nächsten Synchronisierung von selbst (nie mit einem Namen) und löscht dort auch die Chrono-Einträge dieser Person."
+        - "Der erste vollständige Entwurf des Datenschutzhinweises, auf Portugiesisch und Englisch, neu geschrieben nach dem, was jeder Teil von Atalaia heute tut. Ein Entwurf, keine Rechtsberatung, noch nicht von einer Juristin oder einem Juristen geprüft."
+        - "Der Site-Server veröffentlicht den Datenschutzhinweis, den der Betrieb ihm gibt, als Seite und über die API in vier Sprachen und bittet Konten um erneute Einwilligung, wenn sich seine Version ändert. Nichts wird gesperrt: Export und Löschung bleiben möglich. Auf einem Computer getestet."
     g_games:
       title: Spiele, Clubs und Staff-Seiten
       items:
@@ -1045,9 +1068,10 @@ roadmap:
         - "Chrono-Einträge zeigen, wie weit eine Replik über dem Limit lag, und markieren Wiederholungstäter."
         - "Eine Seite für das Personal des Feldes mit dem Datenexport und dem Verbrauch der Kontingente."
         - "Punkteverläufe in Spielzeit."
-        - "Die Seite eines Clubs listet die Felder auf, auf denen er spielt."
+        - "Die Seite eines Clubs listet die Felder auf, auf denen er spielt, auch die Seite für die Mitarbeitenden."
         - "Der Controller importiert eine Anmelde-CSV selbst, ganz ohne Site-Server."
-        - "Die Konsole warnt, wenn ein Name Buchstaben hat, die die Boxen nicht zeichnen können."
+        - "Die Konsole warnt, wenn ein Name Buchstaben hat, die die Boxen nicht zeichnen können: Teamnamen, der Name des Spiels, der eines Szenarios und die seiner Ziele."
+        - "Anmeldelisten tragen die Verbands-ID und das Ablaufdatum der Mitgliedschaft als optionale Spalten, und der Export der Anmeldungen lässt sich unverändert wieder importieren."
     g_boxes:
       title: Boxen und das Feld
       items:
@@ -1099,6 +1123,9 @@ roadmap:
           anderen. In Docker getestet, nicht auf einem echten Hosted-Server mit echter Domain."
         - "Gehosteter Modus: ein Kontingent pro Feld, ein Datenexport, den die Verwaltung eines Felds herunterladen kann, und die offenen Verbindungen eines gelöschten Felds werden sofort geschlossen."
         - "Hosted-Modus: ein Speicherkontingent und eigene Domains pro Feld."
+        - "Hosted-Modus: Jedes Feld hat eine eigene Datenbankrolle, so dass eine SQL-Injection nicht mehr auf die Daten eines anderen Feldes umschalten kann, indem sie die Einstellung ändert, die die Zeilensicherheit nutzte. Eine Lücke, die eine zweite SQL-Anweisung braucht, bleibt offen und ist dokumentiert. Gegen PostgreSQL in Docker getestet."
+        - "Hosted-Modus: Felder, die Chrono-Einträge teilen, tun das jetzt auch zwischen den Feldern eines Hubs, über eine schreibgeschützte Ansicht, die eine Einwilligung braucht; eine Person verknüpft ihre Konten bei zwei Feldern mit einem Einmalcode, und nichts wird über E-Mail oder Namen zugeordnet. Gegen PostgreSQL in Docker getestet."
+        - "Eine schreibgeschützte Live-Demo für den Vorschau-Server: Der echte Feld-Controller mit drei simulierten Field Boxen spielt endlos Domination-Spiele, und Besuchende sehen die GM-Konsole, die Anzeigetafel und eine Spielendenansicht, ohne etwas ändern zu können und ohne personenbezogene Daten. In Docker gebaut und getestet; sie geht online, sobald ihre Adresse eingerichtet ist."
     next:
       - Ein echter Server mit Domain.
       - Eine rechtliche Prüfung der Vorlagen, bevor der Hosted-Modus live geht. Vorher wird er nicht angeboten.
@@ -1160,6 +1187,7 @@ roadmap:
       - "Die Web-Ansicht des Simulators hat jede Eingabe, die ein Modus nutzt: Tags, Tastenfeld, Treffer und GM-Befehle, mit Download des Ereignisprotokolls."
       - "Die Szenario-Blöcke der GM-Konsole haben eine Sprachliste mit allen vier Sprachen."
       - "Die Modus-Schlüssel des Projekts: ein offline gehaltener Root-Schlüssel und ein Schlüssel, mit dem die Registry das Verifiziert-Abzeichen signiert. Boxen, App und Controller vertrauen standardmäßig beiden."
+      - "Die Firmware-Anleitung und die Bauhandbücher erklären das eine Flashen per USB, das eine Box mit der alten Partitionstabelle braucht, und dass Einstellungen und Schlüssel es überleben."
     next:
       - "Die Prüfung des Deutschen und des Chinesischen: Wenn du auf Deutsch oder Chinesisch
         spielst, hilf uns beim Prüfen. Übersetzungen in andere Sprachen beginnen in

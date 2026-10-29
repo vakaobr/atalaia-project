@@ -123,6 +123,16 @@ To restore on a new Pi, install as in section 4, stop the service, unpack the ba
 
 Back up before a game day and after you adopt new boxes. Do not copy the database while the controller runs.
 
+### How long the controller keeps data
+
+Once a day the controller deletes what is older than its retention periods. They are settings in the `[checkin]` section of `/etc/atalaia/controller.toml`, in days:
+
+- `retention_days = 30`: the names and federation numbers of a game's check-ins, erased this many days after the game.
+- `chrono_retention_days = 365` (30 to 3653): chronograph readings, other fields' copies of them and a marshal's earlier keys.
+- `game_retention_days = 365` (30 to 3653): an ended game's events, scores and list of devices. With a site server set up, a game is never deleted before the site server has all of it, so a game that cannot be sent stays until it can.
+
+The last two can also be set in the GM console (**Check-in › Check-in rules**, see the [Game master manual](game-master.md#check-in-rules-and-the-poster)). With `[sync] branding = "site"` they come from the site server's field settings and the console cannot change them. After you edit the file, restart the controller (`sudo systemctl restart atalaia-controller`). A backup holds what the controller had not yet deleted: delete old backups too, as you would the data.
+
 ## 8. Troubleshooting
 
 | Problem | What to do |

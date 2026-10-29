@@ -50,6 +50,18 @@ here. See site/README.md and the comment at the top of index.html.
               <figcaption>{{ gifs.bomb.caption }}</figcaption>
             </figure>
           </article>
+          <article class="card" id="sabotage">
+            <h2>{{ modes.sabotage.title }}</h2>
+            <p>{{ modes.sabotage.text }}</p>
+            <p class="meta">{{ modes.sabotage.meta }}</p>
+            <figure class="modegif" data-still="{{ page.root }}img/modes/sabotage-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/sabotage-{{ page.code }}.gif">
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/sabotage-{{ page.code }}-still.gif">
+                <img src="{{ page.root }}img/modes/sabotage-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.sabotage.alt|text }}">
+              </picture>
+              <figcaption>{{ gifs.sabotage.caption }}</figcaption>
+            </figure>
+          </article>
           <article class="card" id="holdall">
             <h2>{{ modes.holdall.title }}</h2>
             <p>{{ modes.holdall.text }}</p>

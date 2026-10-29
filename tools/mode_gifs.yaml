@@ -65,6 +65,23 @@ scripts:
          tween: {n: 9, frame_s: 0.3, set: {left: [41, 34], defuse: [0.0, 1.0]}}}
       - {screen: defused, data: {team: blue}, s: 3.2}
 
+  sabotage:
+    mode: org.atalaia.sabotage
+    params: {attackers: red, defenders: blue, fuse_s: 300}
+    poster: 3
+    steps:
+      - {screen: standby, data: {arm: red, defend: blue, a_points: 0, d_points: 0, round: 1, game_left: 1200}, s: 1.8}
+      - {screen: standby, data: {arm: red, defend: blue, a_points: 0, d_points: 0, round: 1, game_left: 1190}, s: 0.2,
+         tween: {n: 9, frame_s: 0.22, set: {progress: [0.0, 1.0]}}}
+      - {screen: countdown, data: {left: 8}, s: 1.6}
+      - {screen: exploded, data: {team: red}, s: 2.4}
+      - {screen: pause, data: {attackers: red, defenders: blue, a_points: 1, d_points: 0, left: 7, exploded: true, game_left: 880}, s: 2.0}
+      - {screen: standby, data: {arm: red, defend: blue, a_points: 1, d_points: 0, round: 2, game_left: 870}, s: 1.4}
+      - {screen: countdown, data: {left: 34, defuse: 1}, s: 0.3,
+         tween: {n: 9, frame_s: 0.3, set: {left: [41, 34], defuse: [0.0, 1.0]}}}
+      - {screen: defused, data: {team: blue}, s: 2.4}
+      - {screen: game_over, data: {winner: red, attackers: red, defenders: blue, a_points: 3, d_points: 1}, s: 3.2}
+
   master_satellites:
     mode: org.atalaia.master_satellites
     params: {capture_hold_ms: 3000, tick_s: 10}

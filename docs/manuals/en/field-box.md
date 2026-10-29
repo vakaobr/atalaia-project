@@ -179,6 +179,8 @@ The organisers can update a box's firmware over the field's Wi-Fi, between games
 
 Do not switch the box off during an update. Keep the battery charged: a box with a low battery refuses. Not yet tested on a field.
 
+**A box flashed with v0.4.0 or earlier cannot take this update.** From v0.5 the firmware slots are bigger (a new partition table), and an update over the air cannot change the table. The box needs to be flashed over USB once, without erasing it: it keeps its field, its keys and its settings, and fetches the game modes and the field's logo again at the next game. A box that shows **Flash over USB** is one that is on the old table with the new firmware. After that one flash, updates over the air work as before. How: [firmware guide, section 3.3](firmware.md#33-write-the-image).
+
 ## 10. Radio basics for a field
 
 - **One channel for the whole field.** All boxes, the controller's USB modem and the apps' pods use the same channel. The default is **869.525 MHz** in Europe. The organisers choose it in the console, before the first game, and the box learns it when it joins a game. A box refuses a game from another region.

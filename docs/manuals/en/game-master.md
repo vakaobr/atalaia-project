@@ -145,6 +145,18 @@ You can update the boxes' firmware over the field's Wi-Fi, between games. Not ye
 
 A box needs the field's Wi-Fi name and password in its setup, enough battery and the release's key built into its firmware.
 
+**One exception: a box flashed with v0.4.0 or earlier.** From v0.5 the firmware slots are bigger, which is a new partition table, and an update over the air cannot change it. The console refuses the offer to such a box (the result says: needs a newer partition table, USB flash required once). Flash that box over USB once, without erasing it (it keeps its field, keys and settings): see the [firmware guide, section 3.3](firmware.md#33-write-the-image). After that, updates over the air work as before.
+
+### The I/O pod's settings (optional)
+
+If a phone uses an **I/O pod** as its radio, you can change the pod's settings from the console, without a cable or a new build: the colours of its four buttons, the LED ring's brightness, the volume and whether its enclosure switch reports. Not yet tried with a real pod.
+
+1. Do it **before a game starts or after it ended**. The panel is disabled during a game. The phone with the pod must have joined the game.
+2. Open **Boxes**, panel **I/O pods' settings**. Find the phone with the pod, set only what you want to change (**Set the colours**, the brightness, the volume, the enclosure switch) and tap **Send to the pod**. **Back to the build's settings first** drops everything pushed before.
+3. The panel shows **sent (1), waiting**, then **taken by the pod**. If the pod does not answer, the controller sends it again after 8, 16, 32, 64 and 128 seconds, then says **no answer**: the phone has no pod, the pod's firmware is older than this feature, or it is out of reach or battery.
+
+The pod keeps what you sent, also after a restart. The build guide has the details: [I/O pod, Settings over the radio](../../../hardware/io-pod/BUILD.md#settings-over-the-radio).
+
 ### Box language, branding and saved teams
 
 In **Settings**:

@@ -30,7 +30,7 @@ meta:
   modes:
     title: Game modes · Atalaia
     description: >-
-      Atalaia's game modes for airsoft, paintball and milsim: Domination, Bomb / Rush, Hold-All
+      Atalaia's game modes for airsoft, paintball and milsim: Domination, Bomb / Rush, Sabotage, Hold-All
       Domination, Last Stand, Kill Confirmed, Respawn and Lives, Player Check-in, the Codes modifier
       and the Medic Kit, each a short Lua script.
   radio:
@@ -291,10 +291,10 @@ modes:
   title: Game modes
   intro: >-
     Modes react to intent ("a team is claiming this prop"), not to hardware, so the same script
-    runs on a Field Box, a keypad box or an Android phone. Eleven modes, one modifier and the Medic
+    runs on a Field Box, a keypad box or an Android phone. Fourteen modes, one modifier and the Medic
     Kit are written and tested in software today; none has run on a real field yet.
   # The main page shows three modes, then this link to the modes page.
-  more: See all 11 modes →
+  more: See all 14 modes →
   # At the end of the modes page.
   try: Try a mode in your browser today →
   domination:
@@ -309,6 +309,10 @@ modes:
       Attackers arm the bomb, then defend it; defenders must defuse it before the fuse runs out.
       Arm and defuse by holding a button, or give each team its own keypad code.
     meta: Team buttons or keypad · fuse and hold times are settings
+  sabotage:
+    title: "Sabotage"
+    text: "Bomb in rounds, until the game time runs out. Attackers arm the bomb, defenders defuse it. An explosion is a point for the attackers, a defuse a point for the defenders; then the box rests and the next round starts. The team with more points wins."
+    meta: "Team buttons or keypad · fuse, hold, pause and game times are settings"
   holdall:
     title: Hold-All Domination
     text: >-
@@ -438,6 +442,9 @@ gifs:
     caption: >-
       Bomb / Rush: arming by holding a button, the fuse counting down, the defenders defusing in
       time.
+  sabotage:
+    alt: "Animation of a Field Box playing Sabotage. The screen shows the bomb ready with the score 0 : 0; red holds its button, the bar fills and the bomb is armed; it explodes and the screen turns red, a point for red. A pause shows 1 : 0 and the time to the next round, then blue holds its button to defuse the second bomb and the screen turns blue, a point for blue; the game-over screen shows red the winner."
+    caption: "Sabotage: bomb rounds with a score, an explosion for the attackers, a defuse for the defenders, until the time is up."
   master_satellites:
     alt: >-
       Animation of Master and Satellites: a satellite box turns from neutral to red when red
@@ -721,10 +728,12 @@ roadmap:
       - "The setup a scenario sends to the boxes is sent again until each box confirms it, and the box now sends that confirmation. In software and host tests only, not on a real board."
       - "Change field in the box's admin menu moves an adopted box to another field, by its code. Host tests only, not on a real board."
       - "The field's logo on the box's big screen. In software, not yet seen on a real panel."
+      - "A bigger partition table: the box's two firmware slots are 4 MB each (the image filled 93 % of 2 MB), with the settings and keys kept where they were. In host tests and builds only, not flashed on a board. A box on the old table needs one USB flash; after that, over-the-air updates work as before."
     next:
       - A built box that runs a 2-hour club game with no restarts.
       - "Seeing the timer bar on a real panel."
       - "Trying the setup re-send, Change field and the logo on a real board."
+      - "Flashing the new partition table on a real board (one USB flash, no erase, for a box on the old one)."
     gate: >-
       Gate: one box runs a 2-hour club game with no restarts. <strong>Open</strong> until a built
       box does.
@@ -754,7 +763,11 @@ roadmap:
       - "The Pi controller fails a firmware update at once when the radio refuses the offer."
       - "A box that was set up can go back into Wi-Fi setup, from a menu entry behind the admin PIN or a command on the USB console. The setup page is in English, Portuguese, German and Traditional Chinese, and phones open it by themselves."
       - "The console's Game tab shows a QR code of the scoreboard for players."
-      - "Scenarios can be in German and Traditional Chinese; their objective names stay in Portuguese and English for now."
+      - "Scenarios can be in German and Traditional Chinese, objective names included."
+      - "<strong>Sabotage</strong>, a new mode: Bomb in rounds until the game time runs out. The attackers arm, the defenders defuse; an explosion is a point for the attackers, a defuse a point for the defenders, then the box rests and the next round starts. The team with more points wins, equal points are a draw. In the simulator and in tests, and among the Field Box's presets; not yet on a real board."
+      - "The USB radio modem's small screen speaks Portuguese, English, German and Traditional Chinese, like the box's. Host tests only, not on a real board."
+      - "The GM console's forms keep what the organiser has typed until it is saved: a player checking in, or the console's clock, no longer puts the saved values back."
+      - "The field's logo can be uploaded as a JPEG or WebP too; the GM console converts it for the box. In software, not yet seen on a real panel."
     next:
       - The radio boards, and 5 built boxes for the field test.
       - A 20-box field test with listen-before-talk on and off.
@@ -814,6 +827,9 @@ roadmap:
         - "Login with Google, Microsoft, Apple or a passkey in the app, with an account screen. Android only; not tried on a real phone or against the real providers."
         - "The player's field plan can show the field's grid and the player's own cell."
         - "A marshal can bind an NFC sticker to a replica when registering it."
+        - "A marshal's phone no longer keeps the field join key: only a prop (its join card) and the phone controller do, and an upgrade clears it from a marshal's phone."
+        - "Scoreboard links that pin the field's own CA are remembered per field, and forgotten when the CA changes."
+        - "While a live game is open in the player view, an Android foreground service with a notification keeps the app running, so the buzzes still play with the app closed or the screen off. Not on iOS. Not tried on a real phone."
     g_props:
       title: Props and the I/O pod
       items:
@@ -823,6 +839,7 @@ roadmap:
           NFC reader, enclosure switch and LoRa radio, over USB or Bluetooth."
         - "The app reconnects to a lost I/O pod by itself. Not tried with a real pod."
         - "Android props fetch signed mode packages from their controller, as boxes do. In software."
+        - "The GM console can push an I/O pod's settings over the radio: the four buttons' colours, the LED ring's brightness, the volume and whether the enclosure switch reports. The pod authenticates the command like any other, keeps the settings in its flash and answers; the controller sends it again until it hears back. Before, they were set when the firmware was built. In software and against the pod's code on a computer, not tried with a real pod."
     g_controller:
       title: The phone as the field controller
       items:
@@ -849,6 +866,7 @@ roadmap:
           standby), the site server sync (games, logs and scores sent when the internet is there;
           rosters, branding and the scenario library from it), the remote GM and the ATAK feed."
         - "The GM console fits a phone: its check-in and marshal tables stack, with no sideways scrolling."
+        - "The phone controller's own screen imports a registration list (a CSV or JSON file chosen with Android's file chooser), with no GM console needed."
     g_ios:
       title: iOS
       items:
@@ -940,6 +958,7 @@ roadmap:
         - "ATAK shows an indoor player at their beacon's place, with the room in the remarks."
         - "The grid in ATAK, and a printable grid map."
         - "The remote GM sees players' positions when they share them."
+        - "ATAK device certificates last 90 days (they were 7), and the staff ATAK page warns when one expires within 14 days."
     g_server:
       title: Site server, accounts and data
       items:
@@ -958,6 +977,10 @@ roadmap:
         - "Login with Google, Microsoft or Apple, and with passkeys. Passwords are optional; staff still need a second factor. Tested on a computer, not against the real login providers."
         - "A staff account page where each person manages their own logins: passkeys, linked accounts, password and two-factor code."
         - "Scenario, preset and schedule changes reach the controllers at once."
+        - "How long a field keeps data is a field setting: game data (events, scores, logs) and chrono records each have a retention period, 365 days by default, set on the controller, in the GM console or on the site server's staff settings page. The daily purge deletes an ended game that old, never before the site server has all of it. The unused per-account retention field is gone."
+        - "A player's erasure at a field controller reaches the site server by itself with the next sync (never a name), and erases the player's chrono records there too."
+        - "The first full draft of the privacy notice, in Portuguese and English, rewritten from what every part of Atalaia does today. A draft, not legal advice, not yet reviewed by a lawyer."
+        - "The site server publishes the privacy notice the operator provides, as a page and over the API in four languages, and asks accounts to consent again when its version changes. Nothing is blocked: export and erasure stay available. Tested on a computer."
     g_games:
       title: Games, clubs and staff pages
       items:
@@ -990,9 +1013,10 @@ roadmap:
         - "Chrono records show by how much a replica was over the limit, and flag repeat offenders."
         - "A staff page for the field's data export and its use of the quotas."
         - "Score timelines in game time."
-        - "A club's page lists the fields it plays at."
+        - "A club's page lists the fields it plays at, the staff page too."
         - "The controller imports a registration CSV on its own, with no site server needed."
-        - "The console warns when a name has letters the boxes cannot draw."
+        - "The console warns when a name has letters the boxes cannot draw: team names, the game's name, a scenario's and its objectives' names."
+        - "Registration lists carry an association ID and the membership's expiry date as optional columns, and the registration export imports back as it is."
     g_boxes:
       title: Boxes and the field
       items:
@@ -1039,6 +1063,9 @@ roadmap:
           server with a real domain."
         - "Hosted mode: a quota for each field, a data export a field's administrator can download, and a deleted field's open connections close at once."
         - "Hosted mode: a storage quota, and custom domains per field."
+        - "Hosted mode: every field has a database role of its own, so a SQL injection can no longer switch to another field's data by changing the setting that row-level security used. One gap that needs a second SQL statement stays open and is written down. Tested against PostgreSQL in Docker."
+        - "Hosted mode: fields that share chrono records now do so across a hub's fields, through a read-only view that needs consent; a person links their accounts at two fields with a one-time code, and nothing is matched by e-mail or name. Tested against PostgreSQL in Docker."
+        - "A read-only live demo for the preview server: the real field controller with three simulated Field Boxes plays Domination games forever, and visitors see the GM console, the scoreboard and a player's view, with nothing to change and no personal data. Built and tested in Docker; it goes online once its address is set up."
     next:
       - A real server with its domain.
       - A legal review of the templates before hosted mode goes live. It is not offered before.
@@ -1094,6 +1121,7 @@ roadmap:
       - "The simulator's web view has every input a mode uses: tags, keypad, hits and GM commands, with an event-log download."
       - "The GM console's scenario blocks have a language list with all four languages."
       - "The project's mode keys: an offline root key and a key the registry uses to sign the verified badge. Boxes, the app and the controllers trust both by default."
+      - "The firmware guide and the build manuals explain the one USB flash that a box on the old partition table needs, and that settings and keys survive it."
     next:
       - "The review of the German and the Chinese: if you play in German or in Chinese, help us
         review them. Translations into other languages start at docs/translations."

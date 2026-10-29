@@ -353,7 +353,9 @@ díodo virada para BAT+, a risca do condensador do anel virada para o GND; o
    computador (o Docker no Windows não alcança as portas USB). Compila-o para a
    revisão da tua placa (V4.3 por omissão; a V4.2 precisa da alteração aí
    descrita). O [guia de firmware](../../docs/manuals/pt/firmware.md) tem os
-   mesmos passos para Windows, macOS e Linux.
+   mesmos passos para Windows, macOS e Linux. Uma placa que já correu a v0.4.0 ou
+   anterior precisa desta gravação por USB mais uma vez, **sem** `erase_flash`,
+   porque a tabela de partições mudou ([guia de firmware, secção 3.3](../../docs/manuals/pt/firmware.md#33-escrever-a-imagem)).
 4. **Definições para um Satélite** (opcionais; em `firmware\esp32\build\sdkconfig`
    depois de uma compilação, e depois compilar de novo, como diz a
    [secção 12 do manual](../field-box/BUILD.pt.md)):

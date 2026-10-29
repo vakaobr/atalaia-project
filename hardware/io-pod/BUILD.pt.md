@@ -337,6 +337,14 @@ comando de compilação e a pasta de compilação.
    rádio, `advertising as atalaia-pod-XXXX` e a lista das capacidades que
    empresta.
 
+**Um módulo gravado antes da v0.5** tem a tabela de partições antiga (espaços de
+programa de 2 MB; a tabela da Field Box passou a espaços de 4 MB). Grava-o por USB
+mais uma vez, com o mesmo comando e **sem** `erase_flash`: as definições e as chaves
+ficam. O módulo só regista `WRONG PARTITION TABLE` e continua a funcionar, mas uma
+atualização pelo ar não consegue mudar a tabela. Um módulo gravado pela primeira vez
+a partir da v0.5 não precisa de mais nada
+([guia de firmware, secção 3.3](../../docs/manuals/pt/firmware.md#33-escrever-a-imagem)).
+
 **Definições** (linhas em `firmware\esp32\build-pod\sdkconfig`, e depois
 compilar de novo; o menu Kconfig "I/O pod", listado em
 firmware/esp32/README.md):

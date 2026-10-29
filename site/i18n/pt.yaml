@@ -32,7 +32,7 @@ meta:
   modes:
     title: Modos de jogo · Atalaia
     description: >-
-      Os modos de jogo da Atalaia para airsoft, paintball e milsim: Domínio, Bomba / Rush, Domínio
+      Os modos de jogo da Atalaia para airsoft, paintball e milsim: Domínio, Bomba / Rush, Sabotagem, Domínio
       Total, Último Elemento, Baixa Confirmada, Reentradas e Vidas, Registo de Presença, o
       modificador Códigos e as Ligaduras, cada um num pequeno script Lua.
   radio:
@@ -299,10 +299,10 @@ modes:
   intro: >-
     Os modos reagem à intenção («uma equipa está a capturar este dispositivo») e não ao hardware,
     por isso o mesmo script corre numa Field Box, numa caixa com teclado ou num telemóvel Android.
-    Há onze modos, um modificador e as Ligaduras já escritos e testados em software; ainda nenhum
+    Há catorze modos, um modificador e as Ligaduras já escritos e testados em software; ainda nenhum
     correu num campo a sério.
   # The main page shows three modes, then this link to the modes page.
-  more: Ver os 11 modos →
+  more: Ver os 14 modos →
   # At the end of the modes page.
   try: Experimenta já um modo no browser →
   domination:
@@ -318,6 +318,10 @@ modes:
       da contagem. Arma-se e desarma-se a manter um botão premido, ou com um código de teclado
       para cada equipa.
     meta: Botões de equipa ou teclado · tempos configuráveis
+  sabotage:
+    title: "Sabotagem"
+    text: "A Bomba em rondas, até acabar o tempo de jogo. Os atacantes armam a bomba, os defensores desarmam-na. Uma explosão é um ponto para os atacantes, um desarme um ponto para os defensores; depois a caixa descansa e começa a ronda seguinte. Vence a equipa com mais pontos."
+    meta: "Botões de equipa ou teclado · tempos de rastilho, de premir, de pausa e de jogo configuráveis"
   holdall:
     title: Domínio Total
     text: >-
@@ -452,6 +456,9 @@ gifs:
     caption: >-
       Bomba / Rush: armar a manter um botão premido, a contagem a correr e os defensores a
       desarmar a tempo.
+  sabotage:
+    alt: "Animação de uma caixa de campo a jogar Sabotagem. O ecrã mostra a bomba pronta com o resultado 0 : 0; a equipa vermelha prime o botão, a barra enche e a bomba fica armada; explode e o ecrã fica vermelho, um ponto para o vermelho. Uma pausa mostra 1 : 0 e o tempo até à ronda seguinte, depois a equipa azul prime o botão para desarmar a segunda bomba e o ecrã fica azul, um ponto para o azul; o ecrã de fim de jogo mostra o vermelho vencedor."
+    caption: "Sabotagem: rondas de bomba com marcador, uma explosão para os atacantes, um desarme para os defensores, até acabar o tempo."
   master_satellites:
     alt: >-
       Animação de Mestre e Satélites: uma caixa satélite passa de livre a vermelha quando a
@@ -740,10 +747,12 @@ roadmap:
       - "A configuração que um cenário envia às caixas é enviada outra vez até cada caixa a confirmar, e a caixa já envia essa confirmação. Só em software e testes no computador, não numa placa a sério."
       - "Mudar de campo, no menu de administração da caixa, passa uma caixa adotada para outro campo, pelo código. Só testes no computador, não numa placa a sério."
       - "O logótipo do campo no ecrã grande da caixa. Em software, ainda não visto num painel a sério."
+      - "Uma tabela de partições maior: os dois espaços de firmware da caixa têm 4 MB cada (a imagem ocupava 93 % de 2 MB), e as definições e as chaves ficam onde estavam. Só em testes no computador e compilações, sem ter sido gravada numa placa. Uma caixa com a tabela antiga precisa de uma gravação por USB; depois disso, as atualizações pelo ar funcionam como antes."
     next:
       - Uma caixa montada que aguente um jogo de clube de 2 horas sem reiniciar.
       - "Ver a barra do tempo num painel a sério."
       - "Experimentar o reenvio da configuração, o Mudar de campo e o logótipo numa placa a sério."
+      - "Gravar a nova tabela de partições numa placa a sério (uma gravação por USB, sem apagar, para uma caixa com a antiga)."
     gate: >-
       Prova: uma caixa aguenta um jogo de clube de 2 horas sem reiniciar. <strong>Em aberto</strong>
       até haver uma caixa montada que o consiga.
@@ -774,7 +783,11 @@ roadmap:
       - "O controlador Pi falha logo uma atualização de firmware quando o rádio recusa a oferta."
       - "Uma caixa já configurada pode voltar à configuração do Wi-Fi, por uma entrada de menu atrás do PIN de administração ou por um comando na consola USB. A página de configuração está em inglês, português, alemão e chinês tradicional, e os telemóveis abrem-na sozinhos."
       - "O separador Jogo da consola mostra um código QR do marcador para quem joga."
-      - "Os cenários podem estar em alemão e em chinês tradicional; os nomes dos objetivos ficam por agora em português e inglês."
+      - "Os cenários podem estar em alemão e em chinês tradicional, com os nomes dos objetivos incluídos."
+      - "<strong>Sabotagem</strong>, um modo novo: a Bomba em rondas até acabar o tempo de jogo. Os atacantes armam, os defensores desarmam; uma explosão é um ponto para os atacantes, um desarme um ponto para os defensores; depois a caixa descansa e começa a ronda seguinte. Vence a equipa com mais pontos, pontos iguais são empate. No simulador e em testes, e entre as predefinições da Field Box; ainda não numa placa a sério."
+      - "O pequeno ecrã do modem de rádio USB fala português, inglês, alemão e chinês tradicional, como o da caixa. Só testes no computador, não numa placa a sério."
+      - "Os formulários da consola de GM guardam o que a organização escreveu até haver gravação: quem se regista ou o relógio da consola já não repõem os valores gravados."
+      - "O logótipo do campo também pode ser carregado em JPEG ou WebP; a consola de GM converte-o para a caixa. Em software, ainda não visto num painel a sério."
     next:
       - As placas de rádio e 5 caixas montadas para o teste no campo.
       - Um teste no campo com 20 caixas, com e sem escuta antes de falar.
@@ -837,6 +850,9 @@ roadmap:
         - "Início de sessão com Google, Microsoft, Apple ou uma chave de acesso (passkey) na app, com um ecrã de conta. Só Android; não experimentado num telemóvel a sério nem com os fornecedores reais."
         - "O plano do campo do jogador pode mostrar a quadrícula do campo e a célula do próprio jogador."
         - "Quem é árbitro pode associar um autocolante NFC a uma réplica ao registá-la."
+        - "O telemóvel de um marshal já não guarda a chave de entrada do campo: só uma caixa de jogo (o seu cartão de entrada) e o controlador no telemóvel a guardam, e uma atualização apaga-a do telemóvel de um marshal."
+        - "As ligações ao marcador que fixam a CA do próprio campo ficam guardadas por campo e são esquecidas quando a CA muda."
+        - "Enquanto um jogo em direto está aberto na vista de quem joga, um serviço Android em primeiro plano, com uma notificação, mantém a app a correr, e os avisos por vibração continuam com a app fechada ou o ecrã apagado. No iOS não. Não experimentado num telemóvel a sério."
     g_props:
       title: Dispositivos Android e módulo de E/S
       items:
@@ -847,6 +863,7 @@ roadmap:
           Bluetooth."
         - "A app volta a ligar-se sozinha a um módulo de E/S perdido. Não experimentado com um módulo a sério."
         - "Os props Android vão buscar pacotes de modo assinados ao seu controlador, como as caixas. Em software."
+        - "A consola de GM pode enviar as definições de um módulo de E/S pelo rádio: as cores dos quatro botões, o brilho do anel de LEDs, o volume e se o interruptor da caixa avisa. O módulo autentica o comando como qualquer outro, guarda as definições na sua flash e responde; o controlador volta a enviá-lo até ouvir a resposta. Antes, eram definidas quando o firmware era compilado. Em software e contra o código do módulo num computador, não experimentado com um módulo a sério."
     g_controller:
       title: O telemóvel como controlador de campo
       items:
@@ -876,6 +893,7 @@ roadmap:
           pontuações enviados quando há internet; listas de inscritos, imagem do campo e biblioteca
           de cenários recebidas de lá), o GM remoto e o feed para o ATAK."
         - "A consola da organização cabe num telemóvel: as tabelas de check-in e de marshals empilham-se, sem deslocar a página para o lado."
+        - "O próprio ecrã do controlador no telemóvel importa uma lista de inscrições (um ficheiro CSV ou JSON escolhido com o seletor de ficheiros do Android), sem precisar da consola de GM."
     g_ios:
       title: iOS
       items:
@@ -969,6 +987,7 @@ roadmap:
         - "O ATAK mostra quem está em interiores no sítio da sua baliza, com a sala nas observações."
         - "A quadrícula no ATAK e um mapa de quadrícula para imprimir."
         - "O GM remoto vê as posições dos jogadores quando estes as partilham."
+        - "Os certificados de dispositivo do ATAK duram 90 dias (eram 7), e a página de ATAK do pessoal avisa quando um expira nos próximos 14 dias."
     g_server:
       title: Servidor do site, contas e dados
       items:
@@ -987,6 +1006,10 @@ roadmap:
         - "Início de sessão com Google, Microsoft ou Apple e com passkeys (chaves de acesso). As palavras-passe são opcionais; a equipa continua a precisar de um segundo fator. Testado num computador, não com os fornecedores de início de sessão a sério."
         - "Uma página de conta para a equipa, onde cada pessoa gere os seus inícios de sessão: passkeys, contas associadas, palavra-passe e código de dois fatores."
         - "As alterações a cenários, predefinições e calendário chegam logo aos controladores."
+        - "Durante quanto tempo o campo guarda os dados é uma definição do campo: os dados de jogo (eventos, pontuações, registos) e os registos de cronografagem têm cada um o seu prazo, 365 dias por omissão, definido no controlador, na consola de GM ou na página de definições do servidor do site. A limpeza diária apaga um jogo terminado com essa idade, nunca antes de o servidor do site o ter por inteiro. O campo, sem uso, de retenção por conta desapareceu."
+        - "O apagamento de uma pessoa num controlador de campo chega sozinho ao servidor do site na sincronização seguinte (nunca com o nome), e apaga lá também os registos de cronografagem dessa pessoa."
+        - "O primeiro rascunho completo do aviso de privacidade, em português e inglês, reescrito a partir do que cada parte da Atalaia faz hoje. É um rascunho, não é aconselhamento jurídico e ainda não foi revisto por um/a jurista."
+        - "O servidor do site publica o aviso de privacidade que a operação lhe dá, como página e pela API em quatro línguas, e pede às contas que consintam de novo quando a versão muda. Nada fica bloqueado: a exportação e o apagamento continuam disponíveis. Testado num computador."
     g_games:
       title: Jogos, clubes e páginas da organização
       items:
@@ -1022,9 +1045,10 @@ roadmap:
         - "Os registos de cronógrafo mostram quanto uma réplica passou do limite e assinalam reincidentes."
         - "Uma página para o pessoal do campo com a exportação dos dados e o uso das quotas."
         - "Cronologias de pontuação em tempo de jogo."
-        - "A página de um clube lista os campos onde joga."
+        - "A página de um clube lista os campos onde joga, também a do pessoal."
         - "O controlador importa sozinho um CSV de inscrições, sem servidor do site."
-        - "A consola avisa quando um nome tem letras que as caixas não conseguem desenhar."
+        - "A consola avisa quando um nome tem letras que as caixas não conseguem desenhar: nomes de equipas, o nome do jogo, o de um cenário e os dos seus objetivos."
+        - "As listas de inscrições levam o identificador da associação e a data de validade da filiação como colunas opcionais, e a exportação das inscrições volta a importar-se tal como está."
     g_boxes:
       title: Caixas e o campo
       items:
@@ -1073,6 +1097,9 @@ roadmap:
           Docker, não num servidor alojado real com um domínio real."
         - "Modo alojado: uma quota por campo, uma exportação de dados que a administração do campo pode descarregar, e as ligações abertas de um campo apagado fecham logo."
         - "Modo alojado: uma quota de armazenamento e domínios próprios por campo."
+        - "Modo alojado: cada campo tem um papel de base de dados só seu, e por isso uma injeção de SQL já não consegue passar para os dados de outro campo mudando a definição que a segurança ao nível da linha usava. Uma lacuna que exige uma segunda instrução SQL continua aberta e está escrita. Testado contra o PostgreSQL em Docker."
+        - "Modo alojado: os campos que partilham registos de cronografagem passam a fazê-lo entre os campos de um centro, por uma vista só de leitura que exige consentimento; uma pessoa liga as suas contas em dois campos com um código de uso único, e nada é associado por e-mail ou nome. Testado contra o PostgreSQL em Docker."
+        - "Uma demonstração em direto, só de leitura, para o servidor de pré-visualização: o controlador de campo a sério, com três Field Box simuladas, joga jogos de Domínio sem parar, e quem visita vê a consola de GM, o marcador e a vista de quem joga, sem nada para alterar e sem dados pessoais. Feita e testada em Docker; fica no ar quando o seu endereço estiver configurado."
     next:
       - Um servidor a sério com domínio.
       - A revisão jurídica dos modelos antes de o modo alojado abrir. Não é oferecido antes disso.
@@ -1131,6 +1158,7 @@ roadmap:
       - "A vista web do simulador tem todas as entradas que um modo usa: tags, teclado, impactos e comandos da organização, com descarga do registo de eventos."
       - "Os blocos de cenários da consola do GM têm uma lista de línguas com as quatro."
       - "As chaves de modos do projeto: uma chave raiz guardada offline e uma chave com que o registo assina o selo de verificado. As caixas, a app e os controladores confiam nas duas por omissão."
+      - "O guia do firmware e os manuais de montagem explicam a única gravação por USB de que uma caixa com a tabela de partições antiga precisa, e que as definições e as chaves sobrevivem a ela."
     next:
       - "A revisão do alemão e do chinês: se jogas em alemão ou em chinês, ajuda-nos a revê-los. As
         traduções para outras línguas começam em docs/translations (em inglês)."

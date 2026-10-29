@@ -179,6 +179,8 @@ A organização pode atualizar o firmware de uma caixa pelo Wi-Fi do campo, entr
 
 Não desligues a caixa durante uma atualização. Mantém a bateria carregada: uma caixa com a bateria fraca recusa. Ainda não testado num campo.
 
+**Uma caixa gravada com a v0.4.0 ou anterior não aceita esta atualização.** A partir da v0.5 os espaços de firmware são maiores (uma tabela de partições nova) e uma atualização pelo ar não consegue mudar a tabela. A caixa tem de ser gravada por USB uma vez, sem a apagar: mantém o campo, as chaves e as definições, e volta a obter os modos de jogo e o logótipo do campo no jogo seguinte. Uma caixa que mostra **Instala por USB** é uma caixa com a tabela antiga e o firmware novo. Depois dessa gravação, as atualizações pelo ar funcionam como antes. Como: [guia de firmware, secção 3.3](firmware.md#33-escrever-a-imagem).
+
 ## 10. Rádio: o essencial para um campo
 
 - **Um canal para o campo todo.** Todas as caixas, o modem USB do controlador e os módulos das apps usam o mesmo canal. O canal por omissão é **869,525 MHz** na Europa. A organização escolhe-o na consola, antes do primeiro jogo, e a caixa fica a saber qual é quando entra num jogo. Uma caixa recusa um jogo de outra região.

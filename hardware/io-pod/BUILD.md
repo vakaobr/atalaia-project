@@ -321,6 +321,13 @@ and the build folder.
    radio's lines, `advertising as atalaia-pod-XXXX` and the list of the
    capabilities it lends.
 
+**A pod flashed before v0.5** has the old partition table (2 MB program slots; the
+Field Box's table grew to 4 MB slots). Flash it over USB once more, with the same
+command and **without** `erase_flash`: its settings and keys stay. The pod only
+logs `WRONG PARTITION TABLE` and keeps working, but an update over the air cannot
+change the table. A pod flashed for the first time from v0.5 on needs nothing extra
+([firmware guide, section 3.3](../../docs/manuals/en/firmware.md#33-write-the-image)).
+
 **Settings** (lines in `firmware\esp32\build-pod\sdkconfig`, then build again;
 the Kconfig menu "I/O pod", listed in firmware/esp32/README.md):
 

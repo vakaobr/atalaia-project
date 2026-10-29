@@ -123,6 +123,16 @@ Para restaurar num Pi novo, instala como na secção 4, pára o serviço, descom
 
 Faz uma cópia antes de um dia de jogo e depois de adotares caixas novas. Não copies a base de dados enquanto o controlador corre.
 
+### Durante quanto tempo o controlador guarda os dados
+
+Uma vez por dia, o controlador apaga o que é mais antigo do que os seus prazos de retenção. São definições, em dias, na secção `[checkin]` de `/etc/atalaia/controller.toml`:
+
+- `retention_days = 30`: os nomes e os números de federado dos check-ins de um jogo, apagados este número de dias depois do jogo.
+- `chrono_retention_days = 365` (30 a 3653): as leituras do cronógrafo, as cópias de outros campos e as chaves anteriores de um marshal.
+- `game_retention_days = 365` (30 a 3653): os eventos, as pontuações e a lista de dispositivos de um jogo terminado. Com um servidor do site configurado, um jogo nunca é apagado antes de o servidor do site o ter por inteiro, por isso um jogo que não consegue ser enviado fica até conseguir.
+
+As duas últimas também se definem na consola do GM (**Check-in › Regras do check-in**, ver o [manual da organização](game-master.md#regras-do-check-in-e-o-cartaz)). Com `[sync] branding = "site"` vêm das definições do campo no servidor do site e a consola não as pode mudar. Depois de editares o ficheiro, reinicia o controlador (`sudo systemctl restart atalaia-controller`). Uma cópia de segurança guarda o que o controlador ainda não tinha apagado: apaga também as cópias antigas, tal como os dados.
+
 ## 8. Resolução de problemas
 
 | Problema | O que fazer |

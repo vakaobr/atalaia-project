@@ -91,7 +91,7 @@ the rest of this folder (see [REUSE.toml](../REUSE.toml)); the top-level README 
 | `field-isometric-960/1600` (`.jpg`, `.webp`) | Isometric stone tower ringed by GAME PROP cases | "How it fits together" on the English, German and Chinese main pages |
 | `og-pt.jpg`, `og-en.jpg` | 1200 × 630 social previews (`og:image`) | Link previews of every page in that language; the German and Chinese pages use `og-en.jpg` (`og_image` in `LANGUAGES`) until one is drawn with their text |
 | `screens/` | Screenshots (see [Screenshots](#screenshots)) | "What it looks like" on the main page; some in the top-level README |
-| `modes/` | The modes page's animated pictures, 52 GIFs and 52 stills (see [Game-mode animations](#game-mode-animations)) | The cards of the modes page; one in the top-level README |
+| `modes/` | The modes page's animated pictures, 56 GIFs and 56 stills (see [Game-mode animations](#game-mode-animations)) | The cards of the modes page; one in the top-level README |
 
 Each main page loads only its own hero image (WebP, with JPEG for older browsers, at 960 or 1600
 pixels wide as the screen needs) and lazy-loads everything below it.

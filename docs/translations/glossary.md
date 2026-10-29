@@ -159,5 +159,6 @@ not yet reviewed.
 | VIP / Payload | VIP / Carga | VIP / Payload | VIP / 護送 |
 | Hacking Terminal | Hackeia o terminal | Hacking-Terminal | 駭客終端 |
 | Objectives | Objetivos | Ziele | 任務目標 |
+| Sabotage | Sabotagem | Sabotage | 破壞 |
 | Money Factory | Fábrica de Dinheiro | Money Factory | 印鈔廠 *(check)* |
 | Progressive Domination | Domínio Progressivo | Progressive Domination | 漸進佔點 *(check)* |
