@@ -86,6 +86,7 @@ CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 # builds; its heap goes to PSRAM (the internal RAM is spoken for: see the Wi-Fi notes above).
 # The I/O pod (sdkconfig.pod) and the modem and Wokwi variants set their own, after this file.
 CONFIG_BT_ENABLED=y
+CONFIG_ATALAIA_BOX_BEACON=y
 CONFIG_BT_NIMBLE_ENABLED=y
 CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
 # (ESP-IDF 5.3.2's ble_gap.c does not compile as a broadcaster alone: it needs the peripheral role,
