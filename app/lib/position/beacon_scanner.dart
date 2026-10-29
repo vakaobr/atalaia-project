@@ -35,6 +35,10 @@ const bleIntervalMin = Duration(seconds: 3);
 const bleIntervalMax = Duration(seconds: 30);
 const bleIntervalDefault = Duration(seconds: 5);
 
+/// How long the phone waits after the stream says the registry changed before
+/// it reads it again (BLE-20): a GM registering several tags is one read.
+const beaconsRereadDelay = Duration(seconds: 2);
+
 /// Weaker than this (dBm) is too far away to say the player is in the beacon's
 /// room.
 const bleMinRssi = -95;
@@ -120,9 +124,13 @@ class BeaconScanner extends ChangeNotifier {
 
   final BeaconScanService service;
   final int minRssi;
-  final Map<String, RegisteredBeacon> _registry;
+  Map<String, RegisteredBeacon> _registry;
   Duration _window;
   StreamSubscription<BeaconWindow>? _sub;
+
+  /// Whether [start] was called and [stop] has not been since: a scanner with
+  /// an empty registry waits for a beacon to be registered (BLE-20).
+  bool _wanted = false;
 
   /// The window's length: how often a reading may come.
   Duration get window => _window;
@@ -164,16 +172,45 @@ class BeaconScanner extends ChangeNotifier {
       a.major != b.major ? a.major < b.major : a.minor < b.minor;
 
   void start() {
+    _wanted = true;
     if (running || _registry.isEmpty) return;
     _listen();
     notifyListeners();
   }
 
+  /// The registry the controller gives now (BLE-20: a tag or a box was added,
+  /// moved or removed during the game). The scan restarts, through the same
+  /// call, only when the UUIDs to listen for changed; a changed id or room
+  /// alone costs nothing. An empty registry stops the radio but keeps the
+  /// scanner, which listens again when a beacon is registered. Returns
+  /// whether the radio was (re)started or stopped.
+  bool update(List<RegisteredBeacon> registry) {
+    final before = _uuids();
+    _registry = {for (final b in registry) b.id: b};
+    if (!_wanted) return false;
+    final after = _uuids();
+    if (after.isEmpty) {
+      if (!running) return false;
+      unawaited(_sub?.cancel());
+      _sub = null;
+      latest = null;
+      notifyListeners();
+      return true;
+    }
+    if (running && listEquals(before, after)) return false;
+    unawaited(_sub?.cancel());
+    _listen();
+    notifyListeners();
+    return true;
+  }
+
+  /// The distinct UUIDs of the registry, sorted: what the radio filters on.
+  List<String> _uuids() =>
+      {for (final b in _registry.values) b.uuid}.toList()..sort();
+
   void _listen() {
     _sub = service
-        .windows([
-          for (final u in {for (final b in _registry.values) b.uuid}) u,
-        ], _window)
+        .windows(_uuids(), _window)
         .listen(_onWindow, onError: (Object _) => stop());
   }
 
@@ -196,6 +233,7 @@ class BeaconScanner extends ChangeNotifier {
   }
 
   void stop() {
+    _wanted = false;
     final was = running;
     unawaited(_sub?.cancel());
     _sub = null;

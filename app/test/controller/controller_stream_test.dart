@@ -37,6 +37,22 @@ void main() {
     });
   });
 
+  test('"the beacon registry changed" reaches every connection, bare '
+      '(BLE-20)', () {
+    const player = ApiViewer('player', {
+      'player_id': 'p-a',
+      'game_id': 1,
+      'team': 1,
+      'squad': 0,
+      'role': 'player',
+    });
+    for (final v in [ApiViewer.gm, ApiViewer.read, player]) {
+      expect(hub.route(v, {'type': 'beacons', '_beacons': true}), {
+        'type': 'beacons',
+      });
+    }
+  });
+
   test('positions need the positions service (slice S5)', () {
     expect(
       hub.route(ApiViewer.gm, {'type': 'player_position', '_position': true}),

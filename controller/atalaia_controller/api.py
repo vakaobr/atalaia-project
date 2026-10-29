@@ -1578,8 +1578,9 @@ HELLO_EVENTS = 100
 # A map feature was added, changed or deleted (or the levels in use changed): make_route sends each
 # connection the features it may see (MF-10). Routing marks never leave the controller (ws.py).
 FEATURES_CHANGED = {"type": "map_features", "_map_features": True}
-# The beacon registry changed: staff are told to read it again (a player's phone reads it when it starts to share).
-BEACONS_CHANGED = {"type": "beacons", "_staff": True}
+# The beacon registry changed: every connection is told to read it again, staff for the console and players for
+# their phone's scan (BLE-20). The message carries nothing: each reads what its own token may see.
+BEACONS_CHANGED = {"type": "beacons", "_beacons": True}
 
 
 def _snapshot(controller: Controller, viewer: Optional[Viewer] = None) -> dict[str, Any]:
@@ -1646,6 +1647,8 @@ def make_route(controller: Controller) -> Callable[[Any, dict[str, Any]], Any]:
             if pos is None or v.kind == "read":
                 return None
             return {"type": "positions", "game": msg.get("game"), "positions": pos.visible(v, msg.get("game"))}
+        if msg.get("_beacons"):
+            return {"type": "beacons"}  # "read GET /api/v1/beacons again": no data, so nothing to filter
         if msg.get("_map_features"):
             # Each connection gets the features it may see, whole (MF-10): never another team's or the staff's.
             return {"type": "map_features", "features": mapmod.visible(controller.store, v)}

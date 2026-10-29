@@ -233,7 +233,7 @@ class ReportTests(BoxBeaconCase):
         self.report("1:1", t=22)
         self.assertEqual(self.mine()["room"], "Lobby")
 
-    def test_staff_are_told_when_a_box_moves_and_nobody_else(self) -> None:
+    def test_everyone_is_told_when_a_box_moves_with_no_data(self) -> None:
         def beacon_messages(ws: Any) -> list[dict[str, Any]]:
             self.ctrl._emit({"type": "pong", "sentinel": True})
             got = []
@@ -250,7 +250,7 @@ class ReportTests(BoxBeaconCase):
             player.receive_json()
             self.place(4)
             self.assertEqual(beacon_messages(gm), [{"type": "beacons"}])
-            self.assertEqual(beacon_messages(player), [])
+            self.assertEqual(beacon_messages(player), [{"type": "beacons"}])  # bare, for the phone's scan (BLE-20)
 
 
 if __name__ == "__main__":

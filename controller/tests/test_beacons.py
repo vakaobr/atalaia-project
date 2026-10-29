@@ -171,7 +171,7 @@ class RegistryApiTests(P3Case):
         self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM, json={"force": True})
         self.assertEqual(self.client.get("/api/v1/beacons", headers=GM).json()["ble_interval_s"], 5)
 
-    def test_staff_are_told_when_it_changes_and_nobody_else(self) -> None:
+    def test_everyone_is_told_when_it_changes_with_no_data(self) -> None:
         game = self.new_game(teams=["red", "blue"], params={})
         gid = game["id"]
         self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True})
@@ -196,7 +196,9 @@ class RegistryApiTests(P3Case):
             player.receive_json()
             self.add(beacon())
             self.assertEqual(beacon_messages(gm), [{"type": "beacons"}])  # no routing marks
-            self.assertEqual(beacon_messages(player), [])
+            # The player's phone is told too (BLE-20) and learns nothing: the same bare message.
+            self.assertEqual(beacon_messages(player), [{"type": "beacons"}])
+            self.assertEqual(beacon_messages(player), [])  # and no message of its own is left over
 
 
 class ReportTests(P3Case):

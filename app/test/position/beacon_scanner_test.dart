@@ -244,6 +244,128 @@ void main() {
     });
   });
 
+  group('the registry changes during the game (BLE-20)', () {
+    const box = RegisteredBeacon(uuid: other, major: 45253, minor: 4);
+
+    test('a new UUID restarts the scan with the whole list, sorted; a changed '
+        'id on a known UUID does not', () {
+      final scan = FakeScan();
+      final s = BeaconScanner(service: scan, registry: [lobby])..start();
+      expect(scan.listens.single.$1, [uuid]);
+      expect(s.update([lobby, hall]), isFalse); // same UUID: nothing to do
+      expect(scan.listens, hasLength(1));
+      expect(s.update([lobby, hall, box]), isTrue);
+      expect(scan.listens, hasLength(2));
+      expect(scan.listens.last.$1, [other, uuid]);
+      expect(s.running, isTrue);
+      expect(s.registry.map((b) => b.id), ['1:1', '1:2', '45253:4']);
+      // The new beacon is understood at once.
+      expect(
+        s.strongest(window(1, [heard(45253, 4, -60, u: other)]))!.beaconId,
+        '45253:4',
+      );
+      s.dispose();
+    });
+
+    test('a beacon moved to another UUID drops the old filter', () {
+      final scan = FakeScan();
+      final s = BeaconScanner(service: scan, registry: [lobby, box])..start();
+      expect(s.update([lobby]), isTrue);
+      expect(scan.listens.last.$1, [uuid]);
+      s.dispose();
+    });
+
+    test('an empty registry stops the radio, the first beacon starts it '
+        'again, the window kept', () {
+      final scan = FakeScan();
+      final s = BeaconScanner(
+        service: scan,
+        registry: [lobby],
+        window: const Duration(seconds: 9),
+      )..start();
+      expect(s.update(const []), isTrue);
+      expect(s.running, isFalse);
+      expect(s.update(const []), isFalse);
+      expect(s.update([box]), isTrue);
+      expect(s.running, isTrue);
+      expect(scan.listens.last.$1, [other]);
+      expect(scan.listens.last.$2, const Duration(seconds: 9));
+      s.dispose();
+    });
+
+    test('a scanner that was never started, or was stopped, stays quiet', () {
+      final scan = FakeScan();
+      final s = BeaconScanner(service: scan, registry: const []);
+      expect(s.update([lobby]), isFalse);
+      expect(scan.listens, isEmpty);
+      s.start(); // the registry has a beacon now
+      expect(scan.listens, hasLength(1));
+      s.stop();
+      expect(s.update([lobby, box]), isFalse);
+      expect(scan.listens, hasLength(1));
+      s.dispose();
+    });
+
+    test('a scanner started on an empty registry listens when one arrives, '
+        'through the reporter', () async {
+      final scan = FakeScan();
+      final loc = FakeLocation();
+      final sent = <List<Map<String, Object?>>>[];
+      final s = BeaconScanner(service: scan, registry: const []);
+      final r = PositionReporter(
+        location: loc,
+        send: (reports) async {
+          sent.add(reports);
+          return {'stored': 1, 'interval_s': 10};
+        },
+        beacons: s,
+      )..start();
+      addTearDown(r.dispose);
+      expect(scan.listens, isEmpty);
+      s.update([lobby]);
+      expect(scan.listens.single.$1, [uuid]);
+      scan.out.add(window(2000, [heard(1, 1, -70)]));
+      await settle();
+      await r.flush();
+      expect(sent.single.single['beacon_id'], '1:1');
+    });
+
+    test('a reporter given its scanner after it began (the field got its '
+        'first beacon) starts it', () async {
+      final scan = FakeScan();
+      final sent = <List<Map<String, Object?>>>[];
+      final r = PositionReporter(
+        location: FakeLocation(),
+        send: (reports) async {
+          sent.add(reports);
+          return {'stored': 1, 'interval_s': 10};
+        },
+      )..start();
+      addTearDown(r.dispose);
+      r.attachBeacons(BeaconScanner(service: scan, registry: [lobby]));
+      expect(scan.listens.single.$1, [uuid]);
+      scan.out.add(window(2000, [heard(1, 1, -70)]));
+      await settle();
+      expect(r.indoors, isTrue);
+      await r.flush();
+      expect(sent.single.single['beacon_id'], '1:1');
+    });
+
+    test('the feed counts each registry message and each hello', () {
+      final feed = FieldFeed(
+        FieldLink(Uri.parse('https://10.0.0.1:8443'), 't'),
+      );
+      addTearDown(feed.dispose);
+      expect(feed.beaconsSeq, 0);
+      feed.onMessage({'type': 'beacons'});
+      expect(feed.beaconsSeq, 1);
+      feed.onMessage({'type': 'hello'});
+      expect(feed.beaconsSeq, 2);
+      feed.onMessage({'type': 'score'});
+      expect(feed.beaconsSeq, 2);
+    });
+  });
+
   group('the reporter: a beacon indoors, GPS outdoors', () {
     late FakeScan scan;
     late FakeLocation loc;
@@ -766,6 +888,114 @@ void main() {
       expect(calls.last, startsWith('start Atalaia: following the game'));
     });
 
+    testWidgets('a tag on a new UUID registered during the game: one read '
+        'after a pause, the scan restarts with both (BLE-20)', (tester) async {
+      final (_, http, _, scan, fd) = await open(
+        tester,
+        registry: [
+          {'id': '1:1', 'uuid': uuid},
+        ],
+      );
+      await tester.tap(find.byKey(const Key('player-share-position')));
+      await pumpAfter(tester);
+      await tester.tap(find.byKey(const Key('player-beacons-allow')));
+      await pumpAfter(tester);
+      expect(scan.listens.single.$1, [uuid]);
+      expect(http.beaconReads, 1);
+      http.registry = [
+        {'id': '1:1', 'uuid': uuid},
+        {'id': '45253:4', 'uuid': other},
+        {'id': '1:2', 'uuid': uuid},
+      ];
+      // Three changes in a row, one read.
+      fd.onMessage({'type': 'beacons'});
+      fd.onMessage({'type': 'beacons'});
+      fd.onMessage({'type': 'beacons'});
+      await tester.pump(const Duration(seconds: 1));
+      expect(http.beaconReads, 1); // still waiting
+      await tester.pump(beaconsRereadDelay);
+      await pumpAfter(tester);
+      expect(http.beaconReads, 2);
+      expect(scan.listens, hasLength(2));
+      expect(scan.listens.last.$1, [other, uuid]);
+      // A change that leaves the UUIDs as they were: read, no restart.
+      http.registry = [
+        {'id': '1:1', 'uuid': uuid},
+        {'id': '45253:4', 'uuid': other},
+      ];
+      fd.onMessage({'type': 'beacons'});
+      await tester.pump(beaconsRereadDelay);
+      await pumpAfter(tester);
+      expect(http.beaconReads, 3);
+      expect(scan.listens, hasLength(2));
+      // A reconnect's hello reads again as well.
+      fd.onMessage({
+        'type': 'hello',
+        'game': {
+          'id': 1,
+          'name': 'Domingo',
+          'state': 'running',
+          'teams': ['red', 'blue'],
+        },
+        'me': {'player_id': 'p1', 'role': 'player', 'team': 'red'},
+      });
+      await tester.pump(beaconsRereadDelay);
+      await pumpAfter(tester);
+      expect(http.beaconReads, 4);
+      // Sharing off: a late message reads nothing.
+      await tester.tap(find.byKey(const Key('player-share-position')));
+      await pumpAfter(tester);
+      fd.onMessage({'type': 'beacons'});
+      await tester.pump(beaconsRereadDelay);
+      await pumpAfter(tester);
+      expect(http.beaconReads, 4);
+    });
+
+    testWidgets('a field whose first beacon comes during the game asks once, '
+        'then listens', (tester) async {
+      final (h, http, _, scan, fd) = await open(tester, registry: const []);
+      await tester.tap(find.byKey(const Key('player-share-position')));
+      await pumpAfter(tester);
+      expect(find.byKey(const Key('player-beacons-why')), findsNothing);
+      http.registry = [
+        {'id': '45253:4', 'uuid': other},
+      ];
+      fd.onMessage({'type': 'beacons'});
+      await tester.pump(beaconsRereadDelay);
+      await pumpAfter(tester);
+      expect(find.byKey(const Key('player-beacons-why')), findsOneWidget);
+      expect(scan.listens, isEmpty); // not before the player agrees
+      await tester.tap(find.byKey(const Key('player-beacons-allow')));
+      await pumpAfter(tester);
+      expect(scan.listens.single.$1, [other]);
+      expect(find.byKey(const Key('player-beacons-note')), findsOneWidget);
+      expect(h.device.calls.where((c) => c.contains('BLUETOOTH')), isNotEmpty);
+    });
+
+    testWidgets('a player who said Not now is not asked again by a change', (
+      tester,
+    ) async {
+      final (_, http, _, scan, fd) = await open(
+        tester,
+        registry: [
+          {'id': '1:1', 'uuid': uuid},
+        ],
+      );
+      await tester.tap(find.byKey(const Key('player-share-position')));
+      await pumpAfter(tester);
+      await tester.tap(find.byKey(const Key('player-beacons-skip')));
+      await pumpAfter(tester);
+      http.registry = [
+        {'id': '1:1', 'uuid': uuid},
+        {'id': '1:2', 'uuid': uuid},
+      ];
+      fd.onMessage({'type': 'beacons'});
+      await tester.pump(beaconsRereadDelay);
+      await pumpAfter(tester);
+      expect(find.byKey(const Key('player-beacons-why')), findsNothing);
+      expect(scan.listens, isEmpty);
+    });
+
     testWidgets('a room beacon gives the floor: the picker gives way to it', (
       tester,
     ) async {
@@ -997,7 +1227,8 @@ void main() {
 /// registry (null: an older controller, a 404) and the positions posted.
 class _Http implements FieldHttp {
   _Http(this.registry, {this.levels});
-  final List<Map<String, Object?>>? registry;
+  List<Map<String, Object?>>? registry;
+  int beaconReads = 0;
 
   /// The field's levels (GET /field/levels), or null: a 404.
   final Map<String, Object?>? levels;
@@ -1011,6 +1242,7 @@ class _Http implements FieldHttp {
     String? token,
   }) async {
     if (method == 'GET' && path == '/beacons' && registry != null) {
+      beaconReads++;
       return FieldResponse(200, {'beacons': registry, 'ble_interval_s': 7});
     }
     if (method == 'GET' && path == '/field/levels' && levels != null) {

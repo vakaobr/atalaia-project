@@ -56,6 +56,8 @@ The controller **registers each box's beacon by itself, from the box's own posit
 
 `GET /api/v1/beacons` lists the GM's tags and the boxes together: staff see every box with `kind: "box"`, `node_id`, `name`, `room`, `room_given`, `level`, `x`, `y` and `enabled`, and the field's setting as `box_beacons: {enabled, major, uuid}`; **every other token is given each tag's and each enabled box's `id` and `uuid` only**, which is what a phone needs to listen for them (the box UUID is one more entry in the UUID list its hardware scan filter is built from, BLE-9: **the app needs nothing else**). Staff are told by the `beacons` stream message when a box is placed or moved, disabled, or given a room; a phone reads the registry when it starts to share (BLE-5), so boxes are best placed before the game.
 
+**A phone that is already sharing learns of a change** (a box placed or moved, a level changed, a tag added, a box disabled): the controller sends the stream message `{"type":"beacons"}` to every connection, with no data, and the phone reads `GET /api/v1/beacons` again after a short pause and restarts its scan with the new UUID list only when the UUIDs changed (BLE-20).
+
 A phone that hears a box reports `source: ble`, `beacon_id: "45253:7"`; the controller turns it into the room, level and plan place as for a tag (BLE-3, BLE-4, BLE-8), and the strongest beacon the phone hears, tag or box, wins as it does today.
 
 ## 6. Threat model

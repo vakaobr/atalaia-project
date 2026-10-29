@@ -43,7 +43,9 @@ class PositionReporter extends ChangeNotifier {
     this.onFix,
     this.beacons,
     DateTime Function()? now,
-  }) : _now = now ?? DateTime.now;
+  }) : _now = now ?? DateTime.now {
+    beacons?.addListener(_onScanner);
+  }
 
   final LocationService location;
   final SendReports send;
@@ -51,8 +53,30 @@ class PositionReporter extends ChangeNotifier {
 
   /// The indoor beacons' scanner, when the field has beacons and the phone
   /// may scan (null: GPS only).
-  final BeaconScanner? beacons;
+  BeaconScanner? beacons;
   final DateTime Function() _now;
+  bool _scanning = false;
+
+  /// A scanner for a field whose first beacon was registered after the
+  /// sharing began (BLE-20); the reporter owns it from here.
+  void attachBeacons(BeaconScanner scanner) {
+    if (beacons != null) return;
+    beacons = scanner;
+    scanner.addListener(_onScanner);
+    if (running) {
+      _beaconSub = scanner.readings.listen(_onBeacon);
+      scanner.start();
+      _retime();
+    }
+  }
+
+  /// The radio went on or off (a registry change): the period follows.
+  void _onScanner() {
+    final on = beacons?.running ?? false;
+    if (on == _scanning) return;
+    _scanning = on;
+    if (running) _retime();
+  }
 
   /// Each fix as it arrives, for the out-of-bounds warning (field_bounds.dart,
   /// decision MF-31): the same fixes the reports carry, no extra GPS.
@@ -126,6 +150,7 @@ class PositionReporter extends ChangeNotifier {
     if (b != null) {
       _beaconSub = b.readings.listen(_onBeacon);
       b.start();
+      _scanning = b.running;
     }
     _retime();
     notifyListeners();
@@ -209,6 +234,7 @@ class PositionReporter extends ChangeNotifier {
   @override
   void dispose() {
     stop();
+    beacons?.removeListener(_onScanner);
     beacons?.dispose(); // the reporter owns its scanner
     super.dispose();
   }

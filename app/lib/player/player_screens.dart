@@ -46,6 +46,7 @@ import '../checkin/checkin_screen.dart';
 import '../checkin/failure_details.dart';
 import '../checkin/field_trust.dart';
 import '../l10n/strings.dart';
+import '../platform/beacon_scan.dart' show BeaconScanService;
 import '../platform/location.dart';
 import '../platform/platform_check.dart';
 import '../position/beacon_scanner.dart';
@@ -408,6 +409,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _brandEtagSeen = etag;
       if (_brand?.etag != etag) unawaited(_loadBranding());
     }
+    // The beacon registry again when the stream says it may have changed.
+    if (feed.beaconsSeq != _beaconsSeen) {
+      _beaconsSeen = feed.beaconsSeq;
+      _beaconsMaybeChanged();
+    }
     // The map's features and levels again when the stream says they changed.
     final seen = feed.mapFeatures;
     if (seen != null && !identical(seen, _planSeen)) {
@@ -599,6 +605,69 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// What the indoor beacons are doing, as a text key (null: nothing to say).
   String? _beaconNote;
 
+  /// Whether the player has been (or cannot be) asked about the beacons in
+  /// this sharing: a field that gets its first beacon later asks once (BLE-20).
+  bool _beaconsAsked = false;
+
+  /// The feed's [FieldFeed.beaconsSeq] this view last acted on.
+  int _beaconsSeen = 0;
+  Timer? _beaconsTimer;
+  bool _beaconsBusy = false, _beaconsAgain = false;
+
+  /// The beacon registry may have changed (BLE-20; the stream says so with no
+  /// data, and after a reconnect): read it again after a short pause, so a GM
+  /// registering ten tags costs one read, never a request per tag.
+  void _beaconsMaybeChanged() {
+    final r = _reporter;
+    if (r == null || !r.running) return;
+    _beaconsTimer?.cancel();
+    _beaconsTimer = Timer(
+      beaconsRereadDelay,
+      () => unawaited(_rereadBeacons()),
+    );
+  }
+
+  /// Reads the player's view of the registry (ids and UUIDs) and gives it to
+  /// the scan, which restarts only when the UUIDs changed. A read that fails
+  /// keeps the old registry: the next message or reconnect tries again.
+  Future<void> _rereadBeacons() async {
+    if (_beaconsBusy) {
+      _beaconsAgain = true;
+      return;
+    }
+    final r = _reporter, services = context.services, field = widget.link.field;
+    final scan = services.beacons;
+    if (r == null || !r.running || scan == null || field == null) return;
+    _beaconsBusy = true;
+    try {
+      final client = CheckinClient(_http ??= services.fieldHttp(field));
+      final reg = await client.fetchBeacons(feed.link.token);
+      if (!mounted || !r.running) return;
+      final scanner = r.beacons;
+      if (scanner != null) {
+        scanner.update(_registryOf(reg));
+        final every = reg['ble_interval_s'];
+        if (every is int) scanner.setWindow(Duration(seconds: every));
+      } else if (!_beaconsAsked) {
+        final made = await _scannerFor(services, scan, reg);
+        if (!mounted || !r.running) {
+          made?.dispose();
+          return;
+        }
+        if (made != null) r.attachBeacons(made);
+        setState(() {});
+      }
+    } on CheckinException {
+      // out of reach or an older controller: the registry stays as it was
+    } finally {
+      _beaconsBusy = false;
+      if (_beaconsAgain) {
+        _beaconsAgain = false;
+        _beaconsMaybeChanged();
+      }
+    }
+  }
+
   /// Asks the field for its beacons and, if it has any and the phone may
   /// listen, the player's leave first (decisions BLE-1 to BLE-9): a field
   /// without beacons asks for nothing; the explanation comes before the
@@ -610,6 +679,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     CheckinClient client,
   ) async {
     _beaconNote = null;
+    _beaconsAsked = false;
     final scan = services.beacons;
     if (scan == null) return null;
     Map<String, Object?> reg;
@@ -618,11 +688,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
     } on CheckinException {
       return null; // an older controller, or out of reach: GPS only
     }
-    final registry = [
-      for (final b in (reg['beacons'] as List?) ?? const [])
-        ?RegisteredBeacon.fromApi(b),
-    ];
+    return _scannerFor(services, scan, reg);
+  }
+
+  static List<RegisteredBeacon> _registryOf(Map<String, Object?> reg) => [
+    for (final b in (reg['beacons'] as List?) ?? const [])
+      ?RegisteredBeacon.fromApi(b),
+  ];
+
+  /// The scanner for [reg], after the explanation and the permissions (null:
+  /// no beacons, or the player or the phone says no; [_beaconNote] says why).
+  Future<BeaconScanner?> _scannerFor(
+    AppServices services,
+    BeaconScanService scan,
+    Map<String, Object?> reg,
+  ) async {
+    final registry = _registryOf(reg);
     if (registry.isEmpty) return null;
+    _beaconsAsked = true; // from here the player is not asked a second time
     if (!await scan.available()) {
       _beaconNote = 'player.beacons_unavailable';
       return null;
@@ -682,6 +765,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final field = widget.link.field;
     if (!on) {
       _reporter?.stop();
+      _beaconsTimer?.cancel();
       _beaconNote = null;
       _watch.reset();
       await services.foreground.stop();
@@ -715,6 +799,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       return;
     }
     _reporter?.dispose();
+    _beaconsSeen = feed.beaconsSeq;
     final r = _reporter = PositionReporter(
       location: location,
       send: (reports) => client.reportPositions(feed.link.token, reports),
@@ -783,6 +868,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void dispose() {
     _clock?.cancel();
+    _beaconsTimer?.cancel();
     unawaited(_liveBuzz?.cancel());
     feed.removeListener(_onFeed);
     if (_buzzService || (_reporter?.running ?? false)) {

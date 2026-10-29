@@ -318,6 +318,12 @@ class FieldFeed extends ChangeNotifier {
   /// changes); null until then (the hello has none: fetch them over REST).
   List<Map<String, Object?>>? mapFeatures;
 
+  /// Counts the times the beacon registry may have changed: each `beacons`
+  /// message (BLE-20: no data, read `GET /api/v1/beacons` again) and each
+  /// hello, which after a reconnect covers what was missed while away. The
+  /// view compares it with the count it last acted on.
+  int beaconsSeq = 0;
+
   /// The ETag of the field's branding as the stream last told it (the
   /// snapshot, then `branding` messages): the view fetches it when it changes.
   String? brandingEtag;
@@ -389,6 +395,7 @@ class FieldFeed extends ChangeNotifier {
   void onMessage(Map<String, Object?> m) {
     switch (m['type']) {
       case 'hello':
+        beaconsSeq++;
         _setGame(m['game'] as Map<String, Object?>?);
         final score = m['score'];
         if (score is Map && score['teams'] is Map) {
@@ -432,6 +439,8 @@ class FieldFeed extends ChangeNotifier {
         }
       case 'branding':
         _setBranding(m['branding']);
+      case 'beacons':
+        beaconsSeq++;
       case 'score':
         if (game != null && m['game'] == game!['id'] && m['teams'] is Map) {
           totals = _ints(m['teams']! as Map);

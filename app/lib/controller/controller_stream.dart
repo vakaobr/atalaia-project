@@ -138,6 +138,10 @@ class StreamHub {
         'positions': pos.visible(v, msg['game'] as int?),
       };
     }
+    if (msg['_beacons'] == true) {
+      // "Read GET /api/v1/beacons again": no data, so nothing to filter.
+      return {'type': 'beacons'};
+    }
     if (msg['_map_features'] == true) {
       // Each connection gets the features its token may see, whole (MF-10;
       // slice S7a): never another team's or the staff's.

@@ -15,7 +15,7 @@ for their own row, to the player; player positions only to those who may
 see them (positions.Positions.can_see); a player's connection gets no
 radio or controller internals; data the schema marks gm_only (a Hacking
 Terminal's revealed code, a Bomb's team codes: decision M5-1, visibility.py)
-reaches staff only; map features (map_features.py) as each connection may see
+reaches staff only; "the beacon registry changed" (``beacons``, no data) to everyone; map features (map_features.py) as each connection may see
 them (decision MF-10). Keys starting with "_" are routing marks and never leave
 the controller. api.create_app installs that route (api.make_route);
 ``default_route`` is only for a hub with no controller behind it.

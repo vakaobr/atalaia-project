@@ -358,7 +358,7 @@ class App extends Component {
         case 'map_features': // what this token may see (MF-10)
             this.setState({ mapFeatures: msg.features || [] });
             break;
-        case 'beacons': // the registry changed (staff only; BLE-5)
+        case 'beacons': // the registry changed (BLE-5; players' phones get it too, BLE-20)
             this.loadBeacons();
             break;
         default:

@@ -855,7 +855,10 @@ build differs from the sketch, the field's own plans made the better fit:
   registry; every other token (a player's, the read token's) is given each
   beacon's `id` and `uuid` only, which is what a phone needs to know which
   beacons to listen for and which the beacons broadcast anyway.  Staff
-  consoles are told the registry changed by the stream message `beacons`.
+  consoles are told the registry changed by the stream message `beacons`;
+  since decision BLE-20 every connection is, players' phones included (the
+  message carries nothing: a phone reads `GET /api/v1/beacons` again and
+  restarts its scan only if the UUIDs changed).
 - The controller accepts a `ble` position report only for a beacon of the
   registry (400 otherwise: a modified app cannot invent a room).  It stores
   the beacon's `room`, `zone`, `level` (the beacon's level is the player's,

@@ -32,9 +32,10 @@ final _beaconUuidRe = RegExp(
   r'^[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$',
 );
 
-/// The registry changed: staff are told to read it again (api.py
-/// BEACONS_CHANGED).
-const beaconsChanged = {'type': 'beacons', '_staff': true};
+/// The registry changed: every connection is told to read it again, staff
+/// for the console and players for their phone's scan (BLE-20; api.py
+/// BEACONS_CHANGED). The message carries no data.
+const beaconsChanged = {'type': 'beacons', '_beacons': true};
 
 /// `"major:minor"` as numbers, or a [ControllerError].
 (int, int) parseBeaconId(Object? id) {
