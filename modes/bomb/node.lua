@@ -70,6 +70,8 @@ local function explode()
   audio.play("explosion")
   show_phase()
   emit("bomb.exploded", { team = s.armed_by }, { prio = "critical" })
+  -- An explosion ends the game, the team that armed the bomb winning (GE-10).
+  game.win(s.armed_by)
 end
 
 local function arm(team, how)

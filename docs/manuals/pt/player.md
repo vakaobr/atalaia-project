@@ -164,7 +164,7 @@ Na *Bomba / Rush* há atacantes e defensores. A organização diz que equipa é 
 
 1. Os atacantes **mantêm premido o botão** na caixa da bomba durante 5 segundos, por omissão. A bomba fica **ARMADA** e começa uma contagem (5:00 por omissão).
 2. Os defensores têm de **manter premido o botão durante 10 segundos**, por omissão, antes de a contagem acabar. A caixa mostra **DESARMADA** e os defensores ganham.
-3. Se a contagem chegar a zero, a caixa mostra **EXPLODIU** e os atacantes ganham.
+3. Se a contagem chegar a zero, a caixa mostra **EXPLODIU**, o jogo termina e os atacantes ganham.
 4. Alguns jogos usam **códigos de equipa**. Então escreves o código da tua equipa no teclado para armar, e o de outra equipa para desarmar.
 
 ![Uma Field Box a jogar a Bomba: a bomba pronta, a vermelha arma-a, a contagem corre, a azul desarma-a](../../../site/img/modes/bomb-pt.gif)

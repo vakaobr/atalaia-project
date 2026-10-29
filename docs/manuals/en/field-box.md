@@ -133,7 +133,7 @@ You hold your team's button on the box. The box shows what is happening.
 | **Hold to take it over** | Another team can take the zone the same way. |
 | **READY** · **Hold to arm** | *Bomb / Rush*: the bomb is not armed yet. Attackers hold their button. |
 | **ARMED** · time **until detonation** | The bomb is armed. Defenders hold their button to defuse. |
-| **DEFUSED** / **EXPLODED** | The bomb ended. The winning team is named. |
+| **DEFUSED** / **EXPLODED** | The bomb ended. The winning team is named. After an explosion the game ends. |
 | **PAUSED** · **Wait for the game master** | The organisers paused the game. Do not touch the box. |
 | **GAME OVER** · **Scores are final** | The game ended. After 30 seconds the box shows **READY** again. |
 | **CODE** with dots | A keypad code is asked (*Codes*, team codes in *Bomb*). Type it. `#` confirms and `*` deletes. |

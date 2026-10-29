@@ -315,8 +315,8 @@ modes:
     title: Bomba / Rush
     text: >-
       Os atacantes armam a bomba e depois defendem-na; os defensores têm de a desarmar antes do fim
-      da contagem. Arma-se e desarma-se a manter um botão premido, ou com um código de teclado
-      para cada equipa.
+      da contagem. Uma explosão termina o jogo e os atacantes ganham. Arma-se e desarma-se a manter
+      um botão premido, ou com um código de teclado para cada equipa.
     meta: Botões de equipa ou teclado · tempos configuráveis
   sabotage:
     title: "Sabotagem"

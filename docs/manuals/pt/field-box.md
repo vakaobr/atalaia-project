@@ -133,7 +133,7 @@ Manténs premido o botão da tua equipa na caixa. A caixa mostra o que se passa.
 | **Mantém o botão premido para a tomar** | Outra equipa pode tomar a zona da mesma maneira. |
 | **PRONTA** · **Mantém premido para armar** | *Bomba / Rush*: a bomba ainda não está armada. Os atacantes mantêm premido o botão. |
 | **ARMADA** · tempo **até à explosão** | A bomba está armada. Os defensores mantêm premido o botão para a desarmar. |
-| **DESARMADA** / **EXPLODIU** | A bomba terminou. A equipa vencedora é nomeada. |
+| **DESARMADA** / **EXPLODIU** | A bomba terminou. A equipa vencedora é nomeada. Depois de uma explosão o jogo termina. |
 | **EM PAUSA** · **Aguarda a organização** | A organização pôs o jogo em pausa. Não mexas na caixa. |
 | **FIM DO JOGO** · **Pontuações finais** | O jogo acabou. Passados 30 segundos a caixa mostra outra vez **PRONTA**. |
 | **CÓDIGO** com pontos | Pede-se um código no teclado (*Códigos*, códigos de equipa na *Bomba*). Escreve-o. `#` confirma e `*` apaga. |

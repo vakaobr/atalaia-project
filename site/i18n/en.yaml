@@ -307,7 +307,8 @@ modes:
     title: Bomb / Rush
     text: >-
       Attackers arm the bomb, then defend it; defenders must defuse it before the fuse runs out.
-      Arm and defuse by holding a button, or give each team its own keypad code.
+      An explosion ends the game, the attackers winning. Arm and defuse by holding a button, or
+      give each team its own keypad code.
     meta: Team buttons or keypad · fuse and hold times are settings
   sabotage:
     title: "Sabotage"

@@ -7,3 +7,4 @@ steps:
   - expect: { type: bomb.armed, team: red, at: 30 }
   - wait: 60
   - expect: { type: bomb.exploded, at: 90 }
+  - expect: { type: game.end, at: 90, data: { reason: win, winner: red } }

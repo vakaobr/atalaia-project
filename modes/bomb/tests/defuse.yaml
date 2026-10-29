@@ -10,4 +10,6 @@ steps:
   - expect_screen: { template: defused, data: { team: blue } }
   - wait: 120
   - expect_no: bomb.exploded
+  - expect_no: game.end
+  - expect_status: running
   - expect_screen: { template: defused }

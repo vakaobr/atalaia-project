@@ -1,12 +1,12 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 id: org.atalaia.bomb
-version: 0.2.0
+version: 0.3.0
 license: GPL-3.0-or-later
 min_tier: reduced
 kind: mode
 name: Bomb / Rush
-description: Attackers arm the bomb and defend it; defenders must defuse it before it explodes. With team codes, each team arms and defuses with its own keypad code.
+description: Attackers arm the bomb and defend it; defenders must defuse it before it explodes. An explosion ends the game, the attackers winning. With team codes, each team arms and defuses with its own keypad code.
 roles:
   bomb: { requires: [team_input], optional: [keypad, audio, led, display] }
 params:
@@ -21,7 +21,7 @@ params:
 i18n:
   pt:
     name: Bomba / Rush
-    description: Os atacantes armam a bomba e defendem-na; os defensores têm de a desarmar antes de explodir. Com códigos de equipa, cada equipa arma e desarma com o seu próprio código no teclado.
+    description: Os atacantes armam a bomba e defendem-na; os defensores têm de a desarmar antes de explodir. Uma explosão termina o jogo e os atacantes ganham. Com códigos de equipa, cada equipa arma e desarma com o seu próprio código no teclado.
     params:
       attackers: Atacantes
       defenders: Defensores
@@ -35,7 +35,7 @@ i18n:
     name: Bombe / Rush
     description: >-
       Die Angreifenden machen die Bombe scharf und verteidigen sie; die Verteidigenden müssen sie entschärfen,
-      bevor sie explodiert. Mit Team-Codes macht jedes Team mit seinem eigenen Code am Tastenfeld scharf und
+      bevor sie explodiert. Eine Explosion beendet das Spiel, die Angreifenden gewinnen. Mit Team-Codes macht jedes Team mit seinem eigenen Code am Tastenfeld scharf und
       entschärft.
     params:
       attackers: Angreifende
@@ -48,7 +48,7 @@ i18n:
       team_codes: "Team-Codes, z. B. red=1234,blue=5678: das Tastenfeld macht scharf (der Code eines Teams) und entschärft (der Code eines anderen Teams) statt der Knöpfe"
   zh-tw:
     name: 炸彈 / Rush
-    description: 進攻方啟動炸彈並守住它；防守方必須在爆炸前拆除。使用隊伍密碼時，各隊用自己的密碼在按鍵上啟動與拆除。
+    description: 進攻方啟動炸彈並守住它；防守方必須在爆炸前拆除。爆炸會結束遊戲，進攻方獲勝。使用隊伍密碼時，各隊用自己的密碼在按鍵上啟動與拆除。
     params:
       attackers: 進攻方
       defenders: 防守方

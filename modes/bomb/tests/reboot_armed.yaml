@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "In a game a controller leads, a power loss puts the bomb back to standby: no explosion, so the game does not end"
+params: { fuse_s: 60 }
+steps:
+  - hold: { team: red, s: 5 }
+  - expect: { type: bomb.armed, team: red }
+  - wait: 20
+  - reboot: bomb
+  - expect: { type: node.rebooted, data: { reason: power } }
+  - expect_screen: { template: standby, data: { arm: red } }
+  - wait: 90
+  - expect_no: bomb.exploded
+  - expect_no: game.end
+  - expect_status: running

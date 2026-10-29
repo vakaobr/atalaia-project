@@ -248,7 +248,7 @@ Todos os modos incluídos aparecem em **Modo ou predefinição**. Os nomes em in
 | --- | --- | --- |
 | Domination | Domínio | Uma caixa ou várias. O tempo a premir e os pontos são parâmetros. |
 | Hold-All Domination | Domínio Total | Uma equipa só pontua enquanto tiver todas as caixas. |
-| Bomb / Rush | Bomba / Rush | Rastilho, tempos a premir para armar e desarmar. **Códigos de equipa** opcionais, por exemplo `red=1234,blue=5678`. |
+| Bomb / Rush | Bomba / Rush | Rastilho, tempos a premir para armar e desarmar. Uma explosão termina o jogo e vence a equipa que armou a bomba; um desarme não o termina (usa **Terminar**). **Códigos de equipa** opcionais, por exemplo `red=1234,blue=5678`. |
 | Sabotage | Sabotagem | Rondas da bomba até acabar o tempo de jogo: uma explosão pontua para os atacantes, um desarme para os defensores, e há uma pausa curta. Vence a equipa com mais pontos. Pausa, tempo de jogo e **Códigos de equipa** opcionais são parâmetros. |
 | Last Stand | Último Elemento | Atacantes, defensores, contagem para a derrota. |
 | Kill Confirmed | Baixa Confirmada | Precisa de etiquetas de quem joga. |
@@ -413,7 +413,7 @@ Para quem joga acompanhar o jogo na aplicação sem fazer o registo, abre o sepa
 
 ## 10. Termina o jogo e os registos
 
-1. Toca em **Terminar** e depois em **Sim**. Ou deixa a **Duração** esgotar-se. Alguns modos terminam o jogo sozinhos: no Sabotagem, por exemplo, o limite de tempo da própria caixa termina-o, e o jogo termina então no controlador com a equipa vencedora da caixa (ou em empate). O separador **Registo** diz **O jogo terminou: terminado pela caixa** *nome*. Isto só acontece com o jogo a decorrer e só para uma caixa que está no jogo: se puseste o jogo em pausa, uma caixa que anuncie o fim durante a pausa não o termina, por isso termina tu o jogo com **Terminar**.
+1. Toca em **Terminar** e depois em **Sim**. Ou deixa a **Duração** esgotar-se. Alguns modos terminam o jogo sozinhos: na Bomba / Rush uma explosão termina-o (vence a equipa que armou a bomba) e no Sabotagem, por exemplo, o limite de tempo da própria caixa termina-o, e o jogo termina então no controlador com a equipa vencedora da caixa (ou em empate). O separador **Registo** diz **O jogo terminou: terminado pela caixa** *nome*. Isto só acontece com o jogo a decorrer e só para uma caixa que está no jogo: se puseste o jogo em pausa, uma caixa que anuncie o fim durante a pausa não o termina, por isso termina tu o jogo com **Terminar**.
 2. O controlador avisa as caixas pelo rádio de que o jogo acabou. Se não conseguir, diz **Não foi possível avisar as caixas pelo rádio**: reinicia cada caixa ou junta-a ao próximo jogo com um cartão.
 3. As caixas mostram **FIM DO JOGO**. Passados 30 segundos mostram **PRONTA**.
 4. O separador **Jogo** diz **O jogo «…» terminou.** O marcador e os telemóveis de quem joga mostram a equipa vencedora.

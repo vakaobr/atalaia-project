@@ -194,7 +194,9 @@ static void test_bomb_arm_explode(void)
 
     /* 5. Verify bomb.exploded event. */
     CHECK(r.event_count > events_after_arm);
-    CHECK(strcmp(r.last_event_type, "bomb.exploded") == 0);
+    /* The explosion ends the game (GE-10): bomb.exploded, then game.end. */
+    CHECK(r.event_count >= events_after_arm + 2);
+    CHECK(strcmp(r.last_event_type, "game.end") == 0);
 
     /* Verify exploded screen was queued. */
     int found_exploded = 0;

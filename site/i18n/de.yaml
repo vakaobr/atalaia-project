@@ -325,7 +325,8 @@ modes:
     title: Bombe / Rush
     text: >-
       Die Angreifenden machen die Bombe scharf und verteidigen sie; die Verteidigenden müssen sie
-      entschärfen, bevor die Zündzeit abläuft. Scharf machen und entschärfen durch Gedrückthalten
+      entschärfen, bevor die Zündzeit abläuft. Eine Explosion beendet das Spiel, die Angreifenden
+      gewinnen. Scharf machen und entschärfen durch Gedrückthalten
       eines Knopfs, oder jedes Team bekommt seinen eigenen Code fürs Tastenfeld.
     meta: Team-Knöpfe oder Tastenfeld · Zünd- und Haltezeiten einstellbar
   sabotage:

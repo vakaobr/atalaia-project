@@ -248,7 +248,7 @@ Every built-in mode is listed in **Mode or preset**. Their English and Portugues
 | --- | --- | --- |
 | Domination | Domínio | One box or many. Hold time and points are parameters. |
 | Hold-All Domination | Domínio Total | A team scores only while it holds every box. |
-| Bomb / Rush | Bomba / Rush | Fuse, arm and defuse hold times. Optional **Team codes**, for example `red=1234,blue=5678`. |
+| Bomb / Rush | Bomba / Rush | Fuse, arm and defuse hold times. An explosion ends the game and the team that armed the bomb wins; a defuse does not end it (use **End**). Optional **Team codes**, for example `red=1234,blue=5678`. |
 | Sabotage | Sabotagem | Bomb rounds until the game time runs out: an explosion scores for the attackers, a defuse for the defenders, then a short pause. The team with more points wins. Pause, game time and optional **Team codes** are parameters. |
 | Last Stand | Último Elemento | Attackers, defenders, countdown to defeat. |
 | Kill Confirmed | Baixa Confirmada | Needs player tags. |
@@ -413,7 +413,7 @@ To let players follow the game in the app without checking in, open the **Game**
 
 ## 10. End the game, and the logs
 
-1. Tap **End**, then **Yes**. Or let the **Duration** run out. Some modes end the game themselves: in Sabotage, for example, the box's own game-time limit ends it, and the game then ends on the controller with the box's winner (or as a draw). The **Log** tab says **The game ended: ended by box** *name*. This works only while the game runs, and only for a box that is in the game: if you have paused the game, a box that announces the end during the pause does not end it, so end the game yourself with **End**.
+1. Tap **End**, then **Yes**. Or let the **Duration** run out. Some modes end the game themselves: in Bomb / Rush an explosion ends it (the team that armed the bomb wins), and in Sabotage, for example, the box's own game-time limit ends it, and the game then ends on the controller with the box's winner (or as a draw). The **Log** tab says **The game ended: ended by box** *name*. This works only while the game runs, and only for a box that is in the game: if you have paused the game, a box that announces the end during the pause does not end it, so end the game yourself with **End**.
 2. The controller tells the boxes over the radio that the game is over. If it cannot, it says **The boxes could not be told over the radio**: restart each box or join it to the next game with a card.
 3. The boxes show **GAME OVER**. After 30 seconds they show **READY**.
 4. The **Game** tab says **The game "…" has ended.** The scoreboard and the players' phones show the winner.

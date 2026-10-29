@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: Attackers arm the bomb and it explodes when the fuse runs out
+name: Attackers arm the bomb, it explodes when the fuse runs out and the game ends, the attackers winning
 params: { fuse_s: 60 }
 steps:
   - hold: { team: red, s: 5 }
@@ -11,5 +11,7 @@ steps:
   - wait: 1
   - expect: { type: bomb.exploded, team: red, at: 65 }
   - expect_screen: { template: exploded, data: { team: red } }
+  - expect: { type: game.end, at: 65, data: { reason: win, winner: red } }
+  - expect_status: ended
   - wait: 5
   - expect_screen: { template: exploded }

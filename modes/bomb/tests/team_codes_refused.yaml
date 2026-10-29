@@ -19,3 +19,4 @@ steps:
   - wait: 60
   - expect: { type: bomb.exploded, team: blue }
   - expect_screen: { template: exploded, data: { team: blue } }
+  - expect: { type: game.end, data: { reason: win, winner: blue } }

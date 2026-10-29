@@ -146,8 +146,8 @@ static void test_bomb_resume_after_reboot(void)
         node_runner_tick(&r2, 1000);
     }
 
-    /* Verify bomb.exploded event. */
-    CHECK(strcmp(r2.last_event_type, "bomb.exploded") == 0);
+    /* The explosion ends the game (GE-10): bomb.exploded, then game.end. */
+    CHECK(strcmp(r2.last_event_type, "game.end") == 0);
 
     /* Verify exploded screen was queued. */
     int found_exploded = 0;

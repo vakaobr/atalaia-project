@@ -164,7 +164,7 @@ In *Bomb / Rush* there are attackers and defenders. The organisers say which tea
 
 1. Attackers **hold their button** on the bomb box for 5 seconds by default. The bomb is **ARMED** and a countdown starts (5:00 by default).
 2. Defenders must **hold their button for 10 seconds** by default before the countdown ends. The box shows **DEFUSED** and the defenders win.
-3. If the countdown reaches zero, the box shows **EXPLODED** and the attackers win.
+3. If the countdown reaches zero, the box shows **EXPLODED**, the game ends and the attackers win.
 4. Some games use **team codes**. Then you type your team's code on the keypad to arm, and another team's code to defuse.
 
 ![A Field Box playing Bomb: the bomb ready, red arms it, the countdown runs, blue defuses it](../../../site/img/modes/bomb-en.gif)
