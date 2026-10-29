@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib import error, request
 
+import building
 import fieldmap
 from air import HostBox
 
@@ -111,6 +112,171 @@ class Player:
         self.x, self.y = min(0.98, max(0.02, self.x)), min(0.98, max(0.02, self.y))
 
 
+class BuildingPlayer(Player):
+    """A player in the three-storey building: walks from room to room through the doors and corridors, up and down
+    the stairs, and tells the controller where it is the way one phone of three kinds does:
+
+    - ``ble``: the strongest registered beacon it hears (the nearest one), nothing else: the controller puts it at
+      that beacon's room and level (PM-2, BLE-3);
+    - ``gps``: a GPS fix and the floor the player picked in the app (PM-1: ``level`` in the report);
+    - ``unsure``: a GPS fix and "Not sure" (``level`` null), which the player's map draws hollow (PM-6)."""
+
+    def __init__(self, name: str, team: str, mode: str, rng: random.Random) -> None:
+        room, level = building.BASES[team]
+        _, cx, cy = building.room_at(room, level)
+        super().__init__(name, team, (cx, cy), rng)
+        self.mode, self.level = mode, level
+        self.x, self.y = cx + rng.uniform(-0.02, 0.02), cy + rng.uniform(-0.05, 0.05)
+        self.speed = rng.uniform(0.026, 0.04)   # of the plan's width a second: 1.2 to 1.9 m/s on the 48 m plan
+        self.route: list[tuple[int, float, float]] = []
+        self.wait = 0.0
+
+    def step(self, dt: float, rng: random.Random) -> None:
+        if self.wait > 0:
+            self.wait -= dt
+            return
+        if not self.route:
+            return
+        level, tx, ty = self.route[0]
+        self.level = level            # stairs: a waypoint on the same x, y on the next level
+        dx, dy = tx - self.x, ty - self.y
+        dist = math.hypot(dx, dy)
+        move = self.speed * dt
+        if dist <= move:
+            self.x, self.y = tx, ty
+            self.route.pop(0)
+            if not self.route:
+                self.wait = rng.uniform(4.0, 14.0)
+            return
+        self.x += dx / dist * move
+        self.y += dy / dist * move
+
+
+class OpenFieldScenario:
+    """The first scenario: the open field (a rectangle in the open sea, one plan, GPS positions)."""
+
+    key = "open"
+    suffix = "Domínio"
+    beacons: list[dict] = []
+
+    def setup(self, api: Api) -> None:
+        """One plan and its place on the map; a building's levels and beacons put away first."""
+        for b in (api.call("GET", "/api/v1/beacons") or {}).get("beacons", []):
+            api.call("DELETE", f"/api/v1/beacons/{b['id']}")
+        if (api.call("GET", "/api/v1/field/levels") or {}).get("enabled"):
+            api.call("PUT", "/api/v1/field/levels", {"enabled": False})
+        api.call("PUT", "/api/v1/field/image", raw=fieldmap.plan_png(), ctype="image/png")
+        api.call("PUT", "/api/v1/field/georef", {"points": fieldmap.georef_points()})
+
+    @staticmethod
+    def box_places() -> list[tuple[float, float, int]]:
+        return [(fx, fy, 0) for fx, fy in fieldmap.ZONES.values()]
+
+    @staticmethod
+    def new_player(i: int, name: str, team: str, rng: random.Random) -> Player:
+        return Player(name, team, fieldmap.BASES[team], rng)
+
+    @staticmethod
+    def step(players: list[Player], dt: float, rng: random.Random) -> None:
+        for p in players:
+            if rng.random() < 0.05 or math.hypot(p.target[0] - p.x, p.target[1] - p.y) < 0.03:
+                zone = rng.choice(list(fieldmap.ZONES.values()))
+                p.target = (zone[0] + rng.uniform(-0.05, 0.05), zone[1] + rng.uniform(-0.05, 0.05))
+            p.step(dt, rng)
+
+    @staticmethod
+    def report(api: Api, players: list[Player]) -> None:
+        for p in players:
+            lat, lon = fieldmap.to_latlon(p.x, p.y)
+            send_position(api, p, {"lat": lat, "lon": lon, "accuracy_m": 5.0, "source": "gps"})
+
+
+class BuildingScenario:
+    """The second scenario: a three-storey building (R/C, 1.º andar, 2.º andar), boxes on different floors, players
+    walking between rooms and floors, located by registered beacons, by GPS with a floor picked, or not sure."""
+
+    key = "building"
+    suffix = "Domínio, edifício"
+    # Twelve players, red on even indexes and blue on odd: six by beacon, five by GPS with a floor, one not sure
+    # (a red one, so that the player's view, which follows the first red player, sees them all).
+    MODES = ("gps", "ble", "unsure", "ble", "ble", "ble", "ble", "gps", "gps", "gps", "gps", "ble")
+
+    def __init__(self) -> None:
+        self.beacons = building.beacons()
+
+    def setup(self, api: Api) -> None:
+        """The levels, one plan each, the building's place on the map, and the beacon registry (replaced when it
+        differs from what is there)."""
+        api.call("PUT", "/api/v1/field/levels", {"enabled": True, "count": len(building.LEVEL_NAMES),
+                                                 "names": building.LEVEL_NAMES})
+        for level in range(len(building.LEVEL_NAMES)):
+            api.call("PUT", f"/api/v1/field/levels/{level}/image", raw=building.plan_png(level), ctype="image/png")
+        api.call("PUT", "/api/v1/field/georef", {"points": building.georef_points()})
+        have = (api.call("GET", "/api/v1/beacons") or {}).get("beacons", [])
+        key = ("uuid", "major", "minor", "room", "zone", "level", "x", "y")
+        if sorted(tuple(b.get(k) for k in key) for b in have) == sorted(tuple(b[k] for k in key) for b in self.beacons):
+            return
+        for b in have:
+            api.call("DELETE", f"/api/v1/beacons/{b['id']}")
+        for b in self.beacons:
+            api.call("POST", "/api/v1/beacons", b)
+
+    @staticmethod
+    def box_places() -> list[tuple[float, float, int]]:
+        out = []
+        for room, level in building.BOX_PLACES.values():
+            _, x, y = building.room_at(room, level)
+            out.append((x, y, level))
+        return out
+
+    def new_player(self, i: int, name: str, team: str, rng: random.Random) -> Player:
+        return BuildingPlayer(name, team, self.MODES[i % len(self.MODES)], rng)
+
+    @staticmethod
+    def step(players: list[Player], dt: float, rng: random.Random) -> None:
+        for p in players:
+            assert isinstance(p, BuildingPlayer)
+            if not p.route and p.wait <= 0:
+                # mostly to where a box is (a player goes to the boxes), else to any room of any floor
+                if rng.random() < 0.65:
+                    room, level = rng.choice(list(building.BOX_PLACES.values()))
+                else:
+                    room, level = rng.choice(list(building.ROOMS)), rng.randrange(len(building.LEVEL_NAMES))
+                _, rx, ry = building.room_at(room, level)
+                p.route = building.route(p.level, p.x, p.y, level, rx + rng.uniform(-0.02, 0.02),
+                                         ry + rng.uniform(-0.06, 0.06))
+            p.step(dt, rng)
+
+    @staticmethod
+    def report(api: Api, players: list[Player]) -> None:
+        for p in players:
+            assert isinstance(p, BuildingPlayer)
+            if p.mode == "ble":
+                beacon = building.nearest_beacon(p.level, p.x, p.y)
+                send_position(api, p, {"source": "ble", "beacon_id": beacon})
+                continue
+            lat, lon = building.to_latlon(p.x, p.y)
+            body = {"lat": lat, "lon": lon, "accuracy_m": 6.0, "source": "gps"}
+            body["level"] = p.level if p.mode == "gps" else None
+            send_position(api, p, body)
+
+
+def send_position(api: Api, p: Player, body: dict[str, Any]) -> None:
+    try:
+        api.call("POST", "/api/v1/positions", {**body, "t": int(time.time() * 1000)}, token=p.token)
+    except ApiError as exc:
+        log.warning("position of %s: %s", p.name, exc)
+
+
+SCENARIOS = {"open": OpenFieldScenario, "building": BuildingScenario}
+
+
+def scenarios_from_env() -> list[Any]:
+    """DEMO_SCENARIOS: the scenarios the director alternates, in order (default ``open,building``)."""
+    names = [n.strip() for n in os.environ.get("DEMO_SCENARIOS", "open,building").split(",") if n.strip() in SCENARIOS]
+    return [SCENARIOS[n]() for n in (names or ["open", "building"])]
+
+
 class Director:
     def __init__(self, api: Api, boxes: list[HostBox], data_dir: Path, seed: Optional[int] = None) -> None:
         self.api = api
@@ -123,6 +289,8 @@ class Director:
         self.cycle_no = 0
         self.max_games = int(env_float("DEMO_RESTART_AFTER_GAMES", 24))
         self.marshal = self._marshal_identity()
+        self.scenarios = scenarios_from_env()
+        self.scenario = self.scenarios[0]
 
     # --- the marshal: one identity for the field, kept in the data folder ---------------------------------
 
@@ -146,10 +314,18 @@ class Director:
     # --- setting the field up (once per start) --------------------------------------------------------------
 
     def prepare_field(self) -> None:
-        """The plan and its place on the map, so boxes and players are drawn on it; idempotent."""
-        self.api.call("PUT", "/api/v1/field/image", raw=fieldmap.plan_png(), ctype="image/png")
-        self.api.call("PUT", "/api/v1/field/georef", {"points": fieldmap.georef_points()})
+        """Once per start: a game left running by a restart is ended. The plans, levels and beacons are the
+        scenario's, set at the start of each game (``Scenario.setup``)."""
         self.end_stale_games()
+
+    def publish_beacons(self) -> None:
+        """Tells the read-only proxy the demo's beacon registry (invented: rooms, levels, places), for the player's
+        view to draw: the controller gives a visitor's token only each beacon's id and uuid (BLE-2)."""
+        path = self.data / "beacons.json"
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.scenario.beacons))
+        tmp.chmod(0o600)
+        os.replace(tmp, path)
 
     def end_stale_games(self) -> None:
         """A game left running or paused by a restart is ended: a restart never resumes a half-played game."""
@@ -187,9 +363,12 @@ class Director:
 
     def cycle(self) -> None:
         self.cycle_no += 1
+        self.scenario = self.scenarios[(self.cycle_no - 1) % len(self.scenarios)]
+        self.scenario.setup(self.api)
+        self.publish_beacons()
         stamp = datetime.now(timezone.utc).strftime("%H:%M")
         game = self.api.call("POST", "/api/v1/games", {
-            "name": f"Demonstração {stamp} (Domínio)", "mode_id": MODE_ID, "teams": list(TEAMS), "squads": 2, "params": PARAMS})
+            "name": f"Demonstração {stamp} ({self.scenario.suffix})", "mode_id": MODE_ID, "teams": list(TEAMS), "squads": 2, "params": PARAMS})
         gid = game["id"]
         log.info("game %d made", gid)
         self.join_boxes(gid)
@@ -206,7 +385,11 @@ class Director:
         log.info("game %d started", gid)
         self.play(gid, players)
         self.api.call("POST", f"/api/v1/games/{gid}/end", {})
-        self.api.call("POST", f"/api/v1/games/{gid}/checkin/close")
+        try:  # an ended game's check-in is closed already: the controller answers 409 now (it did not before)
+            self.api.call("POST", f"/api/v1/games/{gid}/checkin/close")
+        except ApiError as exc:
+            if exc.status != 409:
+                raise
         log.info("game %d ended", gid)
         self.sleep(self.pause_s)
 
@@ -227,9 +410,9 @@ class Director:
     def place_boxes(self, gid: int) -> None:
         nodes = self.api.call("GET", "/api/v1/nodes") or []
         mine = {n["node_id"] for n in nodes if n.get("game_id") in (None, gid)}
-        for node_id, (fx, fy) in zip(sorted(mine)[-len(BOX_NAMES):], fieldmap.ZONES.values()):
+        for node_id, (fx, fy, level) in zip(sorted(mine)[-len(BOX_NAMES):], self.scenario.box_places()):
             try:
-                self.api.call("PUT", f"/api/v1/games/{gid}/positions/{node_id}", {"x": fx, "y": fy})
+                self.api.call("PUT", f"/api/v1/games/{gid}/positions/{node_id}", {"x": fx, "y": fy, "level": level})
             except ApiError as exc:
                 log.warning("could not place box %s: %s", node_id, exc)
 
@@ -241,7 +424,7 @@ class Director:
         players: list[Player] = []
         for i, name in enumerate(names):
             team = TEAMS[i % 2]
-            players.append(Player(name, team, fieldmap.BASES[team], self.rng))
+            players.append(self.scenario.new_player(i, name, team, self.rng))
         # The player the player's view follows is the first one of the red team.
         for i, p in enumerate(players):
             body = {"game_id": gid, "player_id": p.pid, "player_secret": p.secret, "display_name": p.name,
@@ -321,14 +504,10 @@ class Director:
             if elapsed - last_capture >= 4.0:
                 last_capture = elapsed
                 self.capture(elapsed)
-            for p in players:
-                if self.rng.random() < 0.05 or math.hypot(p.target[0] - p.x, p.target[1] - p.y) < 0.03:
-                    zone = self.rng.choice(list(fieldmap.ZONES.values()))
-                    p.target = (zone[0] + self.rng.uniform(-0.05, 0.05), zone[1] + self.rng.uniform(-0.05, 0.05))
-                p.step(dt, self.rng)
+            self.scenario.step(players, dt, self.rng)
             if elapsed - last_report >= 6.0:
                 last_report = elapsed
-                self.report(players)
+                self.scenario.report(self.api, players)
             time.sleep(1.0)
 
     def capture(self, elapsed: float) -> None:
@@ -337,12 +516,3 @@ class Director:
         team = 0 if self.rng.random() < 0.5 + 0.35 * phase else 1
         box = self.rng.choice(self.boxes)
         box.hold(team + 1, int(PARAMS["capture_hold_ms"]) + 600)
-
-    def report(self, players: list[Player]) -> None:
-        for p in players:
-            lat, lon = fieldmap.to_latlon(p.x, p.y)
-            try:
-                self.api.call("POST", "/api/v1/positions", {"lat": lat, "lon": lon, "accuracy_m": 5.0, "source": "gps",
-                                                            "t": int(time.time() * 1000)}, token=p.token)
-            except ApiError as exc:
-                log.warning("position of %s: %s", p.name, exc)

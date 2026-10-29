@@ -172,9 +172,9 @@ async def player_page() -> Response:
 
 
 @app.get("/player/{name}", include_in_schema=False)
-async def player_files(name: str) -> Response:
+async def player_files(name: str, request: Request) -> Response:
     if name in ("data.json", "field.png"):
-        return await player_data(name)
+        return await player_data(name, request.query_params.get("level", "0"))
     if not re.fullmatch(r"[a-z0-9._-]{1,40}", name) or not (HERE / "player" / name).is_file():
         return PlainTextResponse("not found\n", status_code=404)
     return FileResponse(HERE / "player" / name, headers={"Cache-Control": "no-cache"})
@@ -188,22 +188,36 @@ async def player_get(path: str, token: str) -> Optional[httpx.Response]:
     return r if r.status_code == 200 else None
 
 
-async def player_data(name: str) -> Response:
+def beacons_file() -> list[dict[str, Any]]:
+    """The demo's invented beacon registry (rooms, levels, places on the plans), written by the director: the
+    controller gives a visitor's token only each beacon's id and uuid (BLE-2), the player's view draws the rest."""
+    try:
+        rows = json.loads((DATA / "beacons.json").read_text())
+    except (OSError, ValueError):
+        return []
+    keep = ("major", "minor", "room", "zone", "level", "x", "y")
+    return [{k: b.get(k) for k in keep} for b in rows if isinstance(b, dict)] if isinstance(rows, list) else []
+
+
+async def player_data(name: str, level: str = "0") -> Response:
     who = player_file()
     if who is None:
         return JSONResponse({"waiting": True}, status_code=503, headers={"Cache-Control": "no-store"})
     token, gid = who["token"], who["game_id"]
     if name == "field.png":
-        r = await player_get("/api/v1/field/image", READ_TOKEN)
+        # level 0 is the field image; another level's plan only if that level is in use
+        path = f"/api/v1/field/levels/{level}/image" if re.fullmatch(r"[1-9]", level) else "/api/v1/field/image"
+        r = await player_get(path, READ_TOKEN)
         if r is None:
             return PlainTextResponse("not found\n", status_code=404)
         return Response(r.content, media_type=r.headers.get("content-type", "image/png"),
                         headers={"Cache-Control": "max-age=300"})
-    me, game, score, pos, log, geo, nodes, boxes = await asyncio.gather(
+    me, game, score, pos, log, geo, nodes, boxes, levels = await asyncio.gather(
         player_get("/api/v1/checkin/me", token), player_get(f"/api/v1/games/{gid}", token),
         player_get(f"/api/v1/games/{gid}/score", token), player_get("/api/v1/positions", token),
         player_get(f"/api/v1/games/{gid}/log", token), player_get("/api/v1/field/georef", token),
-        player_get("/api/v1/nodes", token), player_get(f"/api/v1/games/{gid}/positions", token))
+        player_get("/api/v1/nodes", token), player_get(f"/api/v1/games/{gid}/positions", token),
+        player_get("/api/v1/field/levels", token))
     if me is None or game is None:
         return JSONResponse({"waiting": True}, status_code=503, headers={"Cache-Control": "no-store"})
     me_j = me.json()
@@ -220,9 +234,17 @@ async def player_data(name: str) -> Response:
         "georef": geo.json() if geo else None,
         "nodes": [{k: n.get(k) for k in ("node_id", "name", "owner", "link")} for n in (nodes.json() if nodes else [])],
         "boxes": boxes.json() if boxes else {},
+        "levels": levels_view(levels.json()) if levels else None,
+        "beacons": beacons_file() if levels and levels.json().get("enabled") else [],
         "you": who["player_id"],
     }
     return JSONResponse(body, headers={"Cache-Control": "no-store"})
+
+
+def levels_view(v: dict[str, Any]) -> dict[str, Any]:
+    """The levels as the phone's floor chips need them: on or off, the names, and when each plan last changed."""
+    return {"enabled": bool(v.get("enabled")), "count": v.get("count", 1), "names": v.get("names", []),
+            "stamps": [(lv.get("image") or {}).get("updated_at") for lv in v.get("levels", [])]}
 
 
 # --- the controller's console, scoreboard and read endpoints ---------------------------------------------------------

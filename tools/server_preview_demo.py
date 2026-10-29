@@ -16,7 +16,11 @@ preview is never touched), with the demo's pace shortened (a game is a minute), 
     number or address-like text is in anything a visitor can read;
  5. the site server shows the demo: its landing page links to it, and the live demo field's public page and scoreboard
     show the games the simulated controller synced (also a finished game's scores);
- 6. it restarts cleanly: after a restart of the demo container a game that was running is ended, boxes rejoin, and a
+ 6. the second scenario, a three-storey building, is played in turn: levels "R/C", "1.º andar" and "2.º andar" with a plan
+    each, boxes on different levels, a beacon registry (a visitor's token reads only each beacon's id and uuid), and
+    players seen on different levels, located by beacon (with their room), by GPS with a floor, and one not sure
+    (no level); the open-field game before it has no levels and no beacons;
+ 7. it restarts cleanly: after a restart of the demo container a game that was running is ended, boxes rejoin, and a
     new game is played; the old games are not listed any more (a fresh controller database).
 Everything it made is removed at the end, whatever the result.
 """
@@ -188,6 +192,10 @@ def main() -> int:
         running = wait(lambda: next((g for g in (jget(f"{base}/api/v1/games") or []) if g["state"] == "running"), None), 150)
         check.ok(bool(running), "a game is running")
         if running:
+            check.ok("edifício" not in running["name"] and (jget(f"{base}/api/v1/field/levels") or {}).get("enabled") is False
+                     and not (jget(f"{base}/api/v1/beacons") or {}).get("beacons"),
+                     "the first game is the open field: no levels, no beacons")
+        if running:
             gid = running["id"]
             nodes = jget(f"{base}/api/v1/nodes") or []
             check.ok(len(nodes) == 3 and all(n["link"] == "online" for n in nodes), "three simulated boxes are online")
@@ -207,6 +215,68 @@ def main() -> int:
             check.ok(bool(ended), "the game ends on its own")
             nxt = wait(lambda: next((g for g in (jget(f"{base}/api/v1/games") or []) if g["id"] != gid and g["state"] in ("ready", "running")), None), 60)
             check.ok(bool(nxt), "another game begins")
+
+        print("2b. the building scenario", flush=True)
+        building_game = wait(lambda: next((g for g in (jget(f"{base}/api/v1/games") or [])
+                                           if "edifício" in g["name"] and g["state"] == "running"), None), 150)
+        check.ok(bool(building_game), "a building game is played in turn with the open-field one")
+        if building_game:
+            bgid = building_game["id"]
+            lv = jget(f"{base}/api/v1/field/levels") or {}
+            check.ok(lv.get("enabled") is True and lv.get("count") == 3 and lv.get("names") == ["R/C", "1.º andar", "2.º andar"],
+                     f"three levels, named in the controller's language ({lv.get('names')})")
+            plans = []
+            for n in range(3):
+                code, png = get(f"{base}/api/v1/field/levels/{n}/image", READ_TOKEN)
+                plans.append(png)
+                check.ok(code == 200 and png[:8] == b"\x89PNG\r\n\x1a\n", f"level {n} has a floor plan (a PNG)")
+            check.ok(len(set(plans)) == 3, "the three floor plans differ")
+            check.ok(get(f"{base}/api/v1/field/levels/3/image", READ_TOKEN)[0] == 404, "there is no fourth level")
+            registry = jget(f"{base}/api/v1/beacons") or {}
+            check.ok(len(registry.get("beacons", [])) == 15, "fifteen beacons are registered (five a level)")
+            check.ok(all(set(b) == {"id", "uuid"} for b in registry.get("beacons", [])),
+                     "a visitor's token reads only each beacon's id and uuid")
+            boxes = jget(f"{base}/api/v1/games/{bgid}/positions") or {}
+            check.ok(sorted(p.get("level") for p in boxes.values()) == [0, 1, 2], f"the three boxes are on different levels ({boxes})")
+            seen_levels: set = set()
+            kinds = {"ble_room": 0, "gps_level": 0, "no_level": 0}
+            view = {}
+            end = time.monotonic() + 40
+            while time.monotonic() < end:
+                view = jget(f"{base}/player/data.json", None) or {}
+                for p in view.get("positions", []):
+                    if isinstance(p.get("level"), int):
+                        seen_levels.add(p["level"])
+                    if p.get("source") == "ble" and p.get("room") and isinstance(p.get("level"), int):
+                        kinds["ble_room"] += 1
+                    if p.get("source") == "gps" and isinstance(p.get("level"), int):
+                        kinds["gps_level"] += 1
+                    if p.get("source") == "gps" and not isinstance(p.get("level"), int):
+                        kinds["no_level"] += 1
+                if len(seen_levels) >= 2 and all(kinds.values()):
+                    break
+                time.sleep(3)
+            check.ok(len(seen_levels) >= 2, f"players are seen on different levels ({sorted(seen_levels)})")
+            check.ok(kinds["ble_room"] > 0, "a player located by a registered beacon is at a room of its level")
+            check.ok(kinds["gps_level"] > 0, "a player located by GPS has the floor they picked")
+            check.ok(kinds["no_level"] > 0, "a player who is not sure has a position and no level")
+            check.ok((view.get("levels") or {}).get("count") == 3 and len(view.get("beacons", [])) == 15
+                     and all(b.get("room") and "uuid" not in b for b in view.get("beacons", [])),
+                     "the player's view has the levels and the beacons' rooms (and no uuid)")
+            for n in range(3):
+                code, png = get(f"{base}/player/field.png?level={n}", None)
+                check.ok(code == 200 and png == plans[n], f"the player's view serves level {n}'s plan")
+            check.ok(get(f"{base}/player/")[0] == 200 and get(f"{base}/player/player.js")[0] == 200, "the player's page is served")
+            for method, path in (("POST", "/api/v1/beacons"), ("PUT", "/api/v1/field/levels"), ("PUT", "/api/v1/field/levels/1/image"),
+                                 ("DELETE", "/api/v1/beacons/1:1")):
+                check.ok(get(base + path, READ_TOKEN, method, b"{}")[0] == 405, f"{method} {path} is refused")
+            check.ok(get(f"{base}/api/v1/beacons/1:1", READ_TOKEN)[0] == 404, "one beacon's own page is not served")
+            site_seen = wait(lambda: "edifício" in (get(f"{site}/f/demo-ao-vivo/")[1].decode("utf-8", "replace")
+                                                    + get(f"{site}/f/demo-ao-vivo/scoreboard.json")[1].decode("utf-8", "replace")), 90)
+            check.ok(bool(site_seen), "the site server's pages show the building game too (the same field, synced)")
+            check.ok(wait(lambda: (jget(f"{base}/api/v1/field/levels") or {}).get("enabled") is False, 200),
+                     "the next open-field game turns the levels off again")
+            check.ok(not (jget(f"{base}/api/v1/beacons") or {}).get("beacons"), "and takes the beacons down")
 
         print("3. nothing can be changed", flush=True)
         games = jget(f"{base}/api/v1/games") or []
@@ -275,7 +345,7 @@ def main() -> int:
         check.ok(bool(board), f"its public scoreboard shows a game the simulated controller synced ({str(board)[:90]})")
         check.ok(get(f"{base}/")[0] == 200 and b"demo" in get(f"{base}/")[1].lower(), "the demo's home page")
 
-        print("6. it restarts cleanly", flush=True)
+        print("7. it restarts cleanly", flush=True)
         before = {g["id"] for g in (jget(f"{base}/api/v1/games") or [])}
         dc("restart", "demo-field")
         up = wait(lambda: get(f"{base}/demo/health")[0] == 200, 90)

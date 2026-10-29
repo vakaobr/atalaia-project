@@ -24,6 +24,11 @@ const TEXTS = {
            'tempos a demonstração reinicia-se sozinha.',
     note2: 'Tudo é inventado: o campo, as alcunhas, as pontuações. A demonstração não pede nem guarda dados de ' +
            'quem a visita.',
+    building: 'Os jogos alternam entre dois cenários: o campo aberto e um edifício de três pisos (R/C, 1.º ' +
+              'andar e 2.º andar), com caixas em pisos diferentes e participantes localizados por balizas BLE ' +
+              'ou por GPS com o piso escolhido (um deles não sabe em que piso está). Para mudar de piso: na ' +
+              'consola, os separadores por cima do plano; na vista de quem joga, os botões de piso por cima do ' +
+              'plano (abre no piso de quem joga).',
     feedback: 'Diga-nos o que achou'
   },
   en: {
@@ -46,6 +51,11 @@ const TEXTS = {
            'restarts itself.',
     note2: 'Everything is invented: the field, the callsigns, the scores. The demo neither asks for nor keeps ' +
            'anything about the people who visit it.',
+    building: 'The games alternate between two scenarios: the open field and a three-storey building (ground ' +
+              'floor, 1st and 2nd floor), with boxes on different floors and players located by BLE beacons or ' +
+              'by GPS with a floor picked (one of them is not sure of their floor). To switch floors: in the ' +
+              'console, the tabs above the plan; in the player’s view, the floor buttons above the plan (it ' +
+              'opens on the player’s own floor).',
     feedback: 'Tell us what you think'
   },
   de: {
@@ -71,6 +81,11 @@ const TEXTS = {
            'Ab und zu startet sich die Demo selbst neu.',
     note2: 'Alles ist erfunden: das Spielfeld, die Rufnamen, die Punkte. Die Demo verlangt und speichert nichts ' +
            'über Besuchende.',
+    building: 'Die Spiele wechseln zwischen zwei Szenarien: dem offenen Gelände und einem dreigeschossigen ' +
+              'Gebäude (Erdgeschoss, 1. und 2. Obergeschoss), mit Boxen auf verschiedenen Etagen und Spielenden, ' +
+              'die per BLE-Beacon oder per GPS mit gewählter Etage geortet werden (eine Person ist nicht sicher, ' +
+              'auf welcher Etage). Etage wechseln: in der Konsole die Reiter über dem Plan; in der Sicht der ' +
+              'Spielenden die Etagen-Tasten über dem Plan (sie öffnet auf der Etage der Spielenden).',
     feedback: 'Sagen Sie uns Ihre Meinung'
   },
   'zh-tw': {
@@ -89,6 +104,9 @@ const TEXTS = {
     site_b: '公開計分板',
     note1: '遊戲會重複進行：一場結束後接著開始下一場，中間稍作停頓。示範偶爾會自行重新啟動。',
     note2: '一切皆為虛構：場地、代號與比分。本示範不會索取或保存任何訪客的資料。',
+    building: '遊戲會在兩種情境之間輪流：開放場地，以及三層樓的建築（一樓、二樓、三樓），盒子分布在不同樓層，' +
+              '玩家以 BLE 信標或以 GPS 搭配所選樓層定位（其中一位不確定自己所在的樓層）。切換樓層：在主控台，' +
+              '使用平面圖上方的分頁；在玩家視角，使用平面圖上方的樓層按鈕（預設開啟玩家所在的樓層）。',
     feedback: '告訴我們您的想法'
   }
 };
@@ -152,7 +170,7 @@ function render() {
                                            link(`${base}/scoreboard?lang=${sl}`, t.site_b)]));
   }
   document.getElementById('cards').replaceChildren(...cards);
-  const notes = [el('p', {}, t.note1), el('p', {}, t.note2)];
+  const notes = [el('p', {}, t.note1), el('p', {}, t.building), el('p', {}, t.note2)];
   if (config.site_url) notes.push(el('p', {}, el('a', { href: `${config.site_url}/feedback?lang=${lang}` }, t.feedback)));
   document.getElementById('notes').replaceChildren(...notes);
 }

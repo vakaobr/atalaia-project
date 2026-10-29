@@ -21,6 +21,10 @@ const TEXTS = {
     planNote: 'As bolas grandes são as caixas, na cor de quem as tem; os pontos são a minha equipa (o meu com ' +
               'contorno). O jogo só mostra as posições enquanto decorre.',
     planTitle: 'Plano do campo com as caixas e a minha equipa',
+    floor: 'Piso', where: (r) => `A minha posição: ${r}`,
+    levelNote: 'Escolha o piso nos botões. Quadrados: quem é localizado por balizas BLE; círculos: por GPS com o ' +
+               'piso escolhido; vazado: piso desconhecido (\u201cNão sei\u201d). Os pontos pequenos são as balizas.',
+    unsure: (n) => `${n} da equipa não sabe em que piso está: aparece vazado em todos os pisos.`,
     captured: (b, t) => `a equipa ${t} capturou a caixa ${b}`, start: 'o jogo começou',
     end: (w) => (w ? `o jogo terminou, ganhou a equipa ${w}` : 'o jogo terminou')
   },
@@ -39,6 +43,10 @@ const TEXTS = {
     planNote: 'The big circles are the boxes, in the colour of whoever holds them; the dots are my team (mine ' +
               'outlined). Positions are shown only while the game runs.',
     planTitle: 'Field plan with the boxes and my team',
+    floor: 'Floor', where: (r) => `My position: ${r}`,
+    levelNote: 'Pick the floor with the buttons. Squares: located by BLE beacons; circles: by GPS with the floor ' +
+               'chosen; hollow: floor not known (\u201cNot sure\u201d). The small dots are the beacons.',
+    unsure: (n) => `${n} on the team not sure of their floor: drawn hollow on every floor.`,
     captured: (b, t) => `team ${t} captured box ${b}`, start: 'the game started',
     end: (w) => (w ? `the game ended, team ${w} won` : 'the game ended')
   },
@@ -57,6 +65,10 @@ const TEXTS = {
     planNote: 'Die großen Kreise sind die Boxen in der Farbe des haltenden Teams; die Punkte sind mein Team ' +
               '(ich mit Umrandung). Positionen gibt es nur, solange das Spiel läuft.',
     planTitle: 'Geländeplan mit den Boxen und meinem Team',
+    floor: 'Etage', where: (r) => `Meine Position: ${r}`,
+    levelNote: 'Etage mit den Tasten wählen. Quadrate: per BLE-Beacon geortet; Kreise: per GPS mit gewählter ' +
+               'Etage; hohl: Etage unbekannt (\u201eNicht sicher\u201c). Die kleinen Punkte sind die Beacons.',
+    unsure: (n) => `${n} im Team nicht sicher, auf welcher Etage: auf jeder Etage hohl gezeichnet.`,
     captured: (b, t) => `Team ${t} hat Box ${b} eingenommen`, start: 'das Spiel hat begonnen',
     end: (w) => (w ? `das Spiel ist zu Ende, Team ${w} hat gewonnen` : 'das Spiel ist zu Ende')
   },
@@ -71,6 +83,9 @@ const TEXTS = {
     states: { ready: '準備中', running: '進行中', paused: '暫停', ended: '已結束' },
     planNote: '大圓圈是盒子，顏色為佔有它的隊伍；小圓點是我的隊伍（我有外框）。位置只在遊戲進行時顯示。',
     planTitle: '顯示盒子與我的隊伍的場地平面圖',
+    floor: '樓層', where: (r) => `我的位置：${r}`,
+    levelNote: '用按鈕選擇樓層。方塊：以 BLE 信標定位；圓圈：以 GPS 搭配所選樓層；空心：樓層未知（「不確定」）。小點為信標。',
+    unsure: (n) => `隊伍中有 ${n} 位不確定所在樓層：在每個樓層都以空心顯示。`,
     captured: (b, t) => `${t}佔領了盒子 ${b}`, start: '遊戲開始',
     end: (w) => (w ? `遊戲結束，${w}獲勝` : '遊戲結束')
   }
@@ -91,6 +106,8 @@ function pickLang() {
 
 let lang = pickLang();
 let data = null;
+let chosen = null;   // the floor the visitor picked (null: follow the player's own)
+let planSrc = '';
 let fetchedAt = 0;
 
 const $ = (id) => document.getElementById(id);
@@ -121,6 +138,24 @@ function chronoText(t, replicas) {
 
 function teamName(t, team) { return t.teams[team] || team || ''; }
 
+function levelsOn() {
+  return !!(data && data.levels && data.levels.enabled && data.levels.count > 1);
+}
+
+function ownLevel() {
+  const me = (data.positions || []).find((p) => p.player_id === data.you);
+  return me && Number.isInteger(me.level) ? me.level : null;
+}
+
+// The floor shown: the visitor's pick, else the player's own, else 0 (as a phone does, PM-7).
+function viewLevel() {
+  if (!levelsOn()) return 0;
+  const n = data.levels.count;
+  if (chosen !== null && chosen >= n) chosen = null;
+  const v = chosen !== null ? chosen : ownLevel();
+  return v !== null && v < n ? v : 0;
+}
+
 function renderStatic() {
   const t = TEXTS[lang];
   document.documentElement.lang = lang === 'zh-tw' ? 'zh-TW' : lang;
@@ -134,7 +169,7 @@ function renderStatic() {
   $('h-game').textContent = t.game;
   $('h-plan').textContent = t.plan;
   $('h-events').textContent = t.events;
-  $('plan-note').textContent = t.planNote;
+  $('plan-note').textContent = levelsOn() ? t.planNote + ' ' + t.levelNote : t.planNote;
   $('plan-title').textContent = t.planTitle;
   const langs = $('langs');
   langs.replaceChildren(...Object.entries(LANGS).map(([code, name]) => {
@@ -184,9 +219,31 @@ function renderData() {
   renderClock();
   // the plan: boxes, then people
   const nodes = new Map((data.nodes || []).map((n) => [String(n.node_id), n]));
+  const on = levelsOn();
+  const view = viewLevel();
+  if (!on) chosen = null;
+  $('plan-note').textContent = on ? t.planNote + ' ' + t.levelNote : t.planNote;
+  const chips = $('levels');
+  chips.hidden = !on;
+  chips.setAttribute('aria-label', t.floor);
+  chips.replaceChildren(...(on ? data.levels.names.map((name, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = name || String(i);
+    b.setAttribute('aria-pressed', String(i === view));
+    b.addEventListener('click', () => { chosen = i; renderData(); });
+    return b;
+  }) : []));
+  const stamp = ((data.levels && data.levels.stamps) || [])[view];
+  const src = `/player/field.png?level=${view}&v=${encodeURIComponent(stamp || '')}`;
+  if (src !== planSrc) { planSrc = src; $('plan-img').setAttribute('href', src); }
+  const beacons = $('plan-beacons');
+  beacons.replaceChildren(...(on ? (data.beacons || []).filter((b) => b.level === view && b.x !== null).map((b) =>
+    svg('circle', { cx: b.x * 720, cy: b.y * 540, r: 4, fill: '#ffffff', stroke: '#444444', 'stroke-width': 1.5 })) : []));
   const boxes = $('plan-boxes');
   boxes.replaceChildren();
   for (const [id, pos] of Object.entries(data.boxes || {})) {
+    if (on && (pos.level || 0) !== view) continue;
     const n = nodes.get(id) || {};
     boxes.append(svg('circle', { cx: pos.x * 720, cy: pos.y * 540, r: 22, fill: COLOURS[n.owner] || '#d9d9d9',
                                  stroke: '#101010', 'stroke-width': 3, 'fill-opacity': 0.9 }));
@@ -197,13 +254,33 @@ function renderData() {
   }
   const people = $('plan-people');
   people.replaceChildren();
+  let unsure = 0;
   for (const p of data.positions || []) {
-    const at = toPlan(data.georef, p.lat, p.lon);
+    // a beacon gives the place on the plan itself; a GPS fix goes through the georeference
+    const at = typeof p.x === 'number' && typeof p.y === 'number' ? [p.x * 720, p.y * 540]
+      : (typeof p.lat === 'number' ? toPlan(data.georef, p.lat, p.lon) : null);
     if (!at) continue;
+    const hollow = on && !Number.isInteger(p.level);   // a floor not known (PM-6): hollow, on the floor shown
+    if (on && !hollow && p.level !== view) continue;
+    if (hollow) unsure += 1;
     const mine = p.player_id === data.you;
-    people.append(svg('circle', { cx: at[0], cy: at[1], r: mine ? 9 : 6, fill: COLOURS[p.team] || '#ffffff',
-                                  stroke: mine ? '#ffffff' : '#101010', 'stroke-width': mine ? 3 : 1.5 }));
+    const r = mine ? 9 : 6;
+    // the controller gives a position's team as its number in the game's list (1, 2), a name only in older data
+    const colour = COLOURS[typeof p.team === 'number' ? (game.teams || [])[p.team - 1] : p.team] || '#ffffff';
+    const common = { fill: hollow ? 'none' : colour, stroke: hollow ? colour : (mine ? '#ffffff' : '#101010'),
+                     'stroke-width': hollow ? 3 : (mine ? 3 : 1.5) };
+    people.append(p.source === 'ble'
+      ? svg('rect', { x: at[0] - r, y: at[1] - r, width: 2 * r, height: 2 * r, rx: 2, ...common })
+      : svg('circle', { cx: at[0], cy: at[1], r, ...common }));
   }
+  const unsureNote = $('unsure-note');
+  unsureNote.hidden = !unsure;
+  unsureNote.textContent = unsure ? t.unsure(unsure) : '';
+  const here = (data.positions || []).find((p) => p.player_id === data.you);
+  const where = $('where');
+  where.hidden = !(here && here.room);
+  where.textContent = here && here.room
+    ? t.where(here.room + (on && Number.isInteger(here.level) ? ', ' + data.levels.names[here.level] : '')) : '';
   // the events
   const names = new Map([...nodes.entries()].map(([id, n]) => [id, n.name]));
   const shown = ['zone.captured', 'game.start', 'game.end'];

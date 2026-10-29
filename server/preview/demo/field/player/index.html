@@ -34,13 +34,17 @@
     </section>
     <section class="card" aria-labelledby="h-plan">
       <h2 id="h-plan"></h2>
+      <div id="levels" class="levels" role="group" hidden></div>
       <svg id="plan" viewBox="0 0 720 540" role="img" aria-labelledby="plan-title">
         <title id="plan-title"></title>
         <image id="plan-img" href="/player/field.png" x="0" y="0" width="720" height="540"></image>
+        <g id="plan-beacons"></g>
         <g id="plan-boxes"></g>
         <g id="plan-people"></g>
       </svg>
+      <p class="small" id="where" hidden></p>
       <p class="muted small" id="plan-note"></p>
+      <p class="muted small" id="unsure-note" hidden></p>
     </section>
     <section class="card" aria-labelledby="h-events">
       <h2 id="h-events"></h2>

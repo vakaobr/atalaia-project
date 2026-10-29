@@ -119,6 +119,26 @@ def georef() -> dict:
     return {"georef": None}
 
 
+LEVEL_NAMES = ["R/C", "1.º andar", "2.º andar"]
+
+
+@stub.get("/api/v1/field/levels")
+def levels() -> dict:
+    return {"enabled": True, "count": 3, "names": LEVEL_NAMES, "in_use": 3,
+            "levels": [{"level": i, "name": n, "image": {"content_type": "image/png", "bytes": 9, "updated_at": 10.0 + i},
+                        "own_georef": False, "grid": None} for i, n in enumerate(LEVEL_NAMES)]}
+
+
+@stub.get("/api/v1/field/levels/{n}/image")
+def level_image(n: int) -> Response:
+    return Response(b"\x89PNG-level-%d" % n, media_type="image/png")
+
+
+@stub.get("/api/v1/beacons")
+def beacons() -> dict:
+    return {"beacons": [{"id": "1:1", "uuid": "A7A11A1A-0B1D-4C0D-9E57-00A7A11A0001"}], "ble_interval_s": 5}
+
+
 @stub.websocket("/api/v1/stream")
 async def stream(ws: WebSocket) -> None:
     await ws.accept()
@@ -164,6 +184,7 @@ class ProxyTests(unittest.TestCase):
         seen.clear()
         ws_received.clear()
         (Path(TMP) / "player.json").unlink(missing_ok=True)
+        (Path(TMP) / "beacons.json").unlink(missing_ok=True)
 
     def reached(self, method: str, path: str) -> bool:
         return any(m == method and p == path for m, p, _ in seen)
@@ -295,6 +316,47 @@ class ProxyTests(unittest.TestCase):
         self.assertFalse(any(m != "GET" for m, _, _ in seen))
         self.assertEqual(self.client.get("/player/field.png").status_code, 200)
 
+    def test_the_building_levels_and_beacons_are_read_only_read_endpoints(self) -> None:
+        auth = {"Authorization": f"Bearer {READ}"}
+        for path in ("/api/v1/field/levels", "/api/v1/field/levels/0/image", "/api/v1/field/levels/2/image",
+                     "/api/v1/beacons"):
+            self.assertEqual(self.client.get(path, headers=auth).status_code, 200, path)
+        # no beacon is read with more than the stand-in gave a visitor's token, and nothing writes
+        for path in ("/api/v1/field/levels/10/image", "/api/v1/field/levels/x/image", "/api/v1/beacons/1:1",
+                     "/api/v1/field/levels/2/from-map"):
+            self.assertEqual(self.client.get(path, headers=auth).status_code, 404, path)
+        for method, path in (("POST", "/api/v1/beacons"), ("PUT", "/api/v1/beacons/1:1"), ("DELETE", "/api/v1/beacons/1:1"),
+                             ("PUT", "/api/v1/field/levels"), ("PUT", "/api/v1/field/levels/1/image"),
+                             ("POST", "/api/v1/positions")):
+            self.assertEqual(self.client.request(method, path, headers=auth, content=b"{}").status_code, 405, (method, path))
+        self.assertTrue(all(m == "GET" for m, _, _ in seen))
+
+    def test_the_players_view_has_the_levels_the_beacons_and_each_levels_plan(self) -> None:
+        (Path(TMP) / "player.json").write_text(json.dumps({"game_id": 7, "player_id": "p-abc", "token": PLAYER,
+                                                           "name": "Falcão", "team": "red"}))
+        (Path(TMP) / "beacons.json").write_text(json.dumps([
+            {"uuid": "A7A11A1A-0B1D-4C0D-9E57-00A7A11A0001", "major": 1, "minor": 1, "room": "Entrada", "zone": "Ala norte",
+             "level": 0, "x": 0.24, "y": 0.26, "secret": "must-not-pass"}, "junk"]))
+        body = self.client.get("/player/data.json").json()
+        self.assertEqual(body["levels"], {"enabled": True, "count": 3, "names": LEVEL_NAMES, "stamps": [10.0, 11.0, 12.0]})
+        self.assertEqual(body["beacons"], [{"major": 1, "minor": 1, "room": "Entrada", "zone": "Ala norte", "level": 0,
+                                            "x": 0.24, "y": 0.26}])
+        self.assertNotIn("must-not-pass", json.dumps(body))
+        self.assertNotIn("uuid", json.dumps(body["beacons"]))
+        seen.clear()
+        for level, want in (("0", b"\x89PNG-stand-in"), ("2", b"\x89PNG-level-2"), ("9", b"\x89PNG-level-9")):
+            self.assertEqual(self.client.get("/player/field.png?level=" + level).content, want)
+        # anything but one digit is the field image: nothing a visitor writes becomes part of a controller path
+        for odd in ("10", "x", "../../boxes", "2/../../boxes", "-1", ""):
+            self.assertEqual(self.client.get("/player/field.png", params={"level": odd}).content, b"\x89PNG-stand-in", odd)
+        self.assertEqual({p for _, p, _ in seen}, {"/api/v1/field/levels/2/image", "/api/v1/field/levels/9/image",
+                                                   "/api/v1/field/image"})
+
+    def test_without_a_file_there_are_no_beacons(self) -> None:
+        (Path(TMP) / "player.json").write_text(json.dumps({"game_id": 7, "player_id": "p-abc", "token": PLAYER,
+                                                           "name": "Falcão", "team": "red"}))
+        self.assertEqual(self.client.get("/player/data.json").json()["beacons"], [])
+
     # --- the proxy's own pages ---
 
     def test_the_home_page_and_its_facts(self) -> None:
@@ -343,6 +405,145 @@ class FieldMapTests(unittest.TestCase):
 
         for fx, fy in [*fieldmap.ZONES.values(), *fieldmap.BASES.values()]:
             self.assertTrue(0.05 < fx < 0.95 and 0.05 < fy < 0.95)
+
+
+class BuildingTests(unittest.TestCase):
+    def test_the_three_plans_are_pngs_the_controller_accepts_and_differ(self) -> None:
+        import building
+        from atalaia_controller import images
+
+        plans = [building.plan_png(i) for i in range(3)]
+        self.assertEqual(len(set(plans)), 3)
+        for png in plans:
+            checked = images.check(png, "image/png", images.Limits("field", 4 << 20, 16, 4096, 8.0))
+            self.assertEqual((checked.width, checked.height), (building.WIDTH, building.HEIGHT))
+            self.assertLess(len(png), 200_000)
+
+    def test_the_building_has_a_georeference_of_its_own_in_the_open_sea(self) -> None:
+        import building
+        import fieldmap
+
+        pts = building.georef_points()
+        self.assertNotEqual(pts, fieldmap.georef_points())
+        for p in pts:
+            self.assertLess(abs(p["lat"]), 0.01)
+            self.assertLess(abs(p["lon"]), 0.01)
+        for x, y in ((0.0, 0.0), (0.5, 0.5), (0.24, 0.26), (1.0, 1.0)):
+            bx, by = building.to_plan(*building.to_latlon(x, y))
+            self.assertAlmostEqual(bx, x, places=3)
+            self.assertAlmostEqual(by, y, places=3)
+
+    def test_levels_boxes_and_beacons_are_what_the_controller_accepts(self) -> None:
+        import building
+        from atalaia_controller import beacons, field_levels
+
+        self.assertEqual(building.LEVEL_NAMES, ["R/C", "1.º andar", "2.º andar"])
+        meta = field_levels.check({"enabled": True, "count": 3, "names": building.LEVEL_NAMES}, field_levels.load(_Settings()))
+        self.assertEqual((meta["enabled"], meta["count"], meta["names"]), (True, 3, building.LEVEL_NAMES))
+        registry = building.beacons()
+        self.assertEqual(len(registry), 15)
+        ids = set()
+        for b in registry:
+            checked = beacons.check(b, meta)
+            self.assertEqual((checked["room"], checked["level"]), (b["room"], b["level"]))
+            ids.add((b["major"], b["minor"]))
+        self.assertEqual(len(ids), 15)
+        self.assertEqual({b["level"] for b in registry}, {0, 1, 2})
+        self.assertEqual(len({b["uuid"] for b in registry}), 1)
+        # the boxes are on three different levels, each in a room of that level
+        levels = [lv for _, lv in building.BOX_PLACES.values()]
+        self.assertEqual(sorted(levels), [0, 1, 2])
+
+    def test_a_route_runs_along_doors_and_the_corridor_and_changes_a_level_only_at_the_stairs(self) -> None:
+        import building
+
+        for (key, level), (key2, level2) in (((a, la), (b, lb)) for a, la in (("se", 0), ("nw", 2)) for b, lb in (("nw", 2), ("ne", 1), ("sw", 0))):
+            _, x, y = building.room_at(key, level)
+            _, x2, y2 = building.room_at(key2, level2)
+            route = building.route(level, x, y, level2, x2, y2)
+            self.assertEqual(route[-1], (level2, x2, y2))
+            here = (level, x, y)
+            for wp in route:
+                if wp[0] != here[0]:
+                    self.assertEqual((wp[1], wp[2]), building.STAIRS)      # a level changes only on the stairs
+                    self.assertEqual((here[1], here[2]), building.STAIRS)
+                    self.assertEqual(abs(wp[0] - here[0]), 1)              # one floor at a time
+                else:
+                    # axis-aligned legs: through a door (same x) or along the corridor (same y)
+                    self.assertTrue(abs(wp[1] - here[1]) < 1e-9 or abs(wp[2] - here[2]) < 1e-9, (here, wp))
+                here = wp
+
+    def test_the_nearest_beacon_is_the_one_of_the_room_on_that_level(self) -> None:
+        import building
+
+        self.assertEqual(building.nearest_beacon(1, 0.25, 0.27), "2:1")
+        self.assertEqual(building.nearest_beacon(0, 0.5, 0.5), "1:5")
+        self.assertEqual(building.nearest_beacon(2, 0.76, 0.74), "3:4")
+
+    def test_the_players_are_located_three_ways_and_only_as_the_app_would_report(self) -> None:
+        import random
+
+        import building
+        import director
+
+        scenario = director.BuildingScenario()
+        rng = random.Random(5)
+        players = [scenario.new_player(i, f"P{i}", director.TEAMS[i % 2], rng) for i in range(12)]
+        for i, p in enumerate(players):
+            p.token = f"token-{i}"
+        modes = [p.mode for p in players]
+        self.assertEqual((modes.count("ble"), modes.count("gps"), modes.count("unsure")), (6, 5, 1))
+        self.assertEqual(players[0].team, "red")
+        self.assertEqual(players[0].mode, "gps")            # the player's view follows the first one
+        self.assertEqual([p.team for p in players if p.mode == "unsure"], ["red"])
+        posted: list[tuple[str, dict]] = []
+
+        class Api:
+            def call(self, method, path, body=None, token=None, **kw):
+                posted.append((token, body))
+
+        levels_seen = set()
+        for _ in range(900):
+            scenario.step(players, 1.0, rng)
+            levels_seen |= {p.level for p in players}
+            for p in players:
+                self.assertTrue(0.0 <= p.x <= 1.0 and 0.0 <= p.y <= 1.0)
+        self.assertEqual(levels_seen, {0, 1, 2})            # people do go between floors
+        scenario.report(Api(), players)
+        self.assertEqual(len(posted), 12)
+        registered = {f"{b['major']}:{b['minor']}" for b in scenario.beacons}
+        by_token = {p.token: p for p in players}
+        for token, body in posted:
+            p = by_token[token]
+            if p.mode == "ble":
+                self.assertEqual(set(body) - {"t"}, {"source", "beacon_id"})   # a beacon report says nothing of a level
+                self.assertIn(body["beacon_id"], registered)
+                self.assertEqual(body["beacon_id"].split(":")[0], str(p.level + 1))
+            else:
+                self.assertEqual(body["source"], "gps")
+                self.assertIn("level", body)
+                self.assertEqual(body["level"], p.level if p.mode == "gps" else None)
+
+    def test_the_scenarios_alternate_and_the_callsigns_stay_made_up(self) -> None:
+        import director
+
+        self.assertEqual([s.key for s in director.scenarios_from_env()], ["open", "building"])
+        os.environ["DEMO_SCENARIOS"] = "building"
+        try:
+            self.assertEqual([s.key for s in director.scenarios_from_env()], ["building"])
+            os.environ["DEMO_SCENARIOS"] = "nonsense"
+            self.assertEqual([s.key for s in director.scenarios_from_env()], ["open", "building"])
+        finally:
+            del os.environ["DEMO_SCENARIOS"]
+        self.assertTrue(all(len(n) <= 32 for n in director.building.LEVEL_NAMES))
+        self.assertTrue(all(len(b["room"]) <= 48 for b in director.building.beacons()))
+
+
+class _Settings:
+    """The little of the controller's store that field_levels.load reads: no setting yet."""
+
+    def get_setting(self, key: str):
+        return None
 
 
 class DirectorTests(unittest.TestCase):

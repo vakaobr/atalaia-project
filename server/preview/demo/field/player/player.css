@@ -37,3 +37,7 @@ svg { width: 100%; height: auto; border-radius: 6px; display: block; background:
 .events li { padding: 4px 0; border-bottom: 1px solid var(--line); display: flex; gap: 10px; }
 .events li:last-child { border-bottom: 0; }
 .events time { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 4.5em; }
+.levels { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.levels button { font: inherit; color: var(--fg); background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+                 padding: 4px 14px; cursor: pointer; }
+.levels button[aria-pressed="true"] { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
