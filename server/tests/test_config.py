@@ -244,5 +244,25 @@ class RedactTests(unittest.TestCase):
         self.assertEqual(redact_url("postgresql+asyncpg://db/atalaia"), "postgresql+asyncpg://db/atalaia")
 
 
+
+class ComposeTests(unittest.TestCase):
+    """The settings an operator puts in .env reach the server's container: docker-compose.yml lists them in
+    the server's environment (the social login settings were missing until 2026-10-29, so no Docker deployment
+    could turn a provider on)."""
+
+    def test_the_social_login_settings_reach_the_container(self) -> None:
+        compose = Path(__file__).resolve().parents[1] / "docker-compose.yml"
+        if not compose.exists():
+            self.skipTest("docker-compose.yml is not next to the tests here")
+        text = compose.read_text(encoding="utf-8")
+        for provider, names in (("GOOGLE", ("CLIENT_ID", "CLIENT_SECRET")),
+                                ("MICROSOFT", ("CLIENT_ID", "CLIENT_SECRET", "TENANT")),
+                                ("APPLE", ("CLIENT_ID", "TEAM_ID", "KEY_ID", "KEY_FILE"))):
+            for name in names:
+                var = f"ATALAIA_OIDC_{provider}_{name}"
+                self.assertIn(f'{var}: "${{{var}:-}}"', text, var)
+
+
 if __name__ == "__main__":
     unittest.main()
+

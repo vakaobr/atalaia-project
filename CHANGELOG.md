@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Site server: the social login settings never reached the server's container** (`server/docker-compose.yml`): the `ATALAIA_OIDC_*` settings DEPLOY.md tells the operator to put in `.env` were not in the server's environment, so Google, Microsoft and Apple stayed off in every Docker deployment (found on the preview server on 2026-10-29). A test now checks the compose file lists them.
+
 ### Added
 
 - **Bench builds: `@hold <button 1-4> <ms>` on the box's serial console holds a team button** (`firmware/esp32/main/shell.c`, only with `CONFIG_ATALAIA_SERIAL_KEYS`, i.e. `sdkconfig.bench` and the Wokwi build): the projected-score runbook and the penalty check ran on the bench on 2026-10-29 without hands on the board; results in `docs/runbooks/projected-score-bench.md`.
