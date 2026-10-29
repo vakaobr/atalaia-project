@@ -36,6 +36,61 @@ const boxBeaconsOffPrefix = 'box_beacons_off:';
 const boxBeaconRoomsPrefix = 'box_beacon_rooms:';
 const _boxRoomMax = 48;
 
+/// What a standby controller's join carries (key 21, decision BBC-20): the
+/// nodes the GM disabled and the rooms the GM gave in game [gameId], or null
+/// when there are none (box_beacons.py `mirror`). The field's switch is key 19.
+BoxBeaconsMirror? boxBeaconsMirror(ControllerStore store, int gameId) {
+  final off = <int>{};
+  final rooms = <int, String>{};
+  try {
+    final rawOff = store.getSetting('$boxBeaconsOffPrefix$gameId');
+    if (rawOff != null && rawOff.isNotEmpty) {
+      for (final n in jsonDecode(rawOff) as List) {
+        if (n is int) off.add(n);
+      }
+    }
+    final rawRooms = store.getSetting('$boxBeaconRoomsPrefix$gameId');
+    if (rawRooms != null && rawRooms.isNotEmpty) {
+      for (final e in (jsonDecode(rawRooms) as Map).entries) {
+        final n = int.tryParse('${e.key}');
+        if (n != null && e.value is String) rooms[n] = e.value as String;
+      }
+    }
+  } on Object {
+    // a damaged setting is as good as none
+  }
+  final sorted = off.toList()..sort();
+  final keys = rooms.keys.toList()..sort();
+  final out = BoxBeaconsMirror(
+    off: sorted,
+    rooms: {for (final k in keys) k: rooms[k]!},
+  );
+  return out.isEmpty ? null : out;
+}
+
+/// A standby controller takes the primary's box-beacon choices from its join
+/// (keys 19 and 21): the field switch, and the game's disabled boxes and
+/// rooms, replacing its own (box_beacons.py `apply_mirror`).
+void applyBoxBeaconsMirror(
+  ControllerStore store,
+  int gameId,
+  bool on,
+  BoxBeaconsMirror? mirror,
+) {
+  store.setSetting(boxBeaconsSetting, on ? 'on' : 'off');
+  final off = mirror?.off ?? const <int>[];
+  final rooms = mirror?.rooms ?? const <int, String>{};
+  off.isEmpty
+      ? store.deleteSetting('$boxBeaconsOffPrefix$gameId')
+      : store.setSetting('$boxBeaconsOffPrefix$gameId', jsonEncode(off));
+  rooms.isEmpty
+      ? store.deleteSetting('$boxBeaconRoomsPrefix$gameId')
+      : store.setSetting(
+          '$boxBeaconRoomsPrefix$gameId',
+          jsonEncode({for (final e in rooms.entries) '${e.key}': e.value}),
+        );
+}
+
 /// The field's box-beacon UUID from its join key, upper case 8-4-4-4-12.
 String deriveBoxBeaconUuid(List<int> joinKey) {
   final mac = Hmac(sha256, joinKey).convert(utf8.encode(_boxBeaconLabel)).bytes;

@@ -2256,7 +2256,7 @@
         ]
       },
       {
-        "name": "S7 failover: a standby joins from a controller's join, follows its TIME, is promoted and takes over",
+        "name": "S7 failover: a standby joins from a controller's join, follows its TIME, is promoted and takes over; a join made again only refreshes it",
         "join_key": "6465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80818283",
         "steps": [
           {"request": {"method": "GET", "path": "/api/v1/whoami", "token": "gm"}, "status": 200, "json": {"features": {"$contains": ["failover"]}}},
@@ -2269,7 +2269,7 @@
           {"request": {"method": "POST", "path": "/api/v1/controller/join", "token": "gm", "body": {"text": "atalaia:join:AAAA"}}, "status": 400},
           {"request": {"method": "POST", "path": "/api/v1/controller/join", "token": "gm", "body": {}}, "status": 400},
           {"request": {"method": "POST", "path": "/api/v1/controller/join", "token": "gm", "body": {"text": "${jtext}"}}, "status": 201, "json": {"id": 77, "name": "Game 77 (standby)", "state": "ready", "joined": true, "node_id": 2, "controller_id": 1, "channel_hz": 869525000, "teams": ["red", "blue"], "term": 0, "live": true, "mode_id": "org.atalaia.domination", "start_check": "$absent"}},
-          {"request": {"method": "POST", "path": "/api/v1/controller/join", "token": "gm", "body": {"text": "${jtext}"}}, "status": 409},
+          {"request": {"method": "POST", "path": "/api/v1/controller/join", "token": "gm", "body": {"text": "${jtext}"}}, "status": 201, "json": {"id": 77, "joined": true}},
           {"tx": [{"kind": "configure", "game_id": 77, "node_id": 2, "epoch": "$any", "max_hops": 2, "channel_hz": 869525000}]},
           {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"joined": true, "role": "follower", "term": 0, "leader": null, "live_game": 77, "node_id": 2}},
           {"request": {"method": "POST", "path": "/api/v1/games/77/start", "token": "gm", "body": {"force": true}}, "status": 409},
@@ -2304,6 +2304,28 @@
           {"advance_ms": 100},
           {"request": {"method": "GET", "path": "/api/v1/games/77", "token": "gm"}, "status": 200, "json": {"state": "ended", "live": false, "ended_at": "$any"}},
           {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"live_game": null, "role": null, "joined": false}}
+        ]
+      },
+      {
+        "name": "S7 failover: a standby takes the primary's box-beacon choices from its join and serves the same registry (BBC-20)",
+        "join_key": "6465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80818283",
+        "steps": [
+          {"join_encode": {"kind": "controller", "game_id": 77, "game_key": "00112233445566778899aabbccddeeff", "node_id": 2, "controller_id": 1, "channel_hz": 869525000, "max_hops": 2, "teams": ["red", "blue"], "mode_id": "org.atalaia.domination", "role": "controller", "game_seed": 12345, "params": null, "box_beacon": false, "box_beacons": {"off": [5], "rooms": {"4": "Cellar"}}}, "save": "j1"},
+          {"request": {"method": "POST", "path": "/api/v1/controller/join", "token": "gm", "body": {"text": "${j1}"}}, "status": 201, "json": {"id": 77, "joined": true}},
+          {"request": {"method": "GET", "path": "/api/v1/beacons", "token": "gm"}, "status": 200, "json": {"beacons": [], "box_beacons": {"enabled": false, "major": 45253, "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D"}}},
+          {"rx": {"source": 4, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+          {"rx": {"source": 5, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-5", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+          {"request": {"method": "PUT", "path": "/api/v1/games/77/positions/4", "token": "gm", "body": {"x": 0.25, "y": 0.5}}, "status": 200},
+          {"request": {"method": "PUT", "path": "/api/v1/games/77/positions/5", "token": "gm", "body": {"x": 0.75, "y": 0.5}}, "status": 200},
+          {"request": {"method": "GET", "path": "/api/v1/beacons", "token": "gm"}, "status": 200, "json": {"beacons": [{"id": "45253:4", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "kind": "box", "minor": 4, "node_id": 4, "room": "Cellar", "room_given": true, "enabled": true}, {"id": "45253:5", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "kind": "box", "minor": 5, "node_id": 5, "room": "box-5", "room_given": false, "enabled": false}], "box_beacons": {"enabled": false}}},
+          {"request": {"method": "GET", "path": "/api/v1/beacons", "token": "read"}, "status": 200, "json": {"beacons": []}},
+          {"join_encode": {"kind": "controller", "game_id": 77, "game_key": "00112233445566778899aabbccddeeff", "node_id": 2, "controller_id": 1, "channel_hz": 869525000, "max_hops": 2, "teams": ["red", "blue"], "mode_id": "org.atalaia.domination", "role": "controller", "game_seed": 12345, "params": null, "box_beacons": {"rooms": {"5": "Hall"}}}, "save": "j2"},
+          {"request": {"method": "POST", "path": "/api/v1/controller/join", "token": "gm", "body": {"text": "${j2}"}}, "status": 201, "json": {"id": 77, "joined": true}},
+          {"request": {"method": "GET", "path": "/api/v1/beacons", "token": "gm"}, "status": 200, "json": {"beacons": [{"id": "45253:4", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "kind": "box", "minor": 4, "node_id": 4, "room": "box-4", "room_given": false, "enabled": true}, {"id": "45253:5", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "kind": "box", "minor": 5, "node_id": 5, "room": "Hall", "room_given": true, "enabled": true}], "box_beacons": {"enabled": true}}},
+          {"request": {"method": "GET", "path": "/api/v1/beacons", "token": "read"}, "status": 200, "json": {"beacons": [{"id": "45253:4", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "room": "$absent"}, {"id": "45253:5", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "room": "$absent"}]}},
+          {"join_encode": {"kind": "controller", "game_id": 77, "game_key": "00112233445566778899aabbccddeeff", "node_id": 2, "controller_id": 1, "channel_hz": 869525000, "max_hops": 2, "teams": ["red", "blue"], "mode_id": "org.atalaia.domination", "role": "controller", "game_seed": 12345, "params": null}, "save": "j3"},
+          {"request": {"method": "POST", "path": "/api/v1/controller/join", "token": "gm", "body": {"text": "${j3}"}}, "status": 201, "json": {"id": 77, "joined": true}},
+          {"request": {"method": "GET", "path": "/api/v1/beacons", "token": "gm"}, "status": 200, "json": {"beacons": [{"id": "45253:4", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "kind": "box", "minor": 4, "node_id": 4, "room": "box-4", "room_given": false, "enabled": true}, {"id": "45253:5", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "kind": "box", "minor": 5, "node_id": 5, "room": "box-5", "room_given": false, "enabled": true}]}}
         ]
       },
       {

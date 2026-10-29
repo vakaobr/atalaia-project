@@ -28,6 +28,7 @@ warnings, never a block (decisions RJ-1 to RJ-3).
 
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import os
@@ -1307,6 +1308,10 @@ class Controller:
                 # is made (a game already joined keeps what its boxes were told).
                 "box_beacon": self.store.get_setting(BOX_BEACONS_SETTING) != "off",
             }
+            if kind == "controller":
+                # Key 21 (Amendment 21, BBC-20): a standby serves the same registry after a failover.
+                from . import box_beacons
+                join["box_beacons"] = box_beacons.mirror(self, self.game["id"])
             # Android props link over Wi-Fi with the field CA and the controller's addresses
             # (keys 13 and 14, RFC 0001 Amendment 4, proposed); boxes use them for firmware
             # updates (protocol/firmware-update.md). A payload too long with them is made
@@ -1361,7 +1366,7 @@ class Controller:
         GM promotes it (ADR-P2-8). Answers with the game.
         """
         with self._lock:
-            if self.game is not None:
+            if self.game is not None and not self.game.get("joined"):
                 raise Conflict(f"game {self.game['id']} is still live here; end it first")
             if not self.join_key:
                 raise Unavailable("no join key configured")
@@ -1373,6 +1378,8 @@ class Controller:
                 raise ControllerError(f"join payload refused ({exc.reason}): {exc}") from None
             if j["kind"] != "controller":
                 raise ControllerError("this join payload is for a box, not a standby controller")
+            if self.game is not None:
+                return self._refresh_standby(j)
             if j["region"] != self.field_region.code:
                 raise Conflict(f"this game is in the {j['region']} radio region and this controller's field "
                                f"in {self.field_region.code}; change the region in the radio settings first")
@@ -1407,10 +1414,32 @@ class Controller:
             self.store.create_game(game, key if self.cfg.persist_game_key else None)
             if j.get("lang"):  # promoted, it issues joins in the same language
                 self.store.set_setting(f"box_lang:{j['game_id']}", j["lang"])
+            self._mirror_box_beacons(j)
             self._activate(self.store.game(j["game_id"]) or game, key, 0, lead=False)
             out = self.get_game(j["game_id"])
             self._emit({"type": "game", "game": out})
             return out
+
+    def _mirror_box_beacons(self, j: dict[str, Any]) -> None:
+        """The primary's box-beacon choices from a standby join (keys 19 and 21, BBC-5, BBC-20): promoted, this
+        controller serves the same registry and makes the same joins."""
+        from . import box_beacons
+        box_beacons.apply_mirror(self, j["game_id"], j["box_beacon"], j.get("box_beacons"))
+
+    def _refresh_standby(self, j: dict[str, Any]) -> dict[str, Any]:
+        """A join of the game this controller already follows as a standby, made again by the primary: the
+        settings that travel in the join (the boxes' language and beacons) are brought up to date, nothing
+        else changes. The primary's choices made after the first join reach the standby this way (BBC-20)."""
+        game = self.game
+        assert game is not None
+        if (game["id"] != j["game_id"] or not game.get("joined") or self.fc is None or self.fc.is_controller
+                or not hmac.compare_digest(self._key, j["game_key"])):
+            raise Conflict(f"game {game['id']} is still live here; end it first")
+        if j.get("lang"):
+            self.store.set_setting(f"box_lang:{j['game_id']}", j["lang"])
+        self._mirror_box_beacons(j)
+        self._emit({"type": "beacons", "_staff": True})  # api.py BEACONS_CHANGED
+        return self.get_game(game["id"])
 
     def _live(self, game_id: int) -> FieldController:
         game = self.store.game(game_id)

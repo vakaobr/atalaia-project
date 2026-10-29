@@ -16,6 +16,7 @@ import 'dart:typed_data';
 import 'package:atalaia_app/controller/controller_checkin.dart';
 import 'package:atalaia_app/controller/controller_engine.dart';
 import 'package:atalaia_app/controller/controller_field.dart';
+import 'package:atalaia_app/protocol/join_payload.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/vectors.dart';
@@ -224,6 +225,88 @@ void main() {
       expect(ids, ['1:1', '$boxBeaconMajor:4']);
       expect(field.beaconPlace('1:1')!['room'], 'Lobby');
       expect(field.beaconPlace('$boxBeaconMajor:4')!['room'], 'node-4');
+    });
+
+    test('a standby takes the primary\'s choices and serves the same '
+        'registry after a failover (BBC-20)', () {
+      final standby = ControllerEngine()..joinKey = key;
+      addTearDown(standby.close);
+      final sfield = ControllerField(standby);
+      for (final n in [4, 5]) {
+        field.putPlace(gid, n, {'x': 0.1 * n, 'y': 0.5});
+      }
+      // Before the standby joins: box 4 disabled, box 5 given a room.
+      field.updateBoxBeacon(4, {'enabled': false});
+      field.updateBoxBeacon(5, {'room': 'Kitchen'});
+      final first = engine.issueJoin({'kind': 'controller'})['text']! as String;
+      final j = decodeJoin(joinFromText(first), key);
+      expect(j.boxBeacons!.off, [4]);
+      expect(j.boxBeacons!.rooms, {5: 'Kitchen'});
+      expect(j.boxBeacon, true);
+      expect(standby.joinAsStandby(first)['id'], gid);
+      // The boxes the standby knows and where the GM put them there.
+      for (final n in [4, 5]) {
+        standby.store.upsertNode(gid, {'node_id': n, 'name': 'node-$n'});
+        sfield.putPlace(gid, n, {'x': 0.1 * n, 'y': 0.5});
+      }
+      // The primary's later choices reach it by a join made again.
+      field.setBoxBeaconsEnabled({'enabled': false});
+      field.updateBoxBeacon(4, {'enabled': true});
+      field.updateBoxBeacon(5, {'enabled': false, 'room': 'Hall'});
+      field.setBoxBeaconsEnabled({'enabled': true});
+      field.updateBoxBeacon(4, {'room': 'Garage'});
+      expect(
+        sfield.boxBeaconsEnabled,
+        true,
+        reason: 'what the first join said, until the next',
+      );
+      final second =
+          engine.issueJoin({'kind': 'controller'})['text']! as String;
+      expect(standby.joinAsStandby(second)['id'], gid);
+      expect(standby.liveGame?['joined'], true);
+      for (final viewer in [ApiViewer.gm, ApiViewer.read, player(gid)]) {
+        expect(sfield.beaconsFor(viewer), field.beaconsFor(viewer));
+      }
+      final by = {for (final b in boxes(ApiViewer.gm)) b['minor']: b};
+      expect((by[4]!['room'], by[4]!['enabled']), ('Garage', true));
+      expect((by[5]!['room'], by[5]!['enabled']), ('Hall', false));
+      // The field switch off, then joined again: the standby is off too, and
+      // a phone listens for no box on either.
+      field.setBoxBeaconsEnabled({'enabled': false});
+      standby.joinAsStandby(engine.issueJoin({'kind': 'controller'})['text']);
+      expect(sfield.boxBeaconsEnabled, false);
+      expect(
+        sfield.beaconsFor(ApiViewer.read),
+        field.beaconsFor(ApiViewer.read),
+      );
+      expect(boxes(ApiViewer.read), isEmpty);
+      expect(sfield.boxBeaconPlace('$boxBeaconMajor:4'), isNull);
+      // Back on, with nothing set per box: the standby's own choices go too.
+      field.setBoxBeaconsEnabled({'enabled': true});
+      field.updateBoxBeacon(5, {'enabled': true, 'room': null});
+      field.updateBoxBeacon(4, {'room': null});
+      standby.joinAsStandby(engine.issueJoin({'kind': 'controller'})['text']);
+      expect(sfield.beaconsFor(ApiViewer.gm), field.beaconsFor(ApiViewer.gm));
+      expect(standby.store.getSetting('box_beacons_off:$gid'), isNull);
+      expect(standby.store.getSetting('box_beacon_rooms:$gid'), isNull);
+    });
+
+    test('a join of another game is not a refresh', () {
+      final other = ControllerEngine()..joinKey = key;
+      addTearDown(other.close);
+      other.createGame({
+        'name': 'o',
+        'mode_id': 'org.atalaia.domination',
+        'teams': ['red', 'blue'],
+      });
+      final text = other.issueJoin({'kind': 'controller'})['text']! as String;
+      final standby = ControllerEngine()..joinKey = key;
+      addTearDown(standby.close);
+      standby.joinAsStandby(engine.issueJoin({'kind': 'controller'})['text']);
+      expect(
+        () => standby.joinAsStandby(text),
+        throwsA(isA<ControllerError>()),
+      );
     });
 
     test('with no live game or no join key there are no box beacons', () {

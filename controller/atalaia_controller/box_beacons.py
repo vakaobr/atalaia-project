@@ -220,3 +220,29 @@ def update_box(ctrl: "Controller", node_id: int, body: Any) -> dict[str, Any]:
             return b
     return {"node_id": node_id, "id": box_id(node_id), "placed": False, "enabled": node_id not in disabled_nodes(
         ctrl, game["id"])}
+
+
+def mirror(ctrl: "Controller", game_id: int) -> Optional[dict[str, Any]]:
+    """What a standby controller's join carries (key 21, decision BBC-20): the nodes the GM disabled and the
+    rooms the GM gave in this game, or None when there are none. The field's own switch is key 19."""
+    out: dict[str, Any] = {}
+    off = sorted(disabled_nodes(ctrl, game_id))
+    if off:
+        out["off"] = off
+    given = rooms(ctrl, game_id)
+    if given:
+        out["rooms"] = dict(sorted(given.items()))
+    return out or None
+
+
+def apply_mirror(ctrl: "Controller", game_id: int, on: bool, mirrored: Optional[dict[str, Any]]) -> None:
+    """A standby controller takes the primary's box-beacon choices from its join (keys 19 and 21): the field
+    switch, and the game's disabled boxes and rooms, replacing its own (a join made again refreshes them)."""
+    ctrl.store.set_setting(SETTING_ENABLED, "on" if on else "off")
+    mirrored = mirrored or {}
+    given = {str(k): v for k, v in (mirrored.get("rooms") or {}).items()}
+    for prefix, value in ((SETTING_OFF, mirrored.get("off")), (SETTING_ROOMS, given)):
+        if value:
+            ctrl.store.set_setting(f"{prefix}{game_id}", json.dumps(value))
+        else:
+            ctrl.store.delete_setting(f"{prefix}{game_id}")

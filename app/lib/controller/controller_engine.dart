@@ -64,7 +64,7 @@ import '../modes/mode_catalog.dart';
 import '../protocol/join_payload.dart';
 import '../protocol/radio_region.dart';
 import '../radio/rf_codec.dart';
-import '../security/bytes.dart' show hexDecode;
+import '../security/bytes.dart' show constantTimeEquals, hexDecode;
 import '../security/ndef.dart';
 import 'controller_adoption.dart';
 import 'controller_boxes.dart';
@@ -1892,6 +1892,9 @@ class ControllerEngine {
       region: fieldRegion.code, // key 18: a box refuses another region's game
       // Key 19 (RFC 0001 Amendment 20): the GM's setting for the boxes' iBeacon.
       boxBeacon: store.getSetting('box_beacons') != 'off',
+      // Key 21 (Amendment 21, BBC-20): a standby serves the same registry
+      // after a failover.
+      boxBeacons: kind == 'controller' ? boxBeaconsMirror(store, id) : null,
     );
     var join = joinWith(link: withLink);
     var linked = withLink;
@@ -2038,7 +2041,7 @@ class ControllerEngine {
   /// `failover_mode = auto`, until the leader falls silent). Answers with
   /// the game.
   Map<String, Object?> joinAsStandby(Object? text) {
-    if (_game != null) {
+    if (_game != null && _game!['joined'] != true) {
       throw ControllerError.conflict(
         'game ${_game!['id']} is still live here; end it first',
       );
@@ -2062,6 +2065,7 @@ class ControllerEngine {
         'this join payload is for a box, not a standby controller',
       );
     }
+    if (_game != null) return _refreshStandby(j);
     // The standby keeps to its field's radio region (RF-AS923, as the Pi).
     if (j.region != fieldRegion.code) {
       throw ControllerError.conflict(
@@ -2134,10 +2138,39 @@ class ControllerEngine {
     // Promoted, it issues joins in the same language.
     final lang = j.lang;
     if (lang != null) store.setSetting('box_lang:${j.gameId}', lang);
+    _mirrorBoxBeacons(j);
     _activate(store.game(j.gameId) ?? game, j.gameKey, lead: false);
     final out = getGame(j.gameId);
     _emit({'type': 'game', 'game': out});
     return out;
+  }
+
+  /// The primary's box-beacon choices from a standby join (keys 19 and 21,
+  /// BBC-5, BBC-20): promoted, this controller serves the same registry and
+  /// makes the same joins (engine.py `_mirror_box_beacons`).
+  void _mirrorBoxBeacons(JoinPayload j) =>
+      applyBoxBeaconsMirror(store, j.gameId, j.boxBeacon, j.boxBeacons);
+
+  /// A join of the game this controller already follows as a standby, made
+  /// again by the primary: the settings that travel in the join (the boxes'
+  /// language and beacons) are brought up to date, nothing else changes
+  /// (engine.py `_refresh_standby`).
+  Map<String, Object?> _refreshStandby(JoinPayload j) {
+    final game = _game!;
+    final fc = _fc;
+    if (game['id'] != j.gameId ||
+        fc == null ||
+        fc.isController ||
+        !constantTimeEquals(_key, j.gameKey)) {
+      throw ControllerError.conflict(
+        'game ${game['id']} is still live here; end it first',
+      );
+    }
+    final lang = j.lang;
+    if (lang != null) store.setSetting('box_lang:${j.gameId}', lang);
+    _mirrorBoxBeacons(j);
+    _emit({'type': 'beacons', '_staff': true});
+    return getGame(j.gameId);
   }
 
   /// A standby controller stops following a game (the GM left it, or it

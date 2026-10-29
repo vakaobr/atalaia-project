@@ -308,9 +308,12 @@ class StandbyApiTests(unittest.TestCase):
         args = self.b.modem.configured[-1]
         self.assertEqual(args[:2], (self.game["id"], 1))
         self.assertEqual(args[4:], (869_525_000, self.a.ctrl.game_key(self.game["id"])))
-        # On standby the game cannot be driven, and a second join is refused.
+        # On standby the game cannot be driven. A second join of the same game and key only refreshes what the
+        # join carries (BBC-20); a join of another game is refused while this one is live.
         self.assertEqual(c.post(f"/api/v1/games/{self.game['id']}/start", headers=GM, json={"force": True}).status_code, 409)
-        self.assertEqual(c.post("/api/v1/controller/join", headers=GM, json={"text": self.text}).status_code, 409)
+        again = c.post("/api/v1/controller/join", headers=GM, json={"text": self.text})
+        self.assertEqual((again.status_code, again.json()["id"]), (201, self.game["id"]))
+        self.assertEqual(len(self.b.modem.configured), 1)  # nothing was reconfigured
 
         # The primary's TIME says running: the standby's game follows it.
         self.b.modem.rx(0, 1, "TIME", self.time_packet(1, 5000), game_id=self.game["id"], epoch=1)
@@ -329,6 +332,85 @@ class StandbyApiTests(unittest.TestCase):
         self.assertEqual(c.get(f"/api/v1/games/{self.game['id']}", headers=READ).json()["state"], "ended")
         self.assertIsNone(self.b.ctrl.game)
         self.assertEqual(self.b.modem.cleared, 1)
+
+    def beacon_view(self, side, headers):
+        r = side.client.get("/api/v1/beacons", headers=headers)
+        self.assertEqual(r.status_code, 200, r.text)
+        out = r.json()
+        # What a phone (or the console) reads: the same list, whichever controller serves it.
+        return out["beacons"], out.get("box_beacons")
+
+    def place_box(self, side, node, x, y):
+        side.ctrl.store.set_position(self.game["id"], node, x, y)
+
+    def test_box_beacon_choices_travel_to_the_standby_and_survive_a_failover(self):
+        """BBC-20: the GM's field switch, disabled boxes and rooms made on the primary are the standby's
+        after its join (key 19 and key 21), and a join made again brings later changes."""
+        from atalaia_controller import box_beacons as bb
+        a, b, gid = self.a.client, self.b.client, self.game["id"]
+        boxes = [a.post("/api/v1/join", headers=GM, json={"role": "zone"}).json()["node_id"] for _ in range(3)]
+        self.assertEqual(len(boxes), 3)
+        # Before the standby joins: box 1 disabled, box 2 given a room, the field switch off.
+        self.assertEqual(a.put(f"/api/v1/box-beacons/{boxes[0]}", headers=GM, json={"enabled": False}).status_code, 200)
+        self.assertEqual(a.put(f"/api/v1/box-beacons/{boxes[1]}", headers=GM, json={"room": "Kitchen"}).status_code, 200)
+        text = a.post("/api/v1/join", headers=GM, json={"kind": "controller"}).json()["text"]
+        got = join.decode(join.from_text(text), JOIN_KEY)
+        self.assertEqual(got["box_beacons"], {"off": [boxes[0]], "rooms": {boxes[1]: "Kitchen"}})
+        self.assertTrue(got["box_beacon"])
+        self.assertEqual(b.post("/api/v1/controller/join", headers=GM, json={"text": text}).status_code, 201)
+        # The primary's later choices: the field switch, a second room, the box enabled again. The text made
+        # earlier does not have them; a standby join made again does, and changes nothing else.
+        self.assertEqual(a.put("/api/v1/box-beacons", headers=GM, json={"enabled": False}).status_code, 200)
+        self.assertEqual(a.put(f"/api/v1/box-beacons/{boxes[0]}", headers=GM, json={"enabled": True}).status_code, 200)
+        self.assertEqual(a.put(f"/api/v1/box-beacons/{boxes[2]}", headers=GM, json={"room": "Hall"}).status_code, 200)
+        self.assertEqual(a.put(f"/api/v1/box-beacons/{boxes[2]}", headers=GM, json={"enabled": False}).status_code, 200)
+        self.assertEqual(a.put("/api/v1/box-beacons", headers=GM, json={"enabled": True}).status_code, 200)
+        self.assertEqual(a.put(f"/api/v1/box-beacons/{boxes[0]}", headers=GM, json={"room": "Garage"}).status_code, 200)
+        self.assertEqual(a.put("/api/v1/box-beacons", headers=GM, json={"enabled": False}).status_code, 200)
+        text2 = a.post("/api/v1/join", headers=GM, json={"kind": "controller"}).json()["text"]
+        r = b.post("/api/v1/controller/join", headers=GM, json={"text": text2})
+        self.assertEqual(r.status_code, 201, r.text)  # a refresh answers with the game, as a join does
+        self.assertEqual((r.json()["id"], r.json()["joined"]), (gid, True))
+        self.assertEqual(self.b.ctrl.game["id"], gid)
+
+        # Both controllers know the boxes (placed on the field view as the GM does on each) ...
+        for side in (self.a, self.b):
+            for n, box in enumerate(boxes):
+                self.place_box(side, box, 0.1 * (n + 1), 0.5)
+        self.b.ctrl.fc.register_node(boxes[0], f"node-{boxes[0]}", "zone")
+        self.b.ctrl.fc.register_node(boxes[1], f"node-{boxes[1]}", "zone")
+        self.b.ctrl.fc.register_node(boxes[2], f"node-{boxes[2]}", "zone")
+        # ... and serve the same registry: the field switch (off), the disabled box, the rooms.
+        self.assertFalse(bb.enabled(self.a.ctrl))
+        self.assertEqual(self.beacon_view(self.a, GM), self.beacon_view(self.b, GM))
+        self.assertEqual(self.beacon_view(self.a, READ), self.beacon_view(self.b, READ))
+        self.assertEqual(self.beacon_view(self.b, READ)[0], [])  # off: a phone listens for no box
+        by = {x["minor"]: x for x in self.beacon_view(self.b, GM)[0]}
+        self.assertEqual((by[boxes[0]]["room"], by[boxes[0]]["enabled"]), ("Garage", True))
+        self.assertEqual((by[boxes[1]]["room"], by[boxes[1]]["room_given"]), ("Kitchen", True))
+        self.assertEqual((by[boxes[2]]["room"], by[boxes[2]]["enabled"]), ("Hall", False))
+        # The primary goes away; the GM switches the field's boxes on again on the primary and joins a third
+        # time: a promoted standby makes joins that say the same (key 19) and lists the same boxes.
+        self.assertEqual(a.put("/api/v1/box-beacons", headers=GM, json={"enabled": True}).status_code, 200)
+        text3 = a.post("/api/v1/join", headers=GM, json={"kind": "controller"}).json()["text"]
+        self.assertEqual(b.post("/api/v1/controller/join", headers=GM, json={"text": text3}).status_code, 201)
+        self.assertEqual(self.beacon_view(self.a, READ), self.beacon_view(self.b, READ))
+        self.assertEqual(len(self.beacon_view(self.b, READ)[0]), 2)  # the disabled one is left out
+        self.assertEqual(self.b.ctrl.store.get_setting("box_beacons"), "on")
+        self.assertEqual(b.post("/api/v1/controller/promote", headers=GM).json()["role"], "candidate")
+
+    def test_a_refreshing_join_is_for_the_game_and_key_the_standby_follows(self):
+        b = self.b.client
+        self.assertEqual(b.post("/api/v1/controller/join", headers=GM, json={"text": self.text}).status_code, 201)
+        # Another game's standby join (another key) is not a refresh.
+        other = Side(self.tmp.name, "e")
+        other.client.post("/api/v1/games", headers=GM, json={"name": "Other", "mode_id": DOMINATION,
+                                                            "teams": ["red", "blue"]})
+        text = other.client.post("/api/v1/join", headers=GM, json={"kind": "controller"}).json()["text"]
+        other.close()
+        r = b.post("/api/v1/controller/join", headers=GM, json={"text": text})
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("still live", r.json()["detail"])
 
     def test_refused_payloads(self):
         c = self.b.client

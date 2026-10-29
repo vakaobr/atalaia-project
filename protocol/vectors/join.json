@@ -1004,5 +1004,207 @@
         "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c001341001a0e46835581b6589dd86fdc80f0ee856a263826e27d08068178664198828715"
       }
     ]
+  },
+  "box_beacons": {
+    "description": "Optional key 21 (box_beacons), RFC 0001 Amendment 21 (decision BBC-20, protocol/box-beacon.md): a standby controller's join carries what the GM set per Field Box on the primary, so a failover serves the same registry: a map with key 1, the node ids disabled (ascending, at most 32), and/or key 2, the rooms given by node id (at most 32, each 1-48 bytes), at most 200 bytes of CBOR in all. Only a standby controller's payload (kind 1) has it; a box skips it (key 21 is unknown to it). Absent is byte for byte a join of before. Valid ones made with the simulator's codec; invalid ones by hand, tagged with Python's hmac module. The simulator's and the app's codecs decode and re-encode the valid ones byte for byte and refuse the invalid ones (body). The core (core/src/join.c) skips the key as unknown.",
+    "valid": [
+      {
+        "name": "standby_off_and_rooms",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 1,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "controller",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "controller",
+          "box_beacons": {
+            "off": [
+              4,
+              9
+            ],
+            "rooms": {
+              "7": "Kitchen",
+              "12": "Café 大廳"
+            }
+          }
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a20182040902a207674b69746368656e0c6c436166c3a920e5a4a7e5bbb3aa7cb427f61ccd0713ab7b440bce2da17af4f1268153273a8d697baa63602351",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwEEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JamNvbnRyb2xsZXIKGTA5DAEVogGCBAkCogdnS2l0Y2hlbgxsQ2Fmw6kg5aSn5buzqny0J_YczQcTq3tEC84toXr08SaBUyc6jWl7qmNgI1E"
+      },
+      {
+        "name": "standby_off_only",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 1,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "controller",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "controller",
+          "box_beacons": {
+            "off": [
+              3
+            ]
+          }
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a101810354d4ae2470f0c5c5e34ab11d5551b50d32038d0efe88dad2600389a3c7ebec40",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwEEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JamNvbnRyb2xsZXIKGTA5DAEVoQGBA1TUriRw8MXF40qxHVVRtQ0yA40O_oja0mADiaPH6-xA"
+      },
+      {
+        "name": "standby_rooms_only_beacons_off",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 1,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "controller",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "controller",
+          "box_beacon": false,
+          "box_beacons": {
+            "rooms": {
+              "2": "Hall"
+            }
+          }
+        },
+        "payload": "01ad0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0113f415a102a1026448616c6c42d64410530d851f5c181cb2c8b3f7152ad1d551e37ac9481a810a353cfabe77",
+        "text": "atalaia:join:Aa0BGRCSAlArfhUWKK7Spqv3FYgJz088AwEEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JamNvbnRyb2xsZXIKGTA5DAET9BWhAqECZEhhbGxC1kQQUw2FH1wYHLLIs_cVKtHVUeN6yUgagQo1PPq-dw"
+      }
+    ],
+    "invalid": [
+      {
+        "name": "box_beacons_in_a_node",
+        "why": "key 21 is a standby controller's: a node's payload with it is refused (boxes skip it, the readers that check kinds refuse it)",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c0015a1018104f488b04c1b61290a177735db6743c703ee68b6aa71e5f0a9588326f0a1281503"
+      },
+      {
+        "name": "box_beacons_empty_map",
+        "why": "key 21 holds at least one of off and rooms",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a027f520e7991c5c6a9d44f362ec619a26b483de7003c5f9cec9518c74ab80b0bf"
+      },
+      {
+        "name": "box_beacons_null",
+        "why": "key 21 null: leave an optional field out",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115f6be146ac68b2b3a0ff1a9898a3d61b059270911a369714bd001ab9323cd3918d1"
+      },
+      {
+        "name": "box_beacons_text",
+        "why": "key 21 must be a map",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115636f6666429c30a5705dd9047534062b51b104ba073fc1c62b9a09d042f3d5aa64d062d7"
+      },
+      {
+        "name": "box_beacons_unknown_inner_key",
+        "why": "only inner keys 1 (off) and 2 (rooms)",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a1038104103e324d3116854503575132a3f19817c2aa6ebd1a7d8e3b50fcbccbf7aaa674"
+      },
+      {
+        "name": "box_beacons_off_not_ascending",
+        "why": "off is ascending and has no repeats",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a1018209046c9d1458c5ea8f95fee7bc491386f218c6661cca49defc01ff04899e8dbe97c9"
+      },
+      {
+        "name": "box_beacons_off_repeat",
+        "why": "off is ascending and has no repeats",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a1018204041126ffc6204c226b78a7ad839b401fd3ab9ab6c8224c9dfc8b2f03c907179cd8"
+      },
+      {
+        "name": "box_beacons_off_zero",
+        "why": "a node id is 1-65534",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a1018100764505289bfb57587a54197b41dcc6e282f7774c2c8421e12dfad87ce5752555"
+      },
+      {
+        "name": "box_beacons_off_too_big",
+        "why": "a node id is 1-65534",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a1018119ffffbf87270ce64376251567427299a7a453a88c5c4b5c6a3b3f245a4db26a5b0a53"
+      },
+      {
+        "name": "box_beacons_off_empty",
+        "why": "an off list is left out when empty",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a101808885a5b0372365dc764c33d883cb3f798e660f1a914596029fd99b443dbb9d37"
+      },
+      {
+        "name": "box_beacons_off_too_many",
+        "why": "at most 32 nodes off",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a10198210102030405060708090a0b0c0d0e0f101112131415161718181819181a181b181c181d181e181f18201821edcf61357bd85c32528bd0a0cf15addca044853dd5cda33e5ec3ddc1eb7da842"
+      },
+      {
+        "name": "box_beacons_off_text",
+        "why": "off holds node ids",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a101816134e57b1f75ae62f4b0877223e91e6a1e21961c1432f6dd478c9dd7eaa02b183b23"
+      },
+      {
+        "name": "box_beacons_room_empty",
+        "why": "a room is 1-48 bytes",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a102a1076034587b34dcfce5ad962b06e5565c404900851c076feb4a8d1eabd9fc009c2391"
+      },
+      {
+        "name": "box_beacons_room_too_long",
+        "why": "a room is 1-48 bytes",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a102a107783178787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878dbebe9a095c0dd57f192890177dc50f33a2570ebcc61db11a26b3baa0be8d0a4"
+      },
+      {
+        "name": "box_beacons_room_bytes",
+        "why": "a room is text",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a102a10743616263cbfd7639a3b8d6198da664681a179da673043db8cef9328f116757010eb2e0f5"
+      },
+      {
+        "name": "box_beacons_room_key_text",
+        "why": "rooms are keyed by node id",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a102a16137674b69746368656ed3a076cb097140adc82570a086f54b7fde9287566abfe01bbd41fac24e4d53f5"
+      },
+      {
+        "name": "box_beacons_rooms_empty",
+        "why": "a rooms map is left out when empty",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a102a0ba86715bf1ad2f1859455c10ee11844f8760ce78e27710575476c9564485356c"
+      },
+      {
+        "name": "box_beacons_over_200_bytes",
+        "why": "at most 200 bytes of CBOR for key 21",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a102a50178307878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878780278307878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878780378307878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878780478307878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878780578307878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878783d9a28bae347b0d0302cb74cdac91ad2d28f2e9898c7bf74d064a2e9386fd714"
+      }
+    ]
   }
 }

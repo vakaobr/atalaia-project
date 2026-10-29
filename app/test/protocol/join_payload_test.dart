@@ -34,7 +34,20 @@ JoinPayload _fields(Map<String, dynamic> f) => JoinPayload(
   lang: f['lang'] as String?,
   region: f['region'] as String? ?? 'eu868',
   boxBeacon: f['box_beacon'] as bool? ?? true,
+  boxBeacons: _mirror(f['box_beacons']),
 );
+
+BoxBeaconsMirror? _mirror(Object? m) {
+  if (m == null) return null;
+  final map = m as Map<String, dynamic>;
+  return BoxBeaconsMirror(
+    off: (map['off'] as List?)?.cast<int>() ?? const [],
+    rooms: {
+      for (final e in ((map['rooms'] as Map?) ?? const {}).entries)
+        int.parse(e.key as String): e.value as String,
+    },
+  );
+}
 
 /// [text] with the last base64url character's lowest bit set: a padding bit
 /// when the length is not a multiple of 4.
@@ -245,6 +258,91 @@ void main() {
         final j = decodeJoin(payload, key);
         expect(j.boxBeacon, true);
         expect(hexEncode(encodeJoin(j, key)), c['payload']);
+      }
+    });
+  });
+
+  group('box_beacons (key 21)', () {
+    final section = v['box_beacons'] as Map<String, dynamic>;
+    test('the section has its cases', () {
+      expect(cases(section, 'valid').length, greaterThanOrEqualTo(3));
+      expect(cases(section, 'invalid').length, greaterThanOrEqualTo(15));
+    });
+    for (final c in cases(section, 'valid')) {
+      test('${c['name']}', () {
+        final payload = hexDecode(c['payload'] as String);
+        final f = c['fields'] as Map<String, dynamic>;
+        final j = decodeJoin(payload, key);
+        expect(j.kind, JoinKind.controller);
+        final want = _mirror(f['box_beacons'])!;
+        expect(j.boxBeacons!.off, want.off);
+        expect(j.boxBeacons!.rooms, want.rooms);
+        expect(j.boxBeacon, f['box_beacon'] as bool? ?? true);
+        expect(hexEncode(encodeJoin(j, key)), c['payload']);
+        expect(hexEncode(encodeJoin(_fields(f), key)), c['payload']);
+        expect(joinToText(payload), c['text']);
+      });
+    }
+    for (final c in cases(section, 'invalid')) {
+      test('${c['name']}: body', () {
+        expect(
+          () => decodeJoin(hexDecode(c['payload'] as String), key),
+          throwsA(
+            isA<JoinException>().having(
+              (e) => e.reason,
+              'reason',
+              JoinFailure.body,
+            ),
+          ),
+        );
+      });
+    }
+    test('the encoder refuses what the decoder does', () {
+      final base = _fields(
+        cases(section, 'valid').first['fields'] as Map<String, dynamic>,
+      );
+      JoinPayload with_(BoxBeaconsMirror m, {JoinKind? kind}) => JoinPayload(
+        gameId: base.gameId,
+        gameKey: base.gameKey,
+        nodeId: base.nodeId,
+        controllerId: base.controllerId,
+        channelHz: base.channelHz,
+        maxHops: base.maxHops,
+        teams: base.teams,
+        modeId: base.modeId,
+        role: base.role,
+        gameSeed: base.gameSeed,
+        params: base.params,
+        kind: kind ?? base.kind,
+        boxBeacons: m,
+      );
+      for (final bad in [
+        BoxBeaconsMirror(),
+        BoxBeaconsMirror(off: [9, 4]),
+        BoxBeaconsMirror(off: [0]),
+        BoxBeaconsMirror(rooms: {7: ''}),
+        BoxBeaconsMirror(rooms: {7: 'x' * 49}),
+        BoxBeaconsMirror(rooms: {for (var n = 1; n < 6; n++) n: 'x' * 48}),
+      ]) {
+        expect(
+          () => encodeJoin(with_(bad), key),
+          throwsA(isA<JoinException>()),
+        );
+      }
+      expect(
+        () => encodeJoin(
+          with_(BoxBeaconsMirror(off: [4]), kind: JoinKind.node),
+          key,
+        ),
+        throwsA(isA<JoinException>()),
+      );
+    });
+    test('absent is the join of before', () {
+      for (final c in cases(v, 'valid')) {
+        expect(
+          decodeJoin(hexDecode(c['payload'] as String), key).boxBeacons,
+          isNull,
+        );
       }
     });
   });

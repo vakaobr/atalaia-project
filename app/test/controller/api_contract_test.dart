@@ -748,6 +748,21 @@ void main() {
               kind: JoinKind.values.byName(f['kind']! as String),
               lang: f['lang'] as String?,
               region: (f['region'] as String?) ?? 'eu868',
+              boxBeacon: (f['box_beacon'] as bool?) ?? true,
+              boxBeacons: f['box_beacons'] == null
+                  ? null
+                  : () {
+                      final m = (f['box_beacons']! as Map)
+                          .cast<String, Object?>();
+                      return BoxBeaconsMirror(
+                        off: ((m['off'] as List?) ?? const []).cast<int>(),
+                        rooms: {
+                          for (final e
+                              in ((m['rooms'] as Map?) ?? const {}).entries)
+                            int.parse(e.key as String): e.value! as String,
+                        },
+                      );
+                    }(),
             );
             saved[step['save'] as String] = joinToText(
               encodeJoin(join, joinKey),

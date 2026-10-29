@@ -439,6 +439,10 @@ class ContractCase(unittest.TestCase):
             # another controller makes one (a standby's, kind "controller"); its text is saved.
             fields = dict(substitute(step["join_encode"], env.saved))
             fields["game_key"] = bytes.fromhex(fields["game_key"])
+            mirror = fields.get("box_beacons")  # key 21: the vectors' JSON keys the rooms by text
+            if mirror is not None:
+                fields["box_beacons"] = {k: ({int(n): t for n, t in v.items()} if k == "rooms" else v)
+                                         for k, v in mirror.items()}
             text = joinfmt.to_text(joinfmt.encode(fields, bytes.fromhex(env.case["join_key"])))
             env.saved[step["save"]] = text
             return

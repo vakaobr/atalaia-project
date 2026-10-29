@@ -58,8 +58,10 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
+import '../protocol/join_payload.dart' show BoxBeaconsMirror;
 import 'controller_checkin.dart';
 import 'controller_engine.dart';
+import 'controller_store.dart' show ControllerStore;
 
 part 'controller_box_beacons.dart';
 part 'controller_field_beacons.dart';

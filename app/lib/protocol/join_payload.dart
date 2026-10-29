@@ -23,7 +23,10 @@
 /// the phone controller sends them from slice S7b of PE24). Key 18 is the
 /// field's radio region (RFC 0001 Amendment 12, radio_region.dart): its
 /// number, left out for EU868 (0 written is refused, so a join has one
-/// encoding); the channel must fit in that region.
+/// encoding); the channel must fit in that region. Key 21 (RFC 0001
+/// Amendment 21, decision BBC-20) is a standby controller's only (a box skips
+/// it): the boxes the GM disabled and the rooms the GM gave, so the standby
+/// serves the same registry after a failover ([BoxBeaconsMirror]).
 library;
 
 import 'dart:convert';
@@ -82,6 +85,7 @@ final class JoinPayload {
     this.forgetModes = false,
     this.region = 'eu868',
     this.boxBeacon = true,
+    this.boxBeacons,
   });
 
   final int gameId;
@@ -126,12 +130,105 @@ final class JoinPayload {
   /// GM turned it off; on is the key left out.
   final bool boxBeacon;
 
+  /// Key 21 (RFC 0001 Amendment 21): a standby controller's join only, or
+  /// null: what the GM set per box.
+  final BoxBeaconsMirror? boxBeacons;
+
   /// The parts of [modeId]: the main mode, then its modifiers.
   List<String> get modeParts => modeId.split('+');
 
   @override
   String toString() =>
       'JoinPayload(game $gameId, node $nodeId, $modeId/$role, $teams)';
+}
+
+/// Key 21: the boxes the GM disabled ([off], ascending) and the rooms the GM
+/// gave ([rooms]), by node id; at least one of them is not empty.
+final class BoxBeaconsMirror {
+  BoxBeaconsMirror({this.off = const [], this.rooms = const {}});
+
+  static const int maxBytes = 200;
+  static const int maxOff = 32;
+  static const int maxRooms = 32;
+  static const int maxRoom = 48;
+
+  final List<int> off;
+  final Map<int, String> rooms;
+
+  bool get isEmpty => off.isEmpty && rooms.isEmpty;
+
+  Map<int, Object?> toWire() => {
+    if (off.isNotEmpty) 1: off,
+    if (rooms.isNotEmpty) 2: rooms,
+  };
+}
+
+bool _nodeIdOk(Object? n) => n is int && n >= 1 && n <= 0xfffe;
+
+BoxBeaconsMirror? _checkBoxBeacons(Object? v, JoinKind kind) {
+  if (v == null) return null;
+  if (kind != JoinKind.controller) {
+    throw _body("box_beacons: only a standby controller's join carries it");
+  }
+  if (v is! BoxBeaconsMirror || v.isEmpty) {
+    throw _body('box_beacons: off and/or rooms, not empty');
+  }
+  final off = v.off;
+  if (off.length > BoxBeaconsMirror.maxOff ||
+      !off.every(_nodeIdOk) ||
+      !_ascending(off)) {
+    throw _body(
+      'box_beacons.off: up to ${BoxBeaconsMirror.maxOff} different node ids, '
+      'ascending',
+    );
+  }
+  if (v.rooms.length > BoxBeaconsMirror.maxRooms ||
+      !v.rooms.keys.every(_nodeIdOk)) {
+    throw _body(
+      'box_beacons.rooms: up to ${BoxBeaconsMirror.maxRooms} rooms by node id',
+    );
+  }
+  final keys = v.rooms.keys.toList()..sort();
+  final rooms = {
+    for (final k in keys)
+      k: _text('room', v.rooms[k], BoxBeaconsMirror.maxRoom),
+  };
+  final out = BoxBeaconsMirror(off: List.of(off), rooms: rooms);
+  if (cborEncode(out.toWire()).length > BoxBeaconsMirror.maxBytes) {
+    throw _body(
+      'box_beacons: over ${BoxBeaconsMirror.maxBytes} bytes '
+      '(shorter room names)',
+    );
+  }
+  return out;
+}
+
+bool _ascending(List<int> l) {
+  for (var i = 1; i < l.length; i++) {
+    if (l[i] <= l[i - 1]) return false;
+  }
+  return true;
+}
+
+BoxBeaconsMirror _decodeBoxBeacons(Object? v) {
+  if (v is! Map || v.isEmpty || v.keys.any((k) => k != 1 && k != 2)) {
+    throw _body('box_beacons: a map with keys 1 (off) and 2 (rooms)');
+  }
+  final off = v[1];
+  final rooms = v[2];
+  if (off != null && (off is! List || off.any((n) => n is! int))) {
+    throw _body('box_beacons.off: a list of node ids');
+  }
+  if (rooms != null &&
+      (rooms is! Map ||
+          rooms.keys.any((k) => k is! int) ||
+          rooms.values.any((r) => r is! String))) {
+    throw _body('box_beacons.rooms: texts by node id');
+  }
+  return BoxBeaconsMirror(
+    off: off == null ? const [] : (off as List).cast<int>(),
+    rooms: rooms == null ? const {} : (rooms as Map).cast<int, String>(),
+  );
 }
 
 JoinException _body(String why) => JoinException(JoinFailure.body, why);
@@ -273,6 +370,7 @@ JoinPayload _validate(Map<String, Object?> j) {
   if (beacon != null && beacon is! bool) {
     throw _body('box_beacon: true or false');
   }
+  final mirror = _checkBoxBeacons(j['box_beacons'], kind);
   final lang = j['lang'];
   if (lang != null && (lang is! String || !_lang.hasMatch(lang))) {
     throw _body(
@@ -299,6 +397,7 @@ JoinPayload _validate(Map<String, Object?> j) {
     forgetModes: j['forget_modes'] == true,
     region: region.code,
     boxBeacon: beacon != false,
+    boxBeacons: mirror,
   );
 }
 
@@ -326,7 +425,7 @@ const _keys = {
   5: 'channel_hz', 6: 'max_hops', 7: 'teams', 8: 'mode_id', 9: 'role',
   10: 'game_seed', 11: 'params', 12: 'kind', 13: 'ca_sha256', 14: 'urls',
   15: 'lang', 16: 'fetch_modes', 17: 'forget_modes', 18: 'region',
-  19: 'box_beacon',
+  19: 'box_beacon', 21: 'box_beacons',
 };
 
 bool _hasBytes(Object? v) => switch (v) {
@@ -390,6 +489,12 @@ JoinPayload decodeJoin(List<int> data, List<int> joinKey) {
     if (name == 'box_beacon' && v != false) {
       throw _body('box_beacon: CBOR false when off, else left out');
     }
+    if (name == 'box_beacons') {
+      if (v == null) {
+        throw _body('$name is null: leave an optional field out instead');
+      }
+      v = _decodeBoxBeacons(v);
+    }
     if (name == 'region') {
       final r = v is int && v != 0 ? regionsByNumber[v] : null;
       if (r == null) {
@@ -438,6 +543,7 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
     'forget_modes': j.forgetModes,
     'region': j.region,
     'box_beacon': j.boxBeacon,
+    'box_beacons': j.boxBeacons,
   });
   final body = <int, Object?>{
     1: v.gameId,
@@ -459,6 +565,7 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
     if (v.forgetModes) 17: true,
     if (v.region != eu868.code) 18: regionsByCode[v.region]!.number,
     if (!v.boxBeacon) 19: false,
+    if (v.boxBeacons != null) 21: v.boxBeacons!.toWire(),
   };
   final signed = Uint8List.fromList([joinVersion, ...cborEncode(body)]);
   final out = Uint8List.fromList([

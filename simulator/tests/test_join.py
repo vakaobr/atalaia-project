@@ -32,6 +32,9 @@ def fields(v: dict) -> dict:
     out.setdefault("forget_modes", False)
     out.setdefault("region", "eu868")
     out.setdefault("box_beacon", True)
+    mirror = out.get("box_beacons")  # key 21: JSON has text keys, the codec node ids
+    out["box_beacons"] = None if mirror is None else {
+        k: ({int(n): t for n, t in v.items()} if k == "rooms" else v) for k, v in mirror.items()}
     return out
 
 
@@ -197,6 +200,47 @@ class BoxBeaconTests(unittest.TestCase):
         for bad in (0, 1, "false", None):
             with self.subTest(bad), self.assertRaises(join.JoinError):
                 join.encode({**base, "box_beacon": bad}, KEY)
+
+
+class BoxBeaconsMirrorTests(unittest.TestCase):
+    """Optional key 21 (box_beacons), RFC 0001 Amendment 21 (decision BBC-20): a standby controller's join
+    carries the boxes the GM disabled and the rooms the GM gave."""
+
+    def test_valid_round_trip(self) -> None:
+        section = VECTORS["box_beacons"]
+        self.assertGreaterEqual(len(section["valid"]), 3)
+        for v in section["valid"]:
+            with self.subTest(v["name"]):
+                payload = bytes.fromhex(v["payload"])
+                got = join.decode(payload, KEY)
+                self.assertEqual(got["kind"], "controller")
+                self.assertEqual(got, fields(v))
+                self.assertEqual(join.encode(fields(v), KEY), payload)
+                self.assertEqual(join.to_text(payload), v["text"])
+
+    def test_invalid_fail_as_body(self) -> None:
+        self.assertGreaterEqual(len(VECTORS["box_beacons"]["invalid"]), 15)
+        for v in VECTORS["box_beacons"]["invalid"]:
+            with self.subTest(v["name"]), self.assertRaises(join.JoinError) as cm:
+                join.decode(bytes.fromhex(v["payload"]), KEY)
+            self.assertEqual(cm.exception.reason, "body", f"{v['name']}: {cm.exception}")
+
+    def test_the_encoder_refuses_what_the_decoder_does(self) -> None:
+        base = fields(VECTORS["box_beacons"]["valid"][0])
+        for bad in ({}, {"off": []}, {"off": [9, 4]}, {"off": [0]}, {"rooms": {7: ""}}, {"rooms": {7: "x" * 49}},
+                    {"rooms": {n: "x" * 48 for n in range(1, 6)}}, {"off": [1], "other": 1}, "off", 5):
+            with self.subTest(bad), self.assertRaises(join.JoinError):
+                join.encode({**base, "box_beacons": bad}, KEY)
+        node = fields(VECTORS["valid"][0])
+        with self.assertRaises(join.JoinError):  # a box's join never carries it
+            join.encode({**node, "box_beacons": {"off": [4]}}, KEY)
+
+    def test_absent_is_the_join_of_before(self) -> None:
+        base = fields(VECTORS["box_beacons"]["valid"][0])
+        plain = join.encode({**base, "box_beacons": None}, KEY)
+        self.assertEqual(plain, join.encode({k: v for k, v in base.items() if k != "box_beacons"}, KEY))
+        self.assertIsNone(join.decode(plain, KEY)["box_beacons"])
+        self.assertLess(len(plain), len(join.encode(base, KEY)))
 
 
 class RegionTests(unittest.TestCase):

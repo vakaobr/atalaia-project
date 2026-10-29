@@ -878,6 +878,22 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 
 **Reason:** a Field Box doubles as a floor and room locator on a multi-story field, so the field needs tags only where no box is. Everything a phone needs is already in the box (the join key it holds), and the one thing a box cannot know by itself, that the GM switched the beacons off for this game, rides in the join the controller already makes for every game.
 
+## Amendment 21 (2026-10-29): A standby controller's join carries the box-beacon choices (join key 21)
+
+**Status:** built (decision BBC-20). The Python and Dart codecs (`simulator/atalaia_sim/join.py`, `app/lib/protocol/join_payload.dart`) carry it, and both controllers apply it (`controller/atalaia_controller/box_beacons.py` `mirror`/`apply_mirror`, `app/lib/controller/controller_box_beacons.dart`); the shared cases are the `box_beacons` section of `protocol/vectors/join.json` and the contract case "S7 failover: a standby takes the primary's box-beacon choices from its join" in `protocol/vectors/controller_api.json`.
+
+**Supersedes:** nothing. No radio frame changes.
+
+**Change:**
+
+1. **A new optional join key, 21 `box_beacons`** ([protocol/join.md](../../protocol/join.md)), for a payload of kind 1 (a standby controller) only: a CBOR map `{1: [node ids], 2: {node id: room}}`, the Field Boxes the GM disabled and the rooms the GM gave in this game (Amendment 20, decisions BBC-8 to BBC-10), at most 200 bytes. Left out when the GM set nothing per box. A box's payload with it is refused by the encoders.
+2. **A standby takes key 19 as well as key 21.** The join is the only thing that goes from a primary to its standby, so the field's switch (key 19) and the per-box choices are applied to the standby's store when it joins, and a promoted standby serves the same registry and writes the same key 19 in its joins.
+3. **A join made again refreshes.** A standby that already follows a game, given a join of the same game and key, takes the settings the join carries (the box language and the beacon choices) and changes nothing else; it used to be refused as a second join.
+
+**Compatibility:** a reader from before skips key 21 (Amendment 1's rule for keys up to 31); the core's codec in the boxes skips it, which is right, as a box never gets it. A standby from before takes neither key 19 nor 21, so after a failover its registry is the default (boxes on, none disabled), as before this amendment. Key 20 stays free (it is the "future key" of the `optional_key_skipped` vector).
+
+**Reason:** BBC-5, BBC-8 to BBC-10 made the beacon choices settings of the controller that serves them; the failover (ADR-P2-8) already copies the box language through the standby's join but nothing of the beacon choices, so after a failover the registry served to phones and the join's key 19 could differ from what the GM had set on the primary.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit

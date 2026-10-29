@@ -31,7 +31,10 @@ field's radio region (regions.py): the key holds the region's number (1: AS923-T
 and is left out for EU868 (0 is refused, so a join has one encoding); the channel
 must fit in that region. box_beacon (key 19, RFC 0001 Amendment 20, decision BBC-5) says whether a
 Field Box advertises as an iBeacon in this game (protocol/box-beacon.md): True (the default) is the
-key left out, False is CBOR false (true is refused, so a join has one encoding). Keys 20-31 are skipped.
+key left out, False is CBOR false (true is refused, so a join has one encoding). box_beacons (key 21,
+RFC 0001 Amendment 21, decision BBC-20) is for a standby controller only (a box skips it): the boxes the
+GM disabled and the rooms the GM gave, {"off": [node ids], "rooms": {node id: "text"}}, so the standby
+serves the same registry after a failover. Keys 20 and 22-31 are skipped.
 
 The codecs check protocol/vectors/join.json.
 """
@@ -58,6 +61,10 @@ TEAM_MAX = 23
 MODE_MAX = 63
 ROLE_MAX = 31
 PARAMS_MAX = 200
+BOX_BEACONS_MAX = 200  # bytes of key 21's CBOR value
+BOX_OFF_MAX = 32
+BOX_ROOMS_MAX = 32
+BOX_ROOM_MAX = 48
 TEXT_PREFIX = "atalaia:join:"
 NDEF_TYPE = b"application/vnd.atalaia.join"
 
@@ -65,9 +72,9 @@ KEYS = {
     "game_id": 1, "game_key": 2, "node_id": 3, "controller_id": 4, "channel_hz": 5,
     "max_hops": 6, "teams": 7, "mode_id": 8, "role": 9, "game_seed": 10, "params": 11, "kind": 12,
     "ca_sha256": 13, "urls": 14, "lang": 15, "fetch_modes": 16, "forget_modes": 17,
-    "region": 18, "box_beacon": 19,
+    "region": 18, "box_beacon": 19, "box_beacons": 21,
 }
-OPTIONAL = ("params", "ca_sha256", "urls", "lang")
+OPTIONAL = ("params", "ca_sha256", "urls", "lang", "box_beacons")
 FLAGS = ("fetch_modes", "forget_modes")  # CBOR true when set, left out otherwise
 REQUIRED = set(KEYS) - set(OPTIONAL) - set(FLAGS) - {"region", "box_beacon"}
 URLS_MAX = 3
@@ -196,7 +203,40 @@ def validate(j: dict[str, Any]) -> dict[str, Any]:
     if kind not in KINDS:
         raise JoinError("body", f"kind must be one of {sorted(KINDS)}")
     out["kind"] = kind
+    out["box_beacons"] = _box_beacons(j.get("box_beacons"), kind)
     return out
+
+
+def _box_beacons(value: Any, kind: str) -> Optional[dict[str, Any]]:
+    """Key 21 as a dict ``{"off": [node ids, ascending], "rooms": {node id: text}}`` (either part left out when
+    empty), None when there is none. For a standby controller only; at most BOX_BEACONS_MAX bytes of CBOR."""
+    if value is None:
+        return None
+    if kind != "controller":
+        raise JoinError("body", "box_beacons: only a standby controller's join carries it")
+    if not isinstance(value, dict) or not value or set(value) - {"off", "rooms"}:
+        raise JoinError("body", "box_beacons: a map with off and/or rooms, not empty")
+    out: dict[str, Any] = {}
+    if "off" in value:
+        off = value["off"]
+        if (not isinstance(off, list) or not 1 <= len(off) <= BOX_OFF_MAX
+                or any(not isinstance(n, int) or isinstance(n, bool) or not 1 <= n <= 0xFFFE for n in off)
+                or off != sorted(set(off))):
+            raise JoinError("body", f"box_beacons.off: 1 to {BOX_OFF_MAX} different node ids, ascending")
+        out["off"] = list(off)
+    if "rooms" in value:
+        rooms = value["rooms"]
+        if (not isinstance(rooms, dict) or not 1 <= len(rooms) <= BOX_ROOMS_MAX
+                or any(not isinstance(n, int) or isinstance(n, bool) or not 1 <= n <= 0xFFFE for n in rooms)):
+            raise JoinError("body", f"box_beacons.rooms: 1 to {BOX_ROOMS_MAX} rooms by node id")
+        out["rooms"] = {n: _text("room", rooms[n], BOX_ROOM_MAX) for n in sorted(rooms)}
+    if len(cbor.encode(_box_beacons_wire(out))) > BOX_BEACONS_MAX:
+        raise JoinError("body", f"box_beacons: over {BOX_BEACONS_MAX} bytes (shorter room names)")
+    return out
+
+
+def _box_beacons_wire(v: dict[str, Any]) -> dict[int, Any]:
+    return {k: v[name] for k, name in ((1, "off"), (2, "rooms")) if name in v}
 
 
 def encode(j: dict[str, Any], join_key: bytes) -> bytes:
@@ -207,6 +247,9 @@ def encode(j: dict[str, Any], join_key: bytes) -> bytes:
     body: dict[int, Any] = {}
     for name in KEYS:
         if (name in OPTIONAL and v[name] is None) or (name in FLAGS and not v[name]):
+            continue
+        if name == "box_beacons":
+            body[KEYS[name]] = _box_beacons_wire(v[name])
             continue
         if name == "box_beacon":
             if not v[name]:  # on is the key's absence; only false is written
@@ -251,12 +294,16 @@ def decode(data: bytes, join_key: bytes) -> dict[str, Any]:
             if not isinstance(v, int) or isinstance(v, bool) or v not in _KIND_NAMES:
                 raise JoinError("body", f"unknown join kind {v!r}")
             v = _KIND_NAMES[v]
-        if name in ("ca_sha256", "urls", "lang") and v is None:
+        if name in ("ca_sha256", "urls", "lang", "box_beacons") and v is None:
             raise JoinError("body", f"{name} is null: leave an optional field out instead")
         if name in FLAGS and v is not True:
             raise JoinError("body", f"{name} is only ever true: leave it out instead")
         if name == "box_beacon" and v is not False:
             raise JoinError("body", "box_beacon is only ever false: leave it out instead")
+        if name == "box_beacons":
+            if not isinstance(v, dict) or any(k not in (1, 2) for k in v):
+                raise JoinError("body", "box_beacons: a map with keys 1 (off) and 2 (rooms)")
+            v = {name2: v[k] for k, name2 in ((1, "off"), (2, "rooms")) if k in v}
         if name == "region":
             if not isinstance(v, int) or isinstance(v, bool) or v not in regions.BY_NUMBER or v == 0:
                 raise JoinError("body", f"region {v!r}: a known region from 1 up (EU868 leaves the key out)")
