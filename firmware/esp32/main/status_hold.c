@@ -29,7 +29,11 @@ void status_hold_transient(status_hold_t *h, uint32_t now)
 bool status_hold_due(status_hold_t *h, uint32_t now, bool busy, screen_update_t *out)
 {
     if (!h->transient || busy) return false;
-    if ((uint32_t)(now - h->at) < STATUS_HOLD_MS) return false;
+    /* Signed: the main loop reads its clock once per pass, and a status drawn later in the same
+     * pass (a serial "@update" handled after the read) has `at` a little after `now`. Unsigned,
+     * that difference wrapped to a huge number and the status went away at once (bench,
+     * 2026-10-29). */
+    if ((int32_t)(now - h->at) < (int32_t)STATUS_HOLD_MS) return false;
     h->transient = false;
     if (!h->have_state) return false;
     *out = h->state;

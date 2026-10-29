@@ -53,12 +53,26 @@ static void test_busy_and_progress_renew(void)
     screen_update_t out;
     status_hold_init(&h);
     status_hold_state(&h, "lobby", "{}");
-    status_hold_transient(&h, 0); /* "updating 10%" */
+    status_hold_transient(&h, 0);                                /* "updating 10%" */
     CHECK(!status_hold_due(&h, STATUS_HOLD_MS * 2, true, &out)); /* the download runs on */
     status_hold_transient(&h, STATUS_HOLD_MS * 2);               /* it failed */
     CHECK(!status_hold_due(&h, STATUS_HOLD_MS * 2 + 100, false, &out));
     CHECK(status_hold_due(&h, STATUS_HOLD_MS * 3, false, &out));
     CHECK(strcmp(out.template_name, "lobby") == 0);
+}
+
+/* The bench case (2026-10-29): the loop read its clock, then a serial "@update" in the same pass
+ * drew the refusal with a later time; the next check, with that earlier clock, must not end it. */
+static void test_a_clock_read_before_the_status(void)
+{
+    status_hold_t h;
+    screen_update_t out;
+    status_hold_init(&h);
+    status_hold_state(&h, "ready", "{\"picker\":true}");
+    status_hold_transient(&h, 11014);
+    CHECK(!status_hold_due(&h, 11000, false, &out)); /* now 14 ms before the status */
+    CHECK(!status_hold_due(&h, 11039, false, &out)); /* the bench redrew here */
+    CHECK(status_hold_due(&h, 11014 + STATUS_HOLD_MS, false, &out));
 }
 
 static void test_no_state_screen_and_wrap(void)
@@ -81,4 +95,5 @@ void run_status_hold_tests(void)
     test_something_drew_meanwhile();
     test_busy_and_progress_renew();
     test_no_state_screen_and_wrap();
+    test_a_clock_read_before_the_status();
 }
