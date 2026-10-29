@@ -67,3 +67,22 @@ CONFIG_COMPILER_OPTIMIZATION_PERF=y
 # (CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK, with secure boot) would add a hardware
 # anti-rollback under the box's own version check (decision FU3-8).
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# --- Bluetooth LE: the Field Box's iBeacon (decisions BBC-1 to BBC-12) ---
+# A broadcaster only: NimBLE advertises one non-connectable packet while the box is joined to a
+# game (main/box_beacon_esp.c) and is taken down again, controller memory included, when the game
+# ends. No connection, no scan, no pairing and no bond store, so the host is the smallest NimBLE
+# builds; its heap goes to PSRAM (the internal RAM is spoken for: see the Wi-Fi notes above).
+# The I/O pod (sdkconfig.pod) and the modem and Wokwi variants set their own, after this file.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
+# (ESP-IDF 5.3.2's ble_gap.c does not compile as a broadcaster alone: it needs the peripheral role,
+# which stays unused; the advertisement is non-connectable.)
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+CONFIG_BT_NIMBLE_SECURITY_ENABLE=n
+CONFIG_BT_NIMBLE_NVS_PERSIST=n
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y

@@ -61,6 +61,15 @@ void box_logo_esp_init(box_game_t *box)
     if (box_logo_init("/littlefs") != 0) ESP_LOGW(TAG, "no storage for the field's logo");
 }
 
+bool box_logo_esp_pending(void)
+{
+    if (s_box == NULL) return false;
+    if (s_running) return true;
+    const atalaia_join_t *j = &s_box->join;
+    return s_box->phase == BOX_JOINED && j->has_ca && j->url_count != 0 &&
+           !(s_asked && s_game_id == j->game_id);
+}
+
 void box_logo_esp_poll(void)
 {
     if (s_box == NULL || s_running || s_box->phase != BOX_JOINED) return;

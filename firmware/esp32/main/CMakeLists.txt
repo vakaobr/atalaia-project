@@ -142,6 +142,8 @@ else()
         "mode_fetch_esp.c"
         "box_logo.c"
         "box_logo_esp.c"
+        "box_beacon.c"
+        "box_beacon_esp.c"
         "admin_pin.c"
         "adoption.c"
         "cpace.c"

@@ -491,6 +491,11 @@ void fw_update_esp_net_release(void)
     __atomic_store_n(&s_busy, false, __ATOMIC_RELEASE);
 }
 
+bool fw_update_esp_net_busy(void)
+{
+    return __atomic_load_n(&s_busy, __ATOMIC_ACQUIRE);
+}
+
 void fw_update_esp_poll(void)
 {
     if (s_box == NULL || !__atomic_load_n(&s_failed_due, __ATOMIC_ACQUIRE)) return;

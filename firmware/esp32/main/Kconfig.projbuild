@@ -866,6 +866,62 @@ menu "Atalaia Field Box Configuration"
                 Off only for bench tests with tools that cannot pair.
     endmenu
 
+    # ---- The Field Box as an iBeacon (decisions BBC-1 to BBC-12) -------------
+    menu "Field Box iBeacon"
+        depends on ATALAIA_NODE_MODE
+
+        config ATALAIA_BOX_BEACON
+            bool "Advertise as an iBeacon while joined to a game"
+            default y
+            help
+                A Field Box joined to a field's game advertises a non-connectable
+                iBeacon packet (protocol/box-beacon.md), so a phone that hears it
+                is placed in the room, on the floor, where the GM put the box.
+                The proximity UUID is derived from the field's join key, the
+                major is the constant 0xB0C5 and the minor is the box's node id
+                in the game. Off here leaves the Bluetooth stack out of the
+                logic (also turn CONFIG_BT_ENABLED off to leave it out of the
+                image: the Wokwi variant does). The GM can also turn the beacons
+                of a field off at the console (join key 19); this is the
+                build-time switch.
+
+        config ATALAIA_BOX_BEACON_INTERVAL_MS
+            int "Advertising interval (ms)"
+            range 100 10000
+            default 500
+            depends on ATALAIA_BOX_BEACON
+            help
+                500 ms: an Android scan in its low-power mode listens for about
+                0.5 s in every 5 s, so an advertiser slower than that is missed
+                in a good share of the scans (about half at 1 s, by the
+                arithmetic of one 0.5 s window against one advertisement a
+                second); at 500 ms nearly every scan window holds one
+                advertisement. The cost at 0 dBm is 2 events a second of
+                a few hundred microseconds each, and the 2.4 GHz radio does not
+                touch the SX1262's 868 MHz (they are separate radios; Wi-Fi
+                and Bluetooth share the 2.4 GHz one, and the box's Wi-Fi is
+                only on for setup and updates, never in a game).
+
+        config ATALAIA_BOX_BEACON_TX_DBM
+            int "Transmit power (dBm)"
+            range -24 20
+            default 0
+            depends on ATALAIA_BOX_BEACON
+            help
+                0 dBm reaches about one room, which is what the position means.
+                Rounded to the nearest level the controller has.
+
+        config ATALAIA_BOX_BEACON_MEASURED_POWER
+            int "Measured power at 1 m (dBm, the iBeacon's last byte)"
+            range -127 0
+            default -59
+            depends on ATALAIA_BOX_BEACON
+            help
+                Written in the packet as the calibrated RSSI at one metre. The
+                app takes the strongest beacon and never reads a distance from
+                it, so this only matters to other iBeacon apps.
+    endmenu
+
     # ---- Development and emulator options -----------------------------------
     menu "Development"
         config ATALAIA_RADIO_DISABLE

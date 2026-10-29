@@ -62,6 +62,9 @@ void fw_update_esp_poll(void);
 const fw_io_t *fw_update_esp_net(const uint8_t ca_sha256[32]);
 bool fw_update_esp_net_claim(void);
 void fw_update_esp_net_release(void);
+/* True while an update, a mode fetch or the logo's fetch has the Wi-Fi: the box's iBeacon waits
+ * for it (its controller's memory and the Wi-Fi driver's share the internal RAM). */
+bool fw_update_esp_net_busy(void);
 
 /* The field Wi-Fi a firmware update uses (stored in NVS: wifi_ssid, wifi_pass). */
 bool fw_update_esp_set_wifi(const char *ssid, const char *password);

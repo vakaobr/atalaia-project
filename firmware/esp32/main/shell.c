@@ -29,6 +29,7 @@
 #include "box_text.h"
 #include "atalaia/packet.h"
 #include "atalaia/version.h"
+#include "box_beacon_esp.h"
 #include "box_game.h"
 #include "builtin_presets.h"
 #include "button_tracker.h"
@@ -1084,6 +1085,17 @@ static void task_game(void *arg)
         mode_fetch_esp_poll(); /* a mode fetch that is over: join its game, or say why not */
         box_logo_esp_poll();   /* a joined game, not started: the field's logo, once (PKG-1) */
         box_game_tick(&box, delta_ms, now);
+        /* The box's iBeacon (decisions BBC-1 to BBC-12): on while joined to a game whose join did
+         * not turn it off, the Bluetooth stack taken down again after it. */
+        {
+            /* Not while the Wi-Fi is in use (the logo's fetch right after the join, a mode fetch,
+             * an update): the Bluetooth controller and the Wi-Fi driver share the internal RAM,
+             * which the Wi-Fi driver needed all of (sdkconfig.defaults). */
+            box_beacon_id_t beacon_id = {0};
+            bool beacon_on = box_game_beacon(&box, &beacon_id) && !fw_update_esp_net_busy() &&
+                             !box_logo_esp_pending();
+            box_beacon_esp_update(beacon_on, &beacon_id);
+        }
         if (field_game) {
             /* ticked above */
         } else if (runner.running) {

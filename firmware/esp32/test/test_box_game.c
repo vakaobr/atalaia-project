@@ -566,6 +566,69 @@ static void test_join_play_end(void)
     CHECK(memcmp(game.link.proto.game_key, zero, 16) == 0);
 }
 
+/* The box's iBeacon (decisions BBC-1 to BBC-12): advertised from the join to the end of the game,
+ * with the field's UUID and the node id as the minor; a join that turns it off (key 19) never
+ * advertises, not after a reboot either; nothing while fetching modes or between games. */
+static void test_beacon_follows_the_game(void)
+{
+    fixture(false);
+    game.state_interval_ms = 1000;
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    box_beacon_id_t id;
+    CHECK(!box_game_beacon(&game, &id)); /* idle */
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    size_t n = encode(&j, JOIN_KEY, buf);
+    CHECK(box_game_join(&game, buf, n) == BOX_JOIN_OK);
+    CHECK(game.phase == BOX_JOINED && box_game_beacon(&game, &id)); /* joined, not started */
+    uint8_t uuid[BOX_BEACON_UUID_SIZE];
+    box_beacon_uuid(JOIN_KEY, uuid);
+    CHECK(memcmp(id.uuid, uuid, sizeof(uuid)) == 0);
+    CHECK(id.major == BOX_BEACON_MAJOR && id.minor == NODE);
+    uint32_t now = 100;
+    run_ms(&now, 100);
+    cmd(FIELD_CMD_START);
+    CHECK(game.phase == BOX_PLAYING && box_game_beacon(&game, &id) && id.minor == NODE);
+    cmd(FIELD_CMD_PAUSE);
+    CHECK(game.paused && box_game_beacon(&game, &id)); /* a paused game is still a game */
+    cmd(FIELD_CMD_RESUME);
+    cmd(FIELD_CMD_END);
+    CHECK(game.phase == BOX_ENDED && !box_game_beacon(&game, &id));
+    ack_all();
+    run_ms(&now, 20);
+    CHECK(game.phase == BOX_IDLE && !box_game_beacon(&game, &id));
+    state_persist_clear();
+
+    /* The GM turned the field's box beacons off: key 19 in the join. */
+    fixture(false);
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    make_join(&j);
+    j.game_id = GAME_ID + 2;
+    j.box_beacon_off = true;
+    n = encode(&j, JOIN_KEY, buf);
+    CHECK(box_game_join(&game, buf, n) == BOX_JOIN_OK);
+    CHECK(game.phase == BOX_JOINED && game.join.box_beacon_off && !box_game_beacon(&game, &id));
+    /* And after a reboot, from the stored payload. */
+    node_runner_stop(&runner);
+    fixture(true);
+    CHECK(game.have_join_key && box_game_resume(&game, 5));
+    CHECK(box_game_active(&game) && game.join.box_beacon_off && !box_game_beacon(&game, &id));
+    state_persist_clear();
+
+    /* On again: a payload without key 19 advertises, and keeps doing so after a reboot. */
+    fixture(false);
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    make_join(&j);
+    n = encode(&j, JOIN_KEY, buf);
+    CHECK(box_game_join(&game, buf, n) == BOX_JOIN_OK && box_game_beacon(&game, &id));
+    node_runner_stop(&runner);
+    fixture(true);
+    CHECK(game.have_join_key && box_game_resume(&game, 5));
+    CHECK(box_game_beacon(&game, &id) && id.minor == NODE);
+    state_persist_clear();
+}
+
 /* Without any ACK the box still lets the key go: when the events give up, at most a minute. */
 static void test_end_without_acks(void)
 {
@@ -2205,6 +2268,7 @@ void run_box_game_tests(void)
     test_join_refusals();
     test_join_with_a_modifier();
     test_join_play_end();
+    test_beacon_follows_the_game();
     test_radio_report();
     test_end_without_acks();
     test_resume_after_reboot();

@@ -17,4 +17,8 @@ void box_logo_esp_init(box_game_t *box);
  * started, no other fetch has the Wi-Fi) that has not asked yet starts the fetch. */
 void box_logo_esp_poll(void);
 
+/* True while the logo's fetch runs, or a joined game that will ask has not yet: the box's iBeacon
+ * does not start before the Wi-Fi has been used and let go (its memory is shared). */
+bool box_logo_esp_pending(void);
+
 #endif /* ATALAIA_BOX_LOGO_ESP_H */

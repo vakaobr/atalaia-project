@@ -56,6 +56,7 @@ int main(void)
     run_mode_package_tests();
     run_mode_fetch_tests();
     run_box_logo_tests();
+    run_box_beacon_tests();
     run_adoption_tests();
     run_admin_pin_tests();
     run_box_pair_tests();

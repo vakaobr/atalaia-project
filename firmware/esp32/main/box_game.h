@@ -34,6 +34,7 @@
 #include "atalaia/field_frame.h"
 #include "atalaia/join.h"
 #include "atalaia/tag.h"
+#include "box_beacon.h"
 #include "node_runner.h"
 #include "preset_store.h"
 #include "radio/field_link.h"
@@ -275,6 +276,14 @@ bool box_game_active(const box_game_t *g);
 
 /* True while a joined game is being played (running or paused): no firmware update then. */
 bool box_game_playing(const box_game_t *g);
+
+/*
+ * True, with the box's iBeacon identity (box_beacon.h), while this box should advertise: it is
+ * joined to a game (waiting for the start, running or paused) whose join did not turn the beacon
+ * off (join key 19). False between games, while fetching modes and after the end. The shell calls
+ * it every turn and hands the answer to the Bluetooth side.
+ */
+bool box_game_beacon(const box_game_t *g, box_beacon_id_t *id);
 
 /*
  * A firmware update that failed and could not be reported over HTTPS (no Wi-Fi, the controller

@@ -59,6 +59,7 @@ add_executable(box_host
     ${MAIN_DIR}/mode_package.c
     ${MAIN_DIR}/mode_store.c
     ${MAIN_DIR}/mode_fetch.c
+    ${MAIN_DIR}/box_beacon.c
     ${MAIN_DIR}/admin_pin.c
     ${MAIN_DIR}/adoption.c
     ${MAIN_DIR}/cpace.c

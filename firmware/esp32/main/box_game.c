@@ -905,6 +905,15 @@ bool box_game_playing(const box_game_t *g)
     return g->phase == BOX_PLAYING;
 }
 
+bool box_game_beacon(const box_game_t *g, box_beacon_id_t *id)
+{
+    /* Joined or playing (paused too), never fetching, ended or idle: the beacon is for the game
+     * the controller placed this box in. The join may say the GM turned it off (key 19). */
+    if (g->phase != BOX_JOINED && g->phase != BOX_PLAYING) return false;
+    if (!g->have_join_key || g->join.box_beacon_off) return false;
+    return box_beacon_id(g->join_key, g->join.node_id, id);
+}
+
 bool box_game_update_failed(box_game_t *g, const char *release, const char *reason, const char *fw)
 {
     if (g->phase == BOX_IDLE || g->phase == BOX_FETCHING) return false;

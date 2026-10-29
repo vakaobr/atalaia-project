@@ -684,6 +684,53 @@ image decoder.
 - **Image size**: the Field Box image was 1,949,264 bytes of its then 2,097,152-byte OTA slot (92.95 %,
   3,328 bytes more than before the logo); the slots are 4 MB now (Partition Table above).
 
+## The Field Box as an iBeacon (decisions BBC-1 to BBC-12)
+
+A box joined to a field game advertises a standard iBeacon over Bluetooth LE, so a phone that hears it
+is placed in the room, on the floor, where the GM put the box on the field view; it sits beside the
+GM's iBeacon tags and a field needs tags only where there is no box. The specification is
+[protocol/box-beacon.md](../../protocol/box-beacon.md) (RFC 0001 Amendment 19).
+
+- **What it advertises** (`main/box_beacon.c`, platform-free, run by `test/test_box_beacon.c` against
+  `protocol/vectors/box_beacon.json`): the 30-byte iBeacon packet. **UUID**: the field's, the first 16
+  bytes of `HMAC-SHA256(join key, "atalaia box beacon uuid v1")` with the version nibble 8 and the
+  RFC 4122 variant (every box of a field has the same one, which a phone filters by; the controller
+  derives it from the join key it holds, so nothing travels). **Major**: the constant 45253
+  (`0xB0C5`), which the controller refuses a GM's tag, so a box's id never collides with a tag's.
+  **Minor**: the box's node id in the game. Measured power -59 dBm.
+- **When** (`box_game_beacon`, tested in `test/test_box_game.c`): from the join (waiting for the start)
+  to the end of the game, paused included; never idle between games (nothing for a phone to use, and no
+  power or RAM spent), never while fetching modes, not after the end. A join that carries key 19 =
+  `false` (the GM turned the field's box beacons off) never advertises, not after a reboot either.
+- **How** (`main/box_beacon_esp.c`): NimBLE as a **broadcaster only** (non-connectable, no scan, no
+  pairing, no bond store), the host's heap in PSRAM. The shell calls `box_beacon_esp_update` every turn;
+  the controller is started and stopped on its own task, only when the answer changes, and **taken down
+  again with its memory** when the game ends. It also waits while the Wi-Fi is in use (the logo's fetch
+  right after a join, a mode fetch, an update: `fw_update_esp_net_busy`, `box_logo_esp_pending`), because
+  the Bluetooth controller and the Wi-Fi driver share the internal RAM.
+- **Interval and power**: 500 ms and 0 dBm. An Android scan in low-power mode (the app's, BLE-9) listens
+  about 0.5 s in every 5 s, so a slower beacon is missed in a good share of the scans (about half at 1 s);
+  at 500 ms nearly every window holds an advertisement. Two short events a second cost almost nothing, and
+  the SX1262's band (868 or 920-925 MHz) is not Bluetooth's (2.4 GHz): the beacon never touches a game
+  frame; what Bluetooth shares with the ESP32-S3 is its 2.4 GHz radio with Wi-Fi, which is on only for
+  the between-game fetches above.
+- **Kconfig** (menu "Field Box iBeacon"): `ATALAIA_BOX_BEACON` (default **on** for the Field Box),
+  `ATALAIA_BOX_BEACON_INTERVAL_MS` (500), `ATALAIA_BOX_BEACON_TX_DBM` (0),
+  `ATALAIA_BOX_BEACON_MEASURED_POWER` (-59). `sdkconfig.defaults` turns on the Bluetooth stack
+  (`CONFIG_BT_ENABLED`, NimBLE with the broadcaster and peripheral roles: ESP-IDF 5.3.2's `ble_gap.c`
+  does not compile as a broadcaster alone); `sdkconfig.wokwi` (no Bluetooth radio in the emulator) and
+  `sdkconfig.modem` turn it off, and the I/O pod keeps its own Bluetooth settings (`sdkconfig.pod`).
+  The GM's runtime switch is the join's key 19 (console: *Field > Indoor beacons > Field Boxes as
+  beacons*).
+- **Size** (Field Box image, ESP-IDF 5.3.2, same commit with and without): the image grew from 1,974,080
+  to 2,135,360 bytes (+161,280, +8.2 %; 3,125,... of the 4 MB OTA slot's 4,194,304 bytes are 51 %
+  used, 49 % free). Static internal RAM (DIRAM: `.text` + `.data` + `.bss`) grew from 270,880 to
+  296,024 bytes (+25,144): 70,880 bytes of it were free before and 45,736 after. The Bluetooth
+  controller's working memory is allocated only while the beacon runs and logged at start
+  (`box-beacon: Bluetooth controller up: internal RAM N bytes free (took M)`);
+  `docs/runbooks/box-beacon-bench.md` reads it on the boards. The modem and Wokwi builds are unchanged
+  in kind (no Bluetooth) and the pod builds as before.
+
 ## IDF Component Dependencies
 
 Listed in `main/idf_component.yml`:

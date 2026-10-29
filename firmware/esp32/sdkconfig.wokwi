@@ -67,6 +67,11 @@ CONFIG_SPIRAM_IGNORE_NOTFOUND=y
 # key (protocol/vectors/join.json). Never set it on a real Field Box.
 CONFIG_ATALAIA_DEV_JOIN_KEY="000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
 
+# The emulator has no Bluetooth radio: no iBeacon, and the Bluetooth stack the
+# Field Box's defaults turn on stays out of this image.
+CONFIG_BT_ENABLED=n
+CONFIG_ATALAIA_BOX_BEACON=n
+
 # The emulated board's console is UART0; the USB-Serial-JTAG input of the
 # Field Box build (CONFIG_ATALAIA_CONSOLE_USB_INPUT) is not used here.
 # CONFIG_ATALAIA_CONSOLE_USB_INPUT is not set
