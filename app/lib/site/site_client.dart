@@ -48,6 +48,23 @@ final class SiteResponse {
     final d = json['detail'];
     return d is String ? d : 'http_$status';
   }
+
+  /// Whether this is a 422 that refuses [field] of the request body as one it
+  /// does not know (FastAPI's `extra_forbidden` for `['body', field]`): what a
+  /// server older than the field answers. Any other 422 is not this.
+  bool refusesUnknownField(String field) {
+    if (status != 422) return false;
+    final d = json['detail'];
+    if (d is! List) return false;
+    return d.any((e) {
+      if (e is! Map || e['type'] != 'extra_forbidden') return false;
+      final loc = e['loc'];
+      return loc is List &&
+          loc.length == 2 &&
+          loc[0] == 'body' &&
+          loc[1] == field;
+    });
+  }
 }
 
 /// The HTTP side, replaced in tests by a fake site server.

@@ -265,6 +265,9 @@ class FakeSite {
 
   /// A server that takes `notice_version` on the social sign-up's start.
   var startTakesNoticeVersion = true;
+
+  /// A 422 for another reason on the start (a field the body got wrong).
+  var startValidationError = false;
   String? lastNoticeVersion;
 
   // --- the chrono link of a hosted hub (api/hub_share.py, SVX-2) -----------------
@@ -548,9 +551,31 @@ class FakeSite {
             b['password'] != accountPassword) {
           return err(403, 'invalid_password');
         }
+        if (startValidationError) {
+          return SiteResponse(422, {
+            'detail': [
+              {
+                'loc': ['body', 'return_to'],
+                'msg': 'String should have at most 400 characters',
+                'type': 'string_too_long',
+              },
+            ],
+          });
+        }
         // A server before the notice version refuses the field (422).
         if (b.containsKey('notice_version')) {
-          if (!startTakesNoticeVersion) return err(422, 'validation_error');
+          if (!startTakesNoticeVersion) {
+            // What FastAPI says of a field the model forbids (app.py).
+            return SiteResponse(422, {
+              'detail': [
+                {
+                  'loc': ['body', 'notice_version'],
+                  'msg': 'Extra inputs are not permitted',
+                  'type': 'extra_forbidden',
+                },
+              ],
+            });
+          }
           if (b['notice_version'] != noticeVersion) {
             return err(409, 'notice_version_changed');
           }

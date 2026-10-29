@@ -362,6 +362,32 @@ void main() {
       expect(find.text('Jogos'), findsOneWidget);
     });
 
+    testWidgets('a 422 for another reason: not asked again, shown as the '
+        'refusal it is', (tester) async {
+      await open(tester);
+      site.startValidationError = true;
+      await tapKey(tester, 'site-login-consent');
+      await tapKey(tester, 'site-login-google');
+      expect(
+        site.requests.where((r) => r == 'POST /auth/oidc/google/start'),
+        hasLength(1),
+      );
+      expect(find.byKey(const Key('site-error')), findsOneWidget);
+      expect(browser.opened, isEmpty);
+    });
+
+    testWidgets('a server that takes the field: one request, the version '
+        'sent', (tester) async {
+      await open(tester);
+      await tapKey(tester, 'site-login-consent');
+      await tapKey(tester, 'site-login-google');
+      expect(
+        site.requests.where((r) => r == 'POST /auth/oidc/google/start'),
+        hasLength(1),
+      );
+      expect(site.lastNoticeVersion, site.noticeVersion);
+    });
+
     testWidgets('no notice published: no version, the sign-in is as before', (
       tester,
     ) async {

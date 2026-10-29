@@ -309,10 +309,13 @@ class SiteAuth {
   /// [consent] is the box the server asks for the first sign-in of a new
   /// account; [password] confirms a `link` for an account that has one.
   /// [noticeVersion] is the version of the privacy notice the person was
-  /// shown when they ticked [consent] (sent with the consent only: a server
-  /// that does not take it yet refuses the field, 422, and the start is asked
-  /// again without it; a server that does refuses a notice that changed since
-  /// with 409 `notice_version_changed`).
+  /// shown when they ticked [consent] (sent with the consent only). A server
+  /// before CONS-7 refuses the unknown field with a 422 that names it
+  /// (`extra_forbidden` at `body.notice_version`); only that answer, which the
+  /// app also meets from older self-hosted servers, is asked again without the
+  /// field (decision APF-10). Every other 422 is the caller's to see. A server
+  /// that takes the field refuses a notice that changed since with 409
+  /// `notice_version_changed`.
   Future<OidcStart> oidcStart(
     String provider, {
     required String purpose,
@@ -336,7 +339,9 @@ class SiteAuth {
       ...body,
       if (withVersion) 'notice_version': noticeVersion,
     });
-    if (withVersion && r.status == 422) r = await ask(body);
+    if (withVersion && r.refusesUnknownField('notice_version')) {
+      r = await ask(body);
+    }
     final json = await _ok(r);
     final url = Uri.tryParse('${json['browser_url'] ?? ''}');
     final ok = url != null && url.scheme == 'https' && url.host.isNotEmpty;
