@@ -300,6 +300,57 @@ void main() {
       engine.close();
     });
 
+    test('keeps a box\'s penalties in the totals and in the nodes view '
+        '(BSC-1)', () {
+      boot();
+      final gid =
+          engine.createGame({
+                'name': 'g',
+                'mode_id': 'org.atalaia.domination',
+                'assignments': {'4': 'zone'},
+              })['id']!
+              as int;
+      engine.startGame(gid, force: true);
+      rx(
+        1,
+        RfType.state,
+        const RfState(
+          ownerTeam: 1,
+          phase: 1,
+          gameTimeMs: 0,
+          counters: {1: 12, 2: 4},
+          lost: {2: 3},
+          epoch: 2,
+        ).encode(),
+      );
+      Object? lostOf() => engine.nodes(gid).single['lost'];
+      expect(lostOf(), {'red': 0, 'blue': 3});
+      expect(engine.score(gid)['teams'], {'red': 12, 'blue': 1});
+      for (var i = 0; i < 2; i++) {
+        engine.close();
+        boot();
+        // Before the box says anything: the stored penalties.
+        expect(lostOf(), {'red': 0, 'blue': 3});
+        expect(engine.score(gid)['teams'], {'red': 12, 'blue': 1});
+        advance(5);
+        expect(lostOf(), {'red': 0, 'blue': 3});
+      }
+      // A box that rebooted and sends no key 9: the merge is by maximum.
+      rx(
+        2,
+        RfType.state,
+        const RfState(
+          ownerTeam: 1,
+          phase: 1,
+          gameTimeMs: 0,
+          counters: {1: 12, 2: 4},
+          epoch: 3,
+        ).encode(),
+      );
+      expect(lostOf(), {'red': 0, 'blue': 3});
+      engine.close();
+    });
+
     test('keeps the key with persist_game_key, else only ending is left', () {
       boot();
       final gid =

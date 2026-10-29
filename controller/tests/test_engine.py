@@ -227,7 +227,44 @@ class RadioInputTests(EngineCase):
         self.assertEqual({n["node_id"]: n for n in self.store.nodes(gid)}[4]["lost"], {"red": 0, "blue": 3})
         self.reopen(persist_game_key=True)  # the Pi rebooted
         self.assertEqual(self.ctrl.score(gid)["teams"], {"red": 12, "blue": 1})
+        # The nodes view after the restart, before the box says anything: its stored penalties (BSC-1).
+        self.assertEqual(self.ctrl.nodes()[0]["lost"], {"red": 0, "blue": 3})
         self.rx(4, 2, "STATE", state(1, {1: 12, 2: 4}, epoch=3), epoch=3)  # an older box: no key 9
+        self.assertEqual(self.ctrl.nodes()[0]["lost"], {"red": 0, "blue": 3})
+        self.assertEqual(self.ctrl.score(gid)["teams"], {"red": 12, "blue": 1})
+
+    def test_the_nodes_view_keeps_a_boxs_penalties_across_restarts(self):
+        """BSC-1 on the bench: after a controller restart (a new engine on the same store, as often
+        as it happens, with the clock running) GET /nodes still has the box's `lost`."""
+        gid = self.gid
+        lost_state = state_encode({"owner_team": 1, "phase": 1, "game_time_ms": 0, "counters": {1: 12, 2: 4},
+                                   "epoch": 3, "lost": {2: 3}})
+        self.rx(4, 0, "HELLO", hello_encode({"node_name": "alpha", "platform": 1, "fw_version": "0.2.0",
+                                              "core_version": "0.2.0", "tier": 0, "capabilities": [0, 3],
+                                              "transports": 1, "battery_pct": 81, "epoch": 3}), epoch=3)
+        self.rx(4, 1, "STATE", lost_state, epoch=3)
+        for _ in range(3):
+            self.reopen(persist_game_key=True)
+            self.assertEqual({n["node_id"]: n["lost"] for n in self.ctrl.nodes()}[4], {"red": 0, "blue": 3})
+            self.clock.advance(300)  # long enough for the box to be called offline
+            self.ctrl.status()
+            self.assertEqual({n["node_id"]: n["lost"] for n in self.ctrl.nodes()}[4], {"red": 0, "blue": 3})
+            self.assertEqual(self.ctrl.score(gid)["teams"], {"red": 12, "blue": 1})
+            self.assertEqual({n["node_id"]: n for n in self.store.nodes(gid)}[4]["lost"], {"red": 0, "blue": 3})
+
+    def test_the_nodes_view_without_the_game_key_and_for_an_old_row(self):
+        """The key was not kept (persist_game_key off): the game cannot go on, but the view still has the
+        stored `lost`; a row stored before key 9 existed has the map too (all zero)."""
+        gid = self.gid
+        self.rx(4, 1, "STATE", state_encode({"owner_team": 1, "phase": 1, "game_time_ms": 0,
+                                             "counters": {1: 12, 2: 4}, "epoch": 3, "lost": {2: 3}}), epoch=3)
+        self.store.upsert_node(gid, 6, "old", "zone", {"score": {"red": 1, "blue": 0}})  # no `lost`
+        self.store._exec("UPDATE games SET game_key = NULL WHERE id = ?", (gid,))  # as if never kept
+        self.reopen(persist_game_key=False)
+        self.assertTrue(self.ctrl.status()["key_lost"])
+        nodes ={n["node_id"]: n for n in self.ctrl.nodes(gid)}
+        self.assertEqual(nodes[4]["lost"], {"red": 0, "blue": 3})
+        self.assertEqual(nodes[6]["lost"], {"red": 0, "blue": 0})
         self.assertEqual(self.ctrl.score(gid)["teams"], {"red": 12, "blue": 1})
 
     def test_other_games_are_ignored(self):

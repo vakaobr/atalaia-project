@@ -1634,9 +1634,13 @@ class Controller:
                 game_id = self.game["id"]
             if game_id is None:
                 return []
-            if self.store.game(game_id) is None:
+            game = self.store.game(game_id)
+            if game is None:
                 raise NotFound(f"no game {game_id}")
             stored = {n["node_id"]: n for n in self.store.nodes(game_id)}
+            for row in stored.values():
+                # A row stored before STATE key 9 (BSC-1) has no `lost`: nothing was lost, say so.
+                row.setdefault("lost", {t: 0 for t in game["teams"]})
             if self.fc is not None and self.game is not None and self.game["id"] == game_id:
                 now = self.now_ms()
                 for node in self.fc.nodes.values():

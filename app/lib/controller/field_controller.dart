@@ -22,7 +22,7 @@
 library;
 
 import 'dart:convert';
-import 'dart:math' show max;
+import 'dart:math' show max, min;
 import 'dart:typed_data';
 
 import '../core/node_types.dart';
@@ -144,6 +144,11 @@ class FieldNode {
   /// Projected score (decision BSC-2): a STATE from this box was heard in this
   /// run.
   bool reported = false;
+
+  /// Ownership changes the box's own events announced since its last STATE:
+  /// (game ms, team id, 0 = nobody) in the box's game time. The projection
+  /// follows them; every STATE clears them (decision BSC-4).
+  final List<(int, int)> changes = [];
 
   String? ownerName(List<String> teams) =>
       ownerTeam >= 1 && ownerTeam <= teams.length ? teams[ownerTeam - 1] : null;
@@ -616,6 +621,8 @@ class FieldController {
       ..phase = state.phase
       ..gameTimeMs = state.gameTimeMs
       ..reported = true;
+    // The STATE is the authority: it replaces what the events said.
+    node.changes.clear();
     if (state.batteryPct != null) node.batteryPct = state.batteryPct;
     if (state.rssi != null) node.rssi = state.rssi;
     mergeCounters('node-${node.nodeId}', {
@@ -679,6 +686,9 @@ class FieldController {
       'pkt_seq': header.seq,
       'received_ms': _now,
     };
+    if (ev.type == 'zone.captured' || ev.type == 'zone.neutralized') {
+      _noteOwnerChange(node, ev.type, ev.tMs, ev.team);
+    }
     if (ev.type == 'battery.low') {
       node
         ..batteryLow = true
@@ -728,37 +738,70 @@ class FieldController {
 
   // --- projected score (decision BSC-2) -------------------------------------
 
+  /// A zone.captured (or zone.neutralized) from a box: the projection follows
+  /// it until the box's next STATE (decision BSC-4). Its game time [tMs] is the
+  /// box's own, like the STATE's. An event not newer than the box's last STATE
+  /// is already in that STATE and changes nothing; one dated after the
+  /// controller's own game time counts from now. `previous_team` is not used:
+  /// the old owner is whoever the last STATE (or the event before) said.
+  void _noteOwnerChange(FieldNode node, String type, int tMs, int teamId) {
+    if (!node.reported || scoringHold == null) return;
+    if (tMs <= node.gameTimeMs) return;
+    final team = type == 'zone.captured' ? teamId : 0;
+    if (team < 0 || team > teams.length) return;
+    final changes = node.changes;
+    if (changes.isNotEmpty && tMs < changes.last.$1) return;
+    changes.add((min(tMs, max(gameTimeMs, node.gameTimeMs)), team));
+    if (changes.length > 8) changes.removeRange(0, changes.length - 8);
+  }
+
   /// Scoring ticks of the mode that happened on this box since its last
-  /// STATE, by game time: the boundaries k x every between the box's own
-  /// report time and the controller's game time. 0 unless the game runs, the
-  /// box is online, it reported and it is running.
-  int _ticksSinceReport(FieldNode node) {
+  /// STATE, by game time, per owner (team id): the boundaries k x every
+  /// between the box's own report time and the controller's game time, split
+  /// at the ownership changes its events announced since (the old owner's
+  /// ticks up to the change, the new owner's after it). Empty unless the game
+  /// runs, the box is online, it reported and it is running.
+  Map<int, int> _projectedTicks(FieldNode node) {
     final hold = scoringHold;
     if (hold == null ||
         gameState != gameRunning ||
         !node.reported ||
         node.phase != gameRunning ||
-        node.link == 'offline' ||
-        node.ownerName(teams) == null) {
-      return 0;
+        node.link == 'offline') {
+      return const {};
     }
     final every = hold.$1;
-    final ticks = gameTimeMs ~/ every - node.gameTimeMs ~/ every;
-    return ticks < 0 ? 0 : ticks;
+    final out = <int, int>{};
+    var start = node.gameTimeMs;
+    var owner = node.ownerTeam;
+    for (final (when0, team) in [...node.changes, (gameTimeMs, 0)]) {
+      final when = max(start, min(when0, gameTimeMs));
+      final ticks = when ~/ every - start ~/ every;
+      if (ticks > 0 && owner >= 1 && owner <= teams.length) {
+        out[owner] = (out[owner] ?? 0) + ticks;
+      }
+      start = when;
+      owner = team;
+    }
+    return out;
   }
 
-  /// Points each team has probably made since its boxes' last STATEs. Display
-  /// only.
+  /// The ticks the box's owner at its last STATE made since it (the drift
+  /// measure's side).
+  int _ticksSinceReport(FieldNode node) =>
+      _projectedTicks(node)[node.ownerTeam] ?? 0;
+
+  /// Points each team has probably made since its boxes' last STATEs, to
+  /// whoever held the box at the time. Display only.
   Map<String, int> projectedGains() {
     final out = <String, int>{};
     final hold = scoringHold;
     if (hold == null) return out;
     for (final node in nodes.values) {
-      final ticks = _ticksSinceReport(node);
-      final team = node.ownerName(teams);
-      if (ticks > 0 && team != null) {
+      _projectedTicks(node).forEach((teamId, ticks) {
+        final team = teams[teamId - 1];
         out[team] = (out[team] ?? 0) + ticks * hold.$2;
-      }
+      });
     }
     return out;
   }

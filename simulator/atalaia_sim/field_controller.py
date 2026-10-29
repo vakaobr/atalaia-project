@@ -146,6 +146,9 @@ class FieldNode:
     battery_low_since: Optional[int] = None
     # Projected score (decision BSC-2): a STATE from this box was heard in this run.
     reported: bool = False
+    # Ownership changes the box's own events announced since its last STATE: (game ms, team id,
+    # 0 = nobody) in the box's game time. The projection follows them; every STATE clears them.
+    changes: list[tuple[int, int]] = field(default_factory=list)
 
     def owner_name(self, teams: list[str]) -> Optional[str]:
         if 1 <= self.owner_team <= len(teams):
@@ -562,6 +565,7 @@ class FieldController:
             if isinstance(state.get(name), int):
                 setattr(node, name, state[name])
         node.reported = True
+        node.changes.clear()  # the STATE is the authority: it replaces what the events said
         if isinstance(state.get("battery_pct"), int):
             node.battery_pct = state["battery_pct"]
         if isinstance(state.get("rssi"), int):
@@ -629,6 +633,8 @@ class FieldController:
         }
         entry["event"] = record
         self.event_log.append(entry)
+        if record["type"] in ("zone.captured", "zone.neutralized"):
+            self._note_owner_change(node, record)
         if record["type"] == "battery.low":
             node.battery_low = True  # the box spoke for itself: no second one from here
             node.battery_low_since = None
@@ -761,28 +767,60 @@ class FieldController:
 
     # --- projected score (decision BSC-2) -------------------------------------
 
-    def _ticks_since_report(self, node: FieldNode) -> int:
-        """Scoring ticks of the mode that happened on this box since its last STATE, by game
-        time: the boundaries k x every between the box's own report time and the controller's
-        game time. 0 unless the game runs, the box is online, it reported and it is running."""
+    def _note_owner_change(self, node: FieldNode, record: dict[str, Any]) -> None:
+        """A zone.captured (or zone.neutralized) from a box: the projection follows it until the
+        box's next STATE (decision BSC-4). Its game time `t` is the box's own, like the STATE's. An
+        event not newer than the box's last STATE is already in that STATE and changes nothing; one
+        dated after the controller's own game time counts from now. `previous_team` is not used:
+        the old owner is whoever the last STATE (or the event before) said."""
+        if not node.reported or self.scoring_hold is None:
+            return
+        t = record.get("t")
+        if not isinstance(t, int) or isinstance(t, bool) or t <= node.game_time_ms:
+            return
+        team = int(record.get("team_id") or 0) if record["type"] == "zone.captured" else 0
+        if not 0 <= team <= len(self.teams):
+            return
+        if node.changes and t < node.changes[-1][0]:
+            return  # out of order: keep the later one
+        node.changes.append((min(t, max(self.game_time_ms, node.game_time_ms)), team))
+        del node.changes[:-8]  # a bounded list: the STATE soon says it all
+
+    def _projected_ticks(self, node: FieldNode) -> dict[int, int]:
+        """Scoring ticks of the mode that happened on this box since its last STATE, by game time,
+        per owner (team id): the boundaries k x every between the box's own report time and the
+        controller's game time, split at the ownership changes its events announced since (the
+        old owner's ticks up to the change, the new owner's after it). Empty unless the game runs,
+        the box is online, it reported and it is running."""
         if (self.scoring_hold is None or self.game_state != GAME_RUNNING or not node.reported
-                or node.phase != GAME_RUNNING or node.link == "offline"
-                or not 1 <= node.owner_team <= len(self.teams)):
-            return 0
+                or node.phase != GAME_RUNNING or node.link == "offline"):
+            return {}
         every = self.scoring_hold[0]
-        return max(0, self.game_time_ms // every - node.game_time_ms // every)
+        out: dict[int, int] = {}
+        start, owner = node.game_time_ms, node.owner_team
+        for when, team in [*node.changes, (self.game_time_ms, 0)]:
+            when = max(start, min(when, self.game_time_ms))
+            ticks = when // every - start // every
+            if ticks > 0 and 1 <= owner <= len(self.teams):
+                out[owner] = out.get(owner, 0) + ticks
+            start, owner = when, team
+        return out
+
+    def _ticks_since_report(self, node: FieldNode) -> int:
+        """The ticks the box's owner at its last STATE made since it (the drift measure's side)."""
+        return self._projected_ticks(node).get(node.owner_team, 0)
 
     def projected_gains(self) -> dict[str, int]:
         """Points each team has probably made since its boxes' last STATEs: every box that holds
-        for a team adds `points` per tick boundary crossed since its report. Display only."""
+        for a team adds `points` per tick boundary crossed since its report, to whoever held it at
+        the time. Display only."""
         out: dict[str, int] = {}
         if self.scoring_hold is None:
             return out
         points = self.scoring_hold[1]
         for node in self.nodes.values():
-            ticks = self._ticks_since_report(node)
-            team = node.owner_name(self.teams)
-            if ticks and team is not None:
+            for team_id, ticks in self._projected_ticks(node).items():
+                team = self.teams[team_id - 1]
                 out[team] = out.get(team, 0) + ticks * points
         return out
 

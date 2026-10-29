@@ -11,6 +11,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from atalaia_sim import codec
 from atalaia_sim.field_controller import GAME_RUNNING, FieldController
 from atalaia_sim.mode import ModeError, check_manifest, compose, hold_scoring, load_mode
 from atalaia_sim.packet import Header, state_encode, vf_make
@@ -123,6 +124,79 @@ class ProjectionTests(unittest.TestCase):
         self.state(4, 1, 2, {1: 2}, 20_000)
         self.assertEqual(self.drifts[-1]["drift"], 2)
         self.assertEqual(self.fc.projected_scores(), {"red": 2, "blue": 4})
+
+    def captured(self, node, seq, team, t, previous=None, type_="zone.captured"):
+        data = {"previous_team": previous} if previous else {}
+        payload = codec.encode_event({"node": node, "seq": seq, "t": t, "type": type_, "team": team,
+                                      "data": data})
+        hdr = Header(version_flags=vf_make(1, 1, False, True), game_id=1, source=node, seq=100 + seq,
+                     hop_limit=2, type=MESSAGE_TYPES["EVENT"])
+        self.fc.on_packet(node, hdr, payload, {"epoch": 0})
+
+    def test_a_capture_then_a_lost_state_counts_for_the_new_owner(self):
+        """The bench case (BSC-4): the capture was sent and ACKed, the STATE after it was lost."""
+        self.state(4, 0, 1, {1: 4}, 20_000)
+        self.fc.tick(33_000)
+        self.assertEqual(self.fc.projected_scores(), {"red": 4 + 2, "blue": 0})
+        self.captured(4, 1, 2, 33_000, previous="red")
+        self.assertEqual(self.fc.projected_scores(), {"red": 4 + 2, "blue": 0})
+        # Red kept the tick of 30 s (before the capture); from 33 s the ticks are blue's.
+        self.fc.tick(60_000)
+        self.assertEqual(self.fc.projected_scores(), {"red": 4 + 2, "blue": 2 * 3})
+        self.assertEqual(self.fc.total_scores, {"red": 4, "blue": 0})  # reports only
+        self.state(4, 1, 2, {1: 6, 2: 6}, 60_000)  # the next STATE that got through is the truth
+        self.assertEqual(self.fc.projected_scores(), {"red": 6, "blue": 6})
+        self.assertEqual(self.fc.nodes[4].changes, [])
+        self.assertEqual((self.drifts[-1]["team"], self.drifts[-1]["drift"]), ("red", 0))
+
+    def test_a_capture_then_its_state_leaves_nothing_of_the_event(self):
+        self.state(4, 0, 1, {1: 2}, 10_000)
+        self.fc.tick(24_000)
+        self.captured(4, 1, 2, 22_000)
+        self.assertEqual(self.fc.projected_scores(), {"red": 2 + 2, "blue": 0})
+        self.state(4, 1, 2, {1: 4, 2: 0}, 24_000)
+        self.assertEqual(self.fc.projected_scores(), {"red": 4, "blue": 0})
+        self.fc.tick(30_000)
+        self.assertEqual(self.fc.projected_scores(), {"red": 4, "blue": 2})
+        # A copy of the event arriving after the STATE (reordered) is not newer: no double count.
+        self.captured(4, 2, 2, 22_000)
+        self.assertEqual(self.fc.nodes[4].changes, [])
+        self.assertEqual(self.fc.projected_scores(), {"red": 4, "blue": 2})
+
+    def test_two_captures_and_a_neutralization_between_states(self):
+        self.state(4, 0, 1, {}, 0)
+        self.fc.tick(50_000)
+        self.captured(4, 1, 2, 12_000)
+        self.captured(4, 2, 1, 31_000)
+        self.captured(4, 3, 0, 41_000, type_="zone.neutralized")
+        # red holds 0-12 s (the tick at 10 s), blue 12-31 s (20 s, 30 s), red 31-41 s (40 s),
+        # nobody after 41 s.
+        self.assertEqual(self.fc.projected_scores(), {"red": 2 + 2, "blue": 4})
+
+    def test_a_capture_during_a_pause(self):
+        self.state(4, 0, 1, {}, 0)
+        self.fc.tick(14_000)
+        self.fc.pause_game(now_ms=14_000)
+        self.captured(4, 1, 2, 13_000)  # sent before the pause, heard during it
+        self.assertEqual(self.fc.projected_scores(), {"red": 0, "blue": 0})  # nothing while paused
+        self.fc.tick(40_000)  # the game clock does not move
+        self.assertEqual(self.fc.projected_scores(), {"red": 0, "blue": 0})
+        self.fc.resume_game(now_ms=40_000)
+        self.fc.tick(56_000)  # game time 30 s
+        # Red had the tick at 10 s; blue holds from 13 s: the ticks at 20 s and 30 s.
+        self.assertEqual(self.fc.game_time_ms, 30_000)
+        self.assertEqual(self.fc.projected_scores(), {"red": 2, "blue": 4})
+
+    def test_events_that_say_nothing_new_are_ignored(self):
+        self.captured(4, 1, 2, 5_000)  # the box never reported: nothing to follow
+        self.assertEqual(self.fc.nodes[4].changes, [])
+        self.state(4, 0, 1, {}, 8_000)
+        self.fc.tick(12_000)
+        self.captured(4, 2, 2, 8_000)  # not after the STATE it should follow
+        self.captured(4, 3, 9, 11_000)  # a team the game does not have
+        self.assertEqual(self.fc.nodes[4].changes, [])
+        self.captured(4, 4, 2, 99_000)  # dated in the controller's future: counts from now
+        self.assertEqual(self.fc.nodes[4].changes, [(12_000, 2)])
 
     def test_nothing_projected_when_paused_offline_unowned_or_not_opted_in(self):
         self.state(4, 0, 1, {}, 0)

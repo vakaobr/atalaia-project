@@ -58,7 +58,7 @@ Join the box as usual (the invite from the console, or `@join` on its serial con
    ```
 
 4. Let it run **5 minutes with red holding** (about 20 STATEs), and watch the console's score card: the grey "estimated N" climbs by 1 every 10 s; the official number follows with each STATE. Do not touch the box.
-5. Then do the **capture test**: at about 4 minutes, hold the **blue** button until the capture. The estimate may be one tick wrong for red or blue until the next STATE (a capture is sent at once, so it is usually corrected within a second): note whether it was.
+5. Then do the **capture test**: at about 4 minutes, hold the **blue** button until the capture. The estimate follows the capture from its event (BSC-4), so it should not be more than one tick wrong for red or blue even if the STATE after it is lost: note whether it was.
 6. **Pause and resume** once from the console: the estimate must disappear while paused (the score card shows no "estimated") and come back after the resume; the official number does not move.
 7. End the game. The final result must equal the official number of the last STATE, never the estimate.
 
@@ -76,7 +76,7 @@ The report prints how many STATEs were compared, how many were off, the largest 
 
 ### What to expect
 
-A box scores at game time k x `tick_s` and sends its STATE with its own game time T. The controller counts ticks up to **its** game time when the STATE arrives, which is the box's plus the air time, the relays and the clock offset between the two (the box follows the controller's TIME beacons, so a few hundred ms). A STATE sent just before a tick boundary therefore finds the projection **one tick ahead** for those few hundred ms: with `tick_s` = 10 s and about 0.3 s of offset, 3 % of the STATEs (the same fraction as offset / tick). That is the main source of nonzero drift, always +1 tick, and it is corrected by the STATE itself. A capture that the STATE has not yet carried gives at most one tick of the other sign. More than that means a STATE was lost (the next one repairs it) or the clocks are far apart.
+A box scores at game time k x `tick_s` and sends its STATE with its own game time T. The controller counts ticks up to **its** game time when the STATE arrives, which is the box's plus the air time, the relays and the clock offset between the two (the box follows the controller's TIME beacons, so a few hundred ms). A STATE sent just before a tick boundary therefore finds the projection **one tick ahead** for those few hundred ms: with `tick_s` = 10 s and about 0.3 s of offset, 3 % of the STATEs (the same fraction as offset / tick). That is the main source of nonzero drift, always +1 tick, and it is corrected by the STATE itself. A capture is followed from its event (decision BSC-4): the `zone.captured` is sent at once and ACKed, and the projection gives the old owner the ticks up to the event's game time and the new owner those after it, so a capture does not need its STATE: with the STATE lost, the projection stays right for the new owner (before BSC-4 it kept counting for the old one: on 2026-10-29 a lost STATE 120 ms after a capture left a +13-tick drift at `tick_s` = 2). At most one tick of the other sign remains when the box and the controller disagree on which side of a boundary the capture was. More than that means an event and a STATE were both lost (the next STATE repairs it) or the clocks are far apart.
 
 ## 4. Setting B: tick 2 s (measures the clock offset)
 
@@ -88,7 +88,7 @@ With the Kill Confirmed mode and the box's `@tag` console command (no NFC reader
 
 1. Make a Kill Confirmed game with `penalty_points` 3 and join the box, start it, press red's button, then `@tag` an enemy tag of blue.
 2. Within 15 s the console shows blue **3 lower** (official total, no "estimated") and `GET /api/v1/nodes` shows the box's `lost: {"red": 0, "blue": 3}`; `score.delta` is in the feed.
-3. Reboot the box and wait for a STATE: blue stays 3 lower (the box's counters survive the reboot, the controller's merge is by maximum). Restart the controller container: blue stays 3 lower (the node's `lost` is stored).
+3. Reboot the box and wait for a STATE: blue stays 3 lower (the box's counters survive the reboot, the controller's merge is by maximum). Restart the controller container (more than once if you like): blue stays 3 lower and `GET /api/v1/nodes` still shows the box's `lost: {"red": 0, "blue": 3}` before the box says anything (the node's `lost` is stored and restored; a row stored before the key existed shows zeros). Tests: `controller/tests/test_engine.py` (`test_the_nodes_view_*`) and `app/test/controller/controller_store_test.dart`.
 
 ## Results
 

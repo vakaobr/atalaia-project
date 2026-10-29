@@ -198,6 +198,117 @@ void main() {
     expect(fc.projectedScores(), isNull);
   });
 
+  group('projected score follows a capture until the next STATE (BSC-4)', () {
+    // 2 points every 10 s; an event is [node, seq, t in s, team, 0 captured | 1
+    // neutralized].
+    late FieldController pc;
+    late List<Map<String, Object?>> drifts;
+
+    setUp(() {
+      drifts = [];
+      pc = FieldController(
+        transport: radio,
+        gameId: 9,
+        teams: const ['red', 'blue'],
+        decodeEvent: (p) => EmittedEvent(
+          node: p[0],
+          seq: p[1],
+          tMs: p[2] * 1000,
+          team: p[3],
+          squad: 0,
+          prio: 1,
+          type: p[4] == 0 ? 'zone.captured' : 'zone.neutralized',
+          dataJson: '{"previous_team":"red"}',
+        ),
+        wallSeconds: () => 1000,
+      )..registerNode(4, 'node-4', 'zone');
+      pc
+        ..scoringHold = (10000, 2)
+        ..onDrift = drifts.add
+        ..startGame(nowMs: 0);
+    });
+
+    void st(int seq, int owner, Map<int, int> counters, int gameMs) =>
+        pc.onPacket(
+          header(4, seq, RfType.state),
+          state(owner, counters, gameTimeMs: gameMs),
+          epoch: 1,
+        );
+    void captured(int seq, int team, int tSec, {bool neutral = false}) =>
+        pc.onPacket(
+          header(4, 100 + seq, RfType.event),
+          Uint8List.fromList([4, seq, tSec, team, neutral ? 1 : 0]),
+          epoch: 1,
+        );
+
+    test('a capture, then a lost STATE: the new owner scores from it', () {
+      st(0, 1, {1: 4}, 20000);
+      pc.tick(33000);
+      expect(pc.projectedScores(), {'red': 4 + 2, 'blue': 0});
+      captured(1, 2, 33);
+      expect(pc.projectedScores(), {'red': 4 + 2, 'blue': 0});
+      pc.tick(60000);
+      // Red kept the tick of 30 s; from 33 s the ticks are blue's.
+      expect(pc.projectedScores(), {'red': 4 + 2, 'blue': 6});
+      expect(pc.totalScores, {'red': 4, 'blue': 0}); // reports only
+      st(1, 2, {1: 6, 2: 6}, 60000);
+      expect(pc.projectedScores(), {'red': 6, 'blue': 6});
+      expect(pc.nodes[4]!.changes, isEmpty);
+      expect(drifts.last['team'], 'red');
+      expect(drifts.last['drift'], 0);
+    });
+
+    test('a capture, then its STATE: nothing of the event is left', () {
+      st(0, 1, {1: 2}, 10000);
+      pc.tick(24000);
+      captured(1, 2, 22);
+      expect(pc.projectedScores(), {'red': 2 + 2, 'blue': 0});
+      st(1, 2, {1: 4, 2: 0}, 24000);
+      expect(pc.projectedScores(), {'red': 4, 'blue': 0});
+      pc.tick(30000);
+      expect(pc.projectedScores(), {'red': 4, 'blue': 2});
+      captured(2, 2, 22); // reordered: not newer than the STATE
+      expect(pc.nodes[4]!.changes, isEmpty);
+      expect(pc.projectedScores(), {'red': 4, 'blue': 2});
+    });
+
+    test('two captures and a neutralization between STATEs', () {
+      st(0, 1, {}, 0);
+      pc.tick(50000);
+      captured(1, 2, 12);
+      captured(2, 1, 31);
+      captured(3, 0, 41, neutral: true);
+      // red 0-12 s (10 s), blue 12-31 s (20 s, 30 s), red 31-41 s (40 s).
+      expect(pc.projectedScores(), {'red': 4, 'blue': 4});
+    });
+
+    test('a capture during a pause counts after the resume', () {
+      st(0, 1, {}, 0);
+      pc.tick(14000);
+      pc.pauseGame(nowMs: 14000);
+      captured(1, 2, 13);
+      expect(pc.projectedScores(), {'red': 0, 'blue': 0});
+      pc.tick(40000);
+      expect(pc.projectedScores(), {'red': 0, 'blue': 0});
+      pc.resumeGame(nowMs: 40000);
+      pc.tick(56000);
+      expect(pc.gameTimeMs, 30000);
+      expect(pc.projectedScores(), {'red': 2, 'blue': 4});
+    });
+
+    test('events that say nothing new are ignored', () {
+      captured(1, 2, 5); // the box never reported
+      expect(pc.nodes[4]!.changes, isEmpty);
+      st(0, 1, {}, 8000);
+      pc.tick(12000);
+      captured(2, 2, 8); // not after the STATE
+      captured(3, 9, 11); // a team the game does not have
+      expect(pc.nodes[4]!.changes, isEmpty);
+      captured(4, 2, 99); // in the controller's future: counts from now
+      expect(pc.nodes[4]!.changes, [(12000, 2)]);
+    });
+  });
+
   test('scores: the highest value per node, summed, plus adjustments', () {
     fc.onPacket(header(4, 0, RfType.state), state(1, {1: 5}), epoch: 1);
     fc.onPacket(header(4, 1, RfType.state), state(1, {1: 3}), epoch: 1);
