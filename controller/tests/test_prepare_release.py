@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import shutil
 import tempfile
 import unittest
@@ -37,6 +38,11 @@ class Tree(unittest.TestCase):
         files: dict[str, str] = {}
         tool._set_core(self.root, V("0.4.0"), "", files)
         tool._write_all(self.root, files)
+        for name, pattern in ((tool.PUBSPEC, r"^(version:\s*)[^\s+]+"), (tool.DART, r"^(const appVersion = ')[^']+"),
+                              (tool.CONTROLLER, r'^(__version__ = ")[^"]+'), (tool.SERVER, r'^(__version__ = ")[^"]+')):
+            p = self.root / name
+            p.write_text(re.sub(pattern, r"\g<1>0.4.0", p.read_text(encoding="utf-8"), count=1, flags=re.M),
+                         encoding="utf-8", newline="")
         self.set_changelog("## [Unreleased]\n\n### Added\n- A thing.\n\n## [0.4.0] - 2026-10-28\n\nOld.\n\n### Added\n- Old thing.\n")
 
     def set_changelog(self, text: str) -> None:
