@@ -24,6 +24,7 @@ extern int check_count;
 void run_game_timer_tests(void);
 void run_command_dispatch_tests(void);
 void run_preset_store_tests(void);
+void run_legacy_files_tests(void);
 void run_state_persist_tests(void);
 void run_node_runner_tests(void);
 void run_preset_ui_tests(void);

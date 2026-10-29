@@ -20,6 +20,7 @@ int main(void)
     run_game_timer_tests();
     run_command_dispatch_tests();
     run_preset_store_tests();
+    run_legacy_files_tests();
     run_state_persist_tests();
     run_node_runner_tests();
     run_preset_ui_tests();

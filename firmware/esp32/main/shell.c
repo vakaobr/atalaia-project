@@ -38,6 +38,7 @@
 #include "config_store.h"
 #include "fw_update_esp.h"
 #include "mode_fetch_esp.h"
+#include "legacy_files.h"
 #include "mode_store.h"
 #include "game_timer.h"
 #include "hal/hal.h"
@@ -1413,6 +1414,11 @@ void app_main(void)
     /* An image a firmware update just installed confirms itself here, or rolls back. */
     fw_update_esp_boot(hal.radio != NULL, storage_ok);
     preset_store_init(STORAGE_PATH);
+    /* The field logo an older firmware fetched is never read now (LOGO-5): removed once. */
+    if (storage_ok) {
+        int gone = legacy_files_remove(STORAGE_PATH);
+        if (gone > 0) ESP_LOGI(TAG, "removed %d old field-logo file(s) from storage", gone);
+    }
     /* Fetched mode packages (mode_store.h): a commit a power loss cut short is finished or
      * forgotten; their screens come from storage. */
     mode_store_init(STORAGE_PATH);

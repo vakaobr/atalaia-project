@@ -151,6 +151,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/game_timer.c
     ${SHELL_DIR}/command_dispatch.c
     ${SHELL_DIR}/preset_store.c
+    ${SHELL_DIR}/legacy_files.c
     ${SHELL_DIR}/state_persist.c
     ${SHELL_DIR}/node_runner.c
     ${SHELL_DIR}/preset_ui.c
@@ -208,6 +209,7 @@ set(TEST_SOURCES
     test_game_timer.c
     test_command_dispatch.c
     test_preset_store.c
+    test_legacy_files.c
     test_state_persist.c
     test_node_runner.c
     test_preset_ui.c

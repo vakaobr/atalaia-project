@@ -81,6 +81,7 @@ else()
         "game_timer.c"
         "command_dispatch.c"
         "preset_store.c"
+        "legacy_files.c"
         "builtin_presets.c"
         "state_persist.c"
         "node_runner.c"
