@@ -2739,3 +2739,11 @@ The firmware image filled 93 % of a 2 MB slot; the maintainer approved the bigge
 | PART-3 | How does OTA refuse a release that needs a new table? | Descriptor byte 5 holds the layout; the box refuses a newer layout with result `layout` before opening the slot; .release.json records "layout". | Additive, covered by the image hash, no wire change. | built (2026-10-28); open for the maintainer's review |
 | PART-4 | Do the modem and pod get their own table? | No: they share partitions.csv and only log a mismatch. | USB-flashed, no storage. | built (2026-10-28); open for the maintainer's review |
 | PART-5 | How is "USB flash required once" enforced and announced? | release_package.py fails a package whose table differs or whose app does not fit; README, release notes, firmware guide (en, pt), build guides, CHANGELOG say it ("no erase_flash"). | A wrong table cannot be fixed over the air. | built (2026-10-28); open for the maintainer's review |
+
+## Sabotage on the bench: fixed roles for team codes too (SAB-11, 2026-10-29)
+
+The first bench run of Sabotage (board 1, v0.5.0-dev.55, team codes red=1234 and blue=5678) armed the bomb with the defenders' code, as the Bomb allows, which SAB-9's "as the Bomb" had carried over against SAB-1.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| SAB-11 | Which team's code arms and which defuses? | Only the attackers' code arms (standby), only the defenders' defuses (armed); the other team's code shows "Not your team's code" for 3 s. One message for both cases keeps the script inside a Reduced box's heap with the Codes modifier (57,147 of 57,344 bytes). | SAB-1 (fixed roles, the maintainer's choice) must hold whichever input arms. | built (2026-10-29); open for the maintainer's review |

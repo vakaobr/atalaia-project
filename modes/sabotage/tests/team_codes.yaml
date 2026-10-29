@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: With team codes the keypad arms and defuses, and each result scores
+name: With team codes the keypad arms (attackers only) and defuses (defenders only), and each result scores
 params: { fuse_s: 60, pause_s: 5, team_codes: "red=1234,blue=5678" }
 steps:
   - expect_screen: { template: code_entry, data: { title: ARM, digits: 0 } }
@@ -15,9 +15,15 @@ steps:
   - expect_score: { team: blue, points: 1 }
   - wait: 10
   - expect_screen: { template: code_entry, data: { title: ARM, digits: 0 } }
+  # The defenders' code does not arm (fixed roles, SAB-1; found on the bench 2026-10-29).
   - keys: "5678#"
-  - expect: { type: bomb.armed, team: blue, data: { reason: code } }
+  - expect_no: bomb.armed
+  - expect_screen: { template: code_entry, data: { message: "Not your team's code", error: true } }
+  - wait: 4
+  - keys: "1234#"
+  - expect: { type: bomb.armed, team: red, data: { reason: code } }
   - wait: 60
-  - expect: { type: bomb.exploded, team: blue }
-  - expect_score: { team: blue, points: 2 }
+  - expect: { type: bomb.exploded, team: red }
+  - expect_score: { team: red, points: 1 }
+  - expect_score: { team: blue, points: 1 }
   - expect_no: script.error

@@ -281,12 +281,13 @@ on("keypad.key", function(e)
       end
       return prompt("Wrong code", true, 3)
     end
-    if s.phase == "standby" then
+    -- Fixed roles with codes too (SAB-1): only the attackers' code arms, only the defenders' defuses.
+    if s.phase == "standby" and team == params.attackers then
       arm(team, "code")
-    elseif s.phase == "armed" and team ~= s.armed_by then
+    elseif s.phase == "armed" and team == params.defenders then
       defuse(team, "code")
-    elseif s.phase == "armed" then
-      prompt("Your team armed it", true, 3)
+    elseif s.phase == "standby" or s.phase == "armed" then
+      prompt("Not your team's code", true, 3)
     else
       prompt("Next round soon", true, 3)
     end
