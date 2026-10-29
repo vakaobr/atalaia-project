@@ -2534,6 +2534,13 @@ class ConsoleBrowserTests(unittest.TestCase):
         """A press on the plan at (x, y) as fractions of it; with ``to``, dragged there before letting go."""
         page.get_by_test_id("field-area").scroll_into_view_if_needed()
         area = page.get_by_test_id("field-area").bounding_box()
+        # A plan taller than the window (the console grew a panel below it): bring the target point into view.
+        for fy in [y] + ([to[1]] if to is not None else []):
+            top = area["y"] + area["height"] * fy
+            height = page.viewport_size["height"]
+            if not 0 <= top <= height - 1:
+                page.evaluate("(dy) => window.scrollBy(0, dy)", top - height / 2)
+                area = page.get_by_test_id("field-area").bounding_box()
         page.mouse.move(area["x"] + area["width"] * x, area["y"] + area["height"] * y)
         page.mouse.down()
         if to is not None:

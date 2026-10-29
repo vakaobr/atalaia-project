@@ -57,7 +57,7 @@ enum {
     ATALAIA_JOIN_K_FETCH_MODES = 16,  /* optional, true only (phase 5 plan phase 13) */
     ATALAIA_JOIN_K_FORGET_MODES = 17, /* optional, true only (phase 5 plan phase 13) */
     ATALAIA_JOIN_K_REGION = 18,       /* optional, 1 and up only (RFC 0001 Amendment 12) */
-    ATALAIA_JOIN_K_BOX_BEACON = 19,   /* optional, false only (RFC 0001 Amendment 19) */
+    ATALAIA_JOIN_K_BOX_BEACON = 19,   /* optional, false only (RFC 0001 Amendment 20) */
 };
 
 typedef enum {
@@ -99,7 +99,7 @@ typedef struct {
      * region this codec does not know, is refused. The channel must fit in this region. A box
      * whose firmware is built for another region refuses the join (box_game.c). */
     uint8_t region;
-    /* Key 19 (RFC 0001 Amendment 19, protocol/box-beacon.md): true when the field's GM turned
+    /* Key 19 (RFC 0001 Amendment 20, protocol/box-beacon.md): true when the field's GM turned
      * the Field Boxes' iBeacon off for this game. The key is written (CBOR false) only then, so
      * a payload without it keeps its bytes and the default, a box that advertises, costs
      * nothing; a payload that writes true is refused. Zero-initialised joins advertise. */

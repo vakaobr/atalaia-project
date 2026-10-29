@@ -471,7 +471,7 @@ static bool decode_body(const uint8_t *body, size_t len, atalaia_join_t *j)
     for (uint64_t i = 0; i < count && r.ok; i++) {
         uint64_t key, v;
         /* Keys 13 and 14 are optional (RFC 0001 Amendment 4), 15 too (Amendment 10), 16 and 17
-         * too (plan phase 13), 18 too (Amendment 12), 19 too (Amendment 19); 20-31 are reserved for
+         * too (plan phase 13), 18 too (Amendment 12), 19 too (Amendment 20); 20-31 are reserved for
          * optional fields (skipped); 32 and up are invalid. */
         if (!mc_read_uint(&r, &key) || key >= 32) return false;
         if (seen & JBIT(key)) return false; /* duplicate key */
@@ -574,7 +574,7 @@ static bool decode_body(const uint8_t *body, size_t len, atalaia_join_t *j)
             break;
         }
         case ATALAIA_JOIN_K_BOX_BEACON:
-            /* Only CBOR false (Amendment 19): true, null or anything else is a bad body. */
+            /* Only CBOR false (Amendment 20): true, null or anything else is a bad body. */
             if (mc_remaining(&r) < 1 || *r.p != 0xF4) return false;
             r.p++;
             j->box_beacon_off = true;

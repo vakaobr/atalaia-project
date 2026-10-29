@@ -1303,7 +1303,7 @@ class Controller:
                 "lang": self.store.get_setting(f"box_lang:{self.game['id']}"),
                 "fetch_modes": fetch, "forget_modes": forget,
                 "region": self.field_region.code,  # key 18: the box refuses another region's game
-                # Key 19 (RFC 0001 Amendment 19): the GM's setting for the boxes' iBeacon, read when the join
+                # Key 19 (RFC 0001 Amendment 20): the GM's setting for the boxes' iBeacon, read when the join
                 # is made (a game already joined keeps what its boxes were told).
                 "box_beacon": self.store.get_setting(BOX_BEACONS_SETTING) != "off",
             }

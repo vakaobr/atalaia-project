@@ -203,6 +203,8 @@ Example for a Taiwanese field: `python tools/docker_fw.py build --region=as923-t
 | Display chip ST7789 | `CONFIG_ATALAIA_DISP_ST7789=y` and `# CONFIG_ATALAIA_DISP_ILI9341 is not set` |
 | 12 or 16 LEDs in the ring | `CONFIG_ATALAIA_LED_COUNT=12` (or 16) |
 | Board's small screen upside down | `CONFIG_ATALAIA_OLED_FLIP=y` |
+| No iBeacon on the Field Box (it is on by default) | `# CONFIG_ATALAIA_BOX_BEACON is not set` |
+| The beacon's interval, power | `CONFIG_ATALAIA_BOX_BEACON_INTERVAL_MS=500` (100 to 10000), `CONFIG_ATALAIA_BOX_BEACON_TX_DBM=0` |
 
 Never lower `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` or the antenna gain below the real values. That would break the legal power limit.
 
@@ -213,6 +215,7 @@ If you change `--region`, `--lbt`, a key option, or update the repository, the b
 - **The admin PIN** has no default. You choose it on the setup page ([section 5](#5-first-boot-and-setup)). Easy PINs such as 1234 are refused.
 - **The field Wi-Fi** name and password are set on the setup page too.
 - **The field join key** is given to the box when it is adopted ([section 6](#6-adoption)).
+- **The box's Bluetooth beacon.** A Field Box joined to a game advertises an iBeacon so that a phone that hears it is placed where the box is (the beacon's UUID comes from the join key, its major is 45253 and its minor is the box's node id). Nothing to set on the box: the GM turns it off for the whole field at the console (**Field**, **Indoor beacons**, **Field Boxes as beacons**), and the next game's join tells the boxes. It uses the Bluetooth stack in the image (about 160 KB more flash and 25 KB more RAM than a build without it) and is off between games. The Wokwi variant and the modem have no beacon.
 
 ## 5. First boot and setup
 

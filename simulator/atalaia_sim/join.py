@@ -29,7 +29,7 @@ controller (keys 13 and 14 give it the address and the field CA), and forgets th
 packages it fetched before. region (key 18, RFC 0001 Amendment 12, proposed) is the
 field's radio region (regions.py): the key holds the region's number (1: AS923-TW)
 and is left out for EU868 (0 is refused, so a join has one encoding); the channel
-must fit in that region. box_beacon (key 19, RFC 0001 Amendment 19, decision BBC-5) says whether a
+must fit in that region. box_beacon (key 19, RFC 0001 Amendment 20, decision BBC-5) says whether a
 Field Box advertises as an iBeacon in this game (protocol/box-beacon.md): True (the default) is the
 key left out, False is CBOR false (true is refused, so a join has one encoding). Keys 20-31 are skipped.
 

@@ -203,6 +203,8 @@ Exemplo para um campo em Taiwan: `python tools/docker_fw.py build --region=as923
 | Chip de ecrã ST7789 | `CONFIG_ATALAIA_DISP_ST7789=y` e `# CONFIG_ATALAIA_DISP_ILI9341 is not set` |
 | 12 ou 16 LEDs no anel | `CONFIG_ATALAIA_LED_COUNT=12` (ou 16) |
 | Ecrã pequeno da placa de pernas para o ar | `CONFIG_ATALAIA_OLED_FLIP=y` |
+| Sem iBeacon na Field Box (vem ligado por omissão) | `# CONFIG_ATALAIA_BOX_BEACON is not set` |
+| O intervalo e a potência da baliza | `CONFIG_ATALAIA_BOX_BEACON_INTERVAL_MS=500` (100 a 10000), `CONFIG_ATALAIA_BOX_BEACON_TX_DBM=0` |
 
 Nunca baixes o `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` nem o ganho da antena abaixo dos valores reais. Isso quebraria o limite legal de potência.
 
@@ -213,6 +215,7 @@ Se mudares `--region`, `--lbt`, uma opção de chaves, ou atualizares o reposit�
 - **O PIN de administração** não tem valor por omissão. Escolhes tu na página de configuração ([secção 5](#5-primeiro-arranque-e-configuração)). PIN fáceis, como 1234, são recusados.
 - **O nome e a palavra-passe do Wi-Fi do campo** também se definem na página de configuração.
 - **A chave de entrada do campo** é dada à caixa quando ela é adotada ([secção 6](#6-adoção)).
+- **A baliza Bluetooth da caixa.** Uma Field Box ligada a um jogo emite um iBeacon para que um telemóvel que o ouça fique no lugar da caixa (o UUID da baliza vem da chave de entrada, o major é 45253 e o minor é o número do nó da caixa). Nada a definir na caixa: o Mestre de Jogo desliga-a para o campo todo na consola (**Campo**, **Balizas interiores**, **Caixas de campo como balizas**) e a entrada do jogo seguinte avisa as caixas. Usa a pilha Bluetooth da imagem (cerca de 160 KB a mais de flash e 25 KB a mais de RAM do que uma compilação sem ela) e está desligada entre jogos. A variante Wokwi e o modem não têm baliza.
 
 ## 5. Primeiro arranque e configuração
 

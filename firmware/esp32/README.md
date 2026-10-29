@@ -689,7 +689,7 @@ image decoder.
 A box joined to a field game advertises a standard iBeacon over Bluetooth LE, so a phone that hears it
 is placed in the room, on the floor, where the GM put the box on the field view; it sits beside the
 GM's iBeacon tags and a field needs tags only where there is no box. The specification is
-[protocol/box-beacon.md](../../protocol/box-beacon.md) (RFC 0001 Amendment 19).
+[protocol/box-beacon.md](../../protocol/box-beacon.md) (RFC 0001 Amendment 20).
 
 - **What it advertises** (`main/box_beacon.c`, platform-free, run by `test/test_box_beacon.c` against
   `protocol/vectors/box_beacon.json`): the 30-byte iBeacon packet. **UUID**: the field's, the first 16
@@ -722,14 +722,14 @@ GM's iBeacon tags and a field needs tags only where there is no box. The specifi
   `sdkconfig.modem` turn it off, and the I/O pod keeps its own Bluetooth settings (`sdkconfig.pod`).
   The GM's runtime switch is the join's key 19 (console: *Field > Indoor beacons > Field Boxes as
   beacons*).
-- **Size** (Field Box image, ESP-IDF 5.3.2, same commit with and without): the image grew from 1,974,080
-  to 2,135,360 bytes (+161,280, +8.2 %; 3,125,... of the 4 MB OTA slot's 4,194,304 bytes are 51 %
-  used, 49 % free). Static internal RAM (DIRAM: `.text` + `.data` + `.bss`) grew from 270,880 to
-  296,024 bytes (+25,144): 70,880 bytes of it were free before and 45,736 after. The Bluetooth
-  controller's working memory is allocated only while the beacon runs and logged at start
-  (`box-beacon: Bluetooth controller up: internal RAM N bytes free (took M)`);
-  `docs/runbooks/box-beacon-bench.md` reads it on the boards. The modem and Wokwi builds are unchanged
-  in kind (no Bluetooth) and the pod builds as before.
+- **Size** (Field Box image, ESP-IDF 5.3.2, the same commit with and without the beacon): the image grew
+  from 1,974,080 to 2,135,712 bytes (+161,632, +8.2 %; 51 % of the 4 MB OTA slot used, 49 % free). Static
+  internal RAM (DIRAM: `.text` + `.data` + `.bss`) grew from 270,880 to 296,024 bytes (+25,144): 70,880
+  bytes of it were free before and 45,736 after. The Bluetooth controller's working memory is allocated
+  only while the beacon runs and logged at start (`box-beacon: Bluetooth controller up: internal RAM N
+  bytes free (took M)`); `docs/runbooks/box-beacon-bench.md` reads it on the boards. The Wokwi image is
+  0x1d7850 bytes, the modem's 0x8b120 and the pod's 0xa5a90 (the same kind as before: no Bluetooth in
+  the first two, the pod's own stack in the third), all four with no warnings.
 
 ## IDF Component Dependencies
 

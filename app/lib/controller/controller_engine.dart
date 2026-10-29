@@ -1890,7 +1890,7 @@ class ControllerEngine {
       fetchModes: fetch,
       forgetModes: forget,
       region: fieldRegion.code, // key 18: a box refuses another region's game
-      // Key 19 (RFC 0001 Amendment 19): the GM's setting for the boxes' iBeacon.
+      // Key 19 (RFC 0001 Amendment 20): the GM's setting for the boxes' iBeacon.
       boxBeacon: store.getSetting('box_beacons') != 'off',
     );
     var join = joinWith(link: withLink);

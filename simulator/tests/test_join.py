@@ -166,7 +166,7 @@ class ModeFetchTests(unittest.TestCase):
 
 
 class BoxBeaconTests(unittest.TestCase):
-    """Optional key 19 (box_beacon), RFC 0001 Amendment 19: false when the GM turned the boxes' iBeacon
+    """Optional key 19 (box_beacon), RFC 0001 Amendment 20: false when the GM turned the boxes' iBeacon
     off, the key left out for on."""
 
     def test_valid_round_trip(self) -> None:

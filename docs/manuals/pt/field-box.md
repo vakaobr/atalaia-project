@@ -25,6 +25,8 @@ A *Field Box* é o dispositivo de jogo principal da Atalaia. Tem:
 
 Corre as regras do jogo sozinha e fala com o controlador de campo por rádio. Se perder o controlador, continua a jogar e a contar pontos.
 
+**É também uma baliza Bluetooth.** Enquanto uma caixa está num jogo (desde que entra até o jogo acabar) emite um pequeno sinal Bluetooth iBeacon, de meio em meio segundo. O telemóvel de um jogador que o ouça fica na divisão e no piso onde a organização pôs a caixa na planta do campo; por isso, num edifício com vários pisos, o campo só precisa de balizas à parte onde não houver caixa. Não precisas de fazer nada: vem ligado por omissão, a organização pode desligá-lo para o campo na consola, e a caixa usa a mesma antena de 2,4 GHz do Wi-Fi (nada a acrescentar). Não afeta o rádio LoRa e está desligado entre jogos. Os pormenores estão no [guia do Mestre de Jogo](game-master.md#balizas-interiores) e no [guia do firmware](firmware.md#4-as-opções-de-quem-monta).
+
 ![Uma Field Box a jogar Domínio: o ecrã grande e o OLED pequeno mostram uma zona livre, a vermelha toma-a, a azul toma-a por sua vez, e a pontuação final](../../../site/img/modes/domination-pt.gif)
 
 ### Segurança primeiro

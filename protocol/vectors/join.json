@@ -915,7 +915,7 @@
     ]
   },
   "box_beacon": {
-    "description": "Optional key 19 (box_beacon), RFC 0001 Amendment 19 (decision BBC-5, protocol/box-beacon.md): whether the Field Boxes advertise as iBeacons in this game. On (the default) is the key left out, so every older payload keeps its bytes; the GM turning it off writes CBOR false; true, null, a number, text or bytes refuse the payload (body), so a join has one encoding. A reader from before key 19 skips it and (having no beacon) advertises nothing anyway. Valid ones made with the simulator's codec from node_domination_zone's fields (the fields give box_beacon false); invalid ones by hand, tagged with Python's hmac module. The simulator's, the core's (core/src/join.c) and the app's codecs decode and re-encode the valid ones byte for byte and refuse the invalid ones (body).",
+    "description": "Optional key 19 (box_beacon), RFC 0001 Amendment 20 (decision BBC-5, protocol/box-beacon.md): whether the Field Boxes advertise as iBeacons in this game. On (the default) is the key left out, so every older payload keeps its bytes; the GM turning it off writes CBOR false; true, null, a number, text or bytes refuse the payload (body), so a join has one encoding. A reader from before key 19 skips it and (having no beacon) advertises nothing anyway. Valid ones made with the simulator's codec from node_domination_zone's fields (the fields give box_beacon false); invalid ones by hand, tagged with Python's hmac module. The simulator's, the core's (core/src/join.c) and the app's codecs decode and re-encode the valid ones byte for byte and refuse the invalid ones (body).",
     "valid": [
       {
         "name": "beacon_off",

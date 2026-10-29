@@ -302,7 +302,7 @@ static void test_region_vectors(void)
     CHECK(!atalaia_join_region_channel_ok(ATALAIA_REGION_COUNT, 921500000u));
 }
 
-/* Key 19 (RFC 0001 Amendment 19): the Field Boxes' beacon, written only when turned off. */
+/* Key 19 (RFC 0001 Amendment 20): the Field Boxes' beacon, written only when turned off. */
 static void test_box_beacon_vectors(void)
 {
     CHECK(JOIN_BEACON_VECTOR_COUNT >= 2);

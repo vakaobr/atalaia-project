@@ -13,7 +13,6 @@
 
 import 'dart:typed_data';
 
-import 'package:atalaia_app/controller/controller_api.dart';
 import 'package:atalaia_app/controller/controller_checkin.dart';
 import 'package:atalaia_app/controller/controller_engine.dart';
 import 'package:atalaia_app/controller/controller_field.dart';

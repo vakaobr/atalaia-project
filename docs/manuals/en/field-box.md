@@ -25,6 +25,8 @@ The *Field Box* is Atalaia's main game prop. It has:
 
 It runs the game's rules by itself, and it talks to the field controller by radio. If it loses the controller, it keeps playing and keeps score.
 
+**It is also a Bluetooth beacon.** While a box is in a game (from the moment it joins until the game ends) it sends a small Bluetooth iBeacon signal, once every half second. A player's phone that hears it is placed in the room, on the floor, where the organisers put the box on the field plan, so on a building with several floors the field needs separate beacons only where there is no box. It needs nothing from you: it is on by default, the organisers can switch it off for the field at the console, and the box uses the same 2.4 GHz antenna as for Wi-Fi (nothing extra to fit). It does not affect the LoRa radio, and it is off between games. The details are in the [Game Master guide](game-master.md#indoor-beacons) and the [firmware guide](firmware.md#4-the-options-a-builder-sets).
+
 ![A Field Box playing Domination: the big screen and the small OLED show a neutral zone, red takes it, blue takes it over, and the final score](../../../site/img/modes/domination-en.gif)
 
 ### Safety first

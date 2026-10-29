@@ -954,7 +954,7 @@ def gen_join_vectors(jv: dict[str, Any], byte_array: Any) -> list[str]:
 
 
 def gen_join_beacon_vectors(bv: dict[str, Any], byte_array: Any, kinds: dict[str, str]) -> list[str]:
-    """Key 19 (box_beacon) of a join payload (RFC 0001 Amendment 19): written only as false."""
+    """Key 19 (box_beacon) of a join payload (RFC 0001 Amendment 20): written only as false."""
     numbers = {"eu868": 0, "as923-tw": 1}  # atalaia_region_t (core/include/atalaia/duty_cycle.h)
     L = ["/* ---- join payloads with the Field Boxes' beacon turned off (key 19) ---- */", "",
          "typedef struct {", "    const char *name;", "    atalaia_join_t fields;", "    const uint8_t *payload;",

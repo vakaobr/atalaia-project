@@ -121,7 +121,7 @@ final class JoinPayload {
   /// built for another region refuses the join.
   final String region;
 
-  /// Key 19 (RFC 0001 Amendment 19): whether the Field Boxes advertise as
+  /// Key 19 (RFC 0001 Amendment 20): whether the Field Boxes advertise as
   /// iBeacons in this game. The key is written, as CBOR false, only when the
   /// GM turned it off; on is the key left out.
   final bool boxBeacon;
