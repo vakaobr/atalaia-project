@@ -146,8 +146,23 @@ def unit() -> int:
     if build.returncode != 0:
         return build.returncode
     try:
-        return subprocess.run(["docker", "run", "--rm", "--network", "none", image,
-                               "python3", "-m", "unittest", "discover", "-s", "/app/demo", "-v"]).returncode
+        rc = subprocess.run(["docker", "run", "--rm", "--network", "none", image,
+                             "python3", "-m", "unittest", "discover", "-s", "/app/demo", "-v"]).returncode
+    finally:
+        subprocess.run(["docker", "image", "rm", "-f", image], capture_output=True)
+    return rc or browser_tests()
+
+
+def browser_tests() -> int:
+    """Every demo JavaScript file parses and the player's view works in headless Chromium (tools/demo_player_browser.py, DEMO-20)."""
+    image = f"atalaia-demo-browser{SUFFIX}"
+    build = subprocess.run(["docker", "build", "-q", "-t", image, str(REPO / "tools" / "dev" / "demo-browser")],
+                           stdout=subprocess.DEVNULL)
+    if build.returncode != 0:
+        return build.returncode
+    try:
+        return subprocess.run(["docker", "run", "--rm", "--network", "none", "-v", f"{REPO}:/src:ro", image,
+                               "python3", "-B", "/src/tools/demo_player_browser.py", "/src"]).returncode
     finally:
         subprocess.run(["docker", "image", "rm", "-f", image], capture_output=True)
 
