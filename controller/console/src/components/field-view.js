@@ -239,7 +239,8 @@ export class FieldView extends Component {
 
     shownBeacons() {
         const b = this.state.beaconDraft;
-        const list = (this.props.app.state.beacons || []).filter((x) => !(b && b.id === x.id));
+        // The Field Boxes' own beacons are drawn as the boxes themselves (their markers), not as pins.
+        const list = (this.props.app.state.beacons || []).filter((x) => x.kind !== 'box' && !(b && b.id === x.id));
         return b && b.level === this.state.level ? [...list, b] : list;
     }
 
@@ -454,7 +455,7 @@ export class FieldView extends Component {
         <${MapFeatures} app=${app} features=${app.state.mapFeatures || []} level=${state.level} teams=${featureTeams}
             canEdit=${role === 'gm'} draft=${state.draft} scale=${scale} grid=${grid}
             onDraft=${(d) => this.setDraft(d)} onPlace=${(p) => this.placeDraft(p)} />
-        ${role === 'gm' && app.serves('positions') && html`<${BeaconPanel} app=${app} beacons=${app.state.beacons || []}
+        ${role === 'gm' && app.serves('positions') && html`<${BeaconPanel} app=${app} beacons=${app.state.beacons || []} boxStatus=${app.state.boxBeacons}
             levels=${state.levels} level=${state.level} canEdit=${true} draft=${state.beaconDraft}
             onDraft=${(d) => this.setBeaconDraft(d)} onPlace=${(p) => this.placeBeacon(p)} />`}
         ${state.imageUrl && html`<${GeorefPanel} app=${app} georef=${state.georef} level=${state.level}

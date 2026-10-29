@@ -2773,6 +2773,56 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(phone.get_by_test_id("bc-form")).to_be_visible()
         self.no_horizontal_scroll(phone)
 
+    def test_field_boxes_are_beacons_too(self):
+        """Decisions BBC-1 to BBC-12: the boxes of the live game the GM has placed are listed as Field Boxes under
+        the beacons (no pin: the box's own marker is its place), registered by themselves; the GM disables one,
+        gives it a room, turns the field's boxes off; a read-only page has no panel; in pt-PT."""
+        game = self.field.create_game(start=True)
+        self.field.box_hello()
+        self.field.http.put("/api/v1/field/image", headers={"Content-Type": "image/png"}, content=ICON.read_bytes())
+        page = self.console()
+        page.get_by_test_id("tab-field").click()
+        expect(page.get_by_role("heading", name="Caixas de campo como balizas")).to_be_visible()
+        expect(page.get_by_test_id("bc-box-none")).to_be_visible()  # not placed on a plan: no level, no beacon
+        self.field.http.put(f"/api/v1/games/{game['id']}/positions/{BOX}", json={"x": 0.35, "y": 0.3})
+        item = page.get_by_test_id(f"bc-box-{BOX}")
+        expect(item).to_be_visible()  # the stream told this console
+        expect(item).to_contain_text("Caixa de campo")
+        expect(item).to_contain_text(f"45253:{BOX}")
+        expect(page.locator(".bc-pin")).to_have_count(0)  # a box is not a pin
+        expect(page.get_by_test_id("bc-none")).to_be_visible()  # and not one of the building's own beacons
+        boxes = [b for b in self.beacons() if b.get("kind") == "box"]
+        self.assertEqual([(b["node_id"], b["enabled"]) for b in boxes], [(BOX, True)])
+        # A room of the GM's.
+        page.get_by_test_id(f"bc-box-room-{BOX}").click()
+        page.get_by_test_id("bc-box-room-input").fill("Cave")
+        page.get_by_test_id("bc-box-room-save").click()
+        self.assertTrue(wait_for(lambda: [b for b in self.beacons() if b.get("kind") == "box"][0]["room"] == "Cave", 5))
+        expect(item).to_contain_text("Cave")
+        # Disabled, then enabled.
+        page.get_by_test_id(f"bc-box-toggle-{BOX}").click()
+        self.assertTrue(wait_for(lambda: not [b for b in self.beacons() if b.get("kind") == "box"][0]["enabled"], 5))
+        expect(item).to_contain_text("desativada")
+        page.get_by_test_id(f"bc-box-toggle-{BOX}").click()
+        self.assertTrue(wait_for(lambda: [b for b in self.beacons() if b.get("kind") == "box"][0]["enabled"], 5))
+        # The field's switch.
+        switch = page.get_by_test_id("bc-box-switch")
+        expect(switch).to_be_checked()
+        switch.uncheck()
+        self.assertTrue(wait_for(lambda: not self.field.http.get("/api/v1/beacons").json()["box_beacons"]["enabled"], 5))
+        switch.check()
+        self.assertTrue(wait_for(lambda: self.field.http.get("/api/v1/beacons").json()["box_beacons"]["enabled"], 5))
+        # A read-only page has no panel.
+        viewer = self.console(READ)
+        viewer.get_by_test_id("tab-field").click()
+        expect(viewer.get_by_test_id("field-area")).to_be_visible()
+        expect(viewer.get_by_test_id("bc-boxes")).to_have_count(0)
+        self.no_horizontal_scroll(page)
+        phone = self.console(width=390, height=844)
+        phone.get_by_test_id("tab-field").click()
+        expect(phone.get_by_test_id(f"bc-box-{BOX}")).to_be_visible()
+        self.no_horizontal_scroll(phone)
+
     def test_map_features_in_english_without_a_map_position(self):
         """English; a plan without a map position draws a circle at a set size and says so; a feature for the
         organisers only never reaches a read-only page."""
@@ -3881,7 +3931,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v14').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v15').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):

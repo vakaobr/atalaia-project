@@ -423,7 +423,20 @@
     "unplace": "Take it off the plan",
     "bad_uuid": "The UUID is 32 hexadecimal digits, as 8-4-4-4-12.",
     "bad_id": "Major and minor are whole numbers from 0 to 65535.",
-    "need_room": "Give the room a name."
+    "need_room": "Give the room a name.",
+    "boxes_title": "Field Boxes as beacons",
+    "boxes_intro": "A Field Box joined to a game also advertises as an iBeacon, so a phone that hears it is placed in the room, on the floor, where you put the box on the plan above. Nothing to register: place the box and it appears here. You can disable one, or give it a room other than its name.",
+    "boxes_switch": "The Field Boxes advertise as beacons (the boxes are told when the next game is joined)",
+    "boxes_none": "No box is placed on a plan yet. Place a box on the field view above to make it a beacon.",
+    "box_label": "Field Box",
+    "box_disabled": "disabled",
+    "box_disable": "Disable",
+    "box_enable": "Enable",
+    "box_disable_of": "Disable the beacon of {name}",
+    "box_enable_of": "Enable the beacon of {name}",
+    "box_room_edit": "Room",
+    "box_room_label": "Room of {name} (empty: the box's name)",
+    "box_room_save": "Save the room"
   },
   "fieldmap": {
     "open": "Load the field from a map",

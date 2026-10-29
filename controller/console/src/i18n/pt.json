@@ -423,7 +423,20 @@
     "unplace": "Tirar da planta",
     "bad_uuid": "O UUID tem 32 algarismos hexadecimais, no formato 8-4-4-4-12.",
     "bad_id": "Major e minor são números inteiros de 0 a 65535.",
-    "need_room": "Dá um nome à divisão."
+    "need_room": "Dá um nome à divisão.",
+    "boxes_title": "Caixas de campo como balizas",
+    "boxes_intro": "Uma caixa de campo ligada a um jogo também emite como iBeacon, por isso um telemóvel que a ouve fica na divisão e no piso onde puseste a caixa na planta acima. Não há nada a registar: põe a caixa na planta e ela aparece aqui. Podes desativar uma, ou dar-lhe uma divisão diferente do nome.",
+    "boxes_switch": "As caixas de campo emitem como balizas (as caixas sabem-no quando o próximo jogo é ligado)",
+    "boxes_none": "Ainda nenhuma caixa está numa planta. Põe uma caixa na vista do campo acima para a tornar baliza.",
+    "box_label": "Caixa de campo",
+    "box_disabled": "desativada",
+    "box_disable": "Desativar",
+    "box_enable": "Ativar",
+    "box_disable_of": "Desativar a baliza de {name}",
+    "box_enable_of": "Ativar a baliza de {name}",
+    "box_room_edit": "Divisão",
+    "box_room_label": "Divisão de {name} (vazio: o nome da caixa)",
+    "box_room_save": "Guardar a divisão"
   },
   "fieldmap": {
     "open": "Carregar o campo de um mapa",

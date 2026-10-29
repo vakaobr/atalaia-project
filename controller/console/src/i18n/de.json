@@ -423,7 +423,20 @@
     "unplace": "Vom Plan nehmen",
     "bad_uuid": "Die UUID besteht aus 32 Hexadezimalziffern im Format 8-4-4-4-12.",
     "bad_id": "Major und Minor sind ganze Zahlen von 0 bis 65535.",
-    "need_room": "Gib dem Raum einen Namen."
+    "need_room": "Gib dem Raum einen Namen.",
+    "boxes_title": "Feldboxen als Beacons",
+    "boxes_intro": "Eine Feldbox, die einem Spiel beigetreten ist, sendet auch als iBeacon. Ein Telefon, das sie hört, wird so in dem Raum und auf dem Stockwerk verortet, wo du die Box oben auf dem Plan platziert hast. Nichts zu registrieren: Platziere die Box, und sie erscheint hier. Du kannst eine deaktivieren oder ihr einen anderen Raum als ihren Namen geben.",
+    "boxes_switch": "Die Feldboxen senden als Beacons (die Boxen erfahren es, wenn das nächste Spiel beigetreten wird)",
+    "boxes_none": "Noch keine Box ist auf einem Plan platziert. Platziere oben in der Feldansicht eine Box, um sie zum Beacon zu machen.",
+    "box_label": "Feldbox",
+    "box_disabled": "deaktiviert",
+    "box_disable": "Deaktivieren",
+    "box_enable": "Aktivieren",
+    "box_disable_of": "Beacon von {name} deaktivieren",
+    "box_enable_of": "Beacon von {name} aktivieren",
+    "box_room_edit": "Raum",
+    "box_room_label": "Raum von {name} (leer: der Name der Box)",
+    "box_room_save": "Raum speichern"
   },
   "fieldmap": {
     "open": "Feld aus einer Karte laden",

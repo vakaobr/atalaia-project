@@ -55,7 +55,7 @@ class App extends Component {
             nodes: {}, seen: {}, feed: [], alerts: [], modes: [], presets: [],
             positions: {}, scoreHistory: [], clockBase: null, toast: '', now: Date.now(),
             radio: null, chronoCounts: null, branding: null, teamPresets: [],
-            boxes: null, invites: [], invitePicker: false, mapFeatures: [], beacons: [], modeFetch: null, posterPrompt: null,
+            boxes: null, invites: [], invitePicker: false, mapFeatures: [], beacons: [], boxBeacons: null, modeFetch: null, posterPrompt: null,
         };
         this.checkinPanel = null;
         this.stream = null;
@@ -425,7 +425,7 @@ class App extends Component {
     async loadBeacons() {
         if (!this.serves('positions') || this.state.role !== 'gm') return;
         const out = await this.call('GET', '/beacons');
-        if (out) this.setState({ beacons: out.beacons || [] });
+        if (out) this.setState({ beacons: out.beacons || [], boxBeacons: out.box_beacons || null });
     }
 
     async loadPositions(gameId) {

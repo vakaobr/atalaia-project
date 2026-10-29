@@ -42,6 +42,7 @@ import time
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from . import beacons as beaconsmod
+from . import box_beacons as boxbeacons
 from .engine import Conflict, ControllerError
 from .field_levels import LEVELS_MAX
 
@@ -176,7 +177,9 @@ class Positions:
             raise Conflict("positions are kept only while the game runs")
         for i, r in enumerate(checked):
             if r["source"] == "ble":
-                place = beaconsmod.place_of(self.ctrl.store, r["beacon_id"])
+                # A Field Box's own beacon (its place on the field view, box_beacons.py), else a tag of the registry.
+                place = boxbeacons.place_of(self.ctrl, r["beacon_id"]) if r["beacon_id"].startswith(
+                    f"{beaconsmod.BOX_MAJOR}:") else beaconsmod.place_of(self.ctrl.store, r["beacon_id"])
                 if place is None:
                     raise ControllerError(f"beacon_id: {r['beacon_id']} is not a beacon of this field's registry")
                 checked[i] = {**r, **place}

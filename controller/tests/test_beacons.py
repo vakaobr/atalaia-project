@@ -118,7 +118,10 @@ class RegistryApiTests(P3Case):
 
     def test_gm_writes_and_everyone_reads_what_they_may(self) -> None:
         c = self.client
-        self.assertEqual(c.get("/api/v1/beacons", headers=GM).json(), {"beacons": [], "ble_interval_s": 5})
+        empty = c.get("/api/v1/beacons", headers=GM).json()
+        self.assertEqual((empty["beacons"], empty["ble_interval_s"]), ([], 5))
+        self.assertTrue(empty["box_beacons"]["enabled"])  # staff also read the boxes' switch (box_beacons.py)
+        self.assertEqual(c.get("/api/v1/beacons", headers=READ).json(), {"beacons": [], "ble_interval_s": 5})
         made = self.add(beacon(zone="Ground floor", x=0.2, y=0.4))
         self.assertEqual((made["id"], made["room"], made["zone"], made["level"]), ("1:1", "Lobby", "Ground floor", 0))
         self.add(beacon(minor=2, room="Corridor A"))

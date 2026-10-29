@@ -990,6 +990,19 @@ tr.offline td {
     overflow-wrap: anywhere;
 }
 
+.bc-boxes {
+    margin-top: 1rem;
+}
+
+.bc-box-room {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.6rem;
+    align-items: center;
+    flex: 1 1 100%;
+    min-width: 0;
+}
+
 .mf-actions {
     display: flex;
     flex-wrap: wrap;

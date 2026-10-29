@@ -423,7 +423,20 @@
     "unplace": "從平面圖上移除",
     "bad_uuid": "UUID 是 32 個十六進位數字，格式為 8-4-4-4-12。",
     "bad_id": "Major 和 Minor 是 0 到 65535 的整數。",
-    "need_room": "請為房間命名。"
+    "need_room": "請為房間命名。",
+    "boxes_title": "野戰箱作為信標",
+    "boxes_intro": "加入遊戲的野戰箱也會以 iBeacon 廣播，因此聽到它的手機會被定位在你於上方平面圖放置該箱的房間與樓層。無需登記：放置箱子後它就會出現在這裡。你可以停用某個箱子，或為它指定不同於名稱的房間。",
+    "boxes_switch": "野戰箱作為信標廣播（下次加入遊戲時通知各箱）",
+    "boxes_none": "尚無箱子放置在平面圖上。請在上方的場地檢視中放置箱子，使其成為信標。",
+    "box_label": "野戰箱",
+    "box_disabled": "已停用",
+    "box_disable": "停用",
+    "box_enable": "啟用",
+    "box_disable_of": "停用 {name} 的信標",
+    "box_enable_of": "啟用 {name} 的信標",
+    "box_room_edit": "房間",
+    "box_room_label": "{name} 的房間（留空：箱子的名稱）",
+    "box_room_save": "儲存房間"
   },
   "fieldmap": {
     "open": "從地圖載入場地",

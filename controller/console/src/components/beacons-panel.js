@@ -12,6 +12,12 @@
 // On the plan: a pin (a button, focusable, with its room) at each placed beacon of the shown level,
 // under the boxes. The editor under the plan places a beacon by a click on the plan, or by typing a
 // place across and down it, as the map features' editor does.
+//
+// The Field Boxes are beacons too (decisions BBC-1 to BBC-12): the controller lists the boxes of the live
+// game that the GM has placed, each as a beacon of kind "box" with its room (the box's name, or the one the
+// GM gives) and its level and place from the field view. They are not edited as tags (no UUID, major or
+// minor to type, no pin: the box's own marker is its place); the GM can disable one, give it a room, or turn
+// the field's boxes off (PUT /api/v1/box-beacons, .../{node}).
 
 import { html, Component, t, ConfirmButton } from '../ui.js';
 import { levelName, levelsInUse } from './field-levels.js';
@@ -28,7 +34,7 @@ export function beaconName(b) {
 
 /** A pin per placed beacon of the shown level (the GM edits it from the list below the plan). */
 export function beaconPins(beacons, level, onSelect) {
-    return beacons.filter((b) => b.level === level && typeof b.x === 'number').map((b) => {
+    return beacons.filter((b) => b.kind !== 'box' && b.level === level && typeof b.x === 'number').map((b) => {
         const label = t('beacons.pin', { id: b.id, name: beaconName(b) });
         return html`<button type="button" class=${`bc-pin${b.draft ? ' draft' : ''}`}
             data-testid=${`bc-pin-${b.id}`} aria-label=${label} title=${label} onClick=${() => onSelect && onSelect(b)}
@@ -43,7 +49,8 @@ export function beaconPins(beacons, level, onSelect) {
 
 /** A new beacon's form values: the UUID of the last one (a building usually has one), on the shown level. */
 export function newBeaconDraft(level, beacons) {
-    const last = beacons.length ? beacons[beacons.length - 1].uuid : '';
+    const tags = beacons.filter((b) => b.kind !== 'box');
+    const last = tags.length ? tags[tags.length - 1].uuid : '';
     return { id: 'new', draft: true, uuid: last, major: '', minor: '', room: '', zone: '', level, x: null, y: null,
              placing: false };
 }
@@ -52,7 +59,7 @@ export function newBeaconDraft(level, beacons) {
 export class BeaconPanel extends Component {
     constructor() {
         super();
-        this.state = { error: '', across: '', down: '' };
+        this.state = { error: '', across: '', down: '', boxRoom: null };
     }
 
     set(change) {
@@ -113,8 +120,60 @@ export class BeaconPanel extends Component {
         if (out) this.props.app.loadBeacons();
     }
 
+    /** The GM's choice for the field's boxes, or for one of them. */
+    async boxCall(path, body) {
+        const out = await this.props.app.call('PUT', path, body);
+        if (out) this.props.app.loadBeacons();
+        return out;
+    }
+
+    async saveBoxRoom(b) {
+        const text = this.state.boxRoom.text.trim();
+        const out = await this.boxCall(`/box-beacons/${b.node_id}`, { room: text === '' ? null : text });
+        if (out) this.setState({ boxRoom: null });
+    }
+
+    renderBoxes() {
+        const { beacons, levels, canEdit, boxStatus } = this.props;
+        const boxes = beacons.filter((b) => b.kind === 'box');
+        const multi = levelsInUse(levels) > 1;
+        const editing = this.state.boxRoom;
+        return html`<div class="bc-boxes" data-testid="bc-boxes">
+            <h3 id="bc-boxes-h">${t('beacons.boxes_title')}</h3>
+            <p class="muted small">${t('beacons.boxes_intro')}</p>
+            ${canEdit && boxStatus && html`<div class="field"><label><input type="checkbox" data-testid="bc-box-switch"
+                checked=${boxStatus.enabled} onChange=${(e) => this.boxCall('/box-beacons', { enabled: e.target.checked })} />
+                ${' '}${t('beacons.boxes_switch')}</label></div>`}
+            ${boxes.length === 0 && html`<p class="muted small" data-testid="bc-box-none">${t('beacons.boxes_none')}</p>`}
+            ${boxes.length > 0 && html`<ul class="mf-list" data-testid="bc-box-list" aria-labelledby="bc-boxes-h">${boxes.map((b) => html`<li data-testid=${`bc-box-${b.node_id}`}>
+                <span class="mf-what"><strong>${b.room}</strong>
+                    <span class="muted small">${t('beacons.box_label')} · ${b.id}${multi ? ` · ${levelName(levels, b.level)}` : ''}${
+                        b.enabled ? '' : ` · ${t('beacons.box_disabled')}`}</span></span>
+                ${canEdit && html`<span class="mf-actions">
+                    <button type="button" data-testid=${`bc-box-toggle-${b.node_id}`}
+                        aria-label=${t(b.enabled ? 'beacons.box_disable_of' : 'beacons.box_enable_of', { name: b.room })}
+                        onClick=${() => this.boxCall(`/box-beacons/${b.node_id}`, { enabled: !b.enabled })}>${
+                        t(b.enabled ? 'beacons.box_disable' : 'beacons.box_enable')}</button>
+                    <button type="button" data-testid=${`bc-box-room-${b.node_id}`}
+                        onClick=${() => this.setState({ boxRoom: { node: b.node_id, text: b.room_given ? b.room : '' } })}>${
+                        t('beacons.box_room_edit')}</button>
+                </span>`}
+                ${canEdit && editing && editing.node === b.node_id && html`<form class="bc-box-room"
+                    onSubmit=${(e) => { e.preventDefault(); this.saveBoxRoom(b); }}>
+                    <label for=${`bc-box-room-input-${b.node_id}`}>${t('beacons.box_room_label', { name: b.name })}</label>
+                    <input id=${`bc-box-room-input-${b.node_id}`} data-testid="bc-box-room-input" maxlength="48" autocomplete="off"
+                        value=${editing.text} onInput=${(e) => this.setState({ boxRoom: { ...editing, text: e.target.value } })} />
+                    <button type="submit" class="primary" data-testid="bc-box-room-save">${t('beacons.box_room_save')}</button>
+                    <button type="button" data-testid="bc-box-room-cancel" onClick=${() => this.setState({ boxRoom: null })}>${
+                        t('common.cancel')}</button>
+                </form>`}
+            </li>`)}</ul>`}
+        </div>`;
+    }
+
     renderList() {
-        const { beacons, levels, canEdit } = this.props;
+        const { levels, canEdit } = this.props;
+        const beacons = this.props.beacons.filter((b) => b.kind !== 'box');
         if (!beacons.length) return html`<p class="muted small" data-testid="bc-none">${t('beacons.none')}</p>`;
         const multi = levelsInUse(levels) > 1;
         return html`<ul class="mf-list" data-testid="bc-list">${beacons.map((b) => html`<li data-testid=${`bc-item-${b.id}`}>
@@ -208,6 +267,7 @@ export class BeaconPanel extends Component {
                     t('beacons.add')}</button>
             </div>`}
             ${canEdit && draft && this.renderForm()}
+            ${canEdit && this.props.boxStatus && this.renderBoxes()}
         </section>`;
     }
 }

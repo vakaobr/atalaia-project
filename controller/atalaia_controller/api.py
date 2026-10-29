@@ -124,6 +124,9 @@ which browsers cannot give headers, also takes ``?token=``.
     GET|POST /api/v1/beacons               the indoor BLE beacon registry (beacons.py, ADR-P3-6): staff all of it,
                                            others each beacon's id and uuid; POST: GM
     PUT|DELETE /api/v1/beacons/{major:minor} GM: change or delete one
+    PUT  /api/v1/box-beacons               GM: turn the Field Boxes' own iBeacons on or off for the field
+                                           (box_beacons.py; the boxes are listed with the tags by GET beacons)
+    PUT  /api/v1/box-beacons/{node_id}     GM: disable one box's beacon, or give it a room
     WS   /api/v1/prop                      an Android prop's Wi-Fi link (prop_link.py)
     GET  /healthz                          liveness, no token
     GET  /console/                         the GM console (static files, no token)
@@ -161,6 +164,7 @@ from . import field_map as fieldmapmod
 from . import georef as georefmod
 from . import map_features as mapmod
 from . import beacons as beaconsmod
+from . import box_beacons as boxbeacons
 from . import images, player_tags, visibility
 from . import scenario_service as scenarios
 from . import box_logo
@@ -898,11 +902,32 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
 
     @app.get("/api/v1/beacons")
     def beacons_list(v: Viewer = Depends(require_read)) -> JSONResponse:
-        """Staff the whole registry; everyone else each beacon's id and uuid (what a phone listens for)."""
+        """Staff the whole registry; everyone else each beacon's id and uuid (what a phone listens for). The
+        Field Boxes of the live game are in it as beacons of their own (box_beacons.py); staff also get the
+        field's box-beacon setting."""
         live = controller.game
         game = controller.store.game(live["id"]) if live else None
-        return JSONResponse({"beacons": beaconsmod.visible(controller.store, v),
-                             "ble_interval_s": beaconsmod.interval(game)}, headers=NO_STORE)
+        out: dict[str, Any] = {"beacons": boxbeacons.registry(controller, v),
+                               "ble_interval_s": beaconsmod.interval(game)}
+        if visibility.is_staff(v):
+            out["box_beacons"] = boxbeacons.status(controller)
+        return JSONResponse(out, headers=NO_STORE)
+
+    @app.put("/api/v1/box-beacons", dependencies=[Depends(require_gm)])
+    def box_beacons_put(body: Any = Body(None)) -> dict[str, Any]:
+        """The field's setting: whether the boxes advertise (the next join says so to the boxes; the registry
+        stops listing them at once)."""
+        if not isinstance(body, dict) or set(body) != {"enabled"}:
+            raise ControllerError('the body is {"enabled": true|false}')
+        out = boxbeacons.set_enabled(controller, body["enabled"])
+        controller._emit(BEACONS_CHANGED)
+        return out
+
+    @app.put("/api/v1/box-beacons/{node_id}", dependencies=[Depends(require_gm)])
+    def box_beacon_put(node_id: int, body: Any = Body(None)) -> dict[str, Any]:
+        out = boxbeacons.update_box(controller, node_id, body)
+        controller._emit(BEACONS_CHANGED)
+        return out
 
     @app.post("/api/v1/beacons", status_code=201, dependencies=[Depends(require_gm)])
     def beacon_add(body: Any = Body(None)) -> dict[str, Any]:
@@ -963,6 +988,8 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         level = controller.store.set_position(game_id, node_id, xy[0], xy[1], level)
         msg = {"type": "position", "game": game_id, "node_id": node_id, "x": xy[0], "y": xy[1], "level": level}
         controller._emit(msg)
+        if boxbeacons.is_live_box(controller, game_id, node_id):
+            controller._emit(BEACONS_CHANGED)  # a box's beacon is its place: it moves with it (box_beacons.py)
         return msg
 
     # --- field and team branding (branding.py, decisions BR1-BR24) ----------------

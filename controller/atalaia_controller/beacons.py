@@ -33,6 +33,9 @@ from .engine import ControllerError
 
 BEACON_RE = re.compile(r"[0-9]{1,5}:[0-9]{1,5}")
 BEACONS_MAX = 200
+# The major of the Field Boxes' own beacons (box_beacons.py, decisions BBC-1 to BBC-12): a GM's tag may not use it,
+# so a box's id ``major:minor`` (its node id as the minor) never collides with a tag's.
+BOX_MAJOR = 0xB0C5  # 45253
 ROOM_MAX = 48            # characters, as a map feature's label
 ZONE_MAX = 48
 FIELDS = ("uuid", "major", "minor", "room", "zone", "level", "x", "y")
@@ -101,6 +104,9 @@ def check(body: Any, meta: dict[str, Any], path_id: Optional[str] = None) -> dic
                 raise ControllerError(f"{name}: a beacon's major and minor do not change (delete it and add another)")
     else:
         major, minor = _id16(body.get("major"), "major"), _id16(body.get("minor"), "minor")
+    if major == BOX_MAJOR:
+        raise ControllerError(f"major: {BOX_MAJOR} is the Field Boxes' own (they register themselves from their "
+                              "place); give a tag another major")
     level = body.get("level", 0)
     if isinstance(level, bool) or not isinstance(level, int):
         raise ControllerError("level: a level in use, from 0")
