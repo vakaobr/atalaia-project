@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **Bench builds: `@hold <button 1-4> <ms>` on the box's serial console holds a team button** (`firmware/esp32/main/shell.c`, only with `CONFIG_ATALAIA_SERIAL_KEYS`, i.e. `sdkconfig.bench` and the Wokwi build): the projected-score runbook and the penalty check ran on the bench on 2026-10-29 without hands on the board; results in `docs/runbooks/projected-score-bench.md`.
+
 ## [0.5.0] - 2026-10-29
 
 A **pre-alpha, not field-tested** pre-release. **USB flash required once:** the Field Box (and the Satellite), the modem and the I/O pod get a new partition table with 4 MB app slots, which an update over the air cannot change; flash this release over USB once, **without** erasing, and the box keeps its adoption, keys and settings (firmware guide, section 3.3). Also new: the Sabotage game mode, box penalties and a projected score, I/O pod settings over the radio, data retention per field, the published privacy notice with consent asked again, chrono sharing across a hosted hub's fields, a database role per field in hosted mode, and a read-only live demo.

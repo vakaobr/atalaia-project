@@ -7,7 +7,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 Decisions **SL-6** and **BSC-2** ([decisions-to-review.md](../review/decisions-to-review.md); contract in [modes/README.md](../../modes/README.md#projected-score-scoring-optional)). A mode that says how a box scores while it holds (`scoring.hold` in its `mode.yaml`: Domination) gets a **projected** total on the controller between two STATEs: the last reported total plus the scoring ticks a held box has made since. This runbook measures, on two real Heltec V4.3 boards, **how far the projection is from the score each box really reports in its next STATE** (the drift), and whether the console shows it as an estimate.
 
-Status: built and tested in software (core, both controllers, shared contract case); **the bench run is pending**: nobody has run it on a board. **Nothing here is transmitted by the build or the tools**: the run is the maintainer's or the coordinator's, on the bench, with the antennas fitted.
+Status: built and tested in software (core, both controllers, shared contract case); **run on the bench on 2026-10-29** (results at the end): setting A passed; setting B found that a STATE lost right after a capture left the projection on the old owner until the next STATE, fixed by BSC-4 (the projection follows the capture event), after which B passed. **Nothing here is transmitted by the build or the tools**: the run is the maintainer's or the coordinator's, on the bench, with the antennas fitted.
 
 ## What you are checking
 
@@ -50,7 +50,7 @@ Join the box as usual (the invite from the console, or `@join` on its serial con
 ## 2. Run it (setting A: tick 10 s, 5 minutes)
 
 1. Start the game from the console. Note the time.
-2. On the box, hold the **red** button for the capture time (3 s): `zone.captured` goes out at once and a STATE with the new owner follows within a second.
+2. On the box, hold the **red** button for the capture time (3 s; a bench build can do it from its serial console: `@hold 1 4000`, button 1 being the game's first team): `zone.captured` goes out at once and a STATE with the new owner follows within a second.
 3. In a second terminal start the recorder (it only reads the score every second; the token can be the read token):
 
    ```sh
@@ -96,5 +96,8 @@ Fill in (and send to the coordinator) for each setting: the date, the commit, th
 
 | Setting | STATEs | off | largest drift | share off | PASS/FAIL | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| A: tick 10 s | | | | | | |
-| B: tick 2 s | | | | | | |
+| A: tick 10 s | 22 | 2 (+1 each) | 1 tick | 9.1 % | PASS | 2026-10-29, bench build with `@hold`, board 1 (Heltec V4.3), EU868 869.525 MHz, game 55. The estimate disappeared while paused (`projected` absent) and came back; the final result was the last STATE's (blue 4, estimate 5). |
+| B: tick 2 s | 13 | 4 (3 x +1, 1 x +13) | 13 ticks | 30.8 % | FAIL | Game 3468. The +1 share (3 of 13) is an offset of about 0.46 s between the box's game time and the controller's. The +13: the box sent the capture event and a STATE 120 ms later; the event was acknowledged, the STATE never arrived, and the projection kept counting for red until the next STATE 40 s later. Fixed by BSC-4. |
+| B again, after BSC-4 (0bdff583) | 9 | 1 (+1) | 1 tick | 11.1 % | PASS | Same board and channel, the controller whose projection follows a capture event. |
+
+Penalty check (step 5), 2026-10-29, game 2499 (Kill Confirmed, `penalty_points` 3; red's button by `@hold 1 300`, blue's tag by `@tag` with a tag from `POST /api/v1/games/{id}/tags`): blue -3 at once and the node's `lost` was `{"red": 0, "blue": 3}`; after a box reboot (epoch 2) and after a controller restart blue stayed at -3. **PASS.** (Right after the controller restart `GET /api/v1/nodes` showed the node without `lost`; not reproduced in tests, and BSC-5 now always gives the map.)
