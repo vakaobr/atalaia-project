@@ -543,7 +543,9 @@ class PositionsTests(RemoteCase):
         site.next("hello")
         sent = site.next("positions")
         self.assertEqual([p["player_id"] for p in sent["positions"]], ["p-abcdef234567"])
-        self.assertEqual(remote.positions_sent, 1)
+        # The counter is bumped by the stream thread after the frame is on the wire, so the frame can reach the
+        # fake site before it: wait for it rather than read it the instant the message arrives.
+        self.assertTrue(wait_for(lambda: remote.positions_sent == 1, 5), remote.positions_sent)
         self.ctrl.end_game(game["id"])
         self.store.delete_player_positions(game["id"])
         ended = site.next("positions", timeout=15)
