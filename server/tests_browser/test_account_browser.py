@@ -124,7 +124,6 @@ class GoogleAccountTests(AccountCase):
         await expect(page.locator("#link-buttons button")).to_have_count(0)
         rows = await self.fetch("SELECT provider, subject FROM user_identities")
         self.assertEqual([(r["provider"], r["subject"]) for r in rows], [("google", self.subject)])
-        # The same Google account for another account is refused, in words.
         _, other, _ = await self.make_user()
         second = await self.new_page(lang="en-GB")
         await self.provider(second)
@@ -132,13 +131,38 @@ class GoogleAccountTests(AccountCase):
         await second.fill("#confirm-password", PASSWORD)
         await second.locator("#link-buttons button[data-provider=google]").click()
         await second.wait_for_url(f"{self.base}{PAGE}")
-        await expect(second.locator("#status")).to_have_text("That login is already linked to another account.")
+        # The same Google account for another account offers to merge (LG-11), and cancelling changes nothing.
+        await expect(second.locator("#merge")).to_be_visible()
+        await expect(second.locator("#merge-text")).to_contain_text("belongs to another account")
+        await second.click("#merge-cancel")
+        await expect(second.locator("#merge")).to_be_hidden()
+        self.assertEqual((await self.fetch("SELECT count(*) FROM user_identities"))[0][0], 1)
         # Unlink it again.
         await page.fill("#confirm-password", PASSWORD)
         await page.locator("#providers li[data-provider=google] button[data-act=unlink]").click()
         await expect(page.locator("#status")).to_have_text("Login unlinked.")
         await expect(page.locator("#providers-none")).to_be_visible()
         self.assertEqual((await self.fetch("SELECT count(*) FROM user_identities"))[0][0], 0)
+
+    async def test_a_social_account_chooses_and_changes_its_username(self) -> None:
+        page = await self.new_page(lang="en-GB")
+        await self.provider(page)
+        await page.goto(self.base + "/staff/login?next=%2Fstaff%2Faccount")
+        await page.check("#consent")
+        await page.locator("button.provider").click()
+        await page.wait_for_url("**/staff/account?*welcome=1*")
+        await page.fill("#new-username", "Ana Silva")  # not a username: refused in words, nothing changes
+        await page.click("#username-save")
+        await expect(page.locator("#status")).to_contain_text("Invalid username")
+        await page.fill("#new-username", "ana.silva")
+        await page.click("#username-save")
+        await page.wait_for_url(f"{self.base}{PAGE}")  # on to where the login was going
+        self.assertEqual((await self.fetch("SELECT username FROM users"))[0][0], "ana.silva")
+        await expect(page.locator("#username-current")).to_have_text("Current name: ana.silva")
+        await page.fill("#new-username", "ana.costa")  # later, with no welcome step: the same section
+        await page.click("#username-save")
+        await expect(page.locator("#status")).to_have_text("Username saved.")
+        self.assertEqual((await self.fetch("SELECT username FROM users"))[0][0], "ana.costa")
 
     async def test_an_account_with_no_password_confirms_with_the_provider(self) -> None:
         page = await self.new_page(lang="en-GB")
@@ -147,6 +171,8 @@ class GoogleAccountTests(AccountCase):
         await page.goto(self.base + "/staff/login?next=%2Fstaff%2Faccount")
         await page.check("#consent")
         await page.locator("button.provider").click()
+        await page.wait_for_url("**/staff/account?*welcome=1*")  # a new account: the username step first
+        await page.click("#username-skip")
         await page.wait_for_url(f"{self.base}{PAGE}")
         await expect(page.locator("#confirm-recent-box")).to_be_visible()
         await expect(page.locator("#confirm-password-box")).to_be_hidden()

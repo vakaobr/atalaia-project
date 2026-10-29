@@ -22,6 +22,29 @@
 <div id="confirm-providers" class="alt-buttons"></div>
 </div>
 </section>
+<section id="username-section" class="acct" aria-labelledby="username-title">
+<h2 id="username-title">$acct_username_title</h2>
+<p id="username-intro" class="hint">$acct_username_intro</p>
+<p id="username-current"></p>
+<form id="username-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="new-username">$acct_username_label</label>
+<input id="new-username" name="username" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="64">
+<p class="hint">$acct_username_rules</p>
+<button type="submit" id="username-save">$acct_username_save</button>
+<button type="button" id="username-name" class="provider" hidden></button>
+<button type="button" id="username-skip" hidden>$acct_username_skip</button>
+</fieldset>
+</form>
+</section>
+<section id="merge" class="acct" aria-labelledby="merge-title" hidden>
+<h2 id="merge-title">$acct_merge_title</h2>
+<p id="merge-text"></p>
+<p id="merge-note" class="hint"></p>
+<p id="merge-blocked" class="field-error" role="alert" hidden></p>
+<p><button type="button" id="merge-go" class="danger">$acct_merge_go</button>
+<button type="button" id="merge-cancel">$acct_merge_cancel</button></p>
+</section>
 <section id="providers-section" class="acct" aria-labelledby="providers-title">
 <h2 id="providers-title">$acct_providers_title</h2>
 <ul id="providers" class="acct-list"></ul>

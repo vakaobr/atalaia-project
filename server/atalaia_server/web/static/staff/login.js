@@ -60,6 +60,13 @@ let step = null;
 
 function done(body) {
     keep(body);
+    if (body.new_account) {
+        // A social login that made the account: the Account page's "choose your username" step first (LG-10),
+        // then on to where the browser was going.
+        const account = link('/staff/account');
+        location.assign(`${account}${account.includes('?') ? '&' : '?'}welcome=1&next=${encodeURIComponent(next())}`);
+        return;
+    }
     location.assign(next());
 }
 
@@ -166,6 +173,22 @@ async function socialLogin(provider) {
     location.assign(target.href);
 }
 
+let consentFailed = false;
+
+/** The refusal for a missing agreement is shown where the box is, with the box marked and focused. */
+function consentMissing() {
+    const row = $('consent-row');
+    const box = $('consent');
+    const note = $('consent-error');
+    note.textContent = t('oidc_err_consent_required');
+    note.hidden = false;
+    row.classList.add('invalid');
+    box.setAttribute('aria-invalid', 'true');
+    status('');
+    row.scrollIntoView({ block: 'center' });
+    box.focus();
+}
+
 function oidcError(code) {
     const key = `oidc_err_${code}`;
     return has(key) ? t(key) : t('oidc_err_other');
@@ -181,6 +204,10 @@ async function finishSocial() {
         params.delete('oidc');
         const rest = params.toString();
         history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}`);
+    }
+    if (failure === 'consent_required') {
+        consentFailed = true;  // shown at the box once the buttons are on the page (offer)
+        return false;
     }
     if (failure) {
         status(oidcError(failure), 'error');
@@ -212,6 +239,11 @@ async function offer() {
         }));
     }
     $('consent-row').hidden = providers.length === 0;
+    $('consent').addEventListener('change', () => {
+        $('consent-error').hidden = true;
+        $('consent-row').classList.remove('invalid');
+        $('consent').removeAttribute('aria-invalid');
+    });
     const passkey = $('passkey-login');
     passkey.hidden = !passkeysSupported();
     passkey.addEventListener('click', passkeyLogin);
@@ -221,6 +253,11 @@ async function offer() {
         const first = alt.querySelector('button:not([hidden])');
         if (first) first.focus();
     }
+    // The box is on the page now (its section was hidden until here): show the refusal there.
+    if (consentFailed) {
+        if (providers.length > 0) consentMissing();
+        else status(oidcError('consent_required'), 'error');
+    }
 }
 
 forget();
@@ -228,5 +265,5 @@ if (params.get('out')) status(t('logged_out'), 'ok');
 enable(loginForm);
 if (!(await finishSocial())) {
     await offer();
-    if (!loginForm.hidden) $('username').focus();
+    if (!loginForm.hidden && !consentFailed) $('username').focus();
 }

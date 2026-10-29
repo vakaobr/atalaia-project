@@ -1190,7 +1190,7 @@ const Map<String, String> ptStrings = {
       'Este pedido de entrada expirou ou não foi feito por esta app. Tentar de novo.',
   'acct.oidc.denied': 'A entrada foi recusada no fornecedor.',
   'acct.oidc.consent_required':
-      'Para criar uma conta nova, marcar primeiro a autorização acima.',
+      'Para criar uma conta nova, marcar a caixa de autorização que está abaixo dos botões dos fornecedores e escolher o fornecedor de novo.',
   'acct.oidc.too_many_attempts':
       'Demasiadas contas novas a partir deste endereço. Tentar mais tarde.',
   'acct.oidc.quota_exceeded':

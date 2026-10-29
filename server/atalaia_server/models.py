@@ -238,7 +238,7 @@ class OidcLogin(Base):
 
     __tablename__ = "oidc_logins"
     __table_args__ = (Index("idx_oidc_logins_expires", "expires_at"),
-                      CheckConstraint("purpose IN ('login', 'link', 'reauth')", name="purpose"))
+                      CheckConstraint("purpose IN ('login', 'link', 'reauth', 'name')", name="purpose"))
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     state_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)

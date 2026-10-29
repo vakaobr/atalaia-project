@@ -1220,7 +1220,7 @@ const Map<String, String> deStrings = {
       'Diese Anmeldeanfrage ist abgelaufen oder wurde nicht von dieser App gestellt. Versuch es noch einmal.',
   'acct.oidc.denied': 'Die Anmeldung wurde beim Anbieter abgelehnt.',
   'acct.oidc.consent_required':
-      'Um ein neues Konto anzulegen, setze zuerst das Häkchen oben.',
+      'Um ein neues Konto anzulegen, setze das Häkchen im Feld unter den Anbieter-Schaltflächen und wähle den Anbieter dann noch einmal.',
   'acct.oidc.too_many_attempts':
       'Zu viele neue Konten von dieser Adresse. Versuch es später noch einmal.',
   'acct.oidc.quota_exceeded':

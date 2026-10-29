@@ -160,7 +160,7 @@ def _session_body(request: Request, user: User, session: UserSession,
 
 
 async def _start_session(db: AsyncSession, request: Request, user: User, mfa: bool, method: str = "password",
-                         provider: Optional[str] = None) -> JSONResponse:
+                         provider: Optional[str] = None, extra: Optional[dict[str, Any]] = None) -> JSONResponse:
     """A new session and its refresh token. ``method`` (password, passkey, oidc) goes in the audit entry; a
     passkey login counts as both factors (``mfa``), a password login only when the TOTP step passed, a social
     login never (LG-4)."""
@@ -177,7 +177,7 @@ async def _start_session(db: AsyncSession, request: Request, user: User, mfa: bo
            details={"mfa": mfa, "method": method, **({"provider": provider} if provider else {})})
     await db.commit()
     roles = await load_roles(db, user.id)
-    response = JSONResponse(_session_body(request, user, session, roles), headers=NO_STORE)
+    response = JSONResponse({**_session_body(request, user, session, roles), **(extra or {})}, headers=NO_STORE)
     _set_cookie(response, refresh)
     return response
 

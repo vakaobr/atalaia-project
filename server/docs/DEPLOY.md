@@ -189,7 +189,7 @@ provider, with **Google**, **Microsoft** (personal and work or school accounts) 
 from (`ATALAIA_PUBLIC_URL`, so set it) as the WebAuthn origin and its host name as the RP ID; that name must not
 change afterwards, or the passkeys stop working. A provider is **off** until you give all of its settings in `.env`
 (`docker compose up -d` afterwards); the server stores only the provider and the opaque subject it gives, never an
-email or a name, so you ask the providers for nothing but sign-in.
+email or a name, so you ask the providers for nothing but sign-in. (One exception, on request only: the Account page's "Use my Google name" / "Use my Microsoft name" button, which an account made by that provider's login can press once to get a username suggested, runs a round with the extra scope `profile`; the name is read for that one answer and kept nowhere. Google's consent screen must therefore list `profile`, below. Apple has no such button.)
 
 The one address every provider needs is the **redirect URI**: `https://DOMAIN/api/v1/auth/oidc/PROVIDER/callback`, with
 `DOMAIN` your site's name and `PROVIDER` `google`, `microsoft` or `apple`, typed exactly (https, no trailing slash). In
@@ -198,7 +198,7 @@ for every field that should offer the provider (Google and Microsoft take many r
 a wildcard host).
 
 **Google** (Google Cloud console, *APIs and services*, *Credentials*): configure the OAuth consent screen (the app's
-name, your address, the scope `openid` only, no sensitive or restricted scope), then *Create credentials*, *OAuth
+name, your address, the scopes `openid` and **`profile`** (both non-sensitive: no Google verification is needed; `profile` is only used when a person presses "Use my Google name" to get a suggested username, and the name is never stored), no sensitive or restricted scope), then *Create credentials*, *OAuth
 client ID*, *Web application*, with the redirect URI above as an *Authorized redirect URI*. Put the client id and secret in
 `.env`:
 
@@ -217,6 +217,8 @@ ATALAIA_OIDC_MICROSOFT_CLIENT_ID=00000000-0000-0000-0000-000000000000
 ATALAIA_OIDC_MICROSOFT_CLIENT_SECRET=...
 ATALAIA_OIDC_MICROSOFT_TENANT=common
 ```
+
+Microsoft needs nothing more for the "Use my Microsoft name" button: `profile` is one of the default OpenID scopes, which a user consents to at sign-in, so there is no extra permission to add or grant admin consent for.
 
 `ATALAIA_OIDC_MICROSOFT_TENANT` may be `organizations` (work and school only), `consumers` (personal only) or one
 tenant's id (only that organisation), and must then match the registration's account types.

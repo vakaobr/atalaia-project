@@ -544,7 +544,7 @@ class LinkingTests(LoginTestCase):
         other = await self.social("microsoft", "m-1", client=self.other_client())
         _, name2, _ = await self.make_user()
         headers2 = await self.auth(name2)
-        self.assertEqual(await self.link("microsoft", "m-1", headers2), {"oidc_error": "identity_taken"})
+        self.assertEqual(await self.link("microsoft", "m-1", headers2), {"oidc": "merge"})
         self.assertNotEqual(other["user"]["username"], name2)
         # Unlink: the password is asked, the unknown one is a 404.
         r = await self.client.request("DELETE", "/api/v1/me/identities/google", headers=headers, json={"password": "wrong"})

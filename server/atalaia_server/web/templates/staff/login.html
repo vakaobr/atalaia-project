@@ -23,5 +23,8 @@
 <p id="login-or">$login_or</p>
 <div id="oidc-buttons" class="alt-buttons"></div>
 <p><button type="button" id="passkey-login" hidden>$login_passkey</button></p>
-<p id="consent-row" class="consent" hidden><label><input type="checkbox" id="consent"> $login_consent</label></p>
+<div id="consent-row" class="consent" hidden>
+<p id="consent-error" class="field-error" role="alert" hidden></p>
+<p><label><input type="checkbox" id="consent" aria-describedby="consent-error"> $login_consent</label></p>
+</div>
 </section>

@@ -104,7 +104,7 @@ is stated.
 | **Password**: only an Argon2id hash, never the password itself. The password is optional | To log in with a password | as above |
 | **Authenticator app (TOTP)**: whether it is on, and its secret, stored encrypted. Compulsory for marshals, game masters and administrators | A second step at login; protects staff accounts | as above; for staff also (f) the security of the games |
 | **Passkeys** (WebAuthn): a name (yours, or one the server gives), the host name, the dates. The server keeps only the public part; **never** the private key or the passkey's identifier shown to you | To log in without a password | as above |
-| **Google, Microsoft or Apple sign-in**: **only the provider's name and the opaque identifier ("subject") the provider gives for you, and when you linked it**. The server asks for no email, no name, no photo, nothing else. The provider is told which site you are signing in to, as in any social login | To log in without a password | as above |
+| **Google, Microsoft or Apple sign-in**: **only the provider's name and the opaque identifier ("subject") the provider gives for you, and when you linked it**. The server asks for no email, no photo, nothing else when you sign in. **One exception, only when you press "Use my Google name" or "Use my Microsoft name" on your account page**: the provider then also tells the server your name, once, so that a username can be suggested to you. **That name is read only because you asked, is turned into a suggestion you can edit and is not kept**: only the username you confirm is saved. The provider is told which site you are signing in to, as in any social login | To log in without a password | as above |
 | Your **roles** at the field (player, squad leader, VIP, marshal, game master, spectator, administrator) | To let you do what your role allows | as above; for staff roles also (f) |
 | Login sessions: a hash of the refresh token, the address and the browser or app of each login, the times | To keep you logged in and your account safe | (f) security of the service |
 | **Security log**: logins, failed logins, lockouts, changes to the account, roles granted, with the address. Never a password or a code | Security and accountability | (f) |
@@ -311,7 +311,8 @@ this site; see 6.
 - **Sign-in providers: Google, Microsoft, Apple (only if you choose them).**
   Your browser or phone goes to the provider, which has its own privacy
   policy and is a separate controller of what it holds about you. They send
-  the site server one opaque identifier for you. **Atalaia's field
+  the site server one opaque identifier for you (and your name, only if
+  you press the button that suggests a username from it; it is not kept). **Atalaia's field
   controller, boxes and modem never contact them**; only your browser and
   the site server do. Not choosing them costs you nothing: a password or a
   passkey is enough. [LAWYER: the transfer rules for these providers.]
@@ -481,7 +482,9 @@ Part A. Keep it to about this length. Pt-PT in `privacy-notice-pt.md`.
 >
 > **What we keep:** a username, an email if you give one, a login method
 > (a password, a passkey, or a Google, Microsoft or Apple sign-in, where we
-> only keep that provider's identifier for you, never your email or name),
+> only keep that provider's identifier for you, never your email or name;
+> the provider's name is read only if you ask for it, to suggest a
+> username, and is not kept),
 > your roles at the field, your registrations (a display name, team, and a
 > membership number if the game asks) and your game history.
 >

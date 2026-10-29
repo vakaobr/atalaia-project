@@ -74,8 +74,116 @@ async function reload() {
     render(server);
 }
 
+// ---- the username ---------------------------------------------------------------------------------------
+
+const query = new URLSearchParams(location.search);
+const welcome = query.get('welcome') === '1';  // the first visit of an account a social login made (LG-10)
+
+/** Where "Skip" and a saved username go on to: the page the login was for, if it is one of the staff pages. */
+function afterWelcome() {
+    const wanted = query.get('next') || '';
+    const safe = wanted.startsWith('/staff/') && !wanted.includes('//') && !wanted.includes('\\');
+    return safe ? wanted : link('/staff/');
+}
+
+function renderUsername() {
+    $('username-title').textContent = welcome ? t('acct_username_welcome_title') : t('acct_username_title');
+    $('username-intro').textContent = welcome ? t('acct_username_welcome_intro') : t('acct_username_intro');
+    $('username-current').textContent = t('acct_username_current', { name: methods.username });
+    enable($('username-form'));
+    $('username-skip').hidden = !welcome;
+    // "Use my Google name": only for the provider the account signed up with, and only when it is still linked.
+    const button = $('username-name');
+    const provider = methods.name_provider;
+    button.hidden = !provider;
+    if (provider) {
+        button.textContent = t('acct_username_use_name', { provider: provider.label });
+        button.onclick = () => guarded(() => startName(provider.provider));
+    }
+}
+
+async function saveUsername() {
+    if (needsPassword()) return;
+    const username = $('new-username').value.trim();
+    if (!username) return;
+    await api('PATCH', '/api/v1/me', { username, password: currentPassword() });
+    $('confirm-password').value = '';
+    $('new-username').value = '';
+    try {
+        await session(true);  // the header shows the new name
+    } catch (e) {
+        /* the next page asks again */
+    }
+    if (welcome) {
+        location.assign(afterWelcome());
+        return;
+    }
+    await reload();
+    status(t('acct_username_saved'), 'ok');
+}
+
+/** The "use my name" round: the provider's `profile` scope, asked for only now; what comes back is a username to
+ * edit, never stored by the server. */
+async function startName(provider) {
+    const back = `${link(HOME)}${link(HOME).includes('?') ? '&' : '?'}welcome=${welcome ? '1' : '0'}`
+        + `&next=${encodeURIComponent(query.get('next') || '/staff/')}`;
+    status(t('login_social_working'));
+    const answer = await api('POST', `/api/v1/auth/oidc/${encodeURIComponent(provider)}/start`,
+        { purpose: 'name', return_to: back });
+    let target = null;
+    try {
+        target = new URL(answer.authorization_url);
+    } catch (e) {
+        target = null;
+    }
+    if (!target || target.protocol !== 'https:') {
+        status(t('oidc_err_other'), 'error');
+        return;
+    }
+    location.assign(target.href);
+}
+
+// ---- merging an account the same person made with another login ------------------------------------------
+
+let mergeTicket = null;
+
+async function showMerge(ticket) {
+    mergeTicket = ticket;
+    const info = await api('POST', '/api/v1/me/merge/preview', { ticket });
+    $('merge').hidden = false;
+    $('merge-text').textContent = t('acct_merge_text', { name: info.username, provider: info.label });
+    const parts = [t('acct_merge_moves', { logins: info.logins.join(', '), n: info.passkeys })];
+    if (info.other_has_password) {
+        parts.push(info.has_password ? t('acct_merge_pw_dropped') : t('acct_merge_pw_not_carried'));
+    }
+    $('merge-note').textContent = parts.join(' ');
+    const blocked = $('merge-blocked');
+    blocked.hidden = !info.blocked;
+    blocked.textContent = info.blocked ? refusal(new ApiError(409, { detail: info.blocked })) : '';
+    $('merge-go').hidden = Boolean(info.blocked);
+    $('merge').scrollIntoView({ block: 'start' });
+    $(info.blocked ? 'merge-cancel' : 'merge-go').focus();
+}
+
+async function doMerge() {
+    if (needsPassword()) return;
+    const answer = await api('POST', '/api/v1/me/merge', { ticket: mergeTicket, password: currentPassword() });
+    mergeTicket = null;
+    $('merge').hidden = true;
+    $('confirm-password').value = '';
+    await reload();
+    status(answer.password_dropped && !answer.has_password ? t('acct_merged_no_password') : t('acct_merged'), 'ok');
+}
+
+function cancelMerge() {
+    mergeTicket = null;
+    $('merge').hidden = true;
+    status('');
+}
+
 function render(server) {
     $('confirm').hidden = false;
+    renderUsername();
     $('confirm-password-box').hidden = !methods.password.set;
     $('confirm-recent-box').hidden = methods.password.set;
     renderConfirm();
@@ -216,9 +324,12 @@ async function unlink(item) {
     status(t('acct_unlinked'), 'ok');
 }
 
-/** Back from a provider: ?oidc=linked|reauth, or ?oidc_error=<code>; the address is cleaned at once. */
-function finishProvider() {
+/** Back from a provider: ?oidc=linked|reauth|name|merge, or ?oidc_error=<code>; the address is cleaned at once.
+ * The address fragment carries what the server must not keep: the username proposed from the name (`username`) and
+ * the merge ticket (`merge`). */
+async function finishProvider() {
     const params = new URLSearchParams(location.search);
+    const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
     const ok = params.get('oidc');
     const failure = params.get('oidc_error');
     if (!ok && !failure) return;
@@ -228,6 +339,16 @@ function finishProvider() {
     history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}`);
     if (failure) {
         status(has(`oidc_err_${failure}`) ? t(`oidc_err_${failure}`) : t('oidc_err_other'), 'error');
+    } else if (ok === 'name') {
+        $('new-username').value = fragment.get('username') || '';
+        status(t('acct_username_from_name'), 'ok');
+        $('new-username').focus();
+    } else if (ok === 'merge' && fragment.get('merge')) {
+        try {
+            await showMerge(fragment.get('merge'));
+        } catch (err) {
+            fail(err);
+        }
     } else if (ok === 'linked') {
         status(t('acct_linked'), 'ok');
     } else if (ok === 'reauth') {
@@ -400,7 +521,11 @@ async function main() {
         fail(err);
         return;
     }
-    finishProvider();
+    await finishProvider();
+    submit('username-form', saveUsername);
+    $('username-skip').addEventListener('click', () => location.assign(afterWelcome()));
+    $('merge-go').addEventListener('click', () => guarded(doMerge));
+    $('merge-cancel').addEventListener('click', cancelMerge);
     submit('passkey-form', addPasskey);
     submit('password-form', savePassword);
     submit('confirm-totp-form', confirmWithTotp);

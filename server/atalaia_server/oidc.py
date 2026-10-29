@@ -5,7 +5,9 @@
 The authorization code flow with PKCE (RFC 7636, S256), a state and a nonce, no implicit flow and no
 profile: the only scope asked for is ``openid`` (none for Apple, whose scopes are ``name`` and ``email``,
 neither of which the server wants), so the provider tells the server one thing, an opaque subject, which
-is all that is stored (``user_identities``). Email is never asked for and never read.
+is all that is stored (``user_identities``). Email is never asked for and never read. One exception to the scope, and only on request (LG-10): the "use my
+name" round on the Account page, started by the person pressing its button, adds ``profile`` (Google, Microsoft)
+so a username can be proposed from the name; the name is read once, turned into a suggestion and never stored.
 
 The ID token is read from the token endpoint's answer (a server-to-server TLS call with the client secret and
 the PKCE verifier) and still validated in full, as OpenID Connect Core section 3.1.3.7 asks: the signature
@@ -31,8 +33,10 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import secrets
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -52,6 +56,7 @@ MAX_BODY = 1 << 20          # no provider answer is bigger than a megabyte
 MAX_SUBJECT = 255
 MSA_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad"   # the tenant id of Microsoft personal accounts
 APPLE_ISSUER = "https://appleid.apple.com"
+NAME_PROVIDERS = ("google", "microsoft")   # Apple gives a name only once, in a form post the flow does not use (LG-10)
 PROVIDER_LABELS = {"google": "Google", "microsoft": "Microsoft", "apple": "Apple"}
 
 
@@ -155,13 +160,16 @@ class OidcService:
     def providers(self) -> list[str]:
         return [p for p in PROVIDER_LABELS if p in self.clients]
 
-    def authorization_url(self, provider: str, redirect_uri: str, state: str, nonce: str, challenge: str) -> str:
+    def authorization_url(self, provider: str, redirect_uri: str, state: str, nonce: str, challenge: str,
+                          profile: bool = False) -> str:
+        """The provider's address for one attempt. ``profile`` (only the "use my name" round, LG-10, only when the
+        person presses the button, and never for Apple) adds the ``profile`` scope so the ID token carries a name."""
         client = self.clients[provider]
         ep = endpoints(client)
         params = {"client_id": client.client_id, "response_type": "code", "redirect_uri": redirect_uri,
                   "state": state, "nonce": nonce, "code_challenge": challenge, "code_challenge_method": "S256"}
         if ep.scope:
-            params["scope"] = ep.scope
+            params["scope"] = f"{ep.scope} profile" if profile and provider in NAME_PROVIDERS else ep.scope
         if provider in ("google", "microsoft"):
             params["prompt"] = "select_account"
         return f"{ep.authorize}?{urllib.parse.urlencode(params)}"
@@ -213,6 +221,11 @@ class OidcService:
 
     async def validate(self, provider: str, id_token: str, nonce: str) -> str:
         """The subject of a valid ID token, else ``OidcError``."""
+        return (await self.validate_claims(provider, id_token, nonce))["sub"]
+
+    async def validate_claims(self, provider: str, id_token: str, nonce: str) -> dict[str, Any]:
+        """The claims of a valid ID token (checked in full), else ``OidcError``. Only the "use my name" round reads
+        anything but ``sub`` from them, and nothing it reads is stored."""
         client = self.clients[provider]
         try:
             header = jwt.get_unverified_header(id_token)
@@ -238,7 +251,7 @@ class OidcService:
         subject = claims["sub"]
         if not isinstance(subject, str) or not subject or len(subject) > MAX_SUBJECT or subject != subject.strip():
             raise OidcError("id_token_invalid")
-        return subject
+        return claims
 
     @staticmethod
     def _issuer_ok(client: OidcClient, claims: dict[str, Any]) -> bool:
@@ -257,3 +270,24 @@ class OidcService:
         if client.tenant != "common":
             return tid == client.tenant
         return True
+
+
+USERNAME_SHAPE = re.compile(r"[a-z0-9][a-z0-9_.-]{2,63}")
+
+
+def username_from_name(claims: dict[str, Any]) -> Optional[str]:
+    """A username proposed from the provider's name claim (``name``, else ``given_name``): accents dropped,
+    lower-cased, every other run of characters outside the allowed ones one dot, at most 64 characters; ``None`` when
+    nothing of at least three characters is left (a name in a script with no Latin letters). It is only a
+    suggestion the person edits; the name itself is read here and kept nowhere (LG-10)."""
+    for key in ("name", "given_name"):
+        value = claims.get(key)
+        if not isinstance(value, str) or not value or len(value) > 256:
+            continue
+        text = unicodedata.normalize("NFKD", value)
+        text = "".join(c for c in text if not unicodedata.combining(c)).lower()
+        text = re.sub(r"[^a-z0-9_-]+", ".", text)
+        text = re.sub(r"\.{2,}", ".", text).strip("._-")[:64].rstrip("._-")
+        if USERNAME_SHAPE.fullmatch(text):
+            return text
+    return None

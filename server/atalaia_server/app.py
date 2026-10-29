@@ -45,7 +45,7 @@ from fastapi.responses import JSONResponse
 from . import __version__, atak_pki, integrations, personal_data, quotas, tenancy, tenant_watch
 from .api import (app_links, atak, auth, branding, chrono, clubs, devices, export, feedback, fields, firmware, games,
                   hub_share as hub_share_api, health, history, integrations as integrations_api, me, registration_import,
-                  registrations, privacy as privacy_api, remote_gm, scenarios, login_methods, scheduling, sync)
+                  registrations, privacy as privacy_api, remote_gm, scenarios, login_methods, account_merge, scheduling, sync)
 from .atak_relay import AtakRelay
 from .config import Settings, redact_url
 from .db import make_engine, make_sessionmaker
@@ -141,6 +141,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(login_methods.router)  # social login, passkeys, step-up (LG-*)
+    app.include_router(account_merge.router)  # merging two accounts of one person (LG-11)
     app.include_router(app_links.router)  # the app's well-known files and its login return (PKA-1)
     app.include_router(fields.router)
     app.include_router(export.router)  # a field's data export for its administrator (S21-12)

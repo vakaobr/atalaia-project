@@ -106,7 +106,7 @@ de cronógrafo), diz-se.
 | **Palavra-passe**: apenas um hash Argon2id, nunca a palavra-passe. A palavra-passe é opcional | Iniciar sessão com palavra-passe | idem |
 | **App de autenticação (TOTP)**: se está ativa e o segredo, guardado cifrado. Obrigatória para quem é marshal, da organização ou da administração | Um segundo passo no início de sessão; protege as contas da equipa | idem; para a equipa, também f) a segurança dos jogos |
 | **Chaves de acesso** (passkeys, WebAuthn): um nome (teu, ou dado pelo servidor), o nome do anfitrião e as datas. O servidor guarda só a parte pública; **nunca** a chave privada nem o identificador da chave de acesso | Iniciar sessão sem palavra-passe | idem |
-| **Início de sessão com Google, Microsoft ou Apple**: **só o nome do fornecedor e o identificador opaco ("subject") que o fornecedor dá para ti, e quando o ligaste**. O servidor não pede email, nome, fotografia nem mais nada. O fornecedor fica a saber em que site estás a entrar, como em qualquer início de sessão social | Iniciar sessão sem palavra-passe | idem |
+| **Início de sessão com Google, Microsoft ou Apple**: **só o nome do fornecedor e o identificador opaco ("subject") que o fornecedor dá para ti, e quando o ligaste**. O servidor não pede email, fotografia nem mais nada ao iniciares sessão. **Uma exceção, só quando carregas em "Usar o meu nome de Google" ou "Usar o meu nome de Microsoft" na página da tua conta**: o fornecedor diz então também o teu nome ao servidor, uma vez, para te sugerir um nome de utilizador. **Esse nome só é lido porque o pediste, é transformado numa sugestão que podes editar e não fica guardado**: só se guarda o nome de utilizador que confirmares. O fornecedor fica a saber em que site estás a entrar, como em qualquer início de sessão social | Iniciar sessão sem palavra-passe | idem |
 | Os teus **papéis** no campo (participante, líder de squad, VIP, marshal, organização, espectador, administração) | Deixar-te fazer o que o papel permite | idem; para a equipa também f) |
 | Sessões: um hash do token de renovação, o endereço e o navegador ou app de cada início de sessão, as horas | Manter a sessão e a conta seguras | f) segurança do serviço |
 | **Registo de segurança**: inícios de sessão, falhados, bloqueios, alterações à conta, papéis atribuídos, com o endereço. Nunca uma palavra-passe nem um código | Segurança e responsabilização | f) |
@@ -316,7 +316,9 @@ neste site; ver 6.
 - **Fornecedores de início de sessão: Google, Microsoft, Apple (só se os
   escolheres).** O teu navegador ou telemóvel vai ao fornecedor, que tem a
   sua política de privacidade e é responsável pelo tratamento do que guarda
-  sobre ti. Enviam ao servidor um identificador opaco para ti. **O
+  sobre ti. Enviam ao servidor um identificador opaco para ti (e o teu nome,
+  só se carregares no botão que sugere um nome de utilizador a partir dele;
+  não fica guardado). **O
   controlador do campo, as caixas e o modem do Atalaia nunca os contactam**;
   só o teu navegador e o servidor. Não os escolher não te custa nada: uma
   palavra-passe ou uma chave de acesso chega. [ADVOGADO: as regras de
@@ -493,7 +495,9 @@ mais ou menos este tamanho. O inglês está em `privacy-notice-en.md`.
 > **O que guardamos:** um nome de utilizador, um email se o deres, um
 > método de início de sessão (palavra-passe, chave de acesso, ou início de
 > sessão com Google, Microsoft ou Apple, caso em que só guardamos o
-> identificador que esse fornecedor dá para ti, nunca o teu email nem nome),
+> identificador que esse fornecedor dá para ti, nunca o teu email nem nome;
+> o nome do fornecedor só é lido se o pedires, para te sugerir um nome de
+> utilizador, e não fica guardado),
 > os teus papéis no campo, as tuas inscrições (um nome a mostrar, equipa e,
 > se o jogo o pedir, um número de associado) e o teu histórico de jogos.
 >

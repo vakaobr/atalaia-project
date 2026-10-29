@@ -67,11 +67,11 @@ from .. import passkeys, personal_data, quotas, tenancy
 from ..audit import record
 from ..auth import Principal, bearer, current_principal, principal_from_token
 from ..db import get_session
-from ..models import PRIVILEGED_ROLES, ROLE_NAMES, OidcLogin, Passkey, User, UserFieldRole, UserIdentity, UserSession
-from ..oidc import PROVIDER_LABELS, OidcError, new_verifier, pkce_challenge
-from ..tokens import (TokenError, WebauthnChallenge, make_oidc_ticket, make_webauthn_challenge, read_oidc_ticket,
+from ..models import PRIVILEGED_ROLES, ROLE_NAMES, AuditLog, OidcLogin, Passkey, User, UserFieldRole, UserIdentity, UserSession
+from ..oidc import NAME_PROVIDERS, PROVIDER_LABELS, OidcError, new_verifier, pkce_challenge, username_from_name
+from ..tokens import (TokenError, WebauthnChallenge, make_merge_ticket, make_oidc_ticket, make_webauthn_challenge, read_oidc_ticket,
                       read_webauthn_challenge)
-from .auth import (NO_STORE, Strict, _check_code, _check_password, _ip_key, _now, _secret, _start_session, _too_many,
+from .auth import (NO_STORE, Strict, username_problem, _check_code, _check_password, _ip_key, _now, _secret, _start_session, _too_many,
                    _user_for_update, passkey_count)
 
 router = APIRouter(prefix="/api/v1", tags=["login methods"])
@@ -89,7 +89,7 @@ APP_RETURN_TO = re.compile(r"/app/oidc(?:\?[A-Za-z0-9_.=&%-]{0,380})?")
 
 
 class StartIn(Strict):
-    purpose: Literal["login", "link", "reauth"] = "login"
+    purpose: Literal["login", "link", "reauth", "name"] = "login"
     consent: bool = False
     return_to: str = Field(default=DEFAULT_RETURN, max_length=400)
     password: str = Field(default="", max_length=4096)
@@ -205,16 +205,18 @@ def passkey_json(k: Passkey) -> dict[str, Any]:
 
 
 def _back(return_to: str, *, ok: Optional[str] = None, error: Optional[str] = None,
-          ticket: Optional[str] = None) -> RedirectResponse:
+          ticket: Optional[str] = None, fragment: Optional[dict[str, str]] = None) -> RedirectResponse:
     """The redirect to the page that began the login: ``?oidc=linked|reauth`` or ``?oidc_error=<code>`` in the query,
-    a login's ticket in the fragment. The binding cookie is cleared: it is for one attempt."""
+    a login's ticket (or a merge ticket, or the proposed username of the "use my name" round) in the fragment. The binding cookie is cleared: it is for one attempt."""
     parts = urlsplit(safe_return_to(return_to))
     query = [(k, v) for k, v in parse_qsl(parts.query) if k not in ("oidc", "oidc_error")]
     if ok:
         query.append(("oidc", ok))
     if error:
         query.append(("oidc_error", error))
-    url = urlunsplit(("", "", parts.path, urlencode(query), f"oidc={ticket}" if ticket else ""))
+    if ticket:
+        fragment = {"oidc": ticket}
+    url = urlunsplit(("", "", parts.path, urlencode(query), urlencode(fragment) if fragment else ""))
     response = RedirectResponse(url, status_code=303, headers={**NO_STORE, "Referrer-Policy": "no-referrer"})
     response.delete_cookie(BINDING_COOKIE, path=BINDING_PATH, secure=True, httponly=True, samesite="lax")
     return response
@@ -235,11 +237,19 @@ async def methods(request: Request) -> JSONResponse:
 async def my_methods(request: Request, principal: Principal = Depends(current_principal),
                      db: AsyncSession = Depends(get_session)) -> JSONResponse:
     user = principal.user
-    identities = await db.scalars(select(UserIdentity).where(UserIdentity.user_id == user.id)
-                                  .order_by(UserIdentity.created_at))
+    identities_list = list(await db.scalars(select(UserIdentity).where(UserIdentity.user_id == user.id)
+                                            .order_by(UserIdentity.created_at)))
+    identities = identities_list
     keys = await db.scalars(select(Passkey).where(Passkey.user_id == user.id).order_by(Passkey.created_at))
     settings = request.app.state.settings
+    signed_up = await signup_provider(db, user.id)
+    linked = {i.provider for i in identities_list}
+    name_provider = ({"provider": signed_up, "label": PROVIDER_LABELS[signed_up]}
+                     if signed_up in NAME_PROVIDERS and signed_up in linked
+                     and signed_up in request.app.state.oidc.providers() else None)
     return JSONResponse({
+        "username": user.username,
+        "name_provider": name_provider,
         "password": {"set": user.password_hash is not None, "login_enabled": settings.password_login},
         "identities": [{"provider": i.provider, "label": PROVIDER_LABELS.get(i.provider, i.provider),
                         "linked_at": i.created_at.isoformat(),
@@ -273,6 +283,8 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
         if body.purpose == "link":
             user = await _user_for_update(db, principal)
             await _check_password(db, request, user, body.password, "identity_link")
+        if body.purpose == "name":
+            await _check_name_round(db, request, principal, provider, body.return_to)
     now = _now()
     await db.execute(delete(OidcLogin).where(OidcLogin.expires_at < now))  # the ones never finished
     state, binding = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
@@ -284,7 +296,7 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
                      consent=body.consent, expires_at=now + timedelta(seconds=STATE_TTL_S)))
     await db.commit()
     url = request.app.state.oidc.authorization_url(provider, redirect_uri, state, nonce,
-                                                   pkce_challenge(verifier))
+                                                   pkce_challenge(verifier), profile=body.purpose == "name")
     if APP_RETURN_TO.fullmatch(safe_return_to(body.return_to, site_origin(request))):
         # The app calls this itself, so the binding cookie would land in the app, not in the browser that goes
         # to the provider: the app opens this address in the browser, which sets the cookie there (PKA-1).
@@ -296,6 +308,24 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
     response.set_cookie(BINDING_COOKIE, binding, max_age=STATE_TTL_S, path=BINDING_PATH, secure=True, httponly=True,
                         samesite="lax")
     return response
+
+
+async def signup_provider(db: AsyncSession, user_id: uuid.UUID) -> Optional[str]:
+    """The provider whose login made the account, when a social login did (the ``register`` audit entry names it)."""
+    details = await db.scalar(select(AuditLog.details).where(AuditLog.user_id == user_id, AuditLog.action == "register")
+                              .order_by(AuditLog.id).limit(1))
+    if isinstance(details, dict) and details.get("method") == "oidc" and details.get("provider") in PROVIDER_LABELS:
+        return str(details["provider"])
+    return None
+
+
+async def _check_name_round(db: AsyncSession, request: Request, principal: Principal, provider: str,
+                            return_to: str) -> None:
+    """The "use my name" round (LG-10) is offered for the provider the account signed up with, never Apple, and
+    only to the staff pages (the app has no such step)."""
+    if provider not in NAME_PROVIDERS or await signup_provider(db, principal.user.id) != provider \
+            or APP_RETURN_TO.fullmatch(safe_return_to(return_to, site_origin(request))):
+        raise HTTPException(409, "name_not_offered")
 
 
 BROWSER_GONE = """<!doctype html>
@@ -347,7 +377,7 @@ async def oidc_browser(provider: str, request: Request, x: str = "", s: str = ""
         return HTMLResponse(BROWSER_CONFIRM.format(en=what[0], pt=what[1], href=href, provider=html.escape(label)),
                             headers={**NO_STORE, "Referrer-Policy": "no-referrer"})
     url = request.app.state.oidc.authorization_url(provider, row.redirect_uri, s, row.nonce,
-                                                   pkce_challenge(row.code_verifier))
+                                                   pkce_challenge(row.code_verifier), profile=row.purpose == "name")
     response = RedirectResponse(url, status_code=303, headers={**NO_STORE, "Referrer-Policy": "no-referrer"})
     response.set_cookie(BINDING_COOKIE, x, max_age=STATE_TTL_S, path=BINDING_PATH, secure=True, httponly=True,
                         samesite="lax")
@@ -374,11 +404,14 @@ async def oidc_callback(provider: str, request: Request, code: Optional[str] = N
     oidc = request.app.state.oidc
     try:
         token = await oidc.exchange(provider, code, row.redirect_uri, row.code_verifier)
-        subject = await oidc.validate(provider, token, row.nonce)
+        claims = await oidc.validate_claims(provider, token, row.nonce)
+        subject = claims["sub"]
     except OidcError as e:
         record(db, "oidc_failed", request, user_id=row.user_id, details={"provider": provider, "reason": e.code})
         await db.commit()
         return _back(row.return_to, error=e.code)
+    if row.purpose == "name":
+        return await _oidc_name(db, request, row, provider, subject, claims)
     handler = {"login": _oidc_login, "link": _oidc_link, "reauth": _oidc_reauth}[row.purpose]
     return await handler(db, request, row, provider, subject)
 
@@ -421,7 +454,7 @@ async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provid
     record(db, "register", request, user_id=user.id, resource="user", resource_id=user.id,
            details={"method": "oidc", "provider": provider})
     await db.commit()
-    return _back(row.return_to, ticket=make_oidc_ticket(request.app.state.keys, user.id, provider))
+    return _back(row.return_to, ticket=make_oidc_ticket(request.app.state.keys, user.id, provider, new_account=True))
 
 
 async def _oidc_link(db: AsyncSession, request: Request, row: OidcLogin, provider: str,
@@ -431,11 +464,21 @@ async def _oidc_link(db: AsyncSession, request: Request, row: OidcLogin, provide
         return _back(row.return_to, error="state_invalid")
     existing = await db.scalar(select(UserIdentity).where(UserIdentity.provider == provider,
                                                           UserIdentity.subject == subject))
-    if existing is not None:
-        return _back(row.return_to, error="already_linked" if existing.user_id == user.id else "identity_taken")
+    if existing is not None and existing.user_id == user.id:
+        return _back(row.return_to, error="already_linked")
     if await db.scalar(select(UserIdentity.id).where(UserIdentity.user_id == user.id,
                                                      UserIdentity.provider == provider)):
         return _back(row.return_to, error="provider_already_linked")
+    if existing is not None:
+        if APP_RETURN_TO.fullmatch(row.return_to):
+            return _back(row.return_to, error="identity_taken")
+        # The login belongs to another account: this round proved control of it, so the Account page may offer to
+        # merge that account into this one (account_merge.py). Nothing changes until the person confirms there.
+        ticket = make_merge_ticket(request.app.state.keys, user.id, existing.user_id, provider)
+        record(db, "identity_link_taken", request, user_id=user.id, resource="user", resource_id=user.id,
+               details={"provider": provider})
+        await db.commit()
+        return _back(row.return_to, ok="merge", fragment={"merge": ticket})
     db.add(UserIdentity(user_id=user.id, provider=provider, subject=subject))
     try:
         await db.flush()
@@ -463,11 +506,33 @@ async def _oidc_reauth(db: AsyncSession, request: Request, row: OidcLogin, provi
     return _back(row.return_to, ok="reauth")
 
 
+async def _oidc_name(db: AsyncSession, request: Request, row: OidcLogin, provider: str, subject: str,
+                     claims: dict[str, Any]) -> RedirectResponse:
+    """The "use my name" round (LG-10): proves it is the account's own login (as a reauth does) and hands the browser
+    a username proposed from the name claim, in the address fragment. The name is read here and kept nowhere: not in
+    the users row, not in the audit entry, not in the log."""
+    mine = await db.scalar(select(UserIdentity.id).where(UserIdentity.provider == provider,
+                                                         UserIdentity.subject == subject,
+                                                         UserIdentity.user_id == row.user_id))
+    if mine is None or row.session_id is None:
+        return _back(row.return_to, error="identity_mismatch")
+    suggestion = username_from_name(claims)
+    if suggestion is None or username_problem(suggestion):
+        record(db, "oidc_name_read", request, user_id=row.user_id, details={"provider": provider, "usable": False})
+        await db.commit()
+        return _back(row.return_to, error="name_unusable")
+    await db.execute(update(UserSession).where(UserSession.id == row.session_id, UserSession.revoked_at.is_(None))
+                     .values(confirmed_at=_now()))
+    record(db, "oidc_name_read", request, user_id=row.user_id, details={"provider": provider, "usable": True})
+    await db.commit()
+    return _back(row.return_to, ok="name", fragment={"username": suggestion})
+
+
 @router.post("/auth/oidc/complete")
 async def oidc_complete(body: TicketIn, request: Request, db: AsyncSession = Depends(get_session)) -> JSONResponse:
     """A finished social login becomes a session (``mfa`` false: see the module's text)."""
     try:
-        user_id, provider, jti, expires_at = read_oidc_ticket(request.app.state.keys, body.ticket)
+        user_id, provider, jti, expires_at, new_account = read_oidc_ticket(request.app.state.keys, body.ticket)
     except TokenError:
         raise HTTPException(401, "invalid_ticket") from None
     used = request.app.state.used_challenges
@@ -476,7 +541,8 @@ async def oidc_complete(body: TicketIn, request: Request, db: AsyncSession = Dep
     user = await db.get(User, user_id)
     if user is None:
         raise HTTPException(401, "invalid_ticket")
-    return await _start_session(db, request, user, mfa=False, method="oidc", provider=provider)
+    return await _start_session(db, request, user, mfa=False, method="oidc", provider=provider,
+                                extra={"new_account": True, "provider": provider} if new_account else None)
 
 
 @router.delete("/me/identities/{provider}", status_code=204)

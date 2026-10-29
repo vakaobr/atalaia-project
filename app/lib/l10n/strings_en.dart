@@ -1161,7 +1161,7 @@ const Map<String, String> enStrings = {
       'This login request expired or was not made by this app. Try again.',
   'acct.oidc.denied': 'The login was refused at the provider.',
   'acct.oidc.consent_required':
-      'To make a new account, tick the agreement above first.',
+      'To make a new account, tick the agreement box below the provider buttons, then choose the provider again.',
   'acct.oidc.too_many_attempts':
       'Too many new accounts from this address. Try again later.',
   'acct.oidc.quota_exceeded':

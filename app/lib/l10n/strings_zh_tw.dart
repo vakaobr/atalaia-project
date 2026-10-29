@@ -977,7 +977,7 @@ const Map<String, String> zhTwStrings = {
   'acct.passkey_none': '這個帳號沒有密碼金鑰。',
   'acct.oidc.state_invalid': '這個登入請求已過期，或不是由這個 App 發出的，請再試一次。',
   'acct.oidc.denied': '提供者拒絕了這次登入。',
-  'acct.oidc.consent_required': '要建立新帳號，請先勾選上方的同意。',
+  'acct.oidc.consent_required': '要建立新帳號，請先勾選提供者按鈕下面的同意框，然後再選一次提供者。',
   'acct.oidc.too_many_attempts': '這個位址建立的新帳號太多，請稍後再試。',
   'acct.oidc.quota_exceeded': '這個場地的帳號數量已達上限，請聯絡場地的工作人員。',
   'acct.oidc.id_token_invalid': '提供者的回應不被接受，請再試一次。',

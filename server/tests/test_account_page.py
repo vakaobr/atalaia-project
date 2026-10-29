@@ -67,7 +67,8 @@ class AccountPageTests(AppTestCase):
                        "PATCH /api/v1/me/passkeys/x", "DELETE /api/v1/me/passkeys/x", "POST /api/v1/me/password",
                        "DELETE /api/v1/me/password", "POST /api/v1/auth/totp/enrol", "POST /api/v1/auth/totp/confirm",
                        "POST /api/v1/auth/totp/disable", "POST /api/v1/auth/stepup/totp",
-                       "POST /api/v1/auth/stepup/passkey/options", "POST /api/v1/auth/stepup/passkey"):
+                       "POST /api/v1/auth/stepup/passkey/options", "POST /api/v1/auth/stepup/passkey",
+                       "PATCH /api/v1/me", "POST /api/v1/me/merge/preview", "POST /api/v1/me/merge"):
             self.assertIn(wanted, have)
 
     async def test_the_script_sends_what_the_api_reads(self) -> None:
@@ -86,8 +87,12 @@ class AccountPageTests(AppTestCase):
     async def test_every_refusal_has_words_in_every_language(self) -> None:
         """The codes the account's endpoints give (read from their source), each with a text, and the codes the
         provider's return can carry."""
-        source = (SERVER / "atalaia_server" / "api" / "login_methods.py").read_text(encoding="utf-8")
-        codes = set(re.findall(r'HTTPException\(\d{3}, "([a-z_]+)"', source))
+        codes = set()
+        for name in ("login_methods.py", "account_merge.py"):
+            source = (SERVER / "atalaia_server" / "api" / name).read_text(encoding="utf-8")
+            codes |= set(re.findall(r'HTTPException\(\d{3}, "([a-z_]+)"', source))
+        codes |= {"username_invalid", "username_reserved", "username_or_email_taken", "merge_staff_account",
+                  "merge_provider_conflict", "merge_too_many_passkeys"}
         codes |= {"confirmation_required", "invalid_password", "invalid_code", "password_login_disabled",
                   "totp_already_enabled", "totp_not_pending", "totp_not_enabled", "totp_required_by_role",
                   "password_too_short", "password_too_long", "password_is_username", "password_breached"}
@@ -101,7 +106,7 @@ class AccountPageTests(AppTestCase):
                 with self.subTest(lang=lang, code=code):
                     self.assertIn(f"acct_e_{code}", strings)
             for code in ("already_linked", "identity_taken", "provider_already_linked", "identity_mismatch",
-                         "denied", "state_invalid", "other"):
+                         "denied", "state_invalid", "other", "name_unusable", "consent_required"):
                 self.assertIn(f"oidc_err_{code}", strings, (lang, code))
 
     async def test_every_text_of_the_page_is_in_the_four_languages(self) -> None:

@@ -142,20 +142,46 @@ def read_totp_step_token(keys: Keys, token: str) -> tuple[uuid.UUID, str, int]:
 OIDC_TICKET_TTL_S = 60
 
 
-def make_oidc_ticket(keys: Keys, user_id: uuid.UUID, provider: str, now: Optional[float] = None) -> str:
+def make_oidc_ticket(keys: Keys, user_id: uuid.UUID, provider: str, now: Optional[float] = None,
+                     new_account: bool = False) -> str:
     """What a finished social login hands the browser (LG-1): a signed, one-minute, single-use ticket that
     ``POST /api/v1/auth/oidc/complete`` turns into a session. The session itself is made by that same-site
     call, so the refresh cookie is set by a request the site started, not by a redirect from the provider."""
-    token, _ = _encode(keys.oidc_ticket, {"typ": "oidc", "sub": str(user_id), "prov": provider}, OIDC_TICKET_TTL_S,
-                       now)
+    claims: dict[str, Any] = {"typ": "oidc", "sub": str(user_id), "prov": provider}
+    if new_account:
+        claims["new"] = True  # this login made the account: the pages offer the "choose your username" step (LG-10)
+    token, _ = _encode(keys.oidc_ticket, claims, OIDC_TICKET_TTL_S, now)
     return token
 
 
-def read_oidc_ticket(keys: Keys, token: str) -> tuple[uuid.UUID, str, str, int]:
-    """The user, the provider, the ``jti`` and the expiry of a social login ticket."""
+def read_oidc_ticket(keys: Keys, token: str) -> tuple[uuid.UUID, str, str, int, bool]:
+    """The user, the provider, the ``jti``, the expiry and whether it made the account, of a social login ticket."""
     claims = _decode(keys.oidc_ticket, token, "oidc")
     try:
-        return uuid.UUID(claims["sub"]), str(claims["prov"]), claims["jti"], int(claims["exp"])
+        return uuid.UUID(claims["sub"]), str(claims["prov"]), claims["jti"], int(claims["exp"]), claims.get("new") is True
+    except (KeyError, ValueError, TypeError):
+        raise TokenError("malformed claims") from None
+
+
+MERGE_TICKET_TTL_S = 5 * 60
+
+
+def make_merge_ticket(keys: Keys, user_id: uuid.UUID, other_id: uuid.UUID, provider: str,
+                      now: Optional[float] = None) -> str:
+    """What the provider round of an account that links a login belonging to another account hands the browser
+    (LG-11): the proof, for five minutes and one use, that ``user_id`` just completed ``provider``'s login of
+    ``other_id``. It asks for nothing by itself: the merge is a separate, confirmed call by ``user_id``."""
+    token, _ = _encode(keys.oidc_ticket, {"typ": "merge", "sub": str(user_id), "oth": str(other_id), "prov": provider},
+                       MERGE_TICKET_TTL_S, now)
+    return token
+
+
+def read_merge_ticket(keys: Keys, token: str) -> tuple[uuid.UUID, uuid.UUID, str, str, int]:
+    """The account that proved it, the account whose login it was, the provider, the ``jti`` and the expiry."""
+    claims = _decode(keys.oidc_ticket, token, "merge")
+    try:
+        return (uuid.UUID(claims["sub"]), uuid.UUID(claims["oth"]), str(claims["prov"]), claims["jti"],
+                int(claims["exp"]))
     except (KeyError, ValueError, TypeError):
         raise TokenError("malformed claims") from None
 
