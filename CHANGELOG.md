@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- **Preview: the live demo's `demo-init` failed on every update after the first** (`server/docker-compose.preview.yml`): it changes `/secrets`' mode, which once the folder belongs to the demo user (10001) needs the FOWNER capability it did not have. Found on the preview server on 2026-10-29.
 - **Site server: the social login settings never reached the server's container** (`server/docker-compose.yml`): the `ATALAIA_OIDC_*` settings DEPLOY.md tells the operator to put in `.env` were not in the server's environment, so Google, Microsoft and Apple stayed off in every Docker deployment (found on the preview server on 2026-10-29). A test now checks the compose file lists them.
 
 ### Added

@@ -85,7 +85,9 @@ services:
     network_mode: none
     read_only: true
     cap_drop: [ALL]
-    cap_add: [CHOWN]
+    # FOWNER: from the second run on /secrets belongs to 10001, and root needs it to chmod a folder it
+    # does not own (every update after the first failed here).
+    cap_add: [CHOWN, FOWNER]
     security_opt: ["no-new-privileges:true"]
     restart: "no"
     logging: *logging
