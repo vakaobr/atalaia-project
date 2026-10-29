@@ -190,6 +190,18 @@ void main() {
       final st = end.got.lastWhere((m) => m['type'] == 'state');
       expect(st['owner_team'], 1);
       expect(st['counters'], {'1': 7});
+      expect(st['lost'], isEmpty); // none yet: nothing to carry
+      // A box's penalty (BSC-1): the counters stay the gains, STATE's key 9
+      // carries the loss, so the controller's merge by maximum can total it.
+      node
+        ..scoreMap = const {'red': 4, 'blue': 0}
+        ..gainedMap = const {'red': 7, 'blue': 0}
+        ..lostMap = const {'red': 3};
+      await s.advance(1000);
+      await settle();
+      final pen = end.got.lastWhere((m) => m['type'] == 'state');
+      expect(pen['counters'], {'1': 7});
+      expect(pen['lost'], {'1': 3});
       end.push({'type': 'ack', 'seq': 1, 'event_type': 'zone.captured'});
       end.push({
         'type': 'cmd',

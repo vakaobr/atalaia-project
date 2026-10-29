@@ -29,6 +29,9 @@ import '../ui/qr_painter.dart';
 import '../ui/widgets.dart';
 import 'account_screen.dart';
 import 'history_screens.dart';
+import 'hub_share.dart';
+import 'privacy_notice.dart';
+import 'privacy_screens.dart';
 import 'site_api.dart';
 import 'site_auth.dart';
 import 'site_client.dart';
@@ -86,6 +89,15 @@ class _SiteScreenState extends State<SiteScreen> {
   bool _passkeys = false;
   bool _consent = false;
   PendingReturn? _waiting;
+
+  /// The privacy notice's version the person was shown at the login (sent
+  /// with the consent of a social sign-up); null: none published or unread.
+  String? _noticeVersion;
+
+  /// Where the signed-in account's consent stands (null: not known), and
+  /// whether this site is a hosted hub (the chrono link screen is only then).
+  ConsentState? _consentState;
+  bool _hosted = false;
 
   @override
   void initState() {
@@ -157,6 +169,7 @@ class _SiteScreenState extends State<SiteScreen> {
         _mine = mine;
         _step = _Step.field;
       });
+      unawaited(_loadAccountExtras(session));
       final want = _link!.gameId;
       if (want != null && !_openedGame) {
         _openedGame = true;
@@ -172,6 +185,65 @@ class _SiteScreenState extends State<SiteScreen> {
     }
   }
 
+  /// What the signed-in account has beside the games: where its consent to
+  /// the privacy notice stands (asked again when it is not for the current
+  /// version) and whether this is a hosted hub (the chrono link). Neither
+  /// holds the field screen back: an older server or a refusal shows nothing.
+  Future<void> _loadAccountExtras(SiteSession session) async {
+    ConsentState? consent;
+    var hosted = false;
+    try {
+      consent = await PrivacyApi(session).consent();
+    } on SiteException {
+      // not known: no prompt
+    }
+    try {
+      hosted = await HubShareApi(session).state() != null;
+    } on SiteException {
+      // not known: no screen
+    }
+    if (mounted) {
+      setState(() {
+        _consentState = consent;
+        _hosted = hosted;
+      });
+    }
+  }
+
+  void _openPrivacy({bool asks = false}) {
+    final session = _session!;
+    final c = _consentState;
+    unawaited(
+      Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => PrivacyNoticeScreen(
+            session: session,
+            consent: asks && c != null && c.needed ? c : null,
+            onAgreed: (state) {
+              if (mounted) setState(() => _consentState = state);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The notice's reading from the login: what version the person was shown.
+  void _openLoginPrivacy() {
+    unawaited(
+      Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => PrivacyNoticeScreen(
+            session: _session!,
+            onShown: (v) => _noticeVersion = v,
+          ),
+        ),
+      ),
+    );
+  }
+
   /// What the site offers to log in with; the password alone when it does
   /// not say (an older server, or out of reach).
   Future<void> _loadMethods() async {
@@ -183,10 +255,20 @@ class _SiteScreenState extends State<SiteScreen> {
       // the password form stays
     }
     final passkeys = methods.passkeys && await auth.passkeysAvailable();
+    // A social sign-up consents to the notice: which version is on offer now.
+    String? version;
+    if (methods.oidc.isNotEmpty && mounted) {
+      try {
+        version = (await PrivacyApi(_session!).notice(context.s.code))?.version;
+      } on SiteException {
+        // none published, or out of reach: no version is sent
+      }
+    }
     if (mounted) {
       setState(() {
         _methods = methods;
         _passkeys = passkeys;
+        _noticeVersion = version ?? _noticeVersion;
       });
     }
   }
@@ -218,6 +300,7 @@ class _SiteScreenState extends State<SiteScreen> {
     (auth) => auth.oidc(
       provider,
       consent: _consent,
+      noticeVersion: _noticeVersion,
       onOpened: (w) {
         if (!mounted) return;
         setState(() {
@@ -322,6 +405,9 @@ class _SiteScreenState extends State<SiteScreen> {
             ),
           Expanded(
             child: ListView(
+              // Each step starts at its top (the login's scroll is not the
+              // field's).
+              key: ValueKey(_step),
               padding: const EdgeInsets.all(16),
               children: [
                 ...switch (_step) {
@@ -466,6 +552,16 @@ class _SiteScreenState extends State<SiteScreen> {
           ),
         ),
       if (_methods.oidc.isNotEmpty)
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton.icon(
+            key: const Key('site-login-privacy'),
+            icon: const Icon(Icons.privacy_tip_outlined),
+            label: Text(s.t('privacy.read')),
+            onPressed: _openLoginPrivacy,
+          ),
+        ),
+      if (_methods.oidc.isNotEmpty)
         CheckboxListTile(
           key: const Key('site-login-consent'),
           contentPadding: EdgeInsets.zero,
@@ -512,6 +608,14 @@ class _SiteScreenState extends State<SiteScreen> {
         key: const Key('site-logged-in'),
         style: TextStyle(color: Theme.of(context).hintColor),
       ),
+      if (_consentState != null && _consentState!.needed)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: ConsentBanner(
+            state: _consentState!,
+            onOpen: () => _openPrivacy(asks: true),
+          ),
+        ),
       SectionTitle(s.t('site.games')),
       if (fg.games.isEmpty)
         Notice(s.t('site.no_games'), key: const Key('site-no-games')),
@@ -551,6 +655,27 @@ class _SiteScreenState extends State<SiteScreen> {
           ),
         ),
       ),
+      const SizedBox(height: 8),
+      OutlinedButton.icon(
+        key: const Key('site-privacy'),
+        icon: const Icon(Icons.privacy_tip_outlined),
+        label: Text(s.t('privacy.read')),
+        onPressed: _openPrivacy,
+      ),
+      if (_hosted) ...[
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          key: const Key('site-hub-share'),
+          icon: const Icon(Icons.share_outlined),
+          label: Text(s.t('hub.open')),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => HubShareScreen(session: _session!),
+            ),
+          ),
+        ),
+      ],
       const SizedBox(height: 8),
       OutlinedButton.icon(
         key: const Key('site-history'),

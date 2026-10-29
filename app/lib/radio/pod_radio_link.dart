@@ -420,19 +420,13 @@ class PodRadioLink extends ChangeNotifier implements ControllerLink {
   void _sendState() {
     final f = _state;
     if (f == null || !linked) return;
-    final counters = <int, int>{};
-    final c = f['counters'];
-    if (c is Map) {
-      c.forEach((k, v) {
-        final team = int.tryParse('$k');
-        if (team != null && v is int) counters[team] = v;
-      });
-    }
+    final counters = teamPointsOf(f['counters']);
     final st = RfState(
       ownerTeam: (f['owner_team'] as int?) ?? 0,
       phase: (f['phase'] as int?) ?? 0,
       gameTimeMs: (f['game_time_ms'] as int?) ?? 0,
       counters: counters,
+      lost: teamPointsOf(f['lost']),
       batteryPct: f['battery_pct'] as int?,
       flags: f['flags'] as int?,
       epoch: epoch,

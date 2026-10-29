@@ -1485,4 +1485,74 @@ const Map<String, String> ptStrings = {
   'player.buzz_text': 'A vibrar nos eventos do jogo com a aplicação fechada',
   'player.saved': 'Campos guardados',
   'player.saved_forget': 'Esquecer este campo',
+  // O aviso de privacidade do servidor do campo e o consentimento de novo
+  // (CONS-*), a versão do aviso na criação de conta com login social, e a
+  // ligação da cronografagem entre os campos de um hub alojado (SVX-2).
+  'privacy.title': 'Aviso de privacidade',
+  'privacy.read': 'Ler o aviso de privacidade',
+  'privacy.version': 'Versão {version}',
+  'privacy.lang_fallback':
+      'Este aviso não existe em {requested}: mostra-se em {shown}.',
+  'privacy.none':
+      'O servidor ainda não publicou o texto do aviso de privacidade. Pergunta à organização do campo.',
+  'privacy.intro_outdated':
+      'O aviso de privacidade mudou desde o último consentimento desta conta (versão {old}, agora {version}). Lê o aviso e confirma de novo.',
+  'privacy.intro_missing':
+      'Esta conta não tem consentimento registado para o aviso de privacidade (versão {version}). Lê o aviso e confirma.',
+  'privacy.read_and_confirm': 'Ler e confirmar',
+  'privacy.accept': 'Li o aviso de privacidade e estou de acordo.',
+  'privacy.confirm': 'Confirmar',
+  'privacy.tick_first': 'Marca primeiro que leste o aviso e estás de acordo.',
+  'privacy.done': 'Consentimento registado.',
+  'privacy.changed':
+      'O aviso mudou entretanto. Lê a nova versão e confirma de novo.',
+  'site.err.notice_version_changed':
+      'O aviso de privacidade mudou entretanto. Abre-o, lê a nova versão e tenta de novo.',
+  'acct.oidc.notice_version_changed':
+      'O aviso de privacidade mudou entretanto. Abre-o, lê a nova versão e tenta de novo.',
+  'hub.title': 'Cronografagem entre campos',
+  'hub.open': 'Partilha da cronografagem entre campos',
+  'hub.intro':
+      'Se jogas em vários campos deste servidor, podes ligar as tuas contas para que cada campo veja as cronografagens que passaste noutro (só de leitura). Cada campo continua a precisar do teu consentimento.',
+  'hub.not_hosted': 'Este servidor tem um só campo: não há nada para ligar.',
+  'hub.linked': 'Conta ligada desde {when}.',
+  'hub.unlinked':
+      'Esta conta ainda não está ligada às tuas contas de outros campos.',
+  'hub.sharing_on':
+      'A partilhar: os outros campos veem as tuas cronografagens.',
+  'hub.sharing_off':
+      'Ainda não está a partilhar: falta o teu consentimento neste campo, ou o campo tem a partilha desligada.',
+  'hub.consent_hint':
+      'A partilha precisa do teu consentimento em cada campo e do interruptor do próprio campo.',
+  'hub.make_title': 'Gerar um código',
+  'hub.make_text': 'Gera um código e escreve-o na tua conta do outro campo.',
+  'hub.make': 'Gerar código',
+  'hub.code_note':
+      'Vale {minutes} minutos e só pode ser usado uma vez. Não volta a ser mostrado.',
+  'hub.copy': 'Copiar',
+  'hub.enter_title': 'Escrever o código de outro campo',
+  'hub.enter_text':
+      'Gera um código na tua conta do outro campo e escreve-o aqui.',
+  'hub.enter_label': 'Código do outro campo',
+  'hub.link': 'Ligar',
+  'hub.code_needed': 'Escreve o código.',
+  'hub.linked_ok': 'Contas ligadas.',
+  'hub.unlink_title': 'Desligar',
+  'hub.unlink_text':
+      'Desligar tira as cronografagens deste campo da vista dos outros campos.',
+  'hub.unlink': 'Desligar',
+  'hub.unlink_confirm': 'Desligar as contas?',
+  'hub.unlink_body':
+      'Os outros campos deixam de ver as cronografagens deste campo.',
+  'hub.unlink_yes': 'Desligar',
+  'hub.unlinked_ok': 'Contas desligadas.',
+  'hub.e.invalid_code': 'O código não é válido, já expirou ou já foi usado.',
+  'hub.e.already_linked':
+      'Esta conta já está ligada a outra pessoa. Desliga-a primeiro.',
+  'hub.e.person_already_linked_here':
+      'Essa pessoa já tem uma conta ligada neste campo.',
+  'hub.e.not_linked': 'Esta conta não está ligada.',
+  'hub.e.too_many_requests': 'Demasiadas tentativas: espera um pouco.',
+  'hub.e.field_not_found': 'O servidor não encontrou o campo.',
+  'hub.e.not_hosted': 'Este servidor tem um só campo.',
 };

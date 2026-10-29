@@ -118,7 +118,9 @@ final class NodeSnapshot {
     required this.memUsed,
     required this.lastError,
     required this.scores,
-  });
+    Map<String, int>? gained,
+    this.lost = const {},
+  }) : gained = gained ?? scores;
 
   final NodeStatus status;
   final bool paused;
@@ -132,6 +134,14 @@ final class NodeSnapshot {
 
   /// Net points per team name on this node.
   final Map<String, int> scores;
+
+  /// Points gained per team name (never decreases: what STATE's counters
+  /// carry); [scores] when the runner does not tell (no penalties then).
+  final Map<String, int> gained;
+
+  /// Points lost to penalties per team name (STATE key 9, RFC 0001
+  /// Amendment 18); a team with none is absent.
+  final Map<String, int> lost;
 
   @override
   String toString() =>

@@ -11,6 +11,9 @@ library;
 import 'package:atalaia_app/checkin/my_replicas.dart';
 import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/site/account_screen.dart';
+import 'package:atalaia_app/site/hub_share.dart';
+import 'package:atalaia_app/site/privacy_notice.dart';
+import 'package:atalaia_app/site/privacy_screens.dart';
 import 'package:atalaia_app/site/site_api.dart';
 import 'package:atalaia_app/site/site_link.dart';
 import 'package:atalaia_app/site/site_screens.dart';
@@ -106,6 +109,57 @@ void main() {
       );
       await tester.pumpAndSettle();
       await snap(tester, 'account', lang);
+    });
+
+    testWidgets('the field asks for the consent again (${lang.code})', (
+      tester,
+    ) async {
+      final site = FakeSite()
+        ..consentStatus = 'outdated'
+        ..consentVersion = '2026-05';
+      final h = await start(tester, site);
+      await tester.pumpWidget(h.app(home: SiteScreen(link: link)));
+      await tester.pumpAndSettle();
+      await snap(tester, 'consent_banner', lang);
+    });
+
+    testWidgets('the privacy notice and its consent (${lang.code})', (
+      tester,
+    ) async {
+      final site = FakeSite()..consentStatus = 'outdated';
+      final h = await start(tester, site);
+      final session = h.services.sites.of(link.site);
+      await tester.pumpWidget(
+        h.app(
+          home: PrivacyNoticeScreen(
+            session: session,
+            consent: ConsentState({
+              'status': 'outdated',
+              'version': '2026-05',
+              'current_version': '2026-11',
+              'notice_published': true,
+            }),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await snap(tester, 'privacy', lang);
+    });
+
+    testWidgets('the chrono link between fields (${lang.code})', (
+      tester,
+    ) async {
+      final site = FakeSite()
+        ..hosted = true
+        ..hubLinked = true
+        ..hubSharing = true;
+      final h = await start(tester, site);
+      final session = h.services.sites.of(link.site);
+      await tester.pumpWidget(h.app(home: HubShareScreen(session: session)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('hub-make')));
+      await tester.pumpAndSettle();
+      await snap(tester, 'hub_share', lang);
     });
 
     testWidgets('registering (${lang.code})', (tester) async {

@@ -1446,4 +1446,75 @@ const Map<String, String> enStrings = {
   'player.buzz_text': 'Vibrating on game events while the app is closed',
   'player.saved': 'Fields remembered',
   'player.saved_forget': 'Forget this field',
+  // The site server's privacy notice and consent again (CONS-*), the notice
+  // version of a social sign-up, and the chrono link between a hosted hub's
+  // fields (SVX-2).
+  'privacy.title': 'Privacy notice',
+  'privacy.read': 'Read the privacy notice',
+  'privacy.version': 'Version {version}',
+  'privacy.lang_fallback':
+      'This notice has no {requested} text: shown in {shown}.',
+  'privacy.none':
+      'The server has not published the privacy notice\'s text yet. Ask the field\'s organisers.',
+  'privacy.intro_outdated':
+      'The privacy notice has changed since this account last consented (version {old}, now {version}). Read the notice and confirm again.',
+  'privacy.intro_missing':
+      'This account has no consent recorded for the privacy notice (version {version}). Read the notice and confirm.',
+  'privacy.read_and_confirm': 'Read and confirm',
+  'privacy.accept': 'I have read the privacy notice and I agree.',
+  'privacy.confirm': 'Confirm',
+  'privacy.tick_first': 'Tick first that you have read the notice and agree.',
+  'privacy.done': 'Consent recorded.',
+  'privacy.changed':
+      'The notice has changed in the meantime. Read the new version and confirm again.',
+  'site.err.notice_version_changed':
+      'The privacy notice has changed in the meantime. Open it, read the new version and try again.',
+  'acct.oidc.notice_version_changed':
+      'The privacy notice has changed in the meantime. Open it, read the new version and try again.',
+  'hub.title': 'Chrono sharing',
+  'hub.open': 'Chrono sharing between fields',
+  'hub.intro':
+      'If you play at several fields of this server, you can link your accounts so that each field sees the chrono checks you passed at another (read only). Every field still needs your consent.',
+  'hub.not_hosted': 'This server has a single field: there is nothing to link.',
+  'hub.linked': 'Account linked since {when}.',
+  'hub.unlinked':
+      'This account is not linked to your accounts at other fields yet.',
+  'hub.sharing_on': 'Sharing: the other fields see your chrono checks.',
+  'hub.sharing_off':
+      'Not sharing yet: your consent at this field is missing, or the field has sharing off.',
+  'hub.consent_hint':
+      'Sharing needs your consent at each field and the field\'s own switch.',
+  'hub.make_title': 'Make a code',
+  'hub.make_text':
+      'Make a code and enter it in your account at the other field.',
+  'hub.make': 'Make a code',
+  'hub.code_note':
+      'Valid for {minutes} minutes and can be used once. It is not shown again.',
+  'hub.copy': 'Copy',
+  'hub.enter_title': 'Enter another field\'s code',
+  'hub.enter_text':
+      'Make a code in your account at the other field and enter it here.',
+  'hub.enter_label': 'Code from the other field',
+  'hub.link': 'Link',
+  'hub.code_needed': 'Enter the code.',
+  'hub.linked_ok': 'Accounts linked.',
+  'hub.unlink_title': 'Unlink',
+  'hub.unlink_text':
+      'Unlinking takes this field\'s chrono records out of the other fields\' view.',
+  'hub.unlink': 'Unlink',
+  'hub.unlink_confirm': 'Unlink the accounts?',
+  'hub.unlink_body':
+      'The other fields no longer see this field\'s chrono records.',
+  'hub.unlink_yes': 'Unlink',
+  'hub.unlinked_ok': 'Accounts unlinked.',
+  'hub.e.invalid_code':
+      'The code is not valid, has expired or was already used.',
+  'hub.e.already_linked':
+      'This account is already linked to another person. Unlink it first.',
+  'hub.e.person_already_linked_here':
+      'That person already has an account linked at this field.',
+  'hub.e.not_linked': 'This account is not linked.',
+  'hub.e.too_many_requests': 'Too many tries: wait a little.',
+  'hub.e.field_not_found': 'The server could not find the field.',
+  'hub.e.not_hosted': 'This server has a single field.',
 };

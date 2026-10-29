@@ -303,6 +303,11 @@ final class _Loop {
     memUsed: node.memUsed,
     lastError: node.lastError,
     scores: {for (final t in node.teams) t: node.score(t)},
+    gained: {for (final t in node.teams) t: node.gained(t)},
+    lost: {
+      for (final t in node.teams)
+        if (node.lost(t) != 0) t: node.lost(t),
+    },
   );
 
   /// Reports handler exceptions and status changes after each call.

@@ -282,6 +282,10 @@ Do not share the ticket. Whoever has it can check in in your place. You can chan
 
 The app can log you in to an account that already exists, or make one with Google, Microsoft or Apple (with the box ticked). It cannot yet create a password account. Ask the field's organisers how to get one.
 
+**The privacy notice.** On the login screen, **Read the privacy notice** shows the field's notice in the app's language (in another one, and it says which, when the field has no text in yours). When you make an account with Google, Microsoft or Apple, the app sends the version of the notice it showed you along with the box you ticked; if the notice changed meanwhile the sign-up is refused and you read the new one first. After you log in, **Read the privacy notice** is always on the field screen. When the notice changes after you agreed (or your account has no consent recorded), the field screen shows **Read and confirm** at the top: read the text, tick *I have read the privacy notice and I agree* and tap **Confirm**. Nothing is blocked while you have not: you can still use the app, export your data or erase it. If the notice changes while you read, the app shows the new text and asks you to confirm again.
+
+**Chrono sharing between fields.** Only on a server that hosts several fields: **Chrono sharing between fields** (on the field screen) links your accounts at two fields, so each field sees the chrono checks you passed at the other (read only). At one field tap **Make a code** (it shows once, works for 15 minutes and once); at the other, type it under **Enter another field's code** and tap **Link**. **Unlink** takes this field's records out of the other fields' view. Sharing also needs your consent at each field and the field's own switch; the screen says whether it is on. A server with a single field does not show this screen.
+
 ## 9. Leave a game and your data
 
 - **Leave the game** (on **My check-in**) erases your name and federation number from this game. Replicas already chronographed stay on record.

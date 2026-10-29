@@ -221,19 +221,13 @@ class PropLinks {
         _deliver(link, RfType.hello, _encoded(h.encode), RfPrio.normal);
         return null;
       case 'state':
-        final counters = <int, int>{};
-        final c = msg['counters'];
-        if (c is Map) {
-          c.forEach((k, v) {
-            final team = int.tryParse('$k');
-            if (team != null && v is int) counters[team] = v;
-          });
-        }
+        final counters = teamPointsOf(msg['counters']);
         final st = RfState(
           ownerTeam: _need(msg, 'owner_team'),
           phase: _need(msg, 'phase'),
           gameTimeMs: _need(msg, 'game_time_ms'),
           counters: counters,
+          lost: teamPointsOf(msg['lost']),
           batteryPct: msg['battery_pct'] as int?,
           flags: msg['flags'] as int?,
           epoch: 0,

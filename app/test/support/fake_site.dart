@@ -71,6 +71,7 @@ class FakeSite {
   String? lastReturnTo;
   String? lastStartPurpose;
   bool? lastStartConsent;
+  // (the notice version it carried: lastNoticeVersion, below)
 
   /// Ends every access token (as if they had expired).
   void expireAccess() => _access.clear();
@@ -239,6 +240,120 @@ class FakeSite {
     };
   }
 
+  // --- the privacy notice and the account's consent (api/privacy.py, CONS-*) -----
+  /// The notice's current version and its Markdown per language (empty: the
+  /// operator has not published one).
+  var noticeVersion = '2026-11';
+  Map<String, String> noticeTexts = {
+    'pt':
+        '# Aviso de privacidade\n\nTratamos o teu **nome**.\n\n- guardamos o registo\n- apagamos a pedido',
+    'en':
+        '# Privacy notice\n\nWe keep your **name**.\n\n- we keep the registration\n- we erase on request',
+    'de': '# Datenschutzhinweis\n\nWir speichern deinen Namen.',
+  };
+
+  /// What `GET /me` says about the consent: `current`, `outdated` or `missing`
+  /// (null: an older server whose /me has no `consent`), the version it is
+  /// for, and the languages the app asked the notice in.
+  String? consentStatus = 'current';
+  String? consentVersion = '2026-11';
+  final noticeLangsAsked = <String>[];
+
+  /// A notice that changes while the person reads: the version the server
+  /// has from the next consent on (the 409 case).
+  String? changeNoticeOnConsent;
+
+  /// A server that takes `notice_version` on the social sign-up's start.
+  var startTakesNoticeVersion = true;
+  String? lastNoticeVersion;
+
+  // --- the chrono link of a hosted hub (api/hub_share.py, SVX-2) -----------------
+  /// Hosted mode (otherwise 404 `not_hosted`), whether the account is linked,
+  /// and whether sharing is on.
+  var hosted = false;
+  var hubLinked = false;
+  var hubSharing = false;
+  var codesMade = 0;
+
+  /// The code another field made, which `link` takes (once).
+  var otherFieldCode = 'ABCD-EFGH-JKLM';
+
+  SiteResponse? _consentAndHub(
+    String method,
+    String path,
+    Map<String, Object?> b,
+  ) {
+    SiteResponse err(int status, String detail) =>
+        SiteResponse(status, {'detail': detail});
+    switch ('$method $path') {
+      case 'GET /me':
+        return SiteResponse(200, {
+          'id': 'u1',
+          'username': username,
+          if (consentStatus != null)
+            'consent': {
+              'status': consentStatus,
+              'version': consentStatus == 'missing' ? null : consentVersion,
+              'current_version': noticeVersion,
+              'given_at': consentStatus == 'missing'
+                  ? null
+                  : '2026-10-01T10:00:00+00:00',
+              'notice_published': noticeTexts.isNotEmpty,
+            },
+        });
+      case 'POST /me/consents/account':
+        if (changeNoticeOnConsent != null) {
+          noticeVersion = changeNoticeOnConsent!;
+          changeNoticeOnConsent = null;
+        }
+        if (b['notice_version'] != noticeVersion) {
+          return SiteResponse(409, {
+            'detail': 'notice_version_changed',
+            'current_version': noticeVersion,
+          });
+        }
+        consentStatus = 'current';
+        consentVersion = noticeVersion;
+        return SiteResponse(200, {
+          'status': 'current',
+          'version': noticeVersion,
+          'current_version': noticeVersion,
+          'given_at': '2026-10-29T10:00:00+00:00',
+        });
+      case 'GET /me/hub-share':
+        if (!hosted) return err(404, 'not_hosted');
+        return SiteResponse(200, _hub());
+      case 'POST /me/hub-share/code':
+        if (!hosted) return err(404, 'not_hosted');
+        hubLinked = true; // a code makes the person if the account had none
+        codesMade++;
+        return SiteResponse(201, {
+          'code': 'WXYZ-2345-QRST',
+          'expires_at': '2026-10-29T10:15:00+00:00',
+          'expires_in': 900,
+        });
+      case 'POST /me/hub-share/link':
+        if (!hosted) return err(404, 'not_hosted');
+        if (b['code'] != otherFieldCode) return err(400, 'invalid_code');
+        if (hubLinked) return err(409, 'already_linked');
+        hubLinked = true;
+        return SiteResponse(200, _hub());
+      case 'DELETE /me/hub-share':
+        if (!hosted) return err(404, 'not_hosted');
+        if (!hubLinked) return err(404, 'not_linked');
+        hubLinked = false;
+        hubSharing = false;
+        return const SiteResponse(204, null);
+    }
+    return null;
+  }
+
+  Map<String, Object?> _hub() => {
+    'linked': hubLinked,
+    'linked_at': hubLinked ? '2026-10-20T09:00:00+00:00' : null,
+    'sharing': hubLinked && hubSharing,
+  };
+
   /// The account's own login methods (api/login_methods.py, api/me.py,
   /// api/auth.py), or null for any other request.
   SiteResponse? _loginMethods(
@@ -382,11 +497,16 @@ class FakeSite {
 
   SiteResponse handle(
     String method,
-    String path,
+    String fullPath,
     Object? body,
     String? bearer,
     String? refresh,
   ) {
+    final cut = fullPath.indexOf('?');
+    final path = cut < 0 ? fullPath : fullPath.substring(0, cut);
+    final query = cut < 0
+        ? const <String, String>{}
+        : Uri.splitQueryString(fullPath.substring(cut + 1));
     requests.add('$method $path');
     bodies['$method $path'] = body;
     final b = body is Map ? body.cast<String, Object?>() : <String, Object?>{};
@@ -397,6 +517,26 @@ class FakeSite {
     switch ('$method $path') {
       case 'GET /auth/methods':
         return SiteResponse(200, offers);
+      case 'GET /privacy-notice':
+        // Public: the operator's text in the language asked for, else in the
+        // first one it has (CONS-5).
+        if (noticeTexts.isEmpty) {
+          return err(404, 'privacy_notice_not_published');
+        }
+        final asked = query['lang'] ?? 'pt';
+        noticeLangsAsked.add(asked);
+        final lang = noticeTexts.containsKey(asked)
+            ? asked
+            : noticeTexts.keys.first;
+        return SiteResponse(200, {
+          'version': noticeVersion,
+          'lang': lang,
+          'requested_lang': asked,
+          'available': noticeTexts.keys.toList(),
+          'markdown': noticeTexts[lang],
+          'html': '',
+          'url': 'https://campo.example.pt/privacy?lang=$lang',
+        });
       case 'POST /auth/oidc/google/start':
       case 'POST /auth/oidc/microsoft/start':
         if (b['purpose'] != 'login' &&
@@ -408,6 +548,14 @@ class FakeSite {
             b['password'] != accountPassword) {
           return err(403, 'invalid_password');
         }
+        // A server before the notice version refuses the field (422).
+        if (b.containsKey('notice_version')) {
+          if (!startTakesNoticeVersion) return err(422, 'validation_error');
+          if (b['notice_version'] != noticeVersion) {
+            return err(409, 'notice_version_changed');
+          }
+        }
+        lastNoticeVersion = b['notice_version'] as String?;
         lastReturnTo = '${b['return_to']}';
         lastStartPurpose = '${b['purpose']}';
         lastStartConsent = b['consent'] == true;
@@ -473,6 +621,8 @@ class FakeSite {
     }
     final login = _loginMethods(method, path, b, bearer);
     if (login != null) return login;
+    final own = _consentAndHub(method, path, b);
+    if (own != null) return own;
     final regPath = RegExp(
       r'^/fields/([0-9a-f-]+)/scheduled-games/([0-9a-f-]+)/registrations$',
     ).firstMatch(path);
@@ -618,7 +768,9 @@ Future<HttpServer> serveFakeSite(FakeSite site) async {
         if (c.name == refreshCookie) refresh = c.value;
       }
     }
-    final path = req.uri.path.replaceFirst('/api/v1', '');
+    final path =
+        req.uri.path.replaceFirst('/api/v1', '') +
+        (req.uri.query.isEmpty ? '' : '?${req.uri.query}');
     final r = site.handle(
       req.method,
       path,

@@ -308,12 +308,18 @@ class SiteAuth {
   /// [purpose] is `login`, `link` or `reauth` (the last two need a session);
   /// [consent] is the box the server asks for the first sign-in of a new
   /// account; [password] confirms a `link` for an account that has one.
+  /// [noticeVersion] is the version of the privacy notice the person was
+  /// shown when they ticked [consent] (sent with the consent only: a server
+  /// that does not take it yet refuses the field, 422, and the start is asked
+  /// again without it; a server that does refuses a notice that changed since
+  /// with 409 `notice_version_changed`).
   Future<OidcStart> oidcStart(
     String provider, {
     required String purpose,
     required String nonce,
     bool consent = false,
     String password = '',
+    String? noticeVersion,
   }) async {
     final body = {
       'purpose': purpose,
@@ -322,9 +328,15 @@ class SiteAuth {
       if (password.isNotEmpty) 'password': password,
     };
     final path = '/auth/oidc/${Uri.encodeComponent(provider)}/start';
-    final r = purpose == 'login'
-        ? await _http.send('POST', path, body: body)
-        : await session.callRaw('POST', path, body: body);
+    Future<SiteResponse> ask(Map<String, Object?> b) => purpose == 'login'
+        ? _http.send('POST', path, body: b)
+        : session.callRaw('POST', path, body: b);
+    final withVersion = consent && noticeVersion != null && noticeVersion != '';
+    var r = await ask({
+      ...body,
+      if (withVersion) 'notice_version': noticeVersion,
+    });
+    if (withVersion && r.status == 422) r = await ask(body);
     final json = await _ok(r);
     final url = Uri.tryParse('${json['browser_url'] ?? ''}');
     final ok = url != null && url.scheme == 'https' && url.host.isNotEmpty;
@@ -343,6 +355,7 @@ class SiteAuth {
     String purpose = 'login',
     bool consent = false,
     String password = '',
+    String? noticeVersion,
     void Function(PendingReturn waiting)? onOpened,
   }) async {
     final b = browser, rs = returns;
@@ -354,6 +367,7 @@ class SiteAuth {
       nonce: nonce,
       consent: consent,
       password: password,
+      noticeVersion: noticeVersion,
     );
     final url = start.browserUrl;
     if (url == null) throw OidcFailure('browser_unavailable');

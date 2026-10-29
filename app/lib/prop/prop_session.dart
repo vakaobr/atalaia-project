@@ -210,6 +210,11 @@ class PropSession extends ChangeNotifier {
   int gameTimeMs = 0;
   Map<String, int> scores = const {};
 
+  /// What STATE carries from the same snapshot: the points gained (counters)
+  /// and the points lost to penalties (key 9) per team name.
+  Map<String, int> _gained = const {};
+  Map<String, int> _lost = const {};
+
   /// The game's log: events, the script's log lines, errors (newest last).
   final log = <String>[];
 
@@ -585,17 +590,21 @@ class PropSession extends ChangeNotifier {
     } on Object {
       return;
     }
-    final before = (gameTimeMs ~/ 1000, scores, phase);
+    final before = (gameTimeMs ~/ 1000, scores, phase, _lost);
     gameTimeMs = s.timeMs;
     scores = s.scores;
+    _gained = s.gained;
+    _lost = s.lost;
     _phaseFrom(s);
     if (phase == PropPhase.running && timer.update(gameTimeMs)) {
       // The game's length is up: the shell ends the game (decision PC6).
       _log('time is up: game.end');
       await node.input('game.end');
     }
-    if (before != (gameTimeMs ~/ 1000, scores, phase)) {
-      if (_link != null && before.$2 != scores) _sendState();
+    if (before != (gameTimeMs ~/ 1000, scores, phase, _lost)) {
+      if (_link != null && (before.$2 != scores || before.$4 != _lost)) {
+        _sendState();
+      }
       notifyListeners();
     }
   }
@@ -609,10 +618,18 @@ class PropSession extends ChangeNotifier {
       'owner_team': _ownerTeam,
       'phase': phase == PropPhase.running ? 1 : 0,
       'game_time_ms': gameTimeMs,
+      // The gains, not the net: a penalty never takes a counter back (the
+      // controller merges by maximum), it goes in `lost` (STATE key 9, sent
+      // only when there is one, as a box does).
       'counters': {
         for (var i = 0; i < setup.teams.length; i++)
-          if ((scores[setup.teams[i]] ?? 0) > 0)
-            '${i + 1}': scores[setup.teams[i]],
+          if ((_gained[setup.teams[i]] ?? 0) > 0)
+            '${i + 1}': _gained[setup.teams[i]],
+      },
+      'lost': {
+        for (var i = 0; i < setup.teams.length; i++)
+          if ((_lost[setup.teams[i]] ?? 0) > 0)
+            '${i + 1}': _lost[setup.teams[i]],
       },
       'flags':
           (phase == PropPhase.running ? 1 : 0) |
@@ -719,6 +736,8 @@ class PropSession extends ChangeNotifier {
       case NodeStatusOutput(:final snapshot):
         gameTimeMs = snapshot.timeMs;
         scores = snapshot.scores;
+        _gained = snapshot.gained;
+        _lost = snapshot.lost;
         _phaseFrom(snapshot);
     }
     notifyListeners();

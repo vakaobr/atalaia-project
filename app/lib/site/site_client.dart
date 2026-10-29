@@ -81,9 +81,14 @@ class IoSiteHttp implements SiteHttp {
     String? refreshToken,
   }) async {
     try {
+      // A path may carry a query (`/privacy-notice?lang=en`).
+      final cut = path.indexOf('?');
       final req = await _client.openUrl(
         method,
-        origin.replace(path: '/api/v1$path'),
+        origin.replace(
+          path: '/api/v1${cut < 0 ? path : path.substring(0, cut)}',
+          query: cut < 0 ? null : path.substring(cut + 1),
+        ),
       );
       req.followRedirects = false;
       req.headers.set('Accept', 'application/json');

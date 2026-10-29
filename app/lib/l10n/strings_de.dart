@@ -1518,4 +1518,75 @@ const Map<String, String> deStrings = {
       'Vibriert bei Spielereignissen, auch wenn die App geschlossen ist',
   'player.saved': 'Gemerkte Felder',
   'player.saved_forget': 'Dieses Feld vergessen',
+  'privacy.title': 'Datenschutzhinweis',
+  'privacy.read': 'Datenschutzhinweis lesen',
+  'privacy.version': 'Version {version}',
+  'privacy.lang_fallback':
+      'Diesen Hinweis gibt es nicht auf {requested}: angezeigt auf {shown}.',
+  'privacy.none':
+      'Der Server hat den Text des Datenschutzhinweises noch nicht veröffentlicht. Frag die Orga des Spielfelds.',
+  'privacy.intro_outdated':
+      'Der Datenschutzhinweis hat sich seit der letzten Zustimmung dieses Kontos geändert (Version {old}, jetzt {version}). Lies den Hinweis und bestätige erneut.',
+  'privacy.intro_missing':
+      'Für dieses Konto ist keine Zustimmung zum Datenschutzhinweis gespeichert (Version {version}). Lies den Hinweis und bestätige.',
+  'privacy.read_and_confirm': 'Lesen und bestätigen',
+  'privacy.accept': 'Ich habe den Datenschutzhinweis gelesen und stimme zu.',
+  'privacy.confirm': 'Bestätigen',
+  'privacy.tick_first':
+      'Setze zuerst das Häkchen, dass du den Hinweis gelesen hast und zustimmst.',
+  'privacy.done': 'Zustimmung gespeichert.',
+  'privacy.changed':
+      'Der Hinweis hat sich inzwischen geändert. Lies die neue Version und bestätige erneut.',
+  'site.err.notice_version_changed':
+      'Der Datenschutzhinweis hat sich inzwischen geändert. Öffne ihn, lies die neue Version und versuche es erneut.',
+  'acct.oidc.notice_version_changed':
+      'Der Datenschutzhinweis hat sich inzwischen geändert. Öffne ihn, lies die neue Version und versuche es erneut.',
+  'hub.title': 'Chrono-Freigabe',
+  'hub.open': 'Chrono-Freigabe zwischen Spielfeldern',
+  'hub.intro':
+      'Wenn du auf mehreren Spielfeldern dieses Servers spielst, kannst du deine Konten verknüpfen, damit jedes Feld die Chrono-Prüfungen sieht, die du auf einem anderen bestanden hast (nur lesend). Jedes Feld braucht weiterhin deine Zustimmung.',
+  'hub.not_hosted':
+      'Dieser Server hat nur ein Spielfeld: Es gibt nichts zu verknüpfen.',
+  'hub.linked': 'Konto verknüpft seit {when}.',
+  'hub.unlinked':
+      'Dieses Konto ist noch nicht mit deinen Konten auf anderen Feldern verknüpft.',
+  'hub.sharing_on':
+      'Freigabe aktiv: Die anderen Felder sehen deine Chrono-Prüfungen.',
+  'hub.sharing_off':
+      'Noch keine Freigabe: Deine Zustimmung auf diesem Feld fehlt, oder das Feld hat die Freigabe ausgeschaltet.',
+  'hub.consent_hint':
+      'Die Freigabe braucht deine Zustimmung auf jedem Feld und den Schalter des Feldes selbst.',
+  'hub.make_title': 'Code erzeugen',
+  'hub.make_text':
+      'Erzeuge einen Code und gib ihn in deinem Konto auf dem anderen Feld ein.',
+  'hub.make': 'Code erzeugen',
+  'hub.code_note':
+      'Gilt {minutes} Minuten und kann einmal benutzt werden. Er wird nicht noch einmal angezeigt.',
+  'hub.copy': 'Kopieren',
+  'hub.enter_title': 'Code eines anderen Feldes eingeben',
+  'hub.enter_text':
+      'Erzeuge einen Code in deinem Konto auf dem anderen Feld und gib ihn hier ein.',
+  'hub.enter_label': 'Code vom anderen Feld',
+  'hub.link': 'Verknüpfen',
+  'hub.code_needed': 'Gib den Code ein.',
+  'hub.linked_ok': 'Konten verknüpft.',
+  'hub.unlink_title': 'Verknüpfung lösen',
+  'hub.unlink_text':
+      'Beim Lösen sind die Chrono-Daten dieses Feldes für die anderen Felder nicht mehr sichtbar.',
+  'hub.unlink': 'Verknüpfung lösen',
+  'hub.unlink_confirm': 'Verknüpfung der Konten lösen?',
+  'hub.unlink_body':
+      'Die anderen Felder sehen die Chrono-Daten dieses Feldes nicht mehr.',
+  'hub.unlink_yes': 'Lösen',
+  'hub.unlinked_ok': 'Verknüpfung gelöst.',
+  'hub.e.invalid_code':
+      'Der Code ist ungültig, abgelaufen oder wurde schon benutzt.',
+  'hub.e.already_linked':
+      'Dieses Konto ist schon mit einer anderen Person verknüpft. Löse die Verknüpfung zuerst.',
+  'hub.e.person_already_linked_here':
+      'Diese Person hat auf diesem Feld schon ein verknüpftes Konto.',
+  'hub.e.not_linked': 'Dieses Konto ist nicht verknüpft.',
+  'hub.e.too_many_requests': 'Zu viele Versuche: Warte einen Moment.',
+  'hub.e.field_not_found': 'Der Server hat das Feld nicht gefunden.',
+  'hub.e.not_hosted': 'Dieser Server hat nur ein Spielfeld.',
 };

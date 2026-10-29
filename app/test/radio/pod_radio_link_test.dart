@@ -312,12 +312,14 @@ void main() {
       'phase': 1,
       'game_time_ms': 9000,
       'counters': {'1': 7},
+      'lost': {'1': 2},
       'flags': 1,
     });
     final (sh, sp, _) = await field.heard(RfType.state, from: mark);
     final st = RfState.decode(sp);
     expect((st.ownerTeam, st.epoch), (1, 1));
     expect(st.counters, {1: 7});
+    expect(st.lost, {1: 2}); // a box penalty (BSC-1) reaches the controller
     expect(sh.ackRequested, isFalse);
     radio.sendState({
       'owner_team': 2,

@@ -224,6 +224,11 @@ class FakeRunningNode implements RunningNode {
   bool paused = false;
   int timeMs = 0;
   Map<String, int> scoreMap = const {'red': 0, 'blue': 0};
+
+  /// What the snapshot says was gained and lost to penalties (STATE's counters
+  /// and key 9); null: [scoreMap] gained, nothing lost.
+  Map<String, int>? gainedMap;
+  Map<String, int> lostMap = const {};
   bool closed = false;
 
   @override
@@ -268,6 +273,8 @@ class FakeRunningNode implements RunningNode {
     memUsed: 1000,
     lastError: '',
     scores: scoreMap,
+    gained: gainedMap,
+    lost: lostMap,
   );
 
   @override

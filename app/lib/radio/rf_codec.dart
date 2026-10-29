@@ -253,6 +253,20 @@ abstract final class RfTransport {
 
 // ---- STATE --------------------------------------------------------------------------------
 
+/// The team points of a STATE's JSON form (the prop link's and the radio
+/// link's input): `{"1": 40}` as {1: 40}; an entry that is not a team id
+/// with a non-negative integer is left out, anything but a map is empty.
+Map<int, int> teamPointsOf(Object? raw) {
+  final out = <int, int>{};
+  if (raw is Map) {
+    raw.forEach((k, v) {
+      final team = int.tryParse('$k');
+      if (team != null && v is int && v >= 0) out[team] = v;
+    });
+  }
+  return out;
+}
+
 final class RfState {
   const RfState({
     required this.ownerTeam,

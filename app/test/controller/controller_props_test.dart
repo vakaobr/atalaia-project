@@ -109,6 +109,24 @@ void main() {
       isTrue,
     );
 
+    // A penalty on the prop (BSC-1, STATE key 9): the controller totals the
+    // counters minus the `lost` the prop's link now carries.
+    link.sendState({
+      'owner_team': 1,
+      'phase': 1,
+      'game_time_ms': 200,
+      'counters': {'1': 6},
+      'lost': {'1': 2},
+    });
+    expect(
+      await waitFor(() => (engine.score(gid)['teams']! as Map)['red'] == 4),
+      isTrue,
+    );
+    expect(
+      engine.nodes().firstWhere((n) => n['node_id'] == 7)['lost'],
+      containsPair('red', 2),
+    );
+
     // Without a radio, the start and a command still reach the prop, and
     // the command counts as sent (protocol/prop-link.md).
     engine.startGame(gid, force: true);

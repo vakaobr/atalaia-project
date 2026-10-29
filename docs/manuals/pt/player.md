@@ -282,6 +282,10 @@ Não partilhes o bilhete. Quem o tiver pode fazer o check-in no teu lugar. Podes
 
 A app entra numa conta que já existe, ou cria uma com Google, Microsoft ou Apple (com a caixa marcada). Ainda não cria uma conta com palavra-passe. Pergunta à organização do campo como obter uma.
 
+**O aviso de privacidade.** No ecrã de entrada, **Ler o aviso de privacidade** mostra o aviso do campo na língua da app (noutra, e diz qual, quando o campo não tem texto na tua). Quando crias uma conta com Google, Microsoft ou Apple, a app envia, com a caixa que marcaste, a versão do aviso que te mostrou; se o aviso mudou entretanto, o registo é recusado e lês primeiro o novo. Depois de entrares, **Ler o aviso de privacidade** está sempre no ecrã do campo. Quando o aviso muda depois de teres aceitado (ou a conta não tem consentimento registado), o ecrã do campo mostra **Ler e confirmar** no topo: lê o texto, marca *Li o aviso de privacidade e estou de acordo* e toca em **Confirmar**. Nada fica bloqueado enquanto não o fizeres: podes continuar a usar a app, exportar os teus dados ou apagá-los. Se o aviso mudar enquanto lês, a app mostra o novo texto e pede que confirmes de novo.
+
+**Partilha da cronografagem entre campos.** Só num servidor que aloja vários campos: **Partilha da cronografagem entre campos** (no ecrã do campo) liga as tuas contas de dois campos, para que cada campo veja as cronografagens que passaste no outro (só de leitura). Num campo toca em **Gerar código** (aparece uma vez, vale 15 minutos e uma só utilização); no outro, escreve-o em **Escrever o código de outro campo** e toca em **Ligar**. **Desligar** tira os registos deste campo da vista dos outros. A partilha precisa ainda do teu consentimento em cada campo e do interruptor do próprio campo; o ecrã diz se está ligada. Um servidor com um só campo não mostra este ecrã.
+
 ## 9. Sair de um jogo e os teus dados
 
 - **Sair do jogo** (em **O meu check-in**) apaga o teu nome e o número de federado deste jogo. As réplicas já cronografadas ficam registadas.
