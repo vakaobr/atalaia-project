@@ -1731,6 +1731,204 @@
       ]
     },
     {
+      "name": "S7c MOVE progress: radio.move says the free boxes are told on the old channel, then moved",
+      "join_key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "steps": [
+        {
+          "request": {
+            "method": "GET",
+            "path": "/api/v1/radio",
+            "token": "gm"
+          },
+          "status": 200,
+          "json": {
+            "move": null
+          }
+        },
+        {
+          "ws_connect": "g",
+          "token": "gm",
+          "hello": {
+            "type": "hello"
+          }
+        },
+        {
+          "request": {
+            "method": "PUT",
+            "path": "/api/v1/radio/channel",
+            "token": "gm",
+            "body": {
+              "channel_hz": 869925000,
+              "source": "manual"
+            }
+          },
+          "status": 200,
+          "json": {
+            "channel": {
+              "channel_hz": 869925000
+            },
+            "move": {
+              "state": "telling",
+              "from_hz": 869525000,
+              "to_hz": 869925000,
+              "rev": "$any",
+              "sent": 1,
+              "repeats": 3
+            }
+          }
+        },
+        {
+          "ws": "g",
+          "messages": [
+            {
+              "type": "radio",
+              "radio": {
+                "channel": {
+                  "channel_hz": 869925000
+                },
+                "previous_channels_hz": [
+                  869525000
+                ],
+                "move": {
+                  "state": "telling",
+                  "from_hz": 869525000,
+                  "to_hz": 869925000,
+                  "rev": "$any",
+                  "sent": 1,
+                  "repeats": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "field_tx": [
+            {
+              "type": "field",
+              "kind": "move",
+              "channel_hz": 869925000,
+              "rev": "$any"
+            }
+          ]
+        },
+        {
+          "advance_ms": 2700
+        },
+        {
+          "ws": "g",
+          "messages": [
+            {
+              "type": "radio",
+              "radio": {
+                "channel": {
+                  "channel_hz": 869925000
+                },
+                "previous_channels_hz": [
+                  869525000
+                ],
+                "move": {
+                  "state": "telling",
+                  "from_hz": 869525000,
+                  "to_hz": 869925000,
+                  "rev": "$any",
+                  "sent": 2,
+                  "repeats": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "field_tx": [
+            {
+              "kind": "move",
+              "channel_hz": 869925000
+            }
+          ]
+        },
+        {
+          "advance_ms": 2700
+        },
+        {
+          "ws": "g",
+          "messages": [
+            {
+              "type": "radio",
+              "radio": {
+                "channel": {
+                  "channel_hz": 869925000
+                },
+                "previous_channels_hz": [
+                  869525000
+                ],
+                "move": {
+                  "state": "telling",
+                  "from_hz": 869525000,
+                  "to_hz": 869925000,
+                  "rev": "$any",
+                  "sent": 3,
+                  "repeats": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "field_tx": [
+            {
+              "kind": "move",
+              "channel_hz": 869925000
+            }
+          ]
+        },
+        {
+          "advance_ms": 2700
+        },
+        {
+          "ws": "g",
+          "messages": [
+            {
+              "type": "radio",
+              "radio": {
+                "channel": {
+                  "channel_hz": 869925000
+                },
+                "previous_channels_hz": [
+                  869525000
+                ],
+                "move": {
+                  "state": "moved",
+                  "from_hz": 869525000,
+                  "to_hz": 869925000,
+                  "rev": "$any",
+                  "sent": 3,
+                  "repeats": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "request": {
+            "method": "GET",
+            "path": "/api/v1/radio",
+            "token": "read"
+          },
+          "status": 200,
+          "json": {
+            "move": {
+              "state": "moved",
+              "from_hz": 869525000,
+              "to_hz": 869925000,
+              "rev": "$any",
+              "sent": 3,
+              "repeats": 3
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "S7c GAME_OVER: three times, 4 s apart, after a game ends; none without a radio",
       "join_key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
       "steps": [

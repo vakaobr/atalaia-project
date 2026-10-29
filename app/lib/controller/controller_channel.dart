@@ -399,6 +399,8 @@ class ControllerChannel {
       'scan': scanStatus(),
       'game_channel_hz': game?['channel_hz'],
       'previous_channels_hz': history(),
+      // The last change's MOVEs (decision RB-13): null until one this run.
+      'move': engine.boxes?.moveStatus(),
     };
   }
 

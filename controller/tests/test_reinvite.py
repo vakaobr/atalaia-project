@@ -546,6 +546,27 @@ class MoveTests(Case):
         gid = self.game()
         self.assertEqual(self.ctrl.get_game(gid)["channel_hz"], NEW_HZ)
 
+    def test_the_radio_settings_say_how_far_the_move_is(self):
+        """RB-13: radio.move is null before a change, then 'telling' (MOVEs said so far) and 'moved'."""
+        self.assertIsNone(self.ctrl.radio_settings()["move"])
+        self.ctrl.set_field_channel(NEW_HZ, "scan")
+        move = self.ctrl.radio_settings()["move"]
+        self.assertEqual({k: v for k, v in move.items() if k != "rev"},
+                         {"state": "telling", "from_hz": OLD_HZ, "to_hz": NEW_HZ, "sent": 1, "repeats": 3})
+        self.assertEqual(move["rev"], self.ctrl.move_rev())
+        self.pump(20)
+        move = self.ctrl.radio_settings()["move"]
+        self.assertEqual((move["state"], move["sent"]), ("moved", 3))
+        # A GM's discover sweep (earlier channels) does not touch it.
+        self.client.post("/api/v1/boxes/discover", headers=GM)
+        self.pump(25)
+        self.assertEqual(self.ctrl.radio_settings()["move"]["state"], "moved")
+        # Without a modem that carries field frames there are no MOVEs to report.
+        self.modem.has_field_frames = False
+        self.ctrl.set_field_channel(OLDER_HZ)
+        # The earlier change's status stays as it was (the console shows it only for the current channel).
+        self.assertEqual(self.ctrl.radio_settings()["move"]["to_hz"], NEW_HZ)
+
     def test_the_revision_rises_with_every_change(self):
         self.ctrl.set_field_channel(NEW_HZ)
         first = self.ctrl.move_rev()

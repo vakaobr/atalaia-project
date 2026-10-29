@@ -1989,6 +1989,88 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("tab-settings").click()
         expect(page.get_by_test_id("radio-source")).to_have_text("at random")
 
+    def test_a_channel_change_says_the_free_boxes_are_told_then_moved(self):
+        """RFC 0001 Amendment 19, decision RB-13: while the MOVEs repeat on the old channel (about 5 s) the
+        channel panel says the free boxes are being told, how many times it has been said, and then that
+        the controller has moved, with what to do about a box that is still missing; four languages."""
+        page = self.console()
+        page.get_by_test_id("lang").first.select_option("en")
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("radio-move-telling")).to_have_count(0)
+        page.get_by_test_id("radio-manual").select_option("869925000")
+        page.get_by_test_id("radio-apply-manual").click()
+        telling = page.get_by_test_id("radio-move-telling")
+        expect(telling).to_contain_text("Telling the free boxes on the old channel (869.525 MHz)")
+        expect(telling).to_contain_text("moving to 869.925 MHz")
+        expect(telling).to_contain_text("of 3 times")
+        expect(page.get_by_test_id("radio-channel")).to_have_text("869.925 MHz")
+        moved = page.get_by_test_id("radio-move-moved")
+        expect(moved).to_contain_text("The controller has moved to 869.925 MHz", timeout=20000)
+        expect(moved).to_contain_text("adopted again")
+        expect(telling).to_have_count(0)
+        self.assertTrue(wait_for(lambda: (self.field.bundle.modem.status or {}).get("channel_hz")
+                                 == 869_925_000, 8))
+        move = self.field.http.get("/api/v1/radio").json()["move"]
+        self.assertEqual((move["state"], move["sent"], move["repeats"], move["from_hz"], move["to_hz"]),
+                         ("moved", 3, 3, 869_525_000, 869_925_000))
+        for lang, text in (("pt", "O controlador já mudou para 869,925 MHz"),
+                           ("de", "Der Controller ist auf 869,925 MHz gewechselt"),
+                           ("zh-tw", "控制器已切換到 869.925 MHz")):
+            page.get_by_test_id("lang").first.select_option(lang)
+            expect(moved).to_contain_text(text)
+        page.get_by_test_id("radio-move-dismiss").click()
+        expect(moved).to_have_count(0)
+
+    def test_find_boxes_names_the_swept_channels_and_counts_the_answers(self):
+        """After "Look for boxes" (the Settings panel between games, the invite dialog in a game): which
+        earlier channels were swept (boxes that were away when the field moved), how many boxes answered,
+        and the help line for a box still missing; four languages."""
+        self.assertEqual(self.field.http.put("/api/v1/radio/channel", json={"channel_hz": 869_925_000}).status_code,
+                         200)
+        self.assertTrue(wait_for(lambda: self.field.http.get("/api/v1/radio").json()["move"]["state"] == "moved",
+                                 20))
+        device = bytes.fromhex("5a17c0de0b0e1234")
+        key = ff.field_key(JOIN_KEY)
+        page = self.console()
+        page.get_by_test_id("lang").first.select_option("en")
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("invite-discover-result")).to_have_count(0)
+        page.get_by_test_id("radio-find-boxes").click()
+        # (The controller's own DISCOVER after the move was a moment ago: it may say "asked a moment ago".)
+        expect(page.get_by_test_id("invite-discover-sent")).to_have_text(
+            re.compile("Asked the free boxes to announce themselves.|asked a moment ago"))
+        expect(page.get_by_test_id("invite-discover-sweep")).to_contain_text(
+            "Also looked on the earlier channels: 869.525 MHz.")
+        expect(page.get_by_test_id("invite-discover-answered")).to_have_text("Boxes that answered: 0.")
+        expect(page.get_by_test_id("invite-missing-help")).to_contain_text("must be adopted again")
+        # A box that was away answers: counted.
+        box = lobby.IdleBox(JOIN_KEY, "Zona Norte", device_id=device, rng=random.Random(2))
+        self.field.host.hear(ff.encode(key, box._announce(), box.nonces.next()))
+        expect(page.get_by_test_id("invite-discover-answered")).to_have_text("Boxes that answered: 1.")
+        # Asking again within the minute is not swept again by the controller, yet the sweep stays named.
+        self.assertEqual(self.field.http.post("/api/v1/boxes/discover").json()["sweep"], [])
+        page.get_by_test_id("radio-find-boxes").click()
+        expect(page.get_by_test_id("invite-discover-sweep")).to_contain_text("869.525 MHz")
+        expect(page.get_by_test_id("invite-discover-answered")).to_have_text("Boxes that answered: 1.")
+        page.get_by_test_id("lang").first.select_option("pt")
+        expect(page.get_by_test_id("invite-discover-sweep")).to_contain_text(
+            "Procurou-se também nos canais anteriores: 869,525 MHz.")
+        expect(page.get_by_test_id("invite-missing-help")).to_contain_text("adotada de novo")
+        page.get_by_test_id("lang").first.select_option("de")
+        expect(page.get_by_test_id("invite-discover-answered")).to_have_text("Boxen, die geantwortet haben: 1.")
+        page.get_by_test_id("lang").first.select_option("zh-tw")
+        expect(page.get_by_test_id("invite-discover-answered")).to_have_text("已回應的盒子：1。")
+        # In a game's invite dialog the same lines show (the controller sweeps only between games, but a
+        # sweep from the last minute is still named).
+        page.get_by_test_id("lang").first.select_option("en")
+        self.field.create_game()
+        page.get_by_test_id("tab-game").click()
+        page.get_by_test_id("game-invite").click()
+        expect(page.get_by_test_id("invite-dialog")).to_be_visible()
+        expect(page.get_by_test_id("invite-discover-sent")).to_be_visible()
+        expect(page.get_by_test_id("invite-discover-sweep")).to_contain_text("869.525 MHz")
+        expect(page.get_by_test_id("invite-missing-help")).to_be_visible()
+
     def test_channel_scan_without_a_radio(self):
         self.field.close()
         self.field = Field("--no-radio")

@@ -230,6 +230,36 @@ void main() {
       },
     );
 
+    test('radio.move says how far the MOVEs are, and the stream hears of it', () {
+      expect(ch.settings()['move'], isNull);
+      final heard = <Map<String, Object?>>[];
+      engine.addListener((m) {
+        if (m['type'] == 'radio') heard.add(m);
+      });
+      final out = ch.setChannel(newHz, 'scan');
+      final first = out['move']! as Map<String, Object?>;
+      expect(first['state'], 'telling');
+      expect(
+        [first['from_hz'], first['to_hz'], first['sent'], first['repeats']],
+        [oldHz, newHz, 1, 3],
+      );
+      expect(
+        first['rev'],
+        int.parse(engine.store.getSetting('radio.move_rev')!),
+      );
+      run(12000);
+      final done = ch.settings()['move']! as Map<String, Object?>;
+      expect([done['state'], done['sent']], ['moved', 3]);
+      // One radio message per step: the change's own (1 said), 2, 3, then moved.
+      final steps = [
+        for (final m in heard)
+          (((m['radio']! as Map)['move']) as Map)['state'] == 'moved'
+              ? 'moved'
+              : '${(((m['radio']! as Map)['move']) as Map)['sent']}',
+      ];
+      expect(steps, ['1', '2', '3', 'moved']);
+    });
+
     test(
       'the revision rises, the same channel says nothing, a region forgets',
       () {

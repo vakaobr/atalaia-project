@@ -58,6 +58,10 @@ class Reinvite:
         self._discover_after = False  # a DISCOVER on the field's channel once the MOVEs are said
         self._pending_emit: set[str] = set()
         self._tuned: Optional[int] = None  # the channel a GAME_OVER took the modem to
+        # The field's last change of channel, for the console (radio.move): the MOVE order that says it
+        # and the status last sent on the stream.
+        self._move_info: Optional[tuple[int, int, int, lobby.MoveOrder]] = None  # old Hz, new Hz, rev, order
+        self._move_sent: Optional[dict[str, Any]] = None
 
     def _nonces(self) -> ff.NonceSource:
         """This controller's field frame nonces (decisions RJ-7, RJ-15): a sender id fresh from
@@ -95,6 +99,7 @@ class Reinvite:
             if self._discover_after and not self.inviter.moves and not self.inviter.games_over:
                 self._discover_after = False  # the MOVEs were dropped (a game took the radio): no DISCOVER
             self._flush()
+        self._emit_move()
 
     def on_hello(self, node_id: int, device_hex: Optional[str]) -> None:
         """A HELLO in the live game: an invite for that node is done."""
@@ -123,11 +128,32 @@ class Reinvite:
         modem = self.ctl.modem
         if modem is None or not modem.is_up or not getattr(modem, "has_field_frames", False):
             return False
-        self.inviter.move(old_hz, new_hz, rev, self.ctl.now_ms())
+        order = self.inviter.move(old_hz, new_hz, rev, self.ctl.now_ms())
+        self._move_info = (old_hz, new_hz, rev, order)
         self._discover_after = True
         self.inviter.tick(self.ctl.now_ms())  # the first one at once
+        # The caller emits the radio settings (with this status) at once: not again at the next tick.
+        self._move_sent = self.move_status()
         log.info("the field moves from %d to %d Hz (revision %d): MOVE on the old channel", old_hz, new_hz, rev)
         return True
+
+    def move_status(self) -> Optional[dict[str, Any]]:
+        """The progress of the field's last change of channel, for the console (radio.move): ``telling`` while
+        the MOVEs are said on the old channel (``sent`` of ``repeats``), ``moved`` once they are said and the
+        modem is on the new one. None before a change with MOVEs this run."""
+        if self._move_info is None:
+            return None
+        old_hz, new_hz, rev, order = self._move_info
+        telling = any(m is order for m in self.inviter.moves)
+        return {"state": "telling" if telling else "moved", "from_hz": old_hz, "to_hz": new_hz, "rev": rev,
+                "sent": order.sent, "repeats": lobby.MOVE_REPEATS}
+
+    def _emit_move(self) -> None:
+        """Tells the consoles when the change's progress moved on (a MOVE said, or the modem retuned)."""
+        status = self.move_status()
+        if status is not None and status != self._move_sent:
+            self._move_sent = status
+            self.ctl._emit({"type": "radio", "radio": self.ctl.radio_settings()})
 
     def _orders_done(self) -> None:
         """The GAME_OVERs and MOVEs are said and the modem is back on the field's channel: after a MOVE,

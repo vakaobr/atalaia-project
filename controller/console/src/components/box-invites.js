@@ -28,6 +28,7 @@
 
 import { html, Component, createRef, t, api } from '../ui.js';
 import { gameRoles } from './preset-builder.js';
+import { DiscoverResult } from './radio-settings.js';
 
 const DONE = new Set(['joined']);
 const FETCH_ACTIVE = new Set(['sent', 'fetching', 'installed']);
@@ -86,6 +87,7 @@ export class BoxInvites extends Component {
 
     componentWillUnmount() {
         clearInterval(this.timer);
+        this.props.app.setState({ discovered: null }); // the settings panel starts from its own ask
     }
 
     /** What the game lets a box be: its roles, or a scenario's box names. */
@@ -347,6 +349,7 @@ export class BoxInvites extends Component {
                         </tbody></table></div>`}
                 <div role="status" aria-live="polite" data-testid="invite-readiness">${this.renderReadiness(check)}</div>
                 ${this.renderFetchWait()}
+                <${DiscoverResult} app=${app} />
                 <div class="actions">
                     <button type="button" class=${check && check.ok ? '' : 'primary'} data-testid="invite-send" disabled=${!count || state.sending}
                         onClick=${() => this.send()}>${t('invites.send', { n: count })}</button>
@@ -370,11 +373,13 @@ export function StartCheck({ game }) {
             t(`game.start_warnings.${w.code}`, { role: w.role, have: w.have, value: w.value, param: w.param })}</li>`)}</ul>`}`;
 }
 
-/** Asks the free boxes to announce themselves; quietly does nothing without a radio. */
+/** Asks the free boxes to announce themselves; quietly does nothing without a radio. Gives the
+ * answer, {sent, sweep: [Hz of the earlier channels asked too]}, or null. */
 export async function discover(token) {
     try {
-        await api(token, 'POST', '/boxes/discover');
+        return await api(token, 'POST', '/boxes/discover');
     } catch (e) {
         /* no radio, or no join key: the dialog says so from GET /boxes */
+        return null;
     }
 }

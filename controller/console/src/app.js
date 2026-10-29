@@ -190,9 +190,20 @@ class App extends Component {
     /** The free boxes heard over the radio (GET /boxes); with ask, a DISCOVER first. */
     async loadBoxes(ask) {
         if (this.state.role !== 'gm' || !this.serves('boxes')) return;
-        if (ask) await discover(this.token);
+        // What the DISCOVER did (sent, the earlier channels swept) and when, for the invite dialog.
+        if (ask) {
+            const asked = await discover(this.token);
+            const before = this.state.discovered;
+            const now = Date.now();
+            // A second ask within the sweep's minute is not swept again (the controller says so): keep
+            // what the first one swept and count the answers from it.
+            const carry = asked && before && !(asked.sweep || []).length && now - before.at < 60000
+                && (before.sweep || []).length > 0;
+            this.setState({ discovered: !asked ? null
+                : carry ? { ...before, sent: asked.sent || before.sent } : { at: now, ...asked } });
+        }
         try {
-            this.setState({ boxes: await api(this.token, 'GET', '/boxes') });
+            this.setState({ boxes: await api(this.token, 'GET', '/boxes'), boxesAt: Date.now() });
         } catch (e) {
             this.setState({ boxes: { boxes: [], radio: false, error: e.message } });
         }
@@ -318,7 +329,7 @@ class App extends Component {
             this.setState({ radio: msg.radio });
             break;
         case 'boxes':
-            this.setState((s) => ({ boxes: { ...(s.boxes || {}), boxes: msg.boxes } }));
+            this.setState((s) => ({ boxes: { ...(s.boxes || {}), boxes: msg.boxes }, boxesAt: Date.now() }));
             break;
         case 'invites':
             if (this.state.game && msg.game === this.state.game.id) this.setState({ invites: msg.invites });

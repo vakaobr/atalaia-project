@@ -18,6 +18,25 @@ export function mhz(hz) {
     return decimal((hz / 1e6).toFixed(3));
 }
 
+/** After "Look for boxes" (RFC 0001 Amendment 19, decision RB-13): that it was asked, the earlier
+ * channels swept for boxes that were away when the field moved, how many boxes have answered since
+ * (heard after the request), and what to do about one that is still missing. */
+export function DiscoverResult({ app }) {
+    const { discovered, boxesAt, boxes } = app.state;
+    if (!discovered) return null;
+    const heard = ((boxes && boxes.boxes) || []).filter((b) => b.seen_s_ago != null
+        && (boxesAt || Date.now()) - b.seen_s_ago * 1000 >= discovered.at - 1500).length;
+    const sweep = discovered.sweep || [];
+    return html`<div data-testid="invite-discover-result" role="status" aria-live="polite">
+        <p class="small" data-testid="invite-discover-sent">${t(discovered.sent ? 'invites.discover_sent'
+            : 'invites.discover_recent')}</p>
+        ${sweep.length > 0 && html`<p class="small" data-testid="invite-discover-sweep">${t('invites.discover_sweep',
+            { channels: sweep.map((hz) => mhz(hz)).join(' MHz, ') })}</p>`}
+        <p class="small" data-testid="invite-discover-answered">${t('invites.discover_answered', { n: heard })}</p>
+        <p class="muted small" data-testid="invite-missing-help">${t('invites.missing_help')}</p>
+    </div>`;
+}
+
 function pct(value) {
     return decimal(value);
 }
@@ -136,6 +155,24 @@ export class RadioSettings extends Component {
     async random() {
         const out = await this.props.app.call('POST', '/radio/random');
         if (out) this.setState({ random: out.suggestion });
+    }
+
+    /** The field's change of channel, told to the free boxes on the old channel first (RFC 0001
+     * Amendment 19, decision RB-13): while the MOVEs are said, then that the controller has moved. */
+    renderMove(radio) {
+        const mv = radio.move;
+        if (!mv || mv.to_hz !== radio.channel.channel_hz) return null;
+        if (mv.state === 'telling') {
+            return html`<p class="notice" role="status" data-testid="radio-move-telling">${t('radio.move_telling',
+                { from: mhz(mv.from_hz), to: mhz(mv.to_hz), sent: mv.sent, repeats: mv.repeats })}</p>`;
+        }
+        if (this.state.moveSeen === mv.rev) return null;
+        return html`<div class="notice" role="status" data-testid="radio-move-moved">
+            <p>${t('radio.move_moved', { to: mhz(mv.to_hz) })}</p>
+            <p class="small">${t('invites.missing_help')}</p>
+            <button type="button" class="link" data-testid="radio-move-dismiss"
+                onClick=${() => this.setState({ moveSeen: mv.rev })}>${t('radio.move_dismiss')}</button>
+        </div>`;
     }
 
     renderCurrent(radio) {
@@ -270,6 +307,11 @@ export class RadioSettings extends Component {
         return html`<section class="card" aria-labelledby="radio-h" data-testid="radio-settings">
             <h2 id="radio-h">${t('radio.title')}</h2>
             ${this.renderCurrent(radio)}
+            ${this.renderMove(radio)}
+            ${gm && !live && app.serves('boxes') && html`<div class="actions" data-testid="radio-find-boxes-row">
+                <button type="button" data-testid="radio-find-boxes" title=${t('radio.find_boxes_hint')}
+                    onClick=${() => app.loadBoxes(true)}>${t('invites.discover')}</button></div>
+                <${DiscoverResult} app=${app} />`}
             <details class="why" data-testid="radio-why">
                 <summary>${t('radio.why_title', { channel: mhz(radio.recommended_hz) })}</summary>
                 ${taiwan(radio) ? html`<p>${t('radio.why_tw_1')}</p><p>${t('radio.why_tw_2')}</p><p>${t('radio.why_tw_3')}</p>`

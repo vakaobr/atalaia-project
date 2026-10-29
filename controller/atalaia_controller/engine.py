@@ -1036,6 +1036,8 @@ class Controller:
                 "scan": scan,
                 "game_channel_hz": (self.game.get("channel_hz") if self.game is not None else None),
                 "previous_channels_hz": self.channel_history(),
+                # The last change's MOVEs: null until one this run (RFC 0001 Amendment 19, decision RB-13).
+                "move": self.reinvite.move_status() if self.reinvite is not None else None,
             }
 
     CHANNEL_HISTORY_MAX = 4  # earlier field channels remembered for the sweep (RFC 0001 Amendment 19)

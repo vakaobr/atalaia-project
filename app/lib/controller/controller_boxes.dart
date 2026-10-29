@@ -217,7 +217,18 @@ class FieldInviter {
   final _fresh = <String, (int, int)>{};
   final _gamesOver = <_GameOver>[];
   final _moves = <_Move>[];
+  _Move?
+  _change; // the MOVEs of the field's own change of channel (not a sweep's)
   int? lastSweep;
+
+  /// How far the field's last change of channel is told (reinvite.py
+  /// `move_status`): MOVEs [sent], and whether any is still [telling].
+  ({int sent, bool telling})? get changeProgress {
+    final c = _change;
+    return c == null
+        ? null
+        : (sent: c.sent, telling: _moves.any((m) => identical(m, c)));
+  }
 
   /// A GAME_OVER or a MOVE is still to be sent.
   bool get ordersPending => _gamesOver.isNotEmpty || _moves.isNotEmpty;
@@ -416,9 +427,12 @@ class FieldInviter {
     int repeats = moveRepeats,
     int? startMs,
     int gapMs = moveGapMs,
+    bool change = false,
   }) {
     validateFieldMessage({'kind': 'move', 'channel_hz': toHz, 'rev': rev});
-    _moves.add(_Move(channelHz, toHz, rev, repeats, startMs ?? nowMs, gapMs));
+    final m = _Move(channelHz, toHz, rev, repeats, startMs ?? nowMs, gapMs);
+    _moves.add(m);
+    if (change) _change = m;
   }
 
   /// MOVE on each earlier channel, one after the other (the radio is tuned
@@ -619,6 +633,8 @@ class ControllerBoxes {
   final _pending = <String>{};
   int? _tuned; // the channel a GAME_OVER or a MOVE took the radio to
   bool _discoverAfter = false; // a DISCOVER on the field's channel after a MOVE
+  Map<String, Object?>? _moveInfo; // the last change: from_hz, to_hz, rev
+  Map<String, Object?>? _moveSent; // the status last sent on the stream
 
   int? _send(Uint8List frame) {
     final m = engine.modem;
@@ -644,7 +660,33 @@ class ControllerBoxes {
       _discoverAfter = false; // the MOVEs were dropped (a game took the radio)
     }
     _flush();
+    _emitMove();
   }
+
+  /// The progress of the field's last change of channel, for the console
+  /// (reinvite.py `move_status`): null before a change with MOVEs this run.
+  Map<String, Object?>? moveStatus() {
+    final info = _moveInfo;
+    final p = inviter.changeProgress;
+    if (info == null || p == null) return null;
+    return {
+      'state': p.telling ? 'telling' : 'moved',
+      ...info,
+      'sent': p.sent,
+      'repeats': moveRepeats,
+    };
+  }
+
+  void _emitMove() {
+    final s = moveStatus();
+    if (s == null || _sameMap(s, _moveSent)) return;
+    _moveSent = s;
+    final c = engine.channel;
+    if (c != null) engine.emit({'type': 'radio', 'radio': c.settings()});
+  }
+
+  static bool _sameMap(Map<String, Object?> a, Map<String, Object?>? b) =>
+      b != null && a.length == b.length && a.keys.every((k) => a[k] == b[k]);
 
   /// A HELLO in the live game: an invite for that node is done.
   void onHello(int nodeId, String? deviceHex) {
@@ -676,10 +718,13 @@ class ControllerBoxes {
   bool fieldMoved(int oldHz, int newHz, int rev) {
     final m = engine.modem;
     if (m == null || !m.isUp || !m.hasFieldFrames) return false;
-    inviter.move(oldHz, newHz, rev, engine.nowMs());
+    inviter.move(oldHz, newHz, rev, engine.nowMs(), change: true);
+    _moveInfo = {'from_hz': oldHz, 'to_hz': newHz, 'rev': rev};
     _discoverAfter = true;
     inviter.tick(engine.nowMs()); // the first one at once
     _flush();
+    // The caller emits the radio settings (with this status) at once.
+    _moveSent = moveStatus();
     return true;
   }
 
