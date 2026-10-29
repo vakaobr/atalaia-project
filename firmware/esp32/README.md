@@ -729,7 +729,11 @@ a build asset:
   relative to this folder, or absolute) to yours. The steps, with the `convert` command, are in
   `docs/manuals/en/firmware.md` section 4. The modem's small header icon (`oled_icon_a8`) is not part of it.
 - **The project's release images always carry the Atalaia tower** (the default); the screen goldens
-  (`test/screens/`) are rendered with it.
+  (`test/screens/`) are rendered with it. This is enforced (decision LOGO-7): `tools/release_package.py package`,
+  the last step of `release.yml`'s build, fails when `assets/splash.pgm` is not the SHA-256 pinned there
+  (`SPLASH_SHA256`), when the build's `sdkconfig` has another `CONFIG_ATALAIA_SPLASH_LOGO`, or when the
+  generated `splash_logo.c` is not that file's pixels. Your own splash is for your own builds; to redraw the
+  project's tower, change the pin in the same commit.
 
 ## The Field Box as an iBeacon (decisions BBC-1 to BBC-12)
 

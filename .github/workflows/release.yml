@@ -135,6 +135,7 @@ jobs:
           fi
           ls -l "$d/atalaia_esp32.bin"
       - name: Package (USB bundle, merged image, app image)
+        # Also refuses an image whose boot splash is not the pinned Atalaia tower (decision LOGO-7).
         run: |
           . "$IDF_PATH/export.sh"
           python3 tools/release_package.py package --variant ${{ matrix.variant }} \

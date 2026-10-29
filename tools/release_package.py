@@ -22,6 +22,7 @@ Standard library only. It never touches a key: signing is tools/firmware_release
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
 import shutil
 import subprocess
@@ -89,6 +90,52 @@ def table_problem(build: Path) -> str | None:
     return None
 
 
+# The project's boot splash (decision LOGO-7): a release image always carries the Atalaia tower. This is
+# the SHA-256 of firmware/esp32/assets/splash.pgm as committed. A builder's own splash is a local build
+# (assets/splash.pgm replaced, or CONFIG_ATALAIA_SPLASH_LOGO); the release path refuses it. Redrawing the
+# project's tower (tools/oled_logo.py) means changing this pin in the same commit, on purpose.
+SPLASH_SHA256 = "557889365cfb771f74610e37371f7019f1196f6c7540fd01bde59551a722c979"
+SPLASH_DEFAULT = "assets/splash.pgm"
+
+
+def splash_bytes(pgm: Path) -> bytes:
+    """What main/splash_logo.cmake embeds: 1800 bytes, 0xFF where the value is at least half the maximum."""
+    tokens: list[str] = []
+    for line in pgm.read_text(encoding="utf-8").splitlines():
+        tokens += line.split("#", 1)[0].split()
+    if tokens[:3] != ["P2", "30", "60"] or len(tokens) != 4 + 1800:
+        raise ValueError(f"{pgm} is not a 30 x 60 plain-text PGM")
+    half = (int(tokens[3]) + 1) // 2
+    return bytes(0xFF if int(v) >= half else 0 for v in tokens[4:])
+
+
+def splash_problem(build: Path, repo: Path = REPO) -> str | None:
+    """None if the build carries the project's Atalaia tower; else what is wrong. Three checks, so that
+    no one of them can be got round by accident: the committed asset is the pinned one, the build's
+    sdkconfig does not point the splash elsewhere, and the splash_logo.c the build generated (the array
+    that went into the image) is that asset's pixels."""
+    pgm = repo / "firmware/esp32" / SPLASH_DEFAULT
+    if not pgm.is_file():
+        return f"{pgm} is missing"
+    digest = hashlib.sha256(pgm.read_bytes()).hexdigest()
+    if digest != SPLASH_SHA256:
+        return (f"firmware/esp32/{SPLASH_DEFAULT} is not the project's Atalaia tower (sha256 {digest}, "
+                f"pinned {SPLASH_SHA256}): the project's release images always carry it (decision LOGO-6)")
+    sdkconfig = build / "sdkconfig"
+    if not sdkconfig.is_file():
+        return f"{sdkconfig} is missing (cannot tell which splash was built)"
+    m = re.search(r'^CONFIG_ATALAIA_SPLASH_LOGO="([^"]*)"', sdkconfig.read_text(encoding="utf-8"), re.M)
+    if m and m.group(1) != SPLASH_DEFAULT:
+        return f'CONFIG_ATALAIA_SPLASH_LOGO="{m.group(1)}": a release image keeps the default "{SPLASH_DEFAULT}"'
+    generated = sorted(build.rglob("splash_logo.c"))
+    if len(generated) != 1:
+        return f"the build folder has {len(generated)} splash_logo.c files, not 1 (is it a build of this firmware?)"
+    got = bytes(int(x, 16) for x in re.findall(r"0x([0-9A-Fa-f]{2})", generated[0].read_text(encoding="utf-8").split("= {", 1)[-1]))
+    if got != splash_bytes(pgm):
+        return f"{generated[0]} is not the pixels of {SPLASH_DEFAULT}: the image carries another splash"
+    return None
+
+
 def readme(variant: str, version: str, files: list[tuple[str, str]]) -> str:
     listing = "\n".join(f"  {offset}  {path}" for offset, path in files)
     return f"""Atalaia {version} firmware: {VARIANTS[variant]}
@@ -134,6 +181,9 @@ def cmd_package(args: argparse.Namespace) -> int:
     if not app.is_file() or not (build / "flash_args").is_file():
         return fail(f"{build}: no atalaia_esp32.bin and flash_args (is the build done?)")
     problem = table_problem(build)
+    if problem:
+        return fail(problem)
+    problem = splash_problem(build)
     if problem:
         return fail(problem)
     files = flash_files(build)

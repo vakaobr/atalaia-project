@@ -130,6 +130,8 @@ For the maintainer. A release is a pull request and a merge; the tag and the bui
 3. Review it, let CI pass, merge it. Merging is the go-ahead: `tag-release.yml` creates the annotated tag `vX.Y.Z` on the merge commit and starts `release.yml` for it (builds the images, signs the Field Box image with the CI key, publishes a GitHub pre-release; see [firmware/esp32/docs/RELEASE_SIGNING.md](firmware/esp32/docs/RELEASE_SIGNING.md)). A second pull request, **Open X.Y.Z-dev after the vX.Y.Z release**, sets the core's next development version; merge it too, so that later builds sort above the release.
 4. Closing the pull request without merging releases nothing: delete its branch. A release that went wrong is deleted by hand (the GitHub release, then the tag) before trying again; `release.yml` refuses to publish a tag that already has a release.
 
+The release build refuses an image whose boot splash is not the Atalaia tower (decision LOGO-7): `tools/release_package.py package` checks that `firmware/esp32/assets/splash.pgm` matches the SHA-256 pinned in the tool, that the build's `sdkconfig` has no other `CONFIG_ATALAIA_SPLASH_LOGO`, and that the generated `splash_logo.c` holds that file's pixels, and fails the job otherwise (a dry run from a branch fails the same way). A builder's own splash is for local builds only. To change the project's tower on purpose, redraw it (`tools/oled_logo.py`) and update `SPLASH_SHA256` in `tools/release_package.py` in the same commit.
+
 By hand, the same: `python3 tools/prepare_release.py prepare --bump minor`, commit, tag `vX.Y.Z` on the commit that passes `prepare_release.py check --version X.Y.Z`, push the tag. "Run workflow" on `release.yml` from a branch is a dry run that publishes nothing.
 
 ## Code style
