@@ -160,6 +160,8 @@ class MemoryControllerStore implements ControllerStore {
     'field_run',
     'box_lang',
     'issued_nodes',
+    'box_beacons_off',
+    'box_beacon_rooms',
   ];
 
   @override

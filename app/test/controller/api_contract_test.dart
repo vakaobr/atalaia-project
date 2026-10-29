@@ -179,6 +179,7 @@ Map<String, Object?> joinJson(JoinPayload j) => {
   'fetch_modes': j.fetchModes,
   'forget_modes': j.forgetModes,
   'region': j.region,
+  'box_beacon': j.boxBeacon,
 };
 
 /// A decoded frame's fields as the cases see them: bytes in hex.

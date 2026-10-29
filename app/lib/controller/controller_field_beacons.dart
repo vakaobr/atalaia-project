@@ -18,6 +18,9 @@
 part of 'controller_field.dart';
 
 const beaconsMax = 200;
+
+/// The Field Boxes' own major (box_beacons.py): a tag may not use it.
+const _boxMajorReserved = 0xB0C5;
 const _beaconRoomMax = 48;
 const _beaconZoneMax = 48;
 const bleIntervalDefaultS = 5;
@@ -88,6 +91,12 @@ Map<String, Object?> checkBeacon(
   } else {
     major = _id16(body['major'], 'major');
     minor = _id16(body['minor'], 'minor');
+  }
+  if (major == _boxMajorReserved) {
+    throw ControllerError(
+      "major: $_boxMajorReserved is the Field Boxes' own (they register "
+      'themselves from their place); give a tag another major',
+    );
   }
   final level = body.containsKey('level') ? body['level'] : 0;
   if (level is! int) {
@@ -183,7 +192,9 @@ extension FieldBeacons on ControllerField {
   }
 
   /// GET /api/v1/beacons: staff the whole registry, everyone else each
-  /// beacon's id and uuid (what a phone listens for).
+  /// beacon's id and uuid (what a phone listens for). The Field Boxes of the
+  /// live game are in it as beacons of their own (controller_box_beacons.dart);
+  /// staff also get the field's box-beacon setting.
   Map<String, Object?> beaconsFor(ApiViewer v) {
     final live = engine.liveGame;
     final game = live == null ? null : engine.store.game(live['id']! as int);
@@ -197,8 +208,14 @@ extension FieldBeacons on ControllerField {
               'id': beaconId(b['major']! as int, b['minor']! as int),
               'uuid': (b['data']! as Map)['uuid'],
             },
+        if (v.isStaff)
+          ...boxBeacons()
+        else
+          for (final b in registeredBoxBeacons())
+            {'id': b['id'], 'uuid': b['uuid']},
       ],
       'ble_interval_s': bleIntervalS(game),
+      if (v.isStaff) 'box_beacons': boxBeaconsStatus(),
     };
   }
 
@@ -278,6 +295,8 @@ extension FieldBeacons on ControllerField {
     } on ControllerError {
       return null;
     }
+    // A Field Box's own beacon (its place on the field view), else a tag.
+    if (key.$1 == boxBeaconMajor) return boxBeaconPlace(id);
     final row = _beacon(key.$1, key.$2);
     if (row == null) return null;
     final d = (row['data']! as Map).cast<String, Object?>();

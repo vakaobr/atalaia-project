@@ -207,6 +207,18 @@ extension on ControllerApi {
       _gm((r) => ApiResponse(200, _field.deleteBeacon(r.pathText(1)))),
     ),
     ControllerApi._route(
+      'PUT',
+      r'/api/v1/box-beacons',
+      _gm((r) => ApiResponse(200, _field.setBoxBeaconsEnabled(r.json))),
+    ),
+    ControllerApi._route(
+      'PUT',
+      r'/api/v1/box-beacons/([^/]+)',
+      _gm(
+        (r) => ApiResponse(200, _field.updateBoxBeacon(r.pathInt(1), r.json)),
+      ),
+    ),
+    ControllerApi._route(
       'GET',
       r'/api/v1/games/([^/]+)/positions',
       _viewer((r, v) => ApiResponse(200, _field.places(r.pathInt(1)))),

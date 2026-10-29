@@ -56,9 +56,12 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
+
 import 'controller_checkin.dart';
 import 'controller_engine.dart';
 
+part 'controller_box_beacons.dart';
 part 'controller_field_beacons.dart';
 
 /// Bytes of one level's plan (store.py FIELD_IMAGE_MAX).
@@ -1585,6 +1588,8 @@ class ControllerField {
       'level': level,
     };
     _emit(msg);
+    // A box's beacon is its place: it moves with it (box_beacons.py).
+    if (isLiveBox(gameId, nodeId)) _emit(beaconsChanged);
     return msg;
   }
 
