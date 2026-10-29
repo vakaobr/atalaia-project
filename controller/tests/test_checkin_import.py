@@ -95,10 +95,10 @@ class ImportTests(P3Case):
         g = self.new_game()
         out = self.post(g["id"], data="Email,display_name\r\nx@example.pt,Rita\r\n", source="clube", dry_run=True)
         self.assertEqual((out["columns"], out["not_imported_columns"]), (["display_name"], ["Email"]))
-        js = '[{"display_name": "Rita", "external_ref": 7, "phone": "912"}]'
+        js = '[{"display_name": "Rita", "external_ref": 7, "phone": "PHONE-QX73"}]'
         out = self.post(g["id"], data=js, format="json", source="clube", basis_confirmed=True)
         self.assertEqual((out["counts"]["created"], out["not_imported_columns"]), (1, ["phone"]))
-        self.assertNotIn("912", str(self.rows(g["id"])))
+        self.assertNotIn("PHONE-QX73", str(self.rows(g["id"])))
 
     def test_federation_rules_follow_the_field(self):
         g = self.new_game()
