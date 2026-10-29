@@ -55,7 +55,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Callable, Optional
 
 from . import regions
-from .field_controller import AckTracker
+from .field_controller import STATE_REPEAT_GAPS_MS, AckTracker
 from .packet import ack_encode, cmd_encode
 
 # ---------------------------------------------------------------------------
@@ -363,6 +363,10 @@ class Policy:
     lbt_cad_ms: float = 0.0
     lbt_core: bool = False  # the tries and the 20-200 ms wait are the core's atalaia_lbt_* (relay_core.CoreLbt)
     radio_loop_ms: int = 0  # >0: the radio task's loop grid (11 with LBT: recv waits 10 ms; 60 without: 50 + 10)
+    # The controller's TIME repeats after a start, a pause or a resume (RFC 0001 Amendment 19 part 2, decision
+    # RB-8): the built gaps; () is the controller as it was before. Used only when the Engine is given
+    # ``state_changes`` (the study's older runs have no state change after the start and are unchanged).
+    time_repeat_gaps_ms: tuple[int, ...] = STATE_REPEAT_GAPS_MS
     core_rules: bool = False  # every box runs the core's own relay rules (core/src/flood.c, ack.c; relay_core.py)
                               # instead of this file's model of them: RFC 0001 Amendment 13, the shipped code
 
@@ -506,6 +510,7 @@ class Stats:
 
     def __init__(self) -> None:
         self.air_us: dict[str, int] = {}
+        self.air_ptype: dict[str, int] = {}  # on air by frame type (own and relayed), for the load tables
         self.dc_dropped: dict[str, int] = {}
         self.queue_dropped: dict[str, int] = {}
         self.relay_slot_dropped = 0
@@ -665,6 +670,7 @@ class Node:
         a = tx.end - tx.start
         self.dc.record(a, t_us // 1000)
         self.stats.add(self.stats.air_us, kind, a)
+        self.stats.add(self.stats.air_ptype, tx.frame.ptype, a)
         self.stats.peak_used_us = max(self.stats.peak_used_us, self.dc.used_us)
         minute = t_us // 60_000_000
         ab = self.stats.air_by_minute
@@ -1082,6 +1088,9 @@ class Controller(Node):
         self.acks = GapSkippingAckTracker(h) if h else AckTracker()
         self.heard: set[tuple[int, int]] = set()
         self.ack_sent = 0
+        self.time_gen = 0  # a state change starts a new TIME beacon chain (its last repeat resets the 30 s period)
+        self.state_changes_sent = 0
+        self.time_repeats_sent = 0
 
     def on_rx(self, f: Frame, t_us: int) -> None:
         key = (f.src, f.seq)
@@ -1109,11 +1118,40 @@ class Controller(Node):
         self.ack_sent += 1
         self.enqueue(f, "ack", t_us)
 
-    def send_time(self, t_us: int) -> None:
+    def send_time(self, t_us: int, gen: Optional[int] = None) -> None:
+        if gen is not None and gen != self.time_gen:
+            return  # a state change took over the beacon chain
+        gen = self.time_gen
         f = Frame(CONTROLLER, self.next_seq(), "TIME", HEADER + 23 + MIC, False, MAX_HOPS,
                   ("time",), t_us)
         self.enqueue(f, "time", t_us)
-        self.eng.at(t_us + int(TIME_MS * 1000 * self.drift), self.send_time)
+        self.eng.at(t_us + int(TIME_MS * 1000 * self.drift), lambda t, g=gen: self.send_time(t, g))
+
+    def send_state_change(self, t_us: int, kind: str) -> None:
+        """A start, pause or resume (field_controller.py: CMD + TIME at once, then TIME alone after each gap of
+        ``time_repeat_gaps_ms``; a new change replaces the repeats still due; the 30 s beacon goes on from the
+        last repeat). An end is not modelled (GAME_OVER is three field frames, not TIME)."""
+        self.time_gen += 1
+        gen = self.time_gen
+        self.state_changes_sent += 1
+        code = {"start": 0, "pause": 1, "resume": 2}[kind]
+        body = cmd_encode({"cmd": code, "dest": 0xFFFF})
+        self.enqueue(Frame(CONTROLLER, self.next_seq(), "CMD", HEADER + len(body) + MIC, False, MAX_HOPS,
+                           ("cmd", None, None), t_us), "cmd", t_us)
+        self.enqueue(Frame(CONTROLLER, self.next_seq(), "TIME", HEADER + 23 + MIC, False, MAX_HOPS,
+                           ("time",), t_us), "time", t_us)
+        at = t_us
+        for gap in self.eng.policy.time_repeat_gaps_ms:
+            at += int(gap * 1000 * self.drift)
+            self.eng.at(at, lambda t, g=gen: self.send_time_repeat(t, g))
+        self.eng.at(at + int(TIME_MS * 1000 * self.drift), lambda t, g=gen: self.send_time(t, g))
+
+    def send_time_repeat(self, t_us: int, gen: int) -> None:
+        if gen != self.time_gen:
+            return  # a later change replaced it
+        self.time_repeats_sent += 1
+        self.enqueue(Frame(CONTROLLER, self.next_seq(), "TIME", HEADER + 23 + MIC, False, MAX_HOPS,
+                           ("time",), t_us), "time", t_us)
 
     def send_cmd(self, t_us: int, dest: Optional[int], params_len: int, setup: Optional["Setup"] = None) -> None:
         body = cmd_encode({"cmd": 8, "params": {"p": "x" * max(params_len - 8, 0)}, "dest": dest or 0xFFFF})
@@ -1134,10 +1172,11 @@ class Engine:
     def __init__(self, layout: Layout, trace: Any, region: str, policy: Policy, seed: int = 1,
                  minutes: Optional[int] = None, ideal_channel: bool = False, loss: float = 0.0,
                  drift_ppm: float = 20.0, capture_db: float = CAPTURE_DB, lib: Optional[str] = None,
-                 cmd_mode: str = "oneshot") -> None:
+                 cmd_mode: str = "oneshot", state_changes: Optional[list[tuple[int, str]]] = None) -> None:
         if cmd_mode not in CMD_MODES:
             raise ValueError(f"cmd_mode is one of {CMD_MODES}")
         self.cmd_mode = cmd_mode
+        self.state_changes = state_changes  # [(ms after the game's start, "start"|"pause"|"resume")] or None
         self.setups: list[Setup] = []
         self.ack_events: list[EventRec] = []
         self.lib = lib
@@ -1234,7 +1273,11 @@ class Engine:
             # 100 ms steps: 0.3-1.5 s after the trace's time (the first, at the game's start, is not an answer)
             lag = self.rng.randint(300, 1500) * 1000 if c.t_ms > 0 else 0
             self.at(c.t_ms * 1000 + GAME_T0_US + lag, lambda t, c=c: self.send_setup(t, c))
-        self.at(GAME_T0_US, self.ctl.send_time)
+        if self.state_changes is None:
+            self.at(GAME_T0_US, self.ctl.send_time)
+        else:
+            for ms, kind in self.state_changes:
+                self.at(GAME_T0_US + ms * 1000, lambda t, k=kind: self.ctl.send_state_change(t, k))
 
     def send_setup(self, t_us: int, c: Any) -> None:
         """A command of the scenario. For one box it is a setup; in the repeating modes the controller sends it
@@ -1342,9 +1385,14 @@ class Engine:
             "airtime_pct": round(sum(self.ctl.stats.air_us.values()) / (dur_s * 1e6 + 30e6) * 100, 2),
             "dc_dropped": sum(self.ctl.stats.dc_dropped.values()),
             "queue_dropped": sum(self.ctl.stats.queue_dropped.values()),
+            "air_s_by_type": {k: round(v / 1e6, 2) for k, v in sorted(self.ctl.stats.air_ptype.items())},
+            "state_changes": self.ctl.state_changes_sent, "time_repeats": self.ctl.time_repeats_sent,
             "acks_sent": self.ctl.ack_sent,
             "acks_heard_by_their_box_pct": round(100.0 * sum(b.acks_for_me for b in boxes) / max(1, self.ctl.ack_sent), 1),
         }
+        res["time_air_s_per_box_hour"] = {
+            "all": round(statistics.fmean(b.stats.air_ptype.get("TIME", 0) for b in boxes) / 1e6 / (dur_s / 3600.0), 2),
+            "cmd": round(statistics.fmean(b.stats.air_ptype.get("CMD", 0) for b in boxes) / 1e6 / (dur_s / 3600.0), 2)}
         res["events"] = self._event_metrics(end_us)
         res["states"] = self._state_metrics(end_us, t0)
         if self.cmd_sent:
@@ -1455,12 +1503,18 @@ class Engine:
 
 def run_one(game: str, n: int, layout: str, region: str, policy: str, minutes: int = 90, seed: int = 1,
             lib: Optional[str] = None, ideal_channel: bool = False, loss: float = 0.0, capture_db: float = CAPTURE_DB,
-            drift_ppm: float = 20.0, trace: Any = None, cmd_mode: str = "oneshot", **trace_kw: Any) -> dict[str, Any]:
+            drift_ppm: float = 20.0, trace: Any = None, cmd_mode: str = "oneshot",
+            state_changes: Optional[list[tuple[int, str]]] = None, time_repeat_gaps_ms: Optional[tuple[int, ...]] = None,
+            **trace_kw: Any) -> dict[str, Any]:
     from .relay_traces import get_trace
     tr = trace or get_trace(game, n, minutes, seed, lib, **trace_kw)
     lay = LAYOUTS[layout](n, seed)
-    eng = Engine(lay, tr, region, POLICIES[policy], seed=seed, minutes=minutes, ideal_channel=ideal_channel,
-                 loss=loss, capture_db=capture_db, drift_ppm=drift_ppm, lib=lib, cmd_mode=cmd_mode)
+    pol = POLICIES[policy]
+    if time_repeat_gaps_ms is not None:
+        pol = replace(pol, time_repeat_gaps_ms=time_repeat_gaps_ms)
+    eng = Engine(lay, tr, region, pol, seed=seed, minutes=minutes, ideal_channel=ideal_channel,
+                 loss=loss, capture_db=capture_db, drift_ppm=drift_ppm, lib=lib, cmd_mode=cmd_mode,
+                 state_changes=state_changes)
     res = eng.run()
     res["seed"] = seed
     return res

@@ -90,6 +90,7 @@ python -m atalaia_sim.relay_study --list-policies                  # the rules c
 python -m atalaia_sim.relay_study --games scenario --sizes 20 --cmd-mode resend_ack   # the scenario's setup commands sent again until the box confirms (PKB-3; also oneshot, resend)
 python -m atalaia_sim.relay_report --setup-study --seeds 1,2,3,4,5                    # those three side by side
 python -m atalaia_sim.relay_report --out relay-study-results.md   # everything the decisions quote (about 10 minutes on 32 cores)
+python -m atalaia_sim.state_load --sizes 20 --seeds 1,2,3           # what the state changes' TIME repeats, a MOVE and a sweep add (RB-8, RB-4, RB-6; docs/review/state-load-results.md)
 ```
 
 `docs/review/relay-study-results.md` is that report's output. Every number is a model's: the link budget and the capture effect are assumptions (decision SL-18 lists them and the sensitivity runs), so use it to compare rules and for the order of magnitude, not for a field's last percent. `tests/test_relay_study.py` checks the model against the rules it ports: the C core's jitter values, the relay count of a full mesh, a chain's three-hop reach, the budget refusing and dropping a frame, the table sizes, SL-4's arithmetic on an ideal channel.

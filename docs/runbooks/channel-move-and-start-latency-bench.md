@@ -28,7 +28,7 @@ Status: built and tested in software (the core, the box's own code in the host b
 
 ## Duty cycle
 
-The whole of part 1 costs 0.27 s of air on the old channel (three MOVEs) and 0.18 s on each remembered channel of a sweep: under 0.01 % of an hour on 869.525 MHz (10 %) and 0.75 % of the budget of 869.925 MHz (1 %, 25 mW). Part 2 adds four TIMEs (0.36 s) per start, pause or resume. Nothing in this runbook comes near a limit; the modem's duty-cycle guard still applies (a refused frame shows as `duty_cycle` in `bench.py get /controller` `tx_status`).
+The whole of part 1 costs 0.27 s of air on the old channel (three MOVEs) and 0.18 s on each remembered channel of a sweep: under 0.01 % of an hour on 869.525 MHz (10 %) and 0.75 % of the budget of 869.925 MHz (1 %, 25 mW). Part 2 adds four TIMEs (0.36 s) per start, pause or resume. The 20-box field's numbers, per hour and per sub-band, are in [state-load-results.md](../review/state-load-results.md) and its measurement in [radio-field-test.md](radio-field-test.md). Nothing in this runbook comes near a limit; the modem's duty-cycle guard still applies (a refused frame shows as `duty_cycle` in `bench.py get /controller` `tx_status`).
 
 ## Part 1: a change of channel with a box idle
 

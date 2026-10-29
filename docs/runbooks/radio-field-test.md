@@ -101,6 +101,32 @@ What would be a result: **the STATEs the controller hears** and **the capture la
 
 **AS923-TW boxes.** The CAD's detection peak there (29 at SF9/500 kHz) was measured on the bench with that modulation on 868.3 MHz (Semtech's 23 gave 17.8 % false busy; decision SL-38), not on 921.5 MHz: run the bench gate ([lbt-bench-gate.md](lbt-bench-gate.md): on an AS923-TW image, or in Europe with the same modulation on 868.3 MHz, `@lbt ... proxy=as923`) before trusting a Taiwanese field's LBT numbers, or build that field with `--lbt=off`.
 
+## State changes in the field: the TIME repeats (RFC 0001 Amendment 19, decisions RB-8 and RL-1 to RL-8)
+
+Since Amendment 19 the controller says a start, a pause or a resume as CMD + TIME and then TIME again at +1, +2.5, +5 and +10 s, and every box relays each TIME (probability min(1, 3 / neighbours)). The study's tables above were made without those frames; [the state-load model](../review/state-load-results.md) adds them. **Every 20-box run of this test includes them**, so the numbers above are measured with the repeats on.
+
+**What the model predicts** (EU868, 20 boxes in a mesh, 60 minutes, a start and three pause / resume pairs = 7 state changes; the repeats against none):
+
+| | without the repeats | with them | added |
+| --- | --- | --- | --- |
+| the controller's air for a change | 0.14 s | 0.47 s | 0.33 s (CMD 62 ms + 5 TIMEs of 82 ms) |
+| the controller's air, whole hour | 0.89 % | 0.96 % | +0.06 point (+2.2 s of TIME) |
+| a box's air, mean | 2.99 % | 3.00 % | +0.01 point (inside the noise) |
+| a box's TIME relays, per change | | 0.04 s | (0.22 s at 5 boxes, 0.11 at 10, 0.03 at 30) |
+| frames refused by a budget | 0 | 0 | |
+
+**The script.** In each 90-minute run the GM presses **Pause at minute 25, Resume at 28, Pause at 45, Resume at 48, Pause at 65, Resume at 68** (and the start at minute 0 is the first change: 7 in all; the same times in the on and off runs of the listen-before-talk comparison, and the same in the runs of the other sections). Write the press times down to the second. Run the 90 minutes with Domination as before.
+
+**What to read.**
+
+1. **The controller's air per change.** Before each press and after the repeats are over (12 s later) take the modem's STATUS (`duty_ms`, `tx`, `tx_fail`; the console's modem status or the controller's `tx_status`): `tx` should rise by 6 for a pause or resume (CMD, TIME, 4 TIMEs) and by 7 or 8 when the periodic beacon falls in the window, `duty_ms` should fall by about 470 ms (more if ACKs go out meanwhile: take the median of the six changes; quiet minutes' ACKs are a few a minute). Over the whole run the controller's `tx` should be about 7 x 6 = 42 above what 90 minutes of beacons (180 TIMEs) and the ACKs give.
+2. **A box's cost.** The summary's airtime and `duty_remaining_ms` slope per minute: the minutes holding a change should not stand out of the 1.7 s a minute by more than about 0.05 s (0.04 s relayed per change at 20 boxes); a box that relays every TIME (fewer than 4 neighbours heard: `neighbours` in its line) pays 0.33 s.
+3. **`tx_refused` and the modem's `tx_fail`** stay 0 on the default sub-band; a refused frame near a change is the one thing that would make the repeats a problem (the modem's `tx_status` says `duty_cycle`). On a 1 % channel (868.1 to 868.5, 869.7 to 870 MHz: the console warns) the budget is 36 s an hour and a relayed 20-box field spends it three times over without any repeat; only run one there as a refusal test, not a comparison.
+4. **How fast the state reaches the boxes**, the point of the repeats: for each change, the time from the press to each box's own log line of the new state (`game N started`, paused, resumed on the serial log; the log's timestamp against the press time). The study has no number for it; the bench's quiet-channel result was within 1 s (the first repeat), so in the 20-box field expect **most boxes within about 1 s and all within 5 s** (two repeats lost) and none waiting for the 30 s beacon (the one a box that missed all five would wait for). Boxes later than 12 s are the finding: say how many, and whether they were the ones with the lowest `neighbours`.
+5. **Channel change and sweep** (once, after the game, with no game live): change the field's channel from the console (three MOVEs, 0.28 s on the old channel's sub-band) and press *Find boxes* five times a minute apart. The modem's `duty_ms` falls by 0.28 s for the change and by about 0.74 s per sweep when four channels are remembered (0.18 s a channel); `tx_fail` stays 0 on the 10 % sub-band; on a 0.1 % or 1 % sub-band note the first refusal (the model: the 49th sweep of an hour spends a 1 % band's 36 s if the remembered channels share it, the 5th a 0.1 % band's 3.6 s). Every free box should follow the move (`moves_refused` 0 on the idle boxes of the field and the box's idle channel right after).
+
+**What would say the model is wrong:** a controller `duty_ms` fall per change far above 0.5 s (the CMD or TIME is bigger than 40 / 24 bytes, or the repeats are not replaced by a newer change), a box's per-change cost several times 0.04 s (the density rule is not holding the relays down: compare `relayed` and `neighbours`), or boxes later than 5 s with a clean channel (the repeats are not reaching them: a hidden-node pocket the layouts do not have).
+
 ## The controller's TX pacing, on and off
 
 The controller can leave a gap between its own frames (ACKs, TIME beacons, CMDs): `[radio] controller_pace_ms` on the Pi, `ControllerConfig.controllerPaceMs` on the phone ([RFC 0001 Amendment 15](../rfcs/0001-skirmesh-rf-wire-format.md), decisions SL-13 and SL-39). **It ships off (0)**: the model says 800 ms adds 0-22 points to the setup CMDs that reach their box, but it also costs some of the controller's ACKs (section 7 of [the study's results](../review/relay-study-results.md): for example 55.7 to 48.0 % heard in a mesh of 30, 83.3 to 68.2 % in a long field of 10, and more in other cells). The maintainer decides from this test: **the same field, the same game, once with 0 and once with 800** (alternate the order between days, as for listen before talk), with a scenario that sets its boxes up by CMD (Foxhound's `setup`).
