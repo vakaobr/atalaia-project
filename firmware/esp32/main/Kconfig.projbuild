@@ -872,7 +872,7 @@ menu "Atalaia Field Box Configuration"
 
         config ATALAIA_BOX_BEACON
             bool "Advertise as an iBeacon while joined to a game"
-            default y
+            default n
             help
                 A Field Box joined to a field's game advertises a non-connectable
                 iBeacon packet (protocol/box-beacon.md), so a phone that hears it
