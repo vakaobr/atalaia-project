@@ -215,6 +215,7 @@ If you change `--region`, `--lbt`, a key option, or update the repository, the b
 - **The admin PIN** has no default. You choose it on the setup page ([section 5](#5-first-boot-and-setup)). Easy PINs such as 1234 are refused.
 - **The field Wi-Fi** name and password are set on the setup page too.
 - **The field join key** is given to the box when it is adopted ([section 6](#6-adoption)).
+- **Your own splash logo.** The image on the box's boot screen and on its *ready* screens is a build asset, `firmware/esp32/assets/splash.pgm` (the Atalaia tower). To build a box with another one, make a **plain-text PGM** (the first line `P2`, then `30 60`, then the maximum value, then 1,800 numbers, one per pixel, row by row; `assets/splash.pgm` is an example you can open in a text editor, and GIMP and ImageMagick write the format: `convert logo.png -resize 30x60! -depth 8 -compress none logo.pgm`) **of exactly 30 x 60 pixels**. A pixel is lit from half the maximum value up and dark below: the image is one colour, drawn white on the small OLED and in the accent colour, scaled up to 96 pixels tall, on the big screen; make it tall and narrow, like the tower. Then either replace `assets/splash.pgm`, or point the build at your file (`CONFIG_ATALAIA_SPLASH_LOGO` in menuconfig, *Boot splash*, a path relative to `firmware/esp32/` or absolute; for `docker_fw.py` put a line `CONFIG_ATALAIA_SPLASH_LOGO="assets/mine.pgm"` in `firmware/esp32/sdkconfig.defaults`, and keep the file inside the repository so the build container sees it). The build turns the file into a C array and stops with a message if the file is not a 30 x 60 plain-text PGM. Only the Field Box and the modem have a splash. **The project's release images always carry the Atalaia tower**; a box with your image is your own build and gets no release update that you did not build yourself ([section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)).
 - **The box's Bluetooth beacon.** A Field Box joined to a game advertises an iBeacon so that a phone that hears it is placed where the box is (the beacon's UUID comes from the join key, its major is 45253 and its minor is the box's node id). Nothing to set on the box: the GM turns it off for the whole field at the console (**Field**, **Indoor beacons**, **Field Boxes as beacons**), and the next game's join tells the boxes. It uses the Bluetooth stack in the image (about 160 KB more flash and 25 KB more RAM than a build without it) and is off between games. The Wokwi variant and the modem have no beacon.
 
 ## 5. First boot and setup
@@ -231,10 +232,10 @@ A new Field Box or Satellite does this on its first start. The 2.4 GHz antenna m
    - **Admin PIN**: 4 to 8 digits. Write it down. 1234, 0000, a sequence such as 9876 and a repeated pair such as 1212 are refused.
    - **Display Brightness** and **Audio Volume**.
    - **Field join key** (optional): the 64 digits from the organisers. You can add it later by adoption.
-   - **Field Wi-Fi name** and **password** (optional, but needed for updates, the field's logo and fetched game modes: [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)). The field Wi-Fi must be 2.4 GHz.
+   - **Field Wi-Fi name** and **password** (optional, but needed for updates and fetched game modes: [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)). The field Wi-Fi must be 2.4 GHz.
 5. Tap **Save & Reboot**. The box restarts.
 
-Then a box with no field shows **PAIR THIS BOX** and a 6-digit code ([section 6](#6-adoption)). A box that is already adopted shows **READY**, with the field's logo if it has one.
+Then a box with no field shows **PAIR THIS BOX** and a 6-digit code ([section 6](#6-adoption)). A box that is already adopted shows **READY**.
 
 **Open the setup page again.** On a box that was set up, there are two ways. Neither works during a game.
 
@@ -259,7 +260,7 @@ A box of another field asks for its **admin PIN**. **Change field** moves a box 
 
 ## 7. Updates over the air, and what else uses the field Wi-Fi
 
-Three things use the field's Wi-Fi, and only between games: **firmware updates**, **game modes the box does not have** (fetched from the controller as signed packages) and **the field's logo** (one small picture, fetched once for each joined game). For all three the box needs the **field Wi-Fi name and password** from the setup page. You can also set them on the USB console: `@wifi <name> <password>`. The controller must be running with HTTPS on.
+Two things use the field's Wi-Fi, and only between games: **firmware updates** and **game modes the box does not have** (fetched from the controller as signed packages). For both the box needs the **field Wi-Fi name and password** from the setup page. You can also set them on the USB console: `@wifi <name> <password>`. The controller must be running with HTTPS on.
 
 **The rules for firmware updates.** The box installs an update only if all of these are true:
 

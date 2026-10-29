@@ -37,7 +37,6 @@ const SHELL = [
     'components/box-invites.js',
     'components/box-language-settings.js',
     'components/box-glyphs.js',
-    'components/box-logo.js',
     'components/branding-settings.js',
     'components/checkin-panel.js',
     'components/field-grid.js',

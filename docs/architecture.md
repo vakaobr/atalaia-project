@@ -75,7 +75,7 @@ used while loading a field map`"]
     boxes <-->|"LoRa"| modem
     modem <-->|"USB serial"| ctrl
     pod <-->|"LoRa"| modem
-    boxes -->|"Wi-Fi HTTPS pinned: firmware, modes, logo"| ctrl
+    boxes -->|"Wi-Fi HTTPS pinned: firmware, modes"| ctrl
     props <-->|"Wi-Fi WebSocket, pinned"| ctrl
     props <-->|"USB-OTG or BLE"| pod
     gm <-->|"Wi-Fi HTTPS and WebSocket"| ctrl
@@ -93,7 +93,7 @@ used while loading a field map`"]
 talk over LoRa through the modem: events, scores, the clock and commands. The
 controller serves everything else on the field's Wi-Fi: the GM console, the
 live view for players, the Android props, and the files a box fetches (firmware,
-game modes, the field's logo). A phone that is the field controller replaces the
+game modes). A phone that is the field controller replaces the
 Raspberry Pi and the modem: it uses a modem or an I/O pod plugged into it, or
 has no LoRa at all and serves only Android props on Wi-Fi.
 
@@ -380,7 +380,7 @@ root (offline) and CI`"]
     reg["Mode registry:<br/>signed packages"]
     op["Operator:<br/>downloads, then uploads"]
     ctrl["`**Field controller**
-keeps releases, packages, logo`"]
+keeps releases, packages`"]
     box["`**Field Box**
 checks everything itself`"]
     card["NFC field card"]
@@ -392,7 +392,7 @@ checks everything itself`"]
     op -->|"Wi-Fi HTTPS: console upload"| ctrl
     reg -.->|"HTTPS: index and packages"| ctrl
     ctrl -->|"LoRa: CMD update, or an invite with modes"| box
-    box -->|"Wi-Fi HTTPS pinned: image, mode packages, logo, report"| ctrl
+    box -->|"Wi-Fi HTTPS pinned: image, mode packages, report"| ctrl
     ctrl ---|"USB cable: adopt"| box
     ctrl -->|"writes"| card
     card -->|"NFC tap: adopt"| box
@@ -412,8 +412,7 @@ The box then fetches the signed release and the image over the field Wi-Fi, from
 the controller's HTTPS, trusting only the field CA whose hash its join payload
 carries (so it needs no clock and no other trust store), and it reports the result
 over HTTPS (or by a LoRa event if HTTPS fails). A mode a box lacks is fetched the
-same way after an invite that asks for it. The field's logo comes over the same
-Wi-Fi and HTTPS. Updates happen only between games, never while a game runs.
+same way after an invite that asks for it. Updates happen only between games, never while a game runs.
 
 **The trust chain.** The signature, not the channel, is what makes a file safe:
 
@@ -433,7 +432,7 @@ Wi-Fi and HTTPS. Updates happen only between games, never while a game runs.
   never needs the key that can replace a box's firmware. See
   [`community/keys.md`](community/keys.md).
 
-Not yet run on real hardware: modes fetched by a box, the logo on a box's screen,
+Not yet run on real hardware: modes fetched by a box,
 and the NFC field card. Adoption by USB cable and by pairing code, and an update
 over the air, have run on a bench.
 

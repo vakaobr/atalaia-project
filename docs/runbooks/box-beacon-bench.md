@@ -20,7 +20,7 @@ Not on the list, on purpose: do **not** use the Wokwi build (no Bluetooth radio,
 
 ## 1. The box starts the Bluetooth stack
 
-1. Flash the image, restart the box, join a game from the console (an invite, a card or `@join ...`). If the box has the field Wi-Fi set (for the logo), it fetches the logo first; **the beacon starts after the fetch** (the Wi-Fi driver and the Bluetooth controller share the internal RAM), up to about the Wi-Fi timeout after the join, and at once if there is no Wi-Fi or no logo.
+1. Flash the image, restart the box, join a game from the console (an invite, a card or `@join ...`). The box no longer fetches a logo at a join (decision LOGO-5): **the beacon starts at once**, unless a mode fetch or an update has the Wi-Fi, and then right after it (the Wi-Fi driver and the Bluetooth controller share the internal RAM and are never up together: the Wi-Fi start waits for the beacon to be down, and the beacon is refused while Wi-Fi is in use).
 2. On the serial console read, in this order:
 
    ```
@@ -28,8 +28,8 @@ Not on the list, on purpose: do **not** use the Wokwi build (no Bluetooth radio,
    box-beacon: advertising as iBeacon <UUID> 45253:<node> every 500 ms
    ```
 
-   **Write down A and B.** B is what the controller takes of the internal RAM while it runs (released when it stops); A is what is left. The Wi-Fi driver logged "DMA-capable RAM ... free" before it started in the same run: **a logo that does not appear, or "Wi-Fi driver did not start" after a beacon, is a RAM failure** (the Wi-Fi driver once needed all of 47 KB of it): write the numbers down and report it. `Bluetooth controller failed to start (...)` is the same kind of failure for the beacon: the box plays on without it.
-3. Static internal RAM grew by about 25 KB in the image (`idf.py size`: DIRAM 270,880 to 296,024 bytes, 45,736 left); the memory monitor logs the heap every 10 s: note whether the lowest free internal RAM in a game with the beacon on is below the same game with it off (the field's switch, step 5).
+   **Write down A and B.** B is what the controller takes of the internal RAM while it runs (released when it stops); A is what is left. **Expect A of about 150 KB or more and B of about 20 to 25 KB** (the static budget left 194 KB for the heap, up from 45.7 KB: README, "Memory budget"). The beacon refuses to start with less than 40 KB free or a block under 12 KB and says so (`not enough internal RAM for the Bluetooth controller ...`; the game goes on without a beacon); `Bluetooth controller failed to start (...)` is a failure after that gate. Neither may panic or reset the box: if one does, that is a bug, report it with the log. The memory monitor line `mem_monitor: <when>: internal free=... DMA free=...` is logged at `boot`, `Wi-Fi starting` and `beacon starting`.
+3. Static internal RAM: the Bluetooth stack added about 25 KB to the image (`idf.py size`: DIRAM 270,880 to 296,024 bytes), and moving the game's big buffers and LVGL's heap to PSRAM took 148 KB out: DIRAM used is now 147,711 bytes, 194,049 left (CI fails under 120 KiB left, `tools/check_fw_ram.py`). The memory monitor logs the heap every 10 s: note whether the lowest free internal RAM in a game with the beacon on is below the same game with it off (the field's switch, step 5).
 
 ## 2. A phone sees what the tests say
 
@@ -43,7 +43,7 @@ With nRF Connect scanning all the time, and the serial log open:
 
 | Do | Expect |
 | --- | --- |
-| The box joins (before the game starts) | Advertising starts (after the logo's fetch, if any). |
+| The box joins (before the game starts) | Advertising starts at once (after a mode fetch, if the box had to fetch one). |
 | The game starts, pauses, resumes | Advertising goes on all through. |
 | The game ends (CMD end) and the last events are acknowledged | `box-beacon: iBeacon stopped`; the box vanishes from the scan within a second. |
 | Between games (the box is idle, "Ready") | Nothing advertised. |
@@ -82,4 +82,14 @@ Optional: the same box, the same game, on a USB power meter or the battery gauge
 
 ## What to send back
 
-The A and B of step 1 (internal RAM free and taken), whether the logo and the beacon both came up in a game with the field Wi-Fi set, the RSSI figures of step 2, the interval nRF Connect shows, the hit rate of step 6, the radio comparison of step 7, and anything that surprised you. If the box could not start the Bluetooth controller in a game with the Wi-Fi in use, the way out is Kconfig `ATALAIA_BOX_BEACON=n` (and `CONFIG_BT_ENABLED=n`): tell the maintainer before building that.
+The A and B of step 1 (internal RAM free and taken), whether the Wi-Fi fetch (a mode the box lacks, or `@update`) and the beacon both came up in a game with the field Wi-Fi set, the RSSI figures of step 2, the interval nRF Connect shows, the hit rate of step 6, the radio comparison of step 7, and anything that surprised you. If the box could not start the Bluetooth controller in a game with the Wi-Fi in use, the way out is Kconfig `ATALAIA_BOX_BEACON=n` (and `CONFIG_BT_ENABLED=n`): tell the maintainer before building that.
+
+## Bench checklist: the internal RAM budget (decisions BBC-13 to BBC-18)
+
+For the coordinator, after the change that moved the game's big buffers and LVGL's heap to PSRAM (the box no longer fetches a logo, so a join starts no Wi-Fi by itself; the Wi-Fi checks below use a mode the box lacks, or `@update`):
+
+1. Build the Field Box image (`python3 tools/docker_fw.py build`) and flash it (USB). Boot, watch the log: `mem_monitor: boot: internal free=... DMA free=...` (expected: about 150 KB or more of internal RAM free; the line before the game starts), `display: LVGL ... 2 x 15360 byte draw buffers`, the screens drawn as before (LVGL's heap is in PSRAM now: note any slower redraw, `display: slow redraw` lines).
+2. Set the field Wi-Fi (`@wifi <ssid> <password>`), have the controller offer a game whose mode the box does not have, join it. Expect `mem_monitor: Wi-Fi starting: internal free=... DMA free=...` (Wi-Fi needs about 47 KB of DMA RAM), the Wi-Fi up, the mode fetched and the game joined; **no** `ESP_ERR_NO_MEM`, no `Expected to init 6 rx buffer, actual is 5`, no `esp-aes: Failed to allocate memory`.
+3. In the same run, **the beacon comes up after the fetch**: `mem_monitor: beacon starting: ...`, then `box-beacon: Bluetooth controller up: internal RAM <A> bytes free (took <B>)` and `advertising as iBeacon`. Then `@update` while joined: `iBeacon stopped` before `Wi-Fi starting` (no `the Bluetooth controller is still up` warning).
+4. Join a second game with Wi-Fi unset or wrong: Wi-Fi fails cleanly, the beacon still comes up, nothing resets.
+5. Write down: the `boot`, `Wi-Fi starting`, `beacon starting` and `Bluetooth controller up` lines (internal free, largest, min, DMA free, PSRAM free) and the lowest `min` seen in a 10-minute game with the beacon on. Report any `Guru Meditation`, `BLE_INIT: Malloc failed`, or `no DMA memory for the draw buffers`.

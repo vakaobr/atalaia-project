@@ -235,7 +235,7 @@ It is a second LVGL display, rendered in RGB565 and packed to one bit per
 pixel on flush (`oled_pack`); only the 128-byte pages that changed go over
 the 100 kHz bus, so a countdown tick costs one or two pages and a full frame
 about 100 ms. At boot it shows a splash for 2 s (the tower from
-`site/favicon.svg`, drawn by `tools/oled_logo.py` into `main/oled_logo.c`,
+`site/favicon.svg`, drawn by `tools/oled_logo.py` into `assets/splash.pgm`, the build's boot splash: "Your own splash logo" below; the modem's icon is `main/oled_logo.c`,
 with the name and the version, short: `v0.4.0-dev.12` and the commit, `abc1234`, on
 the next line, `*` after it for uncommitted changes, a release alone, `v0.3.0`; FV-8;
 the same file has the USB radio modem's
@@ -567,7 +567,7 @@ Custom layout for 16 MB flash (`partitions.csv`):
 | nvs_keys | 4 KB | Encryption keys for NVS (Phase 2; see BRING_UP.md step 0) |
 | ota_0 | 4 MB | Application slot A (the USB flash writes this one), at 0x20000 |
 | ota_1 | 4 MB | Application slot B (a firmware update writes the slot not running), at 0x420000 |
-| storage | 4 MB | LittleFS (at 0x820000): presets, modes, state, event log, the field's logo |
+| storage | 4 MB | LittleFS (at 0x820000): presets, modes, state, event log |
 
 Offsets: nvs 0x9000, otadata 0xf000, phy_init 0x11000, nvs_keys 0x12000, ota_0 0x20000, ota_1
 0x420000, storage 0x820000; 0xc20000 to the end of the flash (0x3e0000, 3.875 MB) is unallocated.
@@ -576,7 +576,7 @@ Offsets: nvs 0x9000, otadata 0xf000, phy_init 0x11000, nvs_keys 0x12000, ota_0 0
 one); they are 4 MB since v0.5 (the image is 1,952,160 bytes: 53 % free). The first four rows did not
 move, so a box re-flashed over USB keeps its adoption, keys and settings; `storage` moved (it was at
 0x420000) and starts empty: the box formats it on the first mount (`format_if_mount_failed`) and
-fetches the game modes and the field's logo again; the event log and a stored game to resume are
+fetches the game modes again; the event log and a stored game to resume are
 lost. **An update over the air cannot change the partition table: USB flash required once** for a
 box on the old table (v0.4.0 or earlier; BRING_UP, `docs/manuals/en/firmware.md` section 3.3). The
 firmware guards this three ways:
@@ -660,29 +660,76 @@ tests; not yet run on a real board.
 - **Console** (`ATALAIA_SERIAL_JOIN`): `@modes` lists the kept packages, `@forgetmodes`
   forgets them between games.
 
-## The field's logo on the big screen (decision PKG-1)
+## Memory budget (decisions BBC-13 to BBC-18)
 
-Once for each joined game, while the box waits for the game to start, it asks its controller for the
-field's logo over the same Wi-Fi and HTTPS as a firmware update or a mode package (pinned to the join's
-field CA; never over LoRa; protocol/mode-packages.md, section 8). The controller prepares the picture
-(a PNG fitted into 96 x 96 pixels, RGB565, 18,440 bytes with an 8-byte header), so the firmware has no
-image decoder.
+The Field Box's **internal RAM** (320 KB on the ESP32-S3, less what the image's static data and its RAM
+code take) is what the Wi-Fi driver (about 47 KB of DMA-capable RAM when it starts), the Bluetooth
+controller (about 20 to 25 KB, never together with Wi-Fi), the display's DMA draw buffers (2 x 15 KB),
+the task stacks (about 40 KB) and every small allocation share; PSRAM (2 MB) holds what does not need
+the internal RAM. On the bench on 2026-10-29 it ran out at a game's join: Wi-Fi did not start, the
+beacon's controller failed half-way and the box reset.
 
-- **Fetch** (`main/box_logo.c`, platform-free, run by `test/test_box_logo.c` with fakes;
-  `main/box_logo_esp.c` is the task, started from the game loop): `GET /api/v1/field/box-logo/release`,
-  then, only when the logo's SHA-256 in it is not the one kept, `GET /api/v1/field/box-logo`, streamed
-  into `logo.new`, hashed as it goes, checked (size, SHA-256, header) and renamed over `logo.bin`. A
-  failure of any kind keeps what the box had; a `404` (no logo, or a JPEG or WebP one the controller
-  cannot convert) removes it. A box adopted to another field forgets it.
-- **Storage**: `/littlefs/logo.bin` on the existing `storage` partition (the 64 hex digits of the key,
-  then the bytes). Its place moved with the 4 MB slots (above): it is fetched again after a re-flash.
-- **Screen** (`screen_renderer.c`): the 96 x 96 image is loaded from the file only while a screen that
-  draws it is built (`box_logo_load` / `box_logo_unload`, 18 KB), and drawn by LVGL as it is: the
-  **READY** screen (no game) and the *waiting* screen of a bomb that is not armed show it, with the
-  Atalaia towers of the OLED, scaled up and in the accent colour, when the box keeps no logo. The
-  OLED keeps the Atalaia tower.
-- **Image size**: the Field Box image was 1,949,264 bytes of its then 2,097,152-byte OTA slot (92.95 %,
-  3,328 bytes more than before the logo); the slots are 4 MB now (Partition Table above).
+| | Before (`bd3e888`) | After |
+| --- | --- | --- |
+| Static internal RAM used (`idf.py size`, DIRAM) | 296,056 bytes | 147,711 bytes |
+| of it `.bss` | 184,432 | 36,248 |
+| **Static internal RAM left for the heap** | **45,704** | **194,049** |
+| At a join, with the beacon in the image: DMA-capable free (bench) | 11,547 (largest 6,400) | about 150,000 (estimate: 194 KB less the 27 KB the stacks and the rest take, measured at the same point on the bench, less the non-DMA part) |
+| At a join, no Bluetooth in the image (bench, the hotfix) | 36,023 (largest 20,480) | not built |
+
+What moved, and why it is safe:
+- **LVGL's 48 KB widget heap** (`LV_MEM_SIZE`) to PSRAM (`LV_ATTRIBUTE_LARGE_RAM_ARRAY` in
+  `lvgl_conf/lv_conf.h`); the draw buffers stay in internal DMA RAM.
+- **The game's big static buffers** (about 62 KB: the preset being played, the built-in presets' scratch
+  copy, the box, the runner, the stored-preset lists, the screen template) to PSRAM with
+  `ATALAIA_PSRAM_BSS` (`main/psram_attr.h`, `CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y`). Only
+  zero-initialised statics that tasks use: never an interrupt, a DMA or an SPI buffer. The flash and the
+  file system copy PSRAM buffers through internal ones. **Wokwi, modem and pod images leave the option off**
+  (their statics stay where they were, so those builds are as before).
+- **The Bluetooth controller**: `BT_CTRL_BLE_MAX_ACT` 6 to 2, no scan duplicate filter, no advertising-report
+  flow control (a beacon never scans).
+- Already there: Wi-Fi TX buffers, LwIP and mbedTLS in PSRAM, 6 static RX buffers, no Wi-Fi code in IRAM
+  (`sdkconfig.defaults`, "Wi-Fi memory").
+
+The rules the code keeps:
+- **Wi-Fi and Bluetooth are never up together.** The shell keeps the beacon off while the Wi-Fi is claimed
+  (`fw_update_esp_net_busy`), and the Wi-Fi start waits (up to 5 s) for the beacon's task to have taken the
+  controller down and given its memory back (`box_beacon_esp_wait_down`); the beacon refuses to start while
+  Wi-Fi is in use.
+- **The beacon refuses cleanly when memory is short** (`box_beacon_memory_ok`: 40 KB internal free and a
+  12 KB block, host-tested): it logs the figures and the game goes on without a beacon; a start that fails
+  half-way is cleaned up (`esp_bt_controller_disable`/`deinit`), retried up to three times 20 s apart, then
+  "no beacon this game". No panic, no watchdog.
+- **The display** falls back to one draw buffer, then fewer lines, instead of staying blank.
+- **A log line with the figures** (`mem_monitor_log`): `mem_monitor: <when>: internal free=... largest=...
+  min=..., DMA free=... largest=..., PSRAM free=...` at `boot`, `Wi-Fi starting` and around the beacon's
+  start, and every 10 s from the monitor.
+- **CI fails on a regression**: `tools/check_fw_ram.py` (the `esp32-build` job) requires at least 120 KiB
+  of static internal RAM left: the 194 KB measured less 70 KB of room, so a change that adds a 70 KB
+  buffer to internal RAM fails, and the runtime's needs (about 27 + 47 KB, or 27 + 25 KB) stay covered
+  with margin. Put a new big static buffer in PSRAM (`ATALAIA_PSRAM_BSS`) or raise the threshold with a
+  reason; never lower it.
+
+## Your own splash logo (decisions LOGO-5, LOGO-6)
+
+The box shows the Atalaia tower and nothing else: on the on-board OLED's boot screen (30 x 60) and, scaled
+up to 96 pixels in the accent colour, on the big screen's *ready* screens and the bomb's *waiting* screen.
+The field's own logo is **not** fetched or drawn any more (decision PKG-1 is retired: no `box_logo`, no
+Wi-Fi at a join for it, no logo file in the LittleFS; an old `logo.bin` there is never read). The splash is
+a build asset:
+
+- **The file**: `assets/splash.pgm`, a plain-text PGM (first line `P2`, then `30 60`, the maximum value,
+  then the 1,800 pixel values), generated for the Atalaia tower by `tools/oled_logo.py`. A pixel is lit from
+  half the maximum value up.
+- **How it is embedded**: `main/splash_logo.cmake` (also used by the host tests, always with the default)
+  reads the file at configure time and writes `splash_logo.c` in the build folder: the array
+  `oled_logo_a8` (`main/oled_logo.h`), one byte per pixel, `0xFF` or `0x00`. A file that is not a 30 x 60
+  plain-text PGM stops the build with a message.
+- **Your own**: replace the file, or set `CONFIG_ATALAIA_SPLASH_LOGO` (menuconfig, *Boot splash*; a path
+  relative to this folder, or absolute) to yours. The steps, with the `convert` command, are in
+  `docs/manuals/en/firmware.md` section 4. The modem's small header icon (`oled_icon_a8`) is not part of it.
+- **The project's release images always carry the Atalaia tower** (the default); the screen goldens
+  (`test/screens/`) are rendered with it.
 
 ## The Field Box as an iBeacon (decisions BBC-1 to BBC-12)
 
@@ -705,9 +752,9 @@ GM's iBeacon tags and a field needs tags only where there is no box. The specifi
 - **How** (`main/box_beacon_esp.c`): NimBLE as a **broadcaster only** (non-connectable, no scan, no
   pairing, no bond store), the host's heap in PSRAM. The shell calls `box_beacon_esp_update` every turn;
   the controller is started and stopped on its own task, only when the answer changes, and **taken down
-  again with its memory** when the game ends. It also waits while the Wi-Fi is in use (the logo's fetch
-  right after a join, a mode fetch, an update: `fw_update_esp_net_busy`, `box_logo_esp_pending`), because
-  the Bluetooth controller and the Wi-Fi driver share the internal RAM.
+  again with its memory** when the game ends. It also waits while the Wi-Fi is in use (a mode fetch, an
+  update: `fw_update_esp_net_busy`), and the Wi-Fi start waits for it (see "Memory budget"), because
+  the Bluetooth controller and the Wi-Fi driver share the internal RAM and are never up together.
 - **Interval and power**: 500 ms and 0 dBm. An Android scan in low-power mode (the app's, BLE-9) listens
   about 0.5 s in every 5 s, so a slower beacon is missed in a good share of the scans (about half at 1 s);
   at 500 ms nearly every window holds an advertisement. Two short events a second cost almost nothing, and

@@ -140,8 +140,6 @@ else()
         "mode_store.c"
         "mode_fetch.c"
         "mode_fetch_esp.c"
-        "box_logo.c"
-        "box_logo_esp.c"
         "box_beacon.c"
         "box_beacon_esp.c"
         "admin_pin.c"
@@ -219,6 +217,18 @@ if(NOT CONFIG_ATALAIA_MODEM_MODE AND NOT CONFIG_ATALAIA_POD_MODE)
     atalaia_builtin_screens("${CMAKE_CURRENT_LIST_DIR}/../../../modes"
                             "${CMAKE_CURRENT_BINARY_DIR}/builtin_screens.c")
     target_sources(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/builtin_screens.c")
+endif()
+
+# The boot splash (oled_logo_a8): assets/splash.pgm, the Atalaia towers, or the builder's own
+# (CONFIG_ATALAIA_SPLASH_LOGO; README.md, "Your own splash logo"), embedded as a C array.
+if(NOT CONFIG_ATALAIA_POD_MODE)
+    include("${CMAKE_CURRENT_LIST_DIR}/splash_logo.cmake")
+    set(splash_pgm "${CONFIG_ATALAIA_SPLASH_LOGO}")
+    if(NOT IS_ABSOLUTE "${splash_pgm}")
+        set(splash_pgm "${CMAKE_CURRENT_LIST_DIR}/../${splash_pgm}")
+    endif()
+    atalaia_splash_logo("${splash_pgm}" "${CMAKE_CURRENT_BINARY_DIR}/splash_logo.c")
+    target_sources(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/splash_logo.c")
 endif()
 
 # Built-in presets: the mode scripts from modes/ are compiled into the image

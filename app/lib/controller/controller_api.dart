@@ -113,7 +113,6 @@ import 'package:crypto/crypto.dart';
 import '../modes/mode_catalog.dart';
 import '../security/bytes.dart' show hexEncode;
 import '../version.dart';
-import 'controller_box_logo.dart';
 import 'controller_branding.dart';
 import 'controller_channel.dart';
 import 'controller_checkin.dart';

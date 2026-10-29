@@ -61,8 +61,6 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/field/branding            the field's name, logo, wallpaper and accent (no token, ETag)
     PUT  /api/v1/field/branding            GM: {"field_name"?, "accent"?}
     GET|PUT|DELETE /api/v1/field/branding/{logo|wallpaper}  the images (GET: no token, ETag)
-    GET  /api/v1/field/box-logo[/release]  the logo as a Field Box draws it, 96x96 RGB565 (no token; box_logo.py)
-    PUT  /api/v1/field/branding/logo/box?id=  a JPEG or WebP logo's box-ready bytes, made by the console (GM)
     POST /api/v1/crests                    GM: upload a team crest (raw PNG, JPEG or WebP)
     GET  /api/v1/crests/{id}               a crest (no token, immutable)
     GET|POST /api/v1/team-presets          saved teams: display name, colour, crest
@@ -167,7 +165,6 @@ from . import beacons as beaconsmod
 from . import box_beacons as boxbeacons
 from . import images, player_tags, visibility
 from . import scenario_service as scenarios
-from . import box_logo
 from .branding import SLOTS, Branding, etag
 from .addresses import url_host
 from .checkin import Viewer
@@ -185,7 +182,6 @@ FEATURES = ("checkin", "join", "box_language", "positions", "presets", "branding
             "adoption", "firmware", "pod_config", "atak", "field", "scenarios", "schedule", "mode_packages", "failover")
 NO_STORE = {"Cache-Control": "no-store"}
 # Served images: never sniffed as anything else, and inert if opened as a page (decision BR9).
-NO_BOX_LOGO = "no logo a box can draw (a PNG logo is converted for the box, a JPEG or WebP one by the console)"
 IMAGE_HEADERS = {"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox",
                  "Content-Disposition": "inline"}
 
@@ -1050,34 +1046,6 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         if img is None:
             raise HTTPException(404, f"no {slot} uploaded")
         return image_response(request, img, "no-cache")
-
-    # The logo as a Field Box draws it (box_logo.py, decision PKG-1): the box asks for the text, and for the bytes
-    # only when the id in it is not the one it keeps. 404: no logo, or one the controller cannot convert (not a
-    # PNG); the box then shows the Atalaia logo.
-    @app.get("/api/v1/field/box-logo/release")
-    def field_box_logo_release(request: Request) -> Response:
-        public_read(request)
-        made = branding.box_logo()
-        if made is None:
-            raise HTTPException(404, NO_BOX_LOGO)
-        return Response(box_logo.release_text(*made), media_type="text/plain",
-                        headers={"Cache-Control": "no-cache"})
-
-    @app.get("/api/v1/field/box-logo")
-    def field_box_logo(request: Request) -> Response:
-        public_read(request)
-        made = branding.box_logo()
-        if made is None:
-            raise HTTPException(404, NO_BOX_LOGO)
-        return Response(made[1], media_type="application/octet-stream",
-                        headers={"Cache-Control": "no-cache", "ETag": etag(made[0])})
-
-    # The box-ready bytes of a JPEG or WebP logo, converted by the GM console in the browser (decision LOGO-1);
-    # checked here (size, header) and kept next to the branding for that logo only.
-    @app.put("/api/v1/field/branding/logo/box", dependencies=[Depends(require_gm)])
-    async def put_field_box_logo(request: Request, id: str = "") -> dict[str, Any]:
-        data, _ = await read_upload(request, box_logo.SIZE, "box logo")
-        return branding.put_box_logo(id, data)
 
     @app.put("/api/v1/field/branding/{slot}", dependencies=[Depends(require_gm)])
     async def put_field_branding_image(slot: str, request: Request) -> dict[str, Any]:

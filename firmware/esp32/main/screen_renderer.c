@@ -27,7 +27,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "box_logo.h"
 #include "box_text.h"
 #include "oled_logo.h"
 #include "screen_json.h"
@@ -224,37 +223,27 @@ static void format_minutes(long s, char *buf, size_t sz)
     }
 }
 
-/* The field's logo (box_logo.h, decision PKG-1), 96x96 pixels, centred y pixels below the screen's
- * middle; the Atalaia towers, as on the OLED, when the box keeps none. The logo's pixels are loaded
- * for the screen that shows it and freed with it (clean_screen). */
-static lv_image_dsc_t logo_dsc, towers_dsc;
+/* The boot splash (oled_logo_a8: assets/splash.pgm, the Atalaia towers unless a builder chose
+ * another, README.md "Your own splash logo"), 96 pixels tall, centred y pixels below the screen's
+ * middle, in the accent colour. The box shows no other logo: the field's own was retired (LOGO-5).
+ */
+#define SPLASH_H 96
+static lv_image_dsc_t towers_dsc;
 
-static lv_obj_t *field_logo(lv_obj_t *scr, int y)
+static lv_obj_t *splash_logo(lv_obj_t *scr, int y)
 {
     lv_obj_t *img = lv_image_create(scr);
-    const uint16_t *px = box_logo_load();
-    if (px != NULL) {
-        logo_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
-        logo_dsc.header.cf = LV_COLOR_FORMAT_RGB565;
-        logo_dsc.header.w = BL_SIDE;
-        logo_dsc.header.h = BL_SIDE;
-        logo_dsc.header.stride = BL_SIDE * 2;
-        logo_dsc.data = (const uint8_t *)px;
-        logo_dsc.data_size = BL_PIXELS * 2;
-        lv_image_set_src(img, &logo_dsc);
-    } else {
-        towers_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
-        towers_dsc.header.cf = LV_COLOR_FORMAT_A8;
-        towers_dsc.header.w = OLED_LOGO_W;
-        towers_dsc.header.h = OLED_LOGO_H;
-        towers_dsc.header.stride = OLED_LOGO_W;
-        towers_dsc.data = oled_logo_a8;
-        towers_dsc.data_size = sizeof(oled_logo_a8);
-        lv_image_set_src(img, &towers_dsc);
-        lv_image_set_scale(img, 256 * BL_SIDE / OLED_LOGO_H); /* 96 pixels tall */
-        lv_obj_set_style_image_recolor(img, lv_color_hex(COLOR_ACCENT), 0);
-        lv_obj_set_style_image_recolor_opa(img, LV_OPA_COVER, 0);
-    }
+    towers_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+    towers_dsc.header.cf = LV_COLOR_FORMAT_A8;
+    towers_dsc.header.w = OLED_LOGO_W;
+    towers_dsc.header.h = OLED_LOGO_H;
+    towers_dsc.header.stride = OLED_LOGO_W;
+    towers_dsc.data = oled_logo_a8;
+    towers_dsc.data_size = sizeof(oled_logo_a8);
+    lv_image_set_src(img, &towers_dsc);
+    lv_image_set_scale(img, 256 * SPLASH_H / OLED_LOGO_H);
+    lv_obj_set_style_image_recolor(img, lv_color_hex(COLOR_ACCENT), 0);
+    lv_obj_set_style_image_recolor_opa(img, LV_OPA_COVER, 0);
     lv_obj_align(img, LV_ALIGN_CENTER, 0, y);
     return img;
 }
@@ -270,7 +259,7 @@ static void build_standby(lv_obj_t *scr)
     slot[2] = box(scr, 180, 8, COLOR_PANEL);
     lv_obj_set_style_radius(slot[2], 4, 0);
     lv_obj_align(slot[2], LV_ALIGN_CENTER, 0, 46);
-    slot[3] = field_logo(scr, 36); /* while no team arms it */
+    slot[3] = splash_logo(scr, 36); /* while no team arms it */
     footer(scr, box_text(TX_BOMB_NOT_ARMED));
 }
 
@@ -536,7 +525,7 @@ static void build_ready(lv_obj_t *scr)
 {
     set_bg(scr, COLOR_BG);
     lv_label_set_text(header(scr, COLOR_PANEL), box_text(TX_READY_UP));
-    field_logo(scr, -22);
+    splash_logo(scr, -22);
     slot[0] = label(scr, &lv_font_atalaia_28, COLOR_TEXT, 58);
     lv_label_set_text(slot[0], box_text(TX_NEXT_GAME));
     slot[1] = footer(scr, box_text(TX_KEY_FOR_PICKER));
@@ -964,7 +953,6 @@ static const template_fns_t templates[] = {
 static void clean_screen(lv_obj_t *scr)
 {
     lv_obj_clean(scr);
-    box_logo_unload(); /* no image of it is left */
     memset(slot, 0, sizeof(slot));
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_pad_all(scr, 0, 0);

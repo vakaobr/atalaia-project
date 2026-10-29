@@ -59,7 +59,6 @@ void run_pod_settings_tests(void);
 void run_fw_update_tests(void);
 void run_mode_package_tests(void);
 void run_mode_fetch_tests(void);
-void run_box_logo_tests(void);
 void run_box_beacon_tests(void);
 void run_adoption_tests(void);
 void run_admin_pin_tests(void);

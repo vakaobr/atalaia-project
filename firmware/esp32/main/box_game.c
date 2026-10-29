@@ -690,7 +690,8 @@ box_join_result_t box_game_join(box_game_t *g, const uint8_t *payload, size_t le
 /* True if every part of a join's mode id is installed (find_preset's test, without loading). */
 static bool modes_installed(const char *mode_id)
 {
-    static preset_summary_t list[PRESET_MAX_SLOTS] ATALAIA_PSRAM_BSS; /* as find_preset: not on the stack */
+    static preset_summary_t
+        list[PRESET_MAX_SLOTS] ATALAIA_PSRAM_BSS; /* as find_preset: not on the stack */
     int n = preset_store_list(list, PRESET_MAX_SLOTS);
     for (const char *p = mode_id; *p;) {
         const char *next = strchr(p, '+');

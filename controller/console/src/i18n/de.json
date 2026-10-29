@@ -1614,10 +1614,6 @@
     "hide": "Ausblenden",
     "no_game": "Erstelle zuerst ein Spiel: Tags werden mit dem Schlüssel des laufenden Spiels signiert."
   },
-  "boxlogo": {
-    "failed": "Das Logo ist für die Konsole gespeichert, aber dieser Browser konnte es nicht für die Field Boxes umwandeln: sie behalten das Atalaia-Logo.",
-    "ready": "Die Field Boxes zeigen dieses Logo."
-  },
   "pod_config": {
     "title": "Einstellungen der E/A-Module",
     "hint": "Stellt per Funk, mit dem Spielschlüssel versiegelt, die Tastenfarben, die Helligkeit des Rings, die Lautstärke und den Gehäuseschalter des E/A-Moduls ein, mit dem ein Telefon verbunden ist. Nur ausgefüllte Einstellungen ändern sich; das Modul speichert sie im Flash. Funk, Pins und Bluetooth-Sicherheit bleiben wie gebaut.",

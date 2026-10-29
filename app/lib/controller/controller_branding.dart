@@ -37,7 +37,6 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
-import 'controller_box_logo.dart';
 import 'controller_checkin.dart';
 import 'controller_engine.dart';
 import 'controller_images.dart';
@@ -151,7 +150,6 @@ class ControllerBranding {
 
   static const _sitePresets = 'branding.site_presets';
   static const _setting = 'branding.field';
-  static const _boxLogoSetting = 'branding.box_logo';
   static const _nameSetting = 'branding.field_name';
   static const _imagesDoc = 'images';
   static const _teamPresetsDoc = 'team_presets';
@@ -366,73 +364,6 @@ class ControllerBranding {
     final id = _saved()[slot];
     return id is String ? image(id) : null;
   }
-
-  /// The field's logo as a Field Box draws it (controller_box_logo.dart,
-  /// decisions PKG-1 and LOGO-1): the source image's id and the box-ready
-  /// bytes, or null when there is no logo or none a box can draw. A PNG is
-  /// converted here (kept by the image's id, so each logo is converted once);
-  /// a JPEG or WebP logo is the bytes the GM console made in the browser and
-  /// uploaded for exactly this logo ([putBoxLogo]), when there are any.
-  (String, Uint8List)? boxLogo() {
-    final img = slotImage('logo');
-    if (img == null) return null;
-    final id = img['id']! as String;
-    if (img['content_type'] != 'image/png') return _uploadedBoxLogo(id);
-    if (_boxLogo == null || _boxLogo!.$1 != id) {
-      try {
-        _boxLogo = (id, convertBoxLogo(img['data']! as Uint8List));
-      } on BoxLogoError {
-        _boxLogo = (id, Uint8List(0));
-      }
-    }
-    return _boxLogo!.$2.isEmpty ? null : _boxLogo;
-  }
-
-  (String, Uint8List)? _uploadedBoxLogo(String id) {
-    final raw = engine.store.getSetting(_boxLogoSetting);
-    if (raw == null || raw.isEmpty) return null;
-    try {
-      final v = jsonDecode(raw);
-      if (v is! Map || v['id'] != id || v['data'] is! String) return null;
-      final data = base64Decode(v['data'] as String);
-      return checkBoxLogo(data) ? (id, data) : null;
-    } on FormatException {
-      return null;
-    }
-  }
-
-  /// `PUT /api/v1/field/branding/logo/box?id=<logo id>`: the box-ready bytes of
-  /// the field's JPEG or WebP logo, made by the GM console (the controller has
-  /// no decoder for them). Checked (size, header) and kept for that logo
-  /// only; a new logo, or none, makes them stale and they are never served.
-  Map<String, Object?> putBoxLogo(String id, Uint8List data) {
-    _localOnly();
-    final img = slotImage('logo');
-    if (img == null || img['id'] != id) {
-      throw ControllerError.conflict(
-        "the box logo is for another logo than the field's: upload the logo "
-        'first',
-      );
-    }
-    if (img['content_type'] == 'image/png') {
-      throw ControllerError.conflict(
-        'a PNG logo is converted by the controller itself',
-      );
-    }
-    if (!checkBoxLogo(data)) {
-      throw ControllerError(
-        'the box logo is $boxLogoSize bytes: \'ALG1\', 96, 96 and 9,216 '
-        'RGB565 pixels',
-      );
-    }
-    engine.store.setSetting(
-      _boxLogoSetting,
-      jsonEncode({'id': id, 'data': base64Encode(data)}),
-    );
-    return view();
-  }
-
-  (String, Uint8List)? _boxLogo;
 
   static CheckedImage _check(
     Uint8List data,

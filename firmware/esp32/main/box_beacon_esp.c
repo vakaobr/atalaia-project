@@ -42,9 +42,9 @@ static volatile bool running;  /* the controller is initialised (up, or its host
 /* Owned by the beacon's task. */
 static bool stack_up;
 static box_beacon_id_t tried_id;
-static uint8_t failures;     /* starts refused or failed for this identity */
-static TickType_t retry_at;  /* not before this tick */
-#define MAX_FAILURES 3       /* then no beacon for this game (a new identity tries again) */
+static uint8_t failures;    /* starts refused or failed for this identity */
+static TickType_t retry_at; /* not before this tick */
+#define MAX_FAILURES 3      /* then no beacon for this game (a new identity tries again) */
 #define RETRY_MS     20000
 static box_beacon_id_t have_id;
 static uint8_t adv[BOX_BEACON_ADV_SIZE];

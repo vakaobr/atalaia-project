@@ -125,7 +125,7 @@ You hold your team's button on the box. The box shows what is happening.
 
 | On the screen | Meaning |
 | --- | --- |
-| **READY** · your field's logo · **Next game** | Adopted, in no game. It can be invited. The logo is the field's, or the Atalaia tower if the box has none. |
+| **READY** · the Atalaia tower · **Next game** | Adopted, in no game. It can be invited. |
 | **WAITING** · **Game** *N* · **The game hasn't started** | Joined. Waits for the organisers' **Start**. |
 | **GAME ON** | The game started. The mode's own screen follows. |
 | **ZONE · NEUTRAL** · **Hold to capture** | A zone nobody holds (Domination, Hold-All, Last Stand, Master and Satellites). Hold your team's button. A bar fills. |
@@ -140,7 +140,7 @@ You hold your team's button on the box. The box shows what is happening.
 
 Other modes have their own screens: *Kill Confirmed* (**press your button, then scan the tags**), *Respawn and Lives* (**Scan your tag to come back in**), *Medic Kit* (**Scan your tag**, **then hold the button**) and *Hacking Terminal* (a puzzle on the keypad). The [modes page](https://atalaia-project.link/en/modes/) shows them.
 
-**The field's logo.** If the organisers set a logo for the field (in the console's *Settings*), the box shows it on the **READY** screen, and on the *Bomb / Rush* screen while the bomb is not armed. The box fetches it by itself over the field Wi-Fi when it joins a game, so it needs the **Field Wi-Fi name** and **password** (as for [updates](#9-updates-over-the-air)); it keeps it, and fetches it again only when the logo changes. A PNG, JPEG or WebP logo reaches the box (for a JPEG or WebP one, the console converts it in your browser when you upload it); with no logo, the box shows the Atalaia tower. A box that never joined a game on this field's Wi-Fi shows the tower too. The small OLED always shows the Atalaia tower.
+**The logo.** The box shows the Atalaia tower, on its boot screen and on the **READY** screen, and on the *Bomb / Rush* screen while the bomb is not armed. The field's own logo (the console's *Settings*) shows in the app, on the scoreboard and on the poster, not on the box: a box used to fetch it over the field Wi-Fi, which it no longer does. A builder can build a box with another splash: [firmware guide, section 4](firmware.md#4-the-options-a-builder-sets).
 
 On the small OLED you see the mode on top, one big value (the phase, the timer or the team) and a hint under it. While a team holds its button, the OLED shows a bar that fills.
 

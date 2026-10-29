@@ -1614,10 +1614,6 @@
     "hide": "Hide",
     "no_game": "Make a game first: tags are signed with the running game's key."
   },
-  "boxlogo": {
-    "failed": "The logo is saved for the console, but this browser could not convert it for the Field Boxes: they keep the Atalaia logo.",
-    "ready": "The Field Boxes will show this logo."
-  },
   "pod_config": {
     "title": "I/O pods' settings",
     "hint": "Sets the buttons' colours, the ring's brightness, the volume and the enclosure switch of the I/O pod a phone is linked to, over the radio, sealed with the game key. Only the settings you fill in change; the pod keeps them in its flash. Radio, pins and Bluetooth security stay as built.",

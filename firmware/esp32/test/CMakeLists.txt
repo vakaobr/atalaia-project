@@ -114,6 +114,9 @@ target_compile_options(atalaia_lvgl_host PRIVATE -w)
 # With the screen templates of modes/ built in, as main/CMakeLists.txt does.
 include(${CMAKE_CURRENT_LIST_DIR}/../main/builtin_screens.cmake)
 atalaia_builtin_screens("${MODES_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/builtin_screens.c")
+# The boot splash, always the project's default here (the goldens show the Atalaia towers).
+include(${CMAKE_CURRENT_LIST_DIR}/../main/splash_logo.cmake)
+atalaia_splash_logo("${CMAKE_CURRENT_LIST_DIR}/../assets/splash.pgm" "${CMAKE_CURRENT_BINARY_DIR}/splash_logo.c")
 add_library(atalaia_screens_fw STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/screen_renderer.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/box_text.c
@@ -121,9 +124,9 @@ add_library(atalaia_screens_fw STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/screen_template.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/oled_view.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/oled_logo.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../main/box_logo.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/modem/modem_screen.c
     ${CMAKE_CURRENT_BINARY_DIR}/builtin_screens.c
+    ${CMAKE_CURRENT_BINARY_DIR}/splash_logo.c
 )
 target_include_directories(atalaia_screens_fw PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../main
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/hal)
@@ -176,7 +179,6 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/mode_package.c
     ${SHELL_DIR}/mode_store.c
     ${SHELL_DIR}/mode_fetch.c
-    ${SHELL_DIR}/box_logo.c
     ${SHELL_DIR}/box_beacon.c
     ${SHELL_DIR}/admin_pin.c
     ${SHELL_DIR}/adoption.c
@@ -241,7 +243,6 @@ set(TEST_SOURCES
     test_fw_update.c
     test_mode_package.c
     test_mode_fetch.c
-    test_box_logo.c
     test_box_beacon.c
     test_adoption.c
     test_admin_pin.c

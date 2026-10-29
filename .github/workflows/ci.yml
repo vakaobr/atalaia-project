@@ -564,6 +564,9 @@ jobs:
           # The Field Box's iBeacon (decisions BBC-1 to BBC-12): NimBLE as a broadcaster, on by default.
           grep -q '^CONFIG_ATALAIA_BOX_BEACON=y' sdkconfig
           grep -q '^CONFIG_BT_NIMBLE_ENABLED=y' sdkconfig
+          # The internal RAM the image leaves to the heap (Wi-Fi, Bluetooth, DMA buffers, stacks): see
+          # tools/check_fw_ram.py and README.md, "Memory budget".
+          python3 ../../tools/check_fw_ram.py build/atalaia_esp32.map
 
   esp32-modem-build:
     name: ESP32 USB radio modem cross-compilation

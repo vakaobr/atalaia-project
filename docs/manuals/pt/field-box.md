@@ -125,7 +125,7 @@ Manténs premido o botão da tua equipa na caixa. A caixa mostra o que se passa.
 
 | No ecrã | Significado |
 | --- | --- |
-| **PRONTA** · logótipo do campo · **Próximo jogo** | Adotada, sem jogo. Pode ser convidada. O logótipo é o do campo, ou a torre da Atalaia se a caixa não tiver nenhum. |
+| **PRONTA** · a torre da Atalaia · **Próximo jogo** | Adotada, sem jogo. Pode ser convidada. |
 | **À ESPERA** · **Jogo** *N* · **O jogo ainda não começou** | Juntou-se. Espera pelo **Começar** da organização. |
 | **JOGO EM CURSO** | O jogo começou. Segue-se o ecrã próprio do modo. |
 | **ZONA · LIVRE** · **Mantém premido** | Uma zona que nenhuma equipa tem (Domínio, Domínio Total, Último Elemento, Mestre e Satélites). Mantém premido o botão da tua equipa. Uma barra enche. |
@@ -140,7 +140,7 @@ Manténs premido o botão da tua equipa na caixa. A caixa mostra o que se passa.
 
 Os outros modos têm ecrãs próprios: *Baixa Confirmada* (**carrega no botão e lê as etiquetas**), *Reentradas e Vidas* (**Lê a tua etiqueta para voltares ao jogo**), *Ligaduras* (**Lê a tua etiqueta** e **mantém premido o botão**) e *Hackeia o terminal* (um enigma no teclado). A [página dos modos](https://atalaia-project.link/modos/) mostra-os.
 
-**O logótipo do campo.** Se a organização definiu um logótipo para o campo (nas *Definições* da consola), a caixa mostra-o no ecrã **PRONTA**, e no ecrã de *Bomba / Rush* enquanto a bomba não está armada. A caixa vai buscá-lo sozinha pela Wi-Fi do campo quando se junta a um jogo, por isso precisa do **nome** e da **palavra-passe da Wi-Fi do campo** (como nas [atualizações](#9-atualizações-pelo-ar)); guarda-o e só volta a buscá-lo quando o logótipo muda. Chega à caixa um logótipo em PNG, JPEG ou WebP (num JPEG ou WebP, a consola converte-o no navegador quando o carregas); sem logótipo, a caixa mostra a torre da Atalaia. Uma caixa que nunca se juntou a um jogo na Wi-Fi deste campo mostra também a torre. O OLED pequeno mostra sempre a torre da Atalaia.
+**O logótipo.** A caixa mostra a torre da Atalaia, no ecrã de arranque e no ecrã **PRONTA**, e no ecrã de *Bomba / Rush* enquanto a bomba não está armada. O logótipo do próprio campo (as *Definições* da consola) aparece na app, no placar e no cartaz, não na caixa: a caixa ia buscá-lo pela Wi-Fi do campo e já não vai. Quem monta a caixa pode compilá-la com outra imagem de arranque: [guia de firmware, secção 4](firmware.md#4-as-opções-de-quem-monta).
 
 No OLED pequeno vês o modo em cima, um valor grande (a fase, o tempo ou a equipa) e uma dica por baixo. Enquanto uma equipa mantém premido o botão, o OLED mostra uma barra que enche.
 

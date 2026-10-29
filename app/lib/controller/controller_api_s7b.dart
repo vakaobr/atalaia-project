@@ -24,18 +24,12 @@ part of 'controller_api.dart';
 //     GET|POST /api/v1/presets               saved presets / GM: save one {"name", "mode_id", "params"}
 //     GET|PUT /api/v1/field/branding         the field's name, logo, wallpaper, accent (GET: no token, ETag)
 //     GET|PUT|DELETE /api/v1/field/branding/{logo|wallpaper}  the images (GET: no token)
-//     GET  /api/v1/field/box-logo[/release]  the logo as a Field Box draws it, 96x96 RGB565 (no token)
-//     PUT  /api/v1/field/branding/logo/box?id=  a JPEG or WebP logo's box-ready bytes, made by the console (GM)
 //     POST /api/v1/crests                    GM: upload a team crest (raw PNG, JPEG or WebP)
 //     GET  /api/v1/crests/{id}               a crest (no token, immutable)
 //     GET|POST /api/v1/team-presets          saved teams: display name, colour, crest
 //     PUT|DELETE /api/v1/team-presets/{id}   GM
 //     GET  /api/v1/games/{id}/teams          a game's team colours, names and crests (no token)
 //     PUT  /api/v1/games/{id}/teams/{team}   GM: {"display_name"?, "crest_id"?, "team_preset_id"?}
-
-const _noBoxLogo =
-    'no logo a box can draw (a PNG logo is converted for the box, a JPEG or '
-    'WebP one by the console)';
 
 /// Served images: never sniffed as anything else, inert if opened as a page
 /// (api.py IMAGE_HEADERS, decision BR9).
@@ -344,41 +338,6 @@ extension _S7bRoutes on ControllerApi {
       'PUT',
       r'/api/v1/field/branding',
       _gm((r) => ApiResponse(200, _branding().setField(r.body))),
-    ),
-    // The logo as a Field Box draws it (controller_box_logo.dart, decision
-    // PKG-1): the box asks for the text, and for the bytes only when the id in
-    // it is not the one it keeps. 404: no logo, or one the controller cannot
-    // convert (not a PNG); the box then shows the Atalaia logo.
-    ControllerApi._route('GET', r'/api/v1/field/box-logo/release', (r) {
-      _publicRead(r);
-      final made = _branding().boxLogo();
-      if (made == null) throw _HttpError(404, _noBoxLogo);
-      return ApiResponse.bytes(
-        200,
-        Uint8List.fromList(utf8.encode(boxLogoReleaseText(made.$1, made.$2))),
-        'text/plain',
-        const {'Cache-Control': 'no-cache'},
-      );
-    }),
-    ControllerApi._route('GET', r'/api/v1/field/box-logo', (r) {
-      _publicRead(r);
-      final made = _branding().boxLogo();
-      if (made == null) throw _HttpError(404, _noBoxLogo);
-      return ApiResponse.bytes(200, made.$2, 'application/octet-stream', {
-        'Cache-Control': 'no-cache',
-        'ETag': etagOf(made.$1),
-      });
-    }),
-    // The box-ready bytes of a JPEG or WebP logo, converted by the GM console
-    // in the browser (decision LOGO-1); checked here and kept for that logo.
-    ControllerApi._route(
-      'PUT',
-      r'/api/v1/field/branding/logo/box',
-      _gm((r) {
-        final (data, _) = _upload(r, boxLogoSize, 'box logo');
-        final id = r.uri.queryParameters['id'] ?? '';
-        return ApiResponse(200, _branding().putBoxLogo(id, data));
-      }),
     ),
     ControllerApi._route('GET', r'/api/v1/field/branding/([^/]+)', (r) {
       final slot = r.pathText(1);

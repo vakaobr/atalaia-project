@@ -866,6 +866,20 @@ menu "Atalaia Field Box Configuration"
                 Off only for bench tests with tools that cannot pair.
     endmenu
 
+    # ---- Boot splash (decision LOGO-6) ----------------------------------------
+    menu "Boot splash"
+        config ATALAIA_SPLASH_LOGO
+            string "Boot splash image (plain-text PGM, 30 x 60)"
+            default "assets/splash.pgm"
+            help
+                The image the boxes draw on their boot screen (the on-board OLED's) and,
+                scaled up in the accent colour, on the big screen's "ready" screens: a
+                plain-text PGM (first line P2) of exactly 30 x 60 pixels, a pixel lit from
+                half the maximum value up. A path relative to firmware/esp32/, or absolute.
+                The default is the Atalaia towers; the project's release images always carry
+                it. See firmware/esp32/README.md, "Your own splash logo".
+    endmenu
+
     # ---- The Field Box as an iBeacon (decisions BBC-1 to BBC-12) -------------
     menu "Field Box iBeacon"
         depends on ATALAIA_NODE_MODE

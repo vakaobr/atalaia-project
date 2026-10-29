@@ -5157,59 +5157,6 @@ class ConsoleBrowserTests(unittest.TestCase):
         board.set_viewport_size({"width": 390, "height": 844})
         self.no_horizontal_scroll(board)
 
-    def test_a_jpeg_or_webp_logo_is_converted_in_the_browser_for_the_boxes(self):
-        """LOGO-1: the controllers convert a PNG logo only, so the console decodes a JPEG or WebP logo with the
-        browser's canvas and uploads the 96x96 RGB565 bytes; the box-logo endpoints then answer 200 with 18,440
-        bytes whose SHA-256 the release text promises, and a PNG logo is still the controller's own work."""
-        import hashlib
-        page = self.console()
-        page.get_by_test_id("tab-settings").click()
-        self.assertEqual(httpx.get(self.field.base + "/api/v1/field/box-logo").status_code, 404)
-        page.get_by_test_id("branding-logo-upload").set_input_files(str(BRANDING / "logo.jpg"))
-        self.loaded(page.get_by_test_id("branding-logo-img"))
-        expect(page.get_by_test_id("toast")).to_contain_text("Field Boxes")
-        logo_id = self.field.http.get("/api/v1/field/branding").json()["logo"]["id"]
-        got = httpx.get(self.field.base + "/api/v1/field/box-logo")  # a box: no token
-        self.assertEqual((got.status_code, len(got.content)), (200, 18440), got.text[:200])
-        self.assertEqual(got.content[:8], b"ALG1" + bytes([96, 0, 96, 0]))
-        self.assertEqual(got.headers["etag"], f'"{logo_id}"')
-        rel = httpx.get(self.field.base + "/api/v1/field/box-logo/release").text.splitlines()
-        self.assertEqual(rel[1:], [f"id={logo_id}", f"sha256={hashlib.sha256(got.content).hexdigest()}", "bytes=18440"])
-        self.assertTrue(any(px != got.content[8:10] for px in (got.content[i:i + 2] for i in range(8, 18440, 2))),
-                        "the picture is not one flat colour")
-        # A WebP logo likewise (a new logo, a new id), then a PNG one is the controller's own conversion.
-        page.get_by_test_id("branding-logo-upload").set_input_files(str(BRANDING / "crest-blue.webp"))
-        self.assertTrue(wait_for(lambda: httpx.get(self.field.base + "/api/v1/field/box-logo/release").status_code == 200
-                                 and f"id={logo_id}" not in httpx.get(
-                                     self.field.base + "/api/v1/field/box-logo/release").text, 10))
-        self.assertEqual(len(httpx.get(self.field.base + "/api/v1/field/box-logo").content), 18440)
-        page.get_by_test_id("branding-logo-upload").set_input_files(str(BRANDING / "logo.png"))
-        self.assertTrue(wait_for(lambda: self.field.http.get("/api/v1/field/branding").json()["logo"]["content_type"]
-                                 == "image/png", 10))
-        self.assertEqual(len(httpx.get(self.field.base + "/api/v1/field/box-logo").content), 18440)
-
-    def test_the_browsers_conversion_matches_the_vectors(self):
-        """LOGO-1: box-logo.js does the controllers' sums, so the browser's bytes for a vector's PNG (decoded by
-        Chromium, not by the controller) are the vector's SHA-256, wherever the canvas keeps the pixels exactly:
-        every vector but rgba8_square, whose partly transparent pixels a canvas stores premultiplied (rounded)."""
-        vectors = json.loads((CONTROLLER.parent / "protocol" / "vectors" / "box_logo.json").read_text())
-        page = self.console()
-        out = page.evaluate("""async (cases) => {
-            const m = await import('/console/components/box-logo.js');
-            const res = {};
-            for (const c of cases) {
-                const bin = Uint8Array.from(atob(c.png_b64), (ch) => ch.charCodeAt(0));
-                const bytes = await m.convertImage(new Blob([bin], { type: 'image/png' }));
-                const h = await crypto.subtle.digest('SHA-256', bytes);
-                res[c.name] = [bytes.length, Array.from(new Uint8Array(h), (b) => b.toString(16).padStart(2, '0')).join('')];
-            }
-            return res;
-        }""", vectors["cases"])
-        for case in vectors["cases"]:
-            self.assertEqual(out[case["name"]][0], 18440)
-        exact = [c for c in vectors["cases"] if out[c["name"]][1] == c["box_sha256"]]
-        self.assertEqual(sorted(c["name"] for c in vectors["cases"] if c not in exact), ["rgba8_square"])
-
     def test_read_token_sees_branding_without_controls(self):
         self.field.http.put("/api/v1/field/branding/logo", content=(BRANDING / "logo.jpg").read_bytes(),
                             headers={"Content-Type": "image/jpeg"})

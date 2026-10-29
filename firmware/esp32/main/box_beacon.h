@@ -67,7 +67,7 @@ uint16_t box_beacon_interval_units(uint32_t interval_ms);
  * checks before it starts and stays off for that game when the memory is short.
  * The figures are generous on purpose: the controller took about 20 KB on the bench (the log line
  * "Bluetooth controller up: ... (took N)" says how much; tighten these from it). */
-#define BOX_BEACON_MIN_INTERNAL_FREE   40960u
+#define BOX_BEACON_MIN_INTERNAL_FREE    40960u
 #define BOX_BEACON_MIN_INTERNAL_LARGEST 12288u
 
 /* True if that much internal RAM is free in all, and in one block, for the controller to start. */

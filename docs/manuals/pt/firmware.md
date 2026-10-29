@@ -216,6 +216,7 @@ Se mudares `--region`, `--lbt`, uma opção de chaves, ou atualizares o reposit�
 - **O nome e a palavra-passe do Wi-Fi do campo** também se definem na página de configuração.
 - **A chave de entrada do campo** é dada à caixa quando ela é adotada ([secção 6](#6-adoção)).
 - **A baliza Bluetooth da caixa.** Uma Field Box ligada a um jogo emite um iBeacon para que um telemóvel que o ouça fique no lugar da caixa (o UUID da baliza vem da chave de entrada, o major é 45253 e o minor é o número do nó da caixa). Nada a definir na caixa: o Mestre de Jogo desliga-a para o campo todo na consola (**Campo**, **Balizas interiores**, **Caixas de campo como balizas**) e a entrada do jogo seguinte avisa as caixas. Usa a pilha Bluetooth da imagem (cerca de 160 KB a mais de flash e 25 KB a mais de RAM do que uma compilação sem ela) e está desligada entre jogos. A variante Wokwi e o modem não têm baliza.
+- **A tua própria imagem de arranque.** A imagem do ecrã de arranque da caixa e dos ecrãs *pronta* é um ficheiro da compilação, `firmware/esp32/assets/splash.pgm` (a torre da Atalaia). Para compilar uma caixa com outra, faz um **PGM em texto** (primeira linha `P2`, depois `30 60`, o valor máximo e 1800 números, um por píxel, linha a linha; o `assets/splash.pgm` é um exemplo que podes abrir num editor de texto, e o GIMP e o ImageMagick escrevem o formato: `convert logo.png -resize 30x60! -depth 8 -compress none logo.pgm`) **com exatamente 30 x 60 píxeis**. Um píxel acende do meio do valor máximo para cima e fica escuro abaixo: a imagem tem uma só cor, branca no OLED pequeno e na cor de destaque, ampliada até 96 píxeis de altura, no ecrã grande; faz-a alta e estreita, como a torre. Depois substitui o `assets/splash.pgm` ou aponta a compilação ao teu ficheiro (`CONFIG_ATALAIA_SPLASH_LOGO` no menuconfig, *Boot splash*, um caminho relativo a `firmware/esp32/` ou absoluto; com o `docker_fw.py`, põe uma linha `CONFIG_ATALAIA_SPLASH_LOGO="assets/meu.pgm"` em `firmware/esp32/sdkconfig.defaults` e mantém o ficheiro dentro do repositório). A compilação transforma o ficheiro numa tabela em C e pára com uma mensagem se o ficheiro não for um PGM em texto de 30 x 60. Só a caixa de campo e o modem têm imagem de arranque. **As imagens de lançamento do projeto levam sempre a torre da Atalaia**; uma caixa com a tua imagem é uma compilação tua e não recebe atualizações de lançamento que não tenhas compilado tu.
 
 ## 5. Primeiro arranque e configuração
 
@@ -231,10 +232,10 @@ Uma Field Box ou um Satélite novo faz isto no primeiro arranque. A antena de 2,
    - **PIN de administração**: 4 a 8 algarismos. Anota-o. 1234, 0000, uma sequência como 9876 e um par repetido como 1212 são recusados.
    - **Brilho do ecrã** e **Volume do som**.
    - **Chave de ligação ao campo** (opcional): os 64 algarismos hexadecimais que a organização te dá. Podes juntá-la depois, por adoção.
-   - **Nome do Wi-Fi do campo** e **Palavra-passe do Wi-Fi do campo** (opcionais, mas precisos para as atualizações, para o logótipo do campo e para os modos de jogo obtidos: [secção 7](#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo)). O Wi-Fi do campo tem de ser de 2,4 GHz.
+   - **Nome do Wi-Fi do campo** e **Palavra-passe do Wi-Fi do campo** (opcionais, mas precisos para as atualizações e para os modos de jogo obtidos: [secção 7](#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo)). O Wi-Fi do campo tem de ser de 2,4 GHz.
 5. Toca em **Guardar e reiniciar**. A caixa reinicia.
 
-Depois, uma caixa sem campo mostra **Emparelhar caixa** e um código de 6 algarismos ([secção 6](#6-adoção)). Uma caixa que já está adotada mostra **PRONTA**, com o logótipo do campo se tiver um.
+Depois, uma caixa sem campo mostra **Emparelhar caixa** e um código de 6 algarismos ([secção 6](#6-adoção)). Uma caixa que já está adotada mostra **PRONTA**.
 
 **Abrir outra vez a página de configuração.** Numa caixa que já foi configurada há duas maneiras. Nenhuma funciona durante um jogo.
 
@@ -259,7 +260,7 @@ Uma caixa de outro campo pede o seu **PIN de administração**. **Mudar de campo
 
 ## 7. Atualizações pelo ar, e o que mais usa o Wi-Fi do campo
 
-Três coisas usam o Wi-Fi do campo, e só entre jogos: as **atualizações de firmware**, os **modos de jogo que a caixa não tem** (obtidos do controlador, como pacotes assinados) e **o logótipo do campo** (uma imagem pequena, obtida uma vez por cada jogo em que a caixa entra). Para as três, a caixa precisa do **nome e da palavra-passe do Wi-Fi do campo** da página de configuração. Também os podes definir na consola USB: `@wifi <name> <password>`. O controlador tem de estar a correr com HTTPS ligado.
+Duas coisas usam o Wi-Fi do campo, e só entre jogos: as **atualizações de firmware** e os **modos de jogo que a caixa não tem** (obtidos do controlador, como pacotes assinados). Para as duas, a caixa precisa do **nome e da palavra-passe do Wi-Fi do campo** da página de configuração. Também os podes definir na consola USB: `@wifi <name> <password>`. O controlador tem de estar a correr com HTTPS ligado.
 
 **As regras das atualizações de firmware.** A caixa só instala uma atualização se tudo isto for verdade:
 
