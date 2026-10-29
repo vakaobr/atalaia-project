@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **Indoor beacon positions on iPhone** (decisions IOSB-1 to IOSB-8; `app/ios/Runner/BeaconScanPlugin.swift`, `AppDelegate.swift`, `LocationPlugin.swift`, `app/lib/player/player_screens.dart`): a Swift plugin on the same channels and message shapes as Android's `BeaconScanPlugin.kt` (`org.atalaia.app/beacons` and `/sightings`), over CoreLocation: one `startRangingBeacons(satisfying:)` constraint per registered UUID (a Field Box's per-field UUID and the tags' alike), the one-second readings grouped into the game's beacon window, one average signal strength per beacon, the same -95 dBm floor and strongest-beacon rule in the shared Dart code. It needs only the location *When in use* (no Bluetooth permission, no *Always*; the explain-first dialog and *Continue* / *Not now* are as on Android, with iPhone texts in pt, en, de and zh-Hant, and the location usage text names the beacons) and ranges only while the app is on the screen: a locked phone falls back to GPS and the last floor, which the player screen says. Dart tests with a fake channel cover the iOS path; **the Swift has not been compiled or run** (no Mac here: CI's `ios-build` and the maintainer's iPhone are the first check; checklist in `docs/runbooks/ios-beacons-iphone.md`).
+
 ### Changed
 
 - **Site server: the daily retention purge deletes anonymised accounts nothing refers to any more** (`personal_data.py`, `purge`, new count `anonymised_users`): a `deleted-...` row (what erasure leaves; also what an account merge will leave) was kept forever. It now goes once no audit entry and no row of any table with a foreign key to `users.id` refers to it (the check is built from the models' foreign keys, so a later table is covered); the audit entries' own 36 months free it in the same pass. Hosted mode: per field, under the field's role. The privacy notice drafts (pt, en), README and DEPLOY say how long the remains of an erased account are kept.

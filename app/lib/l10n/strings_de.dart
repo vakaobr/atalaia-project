@@ -759,8 +759,10 @@ const Map<String, String> deStrings = {
       'Positionen im Gebäude sind aus: Bluetooth ist ausgeschaltet. Schalte es ein und teile erneut.',
   'player.beacons_unavailable':
       'Dieses Handy kann die Beacons des Felds nicht hören. Deine GPS-Position wird weiter geteilt.',
-  'player.beacons_ios':
-      'Auf dem iPhone werden die Beacons des Felds im Gebäude noch nicht genutzt: Deine Position ist nur GPS.',
+  'player.beacons_why_ios':
+      'Dieses Feld hat Bluetooth-Beacons im Gebäude. Um zu sagen, in welchem Raum du bist, kann Atalaia sie hören, während du deine Position teilst: nur die Beacons des Felds, und es sendet nur, welches am stärksten ist. Das iPhone fragt dafür nach der Standortberechtigung (Bluetooth nutzen die Beacons, es wird nicht abgefragt). Ohne sie bleibt deine Position nur GPS.',
+  'player.beacons_on_ios':
+      'Hört auf die Beacons des Felds, nur solange Atalaia auf dem Bildschirm offen ist: im Gebäude ist deine Position der Raum. Bei gesperrtem Telefon oder mit einer anderen App im Vordergrund geht deine Position zurück auf GPS und behält das letzte Stockwerk.',
   'player.my_room': 'Deine Position: {room}',
   'player.map_title': 'Feldplan',
   'player.map_semantics': 'Plan des Felds, {level}: {n} Positionen',

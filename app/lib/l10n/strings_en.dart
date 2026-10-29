@@ -730,8 +730,10 @@ const Map<String, String> enStrings = {
       'Indoor positions are off: Bluetooth is switched off. Switch it on and share again.',
   'player.beacons_unavailable':
       'This phone cannot listen for the field\'s beacons. Your GPS position is still shared.',
-  'player.beacons_ios':
-      'On iPhone the field\'s indoor beacons are not used yet: your position is GPS only.',
+  'player.beacons_why_ios':
+      'This field has Bluetooth beacons indoors. To tell which room you are in, Atalaia can listen for them while you share your position: only the field\'s own beacons, and it sends only which one is strongest. iPhone asks for the location permission for this (Bluetooth is used by the beacons, not asked for). Without it your position stays GPS only.',
+  'player.beacons_on_ios':
+      'Listening for the field\'s beacons, only while Atalaia is open on the screen: indoors your position is the room. With the phone locked or another app in front, your position goes back to GPS and keeps the last floor.',
   'player.my_room': 'Your position: {room}',
   'player.map_title': 'Field map',
   'player.map_semantics': 'Map of the field, {level}: {n} positions',

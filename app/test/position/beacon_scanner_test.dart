@@ -22,6 +22,7 @@ import 'package:atalaia_app/player/player_screens.dart';
 import 'package:atalaia_app/position/beacon_scanner.dart';
 import 'package:atalaia_app/position/position_reporter.dart';
 import 'package:atalaia_app/storage/app_store.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -87,6 +88,55 @@ void main() {
       expect(r.rssi, -62);
       expect(r.tMs, 1000);
       expect(r.toReport(), {'source': 'ble', 'beacon_id': '1:2', 't': 1000});
+    });
+
+    test('a Field Box (per-field UUID, major 0xB0C5) and a tag pass the same '
+        'filter, the strongest wins whichever it is', () {
+      const boxUuid = '9C3E1A52-7B64-4D08-A1F3-5E2B8D406C71';
+      final box = RegisteredBeacon.fromApi({
+        'id': '${0xB0C5}:7',
+        'uuid': boxUuid.toLowerCase(),
+      })!;
+      expect(box.major, 0xB0C5);
+      final scanner = BeaconScanner(
+        service: FakeScan(),
+        registry: [lobby, box],
+      );
+      // The box is nearer than the tag: it wins, and is reported as its id.
+      expect(
+        scanner
+            .strongest(
+              window(1, [heard(1, 1, -80), heard(0xB0C5, 7, -60, u: boxUuid)]),
+            )
+            ?.beaconId,
+        '45253:7',
+      );
+      // The tag is nearer: the tag wins.
+      expect(
+        scanner
+            .strongest(
+              window(1, [heard(1, 1, -55), heard(0xB0C5, 7, -60, u: boxUuid)]),
+            )
+            ?.beaconId,
+        '1:1',
+      );
+      // The same filter: both below the floor, or with the wrong UUID, drop.
+      expect(
+        scanner.strongest(
+          window(1, [
+            heard(1, 1, bleMinRssi - 1),
+            heard(0xB0C5, 7, bleMinRssi - 1, u: boxUuid),
+            heard(0xB0C5, 7, -40), // the box's id under the tag's UUID
+          ]),
+        ),
+        isNull,
+      );
+      // One scan listens for both UUIDs.
+      final fake = FakeScan();
+      final both = BeaconScanner(service: fake, registry: [lobby, box])
+        ..start();
+      expect(fake.listens.single.$1.toSet(), {uuid, boxUuid});
+      both.dispose();
     });
 
     test('an unregistered beacon is never reported', () {
@@ -458,6 +508,120 @@ void main() {
     });
   });
 
+  group('the iOS plugin\'s messages (BeaconScanPlugin.swift)', () {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    const events = EventChannel('org.atalaia.app/beacons/sightings');
+    const methods = MethodChannel('org.atalaia.app/beacons');
+
+    tearDown(() {
+      messenger.setMockMethodCallHandler(methods, null);
+      messenger.setMockStreamHandler(events, null);
+    });
+
+    test('start with the UUIDs and the interval, results per window, stop '
+        'cancels', () async {
+      Object? listenedWith;
+      var cancelled = 0;
+      messenger.setMockStreamHandler(
+        events,
+        MockStreamHandler.inline(
+          onListen: (arguments, sink) {
+            listenedWith = arguments;
+            // As Swift sends it: Ints, an upper case UUID, the box's major.
+            sink.success({
+              't': 1790000000000,
+              'beacons': [
+                {
+                  'uuid': 'FDA50693-A4E2-4FB1-AFCF-C28847DC5D9F',
+                  'major': 1,
+                  'minor': 2,
+                  'rssi': -71,
+                  'count': 4,
+                },
+                {
+                  'uuid': '9C3E1A52-7B64-4D08-A1F3-5E2B8D406C71',
+                  'major': 0xB0C5,
+                  'minor': 7,
+                  'rssi': -64,
+                  'count': 5,
+                },
+              ],
+            });
+          },
+          onCancel: (arguments) => cancelled++,
+        ),
+      );
+      final s = ChannelBeaconScanService();
+      final sub = s
+          .windows([
+            uuid,
+            '9C3E1A52-7B64-4D08-A1F3-5E2B8D406C71',
+          ], bleIntervalDefault)
+          .listen((_) {});
+      final first = await s.windows([uuid], const Duration(seconds: 12)).first;
+      expect(listenedWith, {
+        'uuids': [uuid],
+        'window_ms': 12000,
+      });
+      expect(first.sightings.map((b) => b.id), ['1:2', '45253:7']);
+      expect(first.sightings.last.rssi, -64);
+      await sub.cancel();
+      await settle();
+      expect(cancelled, greaterThan(0)); // stop reaches the plugin
+    });
+
+    test('the permission refused: the stream fails with "unavailable" and '
+        'the scanner stops, nothing kept', () async {
+      messenger.setMockStreamHandler(
+        events,
+        MockStreamHandler.inline(
+          onListen: (arguments, sink) => sink.error(
+            code: 'unavailable',
+            message: 'no location permission',
+          ),
+        ),
+      );
+      final scanner = BeaconScanner(
+        service: ChannelBeaconScanService(),
+        registry: [lobby],
+      )..start();
+      await settle();
+      await settle();
+      expect(scanner.running, isFalse);
+      expect(scanner.latest, isNull);
+      scanner.dispose();
+    });
+
+    test('Bluetooth off on iOS: the stream is silent, the position stays '
+        'GPS (the reporter sees no beacon)', () async {
+      messenger.setMockMethodCallHandler(methods, (call) async {
+        return switch (call.method) {
+          'available' => true,
+          'granted' => true,
+          'enabled' => true, // iOS cannot tell Bluetooth is off
+          _ => throw MissingPluginException(),
+        };
+      });
+      messenger.setMockStreamHandler(
+        events,
+        MockStreamHandler.inline(
+          onListen: (arguments, sink) =>
+              sink.success({'t': 1790000000000, 'beacons': <Object?>[]}),
+        ),
+      );
+      final scanner = BeaconScanner(
+        service: ChannelBeaconScanService(),
+        registry: [lobby],
+      )..start();
+      await settle();
+      await settle();
+      expect(scanner.running, isTrue);
+      expect(scanner.latest, isNull);
+      scanner.dispose();
+    });
+  });
+
   group('the player screen', () {
     PinnedField field() => PinnedField(
       fieldId: 'f1',
@@ -716,6 +880,115 @@ void main() {
       expect(scan.listens, isEmpty);
       expect(h.device.calls.where((c) => c.contains('BLUETOOTH')), isEmpty);
       expect(find.textContaining('cannot listen'), findsOneWidget);
+    });
+
+    group('on iOS (CoreLocation ranging)', () {
+      final reg = [
+        {'id': '1:1', 'uuid': uuid},
+        {'id': '${0xB0C5}:7', 'uuid': other},
+      ];
+
+      testWidgets('the explanation names iPhone, the permission is the '
+          'location, and the note says it is foreground only', (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        final (h, _, _, scan, _) = await open(tester, registry: reg);
+        await tester.tap(find.byKey(const Key('player-share-position')));
+        await pumpAfter(tester);
+        expect(find.byKey(const Key('player-beacons-why')), findsOneWidget);
+        expect(
+          find.textContaining('iPhone asks for the location'),
+          findsOneWidget,
+        );
+        expect(scan.listens, isEmpty);
+        await tester.tap(find.byKey(const Key('player-beacons-allow')));
+        await pumpAfter(tester);
+        // Both the tag's and the box's UUID are ranged.
+        expect(scan.listens.single.$1.toSet(), {uuid, other});
+        expect(
+          h.device.calls.where((c) => c.contains('BLUETOOTH_SCAN')),
+          isNotEmpty,
+        );
+        expect(find.byKey(const Key('player-beacons-note')), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('player-beacons-note')),
+            matching: find.textContaining('keeps the last floor'),
+          ),
+          findsNothing, // the note is the Text itself
+        );
+        expect(
+          (tester.widget(find.byKey(const Key('player-beacons-note'))) as Text)
+              .data,
+          contains('keeps the last floor'),
+        );
+        debugDefaultTargetPlatformOverride = null;
+        await tester.pumpWidget(const SizedBox());
+      });
+
+      testWidgets('a box beacon is the room the phone reports', (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        final (_, http, loc, scan, _) = await open(tester, registry: reg);
+        await tester.tap(find.byKey(const Key('player-share-position')));
+        await pumpAfter(tester);
+        await tester.tap(find.byKey(const Key('player-beacons-allow')));
+        await pumpAfter(tester);
+        scan.out.add(window(5000, [heard(0xB0C5, 7, -62, u: other)]));
+        await pumpAfter(tester);
+        loc.fixesOut.add(fix(6000));
+        await pumpAfter(tester);
+        await tester.pump(const Duration(seconds: 8));
+        await pumpAfter(tester);
+        final posts = http.posted.expand((b) => b).toList();
+        expect(
+          posts.any((r) => r['source'] == 'ble' && r['beacon_id'] == '45253:7'),
+          isTrue,
+        );
+        debugDefaultTargetPlatformOverride = null;
+        await tester.pumpWidget(const SizedBox());
+      });
+
+      testWidgets('the location refused at the beacon prompt: said, GPS '
+          'goes on', (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        final (_, _, _, scan, _) = await open(
+          tester,
+          registry: reg,
+          granted: const {'ACCESS_FINE_LOCATION'}, // BLUETOOTH_SCAN refused
+        );
+        await tester.tap(find.byKey(const Key('player-share-position')));
+        await pumpAfter(tester);
+        await tester.tap(find.byKey(const Key('player-beacons-allow')));
+        await pumpAfter(tester);
+        expect(scan.listens, isEmpty);
+        expect(
+          find.textContaining('no permission for Bluetooth'),
+          findsOneWidget,
+        );
+        debugDefaultTargetPlatformOverride = null;
+        await tester.pumpWidget(const SizedBox());
+      });
+
+      testWidgets('Bluetooth off, when the plugin can tell: said', (
+        tester,
+      ) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        final (_, _, _, scan, _) = await open(
+          tester,
+          registry: reg,
+          scan: FakeScan(isOn: false),
+        );
+        await tester.tap(find.byKey(const Key('player-share-position')));
+        await pumpAfter(tester);
+        await tester.tap(find.byKey(const Key('player-beacons-allow')));
+        await pumpAfter(tester);
+        expect(scan.listens, isEmpty);
+        expect(
+          find.textContaining('Bluetooth is switched off'),
+          findsOneWidget,
+        );
+        debugDefaultTargetPlatformOverride = null;
+        await tester.pumpWidget(const SizedBox());
+      });
     });
   });
 }

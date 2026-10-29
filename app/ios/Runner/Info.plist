@@ -65,7 +65,7 @@
 		<string>Atalaia asks for your precise location once, so the organisers see where you are on the field; it is used only while you share your position in a game.</string>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Atalaia uses your location only while you are in a game and have chosen to share your position with the organisers.</string>
+	<string>Atalaia uses your location, and the field's Bluetooth beacons indoors, only while you are in a game with the app open and have chosen to share your position with the organisers.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

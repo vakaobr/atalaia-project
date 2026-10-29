@@ -742,8 +742,10 @@ const Map<String, String> ptStrings = {
       'As posições no interior estão desligadas: o Bluetooth está desligado. Liga-o e partilha outra vez.',
   'player.beacons_unavailable':
       'Este telemóvel não consegue ouvir as balizas do campo. A posição por GPS continua a ser partilhada.',
-  'player.beacons_ios':
-      'No iPhone as balizas interiores do campo ainda não são usadas: a posição é só por GPS.',
+  'player.beacons_why_ios':
+      'Este campo tem balizas Bluetooth no interior. Para saber em que divisão estás, o Atalaia pode ouvi-las enquanto partilhas a posição: só as balizas do campo, e envia apenas qual é a mais forte. O iPhone pede a autorização de localização para isso (o Bluetooth é usado pelas balizas, não é pedido). Sem ela a tua posição fica só por GPS.',
+  'player.beacons_on_ios':
+      'A ouvir as balizas do campo, só enquanto o Atalaia está aberto no ecrã: no interior a tua posição é a divisão. Com o telemóvel bloqueado ou outra aplicação à frente, a posição volta ao GPS e mantém o último piso.',
   'player.my_room': 'A tua posição: {room}',
   'player.map_title': 'Mapa do campo',
   'player.map_semantics': 'Mapa do campo, {level}: {n} posições',
