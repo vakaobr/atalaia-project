@@ -65,3 +65,9 @@ uint16_t box_beacon_interval_units(uint32_t interval_ms)
     if (units > 0x4000u) units = 0x4000u; /* 10.24 s */
     return (uint16_t)units;
 }
+
+bool box_beacon_memory_ok(size_t internal_free, size_t internal_largest)
+{
+    return internal_free >= BOX_BEACON_MIN_INTERNAL_FREE &&
+           internal_largest >= BOX_BEACON_MIN_INTERNAL_LARGEST;
+}

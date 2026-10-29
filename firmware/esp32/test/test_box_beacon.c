@@ -67,8 +67,22 @@ static void test_interval(void)
     }
 }
 
+static void test_memory_gate(void)
+{
+    /* The controller starts with enough internal RAM in all and in one block, and only then. */
+    CHECK(box_beacon_memory_ok(BOX_BEACON_MIN_INTERNAL_FREE, BOX_BEACON_MIN_INTERNAL_LARGEST));
+    CHECK(box_beacon_memory_ok(120000, 60000));
+    CHECK(!box_beacon_memory_ok(BOX_BEACON_MIN_INTERNAL_FREE - 1, BOX_BEACON_MIN_INTERNAL_LARGEST));
+    CHECK(!box_beacon_memory_ok(BOX_BEACON_MIN_INTERNAL_FREE, BOX_BEACON_MIN_INTERNAL_LARGEST - 1));
+    /* The bench's two failures (2026-10-29): 11 KB free with the beacon in, 19 KB without. */
+    CHECK(!box_beacon_memory_ok(19079, 6400));
+    CHECK(!box_beacon_memory_ok(43555 - 30000, 20480));
+    CHECK(!box_beacon_memory_ok(0, 0));
+}
+
 void run_box_beacon_tests(void)
 {
+    test_memory_gate();
     test_uuid();
     test_adv();
     test_interval();

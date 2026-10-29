@@ -12,6 +12,7 @@
 #define ATALAIA_BOX_BEACON_ESP_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "box_beacon.h"
 
@@ -24,5 +25,14 @@ void box_beacon_esp_update(bool on, const box_beacon_id_t *id);
 
 /* True while the controller is advertising (the log and the memory monitor read it). */
 bool box_beacon_esp_running(void);
+
+/*
+ * Blocks (up to timeout_ms) until the Bluetooth controller is not running or starting, and returns
+ * true then. The Wi-Fi driver calls it before it starts: they share the internal RAM and are never
+ * up together (the shell has turned the beacon off by then, the beacon's task stops the controller
+ * and gives its memory back). False after the timeout (the Wi-Fi driver tries anyway and reports
+ * its own failure). Never call it from the beacon's own task or the shell loop.
+ */
+bool box_beacon_esp_wait_down(uint32_t timeout_ms);
 
 #endif /* ATALAIA_BOX_BEACON_ESP_H */

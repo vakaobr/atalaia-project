@@ -49,6 +49,17 @@ CONFIG_ESP_WIFI_RX_IRAM_OPT=n
 # 2026-10-22). Slower TLS, for one download between games.
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
 
+# --- Internal RAM budget (README.md, "Memory budget") ---
+# The Field Box's internal RAM is what Wi-Fi (DMA RX buffers, driver state), the Bluetooth
+# controller, the display's DMA draw buffers and every task stack share. On the bench (2026-10-29)
+# it was gone at a game's join: 11 KB of DMA RAM free with the beacon, 36 KB without it, where the
+# Wi-Fi driver needs about 47 KB. The game's big static buffers and LVGL's 48 KB widget heap were
+# in .bss, i.e. in internal RAM, ~110 KB of it; they live in PSRAM now (ATALAIA_PSRAM_BSS in
+# main/psram_attr.h, LV_ATTRIBUTE_LARGE_RAM_ARRAY in lvgl_conf/lv_conf.h). Only zero-initialised
+# statics that tasks use, never an ISR, a DMA buffer or an SPI buffer. The Wokwi, modem and pod
+# images turn this off (no PSRAM guaranteed, or no need).
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
+
 # --- FreeRTOS ---
 CONFIG_FREERTOS_HZ=1000
 
@@ -69,10 +80,26 @@ CONFIG_COMPILER_OPTIMIZATION_PERF=y
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 
 # --- Bluetooth LE: the Field Box's iBeacon (decisions BBC-1 to BBC-12) ---
-# OFF in the Field Box for now (2026-10-29): on the bench board, Bluetooth compiled in took about 25 KB
-# of internal RAM, and at a game's join the Wi-Fi for the field's logo could no longer start
-# (ESP_ERR_NO_MEM, 19 KB internal free), then the Bluetooth controller's own allocation failed and
-# the watchdog reset the box. The beacon code stays (main/box_beacon_esp.c); it comes back on once it
-# fits beside the Wi-Fi (decision BBC-13). The I/O pod (sdkconfig.pod) turns Bluetooth on for itself.
-CONFIG_BT_ENABLED=n
-CONFIG_ATALAIA_BOX_BEACON=n
+# A broadcaster only: NimBLE advertises one non-connectable packet while the box is joined to a
+# game (main/box_beacon_esp.c) and is taken down again, controller memory included, when the game
+# ends. No connection, no scan, no pairing and no bond store, so the host is the smallest NimBLE
+# builds; its heap goes to PSRAM (the internal RAM is spoken for: see the Wi-Fi notes above).
+# The I/O pod (sdkconfig.pod) and the modem and Wokwi variants set their own, after this file.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
+# (ESP-IDF 5.3.2's ble_gap.c does not compile as a broadcaster alone: it needs the peripheral role,
+# which stays unused; the advertisement is non-connectable.)
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+CONFIG_BT_NIMBLE_SECURITY_ENABLE=n
+CONFIG_BT_NIMBLE_NVS_PERSIST=n
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+# The controller's own memory (internal RAM, released with the controller when the beacon stops):
+# one advertiser needs two activities at most, and the scan duplicate filter and the advertising-report
+# flow control are for scanners (this box never scans).
+CONFIG_BT_CTRL_BLE_MAX_ACT=2
+CONFIG_BT_CTRL_BLE_SCAN_DUPL=n
+CONFIG_BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_SUPP=n

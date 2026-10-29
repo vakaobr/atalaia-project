@@ -60,4 +60,17 @@ void box_beacon_uuid_text(const uint8_t uuid[BOX_BEACON_UUID_SIZE], char out[37]
  * clamped to the range Bluetooth allows for a non-connectable advertiser (20 ms to 10.24 s). */
 uint16_t box_beacon_interval_units(uint32_t interval_ms);
 
+/* The Bluetooth controller's memory is internal RAM (the controller and its interrupt handlers
+ * cannot use PSRAM), taken when it starts and given back when it stops. Starting it with less than
+ * this free, or without a block of this size left, makes its allocations fail half-way (the
+ * bench's "BLE_INIT: Malloc failed" and the watchdog reset behind it, 2026-10-29): the beacon
+ * checks before it starts and stays off for that game when the memory is short.
+ * The figures are generous on purpose: the controller took about 20 KB on the bench (the log line
+ * "Bluetooth controller up: ... (took N)" says how much; tighten these from it). */
+#define BOX_BEACON_MIN_INTERNAL_FREE   40960u
+#define BOX_BEACON_MIN_INTERNAL_LARGEST 12288u
+
+/* True if that much internal RAM is free in all, and in one block, for the controller to start. */
+bool box_beacon_memory_ok(size_t internal_free, size_t internal_largest);
+
 #endif /* ATALAIA_BOX_BEACON_H */

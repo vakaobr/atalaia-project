@@ -75,3 +75,6 @@ CONFIG_ATALAIA_BOX_BEACON=n
 # The emulated board's console is UART0; the USB-Serial-JTAG input of the
 # Field Box build (CONFIG_ATALAIA_CONSOLE_USB_INPUT) is not used here.
 # CONFIG_ATALAIA_CONSOLE_USB_INPUT is not set
+
+# The Field Box's defaults put big static buffers in PSRAM (sdkconfig.defaults); not here.
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=n

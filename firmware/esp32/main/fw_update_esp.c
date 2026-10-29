@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "box_beacon_esp.h"
 #include "box_text.h"
 #include "config_store.h"
 #include "esp_app_desc.h"
@@ -35,6 +36,7 @@
 #include "fw_layout.h"
 #include "fw_layout_esp.h"
 #include "fw_update.h"
+#include "mem_monitor.h"
 #include "mbedtls/md.h"
 #include "mbedtls/pk.h"
 #include "mbedtls/sha256.h"
@@ -212,6 +214,13 @@ static bool net_up(void *ctx)
     xEventGroupClearBits(s_wifi_events, WIFI_GOT_IP | WIFI_FAILED);
     s_retries = 0;
     wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
+    /* The Bluetooth controller (the box's iBeacon) and this driver share the internal RAM and are
+     * never up together: the shell has turned the beacon off (the net is claimed), wait for its
+     * task to give the controller's memory back. */
+    if (!box_beacon_esp_wait_down(5000)) {
+        ESP_LOGW(TAG, "the Bluetooth controller is still up: starting Wi-Fi anyway");
+    }
+    mem_monitor_log("Wi-Fi starting");
     /* The Wi-Fi driver's RX buffers need DMA-capable internal RAM: log the
      * headroom before it starts, the figure that decides whether it can. */
     ESP_LOGI(TAG, "Wi-Fi starting: DMA-capable RAM %u bytes free (largest %u), internal %u",

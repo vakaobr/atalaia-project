@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 #include "builtin_presets.h"
+#include "psram_attr.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -79,8 +80,8 @@ bool builtin_presets_has(const char *mode_id)
 
 /* preset_t holds a 16 KB source buffer, so it is not put on a task stack;
  * nor is the list of stored presets (3.7 KB). */
-static preset_t scratch;
-static preset_summary_t stored[PRESET_MAX_SLOTS];
+static preset_t scratch ATALAIA_PSRAM_BSS;
+static preset_summary_t stored[PRESET_MAX_SLOTS] ATALAIA_PSRAM_BSS;
 
 static const builtin_source_t *source_of(const builtin_source_t *sources, int count,
                                          const char *mode_id)

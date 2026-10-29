@@ -28,3 +28,6 @@ CONFIG_BT_ENABLED=n
 
 # The modem has no Lua heap to place: PSRAM is optional.
 CONFIG_SPIRAM_IGNORE_NOTFOUND=y
+
+# The Field Box's defaults put big static buffers in PSRAM (sdkconfig.defaults); not here.
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=n

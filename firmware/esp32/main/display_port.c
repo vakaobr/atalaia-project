@@ -56,23 +56,29 @@ bool display_port_init(const hal_display_ops_t *ops)
     }
     panel = ops;
 
-    const size_t buf_size = HAL_DISPLAY_WIDTH * HAL_DISPLAY_BUF_LINES * 2;
-    void *buf1 = heap_caps_malloc(buf_size, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
-    void *buf2 = heap_caps_malloc(buf_size, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
-    if (!buf1 || !buf2) {
+    /* Two DMA draw buffers of HAL_DISPLAY_BUF_LINES lines; with less internal RAM than that (the
+     * bench, 2026-10-29: after a failed Wi-Fi start) one buffer, then fewer lines, so the screen
+     * still works, slower, instead of staying blank. */
+    size_t buf_size = 0;
+    void *buf1 = NULL, *buf2 = NULL;
+    for (int lines = HAL_DISPLAY_BUF_LINES; lines >= 4 && buf1 == NULL; lines /= 2) {
+        buf_size = (size_t)HAL_DISPLAY_WIDTH * (size_t)lines * 2;
+        buf1 = heap_caps_malloc(buf_size, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+        if (buf1 != NULL) buf2 = heap_caps_malloc(buf_size, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    }
+    if (!buf1) {
         ESP_LOGE(TAG, "no DMA memory for the draw buffers");
-        heap_caps_free(buf1);
-        heap_caps_free(buf2);
         return false;
     }
+    if (!buf2) ESP_LOGW(TAG, "DMA memory for one draw buffer only: slower redraws");
 
     display = lv_display_create(HAL_DISPLAY_WIDTH, HAL_DISPLAY_HEIGHT);
     lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
     lv_display_set_buffers(display, buf1, buf2, buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(display, panel_ok ? flush_to_panel : flush_discard);
-    ESP_LOGI(TAG, "LVGL %d.%d.%d on %dx%d, 2 x %u byte draw buffers", LVGL_VERSION_MAJOR,
+    ESP_LOGI(TAG, "LVGL %d.%d.%d on %dx%d, %d x %u byte draw buffers", LVGL_VERSION_MAJOR,
              LVGL_VERSION_MINOR, LVGL_VERSION_PATCH, HAL_DISPLAY_WIDTH, HAL_DISPLAY_HEIGHT,
-             (unsigned)buf_size);
+             buf2 ? 2 : 1, (unsigned)buf_size);
     return panel_ok;
 }
 

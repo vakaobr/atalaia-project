@@ -17,6 +17,7 @@
  * accent bars.
  */
 #include "screen_template.h"
+#include "psram_attr.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -229,7 +230,7 @@ void screen_template_fold_text(char *s, int font_size)
 #define QR_SIZE 120
 #define NOT_SET 0xFFFFFFFFu
 
-static atalaia_tpl_t tpl; /* the template on screen */
+static atalaia_tpl_t tpl ATALAIA_PSRAM_BSS; /* the template on screen */
 static char tpl_error[96];
 static lv_obj_t *root;
 static lv_obj_t *obj[W_MAX];

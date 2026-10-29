@@ -470,8 +470,17 @@
 /*Attribute to mark large constant arrays for example font's bitmaps*/
 #define LV_ATTRIBUTE_LARGE_CONST
 
-/*Compiler prefix for a big array declaration in RAM*/
-#define LV_ATTRIBUTE_LARGE_RAM_ARRAY
+/*Compiler prefix for a big array declaration in RAM.
+ *Atalaia: LVGL's 48 KB widget heap (LV_MEM_SIZE) is the biggest block of the firmware's internal RAM, which the
+ *Wi-Fi driver, the Bluetooth controller and the display's DMA buffers need (firmware/esp32/README.md, "Memory
+ *budget"): on the ESP32 it goes to PSRAM when sdkconfig.defaults allows .bss there
+ *(CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY; the draw buffers stay in internal DMA RAM). On the host, empty.*/
+#ifdef ESP_PLATFORM
+    #include "esp_attr.h"
+    #define LV_ATTRIBUTE_LARGE_RAM_ARRAY EXT_RAM_BSS_ATTR
+#else
+    #define LV_ATTRIBUTE_LARGE_RAM_ARRAY
+#endif
 
 /*Place performance critical functions into a faster memory (e.g RAM)*/
 #define LV_ATTRIBUTE_FAST_MEM

@@ -23,6 +23,7 @@
 #include <string.h>
 
 #include "admin_pin.h"
+#include "psram_attr.h"
 #include "adoption.h"
 #include "atalaia/join.h"
 #include "box_pair.h"
@@ -114,20 +115,20 @@ static const char *TAG = "atalaia";
 /* ---- Shared state ----------------------------------------------------- */
 
 static hal_t hal;
-static node_runner_t runner;
+static node_runner_t runner ATALAIA_PSRAM_BSS;
 static button_tracker_t btn_tracker;
 static preset_ui_t preset_ui;
 static bool picker_active; /* the keypad drives the preset picker */
 static key_filter_t key_filter;
 static size_t mem_limit;
 
-static preset_summary_t presets[PRESET_MAX_SLOTS];
+static preset_summary_t presets[PRESET_MAX_SLOTS] ATALAIA_PSRAM_BSS;
 static const char *preset_labels[PRESET_MAX_SLOTS];
 static int preset_count;
 static screen_update_t picker_screen; /* last picker screen sent */
 
 /* preset_t holds a 16 KB source buffer: static, not on a task stack. */
-static preset_t game_preset;
+static preset_t game_preset ATALAIA_PSRAM_BSS;
 
 static QueueHandle_t screen_queue;
 static QueueHandle_t audio_queue;
@@ -136,7 +137,7 @@ static QueueHandle_t audio_queue;
 static const char *const default_teams[] = {"red", "blue", "green", "yellow"};
 
 /* A field controller's game (box_game.h) and its flash event log. */
-static box_game_t box;
+static box_game_t box ATALAIA_PSRAM_BSS;
 static event_log_t game_log;
 static bool box_teams_set;   /* the button tracker uses the joined game's teams */
 static bool box_was_active;  /* to notice the end of a field game */
@@ -1428,6 +1429,7 @@ void app_main(void)
     box_start(tier);
 
     /* Memory monitor. */
+    mem_monitor_log("boot");
     mem_monitor_start();
 
     /* Check if initial setup is needed. */

@@ -13,6 +13,17 @@
 
 static const char *TAG = "mem_monitor";
 
+void mem_monitor_log(const char *when)
+{
+    ESP_LOGI(TAG, "%s: internal free=%u largest=%u min=%u, DMA free=%u largest=%u, PSRAM free=%u",
+             when, (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+}
+
 static void mem_monitor_task(void *arg)
 {
     (void)arg;
@@ -40,6 +51,11 @@ void mem_monitor_start(void)
 }
 
 #else
+
+void mem_monitor_log(const char *when)
+{
+    (void)when;
+}
 
 void mem_monitor_start(void)
 {

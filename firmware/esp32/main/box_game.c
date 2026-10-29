@@ -5,6 +5,7 @@
  * A Field Box in a field controller's game (see box_game.h).
  */
 #include "box_game.h"
+#include "psram_attr.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -467,7 +468,7 @@ static bool add_modifiers(box_game_t *g, const preset_summary_t *list, int n, co
 static int find_preset(box_game_t *g, const char *mode_id)
 {
     /* 3.7 KB: not on the game task's stack (one box per process). */
-    static preset_summary_t list[PRESET_MAX_SLOTS];
+    static preset_summary_t list[PRESET_MAX_SLOTS] ATALAIA_PSRAM_BSS;
     int n = preset_store_list(list, PRESET_MAX_SLOTS);
     const char *plus = strchr(mode_id, '+');
     size_t main_len = plus != NULL ? (size_t)(plus - mode_id) : strlen(mode_id);
@@ -689,7 +690,7 @@ box_join_result_t box_game_join(box_game_t *g, const uint8_t *payload, size_t le
 /* True if every part of a join's mode id is installed (find_preset's test, without loading). */
 static bool modes_installed(const char *mode_id)
 {
-    static preset_summary_t list[PRESET_MAX_SLOTS]; /* as find_preset: not on the stack */
+    static preset_summary_t list[PRESET_MAX_SLOTS] ATALAIA_PSRAM_BSS; /* as find_preset: not on the stack */
     int n = preset_store_list(list, PRESET_MAX_SLOTS);
     for (const char *p = mode_id; *p;) {
         const char *next = strchr(p, '+');
