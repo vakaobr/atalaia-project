@@ -162,6 +162,12 @@ static bool uart_input;
 #if SERIAL_USB
 static serial_console_t console_usb;
 static bool usb_input;
+#if CONFIG_ATALAIA_SERIAL_KEYS
+/* "@hold <button 1-4> <ms>" (bench builds only): the button reads as pressed for that long, so a
+ * bench run can hold a team button without hands on the board (projected-score runbook). */
+static uint8_t serial_hold_mask;
+static uint32_t serial_hold_until;
+#endif
 #endif
 
 /* Mode sources built into the firmware (main/CMakeLists.txt, from modes/). */
@@ -282,7 +288,8 @@ static void serial_input_init(void)
     }
 #endif
 #if CONFIG_ATALAIA_SERIAL_KEYS
-    ESP_LOGI(TAG, "serial keys on: type 0-9, * and # on the console");
+    ESP_LOGI(TAG, "serial keys on: type 0-9, * and # on the console; \"@hold <button 1-4> <ms>\" "
+                  "holds a button");
 #endif
 #if CONFIG_ATALAIA_SERIAL_ADOPT
     ESP_LOGI(TAG, "USB adoption on: \"@adopt-info\", \"@adopt <hex> [<PIN>|-] [<name>]\"");
@@ -336,6 +343,20 @@ static void serial_command(const char *cmd)
             return;
         }
     }
+#if CONFIG_ATALAIA_SERIAL_KEYS
+    if (strncmp(cmd, "hold ", 5) == 0) {
+        unsigned button = 0, ms = 0;
+        if (sscanf(cmd + 5, "%u %u", &button, &ms) == 2 && button >= 1 && button <= 4 &&
+            ms <= 60000) {
+            serial_hold_mask = (uint8_t)(serial_hold_mask | (1u << (button - 1)));
+            serial_hold_until = now_ms() + ms;
+            ESP_LOGI(TAG, "hold: button %u for %u ms", button, ms);
+        } else {
+            ESP_LOGW(TAG, "hold: \"@hold <button 1-4> <ms up to 60000>\"");
+        }
+        return;
+    }
+#endif
 #if CONFIG_ATALAIA_LBT_BENCH
     /* Decision SL-25's bench test of listen-before-talk: "@lbt tx", "@lbt probe", ... */
     if (strcmp(cmd, "lbt") == 0 || strncmp(cmd, "lbt ", 4) == 0) {
@@ -985,6 +1006,13 @@ static void task_game(void *arg)
             after_game = false;
         }
         uint8_t buttons = hal.buttons->poll();
+#if CONFIG_ATALAIA_SERIAL_KEYS
+        if (serial_hold_mask && (int32_t)(now_ms() - serial_hold_until) < 0) {
+            buttons = (uint8_t)(buttons | serial_hold_mask);
+        } else {
+            serial_hold_mask = 0;
+        }
+#endif
         button_tracker_update(&btn_tracker, buttons, delta_ms, &runner);
 
         /* ---- Poll keypad: one press per key stroke ---- */
