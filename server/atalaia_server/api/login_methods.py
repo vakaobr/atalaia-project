@@ -3,7 +3,7 @@
 """Ways to log in besides a password: social login, passkeys, and the staff second factor (decisions LG-*).
 
     GET    /api/v1/auth/methods                        what this server offers (the login pages' buttons)
-    POST   /api/v1/auth/oidc/{provider}/start          {purpose, consent?, return_to?, password?}: the provider's URL
+    POST   /api/v1/auth/oidc/{provider}/start          {purpose, consent?, notice_version?, return_to?, password?}: the provider's URL
     GET    /api/v1/auth/oidc/{provider}/browser        the app's browser starts here (PKA-1): sets the binding cookie
     GET    /api/v1/auth/oidc/{provider}/callback       where the provider sends the browser back
     POST   /api/v1/auth/oidc/complete                  {ticket}: a finished social login becomes a session
@@ -91,6 +91,7 @@ APP_RETURN_TO = re.compile(r"/app/oidc(?:\?[A-Za-z0-9_.=&%-]{0,380})?")
 class StartIn(Strict):
     purpose: Literal["login", "link", "reauth", "name"] = "login"
     consent: bool = False
+    notice_version: Optional[str] = Field(default=None, max_length=64)  # the privacy notice the person was shown
     return_to: str = Field(default=DEFAULT_RETURN, max_length=400)
     password: str = Field(default="", max_length=4096)
 
@@ -274,6 +275,10 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
     ``reauth`` (prove it is you again, for an account with no password) need the bearer token, and ``link`` the
     account's confirmation as every sensitive change does."""
     _provider(request, provider)
+    current = request.app.state.settings.privacy_notice_version
+    if body.consent and body.notice_version is not None and body.notice_version != current:
+        return JSONResponse({"detail": "notice_version_changed", "current_version": current}, status_code=409,
+                            headers=NO_STORE)
     user_id: Optional[uuid.UUID] = None
     session_id: Optional[uuid.UUID] = None
     if body.purpose != "login":
@@ -293,7 +298,8 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
     db.add(OidcLogin(state_hash=_hash(state), binding_hash=_hash(binding), provider=provider, purpose=body.purpose,
                      user_id=user_id, session_id=session_id, nonce=nonce, code_verifier=verifier,
                      redirect_uri=redirect_uri, return_to=safe_return_to(body.return_to, site_origin(request)),
-                     consent=body.consent, expires_at=now + timedelta(seconds=STATE_TTL_S)))
+                     consent=body.consent, notice_version=body.notice_version if body.consent else None,
+                     expires_at=now + timedelta(seconds=STATE_TTL_S)))
     await db.commit()
     url = request.app.state.oidc.authorization_url(provider, redirect_uri, state, nonce,
                                                    pkce_challenge(verifier), profile=body.purpose == "name")
@@ -432,6 +438,9 @@ async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provid
     # registration limit. Never matched to an existing account by email (the server never asks for one).
     if not row.consent:
         return _back(row.return_to, error="consent_required")
+    current = request.app.state.settings.privacy_notice_version
+    if row.notice_version is not None and row.notice_version != current:  # the notice changed during the round trip
+        return _back(row.return_to, error="notice_version_changed")
     try:
         await quotas.check(db, "accounts", None)  # hosted mode: the field's account quota, as for registering
     except quotas.QuotaExceeded:
@@ -449,8 +458,7 @@ async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provid
     except IntegrityError:  # the same subject finished twice at once: the other one won
         await db.rollback()
         return _back(row.return_to, error="try_again")
-    personal_data.give_consent(db, user.id, personal_data.ACCOUNT, request.app.state.settings.privacy_notice_version,
-                               now)
+    personal_data.give_consent(db, user.id, personal_data.ACCOUNT, row.notice_version or current, now)
     record(db, "register", request, user_id=user.id, resource="user", resource_id=user.id,
            details={"method": "oidc", "provider": provider})
     await db.commit()

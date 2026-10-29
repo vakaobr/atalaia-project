@@ -153,9 +153,15 @@ async function passkeyLogin() {
 async function socialLogin(provider) {
     status(t('login_social_working'));
     const back = `${location.pathname}${location.search}`;
-    const answer = await post(`/api/v1/auth/oidc/${provider}/start`, {
-        purpose: 'login', consent: $('consent').checked, return_to: back,
-    });
+    const ticked = $('consent').checked;
+    const body = { purpose: 'login', consent: ticked, return_to: back };
+    if (ticked && noticeVersion) body.notice_version = noticeVersion;  // the notice this page offered (CONS-7)
+    const answer = await post(`/api/v1/auth/oidc/${provider}/start`, body);
+    if (answer.status === 409 && answer.body && answer.body.detail === 'notice_version_changed') {
+        noticeVersion = answer.body.current_version || null;  // read again; the box is ticked again on purpose
+        noticeChanged();
+        return;
+    }
     if (answer.status !== 200 || typeof answer.body.authorization_url !== 'string') {
         status(refused(answer, t('oidc_err_other')), 'error');
         return;
@@ -173,14 +179,21 @@ async function socialLogin(provider) {
     location.assign(target.href);
 }
 
-let consentFailed = false;
+let consentFailed = '';
+let noticeVersion = null;  // the published privacy notice's version, read when the page opened (null: none published)
+
+/** The notice changed after this page read it (or during the round trip): untick, and say so at the box. */
+function noticeChanged() {
+    $('consent').checked = false;
+    consentMissing(t('oidc_err_notice_version_changed'));
+}
 
 /** The refusal for a missing agreement is shown where the box is, with the box marked and focused. */
-function consentMissing() {
+function consentMissing(text = t('oidc_err_consent_required')) {
     const row = $('consent-row');
     const box = $('consent');
     const note = $('consent-error');
-    note.textContent = t('oidc_err_consent_required');
+    note.textContent = text;
     note.hidden = false;
     row.classList.add('invalid');
     box.setAttribute('aria-invalid', 'true');
@@ -205,8 +218,8 @@ async function finishSocial() {
         const rest = params.toString();
         history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}`);
     }
-    if (failure === 'consent_required') {
-        consentFailed = true;  // shown at the box once the buttons are on the page (offer)
+    if (failure === 'consent_required' || failure === 'notice_version_changed') {
+        consentFailed = failure;  // shown at the box once the buttons are on the page (offer)
         return false;
     }
     if (failure) {
@@ -239,6 +252,10 @@ async function offer() {
         }));
     }
     $('consent-row').hidden = providers.length === 0;
+    if (providers.length > 0) {
+        const notice = await call('GET', '/api/v1/privacy-notice');  // 404: no notice published, nothing to name
+        noticeVersion = notice.status === 200 && notice.body && notice.body.version ? notice.body.version : null;
+    }
     $('consent').addEventListener('change', () => {
         $('consent-error').hidden = true;
         $('consent-row').classList.remove('invalid');
@@ -255,8 +272,10 @@ async function offer() {
     }
     // The box is on the page now (its section was hidden until here): show the refusal there.
     if (consentFailed) {
-        if (providers.length > 0) consentMissing();
-        else status(oidcError('consent_required'), 'error');
+        if (providers.length > 0) {
+            if (consentFailed === 'notice_version_changed') $('consent').checked = false;
+            consentMissing(oidcError(consentFailed));
+        } else status(oidcError(consentFailed), 'error');
     }
 }
 

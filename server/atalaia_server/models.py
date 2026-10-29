@@ -252,6 +252,7 @@ class OidcLogin(Base):
     redirect_uri: Mapped[str] = mapped_column(String(512), nullable=False)
     return_to: Mapped[str] = mapped_column(String(512), nullable=False)
     consent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    notice_version: Mapped[Optional[str]] = mapped_column(String(64))  # the notice the person saw (CONS-7)
     created_at: Mapped[datetime] = _created()
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

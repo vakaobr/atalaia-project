@@ -623,6 +623,26 @@ class MigrationTests(unittest.TestCase):
         command.downgrade(self.cfg, "0022_field_retention")
         self.assertEqual((roles(), self.schema()), (roles_before, schema_before))
 
+    def test_0025_with_data(self) -> None:
+        """0025_oidc_notice_version: a sign-up round in progress keeps working (no version, as an older client sends),
+        a new one holds the version shown, and back down the column is gone."""
+        command.upgrade(self.cfg, "0024_oidc_name_purpose")
+        self.db.fetch("INSERT INTO oidc_logins (state_hash, binding_hash, provider, purpose, nonce, code_verifier, "
+                      "redirect_uri, return_to, consent, expires_at) VALUES ('old', 'b', 'google', 'login', 'n', 'v', "
+                      "'r', '/', true, now() + interval '10 minutes')")
+        command.upgrade(self.cfg, "0025_oidc_notice_version")
+        self.assertIsNone(self.db.fetch("SELECT notice_version FROM oidc_logins WHERE state_hash = 'old'")[0][0])
+        self.db.fetch("INSERT INTO oidc_logins (state_hash, binding_hash, provider, purpose, nonce, code_verifier, "
+                      "redirect_uri, return_to, consent, notice_version, expires_at) VALUES ('new', 'b', 'google', "
+                      "'login', 'n', 'v', 'r', '/', true, 'v-2', now() + interval '10 minutes')")
+        self.assertEqual(self.db.fetch("SELECT notice_version FROM oidc_logins WHERE state_hash = 'new'")[0][0], "v-2")
+        command.downgrade(self.cfg, "0024_oidc_name_purpose")
+        columns = {r["column_name"] for r in self.db.fetch(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'oidc_logins'")}
+        self.assertNotIn("notice_version", columns)
+        self.assertEqual(len(self.db.fetch("SELECT 1 FROM oidc_logins")), 2)
+        self.db.fetch("DELETE FROM oidc_logins")
+
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)
         self.assertEqual(len(self.script.get_bases()), 1)
@@ -676,7 +696,7 @@ class TenantRoleMigrationTests(unittest.TestCase):
         self.assertTrue(self.role_exists(role))
         cfg = hosted.alembic_config(self.hub.owner_url, schema)
         before = self.rows("SELECT version_num FROM %s.alembic_version" % schema)[0][0]
-        self.assertEqual(before, "0024_oidc_name_purpose")
+        self.assertEqual(before, "0025_oidc_notice_version")
         command.downgrade(cfg, "0022_field_retention")
         self.assertFalse(self.role_exists(role))  # the role and every grant it held are gone ...
         self.assertTrue(self.role_exists(self.hub.a.role))  # ... and only this field's role

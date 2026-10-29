@@ -6,6 +6,7 @@ soft one; the app, the database and every endpoint are the real ones."""
 
 from __future__ import annotations
 
+import dataclasses
 import io
 import json
 import tempfile
@@ -380,6 +381,70 @@ class SocialLoginTests(LoginTestCase):
         # The same subject under another provider is another account: nothing is matched by email or by name.
         third = await self.social("microsoft", "sub-1")
         self.assertNotEqual(first["user"]["id"], third["user"]["id"])
+
+    def set_notice_version(self, version: str) -> None:
+        self.app.state.settings = dataclasses.replace(self.app.state.settings, privacy_notice_version=version)
+
+    async def recorded_versions(self) -> list[str]:
+        return [r[0] for r in await self.fetch("SELECT notice_version FROM consents WHERE purpose = 'account'")]
+
+    async def test_the_notice_version_the_person_saw_is_recorded(self) -> None:
+        """CONS-7: the version named at the start is the one recorded, and it is held on the login row meanwhile."""
+        current = self.app.state.settings.privacy_notice_version
+        params, r = await self.begin("google", notice_version=current)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual((await self.fetch("SELECT notice_version FROM oidc_logins"))[0][0], current)
+        _, query, fragment = self.landed(await self.callback("google", params, "sub-1"))
+        self.assertEqual((query, fragment.startswith("oidc=")), ({}, True))
+        self.assertEqual(await self.recorded_versions(), [current])
+
+    async def test_a_stale_notice_version_is_refused_at_the_start(self) -> None:
+        current = self.app.state.settings.privacy_notice_version
+        _, r = await self.begin("google", notice_version="an-older-version")
+        self.assertEqual((r.status_code, r.json()), (409, {"detail": "notice_version_changed",
+                                                           "current_version": current}))
+        self.assertEqual((await self.fetch("SELECT count(*) FROM oidc_logins"))[0][0], 0)
+        # Without the tick no account is being agreed to, so the version does not matter (and is not kept).
+        params, r = await self.begin("google", consent=False, notice_version="an-older-version")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIsNone((await self.fetch("SELECT notice_version FROM oidc_logins"))[0][0])
+        too_long = await self.client.post("/api/v1/auth/oidc/google/start",
+                                          json={"purpose": "login", "consent": True, "notice_version": "x" * 65})
+        self.assertEqual(too_long.status_code, 422)
+
+    async def test_the_callback_rechecks_the_notice_version(self) -> None:
+        current = self.app.state.settings.privacy_notice_version
+        params, r = await self.begin("google", notice_version=current)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.set_notice_version("campo-v2")  # the operator publishes a new notice while the person is at Google
+        _, query, fragment = self.landed(await self.callback("google", params, "sub-1"))
+        self.assertEqual((query, fragment), ({"oidc_error": "notice_version_changed"}, ""))
+        self.assertEqual((await self.fetch("SELECT count(*) FROM users"))[0][0], 0)
+        self.assertEqual(await self.recorded_versions(), [])
+        # Starting again with the new version works and records it.
+        await self.social_with("google", "sub-1", "campo-v2")
+        self.assertEqual(await self.recorded_versions(), ["campo-v2"])
+
+    async def test_a_known_subject_does_not_care_about_the_notice_version(self) -> None:
+        await self.social("google", "sub-1")
+        client = self.other_client()
+        params, _ = await self.begin("google", client=client, notice_version=self.app.state.settings.privacy_notice_version)
+        self.set_notice_version("campo-v2")
+        _, query, fragment = self.landed(await self.callback("google", params, "sub-1", client=client))
+        self.assertEqual((query, fragment.startswith("oidc=")), ({}, True))
+
+    async def test_a_client_that_names_no_version_gets_the_current_one(self) -> None:
+        """Older apps and pages send nothing, and neither does a server with no notice published: as before."""
+        self.assertEqual((await self.client.get("/api/v1/privacy-notice")).status_code, 404)  # nothing published
+        await self.social("google", "sub-1")
+        self.assertEqual(await self.recorded_versions(), [self.app.state.settings.privacy_notice_version])
+
+    async def social_with(self, provider: str, subject: str, version: str) -> None:
+        params, r = await self.begin(provider, notice_version=version)
+        self.assertEqual(r.status_code, 200, r.text)
+        _, query, fragment = self.landed(await self.callback(provider, params, subject))
+        self.assertEqual(query, {})
+        self.assertTrue(fragment.startswith("oidc="), fragment)
 
     async def test_a_login_makes_no_account_without_consent(self) -> None:
         params, _ = await self.begin("google", consent=False)
