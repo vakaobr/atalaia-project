@@ -68,6 +68,13 @@ MOVE_GAP_MS = 2_500          # ... this far apart, on the channel the boxes stil
 SWEEP_REPEATS = 2            # a sweep sends it this many times on each earlier channel ...
 SWEEP_AFTER_DISCOVER_MS = 4_000  # ... starting this long after a DISCOVER, so its answers are heard first
 SWEEP_MIN_MS = 60_000        # at most one sweep a minute (a sub-band of 0.1 % has 3.6 s of air an hour)
+# The hourly cap (decision RL-9): on a sub-band under 10 % duty a sweep's MOVEs may use at most this share of
+# its hour (a rolling hour, charged to the sub-band each earlier channel is in); a 10 % sub-band keeps only
+# the once-a-minute limit (the worst case there, 44 s of 360 s, is 12 % and only between games).
+SWEEP_AIR_SHARE = 0.05
+SWEEP_CAP_BELOW_DUTY = 0.10
+SWEEP_WINDOW_MS = 3_600_000
+MOVE_FRAME_BYTES = 45        # the longest MOVE on the air (41-45 bytes: the revision varies)
 MOVE_ANNOUNCE_MS = (6_000, 15_000)  # a box that moved announces itself on the new channel after the
                                     # controller's three MOVEs are over (it is still on the old channel until
                                     # then), unless the controller's DISCOVER there asks it first
@@ -455,6 +462,9 @@ class Inviter:
         self.games_over: list[GameOver] = []
         self.moves: list[MoveOrder] = []
         self.last_sweep: Optional[int] = None
+        self.sweep_log: list[tuple[int, str, int]] = []  # (ms, sub-band, microseconds of air) of the sweeps' MOVEs
+        # Why the last sweep() was refused by the hourly cap (sweep_refusal()), else None.
+        self.sweep_refused: Optional[dict] = None
         # Called once no GAME_OVER or MOVE is left to send (and after tune(None)): the controller's
         # next step, e.g. a DISCOVER on the field's channel after a sweep.
         self.on_orders_done: Optional[Callable[[], None]] = None
@@ -567,14 +577,68 @@ class Inviter:
         self.moves.append(order)
         return order
 
+    @staticmethod
+    def _sweep_cost(channels: list[int], region: Any) -> dict[str, tuple[Any, int]]:
+        """Microseconds of MOVE air a sweep of ``channels`` puts on each capped sub-band: name -> (band, us).
+        A channel off the region's table counts as 1 % (name "?"); a sub-band at or over
+        SWEEP_CAP_BELOW_DUTY is not capped and not listed."""
+        per_channel = SWEEP_REPEATS * round(region.airtime_ms(MOVE_FRAME_BYTES) * 1000)
+        out: dict[str, tuple[Any, int]] = {}
+        for ch in channels:
+            band = region.band_of(ch)
+            if band is not None and band.duty >= SWEEP_CAP_BELOW_DUTY:
+                continue
+            name = band.name if band is not None else "?"
+            out[name] = (band, out.get(name, (band, 0))[1] + per_channel)
+        return out
+
+    def sweep_refusal(self, channels: list[int], now_ms: int, region: Any) -> Optional[dict]:
+        """The hourly cap (decision RL-9): None when a sweep of ``channels`` fits, else why not. Each channel
+        costs SWEEP_REPEATS MOVEs of air on the sub-band it is in; over a rolling hour a sub-band under
+        SWEEP_CAP_BELOW_DUTY may give SWEEP_AIR_SHARE of its duty-cycle budget to sweeps. The answer is
+        ``{"reason": "cap", "band", "duty_pct", "share_pct", "limit_ms", "used_ms", "cost_ms", "retry_after_s"}``;
+        ``retry_after_s`` is None when one sweep never fits that sub-band (0.1 %); with several sub-bands over
+        the cap, the one that waits longest is named (every one must fit)."""
+        self.sweep_log = [e for e in self.sweep_log if now_ms - e[0] < SWEEP_WINDOW_MS]
+        worst: Optional[dict] = None
+        for name, (band, cost) in self._sweep_cost(channels, region).items():
+            duty = band.duty if band is not None else 0.01
+            limit = round(duty * SWEEP_WINDOW_MS * 1000 * SWEEP_AIR_SHARE)
+            mine = sorted((t, us) for t, n, us in self.sweep_log if n == name)
+            used = sum(us for _, us in mine)
+            if used + cost <= limit:
+                continue
+            retry: Optional[int] = None
+            if cost <= limit:  # the oldest sweeps leave the hour one by one
+                left = used
+                for t, us in mine:
+                    left -= us
+                    if left + cost <= limit:
+                        retry = t + SWEEP_WINDOW_MS
+                        break
+            refusal = {"reason": "cap", "band": name, "duty_pct": round(duty * 100, 3), "share_pct": round(SWEEP_AIR_SHARE * 100, 3),
+                       "limit_ms": limit // 1000, "used_ms": used // 1000, "cost_ms": -(-cost // 1000),
+                       "retry_after_s": None if retry is None else max(1, -(-(retry - now_ms) // 1000))}
+            if worst is None or (worst["retry_after_s"] is not None and (
+                    refusal["retry_after_s"] is None or refusal["retry_after_s"] > worst["retry_after_s"])):
+                worst = refusal
+        return worst
+
     def sweep(self, channels: list[int], to_hz: int, rev: int, now_ms: int,
-              delay_ms: int = SWEEP_AFTER_DISCOVER_MS) -> bool:
+              delay_ms: int = SWEEP_AFTER_DISCOVER_MS, region: Any = None) -> bool:
         """MOVE on each earlier channel, one after the other (so the modem is tuned once to each), for boxes
-        that were away when the field moved: at most one sweep in SWEEP_MIN_MS. False when there is
-        nothing to do or it is too soon."""
+        that were away when the field moved: at most one sweep in SWEEP_MIN_MS and, given the field's
+        ``region``, within the hourly cap (sweep_refusal; the reason is left in ``sweep_refused``, never a
+        silent refusal). False when there is nothing to do or it is refused."""
+        self.sweep_refused = None
         channels = [c for c in channels if c != to_hz]
         if not channels or (self.last_sweep is not None and now_ms - self.last_sweep < SWEEP_MIN_MS) or self.moves:
             return False
+        if region is not None:
+            self.sweep_refused = self.sweep_refusal(channels, now_ms, region)
+            if self.sweep_refused is not None:
+                return False
+            self.sweep_log += [(now_ms, name, us) for name, (_, us) in self._sweep_cost(channels, region).items()]
         self.last_sweep = now_ms
         at = now_ms + delay_ms
         for ch in channels:

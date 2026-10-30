@@ -323,9 +323,9 @@ class ReinviteTests(Case):
         self.pump(21)
         self.assertEqual(len(self.client.get("/api/v1/boxes", headers=GM).json()["boxes"]), 1)
         self.modem.fields.clear()
-        self.assertEqual(self.client.post("/api/v1/boxes/discover", headers=GM).json(), {"sent": True, "sweep": []})
+        self.assertEqual(self.client.post("/api/v1/boxes/discover", headers=GM).json(), {"sent": True, "sweep": [], "sweep_refused": None})
         self.assertEqual(ff.decode(ff.field_key(JOIN_KEY), self.modem.fields[0]), {"kind": "discover"})
-        self.assertEqual(self.client.post("/api/v1/boxes/discover", headers=GM).json(), {"sent": False, "sweep": []})
+        self.assertEqual(self.client.post("/api/v1/boxes/discover", headers=GM).json(), {"sent": False, "sweep": [], "sweep_refused": None})
         self.assertEqual(self.client.get("/api/v1/boxes", headers=READ).status_code, 403)
         # No live game, a box nobody heard, a bad device id.
         device = self.box.device_id.hex()
@@ -604,7 +604,7 @@ class MoveTests(Case):
         self.asleep = set()
         self.heard_by_box.clear()
         r = self.client.post("/api/v1/boxes/discover", headers=GM)
-        self.assertEqual(r.json(), {"sent": True, "sweep": [OLD_HZ]})
+        self.assertEqual(r.json(), {"sent": True, "sweep": [OLD_HZ], "sweep_refused": None})
         self.pump(25)
         self.assertEqual([b.channel_hz for b in self.boxes], [NEW_HZ, NEW_HZ])
         # DISCOVER on the new channel, then (4 s later) the MOVE twice on the old one, then DISCOVER again.
@@ -613,6 +613,30 @@ class MoveTests(Case):
         self.assertEqual(self.names(), ["box-0", "box-1"])
         # At most one sweep a minute.
         self.assertEqual(self.client.post("/api/v1/boxes/discover", headers=GM).json()["sweep"], [])
+
+    def test_the_hourly_cap_refuses_a_sweep_on_a_1_percent_channel_and_says_when(self):
+        """RL-9: on a 1 % sub-band a sweep's MOVEs may use 5 % of the hour; the answer is never an empty sweep
+        without a reason, and the 10 % default sub-band keeps only the once-a-minute limit."""
+        for hz in (868_100_000, 868_300_000, 868_500_000):  # all in sub-band g (1 %); the history ends in g2
+            self.ctrl.set_field_channel(hz)
+            self.pump(10)
+        self.assertEqual(self.ctrl.channel_history(), [868_300_000, 868_100_000, OLD_HZ])
+        out = []
+        for _ in range(4):  # two channels on g (369.7 ms of it) and the 10 % one: 1800 ms fit four sweeps
+            out.append(self.client.post("/api/v1/boxes/discover", headers=GM).json())
+            self.pump(61)
+        self.assertEqual([r["sweep"] for r in out], [[868_300_000, 868_100_000, OLD_HZ]] * 4)
+        self.assertEqual([r["sweep_refused"] for r in out], [None] * 4)
+        r = self.client.post("/api/v1/boxes/discover", headers=GM).json()
+        self.assertEqual(r["sweep"], [])
+        refused = r["sweep_refused"]
+        self.assertEqual((refused["reason"], refused["band"], refused["duty_pct"], refused["limit_ms"]),
+                         ("cap", "g", 1.0, 1800))
+        # The first sweep is about 4 x 61 s old: it leaves the hour in just under an hour.
+        self.assertTrue(3300 <= refused["retry_after_s"] <= 3360, refused)
+        self.assertTrue(r["sent"] in (True, False))  # the DISCOVER itself is not capped
+        self.pump(refused["retry_after_s"] + 1)
+        self.assertIsNone(self.client.post("/api/v1/boxes/discover", headers=GM).json()["sweep_refused"])
 
     def test_without_a_modem_that_carries_field_frames_the_channel_changes_at_once(self):
         self.modem.has_field_frames = False

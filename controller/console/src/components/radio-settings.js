@@ -18,6 +18,21 @@ export function mhz(hz) {
     return decimal((hz / 1e6).toFixed(3));
 }
 
+/** A sweep the controller's hourly cap on air time refused (decision RL-9): why, and in how many
+ * minutes the next one is possible (retry_after_s counted from the request; null: never on this
+ * channel's sub-band). Never an empty sweep without a reason. */
+function SweepRefused({ refused, at }) {
+    const duty = decimal(refused.duty_pct);
+    if (refused.retry_after_s == null) {
+        return html`<p class="warning small" data-testid="invite-discover-capped" data-retry="never">${
+            t('invites.discover_never', { duty })}</p>`;
+    }
+    const left = Math.max(0, refused.retry_after_s * 1000 - (Date.now() - at));
+    const minutes = Math.max(1, Math.ceil(left / 60000));
+    return html`<p class="warning small" data-testid="invite-discover-capped" data-retry=${refused.retry_after_s}>${
+        t('invites.discover_capped', { duty, share: decimal(refused.share_pct), minutes })}</p>`;
+}
+
 /** After "Look for boxes" (RFC 0001 Amendment 19, decision RB-13): that it was asked, the earlier
  * channels swept for boxes that were away when the field moved, how many boxes have answered since
  * (heard after the request), and what to do about one that is still missing. */
@@ -32,6 +47,7 @@ export function DiscoverResult({ app }) {
             : 'invites.discover_recent')}</p>
         ${sweep.length > 0 && html`<p class="small" data-testid="invite-discover-sweep">${t('invites.discover_sweep',
             { channels: sweep.map((hz) => mhz(hz)).join(' MHz, ') })}</p>`}
+        ${discovered.sweep_refused && html`<${SweepRefused} refused=${discovered.sweep_refused} at=${discovered.at} />`}
         <p class="small" data-testid="invite-discover-answered">${t('invites.discover_answered', { n: heard })}</p>
         <p class="muted small" data-testid="invite-missing-help">${t('invites.missing_help')}</p>
     </div>`;

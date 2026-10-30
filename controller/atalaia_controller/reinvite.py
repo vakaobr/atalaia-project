@@ -282,13 +282,15 @@ class Reinvite:
             sent = self.inviter.discover(now)
             # Boxes that were away when the field's channel changed still listen on an earlier one: a MOVE
             # on each (a few seconds after the DISCOVER, so its answers are heard first), then another
-            # DISCOVER here. Only between games, and at most once a minute.
+            # DISCOVER here. Only between games, at most once a minute, and within the hourly air cap of
+            # the sub-bands under 10 % (lobby.Inviter.sweep_refusal).
             history = self.ctl.channel_history() if self.ctl.fc is None else []
             sweep = bool(history) and self.inviter.sweep(history, self.ctl.field_channel, self.ctl.move_rev() or 1,
-                                                         now)
+                                                         now, region=self.ctl.field_region)
             if sweep:
                 self._discover_after = True
-            return {"sent": sent, "sweep": history if sweep else []}
+            # A sweep the hourly cap refused says so and when the next one is possible (decision RL-9).
+            return {"sent": sent, "sweep": history if sweep else [], "sweep_refused": self.inviter.sweep_refused if history else None}
 
     def invite(self, game_id: int, specs: Any) -> dict[str, Any]:
         """Invites boxes into the live game: [{"device_id", "role"?, "name"?, "fetch_modes"?}, ...].

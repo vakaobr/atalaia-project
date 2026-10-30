@@ -63,6 +63,19 @@ class FrameSizeTests(unittest.TestCase):
         self.assertEqual(lobby.MOVE_REPEATS, 3)
         self.assertEqual(lobby.SWEEP_REPEATS, 2)
 
+    def test_the_hourly_cap_on_sweeps_per_sub_band(self):
+        """RL-9: 5 % of an hour's budget on a sub-band under 10 %; the 10 % one keeps the once-a-minute limit."""
+        rows = {r["band"]: r for r in state_load.sweep_cap()}
+        self.assertEqual(lobby.MOVE_FRAME_BYTES, state_load.MOVE_BYTES)
+        self.assertEqual((rows["g2"]["capped"], rows["g2"]["sweeps_per_hour"]), (False, 60))
+        self.assertEqual((rows["g"]["limit_s"], rows["g"]["sweeps_per_hour"], rows["g"]["worst_air_s"]), (1.8, 2, 1.5))
+        self.assertEqual(rows["g"]["worst_share_pct"], 4.1)
+        self.assertEqual(rows["g3"]["sweeps_per_hour"], 2)
+        # 0.1 %: 0.18 s an hour is less than one channel's 0.185 s: no sweep at all.
+        self.assertEqual((rows["g1"]["limit_s"], rows["g1"]["sweeps_per_hour"]), (0.18, 0))
+        # The cap on 1 % is under what the repeats of a typical hour already cost the controller (2.3 s).
+        self.assertLess(rows["g"]["limit_s"], state_load.state_change_air_ms()["time_repeats"] * 7 / 1000)
+
     def test_the_gaps_are_the_ones_the_controller_uses(self):
         self.assertEqual(STATE_REPEAT_GAPS_MS, (1000, 1500, 2500, 5000))  # +1, +2.5, +5, +10 s
 

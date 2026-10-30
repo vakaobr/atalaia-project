@@ -8,7 +8,8 @@ RFC 0001 Amendment 19 added frames the relay study (relay_study.py, decisions SL
   +10.0 s (``field_controller.STATE_REPEAT_GAPS_MS``, decision RB-8), and every box relays each TIME with
   the density rule (probability min(1, 3 / neighbours), Amendment 13);
 * a **channel change** sends MOVE three times 2.5 s apart on the old channel (RB-4); *Find boxes* sends two
-  MOVEs on each of the last four channels, at most once a minute (RB-6).
+  MOVEs on each of the last four channels, at most once a minute (RB-6) and, on a sub-band under 10 %, within
+  5 % of its hour (a rolling hour, RL-9; ``sweep_cap``).
 
 This module does two things. ``frame_table`` and ``move_cost`` are arithmetic on the project's own formulas
 (``regions.airtime_ms``, the frame sizes of the codecs), the figures the RFC quotes; ``measure`` runs the
@@ -56,6 +57,28 @@ def move_cost_ms(old_channels: int = 0, region: str = "eu868") -> dict[str, floa
     m = frame_ms(MOVE_BYTES, region)
     return {"move": m, "channel_change": lobby.MOVE_REPEATS * m,
             "sweep": old_channels * lobby.SWEEP_REPEATS * m}
+
+
+def sweep_cap(region: str = "eu868", old_channels: int = 4) -> list[dict[str, Any]]:
+    """The hourly cap on Find boxes' sweeps (decision RL-9, lobby.SWEEP_AIR_SHARE), per sub-band of the region:
+    the budget an hour, the share sweeps may use, and how many sweeps of ``old_channels`` channels all in that
+    sub-band fit in a rolling hour (the cap's worst case for that sub-band). A sub-band at or over
+    lobby.SWEEP_CAP_BELOW_DUTY has no cap: the once-a-minute limit stays (``per_hour`` 60)."""
+    reg = regions.get(region)
+    per_channel = lobby.SWEEP_REPEATS * round(reg.airtime_ms(lobby.MOVE_FRAME_BYTES) * 1000)
+    out = []
+    for band in reg.sub_bands:
+        budget_ms = band.duty * lobby.SWEEP_WINDOW_MS
+        capped = band.duty < lobby.SWEEP_CAP_BELOW_DUTY
+        limit_us = round(band.duty * lobby.SWEEP_WINDOW_MS * 1000 * lobby.SWEEP_AIR_SHARE)
+        sweep_us = per_channel * old_channels
+        per_hour = (limit_us // sweep_us if sweep_us <= limit_us else 0) if capped else 3_600_000 // lobby.SWEEP_MIN_MS
+        used_us = per_hour * sweep_us
+        out.append({"band": band.name, "duty_pct": band.duty_pct, "budget_s": budget_ms / 1000, "capped": capped,
+                    "limit_s": round(limit_us / 1e6, 2) if capped else None,
+                    "sweeps_per_hour": per_hour, "worst_air_s": round(used_us / 1e6, 1),
+                    "worst_share_pct": round(100 * used_us / 1000 / budget_ms, 1)})
+    return out
 
 
 def frame_table(region: str = "eu868") -> list[dict[str, Any]]:
@@ -138,6 +161,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"| {r['frame']} | {r['bytes'] if r['bytes'] else ''} | {r['ms']} |")
     mv = move_cost_ms(4)
     print(f"\nchannel change {mv['channel_change']:.0f} ms, sweep of 4 channels {mv['sweep']:.0f} ms\n")
+    print("hourly cap on sweeps (4 channels all in the sub-band):")
+    for r in sweep_cap():
+        print(f"  {r['band']:3} {r['duty_pct']:>5} %: {r['sweeps_per_hour']:>2} sweeps an hour, worst case "
+              f"{r['worst_air_s']} s = {r['worst_share_pct']} % of {r['budget_s']} s" + ("" if r["capped"] else " (no cap)"))
+    print()
     gaps = tuple(int(x) for x in a.gaps.split(",")) if a.gaps else None
     for n in (int(x) for x in a.sizes.split(",")):
         r = measure(n, tuple(int(x) for x in a.seeds.split(",")), 60, a.pause_pairs, a.policy, gaps=gaps, lib=a.lib)

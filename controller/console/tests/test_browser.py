@@ -2071,6 +2071,44 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("invite-discover-sweep")).to_contain_text("869.525 MHz")
         expect(page.get_by_test_id("invite-missing-help")).to_be_visible()
 
+    def test_find_boxes_says_when_the_hourly_cap_refused_the_sweep(self):
+        """RL-9: a sweep the controller's cap on air time refused is said, with the minutes to the next one
+        (or that the sub-band never allows one), in four languages; never an empty sweep without a reason.
+        The cap itself is the controller's (tests/test_reinvite.py, the contract case); here the console
+        gets the answer."""
+        capped = {"sent": True, "sweep": [], "sweep_refused": {
+            "reason": "cap", "band": "g", "duty_pct": 1.0, "share_pct": 5.0, "limit_ms": 1800, "used_ms": 1478,
+            "cost_ms": 370, "retry_after_s": 3356}}
+        never = {"sent": True, "sweep": [], "sweep_refused": {
+            "reason": "cap", "band": "g1", "duty_pct": 0.1, "share_pct": 5.0, "limit_ms": 180, "used_ms": 0,
+            "cost_ms": 185, "retry_after_s": None}}
+        answer = {"body": capped}
+        page = self.console()
+        page.route("**/api/v1/boxes/discover", lambda route: route.fulfill(json=answer["body"]))
+        page.get_by_test_id("lang").first.select_option("en")
+        page.get_by_test_id("tab-settings").click()
+        page.get_by_test_id("radio-find-boxes").click()
+        refused = page.get_by_test_id("invite-discover-capped")
+        expect(refused).to_have_text(
+            "No sweep of the earlier channels: on a 1% channel the radio may use only 5% of an hour's air time "
+            "for sweeps, and that is used up for now. The next sweep is possible in 56 min.")
+        expect(page.get_by_test_id("invite-discover-sweep")).to_have_count(0)
+        page.get_by_test_id("lang").first.select_option("pt")
+        expect(refused).to_contain_text("possível dentro de 56 min")
+        expect(refused).to_contain_text("tempo de emissão")
+        page.get_by_test_id("lang").first.select_option("de")
+        expect(refused).to_contain_text("Der nächste Suchlauf ist in 56 Min. möglich.")
+        page.get_by_test_id("lang").first.select_option("zh-tw")
+        expect(refused).to_contain_text("下一次搜尋可在 56 分鐘後進行。")
+        # A sub-band that never allows a sweep says that instead.
+        answer["body"] = never
+        page.get_by_test_id("lang").first.select_option("en")
+        page.get_by_test_id("radio-find-boxes").click()
+        expect(page.get_by_test_id("invite-discover-capped")).to_have_text(
+            "No sweep of the earlier channels: a 0.1% channel has too little air time for a sweep.")
+        page.get_by_test_id("lang").first.select_option("pt")
+        expect(page.get_by_test_id("invite-discover-capped")).to_contain_text("um canal de 0,1%")
+
     def test_channel_scan_without_a_radio(self):
         self.field.close()
         self.field = Field("--no-radio")

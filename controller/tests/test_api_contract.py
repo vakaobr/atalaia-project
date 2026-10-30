@@ -8,7 +8,7 @@ The same cases run against the Android field controller (decision PE24,
 app/test/controller/api_contract_test.dart): this controller is the
 reference, so every case must pass here first. Each case gets a fresh
 controller with a recording modem and a clock that only moves on an
-``advance_ms`` step, which also runs the controller's tick once; a
+``advance_ms`` step, which also runs the controller's tick once (``times``: that many steps, a tick after each); a
 ``restart`` step stops the controller, closes its SQLite store and starts a
 new controller on the same file (slice S3), with the case's
 ``persist_game_key`` (the default, true, unless the case says). Stream
@@ -319,8 +319,9 @@ class ContractCase(unittest.TestCase):
             self.boot(env)
             return
         if "advance_ms" in step:
-            env.now[0] += step["advance_ms"] / 1000
-            env.ctrl.tick()
+            for _ in range(step.get("times", 1)):  # "times": that many steps, a tick after each
+                env.now[0] += step["advance_ms"] / 1000
+                env.ctrl.tick()
             return
         if "rx" in step:
             rx = step["rx"]

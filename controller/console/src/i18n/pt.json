@@ -1348,6 +1348,8 @@
     "discover_sent": "Perguntou-se às caixas livres onde estão.",
     "discover_recent": "Perguntou-se às caixas livres há instantes; a aguardar as respostas.",
     "discover_sweep": "Procurou-se também nos canais anteriores: {channels} MHz. As caixas aí são avisadas para mudar; as respostas podem demorar até 30 segundos.",
+    "discover_capped": "Não se procurou nos canais anteriores: num canal de {duty}% o rádio só pode usar {share}% do tempo de emissão de uma hora em procuras, e esse limite já foi atingido. A próxima procura é possível dentro de {minutes} min.",
+    "discover_never": "Não se procurou nos canais anteriores: um canal de {duty}% tem pouco tempo de emissão para uma procura.",
     "discover_answered": "Caixas que responderam: {n}.",
     "missing_help": "Uma caixa que continue em falta depois disto tem de ser adotada de novo (separador Adotar) ou estar perto do controlador, ligada e livre, na próxima mudança de canal.",
     "close": "Fechar",

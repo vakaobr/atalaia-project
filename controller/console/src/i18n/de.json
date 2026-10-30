@@ -1348,6 +1348,8 @@
     "discover_sent": "Die freien Boxen wurden gebeten, sich zu melden.",
     "discover_recent": "Die freien Boxen wurden gerade erst gefragt; es wird auf Antworten gewartet.",
     "discover_sweep": "Auch auf den früheren Kanälen gesucht: {channels} MHz. Boxen dort werden zum Wechseln aufgefordert; Antworten können bis zu 30 Sekunden dauern.",
+    "discover_capped": "Keine Suche auf den früheren Kanälen: Auf einem Kanal mit {duty}% darf das Funkgerät nur {share}% der Sendezeit einer Stunde für Suchläufe nutzen, und das ist vorerst aufgebraucht. Der nächste Suchlauf ist in {minutes} Min. möglich.",
+    "discover_never": "Keine Suche auf den früheren Kanälen: Ein Kanal mit {duty}% hat zu wenig Sendezeit für einen Suchlauf.",
     "discover_answered": "Boxen, die geantwortet haben: {n}.",
     "missing_help": "Eine Box, die danach noch fehlt, muss neu aufgenommen werden (Reiter Aufnehmen) oder beim nächsten Kanalwechsel eingeschaltet, frei und in der Nähe des Controllers sein.",
     "close": "Schließen",

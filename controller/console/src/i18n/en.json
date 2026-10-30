@@ -1348,6 +1348,8 @@
     "discover_sent": "Asked the free boxes to announce themselves.",
     "discover_recent": "The free boxes were asked a moment ago; waiting for their answers.",
     "discover_sweep": "Also looked on the earlier channels: {channels} MHz. Boxes there are told to move; answers can take up to 30 seconds.",
+    "discover_capped": "No sweep of the earlier channels: on a {duty}% channel the radio may use only {share}% of an hour's air time for sweeps, and that is used up for now. The next sweep is possible in {minutes} min.",
+    "discover_never": "No sweep of the earlier channels: a {duty}% channel has too little air time for a sweep.",
     "discover_answered": "Boxes that answered: {n}.",
     "missing_help": "A box that is still missing after this must be adopted again (Adopt tab) or be near the controller, switched on and free, during the next channel change.",
     "close": "Close",

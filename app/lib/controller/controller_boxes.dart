@@ -36,6 +36,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import '../protocol/field_frame.dart';
+import '../protocol/radio_region.dart';
 import '../security/bytes.dart';
 import 'controller_engine.dart';
 
@@ -56,6 +57,12 @@ const moveGapMs = 2500;
 const sweepRepeats = 2;
 const sweepAfterDiscoverMs = 4000;
 const sweepMinMs = 60000;
+// The hourly cap (decision RL-9, lobby.py): a sub-band under 10 % duty gives
+// sweeps' MOVEs at most this share of its hour, over a rolling hour.
+const sweepAirShare = 0.05;
+const sweepCapBelowDuty = 0.10;
+const sweepWindowMs = 3600000;
+const moveFrameBytes = 45;
 
 /// LoRa time on air at SF7/125 kHz (explicit header, CRC, CR 4/5, an
 /// 8-symbol preamble): eu868.py `airtime_ms`, core/src/duty_cycle.c.
@@ -220,6 +227,10 @@ class FieldInviter {
   _Move?
   _change; // the MOVEs of the field's own change of channel (not a sweep's)
   int? lastSweep;
+  final _sweepLog = <({int ms, String band, int us})>[];
+
+  /// Why the last [sweep] was refused by the hourly cap, else null.
+  Map<String, Object?>? sweepRefused;
 
   /// How far the field's last change of channel is told (reinvite.py
   /// `move_status`): MOVEs [sent], and whether any is still [telling].
@@ -435,17 +446,99 @@ class FieldInviter {
     if (change) _change = m;
   }
 
+  /// Microseconds of MOVE air a sweep of [channels] puts on each capped
+  /// sub-band, by name: lobby.py `_sweep_cost`. A channel off the region's
+  /// table counts as 1 % (name "?"); a sub-band at or over
+  /// [sweepCapBelowDuty] is not capped and not listed.
+  static Map<String, ({double duty, int us})> _sweepCost(
+    List<int> channels,
+    Region region,
+  ) {
+    final perChannel =
+        sweepRepeats *
+        (airtimeMs(moveFrameBytes, sf: region.sf, bwHz: region.bwHz) * 1000)
+            .round();
+    final out = <String, ({double duty, int us})>{};
+    for (final ch in channels) {
+      final band = region.bandOf(ch);
+      if (band != null && band.duty >= sweepCapBelowDuty) continue;
+      final name = band?.name ?? '?';
+      out[name] = (
+        duty: band?.duty ?? 0.01,
+        us: (out[name]?.us ?? 0) + perChannel,
+      );
+    }
+    return out;
+  }
+
+  /// The hourly cap (decision RL-9, lobby.py `sweep_refusal`): null when a
+  /// sweep of [channels] fits, else {reason: cap, band, duty_pct, share_pct, limit_ms,
+  /// used_ms, cost_ms, retry_after_s}; retry_after_s is null when one sweep
+  /// never fits that sub-band (0.1 %).
+  Map<String, Object?>? sweepRefusal(
+    List<int> channels,
+    int nowMs,
+    Region region,
+  ) {
+    _sweepLog.removeWhere((e) => nowMs - e.ms >= sweepWindowMs);
+    Map<String, Object?>? worst;
+    _sweepCost(channels, region).forEach((name, c) {
+      final limit = (c.duty * sweepWindowMs * 1000 * sweepAirShare).round();
+      final mine = [
+        for (final e in _sweepLog)
+          if (e.band == name) e,
+      ]..sort((a, b) => a.ms.compareTo(b.ms));
+      var used = 0;
+      for (final e in mine) {
+        used += e.us;
+      }
+      if (used + c.us <= limit) return;
+      int? retry;
+      if (c.us <= limit) {
+        var left = used;
+        for (final e in mine) {
+          left -= e.us;
+          if (left + c.us <= limit) {
+            retry = e.ms + sweepWindowMs;
+            break;
+          }
+        }
+      }
+      final refusal = <String, Object?>{
+        'reason': 'cap',
+        'band': name,
+        'duty_pct': double.parse((c.duty * 100).toStringAsFixed(3)),
+        'share_pct': double.parse((sweepAirShare * 100).toStringAsFixed(3)),
+        'limit_ms': limit ~/ 1000,
+        'used_ms': used ~/ 1000,
+        'cost_ms': (c.us + 999) ~/ 1000,
+        'retry_after_s': retry == null
+            ? null
+            : max(1, (retry - nowMs + 999) ~/ 1000),
+      };
+      final w = worst?['retry_after_s'] as int?;
+      final r = refusal['retry_after_s'] as int?;
+      if (worst == null || (w != null && (r == null || r > w))) {
+        worst = refusal;
+      }
+    });
+    return worst;
+  }
+
   /// MOVE on each earlier channel, one after the other (the radio is tuned
   /// once to each), for boxes that were away when the field moved: at most
-  /// one sweep in [sweepMinMs]. False when there is nothing to do or it is
-  /// too soon.
+  /// one sweep in [sweepMinMs] and, given the field's [region], within the
+  /// hourly cap (the reason is left in [sweepRefused], never a silent
+  /// refusal). False when there is nothing to do or it is refused.
   bool sweep(
     List<int> channels,
     int toHz,
     int rev,
     int nowMs, {
     int delayMs = sweepAfterDiscoverMs,
+    Region? region,
   }) {
+    sweepRefused = null;
     final list = [
       for (final c in channels)
         if (c != toHz) c,
@@ -455,6 +548,13 @@ class FieldInviter {
         (last != null && nowMs - last < sweepMinMs) ||
         _moves.isNotEmpty) {
       return false;
+    }
+    if (region != null) {
+      sweepRefused = sweepRefusal(list, nowMs, region);
+      if (sweepRefused != null) return false;
+      _sweepCost(list, region).forEach((name, c) {
+        _sweepLog.add((ms: nowMs, band: name, us: c.us));
+      });
     }
     lastSweep = nowMs;
     var at = nowMs + delayMs;
@@ -901,9 +1001,16 @@ class ControllerBoxes {
           engine.fieldChannel,
           engine.channel?.moveRev() ?? 1,
           now,
+          region: engine.fieldRegion,
         );
     if (sweep) _discoverAfter = true;
-    return {'sent': sent, 'sweep': sweep ? history : <int>[]};
+    // A sweep the hourly cap refused says so and when the next one is
+    // possible (decision RL-9).
+    return {
+      'sent': sent,
+      'sweep': sweep ? history : <int>[],
+      'sweep_refused': history.isNotEmpty ? inviter.sweepRefused : null,
+    };
   }
 
   /// Invites boxes into the live game: [{"device_id", "role"?, "name"?,

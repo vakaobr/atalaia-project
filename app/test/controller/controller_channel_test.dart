@@ -293,6 +293,7 @@ void main() {
       expect(r, {
         'sent': true,
         'sweep': [oldHz],
+        'sweep_refused': null,
       });
       run(15000);
       // DISCOVER, four seconds later the MOVE twice on the old channel, then
@@ -300,6 +301,39 @@ void main() {
       expect(kinds(), ['discover', 'move', 'move', 'discover']);
       expect(tunes(), [oldHz, newHz]); // tuned once to each
       expect(engine.boxes!.discover()['sweep'], isEmpty);
+    });
+    test('the hourly cap refuses a sweep on a 1 % channel and says when', () {
+      // Decision RL-9: on a 1 % sub-band a sweep's MOVEs may use 5 % of the
+      // hour; the 10 % one keeps only the once-a-minute limit.
+      for (final hz in [868100000, 868300000, 868500000]) {
+        ch.setChannel(
+          hz,
+          'manual',
+        ); // all in sub-band g; the history ends in g2
+        run(10000);
+      }
+      expect(ch.history(), [868300000, 868100000, oldHz]);
+      for (var i = 0; i < 4; i++) {
+        final r = engine.boxes!.discover();
+        expect(r['sweep'], [868300000, 868100000, oldHz], reason: '$i');
+        expect(r['sweep_refused'], isNull);
+        run(61000);
+      }
+      final r = engine.boxes!.discover();
+      expect(r['sweep'], isEmpty);
+      final refused = r['sweep_refused']! as Map;
+      expect(
+        [refused['reason'], refused['band'], refused['duty_pct']],
+        ['cap', 'g', 1.0],
+      );
+      expect(
+        [refused['limit_ms'], refused['used_ms'], refused['cost_ms']],
+        [1800, 1478, 370],
+      );
+      final wait = refused['retry_after_s']! as int;
+      expect(wait, inInclusiveRange(3300, 3360));
+      run((wait + 1) * 1000);
+      expect(engine.boxes!.discover()['sweep_refused'], isNull);
     });
   });
 

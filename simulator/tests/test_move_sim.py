@@ -17,7 +17,7 @@ import os
 import random
 import unittest
 
-from atalaia_sim import eu868, lobby
+from atalaia_sim import eu868, lobby, regions
 from atalaia_sim import field_frame as ff
 
 
@@ -149,6 +149,74 @@ class MoveSim(unittest.TestCase):
         self.inviter.moves.clear()
         self.assertFalse(self.inviter.sweep([NEW], NEW, 1, 10 ** 7), "nothing earlier than the field's channel")
         self.assertFalse(self.inviter.sweep([], NEW, 1, 10 ** 7))
+
+    # --- the hourly cap on a sweep's air (decision RL-9) ----------------------------------------------
+
+    G1, G2, G3 = 868_100_000, 868_300_000, 868_500_000  # all in sub-band g (1 %)
+
+    def test_the_cap_is_a_share_of_the_sub_bands_budget_and_the_10_percent_band_has_none(self):
+        region = regions.EU868
+        per_channel = 2 * round(region.airtime_ms(lobby.MOVE_FRAME_BYTES) * 1000)
+        self.assertEqual(per_channel, 184_832)  # two MOVEs of 92.4 ms
+        # 1 %: 36 s of air an hour, 5 % of it 1.8 s: four sweeps of two channels fit, the fifth does not.
+        inv = self.inviter
+        for i in range(4):
+            self.assertTrue(inv.sweep([self.G1, self.G2], NEW, 1, i * 61_000, region=region), i)
+            inv.moves.clear()
+            self.assertIsNone(inv.sweep_refused)
+        self.assertFalse(inv.sweep([self.G1, self.G2], NEW, 1, 4 * 61_000, region=region))
+        refused = inv.sweep_refused
+        self.assertEqual((refused["reason"], refused["band"], refused["duty_pct"]), ("cap", "g", 1.0))
+        self.assertEqual((refused["limit_ms"], refused["used_ms"], refused["cost_ms"]), (1800, 1478, 370))
+        # The first sweep (at 0 s) leaves the hour at 3600 s: that is the next possible time.
+        self.assertEqual(refused["retry_after_s"], 3600 - 244)
+        self.assertEqual(inv.last_sweep, 3 * 61_000, "a refused sweep does not start the minute")
+        # One second early still refused, on time allowed.
+        self.assertFalse(inv.sweep([self.G1, self.G2], NEW, 1, 3_600_000 - 1, region=region))
+        self.assertEqual(inv.sweep_refused["retry_after_s"], 1)
+        self.assertTrue(inv.sweep([self.G1, self.G2], NEW, 1, 3_600_000, region=region))
+        self.assertIsNone(inv.sweep_refused)
+
+    def test_a_sweep_on_the_10_percent_band_is_only_rate_limited(self):
+        inv = self.inviter
+        for i in range(60):  # once a minute for an hour, as the worst case of state-load-results.md
+            self.assertTrue(inv.sweep([OLD], NEW, 1, i * lobby.SWEEP_MIN_MS, region=regions.EU868), i)
+            inv.moves.clear()
+        self.assertEqual(inv.sweep_log, [])
+
+    def test_each_channel_is_charged_to_its_own_sub_band(self):
+        region = regions.EU868
+        inv = self.inviter
+        # g2 (10 %) is not charged; g and g3 (both 1 %) are separate budgets.
+        self.assertTrue(inv.sweep([OLD, self.G1, 869_850_000], NEW, 1, 0, region=region))
+        self.assertEqual(sorted({name for _, name, _ in inv.sweep_log}), ["g", "g3"])
+        self.assertTrue(all(us == 184_832 for _, _, us in inv.sweep_log))
+
+    def test_a_sweep_that_never_fits_says_so(self):
+        # 0.1 % (g1): 3.6 s an hour, 5 % of it 180 ms, less than one channel's 184 ms.
+        self.assertFalse(self.inviter.sweep([868_950_000], NEW, 1, 0, region=regions.EU868))
+        refused = self.inviter.sweep_refused
+        self.assertEqual((refused["band"], refused["duty_pct"], refused["retry_after_s"]), ("g1", 0.1, None))
+
+    def test_the_window_rolls_and_a_refused_sweep_costs_nothing(self):
+        region = regions.EU868
+        inv = self.inviter
+        three = [self.G1, self.G2, self.G3]
+        for i in range(3):
+            if not inv.sweep(three, NEW, 1, i * 120_000, region=region):
+                break
+            inv.moves.clear()
+        # 552 ms a sweep: three fit in 1800 ms, the fourth would reach 2208 ms.
+        self.assertFalse(inv.sweep(three, NEW, 1, 3 * 120_000, region=region))
+        self.assertEqual(inv.sweep_refused["retry_after_s"], 3600 - 360)
+        self.assertEqual(len(inv.sweep_log), 3)
+        # The first sweep leaves the hour at 3600 s: 1104 + 552 fits again.
+        self.assertTrue(inv.sweep(three, NEW, 1, 3_600_000, region=region))
+
+    def test_without_a_region_there_is_no_cap(self):
+        for i in range(10):
+            self.assertTrue(self.inviter.sweep([OLD, OLDER], NEW, 1, i * lobby.SWEEP_MIN_MS))
+            self.inviter.moves.clear()
 
     def test_the_air_used_is_small(self):
         self.inviter.move(OLD, NEW, rev=1, now_ms=0)

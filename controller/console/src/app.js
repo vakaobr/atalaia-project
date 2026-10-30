@@ -197,7 +197,9 @@ class App extends Component {
             const now = Date.now();
             // A second ask within the sweep's minute is not swept again (the controller says so): keep
             // what the first one swept and count the answers from it.
-            const carry = asked && before && !(asked.sweep || []).length && now - before.at < 60000
+            // A sweep the hourly cap refused (sweep_refused) is not carried over: it says why, and when.
+            const carry = asked && before && !(asked.sweep || []).length && !asked.sweep_refused
+                && now - before.at < 60000
                 && (before.sweep || []).length > 0;
             this.setState({ discovered: !asked ? null
                 : carry ? { ...before, sent: asked.sent || before.sent } : { at: now, ...asked } });

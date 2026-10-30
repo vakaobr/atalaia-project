@@ -1348,6 +1348,8 @@
     "discover_sent": "已請空閒的盒子回報。",
     "discover_recent": "剛剛才詢問過空閒的盒子，正在等候回應。",
     "discover_sweep": "也搜尋了先前的頻道：{channels} MHz。那裡的盒子會被通知切換；回應最多可能需要 30 秒。",
+    "discover_capped": "沒有搜尋先前的頻道：在 {duty}% 的頻道上，每小時只能把 {share}% 的發射時間用於搜尋，目前已用完。下一次搜尋可在 {minutes} 分鐘後進行。",
+    "discover_never": "沒有搜尋先前的頻道：{duty}% 的頻道發射時間太少，無法進行搜尋。",
     "discover_answered": "已回應的盒子：{n}。",
     "missing_help": "之後仍找不到的盒子，必須重新綁定（「綁定」分頁），或在下次更換頻道時開機、保持空閒並靠近控制器。",
     "close": "關閉",

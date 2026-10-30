@@ -6,7 +6,7 @@
 // real core, served over HTTP on the loopback address, as the Pi controller
 // runs them in controller/tests/test_api_contract.py. Each case gets a
 // fresh controller, a radio that is up (a RecordingModem: tx steps read what went to it, slice S4) and a clock that only moves on an
-// advance_ms step, which also runs one tick; its store is a
+// advance_ms step, which also runs one tick (`times`: that many steps); its store is a
 // FileControllerStore in a temporary directory, and a restart step closes
 // the controller and opens a new one on it (slice S3). Stream steps connect real
 // WebSocket clients to WS /api/v1/stream on the loopback address; mqtt
@@ -557,8 +557,10 @@ void main() {
             continue;
           }
           if (step.containsKey('advance_ms')) {
-            now += step['advance_ms'] as int;
-            engine.tick();
+            for (var i = 0; i < ((step['times'] as int?) ?? 1); i++) {
+              now += step['advance_ms'] as int;
+              engine.tick();
+            }
             continue;
           }
           if (step.containsKey('tag_check')) {
