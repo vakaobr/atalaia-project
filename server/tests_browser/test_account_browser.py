@@ -164,7 +164,8 @@ class GoogleAccountTests(AccountCase):
         page = await self.new_page(lang="en-GB")
         await self.provider(page)
         await page.goto(self.base + "/staff/login?next=%2Fstaff%2Faccount")
-        await page.check("#consent")
+        await page.check("#notice-seen")
+        await page.check("#age-confirmed")
         await page.locator("button.provider").click()
         await page.wait_for_url("**/staff/account?*welcome=1*")
         await page.fill("#new-username", "Ana Silva")  # not a username: refused in words, nothing changes
@@ -185,7 +186,8 @@ class GoogleAccountTests(AccountCase):
         await self.provider(page)
         await self.virtual_authenticator(page)
         await page.goto(self.base + "/staff/login?next=%2Fstaff%2Faccount")
-        await page.check("#consent")
+        await page.check("#notice-seen")
+        await page.check("#age-confirmed")
         await page.locator("button.provider").click()
         await page.wait_for_url("**/staff/account?*welcome=1*")  # a new account: the username step first
         await page.click("#username-skip")

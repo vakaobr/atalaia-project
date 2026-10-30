@@ -264,7 +264,10 @@ class OidcLogin(Base):
     code_verifier: Mapped[str] = mapped_column(String(128), nullable=False)
     redirect_uri: Mapped[str] = mapped_column(String(512), nullable=False)
     return_to: Mapped[str] = mapped_column(String(512), nullable=False)
-    consent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # What the person ticked before the round trip, for an unknown subject that makes an account (LEG-*): that they
+    # read the privacy notice (``notice_seen``, with the version shown) and that they are 16 or older.
+    notice_seen: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    age_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     notice_version: Mapped[Optional[str]] = mapped_column(String(64))  # the notice the person saw (CONS-7)
     app_challenge: Mapped[Optional[str]] = mapped_column(String(64))  # SHA-256 of the app's verifier (APP-4)
     created_at: Mapped[datetime] = _created()
@@ -309,10 +312,11 @@ class AuditLog(Base):
 class Consent(Base):
     """A consent given (ADR-P4-8, plan phase 12): its purpose, the version of the privacy notice
     the person was shown, when, and when it was withdrawn. At most one live consent per purpose.
-    ``users.gdpr_consent_at`` keeps the account consent's time, as ADR-P4-1 has it; this table is
-    the record that shows what was consented to (GDPR Art. 7(1)). Purposes: ``account``, and
-    ``chrono_sharing`` (plan phase 14) with the field whose chrono records the person lets other
-    sharing fields see (``field_id``; one live consent per field)."""
+    This table is the record that shows what was consented to (GDPR Art. 7(1)). Since 0031 it holds
+    only real consents, each withdrawable on its own: ``chrono_sharing`` (plan phase 14) with the
+    field whose chrono records the person lets other sharing fields see (``field_id``; one live
+    consent per field). The account is not one: it rests on the contract (Art. 6(1)(b)) and what
+    it keeps is a ``NoticeRecord`` (LEG-*)."""
 
     __tablename__ = "consents"
     __table_args__ = (
@@ -330,6 +334,32 @@ class Consent(Base):
     notice_version: Mapped[str] = mapped_column(String(64), nullable=False)
     given_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     withdrawn_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+NOTICE_KINDS = ("signup", "shown_again", "migrated")
+
+
+class NoticeRecord(Base):
+    """Which version of the privacy notice an account was shown, and when (LEG-*; GDPR Art. 5(2) and 13).
+    The account rests on the contract (Art. 6(1)(b)), so this is a record of information given, not a consent:
+    nothing here can be withdrawn and nothing depends on it. One row is added each time: ``signup`` (the notice
+    shown when the account was made, with ``age_confirmed``: the person confirmed being 16 or older; there is no
+    date of birth), ``shown_again`` (a newer version shown to the account later and acknowledged) and ``migrated``
+    (a row 0031 made from an old ``account`` consent: same version and time, no age confirmation, since accounts
+    of that time were never asked). The newest row says which version the account has seen."""
+
+    __tablename__ = "notice_records"
+    __table_args__ = (
+        Index("idx_notice_records_user", "user_id", "recorded_at"),
+        CheckConstraint("kind IN ('signup', 'shown_again', 'migrated')", name="kind"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    notice_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    age_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 # --- the controller sync (plan phase 13, migration 0004_sync) -----------------------------

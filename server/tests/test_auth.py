@@ -46,7 +46,7 @@ class AuthTestCase(AppTestCase):
 
     async def register(self, username: str, password: str = PASSWORD, **extra: Any) -> httpx.Response:
         return await self.client.post("/api/v1/auth/register",
-                                      json={"username": username, "password": password, "consent": True, **extra})
+                                      json={"username": username, "password": password, "notice_seen": True, "age_confirmed": True, **extra})
 
 
 class RegisterTests(AuthTestCase):
@@ -62,6 +62,13 @@ class RegisterTests(AuthTestCase):
         row = (await self.fetch("SELECT * FROM users WHERE username = 'rita.tejo'"))[0]
         self.assertTrue(row["password_hash"].startswith("$argon2id$v=19$m=65536,t=3,p=4$"))
         self.assertIsNotNone(row["gdpr_consent_at"])
+        # LEG-*: the account rests on the contract. What is recorded is the notice shown at sign-up and the
+        # 16-or-older confirmation, not a consent.
+        self.assertEqual(await self.fetch("SELECT 1 FROM consents WHERE user_id = $1", row["id"]), [])
+        notice = (await self.fetch("SELECT notice_version, kind, age_confirmed, recorded_at = $2 AS same_time "
+                                   "FROM notice_records WHERE user_id = $1", row["id"], row["gdpr_consent_at"]))
+        self.assertEqual([(n["notice_version"], n["kind"], n["age_confirmed"], n["same_time"]) for n in notice],
+                         [(self.app.state.settings.privacy_notice_version, "signup", True, True)])
         self.assertEqual(str(row["id"]), body["id"])
         self.assertEqual(row["id"].version, 7)
         audit = await self.audit("register")
@@ -76,14 +83,16 @@ class RegisterTests(AuthTestCase):
             ({"username": "rita tejo"}, 400, "username_invalid"),
             ({"email": "not-an-address"}, 400, "email_invalid"),
             ({"email": "a@b"}, 400, "email_invalid"),
-            ({"consent": False}, 400, "consent_required"),
+            ({"notice_seen": False}, 400, "notice_required"),
+            ({"age_confirmed": False}, 400, "age_confirmation_required"),
+            ({"notice_seen": False, "age_confirmed": False}, 400, "age_confirmation_required"),
             ({"password": "short pw"}, 400, "password_too_short"),
             ({"password": "basketball"}, 400, "password_breached"),
             ({"password": "Password12"}, 400, "password_breached"),
             ({"username": "fernando.pessoa", "password": "Fernando.Pessoa"}, 400, "password_is_username"),
         ]
         for change, status, code in cases:
-            body = {"username": "joana", "password": PASSWORD, "consent": True, **change}
+            body = {"username": "joana", "password": PASSWORD, "notice_seen": True, "age_confirmed": True, **change}
             with self.subTest(change=change):
                 r = await self.client.post("/api/v1/auth/register", json=body)
                 self.assertEqual((r.status_code, r.json()["detail"]), (status, code))
@@ -105,9 +114,9 @@ class RegisterTests(AuthTestCase):
 
     async def test_validation_errors_do_not_echo_the_input(self) -> None:
         secret = "my very secret password 99"
-        for body in ({"username": "joana", "password": secret, "consent": True, "admin": True},
+        for body in ({"username": "joana", "password": secret, "notice_seen": True, "age_confirmed": True, "admin": True},
                      {"username": ["joana"], "password": secret},
-                     {"username": "joana", "password": secret * 200, "consent": True}):
+                     {"username": "joana", "password": secret * 200, "notice_seen": True, "age_confirmed": True}):
             with self.subTest(keys=sorted(body)):
                 r = await self.client.post("/api/v1/auth/register", json=body)
                 self.assertEqual(r.status_code, 422)

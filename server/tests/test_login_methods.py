@@ -71,7 +71,7 @@ class LoginTestCase(AppTestCase):
                     headers: Optional[dict[str, str]] = None, **body: Any) -> tuple[dict[str, str], httpx.Response]:
         client = client or self.client
         r = await client.post(f"/api/v1/auth/oidc/{provider}/start",
-                              json={"purpose": "login", "consent": True, **body}, headers=headers or {})
+                              json={"purpose": "login", "notice_seen": True, "age_confirmed": True, **body}, headers=headers or {})
         params = self.idp.authorize(r.json()["authorization_url"]) if r.status_code == 200 else {}
         return params, r
 
@@ -91,10 +91,10 @@ class LoginTestCase(AppTestCase):
         return location.path, {k: v[0] for k, v in parse_qs(location.query).items()}, location.fragment
 
     async def social(self, provider: str, subject: str, *, client: Optional[httpx.AsyncClient] = None,
-                     consent: bool = True) -> dict[str, Any]:
+                     signup: bool = True) -> dict[str, Any]:
         """A whole social login: the session's JSON."""
         client = client or self.client
-        params, r = await self.begin(provider, client=client, consent=consent)
+        params, r = await self.begin(provider, client=client, notice_seen=signup, age_confirmed=signup)
         self.assertEqual(r.status_code, 200, r.text)
         _, query, fragment = self.landed(await self.callback(provider, params, subject, client=client))
         self.assertEqual(query.get("oidc_error"), None, query)
@@ -207,7 +207,7 @@ class AppLinkTests(LoginTestCase):
 
     async def app_start(self, provider: str = "google", **body: Any) -> dict[str, Any]:
         r = await self.client.post(f"/api/v1/auth/oidc/{provider}/start", json={
-            "purpose": "login", "consent": True, **{"return_to": f"{ORIGIN}/app/oidc?s=abc123", **body}})
+            "purpose": "login", "notice_seen": True, "age_confirmed": True, **{"return_to": f"{ORIGIN}/app/oidc?s=abc123", **body}})
         self.assertEqual(r.status_code, 200, r.text)
         self.assertNotIn("set-cookie", r.headers)  # it would land in the app, not in the browser
         return r.json()
@@ -395,8 +395,11 @@ class SocialLoginTests(LoginTestCase):
                 self.assertIsNone(row["email"])
                 self.assertTrue(row["username"].startswith("user-"))
                 self.assertIsNotNone(row["gdpr_consent_at"])
-                consents = await self.fetch("SELECT purpose, notice_version FROM consents WHERE user_id = $1", row["id"])
-                self.assertEqual([tuple(c) for c in consents], [("account", self.app.state.settings.privacy_notice_version)])
+                self.assertEqual(await self.fetch("SELECT 1 FROM consents WHERE user_id = $1", row["id"]), [])  # no consent
+                notices = await self.fetch("SELECT notice_version, kind, age_confirmed FROM notice_records "
+                                           "WHERE user_id = $1", row["id"])
+                self.assertEqual([tuple(n) for n in notices],
+                                 [(self.app.state.settings.privacy_notice_version, "signup", True)])
                 identities = await self.fetch("SELECT provider, subject FROM user_identities WHERE user_id = $1", row["id"])
                 self.assertEqual([tuple(i) for i in identities], [(provider, f"{provider}-subject-1")])
         registered = await self.audit("register")
@@ -473,7 +476,7 @@ class SocialLoginTests(LoginTestCase):
         self.app.state.settings = dataclasses.replace(self.app.state.settings, privacy_notice_version=version)
 
     async def recorded_versions(self) -> list[str]:
-        return [r[0] for r in await self.fetch("SELECT notice_version FROM consents WHERE purpose = 'account'")]
+        return [r[0] for r in await self.fetch("SELECT notice_version FROM notice_records")]
 
     async def test_the_notice_version_the_person_saw_is_recorded(self) -> None:
         """CONS-7: the version named at the start is the one recorded, and it is held on the login row meanwhile."""
@@ -491,12 +494,12 @@ class SocialLoginTests(LoginTestCase):
         self.assertEqual((r.status_code, r.json()), (409, {"detail": "notice_version_changed",
                                                            "current_version": current}))
         self.assertEqual((await self.fetch("SELECT count(*) FROM oidc_logins"))[0][0], 0)
-        # Without the tick no account is being agreed to, so the version does not matter (and is not kept).
-        params, r = await self.begin("google", consent=False, notice_version="an-older-version")
+        # Without the tick no notice is being said to be read, so the version does not matter (and is not kept).
+        params, r = await self.begin("google", notice_seen=False, notice_version="an-older-version")
         self.assertEqual(r.status_code, 200, r.text)
         self.assertIsNone((await self.fetch("SELECT notice_version FROM oidc_logins"))[0][0])
         too_long = await self.client.post("/api/v1/auth/oidc/google/start",
-                                          json={"purpose": "login", "consent": True, "notice_version": "x" * 65})
+                                          json={"purpose": "login", "notice_seen": True, "age_confirmed": True, "notice_version": "x" * 65})
         self.assertEqual(too_long.status_code, 422)
 
     async def test_the_callback_rechecks_the_notice_version(self) -> None:
@@ -533,15 +536,22 @@ class SocialLoginTests(LoginTestCase):
         self.assertEqual(query, {})
         self.assertTrue(fragment.startswith("oidc="), fragment)
 
-    async def test_a_login_makes_no_account_without_consent(self) -> None:
-        params, _ = await self.begin("google", consent=False)
-        _, query, fragment = self.landed(await self.callback("google", params, "sub-1"))
-        self.assertEqual((query, fragment), ({"oidc_error": "consent_required"}, ""))
-        self.assertEqual((await self.fetch("SELECT count(*) FROM users"))[0][0], 0)
+    async def test_a_login_makes_no_account_without_the_notice_and_the_age(self) -> None:
+        """LEG-*: an account rests on the contract; the first sign-in needs the notice shown and the person 16 or
+        older, and the age confirmation is recorded with the sign-up's notice record."""
+        for tick, error in (({"notice_seen": False}, "notice_required"),
+                            ({"age_confirmed": False}, "age_confirmation_required"),
+                            ({"notice_seen": False, "age_confirmed": False}, "age_confirmation_required")):
+            params, _ = await self.begin("google", **tick)
+            _, query, fragment = self.landed(await self.callback("google", params, "sub-1"))
+            self.assertEqual((query, fragment), ({"oidc_error": error}, ""))
+            self.assertEqual((await self.fetch("SELECT count(*) FROM users"))[0][0], 0)
         # ... but a known subject needs none.
         await self.social("google", "sub-1")
+        self.assertEqual([tuple(r) for r in await self.fetch("SELECT kind, age_confirmed FROM notice_records")],
+                         [("signup", True)])
         client = self.other_client()
-        params, _ = await self.begin("google", consent=False, client=client)
+        params, _ = await self.begin("google", notice_seen=False, age_confirmed=False, client=client)
         _, query, fragment = self.landed(await self.callback("google", params, "sub-1", client=client))
         self.assertEqual((query, fragment.startswith("oidc=")), ({}, True))
 
@@ -596,7 +606,7 @@ class SocialLoginTests(LoginTestCase):
         self.assertEqual((await self.fetch("SELECT count(*) FROM oidc_logins"))[0][0], 0)
 
     async def test_the_binding_cookie(self) -> None:
-        r = await self.client.post("/api/v1/auth/oidc/google/start", json={"consent": True})
+        r = await self.client.post("/api/v1/auth/oidc/google/start", json={"notice_seen": True, "age_confirmed": True})
         cookie = r.headers["set-cookie"]
         self.assertTrue(cookie.startswith("__Secure-atalaia_oidc="))
         for part in ("HttpOnly", "Secure", "SameSite=lax", "Path=/api/v1/auth/oidc"):
@@ -654,9 +664,9 @@ class SocialLoginTests(LoginTestCase):
 
     async def test_unknown_and_unconfigured_providers(self) -> None:
         for provider in ("github", "GOOGLE", "x" * 40):
-            r = await self.client.post(f"/api/v1/auth/oidc/{provider}/start", json={"consent": True})
+            r = await self.client.post(f"/api/v1/auth/oidc/{provider}/start", json={"notice_seen": True, "age_confirmed": True})
             self.assertEqual((r.status_code, r.json()["detail"]), (404, "provider_not_configured"))
-        r = await self.client.post("/api/v1/auth/oidc/google/start", json={"consent": True, "purpose": "other"})
+        r = await self.client.post("/api/v1/auth/oidc/google/start", json={"notice_seen": True, "age_confirmed": True, "purpose": "other"})
         self.assertEqual(r.status_code, 422)
 
     async def test_link_and_reauth_need_a_session(self) -> None:
@@ -670,7 +680,7 @@ class NoProvidersTests(LoginTestCase):
 
     async def test_nothing_is_offered_and_nothing_starts(self) -> None:
         self.assertEqual((await self.client.get("/api/v1/auth/methods")).json()["oidc"], [])
-        r = await self.client.post("/api/v1/auth/oidc/google/start", json={"consent": True})
+        r = await self.client.post("/api/v1/auth/oidc/google/start", json={"notice_seen": True, "age_confirmed": True})
         self.assertEqual((r.status_code, r.json()["detail"]), (404, "provider_not_configured"))
         r = await self.client.get("/api/v1/auth/oidc/google/callback", params={"code": "c", "state": "s"})
         self.assertEqual(self.landed(r)[1], {"oidc_error": "state_invalid"})
@@ -808,7 +818,7 @@ class PasswordLoginOffTests(LoginTestCase):
         r = await self.client.post("/api/v1/auth/login", json={"username": name, "password": PASSWORD})
         self.assertEqual((r.status_code, r.json()["detail"]), (403, "password_login_disabled"))
         r = await self.client.post("/api/v1/auth/register", json={"username": "nova.pessoa", "password": PASSWORD,
-                                                                  "consent": True})
+                                                                  "notice_seen": True, "age_confirmed": True})
         self.assertEqual((r.status_code, r.json()["detail"]), (403, "password_login_disabled"))
         self.assertEqual((await self.fetch("SELECT count(*) FROM users WHERE username = 'nova.pessoa'"))[0][0], 0)
 
@@ -1309,7 +1319,7 @@ class PersonalDataTests(LoginTestCase):
         self.assertNotIn("public_key", passkeys)
         self.assertNotIn(authenticator.credential_id.hex(), passkeys)
         self.assertEqual(json.loads(files.read("export/identities.json"))[0]["provider"], "google")
-        self.assertEqual(set(personal_data.PURPOSES), {"account", "chrono_sharing"})
+        self.assertEqual(set(personal_data.PURPOSES), {"chrono_sharing"})  # the account is not a consent (LEG-*)
 
     async def test_erasure_deletes_them(self) -> None:
         body = await self.social("google", "g-erase")

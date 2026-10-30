@@ -44,7 +44,7 @@ def bearer(session: dict[str, Any]) -> dict[str, str]:
 class PersonalDataTestCase(AppTestCase):
     async def register(self, username: str, email: str | None = None) -> dict[str, Any]:
         r = await self.client.post("/api/v1/auth/register", json={"username": username, "password": PASSWORD,
-                                                                  "email": email, "consent": True})
+                                                                  "email": email, "notice_seen": True, "age_confirmed": True})
         assert r.status_code == 201, r.text
         return r.json()
 
@@ -83,14 +83,14 @@ class AccessTests(PersonalDataTestCase):
         self.assertEqual(r.headers["cache-control"], "no-store")
         data = r.json()
         self.assertEqual(set(data), {"format", "generated_at", "user", "field_roles", "sessions", "audit_log",
-                                     "audit_log_about_you", "consents", "games", "player_ids", "chrono_records",
+                                     "audit_log_about_you", "consents", "notices", "games", "player_ids", "chrono_records",
                                      "marshal_keys", "scheduled_games", "registrations", "player_id_claims",
                                      "clubs", "club_reports", "game_history", "atak_certificates", "identities",
                                      "passkeys"})
         self.assertEqual(data["format"], "atalaia-personal-data/1")
         self.assertEqual((data["user"]["id"], data["user"]["username"], data["user"]["email"]),
                          (user["id"], "rita", "rita@example.pt"))
-        self.assertIsNotNone(data["user"]["gdpr_consent_at"])
+        self.assertIsNotNone(data["user"]["notice_shown_at"])
         self.assertEqual(data["field_roles"], [{"field_id": data["field_roles"][0]["field_id"], "field": "Campo Tejo",
                                                 "role": "player", "granted_at": data["field_roles"][0]["granted_at"]}])
         sessions = {s["id"]: s for s in data["sessions"]}
@@ -104,8 +104,10 @@ class AccessTests(PersonalDataTestCase):
         self.assertEqual([(a["action"], a["details"]["role"]) for a in data["audit_log_about_you"]],
                          [("role_grant", "player")])
         self.assertEqual(set(data["audit_log_about_you"][0]), {"id", "action", "details", "created_at"})
-        self.assertEqual([(c["purpose"], c["notice_version"], c["withdrawn_at"]) for c in data["consents"]],
-                         [("account", DEFAULT_NOTICE_VERSION, None)])
+        # The account is not a consent (LEG-*): what it keeps is which notice it was shown, and the age confirmation.
+        self.assertEqual(data["consents"], [])
+        self.assertEqual([(n["notice_version"], n["kind"], n["age_confirmed"]) for n in data["notices"]],
+                         [(DEFAULT_NOTICE_VERSION, "signup", True)])
         # Never the credentials, never anyone else.
         row = (await self.fetch("SELECT password_hash FROM users WHERE id = $1", user_id))[0]
         self.assertNotIn(row["password_hash"], r.text)
@@ -133,13 +135,14 @@ class AccessTests(PersonalDataTestCase):
             names = sorted(zf.namelist())
             self.assertEqual(names, sorted(f"export/{n}" for n in (
                 "profile.json", "field_roles.json", "sessions.json", "audit_log.json", "audit_log_about_you.json",
-                "consents.json", "games.json", "player_ids.json", "chrono_records.json", "marshal_keys.json",
+                "consents.json", "notices.json", "games.json", "player_ids.json", "chrono_records.json", "marshal_keys.json",
                 "scheduled_games.json", "registrations.json", "player_id_claims.json", "clubs.json",
                 "club_reports.json", "game_history.json", "atak_certificates.json", "identities.json",
                 "passkeys.json", "README.txt")))
             files = {n: zf.read(n).decode("utf-8") for n in names}
         self.assertEqual(json.loads(files["export/profile.json"]), data["user"])
         self.assertEqual(json.loads(files["export/consents.json"]), data["consents"])
+        self.assertEqual(json.loads(files["export/notices.json"]), data["notices"])
         self.assertEqual([a["action"] for a in json.loads(files["export/audit_log.json"])], ["register", "login"])
         self.assertIn("atalaia-personal-data/1", files["export/README.txt"])
         self.assertIn("joana", files["export/README.txt"])
@@ -203,7 +206,7 @@ class RectificationTests(PersonalDataTestCase):
 
     async def test_registration_refuses_reserved_names(self) -> None:
         r = await self.client.post("/api/v1/auth/register", json={"username": "deleted-cafe", "password": PASSWORD,
-                                                                  "consent": True})
+                                                                  "notice_seen": True, "age_confirmed": True})
         self.assertEqual((r.status_code, r.json()["detail"]), (400, "username_reserved"))
 
 
@@ -274,7 +277,7 @@ class ErasureTests(PersonalDataTestCase):
         self.assertRegex(row["username"], r"^deleted-[0-9a-f]{16}$")
         self.assertEqual((row["email"], row["password_hash"], row["totp_secret_enc"], row["gdpr_consent_at"],
                           row["last_login_at"], row["server_admin"]), (None, "DELETED", None, None, None, False))
-        for table in ("user_field_roles", "sessions", "consents"):
+        for table in ("user_field_roles", "sessions", "consents", "notice_records"):
             with self.subTest(table=table):
                 n = (await self.fetch(f"SELECT count(*) FROM {table} WHERE user_id = $1", user_id))[0][0]
                 self.assertEqual(n, 0)

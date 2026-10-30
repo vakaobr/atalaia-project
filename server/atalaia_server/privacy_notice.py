@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The privacy notice the operator publishes (decisions CONS-1 to CONS-6): the mechanism, never the text.
 
-The notice is the operator's (legal) text. The server only serves it and asks for consent again when its version
-changes. ``ATALAIA_PRIVACY_NOTICE_DIR`` names a folder with one Markdown file per language and version, called
+The notice is the operator's (legal) text. The server only serves it and, when its version
+changes, shows it again to each account (information, not consent: the account rests on the contract). ``ATALAIA_PRIVACY_NOTICE_DIR`` names a folder with one Markdown file per language and version, called
 ``privacy-notice-<lang>-<version>.md`` (``<lang>`` is ``pt``, ``en``, ``de`` or ``zh-tw``; ``<version>`` is the
 ``ATALAIA_PRIVACY_NOTICE_VERSION`` the file is for), for example ``privacy-notice-en-campo-tejo-2026-11.md``: the
 templates in ``docs/templates/`` filled in by the field. Only the files of the current version are served, so a new

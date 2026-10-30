@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""The published privacy notice and consenting again when its version changes (decisions CONS-1 to CONS-6).
+"""The published privacy notice and showing it again when its version changes (decisions CONS-1 to CONS-6, LEG-*).
 
     python3 tools/docker_server.py test tests.test_privacy_notice
 """
@@ -150,7 +150,7 @@ class NoticeTestCase(AppTestCase):
 
     async def register(self, username: str = "rita", **extra: Any) -> Any:
         return await self.client.post("/api/v1/auth/register", json={
-            "username": username, "password": PASSWORD, "consent": True, **extra})
+            "username": username, "password": PASSWORD, "notice_seen": True, "age_confirmed": True, **extra})
 
     async def me(self, headers: dict[str, str]) -> dict[str, Any]:
         r = await self.client.get("/api/v1/me", headers=headers)
@@ -224,65 +224,74 @@ class PublishTests(NoticeTestCase):
             self.assertEqual(set(texts), set(PUBLIC["en"]), lang)
 
 
-class ConsentTests(NoticeTestCase):
+class NoticeAgainTests(NoticeTestCase):
+    """LEG-*: the account rests on the contract (Art. 6(1)(b)). The notice shown at sign-up and later is recorded as
+    information given, not as a consent, and nothing about it can be withdrawn."""
+
     async def test_a_new_account_is_current_and_a_new_version_makes_it_outdated(self) -> None:
         r = await self.register()
         self.assertEqual(r.status_code, 201, r.text)
         headers = await self.auth("rita")
-        consent = (await self.me(headers))["consent"]
-        self.assertEqual((consent["status"], consent["version"], consent["current_version"], consent["notice_published"]),
+        notice = (await self.me(headers))["notice"]
+        self.assertEqual((notice["status"], notice["version"], notice["current_version"], notice["notice_published"]),
                          ("current", V1, V1, True))
+        self.assertNotIn("consent", await self.me(headers))
         self.set_version(V2)
-        consent = (await self.me(headers))["consent"]
-        self.assertEqual((consent["status"], consent["version"], consent["current_version"]), ("outdated", V1, V2))
+        notice = (await self.me(headers))["notice"]
+        self.assertEqual((notice["status"], notice["version"], notice["current_version"]), ("outdated", V1, V2))
 
-    async def test_consenting_again(self) -> None:
+    async def test_the_notice_shown_again(self) -> None:
         await self.register()
         headers = await self.auth("rita")
         before = (await self.fetch("SELECT gdpr_consent_at FROM users WHERE username = 'rita'"))[0][0]
         self.set_version(V2)
         # The version the person was shown is not the current one: refused, with the code and the current version.
-        r = await self.client.post("/api/v1/me/consents/account", json={"notice_version": V1}, headers=headers)
+        r = await self.client.post("/api/v1/me/notice", json={"notice_version": V1}, headers=headers)
         self.assertEqual((r.status_code, r.json()), (409, {"detail": "notice_version_changed", "current_version": V2}))
-        self.assertEqual((await self.me(headers))["consent"]["status"], "outdated")
-        r = await self.client.post("/api/v1/me/consents/account", json={"notice_version": V2}, headers=headers)
+        self.assertEqual((await self.me(headers))["notice"]["status"], "outdated")
+        r = await self.client.post("/api/v1/me/notice", json={"notice_version": V2}, headers=headers)
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual((r.json()["status"], r.json()["version"]), ("current", V2))
-        self.assertEqual((await self.me(headers))["consent"]["status"], "current")
-        rows = await self.fetch("SELECT notice_version, withdrawn_at IS NULL AS live FROM consents "
-                                "WHERE purpose = 'account' ORDER BY given_at")
-        self.assertEqual([(r["notice_version"], r["live"]) for r in rows], [(V1, False), (V2, True)])
+        self.assertEqual((await self.me(headers))["notice"]["status"], "current")
+        rows = await self.fetch("SELECT notice_version, kind, age_confirmed FROM notice_records ORDER BY recorded_at")
+        self.assertEqual([(r["notice_version"], r["kind"], r["age_confirmed"]) for r in rows],
+                         [(V1, "signup", True), (V2, "shown_again", False)])
         after = (await self.fetch("SELECT gdpr_consent_at FROM users WHERE username = 'rita'"))[0][0]
         self.assertGreater(after, before)
-        audit = await self.fetch("SELECT details FROM audit_log WHERE action = 'consent_renewed'")
-        self.assertEqual(json.loads(audit[0]["details"]), {"purpose": "account", "from": V1, "to": V2})
+        audit = await self.fetch("SELECT details FROM audit_log WHERE action = 'notice_shown_again'")
+        self.assertEqual(json.loads(audit[0]["details"]), {"from": V1, "to": V2})
         # Again: nothing changes, nothing is logged twice.
-        r = await self.client.post("/api/v1/me/consents/account", json={"notice_version": V2}, headers=headers)
+        r = await self.client.post("/api/v1/me/notice", json={"notice_version": V2}, headers=headers)
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(len(await self.fetch("SELECT 1 FROM consents WHERE purpose = 'account'")), 2)
-        self.assertEqual(len(await self.fetch("SELECT 1 FROM audit_log WHERE action = 'consent_renewed'")), 1)
-        # The access answer keeps both, with when each ended.
+        self.assertEqual(len(await self.fetch("SELECT 1 FROM notice_records")), 2)
+        self.assertEqual(len(await self.fetch("SELECT 1 FROM audit_log WHERE action = 'notice_shown_again'")), 1)
+        # Nothing here is a consent, and nothing can be withdrawn: no consent rows, no withdraw route.
+        self.assertEqual(await self.fetch("SELECT 1 FROM consents"), [])
+        self.assertEqual((await self.client.delete("/api/v1/me/notice", headers=headers)).status_code, 405)
+        self.assertIn((await self.client.delete("/api/v1/me/consents/account", headers=headers)).status_code, (404, 405))
+        # The access answer keeps both records, oldest first.
         data = (await self.client.get("/api/v1/me/data", headers=headers)).json()
-        self.assertEqual([(c["notice_version"], c["withdrawn_at"] is None) for c in data["consents"]],
-                         [(V1, False), (V2, True)])
+        self.assertEqual([(n["notice_version"], n["kind"]) for n in data["notices"]],
+                         [(V1, "signup"), (V2, "shown_again")])
+        self.assertEqual(data["consents"], [])
 
-    async def test_an_account_with_no_consent_is_missing_and_can_consent(self) -> None:
+    async def test_an_account_with_no_record_is_missing_and_can_acknowledge(self) -> None:
         _, username, _ = await self.make_user("ana")
         headers = await self.auth(username)
-        self.assertEqual((await self.me(headers))["consent"]["status"], "missing")
-        r = await self.client.post("/api/v1/me/consents/account", json={"notice_version": V1}, headers=headers)
+        self.assertEqual((await self.me(headers))["notice"]["status"], "missing")
+        r = await self.client.post("/api/v1/me/notice", json={"notice_version": V1}, headers=headers)
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual((await self.me(headers))["consent"]["status"], "current")
-        audit = await self.fetch("SELECT details FROM audit_log WHERE action = 'consent_renewed'")
+        self.assertEqual((await self.me(headers))["notice"]["status"], "current")
+        audit = await self.fetch("SELECT details FROM audit_log WHERE action = 'notice_shown_again'")
         self.assertEqual(json.loads(audit[0]["details"])["from"], None)
 
     async def test_it_needs_a_session_and_a_body(self) -> None:
-        r = await self.client.post("/api/v1/me/consents/account", json={"notice_version": V1})
+        r = await self.client.post("/api/v1/me/notice", json={"notice_version": V1})
         self.assertEqual(r.status_code, 401)
         await self.register()
         headers = await self.auth("rita")
         for body in ({}, {"notice_version": V1, "x": 1}, {"notice_version": "x" * 65}):
-            r = await self.client.post("/api/v1/me/consents/account", json=body, headers=headers)
+            r = await self.client.post("/api/v1/me/notice", json=body, headers=headers)
             self.assertEqual(r.status_code, 422, body)
 
     async def test_registering_names_the_notice_it_showed(self) -> None:
@@ -295,12 +304,12 @@ class ConsentTests(NoticeTestCase):
         r = await self.register("plain")  # the field the existing clients do not send stays optional
         self.assertEqual(r.status_code, 201, r.text)
 
-    async def test_the_consent_state_without_a_published_notice(self) -> None:
+    async def test_the_notice_state_without_a_published_notice(self) -> None:
         await self.register()
         headers = await self.auth("rita")
         self.set_version("campo-v9")
-        consent = (await self.me(headers))["consent"]
-        self.assertEqual((consent["status"], consent["notice_published"]), ("outdated", False))
+        notice = (await self.me(headers))["notice"]
+        self.assertEqual((notice["status"], notice["notice_published"]), ("outdated", False))
 
 
 class RetentionColumnTests(AppTestCase):

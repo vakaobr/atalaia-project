@@ -18,7 +18,8 @@ What holds personal data now (plan phases 10-12):
 | ``user_identities`` (LG-1) | the provider and subject of each social login linked, and when (``identities.json``) | deleted | (with the account) |
 | ``passkeys`` (LG-2) | the name, when made and last used, the host name (``passkeys.json``; never a key) | deleted | (with the account) |
 | ``oidc_logins`` (LG-1) | (a login in progress, ten minutes: nothing to give) | deleted | when it expires |
-| ``consents`` | every record | deleted | (with the account) |
+| ``consents`` | every record (cross-field chrono sharing: the real consents only, LEG-*) | deleted | (with the account) |
+| ``notice_records`` (LEG-*) | which version of the privacy notice the account was shown, when, and the 16-or-older confirmation at sign-up (``notices.json``) | deleted | (with the account) |
 | ``audit_log`` | the person's own entries, and entries about them (without who made them) | kept for the log's integrity, without addresses; the account it names is anonymised | the network address of every row after ``ATALAIA_AUDIT_IP_DAYS`` (180 by default, PRIV-6), the row after 36 months |
 | ``users.inactivity_warned_at`` (PRIV-7) | the date, in the profile (``inactivity_warned_at``) | cleared with the account's other fields | cleared when the account is active again; an account inactive for ``ATALAIA_INACTIVE_ACCOUNT_MONTHS`` (24) is warned, then anonymised after ``ATALAIA_INACTIVE_GRACE_DAYS`` (30) |
 | ``chrono_copy_revocations`` (PRIV-5) | (the field's: a player id of this field whose owner erased their account or withdrew a consent; no account in it) | | after the field's chrono retention period |
@@ -111,16 +112,20 @@ from .atak_models import AtakCert
 from .preview_models import CONTACT_RETENTION, RETENTION as FEEDBACK_RETENTION, PreviewFeedback
 from .audit import record
 from .models import (ROLE_BY_ID, AuditLog, Base, ChronoCopyRevocation, GameResult, ChronoReading, ChronoReject, Club, ClubMember, ClubReport, Consent, Field,
-                     FieldPlayerId, FirmwareRelease, Game, GameRegistration, MarshalKey, PlayerIdClaim, RegistrationReplica, Replica,
+                     FieldPlayerId, FirmwareRelease, Game, GameRegistration, MarshalKey, NoticeRecord, PlayerIdClaim, RegistrationReplica, Replica,
                      ScheduledGame, User, UserFieldRole, UserGameRole, UserSession, OidcLogin, Passkey, UserIdentity)
 from .services import branding, history
 
 log = logging.getLogger("atalaia.server.purge")
 
 FORMAT = "atalaia-personal-data/1"
-ACCOUNT = "account"
 CHRONO_SHARING = "chrono_sharing"  # per field (consents.field_id): plan phase 14
-PURPOSES = (ACCOUNT, CHRONO_SHARING)
+# The only consents there are (LEG-*): the account rests on the contract (Art. 6(1)(b)), and what it keeps is a
+# notice record below. Position sharing in a game and "use my Google/Microsoft name" are consents given by the
+# act itself in the app and the pages (nothing stored here: see their own modules).
+PURPOSES = (CHRONO_SHARING,)
+NOTICE_SIGNUP, NOTICE_AGAIN, NOTICE_MIGRATED = "signup", "shown_again", "migrated"
+MIN_AGE = 16  # to make an account alone (LEG-*); no date of birth is asked, a confirmation is recorded
 ERASED_PREFIX = "deleted-"
 ERASED_PASSWORD = "DELETED"  # not an Argon2 hash: passwords.verify_password never accepts it
 
@@ -158,34 +163,43 @@ def give_consent(db: AsyncSession, user_id: uuid.UUID, purpose: str, notice_vers
                    given_at=given_at or datetime.now(timezone.utc)))
 
 
-async def account_consent(db: AsyncSession, user_id: uuid.UUID, current_version: str) -> dict[str, Any]:
-    """Where the account's ``account`` consent stands against the privacy notice's current version (CONS-2):
-    ``status`` is ``current`` (given for the current version), ``outdated`` (given for another version: the account
-    is asked to consent again) or ``missing`` (no live consent)."""
-    live = await db.scalar(select(Consent).where(Consent.user_id == user_id, Consent.purpose == ACCOUNT,
-                                                 Consent.field_id.is_(None), Consent.withdrawn_at.is_(None)))
-    status = "missing" if live is None else ("current" if live.notice_version == current_version else "outdated")
-    return {"status": status, "version": live.notice_version if live is not None else None,
-            "current_version": current_version, "given_at": _iso(live.given_at) if live is not None else None}
+def record_notice(db: AsyncSession, user_id: uuid.UUID, notice_version: str, kind: str = NOTICE_SIGNUP,
+                  recorded_at: Optional[datetime] = None, age_confirmed: bool = False) -> None:
+    """Records, in the caller's transaction, that the account was shown ``notice_version`` (LEG-*): at sign-up
+    (``age_confirmed``: the person confirmed being 16 or older) or later (``shown_again``)."""
+    if kind not in (NOTICE_SIGNUP, NOTICE_AGAIN, NOTICE_MIGRATED):
+        raise ValueError(f"unknown notice record kind {kind!r}")
+    db.add(NoticeRecord(user_id=user_id, notice_version=notice_version, kind=kind, age_confirmed=age_confirmed,
+                        recorded_at=recorded_at or datetime.now(timezone.utc)))
 
 
-async def renew_account_consent(db: AsyncSession, user: User, version: str) -> Optional[str]:
-    """Consent again, to ``version``, in the caller's transaction (the caller locked ``user`` and commits): the live
-    consent for another version ends (``withdrawn_at``: it was replaced, not taken back) and a new one is
-    recorded; ``users.gdpr_consent_at`` becomes its time. Returns the version replaced, None when the account had no
-    live consent. Already consented to ``version``: nothing changes."""
-    live = await db.scalar(select(Consent).where(Consent.user_id == user.id, Consent.purpose == ACCOUNT,
-                                                 Consent.field_id.is_(None), Consent.withdrawn_at.is_(None))
-                           .with_for_update())
-    if live is not None and live.notice_version == version:
+async def _latest_notice(db: AsyncSession, user_id: uuid.UUID) -> Optional[NoticeRecord]:
+    return await db.scalar(select(NoticeRecord).where(NoticeRecord.user_id == user_id)
+                           .order_by(NoticeRecord.recorded_at.desc(), NoticeRecord.id).limit(1))
+
+
+async def notice_state(db: AsyncSession, user_id: uuid.UUID, current_version: str) -> dict[str, Any]:
+    """Which version of the privacy notice the account was last shown, against the current one (CONS-2, LEG-*):
+    ``status`` is ``current`` (shown the current version), ``outdated`` (shown another: it is shown again and the
+    person acknowledges it; nothing is blocked) or ``missing`` (no record)."""
+    last = await _latest_notice(db, user_id)
+    status = "missing" if last is None else ("current" if last.notice_version == current_version else "outdated")
+    return {"status": status, "version": last.notice_version if last is not None else None,
+            "current_version": current_version, "shown_at": _iso(last.recorded_at) if last is not None else None}
+
+
+async def acknowledge_notice(db: AsyncSession, user: User, version: str) -> Optional[str]:
+    """The account was shown ``version`` again and acknowledged it, in the caller's transaction (the caller locked
+    ``user`` and commits): a ``shown_again`` record is added and ``users.gdpr_consent_at`` becomes its time (the
+    column keeps its ADR-P4-1 name; it is the time the notice was last shown). Returns the version before, None
+    when the account had none. Already shown ``version``: nothing changes."""
+    last = await _latest_notice(db, user.id)
+    if last is not None and last.notice_version == version:
         return version
     now = datetime.now(timezone.utc)
-    if live is not None:
-        live.withdrawn_at = now
-        await db.flush()  # the one live consent per purpose: the old one ends before the new one starts
-    give_consent(db, user.id, ACCOUNT, version, now)
+    record_notice(db, user.id, version, NOTICE_AGAIN, now)
     user.gdpr_consent_at = now
-    return live.notice_version if live is not None else None
+    return last.notice_version if last is not None else None
 
 
 async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.UUID] = None) -> dict[str, Any]:
@@ -202,6 +216,8 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
         AuditLog.resource == "user", AuditLog.resource_id == user.id,
         or_(AuditLog.user_id.is_(None), AuditLog.user_id != user.id)).order_by(AuditLog.id))
     consents = await db.scalars(select(Consent).where(Consent.user_id == user.id).order_by(Consent.given_at))
+    notices = await db.scalars(select(NoticeRecord).where(NoticeRecord.user_id == user.id)
+                               .order_by(NoticeRecord.recorded_at))
     identities = await db.scalars(select(UserIdentity).where(UserIdentity.user_id == user.id)
                                   .order_by(UserIdentity.created_at))
     passkeys = await db.scalars(select(Passkey).where(Passkey.user_id == user.id).order_by(Passkey.created_at))
@@ -239,7 +255,7 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
         "user": {
             "id": str(user.id), "username": user.username, "email": user.email,
             "created_at": _iso(user.created_at), "updated_at": _iso(user.updated_at),
-            "last_login_at": _iso(user.last_login_at), "gdpr_consent_at": _iso(user.gdpr_consent_at),
+            "last_login_at": _iso(user.last_login_at), "notice_shown_at": _iso(user.gdpr_consent_at),
             "inactivity_warned_at": _iso(user.inactivity_warned_at),
             "totp_enabled": user.totp_enabled,
             "has_password": user.password_hash is not None, "server_admin": user.server_admin,
@@ -264,6 +280,8 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
                                  "created_at": _iso(a.created_at)} for a in about],
         "consents": [{"purpose": c.purpose, "field_id": _str(c.field_id), "notice_version": c.notice_version,
                       "given_at": _iso(c.given_at), "withdrawn_at": _iso(c.withdrawn_at)} for c in consents],
+        "notices": [{"notice_version": n.notice_version, "kind": n.kind, "age_confirmed": n.age_confirmed,
+                     "recorded_at": _iso(n.recorded_at)} for n in notices],
         "games": [{"game": str(g.id), "field": field_name, "name": g.name, "mode_id": g.mode_id,
                    "state": g.state, "started_at": _iso(g.started_at), "ended_at": _iso(g.ended_at),
                    "role": ROLE_BY_ID[role_id], "granted_at": _iso(granted_at)}
@@ -314,7 +332,7 @@ Made {generated_at} for the account {username}.
 Every file is JSON (UTF-8). / Todos os ficheiros são JSON (UTF-8).
 
 profile.json        Your account: id, username, email, when it was made and last
-                    used, when you consented, whether TOTP is on. The password
+                    used, when you were last shown the privacy notice, whether TOTP is on. The password
                     hash and the TOTP secret are not included: they are security
                     credentials, not information about you.
                     A sua conta (sem o hash da palavra-passe nem o segredo TOTP).
@@ -337,9 +355,13 @@ audit_log_about_you.json
                     What others did to your account (a role granted or removed),
                     without who did it.
                     O que outras pessoas fizeram à sua conta, sem dizer quem.
-consents.json       Your consents: purpose, the privacy notice's version, when given
-                    and when withdrawn.
-                    Os seus consentimentos.
+consents.json       Your consents (sharing your chrono records between fields): the
+                    field, the privacy notice's version, when given and when withdrawn.
+                    Os seus consentimentos (partilha de registos entre campos).
+notices.json        Which version of the privacy notice you were shown, and when: at
+                    sign-up (with your confirmation of being 16 or older), and each
+                    time it was shown again.
+                    A versão do aviso de privacidade que lhe foi mostrada, e quando.
 games.json          The games you hold a role on (gm, marshal, player...): the game,
                     its field, when it ran, your role.
                     Os jogos em que tem um papel.
@@ -396,7 +418,7 @@ def export_zip(data: dict[str, Any]) -> bytes:
         "profile.json": data["user"], "identities.json": data["identities"], "passkeys.json": data["passkeys"],
         "field_roles.json": data["field_roles"], "sessions.json": data["sessions"],
         "audit_log.json": data["audit_log"], "audit_log_about_you.json": data["audit_log_about_you"],
-        "consents.json": data["consents"], "games.json": data["games"],
+        "consents.json": data["consents"], "notices.json": data["notices"], "games.json": data["games"],
         "player_ids.json": data["player_ids"], "player_id_claims.json": data["player_id_claims"],
         "registrations.json": data["registrations"],
         "chrono_records.json": data["chrono_records"], "marshal_keys.json": data["marshal_keys"],
@@ -434,6 +456,7 @@ async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_reques
     await db.execute(delete(Passkey).where(Passkey.user_id == user_id))
     await db.execute(delete(OidcLogin).where(OidcLogin.user_id == user_id))
     await db.execute(delete(Consent).where(Consent.user_id == user_id))
+    await db.execute(delete(NoticeRecord).where(NoticeRecord.user_id == user_id))
     await db.execute(delete(UserGameRole).where(UserGameRole.user_id == user_id))
     # The chrono registry (ADR-P4-8 as amended): signed records stay as they are; the person's replicas
     # lose what describes them; marshal keys stay for the records they signed, unlinked; then the links

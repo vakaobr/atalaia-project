@@ -14,11 +14,11 @@
     PUT    /api/v1/me/consents/chrono-sharing/{field_id}      consent: that field's chrono records may be
                                                               shown to other sharing fields, and theirs to it
     DELETE /api/v1/me/consents/chrono-sharing/{field_id}      withdraw it
-    POST   /api/v1/me/consents/account  Bearer, {notice_version}
-                                                              consent again to the privacy notice's current
-                                                              version (CONS-2): 409 ``notice_version_changed``
-                                                              (with ``current_version``) when it is not the
-                                                              current one
+    POST   /api/v1/me/notice     Bearer, {notice_version}
+                                                              the account was shown the privacy notice's current
+                                                              version again (CONS-2, LEG-*; information, not
+                                                              consent): 409 ``notice_version_changed`` (with
+                                                              ``current_version``) when it is not the current one
 
 ``GET /api/v1/me`` itself is in ``api/auth.py``. Changing or erasing the
 account needs the current password (and a TOTP code to erase an account that
@@ -224,21 +224,21 @@ async def withdraw_chrono_sharing(field_id: uuid.UUID, principal: Principal = De
     return Response(status_code=204)
 
 
-@router.post("/me/consents/account")
-async def renew_account_consent(body: NoticeIn, request: Request, principal: Principal = Depends(current_principal),
-                                db: AsyncSession = Depends(get_session)) -> JSONResponse:
-    """Consent again (CONS-2): the account agrees to the privacy notice's current version, which the client shows
-    first (``GET /api/v1/privacy-notice``) and names here, so a notice that changed in between is not agreed to
-    unseen. The consent for the version before ends and the new one is recorded; the answer is the consent's state as
-    ``GET /api/v1/me`` gives it (``status`` ``current``)."""
+@router.post("/me/notice")
+async def acknowledge_notice(body: NoticeIn, request: Request, principal: Principal = Depends(current_principal),
+                             db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    """The notice shown again (CONS-2, LEG-*): the account was shown the privacy notice's current version, which the
+    client shows first (``GET /api/v1/privacy-notice``) and names here, so a notice that changed in between is not
+    recorded as seen. This is information, not consent (the account rests on the contract): a ``shown_again`` record
+    is added; the answer is the state as ``GET /api/v1/me`` gives it (``notice.status`` ``current``)."""
     current = request.app.state.settings.privacy_notice_version
     if body.notice_version != current:
         return JSONResponse({"detail": "notice_version_changed", "current_version": current}, status_code=409,
                             headers=NO_STORE)
     user = await _user_for_update(db, principal)
-    replaced = await personal_data.renew_account_consent(db, user, current)
+    replaced = await personal_data.acknowledge_notice(db, user, current)
     if replaced != current:
-        record(db, "consent_renewed", request, user_id=user.id, resource="user", resource_id=user.id,
-               details={"purpose": personal_data.ACCOUNT, "from": replaced, "to": current})
+        record(db, "notice_shown_again", request, user_id=user.id, resource="user", resource_id=user.id,
+               details={"from": replaced, "to": current})
     await db.commit()
-    return JSONResponse(await personal_data.account_consent(db, user.id, current), headers=NO_STORE)
+    return JSONResponse(await personal_data.notice_state(db, user.id, current), headers=NO_STORE)

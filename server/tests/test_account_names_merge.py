@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""The username step, the "use my name" round, renaming with the account's own login method, the consent error's
+"""The username step, the "use my name" round, renaming with the account's own login method, the sign-up error's
 place on the login page, and merging two accounts of one person (decisions LG-10, LG-11, LG-12).
 
     python3 tools/docker_server.py test tests.test_account_names_merge
@@ -83,7 +83,7 @@ class UsernameStepTests(LoginTestCase):
         for provider in ("google", "microsoft"):
             with self.subTest(provider=provider):
                 headers = bearer(await self.social(provider, f"{provider}-1", client=self.other_client()))
-                self.assertEqual((await self.begin(provider, consent=False))[0]["scope"], "openid")  # a login
+                self.assertEqual((await self.begin(provider, notice_seen=False, age_confirmed=False))[0]["scope"], "openid")  # a login
                 for purpose in ("link", "reauth"):
                     params, _ = await self.begin(provider, headers=headers, purpose=purpose, password="")
                     self.assertEqual(params["scope"], "openid", purpose)
@@ -216,46 +216,61 @@ class RenameTests(LoginTestCase):
         self.assertEqual(again.json()["username"], "ana.silva")
 
 
-class ConsentErrorTests(LoginTestCase):
-    async def test_the_login_page_puts_the_error_next_to_the_box(self) -> None:
+class SignupErrorTests(LoginTestCase):
+    """The notice and the age boxes of the login page, and what refuses a new account without them (LEG-*)."""
+
+    async def test_the_login_page_puts_the_error_next_to_the_boxes(self) -> None:
         template = (staff_pages.TEMPLATE_DIR / "login.html").read_text(encoding="utf-8")
-        self.assertIn('<p id="consent-error" class="field-error" role="alert" hidden></p>', template)
-        self.assertLess(template.index('id="consent-error"'), template.index('id="consent"'))  # the note is at the box
+        self.assertIn('<p id="signup-error" class="field-error" role="alert" hidden></p>', template)
+        self.assertLess(template.index('id="signup-error"'), template.index('id="notice-seen"'))  # the note is at the boxes
+        self.assertLess(template.index('id="notice-seen"'), template.index('id="age-confirmed"'))
         script = (staff_pages.STATIC / "login.js").read_text(encoding="utf-8")
-        for needle in ("function consentMissing", "aria-invalid", "box.focus()", "scrollIntoView",
-                       "classList.add('invalid')", "oidc_err_consent_required"):
+        for needle in ("function signupMissing", "aria-invalid", "box.focus()", "scrollIntoView",
+                       "classList.add('invalid')", "oidc_err_notice_version_changed", "age_confirmed:"):
             self.assertIn(needle, script)
-        self.assertIn("failure === 'consent_required'", script)
+        self.assertIn("notice_required: 'notice-seen'", script)
+        self.assertIn("age_confirmation_required: 'age-confirmed'", script)
         css = (staff_pages.STATIC / "staff.css").read_text(encoding="utf-8")
         self.assertIn(".field-error", css)
-        self.assertIn(".consent.invalid", css)
+        self.assertIn(".signup.invalid", css)
         for lang in STRINGS:
             r = await self.client.get("/staff/login", params={"lang": lang})
-            self.assertIn('id="consent-error"', r.text, lang)
+            self.assertIn('id="signup-error"', r.text, lang)
             self.assertIn('role="alert"', r.text, lang)
 
-    async def test_the_text_points_at_the_box_in_every_language(self) -> None:
+    async def test_the_texts_point_at_the_boxes_in_every_language(self) -> None:
         where = {"pt": "abaixo", "en": "below", "de": "darunter", "zh-tw": "下"}
-        texts = {lang: STRINGS[lang]["oidc_err_consent_required"] for lang in STRINGS}
-        self.assertEqual(len(set(texts.values())), 4)
-        for lang, text in texts.items():
-            with self.subTest(lang=lang):
-                self.assertIn(where[lang], text)
-                for stale in ("acima", "above", "oben", "上方"):
-                    self.assertNotIn(stale, text)
+        for key in ("oidc_err_notice_required", "oidc_err_age_confirmation_required"):
+            texts = {lang: STRINGS[lang][key] for lang in STRINGS}
+            self.assertEqual(len(set(texts.values())), 4)
+            for lang, text in texts.items():
+                with self.subTest(key=key, lang=lang):
+                    self.assertIn(where[lang], text)
+                    for stale in ("acima", "above", "oben", "上方"):
+                        self.assertNotIn(stale, text)
         # pt-PT in the staff texts' own form: an infinitive, no gendered form of address.
-        self.assertTrue(texts["pt"].startswith("Para criar uma conta nova, marcar"))
+        self.assertTrue(STRINGS["pt"]["oidc_err_notice_required"].startswith("Para criar uma conta nova, marcar"))
 
-    async def test_the_consent_text_says_the_providers_name_is_read_only_on_request_and_not_kept(self) -> None:
-        said = {"pt": "não fica guardado", "en": "is not kept", "de": "nicht gespeichert", "zh-tw": "不會保存"}
+    async def test_the_age_refusal_names_the_check_in_without_an_account_in_every_language(self) -> None:
+        said = {"pt": "check-in no campo sem conta", "en": "check in at the field without an account",
+                "de": "ohne Konto ein", "zh-tw": "不需要帳號"}
         for lang, words in said.items():
-            self.assertIn(words, STRINGS[lang]["login_consent"], lang)
+            for key in ("oidc_err_age_confirmation_required", "login_age"):
+                self.assertIn(words, STRINGS[lang][key], (lang, key))
+            self.assertIn("16", STRINGS[lang]["login_age"], lang)
 
-    async def test_a_login_without_the_box_is_still_refused_and_makes_no_account(self) -> None:
-        params, r = await self.begin("google", consent=False)
-        self.assertEqual(r.status_code, 200)
-        _, query, _ = self.landed(await self.callback("google", params, "g-no-box"))
-        self.assertEqual(query, {"oidc_error": "consent_required"})
+    async def test_the_new_account_text_says_the_providers_name_is_read_only_on_request_and_not_kept(self) -> None:
+        said = {"pt": "não fica guardado", "en": "is not stored", "de": "nicht gespeichert", "zh-tw": "不會保存"}
+        for lang, words in said.items():
+            self.assertIn(words, STRINGS[lang]["login_new_intro"], lang)
+
+    async def test_a_login_without_the_boxes_is_still_refused_and_makes_no_account(self) -> None:
+        for ticks, code in (({"notice_seen": False}, "notice_required"),
+                            ({"age_confirmed": False}, "age_confirmation_required")):
+            params, r = await self.begin("google", **ticks)
+            self.assertEqual(r.status_code, 200)
+            _, query, _ = self.landed(await self.callback("google", params, "g-no-box"))
+            self.assertEqual(query, {"oidc_error": code})
         self.assertEqual((await self.fetch("SELECT count(*) FROM users"))[0][0], 0)
 
 
@@ -368,7 +383,7 @@ class MergeTests(LoginTestCase):
         self.assertEqual(await self.count("user_field_roles", "user_id", ub), 0)
         consents = await self.fetch("SELECT purpose, field_id, withdrawn_at FROM consents WHERE user_id = $1 "
                                     "ORDER BY purpose, field_id", ua)
-        self.assertEqual(sum(1 for c in consents if c[0] == "account"), 1)
+        self.assertEqual(sum(1 for c in consents if c[0] == "account"), 0)  # the account is not a consent (LEG-*)
         self.assertEqual(sum(1 for c in consents if c[0] == "chrono_sharing"), 2)  # f1 once, f2 moved
         self.assertEqual(await self.count("consents", "user_id", ub), 0)
         members = await self.fetch("SELECT club_id FROM club_members WHERE user_id = $1", ua)

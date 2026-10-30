@@ -37,7 +37,7 @@ TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log
           "scheduled_games", "game_registrations", "registration_replicas", "player_id_claims",
           "platform_links", "external_game_links", "branding_images", "clubs", "club_members", "club_reports",
           "field_teams", "firmware_releases", "field_history_settings", "game_score_samples", "field_scenarios",
-          "field_scenario_revisions", "field_presets", "atak_cas", "atak_certs", "preview_feedback", "user_identities", "passkeys", "oidc_logins", "hub_share_links",
+          "field_scenario_revisions", "field_presets", "atak_cas", "atak_certs", "preview_feedback", "user_identities", "passkeys", "oidc_logins", "hub_share_links", "notice_records",
           "chrono_copy_revocations", "game_results"}
 
 SCHEMA_SQL = (
@@ -663,6 +663,57 @@ class MigrationTests(unittest.TestCase):
         self.assertNotIn("app_challenge", columns)
         self.assertEqual(len(self.db.fetch("SELECT 1 FROM oidc_logins")), 2)
         self.db.fetch("DELETE FROM oidc_logins")
+
+    def test_0031_with_data(self) -> None:
+        """0031_account_notice_records: every ``account`` consent (live, replaced, or from before 0003) becomes a
+        ``migrated`` notice record with the same version and time, the real consents stay, the account consents go,
+        ``oidc_logins`` is renamed and gets the age box, and back down the account consents come back (the newest
+        live, the older ones ended when the next began)."""
+        command.upgrade(self.cfg, "0026_oidc_app_challenge")
+        self.db.fetch("INSERT INTO users (username, password_hash, gdpr_consent_at) VALUES "
+                      "('rita', 'x', '2026-10-20T10:00:00Z'), ('joana', 'x', '2026-10-01T10:00:00Z')")
+        rita, joana = (self.db.fetch("SELECT id FROM users WHERE username = $1", n)[0][0] for n in ("rita", "joana"))
+        self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Campo', 'campo')")
+        field = self.db.fetch("SELECT id FROM fields")[0][0]
+        self.db.fetch("DELETE FROM consents")  # 0003 made a before-0003 row for each: keep joana's only
+        self.db.fetch("INSERT INTO consents (user_id, purpose, notice_version, given_at, withdrawn_at) VALUES "
+                      "($1, 'account', 'before-0003', '2026-10-01T10:00:00Z', NULL), "
+                      "($2, 'account', 'v1', '2026-10-05T10:00:00Z', '2026-10-20T10:00:00Z'), "
+                      "($2, 'account', 'v2', '2026-10-20T10:00:00Z', NULL)", joana, rita)
+        self.db.fetch("INSERT INTO consents (user_id, purpose, field_id, notice_version) "
+                      "VALUES ($1, 'chrono_sharing', $2, 'v2')", rita, field)
+        self.db.fetch("INSERT INTO oidc_logins (state_hash, binding_hash, provider, purpose, nonce, code_verifier, "
+                      "redirect_uri, return_to, consent, expires_at) VALUES ('s', 'b', 'google', 'login', 'n', 'v', "
+                      "'r', '/', true, now() + interval '10 minutes')")
+        command.upgrade(self.cfg, "0031_account_notice_records")
+        rows = self.db.fetch("SELECT u.username, n.notice_version, n.kind, n.age_confirmed, "
+                             "to_char(n.recorded_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day FROM notice_records n "
+                             "JOIN users u ON u.id = n.user_id ORDER BY u.username, n.recorded_at")
+        self.assertEqual([tuple(r) for r in rows], [("joana", "before-0003", "migrated", False, "2026-10-01"),
+                                                    ("rita", "v1", "migrated", False, "2026-10-05"),
+                                                    ("rita", "v2", "migrated", False, "2026-10-20")])
+        self.assertEqual([tuple(r) for r in self.db.fetch("SELECT purpose, notice_version FROM consents")],
+                         [("chrono_sharing", "v2")])  # real consents stay, the account's are gone
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM users WHERE gdpr_consent_at IS NOT NULL")[0][0], 2)
+        login = self.db.fetch("SELECT notice_seen, age_confirmed FROM oidc_logins")[0]
+        self.assertEqual((login[0], login[1]), (True, False))
+        with self.assertRaisesRegex(Exception, "ck_notice_records_kind"):
+            self.db.fetch("INSERT INTO notice_records (user_id, notice_version, kind) VALUES ($1, 'v', 'consent')", rita)
+        command.downgrade(self.cfg, "0026_oidc_app_challenge")
+        rows = self.db.fetch("SELECT u.username, c.notice_version, c.withdrawn_at IS NULL AS live FROM consents c "
+                             "JOIN users u ON u.id = c.user_id WHERE c.purpose = 'account' "
+                             "ORDER BY u.username, c.given_at")
+        self.assertEqual([tuple(r) for r in rows], [("joana", "before-0003", True), ("rita", "v1", False),
+                                                    ("rita", "v2", True)])
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM consents WHERE purpose = 'chrono_sharing'")[0][0], 1)
+        columns = {r["column_name"] for r in self.db.fetch(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'oidc_logins'")}
+        self.assertIn("consent", columns)
+        self.assertNotIn("age_confirmed", columns)
+        self.db.fetch("DELETE FROM oidc_logins")
+        self.db.fetch("DELETE FROM consents")
+        self.db.fetch("DELETE FROM users")
+        self.db.fetch("DELETE FROM fields")
 
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)

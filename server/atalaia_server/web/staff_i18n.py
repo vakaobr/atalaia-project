@@ -88,17 +88,19 @@ STRINGS: dict[str, dict[str, str]] = {
         "login_or": "Ou entrar com",
         "login_with": "Continuar com {provider}",
         "login_passkey": "Entrar com chave de acesso",
-        "login_consent": "Se esta for a primeira entrada, autorizo criar uma conta nova (só se guarda o identificador "
-                         "dado pelo fornecedor; o nome do fornecedor só é lido se o pedires e não fica guardado; ver o "
-                         "aviso de privacidade do campo).",
+        "login_new_intro": "Primeira vez neste campo? Para criar uma conta ao entrar com um fornecedor, confirmar o seguinte. Só se guarda o identificador dado pelo fornecedor; o nome do fornecedor só é lido se o pedires e não fica guardado.",
+        "login_notice_seen": "Li o aviso de privacidade do campo.",
+        "login_notice_read": "Ler o aviso",
+        "login_age": "Tenho 16 anos ou mais. Quem é mais novo faz o check-in no campo sem conta, com as regras do campo para os pais ou responsáveis.",
         "login_social_working": "A abrir a página do fornecedor…",
         "passkey_cancelled": "A chave de acesso não foi usada (pedido cancelado ou expirado).",
         "passkey_failed": "Não foi possível entrar com a chave de acesso.",
         "passkey_none": "Esta conta não tem chaves de acesso.",
         "oidc_err_state_invalid": "Este pedido de entrada expirou ou não veio deste navegador. Tentar de novo.",
         "oidc_err_denied": "A entrada foi recusada no fornecedor.",
-        "oidc_err_consent_required": "Para criar uma conta nova, marcar a caixa de autorização que está logo abaixo (por baixo dos botões dos fornecedores) e escolher o fornecedor de novo.",
-        "oidc_err_notice_version_changed": "O aviso de privacidade mudou entretanto. A caixa foi desmarcada: ler o aviso atual, marcar a caixa de novo e escolher o fornecedor outra vez.",
+        "oidc_err_notice_required": "Para criar uma conta nova, marcar primeiro que se leu o aviso de privacidade (caixa logo abaixo, por baixo dos botões dos fornecedores) e escolher o fornecedor de novo.",
+        "oidc_err_age_confirmation_required": "Para criar uma conta é preciso ter 16 anos ou mais. Quem é mais novo faz o check-in no campo sem conta, com as regras do campo para os pais ou responsáveis. Se tens 16 anos ou mais, marcar a caixa de idade (logo abaixo) e escolher o fornecedor de novo.",
+        "oidc_err_notice_version_changed": "O aviso de privacidade mudou entretanto. A caixa do aviso foi desmarcada: ler o aviso atual, marcá-la de novo e escolher o fornecedor outra vez.",
         "oidc_err_too_many_attempts": "Demasiadas contas novas a partir deste endereço. Tentar mais tarde.",
         "oidc_err_quota_exceeded": "Este campo chegou ao limite de contas. Falar com a organização do campo.",
         "oidc_err_id_token_invalid": "A resposta do fornecedor não foi aceite. Tentar de novo.",
@@ -861,17 +863,19 @@ STRINGS: dict[str, dict[str, str]] = {
         "login_or": "Or log in with",
         "login_with": "Continue with {provider}",
         "login_passkey": "Log in with a passkey",
-        "login_consent": "If this is a first login, I agree to a new account being made (only the identifier the "
-                         "provider gives is kept; the provider's name is read only if you ask for it and is not kept; "
-                         "see the field's privacy notice).",
+        "login_new_intro": "New here? To make an account when you sign in with a provider for the first time, confirm the following. Only the identifier the provider gives is kept; the provider's name is only read if you ask for it and is not stored.",
+        "login_notice_seen": "I have read the field's privacy notice.",
+        "login_notice_read": "Read the notice",
+        "login_age": "I am 16 or older. Younger players check in at the field without an account, under the field's rules for parents or guardians.",
         "login_social_working": "Opening the provider's page…",
         "passkey_cancelled": "The passkey was not used (the request was cancelled or timed out).",
         "passkey_failed": "Could not log in with the passkey.",
         "passkey_none": "This account has no passkeys.",
         "oidc_err_state_invalid": "This login request expired or did not come from this browser. Try again.",
         "oidc_err_denied": "The login was refused at the provider.",
-        "oidc_err_consent_required": "To make a new account, tick the agreement box just below this message (under the provider buttons), then choose the provider again.",
-        "oidc_err_notice_version_changed": "The privacy notice has changed in the meantime. The box has been unticked: read the current notice, tick the box again, then choose the provider again.",
+        "oidc_err_notice_required": "To make a new account, first tick that you have read the privacy notice (the box just below, under the provider buttons), then choose the provider again.",
+        "oidc_err_age_confirmation_required": "You must be 16 or older to make an account. Younger players check in at the field without an account, under the field's rules for parents or guardians. If you are 16 or older, tick the age box (just below), then choose the provider again.",
+        "oidc_err_notice_version_changed": "The privacy notice has changed in the meantime. The notice box has been unticked: read the current notice, tick it again, then choose the provider again.",
         "oidc_err_too_many_attempts": "Too many new accounts from this address. Try again later.",
         "oidc_err_quota_exceeded": "This field has reached its limit of accounts. Talk to the field's staff.",
         "oidc_err_id_token_invalid": "The provider's answer was not accepted. Try again.",
@@ -1628,9 +1632,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "login_or": "Oder anmelden mit",
         "login_with": "Weiter mit {provider}",
         "login_passkey": "Mit Passkey anmelden",
-        "login_consent": "Bei der ersten Anmeldung stimme ich zu, dass ein neues Konto angelegt wird (gespeichert "
-                         "wird nur die Kennung des Anbieters; der Name beim Anbieter wird nur gelesen, wenn du darum "
-                         "bittest, und nicht gespeichert; siehe die Datenschutzerklärung des Feldes).",
+        "login_new_intro": "Neu hier? Um beim ersten Anmelden mit einem Anbieter ein Konto anzulegen, bestätige Folgendes. Gespeichert wird nur die Kennung, die der Anbieter liefert; sein Name wird nur gelesen, wenn du es verlangst, und nicht gespeichert.",
+        "login_notice_seen": "Ich habe den Datenschutzhinweis des Spielfelds gelesen.",
+        "login_notice_read": "Hinweis lesen",
+        "login_age": "Ich bin 16 Jahre alt oder älter. Jüngere Spielende checken am Spielfeld ohne Konto ein, nach den Regeln des Spielfelds für Eltern oder Erziehungsberechtigte.",
         "login_social_working": "Die Seite des Anbieters wird geöffnet …",
         "passkey_cancelled": "Der Passkey wurde nicht verwendet (Anfrage abgebrochen oder abgelaufen).",
         "passkey_failed": "Die Anmeldung mit dem Passkey hat nicht geklappt.",
@@ -1638,8 +1643,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "oidc_err_state_invalid": "Diese Anmeldeanfrage ist abgelaufen oder stammt nicht aus diesem Browser. Versuch "
                                   "es noch einmal.",
         "oidc_err_denied": "Die Anmeldung wurde beim Anbieter abgelehnt.",
-        "oidc_err_consent_required": "Um ein neues Konto anzulegen, setze das Häkchen im Feld direkt darunter (unter den Anbieter-Schaltflächen) und wähle den Anbieter dann noch einmal.",
-        "oidc_err_notice_version_changed": "Der Datenschutzhinweis hat sich inzwischen geändert. Das Häkchen wurde entfernt: Lies den aktuellen Hinweis, setze das Häkchen erneut und wähle den Anbieter noch einmal.",
+        "oidc_err_notice_required": "Um ein neues Konto anzulegen, setze zuerst das Häkchen, dass du den Datenschutzhinweis gelesen hast (Feld direkt darunter, unter den Anbieter-Schaltflächen), und wähle den Anbieter dann noch einmal.",
+        "oidc_err_age_confirmation_required": "Für ein Konto musst du mindestens 16 Jahre alt sein. Jüngere Spielende checken am Spielfeld ohne Konto ein, nach den Regeln des Spielfelds für Eltern oder Erziehungsberechtigte. Wenn du 16 oder älter bist, setze das Häkchen für das Alter (direkt darunter) und wähle den Anbieter noch einmal.",
+        "oidc_err_notice_version_changed": "Der Datenschutzhinweis hat sich inzwischen geändert. Das Häkchen beim Hinweis wurde entfernt: Lies den aktuellen Hinweis, setze das Häkchen erneut und wähle den Anbieter noch einmal.",
         "oidc_err_too_many_attempts": "Zu viele neue Konten von dieser Adresse. Versuch es später noch einmal.",
         "oidc_err_quota_exceeded": "Dieses Spielfeld hat seine Höchstzahl an Konten erreicht. Wende dich an das Team des Spielfelds.",
         "oidc_err_id_token_invalid": "Die Antwort des Anbieters wurde nicht akzeptiert. Versuch es noch einmal.",
@@ -2399,15 +2405,19 @@ STRINGS: dict[str, dict[str, str]] = {
         "login_or": "或使用以下方式登入",
         "login_with": "使用 {provider} 繼續",
         "login_passkey": "使用密碼金鑰登入",
-        "login_consent": "如果這是第一次登入，我同意建立新帳號（只會保存提供者給的識別碼；提供者的名稱只有在你要求時才會讀取，而且不會保存；請見場地的隱私權聲明）。",
+        "login_new_intro": "第一次來嗎？第一次用提供者登入並建立帳號時，請先確認下列事項。只會保存提供者給的識別碼；提供者的名稱只有在你要求時才會讀取，而且不會保存。",
+        "login_notice_seen": "我已閱讀場地的隱私權聲明。",
+        "login_notice_read": "閱讀聲明",
+        "login_age": "我已年滿 16 歲。未滿 16 歲的玩家不需要帳號，可在場地報到，並依場地對家長或監護人的規定辦理。",
         "login_social_working": "正在開啟提供者的頁面…",
         "passkey_cancelled": "沒有使用密碼金鑰（請求已取消或逾時）。",
         "passkey_failed": "無法使用密碼金鑰登入。",
         "passkey_none": "這個帳號沒有密碼金鑰。",
         "oidc_err_state_invalid": "這個登入請求已過期，或不是從這個瀏覽器發出的，請再試一次。",
         "oidc_err_denied": "提供者拒絕了這次登入。",
-        "oidc_err_consent_required": "要建立新帳號，請先勾選正下方（提供者按鈕下面）的同意框，然後再選一次提供者。",
-        "oidc_err_notice_version_changed": "隱私權聲明在這段時間內已更新。同意框已取消勾選：請閱讀目前的聲明，再次勾選同意框，然後重新選擇提供者。",
+        "oidc_err_notice_required": "要建立新帳號，請先勾選已閱讀隱私權聲明（正下方、提供者按鈕下面的框），然後再選一次提供者。",
+        "oidc_err_age_confirmation_required": "建立帳號需年滿 16 歲。未滿 16 歲的玩家不需要帳號，可在場地報到，並依場地對家長或監護人的規定辦理。如果你已年滿 16 歲，請勾選正下方的年齡框，然後再選一次提供者。",
+        "oidc_err_notice_version_changed": "隱私權聲明在這段時間內已更新。聲明的勾選框已取消勾選：請閱讀目前的聲明，再次勾選，然後重新選擇提供者。",
         "oidc_err_too_many_attempts": "這個位址建立的新帳號太多，請稍後再試。",
         "oidc_err_quota_exceeded": "這個場地的帳號數量已達上限，請聯絡場地的工作人員。",
         "oidc_err_id_token_invalid": "提供者的回應不被接受，請再試一次。",
@@ -3210,7 +3220,7 @@ for _lang, _texts in _MEMBERSHIP.items():
     assert not _clash, sorted(_clash)
     STRINGS[_lang].update(_texts)
 
-# The "consent again" panel of the privacy notice (CONS-*); every key is new, as above.
+# The "notice shown again" panel of the privacy notice (CONS-*, LEG-*); every key is new, as above.
 from .consent_i18n import STAFF as _CONSENT  # noqa: E402
 
 for _lang, _texts in _CONSENT.items():

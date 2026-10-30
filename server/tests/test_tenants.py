@@ -298,7 +298,7 @@ class RoutingTests(HubCase):
         self.assertEqual((await self.login(self.b, "ana", password="another password 4 B!")).status_code, 200)
         # Registration in one field makes no account in the other.
         r = await self.b.post("/api/v1/auth/register", json={"username": "rui", "password": PASSWORD,
-                                                             "consent": True})
+                                                             "notice_seen": True, "age_confirmed": True})
         self.assertEqual(r.status_code, 201, r.text)
         self.assertEqual(len(await self.sql(self.ta, "SELECT 1 FROM users WHERE username = 'rui'")), 0)
         self.assertEqual(len(await self.sql(self.tb, "SELECT 1 FROM users WHERE username = 'rui'")), 1)

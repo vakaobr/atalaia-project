@@ -153,9 +153,11 @@ async function passkeyLogin() {
 async function socialLogin(provider) {
     status(t('login_social_working'));
     const back = `${location.pathname}${location.search}`;
-    const ticked = $('consent').checked;
-    const body = { purpose: 'login', consent: ticked, return_to: back };
-    if (ticked && noticeVersion) body.notice_version = noticeVersion;  // the notice this page offered (CONS-7)
+    // A new account (the provider's identifier is unknown here) rests on the contract (LEG-*): the person says they
+    // were shown the notice and are 16 or older. Neither is read when the login already has an account.
+    const seen = $('notice-seen').checked;
+    const body = { purpose: 'login', notice_seen: seen, age_confirmed: $('age-confirmed').checked, return_to: back };
+    if (seen && noticeVersion) body.notice_version = noticeVersion;  // the notice this page offered (CONS-7)
     const answer = await post(`/api/v1/auth/oidc/${provider}/start`, body);
     if (answer.status === 409 && answer.body && answer.body.detail === 'notice_version_changed') {
         noticeVersion = answer.body.current_version || null;  // read again; the box is ticked again on purpose
@@ -179,20 +181,20 @@ async function socialLogin(provider) {
     location.assign(target.href);
 }
 
-let consentFailed = '';
+let signupFailed = '';
 let noticeVersion = null;  // the published privacy notice's version, read when the page opened (null: none published)
 
 /** The notice changed after this page read it (or during the round trip): untick, and say so at the box. */
 function noticeChanged() {
-    $('consent').checked = false;
-    consentMissing(t('oidc_err_notice_version_changed'));
+    $('notice-seen').checked = false;
+    signupMissing(t('oidc_err_notice_version_changed'), 'notice-seen');
 }
 
-/** The refusal for a missing agreement is shown where the box is, with the box marked and focused. */
-function consentMissing(text = t('oidc_err_consent_required')) {
-    const row = $('consent-row');
-    const box = $('consent');
-    const note = $('consent-error');
+/** A refusal to make an account is shown where the boxes are, with the box it is about marked and focused. */
+function signupMissing(text, boxId) {
+    const row = $('signup-row');
+    const box = $(boxId);
+    const note = $('signup-error');
     note.textContent = text;
     note.hidden = false;
     row.classList.add('invalid');
@@ -201,6 +203,10 @@ function consentMissing(text = t('oidc_err_consent_required')) {
     row.scrollIntoView({ block: 'center' });
     box.focus();
 }
+
+const SIGNUP_BOX = {
+    notice_required: 'notice-seen', notice_version_changed: 'notice-seen', age_confirmation_required: 'age-confirmed',
+};
 
 function oidcError(code) {
     const key = `oidc_err_${code}`;
@@ -218,8 +224,8 @@ async function finishSocial() {
         const rest = params.toString();
         history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}`);
     }
-    if (failure === 'consent_required' || failure === 'notice_version_changed') {
-        consentFailed = failure;  // shown at the box once the buttons are on the page (offer)
+    if (failure in SIGNUP_BOX) {
+        signupFailed = failure;  // shown at the box once the buttons are on the page (offer)
         return false;
     }
     if (failure) {
@@ -251,16 +257,22 @@ async function offer() {
             onclick: () => socialLogin(item.provider),
         }));
     }
-    $('consent-row').hidden = providers.length === 0;
+    $('signup-row').hidden = providers.length === 0;
     if (providers.length > 0) {
         const notice = await call('GET', '/api/v1/privacy-notice');  // 404: no notice published, nothing to name
         noticeVersion = notice.status === 200 && notice.body && notice.body.version ? notice.body.version : null;
+        const noticeLink = $('notice-link');
+        if (noticeVersion) noticeLink.href = link('/privacy');
+        else noticeLink.hidden = true;
     }
-    $('consent').addEventListener('change', () => {
-        $('consent-error').hidden = true;
-        $('consent-row').classList.remove('invalid');
-        $('consent').removeAttribute('aria-invalid');
-    });
+    for (const id of ['notice-seen', 'age-confirmed']) {
+        $(id).addEventListener('change', () => {
+            $('signup-error').hidden = true;
+            $('signup-row').classList.remove('invalid');
+            $('notice-seen').removeAttribute('aria-invalid');
+            $('age-confirmed').removeAttribute('aria-invalid');
+        });
+    }
     const passkey = $('passkey-login');
     passkey.hidden = !passkeysSupported();
     passkey.addEventListener('click', passkeyLogin);
@@ -271,11 +283,11 @@ async function offer() {
         if (first) first.focus();
     }
     // The box is on the page now (its section was hidden until here): show the refusal there.
-    if (consentFailed) {
+    if (signupFailed) {
         if (providers.length > 0) {
-            if (consentFailed === 'notice_version_changed') $('consent').checked = false;
-            consentMissing(oidcError(consentFailed));
-        } else status(oidcError(consentFailed), 'error');
+            if (signupFailed === 'notice_version_changed') $('notice-seen').checked = false;
+            signupMissing(oidcError(signupFailed), SIGNUP_BOX[signupFailed]);
+        } else status(oidcError(signupFailed), 'error');
     }
 }
 
@@ -284,5 +296,5 @@ if (params.get('out')) status(t('logged_out'), 'ok');
 enable(loginForm);
 if (!(await finishSocial())) {
     await offer();
-    if (!loginForm.hidden && !consentFailed) $('username').focus();
+    if (!loginForm.hidden && !signupFailed) $('username').focus();
 }

@@ -269,7 +269,7 @@ class StaffScriptTests(AppTestCase):
                  "reg_window_": ("none", "not_yet", "open", "closed"),
                  "reg_status_": ("registered", "checked_in", "no_show", "cancelled"),
                  "fed_": ("off", "optional", "required"),
-                 "oidc_err_": ("state_invalid", "denied", "consent_required", "too_many_attempts",
+                 "oidc_err_": ("state_invalid", "denied", "notice_required", "age_confirmation_required", "too_many_attempts",
                                "id_token_invalid", "token_exchange_failed", "provider_unreachable", "try_again",
                                "other"),
                  "replica_state_": ("pending", "passed", "refused", "withdrawn"),

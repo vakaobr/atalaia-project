@@ -23,8 +23,10 @@
 <p id="login-or">$login_or</p>
 <div id="oidc-buttons" class="alt-buttons"></div>
 <p><button type="button" id="passkey-login" hidden>$login_passkey</button></p>
-<div id="consent-row" class="consent" hidden>
-<p id="consent-error" class="field-error" role="alert" hidden></p>
-<p><label><input type="checkbox" id="consent" aria-describedby="consent-error"> $login_consent</label></p>
+<div id="signup-row" class="signup" hidden>
+<p>$login_new_intro</p>
+<p id="signup-error" class="field-error" role="alert" hidden></p>
+<p id="notice-row"><label><input type="checkbox" id="notice-seen" aria-describedby="signup-error"> $login_notice_seen</label> <a id="notice-link" target="_blank" rel="noopener">$login_notice_read</a></p>
+<p id="age-row"><label><input type="checkbox" id="age-confirmed" aria-describedby="signup-error"> $login_age</label></p>
 </div>
 </section>

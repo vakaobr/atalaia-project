@@ -64,7 +64,7 @@ from .atak_models import AtakCa, AtakCert
 from .history_models import FieldHistorySettings, FieldPreset, FieldScenario, FieldScenarioRevision, GameScoreSample
 from .models import (AuditLog, BrandingImage, GameResult, ChronoReading, ChronoReject, ChronoViolation, Club, ClubMember,
                      ClubReport, Consent, Controller, ExternalGameLink, Field, FieldApiKey, FieldPlayerId, FieldTeam,
-                     Game, GameEvent, GameNode, GameNodeScore, GameRegistration, MarshalKey, PlatformLink,
+                     Game, GameEvent, GameNode, GameNodeScore, GameRegistration, MarshalKey, NoticeRecord, PlatformLink,
                      PlayerIdClaim, RegistrationReplica, Replica, Role, ScheduledGame, User, UserFieldRole,
                      UserGameRole)
 
@@ -150,6 +150,10 @@ def _consents(fid: uuid.UUID, hosted: bool) -> Any:
     return None if hosted else Consent.user_id.in_(_account_ids(fid))
 
 
+def _notice_records(fid: uuid.UUID, hosted: bool) -> Any:
+    return None if hosted else NoticeRecord.user_id.in_(_account_ids(fid))
+
+
 def _audit(fid: uuid.UUID, hosted: bool) -> Any:
     if hosted:
         return None
@@ -183,6 +187,7 @@ DATASETS: tuple[Dataset, ...] = (
         "last_login_at": "the person's own, across every field: GET /api/v1/me/data"}, _accounts),
     Dataset("user_field_roles", _t(UserFieldRole), {}, _field(UserFieldRole.field_id)),
     Dataset("consents", _t(Consent), {}, _consents),
+    Dataset("notice_records", _t(NoticeRecord), {}, _notice_records),
     Dataset("field_api_keys", _t(FieldApiKey), {"key_sha256": "a credential"}, _field(FieldApiKey.field_id)),
     Dataset("controllers", _t(Controller), {}, _field(Controller.field_id)),
     Dataset("games", _t(Game), {}, _field(Game.field_id)),

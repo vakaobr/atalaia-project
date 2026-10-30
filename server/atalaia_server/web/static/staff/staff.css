@@ -57,14 +57,14 @@ button.link { background: none; border: 0; color: var(--accent); padding: 0 0.25
 .alt-logins { margin: 1.5rem 0; }
 .alt-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; }
 .alt-logins button, .alt-buttons button.provider { background: transparent; color: var(--ink); border-color: var(--muted); }
-.alt-logins .consent { font-size: 0.95rem; color: var(--muted); }
-/* A refusal next to the box it is about (login.js: the agreement for a new account) */
+.alt-logins .signup { font-size: 0.95rem; color: var(--muted); }
+/* A refusal next to the box it is about (login.js: the notice and age boxes for a new account) */
 .field-error { margin: 0.5rem 0; padding: 0.5rem 0.75rem; border: 2px solid var(--warn); border-radius: 0.3rem;
                color: var(--warn); font-weight: 700; }
-.alt-logins .consent.invalid { border: 2px solid var(--warn); border-radius: 0.3rem; padding: 0.25rem 0.75rem;
+.alt-logins .signup.invalid { border: 2px solid var(--warn); border-radius: 0.3rem; padding: 0.25rem 0.75rem;
                                color: var(--ink); }
-.alt-logins .consent.invalid input { outline: 3px solid var(--warn); outline-offset: 2px; }
-.alt-logins .consent p { margin: 0.5rem 0; }
+.alt-logins .signup.invalid input { outline: 3px solid var(--warn); outline-offset: 2px; }
+.alt-logins .signup p { margin: 0.5rem 0; }
 #stepup { margin: 1rem 0; padding: 0.5rem 1rem; border: 1px solid var(--accent); border-radius: 0.3rem; }
 #stepup h2 { margin: 0.25rem 0; font-size: 1.1rem; }
 /* The account page (account.js): one box per kind of login method, rows that wrap on a phone */

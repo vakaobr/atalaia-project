@@ -53,7 +53,7 @@ class RelayCase(HubCase):
     # One login, step by step ---------------------------------------------------------------------
 
     async def start(self, client: httpx.AsyncClient, provider: str = "google", **body: Any) -> dict[str, str]:
-        r = await client.post(f"/api/v1/auth/oidc/{provider}/start", json={"purpose": "login", "consent": True, **body})
+        r = await client.post(f"/api/v1/auth/oidc/{provider}/start", json={"purpose": "login", "notice_seen": True, "age_confirmed": True, **body})
         self.assertEqual(r.status_code, 200, r.text)
         return self.idp.authorize(r.json()["authorization_url"])
 
@@ -124,7 +124,7 @@ class RelayTests(RelayCase):
 
     async def test_the_apps_return_to_the_app_works_through_the_relay(self) -> None:
         r = await self.a.post("/api/v1/auth/oidc/google/start", json={
-            "purpose": "login", "consent": True, "return_to": f"https://campo-a.{DOMAIN}/app/oidc?s=abc123"})
+            "purpose": "login", "notice_seen": True, "age_confirmed": True, "return_to": f"https://campo-a.{DOMAIN}/app/oidc?s=abc123"})
         self.assertEqual(r.status_code, 200, r.text)
         browser_url = urlsplit(r.json()["browser_url"])
         self.assertEqual(browser_url.netloc, f"campo-a.{DOMAIN}")

@@ -3,7 +3,7 @@
 """Ways to log in besides a password: social login, passkeys, and the staff second factor (decisions LG-*).
 
     GET    /api/v1/auth/methods                        what this server offers (the login pages' buttons)
-    POST   /api/v1/auth/oidc/{provider}/start          {purpose, consent?, notice_version?, return_to?, password?, app_challenge?}: the provider's URL
+    POST   /api/v1/auth/oidc/{provider}/start          {purpose, notice_seen?, age_confirmed?, notice_version?, return_to?, password?, app_challenge?}: the provider's URL
     GET    /api/v1/auth/oidc/{provider}/browser        the app's browser starts here (PKA-1): sets the binding cookie
     GET    /api/v1/auth/oidc/{provider}/callback       where the provider sends the browser back (a field's own address)
     GET    /api/v1/auth/oidc/callback                  hosted hub only, ATALAIA_OIDC_RELAY=on: the hub's one address, see oidc_relay.py
@@ -108,7 +108,10 @@ APP_RETURN_TO = re.compile(r"/app/oidc(?:\?[A-Za-z0-9_.=&%-]{0,380})?")
 
 class StartIn(Strict):
     purpose: Literal["login", "link", "reauth", "name"] = "login"
-    consent: bool = False
+    # A new account made at the first sign-in rests on the contract (LEG-*): the person says they were shown the
+    # privacy notice and are 16 or older. Neither is read for a login that already has an account.
+    notice_seen: bool = False
+    age_confirmed: bool = False
     notice_version: Optional[str] = Field(default=None, max_length=64)  # the privacy notice the person was shown
     return_to: str = Field(default=DEFAULT_RETURN, max_length=400)
     password: str = Field(default="", max_length=4096)
@@ -321,7 +324,7 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
     account's confirmation as every sensitive change does."""
     _provider(request, provider)
     current = request.app.state.settings.privacy_notice_version
-    if body.consent and body.notice_version is not None and body.notice_version != current:
+    if body.notice_seen and body.notice_version is not None and body.notice_version != current:
         return JSONResponse({"detail": "notice_version_changed", "current_version": current}, status_code=409,
                             headers=NO_STORE)
     user_id: Optional[uuid.UUID] = None
@@ -349,7 +352,8 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
     db.add(OidcLogin(state_hash=_hash(state), binding_hash=_hash(binding), provider=provider, purpose=body.purpose,
                      user_id=user_id, session_id=session_id, nonce=nonce, code_verifier=verifier,
                      redirect_uri=redirect_uri, return_to=return_to, app_challenge=body.app_challenge,
-                     consent=body.consent, notice_version=body.notice_version if body.consent else None,
+                     notice_seen=body.notice_seen, age_confirmed=body.age_confirmed,
+                     notice_version=body.notice_version if body.notice_seen else None,
                      expires_at=now + timedelta(seconds=STATE_TTL_S)))
     await db.commit()
     url = request.app.state.oidc.authorization_url(provider, redirect_uri, state, nonce,
@@ -515,12 +519,15 @@ async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provid
         await db.commit()
         return _back(row.return_to, ticket=make_oidc_ticket(request.app.state.keys, user.id, provider,
                                                           app_challenge=row.app_challenge))
-    # An unknown subject makes an account, under the same rules as registering: consent given, the per-address
-    # registration limit. Never matched to an existing account by email (the server never asks for one).
-    if privacy_notice.signup_blocked(request.app.state.settings):  # LIVE-2: a consent is to a published text
+    # An unknown subject makes an account, under the same rules as registering: a published notice (LIVE-2), 16 or
+    # older confirmed, the notice shown, the per-address registration limit. Never matched to an existing account
+    # by email (the server never asks for one).
+    if privacy_notice.signup_blocked(request.app.state.settings):
         return _back(row.return_to, error="privacy_notice_unpublished")
-    if not row.consent:
-        return _back(row.return_to, error="consent_required")
+    if not row.age_confirmed:
+        return _back(row.return_to, error="age_confirmation_required")
+    if not row.notice_seen:
+        return _back(row.return_to, error="notice_required")
     current = request.app.state.settings.privacy_notice_version
     if row.notice_version is not None and row.notice_version != current:  # the notice changed during the round trip
         return _back(row.return_to, error="notice_version_changed")
@@ -542,7 +549,8 @@ async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provid
     except IntegrityError:  # the same subject finished twice at once: the other one won
         await db.rollback()
         return _back(row.return_to, error="try_again")
-    personal_data.give_consent(db, user.id, personal_data.ACCOUNT, row.notice_version or current, now)
+    personal_data.record_notice(db, user.id, row.notice_version or current, personal_data.NOTICE_SIGNUP, now,
+                                age_confirmed=True)
     record(db, "register", request, user_id=user.id, resource="user", resource_id=user.id,
            details={"method": "oidc", "provider": provider})
     await db.commit()

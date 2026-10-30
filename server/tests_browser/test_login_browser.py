@@ -12,7 +12,7 @@ PostgreSQL database), with Google configured and a fake provider in its place (t
   gm's role without TOTP;
 - a social login: the browser goes to the provider's address (answered by the test with a redirect back, as a
   provider would), the callback sets nothing but a ticket in the address fragment, the page makes the session;
-  an unknown subject needs the consent box; a provider's refusal is shown in words; the address is cleaned;
+  an unknown subject needs the notice and age boxes; a provider's refusal is shown in words; the address is cleaned;
 - the second factor of such a session: a gm that logged in with Google is offered the TOTP step-up, and the roles count
   from then on;
 - password login off: no password form, the other buttons;
@@ -121,7 +121,7 @@ class PasskeyBrowserTests(LoginBrowserCase):
 
 
 class SocialBrowserTests(LoginBrowserCase):
-    async def test_a_new_account_needs_the_consent_box(self) -> None:
+    async def test_a_new_account_needs_the_notice_and_the_age_boxes(self) -> None:
         page = await self.new_page(lang="en-GB")
         await self.provider(page)
         await page.goto(self.base + "/staff/login?next=%2Fstaff%2F&lang=en")
@@ -129,17 +129,29 @@ class SocialBrowserTests(LoginBrowserCase):
         await expect(button).to_have_text("Continue with Google")
         await button.click()
         await page.wait_for_url("**/staff/login?next=*")
-        # The refusal is at the box (LG-12): an error with role=alert next to it, the box marked and focused.
-        error = page.locator("#consent-error")
+        # The refusal is at the boxes (LG-12, LEG-*): an error with role=alert next to them, the box it is about
+        # marked and focused. Nothing ticked: the age comes first, as on the server.
+        error = page.locator("#signup-error")
         await expect(error).to_be_visible()
-        await expect(error).to_contain_text("tick the agreement box")
+        await expect(error).to_contain_text("You must be 16 or older")
+        await expect(error).to_contain_text("check in at the field without an account")
         self.assertEqual(await error.get_attribute("role"), "alert")
-        await expect(page.locator("#consent")).to_be_focused()
-        await expect(page.locator("#consent")).to_have_attribute("aria-invalid", "true")
+        await expect(page.locator("#age-confirmed")).to_be_focused()
+        await expect(page.locator("#age-confirmed")).to_have_attribute("aria-invalid", "true")
         await expect(page.locator("#status")).to_be_empty()
         self.assertNotIn("oidc", page.url)  # the address is cleaned
         self.assertEqual((await self.fetch("SELECT count(*) FROM users"))[0][0], 0)
-        await page.check("#consent")
+        # The age alone is not enough: the notice box is what the next refusal is about.
+        await page.check("#age-confirmed")
+        await expect(error).to_be_hidden()
+        await button.click()
+        await page.wait_for_url("**/staff/login?next=*")
+        await expect(error).to_be_visible()
+        await expect(error).to_contain_text("first tick that you have read the privacy notice")
+        await expect(page.locator("#notice-seen")).to_be_focused()
+        self.assertEqual((await self.fetch("SELECT count(*) FROM users"))[0][0], 0)
+        await page.check("#notice-seen")
+        await page.check("#age-confirmed")
         await expect(error).to_be_hidden()
         await button.click()
         # A new account is taken to the "choose your username" step first; skipping it goes on.
@@ -153,6 +165,10 @@ class SocialBrowserTests(LoginBrowserCase):
         self.assertTrue(session["user"]["username"].startswith("user-"))
         users = await self.fetch("SELECT password_hash, email FROM users")
         self.assertEqual([(u["password_hash"], u["email"]) for u in users], [(None, None)])
+        # What the server recorded: the notice shown and the 16-or-older confirmation, and no consent (LEG-*).
+        notices = await self.fetch("SELECT kind, age_confirmed FROM notice_records")
+        self.assertEqual([(n["kind"], n["age_confirmed"]) for n in notices], [("signup", True)])
+        self.assertEqual((await self.fetch("SELECT count(*) FROM consents"))[0][0], 0)
         await expect(page.locator("#stepup")).to_have_count(0)  # no role, nothing to confirm
         # The same Google account again is the same account.
         await page.click("#logout")
@@ -165,7 +181,8 @@ class SocialBrowserTests(LoginBrowserCase):
         page = await self.new_page(lang="en-GB")
         await self.provider(page, deny=True)
         await page.goto(self.base + "/staff/login")
-        await page.check("#consent")
+        await page.check("#notice-seen")
+        await page.check("#age-confirmed")
         await page.locator("button.provider").click()
         await expect(page.locator("#status")).to_have_text("The login was refused at the provider.")
         self.assertEqual(urlsplit(page.url).query, "")
@@ -206,7 +223,7 @@ class SocialBrowserTests(LoginBrowserCase):
                 page = await self.new_page(lang=lang)
                 await page.goto(self.base + "/staff/login")
                 await expect(page.locator("button.provider")).to_have_text(text)
-                await expect(page.locator("#consent-row")).to_be_visible()
+                await expect(page.locator("#signup-row")).to_be_visible()
                 await self.check_page(page)
 
 

@@ -165,8 +165,8 @@ async def _create_admin(settings: Settings, engine: Any, username: str, email: O
             await db.flush()
         except IntegrityError:
             raise CommandError("that username or email address is already taken") from None
-        personal_data.give_consent(db, user.id, personal_data.ACCOUNT, settings.privacy_notice_version,
-                                   user.gdpr_consent_at)
+        personal_data.record_notice(db, user.id, settings.privacy_notice_version, personal_data.NOTICE_SIGNUP,
+                                    user.gdpr_consent_at)
         record(db, "admin_create", None, user_id=user.id, resource="user", resource_id=user.id,
                details={"via": "cli"})
         await db.commit()

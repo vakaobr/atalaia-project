@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Accounts and sessions: register, login, the TOTP step, refresh, logout, TOTP enrolment (ADR-P4-2).
 
-    POST /api/v1/auth/register        {username, password, email?, consent}
+    POST /api/v1/auth/register        {username, password, email?, notice_seen, age_confirmed, notice_version?}
     POST /api/v1/auth/login           {username, password}
     POST /api/v1/auth/login/totp      {totp_session, code}
     POST /api/v1/auth/refresh         the refresh cookie + header X-Atalaia-Refresh: 1
@@ -65,7 +65,11 @@ class RegisterIn(Strict):
     username: str = Field(max_length=64)
     password: str = Field(max_length=4096)
     email: Optional[str] = Field(default=None, max_length=320)
-    consent: bool = False
+    # The account rests on the contract (LEG-*), so these are not consents: the person was shown the privacy notice
+    # (``notice_seen``; the version is recorded) and confirms being 16 or older (``age_confirmed``; no date of
+    # birth is asked). Younger players use the field's check-in without an account.
+    notice_seen: bool = False
+    age_confirmed: bool = False
     # The version of the privacy notice the person was shown (GET /api/v1/privacy-notice); when given and not the
     # current one, 409 notice_version_changed (CONS-4).
     notice_version: Optional[str] = Field(default=None, max_length=64)
@@ -319,8 +323,10 @@ async def register(body: RegisterIn, request: Request, db: AsyncSession = Depend
     problem = username_problem(username) or email_problem(email)
     if problem:
         raise HTTPException(400, problem)
-    if not body.consent:
-        raise HTTPException(400, "consent_required")
+    if not body.age_confirmed:
+        raise HTTPException(400, "age_confirmation_required")
+    if not body.notice_seen:
+        raise HTTPException(400, "notice_required")
     current = request.app.state.settings.privacy_notice_version
     if body.notice_version is not None and body.notice_version != current:
         return JSONResponse({"detail": "notice_version_changed", "current_version": current}, status_code=409,
@@ -342,8 +348,8 @@ async def register(body: RegisterIn, request: Request, db: AsyncSession = Depend
     except IntegrityError:
         await db.rollback()
         raise HTTPException(409, "username_or_email_taken") from None
-    personal_data.give_consent(db, user.id, personal_data.ACCOUNT, request.app.state.settings.privacy_notice_version,
-                               user.gdpr_consent_at)
+    personal_data.record_notice(db, user.id, current, personal_data.NOTICE_SIGNUP, user.gdpr_consent_at,
+                                age_confirmed=True)
     record(db, "register", request, user_id=user.id, resource="user", resource_id=user.id)
     await db.commit()
     return JSONResponse(user_json(user, {}), status_code=201, headers=NO_STORE)
@@ -444,22 +450,22 @@ async def logout(request: Request, principal: Principal = Depends(current_princi
 @router.get("/me")
 async def me(request: Request, principal: Principal = Depends(current_principal),
              db: AsyncSession = Depends(get_session)) -> JSONResponse:
-    """The account, its roles and where its consent stands (CONS-2): ``consent.status`` is ``current``, ``outdated``
-    (for another version of the privacy notice: show it and ``POST /api/v1/me/consents/account``) or ``missing``;
-    ``consent.notice_published`` says whether ``GET /api/v1/privacy-notice`` has a text to show. ``inactivity`` is
+    """The account, its roles and which privacy notice it was last shown (CONS-2, LEG-*): ``notice.status`` is
+    ``current``, ``outdated`` (another version: show it again and ``POST /api/v1/me/notice``) or ``missing``;
+    ``notice.notice_published`` says whether ``GET /api/v1/privacy-notice`` has a text to show. ``inactivity`` is
     null, or (PRIV-7) when the retention purge warned that the account, inactive for a long time, would be
     anonymised (``warned_at``) and when it would have been (``anonymise_after``): the client says so, and that the
     account stays because the person is here (the purge clears the warning at its next run)."""
     settings = request.app.state.settings
-    consent = await personal_data.account_consent(db, principal.user.id, settings.privacy_notice_version)
-    consent["notice_published"] = bool(privacy_notice.available(settings.privacy_notice_dir,
-                                                                settings.privacy_notice_version))
+    notice = await personal_data.notice_state(db, principal.user.id, settings.privacy_notice_version)
+    notice["notice_published"] = bool(privacy_notice.available(settings.privacy_notice_dir,
+                                                               settings.privacy_notice_version))
     warned = principal.user.inactivity_warned_at
     inactivity = None
     if warned is not None and settings.retention.inactive_months is not None:
         inactivity = {"warned_at": warned.isoformat(),
                       "anonymise_after": (warned + timedelta(days=settings.retention.inactive_grace_days)).isoformat()}
-    return JSONResponse({**user_json(principal.user, principal.roles), "mfa": principal.mfa, "consent": consent,
+    return JSONResponse({**user_json(principal.user, principal.roles), "mfa": principal.mfa, "notice": notice,
                          "inactivity": inactivity}, headers=NO_STORE)
 
 

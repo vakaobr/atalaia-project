@@ -31,8 +31,8 @@
                             again (the deployment sets /ledger/erasures.jsonl, a Docker volume); unset, no ledger is kept
     ATALAIA_PRIVACY_NOTICE_VERSION
                             the version of the privacy notice the field shows (default
-                            "template-2026-10-19"), stored with every consent; an account whose
-                            consent is for another version is asked to consent again (CONS-*)
+                            "template-2026-10-19"), stored with every notice record; an account last
+                            shown another version is shown the notice again (CONS-*, LEG-*)
     ATALAIA_PRIVACY_NOTICE_DIR
                             optional: the folder with the operator's privacy notice, one Markdown file per
                             language and version, ``privacy-notice-<lang>-<version>.md`` (lang pt, en, de or

@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from atalaia_server import personal_data, tenancy
 from atalaia_server.api import account_merge
-from atalaia_server.models import Consent, Passkey, User, UserFieldRole, UserIdentity
+from atalaia_server.models import NoticeRecord, Passkey, User, UserFieldRole, UserIdentity
 
 from .test_tenants import ROLE, HubCase
 
@@ -41,7 +41,7 @@ class HostedMergeTests(HubCase):
                 db.add_all([UserFieldRole(user_id=a, field_id=self.ta.field_id, role_id=ROLE["player"]),
                             UserFieldRole(user_id=b, field_id=self.ta.field_id, role_id=ROLE["player"]),
                             UserFieldRole(user_id=b, field_id=self.ta.field_id, role_id=6),
-                            Consent(user_id=b, purpose="account", notice_version="v1"),
+                            NoticeRecord(user_id=b, notice_version="v1", kind="signup"),
                             Passkey(user_id=b, credential_id=secrets.token_bytes(16), public_key=b"k", name="k",
                                     rp_id="campo-a.test")])
                 await db.commit()
@@ -51,7 +51,7 @@ class HostedMergeTests(HubCase):
                 self.assertIsNone(await account_merge.blocked_by(db, users[a], users[b]))
                 moved = await account_merge.merge_into(db, users[a], users[b])
                 await db.commit()
-        for key in ("user_identities", "user_field_roles", "consents", "passkeys"):
+        for key in ("user_identities", "user_field_roles", "notice_records", "passkeys"):
             self.assertIn(key, moved)
         rows = await self.sql(self.ta, "SELECT provider FROM user_identities WHERE user_id = $1 ORDER BY provider", a)
         self.assertEqual([r[0] for r in rows], ["google", "microsoft"])

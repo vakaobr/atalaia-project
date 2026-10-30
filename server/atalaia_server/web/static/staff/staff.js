@@ -245,7 +245,7 @@ export function keep(body) {
 export function forget() {
     storageSet(null);
     try {
-        window.sessionStorage.removeItem('atalaia.staff.consent');  // consent.js: asked again at the next login
+        window.sessionStorage.removeItem('atalaia.staff.notice');  // consent.js: shown again at the next login
     } catch (e) {
         /* no storage: nothing to forget */
     }
@@ -496,7 +496,7 @@ export async function boot() {
     if (!s.mfa) {  // a social login, or a password with no TOTP step: offer the second factor if a role needs it
         import('./stepup.js').then((m) => m.maybeStepUp()).catch(() => {});
     }
-    import('./consent.js').then((m) => m.maybeAskConsent()).catch(() => {});  // a changed privacy notice (CONS-*)
+    import('./consent.js').then((m) => m.maybeShowNotice()).catch(() => {});  // a changed privacy notice (CONS-*)
     const logout = $('logout');
     logout.hidden = false;
     logout.addEventListener('click', async () => {

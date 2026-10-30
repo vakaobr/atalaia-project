@@ -93,7 +93,7 @@ class QuotaTests(LimitCase):
 
     async def test_accounts_quota(self) -> None:
         self.limit(accounts=(await self.count(self.ta, "users")) + 1)
-        body = {"username": "nova-conta", "password": PASSWORD, "consent": True}
+        body = {"username": "nova-conta", "password": PASSWORD, "notice_seen": True, "age_confirmed": True}
         r = await self.a.post("/api/v1/auth/register", json=body)
         self.assertEqual(r.status_code, 201, r.text)
         r = await self.a.post("/api/v1/auth/register", json={**body, "username": "uma-a-mais"})

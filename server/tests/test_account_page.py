@@ -106,7 +106,7 @@ class AccountPageTests(AppTestCase):
                 with self.subTest(lang=lang, code=code):
                     self.assertIn(f"acct_e_{code}", strings)
             for code in ("already_linked", "identity_taken", "provider_already_linked", "identity_mismatch",
-                         "denied", "state_invalid", "other", "name_unusable", "consent_required"):
+                         "denied", "state_invalid", "other", "name_unusable", "notice_required", "age_confirmation_required"):
                 self.assertIn(f"oidc_err_{code}", strings, (lang, code))
 
     async def test_every_text_of_the_page_is_in_the_four_languages(self) -> None:
