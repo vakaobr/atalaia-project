@@ -97,6 +97,41 @@ def problems(cfg: dict) -> list[str]:
     text = script.read_text(encoding="utf-8")
     if re.search(r"^[^#\n]*\bcat\b[^>\n]*\$(env_file|home|target)[^>\n]*$", text, re.M):
         found.append("preview.sh seems to print a secrets file")
+    return found + notice_problems()
+
+
+def notice_problems() -> list[str]:
+    """`preview.sh notice` (and so up and update) installs the files of ATALAIA_PRIVACY_NOTICE_VERSION into the
+    folder the server reads, and refuses when that version's files are missing (FU30-1)."""
+    import shutil
+    import tempfile
+    found: list[str] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        home = Path(tmp)
+        (home / "src" / "server" / "preview").mkdir(parents=True)
+        shutil.copy(SERVER / "preview" / "preview.sh", home / "src" / "server" / "preview" / "preview.sh")
+        shutil.copytree(SERVER / "preview" / "privacy-notice", home / "src" / "server" / "preview" / "privacy-notice")
+        env = {"PATH": os.environ.get("PATH", ""), "HOME": tmp, "ATALAIA_PREVIEW_HOME": str(home)}
+
+        def run(version: str) -> subprocess.CompletedProcess:
+            (home / "preview.env").write_text(f"ATALAIA_PRIVACY_NOTICE_VERSION={version}\n", encoding="utf-8")
+            return subprocess.run(["sh", str(home / "src" / "server" / "preview" / "preview.sh"), "notice"],
+                                  env=env, capture_output=True, text=True)
+
+        have = sorted((SERVER / "preview" / "privacy-notice").glob("privacy-notice-en-*.md"))
+        if not have:
+            return ["server/preview/privacy-notice/ has no notice"]
+        version = have[-1].name[len("privacy-notice-en-"):-len(".md")]
+        done = run(version)
+        target = home / "src" / "server" / "privacy-notice"
+        want = {f"privacy-notice-{lang}-{version}.md" for lang in ("pt", "en")}
+        if done.returncode != 0 or not want <= {f.name for f in target.glob("*.md")}:
+            found.append(f"preview.sh notice did not install the notice files of {version}: {done.stderr.strip()}")
+        elif any(version not in f.name for f in target.glob("*.md")):
+            found.append("preview.sh notice installed files of another version")
+        gone = run("preview-9999-01-01")
+        if gone.returncode == 0 or "missing" not in gone.stderr:
+            found.append("preview.sh notice must refuse a version whose files are missing")
     return found
 
 
