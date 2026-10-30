@@ -478,7 +478,7 @@ Radio-specific Kconfig options (under "Atalaia Field Box Configuration > Radio")
 - `ATALAIA_RADIO_FEM_EN_PIN` (2, chip enable), `ATALAIA_RADIO_VFEM_CTL_PIN` (7, the FEM's LDO, driven high), `ATALAIA_RADIO_FEM_CTX_PIN` (5, V4.3, low = LNA), `ATALAIA_RADIO_FEM_PA_PIN` (46, V4.2, high = PA) -- driven only after the SX1262 answers (`main/hal/board_fem.c`)
 - `ATALAIA_VEXT_CTL_PIN` -- Vext, active low, driven low at boot (under "Board power")
 - `ATALAIA_RADIO_FEM_GAIN_DB` -- FEM gain for TX power calculation (default 14)
-- `ATALAIA_RADIO_ANTENNA_GAIN_DBI` -- antenna gain in dBi (default 2)
+- `ATALAIA_RADIO_ANTENNA_GAIN_DBI` -- antenna gain in dBi (default 2); `python3 tools/docker_fw.py build|bench|modem|pod|wokwi --antenna-dbi=N` sets it for that build folder
 - `ATALAIA_RADIO_REGION` -- the radio region the image is built for: EU868 (default) or AS923-TW (Taiwan, 920-925 MHz, SF9 at 500 kHz, 0.5 W at the antenna port; RFC 0001 Amendment 12). The firmware knows only that region: a join, a CONFIGURE or a MEASURE on another region's channel is refused. `python3 tools/docker_fw.py build|bench|modem|pod --region=as923-tw` builds a Taiwanese image (fit a 915-925 MHz antenna; not certified, decisions RF-AS923-3 and RF-AS923-13)
 - `ATALAIA_LBT` -- listen before talk (default on; RFC 0001 Amendment 14): a CAD and the receiver's state before every transmission, in the Field Box, the modem and the pod. `python3 tools/docker_fw.py build|bench|modem|pod|wokwi --lbt=off` builds the same firmware without it, for the field test that compares the two (`docs/runbooks/radio-field-test.md`)
 - `ATALAIA_RADIO_DISABLE` -- skip radio init (kept for debugging; the Wokwi build runs with the radio enabled)

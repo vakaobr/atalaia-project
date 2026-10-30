@@ -186,6 +186,7 @@ Most options are build options. Give them to `docker_fw.py`:
 | --- | --- | --- |
 | Radio region | `--region=eu868` or `--region=as923-tw` (Taiwan, 920-925 MHz) | EU868 |
 | Listen before talk | `--lbt=on` or `--lbt=off` | on |
+| Antenna gain | `--antenna-dbi=10` (the fitted antenna's rated gain, 0 to 20 dBi): the firmware lowers the transmit power by it, so a higher-gain antenna stays within the legal radiated power | 2 dBi |
 | Mode keys | `--mode-keys=<key>[,<key>...]` (up to 4, hex or base64) | The project's two keys |
 | Release keys | `--release-keys=<key>[,<key>...]` (up to 4) | None: every update is refused |
 | Version | `--fw-version=0.4.1` | From the code |
@@ -208,7 +209,7 @@ Example for a Taiwanese field: `python tools/docker_fw.py build --region=as923-t
 
 Never lower `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` or the antenna gain below the real values. That would break the legal power limit.
 
-If you change `--region`, `--lbt`, a key option, or update the repository, the build may make the settings file again from the defaults and your edits are lost. Do the edit again. Keep a note of your edits.
+If you change `--region`, `--lbt`, `--antenna-dbi`, a key option, or update the repository, the build may make the settings file again from the defaults and your edits are lost. Do the edit again. Keep a note of your edits.
 
 **Settings you do not set at build time.**
 

@@ -186,6 +186,7 @@ A maior parte das opções são opções de compilação. Dá-as ao `docker_fw.p
 | --- | --- | --- |
 | Região de rádio | `--region=eu868` ou `--region=as923-tw` (Taiwan, 920-925 MHz) | EU868 |
 | Ouvir antes de falar | `--lbt=on` ou `--lbt=off` | ligado |
+| Ganho da antena | `--antenna-dbi=10` (o ganho indicado da antena montada, 0 a 20 dBi): o firmware baixa a potência de emissão nesse valor, para que uma antena de maior ganho fique dentro da potência radiada legal | 2 dBi |
 | Chaves de modos | `--mode-keys=<key>[,<key>...]` (até 4, em hexadecimal ou base64) | As duas chaves do projeto |
 | Chaves de versões | `--release-keys=<key>[,<key>...]` (até 4) | Nenhuma: toda a atualização é recusada |
 | Versão | `--fw-version=0.4.1` | A do código |
@@ -208,7 +209,7 @@ Exemplo para um campo em Taiwan: `python tools/docker_fw.py build --region=as923
 
 Nunca baixes o `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` nem o ganho da antena abaixo dos valores reais. Isso quebraria o limite legal de potência.
 
-Se mudares `--region`, `--lbt`, uma opção de chaves, ou atualizares o repositório, a compilação pode voltar a fazer o ficheiro de definições a partir dos valores por omissão e as tuas edições perdem-se. Faz a edição outra vez. Guarda uma nota das tuas edições.
+Se mudares `--region`, `--lbt`, `--antenna-dbi`, uma opção de chaves, ou atualizares o repositório, a compilação pode voltar a fazer o ficheiro de definições a partir dos valores por omissão e as tuas edições perdem-se. Faz a edição outra vez. Guarda uma nota das tuas edições.
 
 **Definições que não se fazem na compilação.**
 

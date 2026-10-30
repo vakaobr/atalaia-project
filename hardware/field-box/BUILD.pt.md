@@ -919,7 +919,7 @@ seguido pelo git), altera a linha, guarda e corre outra vez
 | Placa montada ao contrário (o OLED pequeno de pernas para o ar) | `CONFIG_ATALAIA_OLED_FLIP=y` |
 | Módulo GNSS ligado no arranque (só teste de bancada: nada o lê ainda) | `CONFIG_ATALAIA_GNSS_POWER_ON=y` |
 
-Taiwan (`--region=as923-tw`), ouvir antes de falar (`--lbt=`), as chaves de
+Taiwan (`--region=as923-tw`), ouvir antes de falar (`--lbt=`), o ganho da antena (`--antenna-dbi=`), as chaves de
 versões e as chaves de modos são opções de compilação, não linhas a editar;
 vê o [guia do firmware](../../docs/manuals/pt/firmware.md#4-as-opções-de-quem-monta).
 Nunca baixes o `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` nem o ganho da antena abaixo

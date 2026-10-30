@@ -53,6 +53,12 @@ All three apply to that build folder only, and are reset when left out.
                                                default; the 20-box field test builds the same commit
                                                with both (docs/runbooks/radio-field-test.md).
                                                Applies to that build folder; on when left out.
+    --antenna-dbi=N                            the fitted antenna's gain in dBi, 0 to 20 (Kconfig
+                                               ATALAIA_RADIO_ANTENNA_GAIN_DBI): the firmware takes it
+                                               off the conducted power so the radiated power stays
+                                               within the sub-band's limit. Give the antenna's rated
+                                               gain (a 10 dBi whip: --antenna-dbi=10); 2 when left out.
+                                               Applies to that build folder.
 
 Works from any folder and any shell (cmd, PowerShell, bash). Docker must be
 running. `build`, `wokwi`, `modem`, `pod` and `bench` use the espressif/idf:v5.3.2 image (pinned by digest), the same as
@@ -301,6 +307,19 @@ def lbt_options(build_dir: str) -> tuple[str, ...]:
     return (f"{build_dir}/sdkconfig.lbt",)
 
 
+def antenna_options(build_dir: str) -> tuple[str, ...]:
+    """The antenna's gain (--antenna-dbi, 2 when not given): a defaults file in the build folder,
+    written in both cases and only when it changes, so that a new gain rebuilds the sdkconfig."""
+    gain = FW_OPTIONS.get("antenna_dbi", "2")
+    antenna_file = FW / build_dir / "sdkconfig.antenna"
+    text = ("# Written by tools/docker_fw.py (--antenna-dbi): the fitted antenna's gain in this build.\n"
+            f"CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI={gain}\n")
+    antenna_file.parent.mkdir(parents=True, exist_ok=True)
+    if not antenna_file.exists() or antenna_file.read_text() != text:
+        antenna_file.write_text(text)
+    return (f"{build_dir}/sdkconfig.antenna",)
+
+
 def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
     """Builds a variant (defaults applied on top of sdkconfig.defaults) into build_dir, with the
     firmware's version (a CMake cache value, set on every build so that it never sticks)."""
@@ -310,9 +329,11 @@ def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
                     f"{FW_VERSION_LEN} characters; give one with --fw-version=")
     print(f"docker_fw: firmware version {version}", flush=True)
     cmake_args = [f"-D ATALAIA_FW_VERSION={version}"]
-    defaults = defaults + field_box_options(build_dir) + region_options(build_dir) + lbt_options(build_dir)
+    defaults = (defaults + field_box_options(build_dir) + region_options(build_dir) + lbt_options(build_dir)
+                + antenna_options(build_dir))
     print(f"docker_fw: radio region {FW_OPTIONS.get('region', 'eu868')}, "
-          f"listen before talk {FW_OPTIONS.get('lbt', 'on')}", flush=True)
+          f"listen before talk {FW_OPTIONS.get('lbt', 'on')}, antenna {FW_OPTIONS.get('antenna_dbi', '2')} dBi",
+          flush=True)
     # The variant's sdkconfig lives in its build folder. Regenerate it when
     # the defaults change, so edits to them always take effect.
     sdkconfig = FW / build_dir / "sdkconfig"
@@ -422,8 +443,9 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 1
     command, options = argv[0], argv[1:]
-    box = ["--fw-version=", "--release-keys=", "--mode-keys=", "--region=", "--lbt="]
-    known = {"build": box, "wokwi": box, "modem": ["--region=", "--lbt="], "pod": ["--region=", "--lbt="],
+    box = ["--fw-version=", "--release-keys=", "--mode-keys=", "--region=", "--lbt=", "--antenna-dbi="]
+    radio = ["--region=", "--lbt=", "--antenna-dbi="]
+    known = {"build": box, "wokwi": box, "modem": radio, "pod": radio,
              "bench": box,
              "test": ["--update-screens"], "clean": [], "version": []}
     if command not in known:
@@ -452,6 +474,11 @@ def main(argv: list[str]) -> int:
             if value not in ("on", "off"):
                 return fail("--lbt: on or off")
             FW_OPTIONS["lbt"] = value
+        elif name == "--antenna-dbi=":
+            value = option.split("=", 1)[1]
+            if not value.isdigit() or not 0 <= int(value) <= 20:
+                return fail("--antenna-dbi: a whole number of dBi, 0 to 20")
+            FW_OPTIONS["antenna_dbi"] = str(int(value))
         elif name == "--mode-keys=":
             keys = release_keys_hex(option.split("=", 1)[1])
             if keys is None:

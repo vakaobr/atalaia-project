@@ -868,7 +868,7 @@ again, then flash. Common changes:
 | Board mounted the other way up (small OLED upside down) | `CONFIG_ATALAIA_OLED_FLIP=y` |
 | GNSS module switched on at boot (bench test only: nothing reads it yet) | `CONFIG_ATALAIA_GNSS_POWER_ON=y` |
 
-Taiwan (`--region=as923-tw`), listen before talk (`--lbt=`), the release keys
+Taiwan (`--region=as923-tw`), listen before talk (`--lbt=`), the antenna's gain (`--antenna-dbi=`), the release keys
 and the mode keys are build options, not lines to edit; see the
 [firmware guide](../../docs/manuals/en/firmware.md#4-the-options-a-builder-sets).
 Never lower `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` or the antenna gain below the
