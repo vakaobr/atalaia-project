@@ -78,6 +78,15 @@ client = httpx.AsyncClient(base_url=CONTROLLER, timeout=15.0, follow_redirects=F
 streams = 0
 
 
+HSTS = "max-age=31536000"
+
+
+def came_over_https(request: Request) -> bool:
+    """The Cloudflare tunnel ends TLS and tells the proxy so (X-Forwarded-Proto). Only an https request gets
+    Strict-Transport-Security; a browser ignores the header on plain http, so a forged value gains nothing."""
+    return request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower() == "https"
+
+
 def token_ok(request: Request) -> bool:
     """The request carries the public read token (and nothing else is accepted)."""
     header = request.headers.get("authorization", "")
@@ -94,10 +103,15 @@ def clean_headers(upstream: httpx.Response) -> dict[str, str]:
 @app.middleware("http")
 async def read_only(request: Request, call_next):
     if request.method not in ("GET", "HEAD"):
-        return PlainTextResponse("This is a read-only demo: nothing can be changed here.\n", status_code=405,
-                                 headers={"Allow": "GET, HEAD", "X-Robots-Tag": "noindex"})
+        refused = PlainTextResponse("This is a read-only demo: nothing can be changed here.\n", status_code=405,
+                                    headers={"Allow": "GET, HEAD", "X-Robots-Tag": "noindex"})
+        if came_over_https(request):
+            refused.headers["Strict-Transport-Security"] = HSTS
+        return refused
     response = await call_next(request)
     h = response.headers
+    if came_over_https(request):
+        h["Strict-Transport-Security"] = HSTS
     h.setdefault("X-Robots-Tag", "noindex, nofollow, noarchive")
     # The proxy's own pages (the controller's carry their own policy): no script or style but our own files.
     h.setdefault("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; "

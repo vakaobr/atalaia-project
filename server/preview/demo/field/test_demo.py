@@ -205,6 +205,19 @@ class ProxyTests(unittest.TestCase):
                 self.assertEqual(r.headers["allow"], "GET, HEAD")
         self.assertEqual(seen, [])
 
+    def test_hsts_is_sent_on_every_answer_that_came_over_https_and_only_then(self) -> None:
+        https = {"X-Forwarded-Proto": "https"}
+        for path in ("/", "/demo/health", "/robots.txt", "/console/", "/nothing", "/api/v1/games", "/player/"):
+            r = self.client.get(path, headers={**https, "Authorization": f"Bearer {READ}"})
+            self.assertIn("max-age=31536000", r.headers.get("strict-transport-security", ""), path)
+            self.assertNotIn("strict-transport-security", self.client.get(path).headers, path)
+        r = self.client.post("/api/v1/games", headers=https)
+        self.assertEqual(r.status_code, 405)
+        self.assertIn("strict-transport-security", r.headers)
+        self.assertNotIn("strict-transport-security",
+                         self.client.get("/", headers={"X-Forwarded-Proto": "http"}).headers)
+        self.assertNotIn("strict-transport-security", self.client.post("/api/v1/games").headers)
+
     def test_the_gm_token_is_never_accepted_and_never_forwarded(self) -> None:
         for token in (GM, "", "wrong", PLAYER):
             r = self.client.get("/api/v1/games", headers={"Authorization": f"Bearer {token}"} if token else {})
