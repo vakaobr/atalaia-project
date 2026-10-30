@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# What the release workflow's signing job installs (tools/firmware_release.py needs the
+# cryptography library). release-requirements.txt pins it and its dependency chain with PyPI
+# hashes; the job installs it with pip --require-hashes --no-deps --only-binary=:all:, so a
+# poisoned or hijacked package cannot reach the CI release key. To refresh, from the repository root:
+#   docker run --rm -v "$PWD/tools:/w" -w /w python:3.12.14-slim sh -c '
+#     pip install -q uv==0.9.30 &&
+#     uv pip compile --universal --python-version 3.12 --exclude-newer YYYY-MM-DD \
+#       --generate-hashes --no-header release-requirements.in -o release-requirements.txt'
+# then put the SPDX header back at the top of the .txt file.
+cryptography

@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Weekly update pull requests for what the workflows and the hash-pinned requirement files pin
+# (SC-4 to SC-6). The actions are pinned by commit SHA with a version comment, and Dependabot moves
+# both. Every update is a normal pull request: CI runs on it and a maintainer reads it, like any change.
+# The ESP-IDF image (pinned by digest in the workflows) and the Dockerfiles' base images are not
+# listed: their versions are chosen together with the firmware toolchain, by hand.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7 # the supply-chain habit of the pins: nothing newer than a week
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+  - package-ecosystem: pip
+    directory: /controller
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "controller"
+  - package-ecosystem: pip
+    directory: /server
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "server"
+  - package-ecosystem: pip
+    directory: /tools
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "release tooling"
+  - package-ecosystem: pub
+    directory: /app
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "app"

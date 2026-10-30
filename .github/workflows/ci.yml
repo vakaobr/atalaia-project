@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# Read-only by default (SC-3): no job here writes to the repository, makes a release or comments.
+# A job that ever needs more asks for it in its own permissions block.
+permissions:
+  contents: read
+
 jobs:
   core:
     name: Core and game modes
@@ -12,8 +17,10 @@ jobs:
     env:
       ATALAIA_REQUIRE_ALL: "1"
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Install system dependencies
@@ -43,7 +50,9 @@ jobs:
     env:
       ATALAIA_REQUIRE_ALL: "1"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -84,7 +93,9 @@ jobs:
     # host modem; a missing browser or tool fails the job.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Build the browser test image
         run: docker build -t atalaia-console-test tools/dev/console
       - name: Browser tests
@@ -100,7 +111,9 @@ jobs:
     # tests in the simulator (phase 5 plan phase A). A missing browser fails the job.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Build the browser test image
         run: docker build -t atalaia-console-test tools/dev/console
       - name: Browser tests
@@ -132,7 +145,9 @@ jobs:
     env:
       ATALAIA_DATABASE_URL: postgresql+asyncpg://atalaia:atalaia-test@localhost:5432/atalaia
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Build the test image
         run: docker build -f server/Dockerfile --target test -t atalaia-server-test .
       - name: Tests
@@ -153,7 +168,9 @@ jobs:
     # a missing browser fails the job.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Browser tests
         run: python3 tools/docker_server.py browser
 
@@ -166,7 +183,9 @@ jobs:
     # with every table compared.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Shell scripts (POSIX sh)
         run: sh -n server/setup.sh && sh -n server/backup.sh && sh -n server/restore.sh
       - name: Deployment test
@@ -183,7 +202,9 @@ jobs:
     # row-level security compared.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Shell scripts (POSIX sh)
         run: sh -n server/setup.sh && sh -n server/hosted-roles.sh && sh -n server/backup.sh && sh -n server/restore.sh
       - name: ShellCheck (koalaman/shellcheck v0.11.0, pinned by digest)
@@ -211,7 +232,9 @@ jobs:
     # tests and the phone controller's end-to-end tests drive them.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -242,7 +265,9 @@ jobs:
     # libm and libdl, and 16 KB pages on the 64-bit ABIs.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Cross-compile and check
         run: |
           docker run --rm -v "$PWD:/src:ro" -w /src             ghcr.io/cirruslabs/flutter:3.44.0@sha256:46691e311715845de03a3ba4753a475476936805b29431b1f00f1816981033f8             sh /src/app/tool/check.sh ndk
@@ -257,7 +282,9 @@ jobs:
     # The APK is run on an emulator by flutter-integration below.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Build and check the APK
         run: |
           docker run --rm -v "$PWD:/src:ro" -w /src \
@@ -282,7 +309,9 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: 3.44.0
@@ -312,7 +341,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Let the emulator use KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
@@ -354,8 +385,10 @@ jobs:
     name: Protocol schema and generated files
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Install tools
@@ -414,7 +447,9 @@ jobs:
     env:
       ATALAIA_REQUIRE_ALL: "1"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -445,8 +480,10 @@ jobs:
     env:
       ATALAIA_REQUIRE_ALL: "1"
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Install dependencies
@@ -481,8 +518,10 @@ jobs:
       ATALAIA_REQUIRE_ALL: "1"
       ATALAIA_REQUIRE_REGISTRY_TOOLS: "1"
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Install dependencies
@@ -507,7 +546,9 @@ jobs:
       STYLUA_VERSION: "2.6.0"
       STYLUA_SHA256: a485f72bbfa22e4642e77a84b5edc2611a5cab7477b34e2e709dd8f78e919895
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install the formatters (same versions as tools/dev/Dockerfile)
         run: |
           sudo apt-get update
@@ -524,8 +565,10 @@ jobs:
     name: Check licensing headers (REUSE)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Lint
@@ -537,10 +580,11 @@ jobs:
     name: ESP32 cross-compilation
     runs-on: ubuntu-latest
     container:
-      image: espressif/idf:v5.3.2
+      image: espressif/idf:v5.3.2@sha256:5b8f58d9d9caa45b689a31a0b6a0cc53b84594e0ba5fdd8d28eeef7d6123242a
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0 # the whole history and tags: the version counts commits since v<X.Y.Z> (FV-9)
       - name: Firmware version (tools/docker_fw.py's, with the commit; FV-9)
         run: |
@@ -572,10 +616,11 @@ jobs:
     name: ESP32 USB radio modem cross-compilation
     runs-on: ubuntu-latest
     container:
-      image: espressif/idf:v5.3.2
+      image: espressif/idf:v5.3.2@sha256:5b8f58d9d9caa45b689a31a0b6a0cc53b84594e0ba5fdd8d28eeef7d6123242a
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0 # the whole history and tags: the version counts commits since v<X.Y.Z> (FV-9)
       - name: Firmware version (tools/docker_fw.py's, with the commit; FV-9)
         run: |
@@ -602,10 +647,11 @@ jobs:
     name: ESP32 I/O pod cross-compilation
     runs-on: ubuntu-latest
     container:
-      image: espressif/idf:v5.3.2
+      image: espressif/idf:v5.3.2@sha256:5b8f58d9d9caa45b689a31a0b6a0cc53b84594e0ba5fdd8d28eeef7d6123242a
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0 # the whole history and tags: the version counts commits since v<X.Y.Z> (FV-9)
       - name: Firmware version (tools/docker_fw.py's, with the commit; FV-9)
         run: |
@@ -636,7 +682,9 @@ jobs:
     name: Firmware HAL stub tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Build and test
         run: |
           cmake -S firmware/esp32/test -B /tmp/fw-test \
@@ -653,8 +701,9 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Every commit has a Signed-off-by line
         env:
