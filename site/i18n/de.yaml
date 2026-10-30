@@ -576,7 +576,7 @@ screens:
     Emulator. Tippe oder klicke auf ein Bild, um es größer zu sehen.
   note: >-
     Das <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">Bauhandbuch</a>
-    (auf Englisch) enthält den vollständigen Schaltplan und die Anleitung zum ersten Flashen für den
+    (auf Englisch und Portugiesisch) enthält den vollständigen Schaltplan und die Anleitung zum ersten Flashen für den
     Heltec WiFi LoRa 32&nbsp;V4.
   pin_entry:
     alt: >-
@@ -691,7 +691,7 @@ try:
   then: >-
     Dann öffne <code>http://localhost:8000</code>. Du brauchst Python 3.10+ mit PyYAML. Die
     <a href="https://github.com/vakaobr/atalaia-project/blob/main/simulator/README.md">Anleitung zum
-    Simulator</a> (auf Englisch) hat alle Optionen.
+    Simulator</a> (auf Englisch und Portugiesisch) hat alle Optionen.
   board:
     title: Auf einem Board
     text: >-
@@ -713,7 +713,7 @@ try:
       Bau die Debug-APK der App mit Docker und installiere sie auf einem Handy mit Android 8.0 oder
       neuer oder im Android-Emulator, wie die
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">Anleitung
-      zur App</a> (auf Englisch) erklärt. Sie lief auf Emulatoren, noch nicht auf einem echten Handy.
+      zur App</a> (auf Englisch und Portugiesisch) erklärt. Sie lief auf Emulatoren, noch nicht auf einem echten Handy.
   manuals:
     title: Spielen und ausrichten
     text: >-
@@ -1209,7 +1209,7 @@ roadmap:
     next:
       - "Die Prüfung des Deutschen und des Chinesischen: Wenn du auf Deutsch oder Chinesisch
         spielst, hilf uns beim Prüfen. Übersetzungen in andere Sprachen beginnen in
-        docs/translations (auf Englisch)."
+        docs/translations (auf Englisch und Portugiesisch)."
       - "Die Hardware: die Träger-Platine (eine fertige Leiterplatte, die den Bau erleichtert) nach
         den ersten gebauten Boxen, Fotos echter Builds, Community-Inhalte von einem Feld."
     gate: Fortlaufend nach dem ersten Release.
@@ -1220,7 +1220,7 @@ build:
     Die Props von Atalaia werden aus handelsüblichen Teilen rund um ein ESP32-Board gebaut, ohne
     eigens gefertigte Leiterplatte. Hier stehen die Pins und Schaltpläne der Field Box sowie die Anleitungen für den Satelliten, den I/O-Pod und
     das Ziel-Addon, gekürzt; die vollständigen Anleitungen mit allen Prüfungen und den Tabellen zur
-    Fehlersuche liegen im Repository (auf Englisch).
+    Fehlersuche liegen im Repository (auf Englisch und Portugiesisch).
     Um die Firmware auf eine Platine zu bringen, <a href="https://github.com/vakaobr/atalaia-project/releases">lade eine fertige Version herunter</a> oder baue sie selbst: die <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">Firmware-Anleitung</a> (Englisch) erklärt beides. Der Feld-Controller hat eine eigene <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">Einrichtungsanleitung</a> (Englisch).
   status: >-
     <strong>Nach diesen Anleitungen wurde noch keine einzige Box gebaut.</strong> Ihre Pins werden
@@ -1309,7 +1309,7 @@ build:
       Das Haupt-Prop, mit Team-Tastern, Tastenfeld, Farbdisplay, LED-Ring, NFC-Leser und
       Lautsprecher. Ihre
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">Bauanleitung</a>
-      (auf Englisch) hat die Teile, die Schaltpläne, Stromversorgung und Akkusicherheit, das erste
+      (auf Englisch und Portugiesisch) hat die Teile, die Schaltpläne, Stromversorgung und Akkusicherheit, das erste
       Flashen und die Fehlersuche; die Anleitungen unten verweisen bei jedem gemeinsamen Schritt
       darauf.
     pins_shared: >-
@@ -1421,7 +1421,7 @@ build:
         <strong>Ein eigener Schaltplan</strong>: Vorerst zeigen die Schaltpläne der Field Box jedes
         Kabel, das ein Satellit hat.
     full: >-
-      Die vollständige Anleitung (auf Englisch):
+      Die vollständige Anleitung (auf Englisch und Portugiesisch):
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/satellite/BUILD.md">Bauanleitung
       des Satelliten</a>.
   pod:
@@ -1492,7 +1492,7 @@ build:
         <strong>Einstellungen vom Handy aus</strong>: Tasterfarben, LED-Zahl und der Rest werden
         vorerst beim Bauen der Firmware festgelegt.
     full: >-
-      Die vollständige Anleitung (auf Englisch):
+      Die vollständige Anleitung (auf Englisch und Portugiesisch):
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/io-pod/BUILD.md">Bauanleitung
       des I/O-Pods</a>, und die Prüfungen des Pods mit einem Handy in der
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/firmware/esp32/docs/BRING_UP.md">Inbetriebnahme-Liste</a>.
@@ -1560,7 +1560,7 @@ build:
         <strong>Die Energiegrenzen des Felds</strong> gelten beim Schießen auf Ziele wie auf Menschen.
     photo: das fertige Ziel, Platte und Sensor, und der Anschluss an einer Box.
     full: >-
-      Was entschieden ist, mit den Dokumenten hinter jeder Entscheidung (auf Englisch):
+      Was entschieden ist, mit den Dokumenten hinter jeder Entscheidung (auf Englisch und Portugiesisch):
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/target-addon/BUILD.md">Anleitung
       zum Ziel-Addon</a>.
 
@@ -1840,7 +1840,7 @@ involved:
   intro: "Atalaia wird von Spielenden, Feldbetreibenden und Bastelnden gebaut. Du kannst heute schon helfen:"
   review: >-
     die <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/design-spec.md">Design-Spezifikation</a>
-    (auf Englisch) prüfen und <a href="https://github.com/vakaobr/atalaia-project/issues">Issues
+    (auf Englisch und Portugiesisch) prüfen und <a href="https://github.com/vakaobr/atalaia-project/issues">Issues
     eröffnen</a>;
   propose: >-
     Spielmodi mit der
@@ -1850,7 +1850,7 @@ involved:
   code: >-
     Code schreiben: Fang mit
     <a href="https://github.com/vakaobr/atalaia-project/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>
-    (auf Englisch) an.
+    (auf Englisch und Portugiesisch) an.
   rules: >-
     Jeder Commit trägt eine Zeile <code>Signed-off-by</code>, und das Projekt ist strikt Clean-Room,
     von Grund auf neu geschrieben: kein Code, keine Firmware, keine Handbücher, Töne oder Bilder aus
@@ -1889,6 +1889,10 @@ footer:
   independent: >-
     Unabhängig und von der Community getragen; mit keinem kommerziellen Prop-Hersteller verbunden.
     Diese Seite setzt keine Cookies und lädt nichts von anderen Seiten.
+  privacy: Datenschutzerklärung (Entwurf)
+  privacy_note: >-
+    Die Erklärung, die ein Site-Server seinen Spielenden zeigt; dieser Text ist ein Entwurf als Vorlage für Betreibende, noch nicht von einer juristischen Fachperson geprüft (auf Englisch und Portugiesisch).
+  privacy_href: https://github.com/vakaobr/atalaia-project/tree/main/docs/templates
 
 # The two radio diagrams: site/src/diagrams/*.svg, built into site/img/diagrams/.
 # Plain text, not HTML. Each text has a fixed room in the drawing; if a

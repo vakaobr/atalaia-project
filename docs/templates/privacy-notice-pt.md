@@ -343,6 +343,18 @@ Não vendemos os teus dados, não os usamos para publicidade nem para criar
 perfis, nem tomamos decisões sobre ti por meios automáticos. Os servidores
 do próprio projeto não recebem os teus dados.
 
+### 2.11 Os registos do anfitrião [RASCUNHO: a aguardar jurista]
+
+O computador que corre o servidor (o do campo, o de um clube ou uma empresa de alojamento e, num hub alojado, quem o
+opera) costuma guardar **registos próprios fora da base de dados do Atalaia**: o servidor web ou proxy (Caddy) e o
+motor de contentores registam a hora, o teu endereço de rede, a página ou o caminho da API, o código de resposta e o
+nome do navegador ou da app de cada pedido. Servem para pôr o serviço a funcionar e protegê-lo. **O apagamento e os
+prazos do Atalaia não lhes chegam**; durante quanto tempo se guardam, e quem os pode ler, é escolha do anfitrião. A
+configuração Docker do projeto roda-os por tamanho (cinco ficheiros de 10 MB), por isso duram dias ou semanas num
+servidor sossegado. [ANFITRIÃO: indicar aqui o prazo real e quem tem acesso. ADVOGADO: fundamento (art. 6.º, n.º 1,
+al. f), segurança), se o anfitrião é subcontratante do campo (acordo de subcontratação) e como um pedido de
+apagamento deve tratar estes registos.]
+
 ## 3. Quem vê os teus dados (destinatários)
 
 - **A equipa do campo**: administração, organização e marshals, conforme
@@ -459,7 +471,10 @@ DO CAMPO]** é um que o campo pode alterar; os outros estão fixos no código.
 | --- | --- | --- |
 | Conta (nome de utilizador, email, métodos de início de sessão, papéis, consentimentos) | servidor | Até apagares a conta |
 | Sessões | servidor | 30 dias depois de terminarem ou caducarem; um início de sessão nunca concluído: 10 minutos |
-| Registo de segurança | servidor | 36 meses. Apagar a conta tira-lhe os endereços |
+| Registo de segurança | servidor | 36 meses; o **endereço de rede** de cada entrada só **180 dias** (quem gere o servidor pode definir 90 a 365), depois a entrada fica sem ele. Apagar a conta tira-lhe logo os teus endereços |
+| Uma conta que ninguém usa há **24 meses** (sem início de sessão, chave de acesso ou login social, sem sessão, sem inscrição em jogo futuro; contas com papel num campo e administradores do servidor ficam de fora) | servidor | Um aviso na página da conta quando voltares, e 30 dias depois a conta é anonimizada (como se a tivesses apagado). O servidor não envia email, por isso **o aviso só chega se iniciares sessão**; quem gere o servidor pode desligar isto ou mudar os prazos |
+| Uma nota que diz aos controladores de um campo para largarem as cópias de registos de cronógrafo de outros campos que obtiveram sobre ti (depois de apagares a conta ou retirares o consentimento de partilha de um campo). Só tem o teu identificador de jogador nesse campo | servidor | O prazo de conservação do campo (365 dias por defeito) |
+| Os registos do próprio anfitrião (ver 2.11) | anfitrião | **[ESCOLHA DO ANFITRIÃO]** |
 | O que resta de uma conta apagada (uma linha vazia com um nome aleatório `deleted-...`: sem nome, email, palavra-passe nem papéis) | servidor | Até ser apagada a última entrada do registo de segurança que a refere, no máximo 36 meses depois de usares a conta; depois a própria linha é apagada |
 | Dados de inscrição de quem não tem conta (convidados importados) | servidor | 30 dias depois do jogo |
 | O número de associado de uma inscrição | servidor | Apagado quando o check-in é confirmado; no máximo 30 dias depois do jogo |

@@ -1799,6 +1799,10 @@ footer:
   independent: >-
     Independent and community-run; not affiliated with any commercial prop maker. This page sets no
     cookies and loads nothing from other sites.
+  privacy: Privacy notice (draft)
+  privacy_note: >-
+    The notice a site server shows its players; this text is a draft template for operators, not yet reviewed by a lawyer.
+  privacy_href: https://github.com/vakaobr/atalaia-project/tree/main/docs/templates
 
 # The two radio diagrams: site/src/diagrams/*.svg, built into site/img/diagrams/.
 # Plain text, not HTML. Each text has a fixed room in the drawing; if a

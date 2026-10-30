@@ -334,6 +334,17 @@ We do not sell your data, use it for advertising or profiling, or make
 decisions about you by automated means. The project's own servers do not
 receive your data.
 
+### 2.11 The host's logs [DRAFT: pending a lawyer]
+
+The computer that runs the site server (the field's own, a club's, or a hosting company, and on a hosted hub the hub
+operator) normally keeps **its own logs outside Atalaia's database**: the web server or reverse proxy (Caddy) and the
+container runtime record the time, your network address, the page or API path, the answer code and the browser or app
+name of each request. They exist to run and protect the service. **Atalaia's erasure and its retention periods do not
+reach them**; how long they are kept, and who can read them, is the host's choice. The Docker setup the project ships
+rotates them by size (five files of 10 MB), so they last days or weeks on a quiet server. [HOST: state here the real
+period and the people with access. LAWYER: basis (Art. 6(1)(f), security), whether the host is a processor of the field
+(a data processing agreement) and how an erasure request should treat these logs.]
+
 ## 3. Who sees your data (recipients)
 
 - **The field's staff**: administrators, game masters and marshals, as the
@@ -443,7 +454,10 @@ CHOICE]** is one the field can change; the others are fixed in the code.
 | --- | --- | --- |
 | Account (username, email, login methods, roles, consents) | site server | Until you erase your account |
 | Login sessions | site server | 30 days after they end or expire; a login that was never finished: 10 minutes |
-| Security log | site server | 36 months. Erasing your account removes the addresses from it |
+| Security log | site server | 36 months; the **network address** in each entry only **180 days** (the operator can set 90 to 365), after which the entry stays without it. Erasing your account removes your addresses from it at once |
+| An account nobody has used for **24 months** (no login, no passkey or social login, no session, no game registration to come; accounts with a role at a field and server administrators are left out) | site server | A warning on the account page when you come back, then anonymised 30 days later (as if you had erased it). The server cannot send e-mail, so **the warning reaches you only if you log in**; the operator can switch this off or change the periods |
+| A note that tells a field's controllers to drop the copies of other fields' chrono records they pulled for you (after you erased your account or withdrew a field's sharing consent). It holds only your player identifier at that field | site server | The field's chrono retention period (365 days by default) |
+| The host's own logs (see 2.11) | the host | **[HOST CHOICE]** |
 | What is left of an erased account (an empty row under a random `deleted-...` name: no name, email, password or roles) | site server | Until the last security log entry that names it is deleted, at most 36 months after you used the account; then the row itself is deleted |
 | Registration data of people without an account (imported guests) | site server | 30 days after the game |
 | A registration's membership number | site server | Erased when the check-in is confirmed; at the latest 30 days after the game |
