@@ -664,12 +664,12 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(len(self.db.fetch("SELECT 1 FROM oidc_logins")), 2)
         self.db.fetch("DELETE FROM oidc_logins")
 
-    def test_0031_with_data(self) -> None:
-        """0031_account_notice_records: every ``account`` consent (live, replaced, or from before 0003) becomes a
+    def test_0029_with_data(self) -> None:
+        """0029_account_notice_records: every ``account`` consent (live, replaced, or from before 0003) becomes a
         ``migrated`` notice record with the same version and time, the real consents stay, the account consents go,
         ``oidc_logins`` is renamed and gets the age box, and back down the account consents come back (the newest
         live, the older ones ended when the next began)."""
-        command.upgrade(self.cfg, "0026_oidc_app_challenge")
+        command.upgrade(self.cfg, "0028_privacy_retention")
         self.db.fetch("INSERT INTO users (username, password_hash, gdpr_consent_at) VALUES "
                       "('rita', 'x', '2026-10-20T10:00:00Z'), ('joana', 'x', '2026-10-01T10:00:00Z')")
         rita, joana = (self.db.fetch("SELECT id FROM users WHERE username = $1", n)[0][0] for n in ("rita", "joana"))
@@ -685,7 +685,7 @@ class MigrationTests(unittest.TestCase):
         self.db.fetch("INSERT INTO oidc_logins (state_hash, binding_hash, provider, purpose, nonce, code_verifier, "
                       "redirect_uri, return_to, consent, expires_at) VALUES ('s', 'b', 'google', 'login', 'n', 'v', "
                       "'r', '/', true, now() + interval '10 minutes')")
-        command.upgrade(self.cfg, "0031_account_notice_records")
+        command.upgrade(self.cfg, "0029_account_notice_records")
         rows = self.db.fetch("SELECT u.username, n.notice_version, n.kind, n.age_confirmed, "
                              "to_char(n.recorded_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day FROM notice_records n "
                              "JOIN users u ON u.id = n.user_id ORDER BY u.username, n.recorded_at")
@@ -699,7 +699,7 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual((login[0], login[1]), (True, False))
         with self.assertRaisesRegex(Exception, "ck_notice_records_kind"):
             self.db.fetch("INSERT INTO notice_records (user_id, notice_version, kind) VALUES ($1, 'v', 'consent')", rita)
-        command.downgrade(self.cfg, "0026_oidc_app_challenge")
+        command.downgrade(self.cfg, "0028_privacy_retention")
         rows = self.db.fetch("SELECT u.username, c.notice_version, c.withdrawn_at IS NULL AS live FROM consents c "
                              "JOIN users u ON u.id = c.user_id WHERE c.purpose = 'account' "
                              "ORDER BY u.username, c.given_at")

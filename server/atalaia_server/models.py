@@ -312,7 +312,7 @@ class AuditLog(Base):
 class Consent(Base):
     """A consent given (ADR-P4-8, plan phase 12): its purpose, the version of the privacy notice
     the person was shown, when, and when it was withdrawn. At most one live consent per purpose.
-    This table is the record that shows what was consented to (GDPR Art. 7(1)). Since 0031 it holds
+    This table is the record that shows what was consented to (GDPR Art. 7(1)). Since 0029 it holds
     only real consents, each withdrawable on its own: ``chrono_sharing`` (plan phase 14) with the
     field whose chrono records the person lets other sharing fields see (``field_id``; one live
     consent per field). The account is not one: it rests on the contract (Art. 6(1)(b)) and what
@@ -345,7 +345,7 @@ class NoticeRecord(Base):
     nothing here can be withdrawn and nothing depends on it. One row is added each time: ``signup`` (the notice
     shown when the account was made, with ``age_confirmed``: the person confirmed being 16 or older; there is no
     date of birth), ``shown_again`` (a newer version shown to the account later and acknowledged) and ``migrated``
-    (a row 0031 made from an old ``account`` consent: same version and time, no age confirmation, since accounts
+    (a row 0029 made from an old ``account`` consent: same version and time, no age confirmation, since accounts
     of that time were never asked). The newest row says which version the account has seen."""
 
     __tablename__ = "notice_records"

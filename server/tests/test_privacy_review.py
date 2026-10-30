@@ -466,7 +466,7 @@ class NoNoticeSignupTests(PersonalDataTestCase):
 
     async def test_registering_is_refused_and_a_login_still_works(self) -> None:
         r = await self.client.post("/api/v1/auth/register", json={"username": "novo", "password": PASSWORD,
-                                                                  "consent": True})
+                                                                  "notice_seen": True, "age_confirmed": True})
         self.assertEqual((r.status_code, r.json()["detail"]), (409, "privacy_notice_unpublished"))
         self.assertEqual(await self.fetch("SELECT 1 FROM users WHERE username = 'novo'"), [])
         _, name, _ = await self.make_user()
@@ -479,13 +479,13 @@ class NoNoticeSignupTests(PersonalDataTestCase):
                 handle.write("# Notice\n")
             self.app.state.settings = dataclasses.replace(self.app.state.settings, privacy_notice_dir=folder)
             r = await self.client.post("/api/v1/auth/register", json={"username": "novo", "password": PASSWORD,
-                                                                      "consent": True})
+                                                                      "notice_seen": True, "age_confirmed": True})
             self.assertEqual(r.status_code, 201, r.text)
 
     async def test_the_setting_allows_it(self) -> None:
         self.app.state.settings = dataclasses.replace(self.app.state.settings, allow_signup_without_notice=True)
         r = await self.client.post("/api/v1/auth/register", json={"username": "novo", "password": PASSWORD,
-                                                                  "consent": True})
+                                                                  "notice_seen": True, "age_confirmed": True})
         self.assertEqual(r.status_code, 201, r.text)
 
     def test_the_default_is_off(self) -> None:

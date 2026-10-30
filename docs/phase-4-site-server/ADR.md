@@ -2350,7 +2350,7 @@ site server, see the 2026-10-19 amendment) and "use my Google/Microsoft name"
 (a round run only when the button is pressed, whose result is kept nowhere).
 `users.gdpr_consent_at` keeps its name and becomes "the time the privacy
 notice was last shown". The `account` consent becomes a **notice record**
-(`notice_records`, migration 0031): which version of the notice was shown at
+(`notice_records`, migration 0029): which version of the notice was shown at
 sign-up, and later each time it was shown again (information under Art. 13;
 the account then acknowledges it, nothing is withdrawn and nothing is
 blocked); erasure stays one action, `DELETE /api/v1/me`. **Minors:** an
