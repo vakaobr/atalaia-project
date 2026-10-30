@@ -22,8 +22,8 @@
       "phase_c": "complete",
       "phase_d": "complete",
       "phase_e": "complete",
-      "phase_f": "pending"
+      "phase_f": "pending (hardware-blocked: needs the boards)"
     },
-    "resume_at": "mode_pack_then_phase_f"
+    "resume_at": "phase_f (hardware-blocked: needs the boards; the mode pack is built)"
   }
 }

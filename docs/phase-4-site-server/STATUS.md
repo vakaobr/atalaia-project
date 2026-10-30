@@ -371,7 +371,7 @@ only to a staff TCP receiver and never on UDP, and not at all with
 member on the loopback; the API, the stream and the configuration; the
 socket closed on stop. The console: `test_field_georeference_two_corners`
 (Chromium). Not run: a real ATAK device on the field Wi-Fi (HW3), the
-remote relay through the site server (not built, M9-10). Decisions M9-1
+remote relay through the site server (built later as FU5, see the follow-up "the remote ATAK relay"). Decisions M9-1
 to M9-10 (open).
 
 ## Plan phase 10: site server skeleton (built 2026-10-19, in software)
@@ -469,9 +469,10 @@ current version's files at `/privacy` and `GET /api/v1/privacy-notice`
 consent is for the current version (`consent.status`), `POST
 /api/v1/me/consents/account` consents again, and the staff pages prompt for it
 after login. Re-consent is not enforced (the API does not refuse other calls
-meanwhile). `users.data_retention_days` was dropped (migration 0020). Not done:
-the app's own screens for the notice and for consenting again; the social
-login's sign-up (`oidc/.../start`) does not yet take a `notice_version`.
+meanwhile). `users.data_retention_days` was dropped (migration 0020). Built
+since: the app's own screens for the notice and for consenting again
+(`app/lib/site/privacy_screens.dart`, `privacy_notice.dart`) and the social
+login's sign-up (`oidc/.../start` takes `notice_version`, `api/login_methods.py`).
 
 ## Plan phase 13: controller sync (built 2026-10-20, in software)
 
@@ -636,8 +637,9 @@ a chrono pass, the outcomes); 296 controller tests (18 new:
 `test_sync_schedule.py`, 11; `test_checkin_ticket.py`, 6; the answer vectors);
 the console's browser tests (1 new: a game from the schedule, expected players,
 *Arrived*, a scanned ticket, the counts); the Dart ticket tests against the
-same vectors. Not yet: the app's screens for logging in, registering and
-sending the ticket; a real game day (HW1); `[sync] push_walkins`; the
+same vectors. Built since: the app's screens for logging in and the account
+(`app/lib/site/site_auth.dart`, `account_screen.dart`, `site_screens.dart`).
+Not yet: a real game day (HW1); `[sync] push_walkins`; the
 registration import (17). Decisions S16-1 to S16-14, all open; S16-4 (claims
 confirmed by the controller), S16-6 (the field's limit template set on both
 sides) and S16-9 (no registration form on the public pages) want the
@@ -796,9 +798,10 @@ controller's refusals and timeouts; a revoked key; the live view; the audit log)
 `test_remote_gm_e2e.py` (a GM runs the real controller's game over a real socket
 under uvicorn), the migration's data test, and the controller's
 `test_remote_gm.py` (its checks, its log, the live view, the stream against a
-raw-socket server, RFC 6455's own examples). Not built: the remote ATAK relay that
-M9-10 had deferred here (it needs an authenticated endpoint, S19-10), positions in
-the remote view, a GM page on the site server and the console's screen for the log.
+raw-socket server, RFC 6455's own examples). Built later: the remote ATAK relay that
+M9-10 had deferred here (FU5, `atak_relay.py`), positions in the remote view
+(PKD-5) and a GM page on the site server (FU9, S19-11). Not built: the console's
+screen for the log.
 Not yet: a real deployment, over 4G (HW1). Decisions S19-1 to S19-11, all open.
 
 ## Follow-up: device health events (2026-10-21, in software)
@@ -847,8 +850,8 @@ next revision), the migration's data test, and the controller's
 game after one sync, fetch only on change, a refused manifest, a live game
 keeping its scenario, presets waiting for their mode, off, an older site
 server, a corrupt answer); the shared vectors gain 3 valid and 9 invalid
-answers. Not yet: a real deployment, a console or web page for the history
-and the library. Decisions S20-1 to S20-8, all open.
+answers. Not yet: a real deployment, a console page for the history
+and the library (the staff web pages `history` and `scenarios` exist since FU2). Decisions S20-1 to S20-8, all open.
 
 ## Plan phase 21: hosted multi-tenant mode (built 2026-10-20, in software)
 
@@ -1014,7 +1017,8 @@ Closes S21-13 (the coordinator's review note that the row-level security keys on
 | Phase 2 A-E and mode pack | Done in software | None |
 | Phase 2 F (hardware, field test) | Pending, needs the boards | HW1, HW4 |
 | Phase 3 A-F, the Medic Kit, branding | Done in software | Old plan phase F's dependencies are met; plan phases 4, 5, 8, 16, 18 build on them |
-| Phase 3 PE24 (Android controller shell), iOS | Not built | None for phase 4's software |
+| Phase 3 PE24 (Android controller shell) | Done in software (slices S1-S7) | None for phase 4's software |
+| Phase 3 iOS | Not built | None for phase 4's software |
 | Phase 3 G (field test with phones and pods) | Pending, needs the hardware | HW3, HW4 |
 | Target addon (hardware/target-addon) | Design phase | HW2 |
 | Wokwi CI quota (decision R7) | Used up | Firmware changes verified with host tests and ESP-IDF builds only |

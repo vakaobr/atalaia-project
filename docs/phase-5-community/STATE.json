@@ -20,7 +20,7 @@
     "stop_after": null,
     "resume_with": "--implement",
     "refreshed_at": "2026-10-22",
-    "next_plan_phase": "none in software: the reviews of German and Traditional Chinese; the contract cases for the mode-package endpoints; 13 on real boxes in HW3; the build guides' first builds and photos in HW2",
+    "next_plan_phase": "none in software: the reviews of German and Traditional Chinese; 13 on real boxes in HW3; the build guides' first builds and photos in HW2",
     "completed_plan_phases": [
       "1",
       "2",
@@ -55,8 +55,6 @@
       "P5J-1 to P5J-14 (plan phase 12, open; P5J-2, P5J-4, P5J-7, P5J-8, P5J-9 and P5J-11 for the maintainer: the Satellite as the Field Box's firmware, no piezo buzzer, no pod siren, a phone charging the pod, the target addon's open questions, the page's words; P5J-9 answered 2026-10-23: fix in 3.3 V)",
       "P5J-15 to P5J-21 (2026-10-23, open: the target addon's M12 port 3.3 V only, 25 mA behind a resettable fuse, the window on the box's ring, I2C at 100 kHz over 2 m with no pull-ups in the addon, polled every 20 ms with no interrupt line and no pin change, a draft report format and a polling driver stub with host tests, pins 1-4 3.3 V/SDA/GND/SCL and pin 5 free)"
     ],
-    "planned_plan_phases": [
-      "13b (the box's side of missing modes, in parallel with 13a)"
-    ]
+    "planned_plan_phases": []
   }
 }
