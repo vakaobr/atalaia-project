@@ -34,6 +34,13 @@ precedence = "closest"
 SPDX-FileCopyrightText = "2026 The Atalaia contributors"
 SPDX-License-Identifier = "CC-BY-SA-4.0"
 
+# The preview server's privacy notice: served as Markdown, so no header comment in the files.
+[[annotations]]
+path = "server/preview/privacy-notice/**"
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 The Atalaia contributors"
+SPDX-License-Identifier = "CC-BY-SA-4.0"
+
 # Vendored Lua 5.4 keeps its own MIT licence (see the notice in lua.h).
 [[annotations]]
 path = "core/third_party/lua/**"
