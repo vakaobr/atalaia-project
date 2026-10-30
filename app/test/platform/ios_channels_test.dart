@@ -3,7 +3,8 @@
 
 // The Dart sides of the platform channels that have a Swift twin on iOS
 // (ios/Runner/QrScanPlugin.swift, LinkPlugin.swift, LocationPlugin.swift,
-// decisions iOS-13 to iOS-15): the contract both platforms keep (method
+// BrowserPlugin.swift, PasskeyPlugin.swift, decisions iOS-13 to iOS-15, IOSL-1
+// to IOSL-9): the contract both platforms keep (method
 // names, arguments, results, errors), as the Swift code answers it, and what
 // the app does when a channel is missing (the simulator has no camera; a
 // phone without the plugin answers MissingPluginException). The Swift is
@@ -16,8 +17,10 @@ import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/platform/channels.dart';
 import 'package:atalaia_app/platform/links.dart';
 import 'package:atalaia_app/platform/location.dart';
+import 'package:atalaia_app/platform/services.dart';
 import 'package:atalaia_app/player/field_feed.dart';
 import 'package:atalaia_app/player/player_screens.dart';
+import 'package:atalaia_app/site/site_auth.dart';
 import 'package:atalaia_app/storage/app_store.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -148,6 +151,99 @@ void main() {
 
     test('without the plugin: no initial link', () async {
       expect(await ChannelAppLinks().initial(), isNull);
+    });
+  });
+
+  group('site login channels (BrowserPlugin.swift, PasskeyPlugin.swift)', () {
+    test(
+      'the browser opens an https address and says whether it did',
+      () async {
+        final calls = mockMethods('org.atalaia.app/browser', (call) async {
+          return call.method == 'open' ? true : throw MissingPluginException();
+        });
+        final browser = ChannelAuthBrowser();
+        expect(await browser.open(Uri.parse('https://club.example/x')), isTrue);
+        expect(calls.log.single.arguments, {'url': 'https://club.example/x'});
+        // Dart never sends anything but https: the Swift side would say false.
+        expect(await browser.open(Uri.parse('http://club.example/x')), isFalse);
+        expect(calls.log, hasLength(1));
+      },
+    );
+
+    test('before iOS 17.4 the browser answers false: not available', () async {
+      mockMethods('org.atalaia.app/browser', (call) async => false);
+      expect(
+        await ChannelAuthBrowser().open(Uri.parse('https://club.example/x')),
+        isFalse,
+      );
+    });
+
+    test('without the plugin: the browser is not available', () async {
+      expect(
+        await ChannelAuthBrowser().open(Uri.parse('https://club.example/x')),
+        isFalse,
+      );
+    });
+
+    test(
+      'the callback the browser session ends on is read as a social login return',
+      () {
+        // What BrowserPlugin hands to LinkPlugin.deliver, which sends it as "link".
+        final back = OidcReturn.parse(
+          'https://club.example/app/oidc?s=AAAAAAAAAAAAAAAAAAAA#oidc=ticket123',
+        );
+        expect(back, isNotNull);
+        expect(back!.site, Uri.parse('https://club.example'));
+        expect(back.nonce, 'AAAAAAAAAAAAAAAAAAAA');
+        expect(back.ticket, 'ticket123');
+      },
+    );
+
+    test('passkeys: available, create and get pass the request JSON', () async {
+      final calls = mockMethods('org.atalaia.app/passkeys', (call) async {
+        return switch (call.method) {
+          'available' => true,
+          'create' => '{"id":"a","rawId":"a","type":"public-key"}',
+          'get' => '{"id":"b","rawId":"b","type":"public-key"}',
+          _ => throw MissingPluginException(),
+        };
+      });
+      final passkeys = ChannelPasskeyService();
+      expect(await passkeys.available(), isTrue);
+      expect(await passkeys.create('{"challenge":"c"}'), contains('"a"'));
+      expect(await passkeys.get('{"challenge":"d"}'), contains('"b"'));
+      expect(calls.log[1].arguments, {'request': '{"challenge":"c"}'});
+      expect(calls.log[2].arguments, {'request': '{"challenge":"d"}'});
+    });
+
+    test('passkeys: the Swift error codes become the reasons', () async {
+      for (final code in ['cancelled', 'unsupported', 'failed']) {
+        mockMethods(
+          'org.atalaia.app/passkeys',
+          (call) async => throw PlatformException(code: code),
+        );
+        await expectLater(
+          ChannelPasskeyService().get('{}'),
+          throwsA(
+            isA<PasskeyException>().having((e) => e.reason, 'reason', code),
+          ),
+        );
+      }
+    });
+
+    test('passkeys without the plugin are unsupported', () async {
+      final passkeys = ChannelPasskeyService();
+      expect(await passkeys.available(), isFalse);
+      await expectLater(
+        passkeys.create('{}'),
+        throwsA(
+          isA<PasskeyException>().having(
+            (e) => e.reason,
+            'reason',
+            'unsupported',
+          ),
+        ),
+      );
     });
   });
 

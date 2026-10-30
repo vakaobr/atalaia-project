@@ -275,7 +275,7 @@ is a 404 and the app logs in with the password only. The app also needs the **ho
 reads App Links from there at install: the project's build is made with `-Patalaia.appLinkHost=DOMAIN` for the
 site it serves (or `*.hub.example.pt` for a hosted hub), so a club with its own site server builds the app with its own
 host, or keeps the password login in the app. For an iOS app, `ATALAIA_APP_IOS_APP_IDS` (`TEAMID.bundle.id`, commas)
-does the same for `/.well-known/apple-app-site-association`; the iOS app does not use it yet. Check with
+does the same for `/.well-known/apple-app-site-association` (the iOS app's passkeys and social login, which also need the host in the app's associated domains: `app/docs/ios-on-a-mac.md`, "Site login on iOS"). Check with
 `curl https://DOMAIN/.well-known/assetlinks.json`.
 
 **Switching passwords off** (`ATALAIA_PASSWORD_LOGIN=off`): password login and password registration answer 403;

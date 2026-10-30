@@ -21,6 +21,8 @@
 		A7A100D2A7A100D2A7A100D2 /* LinkPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A100C2A7A100C2A7A100C2 /* LinkPlugin.swift */; };
 		A7A100D3A7A100D3A7A100D3 /* LocationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A100C3A7A100C3A7A100C3 /* LocationPlugin.swift */; };
 		A7A100D4A7A100D4A7A100D4 /* BeaconScanPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A100C4A7A100C4A7A100C4 /* BeaconScanPlugin.swift */; };
+		A7A100D5A7A100D5A7A100D5 /* BrowserPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A100C5A7A100C5A7A100C5 /* BrowserPlugin.swift */; };
+		A7A100D6A7A100D6A7A100D6 /* PasskeyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A100C6A7A100C6A7A100C6 /* PasskeyPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,6 +74,9 @@
 		A7A100C2A7A100C2A7A100C2 /* LinkPlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LinkPlugin.swift; sourceTree = "<group>"; };
 		A7A100C3A7A100C3A7A100C3 /* LocationPlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LocationPlugin.swift; sourceTree = "<group>"; };
 		A7A100C4A7A100C4A7A100C4 /* BeaconScanPlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BeaconScanPlugin.swift; sourceTree = "<group>"; };
+		A7A100C5A7A100C5A7A100C5 /* BrowserPlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BrowserPlugin.swift; sourceTree = "<group>"; };
+		A7A100C6A7A100C6A7A100C6 /* PasskeyPlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PasskeyPlugin.swift; sourceTree = "<group>"; };
+		A7A100C7A7A100C7A7A100C7 /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -139,6 +144,9 @@
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
 				A7A100C3A7A100C3A7A100C3 /* LocationPlugin.swift */,
 				A7A100C4A7A100C4A7A100C4 /* BeaconScanPlugin.swift */,
+				A7A100C5A7A100C5A7A100C5 /* BrowserPlugin.swift */,
+				A7A100C6A7A100C6A7A100C6 /* PasskeyPlugin.swift */,
+				A7A100C7A7A100C7A7A100C7 /* Runner.entitlements */,
 				A7A100C2A7A100C2A7A100C2 /* LinkPlugin.swift */,
 				A7A100C1A7A100C1A7A100C1 /* QrScanPlugin.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
@@ -308,6 +316,8 @@
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
 				A7A100D3A7A100D3A7A100D3 /* LocationPlugin.swift in Sources */,
 				A7A100D4A7A100D4A7A100D4 /* BeaconScanPlugin.swift in Sources */,
+				A7A100D5A7A100D5A7A100D5 /* BrowserPlugin.swift in Sources */,
+				A7A100D6A7A100D6A7A100D6 /* PasskeyPlugin.swift in Sources */,
 				A7A100D2A7A100D2A7A100D2 /* LinkPlugin.swift in Sources */,
 				A7A100D1A7A100D1A7A100D1 /* QrScanPlugin.swift in Sources */,
 			);
@@ -414,6 +424,9 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				ATALAIA_ENTITLEMENTS = "";
+				ATALAIA_SITE_HOST = site.example;
+				CODE_SIGN_ENTITLEMENTS = "$(ATALAIA_ENTITLEMENTS)";
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -593,6 +606,9 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				ATALAIA_ENTITLEMENTS = "";
+				ATALAIA_SITE_HOST = site.example;
+				CODE_SIGN_ENTITLEMENTS = "$(ATALAIA_ENTITLEMENTS)";
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -615,6 +631,9 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				ATALAIA_ENTITLEMENTS = "";
+				ATALAIA_SITE_HOST = site.example;
+				CODE_SIGN_ENTITLEMENTS = "$(ATALAIA_ENTITLEMENTS)";
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
