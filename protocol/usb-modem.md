@@ -1,6 +1,6 @@
 # USB radio modem framing
 
-The field controller (a Raspberry Pi) has no radio of its own. A second Heltec WiFi LoRa 32 V4.3 is plugged into it over USB and runs the **modem firmware**, a build variant of the box firmware (ADR-P2-4, ADR-P2-5). The modem does the radio work: SX1262, AES-128-CCM, dedupe and duty cycle. The controller sends and receives *plaintext* Skirmesh-RF payloads over the serial link. This file is the link's specification, version 1 (`"framing": 1` in IDENT).
+The field controller (a Raspberry Pi) has no radio of its own. A second Heltec WiFi LoRa 32 V4.3 is plugged into it over USB and runs the **modem firmware**, a build variant of the box firmware (ADR-P2-4, ADR-P2-5). The modem does the radio work: SX1262, AES-128-CCM, the replay window and duty cycle. The controller sends and receives *plaintext* Skirmesh-RF payloads over the serial link. This file is the link's specification, version 1 (`"framing": 1` in IDENT).
 
 Implementations: `firmware/esp32/main/modem/modem_framing.c` and `modem.c` (the modem), `controller/atalaia_controller/modem_framing.py` and `radio_modem.py` (the controller). The controller's tests run against the modem's C code on Linux (`firmware/esp32/test/modem_host/`).
 
@@ -61,7 +61,7 @@ Between games, boxes and controllers exchange **field frames** ([field-frames.md
 
 ## RX
 
-The modem forwards a packet only if it belongs to the configured game, carries the encrypted bit, is not its own packet relayed back, authenticates, and has not been forwarded in the last 30 seconds (dedupe on source, epoch and seq: flood copies arrive several times). The modem never relays: the controller does not rebroadcast (ADR-P2-6).
+The modem forwards a packet only if it belongs to the configured game, carries the encrypted bit, is not its own packet relayed back, authenticates, and passes the source's **replay window** (RFC 0001 Amendment 23): the highest `epoch << 16 | seq` of the source and a bitmap of the 64 before it. A counter already seen (flood copies arrive several times) is dropped, and so is one 64 or more below the highest, which is a recording played back, however long after (a 30-second table used to let one through). Both count as `rx_dupes` in STATUS and the radio report. The window is checked after the packet authenticates and is kept per source (up to 64 sources, then the oldest is forgotten); CONFIGURE for another game, or CLEAR, forgets every window. The modem never relays: the controller does not rebroadcast (ADR-P2-6).
 
 To authenticate, the modem tries the source's last known epoch and then up to `epoch_window` epochs above it (16 by default, `CONFIG_ATALAIA_MODEM_EPOCH_WINDOW`), or epochs 0 to `epoch_window` for a source it has not heard yet; a HELLO or a TIME up to 256 above (RFC 0001 Amendment 9: a box back from a crash loop says HELLO first); never a lower epoch, so replays stay rejected. ADR-P2-2 tries only one epoch above, which never recovers a box that rebooted twice out of range (decision D4). The controller can also tell the modem a box's epoch with SET_PEER_EPOCH; it does so after every reconnect, from the epochs it has seen.
 

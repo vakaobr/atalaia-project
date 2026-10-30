@@ -285,6 +285,19 @@ bool atalaia_radio_proto_boot_epoch(atalaia_radio_proto_t *rp, bool resuming)
         return false;
     }
     uint16_t new_epoch = at >= 0 ? (uint16_t)(st.epoch[at] + 1) : 1;
+    rp->epoch_lost = false;
+    if (at < 0 && resuming) {
+        /* A stored game with no record of its key: the store was lost (FLD-10, SR-27). */
+        uint8_t r[2];
+        if (rp->nvs->random_bytes == NULL || rp->nvs->random_bytes(rp->nvs->ctx, r, 2) != 0) {
+            rp->tx_blocked = true;
+            return false;
+        }
+        new_epoch = (uint16_t)(ATALAIA_EPOCH_LOST_MIN +
+                               ((uint32_t)(r[0] << 8 | r[1]) %
+                                (ATALAIA_EPOCH_LOST_MAX - ATALAIA_EPOCH_LOST_MIN + 1u)));
+        rp->epoch_lost = true;
+    }
 
     /* Persist BEFORE first TX. */
     store_put(&st, rp->epoch_tag, new_epoch);
@@ -318,6 +331,7 @@ void atalaia_radio_proto_set_source_epoch(atalaia_radio_proto_t *rp, uint16_t so
     int idx = find_source(rp, source);
     if (idx < 0) {
         idx = alloc_source_slot(rp);
+        atalaia_replay_init(&rp->source_epochs[idx].replay);
     }
     rp->source_epochs[idx].source = source;
     rp->source_epochs[idx].epoch = epoch;
@@ -444,6 +458,7 @@ bool atalaia_radio_proto_on_recv_window(atalaia_radio_proto_t *rp, const radio_r
                                         uint8_t *out_payload, size_t *out_payload_len,
                                         uint16_t *out_epoch)
 {
+    rp->last_replay = ATALAIA_REPLAY_FRESH; /* set only by a packet that authenticates */
     if (!rp->has_key) return false;
     if (rx_msg->len < ATALAIA_RF_HEADER_SIZE + ATALAIA_RF_MIC_SIZE) {
         return false;
@@ -485,9 +500,22 @@ bool atalaia_radio_proto_on_recv_window(atalaia_radio_proto_t *rp, const radio_r
         if (!ok) return false;
         if (idx >= 0) provisional = rp->source_epochs[idx].provisional;
     }
-    /* Authenticated: remember (or adopt) this epoch for the source. */
+    /* Authenticated: remember (or adopt) this epoch for the source, and ask its replay window
+     * (Amendment 23): a counter already seen, or 64 or more below the highest, is refused. A
+     * refused packet leaves the table as it was (it may be a recording of a lower epoch). */
     if (idx < 0) {
         idx = alloc_source_slot(rp);
+        atalaia_replay_init(&rp->source_epochs[idx].replay);
+    }
+    rp->last_replay =
+        atalaia_replay_accept(&rp->source_epochs[idx].replay, atalaia_replay_ctr(epoch, hdr.seq));
+    if (rp->last_replay != ATALAIA_REPLAY_FRESH) {
+        if (rp->last_replay == ATALAIA_REPLAY_DUPLICATE) {
+            rp->replay_duplicates++;
+        } else {
+            rp->replay_too_old++;
+        }
+        return false;
     }
     rp->source_epochs[idx].source = source;
     rp->source_epochs[idx].epoch = epoch;

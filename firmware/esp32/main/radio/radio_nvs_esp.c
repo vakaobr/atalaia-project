@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "esp_log.h"
+#include "esp_random.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "sdkconfig.h"
@@ -109,6 +110,14 @@ static int esp_nvs_erase_key(void *ctx)
     return 0;
 }
 
+/* The hardware random generator (true random with the radio on, which a running box has). */
+static int esp_random_bytes(void *ctx, uint8_t *buf, size_t n)
+{
+    (void)ctx;
+    esp_fill_random(buf, n);
+    return 0;
+}
+
 static const atalaia_radio_nvs_ops_t esp_nvs_ops = {
     .read_legacy_epoch = esp_nvs_read_legacy_epoch,
     .read_epochs = esp_nvs_read_epochs,
@@ -116,6 +125,7 @@ static const atalaia_radio_nvs_ops_t esp_nvs_ops = {
     .read_key = esp_nvs_read_key,
     .write_key = esp_nvs_write_key,
     .erase_key = esp_nvs_erase_key,
+    .random_bytes = esp_random_bytes,
     .ctx = NULL,
 };
 

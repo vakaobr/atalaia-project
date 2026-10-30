@@ -215,6 +215,13 @@ static int nvs_erase_key(void *ctx)
     return erase_file("game_key");
 }
 
+static int nvs_random_bytes(void *ctx, uint8_t *buf, size_t n)
+{
+    (void)ctx;
+    for (size_t i = 0; i < n; i++) buf[i] = (uint8_t)rand();
+    return 0;
+}
+
 static const atalaia_radio_nvs_ops_t nvs_ops = {
     .read_legacy_epoch = nvs_read_legacy_epoch,
     .read_epochs = nvs_read_epochs,
@@ -222,6 +229,7 @@ static const atalaia_radio_nvs_ops_t nvs_ops = {
     .read_key = nvs_read_key,
     .write_key = nvs_write_key,
     .erase_key = nvs_erase_key,
+    .random_bytes = nvs_random_bytes,
     .ctx = NULL,
 };
 

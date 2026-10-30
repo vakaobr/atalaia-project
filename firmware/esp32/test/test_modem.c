@@ -608,11 +608,33 @@ static void test_rx_forwards_and_dedupes(void)
     CHECK(rx_frame(last_of(MODEM_FRAME_RX), &h, text, &rssi, &snr, &epoch));
     CHECK(strcmp(text, "again") == 0 && epoch == 1);
 
-    /* Dedupe entries expire after 30 s. */
+    /* A copy heard again is a duplicate however long after: the replay window does not expire
+     * (FLD-1; the 30 s duplicate table used to let a recording through). */
     clear_out();
-    io_state.now += MODEM_DEDUPE_EXPIRY_MS + 1;
+    io_state.now += 31000;
     modem_on_air_rx(&modem, pkt, n, -61, 4);
-    CHECK(last_of(MODEM_FRAME_RX) >= 0);
+    CHECK(last_of(MODEM_FRAME_RX) < 0);
+    CHECK(modem.count.rx_dupes == 2);
+}
+
+/* A recording of a packet the modem never saw, played back after 64 newer ones, is refused. */
+static void test_rx_refuses_a_replay_after_the_window(void)
+{
+    setup(true, 16);
+    configure(0x1234, 0, 1, 2, 869525000, KEY);
+    clear_out();
+    uint8_t pkt[RADIO_MAX_PKT_LEN];
+    uint8_t recorded[RADIO_MAX_PKT_LEN];
+    size_t rec_n = air_packet(0x1234, 7, 5, 0, KEY, "pause", recorded); /* never heard live */
+    size_t n = air_packet(0x1234, 7, 4, 0, KEY, "x", pkt);
+    modem_on_air_rx(&modem, pkt, n, -60, 5);
+    n = air_packet(0x1234, 7, 70, 0, KEY, "later", pkt);
+    modem_on_air_rx(&modem, pkt, n, -60, 5);
+    clear_out();
+    io_state.now += 31000;
+    modem_on_air_rx(&modem, recorded, rec_n, -60, 5);
+    CHECK(last_of(MODEM_FRAME_RX) < 0);
+    CHECK(modem.count.rx_dupes == 1 && modem.count.rx_auth_fail == 0);
 }
 
 static void test_rx_drops_foreign_and_forged(void)
@@ -1019,6 +1041,7 @@ void run_modem_tests(void)
     test_tx_nonce_guard();
     test_tx_rejects_bad_packets();
     test_rx_forwards_and_dedupes();
+    test_rx_refuses_a_replay_after_the_window();
     test_rx_drops_foreign_and_forged();
     test_rx_epoch_window();
     test_clear_forgets_the_game();

@@ -24,7 +24,20 @@ typedef struct {
     bool read_fails; /* read_epochs returns -2 */
     bool write_fail; /* write_epochs fails and changes nothing */
     int writes;      /* write_epochs calls */
+    uint32_t rnd;    /* what random_bytes hands out next (a fixed value in a test) */
+    bool no_random;  /* random_bytes fails */
 } epoch_fake_t;
+
+static inline int epoch_fake_random(void *ctx, uint8_t *buf, size_t n)
+{
+    epoch_fake_t *f = (epoch_fake_t *)ctx;
+    if (f->no_random) return -1;
+    for (size_t i = 0; i < n; i++) {
+        f->rnd = f->rnd * 1664525u + 1013904223u;
+        buf[i] = (uint8_t)(f->rnd >> 24);
+    }
+    return 0;
+}
 
 static inline int epoch_fake_read_legacy(void *ctx, uint16_t *e)
 {
@@ -76,6 +89,7 @@ static inline int epoch_fake_of(const epoch_fake_t *f, const uint8_t key[16])
                                .read_key = (rk),                                                   \
                                .write_key = (wk),                                                  \
                                .erase_key = (ek),                                                  \
+                               .random_bytes = epoch_fake_random,                                  \
                                .ctx = (f)})
 
 #endif /* ATALAIA_EPOCH_STORE_FAKE_H */

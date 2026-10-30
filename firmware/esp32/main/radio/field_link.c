@@ -353,6 +353,12 @@ bool field_link_init(field_link_t *l, const atalaia_join_t *join,
         say(l, "radio halted: the nonce epoch could not be stored");
         return false;
     }
+    if (l->proto.epoch_lost) {
+        say(l,
+            "epoch store lost: radio epoch restarted at %u; controllers will not hear this box "
+            "until they are told its epoch or it joins again",
+            (unsigned)l->proto.epoch);
+    }
     /* Events from before a reboot that were never acknowledged. */
     int replayed = refill(l);
     if (replayed > 0)
@@ -363,24 +369,16 @@ bool field_link_init(field_link_t *l, const atalaia_join_t *join,
 
 /* ---- Receiving -------------------------------------------------------------------- */
 
-/* True if (source, epoch, seq) was seen in the last 30 s; records it otherwise. */
-static bool seen_before(field_link_t *l, uint16_t source, uint16_t epoch, uint16_t seq)
+/*
+ * Is this counter newer than the last one applied from source (RFC 0001 Amendment 23)? The
+ * counters of one source only grow, so a game-state CMD or a TIME whose counter is not above the
+ * last applied is older than what this box has done: a recording played back, or a copy overtaken
+ * by a later one. The counter is recorded only when the caller applies the frame.
+ */
+static bool newer_than(uint16_t source, uint32_t ctr, uint16_t last_source, uint32_t last_ctr,
+                       bool have)
 {
-    field_link_seen_t *oldest = &l->seen[0];
-    field_link_seen_t *free_slot = NULL;
-    for (size_t i = 0; i < FIELD_LINK_DEDUPE; i++) {
-        field_link_seen_t *s = &l->seen[i];
-        bool live = s->seen_ms != 0 && l->now_ms - s->seen_ms < FIELD_LINK_DEDUPE_MS;
-        if (live && s->source == source && s->epoch == epoch && s->seq == seq) return true;
-        if (!live && free_slot == NULL) free_slot = s;
-        if (s->seen_ms < oldest->seen_ms) oldest = s;
-    }
-    field_link_seen_t *slot = free_slot != NULL ? free_slot : oldest;
-    slot->source = source;
-    slot->epoch = epoch;
-    slot->seq = seq;
-    slot->seen_ms = l->now_ms ? l->now_ms : 1;
-    return false;
+    return !have || source != last_source || ctr > last_ctr;
 }
 
 /*
@@ -447,11 +445,20 @@ static void follow_state(field_link_t *l, uint8_t state)
     }
 }
 
-static void on_time(field_link_t *l, const atalaia_header_t *h, const uint8_t *pl, size_t n)
+static void on_time(field_link_t *l, const atalaia_header_t *h, uint16_t epoch, const uint8_t *pl,
+                    size_t n)
 {
     atalaia_time_msg_t t;
     if (!atalaia_time_decode(pl, n, &t)) return;
     if (t.term < l->term) return; /* an old controller that has not stepped down yet */
+    uint32_t ctr = atalaia_replay_ctr(epoch, h->seq);
+    if (!newer_than(h->source, ctr, l->time_source, l->time_ctr, l->have_time_ctr)) {
+        l->stats.times_stale++;
+        return;
+    }
+    l->time_source = h->source;
+    l->time_ctr = ctr;
+    l->have_time_ctr = true;
     if (t.term > l->term || h->source != l->leader) {
         if (h->source != l->leader)
             say(l, "following controller %u (term %lu)", h->source, (unsigned long)t.term);
@@ -478,13 +485,25 @@ static void on_time(field_link_t *l, const atalaia_header_t *h, const uint8_t *p
     }
 }
 
-static void on_cmd(field_link_t *l, const atalaia_header_t *h, const uint8_t *pl, size_t n)
+static void on_cmd(field_link_t *l, const atalaia_header_t *h, uint16_t epoch, const uint8_t *pl,
+                   size_t n)
 {
     atalaia_cmd_msg_t c;
     if (!atalaia_cmd_decode(pl, n, &c)) return;
     if (c.dest != 0xFFFF && c.dest != l->join.node_id) return;
     /* Commands come from the controller we follow (or anyone before the first TIME). */
     if (h->source != l->leader && l->have_time) return;
+    if (c.cmd <= FIELD_CMD_END) {
+        /* START, PAUSE, RESUME and END are ordered: one older than the last applied is refused. */
+        uint32_t ctr = atalaia_replay_ctr(epoch, h->seq);
+        if (!newer_than(h->source, ctr, l->cmd_source, l->cmd_ctr, l->have_cmd_ctr)) {
+            l->stats.cmds_stale++;
+            return;
+        }
+        l->cmd_source = h->source;
+        l->cmd_ctr = ctr;
+        l->have_cmd_ctr = true;
+    }
     l->stats.cmds++;
     switch (c.cmd) {
     case FIELD_CMD_START: l->game_state = FIELD_GAME_RUNNING; break;
@@ -516,11 +535,15 @@ void field_link_on_packet(field_link_t *l, const uint8_t *pkt, size_t len, int8_
         return;
     }
     if (!atalaia_radio_proto_on_recv_window(&l->proto, &rx, 16, &h, pl, &n, &epoch)) {
-        l->stats.rx_rejected++;
-        return;
-    }
-    if (seen_before(l, h.source, epoch, h.seq)) {
-        l->stats.rx_duplicates++;
+        /* Not authentic, or authentic but already seen (a flood copy) or too old (a replay, RFC
+         * 0001 Amendment 23): the replay window's verdict says which. */
+        if (l->proto.last_replay == ATALAIA_REPLAY_DUPLICATE) {
+            l->stats.rx_duplicates++;
+        } else if (l->proto.last_replay == ATALAIA_REPLAY_TOO_OLD) {
+            l->stats.rx_replays++;
+        } else {
+            l->stats.rx_rejected++;
+        }
         return;
     }
     l->stats.rx_ok++;
@@ -542,8 +565,8 @@ void field_link_on_packet(field_link_t *l, const uint8_t *pkt, size_t len, int8_
     }
 
     switch (h.type) {
-    case ATALAIA_MSG_TIME: on_time(l, &h, pl, n); break;
-    case ATALAIA_MSG_CMD: on_cmd(l, &h, pl, n); break;
+    case ATALAIA_MSG_TIME: on_time(l, &h, epoch, pl, n); break;
+    case ATALAIA_MSG_CMD: on_cmd(l, &h, epoch, pl, n); break;
     case ATALAIA_MSG_ACK:
         if (is_ack && ack.ack_node == l->join.node_id) apply_acks(l, &ack);
         break;

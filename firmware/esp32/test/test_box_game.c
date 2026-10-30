@@ -343,17 +343,21 @@ static size_t encode(const atalaia_join_t *j, const uint8_t *key, uint8_t *buf)
     return n;
 }
 
+/* The controller's seq (node 0, epoch 1), one counter for every helper that sends as it: a
+ * receiver refuses a counter it has seen or one far below the highest (the replay window,
+ * RFC 0001 Amendment 23), as it would a real controller's repeats. */
+static uint16_t controller_seq;
+
 /* A packet from the controller (node 0, epoch 1) to the box. */
 static void from_controller(uint8_t type, const uint8_t *pl, size_t n)
 {
     static atalaia_radio_proto_t ctl;
-    static uint16_t seq;
     static uint8_t out[PKT_CAP];
     static size_t out_len;
     atalaia_radio_proto_init(&ctl, GAME_ID, 0, &atalaia_crypto_test_stub, NULL);
     atalaia_radio_proto_set_key(&ctl, GAME_KEY);
     atalaia_radio_proto_set_epoch(&ctl, 1);
-    ctl.seq = seq++;
+    ctl.seq = controller_seq++;
     atalaia_header_t h = {ATALAIA_VF_MAKE(1, 2, 0, 1), GAME_ID, 0, ctl.seq, 2, type};
     out_len =
         atalaia_packet_encrypt(&h, 1, GAME_KEY, pl, n, out, sizeof(out), &atalaia_crypto_test_stub);
@@ -1201,7 +1205,6 @@ static int invite(const uint8_t key[16], const uint8_t token[8], uint16_t gid, u
 /* A CMD from the controller of the game the box is in now (invite() gave it its key). */
 static void cmd_now(uint8_t opcode)
 {
-    static uint16_t seq;
     atalaia_cmd_msg_t c;
     memset(&c, 0, sizeof(c));
     c.cmd = opcode;
@@ -1209,7 +1212,7 @@ static void cmd_now(uint8_t opcode)
     uint8_t pl[64];
     size_t n = atalaia_cmd_encode(&c, pl, sizeof(pl));
     atalaia_header_t h = {
-        ATALAIA_VF_MAKE(1, 2, 0, 1), game.join.game_id, 0, seq++, 2, ATALAIA_MSG_CMD};
+        ATALAIA_VF_MAKE(1, 2, 0, 1), game.join.game_id, 0, controller_seq++, 2, ATALAIA_MSG_CMD};
     uint8_t out[PKT_CAP];
     size_t len = atalaia_packet_encrypt(&h, 1, game.join.game_key, pl, n, out, sizeof(out),
                                         &atalaia_crypto_test_stub);

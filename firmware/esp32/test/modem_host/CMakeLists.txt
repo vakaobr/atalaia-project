@@ -33,6 +33,7 @@ add_executable(modem_host
     ${MAIN_DIR}/radio/radio_limits.c
     ${MAIN_DIR}/radio/noise_stats.c
     ${CORE_DIR}/src/packet.c
+    ${CORE_DIR}/src/replay.c
     ${CORE_DIR}/src/crypto_mbedtls.c
     ${CORE_DIR}/src/codec.c
     ${CORE_DIR}/src/event.c

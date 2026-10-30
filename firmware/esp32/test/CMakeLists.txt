@@ -50,6 +50,7 @@ set(CORE_SOURCES
     ${CORE_DIR}/src/flood.c
     ${CORE_DIR}/src/lbt.c
     ${CORE_DIR}/src/ack.c
+    ${CORE_DIR}/src/replay.c
     ${CORE_DIR}/src/duty_cycle.c
     ${CORE_DIR}/src/msg_codec.c
     ${CORE_DIR}/src/join.c

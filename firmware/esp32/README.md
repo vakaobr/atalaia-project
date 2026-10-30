@@ -262,7 +262,7 @@ sets `CONFIG_ATALAIA_MODEM_MODE`, which builds `main/modem/` instead of
 the Field Box shell: the radio HAL and radio task, plus a serial task
 that moves the frames of [protocol/usb-modem.md](../../protocol/usb-modem.md)
 between the USB-Serial-JTAG port and the radio. The modem encrypts and
-decrypts with AES-CCM (mbedtls, hardware AES), dedupes flood copies,
+decrypts with AES-CCM (mbedtls, hardware AES), drops flood copies and replays with a per-source replay window,
 enforces the duty cycle of the channel's sub-band, measures the noise on
 a channel when asked (MEASURE, only while no game is configured), carries
 field frames as they are, with or without a game (FIELD_TX, FIELD_RX,
@@ -406,7 +406,7 @@ The radio is the USB modem's own code (`main/modem/modem.c`, frames
 shifted by 3): the phone sends plaintext packets with RADIO_TX, the pod
 encrypts them with the game key, keeps the duty cycle and the TX power of
 the channel's EU868 sub-band (`radio/radio_limits.c`), refuses a channel
-that does not fit in one sub-band, dedupes and decrypts what it hears
+that does not fit in one sub-band, decrypts what it hears and drops copies and replays
 (RADIO_RX), and measures noise when asked (MEASURE, answered by RADIO_NOISE
 `0x0B`, decision PF2). Field and pair frames, sealed by the phone, go and
 come as they are (RADIO_FIELD_TX, RX and ACK, `0x0C`-`0x0E`, with or without
@@ -677,6 +677,10 @@ beacon's controller failed half-way and the box reset.
 | **Static internal RAM left for the heap** | **45,704** | **194,049** |
 | At a join, with the beacon in the image: DMA-capable free (bench) | 11,547 (largest 6,400) | about 150,000 (estimate: 194 KB less the 27 KB the stacks and the rest take, measured at the same point on the bench, less the non-DMA part) |
 | At a join, no Bluetooth in the image (bench, the hotfix) | 36,023 (largest 20,480) | not built |
+
+The replay windows (decision SR-24) cost about 0.5 KB net in the box's static RAM (64 sources of 32 bytes in the
+per-source epoch table; the link's 64-entry duplicate table is gone): `check_fw_ram.py` measured 193,497 bytes left
+for the heap (194,049 before), well inside the 120 KiB margin it keeps.
 
 What moved, and why it is safe:
 - **LVGL's 48 KB widget heap** (`LV_MEM_SIZE`) to PSRAM (`LV_ATTRIBUTE_LARGE_RAM_ARRAY` in
@@ -979,6 +983,16 @@ controller's game.
   this box relayed in the last 30 s; every other frame is relayed with probability
   min(1, 3 / boxes heard in 10 minutes) after 20-600 ms; 8 relay slots. A frame
   over the duty-cycle budget is dropped, not queued (RFC 0001 section 8).
+  **Replays** (RFC 0001 Amendment 23, decisions SR-20 to SR-29, the security review's FLD-1): every
+  authenticated packet goes through its source's replay window (`core/src/replay.c`: the highest
+  `epoch << 16 | seq` and a 64-bit bitmap, kept in the per-source epoch table, 64 sources), so a copy or
+  a recording is dropped before anything acts on it, however long after (the 30 s table let a recorded
+  CMD PAUSE or END through); a game-state CMD (start, pause, resume, end) and a TIME must also be newer
+  than the last of theirs the box applied. The counts are `rx_duplicates`, `rx_replays`, `cmds_stale` and
+  `times_stale` in `field_link_stats_t`. The window is in RAM: a box that just rebooted takes the first
+  packet of each source as new. A box that resumes its game with no epoch record for its key (its store
+  was lost) takes a random epoch in 4096 to 61439 instead of 1, so no earlier nonce repeats (FLD-10); no
+  receiver follows it until a controller names its epoch or the game is joined again.
 - **Listen before talk** -- (RFC 0001 Amendment 14, decisions SL-25 to SL-31; Kconfig
   `ATALAIA_LBT`, on by default, in every image that transmits: the Field Box, the USB modem
   and the I/O pod) before each transmission the radio task asks the radio whether the

@@ -48,6 +48,8 @@ from .packet import (
 )
 from .protocol import MESSAGE_TYPES
 from .radio_model import RadioModel
+from .replay import FRESH, ReplayWindow
+from .replay import counter as replay_counter
 
 # Game states (TIME key 2).
 GAME_WAITING = 0
@@ -109,8 +111,9 @@ BROADCAST = 0xFFFF
 # CMD params travel as a CBOR map with text keys; a box's C decoder turns
 # them into JSON in a 128-byte buffer, so their JSON form must fit 127 bytes.
 CMD_PARAMS_MAX = 127
-# Flood copies of a packet are dropped for this long (ADR-P2-6: 60 s on the controller).
-PACKET_DEDUPE_MS = 60_000
+# Flood copies and replays are refused by the per-source replay window (replay.py, RFC 0001
+# Amendment 23): a packet already seen, or 64 or more counters below the source's highest, however
+# long ago (this was a 60 s table; a recording played back after a minute got through).
 
 # Node health (decisions FU1-1 to FU1-3).
 HEALTH_EVENTS = ("node.online", "node.offline", "battery.low")
@@ -335,9 +338,9 @@ class FieldController:
         self.on_drift: Optional[Callable[[dict[str, Any]], None]] = None
 
         self.acks = AckTracker()
-        self._packets_seen: dict[tuple[int, int, int], int] = {}
+        self._replay: dict[int, ReplayWindow] = {}  # source -> its replay window
+        self.replays_refused = 0  # authenticated packets the windows refused (copies and replays)
         self._events_seen: set[tuple[int, int, int, str]] = set()
-        self._last_prune = 0
 
         # Hooks for the host (all optional).
         self.on_event: Optional[Callable[[dict[str, Any]], None]] = None
@@ -540,10 +543,10 @@ class FieldController:
         """Process one decrypted packet. meta may carry epoch, rssi and snr (from the modem)."""
         meta = meta or {}
         epoch = int(meta.get("epoch", 0))
-        key = (header.source, epoch, header.seq)
-        if key in self._packets_seen:
-            return  # a flood copy of a packet already handled
-        self._packets_seen[key] = self._now
+        window = self._replay.setdefault(header.source, ReplayWindow())
+        if window.accept(replay_counter(epoch, header.seq)) != FRESH:
+            self.replays_refused += 1
+            return  # a flood copy of a packet already handled, or a recording played back
         msg_type = header.type
 
         if msg_type == MESSAGE_TYPES["TIME"]:
@@ -752,11 +755,6 @@ class FieldController:
             self._repeats = []
         for node in list(self.nodes.values()):
             self._check_health(node, now_ms)
-
-        if now_ms - self._last_prune >= 10_000:
-            self._last_prune = now_ms
-            cutoff = now_ms - PACKET_DEDUPE_MS
-            self._packets_seen = {k: t for k, t in self._packets_seen.items() if t >= cutoff}
         return deliveries
 
     # --- score merging --------------------------------------------------------

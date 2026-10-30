@@ -1013,6 +1013,105 @@ static void test_many_games_heard_by_a_fresh_receiver(void)
     box_key = KEY;
 }
 
+/* Seals a CMD or TIME as the controller but does not deliver it: a recording of a frame the box
+ * never heard. Returns its index in the controller's sink. */
+static int ctl_record_cmd(ctl_t *c, uint8_t cmd)
+{
+    atalaia_cmd_msg_t m;
+    memset(&m, 0, sizeof(m));
+    m.cmd = cmd;
+    m.dest = 0xFFFF;
+    uint8_t buf[200];
+    size_t n = atalaia_cmd_encode(&m, buf, sizeof(buf));
+    int at = c->sink.count;
+    CHECK(n > 0 &&
+          atalaia_radio_proto_send_payload(&c->proto, ATALAIA_MSG_CMD, 2, false, buf, n, NULL));
+    return at;
+}
+
+static int ctl_record_time(ctl_t *c, uint8_t state, uint32_t game_ms)
+{
+    atalaia_time_msg_t t = {game_ms, state, 0, 1700000000u, 1, 0xFFFF};
+    uint8_t buf[64];
+    size_t n = atalaia_time_encode(&t, buf, sizeof(buf));
+    int at = c->sink.count;
+    CHECK(n > 0 &&
+          atalaia_radio_proto_send_payload(&c->proto, ATALAIA_MSG_TIME, 2, false, buf, n, NULL));
+    return at;
+}
+
+/* FLD-1 (RFC 0001 Amendment 23): a recorded CMD PAUSE played back more than 30 s later, in the
+ * same epoch, used to pause the game (the 30 s duplicate table had forgotten it). */
+static void test_recorded_cmd_replayed_after_31_s_is_refused(void)
+{
+    static box_t b;
+    memset(&b, 0, sizeof(b));
+    CHECK(box_up(&b, NULL, 1));
+    ctl_t c;
+    ctl_up(&c, 0, 3);
+
+    send_cmd(&c, &b, FIELD_CMD_START, 0xFFFF, "");
+    send_cmd(&c, &b, FIELD_CMD_PAUSE, 0xFFFF, "");
+    int pause_at = c.sink.count - 1;
+    send_cmd(&c, &b, FIELD_CMD_RESUME, 0xFFFF, "");
+    CHECK(b.shell.ncmds == 3 && b.link.game_state == FIELD_GAME_RUNNING);
+
+    field_link_tick(&b.link, 32000); /* 31 s later */
+    field_link_on_packet(&b.link, c.sink.pkt[pause_at], c.sink.len[pause_at], -60);
+    CHECK(b.shell.ncmds == 3 && b.link.game_state == FIELD_GAME_RUNNING);
+    CHECK(b.link.stats.rx_duplicates == 1);
+
+    /* The same with an END the box never heard live, after the window has moved on 64 packets:
+     * nothing in any table remembers it, the counter alone is too old. */
+    int end_at = ctl_record_cmd(&c, FIELD_CMD_END);
+    for (int i = 0; i < 70; i++) send_time(&c, &b, FIELD_GAME_RUNNING, 40000 + 100u * i, 1);
+    field_link_tick(&b.link, 90000);
+    field_link_on_packet(&b.link, c.sink.pkt[end_at], c.sink.len[end_at], -60);
+    CHECK(b.link.game_state == FIELD_GAME_RUNNING && b.shell.ncmds == 3);
+    CHECK(b.link.stats.rx_replays == 1);
+    /* A genuine one still works. */
+    send_cmd(&c, &b, FIELD_CMD_END, 0xFFFF, "");
+    CHECK(b.link.game_state == FIELD_GAME_ENDED);
+}
+
+/* A recording the window has not seen (the box missed the original, and not 64 frames have
+ * followed) is still refused when it is older than a CMD or TIME already applied (SR-21). */
+static void test_older_state_frames_are_refused(void)
+{
+    static box_t b;
+    memset(&b, 0, sizeof(b));
+    CHECK(box_up(&b, NULL, 1));
+    ctl_t c;
+    ctl_up(&c, 0, 3);
+
+    send_cmd(&c, &b, FIELD_CMD_START, 0xFFFF, "");
+    int pause_at = ctl_record_cmd(&c, FIELD_CMD_PAUSE); /* lost on the air */
+    send_cmd(&c, &b, FIELD_CMD_RESUME, 0xFFFF, "");     /* heard */
+    int ncmds = b.shell.ncmds;
+    field_link_on_packet(&b.link, c.sink.pkt[pause_at], c.sink.len[pause_at], -60);
+    CHECK(b.shell.ncmds == ncmds && b.link.game_state == FIELD_GAME_RUNNING);
+    CHECK(b.link.stats.cmds_stale == 1);
+
+    /* The same for TIME, whose state would pause the game. */
+    int paused_at = ctl_record_time(&c, FIELD_GAME_PAUSED, 5000);
+    send_time(&c, &b, FIELD_GAME_RUNNING, 6000, 1);
+    field_link_on_packet(&b.link, c.sink.pkt[paused_at], c.sink.len[paused_at], -60);
+    CHECK(b.link.game_state == FIELD_GAME_RUNNING && b.link.stats.times_stale == 1);
+
+    /* Out of order but harmless (a CMD that is not a game-state one) is still applied once. */
+    int msg_at = c.sink.count;
+    send_cmd(&c, &b, FIELD_CMD_MESSAGE, BOX, "{\"text\":\"a\"}");
+    send_cmd(&c, &b, FIELD_CMD_MESSAGE, BOX, "{\"text\":\"b\"}");
+    CHECK(b.shell.ncmds == ncmds + 2);
+    (void)msg_at;
+
+    /* A controller that restarted (a higher epoch) is newer than anything before. */
+    ctl_t c2;
+    ctl_up(&c2, 0, 4);
+    send_cmd(&c2, &b, FIELD_CMD_PAUSE, 0xFFFF, "");
+    CHECK(b.link.game_state == FIELD_GAME_PAUSED);
+}
+
 void run_field_link_tests(void)
 {
     test_hello_event_retry_and_ack();
@@ -1021,6 +1120,8 @@ void run_field_link_tests(void)
     test_retry_backoff_schedule();
     test_cmd_time_and_leader();
     test_late_start_from_time();
+    test_recorded_cmd_replayed_after_31_s_is_refused();
+    test_older_state_frames_are_refused();
     test_time_sync();
     test_relay_and_filters();
     test_relay_waits_for_the_acks_and_is_cancelled();

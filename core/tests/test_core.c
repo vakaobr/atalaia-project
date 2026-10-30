@@ -150,6 +150,7 @@ int main(void)
     run_flood_tests();
     run_lbt_tests();
     run_ack_tests();
+    run_replay_tests();
     run_duty_cycle_tests();
     run_msg_codec_tests();
     run_crypto_mbedtls_tests();

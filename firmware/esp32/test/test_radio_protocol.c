@@ -583,13 +583,14 @@ static void test_recv_window(void)
  * TIME) is searched ATALAIA_RESTART_EPOCH_WINDOW above, so it is heard again; other packets keep
  * the receiver's window; lower epochs are never accepted. */
 static uint32_t clock_ms = 1000;
+static uint16_t typed_seq = 7; /* each packet its own counter: a repeat would be a replay */
 
 static bool recv_typed(atalaia_radio_proto_t *rp, uint16_t source, uint16_t epoch, uint8_t type,
                        uint16_t window, uint16_t *got)
 {
     uint8_t payload[] = {0x33};
     uint8_t pkt[ATALAIA_RF_HEADER_SIZE + sizeof(payload) + ATALAIA_RF_MIC_SIZE + 8];
-    atalaia_header_t hdr = {ATALAIA_VF_MAKE(1, 0, 0, 1), 1, source, 7, 2, type};
+    atalaia_header_t hdr = {ATALAIA_VF_MAKE(1, 0, 0, 1), 1, source, typed_seq++, 2, type};
     size_t n = atalaia_packet_encrypt(&hdr, epoch, test_key, payload, sizeof(payload), pkt,
                                       sizeof(pkt), &atalaia_crypto_test_stub);
     radio_rx_msg_t rx;
@@ -679,6 +680,103 @@ static void test_wide_search_budget(void)
     CHECK(got == 120);
 }
 
+/* FLD-1: the replay window sits in the per-source table, one entry per source: a field of 30
+ * boxes and the controllers (RADIO_PROTO_MAX_SOURCES) each keep their own window, and a replay
+ * of any of them is refused. */
+static void test_replay_window_per_source(void)
+{
+    static atalaia_radio_proto_t rp;
+    atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, NULL);
+    atalaia_radio_proto_set_key(&rp, test_key);
+    uint8_t payload[] = {0x33};
+    static uint8_t recorded[40][ATALAIA_RF_HEADER_SIZE + 1 + ATALAIA_RF_MIC_SIZE + 8];
+    size_t rec_len[40];
+    for (uint16_t src = 100; src < 140; src++) {
+        atalaia_header_t hdr = {ATALAIA_VF_MAKE(1, 0, 0, 1), 1, src, 5, 2, ATALAIA_MSG_EVENT};
+        rec_len[src - 100] =
+            atalaia_packet_encrypt(&hdr, 1, test_key, payload, sizeof(payload), recorded[src - 100],
+                                   sizeof(recorded[0]), &atalaia_crypto_test_stub);
+        radio_rx_msg_t rx;
+        memset(&rx, 0, sizeof(rx));
+        memcpy(rx.data, recorded[src - 100], rec_len[src - 100]);
+        rx.len = rec_len[src - 100];
+        atalaia_header_t out_hdr;
+        uint8_t out[ATALAIA_RF_PAYLOAD_MAX];
+        size_t out_len = 0;
+        CHECK(atalaia_radio_proto_on_recv_window(&rp, &rx, 16, &out_hdr, out, &out_len, NULL));
+    }
+    /* Played back: every one of the 40 sources still remembers its packet. */
+    for (int i = 0; i < 40; i++) {
+        radio_rx_msg_t rx;
+        memset(&rx, 0, sizeof(rx));
+        memcpy(rx.data, recorded[i], rec_len[i]);
+        rx.len = rec_len[i];
+        atalaia_header_t out_hdr;
+        uint8_t out[ATALAIA_RF_PAYLOAD_MAX];
+        size_t out_len = 0;
+        CHECK(!atalaia_radio_proto_on_recv_window(&rp, &rx, 16, &out_hdr, out, &out_len, NULL));
+        CHECK(rp.last_replay == ATALAIA_REPLAY_DUPLICATE);
+    }
+    CHECK(rp.replay_duplicates == 40);
+    /* A garbled packet is not a replay: the verdict is only for what authenticated. */
+    radio_rx_msg_t bad;
+    memset(&bad, 0, sizeof(bad));
+    memcpy(bad.data, recorded[0], rec_len[0]);
+    bad.len = rec_len[0];
+    bad.data[ATALAIA_RF_HEADER_SIZE] ^= 1;
+    atalaia_header_t out_hdr;
+    uint8_t out[ATALAIA_RF_PAYLOAD_MAX];
+    size_t out_len = 0;
+    CHECK(!atalaia_radio_proto_on_recv_window(&rp, &bad, 16, &out_hdr, out, &out_len, NULL));
+    CHECK(rp.last_replay == ATALAIA_REPLAY_FRESH && rp.replay_duplicates == 40);
+}
+
+/* FLD-10: a box that resumes its stored game with no epoch record for its key lost its store.
+ * Starting again at epoch 1 would reuse the nonces of its earlier life under the same key (the
+ * old store said epoch 7, then was erased): it takes a random epoch far above, or refuses. */
+static void test_lost_epoch_store_starts_high(void)
+{
+    uint8_t key[16];
+    memset(key, 0x5a, sizeof(key));
+    for (uint32_t seed = 1; seed <= 200; seed++) {
+        epoch_fake_t f;
+        memset(&f, 0, sizeof(f));
+        f.rnd = seed * 2654435761u;
+        atalaia_radio_nvs_ops_t ops = EPOCH_FAKE_OPS(&f, NULL, NULL, NULL);
+        atalaia_radio_proto_t rp;
+        atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, &ops);
+        atalaia_radio_proto_set_key(&rp, key);
+        CHECK(atalaia_radio_proto_boot_epoch(&rp, true));
+        CHECK(rp.epoch >= ATALAIA_EPOCH_LOST_MIN && rp.epoch <= ATALAIA_EPOCH_LOST_MAX);
+        CHECK(epoch_fake_of(&f, key) == rp.epoch); /* stored before the first packet */
+        CHECK(rp.epoch_lost);
+        /* And from there it goes on as ever. */
+        CHECK(atalaia_radio_proto_boot_epoch(&rp, true) && rp.epoch > ATALAIA_EPOCH_LOST_MIN);
+    }
+    /* A new key (a fresh join, not a resume) still starts at 1: its nonces are new. */
+    epoch_fake_t g;
+    memset(&g, 0, sizeof(g));
+    atalaia_radio_nvs_ops_t gops = EPOCH_FAKE_OPS(&g, NULL, NULL, NULL);
+    atalaia_radio_proto_t rp;
+    atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, &gops);
+    atalaia_radio_proto_set_key(&rp, key);
+    CHECK(atalaia_radio_proto_boot_epoch(&rp, false) && rp.epoch == 1 && !rp.epoch_lost);
+    /* A resume with a record goes on above it, as ever. */
+    CHECK(atalaia_radio_proto_boot_epoch(&rp, true) && rp.epoch == 2);
+    /* No random source, or one that fails: the radio stays silent rather than guess. */
+    epoch_fake_t h;
+    memset(&h, 0, sizeof(h));
+    h.no_random = true;
+    atalaia_radio_nvs_ops_t hops = EPOCH_FAKE_OPS(&h, NULL, NULL, NULL);
+    atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, &hops);
+    atalaia_radio_proto_set_key(&rp, key);
+    CHECK(!atalaia_radio_proto_boot_epoch(&rp, true) && rp.tx_blocked && h.writes == 0);
+    hops.random_bytes = NULL;
+    atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, &hops);
+    atalaia_radio_proto_set_key(&rp, key);
+    CHECK(!atalaia_radio_proto_boot_epoch(&rp, true) && rp.tx_blocked);
+}
+
 /* Review finding 4 (decision BN-21): a receiver that no longer knows a source (its slot reused)
  * took an old recorded HELLO at a low epoch, and then dropped the source's real packets more than
  * 16 above it. A first epoch is now provisional: the real packets are searched up (within the
@@ -719,6 +817,8 @@ void run_radio_protocol_tests(void)
     test_boot_epoch_nvs_write_fail();
     test_boot_epoch_power_cuts();
     test_boot_epoch_migration();
+    test_lost_epoch_store_starts_high();
+    test_replay_window_per_source();
     test_seq_wrap_increments_epoch();
     test_seq_wrap_nvs_fail_blocks_tx();
     test_epoch_exhaustion();

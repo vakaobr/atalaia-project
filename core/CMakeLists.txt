@@ -102,6 +102,7 @@ set(ATALAIA_CORE_SOURCES
     src/flood.c
     src/lbt.c
     src/ack.c
+    src/replay.c
     src/duty_cycle.c
     src/msg_codec.c
     src/join.c
@@ -189,7 +190,7 @@ include(CTest)
 if(BUILD_TESTING)
     add_executable(test_core
         tests/test_core.c tests/test_node.c tests/test_codec.c
-        tests/test_packet.c tests/test_flood.c tests/test_lbt.c tests/test_ack.c
+        tests/test_packet.c tests/test_flood.c tests/test_lbt.c tests/test_ack.c tests/test_replay.c
         tests/test_duty_cycle.c tests/test_msg_codec.c
         tests/test_crypto_mbedtls.c tests/test_field_api.c tests/test_join.c
         tests/test_tag.c tests/test_field_frame.c tests/test_pair_frame.c tests/test_screen_template.c

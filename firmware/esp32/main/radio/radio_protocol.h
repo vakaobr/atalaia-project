@@ -25,6 +25,11 @@
  *     to transmit.
  *   - At epoch 65535: tx_blocked is set (nonce space exhausted).
  *
+ * Replay window (RFC 0001 Amendment 23): after a packet authenticates, its counter
+ * (epoch << 16 | seq) goes through the source's 64-wide window (core/atalaia/replay.h); a counter
+ * already seen or 64 or more below the highest is refused (on_recv_window returns false and sets
+ * last_replay). This replaces the receivers' 30-second duplicate tables.
+ *
  * Receiver epoch trial (ADR-P2-2):
  *   A per-source table tracks each sender's last authenticated epoch.
  *   On receive the receiver tries the stored epoch first, then epoch+1.
@@ -40,6 +45,7 @@
 #include "atalaia/event.h"
 #include "atalaia/msg_codec.h"
 #include "atalaia/packet.h"
+#include "atalaia/replay.h"
 #include "radio_task.h"
 
 /* ---- NVS abstraction (function pointers for testability) ------------------ */
@@ -73,12 +79,18 @@ typedef struct {
     int (*read_key)(void *ctx, uint8_t key[16]);                    /* 0=ok, -1=not found */
     int (*write_key)(void *ctx, const uint8_t key[16]);             /* 0=ok, -1=error */
     int (*erase_key)(void *ctx);                                    /* 0=ok, -1=error */
+    /* n random bytes from the hardware generator (0=ok, -1=error); may be NULL, which only a box
+     * that has lost its epoch store needs (ATALAIA_EPOCH_LOST_MIN, decision SR-27). */
+    int (*random_bytes)(void *ctx, uint8_t *buf, size_t n);
     void *ctx;
 } atalaia_radio_nvs_ops_t;
 
 /* ---- Per-source epoch tracking -------------------------------------------- */
 
-#define RADIO_PROTO_MAX_SOURCES 32
+/* One entry per source heard: its epoch and its replay window (about 24 bytes each). 64 holds a
+ * field of 30 boxes with the controllers and spare (decision SR-24); a full table drops its oldest
+ * entry, whose source is then met again as a new one. */
+#define RADIO_PROTO_MAX_SOURCES 64
 
 typedef struct {
     uint16_t source;
@@ -88,6 +100,8 @@ typedef struct {
      * recorded old packet's, so later packets may be searched further up (within the wide
      * search budget) until one authenticates in the normal window (decision BN-21). */
     bool provisional;
+    /* The packets already accepted from this source (RFC 0001 Amendment 23, decision SR-20). */
+    atalaia_replay_t replay;
 } atalaia_radio_source_epoch_t;
 
 /* The wide search (HELLO and TIME, and a provisional source's packets) costs up to 257
@@ -110,6 +124,7 @@ typedef struct {
     uint8_t epoch_tag[ATALAIA_EPOCH_TAG_SIZE]; /* the key's tag in the epoch store */
     bool has_key;
     bool tx_blocked;
+    bool epoch_lost; /* the last boot_epoch found the epoch store without this key (SR-27) */
     const atalaia_crypto_ops_t *crypto;
     const atalaia_radio_nvs_ops_t *nvs;
     uint8_t max_hops; /* hop_limit of our packets and relay clamp (ADR-P2-6); 2 by default */
@@ -132,6 +147,13 @@ typedef struct {
     uint8_t wide_next;
     uint32_t wide_searches; /* wide searches made */
     uint32_t wide_refused;  /* wide searches the budget refused */
+
+    /* Authenticated packets the replay window refused (RFC 0001 Amendment 23). last_replay is the
+     * verdict of the latest on_recv_window call that authenticated a packet: the caller tells a
+     * flood copy (DUPLICATE) from a packet too old to be genuine (TOO_OLD) by it. */
+    atalaia_replay_verdict_t last_replay;
+    uint32_t replay_duplicates;
+    uint32_t replay_too_old;
 } atalaia_radio_proto_t;
 
 /*
@@ -165,6 +187,19 @@ bool atalaia_radio_epoch_key_retired(const atalaia_radio_nvs_ops_t *nvs,
  * HMAC-SHA256(key, "atalaia epoch tag") (RFC 0001 amendment of 2026-10-22). */
 void atalaia_radio_epoch_tag(const uint8_t key[ATALAIA_RF_KEY_SIZE],
                              uint8_t tag[ATALAIA_EPOCH_TAG_SIZE]);
+
+/*
+ * A box that resumes its stored game but has no epoch record for its key lost its store (NVS
+ * erased or replaced; every game it joins afresh has a record from its first packet on). Its
+ * epoch there starts at a random value in [ATALAIA_EPOCH_LOST_MIN, ATALAIA_EPOCH_LOST_MAX], not at
+ * 1: epochs 1.. may all have been used with this key by the box's earlier life, and a nonce used
+ * twice under one key breaks AES-CCM (decision SR-27, FLD-10). The floor is far above any epoch a
+ * game reaches (a reboot or a 65536-packet wrap each add one); the ceiling leaves 4096 epochs
+ * before the space ends. No receiver that knew the box looks that far, so it is heard again only
+ * once a controller names its epoch (SET_PEER_EPOCH) or the game is joined again with a new key.
+ */
+#define ATALAIA_EPOCH_LOST_MIN 4096u
+#define ATALAIA_EPOCH_LOST_MAX 61439u
 
 /* Packets a (re)started node sends first (HELLO, TIME) are searched this many
  * epochs above the source's last one: a box that rebooted in a crash loop is

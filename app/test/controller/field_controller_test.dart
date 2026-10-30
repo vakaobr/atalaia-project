@@ -201,6 +201,30 @@ void main() {
     expect(fc.totalScores, {'red': 10, 'blue': 5 + 4 - 2 - 1});
   });
 
+  test('a packet played back long after is refused by the replay window '
+      '(FLD-1)', () {
+    fc.onPacket(header(4, 5, RfType.state), state(1, {1: 10}), epoch: 1);
+    expect(fc.replaysRefused, 0);
+    fc.onPacket(header(4, 5, RfType.state), state(1, {1: 10}), epoch: 1);
+    expect(fc.replaysRefused, 1); // a relayed copy
+    for (var seq = 6; seq < 80; seq++) {
+      fc.onPacket(header(4, seq, RfType.state), state(1, {1: 10}), epoch: 1);
+    }
+    fc.tick(10 * 60000); // far past the old 60 s table
+    fc.onPacket(header(4, 5, RfType.state), state(1, {1: 10}), epoch: 1);
+    fc.onPacket(header(4, 70, RfType.state), state(1, {1: 10}), epoch: 1);
+    expect(fc.replaysRefused, 3);
+    // A rebooted box (new epoch, seq from 0) is not a replay.
+    fc.onPacket(header(4, 0, RfType.state), state(1, {1: 10}), epoch: 2);
+    expect(fc.replaysRefused, 3);
+    // Each source has its own window.
+    for (var node = 20; node < 60; node++) {
+      fc.onPacket(header(node, 9, RfType.state), state(1, {}), epoch: 1);
+      fc.onPacket(header(node, 9, RfType.state), state(1, {}), epoch: 1);
+    }
+    expect(fc.replaysRefused, 3 + 40);
+  });
+
   test('projected score: ticks since the last STATE, replaced by the next '
       '(BSC-2)', () {
     fc.scoringHold = (10000, 2);
