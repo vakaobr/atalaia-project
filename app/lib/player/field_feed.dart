@@ -150,13 +150,36 @@ class _IoSocket implements FeedSocket {
   Future<void> close() => ws.close();
 }
 
-Future<FeedSocket> ioConnect(Uri uri) async =>
-    _IoSocket(await WebSocket.connect(uri.toString()));
+/// A stream address as [FieldLink.streamAt] makes it carries the code in its
+/// `token` query only as the feed's own notation; on the wire the code goes in
+/// an `Authorization: Bearer` header and never in the address, which the
+/// controller's and a proxy's access logs keep (LIVE2-1).
+(String, Map<String, String>) _wire(Uri uri) {
+  final token = uri.queryParameters['token'];
+  final rest = Map<String, String>.of(uri.queryParameters)..remove('token');
+  final clean = uri.replace(queryParameters: rest.isEmpty ? null : rest);
+  return (
+    clean.toString(),
+    {if (token != null) 'Authorization': 'Bearer $token'},
+  );
+}
+
+Future<FeedSocket> ioConnect(Uri uri) async {
+  final (url, headers) = _wire(uri);
+  return _IoSocket(await WebSocket.connect(url, headers: headers));
+}
 
 /// [ioConnect] trusting only [field]'s CA.
-Future<FeedSocket> pinnedConnect(Uri uri, PinnedField field) async => _IoSocket(
-  await WebSocket.connect(uri.toString(), customClient: field.client()),
-);
+Future<FeedSocket> pinnedConnect(Uri uri, PinnedField field) async {
+  final (url, headers) = _wire(uri);
+  return _IoSocket(
+    await WebSocket.connect(
+      url,
+      headers: headers,
+      customClient: field.client(),
+    ),
+  );
+}
 
 enum FeedState { connecting, open, closed, denied }
 

@@ -11,6 +11,7 @@ own few paths) may ever be forwarded.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import socket
@@ -141,8 +142,13 @@ def beacons() -> dict:
 
 @stub.websocket("/api/v1/stream")
 async def stream(ws: WebSocket) -> None:
-    await ws.accept()
-    await ws.send_json({"type": "hello", "token": ws.query_params.get("token")})
+    offered = ws.scope.get("subprotocols") or []
+    await ws.accept(subprotocol="atalaia.v1" if "atalaia.v1" in offered else None)
+    carried = [p for p in offered if p.startswith("atalaia.token.")]
+    text = carried[0][len("atalaia.token."):] if carried else ""
+    token = base64.urlsafe_b64decode(text + "=" * (-len(text) % 4)).decode() if text else None
+    # the proxy must hand the token over in the subprotocol, never in the address (LIVE2-1)
+    await ws.send_json({"type": "hello", "token": token, "query": ws.query_params.get("token")})
     try:
         while True:
             ws_received.append(await ws.receive_text())
@@ -280,11 +286,21 @@ class ProxyTests(unittest.TestCase):
     def test_the_stream_relays_to_the_visitor_and_drops_what_the_visitor_sends(self) -> None:
         with self.client.websocket_connect(f"/api/v1/stream?token={READ}") as ws:
             hello = ws.receive_json()
-            self.assertEqual(hello, {"type": "hello", "token": READ})
+            self.assertEqual(hello, {"type": "hello", "token": READ, "query": None})
             ws.send_text('{"cmd":"end"}')
             ws.send_text("x")
             time.sleep(0.5)
         self.assertEqual(ws_received, [])
+
+    def test_the_stream_takes_the_token_in_the_subprotocol_and_passes_it_on_the_same_way(self) -> None:
+        carrier = "atalaia.token." + base64.urlsafe_b64encode(READ.encode()).rstrip(b"=").decode()
+        with self.client.websocket_connect("/api/v1/stream", subprotocols=["atalaia.v1", carrier]) as ws:
+            self.assertEqual(ws.accepted_subprotocol, "atalaia.v1")
+            self.assertEqual(ws.receive_json(), {"type": "hello", "token": READ, "query": None})
+        bad = "atalaia.token." + base64.urlsafe_b64encode(GM.encode()).rstrip(b"=").decode()
+        with self.assertRaises(WebSocketDisconnect):
+            with self.client.websocket_connect("/api/v1/stream", subprotocols=["atalaia.v1", bad]) as ws:
+                ws.receive_json()
 
     def test_the_stream_refuses_any_other_token(self) -> None:
         for query in ("", "?token=" + GM, "?token=wrong", "?token=" + PLAYER):

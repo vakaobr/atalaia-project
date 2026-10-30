@@ -130,6 +130,7 @@ bool node_runner_start(node_runner_t *r, const preset_t *preset, const char *con
     atalaia_node_config_t cfg = {0};
     cfg.node_id = r->node_id;
     cfg.game_seed = r->game_seed;
+    memcpy(cfg.rand_key, r->rand_key, sizeof(cfg.rand_key));
     cfg.mem_limit = r->mem_limit;
     cfg.instr_limit = 1000000;
     cfg.callbacks.event = on_event;
@@ -199,6 +200,7 @@ bool node_runner_resume(node_runner_t *r, const state_persist_data_t *saved, con
     atalaia_node_config_t cfg = {0};
     cfg.node_id = r->node_id;
     cfg.game_seed = r->game_seed;
+    memcpy(cfg.rand_key, r->rand_key, sizeof(cfg.rand_key));
     cfg.mem_limit = r->mem_limit;
     cfg.instr_limit = 1000000;
     cfg.callbacks.event = on_event;

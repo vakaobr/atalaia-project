@@ -193,6 +193,54 @@ void main() {
     },
   );
 
+  group(
+    'rand() seeded from the game key (protocol/vectors/rand.json, LIVE2-2)',
+    () {
+      List<int> values(List<int>? key, int seed, int nodeId) {
+        final logs = <String>[];
+        final node = CoreNode.create(
+          core,
+          NodeSpec(
+            source:
+                "on('go', function() for i = 1, 4 do log(rand(1, 1000000)) end end)",
+            chunkName: '@rand.lua',
+            nodeId: nodeId,
+            gameSeed: seed,
+            gameKey: key,
+            instrLimit: 200000,
+          ),
+          handlers: NodeHandlers(onLog: logs.add),
+        );
+        node.input('go');
+        node.close();
+        return logs.map(int.parse).toList();
+      }
+
+      final doc = loadVectors('rand.json');
+      for (final c in cases(doc, 'cases')) {
+        test(c['name'] as String, () {
+          expect(
+            values(
+              hexDecode(c['game_key'] as String),
+              c['game_seed'] as int,
+              c['node_id'] as int,
+            ),
+            (c['lua_rand_1_1000000'] as List).cast<int>(),
+          );
+        });
+      }
+
+      test('no key is the old sequence, and another key another game', () {
+        final c = cases(doc, 'cases').first;
+        final key = hexDecode(c['game_key'] as String);
+        final seed = c['game_seed'] as int;
+        final node = c['node_id'] as int;
+        expect(values(null, seed, node), values(null, seed, node));
+        expect(values(null, seed, node), isNot(values(key, seed, node)));
+      });
+    },
+  );
+
   test('the sandbox has no io, os or package', () {
     final logs = <String>[];
     final node = CoreNode.create(

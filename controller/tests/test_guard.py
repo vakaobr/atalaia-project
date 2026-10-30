@@ -14,6 +14,7 @@ from atalaia_controller.api import Auth, create_app
 from atalaia_controller.engine import Controller
 from atalaia_controller.guard import JSON_LIMIT, body_limit
 from atalaia_controller.store import FIELD_IMAGE_MAX, Store
+from atalaia_controller.stream_auth import encode_subprotocol
 from atalaia_controller.ws import Hub
 
 def from_address(app, host, base_url="http://testserver"):
@@ -122,6 +123,16 @@ class TokenTransportTests(GuardCase):
                 with c.websocket_connect("/api/v1/stream?token=gm-secret"):
                     pass
             with c.websocket_connect("/api/v1/stream?token=read-secret") as ws:
+                self.assertEqual(ws.receive_json()["type"], "hello")
+
+    def test_websocket_token_in_the_subprotocol_follows_the_same_rules(self):
+        from starlette.websockets import WebSocketDisconnect  # noqa: PLC0415
+        with self.over_http_from_the_field() as c:
+            with self.assertRaises(WebSocketDisconnect):  # the GM token is never accepted in clear
+                with c.websocket_connect("/api/v1/stream", subprotocols=["atalaia.v1", encode_subprotocol("gm-secret")]):
+                    pass
+            with c.websocket_connect("/api/v1/stream",
+                                     subprotocols=["atalaia.v1", encode_subprotocol("read-secret")]) as ws:
                 self.assertEqual(ws.receive_json()["type"], "hello")
 
     def test_what_has_no_token_stays_on_http(self):

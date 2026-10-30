@@ -38,5 +38,6 @@ void run_tag_tests(void);
 void run_screen_template_tests(void);
 void run_proxy_tests(void);
 void run_geo_tests(void);
+void run_rand_tests(void);
 
 #endif /* ATALAIA_TEST_CHECK_H */

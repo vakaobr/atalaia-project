@@ -693,6 +693,8 @@ class ControllerApi {
     return server;
   }
 
+  static const _tokenPrefix = 'atalaia.token.';
+
   /// Answers one request of a server the caller bound (the phone's shell
   /// binds HTTP on the loopback address and HTTPS for the field's Wi-Fi,
   /// controller_host.dart).
@@ -748,18 +750,46 @@ class ControllerApi {
     await res.close();
   }
 
-  /// WS /api/v1/stream: a token in ?token= (browsers cannot set headers on a
-  /// WebSocket) or Authorization; an unknown token is closed with 4401.
+  /// WS /api/v1/stream: a token in Authorization, or in the
+  /// Sec-WebSocket-Protocol header (browsers cannot set headers on a
+  /// WebSocket): `atalaia.v1` plus `atalaia.token.<base64url of the token>`
+  /// (controller/atalaia_controller/stream_auth.py, LIVE2-1), or, deprecated,
+  /// in ?token= (an address access logs keep). An unknown token is closed
+  /// with 4401. The answer names `atalaia.v1`, never the token.
   Future<void> _stream(HttpRequest req) async {
-    var token = req.uri.queryParameters['token'];
     final header = req.headers.value(HttpHeaders.authorizationHeader) ?? '';
-    if ((token == null || token.isEmpty) &&
-        header.toLowerCase().startsWith('bearer ')) {
+    final offered = [
+      for (final v in req.headers['sec-websocket-protocol'] ?? const <String>[])
+        ...v.split(',').map((p) => p.trim()),
+    ];
+    String? token;
+    if (header.toLowerCase().startsWith('bearer ') &&
+        header.substring(7).trim().isNotEmpty) {
       token = header.substring(7).trim();
     }
+    if (token == null) {
+      for (final p in offered) {
+        if (p.startsWith(_tokenPrefix)) {
+          try {
+            final text = p.substring(_tokenPrefix.length);
+            token = utf8.decode(
+              base64Url.decode(text.padRight((text.length + 3) & ~3, '=')),
+            );
+          } on FormatException {
+            token = null;
+          }
+          break;
+        }
+      }
+    }
+    token ??= req.uri.queryParameters['token'];
     final WebSocket socket;
     try {
-      socket = await WebSocketTransformer.upgrade(req);
+      socket = await WebSocketTransformer.upgrade(
+        req,
+        protocolSelector: (offered) =>
+            offered.contains('atalaia.v1') ? 'atalaia.v1' : null,
+      );
     } on WebSocketException {
       return;
     }

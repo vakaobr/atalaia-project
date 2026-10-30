@@ -249,6 +249,7 @@ class PropSession extends ChangeNotifier {
           chunkName: setup.mode.chunkName,
           nodeId: setup.nodeId,
           gameSeed: setup.gameSeed,
+          gameKey: setup.gameKey,
           teams: setup.teams,
           params: setup.params,
         ),

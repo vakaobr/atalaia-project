@@ -89,6 +89,7 @@ from atalaia_controller import prop_link
 from atalaia_controller.mqtt import MqttBridge
 from atalaia_controller.prop_link import PropLinks
 from atalaia_controller.store import Store
+from atalaia_controller.stream_auth import SUBPROTOCOL, encode_subprotocol
 from atalaia_controller.ws import Hub
 from atalaia_sim import codec, cpace, packet
 from atalaia_sim import field_frame as ff
@@ -656,18 +657,22 @@ class ContractCase(unittest.TestCase):
         secret = "not-a-token" if token == "bad" else VECTORS["tokens"].get(token)
         if "bearer" in step:
             secret = substitute(step["bearer"], env.saved)
-        path, headers = "/api/v1/stream", {}
+        path, headers, protocols = "/api/v1/stream", {}, None
         if secret is not None and step.get("via", "query") == "header":
             headers["Authorization"] = f"Bearer {secret}"
+        elif secret is not None and step.get("via") == "subprotocol":
+            protocols = [SUBPROTOCOL, encode_subprotocol(secret)]  # stream_auth.py (LIVE2-1)
         elif secret is not None:
             path += f"?token={secret}"
         if "close" in step:
             with self.assertRaises(WebSocketDisconnect) as ctx:
-                with env.client.websocket_connect(path, headers=headers) as ws:
+                with env.client.websocket_connect(path, headers=headers, subprotocols=protocols) as ws:
                     ws.receive_json()
             self.assertEqual(ctx.exception.code, step["close"])
             return
-        ws = env.stack.enter_context(env.client.websocket_connect(path, headers=headers))
+        ws = env.stack.enter_context(env.client.websocket_connect(path, headers=headers, subprotocols=protocols))
+        if "answers" in step:  # the subprotocol the server picks: never the one that carries the token
+            self.assertEqual(ws.accepted_subprotocol, step["answers"])
         env.sockets[step["ws_connect"]] = ws
         self.check(step["hello"], ws.receive_json(), f"stream {step['ws_connect']}: hello", env)
 

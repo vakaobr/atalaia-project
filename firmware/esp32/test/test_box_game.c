@@ -524,6 +524,8 @@ static void test_join_play_end(void)
     cmd(FIELD_CMD_START);
     CHECK(game.phase == BOX_PLAYING && runner.running);
     CHECK(runner.node_id == NODE && runner.game_seed == 7);
+    CHECK(memcmp(runner.rand_key, GAME_KEY, 16) ==
+          0); /* rand() is seeded from the game key (LIVE2-2) */
     /* While playing, a new card is refused. */
     j.game_id = GAME_ID + 1;
     size_t n2 = encode(&j, JOIN_KEY, buf);
@@ -568,6 +570,7 @@ static void test_join_play_end(void)
     CHECK(game.phase == BOX_IDLE && !game.link.proto.has_key);
     static const uint8_t zero[16];
     CHECK(memcmp(game.link.proto.game_key, zero, 16) == 0);
+    CHECK(memcmp(runner.rand_key, zero, 16) == 0); /* and the runner's copy */
 }
 
 /* The box's iBeacon (decisions BBC-1 to BBC-12): advertised from the join to the end of the game,

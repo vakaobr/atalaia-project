@@ -483,12 +483,30 @@ void main() {
             : (token == 'bad' ? 'not-a-token' : tokens[token]);
         var url = 'ws://127.0.0.1:${server.port}/api/v1/stream';
         final headers = <String, Object>{};
+        List<String>? protocols;
         if (secret != null && step['via'] == 'header') {
           headers['Authorization'] = 'Bearer $secret';
+        } else if (secret != null && step['via'] == 'subprotocol') {
+          protocols = [
+            'atalaia.v1',
+            'atalaia.token.${base64Url.encode(utf8.encode(secret)).replaceAll('=', '')}',
+          ];
         } else if (secret != null) {
           url += '?token=${Uri.encodeQueryComponent(secret)}';
         }
-        final ws = _Stream(await WebSocket.connect(url, headers: headers));
+        final raw = await WebSocket.connect(
+          url,
+          headers: headers,
+          protocols: protocols,
+        );
+        if (step.containsKey('answers')) {
+          expect(
+            raw.protocol,
+            step['answers'],
+            reason: 'the chosen subprotocol',
+          );
+        }
+        final ws = _Stream(raw);
         final name = step['ws_connect'] as String;
         if (step.containsKey('close')) {
           expect(await ws.next(), isNull, reason: 'stream $name');

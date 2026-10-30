@@ -209,6 +209,7 @@ class _FieldScript implements FieldOperations {
     Map<String, Object?> game,
     this.scoreKey, {
     String? scenarioReveal,
+    List<int>? gameKey,
   }) : teams = (game['teams']! as List).cast<String>() {
     node = CoreNode.create(
       core,
@@ -217,6 +218,7 @@ class _FieldScript implements FieldOperations {
         chunkName: chunk,
         nodeId: engine.nodeId,
         gameSeed: game['game_seed']! as int,
+        gameKey: gameKey,
         teams: teams,
         params: {
           ...(game['params']! as Map).cast<String, Object?>(),
@@ -615,12 +617,16 @@ class ControllerEngine {
   ]) {
     final mode = _mode(game['mode_id']);
     final params = game['params'];
-    final out = <String, Object?>{
-      ...game,
-      'params': mode == null || params is! Map
-          ? <String, Object?>{}
-          : mode.publicParams(params.cast<String, Object?>()),
-    }..remove('scenario_nodes');
+    final out =
+        <String, Object?>{
+            ...game,
+            'params': mode == null || params is! Map
+                ? <String, Object?>{}
+                : mode.publicParams(params.cast<String, Object?>()),
+          }
+          ..remove('scenario_nodes')
+          // The game's id towards the site server: for staff only (LIVE2-2).
+          ..remove('game_seed');
     final meta = scenarioMeta(game['mode_id']);
     final svc = scenarios;
     if (meta != null && svc != null) {
@@ -2656,6 +2662,7 @@ class ControllerEngine {
       '${mode.id}/field.lua',
       game,
       'field-$run',
+      gameKey: _key,
       scenarioReveal: scenarioMeta(game['mode_id']) == null
           ? null
           : scenarios?.reveal(game, scenarioMeta(game['mode_id'])),

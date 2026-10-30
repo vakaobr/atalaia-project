@@ -179,6 +179,7 @@ static void prepare_runner(box_game_t *g)
 {
     g->runner->node_id = g->join.node_id;
     g->runner->game_seed = g->join.game_seed;
+    memcpy(g->runner->rand_key, g->join.game_key, sizeof(g->runner->rand_key));
     g->runner->event_hook = on_node_event;
     g->runner->event_ctx = g;
     node_runner_set_mode(g->runner, g->preset->mode_id);
@@ -239,6 +240,7 @@ static void leave_game(box_game_t *g)
     g->link.proto.has_key = false;
     memset(g->join.game_key, 0, sizeof(g->join.game_key));
     memset(g->link.join.game_key, 0, sizeof(g->link.join.game_key));
+    memset(g->runner->rand_key, 0, sizeof(g->runner->rand_key));
     if (g->log != NULL) event_log_clear(g->log);
     /* The final screen stays; the mode's state does not (nothing to resume or save). */
     node_runner_stop(g->runner);

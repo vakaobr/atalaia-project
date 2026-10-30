@@ -1,0 +1,120 @@
+{
+  "_doc": "rand() seeding (LIVE2-2): state = first 16 bytes of HMAC-SHA256(game_key, \"atalaia/rand/v1\" || game_seed u32 BE || node_id u16 BE) as four little-endian words; xoshiro128** from there; rand(a,b) = a + below(b-a+1) with rejection sampling. `next` are the first four raw outputs, `lua_rand_1_1000000` the first four values of rand(1, 1000000) in a fresh node with that key, seed and node id. The Python reference that made these was written independently of the C. Without a key the core falls back to the unkeyed seed (no vectors: predictable by design).",
+  "label": "atalaia/rand/v1",
+  "cases": [
+    {
+      "name": "basic",
+      "game_key": "00112233445566778899aabbccddeeff",
+      "game_seed": 12345,
+      "node_id": 1,
+      "state": "6b3f1ef43edf72fb94df0ada49fb134f",
+      "next": [
+        2560554772,
+        2090497853,
+        3417243852,
+        2528824364
+      ],
+      "lua_rand_1_1000000": [
+        554773,
+        497854,
+        243853,
+        824365
+      ]
+    },
+    {
+      "name": "other_node",
+      "game_key": "00112233445566778899aabbccddeeff",
+      "game_seed": 12345,
+      "node_id": 2,
+      "state": "11b52014dce150dccf8c71582ab08693",
+      "next": [
+        467261270,
+        696004776,
+        4045517527,
+        2982311194
+      ],
+      "lua_rand_1_1000000": [
+        261271,
+        4777,
+        517528,
+        311195
+      ]
+    },
+    {
+      "name": "other_seed",
+      "game_key": "00112233445566778899aabbccddeeff",
+      "game_seed": 12346,
+      "node_id": 1,
+      "state": "8139e43ee44f8feb3de5aa4991237a2d",
+      "next": [
+        411405484,
+        57883711,
+        2834721056,
+        1755882440
+      ],
+      "lua_rand_1_1000000": [
+        405485,
+        883712,
+        721057,
+        882441
+      ]
+    },
+    {
+      "name": "other_key",
+      "game_key": "ffeeddccbbaa99887766554433221100",
+      "game_seed": 12345,
+      "node_id": 1,
+      "state": "028a7d554e870c84cab9f0d0a0fe0d6c",
+      "next": [
+        434396570,
+        3864905499,
+        661798873,
+        3036881014
+      ],
+      "lua_rand_1_1000000": [
+        396571,
+        905500,
+        798874,
+        881015
+      ]
+    },
+    {
+      "name": "field_node_max_seed",
+      "game_key": "000102030405060708090a0b0c0d0e0f",
+      "game_seed": 4294967295,
+      "node_id": 0,
+      "state": "f596a92e5e549763259b49c1c72f0563",
+      "next": [
+        3437905720,
+        2103377495,
+        3665094959,
+        3876300496
+      ],
+      "lua_rand_1_1000000": [
+        905721,
+        377496,
+        94960,
+        300497
+      ]
+    },
+    {
+      "name": "controller_node",
+      "game_key": "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5",
+      "game_seed": 3735928559,
+      "node_id": 65535,
+      "state": "daad49e57aca8365f70e9f5d636e6dff",
+      "next": [
+        357285221,
+        29501169,
+        4242916634,
+        2179547792
+      ],
+      "lua_rand_1_1000000": [
+        285222,
+        501170,
+        916635,
+        547793
+      ]
+    }
+  ]
+}

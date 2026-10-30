@@ -354,7 +354,7 @@ The generated `field.lua` is a data table (`SCENARIO`) followed by the scenario 
 
 ## REST API v1
 
-Reading needs the read or GM token, changing anything the GM token: `Authorization: Bearer <token>` (the WebSocket also takes `?token=`). A player token (field check-in) reads what the read token reads about games, its own check-in and what its role allows; it cannot read modes, presets, the controller's or the radio's state.
+Reading needs the read or GM token, changing anything the GM token: `Authorization: Bearer <token>` (the WebSocket takes it in the `Sec-WebSocket-Protocol` header: offer `atalaia.v1` and `atalaia.token.<base64url of the token>`, and the controller answers `atalaia.v1`; `?token=` still works but is deprecated, because an address ends up in access logs, and the controller logs a warning the first time it is used. Credential-like query values and `Bearer` values are blanked in uvicorn's logs). A player token (field check-in) reads what the read token reads about games, its own check-in and what its role allows; it cannot read modes, presets, the controller's or the radio's state.
 
 | Method | Path | Purpose |
 | --- | --- | --- |

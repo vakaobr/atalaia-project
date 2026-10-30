@@ -21,6 +21,7 @@ final class NodeSpec {
     required this.chunkName,
     this.nodeId = 1,
     this.gameSeed = 1,
+    this.gameKey,
     this.teams = const ['red', 'blue'],
     this.params = const {},
     this.memLimit = 0,
@@ -35,6 +36,11 @@ final class NodeSpec {
 
   /// Seeds rand(): the same seed replays the same game.
   final int gameSeed;
+
+  /// The game's key (16 bytes): rand() is seeded from it as well as the seed
+  /// and the node id, so players who see those cannot predict it (LIVE2-2).
+  /// Null (a test, a load check) seeds from the seed and node id alone.
+  final List<int>? gameKey;
 
   /// The game's teams, ids 1..n in this order.
   final List<String> teams;

@@ -28,7 +28,7 @@ Implementations: `controller/atalaia_controller/sync_client.py` (the controller'
 
 The chrono registry's three bodies (`marshals`, `replicas`, `chrono`) belong to the field, not to a game: they have `sync_version` and `controller` and **no `game`** (one is an error).
 
-A game is **`(field, game_id, game_seed)`** (P4R11): the field comes from the API key, the 16-bit `game_id` repeats over the months, the seed does not. The controller never needs to learn a site server id first. Unknown fields anywhere (except a node's `info`) are an error: a body carries what this page lists and nothing else.
+A game is **`(field, game_id, game_seed)`** (P4R11): the field comes from the API key, the 16-bit `game_id` repeats over the months, the seed does not. The seed is an identifier, not a secret that protects anything (`rand()` is seeded from the game key as well, `protocol/vectors/rand.json`), but players have no use for it: the controllers' game views for players and the scoreboard, and the site server's game lists for anyone but staff, leave it out. The controller never needs to learn a site server id first. Unknown fields anywhere (except a node's `info`) are an error: a body carries what this page lists and nothing else.
 
 Errors are `400 {"detail": "invalid_body", "error": "<code>", "path": "<where>"}` with the first problem found; `401 {"detail": "invalid_api_key"}` for a missing, wrong or revoked key; `404 {"detail": "game_not_found"}` for events, scores or nodes of a game the site server does not have yet (the client then sends the game first and tries again); `413` for a body over 1 MiB; `429` with `Retry-After`.
 

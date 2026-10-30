@@ -98,6 +98,7 @@ void main() {
       'alloc': () => p.ref.alloc = _one.cast(),
       'alloc_ud': () => p.ref.allocUd = _one.cast(),
       'field_ops': () => p.ref.fieldOps = _one.cast(),
+      'rand_key': () => p.ref.randKey[0] = 1,
     });
   });
 

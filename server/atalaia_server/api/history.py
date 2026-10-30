@@ -106,7 +106,7 @@ async def field_history(field_id: uuid.UUID, state: Optional[str] = None,
     out = []
     for g in rows:
         cut = history.cutoff(g, delay, staff, now)
-        out.append({**game_json(g), **history.game_summary(g, await history.totals_until(db, g, cut)),
+        out.append({**game_json(g, staff), **history.game_summary(g, await history.totals_until(db, g, cut)),
                     "delayed": cut is not None})
     nxt = (rows[-1].started_at or rows[-1].controller_created_at).isoformat() if len(rows) == limit else None
     return JSONResponse({"games": out, "next_before": nxt}, headers=NO_STORE)

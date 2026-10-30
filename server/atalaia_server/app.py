@@ -38,6 +38,7 @@ import time
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Optional
 
+from atalaia_controller.stream_auth import install_redaction
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -69,6 +70,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             log.warning("ATALAIA_PUBLIC_URL is not set: this preview takes its WebAuthn origin and OpenID redirect "
                         "address from the request's Host header; set it (SRV-7)")
     logging.getLogger("atalaia").setLevel(settings.log_level.upper())
+    install_redaction()  # no credential-like query value (token=, code=, state=...) in uvicorn's logs (LIVE2-1)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

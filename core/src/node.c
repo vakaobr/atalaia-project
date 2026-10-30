@@ -380,7 +380,15 @@ atalaia_node_t *atalaia_node_create(const atalaia_node_config_t *cfg)
     }
     n->status = ATALAIA_NODE_EMPTY;
     n->next_seq = 1;
-    atalaia_rand_seed(&n->rng, cfg->game_seed, cfg->node_id);
+    uint8_t any_key = 0;
+    for (size_t i = 0; i < sizeof(cfg->rand_key); i++) {
+        any_key |= cfg->rand_key[i];
+    }
+    if (any_key != 0) {
+        atalaia_rand_seed_keyed(&n->rng, cfg->rand_key, cfg->game_seed, cfg->node_id);
+    } else {
+        atalaia_rand_seed(&n->rng, cfg->game_seed, cfg->node_id);
+    }
     atalaia_score_init(&n->score);
 
     n->L = atalaia_sandbox_open(n);

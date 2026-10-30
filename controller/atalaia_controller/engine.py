@@ -262,7 +262,7 @@ class FieldScript:
 
     def __init__(self, core: Core, engine: "Controller", source: str, chunk: str,
                  teams: list[str], params: dict[str, Any], seed: int,
-                 score_key: str = "field-1") -> None:
+                 score_key: str = "field-1", game_key: Optional[bytes] = None) -> None:
         self.engine = engine
         self.teams = list(teams)
         self.score_key = score_key
@@ -270,7 +270,8 @@ class FieldScript:
         self.pending_end: Optional[dict[str, Any]] = None
         ops = FieldOps(nodes=self._nodes, owner=self._owner, send=self._send, on_state=self._on_state)
         self.node = Node(core, engine.node_id, seed, teams, params, source, chunk,
-                         on_event=self._on_event, on_log=self._on_log, field_ops=ops)
+                         on_event=self._on_event, on_log=self._on_log, field_ops=ops,
+                         game_key=game_key)
         if not self.node.loaded:
             raise ModeError(f"field.lua does not load: {self.node.last_error}")
 
@@ -681,6 +682,7 @@ class Controller:
         pkg = self.modes.get(game.get("mode_id")) if isinstance(game.get("mode_id"), str) else None
         out = {**game, "params": visibility.public_params(pkg.mode if pkg else None, game.get("params"))}
         out.pop("scenario_nodes", None)
+        out.pop("game_seed", None)  # the game's id towards the site server, for staff only (LIVE2-2)
         meta = self.scenario_meta(game.get("mode_id"))
         if meta is not None:
             out["scenario"] = meta.player_view(viewer, game, scenarios.revealed(self, game["id"]),
@@ -2175,7 +2177,7 @@ class Controller:
             params = {**params, "scenario_reveal": scenarios.reveal(self, self.game, meta)}
         self.field = FieldScript(self.core, self, pkg.field_script, f"{pkg.id}/field.lua",
                                  self.game["teams"], params, self.game["game_seed"],
-                                 score_key=f"field-{run}")
+                                 score_key=f"field-{run}", game_key=self._key or None)
         if self.fc.game_time_ms > 0:
             self.field.advance(self.fc.game_time_ms)  # a restart or a takeover joins mid-game
         self.field.input("game.start")

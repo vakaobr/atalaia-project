@@ -30,12 +30,12 @@ import ipaddress
 import json
 import re
 from typing import Any, Awaitable, Callable, Optional
-from urllib.parse import parse_qs
 
 from . import images
 from .firmware_updates import SLOT_SIZE
 from .mode_package import MAX_PACKAGE_BYTES
 from .store import FIELD_IMAGE_MAX
+from .stream_auth import stream_token
 
 JSON_LIMIT = 64 * 1024
 FROM_MAP_LIMIT = 6 << 20  # the plan's image in base64 (about 5.6 MB) and its settings
@@ -183,7 +183,7 @@ class TokenTransport:
         if header.lower().startswith("bearer "):
             token = header[7:].strip()
         if scope["type"] == "websocket" and not token:
-            token = (parse_qs(scope.get("query_string", b"").decode("latin-1")).get("token") or [None])[0]
+            token = stream_token(scope)
         if not token:
             return False
         if self.auth.role(token) == "read":  # reading only: the scoreboard's page and its stream

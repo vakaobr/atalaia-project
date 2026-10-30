@@ -162,6 +162,7 @@ int main(void)
     run_screen_template_tests();
     run_proxy_tests();
     run_geo_tests();
+    run_rand_tests();
 
     if (check_failures == 0) {
         printf("core: all tests passed\n");

@@ -37,6 +37,7 @@ from ..audit import record
 from ..auth import Principal, current_principal, require_field_role
 from ..db import get_session
 from ..models import (PRIVILEGED_ROLES, ROLE_BY_ID, ROLE_NAMES, Game, GameEvent, GameNode, User, UserGameRole)
+from ..services.history import STAFF_FIELD_ROLES, STAFF_GAME_ROLES
 from .auth import has_second_factor
 from .fields import GM_GRANTS, NO_STORE, GrantIn
 
@@ -47,8 +48,11 @@ def _iso(value: Any) -> Optional[str]:
     return value.isoformat() if value is not None else None
 
 
-def game_json(g: Game) -> dict[str, Any]:
-    return {"id": str(g.id), "field_id": str(g.field_id), "game_id": g.game_id, "game_seed": g.game_seed,
+def game_json(g: Game, staff: bool = False) -> dict[str, Any]:
+    """A game's public face. ``game_seed`` is the game's identity towards its controller, not a
+    secret, but only staff (who send remote commands naming it) have any use for it (LIVE2-2)."""
+    seed = {"game_seed": g.game_seed} if staff else {}
+    return {"id": str(g.id), "field_id": str(g.field_id), "game_id": g.game_id, **seed,
             "name": g.name, "mode_id": g.mode_id, "teams": g.teams, "team_info": g.team_info, "squads": g.squads,
             "duration_ms": g.duration_ms, "state": g.state, "created_at": _iso(g.controller_created_at),
             "started_at": _iso(g.started_at), "ended_at": _iso(g.ended_at), "synced_at": _iso(g.updated_at)}
@@ -88,7 +92,9 @@ async def list_games(field_id: uuid.UUID, principal: Principal = Depends(current
         raise HTTPException(403, "role_required")
     rows = await db.scalars(select(Game).where(Game.field_id == field_id)
                             .order_by(Game.controller_created_at.desc()).limit(500))
-    return JSONResponse([game_json(g) for g in rows], headers=NO_STORE)
+    roles = principal.field_roles(field_id) | ({"admin"} if principal.is_server_admin else set())
+    staff = bool(roles & STAFF_FIELD_ROLES)
+    return JSONResponse([game_json(g, staff) for g in rows], headers=NO_STORE)
 
 
 @router.get("/games/{game_id}")
@@ -97,7 +103,8 @@ async def get_game(game_id: uuid.UUID, principal: Principal = Depends(current_pr
     game = await _game(db, game_id)
     field_roles = await _may_see(db, principal, game)
     nodes = await db.scalars(select(GameNode).where(GameNode.game == game.id).order_by(GameNode.node_id))
-    body = {**game_json(game), "totals": await sync.totals(db, game), "counters": await sync.counters(db, game),
+    staff = bool(field_roles & STAFF_FIELD_ROLES) or bool(await game_roles(db, principal, game.id) & STAFF_GAME_ROLES)
+    body = {**game_json(game, staff), "totals": await sync.totals(db, game), "counters": await sync.counters(db, game),
             "nodes": [{"node_id": n.node_id, "name": n.name, "role": n.role, "info": n.info,
                        "last_seen_at": _iso(n.last_seen_at)} for n in nodes]}
     if field_roles & {"admin", "gm"}:

@@ -28,7 +28,7 @@ One `atalaia_node_t` runs one mode's `node.lua`. The host owns the clock and the
 
 ```c
 atalaia_node_config_t cfg = {
-    .node_id = 1, .game_seed = seed, .callbacks = cb,
+    .node_id = 1, .game_seed = seed, .callbacks = cb,  /* .rand_key = the game key in a joined game */
     .field_ops = &my_field_ops  /* Phase 2: field-level state and comms */
 };
 atalaia_node_t *node = atalaia_node_create(&cfg);

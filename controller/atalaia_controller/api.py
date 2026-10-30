@@ -5,7 +5,8 @@
 Reading needs the read token or the GM token; anything that changes a game
 or a node needs the GM token (spec section 11: "Publishing commands needs a
 GM token"). Tokens go in ``Authorization: Bearer <token>``; the WebSocket,
-which browsers cannot give headers, also takes ``?token=``.
+which browsers cannot give headers, takes it in the ``Sec-WebSocket-Protocol`` header
+(``atalaia.v1`` plus ``atalaia.token.<base64url>``, stream_auth.py) and, deprecated, ``?token=``.
 
     GET  /api/v1/whoami                    which token this is: gm, read or player, and the console's
                                            areas this controller serves ("features": FEATURES)
@@ -172,6 +173,7 @@ from .addresses import url_host
 from .checkin import Viewer
 from .engine import Controller, ControllerError, StartBlocked
 from .guard import BodyLimit, Hsts, TokenTransport
+from .stream_auth import accepted_subprotocol, install_redaction, stream_token
 from .modes import resolve_params
 from .store import FIELD_IMAGE_MAX
 from .ws import PLAYER_TYPES, Hub, default_route, public
@@ -231,6 +233,8 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
                on_stop: Optional[Callable[[], None]] = None,
                ca_pem: Optional[bytes] = None, https_port: int = 0,
                trusted_proxy: bool = False) -> FastAPI:
+    install_redaction()  # no token or credential-like query value in uvicorn's logs (LIVE2-1)
+
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         if on_start:
@@ -1493,15 +1497,12 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
 
     @app.websocket("/api/v1/stream")
     async def stream(ws: WebSocket) -> None:
-        token = ws.query_params.get("token")
-        header = ws.headers.get("authorization", "")
-        if not token and header.lower().startswith("bearer "):
-            token = header[7:].strip()
-        v = auth.viewer(token)
+        # Authorization header, the token subprotocol or, deprecated, ?token= (stream_auth.py, LIVE2-1).
+        v = auth.viewer(stream_token(ws.scope))
         if v is None:
             await ws.close(code=4401)
             return
-        await ws.accept()
+        await ws.accept(subprotocol=accepted_subprotocol(ws.scope))
         queue = hub.subscribe(v)
         try:
             await ws.send_json(_snapshot(controller, v))

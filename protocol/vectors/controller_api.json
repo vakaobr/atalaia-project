@@ -707,16 +707,18 @@
       "steps": [
         {"ws_connect": "none", "token": "none", "close": 4401},
         {"ws_connect": "bad", "token": "bad", "close": 4401},
+        {"ws_connect": "badsp", "token": "bad", "via": "subprotocol", "close": 4401},
         {"ws_connect": "g", "token": "gm", "hello": {"type": "hello", "game": null, "score": null, "nodes": [], "events": [], "status": {"live_game": null, "role": null, "radio": "up", "node_id": 0}}},
         {"ws_connect": "r", "token": "read", "via": "header", "hello": {"type": "hello", "game": null, "score": null, "nodes": [], "events": [], "status": {"live_game": null, "radio": "up"}}},
         {"ws_send": "g", "json": {"type": "ping"}, "reply": {"type": "pong"}},
         {"ws": "g", "messages": []},
         {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Hack", "mode_id": "org.atalaia.hacking_terminal", "assignments": {"7": "terminal"}, "params": {"reveal_code": "1234"}}}, "status": 201, "save": {"gid": "id"}},
         {"ws": "g", "messages": [{"type": "game", "game": {"id": "${gid}", "state": "ready", "live": true, "params": {"reveal_code": "1234", "digits": 4}, "start_check": {"missing": ["terminal"], "ok": false}}}]},
-        {"ws": "r", "messages": [{"type": "game", "game": {"id": "${gid}", "state": "ready", "params": {"reveal_code": "$absent", "digits": 4}}}]},
-        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "read"}, "status": 200},
+        {"ws": "r", "messages": [{"type": "game", "game": {"id": "${gid}", "state": "ready", "game_seed": "$absent", "params": {"reveal_code": "$absent", "digits": 4}}}]},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "read"}, "status": 200, "json": {"id": "${gid}", "game_seed": "$absent"}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "gm"}, "status": 200, "json": {"id": "${gid}", "game_seed": "$any"}},
         {"ws": "r", "messages": []},
-        {"ws_connect": "g2", "token": "gm", "via": "header", "hello": {"type": "hello", "game": {"id": "${gid}", "state": "ready", "params": {"reveal_code": "1234"}}, "score": {"game": "${gid}", "teams": {"red": 0, "blue": 0}}, "nodes": [{"node_id": 7, "name": "node-7", "role": "terminal", "link": null, "seen_ms_ago": null}], "events": [], "status": {"live_game": "${gid}", "role": "leader"}}},
+        {"ws_connect": "g2", "token": "gm", "via": "subprotocol", "answers": "atalaia.v1", "hello": {"type": "hello", "game": {"id": "${gid}", "state": "ready", "params": {"reveal_code": "1234"}}, "score": {"game": "${gid}", "teams": {"red": 0, "blue": 0}}, "nodes": [{"node_id": 7, "name": "node-7", "role": "terminal", "link": null, "seen_ms_ago": null}], "events": [], "status": {"live_game": "${gid}", "role": "leader"}}},
         {"ws_connect": "r2", "token": "read", "hello": {"type": "hello", "game": {"id": "${gid}", "params": {"reveal_code": "$absent"}}, "status": {"live_game": "${gid}"}}}
       ]
     },

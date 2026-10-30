@@ -326,8 +326,13 @@ export class Stream {
     connect() {
         if (this.stopped) return;
         const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-        const url = `${proto}://${location.host}/api/v1/stream?token=${encodeURIComponent(this.token)}`;
-        const ws = new WebSocket(url);
+        // The token goes in the Sec-WebSocket-Protocol header, never in the address, which access logs
+        // keep (LIVE2-1): "atalaia.v1" is what the server answers, the second is the token, base64url.
+        const bytes = new TextEncoder().encode(this.token);
+        let bin = '';
+        for (const b of bytes) bin += String.fromCharCode(b);
+        const carrier = 'atalaia.token.' + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        const ws = new WebSocket(`${proto}://${location.host}/api/v1/stream`, ['atalaia.v1', carrier]);
         this.ws = ws;
         this.lastRx = Date.now();
         clearInterval(this.beat);

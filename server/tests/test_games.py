@@ -19,7 +19,7 @@ from typing import Any, Optional
 
 from atalaia_server import personal_data
 
-from .test_sync import SyncTestCase, adjustment, envelope, event
+from .test_sync import GAME, SyncTestCase, adjustment, envelope, event
 
 ROLE = {"player": 1, "marshal": 4, "gm": 5, "spectator": 6, "admin": 7}
 PRIVILEGED = {"marshal", "gm", "admin"}
@@ -82,6 +82,29 @@ class HistoryListTests(HistoryCase):
         await self.get(path, stranger, expect=403)
         await self.get(f"/api/v1/games/{ended}/timeline", stranger, expect=403)
         await self.get(f"/api/v1/games/{ended}/log", stranger, expect=403)
+
+
+class GameSeedTests(HistoryCase):
+    async def test_only_staff_see_the_game_seed(self) -> None:
+        """LIVE2-2: the seed (a game's id towards its controller) is not for players or spectators."""
+        game = await self.make_game()
+        seed = GAME["game_seed"]
+        lists = (f"/api/v1/fields/{self.field_id}/games", f"/api/v1/fields/{self.field_id}/history")
+        one = f"/api/v1/games/{game}"
+        for role, sees in (("player", False), ("spectator", False), ("marshal", True), ("gm", True), ("admin", True)):
+            _, headers = await self.role(role)
+            body = await self.get(lists[0], headers)
+            self.assertEqual(body[0].get("game_seed"), seed if sees else None, role)
+            self.assertEqual(self.dig_seed(await self.get(lists[1], headers)), seed if sees else None, role)
+            self.assertEqual((await self.get(one, headers)).get("game_seed"), seed if sees else None, role)
+        user_id, name, secret = await self.make_user(with_totp=True)  # a game role of marshal alone shows it on the game
+        await self.fetch("INSERT INTO user_game_roles (user_id, game, role_id) VALUES ($1, $2, $3)", user_id,
+                         uuid.UUID(game), ROLE["marshal"])
+        self.assertEqual((await self.get(one, await self.auth(name, secret=secret))).get("game_seed"), seed)
+
+    @staticmethod
+    def dig_seed(body: Any) -> Any:
+        return body["games"][0].get("game_seed")
 
 
 class TimelineTests(HistoryCase):

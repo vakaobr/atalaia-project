@@ -136,6 +136,11 @@ final class NodeConfig extends Struct {
   external Pointer<NativeFunction<AllocNative>> alloc;
   external Pointer<Void> allocUd;
   external Pointer<FieldOpsStruct> fieldOps;
+
+  /// The game key's 16 bytes: rand() is seeded from it with the game seed and
+  /// the node id. All zero seeds from the game seed and node id alone.
+  @Array(16)
+  external Array<Uint8> randKey;
 }
 
 /// atalaia_score_t (atalaia/score.h): index 0 (no team) is unused.

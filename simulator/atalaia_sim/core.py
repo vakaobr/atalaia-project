@@ -77,6 +77,7 @@ class _Config(ctypes.Structure):
         ("alloc", _ALLOC_FN),
         ("alloc_ud", ctypes.c_void_p),
         ("field_ops", ctypes.POINTER(_FieldOps)),
+        ("rand_key", ctypes.c_uint8 * 16),
     ]
 
 
@@ -280,6 +281,7 @@ class Node:
         on_command: Optional[Callable[[Command], None]] = None,
         on_log: Optional[Callable[[str], None]] = None,
         field_ops: Optional[FieldOps] = None,
+        game_key: Optional[bytes] = None,
     ):
         self._lib = core.lib
         self.node_id = node_id
@@ -300,6 +302,9 @@ class Node:
         cfg.game_seed = game_seed & 0xFFFFFFFF
         cfg.mem_limit = mem_limit
         cfg.instr_limit = instr_limit
+        if game_key:
+            # rand() is seeded from the game's key as well as the seed and node id (LIVE2-2).
+            cfg.rand_key = (ctypes.c_uint8 * 16)(*game_key[:16])
         cfg.callbacks.event = self._cb_event
         cfg.callbacks.command = self._cb_command
         cfg.callbacks.log = self._cb_log

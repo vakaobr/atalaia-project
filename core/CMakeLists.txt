@@ -194,7 +194,7 @@ if(BUILD_TESTING)
         tests/test_duty_cycle.c tests/test_msg_codec.c
         tests/test_crypto_mbedtls.c tests/test_field_api.c tests/test_join.c
         tests/test_tag.c tests/test_field_frame.c tests/test_pair_frame.c tests/test_screen_template.c
-        tests/test_proxy.c tests/test_geo.c)
+        tests/test_proxy.c tests/test_geo.c tests/test_rand.c)
     target_include_directories(test_core PRIVATE src)
     target_link_libraries(test_core PRIVATE atalaia_core)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
