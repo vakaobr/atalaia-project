@@ -38,6 +38,18 @@ class SettingsTests(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaisesRegex(ConfigError, "ATALAIA_PRIVACY_NOTICE_VERSION"):
                 Settings.from_env({**BASE, "ATALAIA_PRIVACY_NOTICE_VERSION": raw})
 
+    def test_a_server_that_is_not_hosted_needs_its_public_url(self) -> None:
+        """SRV-7: the WebAuthn origin and the redirect URI must not come from the Host header."""
+        from atalaia_server.config import require_public_url
+        with self.assertRaisesRegex(ConfigError, "ATALAIA_PUBLIC_URL is not set"):
+            require_public_url(Settings.from_env(BASE))
+        self.assertTrue(require_public_url(Settings.from_env({**BASE, "ATALAIA_PUBLIC_URL": "https://campo.example.pt"})))
+        self.assertTrue(require_public_url(Settings.from_env({**BASE, "ATALAIA_PUBLIC_URL": "http://localhost:8000"})))
+        self.assertTrue(require_public_url(Settings.from_env({**BASE, "ATALAIA_HOSTED": "on",
+                                                              "ATALAIA_HOSTED_DOMAIN": "hub.example.pt"})))
+        # A preview is let through (its start must not break) and the caller warns.
+        self.assertFalse(require_public_url(Settings.from_env({**BASE, "ATALAIA_PREVIEW": "on"})))
+
     def test_public_url(self) -> None:
         self.assertIsNone(Settings.from_env(BASE).public_url)
         for raw, expected in (("https://Campo.Example.pt", "https://campo.example.pt"),

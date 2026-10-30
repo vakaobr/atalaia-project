@@ -37,12 +37,11 @@ class HealthTests(AppTestCase):
         r = await self.client.get("/api/v1/health")
         self.assertEqual(r.status_code, 200)
         body = r.json()
-        self.assertEqual(set(body), {"status", "database", "version", "uptime_s"})
-        self.assertEqual(body["status"], "healthy")
-        self.assertEqual(body["database"], "connected")
-        self.assertEqual(body["version"], __version__)
-        self.assertIsInstance(body["uptime_s"], int)
-        self.assertGreaterEqual(body["uptime_s"], 0)
+        self.assertEqual(body, {"status": "ok"})  # LIVE-3: no version, no database state, no uptime
+        metrics = (await self.client.get("/api/v1/metrics", headers={"Authorization": f"Bearer {METRICS_TOKEN}"})).json()
+        self.assertEqual(metrics["version"], __version__)
+        self.assertEqual(metrics["database"], "connected")
+        self.assertIsInstance(metrics["uptime_s"], int)
         self.assertEqual(r.headers["cache-control"], "no-store")
         assert_security_headers(self, r.headers)
 
@@ -113,8 +112,7 @@ class DatabaseDownTests(AppTestCase):
     async def test_unhealthy(self) -> None:
         r = await self.client.get("/api/v1/health")
         self.assertEqual(r.status_code, 503)
-        self.assertEqual(r.json()["status"], "unhealthy")
-        self.assertEqual(r.json()["database"], "unreachable")
+        self.assertEqual(r.json(), {"status": "unhealthy"})
         assert_security_headers(self, r.headers)
 
     async def test_metrics_say_so(self) -> None:
@@ -146,7 +144,8 @@ class ServeTests(AppTestCase):
 
     async def test_uvicorn_serves_health_and_stops_cleanly(self) -> None:
         port = _free_port()
-        env = {**os.environ, "ATALAIA_DATABASE_URL": self.database_url, "ATALAIA_SECRET_KEY": SECRET_KEY}
+        env = {**os.environ, "ATALAIA_DATABASE_URL": self.database_url, "ATALAIA_SECRET_KEY": SECRET_KEY,
+               "ATALAIA_PUBLIC_URL": "http://localhost:8000"}  # the server refuses to start without it (SRV-7)
         proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "--factory", "atalaia_server.app:create_app",
                                  "--host", "127.0.0.1", "--port", str(port), "--log-level", "info"],
                                 cwd=SERVER, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -157,7 +156,7 @@ class ServeTests(AppTestCase):
             out, _ = await asyncio.to_thread(proc.communicate, timeout=20)
         log = out.decode(errors="replace")
         self.assertIsNotNone(body, log)
-        self.assertEqual(body["status"], "healthy")
+        self.assertEqual(body["status"], "ok")
         # uvicorn shuts the app down (the lifespan disposes the engine), then exits by the signal it got.
         self.assertIn("Application shutdown complete.", log)
         self.assertIn(proc.returncode, (0, -signal.SIGTERM), log)

@@ -39,6 +39,12 @@
 		defer
 	}
 
+	# The server caps request bodies itself (atalaia_server/body_limit.py: 1 MiB, 4 MiB on the image uploads); this
+	# is the first line of defence, above the largest upload, so a huge body never reaches the one worker (SRV-2).
+	request_body {
+		max_size 5MB
+	}
+
 	reverse_proxy server:8000 {
 		# The client's address reaches the server in X-Forwarded-For (Caddy
 		# replaces whatever a client sent), for the per-address rate limits and

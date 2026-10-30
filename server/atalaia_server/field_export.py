@@ -35,7 +35,9 @@ may hold several fields, the rows of the field (accounts: those with a role, a r
 The clubs and their members and reports are a hosted field's own; on a single-field server they belong to the
 server, not to one field, and are left out. ``tests/test_field_export.py`` fails when a table of the schema is
 neither exported nor listed in ``SKIPPED``, or when an exported column looks like a secret: a new table or column
-needs this decision in the plan phase that adds it (the rule of ``personal_data.py``).
+needs this decision in the plan phase that adds it (the rule of ``personal_data.py``). On a single-field server the
+audit log is the rows about the field only (``resource`` field, ``resource_id`` its id; SRV-5): an account's other
+rows are its own and may belong to another field; the accounts' ``last_login_at`` is left out for the same reason.
 
 The export is audit-logged by the API (``field_export``: who, the file's SHA-256, its size and the rows per dataset).
 """
@@ -54,7 +56,7 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Callable, IO, Optional
 
-from sqlalchemy import Select, and_, or_, select, union
+from sqlalchemy import Select, and_, select, union
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import __version__
@@ -150,8 +152,9 @@ def _consents(fid: uuid.UUID, hosted: bool) -> Any:
 def _audit(fid: uuid.UUID, hosted: bool) -> Any:
     if hosted:
         return None
-    return or_(AuditLog.user_id.in_(_account_ids(fid)),
-               and_(AuditLog.resource == "field", AuditLog.resource_id == fid))
+    # Only the rows about this field: an account's other rows (its logins, its acts on other fields) are the
+    # person's own (GET /api/v1/me/data), and a shared account of another field must not leak through (SRV-5).
+    return and_(AuditLog.resource == "field", AuditLog.resource_id == fid)
 
 
 def _images(fid: uuid.UUID, hosted: bool) -> Any:
@@ -175,7 +178,8 @@ DATASETS: tuple[Dataset, ...] = (
     Dataset("roles", _t(Role), {}, _all),
     Dataset("users", _t(User), {
         "email": "the person's own: GET /api/v1/me/data", "password_hash": "a credential",
-        "totp_secret_enc": "a credential", "totp_last_step": "a credential's state"}, _accounts),
+        "totp_secret_enc": "a credential", "totp_last_step": "a credential's state",
+        "last_login_at": "the person's own, across every field: GET /api/v1/me/data"}, _accounts),
     Dataset("user_field_roles", _t(UserFieldRole), {}, _field(UserFieldRole.field_id)),
     Dataset("consents", _t(Consent), {}, _consents),
     Dataset("field_api_keys", _t(FieldApiKey), {"key_sha256": "a credential"}, _field(FieldApiKey.field_id)),

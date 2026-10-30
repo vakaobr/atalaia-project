@@ -148,10 +148,10 @@ async def grant_game_role(game_id: uuid.UUID, body: GrantIn, request: Request,
     game = await _game(db, game_id)
     _may_manage(principal, game, body.role)
     target = await db.scalar(select(User).where(User.username == body.username.strip().lower()))
+    if body.role in PRIVILEGED_ROLES and (target is None or not await has_second_factor(db, target)):
+        raise HTTPException(409, "totp_required")  # one answer for "no such account" and "no second factor" (SRV-4)
     if target is None:
         raise HTTPException(404, "user_not_found")
-    if body.role in PRIVILEGED_ROLES and not await has_second_factor(db, target):
-        raise HTTPException(409, "totp_required")
     inserted = await db.scalar(
         insert(UserGameRole).values(user_id=target.id, game=game.id, role_id=ROLE_NAMES[body.role],
                                     granted_by=principal.user.id)

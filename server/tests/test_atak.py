@@ -358,7 +358,8 @@ class EnrolmentTests(RelayCase):
         self.assertEqual((await self.issue(gm, holder=player_name))["certificate"]["holder"], player_name)
         _, _, stranger = await self.person()
         self.assertEqual((await self.issue(gm, holder=stranger, status=409))["detail"], "holder_has_no_role")
-        self.assertEqual((await self.issue(gm, holder="nobody-at-all", status=404))["detail"], "holder_not_found")
+        # SRV-4: no such account and an account with no role here are told apart by nothing.
+        self.assertEqual(await self.issue(gm, holder="nobody-at-all", status=409), {"detail": "holder_has_no_role"})
         # A server administrator with no role on the field names a holder.
         root, _, _ = await self.person(server_admin=True)
         self.assertEqual((await self.issue(root, status=409))["detail"], "holder_has_no_role")

@@ -47,6 +47,7 @@ class RegistrationCase(SyncTestCase):
         await super().asyncSetUp()
         self.player_id, self.player_name, _ = await self.make_user("joana")
         self.player = await self.auth("joana")
+        await self.fetch("UPDATE fields SET public_page = true")  # the app's lookup by slug needs it (SRV-6)
 
     async def game(self, field_id: Optional[uuid.UUID] = None, status: str = "published", starts: float = 48,
                    window: bool = True, **values: Any) -> ScheduledGame:

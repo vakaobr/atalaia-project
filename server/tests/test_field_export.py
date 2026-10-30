@@ -49,7 +49,8 @@ class CoverageTests(unittest.TestCase):
                 self.assertIn(column, names, ds.name)
                 self.assertTrue(reason, f"{ds.name}.{column}")
         users = next(d for d in field_export.DATASETS if d.name == "users")
-        self.assertEqual(set(users.omit), {"email", "password_hash", "totp_secret_enc", "totp_last_step"})
+        self.assertEqual(set(users.omit), {"email", "password_hash", "totp_secret_enc", "totp_last_step",
+                                          "last_login_at"})
 
 
 class ExportCase(SyncTestCase):
@@ -95,6 +96,10 @@ class ExportTests(ExportCase):
                          "now() + interval '1 day')", marta)
         await self.fetch("INSERT INTO audit_log (user_id, action, ip_address) VALUES ($1, 'login', '203.0.113.9')",
                          marta)
+        await self.fetch("INSERT INTO audit_log (user_id, action, resource, resource_id) VALUES ($1, 'field_update', "
+                         "'field', $2)", marta, self.field_id)
+        await self.fetch("INSERT INTO audit_log (user_id, action, resource, resource_id) VALUES ($1, "
+                         "'other_field_change', 'field', gen_random_uuid())", marta)
 
     async def test_the_archive_holds_the_fields_data_and_no_secret(self) -> None:
         await self.seed()
@@ -135,9 +140,10 @@ class ExportTests(ExportCase):
         data = b"\n".join(v for n, v in files.items() if n.startswith("data/"))  # the manifest names what it omits
         for marker in (b"password_hash", b"totp_secret", b"key_sha256", b"ip_address", b"ticket_hash", b"config_enc"):
             self.assertNotIn(marker, data, marker)
-        # The audit log of the field's accounts is in, without the address.
+        # The audit log is the field's own rows only (a shared account's logins and its acts on another field
+        # are not in it, SRV-5), without the address.
         audit = [json.loads(line) for line in files["data/audit_log.jsonl"].decode().splitlines()]
-        self.assertIn("login", {a["action"] for a in audit})
+        self.assertEqual({a["action"] for a in audit}, {"field_update"})
         self.assertTrue(all("ip_address" not in a for a in audit))
 
     async def test_the_export_is_audit_logged_with_its_hash(self) -> None:

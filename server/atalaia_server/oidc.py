@@ -320,6 +320,20 @@ class OidcService:
         return True
 
 
+GOOGLE_ISSUER = "https://accounts.google.com"
+
+
+def identity_issuer(provider: str, claims: dict[str, Any]) -> tuple[str, Optional[str]]:
+    """The issuer a subject belongs to, and Microsoft's tenant (``tid``): what is stored with the subject so that
+    identities of different issuers or tenants cannot collide (SRV-8). Only for claims ``validate_claims`` accepted:
+    Google's two spellings of its issuer are one, Microsoft's issuer names the tenant."""
+    if provider == "google":
+        return GOOGLE_ISSUER, None
+    if provider == "apple":
+        return APPLE_ISSUER, None
+    return str(claims["iss"]), str(claims["tid"])
+
+
 USERNAME_SHAPE = re.compile(r"[a-z0-9][a-z0-9_.-]{2,63}")
 
 

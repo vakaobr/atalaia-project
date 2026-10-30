@@ -432,6 +432,43 @@ class SocialLoginTests(LoginTestCase):
         third = await self.social("microsoft", "sub-1")
         self.assertNotEqual(first["user"]["id"], third["user"]["id"])
 
+    async def social_in(self, provider: str, subject: str, claims: dict[str, Any]) -> dict[str, Any]:
+        """A social login whose token carries these extra claims (another tenant, say)."""
+        client = self.other_client()
+        params, r = await self.begin(provider, client=client)
+        _, query, fragment = self.landed(await self.callback(provider, params, subject, client=client, claims=claims))
+        self.assertEqual(query.get("oidc_error"), None, query)
+        r = await client.post("/api/v1/auth/oidc/complete", json={"ticket": fragment[5:]})
+        self.assertEqual(r.status_code, 200, r.text)
+        return r.json()
+
+    async def test_the_issuer_and_tenant_are_stored_with_the_subject(self) -> None:
+        """SRV-8: one subject under two Microsoft tenants is two accounts; each row keeps its issuer and tenant."""
+        a = await self.social_in("microsoft", "same-sub", {"tid": "tenant-1"})
+        b = await self.social_in("microsoft", "same-sub", {"tid": "tenant-2"})
+        again = await self.social_in("microsoft", "same-sub", {"tid": "tenant-1"})
+        self.assertNotEqual(a["user"]["id"], b["user"]["id"])
+        self.assertEqual(a["user"]["id"], again["user"]["id"])
+        rows = await self.fetch("SELECT issuer, tenant FROM user_identities ORDER BY tenant")
+        self.assertEqual([tuple(r) for r in rows], [("https://login.microsoftonline.com/tenant-1/v2.0", "tenant-1"),
+                                                    ("https://login.microsoftonline.com/tenant-2/v2.0", "tenant-2")])
+        await self.social("google", "g-1")
+        await self.social("apple", "a-1")
+        rows = await self.fetch("SELECT provider, issuer, tenant FROM user_identities WHERE provider <> 'microsoft' "
+                                "ORDER BY provider")
+        self.assertEqual([tuple(r) for r in rows], [("apple", "https://appleid.apple.com", None),
+                                                    ("google", "https://accounts.google.com", None)])
+
+    async def test_a_microsoft_row_without_an_issuer_takes_it_at_its_next_login(self) -> None:
+        """SRV-8: rows made before the issuer was stored (empty) match once, by provider and subject."""
+        first = await self.social("microsoft", "old-sub")
+        await self.fetch("UPDATE user_identities SET issuer = '', tenant = NULL")
+        again = await self.social_in("microsoft", "old-sub", {"tid": "tenant-1"})
+        self.assertEqual(first["user"]["id"], again["user"]["id"])
+        rows = await self.fetch("SELECT issuer, tenant FROM user_identities")
+        self.assertEqual([tuple(r) for r in rows], [("https://login.microsoftonline.com/tenant-1/v2.0", "tenant-1")])
+        self.assertEqual((await self.fetch("SELECT count(*) FROM users"))[0][0], 1)
+
     def set_notice_version(self, version: str) -> None:
         self.app.state.settings = dataclasses.replace(self.app.state.settings, privacy_notice_version=version)
 

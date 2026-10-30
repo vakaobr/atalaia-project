@@ -18,7 +18,7 @@
     PATCH  /api/v1/me/registrations/{reg}               change them while the window is open
     DELETE /api/v1/me/registrations/{reg}               cancel while the window is open
     POST   /api/v1/me/registrations/{reg}/ticket        a new ticket (shown once), until the game starts
-    GET    /api/v1/fields-by-slug/{slug}                any account: the field and its games that can be
+    GET    /api/v1/fields-by-slug/{slug}                any account, for a field with its public page on: the field and its games that can be
                                                         registered for, for the app (plan phase 17, S17-9)
     GET    /api/v1/me/player-ids                        the account's player ids and its claims
     POST   /api/v1/me/player-ids                        {field_id, player_id, player_secret}: claim the
@@ -330,11 +330,14 @@ async def field_games(slug: str, principal: Principal = Depends(current_principa
                       db: AsyncSession = Depends(get_session)) -> JSONResponse:
     """A field by its slug (as the public register page's link names it) with its published games that have
     not ended, and what registering needs: the teams, the federation number, the replicas' classes. Any
-    logged-in account; drafts never; no person (only the places left)."""
+    logged-in account, for a field with its public page on (or where the account has a role); drafts never; no person
+    (only the places left)."""
     if not SLUG.fullmatch(slug):
         raise HTTPException(404, "field_not_found")
     field = await db.scalar(select(Field).where(Field.slug == slug))
-    if field is None:
+    if field is None or not (field.public_page or principal.roles.get(field.id)):
+        # A field that keeps its public page off is not found by its slug either, unless the account has a role
+        # there (the staff set the page up before they switch it on; SRV-6).
         raise HTTPException(404, "field_not_found")
     now = svc.now_utc()
     games = list(await db.scalars(select(ScheduledGame).where(

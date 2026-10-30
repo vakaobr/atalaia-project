@@ -84,8 +84,8 @@ from ..audit import record
 from ..auth import Principal, bearer, current_principal, principal_from_token
 from ..db import get_session
 from ..models import PRIVILEGED_ROLES, ROLE_NAMES, AuditLog, OidcLogin, Passkey, User, UserFieldRole, UserIdentity, UserSession
-from ..oidc import (MAX_STATE, NAME_PROVIDERS, PROVIDER_LABELS, OidcError, make_relay_state, new_verifier, read_relay_state,
-                    pkce_challenge, username_from_name)
+from ..oidc import (MAX_STATE, NAME_PROVIDERS, PROVIDER_LABELS, OidcError, identity_issuer, make_relay_state, new_verifier,
+                    pkce_challenge, read_relay_state, username_from_name)
 from ..tokens import (TokenError, WebauthnChallenge, make_merge_ticket, make_oidc_ticket, make_webauthn_challenge, read_oidc_ticket,
                       read_webauthn_challenge)
 from .auth import (NO_STORE, Strict, username_problem, _check_code, _check_password, _ip_key, require_step_up, step_up_needed, _now, _secret, _start_session, _too_many,
@@ -475,21 +475,37 @@ async def oidc_callback(provider: str, request: Request, code: Optional[str] = N
     try:
         token = await oidc.exchange(provider, code, row.redirect_uri, row.code_verifier)
         claims = await oidc.validate_claims(provider, token, row.nonce)
-        subject = claims["sub"]
-    except OidcError as e:
-        record(db, "oidc_failed", request, user_id=row.user_id, details={"provider": provider, "reason": e.code})
+        issuer, tenant = identity_issuer(provider, claims)
+        who = (claims["sub"], issuer, tenant)
+    except (OidcError, KeyError) as e:
+        code = e.code if isinstance(e, OidcError) else "id_token_invalid"
+        record(db, "oidc_failed", request, user_id=row.user_id, details={"provider": provider, "reason": code})
         await db.commit()
-        return _back(row.return_to, error=e.code)
+        return _back(row.return_to, error=code)
     if row.purpose == "name":
-        return await _oidc_name(db, request, row, provider, subject, claims)
+        return await _oidc_name(db, request, row, provider, who, claims)
     handler = {"login": _oidc_login, "link": _oidc_link, "reauth": _oidc_reauth}[row.purpose]
-    return await handler(db, request, row, provider, subject)
+    return await handler(db, request, row, provider, who)
+
+
+async def _find_identity(db: AsyncSession, provider: str, who: tuple[str, str, Optional[str]],
+                         lock: bool = False) -> Optional[UserIdentity]:
+    """The social login with this provider, issuer and subject (SRV-8). A Microsoft row made before the issuer was
+    stored has an empty one: it matches once by provider and subject and takes the issuer and tenant now."""
+    subject, issuer, tenant = who
+    query = select(UserIdentity).where(UserIdentity.provider == provider, UserIdentity.subject == subject,
+                                       UserIdentity.issuer.in_((issuer, ""))).order_by(UserIdentity.issuer.desc())
+    found = await db.scalar(query.with_for_update() if lock else query)
+    if found is not None and found.issuer == "":
+        found.issuer, found.tenant = issuer, tenant
+        await db.flush()
+    return found
 
 
 async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provider: str,
-                      subject: str) -> RedirectResponse:
-    identity = await db.scalar(select(UserIdentity).where(UserIdentity.provider == provider,
-                                                          UserIdentity.subject == subject).with_for_update())
+                      who: tuple[str, str, Optional[str]]) -> RedirectResponse:
+    subject, issuer, tenant = who
+    identity = await _find_identity(db, provider, who, lock=True)
     now = _now()
     if identity is not None:
         user = await db.get(User, identity.user_id)
@@ -518,7 +534,8 @@ async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provid
     db.add(user)
     try:
         await db.flush()
-        db.add(UserIdentity(user_id=user.id, provider=provider, subject=subject, last_login_at=now))
+        db.add(UserIdentity(user_id=user.id, provider=provider, subject=subject, issuer=issuer, tenant=tenant,
+                            last_login_at=now))
         await db.flush()
     except IntegrityError:  # the same subject finished twice at once: the other one won
         await db.rollback()
@@ -532,12 +549,12 @@ async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provid
 
 
 async def _oidc_link(db: AsyncSession, request: Request, row: OidcLogin, provider: str,
-                     subject: str) -> RedirectResponse:
+                     who: tuple[str, str, Optional[str]]) -> RedirectResponse:
+    subject, issuer, tenant = who
     user = await db.scalar(select(User).where(User.id == row.user_id).with_for_update()) if row.user_id else None
     if user is None:
         return _back(row.return_to, error="state_invalid")
-    existing = await db.scalar(select(UserIdentity).where(UserIdentity.provider == provider,
-                                                          UserIdentity.subject == subject))
+    existing = await _find_identity(db, provider, who)
     if existing is not None and existing.user_id == user.id:
         return _back(row.return_to, error="already_linked")
     if await db.scalar(select(UserIdentity.id).where(UserIdentity.user_id == user.id,
@@ -553,7 +570,7 @@ async def _oidc_link(db: AsyncSession, request: Request, row: OidcLogin, provide
                details={"provider": provider})
         await db.commit()
         return _back(row.return_to, ok="merge", fragment={"merge": ticket})
-    db.add(UserIdentity(user_id=user.id, provider=provider, subject=subject))
+    db.add(UserIdentity(user_id=user.id, provider=provider, subject=subject, issuer=issuer, tenant=tenant))
     try:
         await db.flush()
     except IntegrityError:
@@ -566,11 +583,9 @@ async def _oidc_link(db: AsyncSession, request: Request, row: OidcLogin, provide
 
 
 async def _oidc_reauth(db: AsyncSession, request: Request, row: OidcLogin, provider: str,
-                       subject: str) -> RedirectResponse:
-    mine = await db.scalar(select(UserIdentity.id).where(UserIdentity.provider == provider,
-                                                         UserIdentity.subject == subject,
-                                                         UserIdentity.user_id == row.user_id))
-    if mine is None or row.session_id is None:
+                       who: tuple[str, str, Optional[str]]) -> RedirectResponse:
+    mine = await _find_identity(db, provider, who)
+    if mine is None or mine.user_id != row.user_id or row.session_id is None:
         return _back(row.return_to, error="identity_mismatch")
     await db.execute(update(UserSession).where(UserSession.id == row.session_id, UserSession.revoked_at.is_(None))
                      .values(confirmed_at=_now()))
@@ -580,15 +595,13 @@ async def _oidc_reauth(db: AsyncSession, request: Request, row: OidcLogin, provi
     return _back(row.return_to, ok="reauth")
 
 
-async def _oidc_name(db: AsyncSession, request: Request, row: OidcLogin, provider: str, subject: str,
-                     claims: dict[str, Any]) -> RedirectResponse:
+async def _oidc_name(db: AsyncSession, request: Request, row: OidcLogin, provider: str,
+                     who: tuple[str, str, Optional[str]], claims: dict[str, Any]) -> RedirectResponse:
     """The "use my name" round (LG-10): proves it is the account's own login (as a reauth does) and hands the browser
     a username proposed from the name claim, in the address fragment. The name is read here and kept nowhere: not in
     the users row, not in the audit entry, not in the log."""
-    mine = await db.scalar(select(UserIdentity.id).where(UserIdentity.provider == provider,
-                                                         UserIdentity.subject == subject,
-                                                         UserIdentity.user_id == row.user_id))
-    if mine is None or row.session_id is None:
+    mine = await _find_identity(db, provider, who)
+    if mine is None or mine.user_id != row.user_id or row.session_id is None:
         return _back(row.return_to, error="identity_mismatch")
     suggestion = username_from_name(claims)
     if suggestion is None or username_problem(suggestion):

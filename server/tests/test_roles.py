@@ -350,6 +350,12 @@ class RoleTests(RoleTestCase):
     async def test_unknown_things(self) -> None:
         r = await self.grant(self.as_admin, self.field, "nobody-at-all", "player")
         self.assertEqual((r.status_code, r.json()["detail"]), (404, "user_not_found"))
+        # SRV-4: for a role that needs a second factor, "no such account" and "no second factor" are one answer.
+        _, plain, _ = await self.make_user()
+        answers = {(r.status_code, r.json()["detail"]) for r in (
+            await self.grant(self.as_admin, self.field, "nobody-at-all", "gm"),
+            await self.grant(self.as_admin, self.field, plain, "gm"))}
+        self.assertEqual(answers, {(409, "totp_required")})
         r = await self.grant(self.as_admin, str(uuid.uuid4()), "chefe", "player")
         self.assertEqual((r.status_code, r.json()["detail"]), (404, "field_not_found"))
         r = await self.grant(self.as_admin, self.field, "chefe", "general")

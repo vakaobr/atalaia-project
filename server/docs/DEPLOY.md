@@ -87,7 +87,7 @@ paste it into a chat.
 | Variable | Made by setup.sh | Meaning |
 | --- | --- | --- |
 | `ATALAIA_DOMAIN` | the argument | The site's name; Caddy gets its certificate |
-| `ATALAIA_PUBLIC_URL` | `https://DOMAIN` | The links in the field pages and feeds (see [server/README.md](../README.md)) |
+| `ATALAIA_PUBLIC_URL` | `https://DOMAIN` | The links in the field pages and feeds, the WebAuthn origin and the OpenID redirect address (see [server/README.md](../README.md)). Required: the server refuses to start without it (hosted mode: unset) |
 | `ATALAIA_TLS` | `acme` | `acme`: a public certificate (Let's Encrypt or ZeroSSL), renewed by Caddy. `internal`: Caddy's own certificate authority, for a trial or a field server with no public name (below) |
 | `POSTGRES_PASSWORD` | random | The database's password; the database is never reachable from outside |
 | `ATALAIA_SECRET_KEY` | random | See above |
@@ -188,7 +188,7 @@ Browsers warn about such a certificate; players' phones would too.
 Accounts always log in with a password, and can also log in with a **passkey** and, when you register a client with the
 provider, with **Google**, **Microsoft** (personal and work or school accounts) and **Apple**
 (server/README.md, "Accounts, sessions and roles"). Passkeys need nothing: the server uses the address it is served
-from (`ATALAIA_PUBLIC_URL`, so set it) as the WebAuthn origin and its host name as the RP ID; that name must not
+from (`ATALAIA_PUBLIC_URL`, which the server requires) as the WebAuthn origin and its host name as the RP ID; that name must not
 change afterwards, or the passkeys stop working. A provider is **off** until you give all of its settings in `.env`
 (`docker compose up -d` afterwards); the server stores only the provider and the opaque subject it gives, never an
 email or a name, so you ask the providers for nothing but sign-in. (One exception, on request only: the Account page's "Use my Google name" / "Use my Microsoft name" button, which an account made by that provider's login can press once to get a username suggested, runs a round with the extra scope `profile`; the name is read for that one answer and kept nowhere. Google's consent screen must therefore list `profile`, below. Apple has no such button.)
@@ -742,11 +742,18 @@ the rest of hosted mode, this has not run on a real hub with real DNS; the tests
 
 ## Monitoring
 
-- `GET /api/v1/health` (no authentication; not rate limited): `status`,
-  `database`, `version`, `uptime_s`; 503 when the database is down. Any
-  uptime monitor can watch it.
+- `GET /api/v1/health` (no authentication; not rate limited): `{"status": "ok"}`,
+  or 503 `{"status": "unhealthy"}` when the database is down, and nothing else
+  (LIVE-3). Any uptime monitor can watch it.
 - `GET /api/v1/metrics` with `Authorization: Bearer <ATALAIA_METRICS_TOKEN>`
-  (or a server administrator's session).
+  (or a server administrator's session): the version, the uptime, the database
+  state and the counters that used to be public in the health answer.
+- A request a TLS-ending proxy (Cloudflare Tunnel) says came over plain HTTP
+  (`X-Forwarded-Proto: http`, honoured for the proxies `FORWARDED_ALLOW_IPS`
+  names) is answered `308` to the same address over `https` (LIVE-1);
+  `localhost`, loopback hosts, requests with no such header (the containers, a
+  health check on 127.0.0.1) and `/api/v1/health` are not redirected. In
+  Cloudflare, also turn on *Always Use HTTPS* for the hostname.
 - `docker compose ps` shows each container's health.
 
 ## Removing it

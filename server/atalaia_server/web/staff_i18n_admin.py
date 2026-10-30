@@ -258,7 +258,7 @@ PT: dict[str, str] = {
     # API answers
     "e_role_invalid": "Essa função não existe.",
     "e_user_not_found": "Nenhuma conta tem esse nome de utilizador.",
-    "e_totp_required": "Essa conta não tem TOTP: administração, GM e marshal precisam dele.",
+    "e_totp_required": "Essa conta não existe ou não tem TOTP: administração, GM e marshal precisam dele.",
     "e_role_not_found": "Essa função não estava atribuída.",
     "e_too_many_keys": "O campo já tem o máximo de chaves ativas: revogar primeiro uma.",
     "e_key_not_found": "Chave não encontrada.",
@@ -537,7 +537,7 @@ EN: dict[str, str] = {
     # API answers
     "e_role_invalid": "That role does not exist.",
     "e_user_not_found": "No account has that username.",
-    "e_totp_required": "That account has no TOTP: admin, GM and marshal need it.",
+    "e_totp_required": "That account does not exist or has no TOTP: admin, GM and marshal need it.",
     "e_role_not_found": "That role was not held.",
     "e_too_many_keys": "The field already has the most live keys: revoke one first.",
     "e_key_not_found": "Key not found.",
@@ -829,7 +829,7 @@ DE: dict[str, str] = {
     # API answers
     "e_role_invalid": "Diese Rolle gibt es nicht.",
     "e_user_not_found": "Kein Konto hat diesen Benutzernamen.",
-    "e_totp_required": "Dieses Konto hat kein TOTP: Admin, GM und Marshal brauchen es.",
+    "e_totp_required": "Dieses Konto existiert nicht oder hat kein TOTP: Admin, GM und Marshal brauchen es.",
     "e_role_not_found": "Diese Rolle war nicht vergeben.",
     "e_too_many_keys": "Das Spielfeld hat schon die meisten aktiven Schlüssel: Widerrufe zuerst einen.",
     "e_key_not_found": "Schlüssel nicht gefunden.",
@@ -1094,7 +1094,7 @@ ZH_TW: dict[str, str] = {
     # API answers
     "e_role_invalid": "沒有這個角色。",
     "e_user_not_found": "沒有帳號使用這個使用者名稱。",
-    "e_totp_required": "這個帳號沒有 TOTP：管理員、GM 和裁判需要它。",
+    "e_totp_required": "這個帳號不存在或沒有 TOTP：管理員、GM 和裁判需要它。",
     "e_role_not_found": "沒有授予過這個角色。",
     "e_too_many_keys": "場地的有效金鑰已達上限：請先撤銷一把。",
     "e_key_not_found": "找不到金鑰。",

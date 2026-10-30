@@ -372,10 +372,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "e_until_invalid": "Data inválida.",
         "e_atak_relay_off": "O relay ATAK deste servidor está desligado.",
         "e_positions_not_allowed": "Só uma conta com a função de GM ou marshal neste campo pode ver posições.",
-        "e_holder_has_no_role": "Essa conta não tem nenhuma função neste campo.",
+        "e_holder_has_no_role": "Essa conta não existe ou não tem nenhuma função neste campo.",
         "e_positions_need_gm_or_marshal": "Só quem tem a função de GM ou marshal neste campo pode emitir um "
                                           "certificado que vê posições.",
-        "e_holder_not_found": "Não há nenhuma conta com esse nome.",
         "e_certificate_not_found": "Certificado não encontrado.",
         "e_invalid_request": "Pedido inválido.",
         # The schedule, a game's registrations and its roster (Phase 4 follow-up FU6)
@@ -1140,10 +1139,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "e_until_invalid": "Invalid date.",
         "e_atak_relay_off": "This server's ATAK relay is off.",
         "e_positions_not_allowed": "Only an account with the GM or marshal role on this field may see positions.",
-        "e_holder_has_no_role": "That account has no role on this field.",
+        "e_holder_has_no_role": "That account does not exist or has no role on this field.",
         "e_positions_need_gm_or_marshal": "Only someone with the GM or marshal role on this field may issue a "
                                           "certificate that sees positions.",
-        "e_holder_not_found": "No account has that name.",
         "e_certificate_not_found": "Certificate not found.",
         "e_invalid_request": "Invalid request.",
         # The schedule, a game's registrations and its roster (Phase 4 follow-up FU6)
@@ -1915,10 +1913,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "e_atak_relay_off": "Das ATAK-Relay dieses Servers ist aus.",
         "e_positions_not_allowed": "Nur ein Konto mit der Rolle GM oder Marshal auf diesem Spielfeld darf Positionen "
                                    "sehen.",
-        "e_holder_has_no_role": "Dieses Konto hat auf diesem Spielfeld keine Rolle.",
+        "e_holder_has_no_role": "Dieses Konto existiert nicht oder hat auf diesem Spielfeld keine Rolle.",
         "e_positions_need_gm_or_marshal": "Nur wer auf diesem Spielfeld die Rolle GM oder Marshal hat, darf ein "
                                           "Zertifikat ausstellen, das Positionen sieht.",
-        "e_holder_not_found": "Kein Konto hat diesen Namen.",
         "e_certificate_not_found": "Zertifikat nicht gefunden.",
         "e_invalid_request": "Ungültige Anfrage.",
         # The schedule, a game's registrations and its roster (Phase 4 follow-up FU6)
@@ -2666,9 +2663,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "e_until_invalid": "無效的日期。",
         "e_atak_relay_off": "這台伺服器的 ATAK 中繼已關閉。",
         "e_positions_not_allowed": "只有在這個場地擁有 GM 或裁判角色的帳號，才能查看位置。",
-        "e_holder_has_no_role": "那個帳號在這個場地沒有任何角色。",
+        "e_holder_has_no_role": "那個帳號不存在，或在這個場地沒有任何角色。",
         "e_positions_need_gm_or_marshal": "只有在這個場地擁有 GM 或裁判角色的人，才能核發可查看位置的憑證。",
-        "e_holder_not_found": "沒有使用這個名稱的帳號。",
         "e_certificate_not_found": "找不到憑證。",
         "e_invalid_request": "無效的請求。",
         # The schedule, a game's registrations and its roster (Phase 4 follow-up FU6)

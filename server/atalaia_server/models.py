@@ -198,16 +198,20 @@ class UserSession(Base):
 
 class UserIdentity(Base):
     """A social login linked to an account (OpenID Connect, LG-1): the provider and the subject the provider
-    gave, nothing of the profile. One per provider per account; a subject belongs to one account."""
+    gave, nothing of the profile. One per provider per account; a subject belongs to one account. A subject is only
+    unique within its issuer (Microsoft's issuer names the tenant), so the issuer is part of the key and ``tenant``
+    keeps Microsoft's ``tid`` (SRV-8); an empty ``issuer`` is a Microsoft row made before it was stored."""
 
     __tablename__ = "user_identities"
-    __table_args__ = (UniqueConstraint("provider", "subject"), UniqueConstraint("user_id", "provider"),
+    __table_args__ = (UniqueConstraint("provider", "issuer", "subject"), UniqueConstraint("user_id", "provider"),
                       CheckConstraint("provider IN ('google', 'microsoft', 'apple')", name="provider"))
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     provider: Mapped[str] = mapped_column(String(16), nullable=False)
     subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    issuer: Mapped[str] = mapped_column(String(255), nullable=False, server_default="")
+    tenant: Mapped[Optional[str]] = mapped_column(String(64))
     created_at: Mapped[datetime] = _created()
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 

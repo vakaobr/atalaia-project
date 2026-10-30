@@ -268,7 +268,7 @@ class RoutingTests(HubCase):
         self.assertEqual(r.status_code, 401)  # found (case and port do not matter), then asks for a login
         # The health check needs no field: the container calls 127.0.0.1.
         r = await self.client("", "127.0.0.1:8000").get("/api/v1/health")
-        self.assertEqual((r.status_code, r.json()["database"]), (200, "connected"))
+        self.assertEqual((r.status_code, r.json()), (200, {"status": "ok"}))
 
     async def test_slugs_and_hosts(self) -> None:
         self.assertEqual(tenancy.schema_for("campo-a"), "field_campo_a")

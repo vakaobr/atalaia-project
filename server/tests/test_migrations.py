@@ -716,7 +716,7 @@ class TenantRoleMigrationTests(unittest.TestCase):
         self.assertTrue(self.role_exists(role))
         cfg = hosted.alembic_config(self.hub.owner_url, schema)
         before = self.rows("SELECT version_num FROM %s.alembic_version" % schema)[0][0]
-        self.assertEqual(before, "0026_oidc_app_challenge")
+        self.assertEqual(before, "0026_identity_issuer")
         command.downgrade(cfg, "0022_field_retention")
         self.assertFalse(self.role_exists(role))  # the role and every grant it held are gone ...
         self.assertTrue(self.role_exists(self.hub.a.role))  # ... and only this field's role

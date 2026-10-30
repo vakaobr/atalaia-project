@@ -47,7 +47,9 @@ from .api import (app_links, atak, auth, branding, chrono, clubs, devices, expor
                   hub_share as hub_share_api, health, history, integrations as integrations_api, me, registration_import,
                   registrations, privacy as privacy_api, remote_gm, scenarios, login_methods, oidc_relay, account_merge, scheduling, sync)
 from .atak_relay import AtakRelay
-from .config import Settings, redact_url
+from .body_limit import BodyLimitMiddleware
+from .https_redirect import HttpsRedirectMiddleware
+from .config import Settings, redact_url, require_public_url
 from .db import make_engine, make_sessionmaker
 from .oidc import OidcService
 from .ratelimit import Limits, RequestLimitMiddleware
@@ -61,7 +63,11 @@ log = logging.getLogger("atalaia.server")
 
 
 def create_app(settings: Optional[Settings] = None) -> FastAPI:
-    settings = settings or Settings.from_env()
+    if settings is None:  # the server's own start (uvicorn --factory): the tests give their settings
+        settings = Settings.from_env()
+        if not require_public_url(settings):
+            log.warning("ATALAIA_PUBLIC_URL is not set: this preview takes its WebAuthn origin and OpenID redirect "
+                        "address from the request's Host header; set it (SRV-7)")
     logging.getLogger("atalaia").setLevel(settings.log_level.upper())
 
     @asynccontextmanager
@@ -133,8 +139,10 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.add_exception_handler(quotas.QuotaExceeded, _quota_exceeded)
     # The last one added runs first: security headers wrap everything, the 429s and the hosted mode's
     # refusals included; the tenant is chosen before anything else reads the database.
+    app.add_middleware(BodyLimitMiddleware)  # innermost: the headers and the limits wrap its 413 (SRV-2)
     app.add_middleware(RequestLimitMiddleware, get_limits=lambda: app.state.limits)
     app.add_middleware(tenancy.TenantMiddleware, get_state=lambda: app.state)
+    app.add_middleware(HttpsRedirectMiddleware, get_public_url=lambda: settings.public_url)  # LIVE-1
     app.add_middleware(SecurityHeadersMiddleware)
     if settings.preview:  # a preview deployment (decisions PV-*): noindex everywhere, the landing page, the form
         app.add_middleware(preview.PreviewHeadersMiddleware)

@@ -296,6 +296,17 @@ class GuestDataTests(ImportCase):
 class FieldGamesTests(ImportCase):
     """GET /api/v1/fields-by-slug/{slug}: what the app shows before registering (decisions S16-13, S17-9)."""
 
+    async def test_a_field_without_its_public_page_is_not_found_by_slug(self) -> None:
+        """SRV-6: public_page off hides the field and its games from the app's lookup, but not from its own staff."""
+        await self.game()
+        await self.fetch("UPDATE fields SET public_page = false")
+        stranger = self.player  # an account with no role on the field
+        r = await self.client.get("/api/v1/fields-by-slug/campo", headers=stranger)
+        self.assertEqual((r.status_code, r.json()["detail"]), (404, "field_not_found"))
+        self.assertEqual((await self.client.get("/api/v1/fields-by-slug/campo", headers=self.admin)).status_code, 200)
+        await self.fetch("UPDATE fields SET public_page = true")
+        self.assertEqual((await self.client.get("/api/v1/fields-by-slug/campo", headers=stranger)).status_code, 200)
+
     async def test_the_fields_games_for_the_app(self) -> None:
         game = await self.game(federation="required", max_players=10, teams=["red", "blue"])
         await self.game(status="draft")

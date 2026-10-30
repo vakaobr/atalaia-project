@@ -24,7 +24,9 @@
                             GET /api/v1/privacy-notice; unset, no notice is published
     ATALAIA_PUBLIC_URL      the site's public origin (https://campo.example.pt): the links in
                             the field pages and feeds and the host name in iCalendar UIDs;
-                            unset, they follow the request (a local trial only)
+                            and the WebAuthn origin and OpenID redirect URI; required to start the server
+                            (http://localhost:8000 for a trial on this computer), except in hosted mode (each
+                            field's own address) and for a preview, which only warns (SRV-7)
     ATALAIA_TEST_ADAPTER    "on" offers the platform adapters' test adapter (an in-memory stand-in
                             for a platform, for trials and tests); "off" by default (plan phase 17)
     ATALAIA_FIRMWARE_KEYS   the Ed25519 public keys (32 bytes in standard base64, separated by
@@ -271,6 +273,20 @@ def check_public_url(url: str) -> str:
     if parts.path not in ("", "/") or parts.query or parts.fragment or parts.username or parts.password:
         raise ConfigError("ATALAIA_PUBLIC_URL must be an origin only, with no path, query or user")
     return f"{parts.scheme}://{parts.netloc.lower()}"
+
+
+def require_public_url(settings: "Settings") -> bool:
+    """SRV-7: a server that is not hosted needs ATALAIA_PUBLIC_URL, or the WebAuthn origin and the OpenID redirect URI
+    would come from the request's Host header (anyone who can send one could name them). Raises ConfigError; a
+    preview (ATALAIA_PREVIEW=on) is let through and False is returned so that the caller can warn (the preview's start
+    must not break). True: nothing to say."""
+    if settings.hosted or settings.public_url:
+        return True
+    if settings.preview:
+        return False
+    raise ConfigError("ATALAIA_PUBLIC_URL is not set: the WebAuthn origin and the OpenID redirect address would come "
+                      "from the request's Host header. Set it to the site's address (https://campo.example.pt; "
+                      "http://localhost:8000 for a trial on this computer)")
 
 
 def database_url_from_env(env: Optional[Mapping[str, str]] = None) -> str:

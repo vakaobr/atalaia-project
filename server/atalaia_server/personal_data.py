@@ -240,7 +240,7 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
         },
         # Login methods (LG-1, LG-2): the social logins linked (provider and the subject it gave) and the
         # passkeys (name, when, where it was made for). Never a key, never a credential id.
-        "identities": [{"provider": i.provider, "subject": i.subject, "linked_at": _iso(i.created_at),
+        "identities": [{"provider": i.provider, "issuer": i.issuer, "subject": i.subject, "linked_at": _iso(i.created_at),
                         "last_login_at": _iso(i.last_login_at)} for i in identities],
         "passkeys": [{"id": str(k.id), "name": k.name, "rp_id": k.rp_id, "backed_up": k.backed_up,
                       "transports": k.transports, "created_at": _iso(k.created_at),
