@@ -37,6 +37,16 @@ class AccountCase(LoginBrowserCase):
         await page.fill("#passkey-name", name)
         await page.click("#passkey-add")
 
+    async def step_up(self, page: Page, words: str = "Confirmed. Repeat the action.") -> None:
+        """An account with a passkey changes its login methods only after a second factor (SR-1): the page says so
+        and offers the passkey (the virtual authenticator answers it)."""
+        await expect(page.locator("#confirm-stepup")).to_be_visible()
+        await expect(page.locator("#confirm-recent-box")).to_be_visible()
+        await expect(page.locator("#confirm-providers button")).to_have_count(0)  # a provider is no second factor
+        await page.click("#confirm-passkey")
+        await expect(page.locator("#status")).to_have_text(words)
+        await expect(page.locator("#confirm-stepup")).to_be_hidden()
+
 
 class PasskeyAccountTests(AccountCase):
     async def test_add_rename_and_remove_a_passkey(self) -> None:
@@ -63,8 +73,13 @@ class PasskeyAccountTests(AccountCase):
         await expect(row).to_contain_text("Laptop")
         await expect(row).to_contain_text("never used")
         self.assertEqual((await self.fetch("SELECT name FROM passkeys"))[0][0], "Laptop")
-        # Rename.
+        # The account has a passkey now: renaming it asks for a second factor, in words, and the page offers it.
         await row.locator("button[data-act=rename]").click()
+        await page.fill("#passkeys li input", "Phone")
+        await page.click("#passkeys li button[type=submit]")
+        await expect(page.locator("#status")).to_contain_text("asks for a second factor")
+        await self.step_up(page)
+        await page.locator("#passkeys li button[data-act=rename]").click()
         await page.fill("#passkeys li input", "Phone")
         await page.click("#passkeys li button[type=submit]")
         await expect(page.locator("#status")).to_have_text("Name saved.")
@@ -95,6 +110,7 @@ class PasskeyAccountTests(AccountCase):
         # passkey the second factor the role needs).
         await self.add_passkey(page, "Key")
         await expect(page.locator("#passkeys li")).to_have_count(1)
+        await self.step_up(page)
         await page.fill("#confirm-password", PASSWORD)
         await page.locator("#passkeys li button[data-act=remove]").click()
         await expect(page.locator("#status")).to_have_text(
@@ -181,7 +197,10 @@ class GoogleAccountTests(AccountCase):
         # The login just made counts as the confirmation: a passkey can be added at once.
         await self.add_passkey(page, "First", None)
         await expect(page.locator("#status")).to_have_text("Passkey added.")
-        # Ten minutes later it does not: setting a password is refused in words, then the provider again.
+        # It has a passkey now, so changing its login methods needs a second factor: the page says so and the
+        # passkey gives it (a provider would not count).
+        await self.step_up(page)
+        # Ten minutes later the confirmation is gone: setting a password is refused in words, then the provider again.
         await self.fetch("UPDATE sessions SET confirmed_at = now() - interval '20 minutes'")
         await page.fill("#new-password", "a-long-enough-pass-phrase-7")
         await page.click("#password-save")
@@ -273,6 +292,9 @@ class AccountLanguageTests(AccountCase):
         await self.open_account(page, name)
         await self.add_passkey(page, "Mein sehr langer Passkey-Name für das Büro im ersten Stock")
         await expect(page.locator("#status")).to_have_text("Passkey hinzugefügt.")
+        await expect(page.locator("#confirm-stepup")).to_contain_text("zweiten Faktor")
+        await self.check_page(page, 375)
+        await self.step_up(page, "Bestätigt. Wiederhole die Aktion.")
         await page.fill("#confirm-password", PASSWORD)
         await page.locator("#link-buttons button[data-provider=google]").click()
         await page.wait_for_url(f"{self.base}{PAGE}")

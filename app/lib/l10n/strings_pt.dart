@@ -1294,7 +1294,7 @@ const Map<String, String> ptStrings = {
   'acct.e.confirmation_required':
       'Confirmar primeiro que é esta conta (ver a confirmação acima) e repetir a ação.',
   'acct.e.mfa_required':
-      'Esta ação pede um segundo fator (TOTP ou chave de acesso): confirmar com o código ou a chave de acesso no painel de confirmação acima e repetir. Uma conta de equipa sem palavra-passe nem segundo fator tem de ficar a cargo da administração do servidor.',
+      'Esta ação pede um segundo fator (TOTP ou chave de acesso): confirmar com o código ou a chave de acesso no painel de confirmação acima e repetir.',
   'acct.e.invalid_password': 'Palavra-passe errada.',
   'acct.e.invalid_code': 'Código errado.',
   'acct.e.no_password': 'Esta conta não tem palavra-passe.',

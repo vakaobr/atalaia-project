@@ -1264,7 +1264,7 @@ const Map<String, String> enStrings = {
   'acct.e.confirmation_required':
       'Confirm it is you first (see the confirmation above), then repeat the action.',
   'acct.e.mfa_required':
-      'This action asks for a second factor (TOTP or a passkey): confirm with the code or the passkey in the confirmation panel above, then repeat it. A staff account with no password and no second factor has to be sorted out by the server\'s administrator.',
+      'This action asks for a second factor (TOTP or a passkey): confirm with the code or the passkey in the confirmation panel above, then repeat it.',
   'acct.e.invalid_password': 'Wrong password.',
   'acct.e.invalid_code': 'Wrong code.',
   'acct.e.no_password': 'This account has no password.',

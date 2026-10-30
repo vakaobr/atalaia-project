@@ -1325,7 +1325,7 @@ const Map<String, String> deStrings = {
   'acct.e.confirmation_required':
       'Bestätige zuerst, dass du es bist (siehe Bestätigung oben), und wiederhole dann die Aktion.',
   'acct.e.mfa_required':
-      'Diese Aktion verlangt einen zweiten Faktor (TOTP oder Passkey): Bestätige im Bestätigungsfeld oben mit dem Code oder dem Passkey und wiederhole sie dann. Ein Team-Konto ohne Passwort und ohne zweiten Faktor muss die Administration des Servers in Ordnung bringen.',
+      'Diese Aktion verlangt einen zweiten Faktor (TOTP oder Passkey): Bestätige im Bestätigungsfeld oben mit dem Code oder dem Passkey und wiederhole sie dann.',
   'acct.e.invalid_password': 'Falsches Passwort.',
   'acct.e.invalid_code': 'Falscher Code.',
   'acct.e.no_password': 'Dieses Konto hat kein Passwort.',
