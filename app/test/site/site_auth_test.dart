@@ -133,7 +133,7 @@ void main() {
 
     test('a social login is bound to the app: the verifier hash at the start, '
         'the verifier itself at the end (APP-4)', () async {
-      await auth.oidc('google', consent: true);
+      await auth.oidc('google', noticeSeen: true, ageConfirmed: true);
       final challenge = site.lastAppChallenge!;
       expect(challenge, matches(RegExp(r'^[A-Za-z0-9_-]{43}$')));
       final verifier = site.lastVerifier!;
@@ -153,7 +153,8 @@ void main() {
       site.startTakesNoticeVersion = false;
       final name = await auth.oidc(
         'google',
-        consent: true,
+        noticeSeen: true,
+        ageConfirmed: true,
         noticeVersion: site.noticeVersion,
       );
       expect(name, 'falcao');

@@ -297,7 +297,7 @@ class FakeSite {
   /// The code another field made, which `link` takes (once).
   var otherFieldCode = 'ABCD-EFGH-JKLM';
 
-  SiteResponse? _consentAndHub(
+  SiteResponse? _noticeAndHub(
     String method,
     String path,
     Map<String, Object?> b,
@@ -704,7 +704,7 @@ class FakeSite {
     }
     final login = _loginMethods(method, path, b, bearer);
     if (login != null) return login;
-    final own = _consentAndHub(method, path, b);
+    final own = _noticeAndHub(method, path, b);
     if (own != null) return own;
     final regPath = RegExp(
       r'^/fields/([0-9a-f-]+)/scheduled-games/([0-9a-f-]+)/registrations$',

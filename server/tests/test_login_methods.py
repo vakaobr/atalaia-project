@@ -256,10 +256,10 @@ class AppLinkTests(LoginTestCase):
 
     async def test_the_app_challenge_is_for_the_app_return_only(self) -> None:
         r = await self.client.post("/api/v1/auth/oidc/google/start", json={
-            "purpose": "login", "consent": True, "app_challenge": pkce_challenge("x" * 43)})
+            "purpose": "login", "notice_seen": True, "age_confirmed": True, "app_challenge": pkce_challenge("x" * 43)})
         self.assertEqual((r.status_code, r.json()["detail"]), (422, "app_challenge_not_for_browser"))
         r = await self.client.post("/api/v1/auth/oidc/google/start", json={
-            "purpose": "login", "consent": True, "return_to": f"{ORIGIN}/app/oidc", "app_challenge": "nope"})
+            "purpose": "login", "notice_seen": True, "age_confirmed": True, "return_to": f"{ORIGIN}/app/oidc", "app_challenge": "nope"})
         self.assertEqual(r.status_code, 422)
 
     async def test_an_older_app_without_a_challenge_works_unless_the_operator_refuses_it(self) -> None:
@@ -269,7 +269,7 @@ class AppLinkTests(LoginTestCase):
         self.assertEqual(done.status_code, 200, done.text)
         self.app.state.settings = dataclasses.replace(self.app.state.settings, oidc_app_require_challenge=True)
         r = await self.client.post("/api/v1/auth/oidc/google/start", json={
-            "purpose": "login", "consent": True, "return_to": f"{ORIGIN}/app/oidc"})
+            "purpose": "login", "notice_seen": True, "age_confirmed": True, "return_to": f"{ORIGIN}/app/oidc"})
         self.assertEqual((r.status_code, r.json()["detail"]), (426, "app_challenge_required"))
         # The staff page is not an app: it never needs one.
         _, r = await self.begin("google")
