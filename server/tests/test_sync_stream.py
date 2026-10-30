@@ -42,7 +42,7 @@ class StreamTests(unittest.TestCase):
         self.key = sync.new_key()
         self.key_id = self.db.fetch("INSERT INTO field_api_keys (field_id, key_sha256) VALUES ($1, $2) RETURNING id",
                                     field, sync.key_hash(self.key))[0][0]
-        app = create_app(Settings(database_url=self.db.url, secret_key=SECRET_KEY, purge_hour=None))
+        app = create_app(Settings(allow_signup_without_notice=True, database_url=self.db.url, secret_key=SECRET_KEY, purge_hour=None))
         self.client = TestClient(app, base_url="https://server.test")
         self.client.__enter__()
 

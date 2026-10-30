@@ -45,6 +45,9 @@ deleted (``--dry-run``: what it would delete). The server runs it by itself
 every day at ATALAIA_PURGE_HOUR (03:00 UTC by default); the command is for a
 deployment that turns that off and schedules it elsewhere, or for a check.
 
+``erasure-ledger apply`` (PRIV-4) erases again, after a restore from a backup, the accounts and players the erasure ledger
+(``ATALAIA_ERASURE_LEDGER``, ``erasure_ledger.py``) lists: ``restore.sh`` runs it once the restored server is healthy.
+
 ``atak`` is the operator's side of the remote ATAK relay's enrolment (Phase 4
 follow-up FU5; the field's admin and gm use ``/staff/fields/<field>/atak`` or
 the API): ``issue`` writes a TAK data package for a device of the field named
@@ -78,7 +81,7 @@ from typing import Any, Callable, Optional, TextIO
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from . import atak_pki, demo_data, hosted, passwords, personal_data, tenancy, totp
+from . import atak_pki, demo_data, erasure_ledger, erasure_replay, hosted, passwords, personal_data, tenancy, totp
 from .api.auth import EMAIL, username_problem
 from .audit import record
 from .config import QUOTA_DEFAULTS, ConfigError, Settings, database_url_from_env
@@ -228,9 +231,12 @@ async def run_purge(settings: Settings, dry_run: bool, out: TextIO) -> dict[str,
     try:
         maker = make_sessionmaker(engine, hosted=settings.hosted)
         for tenant in (await tenancy.active_tenants(engine)) if settings.hosted else [None]:
+            gone: list[uuid.UUID] = []
             with tenancy.use(tenant):
                 async with maker() as db:
-                    counts = await personal_data.purge(db, dry_run=dry_run)
+                    counts = await personal_data.purge(db, dry_run=dry_run, policy=settings.retention, anonymised=gone)
+            erasure_ledger.append(settings.erasure_ledger,  # PRIV-4: the accounts anonymised for inactivity
+                                  [erasure_ledger.account_entry(u, tenant.slug if tenant else None) for u in gone])
             verb = "would delete" if dry_run else "deleted"
             where = f" ({tenant.slug})" if tenant is not None else ""
             print(f"Retention purge{where} {verb}: "
@@ -443,6 +449,8 @@ def _parser() -> argparse.ArgumentParser:
     p = fsub.add_parser("list", help="print the feedback, newest first")
     p.add_argument("--status", default="new", choices=("new", "seen", "done", "all"))
     p.add_argument("--json", action="store_true")
+    led = sub.add_parser("erasure-ledger", help="erase again what the erasure ledger lists, after a restore (PRIV-4)")
+    led.add_argument("action", choices=("apply",))
     purge = sub.add_parser("purge", help="delete what is past its retention period (ADR-P4-8), once")
     purge.add_argument("--dry-run", action="store_true", help="count, delete nothing")
     imp = sub.add_parser("import-field", help="load a hosted field's export into this single-field server")
@@ -633,6 +641,13 @@ def main(argv: Optional[list[str]] = None, stdin: TextIO = sys.stdin, out: TextI
         return 2
     if args.command == "purge":
         asyncio.run(run_purge(settings, args.dry_run, out))
+        return 0
+    if args.command == "erasure-ledger":
+        try:
+            asyncio.run(erasure_replay.apply_ledger(settings, out))
+        except (ValueError, tenancy.TenantError) as e:
+            print(f"atalaia_server: {e}", file=err)
+            return 1
         return 0
     if args.command == "atak":
         try:

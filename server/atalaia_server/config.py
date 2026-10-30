@@ -13,6 +13,22 @@
     ATALAIA_LOG_LEVEL       debug, info (default), warning or error
     ATALAIA_PURGE_HOUR      the hour (UTC, 0-23, default 3) of the daily retention purge, or
                             "off" when something else runs `python -m atalaia_server purge`
+    ATALAIA_AUDIT_IP_DAYS   days an audit log row keeps the client's network address (default 180, 90-365, PRIV-6);
+                            after that the address is erased and the row stays (until its own 36 months)
+    ATALAIA_INACTIVE_ACCOUNT_MONTHS
+                            months without any activity after which an account is warned and then anonymised
+                            (default 24, 12-120, or "off", PRIV-7); accounts that hold a field role, are server
+                            administrators or are registered for a game still to come are never touched
+    ATALAIA_INACTIVE_GRACE_DAYS
+                            days between the warning and the anonymisation (default 30, 7-180, PRIV-7)
+    ATALAIA_ALLOW_SIGNUP_WITHOUT_NOTICE
+                            "on" lets new accounts be made (password or social login) while no privacy notice is
+                            published for ATALAIA_PRIVACY_NOTICE_VERSION; "off" (default): they are refused with
+                            ``privacy_notice_unpublished``, since the consent would be to no text (LIVE-2). Only
+                            for development and tests; logins of existing accounts are never affected
+    ATALAIA_ERASURE_LEDGER  the file the erasure ledger is appended to, outside the database (PRIV-4): one line per
+                            account or player erased, as SHA-256 hashes only, so a restore from a backup can erase them
+                            again (the deployment sets /ledger/erasures.jsonl, a Docker volume); unset, no ledger is kept
     ATALAIA_PRIVACY_NOTICE_VERSION
                             the version of the privacy notice the field shows (default
                             "template-2026-10-19"), stored with every consent; an account whose
@@ -149,6 +165,9 @@ MAX_QUOTA = 100_000_000
 DEFAULT_EXPORT_INTERVAL_S = 300
 DEFAULT_EXPORT_MAX_MB = 512
 DEFAULT_HOSTED_WATCH_S = 2.0
+DEFAULT_AUDIT_IP_DAYS = 180
+DEFAULT_INACTIVE_MONTHS = 24
+DEFAULT_INACTIVE_GRACE_DAYS = 30
 OIDC_PROVIDERS = ("google", "microsoft", "apple")
 MICROSOFT_TENANT = re.compile(
     r"common|organizations|consumers|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
@@ -157,6 +176,24 @@ OIDC_VALUE = re.compile(r"[\x21-\x7e]{1,512}")  # printable ASCII, no spaces: cl
 
 class ConfigError(ValueError):
     """A setting is missing or not valid."""
+
+
+@dataclass(frozen=True)
+class RetentionPolicy:
+    """What the daily purge does that an operator may tune (``personal_data.purge``; PRIV-6, PRIV-7): how long an audit
+    row keeps its network address, and when an account that nobody uses any more is warned and anonymised."""
+
+    audit_ip_days: int = DEFAULT_AUDIT_IP_DAYS
+    inactive_months: Optional[int] = DEFAULT_INACTIVE_MONTHS   # None: accounts are never anonymised for inactivity
+    inactive_grace_days: int = DEFAULT_INACTIVE_GRACE_DAYS
+
+    def __post_init__(self) -> None:
+        if not 90 <= self.audit_ip_days <= 365:
+            raise ConfigError("ATALAIA_AUDIT_IP_DAYS must be between 90 and 365")
+        if self.inactive_months is not None and not 12 <= self.inactive_months <= 120:
+            raise ConfigError("ATALAIA_INACTIVE_ACCOUNT_MONTHS must be between 12 and 120, or off")
+        if not 7 <= self.inactive_grace_days <= 180:
+            raise ConfigError("ATALAIA_INACTIVE_GRACE_DAYS must be between 7 and 180")
 
 
 @dataclass(frozen=True)
@@ -329,6 +366,12 @@ def _on_off(env: Mapping[str, str], name: str, default: bool = False) -> bool:
     raise ConfigError(f"{name} must be on or off, not {raw}")
 
 
+def _inactive_months(env: Mapping[str, str]) -> Optional[int]:
+    if env.get("ATALAIA_INACTIVE_ACCOUNT_MONTHS", "").strip().lower() == "off":
+        return None
+    return int(_number(env, "ATALAIA_INACTIVE_ACCOUNT_MONTHS", DEFAULT_INACTIVE_MONTHS, 12, 120, int))
+
+
 def quotas_from_env(env: Mapping[str, str]) -> dict[str, int]:
     """The per-field quotas: each default, or ATALAIA_QUOTA_<NAME> (a number of 1 or more, or "off" = 0)."""
     out = dict(QUOTA_DEFAULTS)
@@ -351,6 +394,9 @@ class Settings:
     metrics_token: Optional[str] = field(default=None, repr=False)
     log_level: str = "info"
     purge_hour: Optional[int] = 3
+    retention: RetentionPolicy = field(default_factory=RetentionPolicy)   # PRIV-6, PRIV-7
+    allow_signup_without_notice: bool = False      # LIVE-2: sign-up with no published privacy notice (dev, tests)
+    erasure_ledger: Optional[str] = None           # PRIV-4: the file of the erasure ledger (off when unset)
     privacy_notice_version: str = DEFAULT_NOTICE_VERSION
     privacy_notice_dir: Optional[str] = None
     # Refuse an app's social-login start that carries no app_challenge (APP-4): off while older apps are in use.
@@ -390,6 +436,8 @@ class Settings:
             raise ConfigError(f"ATALAIA_METRICS_TOKEN must be at least {MIN_METRICS_TOKEN} characters {_KEY_HINT}")
         if self.purge_hour is not None and not 0 <= self.purge_hour <= 23:
             raise ConfigError("ATALAIA_PURGE_HOUR must be an hour from 0 to 23, or off")
+        if self.erasure_ledger is not None and (not self.erasure_ledger.strip() or "\0" in self.erasure_ledger):
+            raise ConfigError("ATALAIA_ERASURE_LEDGER must be a file path")
         if not NOTICE_VERSION.fullmatch(self.privacy_notice_version):
             raise ConfigError("ATALAIA_PRIVACY_NOTICE_VERSION must be 1-64 characters: letters, digits and . _ : + -, "
                               "starting with a letter or digit")
@@ -511,7 +559,7 @@ class Settings:
                 f"db_pool_size={self.db_pool_size}, "
                 f"db_max_overflow={self.db_max_overflow}, db_timeout_s={self.db_timeout_s}, "
                 f"metrics_token={'set' if self.metrics_token else 'unset'}, log_level={self.log_level!r}, "
-                f"purge_hour={self.purge_hour!r}, privacy_notice_version={self.privacy_notice_version!r}, "
+                f"purge_hour={self.purge_hour!r}, retention={self.retention!r}, privacy_notice_version={self.privacy_notice_version!r}, "
                 f"public_url={self.public_url!r}, test_adapter={self.test_adapter!r}, "
                 f"firmware_keys={len(self.firmware_keys)}, hosted={self.hosted!r}, "
                 f"hosted_domain={self.hosted_domain!r}, atak_relay={self.atak_relay!r}, preview={self.preview!r}, "
@@ -538,6 +586,13 @@ class Settings:
             metrics_token=env.get("ATALAIA_METRICS_TOKEN", "").strip() or None,
             log_level=env.get("ATALAIA_LOG_LEVEL", "info").strip().lower() or "info",
             purge_hour=_purge_hour(env),
+            retention=RetentionPolicy(
+                audit_ip_days=int(_number(env, "ATALAIA_AUDIT_IP_DAYS", DEFAULT_AUDIT_IP_DAYS, 90, 365, int)),
+                inactive_months=_inactive_months(env),
+                inactive_grace_days=int(_number(env, "ATALAIA_INACTIVE_GRACE_DAYS", DEFAULT_INACTIVE_GRACE_DAYS,
+                                                7, 180, int))),
+            erasure_ledger=env.get("ATALAIA_ERASURE_LEDGER", "").strip() or None,
+            allow_signup_without_notice=_on_off(env, "ATALAIA_ALLOW_SIGNUP_WITHOUT_NOTICE"),
             privacy_notice_version=env.get("ATALAIA_PRIVACY_NOTICE_VERSION", "").strip() or DEFAULT_NOTICE_VERSION,
             privacy_notice_dir=env.get("ATALAIA_PRIVACY_NOTICE_DIR", "").strip() or None,
             oidc_app_require_challenge=_on_off(env, "ATALAIA_OIDC_APP_REQUIRE_CHALLENGE"),

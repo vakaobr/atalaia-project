@@ -88,9 +88,13 @@ class Field(Base):
     field_type: Mapped[str] = mapped_column(String(32), nullable=False, server_default="outdoor")
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, server_default="Europe/Lisbon")
     # How long the field's controllers keep chrono records (and this server its registry, migration 0022, decision
-    # RET-2) and an ended game's events, scores and nodes (decision RET-1): 30-3653 days, 365 by default.
+    # RET-2) and an ended game's events, scores and nodes (decision RET-1): 30-3653 days; chrono 365 by default, game data 90
+    # (maintainer decision 2026-10-30).
     default_retention_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default="365")
-    game_retention_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default="365")
+    game_retention_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default="90")
+    # PRIV-2 (migration 0030): how long a "ban" outcome of a chrono violation lasts (days; null: 12 months, never more
+    # than the field's chrono retention).
+    chrono_ban_days: Mapped[Optional[int]] = mapped_column(Integer)
     chrono_sharing_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     public_scoreboard: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     # The public field page and its feeds (ADR-P4-11, ADR-P4-12; plan phase 15): off by default.
@@ -117,7 +121,9 @@ class Field(Base):
     __table_args__ = (CheckConstraint("accent IS NULL OR accent ~ '^#[0-9a-f]{6}$'", name="accent"),
                       CheckConstraint("country IS NULL OR country ~ '^[A-Z]{2}$'", name="country"),
                       CheckConstraint("default_retention_days BETWEEN 30 AND 3653", name="default_retention_days"),
-                      CheckConstraint("game_retention_days BETWEEN 30 AND 3653", name="game_retention_days"))
+                      CheckConstraint("game_retention_days BETWEEN 30 AND 3653", name="game_retention_days"),
+                      CheckConstraint("chrono_ban_days IS NULL OR chrono_ban_days BETWEEN 1 AND 3653",
+                                      name="chrono_ban_days"))
 
 
 # Roles that need TOTP (ADR-P4-2): granting one to an account without TOTP fails, and they
@@ -148,6 +154,9 @@ class User(Base):
     server_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     gdpr_consent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # PRIV-7 (migration 0030): when the retention purge warned that the account, inactive for the configured time,
+    # will be anonymised; the account page shows it. Cleared by the purge when the account is active again.
+    inactivity_warned_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
 
@@ -392,6 +401,34 @@ class Game(Base):
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
+
+
+class GameResult(Base):
+    """A game's team results, kept after the game's per-player history went (maintainer decision 2026-10-30; migration
+    0030): written by the retention purge from the game's totals just before the game is deleted at its history
+    retention (90 days by default), deleted 365 days after the game ended. **No player ids and no member lists**: only the
+    game's name, mode, teams, the teams' final totals, when it ran and how it ended. A squad is not recorded at all (a
+    squad of fewer than 3 players would identify its members, and the server holds no squad results to fold in): the
+    results are per team."""
+
+    __tablename__ = "game_results"
+    __table_args__ = (UniqueConstraint("field_id", "game_id", "game_seed"),
+                      Index("idx_game_results_field_ended", "field_id", "ended_at"))
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    game_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    game_seed: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    mode_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    teams: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    team_totals: Mapped[dict[str, int]] = mapped_column(JSONB, nullable=False)
+    winner: Mapped[Optional[str]] = mapped_column(String(32))
+    state: Mapped[str] = mapped_column(String(16), nullable=False)
+    duration_ms: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = _created()
 
 
 class GameEvent(Base):
@@ -657,6 +694,28 @@ class ChronoViolation(Base):
     outcome: Mapped[Optional[str]] = mapped_column(String(16))
     resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # PRIV-2 (migration 0030): when a "ban" outcome ends: the field's ban length from the day it was recorded, never
+    # past what the field keeps chrono records for (the violation goes with its reading). Null for any other outcome.
+    ban_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _created()
+
+
+class ChronoCopyRevocation(Base):
+    """PRIV-5 (migration 0030): a player of this field whose chrono copies, pulled from other fields (decision
+    S14-5), this field's controllers must drop: the person erased their account (``erasure``) or withdrew the
+    chrono-sharing consent of a field (``withdrawn``). The site server's schedule answer carries the rows of the
+    field's retention period (``copies_revoked``); no account, no name, only the field's own pseudonymous id."""
+
+    __tablename__ = "chrono_copy_revocations"
+    __table_args__ = (
+        UniqueConstraint("field_id", "player_id", "reason"),
+        CheckConstraint("reason IN ('erasure', 'withdrawn')", name="reason"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    player_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    reason: Mapped[str] = mapped_column(String(16), nullable=False)
     created_at: Mapped[datetime] = _created()
 
 

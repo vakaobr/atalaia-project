@@ -47,6 +47,8 @@ COPY app/lib/chrono/limit_templates /app/app/lib/chrono/limit_templates
 COPY server/atalaia_server /app/server/atalaia_server
 COPY server/migrations /app/server/migrations
 COPY server/alembic.ini /app/server/alembic.ini
+# The erasure ledger's folder (PRIV-4): a named volume mounted here takes this owner.
+RUN mkdir /ledger && chown atalaia /ledger
 WORKDIR /app/server
 USER atalaia
 EXPOSE 8000

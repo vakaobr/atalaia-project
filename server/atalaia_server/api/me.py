@@ -40,7 +40,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import chrono_registry, hub_share, passwords, personal_data
+from .. import chrono_registry, erasure_ledger, hub_share, passwords, personal_data
 from ..audit import record
 from ..auth import Principal, current_principal, load_roles
 from ..db import get_session
@@ -167,6 +167,9 @@ async def erase_me(body: EraseIn, request: Request, principal: Principal = Depen
     revoked: list[uuid.UUID] = []
     await personal_data.erase(db, user.id, revoked_atak=revoked)
     await db.commit()
+    # PRIV-4: after the commit, outside the database: a restore from an older backup erases the account again.
+    erasure_ledger.append(request.app.state.settings.erasure_ledger,
+                          [erasure_ledger.account_entry(user.id, personal_data.ledger_tenant())])
     relay = request.app.state.atak_relay
     if relay is not None:  # the revoked certificates' connections close now, not at the relay's next check
         for cert_id in revoked:
@@ -201,6 +204,7 @@ async def give_chrono_sharing(field_id: uuid.UUID, request: Request, principal: 
         personal_data.give_consent(db, principal.user.id, personal_data.CHRONO_SHARING,
                                    request.app.state.settings.privacy_notice_version, field_id=field_id)
         await hub_share.sync_user(db, principal.user.id)  # a hosted hub's shared view (SVX-2)
+        await chrono_registry.restore_copies(db, principal.user.id)  # PRIV-5: copies pulled from now on stay
         await db.commit()
     return JSONResponse({"purpose": personal_data.CHRONO_SHARING, "field_id": str(field_id), "given": True},
                         status_code=201 if existing is None else 200, headers=NO_STORE)
@@ -214,6 +218,8 @@ async def withdraw_chrono_sharing(field_id: uuid.UUID, principal: Principal = De
         raise HTTPException(404, "consent_not_found")
     existing.withdrawn_at = datetime.now(timezone.utc)
     await hub_share.sync_user(db, principal.user.id)  # what the hub shows of this field goes at once
+    # PRIV-5: the other fields' controllers drop the copies they pulled of this field's records of the person.
+    await chrono_registry.revoke_copies(db, principal.user.id, "withdrawn", source_field=field_id)
     await db.commit()
     return Response(status_code=204)
 

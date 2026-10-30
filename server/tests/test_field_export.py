@@ -58,7 +58,7 @@ class ExportCase(SyncTestCase):
     max_mb = 512
 
     def settings(self) -> Settings:
-        return Settings(database_url=self.database_url, secret_key=SECRET_KEY, metrics_token=METRICS_TOKEN,
+        return Settings(allow_signup_without_notice=True, database_url=self.database_url, secret_key=SECRET_KEY, metrics_token=METRICS_TOKEN,
                         db_timeout_s=2.0, purge_hour=None, export_min_interval_s=self.min_interval,
                         export_max_mb=self.max_mb)
 

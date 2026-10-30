@@ -62,6 +62,7 @@ STAFF: dict[str, dict[str, str]] = {
         "consent_tick": "Marcar primeiro que se leu o aviso e se está de acordo.",
         "consent_done": "Consentimento registado.",
         "e_notice_version_changed": "O aviso mudou entretanto. Recarregar a página e ler a nova versão.",
+        "e_privacy_notice_unpublished": "Este servidor ainda não publicou o seu aviso de privacidade, por isso não cria contas novas. Quem já tem conta entra como sempre. Avisar quem gere o servidor.",
     },
     "en": {
         "consent_title": "Confirm the privacy notice",
@@ -76,6 +77,7 @@ STAFF: dict[str, dict[str, str]] = {
         "consent_tick": "Tick first that you have read the notice and agree.",
         "consent_done": "Consent recorded.",
         "e_notice_version_changed": "The notice has changed in the meantime. Reload the page and read the new version.",
+        "e_privacy_notice_unpublished": "This server has not published its privacy notice yet, so it is not making new accounts. Existing accounts log in as always. Tell whoever runs the server.",
     },
     "de": {
         "consent_title": "Datenschutzhinweis bestätigen",
@@ -92,6 +94,7 @@ STAFF: dict[str, dict[str, str]] = {
         "consent_done": "Zustimmung gespeichert.",
         "e_notice_version_changed": "Der Hinweis hat sich inzwischen geändert. Lade die Seite neu und lies die neue "
                                     "Version.",
+        "e_privacy_notice_unpublished": "Dieser Server hat seine Datenschutzerklärung noch nicht veröffentlicht und legt deshalb keine neuen Konten an. Bestehende Konten melden sich wie gewohnt an. Sag es den Betreibenden des Servers.",
     },
     "zh-tw": {
         "consent_title": "確認隱私權聲明",
@@ -105,5 +108,6 @@ STAFF: dict[str, dict[str, str]] = {
         "consent_tick": "請先勾選你已閱讀聲明並且同意。",
         "consent_done": "已記錄同意。",
         "e_notice_version_changed": "聲明在這段時間內已經更新。請重新載入頁面並閱讀新版本。",
+        "e_privacy_notice_unpublished": "這台伺服器尚未公布隱私權聲明，因此暫不建立新帳號。已有帳號仍可登入。請通知管理這台伺服器的人。",
     },
 }

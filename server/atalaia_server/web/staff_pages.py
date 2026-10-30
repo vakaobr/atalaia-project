@@ -41,6 +41,9 @@
     GET /staff/fields/<field>/branding                 the field's name, accent colour, logo and wallpaper, and its
                                                        saved teams with their crests
     GET /staff/fields/<field>/platforms                the links to third-party platforms: on or off, configured
+    GET /staff/fields/<field>/chrono                   the field's chrono violations: the earlier-violation notice (an
+                                                       advisory, not a verdict), the outcome staff record, how long a
+                                                       ban lasts (PRIV-2; a plain warning never counts: fixed)
     GET /staff/fields/<field>/data                     the field's data export (a ZIP, with its SHA-256) and what it
                                                        uses of each hosted-mode limit (PKC-1)
     GET /staff/fields/<field>/settings                 the field's settings, for its admin: public page, check-in
@@ -90,11 +93,12 @@ from fastapi.responses import RedirectResponse, Response
 
 from .. import firmware, sync
 from ..api import fields as fields_api
-from ..history_models import DEFAULT_RETENTION_DAYS, MAX_DELAY_S, MIN_RETENTION_DAYS
+from ..history_models import MAX_DELAY_S, MAX_RETENTION_DAYS, MIN_RETENTION_DAYS
 from ..services import branding as branding_svc
 from ..services import devices, registration, scheduling
 from . import i18n, preview_texts
-from .field_pages import GET_HEAD, HERE, HTML_TYPE, STARTED, answer, esc, switcher
+from .field_pages import (GET_HEAD, HERE, HTML_TYPE, NOTICE_PHRASE, STARTED, answer, esc, notice_published,
+                          privacy_link, switcher)
 from .staff_i18n import STRINGS
 
 router = APIRouter(include_in_schema=False)
@@ -154,6 +158,7 @@ class StaffPage:
                       ("remote", f"{base}/remote-gm", "nav_remote"), ("atak", f"{base}/atak", "nav_atak"),
                       ("roles", f"{base}/roles", "nav_roles"), ("synckeys", f"{base}/sync-keys", "nav_synckeys"),
                       ("branding", f"{base}/branding", "nav_branding"),
+                      ("chrono", f"{base}/chrono", "nav_chrono"),
                       ("platforms", f"{base}/platforms", "nav_platforms"), ("data", f"{base}/data", "nav_data"),
                       ("settings", f"{base}/settings", "nav_fsettings")]
         # Not of one field: any account's clubs, the firmware list, the server administrator's page.
@@ -176,6 +181,7 @@ class StaffPage:
             attrs["field"] = str(field)
         body = TEMPLATES["staff"].substitute(
             self.texts(),
+            footer=esc(self.t["footer"]) + privacy_link(request, self.lang, self.explicit),
             html_lang=HTML_LANG[self.lang], title=esc(f"{title} · {self.t['site']}"), script=esc(f"{page}.js"),
             data_attrs=" ".join(f'data-{k}="{esc(v)}"' for k, v in attrs.items()),
             home=esc(self.link("/staff/")), account_href=esc(self.link("/staff/account")),
@@ -244,7 +250,13 @@ async def home(request: Request) -> Response:
 @router.api_route("/staff/login", methods=GET_HEAD)
 async def login(request: Request) -> Response:
     p = StaffPage(request)
-    content = TEMPLATES["login"].substitute(p.texts())
+    # LIVE-2: the consent's "privacy notice" is a link when one is published, else plain text.
+    consent = esc(p.t["login_consent"])
+    phrase = esc(NOTICE_PHRASE[p.lang])
+    if notice_published(request) and phrase in consent:
+        href = esc(f"/privacy?lang={p.lang}" if p.explicit else "/privacy")
+        consent = consent.replace(phrase, f'<a href="{href}" target="_blank" rel="noopener">{phrase}</a>', 1)
+    content = TEMPLATES["login"].substitute(p.texts(login_consent=consent))
     return p.render(request, "login", p.t["login_title"], content)
 
 
@@ -261,9 +273,9 @@ async def history(field: str, request: Request) -> Response:
     return _field_page(request, field, "history", "history", "history_title",
                        spectator_delay_label=esc(t["spectator_delay"].format(max=MAX_DELAY_S)),
                        retention_label=esc(t["retention_days"].format(min=MIN_RETENTION_DAYS,
-                                                                      max=DEFAULT_RETENTION_DAYS)),
+                                                                      max=MAX_RETENTION_DAYS)),
                        max_delay=str(MAX_DELAY_S), min_retention=str(MIN_RETENTION_DAYS),
-                       max_retention=str(DEFAULT_RETENTION_DAYS))
+                       max_retention=str(MAX_RETENTION_DAYS))
 
 
 @router.api_route("/staff/fields/{field}/games/{game}", methods=GET_HEAD)
@@ -371,6 +383,11 @@ async def branding(field: str, request: Request) -> Response:
     return _field_page(request, field, "branding", "branding", "branding_title",
                        field_name_max=str(branding_svc.FIELD_NAME_MAX), team_name_max=str(branding_svc.TEAM_NAME_MAX),
                        team_colour_max=str(branding_svc.TEAM_COLOUR_MAX))
+
+
+@router.api_route("/staff/fields/{field}/chrono", methods=GET_HEAD)
+async def chrono(field: str, request: Request) -> Response:
+    return _field_page(request, field, "chrono", "chrono", "chrono_title")
 
 
 @router.api_route("/staff/fields/{field}/platforms", methods=GET_HEAD)

@@ -425,12 +425,47 @@ copy of `.env` as `server/.env` (mode 0600), run `sh server/setup.sh
 campo.example.pt` (it keeps your values and starts the stack), then
 `restore.sh` as above. Point the DNS at the new machine.
 
-**Erasures after the backup:** a restore brings back the database as it was
-when the backup was made, so an account erased after that comes back. After
-a restore, repeat the erasures made since the backup's date: the audit log
-lists them as `gdpr_erasure` (an account) and `chrono_player_erasure` (a
-field's chrono data of a player) with their dates; read it before you
-restore (decision S22-7).
+**Erasures after the backup (the erasure ledger, PRIV-4):** a restore brings back the database as it was when the
+backup was made, so an account erased after that would come back. It does not: the server appends every erasure (an
+account, a player's chrono records, also the accounts the inactivity rule anonymised) to a **ledger outside the
+database**, the Docker volume `ledger` (`ATALAIA_ERASURE_LEDGER=/ledger/erasures.jsonl`), as SHA-256 hashes only (no name,
+no e-mail, no id in clear; a hosted hub's entries carry the field's slug). `backup.sh` copies the ledger next to each
+backup as `erasures-ledger.jsonl` (mode 0600; keep it with the backups, off-site too, and never prune it: about 150 bytes
+per erasure, needed as long as any older backup exists). `restore.sh` merges the copy beside the backup file back into the
+volume (a new machine starts with an empty one), and once the server is healthy runs `docker compose exec server python -m
+atalaia_server erasure-ledger apply`, which erases again, in every field of a hub, whatever the restored database still
+holds of it; it prints what it did and the audit log has it (`gdpr_erasure`, reason `restore_replay`). Running it again does
+nothing. A machine lost together with its volumes loses only the erasures made after the last backup's ledger copy:
+that is the window, so back up often. Written after the erasure commits, best effort: a failure to write is logged
+(`atalaia.server.ledger`) and the erasure stands (decision S22-7, amended by SR-70 to SR-89).
+
+**Retention settings (PRIV-6, PRIV-7):** `ATALAIA_AUDIT_IP_DAYS` (180; 90 to 365): how long an audit entry keeps the
+client's address, after which the entry stays without it until its own 36 months. `ATALAIA_INACTIVE_ACCOUNT_MONTHS` (24;
+12 to 120, or `off`): an account unused that long (no login of any kind, no session, no registration for a game to come;
+never a server administrator or an account with a role at a field) is warned, then anonymised after
+`ATALAIA_INACTIVE_GRACE_DAYS` (30; 7 to 180) by the same code as a person's own erasure. The server cannot send e-mail:
+**the warning is shown on the account page and in `GET /api/v1/me` (`inactivity`) when the person comes back**; if your
+privacy notice promises more, tell people yourself or set `off`.
+
+**Game history keeps 90 days by default (maintainer decision 2026-10-30):** the server's synced games and scheduled games
+90 days after they end (a field may set 30-730 on its history page; it was 24 months), and the controllers' ended
+games 90 days too (`game_retention_days`, a field setting of 30-3653; chrono records keep their own 365). A controller
+with a site sync still never deletes a game before the site server has all of it (RET-3). What carries a player id (events, per-player data, a game's history in accounts) goes at that point; the **team results**
+(final totals per team, the winner, when it ran; no player id, no member list, no squads) are written to `game_results`
+by the purge just before and kept 365 days after the game ended (`GET /api/v1/fields/{id}/history/results`). A controller
+keeps nothing of a game after its 90 days: with a site sync the server has the team results. Existing fields keep the
+value they have stored (the migration only changes the default): lower it on the history and settings pages. Whether
+team-only results with no player ids may be kept longer is still open with the maintainer.
+
+**A ban's end (PRIV-2):** a "ban" outcome a field's admin or gm records on a chrono violation has an end date (the
+field's `chrono_ban_days`, 12 months by default, never longer than the field's chrono retention), and the "earlier violation"
+mark is an advisory notice. The server tells no one: **whoever records a ban tells the person, and when it ends**, in
+the way the field normally talks to its players (the field's contact on its page; the privacy notice says how to contest).
+
+**Sign-up needs a published privacy notice (LIVE-2):** a server with no notice file for `ATALAIA_PRIVACY_NOTICE_VERSION` in
+`ATALAIA_PRIVACY_NOTICE_DIR` refuses new accounts (`409 privacy_notice_unpublished`, password and social sign-up) and logs a
+warning at start; existing accounts log in as before. `ATALAIA_ALLOW_SIGNUP_WITHOUT_NOTICE=on` lifts it for a development
+server. A hosted hub whose notice version still starts with `template-` logs a warning at start.
 
 **Test your restores.** `python3 tools/docker_server.py deploy` tests the
 scripts on any computer with Docker. A restore of your own backups is

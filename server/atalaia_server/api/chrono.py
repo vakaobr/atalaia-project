@@ -45,7 +45,7 @@ from pydantic import BaseModel, ConfigDict, Field as PydanticField
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import chrono_registry
+from .. import chrono_registry, erasure_ledger, personal_data
 from ..audit import record
 from ..auth import Principal, current_principal, require_field_role
 from ..db import get_session
@@ -132,8 +132,14 @@ async def resolve(field_id: uuid.UUID, violation_id: uuid.UUID, body: ResolveIn,
     v.outcome = body.outcome
     v.resolved_by = principal.user.id
     v.resolved_at = datetime.now(timezone.utc)
+    # PRIV-2: a ban ends (the field's ban length, never past its chrono retention); any other outcome has no end date.
+    field = await _field(db, field_id)
+    v.ban_expires_at = await chrono_registry.ban_expiry(db, field, v, v.resolved_at) if body.outcome == "ban" else None
     record(db, "chrono_violation_resolve", request, user_id=principal.user.id, resource="field",
-           resource_id=field_id, details={"violation": str(v.id), "outcome": body.outcome})
+           resource_id=field_id, details={"violation": str(v.id), "outcome": body.outcome,
+                                          **({"ban_expires_at": v.ban_expires_at.isoformat()} if v.ban_expires_at
+                                             else {})})
+    await chrono_registry.refresh_player_flags(db, field_id, v.player_id)  # the outcome may change who is a repeat
     await db.commit()
     await db.refresh(v)
     return JSONResponse(chrono_registry.violation_json(v), headers=NO_STORE)
@@ -174,6 +180,10 @@ async def erase_player(field_id: uuid.UUID, player_id: str, request: Request,
     record(db, "chrono_player_erasure", request, user_id=principal.user.id, resource="field", resource_id=field_id,
            details=counts)
     await db.commit()
+    # PRIV-4: after the commit, outside the database, so that a restore erases the player's records again.
+    erasure_ledger.append(request.app.state.settings.erasure_ledger,
+                          [erasure_ledger.player_entry(field_id, player_id, personal_data.ledger_tenant(),
+                                                       chrono=True, identity=False)])
     return JSONResponse(counts, headers=NO_STORE)
 
 

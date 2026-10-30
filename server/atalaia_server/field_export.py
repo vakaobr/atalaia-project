@@ -62,7 +62,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from . import __version__
 from .atak_models import AtakCa, AtakCert
 from .history_models import FieldHistorySettings, FieldPreset, FieldScenario, FieldScenarioRevision, GameScoreSample
-from .models import (AuditLog, BrandingImage, ChronoReading, ChronoReject, ChronoViolation, Club, ClubMember,
+from .models import (AuditLog, BrandingImage, GameResult, ChronoReading, ChronoReject, ChronoViolation, Club, ClubMember,
                      ClubReport, Consent, Controller, ExternalGameLink, Field, FieldApiKey, FieldPlayerId, FieldTeam,
                      Game, GameEvent, GameNode, GameNodeScore, GameRegistration, MarshalKey, PlatformLink,
                      PlayerIdClaim, RegistrationReplica, Replica, Role, ScheduledGame, User, UserFieldRole,
@@ -96,6 +96,7 @@ SKIPPED: dict[str, str] = {
     "firmware_releases": "the server's firmware catalogue, not a field's data",
     "preview_feedback": "a preview server's visitor feedback, belongs to no field",
     "hub_share_links": "a hosted hub's link between a person's accounts (SVX-2): meaningful only on that hub",
+    "chrono_copy_revocations": "notes telling the field's controllers to drop copies of other fields' records (PRIV-5): transient, no account in them",
 }
 # Left out on a single-field server, exported in hosted mode where the whole schema is the field's.
 HOSTED_ONLY = ("clubs", "club_members", "club_reports")
@@ -185,6 +186,7 @@ DATASETS: tuple[Dataset, ...] = (
     Dataset("field_api_keys", _t(FieldApiKey), {"key_sha256": "a credential"}, _field(FieldApiKey.field_id)),
     Dataset("controllers", _t(Controller), {}, _field(Controller.field_id)),
     Dataset("games", _t(Game), {}, _field(Game.field_id)),
+    Dataset("game_results", _t(GameResult), {}, _field(GameResult.field_id)),
     Dataset("game_events", _t(GameEvent), {}, lambda fid, h: GameEvent.game.in_(_games_of(fid))),
     Dataset("game_node_scores", _t(GameNodeScore), {}, lambda fid, h: GameNodeScore.game.in_(_games_of(fid))),
     Dataset("game_nodes", _t(GameNode), {}, lambda fid, h: GameNode.game.in_(_games_of(fid))),

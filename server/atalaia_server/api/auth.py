@@ -312,6 +312,8 @@ def _secret(request: Request, user: User) -> Optional[str]:
 async def register(body: RegisterIn, request: Request, db: AsyncSession = Depends(get_session)) -> JSONResponse:
     if not request.app.state.settings.password_login:
         raise HTTPException(403, "password_login_disabled")
+    if privacy_notice.signup_blocked(request.app.state.settings):  # LIVE-2: a consent is to a published text
+        raise HTTPException(409, "privacy_notice_unpublished")
     username = body.username.strip().lower()
     email = normalise_email(body.email)
     problem = username_problem(username) or email_problem(email)
@@ -444,13 +446,21 @@ async def me(request: Request, principal: Principal = Depends(current_principal)
              db: AsyncSession = Depends(get_session)) -> JSONResponse:
     """The account, its roles and where its consent stands (CONS-2): ``consent.status`` is ``current``, ``outdated``
     (for another version of the privacy notice: show it and ``POST /api/v1/me/consents/account``) or ``missing``;
-    ``consent.notice_published`` says whether ``GET /api/v1/privacy-notice`` has a text to show."""
+    ``consent.notice_published`` says whether ``GET /api/v1/privacy-notice`` has a text to show. ``inactivity`` is
+    null, or (PRIV-7) when the retention purge warned that the account, inactive for a long time, would be
+    anonymised (``warned_at``) and when it would have been (``anonymise_after``): the client says so, and that the
+    account stays because the person is here (the purge clears the warning at its next run)."""
     settings = request.app.state.settings
     consent = await personal_data.account_consent(db, principal.user.id, settings.privacy_notice_version)
     consent["notice_published"] = bool(privacy_notice.available(settings.privacy_notice_dir,
                                                                 settings.privacy_notice_version))
-    return JSONResponse({**user_json(principal.user, principal.roles), "mfa": principal.mfa, "consent": consent},
-                        headers=NO_STORE)
+    warned = principal.user.inactivity_warned_at
+    inactivity = None
+    if warned is not None and settings.retention.inactive_months is not None:
+        inactivity = {"warned_at": warned.isoformat(),
+                      "anonymise_after": (warned + timedelta(days=settings.retention.inactive_grace_days)).isoformat()}
+    return JSONResponse({**user_json(principal.user, principal.roles), "mfa": principal.mfa, "consent": consent,
+                         "inactivity": inactivity}, headers=NO_STORE)
 
 
 async def _user_for_update(db: AsyncSession, principal: Principal) -> User:

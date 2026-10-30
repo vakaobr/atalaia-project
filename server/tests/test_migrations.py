@@ -37,7 +37,8 @@ TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log
           "scheduled_games", "game_registrations", "registration_replicas", "player_id_claims",
           "platform_links", "external_game_links", "branding_images", "clubs", "club_members", "club_reports",
           "field_teams", "firmware_releases", "field_history_settings", "game_score_samples", "field_scenarios",
-          "field_scenario_revisions", "field_presets", "atak_cas", "atak_certs", "preview_feedback", "user_identities", "passkeys", "oidc_logins", "hub_share_links"}
+          "field_scenario_revisions", "field_presets", "atak_cas", "atak_certs", "preview_feedback", "user_identities", "passkeys", "oidc_logins", "hub_share_links",
+          "chrono_copy_revocations", "game_results"}
 
 SCHEMA_SQL = (
     ("columns", "SELECT table_name, column_name, data_type, is_nullable, column_default, character_maximum_length "
@@ -716,7 +717,7 @@ class TenantRoleMigrationTests(unittest.TestCase):
         self.assertTrue(self.role_exists(role))
         cfg = hosted.alembic_config(self.hub.owner_url, schema)
         before = self.rows("SELECT version_num FROM %s.alembic_version" % schema)[0][0]
-        self.assertEqual(before, "0027_identity_issuer")
+        self.assertEqual(before, ScriptDirectory.from_config(cfg).get_current_head())  # the newest revision
         command.downgrade(cfg, "0022_field_retention")
         self.assertFalse(self.role_exists(role))  # the role and every grant it held are gone ...
         self.assertTrue(self.role_exists(self.hub.a.role))  # ... and only this field's role

@@ -33,7 +33,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from atalaia_controller import sync_format
@@ -44,10 +44,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from . import hub_share
 from .audit import record
 from .chrono_verify import Key, same_record, verify_reading
-from .models import (ChronoReading, ChronoReject, ChronoViolation, Consent, Field, FieldPlayerId, Game, MarshalKey,
+from .models import (ChronoCopyRevocation, ChronoReading, ChronoReject, ChronoViolation, Consent, Field, FieldPlayerId, Game, MarshalKey,
                      PlayerIdClaim, Replica)
 
 SHARING = "chrono_sharing"
+DEFAULT_BAN_DAYS = 365  # a ban lasts 12 months unless the field sets another length (PRIV-2)
 
 
 def _time(value: Optional[float]) -> Optional[datetime]:
@@ -263,18 +264,87 @@ async def _violation(db: AsyncSession, field_id: uuid.UUID, series: uuid.UUID, l
     await _flag_repeats(db, field_id, top.player_id)
 
 
+def counts_for_repeat(violation_type: str, outcome: Optional[str]) -> bool:
+    """Whether an earlier violation makes a later one of the same player a repeat (PRIV-2). **A plain warning never
+    does** (a fixed rule, approved with the lawyer's brief on 2026-10-30): neither a spot check the controller only
+    warned about (``over_tolerance``) nor one staff resolved with the outcome ``warning``. Anything else counts."""
+    return violation_type == "over_limit" and outcome != "warning"
+
+
 async def _flag_repeats(db: AsyncSession, field_id: uuid.UUID, player_id: str) -> None:
-    """A player's violations at the field, oldest deciding reading first: every one after the first is a repeat
-    (worked out again whenever one arrives, so a late arrival of an older one puts the flags right)."""
+    """A player's violations at the field, oldest deciding reading first: one after an earlier violation that counts
+    (``counts_for_repeat``) is flagged ``repeat_offender``. A flag for a person's attention, not a verdict (the staff
+    page words it that way): worked out again whenever a violation arrives or is resolved, so a late arrival of an older one puts the flags right."""
     rows = (await db.execute(
-        select(ChronoViolation.id, ChronoViolation.repeat_offender)
+        select(ChronoViolation.id, ChronoViolation.repeat_offender, ChronoViolation.violation_type,
+               ChronoViolation.outcome)
         .join(ChronoReading, ChronoReading.id == ChronoViolation.reading)
         .where(ChronoViolation.field_id == field_id, ChronoViolation.player_id == player_id)
         .order_by(ChronoReading.timestamp, ChronoReading.reading_id))).all()
-    for position, (vid, flag) in enumerate(rows):
-        if flag != (position > 0):
-            await db.execute(update(ChronoViolation).where(ChronoViolation.id == vid).values(
-                repeat_offender=position > 0))
+    earlier = False
+    for vid, flag, vtype, outcome in rows:
+        if flag != earlier:
+            await db.execute(update(ChronoViolation).where(ChronoViolation.id == vid).values(repeat_offender=earlier))
+        earlier = earlier or counts_for_repeat(vtype, outcome)
+
+
+async def refresh_player_flags(db: AsyncSession, field_id: uuid.UUID, player_id: str) -> None:
+    """One player's flags again (a violation of theirs was resolved: its outcome may change who is a repeat)."""
+    await _flag_repeats(db, field_id, player_id)
+
+
+async def ban_expiry(db: AsyncSession, field: Field, violation: ChronoViolation, now: datetime) -> datetime:
+    """When a "ban" recorded ``now`` ends (PRIV-2): the field's ban length (``chrono_ban_days``, else 12 months) from
+    now, never longer than the field's chrono retention and never later than the violation's own record goes (its reading's time plus the field's chrono
+    retention: the violation is deleted with it, and the ban with it)."""
+    reading = await db.get(ChronoReading, violation.reading)
+    days = min(field.chrono_ban_days or DEFAULT_BAN_DAYS, field.default_retention_days)
+    end = now + timedelta(days=days)
+    if reading is not None:
+        end = min(end, reading.timestamp + timedelta(days=field.default_retention_days))
+    return end
+
+
+async def revoke_copies(db: AsyncSession, user_id: uuid.UUID, reason: str, *,
+                        source_field: Optional[uuid.UUID] = None) -> int:
+    """PRIV-5: tells the controllers of every field where the account holds a player id (but ``source_field``'s: the
+    copies of a field's own records are not at that field) to drop the copies of other fields' chrono records they
+    pulled for it (``chrono_copy_revocations``, carried in the schedule answer). ``erasure``: the account is erased;
+    ``withdrawn``: the person withdrew ``source_field``'s chrono-sharing consent. The caller commits."""
+    query = select(FieldPlayerId.field_id, FieldPlayerId.player_id).where(FieldPlayerId.user_id == user_id)
+    if source_field is not None:
+        query = query.where(FieldPlayerId.field_id != source_field)
+    rows = [{"field_id": f, "player_id": p, "reason": reason} for f, p in (await db.execute(query)).all()]
+    if not rows:
+        return 0
+    stmt = insert(ChronoCopyRevocation).values(rows)
+    await db.execute(stmt.on_conflict_do_update(index_elements=["field_id", "player_id", "reason"],
+                                                set_={"created_at": func.now()}))
+    return len(rows)
+
+
+async def restore_copies(db: AsyncSession, user_id: uuid.UUID) -> None:
+    """The person gave a chrono-sharing consent again: the ``withdrawn`` revocations of their player ids go, so the
+    copies pulled from now on are not dropped again. (Already-dropped copies stay dropped.) The caller commits."""
+    mine = select(FieldPlayerId.player_id).where(FieldPlayerId.user_id == user_id,
+                                                 FieldPlayerId.field_id == ChronoCopyRevocation.field_id)
+    await db.execute(delete(ChronoCopyRevocation).where(ChronoCopyRevocation.reason == "withdrawn",
+                                                        ChronoCopyRevocation.player_id.in_(mine))
+                     .execution_options(synchronize_session=False))
+
+
+async def copies_revoked(db: AsyncSession, field_id: uuid.UUID, now: datetime) -> list[dict[str, Any]]:
+    """The schedule answer's ``copies_revoked`` (PRIV-5): this field's players whose pulled copies its controllers drop,
+    those of the field's chrono retention period (a copy cannot outlive it on a controller), the newest
+    ``sync_format.MAX_REVOKED``."""
+    days = await db.scalar(select(Field.default_retention_days).where(Field.id == field_id))
+    rows = await db.execute(
+        select(ChronoCopyRevocation.player_id, ChronoCopyRevocation.reason, ChronoCopyRevocation.created_at)
+        .where(ChronoCopyRevocation.field_id == field_id,
+               ChronoCopyRevocation.created_at > now - timedelta(days=days or 365))
+        .order_by(ChronoCopyRevocation.created_at.desc(), ChronoCopyRevocation.player_id)
+        .limit(sync_format.MAX_REVOKED))
+    return [{"player_id": p, "reason": r, "at": int(at.timestamp())} for p, r, at in rows]
 
 
 # --- reading the registry ----------------------------------------------------------------
@@ -312,7 +382,16 @@ def violation_json(v: ChronoViolation) -> dict[str, Any]:
             "replica_id": str(v.replica_id), "violation_type": v.violation_type, "energy_j": v.energy_j,
             "limit_j": v.limit_j, "delta_j": v.delta_j, "repeat_offender": v.repeat_offender,
             "game": str(v.game) if v.game else None, "outcome": v.outcome, "resolved_at": _iso(v.resolved_at),
+            "ban_expires_at": _iso(v.ban_expires_at), "ban_active": ban_active(v),
             "created_at": _iso(v.created_at)}
+
+
+def ban_active(v: ChronoViolation, now: Optional[datetime] = None) -> bool:
+    """A "ban" outcome that has not ended (PRIV-2): one with no recorded end (made before ``ban_expires_at`` existed and
+    not given one by the migration) lasts as long as the violation does, which the chrono retention bounds."""
+    if v.outcome != "ban":
+        return False
+    return v.ban_expires_at is None or v.ban_expires_at > (now or datetime.now(timezone.utc))
 
 
 def reject_json(r: ChronoReject) -> dict[str, Any]:
@@ -430,6 +509,9 @@ async def erase_player(db: AsyncSession, field_id: uuid.UUID, player_id: str) ->
     readings naming them, their replicas): a field's erasure, not an account's (an account's keeps
     the signed records and drops the link, ``personal_data.erase``). The caller commits."""
     await hub_share.forget_player(db, field_id, player_id)  # a hosted hub's shared copies (SVX-2)
+    holder = await linked_user(db, field_id, player_id)
+    if holder is not None:  # PRIV-5: the copies of this field's records of them, at the other fields' controllers
+        await revoke_copies(db, holder, "erasure", source_field=field_id)
     readings = await db.execute(delete(ChronoReading).where(ChronoReading.field_id == field_id,
                                                             ChronoReading.player_id == player_id))
     rejects = await db.execute(delete(ChronoReject).where(ChronoReject.field_id == field_id,

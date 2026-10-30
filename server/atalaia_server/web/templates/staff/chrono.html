@@ -1,0 +1,32 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$chrono_title</h1>
+<p>$chrono_intro</p>
+<p class="hint">$chrono_advisory</p>
+<section aria-labelledby="rules-title">
+<h2 id="rules-title">$chrono_rules_title</h2>
+<p>$chrono_rules_intro</p>
+<p class="hint">$chrono_warn_fixed</p>
+<form id="rules-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="r-ban-days">$chrono_ban_days</label>
+<input id="r-ban-days" name="chrono_ban_days" type="number" inputmode="numeric" min="1">
+<p class="hint">$chrono_ban_hint</p>
+<p><button type="submit">$chrono_rules_save</button></p>
+</fieldset>
+</form>
+</section>
+<section aria-labelledby="viol-title">
+<h2 id="viol-title">$chrono_viol_title</h2>
+<p id="viol-none" hidden>$chrono_viol_none</p>
+<div class="table-wrap">
+<table id="viol-table" class="data" hidden>
+<thead><tr><th scope="col">$chrono_col_time</th><th scope="col">$chrono_col_player</th><th scope="col">$chrono_col_type</th><th scope="col" class="num">$chrono_col_energy</th><th scope="col" class="num">$chrono_col_over</th><th scope="col">$chrono_col_flag</th><th scope="col">$chrono_col_outcome</th><th scope="col">$chrono_col_ban</th><th scope="col"><span class="visually-hidden">$col_actions</span></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+</section>
+<section aria-labelledby="contest-title">
+<h2 id="contest-title">$chrono_contest_title</h2>
+<p>$chrono_contest</p>
+</section>

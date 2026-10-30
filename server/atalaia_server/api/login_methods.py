@@ -79,7 +79,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import passkeys, personal_data, quotas, tenancy
+from .. import passkeys, personal_data, privacy_notice, quotas, tenancy
 from ..audit import record
 from ..auth import Principal, bearer, current_principal, principal_from_token
 from ..db import get_session
@@ -517,6 +517,8 @@ async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provid
                                                           app_challenge=row.app_challenge))
     # An unknown subject makes an account, under the same rules as registering: consent given, the per-address
     # registration limit. Never matched to an existing account by email (the server never asks for one).
+    if privacy_notice.signup_blocked(request.app.state.settings):  # LIVE-2: a consent is to a published text
+        return _back(row.return_to, error="privacy_notice_unpublished")
     if not row.consent:
         return _back(row.return_to, error="consent_required")
     current = request.app.state.settings.privacy_notice_version

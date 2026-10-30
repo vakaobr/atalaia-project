@@ -160,7 +160,7 @@ class HubCase(unittest.IsolatedAsyncioTestCase):
         super().tearDownClass()
 
     def settings(self, url: Optional[str] = None) -> Settings:
-        return Settings(database_url=url or self.hub.app_url, secret_key=SECRET_KEY, metrics_token=METRICS_TOKEN,
+        return Settings(allow_signup_without_notice=True, database_url=url or self.hub.app_url, secret_key=SECRET_KEY, metrics_token=METRICS_TOKEN,
                         db_timeout_s=2.0, purge_hour=None, hosted=True, hosted_domain=DOMAIN,
                         db_pool_size=self.pool_size, db_max_overflow=0)
 
@@ -818,7 +818,7 @@ class StartTests(HubCase):
         database = TempDatabase()
         await asyncio.to_thread(database.create)
         try:
-            app = create_app(Settings(database_url=database.url, secret_key=SECRET_KEY, purge_hour=None))
+            app = create_app(Settings(allow_signup_without_notice=True, database_url=database.url, secret_key=SECRET_KEY, purge_hour=None))
             async with app.router.lifespan_context(app):
                 async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
                                              base_url=f"https://campo-a.{DOMAIN}") as client:
@@ -885,7 +885,7 @@ class OperatorTests(HubCase):
                                                          "WHERE username = 'alfa-player'")
             self.assertEqual([tuple(r) for r in rows], [("alfa-player", False)])
             self.assertEqual(await asyncio.to_thread(target.fetch, "SELECT 1 FROM sessions"), [])
-            app = create_app(Settings(database_url=target.url, secret_key="another server's own secret key 0123456",
+            app = create_app(Settings(allow_signup_without_notice=True, database_url=target.url, secret_key="another server's own secret key 0123456",
                                       purge_hour=None))
             async with app.router.lifespan_context(app):
                 async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),

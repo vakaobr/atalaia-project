@@ -53,7 +53,7 @@ from atalaia_controller import sync_format
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, Response
 
-from .. import chrono_registry, quotas, remote_gm, sync, tenancy, tenant_watch
+from .. import chrono_registry, erasure_ledger, personal_data, quotas, remote_gm, sync, tenancy, tenant_watch
 from ..audit import record
 from ..auth import UNAUTHORISED, bearer
 from ..models import FieldApiKey
@@ -69,6 +69,7 @@ async def _handle(request: Request, kind: str) -> JSONResponse:
         length = int(request.headers.get("content-length") or 0)
     except ValueError:
         length = 0
+    ledger: list[dict[str, Any]] = []
     async with request.app.state.sessionmaker() as db:
         caller = await sync.authenticate(db, bearer(request))
         if caller is None:
@@ -79,10 +80,15 @@ async def _handle(request: Request, kind: str) -> JSONResponse:
                 raise sync.SyncProblem(413, "body_too_large")
             body = sync.parse(kind, await request.body())
             answer = await sync.apply(db, caller, kind, body)
+            if kind == "erasures":  # PRIV-4: the erasures the controller sent, for the ledger once they are committed
+                ledger = [erasure_ledger.player_entry(caller.field_id, e["player_id"], personal_data.ledger_tenant(),
+                                                      chrono=e["chrono"], identity=e["identity"])
+                          for e in body["erasures"]]
         except sync.SyncProblem as exc:
             await db.rollback()
             await _quota_note(request.app.state, exc)
             return JSONResponse(exc.body(), status_code=exc.status, headers=NO_STORE)
+    erasure_ledger.append(request.app.state.settings.erasure_ledger, ledger)
     return JSONResponse(answer, headers=NO_STORE)
 
 
@@ -165,7 +171,8 @@ async def schedule(request: Request) -> JSONResponse:
                             headers=NO_STORE)
 
     async def build(db: Any, caller: sync.Caller) -> Any:
-        return await registration.schedule(db, caller.field_id, datetime.now(timezone.utc), int(raw))
+        return await registration.schedule(db, caller.field_id, datetime.now(timezone.utc), int(raw),
+                                           revocations=request.query_params.get("revocations") == "1")
     return await _pull(request, build)
 
 

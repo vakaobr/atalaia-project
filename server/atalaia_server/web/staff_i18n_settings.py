@@ -89,7 +89,7 @@ PT: dict[str, str] = {
                           "dados de cada jogo terminado, e este servidor o seu registo de cronometragem.",
     "fs_chrono_days": "Registos de cronometragem: dias guardados",
     "fs_game_days": "Dados dos jogos (eventos, pontuações, nós): dias guardados depois de o jogo terminar",
-    "fs_retention_hint": "De 30 a 3653 dias; 365 por defeito. Um controlador ligado a este servidor nunca apaga um "
+    "fs_retention_hint": "De 30 a 3653 dias; 365 por defeito para os registos de cronometragem, 90 para os dados dos jogos. Um controlador ligado a este servidor nunca apaga um "
                          "jogo antes de o servidor o ter recebido por inteiro. O historial de jogos deste servidor "
                          "tem o seu próprio prazo, na página do historial. Chega logo aos controladores.",
     "e_chrono_retention_days_invalid": "Prazo dos registos de cronometragem inválido (um número inteiro de dias, "
@@ -167,7 +167,7 @@ EN: dict[str, str] = {
                           "and this server its chrono registry.",
     "fs_chrono_days": "Chrono records: days kept",
     "fs_game_days": "Game data (events, scores, nodes): days kept after the game ends",
-    "fs_retention_hint": "30 to 3653 days; 365 by default. A controller connected to this server never deletes a game "
+    "fs_retention_hint": "30 to 3653 days; 365 by default for chrono records, 90 for game data. A controller connected to this server never deletes a game "
                          "before the server has all of it. This server's game history has its own period, on the "
                          "history page. The controllers get the change at once.",
     "e_chrono_retention_days_invalid": "Invalid chrono retention (a whole number of days, from 30 to 3653).",
@@ -247,7 +247,7 @@ DE: dict[str, str] = {
                           "beendeten Spiels aufbewahren, und dieser Server sein Chrono-Register.",
     "fs_chrono_days": "Chrono-Aufzeichnungen: Tage aufbewahrt",
     "fs_game_days": "Spieldaten (Ereignisse, Punkte, Knoten): Tage aufbewahrt nach dem Spielende",
-    "fs_retention_hint": "30 bis 3653 Tage; standardmäßig 365. Ein Controller, der mit diesem Server verbunden ist, "
+    "fs_retention_hint": "30 bis 3653 Tage; standardmäßig 365 für Chrono-Aufzeichnungen, 90 für Spieldaten. Ein Controller, der mit diesem Server verbunden ist, "
                          "löscht ein Spiel nie, bevor der Server alles davon hat. Der Spielverlauf dieses Servers "
                          "hat eine eigene Frist, auf der Verlaufsseite. Die Controller erhalten die Änderung sofort.",
     "e_chrono_retention_days_invalid": "Ungültige Aufbewahrung der Chrono-Aufzeichnungen (eine ganze Zahl Tage, von "
@@ -316,7 +316,7 @@ ZH_TW: dict[str, str] = {
     "fs_retention_intro": "場地的控制器保存計時紀錄與每場已結束遊戲資料的天數，以及這台伺服器保存計時登錄資料的天數。",
     "fs_chrono_days": "計時紀錄：保存天數",
     "fs_game_days": "遊戲資料（事件、分數、節點）：遊戲結束後的保存天數",
-    "fs_retention_hint": "30 至 3653 天；預設 365。連上這台伺服器的控制器，在伺服器收到完整資料之前絕不會刪除遊戲。"
+    "fs_retention_hint": "30 至 3653 天；預設：測速紀錄 365 天，遊戲資料 90 天。連上這台伺服器的控制器，在伺服器收到完整資料之前絕不會刪除遊戲。"
                          "這台伺服器的遊戲歷史有自己的期限，在歷史頁面。控制器會立刻收到變更。",
     "e_chrono_retention_days_invalid": "計時紀錄的保存天數無效（30 至 3653 的整數）。",
     "e_game_retention_days_invalid": "遊戲資料的保存天數無效（30 至 3653 的整數）。",

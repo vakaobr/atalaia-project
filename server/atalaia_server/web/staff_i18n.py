@@ -3089,10 +3089,11 @@ STRINGS: dict[str, dict[str, str]] = {
 # The texts of the pages for roles, sync keys, branding and clubs, platform links, the firmware catalogue and server
 # administration (FU9) are in their own module; every key is new (a clash would silently change another page's text).
 from .staff_i18n_admin import BY_LANGUAGE as _ADMIN  # noqa: E402
+from .staff_i18n_chrono import BY_LANGUAGE as _CHRONO  # noqa: E402  (the chrono violations page, PRIV-2)
 from .staff_i18n_data import BY_LANGUAGE as _DATA  # noqa: E402  (the data export and quota page, PKC-1)
 from .staff_i18n_settings import BY_LANGUAGE as _SETTINGS  # noqa: E402  (the field's settings page, FS-*)
 
-for _more in (_ADMIN, _DATA, _SETTINGS):
+for _more in (_ADMIN, _CHRONO, _DATA, _SETTINGS):
     for _lang, _texts in _more.items():
         _clash = set(STRINGS[_lang]) & set(_texts)
         assert not _clash, sorted(_clash)
@@ -3240,6 +3241,31 @@ _ATAK_EXPIRY: dict[str, dict[str, str]] = {
     },
 }
 for _lang, _texts in _ATAK_EXPIRY.items():
+    _clash = set(STRINGS[_lang]) & set(_texts)
+    assert not _clash, sorted(_clash)
+    STRINGS[_lang].update(_texts)
+
+
+# LIVE-2: a server with no published privacy notice makes no new accounts; every key is new.
+_NO_NOTICE: dict[str, dict[str, str]] = {
+    "pt": {
+        "acct_inactivity": "Esta conta esteve inativa muito tempo e ia ser anonimizada a {when}. Como voltaste, fica: a marca desaparece na próxima verificação diária.",
+        "oidc_err_privacy_notice_unpublished": "Este servidor ainda não publicou o seu aviso de privacidade, por isso não cria contas novas. Quem já tem conta entra como sempre. Avisar quem gere o servidor.",
+    },
+    "en": {
+        "acct_inactivity": "This account had been inactive for a long time and was due to be anonymised on {when}. Since you are back, it stays: the notice clears at the next daily check.",
+        "oidc_err_privacy_notice_unpublished": "This server has not published its privacy notice yet, so it is not making new accounts. Existing accounts log in as always. Tell whoever runs the server.",
+    },
+    "de": {
+        "acct_inactivity": "Dieses Konto war lange inaktiv und sollte am {when} anonymisiert werden. Da du zurück bist, bleibt es: Der Hinweis verschwindet bei der nächsten täglichen Prüfung.",
+        "oidc_err_privacy_notice_unpublished": "Dieser Server hat seine Datenschutzerklärung noch nicht veröffentlicht und legt deshalb keine neuen Konten an. Bestehende Konten melden sich wie gewohnt an. Sag es den Betreibenden des Servers.",
+    },
+    "zh-tw": {
+        "acct_inactivity": "這個帳號長時間沒有使用，原本會在 {when} 匿名化。你回來了，所以帳號會保留：這則提醒會在下次每日檢查時消失。",
+        "oidc_err_privacy_notice_unpublished": "這台伺服器尚未公布隱私權聲明，因此暫不建立新帳號。已有帳號仍可登入。請通知管理這台伺服器的人。",
+    },
+}
+for _lang, _texts in _NO_NOTICE.items():
     _clash = set(STRINGS[_lang]) & set(_texts)
     assert not _clash, sorted(_clash)
     STRINGS[_lang].update(_texts)

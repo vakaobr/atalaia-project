@@ -56,7 +56,7 @@ class LoginTestCase(AppTestCase):
                    OidcClient("microsoft", "ms-id", client_secret="ms-secret", tenant="common"),
                    OidcClient("apple", "apple.services.id", team_id="TEAM123456", key_id="KEY1234567",
                               key_file=str(self.key_file))) if self.providers else ()
-        return Settings(database_url=self.database_url, secret_key=SECRET_KEY, metrics_token=METRICS_TOKEN,
+        return Settings(allow_signup_without_notice=True, database_url=self.database_url, secret_key=SECRET_KEY, metrics_token=METRICS_TOKEN,
                         db_timeout_s=2.0, purge_hour=self.purge_hour, password_login=self.password_login,
                         oidc=clients)
 

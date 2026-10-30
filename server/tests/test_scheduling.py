@@ -316,7 +316,7 @@ class ScheduleDataTests(ScheduleCase):
     async def test_the_purge(self) -> None:
         now = datetime.now(UTC)
         async with self.app.state.sessionmaker() as db:
-            for title, end in (("old", now - timedelta(days=731)), ("recent", now - timedelta(days=729))):
+            for title, end in (("old", now - timedelta(days=91)), ("recent", now - timedelta(days=89))):
                 db.add(ScheduledGame(field_id=self.field_id, title=title, starts_at=end - timedelta(hours=4),
                                      ends_at=end, status="published", created_by=self.gm_id))
             await db.commit()

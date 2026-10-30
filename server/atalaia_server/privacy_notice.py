@@ -20,7 +20,10 @@ import html
 import logging
 import re
 from pathlib import Path
-from typing import NamedTuple, Optional
+from typing import TYPE_CHECKING, NamedTuple, Optional
+
+if TYPE_CHECKING:
+    from .config import Settings
 
 LANGUAGES = ("pt", "en", "de", "zh-tw")
 MAX_BYTES = 512 * 1024
@@ -44,6 +47,13 @@ def available(directory: Optional[str], version: str) -> tuple[str, ...]:
         return ()
     base = Path(directory)
     return tuple(lang for lang in LANGUAGES if (base / filename(lang, version)).is_file())
+
+
+def signup_blocked(settings: "Settings") -> bool:
+    """New accounts are refused (LIVE-2): no notice is published for the current version, and the operator has not
+    said (``ATALAIA_ALLOW_SIGNUP_WITHOUT_NOTICE``) that this is a development or test server. A consent is to a text."""
+    return not settings.allow_signup_without_notice and not available(settings.privacy_notice_dir,
+                                                                      settings.privacy_notice_version)
 
 
 def load(directory: Optional[str], version: str, wanted: str, fallback: str = "pt") -> Optional[Notice]:

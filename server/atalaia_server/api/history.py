@@ -36,8 +36,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..audit import record
 from ..auth import Principal, current_principal, require_field_role
 from ..db import get_session
-from ..history_models import DEFAULT_RETENTION_DAYS, MAX_DELAY_S, MIN_RETENTION_DAYS, FieldHistorySettings
-from ..models import Field, Game, GameEvent
+from ..history_models import MAX_DELAY_S, MAX_RETENTION_DAYS, MIN_RETENTION_DAYS, FieldHistorySettings
+from ..models import Field, Game, GameEvent, GameResult
 from ..services import history
 from .fields import NO_STORE
 from .games import game_json, game_roles
@@ -110,6 +110,24 @@ async def field_history(field_id: uuid.UUID, state: Optional[str] = None,
                     "delayed": cut is not None})
     nxt = (rows[-1].started_at or rows[-1].controller_created_at).isoformat() if len(rows) == limit else None
     return JSONResponse({"games": out, "next_before": nxt}, headers=NO_STORE)
+
+
+@router.get("/fields/{field_id}/history/results")
+async def field_results(field_id: uuid.UUID, limit: int = Query(100, ge=1, le=500),
+                        principal: Principal = Depends(current_principal),
+                        db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    """The team results of games whose per-player history is gone (90 days by default), kept 365 days after the game: name,
+    mode, teams, the teams' final totals, the winner, when. No player and no member list (maintainer decision
+    2026-10-30). Any role on the field."""
+    roles = principal.field_roles(field_id) | ({"admin"} if principal.is_server_admin else set())
+    if not roles:
+        raise HTTPException(403, "role_required")
+    rows = await db.scalars(select(GameResult).where(GameResult.field_id == field_id)
+                            .order_by(GameResult.ended_at.desc(), GameResult.id.desc()).limit(limit))
+    return JSONResponse({"results": [
+        {"name": r.name, "mode_id": r.mode_id, "teams": r.teams, "team_totals": r.team_totals, "winner": r.winner,
+         "state": r.state, "duration_ms": r.duration_ms, "started_at": r.started_at.isoformat() if r.started_at else None,
+         "ended_at": r.ended_at.isoformat()} for r in rows]}, headers=NO_STORE)
 
 
 @router.get("/games/{game_id}/timeline")
@@ -191,7 +209,7 @@ async def put_settings(field_id: uuid.UUID, body: SettingsIn, request: Request,
             current["spectator_delay_s"] = changed["spectator_delay_s"] = body.spectator_delay_s
     if body.retention_days is not None:
         if isinstance(body.retention_days, bool) or not MIN_RETENTION_DAYS <= body.retention_days \
-                <= DEFAULT_RETENTION_DAYS:
+                <= MAX_RETENTION_DAYS:
             raise HTTPException(400, "retention_days_invalid")
         if body.retention_days != current["retention_days"]:
             current["retention_days"] = changed["retention_days"] = body.retention_days

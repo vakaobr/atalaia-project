@@ -46,7 +46,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from atalaia_controller import apd as apd_core, sync_format
 
-from .. import hub_share, sync
+from .. import chrono_registry, hub_share, sync
 from ..services import branding, registration, scheduling
 from ..audit import record
 from ..auth import Principal, current_principal, require_field_role, server_admin
@@ -87,6 +87,8 @@ class FieldPatch(BaseModel):
     # Days the field's controllers keep chrono records (also this server's registry) and an ended game's data (RET-1/2).
     chrono_retention_days: Optional[int] = None
     game_retention_days: Optional[int] = None
+    # PRIV-2: how long a "ban" outcome lasts (days; null puts the default back: 12 months, within the chrono retention).
+    chrono_ban_days: Optional[int] = None
 
 
 class SyncKeyIn(BaseModel):
@@ -112,7 +114,7 @@ def field_json(f: Field, roles: Any = None) -> dict[str, Any]:
             "description": f.description, "address_text": f.address_text, "federation_label": f.federation_label,
             "limit_template": f.limit_template, "max_replicas": f.max_replicas, "apd": registration.field_rule(f),
             "country": f.country, "chrono_retention_days": f.default_retention_days,
-            "game_retention_days": f.game_retention_days}
+            "game_retention_days": f.game_retention_days, "chrono_ban_days": f.chrono_ban_days}
     if roles is not None:
         body["my_roles"] = sorted(roles)
     return body
@@ -232,6 +234,13 @@ async def update_field(field_id: uuid.UUID, body: FieldPatch, request: Request,
             raise HTTPException(400, "game_retention_days_invalid")
         if body.game_retention_days != field.game_retention_days:
             field.game_retention_days = changed["game_retention_days"] = body.game_retention_days
+    if "chrono_ban_days" in body.model_fields_set:  # null: the field's chrono retention (the most a ban can last)
+        days = body.chrono_ban_days
+        if days is not None and (isinstance(days, bool) or not 1 <= days <= field.default_retention_days):
+            raise HTTPException(400, "chrono_ban_days_invalid")
+        if days != field.chrono_ban_days:
+            field.chrono_ban_days = days
+            changed["chrono_ban_days"] = days
     if "address_text" in changed:
         await scheduling.bump_for_field_address(db, field.id, datetime.now(timezone.utc))
     if "chrono_sharing_enabled" in changed:

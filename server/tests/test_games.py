@@ -222,7 +222,7 @@ class SettingsTests(HistoryCase):
         _, gm = await self.role("gm")
         path = f"/api/v1/fields/{self.field_id}/history/settings"
         self.assertEqual(await self.get(path, gm),
-                         {"public_scoreboard": False, "spectator_delay_s": 60, "retention_days": 730})
+                         {"public_scoreboard": False, "spectator_delay_s": 60, "retention_days": 90})
         await self.put_settings(gm, expect=403, public_scoreboard=True)
         body = await self.put_settings(admin, public_scoreboard=True, spectator_delay_s=0, retention_days=365)
         self.assertEqual(body, {"public_scoreboard": True, "spectator_delay_s": 0, "retention_days": 365})
@@ -295,10 +295,19 @@ class RetentionTests(HistoryCase):
             counts = await personal_data.purge(db, now)
         self.assertEqual(counts["games"], 1)
         left = await self.fetch("SELECT field_id FROM games")
-        self.assertEqual([r[0] for r in left], [other])  # 40 days is within the default 24 months
+        self.assertEqual([r[0] for r in left], [other])  # 40 days is within the default 90 days
         self.assertEqual(await self.count("game_score_samples"), 0)  # with its game
+        # The team results stay (maintainer decision 2026-10-30): totals only, no player, 365 days after the game.
+        results = await self.fetch("SELECT field_id, team_totals, winner FROM game_results")
+        self.assertEqual([(r["field_id"], json.loads(r["team_totals"]), r["winner"]) for r in results],
+                         [(self.field_id, {"red": 4, "blue": 0}, "red")])
         async with self.app.state.sessionmaker() as db:
-            self.assertEqual((await personal_data.purge(db, now + timedelta(days=700)))["games"], 1)
+            counts = await personal_data.purge(db, now + timedelta(days=100))
+        self.assertEqual((counts["games"], counts["game_results"], counts["game_results_expired"]), (1, 1, 0))
+        async with self.app.state.sessionmaker() as db:
+            counts = await personal_data.purge(db, now + timedelta(days=700))
+        self.assertEqual((counts["games"], counts["game_results"], counts["game_results_expired"]), (0, 0, 2))
+        self.assertEqual(await self.count("game_results"), 0)
 
 
 class PersonalDataTests(HistoryCase):

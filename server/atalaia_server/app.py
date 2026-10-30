@@ -42,7 +42,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from . import __version__, atak_pki, integrations, personal_data, quotas, tenancy, tenant_watch
+from . import __version__, atak_pki, integrations, personal_data, privacy_notice, quotas, tenancy, tenant_watch
 from .api import (app_links, atak, auth, branding, chrono, clubs, devices, export, feedback, fields, firmware, games,
                   hub_share as hub_share_api, health, history, integrations as integrations_api, me, registration_import,
                   registrations, privacy as privacy_api, remote_gm, scenarios, login_methods, oidc_relay, account_merge, scheduling, sync)
@@ -83,12 +83,26 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             except BaseException:
                 await app.state.engine.dispose()
                 raise
+        if settings.hosted and settings.privacy_notice_version.startswith("template-"):
+            # SR-89: a hosted hub shows every field's players a privacy notice; a template is a draft, not the operator's.
+            log.warning("hosted mode with the privacy notice version %r: that is a template, not a notice the operator "
+                        "has adopted; set ATALAIA_PRIVACY_NOTICE_VERSION and ATALAIA_PRIVACY_NOTICE_DIR (a lawyer "
+                        "should have read it)", settings.privacy_notice_version)
+        if privacy_notice.signup_blocked(settings):
+            log.warning("no privacy notice is published for version %r (ATALAIA_PRIVACY_NOTICE_DIR): new accounts are "
+                        "REFUSED (409 privacy_notice_unpublished) until one is; existing accounts still log in",
+                        settings.privacy_notice_version)
+        elif settings.allow_signup_without_notice and not privacy_notice.available(settings.privacy_notice_dir,
+                                                                                    settings.privacy_notice_version):
+            log.warning("sign-up is open and no privacy notice is published (ATALAIA_ALLOW_SIGNUP_WITHOUT_NOTICE=on): "
+                        "accounts consent to no text; never for a real deployment")
         purge = None
         if settings.purge_hour is not None:  # the daily retention purge (ADR-P4-8)
             engine = app.state.engine
             tenants = (lambda: tenancy.active_tenants(engine)) if settings.hosted else None
             purge = asyncio.create_task(personal_data.purge_daily(app.state.sessionmaker, settings.purge_hour,
-                                                                  tenants=tenants),
+                                                                  tenants=tenants, policy=settings.retention,
+                                                                  ledger=settings.erasure_ledger),
                                         name="retention-purge")
         app.state.purge_task = purge
         relay = None

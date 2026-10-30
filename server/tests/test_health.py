@@ -107,7 +107,7 @@ class DatabaseDownTests(AppTestCase):
     def settings(self) -> Settings:
         closed = _free_port()  # nothing listens there: the connection is refused at once
         url = make_url(self.database_url).set(host="127.0.0.1", port=closed).render_as_string(hide_password=False)
-        return Settings(database_url=url, secret_key=SECRET_KEY, metrics_token=METRICS_TOKEN, db_timeout_s=2.0)
+        return Settings(allow_signup_without_notice=True, database_url=url, secret_key=SECRET_KEY, metrics_token=METRICS_TOKEN, db_timeout_s=2.0)
 
     async def test_unhealthy(self) -> None:
         r = await self.client.get("/api/v1/health")

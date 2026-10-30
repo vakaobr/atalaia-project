@@ -531,10 +531,23 @@ function submit(id, work) {
     });
 }
 
+async function inactivityNotice() {
+    try {
+        const me = await api('GET', '/api/v1/me');
+        if (!me.inactivity) return;
+        const box = $('inactivity');
+        box.textContent = t('acct_inactivity', { when: when(me.inactivity.anonymise_after) });
+        box.hidden = false;
+    } catch (err) {
+        /* the notice is a courtesy: the page works without it */
+    }
+}
+
 async function main() {
     const ctx = await boot();
     if (!ctx) return;
     $('account-link').setAttribute('aria-current', 'page');
+    inactivityNotice();  // PRIV-7: an account that was due to be anonymised for inactivity is told so
     try {
         await reload();
     } catch (err) {

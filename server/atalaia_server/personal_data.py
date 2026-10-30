@@ -19,7 +19,9 @@ What holds personal data now (plan phases 10-12):
 | ``passkeys`` (LG-2) | the name, when made and last used, the host name (``passkeys.json``; never a key) | deleted | (with the account) |
 | ``oidc_logins`` (LG-1) | (a login in progress, ten minutes: nothing to give) | deleted | when it expires |
 | ``consents`` | every record | deleted | (with the account) |
-| ``audit_log`` | the person's own entries, and entries about them (without who made them) | kept for the log's integrity, without addresses; the account it names is anonymised | after 36 months |
+| ``audit_log`` | the person's own entries, and entries about them (without who made them) | kept for the log's integrity, without addresses; the account it names is anonymised | the network address of every row after ``ATALAIA_AUDIT_IP_DAYS`` (180 by default, PRIV-6), the row after 36 months |
+| ``users.inactivity_warned_at`` (PRIV-7) | the date, in the profile (``inactivity_warned_at``) | cleared with the account's other fields | cleared when the account is active again; an account inactive for ``ATALAIA_INACTIVE_ACCOUNT_MONTHS`` (24) is warned, then anonymised after ``ATALAIA_INACTIVE_GRACE_DAYS`` (30) |
+| ``chrono_copy_revocations`` (PRIV-5) | (the field's: a player id of this field whose owner erased their account or withdrew a consent; no account in it) | | after the field's chrono retention period |
 | ``user_game_roles`` (plan phase 13) | the person's roles per game, with the game (``games.json`` in the export) | deleted | with the game |
 | ``games`` with ``game_events``, ``game_node_scores``, ``game_nodes`` (plan phase 13) | (not linked to an account: see below) | (nothing to unlink) | 24 months after the game ended (or was made, if it never ended) |
 | ``field_player_ids`` (plan phase 14) | the person's player id at each field (``player_ids.json``) | deleted: the link to the person | (with the account) |
@@ -35,6 +37,7 @@ What holds personal data now (plan phases 10-12):
 | ``club_members`` (plan phase 18) | the person's clubs, club role and invitations (``clubs.json``) | deleted (a club whose last admin goes keeps its profile; a server administrator can still manage it) | an invitation not accepted, 30 days after it was made; a membership with the account |
 | ``club_reports`` (plan phase 18) | the reports the person made while logged in (``club_reports.json``; never an address) | kept for the moderation record, without the link to the account (reporter and deciding administrator) | 12 months after the decision (an open report stays until decided) |
 | ``games`` and ``game_events`` as the person's game history (plan phase 20) | the games whose events name one of the person's player ids (``player``, ``owner``, ``holder``), with those events and the game's totals, and the games their registrations were checked in to (``game_history.json``) | nothing to change: the events keep the field's pseudonymous ids; erasure deletes ``field_player_ids``, the only link to the person | the field's ``retention_days`` (``field_history_settings``, 30-730, 730 by default: ADR-P4-8's 24 months) after the game ended |
+| ``game_results`` (maintainer decision 2026-10-30) | (the field's: a game's team totals, no player id and no member list) | | 365 days after the game ended; written from the game's totals when the game itself goes (90 days by default) |
 | ``game_score_samples``, ``field_history_settings``, ``field_scenarios``, ``field_scenario_revisions``, ``field_presets`` (plan phase 20) | (the field's: no person in them; who saved a scenario or a preset is only in the audit log) | | the samples with their game |
 | ``clubs``, ``field_teams``, ``branding_images``, the field's branding columns (plan phase 18) | (a club's or a field's public profile: no person in them; who made a club is ``created_by``, unlinked at erasure) | ``created_by`` and ``hidden_by`` cleared | an image nothing uses, a day after its upload |
 | ``firmware_releases`` (plan phase 19) | (the server's catalogue: no person in it; who added a release is ``added_by``, unlinked at erasure) | ``added_by`` cleared | (kept: withdrawn releases stay, marked) |
@@ -102,11 +105,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from . import chrono_registry, hub_share, tenancy
+from . import chrono_registry, erasure_ledger, hub_share, tenancy
+from .config import RetentionPolicy
 from .atak_models import AtakCert
 from .preview_models import CONTACT_RETENTION, RETENTION as FEEDBACK_RETENTION, PreviewFeedback
 from .audit import record
-from .models import (ROLE_BY_ID, AuditLog, Base, ChronoReading, ChronoReject, Club, ClubMember, ClubReport, Consent, Field,
+from .models import (ROLE_BY_ID, AuditLog, Base, ChronoCopyRevocation, GameResult, ChronoReading, ChronoReject, Club, ClubMember, ClubReport, Consent, Field,
                      FieldPlayerId, FirmwareRelease, Game, GameRegistration, MarshalKey, PlayerIdClaim, RegistrationReplica, Replica,
                      ScheduledGame, User, UserFieldRole, UserGameRole, UserSession, OidcLogin, Passkey, UserIdentity)
 from .services import branding, history
@@ -125,7 +129,8 @@ ERASED_PASSWORD = "DELETED"  # not an Argon2 hash: passwords.verify_password nev
 # keeps each field's fields.default_retention_days (365 by default; the field sets it, and its controllers follow it through the field settings sync, RET-2).
 SESSION_RETENTION = timedelta(days=30)   # after a session expired or was revoked
 AUDIT_RETENTION = timedelta(days=1095)   # 36 months
-GAME_RETENTION = timedelta(days=730)     # 24 months: game history, after the game ended (scheduled games too)
+RESULTS_RETENTION = timedelta(days=365)  # a game's team results (no player ids), after it ended: maintainer decision 2026-10-30
+GAME_RETENTION = timedelta(days=90)      # game history, after the game ended (scheduled games too): maintainer decision 2026-10-30
 FEDERATION_RETENTION = timedelta(days=30)  # a registration's federation number, after the game (ADR-P4-11)
 CLAIM_RETENTION = timedelta(days=30)     # a claim of a phone's player id, after it was made
 GUEST_RETENTION = timedelta(days=30)     # an imported registration (no account), after its game (ADR-P4-8)
@@ -235,6 +240,7 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
             "id": str(user.id), "username": user.username, "email": user.email,
             "created_at": _iso(user.created_at), "updated_at": _iso(user.updated_at),
             "last_login_at": _iso(user.last_login_at), "gdpr_consent_at": _iso(user.gdpr_consent_at),
+            "inactivity_warned_at": _iso(user.inactivity_warned_at),
             "totp_enabled": user.totp_enabled,
             "has_password": user.password_hash is not None, "server_admin": user.server_admin,
         },
@@ -437,6 +443,9 @@ async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_reques
                      .values(make_model=None, tag_type=None, tag_uid=None).execution_options(synchronize_session=False))
     await db.execute(update(MarshalKey).where(MarshalKey.user_id == user_id).values(user_id=None)
                      .execution_options(synchronize_session=False))
+    # PRIV-5 (Art. 17(2)): other fields' controllers hold copies of this person's chrono records, pulled for the
+    # roster; they learn of the erasure from the schedule answer (``copies_revoked``) and drop them. Before the links go.
+    await chrono_registry.revoke_copies(db, user_id, "erasure")
     await db.execute(delete(FieldPlayerId).where(FieldPlayerId.user_id == user_id))
     # Registrations (plan phase 16): one for a game still to come is cancelled; every one loses the
     # account, the name, the team preference, the federation number and the ticket, and its replicas their
@@ -510,18 +519,34 @@ async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_reques
     return tombstone
 
 
-async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool = False) -> dict[str, int]:
+async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool = False,
+                policy: Optional[RetentionPolicy] = None,
+                anonymised: Optional[list[uuid.UUID]] = None) -> dict[str, int]:
     """Deletes what is past its retention (ADR-P4-8) and commits; returns the counts. With
-    ``dry_run`` it counts the same rows and rolls back."""
+    ``dry_run`` it counts the same rows and rolls back. ``policy`` is what the operator tunes (the audit log's
+    addresses, inactive accounts: PRIV-6, PRIV-7; the defaults when none). The ids of the accounts it anonymised
+    for inactivity are added to ``anonymised`` (after the commit) so that the caller can enter them in the erasure
+    ledger (PRIV-4)."""
     now = now or datetime.now(timezone.utc)
+    policy = policy or RetentionPolicy()
     cutoff = now - SESSION_RETENTION
     sessions = await db.execute(delete(UserSession).where(
         or_(UserSession.expires_at < cutoff, UserSession.revoked_at < cutoff)))
+    # PRIV-6: the audit log keeps what happened for 36 months, but where from only for ``audit_ip_days``.
+    addresses = await db.execute(update(AuditLog).where(
+        AuditLog.ip_address.is_not(None), AuditLog.created_at < now - timedelta(days=policy.audit_ip_days))
+        .values(ip_address=None).execution_options(synchronize_session=False))
     audit = await db.execute(delete(AuditLog).where(AuditLog.created_at < now - AUDIT_RETENTION))
     # A game with its events, counters, nodes and per-game roles (they cascade).
     # Each field's game history retention (plan phase 20: field_history_settings, 24 months by default).
+    # Maintainer decision 2026-10-30: what has a player id goes at 90 days; the team results (no player id, no member
+    # list) are written down first and kept 365 days after the game ended.
+    results = await _snapshot_results(db, now)
     games = await db.execute(delete(Game).where(history.past_retention(now)))
-    counts = {"sessions": sessions.rowcount or 0, "audit_log": audit.rowcount or 0, "games": games.rowcount or 0}
+    results_gone = await db.execute(delete(GameResult).where(GameResult.ended_at < now - RESULTS_RETENTION))
+    counts = {"sessions": sessions.rowcount or 0, "audit_log": audit.rowcount or 0,
+              "audit_addresses": addresses.rowcount or 0, "games": games.rowcount or 0,
+              "game_results": results, "game_results_expired": results_gone.rowcount or 0}
     counts.update(await _purge_chrono(db, now))
     await hub_share.sync_all(db)  # a hosted hub's copies follow what the purge removed (SVX-2)
     # The schedule (plan phase 15): a scheduled game is game history once it has ended.
@@ -562,13 +587,96 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
     counts["preview_feedback"] = feedback.rowcount or 0
     logins = await db.execute(delete(OidcLogin).where(OidcLogin.expires_at < now))  # social logins never finished
     counts["oidc_logins"] = logins.rowcount or 0
+    inactive = await _purge_inactive_accounts(db, now, policy)  # PRIV-7: before the anonymised rows are purged
+    counts.update({"inactive_warned": inactive["warned"], "inactive_cleared": inactive["cleared"],
+                   "inactive_anonymised": len(inactive["anonymised"])})
     counts["anonymised_users"] = await _purge_anonymised_users(db)  # last: it sees what the rules above freed
     if dry_run:
         await db.rollback()
         return counts
     record(db, "retention_purge", None, details=counts)
     await db.commit()
+    if anonymised is not None:
+        anonymised.extend(inactive["anonymised"])
     return counts
+
+
+def ledger_tenant() -> Optional[str]:
+    """The erasure ledger's ``tenant`` of the request being served: the field's slug in hosted mode, else None."""
+    tenant = tenancy.current()
+    return tenant.slug if tenant is not None else None
+
+
+async def _snapshot_results(db: AsyncSession, now: datetime) -> int:
+    """Writes the team results of the games the purge is about to delete (``GameResult``; no player ids): the games' totals
+    as staff see them, who won, when it ran. Idempotent (a game already written is left); returns how many were written."""
+    from sqlalchemy.dialects.postgresql import insert  # noqa: PLC0415
+
+    written = 0
+    for game in list(await db.scalars(select(Game).where(history.past_retention(now)))):
+        totals = await history.totals_until(db, game, None)
+        ended = game.ended_at or game.updated_at or game.controller_created_at
+        if ended < now - RESULTS_RETENTION:  # already past the results' own retention: nothing to keep
+            continue
+        stmt = insert(GameResult).values(
+            field_id=game.field_id, game_id=game.game_id, game_seed=game.game_seed, name=game.name, mode_id=game.mode_id,
+            teams=list(game.teams), team_totals=totals, winner=history.winner(totals) if game.state == "ended" else None,
+            state=game.state, duration_ms=game.duration_ms, started_at=game.started_at, ended_at=ended
+        ).on_conflict_do_nothing(index_elements=["field_id", "game_id", "game_seed"])
+        written += (await db.execute(stmt)).rowcount or 0
+    return written
+
+
+def last_activity() -> Any:
+    """The last time the account showed any sign of life (PRIV-7): its creation, a password login, a social login, a
+    passkey use, a session's start or use (sessions are purged 30 days after they end, the others stay). Never
+    ``users.updated_at``: setting the warning changes it."""
+    session = (select(func.max(func.greatest(UserSession.created_at, UserSession.last_used_at)))
+               .where(UserSession.user_id == User.id).scalar_subquery())
+    social = select(func.max(UserIdentity.last_login_at)).where(UserIdentity.user_id == User.id).scalar_subquery()
+    passkey = select(func.max(Passkey.last_used_at)).where(Passkey.user_id == User.id).scalar_subquery()
+    return func.greatest(User.created_at, User.last_login_at, session, social, passkey)
+
+
+def months(count: int) -> timedelta:
+    return timedelta(days=round(count * 30.4375))
+
+
+def _inactive_candidates(now: datetime, policy: RetentionPolicy) -> Any:
+    """Accounts inactive for ``policy.inactive_months`` that the rule may touch: not already anonymised, not a server
+    administrator, holding no role at any field (a field's staff are accountable people, and anonymising the last
+    administrator would lock a field out) and registered for no game still to come."""
+    upcoming = (select(GameRegistration.id).join(ScheduledGame, ScheduledGame.id == GameRegistration.scheduled_game)
+                .where(GameRegistration.user_id == User.id, GameRegistration.status == "registered",
+                       ScheduledGame.ends_at > now).exists())
+    has_role = select(UserFieldRole.id).where(UserFieldRole.user_id == User.id).exists()
+    return and_(~User.username.startswith(ERASED_PREFIX, autoescape=True), User.server_admin.is_(False),
+                ~has_role, ~upcoming, last_activity() < now - months(policy.inactive_months or 0))
+
+
+async def _purge_inactive_accounts(db: AsyncSession, now: datetime, policy: RetentionPolicy) -> dict[str, Any]:
+    """Warn-then-anonymise (PRIV-7), off when ``policy.inactive_months`` is None. An account inactive that long gets
+    ``inactivity_warned_at`` (the account page and ``GET /api/v1/me`` show it: the server has no way to send mail, so
+    the warning reaches a person who comes back); one still inactive ``inactive_grace_days`` later is anonymised
+    through ``erase`` (the same path as the person's own erasure, so RET-9..12 then purge the emptied row); one that
+    is active again, or no longer eligible, has the warning cleared."""
+    out: dict[str, Any] = {"warned": 0, "cleared": 0, "anonymised": []}
+    if policy.inactive_months is None:
+        return out
+    candidate = _inactive_candidates(now, policy)
+    cleared = await db.execute(update(User).where(User.inactivity_warned_at.is_not(None), ~candidate)
+                               .values(inactivity_warned_at=None).execution_options(synchronize_session=False))
+    out["cleared"] = cleared.rowcount or 0
+    due = list(await db.scalars(select(User.id).where(
+        candidate, User.inactivity_warned_at.is_not(None),
+        User.inactivity_warned_at < now - timedelta(days=policy.inactive_grace_days)).order_by(User.id)))
+    for user_id in due:
+        await erase(db, user_id, reason="inactivity")
+        out["anonymised"].append(user_id)
+    warned = await db.execute(update(User).where(candidate, User.inactivity_warned_at.is_(None))
+                              .values(inactivity_warned_at=now).execution_options(synchronize_session=False))
+    out["warned"] = warned.rowcount or 0
+    return out
 
 
 def unreferenced_user(user: Any = User) -> Any:
@@ -612,11 +720,14 @@ async def _purge_chrono(db: AsyncSession, now: datetime) -> dict[str, int]:
         _past_retention(now, Replica.field_id, Replica.updated_at),
         ~select(ChronoReading.id).where(ChronoReading.field_id == Replica.field_id,
                                         ChronoReading.replica_id == Replica.replica_id).exists()))
+    revocations = await db.execute(delete(ChronoCopyRevocation).where(
+        _past_retention(now, ChronoCopyRevocation.field_id, ChronoCopyRevocation.created_at)))
     keys = await db.execute(delete(MarshalKey).where(
         _past_retention(now, MarshalKey.field_id, func.coalesce(MarshalKey.revoked_at, MarshalKey.valid_until)),
         ~select(ChronoReading.id).where(ChronoReading.marshal_key == MarshalKey.id).exists()))
     return {"chrono_readings": readings.rowcount or 0, "chrono_rejects": rejects.rowcount or 0,
-            "replicas": replicas.rowcount or 0, "marshal_keys": keys.rowcount or 0}
+            "replicas": replicas.rowcount or 0, "marshal_keys": keys.rowcount or 0,
+            "copy_revocations": revocations.rowcount or 0}
 
 
 async def live_server_admins(db: AsyncSession, other_than: uuid.UUID) -> int:
@@ -638,7 +749,8 @@ def seconds_until(now: datetime, hour: int) -> float:
 
 async def purge_daily(maker: async_sessionmaker[AsyncSession], hour: int,
                       now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
-                      tenants: Optional[Callable[[], Awaitable[list[tenancy.Tenant]]]] = None) -> None:
+                      tenants: Optional[Callable[[], Awaitable[list[tenancy.Tenant]]]] = None,
+                      policy: Optional[RetentionPolicy] = None, ledger: Optional[str] = None) -> None:
     """Runs ``purge`` every day at ``hour``:00 UTC until cancelled (the app's lifespan task).
     A failed run is logged and the next one is the next day; ``python -m atalaia_server purge``
     runs it by hand. In hosted mode (``tenants``: the active ones, plan phase 21) it runs once
@@ -647,19 +759,23 @@ async def purge_daily(maker: async_sessionmaker[AsyncSession], hour: int,
         await asyncio.sleep(seconds_until(now(), hour))
         try:
             for tenant in (await tenants()) if tenants is not None else [None]:
-                await _purge_one(maker, tenant)
+                await _purge_one(maker, tenant, policy, ledger)
         except asyncio.CancelledError:
             raise
         except Exception:  # noqa: BLE001  (the database down, say: tomorrow's run tries again)
             log.exception("retention purge failed")
 
 
-async def _purge_one(maker: async_sessionmaker[AsyncSession], tenant: Optional[tenancy.Tenant]) -> None:
+async def _purge_one(maker: async_sessionmaker[AsyncSession], tenant: Optional[tenancy.Tenant],
+                     policy: Optional[RetentionPolicy] = None, ledger: Optional[str] = None) -> None:
     where = f" ({tenant.slug})" if tenant is not None else ""
     try:
         with tenancy.use(tenant):
             async with maker() as db:
-                counts = await purge(db)
+                gone: list[uuid.UUID] = []
+                counts = await purge(db, policy=policy, anonymised=gone)
+        erasure_ledger.append(ledger, [erasure_ledger.account_entry(u, tenant.slug if tenant else None)
+                                       for u in gone])  # after the commit (PRIV-4)
         log.info("retention purge%s: %s", where, ", ".join(f"{k} {v}" for k, v in counts.items()))
     except asyncio.CancelledError:
         raise

@@ -17,7 +17,7 @@
   players' pseudonymous ids (decision S20-5). Once the game has ended there is no delay.
 - **The public scoreboard** (``fields.public_scoreboard``, off by default) shows the field's live or last
   game's name, teams and delayed totals to anyone: no events, no players, no parameters.
-- **Retention** (ADR-P4-8: game history 24 months, per field): ``retention_days`` (30-730) per field; the
+- **Retention** (game history 90 days by default, per field; ADR-P4-8 had 24 months, changed by the maintainer on 2026-10-30): ``retention_days`` (30-730) per field; the
   daily purge deletes a game, with everything that hangs off it, that many days after it ended.
 """
 
@@ -207,7 +207,7 @@ async def public_game(db: AsyncSession, field_id: uuid.UUID, now: datetime) -> O
 
 
 def past_retention(now: datetime) -> Any:
-    """The games whose history retention has run out: their field's ``retention_days`` (730 without a row)
+    """The games whose history retention has run out: their field's ``retention_days`` (90 without a row)
     after they ended (or were made, if they never ended). For ``personal_data.purge``."""
     days = (select(FieldHistorySettings.retention_days).where(FieldHistorySettings.field_id == Game.field_id)
             .scalar_subquery())

@@ -1250,22 +1250,22 @@ class SettingsTests(BrowserCase):
         await expect(page.locator("#status")).to_have_text("Saved.")
         row = await self.row()
         self.assertEqual((row[2], row[3], row[4], row[5]), (True, True, "Campo de bosque.\nChegada às 9h.", 3))
-        # The data retention (RET-1, RET-2): 365 days each at first; both are saved and a refusal is in words.
+        # The data retention (RET-1, RET-2): 365 days for chrono, 90 for game data at first; both are saved and a refusal is in words.
         await expect(page.locator("#f-chrono-days")).to_have_value("365")
-        await expect(page.locator("#f-game-days")).to_have_value("365")
+        await expect(page.locator("#f-game-days")).to_have_value("90")
         await page.fill("#f-chrono-days", "180")
-        await page.fill("#f-game-days", "90")
+        await page.fill("#f-game-days", "120")
         await page.click("#retention-form button[type=submit]")
         await expect(page.locator("#status")).to_have_text("Saved. The controllers get the change at once.")
         days = (await self.fetch("SELECT default_retention_days, game_retention_days FROM fields WHERE id = $1",
                                  self.field_id))[0]
-        self.assertEqual((days[0], days[1]), (180, 90))
+        self.assertEqual((days[0], days[1]), (180, 120))
         await page.fill("#f-game-days", "7")
         await page.click("#retention-form button[type=submit]")
         await expect(page.locator("#status")).to_have_text(
             "Invalid game data retention (a whole number of days, from 30 to 3653).")
         self.assertEqual((await self.fetch("SELECT game_retention_days FROM fields WHERE id = $1",
-                                           self.field_id))[0][0], 90)
+                                           self.field_id))[0][0], 120)
         # Refusals, each in words: a country that is not two letters, a one-line text with a tab, a rule
         # that accepts only the ticked ones with none ticked, a number the API refuses.
         await page.fill("#f-country", "PORTUGAL")

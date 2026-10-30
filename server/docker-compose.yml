@@ -80,6 +80,12 @@ services:
       ATALAIA_PRIVACY_NOTICE_VERSION: "${ATALAIA_PRIVACY_NOTICE_VERSION:-}"
       # on refuses an app's social login that sends no PKCE-style verifier hash (APP-4); empty accepts older apps.
       ATALAIA_OIDC_APP_REQUIRE_CHALLENGE: "${ATALAIA_OIDC_APP_REQUIRE_CHALLENGE:-}"
+      # What the daily purge does that an operator tunes (PRIV-6, PRIV-7): empty means the server's defaults.
+      ATALAIA_AUDIT_IP_DAYS: "${ATALAIA_AUDIT_IP_DAYS:-}"
+      ATALAIA_INACTIVE_ACCOUNT_MONTHS: "${ATALAIA_INACTIVE_ACCOUNT_MONTHS:-}"
+      ATALAIA_INACTIVE_GRACE_DAYS: "${ATALAIA_INACTIVE_GRACE_DAYS:-}"
+      # The erasure ledger (PRIV-4): in a volume the restore never touches, copied beside the backups by backup.sh.
+      ATALAIA_ERASURE_LEDGER: /ledger/erasures.jsonl
       # The operator's privacy notice (CONS-*): server/privacy-notice/ on the host, read-only in the container.
       ATALAIA_PRIVACY_NOTICE_DIR: /privacy-notice
       # The field's data export for its administrator (S21-12): empty means the server's defaults.
@@ -95,6 +101,7 @@ services:
       FORWARDED_ALLOW_IPS: "*"
     volumes:
       - ./privacy-notice:/privacy-notice:ro
+      - ledger:/ledger
     ports:
       - "${ATALAIA_BIND:-0.0.0.0}:${ATALAIA_ATAK_PORT:-8089}:8089"
     networks: [app, db, atak]
@@ -140,6 +147,19 @@ services:
     read_only: true
     logging: *logging
 
+  # The erasure ledger's file (PRIV-4; server/atalaia_server/erasure_ledger.py): `docker compose run --rm -T ledger-tool
+  # export|import` (the image with no network) copies it out and merges it in, for backup.sh and restore.sh.
+  ledger-tool:
+    image: ${ATALAIA_SERVER_IMAGE:-atalaia-server}
+    profiles: [tools]
+    entrypoint: ["python", "-m", "atalaia_server.erasure_ledger"]
+    environment:
+      ATALAIA_ERASURE_LEDGER: /ledger/erasures.jsonl
+    volumes:
+      - ledger:/ledger
+    network_mode: none
+    logging: *logging
+
 networks:
   edge: {}
   app:
@@ -154,5 +174,6 @@ networks:
 
 volumes:
   pgdata:
+  ledger:
   caddy-data:
   caddy-config:

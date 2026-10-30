@@ -27,10 +27,12 @@ from atalaia_server.ratelimit import Limits
 from .base import PASSWORD, SECRET_KEY, AppTestCase
 
 # Plan phase 14's to 18's counts.
-NO_CHRONO = {"chrono_readings": 0, "chrono_rejects": 0, "replicas": 0, "marshal_keys": 0, "scheduled_games": 0,
+NO_CHRONO = {"chrono_readings": 0, "chrono_rejects": 0, "replicas": 0, "marshal_keys": 0, "copy_revocations": 0,
+             "scheduled_games": 0, "game_results": 0, "game_results_expired": 0,
              "federation_numbers": 0, "player_id_claims": 0, "imported_registrations": 0, "club_invitations": 0,
              "club_reports": 0, "branding_images": 0, "atak_certificates": 0, "feedback_contacts": 0,
-             "preview_feedback": 0, "oidc_logins": 0, "anonymised_users": 0}
+             "preview_feedback": 0, "oidc_logins": 0, "inactive_warned": 0, "inactive_cleared": 0,
+             "inactive_anonymised": 0, "anonymised_users": 0}
 
 NEW_PASSWORD = "a different long passphrase 7"
 
@@ -350,20 +352,20 @@ class PurgeTests(PersonalDataTestCase):
 
         async with self.app.state.sessionmaker() as db:
             self.assertEqual(await personal_data.purge(db, now, dry_run=True),
-                             {"sessions": 2, "audit_log": 1, "games": 0, **NO_CHRONO})
+                             {"sessions": 2, "audit_log": 1, "audit_addresses": 0, "games": 0, **NO_CHRONO})
         self.assertEqual((await self.fetch("SELECT count(*) FROM sessions"))[0][0], 5)
         async with self.app.state.sessionmaker() as db:
             self.assertEqual(await personal_data.purge(db, now),
-                             {"sessions": 2, "audit_log": 1, "games": 0, **NO_CHRONO})
+                             {"sessions": 2, "audit_log": 1, "audit_addresses": 0, "games": 0, **NO_CHRONO})
         left = {r[0] for r in await self.fetch("SELECT id FROM sessions")}
         self.assertEqual(left, {sessions[n] for n in ("expired_recently", "revoked_recently", "live")})
         self.assertEqual((await self.fetch("SELECT count(*) FROM refresh_tokens"))[0][0], 3)
         self.assertEqual((await self.fetch("SELECT count(*) FROM audit_log WHERE action = 'login'"))[0][0], 1)
         purges = await self.audit("retention_purge")
-        self.assertEqual(json.loads(purges[0]["details"]), {"sessions": 2, "audit_log": 1, "games": 0, **NO_CHRONO})
+        self.assertEqual(json.loads(purges[0]["details"]), {"sessions": 2, "audit_log": 1, "audit_addresses": 0, "games": 0, **NO_CHRONO})
         async with self.app.state.sessionmaker() as db:  # again: nothing left to do
             self.assertEqual(await personal_data.purge(db, now),
-                             {"sessions": 0, "audit_log": 0, "games": 0, **NO_CHRONO})
+                             {"sessions": 0, "audit_log": 0, "audit_addresses": 0, "games": 0, **NO_CHRONO})
 
     async def anonymised(self, tag: str) -> uuid.UUID:
         """An anonymised account as erasure leaves it (and as a merged one is to be left)."""
@@ -462,12 +464,13 @@ class PurgeTests(PersonalDataTestCase):
                 else:
                     os.environ[k] = v
         rest = (", 0 chrono readings rows, 0 chrono rejects rows, 0 replicas rows, 0 marshal keys rows, "
-                "0 scheduled games rows, 0 federation numbers rows, 0 player id claims rows, "
+                "0 copy revocations rows, 0 scheduled games rows, 0 federation numbers rows, 0 player id claims rows, "
                 "0 imported registrations rows, 0 club invitations rows, 0 club reports rows, "
                 "0 branding images rows, 0 atak certificates rows, 0 feedback contacts rows, "
-                "0 preview feedback rows, 0 oidc logins rows, 0 anonymised users rows\n")
-        self.assertEqual(outputs, ["Retention purge would delete: 1 sessions rows, 0 audit log rows, 0 games rows" + rest,
-                                   "Retention purge deleted: 1 sessions rows, 0 audit log rows, 0 games rows" + rest])
+                "0 preview feedback rows, 0 oidc logins rows, 0 inactive warned rows, 0 inactive cleared rows, "
+                "0 inactive anonymised rows, 0 anonymised users rows\n")
+        self.assertEqual(outputs, ["Retention purge would delete: 1 sessions rows, 0 audit log rows, 0 audit addresses rows, 0 games rows, 0 game results rows, 0 game results expired rows" + rest,
+                                   "Retention purge deleted: 1 sessions rows, 0 audit log rows, 0 audit addresses rows, 0 games rows, 0 game results rows, 0 game results expired rows" + rest])
         self.assertEqual((await self.fetch("SELECT count(*) FROM sessions"))[0][0], 0)
 
     async def test_the_daily_task(self) -> None:
@@ -531,12 +534,12 @@ class GameDataTests(PersonalDataTestCase):
         self.assertEqual((await self.fetch("SELECT count(*) FROM user_game_roles"))[0][0], 0)
         self.assertEqual((await self.fetch("SELECT count(*) FROM games"))[0][0], 1)  # the game is the field's
 
-    async def test_games_go_after_24_months(self) -> None:
+    async def test_games_go_after_90_days(self) -> None:
         field_id = await self.field()
         now = datetime.now(timezone.utc)
-        old = await self.game(field_id, now - timedelta(days=731), now - timedelta(days=740))
-        recent = await self.game(field_id, now - timedelta(days=729), now - timedelta(days=740))
-        never_ended = await self.game(field_id, None, now - timedelta(days=731))
+        old = await self.game(field_id, now - timedelta(days=91), now - timedelta(days=100))
+        recent = await self.game(field_id, now - timedelta(days=89), now - timedelta(days=100))
+        never_ended = await self.game(field_id, None, now - timedelta(days=91))
         user_id, _, _ = await self.make_user()
         await self.fetch("INSERT INTO user_game_roles (user_id, game, role_id) VALUES ($1, $2, 1)", user_id, old)
         async with self.app.state.sessionmaker() as db:
