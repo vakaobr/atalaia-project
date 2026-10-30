@@ -65,7 +65,8 @@ P4-6):
 
 | Template | What it is |
 | --- | --- |
-| [`templates/privacy-notice-pt.md`](templates/privacy-notice-pt.md), [`templates/privacy-notice-en.md`](templates/privacy-notice-en.md) | The field's privacy notice (first full draft, not yet reviewed by a lawyer), in Portuguese and English, with a short in-app notice for account creation and a short check-in poster notice (the field controller's own default check-in notice is in `controller/templates/`) |
+| [`templates/privacy-notice-pt.md`](templates/privacy-notice-pt.md), [`templates/privacy-notice-en.md`](templates/privacy-notice-en.md) | The field's privacy notice (a template with the legal positions approved on 2026-10-30; a few points still open, listed in its Part D), in Portuguese and English, with a short in-app notice for account creation and a short check-in poster notice (the field controller's own default check-in notice is in `controller/templates/`) |
+| [`templates/dpia-template.md`](templates/dpia-template.md), [`templates/dpia-template-pt.md`](templates/dpia-template-pt.md) | A data protection impact assessment (GDPR Art. 35) for the field to adopt: the violations register and bans, cross-field sharing, live positions, with the legitimate interest assessment, in English and Portuguese |
 | [`templates/dpa-template.md`](templates/dpa-template.md) | A data processing agreement for a hosted site server (GDPR Art. 28) |
 
 ## Decisions to review
