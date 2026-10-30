@@ -20,7 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/app_harness.dart';
 import '../support/fake_site.dart';
 import '../support/fakes.dart';
-import 'site_screens_test.dart' show FakeLinks, enter, tapKey;
+import 'site_screens_test.dart' show FakeLinks, back, enter, reveal, tapKey;
 
 const _nonce = 'AbCdEfGhIjKlMnOp1234';
 
@@ -43,9 +43,9 @@ void main() {
       expect(linked.site, Uri.parse('https://campo.example.pt:8443'));
       expect((linked.ok, linked.ticket), ('linked', null));
       final failed = OidcReturn.parse(
-        'https://campo.example.pt/app/oidc?s=$_nonce&oidc_error=consent_required',
+        'https://campo.example.pt/app/oidc?s=$_nonce&oidc_error=notice_required',
       )!;
-      expect(failed.error, 'consent_required');
+      expect(failed.error, 'notice_required');
     });
 
     test('anything else is not one', () {
@@ -168,14 +168,19 @@ void main() {
 
     test('a social login: the app\'s own return link, the browser, the '
         'ticket, a session', () async {
-      final name = await auth.oidc('google', consent: true);
+      final name = await auth.oidc(
+        'google',
+        noticeSeen: true,
+        ageConfirmed: true,
+      );
       expect(name, 'falcao');
       final ret = Uri.parse(site.lastReturnTo!);
       expect(ret.origin, 'https://campo.example.pt');
       expect(ret.path, '/app/oidc');
       expect(ret.queryParameters['s'], hasLength(24));
       expect(site.lastStartPurpose, 'login');
-      expect(site.lastStartConsent, isTrue);
+      expect(site.lastStartNoticeSeen, isTrue);
+      expect(site.lastStartAge, isTrue);
       // The browser is opened at the site's own address, nothing else.
       expect(browser.opened.single.host, 'campo.example.pt');
       expect(browser.opened.single.path, contains('/auth/oidc/google/browser'));
@@ -198,18 +203,14 @@ void main() {
           final s = Uri.parse(site.lastReturnTo!).queryParameters['s']!;
           scheduleMicrotask(
             () => returns.add(
-              OidcReturn(site: origin, nonce: s, error: 'consent_required'),
+              OidcReturn(site: origin, nonce: s, error: 'notice_required'),
             ),
           );
         };
         await expectLater(
           auth.oidc('google'),
           throwsA(
-            isA<OidcFailure>().having(
-              (e) => e.code,
-              'code',
-              'consent_required',
-            ),
+            isA<OidcFailure>().having((e) => e.code, 'code', 'notice_required'),
           ),
         );
         // A ticket the site does not take is a refusal of its own.
@@ -388,20 +389,37 @@ void main() {
     });
 
     testWidgets('a social login: the browser, the return, the field\'s games, '
-        'and the consent box goes only when ticked', (tester) async {
+        'and the notice and age boxes go only when ticked', (tester) async {
       await open(tester);
       await tapKey(tester, 'site-login-google');
-      expect(site.lastStartConsent, isFalse);
+      expect(site.lastStartNoticeSeen, isFalse);
+      expect(site.lastStartAge, isFalse);
       expect(find.text('Jogos'), findsOneWidget); // the field's games
       expect(browser.opened, hasLength(1));
       expect(find.byKey(const Key('site-error')), findsNothing);
     });
 
-    testWidgets('the consent box is sent when ticked', (tester) async {
+    testWidgets('the notice and age boxes are sent when ticked, and the notice '
+        'box waits for the notice to be opened (LEG-*)', (tester) async {
       await open(tester);
-      await tapKey(tester, 'site-login-consent');
+      // Closed until the notice was opened: it is shown first.
+      await reveal(tester, find.byKey(const Key('site-login-notice')));
+      expect(
+        tester
+            .widget<CheckboxListTile>(
+              find.byKey(const Key('site-login-notice')),
+            )
+            .onChanged,
+        isNull,
+      );
+      expect(find.byKey(const Key('site-login-notice-first')), findsOneWidget);
+      await tapKey(tester, 'site-login-privacy');
+      await back(tester);
+      await tapKey(tester, 'site-login-notice');
+      await tapKey(tester, 'site-login-age');
       await tapKey(tester, 'site-login-google');
-      expect(site.lastStartConsent, isTrue);
+      expect(site.lastStartNoticeSeen, isTrue);
+      expect(site.lastStartAge, isTrue);
       expect(find.text('Jogos'), findsOneWidget); // the field's games
     });
 
@@ -412,12 +430,12 @@ void main() {
       browser.onOpen = (_) {
         final s = Uri.parse(site.lastReturnTo!).queryParameters['s']!;
         links.send(
-          'https://campo.example.pt/app/oidc?s=$s&oidc_error=consent_required',
+          'https://campo.example.pt/app/oidc?s=$s&oidc_error=notice_required',
         );
       };
       await tapKey(tester, 'site-login-google');
       expect(find.byKey(const Key('site-error')), findsOneWidget);
-      expect(find.textContaining('autorização'), findsOneWidget);
+      expect(find.textContaining('marcar primeiro que se leu'), findsOneWidget);
       expect(find.byKey(const Key('site-login-google')), findsOneWidget);
     });
 
@@ -454,7 +472,11 @@ void main() {
       passkeys.failWith = 'cancelled';
       await tapKey(tester, 'site-login-passkey');
       expect(find.byKey(const Key('site-error')), findsOneWidget);
-      expect(find.byKey(const Key('site-login')), findsOneWidget);
+      // The password form is still on the screen (the list may have scrolled).
+      expect(
+        await reveal(tester, find.byKey(const Key('site-login'))),
+        findsOneWidget,
+      );
     });
 
     testWidgets('no passkeys on the phone: no passkey button; the site with '

@@ -57,7 +57,7 @@ String siteMoment(DateTime t) {
   return '${two(l.day)}/${two(l.month)}/${l.year} ${two(l.hour)}:${two(l.minute)}';
 }
 
-enum _Step { address, confirm, login, totp, busy, waiting, field }
+enum _Step { address, confirm, login, signup, totp, busy, waiting, field }
 
 class SiteScreen extends StatefulWidget {
   const SiteScreen({this.link, super.key});
@@ -73,6 +73,9 @@ class _SiteScreenState extends State<SiteScreen> {
   final _address = TextEditingController();
   final _user = TextEditingController();
   final _password = TextEditingController();
+  final _signupUser = TextEditingController();
+  final _signupEmail = TextEditingController();
+  final _signupPassword = TextEditingController();
   final _code = TextEditingController();
   _Step _step = _Step.address;
   SiteGameLink? _link;
@@ -87,16 +90,26 @@ class _SiteScreenState extends State<SiteScreen> {
   /// use passkeys (decision PKA-1); read when the login is shown.
   AuthMethods _methods = AuthMethods.passwordOnly;
   bool _passkeys = false;
-  bool _consent = false;
   PendingReturn? _waiting;
 
-  /// The privacy notice's version the person was shown at the login (sent
-  /// with the consent of a social sign-up); null: none published or unread.
-  String? _noticeVersion;
+  /// A new account (password or social) rests on the contract, not on consent
+  /// (LEG-*): the person opens the privacy notice ([_noticeOpened], which also
+  /// gives [_noticeVersion], the version on their screen), says they read it
+  /// ([_noticeSeen]) and that they are 16 or older ([_age16]; no date of birth
+  /// is asked). Younger players check in at the field without an account.
+  bool _noticeSeen = false;
+  bool _age16 = false;
+  bool _noticeOpened = false;
 
-  /// Where the signed-in account's consent stands (null: not known), and
-  /// whether this site is a hosted hub (the chrono link screen is only then).
-  ConsentState? _consentState;
+  /// The version of the privacy notice on offer or shown; null: none published
+  /// or unread. [_noticePublished] is whether the server has one.
+  String? _noticeVersion;
+  bool _noticePublished = false;
+
+  /// Which notice version the signed-in account was last shown (null: not
+  /// known), and whether this site is a hosted hub (the chrono link screen is
+  /// only then).
+  NoticeState? _noticeState;
   bool _hosted = false;
 
   @override
@@ -113,6 +126,9 @@ class _SiteScreenState extends State<SiteScreen> {
     _address.dispose();
     _user.dispose();
     _password.dispose();
+    _signupUser.dispose();
+    _signupEmail.dispose();
+    _signupPassword.dispose();
     _code.dispose();
     super.dispose();
   }
@@ -185,15 +201,15 @@ class _SiteScreenState extends State<SiteScreen> {
     }
   }
 
-  /// What the signed-in account has beside the games: where its consent to
-  /// the privacy notice stands (asked again when it is not for the current
-  /// version) and whether this is a hosted hub (the chrono link). Neither
-  /// holds the field screen back: an older server or a refusal shows nothing.
+  /// What the signed-in account has beside the games: which version of the
+  /// privacy notice it was last shown (shown again when it is not the current
+  /// one) and whether this is a hosted hub (the chrono link). Neither holds
+  /// the field screen back: an older server or a refusal shows nothing.
   Future<void> _loadAccountExtras(SiteSession session) async {
-    ConsentState? consent;
+    NoticeState? notice;
     var hosted = false;
     try {
-      consent = await PrivacyApi(session).consent();
+      notice = await PrivacyApi(session).noticeState();
     } on SiteException {
       // not known: no prompt
     }
@@ -204,7 +220,7 @@ class _SiteScreenState extends State<SiteScreen> {
     }
     if (mounted) {
       setState(() {
-        _consentState = consent;
+        _noticeState = notice;
         _hosted = hosted;
       });
     }
@@ -212,16 +228,16 @@ class _SiteScreenState extends State<SiteScreen> {
 
   void _openPrivacy({bool asks = false}) {
     final session = _session!;
-    final c = _consentState;
+    final c = _noticeState;
     unawaited(
       Navigator.push(
         context,
         MaterialPageRoute<void>(
           builder: (_) => PrivacyNoticeScreen(
             session: session,
-            consent: asks && c != null && c.needed ? c : null,
-            onAgreed: (state) {
-              if (mounted) setState(() => _consentState = state);
+            again: asks && c != null && c.needed ? c : null,
+            onAcknowledged: (state) {
+              if (mounted) setState(() => _noticeState = state);
             },
           ),
         ),
@@ -229,7 +245,8 @@ class _SiteScreenState extends State<SiteScreen> {
     );
   }
 
-  /// The notice's reading from the login: what version the person was shown.
+  /// The notice's reading from the login or the sign-up: what version the
+  /// person was shown. Only once it was open can they say they read it.
   void _openLoginPrivacy() {
     unawaited(
       Navigator.push(
@@ -237,7 +254,13 @@ class _SiteScreenState extends State<SiteScreen> {
         MaterialPageRoute<void>(
           builder: (_) => PrivacyNoticeScreen(
             session: _session!,
-            onShown: (v) => _noticeVersion = v,
+            onShown: (v) {
+              if (!mounted) return;
+              setState(() {
+                _noticeVersion = v;
+                _noticeOpened = true;
+              });
+            },
           ),
         ),
       ),
@@ -255,9 +278,10 @@ class _SiteScreenState extends State<SiteScreen> {
       // the password form stays
     }
     final passkeys = methods.passkeys && await auth.passkeysAvailable();
-    // A social sign-up consents to the notice: which version is on offer now.
+    // A new account (social or password) records the notice shown: which
+    // version is on offer now.
     String? version;
-    if (methods.oidc.isNotEmpty && mounted) {
+    if ((methods.oidc.isNotEmpty || methods.passwordLogin) && mounted) {
       try {
         version = (await PrivacyApi(_session!).notice(context.s.code))?.version;
       } on SiteException {
@@ -269,6 +293,7 @@ class _SiteScreenState extends State<SiteScreen> {
         _methods = methods;
         _passkeys = passkeys;
         _noticeVersion = version ?? _noticeVersion;
+        _noticePublished = version != null;
       });
     }
   }
@@ -299,7 +324,8 @@ class _SiteScreenState extends State<SiteScreen> {
   Future<void> _signInOidc(String provider) => _signInWith(
     (auth) => auth.oidc(
       provider,
-      consent: _consent,
+      noticeSeen: _noticeSeen,
+      ageConfirmed: _age16,
       noticeVersion: _noticeVersion,
       onOpened: (w) {
         if (!mounted) return;
@@ -333,6 +359,64 @@ class _SiteScreenState extends State<SiteScreen> {
       await _load();
     } on SiteException catch (e) {
       _fail(e, _Step.login);
+    }
+  }
+
+  /// Makes an account with a password after the notice was shown (LEG-*), then
+  /// logs in with it.
+  Future<void> _signup() async {
+    final s = context.s;
+    final user = _signupUser.text.trim();
+    final password = _signupPassword.text;
+    if (user.isEmpty || password.isEmpty) {
+      setState(() => _error = s.t('site.need_login'));
+      return;
+    }
+    if (!_noticeOpened || !_noticeSeen) {
+      setState(() => _error = s.t('site.err.notice_required'));
+      return;
+    }
+    if (!_age16) {
+      setState(() => _error = s.t('site.err.age_confirmation_required'));
+      return;
+    }
+    setState(() {
+      _step = _Step.busy;
+      _error = null;
+    });
+    try {
+      await _session!.register(
+        user,
+        password,
+        email: _signupEmail.text.trim(),
+        noticeVersion: _noticeVersion,
+      );
+      final step = await _session!.login(user, password);
+      _signupPassword.clear();
+      if (step is TotpNeeded) {
+        if (mounted) setState(() => (_totp = step, _step = _Step.totp));
+        return;
+      }
+      await _load();
+    } on SiteException catch (e) {
+      if (e.code == 'notice_version_changed') {
+        // The notice changed after it was opened: read the new one first.
+        if (mounted) {
+          setState(() {
+            _noticeOpened = false;
+            _noticeSeen = false;
+            _noticeVersion = null;
+          });
+        }
+        unawaited(_loadMethods());
+      }
+      if (!mounted) return;
+      // The account's own words for the code (the password rules), else the
+      // site's (`site.err.username_invalid`, `age_confirmation_required`).
+      setState(() {
+        _error = accountError(s, e);
+        _step = _Step.signup;
+      });
     }
   }
 
@@ -414,6 +498,7 @@ class _SiteScreenState extends State<SiteScreen> {
                   _Step.address => _addressStep(s),
                   _Step.confirm => _confirmStep(s),
                   _Step.login => _loginStep(s),
+                  _Step.signup => _signupStep(s),
                   _Step.totp => _totpStep(s),
                   _Step.busy => [
                     const SizedBox(height: 24),
@@ -551,29 +636,125 @@ class _SiteScreenState extends State<SiteScreen> {
             child: Text(s.t('site.login_with', {'provider': o.label})),
           ),
         ),
-      if (_methods.oidc.isNotEmpty)
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: TextButton.icon(
-            key: const Key('site-login-privacy'),
-            icon: const Icon(Icons.privacy_tip_outlined),
-            label: Text(s.t('privacy.read')),
-            onPressed: _openLoginPrivacy,
-          ),
+      if (_methods.oidc.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Text(
+          s.t('site.new_account_hint'),
+          style: Theme.of(context).textTheme.bodySmall,
         ),
-      if (_methods.oidc.isNotEmpty)
-        CheckboxListTile(
-          key: const Key('site-login-consent'),
-          contentPadding: EdgeInsets.zero,
-          controlAffinity: ListTileControlAffinity.leading,
-          value: _consent,
-          onChanged: (v) => setState(() => _consent = v ?? false),
-          title: Text(
-            s.t('site.login_consent'),
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
+        ..._noticeAndAgeBoxes(s),
+      ],
     ],
+    if (_methods.passwordLogin) ...[
+      const SizedBox(height: 16),
+      OutlinedButton(
+        key: const Key('site-signup-open'),
+        onPressed: () => setState(() {
+          _error = null;
+          _step = _Step.signup;
+        }),
+        child: Text(s.t('site.signup_open')),
+      ),
+    ],
+  ];
+
+  /// The two boxes a new account needs (LEG-*): the privacy notice read (open
+  /// only after the notice was opened, so it was shown first) and 16 or older.
+  List<Widget> _noticeAndAgeBoxes(Strings s) => [
+    Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: TextButton.icon(
+        key: const Key('site-login-privacy'),
+        icon: const Icon(Icons.privacy_tip_outlined),
+        label: Text(s.t('privacy.read')),
+        onPressed: _openLoginPrivacy,
+      ),
+    ),
+    CheckboxListTile(
+      key: const Key('site-login-notice'),
+      contentPadding: EdgeInsets.zero,
+      controlAffinity: ListTileControlAffinity.leading,
+      value: _noticeSeen,
+      onChanged: _noticeOpened
+          ? (v) => setState(() => _noticeSeen = v ?? false)
+          : null,
+      title: Text(
+        s.t('site.login_notice'),
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+      subtitle: _noticeOpened
+          ? null
+          : Text(
+              s.t('site.login_notice_first'),
+              key: const Key('site-login-notice-first'),
+            ),
+    ),
+    CheckboxListTile(
+      key: const Key('site-login-age'),
+      contentPadding: EdgeInsets.zero,
+      controlAffinity: ListTileControlAffinity.leading,
+      value: _age16,
+      onChanged: (v) => setState(() => _age16 = v ?? false),
+      title: Text(
+        s.t('site.login_age'),
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+    ),
+  ];
+
+  List<Widget> _signupStep(Strings s) => [
+    Text(
+      s.t('site.signup_title', {'host': _link!.host}),
+      style: Theme.of(context).textTheme.titleMedium,
+    ),
+    const SizedBox(height: 8),
+    Text(s.t('site.signup_intro')),
+    const SizedBox(height: 12),
+    if (!_noticePublished)
+      Notice(
+        s.t('site.signup_no_notice'),
+        kind: NoticeKind.warning,
+        key: const Key('site-signup-no-notice'),
+      ),
+    TextField(
+      key: const Key('site-signup-user'),
+      controller: _signupUser,
+      autofillHints: const [AutofillHints.newUsername],
+      decoration: InputDecoration(labelText: s.t('site.username')),
+    ),
+    const SizedBox(height: 8),
+    TextField(
+      key: const Key('site-signup-email'),
+      controller: _signupEmail,
+      keyboardType: TextInputType.emailAddress,
+      autofillHints: const [AutofillHints.email],
+      decoration: InputDecoration(labelText: s.t('site.signup_email')),
+    ),
+    const SizedBox(height: 8),
+    TextField(
+      key: const Key('site-signup-password'),
+      controller: _signupPassword,
+      obscureText: true,
+      autofillHints: const [AutofillHints.newPassword],
+      decoration: InputDecoration(labelText: s.t('site.password')),
+      onSubmitted: (_) => _signup(),
+    ),
+    const SizedBox(height: 8),
+    ..._noticeAndAgeBoxes(s),
+    const SizedBox(height: 12),
+    FilledButton(
+      key: const Key('site-signup-create'),
+      onPressed: _noticePublished ? _signup : null,
+      child: Text(s.t('site.signup_create')),
+    ),
+    TextButton(
+      key: const Key('site-signup-back'),
+      onPressed: () => setState(() {
+        _error = null;
+        _step = _Step.login;
+      }),
+      child: Text(s.t('common.cancel')),
+    ),
   ];
 
   List<Widget> _totpStep(Strings s) => [
@@ -608,11 +789,11 @@ class _SiteScreenState extends State<SiteScreen> {
         key: const Key('site-logged-in'),
         style: TextStyle(color: Theme.of(context).hintColor),
       ),
-      if (_consentState != null && _consentState!.needed)
+      if (_noticeState != null && _noticeState!.needed)
         Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: ConsentBanner(
-            state: _consentState!,
+          child: NoticeBanner(
+            state: _noticeState!,
             onOpen: () => _openPrivacy(asks: true),
           ),
         ),

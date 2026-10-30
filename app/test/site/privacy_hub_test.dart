@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// The site server's privacy notice and "consent again" in the app, the notice
-// version a social sign-up carries, and the chrono link between a hosted
+// The site server's privacy notice and "shown again" in the app (LEG-*: the
+// account rests on the contract, not on consent), the notice version a
+// sign-up carries, and the chrono link between a hosted
 // hub's fields (lib/site/privacy_notice.dart, privacy_screens.dart,
 // hub_share.dart; the server's CONS-* and SVX-2 decisions), against the fake
 // site server.
@@ -45,8 +46,18 @@ Future<Harness> signedIn(
   return h;
 }
 
+/// What a new account needs (LEG-*): the notice opened and read, the two
+/// boxes ticked.
+Future<void> ticks(WidgetTester tester) async {
+  await tapKey(tester, 'site-login-privacy');
+  await back(tester);
+  await tester.pumpAndSettle();
+  await tapKey(tester, 'site-login-notice');
+  await tapKey(tester, 'site-login-age');
+}
+
 void main() {
-  group('the notice and the consent calls', () {
+  group('the notice calls', () {
     late FakeSite site;
     late PrivacyApi api;
     setUp(() {
@@ -78,44 +89,39 @@ void main() {
       expect(await api.notice('pt'), isNull);
     });
 
-    test(
-      'the consent states, and consenting again names the version',
-      () async {
-        await api.session.login(site.username, site.password);
-        site
-          ..consentStatus = 'outdated'
-          ..consentVersion = '2026-05';
-        final c = (await api.consent())!;
-        expect(
-          (c.status, c.version, c.currentVersion),
-          ('outdated', '2026-05', '2026-11'),
-        );
-        expect((c.needed, c.noticePublished), (true, true));
-        site.consentStatus = 'missing';
-        expect((await api.consent())!.version, isNull);
-        final done = await api.renew('2026-11');
-        expect(done.isCurrent, isTrue);
-        expect(site.bodies['POST /me/consents/account'], {
-          'notice_version': '2026-11',
-        });
-        // A notice that changed since: refused, nothing recorded.
-        site.consentStatus = 'outdated';
-        await expectLater(
-          api.renew('2026-05'),
-          throwsA(
-            isA<SiteException>().having(
-              (e) => e.code,
-              'code',
-              'notice_version_changed',
-            ),
+    test('the notice states, and confirming it names the version', () async {
+      await api.session.login(site.username, site.password);
+      site
+        ..noticeStatus = 'outdated'
+        ..noticeShownVersion = '2026-05';
+      final c = (await api.noticeState())!;
+      expect(
+        (c.status, c.version, c.currentVersion),
+        ('outdated', '2026-05', '2026-11'),
+      );
+      expect((c.needed, c.noticePublished), (true, true));
+      site.noticeStatus = 'missing';
+      expect((await api.noticeState())!.version, isNull);
+      final done = await api.acknowledge('2026-11');
+      expect(done.isCurrent, isTrue);
+      expect(site.bodies['POST /me/notice'], {'notice_version': '2026-11'});
+      // A notice that changed since: refused, nothing recorded.
+      site.noticeStatus = 'outdated';
+      await expectLater(
+        api.acknowledge('2026-05'),
+        throwsA(
+          isA<SiteException>().having(
+            (e) => e.code,
+            'code',
+            'notice_version_changed',
           ),
-        );
-        expect(site.consentStatus, 'outdated');
-        // An older server's /me says nothing about consent.
-        site.consentStatus = null;
-        expect(await api.consent(), isNull);
-      },
-    );
+        ),
+      );
+      expect(site.noticeStatus, 'outdated');
+      // An older server's /me says nothing about the notice.
+      site.noticeStatus = null;
+      expect(await api.noticeState(), isNull);
+    });
   });
 
   group('the Markdown the notice uses', () {
@@ -159,13 +165,13 @@ void main() {
     });
   });
 
-  group('consent again on the signed-in field', () {
-    testWidgets('a current consent asks nothing; the notice is one tap away', (
+  group('the notice shown again on the signed-in field', () {
+    testWidgets('a current notice asks nothing; it is one tap away', (
       tester,
     ) async {
       final site = FakeSite();
       await signedIn(tester, site);
-      expect(find.byKey(const Key('consent-banner')), findsNothing);
+      expect(find.byKey(const Key('notice-banner')), findsNothing);
       await tapKey(tester, 'site-privacy');
       expect(find.byKey(const Key('privacy-version')), findsOneWidget);
       expect(find.text('Versão 2026-11'), findsOneWidget);
@@ -175,75 +181,73 @@ void main() {
       expect(site.noticeLangsAsked, ['pt']);
     });
 
-    testWidgets('an outdated consent: banner, the notice, the tick, the '
+    testWidgets('an outdated notice: banner, the notice, the tick, the '
         'version recorded', (tester) async {
       final site = FakeSite()
-        ..consentStatus = 'outdated'
-        ..consentVersion = '2026-05';
+        ..noticeStatus = 'outdated'
+        ..noticeShownVersion = '2026-05';
       await signedIn(tester, site);
-      expect(find.byKey(const Key('consent-banner')), findsOneWidget);
+      expect(find.byKey(const Key('notice-banner')), findsOneWidget);
       expect(
         find.textContaining('versão 2026-05, agora 2026-11'),
         findsOneWidget,
       );
-      await tapKey(tester, 'consent-open');
+      await tapKey(tester, 'notice-open');
       expect(find.textContaining('Tratamos o teu nome'), findsOneWidget);
       // Without the tick nothing is sent.
       await tapKey(tester, 'privacy-agree');
       expect(find.byKey(const Key('privacy-error')), findsOneWidget);
-      expect(site.requests, isNot(contains('POST /me/consents/account')));
+      expect(site.requests, isNot(contains('POST /me/notice')));
       await tapKey(tester, 'privacy-tick');
       await tapKey(tester, 'privacy-agree');
-      expect(site.bodies['POST /me/consents/account'], {
-        'notice_version': '2026-11',
-      });
-      expect(find.text('Consentimento registado.'), findsOneWidget);
+      expect(site.bodies['POST /me/notice'], {'notice_version': '2026-11'});
+      expect(find.text('Registado: o aviso foi visto.'), findsOneWidget);
       expect(find.byKey(const Key('privacy-agree')), findsNothing);
       // Back on the field the prompt has gone.
       await back(tester);
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('consent-banner')), findsNothing);
+      expect(find.byKey(const Key('notice-banner')), findsNothing);
     });
 
-    testWidgets('no consent at all asks too, in the account\'s own words', (
+    testWidgets('no record at all asks too, in the account\'s own words', (
       tester,
     ) async {
-      final site = FakeSite()..consentStatus = 'missing';
+      final site = FakeSite()..noticeStatus = 'missing';
       await signedIn(tester, site, language: AppLanguage.en);
       expect(
-        find.textContaining('no consent recorded for the privacy notice'),
+        find.textContaining(
+          'no record that this account has seen the privacy notice',
+        ),
         findsOneWidget,
       );
     });
 
     testWidgets('a notice that changes while it is read is read again, never '
-        'agreed to unseen', (tester) async {
-      final site = FakeSite()..consentStatus = 'outdated';
+        'recorded unseen', (tester) async {
+      final site = FakeSite()..noticeStatus = 'outdated';
       await signedIn(tester, site);
-      await tapKey(tester, 'consent-open');
-      site.changeNoticeOnConsent = '2026-12';
+      await tapKey(tester, 'notice-open');
+      site.changeNoticeOnAck = '2026-12';
       await tapKey(tester, 'privacy-tick');
       await tapKey(tester, 'privacy-agree');
       expect(find.byKey(const Key('privacy-error')), findsOneWidget);
       expect(find.textContaining('O aviso mudou entretanto'), findsOneWidget);
       expect(find.text('Versão 2026-12'), findsOneWidget);
-      expect(site.consentStatus, 'outdated');
-      // The tick is cleared: the new text is agreed to on purpose.
+      expect(site.noticeStatus, 'outdated');
+      // The tick is cleared: the new text is confirmed on purpose.
       await tapKey(tester, 'privacy-agree');
       expect(find.byKey(const Key('privacy-error')), findsOneWidget);
       await tapKey(tester, 'privacy-tick');
       await tapKey(tester, 'privacy-agree');
-      expect(site.bodies['POST /me/consents/account'], {
-        'notice_version': '2026-12',
-      });
-      expect(site.consentStatus, 'current');
+      expect(site.bodies['POST /me/notice'], {'notice_version': '2026-12'});
+      expect(site.noticeStatus, 'current');
     });
 
     testWidgets('the text comes in the app\'s language, and says when the '
         'server fell back', (tester) async {
-      final site = FakeSite()..consentStatus = 'outdated';
+      final site = FakeSite()..noticeStatus = 'outdated';
       await signedIn(tester, site, language: AppLanguage.zhTw);
-      await tapKey(tester, 'consent-open');
+      await tapKey(tester, 'notice-open');
       expect(site.noticeLangsAsked, ['zh-tw']);
       expect(find.byKey(const Key('privacy-fallback')), findsOneWidget);
       expect(find.textContaining('Português'), findsOneWidget);
@@ -253,25 +257,25 @@ void main() {
     testWidgets('a server with no notice published says so; asking is '
         'not blocked', (tester) async {
       final site = FakeSite()
-        ..consentStatus = 'outdated'
+        ..noticeStatus = 'outdated'
         ..noticeTexts = {};
       await signedIn(tester, site);
-      await tapKey(tester, 'consent-open');
+      await tapKey(tester, 'notice-open');
       expect(find.byKey(const Key('privacy-none')), findsOneWidget);
       expect(find.byKey(const Key('privacy-agree')), findsNothing);
     });
 
-    testWidgets('an older server without consent in /me shows no prompt', (
+    testWidgets('an older server without notice in /me shows no prompt', (
       tester,
     ) async {
-      final site = FakeSite()..consentStatus = null;
+      final site = FakeSite()..noticeStatus = null;
       await signedIn(tester, site);
-      expect(find.byKey(const Key('consent-banner')), findsNothing);
+      expect(find.byKey(const Key('notice-banner')), findsNothing);
       expect(find.byKey(const Key('site-privacy')), findsOneWidget);
     });
   });
 
-  group('the notice version of a social sign-up', () {
+  group('the notice version of a sign-up', () {
     late FakeSite site;
     late FakeLinks links;
     late FakeAuthBrowser browser;
@@ -296,13 +300,14 @@ void main() {
       await tapKey(tester, 'site-confirm');
     }
 
-    testWidgets('the consent goes with the version the person was offered', (
+    testWidgets('the boxes go with the version the person was offered', (
       tester,
     ) async {
       await open(tester);
-      await tapKey(tester, 'site-login-consent');
+      await ticks(tester);
       await tapKey(tester, 'site-login-google');
-      expect(site.lastStartConsent, isTrue);
+      expect(site.lastStartNoticeSeen, isTrue);
+      expect(site.lastStartAge, isTrue);
       expect(site.lastNoticeVersion, '2026-11');
       expect(
         site.bodies['POST /auth/oidc/google/start'],
@@ -311,12 +316,18 @@ void main() {
       expect(find.text('Jogos'), findsOneWidget);
     });
 
-    testWidgets('without the consent box no version is sent', (tester) async {
+    testWidgets('without the notice box no version is sent', (tester) async {
       await open(tester);
       await tapKey(tester, 'site-login-google');
       expect(
         site.bodies['POST /auth/oidc/google/start'],
         isNot(contains('notice_version')),
+      );
+      // An existing account's login sends neither box: it works against an
+      // older server too.
+      expect(
+        site.bodies['POST /auth/oidc/google/start'],
+        isNot(anyOf(contains('notice_seen'), contains('age_confirmed'))),
       );
     });
 
@@ -328,7 +339,8 @@ void main() {
       expect(find.text('Versão 2026-12'), findsOneWidget);
       await back(tester);
       await tester.pumpAndSettle();
-      await tapKey(tester, 'site-login-consent');
+      await tapKey(tester, 'site-login-notice');
+      await tapKey(tester, 'site-login-age');
       await tapKey(tester, 'site-login-google');
       expect(site.lastNoticeVersion, '2026-12');
     });
@@ -336,8 +348,8 @@ void main() {
     testWidgets('a notice that changed since it was shown: refused in words, '
         'the login stays', (tester) async {
       await open(tester);
-      site.noticeVersion = '2026-12';
-      await tapKey(tester, 'site-login-consent');
+      await ticks(tester);
+      site.noticeVersion = '2026-12'; // changed after it was shown
       await tapKey(tester, 'site-login-google');
       expect(find.byKey(const Key('site-error')), findsOneWidget);
       expect(
@@ -351,14 +363,14 @@ void main() {
         'without it, the sign-in goes on', (tester) async {
       await open(tester);
       site.startTakesNoticeVersion = false;
-      await tapKey(tester, 'site-login-consent');
+      await ticks(tester);
       await tapKey(tester, 'site-login-google');
       expect(
         site.requests.where((r) => r == 'POST /auth/oidc/google/start'),
         hasLength(2),
       );
       expect(site.lastNoticeVersion, isNull);
-      expect(site.lastStartConsent, isTrue);
+      expect(site.lastStartNoticeSeen, isTrue);
       expect(find.text('Jogos'), findsOneWidget);
     });
 
@@ -366,7 +378,7 @@ void main() {
         'refusal it is', (tester) async {
       await open(tester);
       site.startValidationError = true;
-      await tapKey(tester, 'site-login-consent');
+      await ticks(tester);
       await tapKey(tester, 'site-login-google');
       expect(
         site.requests.where((r) => r == 'POST /auth/oidc/google/start'),
@@ -379,7 +391,7 @@ void main() {
     testWidgets('a server that takes the field: one request, the version '
         'sent', (tester) async {
       await open(tester);
-      await tapKey(tester, 'site-login-consent');
+      await ticks(tester);
       await tapKey(tester, 'site-login-google');
       expect(
         site.requests.where((r) => r == 'POST /auth/oidc/google/start'),
@@ -388,13 +400,19 @@ void main() {
       expect(site.lastNoticeVersion, site.noticeVersion);
     });
 
-    testWidgets('no notice published: no version, the sign-in is as before', (
-      tester,
-    ) async {
+    testWidgets('no notice published: the notice box stays closed, so no '
+        'account can be made, but a login to one still works', (tester) async {
       await open(tester, published: false);
-      await tapKey(tester, 'site-login-consent');
+      await tapKey(tester, 'site-login-privacy');
+      expect(find.byKey(const Key('privacy-none')), findsOneWidget);
+      await back(tester);
+      await tester.pumpAndSettle();
+      final box = tester.widget<CheckboxListTile>(
+        find.byKey(const Key('site-login-notice')),
+      );
+      expect(box.onChanged, isNull);
       await tapKey(tester, 'site-login-google');
-      expect(site.lastStartConsent, isTrue);
+      expect(site.lastStartNoticeSeen, isFalse);
       expect(site.lastNoticeVersion, isNull);
       expect(find.text('Jogos'), findsOneWidget);
     });

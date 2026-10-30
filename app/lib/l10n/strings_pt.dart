@@ -1203,8 +1203,6 @@ const Map<String, String> ptStrings = {
   'acct.oidc.state_invalid':
       'Este pedido de entrada expirou ou não foi feito por esta app. Tentar de novo.',
   'acct.oidc.denied': 'A entrada foi recusada no fornecedor.',
-  'acct.oidc.consent_required':
-      'Para criar uma conta nova, marcar a caixa de autorização que está abaixo dos botões dos fornecedores e escolher o fornecedor de novo.',
   'acct.oidc.too_many_attempts':
       'Demasiadas contas novas a partir deste endereço. Tentar mais tarde.',
   'acct.oidc.quota_exceeded':
@@ -1356,8 +1354,6 @@ const Map<String, String> ptStrings = {
   'site.login_or': 'ou',
   'site.login_with': 'Entrar com {provider}',
   'site.login_passkey': 'Entrar com uma chave de acesso',
-  'site.login_consent':
-      'Se esta for a primeira entrada, autorizo criar uma conta nova (só se guarda o identificador que o fornecedor dá; ver o aviso de privacidade do campo).',
   'site.login_waiting': 'À espera da entrada no navegador…',
   'site.login_waiting_cancel': 'Cancelar',
   'site.account': 'Formas de entrar na conta',
@@ -1503,9 +1499,40 @@ const Map<String, String> ptStrings = {
   'player.buzz_text': 'A vibrar nos eventos do jogo com a aplicação fechada',
   'player.saved': 'Campos guardados',
   'player.saved_forget': 'Esquecer este campo',
-  // O aviso de privacidade do servidor do campo e o consentimento de novo
+  // O aviso de privacidade do servidor do campo e mostrá-lo de novo, a criação de conta (LEG-*)
   // (CONS-*), a versão do aviso na criação de conta com login social, e a
   // ligação da cronografagem entre os campos de um hub alojado (SVX-2).
+  'acct.oidc.notice_required':
+      'Para criar uma conta nova, marcar primeiro que se leu o aviso de privacidade (caixa abaixo dos botões dos fornecedores) e escolher o fornecedor de novo.',
+  'acct.oidc.age_confirmation_required':
+      'Para criar uma conta é preciso ter 16 anos ou mais. Quem é mais novo faz o check-in no campo sem conta, com as regras do campo para os pais ou responsáveis. Se tens 16 anos ou mais, marca a caixa da idade (abaixo dos botões dos fornecedores) e escolhe o fornecedor de novo.',
+  'site.err.age_confirmation_required':
+      'Para criar uma conta é preciso ter 16 anos ou mais. Quem é mais novo faz o check-in no campo sem conta, com as regras do campo para os pais ou responsáveis.',
+  'site.err.notice_required':
+      'Abre e lê o aviso de privacidade, depois marca que o leste.',
+  'site.err.username_invalid':
+      'O nome de utilizador precisa de 3 a 64 letras, algarismos, pontos, hífenes ou sublinhados, e começa por uma letra ou um algarismo.',
+  'site.err.username_reserved':
+      'Esse nome de utilizador está reservado: escolhe outro.',
+  'site.err.email_invalid': 'Esse endereço de email não é válido.',
+  'site.err.username_or_email_taken':
+      'Esse nome de utilizador ou endereço de email já está em uso.',
+  'site.err.quota_exceeded':
+      'Este campo atingiu o limite de contas. Fala com a organização do campo.',
+  'site.signup_open': 'Criar uma conta',
+  'site.signup_title': 'Criar uma conta em {host}',
+  'site.signup_intro':
+      'Uma conta serve para te inscreveres em jogos e veres o teu histórico. Abre e lê primeiro o aviso de privacidade, depois confirma abaixo. Tens menos de 16 anos? Não precisas de conta: faz o check-in no campo.',
+  'site.signup_email': 'Email (opcional)',
+  'site.signup_create': 'Criar conta',
+  'site.signup_no_notice':
+      'Este servidor ainda não publicou o aviso de privacidade, por isso ainda não se pode criar uma conta aqui. Pergunta à organização do campo.',
+  'site.new_account_hint':
+      'É a tua primeira vez? Para criar uma conta, lê o aviso e marca as duas caixas.',
+  'site.login_notice': 'Li o aviso de privacidade.',
+  'site.login_notice_first': 'Abre primeiro o aviso de privacidade, acima.',
+  'site.login_age':
+      'Tenho 16 anos ou mais. Quem é mais novo faz o check-in no campo sem conta, com as regras do campo para os pais ou responsáveis.',
   'privacy.title': 'Aviso de privacidade',
   'privacy.read': 'Ler o aviso de privacidade',
   'privacy.version': 'Versão {version}',
@@ -1514,14 +1541,14 @@ const Map<String, String> ptStrings = {
   'privacy.none':
       'O servidor ainda não publicou o texto do aviso de privacidade. Pergunta à organização do campo.',
   'privacy.intro_outdated':
-      'O aviso de privacidade mudou desde o último consentimento desta conta (versão {old}, agora {version}). Lê o aviso e confirma de novo.',
+      'O aviso de privacidade mudou desde a versão mostrada pela última vez a esta conta (versão {old}, agora {version}). Lê o aviso e confirma que o viste. A conta continua a funcionar como está.',
   'privacy.intro_missing':
-      'Esta conta não tem consentimento registado para o aviso de privacidade (versão {version}). Lê o aviso e confirma.',
+      'Não há registo de que esta conta tenha visto o aviso de privacidade (versão {version}). Lê o aviso e confirma que o viste.',
   'privacy.read_and_confirm': 'Ler e confirmar',
-  'privacy.accept': 'Li o aviso de privacidade e estou de acordo.',
+  'privacy.accept': 'Li o aviso de privacidade.',
   'privacy.confirm': 'Confirmar',
-  'privacy.tick_first': 'Marca primeiro que leste o aviso e estás de acordo.',
-  'privacy.done': 'Consentimento registado.',
+  'privacy.tick_first': 'Marca primeiro que leste o aviso.',
+  'privacy.done': 'Registado: o aviso foi visto.',
   'privacy.changed':
       'O aviso mudou entretanto. Lê a nova versão e confirma de novo.',
   'site.err.notice_version_changed':

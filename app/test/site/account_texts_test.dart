@@ -45,11 +45,27 @@ const accountCodes = [
   'provider_not_configured',
 ];
 
+/// What `POST /auth/register` refuses with that the sign-up screen words
+/// itself (api/auth.py; the password rules are the account's own, above).
+const signupCodes = [
+  'username_invalid',
+  'username_reserved',
+  'email_invalid',
+  'username_or_email_taken',
+  'notice_required',
+  'age_confirmation_required',
+  'quota_exceeded',
+  'notice_version_changed',
+  'password_login_disabled',
+  'password_too_short',
+];
+
 /// What the callback puts in `?oidc_error=`, and what the phone adds.
 const oidcCodes = [
   'state_invalid',
   'denied',
-  'consent_required',
+  'notice_required',
+  'age_confirmation_required',
   'too_many_attempts',
   'quota_exceeded',
   'id_token_invalid',
@@ -80,6 +96,33 @@ void main() {
             reason: '$c has no text of its own in ${lang.name}',
           );
         }
+      });
+
+      test('a text for every refusal of the sign-up, and the age refusal '
+          'names the check-in without an account', () {
+        for (final c in signupCodes) {
+          final text = accountError(s, SiteException(400, c));
+          expect(text, isNotEmpty, reason: c);
+          expect(text, isNot(s.t('site.error', {'error': c})), reason: c);
+        }
+        final age = accountError(
+          s,
+          SiteException(400, 'age_confirmation_required'),
+        );
+        expect(age, contains('16'));
+        expect(
+          age,
+          contains(switch (lang) {
+            AppLanguage.pt => 'check-in no campo sem conta',
+            AppLanguage.en => 'check in at the field without an account',
+            AppLanguage.de => 'ohne Konto ein',
+            AppLanguage.zhTw => '不需要帳號',
+          }),
+        );
+        expect(
+          lang.table['acct.oidc.age_confirmation_required'],
+          contains('16'),
+        );
       });
 
       test('a text for every way a social login ends badly', () {

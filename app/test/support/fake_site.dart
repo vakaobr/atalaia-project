@@ -76,7 +76,13 @@ class FakeSite {
   /// The `return_to` of the last `start`, to see that it is the app's own.
   String? lastReturnTo;
   String? lastStartPurpose;
-  bool? lastStartConsent;
+  bool? lastStartNoticeSeen;
+  bool? lastStartAge;
+
+  /// What the sign-up's `register` last sent, and the accounts it made
+  /// (user name -> password; the login takes them too).
+  Map<String, Object?>? lastRegister;
+  final registered = <String, String>{};
   // (the notice version it carried: lastNoticeVersion, below)
 
   /// Ends every access token (as if they had expired).
@@ -246,7 +252,7 @@ class FakeSite {
     };
   }
 
-  // --- the privacy notice and the account's consent (api/privacy.py, CONS-*) -----
+  // --- the privacy notice and which version the account was shown (api/privacy.py, CONS-*, LEG-*) -----
   /// The notice's current version and its Markdown per language (empty: the
   /// operator has not published one).
   var noticeVersion = '2026-11';
@@ -258,16 +264,16 @@ class FakeSite {
     'de': '# Datenschutzhinweis\n\nWir speichern deinen Namen.',
   };
 
-  /// What `GET /me` says about the consent: `current`, `outdated` or `missing`
-  /// (null: an older server whose /me has no `consent`), the version it is
-  /// for, and the languages the app asked the notice in.
-  String? consentStatus = 'current';
-  String? consentVersion = '2026-11';
+  /// What `GET /me` says about the notice: `current`, `outdated` or `missing`
+  /// (null: an older server whose /me has no `notice`), the version the
+  /// account was last shown, and the languages the app asked the notice in.
+  String? noticeStatus = 'current';
+  String? noticeShownVersion = '2026-11';
   final noticeLangsAsked = <String>[];
 
   /// A notice that changes while the person reads: the version the server
-  /// has from the next consent on (the 409 case).
-  String? changeNoticeOnConsent;
+  /// has from the next acknowledgement on (the 409 case).
+  String? changeNoticeOnAck;
 
   /// A server that takes `notice_version` on the social sign-up's start.
   var startTakesNoticeVersion = true;
@@ -303,21 +309,21 @@ class FakeSite {
         return SiteResponse(200, {
           'id': 'u1',
           'username': username,
-          if (consentStatus != null)
-            'consent': {
-              'status': consentStatus,
-              'version': consentStatus == 'missing' ? null : consentVersion,
+          if (noticeStatus != null)
+            'notice': {
+              'status': noticeStatus,
+              'version': noticeStatus == 'missing' ? null : noticeShownVersion,
               'current_version': noticeVersion,
-              'given_at': consentStatus == 'missing'
+              'shown_at': noticeStatus == 'missing'
                   ? null
                   : '2026-10-01T10:00:00+00:00',
               'notice_published': noticeTexts.isNotEmpty,
             },
         });
-      case 'POST /me/consents/account':
-        if (changeNoticeOnConsent != null) {
-          noticeVersion = changeNoticeOnConsent!;
-          changeNoticeOnConsent = null;
+      case 'POST /me/notice':
+        if (changeNoticeOnAck != null) {
+          noticeVersion = changeNoticeOnAck!;
+          changeNoticeOnAck = null;
         }
         if (b['notice_version'] != noticeVersion) {
           return SiteResponse(409, {
@@ -325,13 +331,13 @@ class FakeSite {
             'current_version': noticeVersion,
           });
         }
-        consentStatus = 'current';
-        consentVersion = noticeVersion;
+        noticeStatus = 'current';
+        noticeShownVersion = noticeVersion;
         return SiteResponse(200, {
           'status': 'current',
           'version': noticeVersion,
           'current_version': noticeVersion,
-          'given_at': '2026-10-29T10:00:00+00:00',
+          'shown_at': '2026-10-29T10:00:00+00:00',
         });
       case 'GET /me/hub-share':
         if (!hosted) return err(404, 'not_hosted');
@@ -604,7 +610,8 @@ class FakeSite {
         lastNoticeVersion = b['notice_version'] as String?;
         lastReturnTo = '${b['return_to']}';
         lastStartPurpose = '${b['purpose']}';
-        lastStartConsent = b['consent'] == true;
+        lastStartNoticeSeen = b['notice_seen'] == true;
+        lastStartAge = b['age_confirmed'] == true;
         final p = path.split('/')[3];
         return SiteResponse(200, {
           'authorization_url': 'https://accounts.example/auth?p=$p',
@@ -634,8 +641,31 @@ class FakeSite {
           return err(401, 'invalid_passkey');
         }
         return _session();
+      case 'POST /auth/register':
+        // api/auth.py (LEG-*): 16 or older and the notice shown, the notice
+        // version checked, the name free.
+        lastRegister = b;
+        if (b['age_confirmed'] != true) {
+          return err(400, 'age_confirmation_required');
+        }
+        if (b['notice_seen'] != true) return err(400, 'notice_required');
+        if (b.containsKey('notice_version') &&
+            b['notice_version'] != noticeVersion) {
+          return SiteResponse(409, {
+            'detail': 'notice_version_changed',
+            'current_version': noticeVersion,
+          });
+        }
+        if (b['username'] == username ||
+            registered.containsKey(b['username'])) {
+          return err(409, 'username_or_email_taken');
+        }
+        registered['${b['username']}'] = '${b['password']}';
+        return SiteResponse(201, {'id': 'u2', 'username': b['username']});
       case 'POST /auth/login':
-        if (b['username'] != username || b['password'] != password) {
+        final isNew = registered[b['username']] == b['password'];
+        if (!isNew &&
+            (b['username'] != username || b['password'] != password)) {
           return err(401, 'invalid_credentials');
         }
         if (totp) {

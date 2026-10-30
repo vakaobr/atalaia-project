@@ -1172,8 +1172,6 @@ const Map<String, String> enStrings = {
   'acct.oidc.state_invalid':
       'This login request expired or was not made by this app. Try again.',
   'acct.oidc.denied': 'The login was refused at the provider.',
-  'acct.oidc.consent_required':
-      'To make a new account, tick the agreement box below the provider buttons, then choose the provider again.',
   'acct.oidc.too_many_attempts':
       'Too many new accounts from this address. Try again later.',
   'acct.oidc.quota_exceeded':
@@ -1320,8 +1318,6 @@ const Map<String, String> enStrings = {
   'site.login_or': 'or',
   'site.login_with': 'Log in with {provider}',
   'site.login_passkey': 'Log in with a passkey',
-  'site.login_consent':
-      'If this is a first login, I agree to a new account being made (only the identifier the provider gives is kept; see the field\'s privacy notice).',
   'site.login_waiting': 'Waiting for the login in the browser…',
   'site.login_waiting_cancel': 'Cancel',
   'site.account': 'Ways to log in to the account',
@@ -1462,9 +1458,39 @@ const Map<String, String> enStrings = {
   'player.buzz_text': 'Vibrating on game events while the app is closed',
   'player.saved': 'Fields remembered',
   'player.saved_forget': 'Forget this field',
-  // The site server's privacy notice and consent again (CONS-*), the notice
+  // The site server's privacy notice and showing it again (CONS-*, LEG-*), sign-up, the notice
   // version of a social sign-up, and the chrono link between a hosted hub's
   // fields (SVX-2).
+  'acct.oidc.notice_required':
+      'To make a new account, first tick that you have read the privacy notice (below the provider buttons), then choose the provider again.',
+  'acct.oidc.age_confirmation_required':
+      'You must be 16 or older to make an account. Younger players check in at the field without an account, under the field\'s rules for parents or guardians. If you are 16 or older, tick the age box (below the provider buttons), then choose the provider again.',
+  'site.err.age_confirmation_required':
+      'You must be 16 or older to make an account. Younger players check in at the field without an account, under the field\'s rules for parents or guardians.',
+  'site.err.notice_required':
+      'Open and read the privacy notice, then tick that you have read it.',
+  'site.err.username_invalid':
+      'The username needs 3 to 64 letters, digits, dots, dashes or underscores, and must start with a letter or digit.',
+  'site.err.username_reserved': 'That username is reserved: choose another.',
+  'site.err.email_invalid': 'That email address is not valid.',
+  'site.err.username_or_email_taken':
+      'That username or email address is already taken.',
+  'site.err.quota_exceeded':
+      'This field has reached its limit of accounts. Talk to the field\'s staff.',
+  'site.signup_open': 'Create an account',
+  'site.signup_title': 'Create an account at {host}',
+  'site.signup_intro':
+      'An account lets you register for games and see your history. Open the privacy notice and read it first, then confirm below. Younger than 16? You do not need an account: check in at the field.',
+  'site.signup_email': 'Email (optional)',
+  'site.signup_create': 'Create account',
+  'site.signup_no_notice':
+      'This server has not published its privacy notice, so no account can be made here yet. Ask the field\'s organisers.',
+  'site.new_account_hint':
+      'New here? To create an account, read the notice and tick both boxes.',
+  'site.login_notice': 'I have read the privacy notice.',
+  'site.login_notice_first': 'Open the privacy notice above first.',
+  'site.login_age':
+      'I am 16 or older. Younger players check in at the field without an account, under the field\'s rules for parents or guardians.',
   'privacy.title': 'Privacy notice',
   'privacy.read': 'Read the privacy notice',
   'privacy.version': 'Version {version}',
@@ -1473,14 +1499,14 @@ const Map<String, String> enStrings = {
   'privacy.none':
       'The server has not published the privacy notice\'s text yet. Ask the field\'s organisers.',
   'privacy.intro_outdated':
-      'The privacy notice has changed since this account last consented (version {old}, now {version}). Read the notice and confirm again.',
+      'The privacy notice has changed since the version last shown to this account (version {old}, now {version}). Read the notice and confirm you have seen it. The account keeps working as it is.',
   'privacy.intro_missing':
-      'This account has no consent recorded for the privacy notice (version {version}). Read the notice and confirm.',
+      'There is no record that this account has seen the privacy notice (version {version}). Read the notice and confirm you have seen it.',
   'privacy.read_and_confirm': 'Read and confirm',
-  'privacy.accept': 'I have read the privacy notice and I agree.',
+  'privacy.accept': 'I have read the privacy notice.',
   'privacy.confirm': 'Confirm',
-  'privacy.tick_first': 'Tick first that you have read the notice and agree.',
-  'privacy.done': 'Consent recorded.',
+  'privacy.tick_first': 'Tick first that you have read the notice.',
+  'privacy.done': 'Recorded: the notice was seen.',
   'privacy.changed':
       'The notice has changed in the meantime. Read the new version and confirm again.',
   'site.err.notice_version_changed':

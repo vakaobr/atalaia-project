@@ -1232,8 +1232,6 @@ const Map<String, String> deStrings = {
   'acct.oidc.state_invalid':
       'Diese Anmeldeanfrage ist abgelaufen oder wurde nicht von dieser App gestellt. Versuch es noch einmal.',
   'acct.oidc.denied': 'Die Anmeldung wurde beim Anbieter abgelehnt.',
-  'acct.oidc.consent_required':
-      'Um ein neues Konto anzulegen, setze das Häkchen im Feld unter den Anbieter-Schaltflächen und wähle den Anbieter dann noch einmal.',
   'acct.oidc.too_many_attempts':
       'Zu viele neue Konten von dieser Adresse. Versuch es später noch einmal.',
   'acct.oidc.quota_exceeded':
@@ -1387,8 +1385,6 @@ const Map<String, String> deStrings = {
   'site.login_or': 'oder',
   'site.login_with': 'Mit {provider} anmelden',
   'site.login_passkey': 'Mit einem Passkey anmelden',
-  'site.login_consent':
-      'Bei der ersten Anmeldung stimme ich zu, dass ein neues Konto angelegt wird (gespeichert wird nur die Kennung des Anbieters; siehe die Datenschutzerklärung des Spielfelds).',
   'site.login_waiting': 'Warten auf die Anmeldung im Browser …',
   'site.login_waiting_cancel': 'Abbrechen',
   'site.account': 'Anmeldemöglichkeiten des Kontos',
@@ -1535,6 +1531,37 @@ const Map<String, String> deStrings = {
       'Vibriert bei Spielereignissen, auch wenn die App geschlossen ist',
   'player.saved': 'Gemerkte Felder',
   'player.saved_forget': 'Dieses Feld vergessen',
+  'acct.oidc.notice_required':
+      'Um ein neues Konto anzulegen, setze zuerst das Häkchen, dass du den Datenschutzhinweis gelesen hast (Feld unter den Anbieter-Schaltflächen), und wähle den Anbieter dann noch einmal.',
+  'acct.oidc.age_confirmation_required':
+      'Für ein Konto musst du mindestens 16 Jahre alt sein. Jüngere Spielende checken am Spielfeld ohne Konto ein, nach den Regeln des Spielfelds für Eltern oder Erziehungsberechtigte. Wenn du 16 oder älter bist, setze das Häkchen für das Alter (unter den Anbieter-Schaltflächen) und wähle den Anbieter noch einmal.',
+  'site.err.age_confirmation_required':
+      'Für ein Konto musst du mindestens 16 Jahre alt sein. Jüngere Spielende checken am Spielfeld ohne Konto ein, nach den Regeln des Spielfelds für Eltern oder Erziehungsberechtigte.',
+  'site.err.notice_required':
+      'Öffne und lies den Datenschutzhinweis und setze dann das Häkchen, dass du ihn gelesen hast.',
+  'site.err.username_invalid':
+      'Der Benutzername braucht 3 bis 64 Buchstaben, Ziffern, Punkte, Bindestriche oder Unterstriche und beginnt mit einem Buchstaben oder einer Ziffer.',
+  'site.err.username_reserved':
+      'Dieser Benutzername ist reserviert: Wähle einen anderen.',
+  'site.err.email_invalid': 'Diese E-Mail-Adresse ist ungültig.',
+  'site.err.username_or_email_taken':
+      'Dieser Benutzername oder diese E-Mail-Adresse ist schon vergeben.',
+  'site.err.quota_exceeded':
+      'Dieses Spielfeld hat sein Limit an Konten erreicht. Sprich mit der Orga des Spielfelds.',
+  'site.signup_open': 'Konto anlegen',
+  'site.signup_title': 'Konto bei {host} anlegen',
+  'site.signup_intro':
+      'Mit einem Konto meldest du dich zu Spielen an und siehst deinen Verlauf. Öffne zuerst den Datenschutzhinweis und lies ihn, dann bestätige unten. Jünger als 16? Du brauchst kein Konto: Check in am Spielfeld.',
+  'site.signup_email': 'E-Mail (optional)',
+  'site.signup_create': 'Konto anlegen',
+  'site.signup_no_notice':
+      'Dieser Server hat seinen Datenschutzhinweis noch nicht veröffentlicht, deshalb kann hier noch kein Konto angelegt werden. Frag die Orga des Spielfelds.',
+  'site.new_account_hint':
+      'Neu hier? Um ein Konto anzulegen, lies den Hinweis und setze beide Häkchen.',
+  'site.login_notice': 'Ich habe den Datenschutzhinweis gelesen.',
+  'site.login_notice_first': 'Öffne zuerst oben den Datenschutzhinweis.',
+  'site.login_age':
+      'Ich bin 16 Jahre alt oder älter. Jüngere Spielende checken am Spielfeld ohne Konto ein, nach den Regeln des Spielfelds für Eltern oder Erziehungsberechtigte.',
   'privacy.title': 'Datenschutzhinweis',
   'privacy.read': 'Datenschutzhinweis lesen',
   'privacy.version': 'Version {version}',
@@ -1543,15 +1570,15 @@ const Map<String, String> deStrings = {
   'privacy.none':
       'Der Server hat den Text des Datenschutzhinweises noch nicht veröffentlicht. Frag die Orga des Spielfelds.',
   'privacy.intro_outdated':
-      'Der Datenschutzhinweis hat sich seit der letzten Zustimmung dieses Kontos geändert (Version {old}, jetzt {version}). Lies den Hinweis und bestätige erneut.',
+      'Der Datenschutzhinweis hat sich seit der Version geändert, die diesem Konto zuletzt gezeigt wurde (Version {old}, jetzt {version}). Lies den Hinweis und bestätige, dass du ihn gesehen hast. Das Konto funktioniert weiter wie bisher.',
   'privacy.intro_missing':
-      'Für dieses Konto ist keine Zustimmung zum Datenschutzhinweis gespeichert (Version {version}). Lies den Hinweis und bestätige.',
+      'Es ist nicht vermerkt, dass dieses Konto den Datenschutzhinweis (Version {version}) gesehen hat. Lies den Hinweis und bestätige, dass du ihn gesehen hast.',
   'privacy.read_and_confirm': 'Lesen und bestätigen',
-  'privacy.accept': 'Ich habe den Datenschutzhinweis gelesen und stimme zu.',
+  'privacy.accept': 'Ich habe den Datenschutzhinweis gelesen.',
   'privacy.confirm': 'Bestätigen',
   'privacy.tick_first':
-      'Setze zuerst das Häkchen, dass du den Hinweis gelesen hast und zustimmst.',
-  'privacy.done': 'Zustimmung gespeichert.',
+      'Setze zuerst das Häkchen, dass du den Hinweis gelesen hast.',
+  'privacy.done': 'Vermerkt: Der Hinweis wurde gesehen.',
   'privacy.changed':
       'Der Hinweis hat sich inzwischen geändert. Lies die neue Version und bestätige erneut.',
   'site.err.notice_version_changed':

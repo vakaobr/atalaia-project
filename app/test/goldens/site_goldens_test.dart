@@ -111,29 +111,29 @@ void main() {
       await snap(tester, 'account', lang);
     });
 
-    testWidgets('the field asks for the consent again (${lang.code})', (
+    testWidgets('the field shows the notice again (${lang.code})', (
       tester,
     ) async {
       final site = FakeSite()
-        ..consentStatus = 'outdated'
-        ..consentVersion = '2026-05';
+        ..noticeStatus = 'outdated'
+        ..noticeShownVersion = '2026-05';
       final h = await start(tester, site);
       await tester.pumpWidget(h.app(home: SiteScreen(link: link)));
       await tester.pumpAndSettle();
-      await snap(tester, 'consent_banner', lang);
+      await snap(tester, 'notice_banner', lang);
     });
 
-    testWidgets('the privacy notice and its consent (${lang.code})', (
+    testWidgets('the privacy notice shown again (${lang.code})', (
       tester,
     ) async {
-      final site = FakeSite()..consentStatus = 'outdated';
+      final site = FakeSite()..noticeStatus = 'outdated';
       final h = await start(tester, site);
       final session = h.services.sites.of(link.site);
       await tester.pumpWidget(
         h.app(
           home: PrivacyNoticeScreen(
             session: session,
-            consent: ConsentState({
+            again: NoticeState({
               'status': 'outdated',
               'version': '2026-05',
               'current_version': '2026-11',

@@ -266,6 +266,35 @@ class SiteSession {
     return LoggedIn(await _start(r, user));
   }
 
+  /// Makes an account with a password (`POST /auth/register`; no session
+  /// follows: the caller logs in). The account rests on the contract, not on
+  /// consent (LEG-*): the person was shown the privacy notice ([noticeVersion]
+  /// is the version on their screen, so a notice that changed meanwhile is
+  /// refused with 409 `notice_version_changed`) and confirms being 16 or older
+  /// (no date of birth is asked). Throws [SiteException] with the server's
+  /// code (`username_invalid`, `password_breached`, `notice_required`, ...).
+  Future<void> register(
+    String user,
+    String password, {
+    String? email,
+    String? noticeVersion,
+  }) async {
+    final r = await http.send(
+      'POST',
+      '/auth/register',
+      body: {
+        'username': user,
+        'password': password,
+        if (email != null && email.isNotEmpty) 'email': email,
+        'notice_seen': true,
+        'age_confirmed': true,
+        if (noticeVersion != null && noticeVersion.isNotEmpty)
+          'notice_version': noticeVersion,
+      },
+    );
+    if (!r.ok) throw SiteException(r.status, r.detail);
+  }
+
   Future<String> loginTotp(TotpNeeded step, String code) async {
     final r = await http.send(
       'POST',

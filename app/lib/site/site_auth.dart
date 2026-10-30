@@ -192,7 +192,7 @@ final class OidcReturn {
   /// `linked` or `reauth` for a finished link or confirmation.
   final String? ok;
 
-  /// The server's error code (`denied`, `consent_required`, ...).
+  /// The server's error code (`denied`, `notice_required`, ...).
   final String? error;
 
   static final _nonce = RegExp(r'^[A-Za-z0-9_-]{16,64}$');
@@ -270,7 +270,7 @@ class PendingReturn {
 }
 
 /// A social login that did not finish: the server's error code
-/// (`consent_required`, `denied`, `state_invalid`, ...), or `cancelled`,
+/// (`notice_required`, `age_confirmation_required`, `denied`, ...), or `cancelled`,
 /// `timeout` or `browser_unavailable` from the phone.
 class OidcFailure implements Exception {
   OidcFailure(this.code);
@@ -334,10 +334,14 @@ class SiteAuth {
 
   /// Asks the site to begin a social login, with the app's own return link.
   /// [purpose] is `login`, `link` or `reauth` (the last two need a session);
-  /// [consent] is the box the server asks for the first sign-in of a new
-  /// account; [password] confirms a `link` for an account that has one.
+  /// [noticeSeen] and [ageConfirmed] are the two boxes the server asks for the
+  /// first sign-in of a new account (LEG-*: the account rests on the contract,
+  /// so they are not consents: the person was shown the notice and is 16 or
+  /// older); they are sent only when ticked, so a login to an existing account
+  /// sends neither and works against an older server too. [password] confirms
+  /// a `link` for an account that has one.
   /// [noticeVersion] is the version of the privacy notice the person was
-  /// shown when they ticked [consent] (sent with the consent only). A server
+  /// shown when they ticked [noticeSeen] (sent with it only). A server
   /// before CONS-7 refuses the unknown field with a 422 that names it
   /// (`extra_forbidden` at `body.notice_version`); only that answer, which the
   /// app also meets from older self-hosted servers, is asked again without the
@@ -350,14 +354,16 @@ class SiteAuth {
     String provider, {
     required String purpose,
     required String nonce,
-    bool consent = false,
+    bool noticeSeen = false,
+    bool ageConfirmed = false,
     String password = '',
     String? noticeVersion,
     String? appChallenge,
   }) async {
     final body = {
       'purpose': purpose,
-      'consent': consent,
+      if (noticeSeen) 'notice_seen': true,
+      if (ageConfirmed) 'age_confirmed': true,
       'return_to': '${session.site}/app/oidc?s=$nonce',
       if (password.isNotEmpty) 'password': password,
     };
@@ -366,7 +372,7 @@ class SiteAuth {
         ? _http.send('POST', path, body: b)
         : session.callRaw('POST', path, body: b);
     final optional = <String, String>{
-      if (consent && noticeVersion != null && noticeVersion != '')
+      if (noticeSeen && noticeVersion != null && noticeVersion != '')
         'notice_version': noticeVersion,
       'app_challenge': ?appChallenge,
     };
@@ -400,7 +406,8 @@ class SiteAuth {
   Future<String?> oidc(
     String provider, {
     String purpose = 'login',
-    bool consent = false,
+    bool noticeSeen = false,
+    bool ageConfirmed = false,
     String password = '',
     String? noticeVersion,
     void Function(PendingReturn waiting)? onOpened,
@@ -413,7 +420,8 @@ class SiteAuth {
       provider,
       purpose: purpose,
       nonce: nonce,
-      consent: consent,
+      noticeSeen: noticeSeen,
+      ageConfirmed: ageConfirmed,
       password: password,
       noticeVersion: noticeVersion,
       appChallenge: verifierChallenge(verifier),
