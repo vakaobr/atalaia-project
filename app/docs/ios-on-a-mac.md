@@ -540,8 +540,8 @@ server) and **passkeys** have Swift sides now: `ios/Runner/BrowserPlugin.swift`
 (an `ASWebAuthenticationSession`) and `ios/Runner/PasskeyPlugin.swift`
 (`ASAuthorizationPlatformPublicKeyCredentialProvider`), on the same channels and
 with the same answers as Android's Kotlin plugins; nothing in `lib/` changed.
-**The Swift has not been compiled or run**: CI's `ios-build` and your iPhone are
-the first check. Without the steps below the app still builds and runs; the
+**The Swift is compiled by CI's `ios-build` (it passed on a draft pull request) but has not been run on an iPhone**: your iPhone is the first
+run. Without the steps below the app still builds and runs; the
 two features then fail ("not available", or a passkey error) and the password
 login stays.
 

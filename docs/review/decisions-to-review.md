@@ -3281,3 +3281,38 @@ The field container of the local pentest stack now reports its health.
 | # | Question | Answer chosen | Why | Status |
 | --- | --- | --- | --- | --- |
 | PT-H-1 | Where does the pentest field container's health check live? | Compose healthcheck on the field service (tools/pentest_stack.py), GET http://127.0.0.1:8080/healthz. | fake-idp already uses one; the demo image's inherited :8001 check is overridden. | built (2026-10-30); open for the maintainer's review |
+
+## Site login on iOS: the browser session and passkeys (IOSL-1 to IOSL-9, 2026-10-30)
+
+Swift twins of Android's browser and passkey plugins, compiled by CI, not run on an iPhone.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| IOSL-1 | How does the iOS social login return to Dart without a Dart change? | ASWebAuthenticationSession with Callback.https(host:path:"/app/oidc"); the callback URL goes to LinkPlugin.deliver as a link event; open returns true if the session started; LinkPlugin.accept also passes https /app/oidc like Android. | OidcReturn.parse and the nonce check run unchanged. The https callback needs iOS 17.4 (earlier: browser_unavailable). The #oidc= fragment surviving the callback is a first on-device check. | built (2026-10-30); open for the maintainer's review |
+| IOSL-2 | How are passkeys done, and how do errors map? | ASAuthorizationPlatformPublicKeyCredentialProvider with the server's WebAuthn JSON; available from iOS 16; .canceled -> cancelled, .notHandled -> unsupported, else failed. | Same shapes as Android; no_credential has no iOS twin (closing the sheet is cancelled). | built (2026-10-30); open for the maintainer's review |
+| IOSL-3 | Excluded credentials or displayName on iOS? | Not sent. | Availability uncertain without a compiler; the OS replaces a passkey for the same site and account. Known gap. | built (2026-10-30); open for the maintainer's review |
+| IOSL-4 | Info.plist keys for passkeys? | None. | No usage string is needed for these APIs. | built (2026-10-30); open for the maintainer's review |
+| IOSL-5 | Entitlements always on or opt-in? | Runner.entitlements with webcredentials:$(ATALAIA_SITE_HOST), wired via CODE_SIGN_ENTITLEMENTS = $(ATALAIA_ENTITLEMENTS), empty by default; a paid-team build sets both. | A free Personal Team cannot sign Associated Domains (iOS-10). | built (2026-10-30); open for the maintainer's review |
+| IOSL-6 | apple-app-site-association? | Already served from ATALAIA_APP_IOS_APP_IDS (404 unset, tested); DEPLOY.md now says iOS uses it. | No server change needed. | built (2026-10-30); open for the maintainer's review |
+| IOSL-7 | Site domain configurable at build time? | ATALAIA_SITE_HOST build setting (placeholder site.example). | Entitlements cannot read env vars; clubs build their own app. | built (2026-10-30); open for the maintainer's review |
+| IOSL-8 | Closing the login sheet? | Nothing sent to Dart; the waiting screen's cancel or the 10-minute limit ends it. | Same as a closed Custom Tab; no Dart change. | built (2026-10-30); open for the maintainer's review |
+| IOSL-9 | What is verified? | Dart contract tests (2866), CI ios-build compile. Not: https-callback behaviour, a real passkey round trip. | No iPhone run yet. | built (2026-10-30); open for the maintainer's review |
+
+## The epoch follow-up (EP-1 to EP-12, 2026-10-30)
+
+RFC 0001 Amendment 25: the epoch floor, the former-leader id rule and Wi-Fi props getting CMD peer; host tests only, not run on boards.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| EP-1 | Wi-Fi prop and CMD 11? | Both controllers forward it as cmd "peer" {src,epoch}, no dest; the prop gives it to its pod's receiver (SET_PEER_EPOCH, raise-only, resent after each configure); a prop with no pod ignores it. | A prop's pod follows a source only 16 epochs above; the Pi dropped it, the phone sent it unnamed. | built (2026-10-30); open for the maintainer's review |
+| EP-2 | How can a second loss not draw lower? | A floor = highest epoch ever used with any key, kept apart from the per-key record; lost draw in [max(4096, floor+1), 61439]. | Receivers never lower a source, and a draw inside the first life repeats a nonce. | built (2026-10-30); open for the maintainer's review |
+| EP-3 | Where is the floor kept? | Box: own NVS u16 epfloor. Pi: DB setting + .epochs floor (old list format still read). Phone: setting tx_epoch_floor. | A separate entry survives a blob-only loss. | built (2026-10-30); open for the maintainer's review |
+| EP-4 | No room, or floor unreadable/unwritable? | Box: tx_blocked. Controllers: error, start a new game. An ordinary boot only raises the floor and does not depend on the write. | Never guess an epoch; protection must not block normal play. | built (2026-10-30); open for the maintainer's review |
+| EP-5 | Former leader (all stores lost) rejoined? | The issuing controller never issues a controller join under the id of a controller that has been on the air, not even as same device; it gets a new id. | A new id makes epoch 1 a new source's. | built (2026-10-30); open for the maintainer's review |
+| EP-6 | Which controllers count as on the air? | The game's controller_id plus every controller whose TIME or CLAIM was authenticated, persisted per game (controllers_heard:<game>). A standby that never transmitted can be re-invited under its id. | Only a transmitted id has used epochs. | built (2026-10-30); open for the maintainer's review |
+| EP-7 | Both records lost together? | Accepted as before (random draw from 4096); GM rejoins with a new key. | Every remaining option needs a wire change or a second durable place that dies with the first. | built (2026-10-30); open for the maintainer's review |
+| EP-8 | CMD 11 received by a pod on the radio? | The pod's phone applies it like the Wi-Fi one. | Only the box's field_link applied it before. | built (2026-10-30); open for the maintainer's review |
+| EP-9 | Bench check on real boards? | Bench-build serial `@epochwipe [all]` + docs/runbooks/epoch-recovery-bench.md. | No other way to lose only the epoch store on a board. | built (2026-10-30); open for the maintainer's review |
+| EP-10 | Epoch file format? | {"keys":[...],"floor":n}; the bare list is still read. | Back-compat for existing Pi installs. | built (2026-10-30); open for the maintainer's review |
+| EP-11 | Alternatives refused? | Box climbing on unacknowledged HELLO; a standby taking CMD peer naming itself; a floor key in the join payload; a random epoch per standby join (SR-119). | Heavier, wire changes, or break failover. | built (2026-10-30); open for the maintainer's review |
+| EP-12 | Firmware? | Yes: radio_protocol.c/.h, radio_nvs_esp.c/.h, shell.c, field_link.c text; host-tested and ASan-clean; ESP image built by the queue. |  | built (2026-10-30); open for the maintainer's review |
