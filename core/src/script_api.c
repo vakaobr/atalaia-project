@@ -91,6 +91,11 @@ static void emit_event(lua_State *L, atalaia_node_t *n, const char *type, int da
     if (len == 0 || len >= ATALAIA_EVENT_TYPE_MAX) {
         luaL_error(L, "%s: event type must be 1 to %d characters", fn, ATALAIA_EVENT_TYPE_MAX - 1);
     }
+    /* script.error and script.halted are the runtime's report of the script itself (node.c):
+     * a script saying so on its own would send the GM's screen and the logs a false report. */
+    if (strncmp(type, "script.", 7) == 0) {
+        luaL_error(L, "%s: script.* events are reserved for the runtime", fn);
+    }
 
     uint8_t team = ATALAIA_TEAM_NONE;
     if (data_idx != 0) {
@@ -423,6 +428,21 @@ static int l_state_field(lua_State *L)
 
 /* ---- field.* (controller only) ------------------------------------------- */
 
+/* Decodes the host's JSON inside lua_pcall (see l_field_nodes). */
+static int decode_host_json(lua_State *L)
+{
+    atalaia_json_push_decoded(L, (const char *)lua_touserdata(L, 1));
+    return 1;
+}
+
+/*
+ * The host hands over a malloc'd buffer that this function must free. The decoder raises a Lua
+ * error (bad JSON, nesting over the cap, the memory cap, the instruction watchdog) and Lua's
+ * error is a longjmp, so a free() after the decode would be skipped: the buffer is decoded in a
+ * protected call, freed, and only then is the error raised again (review finding LIVE2-S1).
+ * Nothing between the host's call and the pcall can raise: the pushes use slots every C function
+ * is given (LUA_MINSTACK) and no allocation.
+ */
 static int l_field_nodes(lua_State *L)
 {
     atalaia_node_t *n = atalaia_node_from_lua(L);
@@ -432,16 +452,28 @@ static int l_field_nodes(lua_State *L)
         lua_newtable(L);
         return 1;
     }
-    atalaia_json_push_decoded(L, json);
+    lua_pushcfunction(L, decode_host_json);
+    lua_pushlightuserdata(L, json);
+    int status = lua_pcall(L, 1, 1, 0);
     free(json);
+    if (status != LUA_OK) {
+        return lua_error(L); /* the error value is on the top */
+    }
     return 1;
+}
+
+/* A node id is 16 bits: anything else is no node (it used to wrap, so 65537 was node 1). */
+static bool node_id_in_range(lua_Integer id)
+{
+    return id >= 0 && id <= UINT16_MAX;
 }
 
 static int l_field_owner(lua_State *L)
 {
     atalaia_node_t *n = atalaia_node_from_lua(L);
     lua_Integer id = luaL_checkinteger(L, 1);
-    const char *owner = n->cfg.field_ops->owner(n->cfg.callbacks.user, (uint16_t)id);
+    const char *owner =
+        node_id_in_range(id) ? n->cfg.field_ops->owner(n->cfg.callbacks.user, (uint16_t)id) : NULL;
     if (owner == NULL) {
         lua_pushnil(L);
     } else {
@@ -461,6 +493,11 @@ static int l_field_send(lua_State *L)
         atalaia_json_push_encoded(L, 3);
         params = lua_tostring(L, -1);
     }
+    if (!node_id_in_range(id) || n->field_sends >= NODE_FIELD_SENDS_PER_ENTRY) {
+        lua_pushboolean(L, 0); /* no such node, or this entry has sent its share */
+        return 1;
+    }
+    n->field_sends++;
     bool ok = n->cfg.field_ops->send(n->cfg.callbacks.user, (uint16_t)id, cmd, params);
     lua_pushboolean(L, ok);
     return 1;
@@ -494,7 +531,9 @@ static int l_field_common_owner(lua_State *L)
         lua_rawgeti(L, 1, i);
         lua_Integer id = luaL_checkinteger(L, -1);
         lua_pop(L, 1);
-        const char *owner = n->cfg.field_ops->owner(n->cfg.callbacks.user, (uint16_t)id);
+        const char *owner = node_id_in_range(id)
+                                ? n->cfg.field_ops->owner(n->cfg.callbacks.user, (uint16_t)id)
+                                : NULL;
         if (owner == NULL) {
             lua_pushnil(L);
             return 1;

@@ -772,7 +772,25 @@
 @@ LUAL_BUFFERSIZE is the initial buffer size used by the lauxlib
 ** buffer system.
 */
-#define LUAL_BUFFERSIZE   ((int)(16 * sizeof(void*) * sizeof(lua_Number)))
+/*
+** ATALAIA PATCH (LIVE2-S3, decision SR-132): 64 bytes instead of 16 * sizeof(void*) *
+** sizeof(lua_Number) (512 on the ESP32). The buffer lives on the C stack of every function that
+** builds a string (string.gsub, format, rep, table.concat, the JSON encoder): at 512 bytes the
+** frame of string.gsub alone was 912 bytes on the Xtensa, and a script that nests gsub callbacks
+** pays it at every level. Longer strings still work: the buffer moves to a userdata.
+*/
+#define LUAL_BUFFERSIZE   64
+
+/*
+** ATALAIA PATCH (LIVE2-S3, decision SR-132): the depth of nested C calls and nested syntax.
+** Lua's 200 needs between 69 and 273 KB of C stack when a script nests pcall, metamethods,
+** gsub callbacks or table.sort comparators (about 0.35 to 1.2 KB a level on the Xtensa), and the
+** Field Box's game task has 24 KB. Lua counts the levels of the parser here too: the built-in modes
+** need up to 14 (their tests fail at 10 and pass at 14), so 20 leaves room for a community mode
+** and the C stack stays near 17 KB at the deepest chain (22 levels count, with the 10% Lua keeps
+** for handling the overflow error).
+*/
+#define LUAI_MAXCCALLS    20
 
 
 /*

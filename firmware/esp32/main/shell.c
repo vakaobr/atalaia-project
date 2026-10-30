@@ -1521,8 +1521,12 @@ void app_main(void)
     }
 
     /* FreeRTOS tasks per ADR-P1-7. */
-    /* 12 KB: Lua, the join codec and the field link all run on the game task. */
-    xTaskCreatePinnedToCore(task_game, "game", 12288, NULL, 5, NULL, 1);
+    /* 24 KB: Lua, the join codec and the field link all run on the game task. Lua's nesting is
+     * capped at 20 C levels (LUAI_MAXCCALLS, core/third_party/lua/luaconf.h, decision SR-132) and
+     * a level of the worst chain (a gsub callback calling gsub) takes about 0.8 KB on the Xtensa
+     * (-fstack-usage, -O2): 22 levels and the pattern matcher's 32 are about 18 KB, with 6 KB for
+     * what is under them. It was 12 KB when Lua allowed 200 levels (69 to 273 KB). */
+    xTaskCreatePinnedToCore(task_game, "game", 24576, NULL, 5, NULL, 1);
     xTaskCreatePinnedToCore(task_lvgl, "lvgl", 8192, NULL, 4, NULL, 1);
     xTaskCreatePinnedToCore(task_audio, "audio", 4096, NULL, 3, NULL, 0);
     xTaskCreatePinnedToCore(task_wifi, "wifi", 4096, NULL, 2, NULL, 0);

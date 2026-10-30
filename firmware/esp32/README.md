@@ -23,7 +23,7 @@ The firmware is structured as a shell around the shared C core (`core/`):
 
 ```
 app_main
-  +-- game_task (core 1, priority 5, 100 Hz, 12 KB stack)
+  +-- game_task (core 1, priority 5, 100 Hz, 24 KB stack)
   |     +-- radio RX -> box_game (field games: join, CMD, TIME, ACK)
   |     +-- poll buttons/keypad/serial console
   |     +-- NFC: join cards when idle, player tags during a game (nfc.tag)
@@ -677,6 +677,8 @@ beacon's controller failed half-way and the box reset.
 | **Static internal RAM left for the heap** | **45,704** | **194,049** |
 | At a join, with the beacon in the image: DMA-capable free (bench) | 11,547 (largest 6,400) | about 150,000 (estimate: 194 KB less the 27 KB the stacks and the rest take, measured at the same point on the bench, less the non-DMA part) |
 | At a join, no Bluetooth in the image (bench, the hotfix) | 36,023 (largest 20,480) | not built |
+
+The game task's stack is 24 KB since decision SR-132 (it was 12 KB), and the mode-fetch task's 20 KB (was 12 KB): Lua's nesting is capped at 20 C levels (`core/third_party/README.md`), and the worst chain takes about 0.8 KB a level. Task stacks come out of the heap at run time, not the static RAM `check_fw_ram.py` measures, so that number does not change; the runtime free heap at a join is 12 KB lower (20 KB lower while a mode is fetched). To check on the bench: run a script that nests `gsub` callbacks to the limit and read the game task's `uxTaskGetStackHighWaterMark`.
 
 The replay windows (decision SR-24) cost about 0.5 KB net in the box's static RAM (64 sources of 32 bytes in the
 per-source epoch table; the link's 64-entry duplicate table is gone): `check_fw_ram.py` measured 193,497 bytes left

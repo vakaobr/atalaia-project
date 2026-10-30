@@ -392,7 +392,8 @@ static const char *match (MatchState *ms, const char *s, const char *p);
 
 /* maximum recursion depth for 'match' */
 #if !defined(MAXCCALLS)
-#define MAXCCALLS	200
+#define MAXCCALLS	32  /* ATALAIA PATCH (LIVE2-S3): 200 deep is about 10 KB of C stack; a pattern holds at most
+                               LUA_MAXCAPTURES (32) captures anyway */
 #endif
 
 

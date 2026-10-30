@@ -101,16 +101,28 @@ static void report_script_error(atalaia_node_t *n, const char *message)
 
 /* ---- Calling into Lua ---------------------------------------------------- */
 
-/* Calls the script function below nargs arguments with a fresh budget. */
+/* Calls the script function below nargs arguments with a fresh per-callback budget. */
 static bool call_script(lua_State *L, atalaia_node_t *n, int nargs)
 {
+    if (n->entry_used > atalaia_node_entry_limit(n)) {
+        /* The callbacks of this entry have used up its budget (the hook only sees it inside
+         * a callback longer than one hook step). */
+        n->entry_tripped = true;
+        lua_pop(L, nargs + 1);
+        halt(n, "instruction limit exceeded in one step");
+        return false;
+    }
     n->instr_used = 0;
     int rc = lua_pcall(L, nargs, 0, 0);
+    /* The rest of this entry pays for what this callback used, or a minimum for calling it. */
+    n->entry_used +=
+        n->instr_used > NODE_CALLBACK_MIN_COST ? n->instr_used : NODE_CALLBACK_MIN_COST;
     if (rc == LUA_OK) {
         return true;
     }
     if (n->watchdog_tripped) {
-        halt(n, "instruction limit exceeded");
+        halt(n, n->entry_tripped ? "instruction limit exceeded in one step"
+                                 : "instruction limit exceeded");
     } else if (rc == LUA_ERRMEM) {
         halt(n, "memory limit exceeded");
     } else {
@@ -125,6 +137,9 @@ static bool call_script(lua_State *L, atalaia_node_t *n, int nargs)
 static bool run_protected(atalaia_node_t *n, lua_CFunction fn, void *arg)
 {
     lua_State *L = n->L;
+    n->entry_used = 0; /* a new host entry: the per-entry budget starts again */
+    n->entry_extra = 0;
+    n->field_sends = 0;
     lua_pushcfunction(L, fn);
     lua_pushlightuserdata(L, arg);
     int rc = lua_pcall(L, 1, 0, 0);
@@ -210,6 +225,17 @@ static void drain(lua_State *L, atalaia_node_t *n)
 
 /* ---- Timers -------------------------------------------------------------- */
 
+/*
+ * Game time is 32-bit milliseconds (49.7 days). A due time past the end used to wrap round to the
+ * start, so a timer set late in a very long game was due at once, and an every() timer fired in a
+ * loop. It stops at the last millisecond instead: such a timer never fires (LIVE2 low note,
+ * decision SR-137).
+ */
+static uint32_t add_ms(uint32_t a, uint32_t b)
+{
+    return b > UINT32_MAX - a ? UINT32_MAX : a + b;
+}
+
 uint32_t atalaia_node_add_timer(atalaia_node_t *n, lua_State *L, int fn_idx, uint32_t delay_ms,
                                 uint32_t interval_ms)
 {
@@ -222,7 +248,7 @@ uint32_t atalaia_node_add_timer(atalaia_node_t *n, lua_State *L, int fn_idx, uin
         t->fn_ref = luaL_ref(L, LUA_REGISTRYINDEX);
         t->active = true;
         t->id = ++n->next_timer_id;
-        t->due_ms = n->now_ms + delay_ms;
+        t->due_ms = add_ms(n->now_ms, delay_ms);
         t->interval_ms = interval_ms;
         return t->id;
     }
@@ -333,6 +359,7 @@ static int p_advance(lua_State *L)
 {
     step_args_t *args = (step_args_t *)lua_touserdata(L, 1);
     atalaia_node_t *n = args->n;
+    n->entry_extra = (uint64_t)(args->ms - n->now_ms) / 100u * n->cfg.instr_limit;
     for (;;) {
         node_timer_t *t = next_due(n, args->ms);
         if (t == NULL) {
@@ -341,9 +368,9 @@ static int p_advance(lua_State *L)
         n->now_ms = t->due_ms;
         lua_rawgeti(L, LUA_REGISTRYINDEX, t->fn_ref);
         /* Update the timer before the call so it may cancel itself. */
-        if (t->interval_ms != 0) {
-            t->due_ms += t->interval_ms;
-        } else {
+        if (t->interval_ms != 0 && add_ms(t->due_ms, t->interval_ms) != t->due_ms) {
+            t->due_ms = add_ms(t->due_ms, t->interval_ms);
+        } else { /* one-shot, or an every() that has run out of game time */
             luaL_unref(L, LUA_REGISTRYINDEX, t->fn_ref);
             t->active = false;
         }
@@ -563,7 +590,9 @@ void atalaia_node_resume_at(atalaia_node_t *n, uint32_t now_ms)
         }
         if (t->interval_ms != 0) {
             uint32_t missed = (now_ms - t->due_ms) / t->interval_ms + 1;
-            t->due_ms += missed * t->interval_ms;
+            t->due_ms = (uint64_t)missed * t->interval_ms > UINT32_MAX - t->due_ms
+                            ? UINT32_MAX
+                            : t->due_ms + missed * t->interval_ms;
         } else {
             t->due_ms = now_ms + 1; /* fires once, on the next advance */
         }

@@ -28,8 +28,11 @@
 
 static const char *TAG = "mode_fetch";
 
-#define FETCH_BUF   4096
-#define FETCH_STACK 12288 /* TLS, and a script's load in the sandbox (as the game task's) */
+#define FETCH_BUF 4096
+/* TLS, and a script's load in the sandbox, which runs its top level (decision SR-132: 20 C levels
+ * of about 0.8 KB at the worst, the same chain as the game task's; no events run here, so 20 KB,
+ * not 24). */
+#define FETCH_STACK 20480
 
 typedef struct {
     mf_job_t job;

@@ -71,19 +71,53 @@ static void on_field_state(void *user, const char *key, const char *value)
     (void)value;
 }
 
-/* Field ops answering what a controller would, plus odd answers a host could give. */
+/*
+ * Field ops answering what a controller would, plus odd answers a host could give. The host owns
+ * the buffer it returns (the core frees it): "bad", "deep" and "big" make the decoder raise a
+ * Lua error (a syntax error, nesting over the cap, the memory cap) while the core still holds it
+ * (review finding LIVE2-S1: the error skipped the free; ASan/LSan sees the leak).
+ */
+static char *dup_text(const char *text, size_t len)
+{
+    char *out = malloc(len + 1);
+    if (out != NULL) {
+        memcpy(out, text, len);
+        out[len] = '\0';
+    }
+    return out;
+}
+
 static char *ops_nodes(void *user, const char *role)
 {
     (void)user;
+    if (role != NULL && strcmp(role, "bad") == 0) {
+        return dup_text("[{\"id\":1},{\"id\":", 17);
+    }
+    if (role != NULL && strcmp(role, "deep") == 0) {
+        char deep[80];
+        memset(deep, '[', 40);
+        memset(deep + 40, ']', 40);
+        return dup_text(deep, 80);
+    }
+    if (role != NULL && strcmp(role, "big") == 0) {
+        size_t count = 60000;
+        char *out = malloc(2 * count + 2);
+        if (out == NULL) {
+            return NULL;
+        }
+        out[0] = '[';
+        for (size_t i = 0; i < count; i++) {
+            out[1 + 2 * i] = '1';
+            out[2 + 2 * i] = i + 1 < count ? ',' : ']';
+        }
+        out[2 * count + 1] = '\0';
+        return out;
+    }
     const char *json =
         role != NULL && strcmp(role, "odd") == 0
             ? "[{\"id\":70000},{\"id\":-1},{\"id\":\"x\"},{\"role\":\"zone\"},{\"id\":1.5}]"
             : "[{\"id\":1,\"role\":\"zone\"},{\"id\":2,\"role\":\"zone\"}]";
-    char *out = malloc(strlen(json) + 1);
-    if (out != NULL) {
-        memcpy(out, json, strlen(json) + 1);
-    }
-    return out;
+    return dup_text(json, strlen(json));
 }
 
 static const char *ops_owner(void *user, uint16_t node_id)
@@ -502,6 +536,166 @@ static const escape_case_t CASES[] = {
      "  log('ok')\n"
      "end)\n",
      SAFE},
+    /* ---- review 2026-10-30 (LIVE2-S1): the host's JSON buffer survives a decoder error ---- */
+    {"field_nodes_decode_errors",
+     /* On a controller each call raises while the core holds the host's buffer; the error is
+      * caught here. A leak fails the ASan/LSan run, not the case's status. */
+     "on('go', function()\n"
+     "  if field then\n"
+     "    for _, role in ipairs({'bad', 'deep', 'big'}) do\n"
+     "      for i = 1, 3 do\n"
+     "        if pcall(field.nodes, role) then log('escaped ' .. role .. ' decoded') end\n"
+     "      end\n"
+     "    end\n"
+     "    if #field.nodes() ~= 2 then log('escaped ok-path') end\n"
+     "  end\n"
+     "  log('ok')\n"
+     "end)\n",
+     SAFE},
+
+    /* ---- review 2026-10-30 (LIVE2-S2): table functions are metered like string ones ---- */
+    {"table_move_huge", "on('go', function() local t = {1, 2, 3} table.move(t, 1, 1e9, 2) end)\n",
+     HALTED},
+    {"table_move_nothing_forever",
+     /* No allocation and no VM instruction: a plain C loop for as long as the range. */
+     "on('go', function() table.move({}, 1, math.maxinteger // 2, 1, {}) end)\n", HALTED},
+    {"table_insert_front_loop",
+     "on('go', function() local t = {} for i = 1, 3000 do t[i] = i end\n"
+     "  for i = 1, 1e6 do table.insert(t, 1, i) end end)\n",
+     HALTED},
+    {"table_remove_front_loop",
+     "on('go', function() local t = {} for i = 1, 3000 do t[i] = i end\n"
+     "  for i = 1, 1e6 do table.insert(t, i) table.remove(t, 1) end end)\n",
+     HALTED},
+    {"table_insert_huge_length",
+     "on('go', function()\n"
+     "  local t = setmetatable({}, { __len = function() return 1e12 end })\n"
+     "  table.insert(t, 1, 'x') end)\n",
+     HALTED},
+    {"table_unpack_loop",
+     "on('go', function() local t = {} for i = 1, 4000 do t[i] = i end\n"
+     "  for i = 1, 1e6 do select('#', table.unpack(t)) end end)\n",
+     HALTED},
+    {"table_concat_loop",
+     "on('go', function() local t = {} for i = 1, 4000 do t[i] = 'ab' end\n"
+     "  for i = 1, 1e6 do local s = table.concat(t, ',') end end)\n",
+     HALTED},
+    {"table_sort_loop",
+     "on('go', function() local t = {} for i = 1, 4000 do t[i] = (i * 7919) % 4001 end\n"
+     "  for i = 1, 1e6 do table.sort(t, function(a, b) return a > b end) table.sort(t) end end)\n",
+     HALTED},
+    {"table_sort_no_comparator_loop",
+     "on('go', function() local t = {} for i = 1, 4000 do t[i] = (i * 7919) % 4001 end\n"
+     "  for i = 1, 1e6 do table.sort(t) t[1], t[4000] = t[4000], t[1] end end)\n",
+     HALTED},
+    {"table_functions_still_work",
+     "on('go', function()\n"
+     "  local t = {5, 3, 8, 1}\n"
+     "  table.insert(t, 9) table.insert(t, 1, 0)\n"
+     "  local removed = table.remove(t, 2) table.remove(t)\n"
+     "  local m = table.move(t, 1, 3, 2, {})\n"
+     "  table.sort(t, function(a, b) return a > b end)\n"
+     "  local big = {} for i = 1, 500 do big[i] = (i * 37) % 501 end\n"
+     "  table.sort(big)\n"
+     "  local sorted = true for i = 2, #big do if big[i - 1] > big[i] then sorted = false end end\n"
+     "  local a, b, c = table.unpack({1, 2, 3})\n"
+     "  if removed == 5 and #t == 4 and t[1] == 8 and t[4] == 0 and m[2] == 0 and m[4] == 8 and\n"
+     "     table.concat({1, 2, 3}, '-') == '1-2-3' and a + b + c == 6 and sorted then\n"
+     "    log('ok')\n"
+     "  end\n"
+     "end)\n",
+     SAFE},
+
+    /* ---- review 2026-10-30 (LIVE2-S3): the C stack is bounded at 20 levels (luaconf.h) ---- */
+    {"nesting_pcall",
+     "on('go', function() local function f() local ok, e = pcall(f) if not ok then error(e, 0) end "
+     "end f() end)\n",
+     ANY},
+    {"nesting_gsub_callbacks",
+     "on('go', function() local function f() return (string.gsub('a', 'a', f)) end f() end)\n",
+     ANY},
+    {"nesting_tostring_format",
+     "on('go', function()\n"
+     "  local t = setmetatable({}, { __tostring = function(s) return string.format('%s', s) end "
+     "})\n"
+     "  tostring(t) end)\n",
+     ANY},
+    {"nesting_concat_index",
+     "on('go', function()\n"
+     "  local t = setmetatable({}, { __index = function(s, i) return table.concat(s, ',', 1, 2) "
+     "end "
+     "})\n"
+     "  table.concat(t, ',', 1, 2) end)\n",
+     ANY},
+    {"nesting_sort_comparators",
+     "on('go', function()\n"
+     "  local function f(a, b) table.sort({3, 2, 1}, f) return a < b end\n"
+     "  table.sort({3, 2, 1}, f) end)\n",
+     ANY},
+    {"nesting_coroutines",
+     "on('go', function() local function f() coroutine.wrap(f)() end f() end)\n", ANY},
+    {"nesting_metamethods_mixed",
+     "on('go', function()\n"
+     "  local mt = {}\n"
+     "  mt.__index = function(t, k) return pcall(string.gsub, 'a', 'a', function() return t[k] "
+     "end) "
+     "end\n"
+     "  mt.__add = function(a, b) return a.x + b end\n"
+     "  local t = setmetatable({}, mt)\n"
+     "  local _ = t.x, t + 1 end)\n",
+     ANY},
+    {"nesting_legit",
+     /* What a mode may do: a few levels of pcall, callbacks and metamethods all work. */
+     "on('go', function()\n"
+     "  local function down(n) if n == 0 then return 'ok' end local ok, v = pcall(down, n - 1) "
+     "return v end\n"
+     "  local t = setmetatable({}, { __index = function(_, k) return k * 2 end })\n"
+     "  local s = string.gsub('abc', '%w', function(c) return pcall(string.upper, c) and c:upper() "
+     "end)\n"
+     "  if down(8) == 'ok' and t[21] == 42 and s == 'ABC' then log('ok') end\n"
+     "end)\n",
+     SAFE},
+
+    /* ---- review 2026-10-30, low notes (decisions SR-137, SR-138) ---- */
+    {"field_ids_do_not_wrap",
+     /* A node id is 16 bits: 65537 used to be node 1. */
+     "on('go', function()\n"
+     "  if field then\n"
+     "    if field.owner(65537) ~= nil or field.owner(-65535) ~= nil or field.owner(1) ~= 'red' "
+     "or\n"
+     "       field.send(65537, 'x', {}) ~= false or field.send(-1, 'x') ~= false or\n"
+     "       field.common_owner({1, 65537}) ~= nil then\n"
+     "      log('escaped id wrapped')\n"
+     "    end\n"
+     "  end\n"
+     "  log('ok')\n"
+     "end)\n",
+     SAFE},
+    {"field_send_is_rate_limited",
+     "on('go', function()\n"
+     "  if field then\n"
+     "    local sent = 0\n"
+     "    for i = 1, 1000 do if field.send(1, 'x') then sent = sent + 1 end end\n"
+     "    if sent ~= 256 then log('escaped sent ' .. sent) end\n"
+     "  end\n"
+     "  log('ok')\n"
+     "end)\n"
+     "on('x.club.two', function()\n"
+     "  if field and not field.send(1, 'x') then log('escaped no new budget') end\n"
+     "end)\n",
+     SAFE},
+    {"emit_refuses_script_events",
+     "on('go', function()\n"
+     "  local a = pcall(emit, 'script.halted', { reason = 'fake' })\n"
+     "  local b = pcall(emit, 'script.error', { message = 'fake' })\n"
+     "  local c = pcall(emit, 'script.', {})\n"
+     "  local d = pcall(emit, 'scripts.fine', {})\n"
+     "  local e = pcall(emit, 'x.club.y', {})\n"
+     "  if a or b or c or not d or not e then log('escaped emit ' .. tostring(a) .. tostring(b)) "
+     "end\n"
+     "  log('ok')\n"
+     "end)\n",
+     SAFE},
 };
 
 #define CASE_COUNT (sizeof(CASES) / sizeof(CASES[0]))
@@ -651,12 +845,239 @@ static void test_halt_is_final(void)
     atalaia_node_destroy(n);
 }
 
+/*
+ * Coroutines are metered (review finding LIVE2-S5): each Lua thread counts its own instructions
+ * towards its next hook call, so a script that makes a coroutine, runs a few hundred instructions
+ * in it and drops it was charged for the loop around it only. The script below runs about 410
+ * instructions inside each coroutine and about 20 in the loop; with instr_limit 200000 it ran
+ * about 10,000 coroutines (4 million instructions, 20 times the limit) before the fix. It logs
+ * once per 10 coroutines and ends halted: the count of lines times 10 bounds what ran.
+ */
+static void test_coroutine_metering(void)
+{
+    static const char *const makers[] = {
+        "coroutine.wrap(function() local x = 0 for i = 1, 200 do x = x + i end end)()",
+        "local co = coroutine.create(function() local x = 0 for i = 1, 200 do x = x + i end end)\n"
+        "      coroutine.resume(co)",
+    };
+    for (size_t m = 0; m < sizeof(makers) / sizeof(makers[0]); m++) {
+        record_t r;
+        memset(&r, 0, sizeof(r));
+        atalaia_node_config_t cfg = {0};
+        cfg.node_id = 3;
+        cfg.instr_limit = 200000;
+        cfg.callbacks.log = on_log;
+        cfg.callbacks.event = on_event;
+        cfg.callbacks.user = &r;
+        atalaia_node_t *n = atalaia_node_create(&cfg);
+        CHECK(n != NULL);
+        char src[512];
+        snprintf(src, sizeof(src),
+                 "on('go', function()\n"
+                 "  local n = 0\n"
+                 "  while true do\n"
+                 "    %s\n"
+                 "    n = n + 1\n"
+                 "    if n %% 10 == 0 then log('n') end\n"
+                 "  end\n"
+                 "end)\n",
+                 makers[m]);
+        CHECK(atalaia_node_load(n, src, strlen(src), "=coroutine_metering"));
+        (void)atalaia_node_input(n, "go", NULL);
+        CHECK(atalaia_node_status(n) == ATALAIA_NODE_HALTED);
+        double ran = (double)r.logs * 10.0 * 410.0;
+        if (getenv("ATALAIA_ESCAPE_TIMES") != NULL) {
+            printf("coroutine metering %zu: %d coroutines, about %.0f instructions for a limit of "
+                   "200000\n",
+                   m, r.logs * 10, ran);
+        }
+        /* One hook step per coroutine plus its loop: at most about 1/2 of what ran unmetered. */
+        CHECK(ran < 2.0 * 200000.0);
+        atalaia_node_destroy(n);
+    }
+}
+
+/* A halted node's coroutines stop too: the hook of the main thread trips with the others. */
+static void test_trip_reaches_every_thread(void)
+{
+    record_t r;
+    memset(&r, 0, sizeof(r));
+    atalaia_node_config_t cfg = {0};
+    cfg.node_id = 3;
+    cfg.instr_limit = 100000;
+    cfg.callbacks.log = on_log;
+    cfg.callbacks.event = on_event;
+    cfg.callbacks.user = &r;
+    atalaia_node_t *n = atalaia_node_create(&cfg);
+    CHECK(n != NULL);
+    /* The coroutine trips the watchdog and resume catches it; the resumer must not go on. */
+    const char *src = "on('go', function()\n"
+                      "  local co = coroutine.create(function() while true do end end)\n"
+                      "  coroutine.resume(co)\n"
+                      "  for i = 1, 100000 do log('after') end\n"
+                      "end)\n";
+    CHECK(atalaia_node_load(n, src, strlen(src), "=trip"));
+    (void)atalaia_node_input(n, "go", NULL);
+    CHECK(atalaia_node_status(n) == ATALAIA_NODE_HALTED);
+    CHECK(r.logs == 0);
+    atalaia_node_destroy(n);
+}
+
+/* One host entry cannot chain callbacks past its cap (review finding LIVE2-S4, decision SR-133). */
+static void test_entry_cap(void)
+{
+    record_t r;
+    memset(&r, 0, sizeof(r));
+    atalaia_node_config_t cfg = {0};
+    cfg.node_id = 3;
+    cfg.instr_limit = 100000; /* the entry cap is 4 times this */
+    cfg.callbacks.log = on_log;
+    cfg.callbacks.event = on_event;
+    cfg.callbacks.user = &r;
+    atalaia_node_t *n = atalaia_node_create(&cfg);
+    CHECK(n != NULL);
+    /* Each handler spends about 55,000 instructions, under its own limit, and emits the next
+     * event: a chain of 50 of them is 2.7 million instructions inside one input. */
+    const char *src = "local function spend() local x = 0 for i = 1, 27000 do x = x + i end end\n"
+                      "local count = 0\n"
+                      "on('go', function() count = 0 emit('x.club.chain', {}) end)\n"
+                      "on('x.club.chain', function()\n"
+                      "  spend() count = count + 1 log('step')\n"
+                      "  if count < 50 then emit('x.club.chain', {}) end\n"
+                      "end)\n"
+                      "on('calm', function() spend() log('calm') end)\n";
+    CHECK(atalaia_node_load(n, src, strlen(src), "=entry_cap"));
+    (void)atalaia_node_input(n, "go", NULL);
+    CHECK(atalaia_node_status(n) == ATALAIA_NODE_HALTED);
+    CHECK(strstr(atalaia_node_last_error(n), "in one step") != NULL);
+    CHECK(r.logs >= 3 && r.logs < 10); /* seven callbacks of about 55,000 fit under 400,000 */
+    atalaia_node_destroy(n);
+
+    /* The cap is per entry: many entries, each within it, run for as long as the game does. */
+    memset(&r, 0, sizeof(r));
+    n = atalaia_node_create(&cfg);
+    CHECK(n != NULL);
+    CHECK(atalaia_node_load(n, src, strlen(src), "=entry_cap"));
+    for (int i = 0; i < 30; i++) {
+        CHECK(atalaia_node_input(n, "calm", NULL));
+    }
+    CHECK(atalaia_node_status(n) == ATALAIA_NODE_RUNNING);
+    CHECK(r.logs == 30);
+    atalaia_node_destroy(n);
+
+    /* Callbacks too short for the hook to count still cost the entry something: a timer that
+     * sets the next one for "now" would run for ever inside one advance. */
+    memset(&r, 0, sizeof(r));
+    n = atalaia_node_create(&cfg);
+    CHECK(n != NULL);
+    const char *tiny =
+        "local n = 0\nevery(0.01, function() n = n + 1 end)\n"
+        "every(1, function() log('tick') end)\n"
+        "on('chain', function() local function again() after(0, again) end again() end)\n";
+    CHECK(atalaia_node_load(n, tiny, strlen(tiny), "=tiny_timers"));
+    CHECK(atalaia_node_input(n, "chain", NULL));
+    atalaia_node_advance(n, 10);
+    CHECK(atalaia_node_status(n) == ATALAIA_NODE_HALTED);
+    CHECK(strstr(atalaia_node_last_error(n), "in one step") != NULL);
+    atalaia_node_destroy(n);
+
+    /* A long jump of game time (the simulator's fast forward) may run what the time holds. */
+    memset(&r, 0, sizeof(r));
+    n = atalaia_node_create(&cfg);
+    CHECK(n != NULL);
+    CHECK(atalaia_node_load(n, tiny, strlen(tiny), "=tiny_timers"));
+    atalaia_node_advance(n, 600000); /* 10 minutes: 60,000 calls of the 10 ms timer */
+    CHECK(atalaia_node_status(n) == ATALAIA_NODE_RUNNING);
+    CHECK(r.logs == 600);
+    atalaia_node_destroy(n);
+
+    /* The same timers advanced the way a game does, in steps of 100 ms, never reach it. */
+    memset(&r, 0, sizeof(r));
+    n = atalaia_node_create(&cfg);
+    CHECK(n != NULL);
+    CHECK(atalaia_node_load(n, tiny, strlen(tiny), "=tiny_timers"));
+    for (uint32_t t = 100; t <= 60000; t += 100) {
+        atalaia_node_advance(n, t);
+    }
+    CHECK(atalaia_node_status(n) == ATALAIA_NODE_RUNNING);
+    CHECK(r.logs == 60);
+    atalaia_node_destroy(n);
+}
+
+/*
+ * The parser counts its nesting in the same C levels (luaconf.h LUAI_MAXCCALLS, decision SR-132):
+ * a source nested over the limit fails to load with an error, a plainly nested one loads.
+ */
+static void test_parser_nesting(void)
+{
+    char src[512];
+    for (int depth = 4; depth <= 60; depth += 4) {
+        size_t n = 0;
+        n += (size_t)snprintf(src + n, sizeof(src) - n, "local x = ");
+        for (int i = 0; i < depth; i++) src[n++] = '(';
+        src[n++] = '1';
+        for (int i = 0; i < depth; i++) src[n++] = ')';
+        src[n] = '\0';
+        record_t r;
+        memset(&r, 0, sizeof(r));
+        atalaia_node_config_t cfg = {0};
+        cfg.node_id = 3;
+        cfg.callbacks.log = on_log;
+        cfg.callbacks.event = on_event;
+        cfg.callbacks.user = &r;
+        atalaia_node_t *node = atalaia_node_create(&cfg);
+        CHECK(node != NULL);
+        bool loaded = atalaia_node_load(node, src, n, "=nesting");
+        if (depth <= 8) {
+            CHECK(loaded);
+        }
+        if (depth >= 24) {
+            CHECK(!loaded);
+            CHECK(strstr(atalaia_node_last_error(node), "overflow") != NULL ||
+                  strstr(atalaia_node_last_error(node), "levels") != NULL);
+        }
+        atalaia_node_destroy(node);
+    }
+}
+
+/* A timer set late in a very long game does not wrap round to the start (decision SR-137). */
+static void test_timer_does_not_wrap(void)
+{
+    record_t r;
+    memset(&r, 0, sizeof(r));
+    atalaia_node_config_t cfg = {0};
+    cfg.node_id = 3;
+    cfg.callbacks.log = on_log;
+    cfg.callbacks.event = on_event;
+    cfg.callbacks.user = &r;
+    atalaia_node_t *n = atalaia_node_create(&cfg);
+    CHECK(n != NULL);
+    const char *src = "on('go', function()\n"
+                      "  after(3456000, function() log('fired after') end)\n"
+                      "  every(3456000, function() log('fired every') end)\n"
+                      "end)\n";
+    CHECK(atalaia_node_load(n, src, strlen(src), "=wrap"));
+    atalaia_node_advance(n, 4000000000u); /* 46 days in: 40 days more is past 2^32 ms */
+    CHECK(atalaia_node_input(n, "go", NULL));
+    atalaia_node_advance(n, 4100000000u);
+    CHECK(r.logs == 0);
+    atalaia_node_advance(n, 4294967295u); /* the very end: they stop there, once at most */
+    CHECK(atalaia_node_status(n) == ATALAIA_NODE_RUNNING);
+    CHECK(r.logs <= 2);
+    atalaia_node_destroy(n);
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0); /* each case's line as it ends */
     test_battery();
     test_bytecode();
     test_halt_is_final();
+    test_coroutine_metering();
+    test_trip_reaches_every_thread();
+    test_entry_cap();
+    test_parser_nesting();
+    test_timer_does_not_wrap();
     printf("sandbox escape battery: %zu cases x 2 memory limits x box and controller, %s\n",
            CASE_COUNT, check_failures ? "FAILED" : "all held");
     return check_failures == 0 ? 0 : 1;
