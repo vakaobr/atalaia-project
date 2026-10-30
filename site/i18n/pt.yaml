@@ -750,12 +750,14 @@ roadmap:
       - "Uma tabela de partições maior: os dois espaços de firmware da caixa têm 4 MB cada (a imagem ocupava 93 % de 2 MB), e as definições e as chaves ficam onde estavam. Só em testes no computador e compilações, sem ter sido gravada numa placa. Uma caixa com a tabela antiga precisa de uma gravação por USB; depois disso, as atualizações pelo ar funcionam como antes."
       - "A Field Box como iBeacon: da entrada num jogo até ao fim, a caixa emite uma baliza Bluetooth (a cada 500 ms, nunca enquanto usa o Wi-Fi), para que um telemóvel perto dela possa colocar quem joga num piso ou numa sala. O identificador do campo deriva da sua chave de adesão, e a organização pode desligar as caixas como balizas, por campo ou por caixa. A memória interna da caixa foi refeita depois de ter acabado na bancada à entrada num jogo (o Wi-Fi falhou e o cão de guarda reiniciou): medido na bancada, ficam livres 241 KB no arranque e 102 KB no mínimo num jogo com a baliza ligada, e o CI falha a compilação se o orçamento encolher demasiado. Ainda não se verificou que um telemóvel ouve a baliza de uma caixa a sério."
       - "Depois de uma recusa ou falha de uma atualização ou da obtenção de um modo, o ecrã da caixa volta ao ecrã do estado passados 8 segundos (na bancada, uma recusa ficou no ecrã até alguém olhar). Só testes no computador."
+      - "Os comandos da consola série que dão à caixa a chave de entrada ou lançam uma atualização (@joinkey, @update) pedem o PIN de administração numa versão de lançamento, e recusam enquanto não houver PIN; uma versão de bancada mantém-nos abertos para os scripts da bancada. Só em testes no computador, não numa placa real."
     next:
       - Uma caixa montada que aguente um jogo de clube de 2 horas sem reiniciar.
       - "Ver a barra do tempo num painel a sério."
       - "Experimentar o reenvio da configuração e o Mudar de campo numa placa a sério."
       - "Ouvir a baliza de uma Field Box com um telemóvel a sério, e arrancar o Wi-Fi à entrada num jogo com o novo orçamento de memória."
       - "Gravar a nova tabela de partições numa placa a sério (uma gravação por USB, sem apagar, para uma caixa com a antiga)."
+      - "Uma imagem de lançamento endurecida (cifra da memória flash, arranque seguro): está só escrita como plano, nada foi construído nem experimentado numa placa."
     gate: >-
       Prova: uma caixa aguenta um jogo de clube de 2 horas sem reiniciar. <strong>Em aberto</strong>
       até haver uma caixa montada que o consiga.
@@ -796,11 +798,14 @@ roadmap:
       - "A consola de GM diz o que uma mudança de canal faz às caixas livres (quantos dos três MOVE já foram ditos, e depois que o controlador mudou), e as Definições têm um botão Procurar caixas que mostra o resultado de uma varredura. Uma varredura tem um limite por hora nas sub-bandas com menos de 10 % de ciclo de trabalho (5 % do orçamento da sub-banda), e a consola di-lo quando recusa e quando a seguinte é possível. Em software, nos dois controladores."
       - "A pontuação projetada acompanha uma captura: entre duas mensagens STATE de uma caixa, o controlador continua a contar para a equipa que um evento de captura indicou, até ao STATE seguinte da caixa. Na bancada a projeção falhou quando se perdeu um STATE logo a seguir a uma captura; com esta mudança a mesma configuração passou na bancada, e uma penalização da caixa também foi verificada lá."
       - "O fim de jogo de uma caixa termina o jogo: num modo sem lógica de campo no controlador (o limite de tempo do Sabotagem, a Bomba), o primeiro game.end de uma caixa do jogo termina-o, com o vencedor da caixa ou em empate. Na Bomba / Rush uma explosão termina agora o jogo, ganhando a equipa que armou a bomba; um desarme não. Encontrado na bancada com o Sabotagem, e a explosão da Bomba também foi verificada lá."
+      - "Um comando de rádio gravado já não pode ser repetido mais tarde: cada recetor (a caixa, o modem USB e os dois controladores) guarda uma janela de repetição por emissor, e uma caixa recusa um início, pausa, retoma, fim ou TIME mais antigo do que o último que aplicou. Uma caixa que perdeu o registo da sua época sorteia uma nova em vez de repetir números únicos. O rádio não muda: caixas mais antigas continuam a funcionar, mas ficam expostas até serem atualizadas. Testado no simulador e em testes no computador, com vetores comuns em C, Python e Dart; nenhuma repetição de rádio foi experimentada em placas reais."
+      - "O endurecimento dos controladores de campo, vindo da revisão de segurança: limites ao tamanho dos pedidos, o código do GM e os códigos dos jogadores recusados em HTTP simples quando o HTTPS está ligado (a consola abre-se em https://controlador:8443/console/), o MQTT do campo com TLS (porta 8883; a 1883 simples só no loopback do Pi), TLS para o feed ATAK do pessoal, HSTS, uma unidade de serviço endurecida no Pi e a revogação dos modos assinados a falhar fechada (uma lista ilegível ou em falta não instala nada; um controlador sem rede usa a última lista durante 30 dias). Testado num computador, não num Pi nem num telemóvel reais num campo."
     next:
       - As placas de rádio e 5 caixas montadas para o teste no campo.
       - Um teste no campo com 20 caixas, com e sem escuta antes de falar.
       - "Ligar ou não o espaçamento do controlador, decidido a partir do teste no campo com 20 caixas."
       - "Verificar em duas placas que uma mudança de canal mantém uma caixa parada e que um início lhe chega em cerca de um segundo (o guia está escrito)."
+      - "Experimentar a janela de repetição e os controladores endurecidos em placas reais e num Pi real (um comando gravado e repetido na bancada)."
     gate: >-
       Prova: 5 caixas num espaço de <a href="{{ page.to.glossary }}#glossario-cqb">CQB</a> e num campo
       exterior, sem uma única captura perdida. <strong>Em aberto.</strong>
@@ -864,6 +869,9 @@ roadmap:
         - "Enquanto um jogo em direto está aberto na vista de quem joga, um serviço Android em primeiro plano, com uma notificação, mantém a app a correr, e os avisos por vibração continuam com a app fechada ou o ecrã apagado. No iOS não. Não experimentado num telemóvel a sério."
         - "As Field Box contam como balizas: uma caixa colocada regista-se como baliza ao lado das da organização, e um telemóvel que já está a partilhar apanha as alterações ao registo durante o jogo. Em software, sem testar com um telemóvel e uma caixa a sério."
         - "O aviso de privacidade na app: um pedido Ler e confirmar quando foi mostrada à conta outra versão, o aviso na língua da app, sem bloquear nada. A app pode criar uma conta (com palavra-passe ou social) depois de mostrar o aviso, com uma caixa «Tenho 16 anos ou mais»; quem é mais novo faz o check-in no campo sem conta. Um registo por conta social leva a versão do aviso que a pessoa viu, e uma entrada continua a funcionar com um servidor próprio mais antigo. A ligação do cronógrafo entre os campos de um hub alojado (um código de uso único) só aparece no modo alojado. Em software."
+        - "A verificação do cartão no check-in: quando o campo confere a filiação, o check-in fica pendente até quem é árbitro ou o GM marcar \"cartão visto, corresponde\" com o cartão físico à frente; o número de filiado é então apagado do controlador (ficam o veredicto e a validade), e é possível passar sem o cartão, com o motivo registado e nunca o número. Na consola, na fila de árbitros da app e nos dois controladores. Só em software."
+        - "A partilha da posição é uma escolha própria, não marcada de origem, no check-in (na app e no check-in manual da consola), com quem a vê; recusar não impede o check-in nem o jogo, e cada jogador/a pode ligá-la ou desligá-la quando quiser. Sem ela, o controlador recusa as posições. Só em software."
+        - "A revisão de segurança da app: a CA do campo fixada é exatamente um certificado, nada de HTTP simples em todo o Android (só o loopback, o anfitrião do emulador, 192.168.4.1 e atalaia.local), uma APK de lançamento que nunca é assinada com a chave de depuração por engano e um bilhete de início de sessão social ligado à instância da app. Não experimentado num telemóvel real; a chave de assinatura de lançamento ainda tem de ser criada pelo responsável do projeto."
     g_props:
       title: Dispositivos Android e módulo de E/S
       items:
@@ -906,7 +914,7 @@ roadmap:
           de cenários recebidas de lá), o GM remoto e o feed para o ATAK."
         - "A consola da organização cabe num telemóvel: as tabelas de check-in e de marshals empilham-se, sem deslocar a página para o lado."
         - "O próprio ecrã do controlador no telemóvel importa uma lista de inscrições (um ficheiro CSV ou JSON escolhido com o seletor de ficheiros do Android), sem precisar da consola de GM."
-        - "Um controlador de reserva recebe do seu convite de adesão as escolhas das balizas das caixas (o interruptor do campo, as caixas desativadas, as salas) e os lugares das caixas, para que, depois de uma passagem de testemunho, os telemóveis recebam o mesmo registo de balizas. Em software, nos dois controladores."
+        - "Um controlador de reserva recebe do seu convite de adesão as escolhas das balizas das caixas (o interruptor do campo, as caixas desativadas, as salas) e os lugares das caixas, para que, depois de uma passagem de testemunho, os telemóveis recebam o mesmo registo de balizas; uma consola já aberta no controlador de reserva move os marcadores das caixas logo, sem recarregar. Em software, nos dois controladores; o movimento dos marcadores está testado num navegador sem ecrã."
     g_ios:
       title: iOS
       items:
@@ -926,14 +934,15 @@ roadmap:
       - "Experimentar o plugin de balizas num iPhone (compilado num Mac), e as balizas a sério, também no Android."
       - "Experimentar o código QR do marcador, a escolha do piso, o histórico de jogos e a religação ao módulo de E/S num telemóvel e num módulo a sério."
       - "Experimentar o início de sessão da app num telemóvel a sério."
+      - "Experimentar num campo e em telemóveis reais a verificação do cartão, a escolha da posição no check-in, a CA fixada e a criação de conta na app."
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do site e jogo avançado
     short: >-
       Servidor do site, marcação de jogos e inscrições, cenários personalizados, modos avançados,
       ATAK. Todos os passos de software estão feitos; o início de sessão com a Google e a Microsoft já
-      foi experimentado a sério num servidor de testes. Faltam um servidor a sério, uma revisão
-      jurídica e os testes em hardware.
+      foi experimentado a sério num servidor de testes. Faltam um servidor a sério, as condições de entrada
+      em produção do modo alojado e os testes em hardware.
     done:
       - "<strong>Modos avançados</strong>: Mestre e Satélites, o «Hackeia o terminal», VIP / Carga e
         a lógica das Janelas de Alvo."
@@ -1003,6 +1012,7 @@ roadmap:
         - "A quadrícula no ATAK e um mapa de quadrícula para imprimir."
         - "O GM remoto vê as posições dos jogadores quando estes as partilham."
         - "Os certificados de dispositivo do ATAK duram 90 dias (eram 7), e a página de ATAK do pessoal avisa quando um expira nos próximos 14 dias."
+        - "O campo pode desligar a obtenção de mapas da consola (Definições, Obtenção de mapas): então o \"Carregar o campo a partir de um mapa\" não chega ao OpenStreetMap, ao Overpass, ao Nominatim nem às imagens aéreas. Ligada de origem."
     g_server:
       title: Servidor do site, contas e dados
       items:
@@ -1021,13 +1031,18 @@ roadmap:
         - "Início de sessão com Google, Microsoft ou Apple e com passkeys (chaves de acesso). As palavras-passe são opcionais; a equipa continua a precisar de um segundo fator. A Google e a Microsoft foram experimentadas com os fornecedores a sério no servidor de testes (tests.atalaia-project.link); a Apple ainda não."
         - "Uma página de conta para a equipa, onde cada pessoa gere os seus inícios de sessão: passkeys, contas associadas, palavra-passe e código de dois fatores."
         - "As alterações a cenários, predefinições e calendário chegam logo aos controladores."
-        - "Durante quanto tempo o campo guarda os dados é uma definição do campo: os dados de jogo (eventos, pontuações, registos) e os registos de cronografagem têm cada um o seu prazo, 365 dias por omissão, definido no controlador, na consola de GM ou na página de definições do servidor do site. A limpeza diária apaga um jogo terminado com essa idade, nunca antes de o servidor do site o ter por inteiro. O campo, sem uso, de retenção por conta desapareceu."
+        - "Durante quanto tempo o campo guarda os dados é uma definição do campo: o histórico de jogos e os registos de cronografagem têm cada um o seu prazo, definido no controlador, na consola de GM ou na página de definições do servidor do site: o histórico de jogos 90 dias por omissão (os resultados das equipas, sem identificadores de jogadores, 365), os registos de cronografagem 365. A limpeza diária apaga um jogo terminado com essa idade, nunca antes de o servidor do site o ter por inteiro. O campo, sem uso, de retenção por conta desapareceu."
         - "O apagamento de uma pessoa num controlador de campo chega sozinho ao servidor do site na sincronização seguinte (nunca com o nome), e apaga lá também os registos de cronografagem dessa pessoa."
-        - "O primeiro rascunho completo do aviso de privacidade, em português e inglês, reescrito a partir do que cada parte da Atalaia faz hoje. É um rascunho, não é aconselhamento jurídico e ainda não foi revisto por um/a jurista."
+        - "Modelos do aviso de privacidade, do acordo de subcontratação de dados e dos termos de partilha entre campos, em português e inglês (o acordo também em pt-PT), e um modelo de avaliação de impacto sobre a proteção de dados: dizem as posições que a assessoria jurídica do responsável do projeto aprovou a 30 de outubro de 2026 (contas assentes no contrato com idade mínima de 16 anos, o cartão de filiado conferido no check-in com o número apagado, infrações por interesse legítimo, partilha da posição por consentimento, sem encarregado de proteção de dados). Continuam a ser modelos que cada campo preenche, não aconselhamento jurídico para um campo em concreto."
         - "O servidor do site publica o aviso de privacidade que a operação lhe dá, como página e pela API em quatro línguas, e mostra-o de novo às contas quando a versão muda (a conta assenta no contrato, não no consentimento). Nada fica bloqueado: a exportação e o apagamento continuam disponíveis. Testado num computador."
         - "Uma conta social escolhe o nome de utilizador na página da Conta logo depois de ser criada (pode ser saltado; o nome do próprio fornecedor só se a pessoa o pedir). Qualquer conta pode mudar o seu nome com o seu próprio método de início de sessão, e duas contas da mesma pessoa podem ser fundidas depois de a pessoa provar as duas (nunca para dentro ou a partir de uma conta com função de equipa). O erro de consentimento em falta aparece junto da caixa de seleção. Testado num computador; o passo do nome de utilizador e a fusão ainda faltam experimentar no servidor de testes."
         - "Um registo por conta social guarda a versão do aviso de privacidade que a pessoa realmente viu: o servidor recusa uma versão desatualizada e verifica outra vez antes de criar a conta. Testado num computador."
         - "A limpeza diária da retenção também apaga as contas anonimizadas (o que uma eliminação ou uma fusão deixa) quando nada as referencia. Testado num computador."
+        - "Mudar a forma como uma conta inicia sessão exige um segundo fator: juntar, mudar o nome ou remover uma passkey, ligar ou desligar o código de dois fatores, mudar a palavra-passe, ligar uma conta social e confirmar uma fusão são recusados se a sessão não passou por um TOTP ou uma passkey (um início de sessão social sozinho não conta); uma fusão nunca leva passkeys para uma conta de equipa. A página de conta e a app pedem esse passo primeiro. Testado num computador, não com os fornecedores a sério."
+        - "A revisão de segurança do servidor do site: corpos de pedidos limitados (413 acima de 1 MiB, 4 MiB nos carregamentos), a mesma resposta para \"conta inexistente\" e para uma atribuição recusada, a exportação do campo só com as entradas de auditoria do campo, o interruptor da página pública respeitado na procura de campo da app, um endereço público obrigatório, o emissor de um início de sessão social guardado com o seu identificador, pedidos HTTP simples atrás de um proxy redirecionados para HTTPS e uma verificação de saúde que só diz ok. Em parte encontrado no servidor de pré-visualização."
+        - "As contas assentam no contrato, não no consentimento: a criação de conta regista que versão do aviso de privacidade foi mostrada, com uma caixa \"Tenho 16 anos ou mais\" (na página da equipa e na app); não se guarda data de nascimento; sem aviso publicado, o registo fica fechado. Os consentimentos antigos passaram a registos de aviso. Testado num computador."
+        - "O código da revisão de privacidade: o endereço de rede de uma entrada de auditoria apaga-se ao fim de 180 dias (definível); uma conta sem uso há 24 meses é avisada e anonimizada 30 dias depois; a eliminação de uma pessoa, ou um consentimento de partilha retirado, chega aos controladores de outros campos, que largam as cópias; as eliminações ficam como somas de controlo num registo fora da base de dados e são aplicadas de novo depois de um restauro; uma página nova da equipa marca quem reincide como um aviso (um simples aviso nunca conta) e um \"banimento\" termina ao fim de 12 meses por omissão; o histórico de jogos guarda-se 90 dias com identificadores de jogadores, e os resultados das equipas, sem eles, 365. Testado num computador."
+        - "Um campo aceita os termos de partilha entre campos (a administração, na página de definições) antes de partilhar registos de cronografagem; a versão, a data e a conta ficam registadas, e quando os termos mudam a partilha fica suspensa até serem aceites. O campo é o responsável pelos dados, o operador do centro é o subcontratante, e os campos que partilham são corresponsáveis só nesse passo. Testado num computador."
     g_games:
       title: Jogos, clubes e páginas da organização
       items:
@@ -1118,9 +1133,12 @@ roadmap:
         - "Modo alojado: cada campo tem um papel de base de dados só seu, e por isso uma injeção de SQL já não consegue passar para os dados de outro campo mudando a definição que a segurança ao nível da linha usava. Uma lacuna que exige uma segunda instrução SQL continua aberta e está escrita. Testado contra o PostgreSQL em Docker."
         - "Modo alojado: os campos que partilham registos de cronografagem passam a fazê-lo entre os campos de um centro, por uma vista só de leitura que exige consentimento; uma pessoa liga as suas contas em dois campos com um código de uso único, e nada é associado por e-mail ou nome. Testado contra o PostgreSQL em Docker."
         - "Uma demonstração em direto, só de leitura, para o servidor de pré-visualização: o controlador de campo a sério, com três Field Box simuladas, joga jogos sem parar, alternando um campo aberto e um edifício inventado de três pisos (uma planta por piso, quinze balizas, doze jogadores simulados: seis localizados por baliza, cinco por GPS com o piso escolhido, um indeciso), e quem visita vê a consola de GM, o marcador e a vista de quem joga, sem nada para alterar e sem dados pessoais. No ar desde 29 de outubro de 2026, em demo.atalaia-project.link; a vista de quem joga é testada num navegador sem ecrã."
+        - "Modo alojado: um só retorno de início de sessão social para todo o centro (opcional): quem opera regista um endereço de retorno por fornecedor; o centro assina o estado, confere o campo no seu registo e passa para o retorno do próprio campo. Testado em Docker, não com os fornecedores a sério."
+        - "Uma lista de verificação de entrada em produção para quem opera: seis condições antes de um campo poder usar o modo alojado (um acordo de subcontratação assinado por campo, os termos de partilha, todos os subcontratantes no anexo e na UE, um aviso de privacidade preenchido, os papéis próprios de quem opera se for uma pessoa singular, e uma prova num servidor real)."
+        - "O servidor de pré-visualização (tests.atalaia-project.link) corre tudo isto desde 30 de outubro e tem um aviso de privacidade próprio (versão preview-2026-10-31, contas assentes no contrato, 16 anos, sem encarregado de proteção de dados)."
     next:
       - Um servidor a sério com domínio.
-      - A revisão jurídica dos modelos antes de o modo alojado abrir. Não é oferecido antes disso.
+      - "As condições de entrada em produção do modo alojado (um acordo de subcontratação assinado por campo, os termos de partilha, um aviso preenchido) e cada campo a preencher o seu aviso e a sua avaliação de impacto. A assessoria jurídica do responsável do projeto aprovou as posições jurídicas a 30 de outubro de 2026; o modo alojado continua a não ser oferecido. Nada do trabalho de segurança, de rádio e jurídico de 30 de outubro foi experimentado numa placa ou num telemóvel reais: corre em software e no servidor de pré-visualização."
       - "Os testes em hardware: placas reais, um telemóvel com ATAK real, uma ligação 4G real, um
         cronógrafo real."
       - O módulo de alvo, que as regras das Janelas de Alvo esperam.
@@ -1177,6 +1195,8 @@ roadmap:
       - "Os blocos de cenários da consola do GM têm uma lista de línguas com as quatro."
       - "As chaves de modos do projeto: uma chave raiz guardada offline e uma chave com que o registo assina o selo de verificado. As caixas, a app e os controladores confiam nas duas por omissão."
       - "O guia do firmware e os manuais de montagem explicam a única gravação por USB de que uma caixa com a tabela de partições antiga precisa, e que as definições e as chaves sobrevivem a ela."
+      - "O endurecimento do CI e do lançamento, vindo da revisão de segurança: cada ação fixada por commit, a imagem de compilação por digest, cada instalação pip a partir de um ficheiro com somas de controlo, o trabalho de assinatura num ambiente protegido que recusa uma etiqueta fora da main, e atualizações semanais das dependências. O responsável do projeto ainda tem de criar o ambiente protegido e mover para lá os segredos de assinatura (os passos estão escritos)."
+      - "Os padrões de texto do Lua e string.rep passam a ser contados no sandbox (um padrão hostil podia bloquear uma caixa até ao watchdog), saltar dados CBOR aninhados tem limite de profundidade, e os descodificadores de CBOR têm testes com entradas hostis."
     next:
       - "A revisão do alemão e do chinês: se jogas em alemão ou em chinês, ajuda-nos a revê-los. As
         traduções para outras línguas começam em docs/translations (em inglês)."

@@ -199,6 +199,17 @@ passwords, no firmware images and no mode packages go over LoRa. A mode package
 or an image is too large and is fetched over HTTPS; only a short offer (CMD
 update) or a failure report (`node.modes_failed`, `node.update_failed`) uses LoRa.
 
+**Replays.** Every receiver (the box, the modem and both controllers) keeps, per
+source, the highest `epoch << 16 | seq` and a 64-bit bitmap, applied only to a packet
+that authenticated: a counter already seen, or 64 or more below the highest, is dropped
+however long after it was recorded. A box also refuses a start, pause, resume, end or
+TIME older than the last of its kind it applied, and a box that lost its epoch store
+draws a new epoch rather than reuse nonces. Nothing changes on the air, so a box that
+has not been updated stays exposed. The window lives in RAM: a box that has just
+rebooted accepts the first packet of each source. Tested with shared vectors in C,
+Python and Dart and in host tests; no recorded packet has been played back on real
+boards.
+
 Not yet run on real hardware: the pod, the relay between many boxes (the field
 test with 5 and 10 boxes), and field frames with more than one box. Whole games
 with a modem and boxes on a bench have run. MOVE and the TIME repeats answer two
@@ -309,15 +320,28 @@ reading is signed on the marshal's phone, so the controller (and later the site
 server or another field) can check it is not changed. Players' own NFC tags are
 signed by the controller, which holds the game key; the key never leaves it.
 
-**Positions.** A player may share their position during a running game, either
-as a GPS fix or, indoors, as the id of the strongest iBeacon the phone hears (it
+**Check-in.** When the field checks association membership (an APD in Portugal), a
+check-in stays pending until a marshal or the GM has the physical card in hand and ticks
+"card seen, matches"; the controller then stores the verdict and erases the membership
+number (the site server erases its copy when the game's outcome arrives or the game
+ends). A marshal can pass someone without the card, with the reason logged. The GM
+token and the players' tokens are refused over plain HTTP when HTTPS is on, so the
+GM console is opened at `https://<controller>:8443/console/`. The console's map
+fetching (*Load the field from a map*, which reaches OpenStreetMap and aerial
+imagery services from the browser) can be turned off in Settings.
+
+**Positions.** A player may share their position during a running game, only if they
+ticked a separate, unticked-by-default box at check-in (declining blocks neither the
+check-in nor the game; it can be switched on or off at any time, and without it the
+controller refuses the positions), either as a GPS fix or, indoors, as the id of the strongest iBeacon the phone hears (it
 listens for the registered beacons only). The registry holds the GM's tags and,
 beside them, the Field Boxes of the live game that have been placed: a box joined to
 a game advertises as an iBeacon (a UUID derived from the field's join key, a fixed
 major, the node id as minor), so a box on a wall also tells a phone its floor and
 room. A phone that is already sharing re-reads the registry when it changes. A
 standby controller gets the box-beacon choices and the boxes' places in its join, so
-after a failover the registry is the same. The controller keeps the latest fix per
+after a failover the registry is the same, and a console open on it moves the boxes'
+markers at once. The controller keeps the latest fix per
 player, for that game only. A player sees their own (and their squad's if the game
 allows it), a squad leader their squad, a VIP their team, marshals and the GM
 everyone, and the read code nobody.
@@ -327,7 +351,8 @@ players of other roles. The scoreboard and MQTT get scores and events, not
 positions. There is no internet in this diagram: the whole of it works with the site
 server off.
 
-Not yet run on real hardware: all of it with a real phone (the iPhone checklist
+Not yet run on real hardware: the card check, the position choice and the HTTPS-only
+tokens with a real phone; all of it with a real phone (the iPhone checklist
 passed for the iOS app, but nothing has been in a field), NFC on a phone, and
 the BLE beacons: the iPhone's CoreLocation plugin compiles on CI and has not been
 run on an iPhone, and no phone has yet heard a real Field Box's beacon.
@@ -499,7 +524,15 @@ account cannot remove its last second factor while a role needs one.
 **Accounts.** A new social account can choose its username on the account page, any
 account can rename itself with its own login method, and two accounts of one person
 can be merged once the person has proved both (never into or from an account with a
-staff role). A social sign-up records the privacy-notice version the person saw. The
+staff role). Accounts rest on the contract, not on consent: a sign-up records which version of the
+privacy notice was shown and that the person is 16 or older, and no sign-up is possible
+while no notice is published. Changing how an account logs in (a passkey, TOTP, the
+password, a linked social login, a merge) needs a session that passed a TOTP or passkey
+step-up: a social login alone is refused. In a hosted hub one callback address serves
+every field (the hub signs a state naming the field and hands over to the field's own
+callback). The audit log forgets network addresses after 180 days, an account unused
+for 24 months is anonymised, and game history is kept 90 days (team results without
+player ids 365). A social sign-up records the privacy-notice version the person saw. The
 daily retention purge deletes the anonymised remains of an erased or merged account
 once nothing refers to it. Google and Microsoft sign-in have been tried against the
 real providers on the project's test server; Apple has not.
