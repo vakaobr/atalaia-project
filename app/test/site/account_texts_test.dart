@@ -22,6 +22,7 @@ const accountCodes = [
   'totp_required_by_role',
   'password_login_disabled',
   'confirmation_required',
+  'mfa_required',
   'invalid_password',
   'invalid_code',
   'no_password',

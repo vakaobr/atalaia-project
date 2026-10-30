@@ -53,6 +53,11 @@ class FakeSite {
   final passkeys = <Map<String, Object?>>[];
   var passwordSet = true;
   var totpEnabled = false;
+
+  /// The account has a second factor or a staff role (the server's SR-1): its
+  /// login methods change only after a TOTP or passkey step-up.
+  var stepUpGuard = false;
+  var _steppedUp = false;
   var totpPending = false;
   var accountPassword = 'correct horse battery';
 
@@ -391,8 +396,10 @@ class FakeSite {
           'totp_enabled': totpEnabled,
           'available_providers': offers['oidc'],
           'mfa': false,
+          'step_up_needed': stepUpGuard && !_steppedUp,
         });
       case 'POST /me/passkeys/options':
+        if (stepUpGuard && !_steppedUp) return err(403, 'mfa_required');
         return checkConfirm() ??
             const SiteResponse(200, {
               'options': {'challenge': 'chal-new', 'rpId': 'site.test'},
@@ -418,10 +425,12 @@ class FakeSite {
         });
       case 'POST /auth/stepup/passkey':
         confirmed = true;
+        _steppedUp = true;
         return const SiteResponse(200, {'mfa': true});
       case 'POST /auth/stepup/totp':
         if (b['code'] != code) return err(401, 'invalid_code');
         confirmed = true;
+        _steppedUp = true;
         return const SiteResponse(200, {'mfa': true});
       case 'POST /me/password':
         if (passwordSet && b['password'] != accountPassword) {

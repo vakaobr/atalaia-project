@@ -9,8 +9,9 @@
 <input id="confirm-password" name="current-password" type="password" autocomplete="current-password" maxlength="4096">
 <p class="hint">$acct_confirm_password_hint</p>
 </div>
+<p id="confirm-stepup" class="hint" role="note" hidden>$acct_stepup_needed</p>
 <div id="confirm-recent-box" hidden>
-<p class="hint">$acct_confirm_recent</p>
+<p id="confirm-recent-hint" class="hint">$acct_confirm_recent</p>
 <form id="confirm-totp-form" class="staff-form" method="post" novalidate hidden>
 <fieldset disabled>
 <label for="confirm-code">$totp_code</label>

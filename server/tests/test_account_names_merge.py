@@ -464,8 +464,51 @@ class MergeTests(LoginTestCase):
         await self.fetch("DELETE FROM user_game_roles")
         await self.fetch("INSERT INTO user_field_roles (id, user_id, field_id, role_id) VALUES (gen_random_uuid(), $1, $2, 5)",
                          ua, f)
+        await self.fetch("INSERT INTO passkeys (id, user_id, credential_id, public_key, name, rp_id) VALUES "
+                         "(gen_random_uuid(), $1, $2, $3, 'k', 'server.test')", ua, secrets.token_bytes(16), b"x")
+        await self.second_factor(bearer(a))  # a staff account's merge needs a second factor (SR-1)
         r = await self.merge(bearer(a), await self.ticket_for(bearer(a)))
         self.assertEqual(r.status_code, 200, r.text)
+
+    async def test_a_social_session_cannot_merge_into_a_staff_account(self) -> None:
+        """SRV-1 path 2: an attacker's account B, with a passkey the attacker holds, merged into a staff A."""
+        a, b = await self.two()
+        ua, ub = uuid.UUID(a["user"]["id"]), uuid.UUID(b["user"]["id"])
+        f = (await self.fetch("INSERT INTO fields (id, name, slug) VALUES (gen_random_uuid(), 'F', 'f') RETURNING id"))[0][0]
+        await self.fetch("INSERT INTO user_field_roles (id, user_id, field_id, role_id) VALUES (gen_random_uuid(), $1, $2, 5)",
+                         ua, f)
+        await self.fetch("INSERT INTO passkeys (id, user_id, credential_id, public_key, name, rp_id) VALUES "
+                         "(gen_random_uuid(), $1, $2, $3, 'owner', 'server.test')", ua, b"owner", b"x")
+        await self.fetch("INSERT INTO passkeys (id, user_id, credential_id, public_key, name, rp_id) VALUES "
+                         "(gen_random_uuid(), $1, $2, $3, 'attacker', 'server.test')", ub, b"attacker", b"x")
+        # The social session of A (mfa false) cannot even start the link round that yields a ticket ...
+        r = await self.client.post("/api/v1/auth/oidc/microsoft/start", headers=bearer(a),
+                                   json={"purpose": "link", "password": ""})
+        self.assertEqual((r.status_code, r.json()["detail"]), (403, "mfa_required"))
+        # ... and after a second factor, B's passkeys are not carried into a staff account.
+        await self.second_factor(bearer(a))
+        ticket = await self.ticket_for(bearer(a))
+        self.assertEqual((await self.preview(bearer(a), ticket)).json()["blocked"], "merge_passkeys_into_staff")
+        await self.fetch("UPDATE sessions SET mfa = false WHERE user_id = $1", ua)
+        r = await self.merge(bearer(a), ticket)
+        self.assertEqual((r.status_code, r.json()["detail"]), (403, "mfa_required"))
+        await self.second_factor(bearer(a))
+        r = await self.merge(bearer(a), ticket)
+        self.assertEqual((r.status_code, r.json()["detail"]), (409, "merge_passkeys_into_staff"))
+        self.assertEqual(await self.count("passkeys", "user_id", ua), 1)
+        self.assertEqual(await self.count("passkeys", "user_id", ub), 1)
+        # Without the passkeys it goes through, with A's second factor.
+        await self.fetch("DELETE FROM passkeys WHERE user_id = $1", ub)
+        r = await self.merge(bearer(a), await self.ticket_for(bearer(a)))
+        self.assertEqual(r.status_code, 200, r.text)
+
+    async def test_a_plain_account_merges_with_b_passkeys_as_before(self) -> None:
+        a, b = await self.two()
+        ub = uuid.UUID(b["user"]["id"])
+        await self.fetch("INSERT INTO passkeys (id, user_id, credential_id, public_key, name, rp_id) VALUES "
+                         "(gen_random_uuid(), $1, $2, $3, 'k', 'server.test')", ub, b"b-key", b"x")
+        r = await self.merge(bearer(a), await self.ticket_for(bearer(a)))
+        self.assertEqual((r.status_code, r.json()["moved"].get("passkeys")), (200, 1))
 
     async def test_two_logins_of_one_provider_or_too_many_passkeys_refuse(self) -> None:
         a, b = await self.two()
@@ -480,6 +523,7 @@ class MergeTests(LoginTestCase):
         for i in range(20):
             await self.fetch("INSERT INTO passkeys (id, user_id, credential_id, public_key, name, rp_id) VALUES "
                              "(gen_random_uuid(), $1, $2, $3, 'k', 'server.test')", ua, secrets.token_bytes(16), b"x")
+        await self.second_factor(bearer(a))  # A has passkeys, so its merge needs a second factor (SR-1)
         await self.fetch("INSERT INTO passkeys (id, user_id, credential_id, public_key, name, rp_id) VALUES "
                          "(gen_random_uuid(), $1, $2, $3, 'k', 'server.test')", ub, secrets.token_bytes(16), b"x")
         r = await self.merge(bearer(a), await self.ticket_for(bearer(a)))

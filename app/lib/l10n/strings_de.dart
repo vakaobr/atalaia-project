@@ -1244,6 +1244,8 @@ const Map<String, String> deStrings = {
       'Die Änderungen unten verlangen das aktuelle Passwort. Gib es hier ein, bevor du sie machst.',
   'acct.confirm_recent':
       'Dieses Konto hat kein Passwort: Die Änderungen verlangen eine Bestätigung aus den letzten 10 Minuten (auch eine Anmeldung zählt). Bestätige auf einem der Wege unten und wiederhole dann die Aktion.',
+  'acct.stepup_needed':
+      'Dieses Konto hat einen zweiten Faktor (TOTP oder Passkey) oder eine Team-Rolle: Wer die Anmeldung ändern will (Passkeys, TOTP, Passwort, verknüpfte Konten, Konten zusammenführen), muss zuerst den TOTP-Code oder den Passkey angeben. Eine Anmeldung mit Google, Microsoft oder Apple reicht nicht.',
   'acct.confirm_with': 'Mit {provider} bestätigen',
   'acct.confirmed': 'Bestätigt. Wiederhole die Aktion.',
   'acct.reauthed': 'Beim Anbieter bestätigt. Wiederhole die Aktion.',
@@ -1322,6 +1324,8 @@ const Map<String, String> deStrings = {
       'Die Anmeldung mit Passwort ist auf diesem Server abgeschaltet, ein Passwort kann nicht gesetzt oder geändert werden.',
   'acct.e.confirmation_required':
       'Bestätige zuerst, dass du es bist (siehe Bestätigung oben), und wiederhole dann die Aktion.',
+  'acct.e.mfa_required':
+      'Diese Aktion verlangt einen zweiten Faktor (TOTP oder Passkey): Bestätige im Bestätigungsfeld oben mit dem Code oder dem Passkey und wiederhole sie dann. Ein Team-Konto ohne Passwort und ohne zweiten Faktor muss die Administration des Servers in Ordnung bringen.',
   'acct.e.invalid_password': 'Falsches Passwort.',
   'acct.e.invalid_code': 'Falscher Code.',
   'acct.e.no_password': 'Dieses Konto hat kein Passwort.',

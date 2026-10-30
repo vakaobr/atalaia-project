@@ -474,6 +474,7 @@ void main() {
       bool totp = false,
       List<Map<String, Object?>>? identities,
       List<Map<String, Object?>>? keys,
+      bool stepUp = false,
     }) async {
       // A tall screen: the whole long list is built.
       tester.view.physicalSize = const Size(800, 4000);
@@ -482,6 +483,7 @@ void main() {
       site = FakeSite();
       site.passwordSet = passwordSet;
       site.totpEnabled = totp;
+      site.stepUpGuard = stepUp;
       site.identities.addAll(identities ?? const []);
       site.passkeys.addAll(keys ?? const []);
       browser = FakeAuthBrowser();
@@ -526,6 +528,28 @@ void main() {
       expect(find.byKey(const Key('account-confirm-password')), findsOneWidget);
       expect(find.text('Esta conta tem palavra-passe.'), findsOneWidget);
       expect(find.byKey(const Key('account-totp-enable')), findsOneWidget);
+    });
+
+    testWidgets('an account with a second factor says a step-up is needed, '
+        'offers the code and no provider, and a refusal says why', (
+      tester,
+    ) async {
+      await open(
+        tester,
+        totp: true,
+        stepUp: true,
+        identities: [google],
+        keys: [key1],
+      );
+      expect(find.byKey(const Key('account-stepup-needed')), findsOneWidget);
+      expect(find.byKey(const Key('account-confirm-code')), findsOneWidget);
+      expect(find.byKey(const Key('account-confirm-passkey')), findsOneWidget);
+      expect(find.byKey(const Key('account-reauth-google')), findsNothing);
+      expect(find.byKey(const Key('account-confirm-password')), findsOneWidget);
+      await enter(tester, 'account-confirm-code', site.code);
+      await tester.tap(find.byKey(const Key('account-confirm-code-button')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('account-stepup-needed')), findsNothing);
     });
 
     testWidgets('link a provider with the password; the return of the browser '

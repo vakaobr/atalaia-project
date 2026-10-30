@@ -13,7 +13,10 @@
 //   - TOTP: POST /api/v1/auth/totp/enrol, /confirm and /disable;
 //   - the confirmation a sensitive change asks for: the current password (sent with the change), or for an account with
 //     none a proof from the last ten minutes: a TOTP code (POST /api/v1/auth/stepup/totp), a passkey
-//     (POST /api/v1/auth/stepup/passkey/options and /passkey) or the provider again (purpose "reauth").
+//     (POST /api/v1/auth/stepup/passkey/options and /passkey) or the provider again (purpose "reauth");
+//   - an account with a TOTP or a passkey, or a staff role, changes its passkeys, TOTP, password, linked logins
+//     and merges only from a session that passed a second factor (403 mfa_required, SR-1): GET /me/login-methods
+//     says so (step_up_needed) and the page shows the TOTP / passkey panel first, with no provider button.
 
 import { $, ApiError, api, boot, clear, el, enable, errorText, has, link, markMfa, session, status, t, when } from './staff.js';
 import { attestationJson, assertionJson, creationOptions, passkeysSupported, requestOptions } from './webauthn.js';
@@ -33,9 +36,10 @@ function refusal(err) {
 function fail(err) {
     if (err instanceof ApiError && err.code === 'not_authenticated') return;
     status(refusal(err), 'error');
-    if (err instanceof ApiError && err.status === 403 && ['confirmation_required', 'invalid_password'].includes(err.code)) {
-        const box = $('confirm-password-box').hidden ? $('confirm-recent-box') : $('confirm-password-box');
-        const target = box.querySelector('input, button');
+    if (err instanceof ApiError && err.status === 403 && ['confirmation_required', 'invalid_password', 'mfa_required'].includes(err.code)) {
+        const box = err.code === 'mfa_required' || $('confirm-password-box').hidden
+            ? $('confirm-recent-box') : $('confirm-password-box');
+        const target = box.querySelector('input:not([hidden]), button:not([hidden])');
         if (target) target.focus();
     }
 }
@@ -184,22 +188,29 @@ function cancelMerge() {
 function render(server) {
     $('confirm').hidden = false;
     renderUsername();
+    // An account with a second factor (or a staff role) changes its login methods only from a session that passed
+    // one (SR-1): the TOTP / passkey panel shows, whether or not the account has a password, and the provider
+    // buttons go (a social login does not count as a second factor).
+    const stepUp = Boolean(methods.step_up_needed);
     $('confirm-password-box').hidden = !methods.password.set;
-    $('confirm-recent-box').hidden = methods.password.set;
-    renderConfirm();
+    $('confirm-recent-box').hidden = methods.password.set && !stepUp;
+    $('confirm-recent-hint').hidden = methods.password.set;
+    $('confirm-stepup').hidden = !stepUp;
+    renderConfirm(stepUp);
     renderProviders();
     renderPasskeys();
     renderPassword(Boolean(server.password_login));
     renderTotp();
 }
 
-function renderConfirm() {
+function renderConfirm(stepUp) {
     const form = $('confirm-totp-form');
     form.hidden = !methods.totp_enabled;
     enable(form);
     $('confirm-passkey').hidden = !(passkeysSupported() && methods.passkeys.length > 0);
     const box = clear($('confirm-providers'));
     for (const item of methods.identities) {
+        if (stepUp) break;  // a provider login confirms, but is not a second factor
         if (!offered.some((o) => o.provider === item.provider)) continue;
         box.append(el('button', {
             type: 'button', class: 'provider', 'data-provider': item.provider, 'data-purpose': 'reauth',
@@ -466,7 +477,7 @@ async function disableTotp() {
     status(t('acct_totp_disabled'), 'ok');
 }
 
-// ---- the confirmation for an account with no password ---------------------------------------------------
+// ---- the confirmation for an account with no password, or the second factor ---------------------------------------------------
 
 async function confirmWithTotp() {
     const code = $('confirm-code').value.replace(/\s+/g, '');
@@ -478,7 +489,17 @@ async function confirmWithTotp() {
         throw err;
     }
     $('confirm-code').value = '';
+    await afterStepUp();
+}
+
+/** The session counts as having a second factor now: take it, and show the page as it is for that session. */
+async function afterStepUp() {
     markMfa();
+    try {
+        await reload();
+    } catch (e) {
+        /* the next action asks again */
+    }
     status(t('acct_confirmed'), 'ok');
 }
 
@@ -498,8 +519,7 @@ async function confirmWithPasskey() {
     await api('POST', '/api/v1/auth/stepup/passkey', {
         challenge_token: first.challenge_token, credential: assertionJson(credential),
     });
-    markMfa();
-    status(t('acct_confirmed'), 'ok');
+    await afterStepUp();
 }
 
 // ---- start ------------------------------------------------------------------------------------------------

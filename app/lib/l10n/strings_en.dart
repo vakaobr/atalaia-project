@@ -1185,6 +1185,8 @@ const Map<String, String> enStrings = {
       'The changes below ask for the current password. Type it here before making them.',
   'acct.confirm_recent':
       'This account has no password: the changes ask for a confirmation made in the last 10 minutes (logging in counts too). Confirm with one of the ways below, then repeat the action.',
+  'acct.stepup_needed':
+      'This account has a second factor (TOTP or a passkey) or a staff role: changing how it logs in (passkeys, TOTP, password, linked accounts, merging accounts) asks for the TOTP code or the passkey first. A Google, Microsoft or Apple login is not enough.',
   'acct.confirm_with': 'Confirm with {provider}',
   'acct.confirmed': 'Confirmed. Repeat the action.',
   'acct.reauthed': 'Confirmed with the provider. Repeat the action.',
@@ -1261,6 +1263,8 @@ const Map<String, String> enStrings = {
       'Password login is turned off on this server, so a password cannot be set or changed.',
   'acct.e.confirmation_required':
       'Confirm it is you first (see the confirmation above), then repeat the action.',
+  'acct.e.mfa_required':
+      'This action asks for a second factor (TOTP or a passkey): confirm with the code or the passkey in the confirmation panel above, then repeat it. A staff account with no password and no second factor has to be sorted out by the server\'s administrator.',
   'acct.e.invalid_password': 'Wrong password.',
   'acct.e.invalid_code': 'Wrong code.',
   'acct.e.no_password': 'This account has no password.',

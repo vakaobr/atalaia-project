@@ -27,7 +27,11 @@ What refuses it (409): a B with a staff role (server administrator, or ``admin``
 game): a role that needs a second factor is not something a social login round may take over, and the decision is
 to keep that out of this feature (``merge_staff_account``); a provider both accounts already have a login for
 (``merge_provider_conflict``: dropping one would be silent loss of a way in); more passkeys together than an account
-may hold (``merge_too_many_passkeys``).
+may hold (``merge_too_many_passkeys``); a B with passkeys into an A with a staff role
+(``merge_passkeys_into_staff``: a passkey counts as both factors, so one the merge carried in would hand a staff
+account a way to log in with ``mfa`` that only a social round proved; B's person removes them first, or keeps the
+accounts apart). Confirming a merge, like linking the provider that starts it, also needs a session that passed a
+second factor when the account has one or a staff role (``mfa_required``, ``api/auth.step_up_needed``).
 
 Accounts are per field in hosted mode, and a merge runs in one request, so inside one field's schema and database
 role; no statement here reaches another field.
@@ -50,12 +54,11 @@ from .. import hub_share, passkeys, personal_data
 from ..audit import record
 from ..auth import Principal, current_principal
 from ..db import get_session
-from ..models import (PRIVILEGED_ROLES, ROLE_NAMES, Base, Consent, GameRegistration, HubShareLink, Passkey, User,
-                      UserFieldRole, UserGameRole, UserIdentity, UserSession)
+from ..models import (Base, Consent, GameRegistration, HubShareLink, Passkey, User, UserFieldRole, UserGameRole,
+                      UserIdentity, UserSession)
 from ..oidc import PROVIDER_LABELS
 from ..tokens import TokenError, read_merge_ticket
-from .auth import NO_STORE, Strict, _check_password
-from .login_methods import _needs_second_factor
+from .auth import NO_STORE, Strict, _check_password, is_staff
 
 router = APIRouter(prefix="/api/v1", tags=["login methods"])
 
@@ -81,18 +84,12 @@ def user_columns() -> list[tuple[Table, Column[Any]]]:
     return found
 
 
-async def _staff(db: AsyncSession, user: User) -> bool:
-    if await _needs_second_factor(db, user):
-        return True
-    privileged = [ROLE_NAMES[r] for r in PRIVILEGED_ROLES]
-    return bool(await db.scalar(select(func.count()).select_from(UserGameRole).where(
-        UserGameRole.user_id == user.id, UserGameRole.role_id.in_(privileged))))
-
-
 async def blocked_by(db: AsyncSession, a: User, b: User) -> Optional[str]:
     """The reason these two accounts may not be merged (the error code), else None."""
-    if await _staff(db, b):
+    if await is_staff(db, b):
         return "merge_staff_account"
+    if await is_staff(db, a) and await db.scalar(select(func.count()).select_from(Passkey).where(Passkey.user_id == b.id)):
+        return "merge_passkeys_into_staff"  # a passkey is a login that counts as two factors: never carried in (SR-3)
     mine = set(await db.scalars(select(UserIdentity.provider).where(UserIdentity.user_id == a.id)))
     theirs = set(await db.scalars(select(UserIdentity.provider).where(UserIdentity.user_id == b.id)))
     if mine & theirs:

@@ -1214,6 +1214,8 @@ const Map<String, String> ptStrings = {
       'As alterações abaixo pedem a palavra-passe atual. Escrevê-la aqui antes de as fazer.',
   'acct.confirm_recent':
       'Esta conta não tem palavra-passe: as alterações pedem uma confirmação feita nos últimos 10 minutos (entrar também conta). Confirmar com uma das formas abaixo e repetir a ação.',
+  'acct.stepup_needed':
+      'Esta conta tem um segundo fator (TOTP ou chave de acesso) ou uma função de equipa: mudar a forma de entrar (chaves de acesso, TOTP, palavra-passe, contas ligadas, junção de contas) pede primeiro o código TOTP ou a chave de acesso. Um início de sessão com Google, Microsoft ou Apple não basta.',
   'acct.confirm_with': 'Confirmar com {provider}',
   'acct.confirmed': 'Confirmado. Repetir a ação.',
   'acct.reauthed': 'Confirmado com o fornecedor. Repetir a ação.',
@@ -1291,6 +1293,8 @@ const Map<String, String> ptStrings = {
       'Neste servidor a entrada com palavra-passe está desligada: não se pode definir nem mudar uma.',
   'acct.e.confirmation_required':
       'Confirmar primeiro que é esta conta (ver a confirmação acima) e repetir a ação.',
+  'acct.e.mfa_required':
+      'Esta ação pede um segundo fator (TOTP ou chave de acesso): confirmar com o código ou a chave de acesso no painel de confirmação acima e repetir. Uma conta de equipa sem palavra-passe nem segundo fator tem de ficar a cargo da administração do servidor.',
   'acct.e.invalid_password': 'Palavra-passe errada.',
   'acct.e.invalid_code': 'Código errado.',
   'acct.e.no_password': 'Esta conta não tem palavra-passe.',

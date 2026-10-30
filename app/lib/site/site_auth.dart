@@ -120,7 +120,8 @@ final class LoginMethods {
       ],
       totpEnabled = j['totp_enabled'] == true,
       available = OidcOffer.list(j['available_providers']),
-      mfa = j['mfa'] == true;
+      mfa = j['mfa'] == true,
+      stepUpNeeded = j['step_up_needed'] == true;
 
   final bool passwordSet;
   final bool passwordLoginEnabled;
@@ -131,6 +132,11 @@ final class LoginMethods {
   /// The providers this server has configured.
   final List<OidcOffer> available;
   final bool mfa;
+
+  /// The account has a second factor or a staff role and this session has not
+  /// passed one: changing its passkeys, TOTP, password, linked logins or
+  /// merging needs a TOTP code or a passkey first (the server's SR-1).
+  final bool stepUpNeeded;
 }
 
 /// TOTP enrolment's answer: the secret and its `otpauth` address, shown as

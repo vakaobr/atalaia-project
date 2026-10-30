@@ -43,6 +43,12 @@ or know in one gesture (user verification is required).
 Accounts with no password (made by a social login, or after removing the password) confirm a sensitive change
 with a proof from the last ten minutes: the session's ``confirmed_at``, set by every login and by a step-up
 (TOTP, passkey) or a social re-login (``purpose: reauth``) (``api/auth._check_password``).
+
+That recent proof is not enough once an account has a second factor or a staff role (SRV-1, SR-1): adding, renaming
+or removing a passkey, TOTP, the password, a linked login and a merge then need a session with ``mfa`` (403
+``mfa_required``), so a social login alone cannot give a staff account a passkey of its own and then log in with it
+(a passkey login sets ``mfa``). ``api/auth.step_up_needed`` draws the line; ``GET /me/login-methods`` says whether
+this session is short of it.
 """
 
 from __future__ import annotations
@@ -73,7 +79,7 @@ from ..oidc import (MAX_STATE, NAME_PROVIDERS, PROVIDER_LABELS, OidcError, make_
                     pkce_challenge, username_from_name)
 from ..tokens import (TokenError, WebauthnChallenge, make_merge_ticket, make_oidc_ticket, make_webauthn_challenge, read_oidc_ticket,
                       read_webauthn_challenge)
-from .auth import (NO_STORE, Strict, username_problem, _check_code, _check_password, _ip_key, _now, _secret, _start_session, _too_many,
+from .auth import (NO_STORE, Strict, username_problem, _check_code, _check_password, _ip_key, require_step_up, step_up_needed, _now, _secret, _start_session, _too_many,
                    _user_for_update, passkey_count)
 
 router = APIRouter(prefix="/api/v1", tags=["login methods"])
@@ -285,6 +291,7 @@ async def my_methods(request: Request, principal: Principal = Depends(current_pr
         "available_providers": [{"provider": p, "label": PROVIDER_LABELS[p]}
                                 for p in request.app.state.oidc.providers()],
         "mfa": principal.mfa,
+        "step_up_needed": await step_up_needed(db, user) and not principal.mfa,
     }, headers=NO_STORE)
 
 
@@ -667,6 +674,7 @@ async def passkey_register(body: AddPasskeyIn, request: Request, principal: Prin
     if challenge.user_id != principal.user.id:
         raise HTTPException(400, "invalid_challenge")
     user = await _user_for_update(db, principal)
+    await require_step_up(db, request, user)  # the options step asked already; a second check costs nothing (SR-1)
     try:
         verified = passkeys.verify_registration(body.credential, challenge.challenge, site_origin(request),
                                                 request.app.state.settings.app_origins)
@@ -705,6 +713,7 @@ async def passkey_rename(passkey_id: uuid.UUID, body: NameIn, request: Request,
     name = body.name.strip()
     if not name or not name.isprintable():
         raise HTTPException(400, "name_invalid")
+    await require_step_up(db, request, principal.user)
     key = await db.scalar(select(Passkey).where(Passkey.id == passkey_id, Passkey.user_id == principal.user.id))
     if key is None:
         raise HTTPException(404, "passkey_not_found")

@@ -119,6 +119,12 @@ class LoginTestCase(AppTestCase):
             "challenge_token": options["challenge_token"], "credential": credential, **({"name": name} if name else {})})
         return authenticator, r
 
+    async def second_factor(self, headers: dict[str, str]) -> None:
+        """Marks this session as having passed a second factor, as a step-up would (SR-1): a test that is not about
+        the step-up itself uses it once the account has a passkey and goes on changing its login methods."""
+        me = (await self.client.get("/api/v1/me", headers=headers)).json()
+        await self.fetch("UPDATE sessions SET mfa = true WHERE user_id = $1", uuid.UUID(me["id"]))
+
     async def passkey_login_parts(self) -> dict[str, Any]:
         r = await self.client.post("/api/v1/auth/passkey/login/options")
         self.assertEqual(r.status_code, 200, r.text)
@@ -687,6 +693,7 @@ class PasswordOptionalTests(LoginTestCase):
         self.assertEqual((r.status_code, r.json()["detail"]), (409, "last_login_method"))
         authenticator, r = await self.add_passkey(headers)
         self.assertEqual(r.status_code, 201, r.text)
+        await self.second_factor(headers)
         r = await self.client.request("DELETE", "/api/v1/me/password", headers=headers, json={"password": "wrong"})
         self.assertEqual(r.status_code, 403)
         r = await self.client.request("DELETE", "/api/v1/me/password", headers=headers, json={"password": PASSWORD})
@@ -755,6 +762,7 @@ class PasskeyTests(LoginTestCase):
         authenticator, r = await self.add_passkey(self.headers, name="Portátil")
         self.assertEqual((r.status_code, r.json()["name"], r.json()["backed_up"]), (201, "Portátil", False))
         key_id = r.json()["id"]
+        await self.second_factor(self.headers)
         row = (await self.fetch("SELECT * FROM passkeys"))[0]
         self.assertEqual((row["rp_id"], row["sign_count"], row["transports"]), ("server.test", 0, "internal"))
         listing = (await self.client.get("/api/v1/me/login-methods", headers=self.headers)).json()
@@ -789,6 +797,7 @@ class PasskeyTests(LoginTestCase):
     async def test_the_default_name_and_a_synced_passkey(self) -> None:
         _, r = await self.add_passkey(self.headers, SoftAuthenticator(backup=True))
         self.assertEqual((r.json()["name"], r.json()["backed_up"]), ("Passkey 1", True))
+        await self.second_factor(self.headers)
         _, r = await self.add_passkey(self.headers)
         self.assertEqual(r.json()["name"], "Passkey 2")
 
@@ -835,6 +844,7 @@ class PasskeyTests(LoginTestCase):
         good = authenticator.create(parts["options"], ORIGIN)
         body = {"challenge_token": parts["challenge_token"], "credential": good}
         self.assertEqual((await self.client.post("/api/v1/me/passkeys", headers=self.headers, json=body)).status_code, 201)
+        await self.second_factor(self.headers)
         r = await self.client.post("/api/v1/me/passkeys", headers=self.headers, json=body)
         self.assertEqual((r.status_code, r.json()["detail"]), (400, "invalid_challenge"))
         # The same authenticator again: the credential exists.
@@ -860,6 +870,7 @@ class PasskeyTests(LoginTestCase):
         for i in range(20):
             await self.fetch("INSERT INTO passkeys (user_id, credential_id, public_key, name, rp_id) "
                              "VALUES ($1, $2, '\\x00', 'k', 'server.test')", self.user_id, bytes([i]) * 8)
+        await self.second_factor(self.headers)
         r = await self.client.post("/api/v1/me/passkeys/options", json={"password": PASSWORD}, headers=self.headers)
         self.assertEqual((r.status_code, r.json()["detail"]), (409, "too_many_passkeys"))
 
@@ -920,6 +931,7 @@ class PasskeyTests(LoginTestCase):
 
     async def test_a_passkey_of_another_host_name_does_not_count(self) -> None:
         authenticator, _ = await self.add_passkey(self.headers)
+        await self.second_factor(self.headers)
         await self.fetch("UPDATE passkeys SET rp_id = 'other.test'")
         r = await self.passkey_login(authenticator)
         self.assertEqual(r.status_code, 401)
@@ -943,6 +955,7 @@ class PasskeyTests(LoginTestCase):
         authenticator, r = await self.add_passkey(headers)  # a fresh social login confirms
         self.assertEqual(r.status_code, 201, r.text)
         key_id = r.json()["id"]
+        await self.second_factor(headers)  # the account has a passkey now: its changes need a second factor
         r = await self.client.request("DELETE", "/api/v1/me/identities/google", headers=headers, json={})
         self.assertEqual(r.status_code, 204)
         r = await self.client.request("DELETE", f"/api/v1/me/passkeys/{key_id}", headers=headers, json={})
@@ -1054,6 +1067,7 @@ class StaffSecondFactorTests(LoginTestCase):
         headers = await self.auth(name)
         authenticator, r = await self.add_passkey(headers)
         key_id = r.json()["id"]
+        await self.second_factor(headers)
         _, added = await self.add_passkey(headers)
         await self.grant(name)
         second_id = added.json()["id"]
@@ -1072,6 +1086,124 @@ class StaffSecondFactorTests(LoginTestCase):
         r = await self.client.post("/api/v1/auth/totp/disable", headers=theaders,
                                    json={"password": PASSWORD, "code": self.code(tsecret)})
         self.assertEqual(r.status_code, 204, r.text)
+
+
+class StepUpTests(LoginTestCase):
+    """Changing how an account logs in needs a session that passed a second factor, when the account has one or a
+    staff role (SRV-1, decisions SR-*): a social login alone must not add its own passkey to a staff account."""
+
+    async def staff_google_only(self, subject: str = "g-staff") -> tuple[uuid.UUID, dict[str, str]]:
+        """A passwordless account made by a Google login, with a passkey of its owner and a gm role; the session is
+        a fresh Google login (``mfa`` false), as an attacker holding only the Google account would have."""
+        body = await self.social("google", subject)
+        user = uuid.UUID(body["user"]["id"])
+        await self.fetch("INSERT INTO passkeys (id, user_id, credential_id, public_key, name, rp_id) VALUES "
+                         "(gen_random_uuid(), $1, $2, $3, 'owner', 'server.test')", user, b"owner-credential", b"x")
+        field = (await self.fetch("INSERT INTO fields (id, name, slug) VALUES (gen_random_uuid(), 'F', 'f') RETURNING id"))[0][0]
+        await self.fetch("INSERT INTO user_field_roles (id, user_id, field_id, role_id) VALUES (gen_random_uuid(), $1, $2, 5)",
+                         user, field)
+        return user, bearer(body)
+
+    async def test_a_google_session_cannot_give_a_staff_account_a_passkey_of_its_own(self) -> None:
+        user, headers = await self.staff_google_only()
+        r = await self.client.post("/api/v1/me/passkeys/options", json={}, headers=headers)
+        self.assertEqual((r.status_code, r.json()["detail"]), (403, "mfa_required"))
+        # Even with a registration prepared while the session had a second factor: the finishing call asks again.
+        await self.second_factor(headers)
+        authenticator = SoftAuthenticator()
+        parts = (await self.client.post("/api/v1/me/passkeys/options", json={}, headers=headers)).json()
+        credential = authenticator.create(parts["options"], ORIGIN)
+        await self.fetch("UPDATE sessions SET mfa = false WHERE user_id = $1", user)
+        r = await self.client.post("/api/v1/me/passkeys", headers=headers,
+                                   json={"challenge_token": parts["challenge_token"], "credential": credential})
+        self.assertEqual((r.status_code, r.json()["detail"]), (403, "mfa_required"))
+        self.assertEqual((await self.fetch("SELECT count(*) FROM passkeys WHERE user_id = $1", user))[0][0], 1)
+        self.assertEqual((await self.passkey_login(authenticator)).status_code, 401)  # no way in with it
+        self.assertGreaterEqual(len(await self.audit("step_up_refused")), 2)
+
+    async def test_every_change_of_the_login_methods_asks_for_it(self) -> None:
+        _, name, secret = await self.make_user(with_totp=True)
+        headers = await self.auth(name, secret=secret)
+        await self.link("google", "g-1", headers)
+        _, added = await self.add_passkey(headers)
+        key_id = added.json()["id"]
+        social = bearer(await self.social("google", "g-1", client=self.other_client()))
+        call = self.client.request
+        asked = [
+            await call("POST", "/api/v1/me/passkeys/options", headers=social, json={"password": PASSWORD}),
+            await call("PATCH", f"/api/v1/me/passkeys/{key_id}", headers=social, json={"name": "x"}),
+            await call("DELETE", f"/api/v1/me/passkeys/{key_id}", headers=social, json={"password": PASSWORD}),
+            await call("POST", "/api/v1/auth/totp/disable", headers=social, json={"password": PASSWORD, "code": "123456"}),
+            await call("POST", "/api/v1/me/password", headers=social,
+                       json={"password": PASSWORD, "new_password": "a new long passphrase 9"}),
+            await call("DELETE", "/api/v1/me/password", headers=social, json={"password": PASSWORD}),
+            await call("POST", "/api/v1/auth/oidc/microsoft/start", headers=social,
+                       json={"purpose": "link", "password": PASSWORD}),
+            await call("DELETE", "/api/v1/me/identities/google", headers=social, json={"password": PASSWORD}),
+        ]
+        self.assertEqual([(r.status_code, r.json()["detail"]) for r in asked], [(403, "mfa_required")] * len(asked))
+        self.assertEqual((await self.fetch("SELECT count(*) FROM passkeys"))[0][0], 1)
+        self.assertIsNotNone((await self.fetch("SELECT password_hash FROM users WHERE username = $1", name))[0][0])
+        # An account with a passkey and no TOTP: starting TOTP is a change too.
+        _, pname, _ = await self.make_user()
+        pheaders = await self.auth(pname)
+        await self.add_passkey(pheaders)
+        r = await call("POST", "/api/v1/auth/totp/enrol", headers=pheaders, json={"password": PASSWORD})
+        self.assertEqual((r.status_code, r.json()["detail"]), (403, "mfa_required"))
+        # What does not change how the account is entered stays as it was.
+        r = await call("PATCH", "/api/v1/me", headers=social, json={"username": "novo.nome", "password": PASSWORD})
+        self.assertEqual(r.status_code, 200, r.text)
+
+    async def test_a_second_factor_step_up_unlocks_them(self) -> None:
+        _, name, secret = await self.make_user(with_totp=True)
+        headers = await self.auth(name, secret=secret)
+        await self.link("google", "g-1", headers)
+        social = bearer(await self.social("google", "g-1", client=self.other_client()))
+        me = (await self.client.get("/api/v1/me/login-methods", headers=social)).json()
+        self.assertEqual((me["mfa"], me["step_up_needed"]), (False, True))
+        r = await self.client.post("/api/v1/auth/stepup/totp", headers=social, json={"code": self.code(secret)})
+        self.assertEqual(r.status_code, 200, r.text)
+        me = (await self.client.get("/api/v1/me/login-methods", headers=social)).json()
+        self.assertEqual((me["mfa"], me["step_up_needed"]), (True, False))
+        authenticator, r = await self.add_passkey(social)
+        self.assertEqual(r.status_code, 201, r.text)
+        self.assertEqual((await self.passkey_login(authenticator)).status_code, 200)
+
+    async def test_the_first_factor_of_a_plain_account_is_not_blocked(self) -> None:
+        # A player with only a Google login adds a first passkey with a fresh login; the second needs the first.
+        body = await self.social("google", "g-player")
+        headers = bearer(body)
+        me = (await self.client.get("/api/v1/me/login-methods", headers=headers)).json()
+        self.assertEqual(me["step_up_needed"], False)
+        _, r = await self.add_passkey(headers)
+        self.assertEqual(r.status_code, 201, r.text)
+        r = await self.client.post("/api/v1/me/passkeys/options", json={}, headers=headers)
+        self.assertEqual((r.status_code, r.json()["detail"]), (403, "mfa_required"))
+        # A password account with no factor and no role starts TOTP as before.
+        _, name, _ = await self.make_user()
+        r = await self.client.post("/api/v1/auth/totp/enrol", headers=await self.auth(name), json={"password": PASSWORD})
+        self.assertEqual(r.status_code, 200, r.text)
+
+    async def test_a_staff_account_with_a_password_and_no_second_factor_can_get_its_first(self) -> None:
+        user_id, name, _ = await self.make_user()
+        field = (await self.fetch("INSERT INTO fields (id, name, slug) VALUES (gen_random_uuid(), 'F', 'f') RETURNING id"))[0][0]
+        await self.fetch("INSERT INTO user_field_roles (id, user_id, field_id, role_id) VALUES (gen_random_uuid(), $1, $2, 5)",
+                         user_id, field)
+        headers = await self.auth(name)
+        # The password is the proof (a wrong one is refused as ever) ...
+        r = await self.client.post("/api/v1/me/passkeys/options", json={"password": "wrong"}, headers=headers)
+        self.assertEqual((r.status_code, r.json()["detail"]), (403, "invalid_password"))
+        _, r = await self.add_passkey(headers)
+        self.assertEqual(r.status_code, 201, r.text)
+        # ... and from then on a second factor is.
+        r = await self.client.post("/api/v1/me/passkeys/options", json={"password": PASSWORD}, headers=headers)
+        self.assertEqual((r.status_code, r.json()["detail"]), (403, "mfa_required"))
+
+    async def test_a_staff_account_with_neither_password_nor_second_factor_gets_nothing_from_a_social_login(self) -> None:
+        body = await self.social("google", "g-adm")
+        await self.fetch("UPDATE users SET server_admin = true WHERE id = $1", uuid.UUID(body["user"]["id"]))
+        r = await self.client.post("/api/v1/me/passkeys/options", json={}, headers=bearer(body))
+        self.assertEqual((r.status_code, r.json()["detail"]), (403, "mfa_required"))
 
 
 class PersonalDataTests(LoginTestCase):

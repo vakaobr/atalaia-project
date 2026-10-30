@@ -41,7 +41,8 @@ from .. import passwords, personal_data, privacy_notice, quotas, tenancy, totp
 from ..audit import record, request_ip
 from ..auth import Principal, current_principal, load_roles
 from ..db import get_session
-from ..models import PRIVILEGED_ROLES, ROLE_NAMES, Passkey, RefreshToken, User, UserFieldRole, UserSession
+from ..models import (PRIVILEGED_ROLES, ROLE_NAMES, Passkey, RefreshToken, User, UserFieldRole, UserGameRole,
+                      UserSession)
 from ..ratelimit import login_key
 from ..tokens import (ACCESS_TTL_S, REFRESH_TTL_S, SESSION_MAX_S, TokenError, make_access_token,
                       make_totp_step_token, new_refresh_token, read_totp_step_token, refresh_token_hash)
@@ -122,6 +123,50 @@ async def has_second_factor(db: AsyncSession, user: User) -> bool:
     return user.totp_enabled or await passkey_count(db, user.id) > 0
 
 
+async def is_staff(db: AsyncSession, user: User) -> bool:
+    """A server administrator, or ``admin``/``gm``/``marshal`` on a field or a game: a role that needs a second
+    factor (LG-4)."""
+    if user.server_admin:
+        return True
+    privileged = [ROLE_NAMES[r] for r in PRIVILEGED_ROLES]
+    for table in (UserFieldRole, UserGameRole):
+        if await db.scalar(select(func.count()).select_from(table).where(table.user_id == user.id,
+                                                                         table.role_id.in_(privileged))):
+            return True
+    return False
+
+
+async def step_up_needed(db: AsyncSession, user: User) -> bool:
+    """True when changing how this account logs in must come from a session that passed a second factor (SR-1).
+
+    An account with a TOTP or a passkey already has one, so a social login or a bare password session (``mfa``
+    false) must not be able to add, swap or remove the means of getting in. A staff account with no second
+    factor yet and a password is let through (the password is the proof; it is how it gets its first one:
+    SR-2). A passwordless staff account with none cannot: nothing could prove it, an operator sets a password
+    first. An account with no staff role and no second factor (a player adding a first passkey) keeps the
+    confirmation it always had (password, or a recent login)."""
+    if await has_second_factor(db, user):
+        return True
+    return user.password_hash is None and await is_staff(db, user)
+
+
+# The confirmations (the ``where`` of ``_check_password``) that change how the account logs in or who it is
+# merged with: the passkeys, TOTP, the password, the social links and the merge.
+STEP_UP_ACTIONS = frozenset({"passkey_add", "passkey_remove", "totp_enrol", "totp_disable", "password_change",
+                             "password_remove", "identity_link", "identity_unlink", "account_merge"})
+
+
+async def require_step_up(db: AsyncSession, request: Request, user: User) -> None:
+    """403 ``mfa_required`` for an account that ``step_up_needed`` unless this session passed a second factor."""
+    principal = getattr(request.state, "principal", None)
+    if principal is not None and principal.user.id == user.id and principal.mfa:
+        return
+    if await step_up_needed(db, user):
+        record(db, "step_up_refused", request, user_id=user.id, resource="user", resource_id=user.id)
+        await db.commit()
+        raise HTTPException(403, "mfa_required")
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -189,6 +234,8 @@ async def _check_password(db: AsyncSession, request: Request, user: Optional[Use
     Two lockouts count each failure (decisions S11-12, S12-1): one per (address, username),
     ``username`` being what was typed at login (the account's own name elsewhere), and a much
     higher one per address against spraying many usernames from one place."""
+    if user is not None and where in STEP_UP_ACTIONS:
+        await require_step_up(db, request, user)
     if user is not None and user.password_hash is None and where != "login":
         _recently_confirmed(request, user)  # an account with no password: a recent proof instead (LG-6)
         return

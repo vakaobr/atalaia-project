@@ -996,6 +996,8 @@ const Map<String, String> zhTwStrings = {
   'acct.confirm_password_hint': '下面的變更需要目前的密碼。請先在這裡輸入。',
   'acct.confirm_recent':
       '這個帳號沒有密碼：變更需要最近 10 分鐘內完成的確認（登入也算）。請用下面其中一種方式確認，再重做一次。',
+  'acct.stepup_needed':
+      '這個帳號有第二重驗證（TOTP 或密碼金鑰）或工作人員角色：要更改登入方式（密碼金鑰、TOTP、密碼、已連結的帳號）或把兩個帳號合在一起，必須先輸入 TOTP 驗證碼或使用密碼金鑰。只用 Google、Microsoft 或 Apple 登入是不夠的。',
   'acct.confirm_with': '用 {provider} 確認',
   'acct.confirmed': '已確認。請重做一次。',
   'acct.reauthed': '已透過提供者確認。請重做一次。',
@@ -1061,6 +1063,8 @@ const Map<String, String> zhTwStrings = {
   'acct.e.totp_required_by_role': '這個帳號的角色需要第二重驗證：停用 TOTP 前請先新增密碼金鑰。',
   'acct.e.password_login_disabled': '這台伺服器已關閉密碼登入，無法設定或變更密碼。',
   'acct.e.confirmation_required': '請先確認是你本人（見上方的確認），再重做一次。',
+  'acct.e.mfa_required':
+      '這個動作需要第二重驗證（TOTP 或密碼金鑰）：請在上方的確認區用驗證碼或密碼金鑰確認，再重做一次。沒有密碼也沒有第二重驗證的工作人員帳號，需要由伺服器管理員處理。',
   'acct.e.invalid_password': '密碼錯誤。',
   'acct.e.invalid_code': '驗證碼錯誤。',
   'acct.e.no_password': '這個帳號沒有密碼。',
