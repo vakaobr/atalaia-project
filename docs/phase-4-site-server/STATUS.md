@@ -1018,7 +1018,7 @@ Closes S21-13 (the coordinator's review note that the row-level security keys on
 | Phase 2 F (hardware, field test) | Pending, needs the boards | HW1, HW4 |
 | Phase 3 A-F, the Medic Kit, branding | Done in software | Old plan phase F's dependencies are met; plan phases 4, 5, 8, 16, 18 build on them |
 | Phase 3 PE24 (Android controller shell) | Done in software (slices S1-S7) | None for phase 4's software |
-| Phase 3 iOS | Not built | None for phase 4's software |
+| Phase 3 iOS | Built and compiled in CI, unsigned (`app/ios/`, decisions iOS-1 to iOS-16); not yet run on a phone. Site login on iOS (social login with `ASWebAuthenticationSession`, passkeys with `ASAuthorization`) is not built: the Android plugins have no Swift side yet | None for phase 4's software |
 | Phase 3 G (field test with phones and pods) | Pending, needs the hardware | HW3, HW4 |
 | Target addon (hardware/target-addon) | Design phase | HW2 |
 | Wokwi CI quota (decision R7) | Used up | Firmware changes verified with host tests and ESP-IDF builds only |
