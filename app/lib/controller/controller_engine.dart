@@ -1680,6 +1680,25 @@ class ControllerEngine {
     return boxLanguage();
   }
 
+  // --- the console's map fetching (LEG-50) ----------------------------------
+
+  /// Whether the console's *Load the field from a map* page may reach
+  /// OpenStreetMap, Overpass, Nominatim and the aerial imagery services: the
+  /// field setting, on by default (the Pi's `map_fetching_on`). Off, the page
+  /// is served without those origins and says so.
+  bool mapFetchingOn() => store.getSetting('map_fetching') != 'off';
+
+  /// GET /api/v1/settings/map-fetching.
+  Map<String, Object?> mapFetching() => {'map_fetching': mapFetchingOn()};
+
+  Map<String, Object?> setMapFetching(Object? value) {
+    if (value is! bool) {
+      throw ControllerError('map_fetching: true or false');
+    }
+    store.setSetting('map_fetching', value ? 'on' : 'off');
+    return mapFetching();
+  }
+
   /// The language of the USB modem's own OLED (decision MOD-2; the Pi's
   /// `_tell_modem_language`): the field's setting, with "auto" the live
   /// game's boxes' language, and nothing while no game says one.

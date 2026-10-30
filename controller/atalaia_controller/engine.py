@@ -981,6 +981,25 @@ class Controller:
             self._tell_modem_language()
         return self.box_language()
 
+    # --- the console's map fetching (LEG-50) ---------------------------------------
+
+    def map_fetching_on(self) -> bool:
+        """Whether the console's *Load the field from a map* page may reach OpenStreetMap, Overpass, Nominatim and the
+        aerial imagery services: the field setting, on by default. Off, the page is served without those origins
+        (api.py) and says so."""
+        with self._lock:
+            return self.store.get_setting("map_fetching") != "off"
+
+    def map_fetching(self) -> dict[str, Any]:
+        return {"map_fetching": self.map_fetching_on()}
+
+    def set_map_fetching(self, value: Any) -> dict[str, Any]:
+        if not isinstance(value, bool):
+            raise ControllerError("map_fetching: true or false")
+        with self._lock:
+            self.store.set_setting("map_fetching", "on" if value else "off")
+        return self.map_fetching()
+
     def _tell_modem_language(self, lang: Optional[str] = None) -> None:
         """The language of the modem board's own OLED (decision MOD-2): the field's box-language
         setting; with "auto" the language the live game's boxes got (the console's that created

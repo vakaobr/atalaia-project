@@ -45,6 +45,7 @@
 ///     POST /api/v1/join                      GM: a join payload (slice S4)
 ///     POST /api/v1/nodes/{id}/join           GM: a join payload for that node id
 ///     GET|PUT /api/v1/settings/box-language  the boxes' screen language
+///     GET|PUT /api/v1/settings/map-fetching  may the console fetch maps (LEG-50)
 ///     WS   /api/v1/prop                      Android props on Wi-Fi
 ///                                            (controller_props.dart, slice S4)
 ///
@@ -350,6 +351,20 @@ class ControllerApi {
               ApiResponse(200, engine.setBoxLanguage(r.body['box_language'])),
         ),
       ),
+      // LEG-50: the field's choice to turn the console's map fetching off.
+      _route(
+        'GET',
+        r'/api/v1/settings/map-fetching',
+        _read((r, who) => ApiResponse(200, engine.mapFetching())),
+      ),
+      _route(
+        'PUT',
+        r'/api/v1/settings/map-fetching',
+        _gm(
+          (r) =>
+              ApiResponse(200, engine.setMapFetching(r.body['map_fetching'])),
+        ),
+      ),
       ..._checkinRoutes(),
       ..._fieldRoutes(),
       ..._boxesRoutes(),
@@ -644,7 +659,8 @@ class ControllerApi {
     final a = console.answer(path);
     if (a == null) return null;
     final headers = {
-      if (path.startsWith('/console')) ...consoleHeadersFor(path),
+      if (path.startsWith('/console'))
+        ...consoleHeadersFor(path, mapFetching: engine.mapFetchingOn()),
       if (a.location != null) 'Location': a.location!,
     };
     return switch (a.status) {

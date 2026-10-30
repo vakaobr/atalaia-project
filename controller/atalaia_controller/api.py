@@ -68,6 +68,7 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/games/{id}/teams          a game's team colours, display names and crests (no token)
     PUT  /api/v1/games/{id}/teams/{team}   GM: {"display_name"?, "crest_id"?, "team_preset_id"?}
     GET|PUT /api/v1/settings/box-language  the boxes' screen language: "auto" (the console's), "pt", "en", "de", "zh-tw"
+    GET|PUT /api/v1/settings/map-fetching  may the console fetch maps (OSM, Overpass, Nominatim, aerial imagery): {"map_fetching": bool}
     GET  /api/v1/radio                     the field's radio region and channel, its limits, candidates, last scan
     PUT  /api/v1/radio/region              set the region {"region": "eu868" or "as923-tw"} (no live game)
     PUT  /api/v1/radio/channel             set it {"channel_hz", "source"} (no live game)
@@ -600,6 +601,16 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.put("/api/v1/settings/box-language", dependencies=[Depends(require_gm)])
     def put_box_language(body: Any = Body(None)) -> dict[str, Any]:
         return controller.set_box_language(body_map(body).get("box_language"))
+
+    # --- the console's map fetching (LEG-50): off, the field-map page reaches nothing outside ----
+
+    @app.get("/api/v1/settings/map-fetching", dependencies=[Depends(require_console)])
+    def map_fetching() -> dict[str, Any]:
+        return controller.map_fetching()
+
+    @app.put("/api/v1/settings/map-fetching", dependencies=[Depends(require_gm)])
+    def put_map_fetching(body: Any = Body(None)) -> dict[str, Any]:
+        return controller.set_map_fetching(body_map(body).get("map_fetching"))
 
     # --- the field's radio channel (channels.py, RFC 0001 Amendment 3) -------
 
@@ -1472,7 +1483,10 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         async def security_headers(request: Request, call_next):
             response = await call_next(request)
             if request.url.path.startswith("/console"):
-                headers = FIELD_MAP_HEADERS if request.url.path == FIELD_MAP_PAGE else SECURITY_HEADERS
+                # The field's map-fetching setting (LEG-50): off, even the field-map page gets the strict headers,
+                # so the browser reaches no map service from it whatever the page's script does.
+                headers = (FIELD_MAP_HEADERS if request.url.path == FIELD_MAP_PAGE and controller.map_fetching_on()
+                           else SECURITY_HEADERS)
                 for k, v in headers.items():
                     response.headers.setdefault(k, v)
             return response

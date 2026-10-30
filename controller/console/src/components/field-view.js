@@ -64,8 +64,15 @@ export class FieldView extends Component {
 
     componentDidMount() {
         this.loadImage();
+        this.loadMapFetching();
         // The note goes into a status region already on the page, so screen readers announce it.
         if (this.loaded !== null) this.noteTimer = setTimeout(() => this.setState({ loadedNote: true }), 150);
+    }
+
+    /** LEG-50: whether the field turned map fetching off; the button then says so (the page itself does too). */
+    async loadMapFetching() {
+        const out = await this.props.app.call('GET', '/settings/map-fetching');
+        if (out && out.map_fetching === false) this.setState({ mapOff: true });
     }
 
     componentDidUpdate() {
@@ -424,6 +431,7 @@ export class FieldView extends Component {
                 ${state.imageUrl && html`<button type="button" data-testid="field-remove"
                     onClick=${() => this.removeImage()}>${multi ? t('levels.remove') : t('field.remove')}</button>`}
             </div>`}
+            ${role === 'gm' && state.mapOff && html`<p class="muted small" data-testid="field-map-off">${t('fieldmap.off_note')}</p>`}
             <div class=${`field-area ${state.imageUrl ? 'with-image' : 'grid'}${placing ? ' placing' : ''}${
                 showGrid ? ' with-field-grid' : ''}`} ref=${this.area}
                 data-testid="field-area" data-level=${state.level}

@@ -123,6 +123,34 @@ class ConsoleFilesTests(unittest.TestCase):
         # No token needed for the static files; the API still needs one.
         self.assertEqual(self.client.get("/api/v1/nodes").status_code, 401)
 
+    def test_map_fetching_can_be_turned_off_for_the_field(self):
+        """LEG-50: the field's setting. Off, the field-map page is served with the strict headers (no map origin)
+        so the browser reaches no map service from it; on again, it gets its own policy back."""
+        gm = {"Authorization": "Bearer gm-secret"}
+        read = {"Authorization": "Bearer read-secret"}
+        url = "/api/v1/settings/map-fetching"
+        self.assertEqual(self.client.get(url).status_code, 401)
+        self.assertEqual(self.client.get(url, headers=read).json(), {"map_fetching": True})  # the default
+        self.assertEqual(self.client.put(url, headers=read, json={"map_fetching": False}).status_code, 403)
+        for bad in ("no", 0, None):
+            self.assertEqual(self.client.put(url, headers=gm, json={"map_fetching": bad}).status_code, 400, bad)
+        try:
+            self.assertEqual(self.client.put(url, headers=gm, json={"map_fetching": False}).json(),
+                             {"map_fetching": False})
+            self.assertEqual(self.client.get(url, headers=read).json(), {"map_fetching": False})
+            r = self.client.get("/console/field-map.html")
+            self.assertEqual(r.status_code, 200)
+            for k, v in SECURITY_HEADERS.items():
+                self.assertEqual(r.headers.get(k), v, k)
+            csp = r.headers["content-security-policy"]
+            for origin in FIELD_MAP_ORIGINS.values():
+                self.assertNotIn(origin, csp, origin)
+            self.assertIn("geolocation=()", r.headers["permissions-policy"])
+        finally:
+            self.client.put(url, headers=gm, json={"map_fetching": True})
+        r = self.client.get("/console/field-map.html")
+        self.assertEqual(r.headers["content-security-policy"], FIELD_MAP_HEADERS["Content-Security-Policy"])
+
     def test_only_the_field_map_page_may_reach_the_internet(self):
         """MF-27, MF-45: the field-map page's CSP adds exactly OSM's tiles (images), the Overpass API, the
         DGT's WMS and Nominatim (connections); every other page of the console stays same-origin only.

@@ -3329,6 +3329,37 @@ class ConsoleBrowserTests(unittest.TestCase):
         viewer.goto(self.field.base + "/console/#field")
         expect(viewer.get_by_test_id("field-from-map")).to_have_count(0)
 
+    def test_map_fetching_turned_off_in_settings_closes_the_map_page(self):
+        """LEG-50: the GM turns map fetching off in Settings (Portuguese, then each language's message); the field-map
+        page then says so, shows no map and asks no map service for anything; the Field tab says it too; turned on
+        again, the map comes back."""
+        page = self.console(service_workers="block")
+        seen = self.map_routes(page)
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("map-fetching-settings")).to_contain_text("Obtenção de mapas")
+        expect(page.get_by_test_id("map-fetching")).to_be_checked()
+        page.get_by_test_id("map-fetching").uncheck()
+        expect(page.get_by_test_id("map-fetching-settings")).to_contain_text("Guardado")
+        self.assertIs(self.field.http.get("/api/v1/settings/map-fetching").json()["map_fetching"], False)
+        page.get_by_test_id("tab-field").click()
+        expect(page.get_by_test_id("field-map-off")).to_contain_text("desligada")
+        for lang, tag, words in (("pt", "pt-PT", "desligada neste campo"), ("en", "en", "turned off for this field"),
+                                 ("de", "de", "ausgeschaltet"), ("zh-tw", "zh-Hant-TW", "已關閉地圖擷取")):
+            page.goto(self.field.base + "/console/")
+            expect(page.get_by_test_id("tab-settings")).to_be_visible()
+            page.get_by_test_id("lang").first.select_option(lang)
+            expect(page.locator("html")).to_have_attribute("lang", tag)  # saved before the page is left
+            page.goto(self.field.base + "/console/field-map.html")
+            expect(page.get_by_test_id("fm-off")).to_contain_text(words)
+            expect(page.get_by_test_id("tm")).to_have_count(0)
+        self.assertEqual(seen["tiles"], 0)
+        for what in ("overpass", "hosts", "wms", "wms_tiles", "search", "other"):
+            self.assertEqual(seen[what], [], what)
+        # On again: the map page is itself again.
+        self.field.http.put("/api/v1/settings/map-fetching", json={"map_fetching": True})
+        page.goto(self.field.base + "/console/field-map.html")
+        expect(page.get_by_test_id("tm")).to_be_visible()
+
     def test_field_map_finds_a_place_by_name(self):
         """MF-44 to MF-46, as the maintainer asked (2026-10-23): a place's name goes to Nominatim (mocked)
         only when the GM presses Search, never per keystroke, at most once a second, the same question once,

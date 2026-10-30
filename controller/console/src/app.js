@@ -19,6 +19,7 @@ import { PresetBuilder } from './components/preset-builder.js';
 import { ScenarioBuilder } from './components/scenario-builder.js';
 import { RadioSettings } from './components/radio-settings.js';
 import { BoxLanguageSettings } from './components/box-language-settings.js';
+import { MapFetchingSettings } from './components/map-fetching-settings.js';
 import { FirmwarePanel } from './components/firmware-panel.js';
 import { PodConfigPanel } from './components/pod-config-panel.js';
 import { FetchedModes } from './components/fetched-modes.js';
@@ -599,7 +600,7 @@ class App extends Component {
         case 'controller':
             return html`<${ControllerPanel} app=${this} />${this.state.role === 'gm' && html`<${RemoteGmLog} app=${this} />`}`;
         case 'settings':
-            return html`${this.serves('radio') && html`<${RadioSettings} app=${this} />`}<${BoxLanguageSettings} app=${this} />${
+            return html`${this.serves('radio') && html`<${RadioSettings} app=${this} />`}<${BoxLanguageSettings} app=${this} /><${MapFetchingSettings} app=${this} />${
                 this.state.role === 'gm' && this.serves('checkin') && html`<${PosterPromptSetting} />`}${
                 this.serves('branding') && html`<${BrandingSettings} app=${this} />`}${
                 this.serves('presets') && html`<${TeamPresets} app=${this} />`}`;

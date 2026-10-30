@@ -151,6 +151,19 @@ class FieldMap extends Component {
             this.setState({ ready: true, role });
             return;
         }
+        // LEG-50: the field turned the console's map fetching off: no map, no search, no imagery; say so and stop.
+        // (The controller also serves this page without the map services' origins then; an older controller
+        // without the setting answers 404, which means on.)
+        let fetching = true;
+        try {
+            fetching = (await api(token, 'GET', '/settings/map-fetching')).map_fetching !== false;
+        } catch (e) {
+            fetching = true;
+        }
+        if (!fetching) {
+            this.setState({ ready: true, role, mapOff: true });
+            return;
+        }
         const info = await api(token, 'GET', '/field');
         const levels = info.levels;
         const level = this.state.level < levelsInUse(levels) ? this.state.level : 0;
@@ -662,6 +675,10 @@ class FieldMap extends Component {
         </header>`;
         if (s.role !== 'gm') {
             return html`${header}<main class="content"><p class="error" data-testid="fm-login">${t('fieldmap.login')}</p></main>`;
+        }
+        if (s.mapOff) {
+            return html`${header}<main class="content"><section class="card"><h1>${t('fieldmap.title')}</h1>
+                <p class="notice" role="status" data-testid="fm-off">${t('fieldmap.off')}</p></section></main>`;
         }
         return html`${header}<main class="content fm">
             ${this.renderBanner()}

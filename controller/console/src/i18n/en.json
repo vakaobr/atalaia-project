@@ -439,10 +439,19 @@
     "box_room_label": "Room of {name} (empty: the box's name)",
     "box_room_save": "Save the room"
   },
+  "map_fetching": {
+    "title": "Map fetching",
+    "intro": "The page “Load the field from a map” asks OpenStreetMap, Overpass, Nominatim and the open aerial imagery services for the map and the field’s area, and sends them the IP address of the device that opens the page and the area asked for. Turn it off if the field does not want that: the page then stays closed and nothing leaves the controller. The field can still be loaded by uploading an image.",
+    "label": "Let the console fetch maps from the internet",
+    "saved": "Saved.",
+    "read_only": "Only the GM changes this."
+  },
   "fieldmap": {
     "open": "Load the field from a map",
     "title": "Load the field from a map",
     "back": "Back to the console",
+    "off": "Map fetching is turned off for this field, so this page does not reach OpenStreetMap, Overpass, Nominatim or any aerial imagery service. To load the field from a map, the GM turns it on under Settings, “Map fetching”. You can also upload an image of the field on the Field tab.",
+    "off_note": "Map fetching is off for this field (Settings).",
     "login": "Sign in to the console with the GM code first, then open this page from the Field tab.",
     "intro": "Find the field on the map and mark the corners of its outline: this browser draws the field image from open maps. The image, its place on the map (ATAK) and the field boundary are then saved on the field controller, which needs no internet for this.",
     "sources": "Only while you set the game up: this browser fetches the map and the area once, from OpenStreetMap (© OpenStreetMap contributors) and, where there is one, the country's or region's open aerial imagery (the DGT orthophoto in mainland Portugal, IGN's PNOA in Spain, IGN's orthophotos in France and PDOK's in the Netherlands, and the public services' of Belgium, Luxembourg, Switzerland, eleven German states, Poland and Czechia, each with its credit). If OpenStreetMap's data service is busy, the same question (only the field's area) goes to another public server with the same data (overpass.private.coffee). Nothing else is downloaded, and the rest of the console keeps working without internet.",

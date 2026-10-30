@@ -194,6 +194,63 @@ void main() {
       });
     });
 
+    test(
+      'map fetching turned off: the field-map page reaches nothing (LEG-50)',
+      () {
+        expect(get('/api/v1/settings/map-fetching').status, 401);
+        final on = api.handle(
+          'GET',
+          Uri.parse('/api/v1/settings/map-fetching'),
+          authorization: 'Bearer rd',
+        );
+        expect(on.body, {'map_fetching': true});
+        final off = api.handle(
+          'PUT',
+          Uri.parse('/api/v1/settings/map-fetching'),
+          authorization: 'Bearer gm',
+          body: '{"map_fetching": false}',
+        );
+        expect(off.status, 200);
+        expect(off.body, {'map_fetching': false});
+        expect(
+          api
+              .handle(
+                'PUT',
+                Uri.parse('/api/v1/settings/map-fetching'),
+                authorization: 'Bearer rd',
+                body: '{"map_fetching": true}',
+              )
+              .status,
+          403,
+        );
+        expect(
+          api
+              .handle(
+                'PUT',
+                Uri.parse('/api/v1/settings/map-fetching'),
+                authorization: 'Bearer gm',
+                body: '{"map_fetching": "no"}',
+              )
+              .status,
+          400,
+        );
+        final page = get(fieldMapPage);
+        expect(page.status, 200);
+        expect(page.headers, consoleSecurityHeaders);
+        final csp = policy(page.headers['Content-Security-Policy']!);
+        expect(csp['connect-src'], "'self'");
+        expect(csp['img-src'], isNot(contains('https://')));
+        expect(page.headers['Permissions-Policy'], 'geolocation=()');
+        api.handle(
+          'PUT',
+          Uri.parse('/api/v1/settings/map-fetching'),
+          authorization: 'Bearer gm',
+          body: '{"map_fetching": true}',
+        );
+        expect(get(fieldMapPage).headers, fieldMapSecurityHeaders);
+      },
+    );
+
     test('files, their types and the security headers, with no token', () {
       final index = get('/console/');
       expect(index.status, 200);

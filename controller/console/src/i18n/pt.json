@@ -439,10 +439,19 @@
     "box_room_label": "Divisão de {name} (vazio: o nome da caixa)",
     "box_room_save": "Guardar a divisão"
   },
+  "map_fetching": {
+    "title": "Obtenção de mapas",
+    "intro": "A página «Carregar o campo de um mapa» pede ao OpenStreetMap, ao Overpass, ao Nominatim e aos serviços de imagem aérea abertos o mapa e a área do campo, e envia-lhes o endereço IP do dispositivo de quem abre a página e a área pedida. Desliga-a se o campo não quiser isso: a página fica fechada e nada sai do controlador. O campo continua a poder ser carregado com uma imagem.",
+    "label": "Deixar a consola obter mapas na internet",
+    "saved": "Guardado.",
+    "read_only": "Só a organização altera isto."
+  },
   "fieldmap": {
     "open": "Carregar o campo de um mapa",
     "title": "Carregar o campo de um mapa",
     "back": "Voltar à consola",
+    "off": "A obtenção de mapas está desligada neste campo, por isso esta página não contacta o OpenStreetMap, o Overpass, o Nominatim nem serviços de imagem aérea. Para carregar o campo de um mapa, a organização liga-a em Definições, «Obtenção de mapas». Também podes carregar uma imagem do campo no separador Campo.",
+    "off_note": "A obtenção de mapas está desligada neste campo (Definições).",
     "login": "Entra primeiro na consola com o código de acesso da organização e abre esta página a partir do separador Campo.",
     "intro": "Encontra o campo no mapa e marca os cantos do seu limite: este navegador desenha a imagem do campo a partir de mapas abertos. A imagem, a sua posição no mapa (ATAK) e o limite do campo ficam depois guardados no controlador de campo, que não precisa de internet para isto.",
     "sources": "Só enquanto preparas o jogo: este navegador obtém o mapa e a área uma vez, do OpenStreetMap (© OpenStreetMap contributors) e, onde houver, da fotografia aérea aberta do país ou da região (o ortofotomapa da DGT em Portugal continental, o PNOA do IGN em Espanha, as ortofotos do IGN em França e as do PDOK nos Países Baixos, e as dos serviços públicos da Bélgica, do Luxemburgo, da Suíça, de onze estados alemães, da Polónia e da Chéquia, cada uma com o seu crédito). Se o serviço de dados do OpenStreetMap estiver ocupado, a mesma pergunta (só a área do campo) vai a outro servidor público com os mesmos dados (overpass.private.coffee). Nada mais é descarregado, e o resto da consola continua a funcionar sem internet.",

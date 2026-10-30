@@ -439,10 +439,19 @@
     "box_room_label": "Raum von {name} (leer: der Name der Box)",
     "box_room_save": "Raum speichern"
   },
+  "map_fetching": {
+    "title": "Kartenabruf",
+    "intro": "Die Seite „Spielfeld aus einer Karte laden“ fragt OpenStreetMap, Overpass, Nominatim und die offenen Luftbilddienste nach der Karte und dem Gebiet des Spielfelds und sendet ihnen die IP-Adresse des Geräts, das die Seite öffnet, und das angefragte Gebiet. Schalte ihn aus, wenn das Spielfeld das nicht will: Die Seite bleibt dann geschlossen, und nichts verlässt den Controller. Das Spielfeld lässt sich weiterhin über ein hochgeladenes Bild laden.",
+    "label": "Die Konsole darf Karten aus dem Internet abrufen",
+    "saved": "Gespeichert.",
+    "read_only": "Nur die Spielleitung ändert das."
+  },
   "fieldmap": {
     "open": "Feld aus einer Karte laden",
     "title": "Feld aus einer Karte laden",
     "back": "Zurück zur Konsole",
+    "off": "Der Kartenabruf ist für dieses Spielfeld ausgeschaltet, deshalb erreicht diese Seite weder OpenStreetMap noch Overpass, Nominatim oder einen Luftbilddienst. Um das Spielfeld aus einer Karte zu laden, schaltet die Spielleitung ihn unter Einstellungen, „Kartenabruf“, ein. Du kannst auch im Reiter Spielfeld ein Bild des Spielfelds hochladen.",
+    "off_note": "Der Kartenabruf ist für dieses Spielfeld ausgeschaltet (Einstellungen).",
     "login": "Melde dich zuerst mit dem GM-Code an der Konsole an und öffne diese Seite dann aus dem Tab Feld.",
     "intro": "Such das Feld auf der Karte und markiere die Ecken seines Umrisses: Dieser Browser zeichnet das Feldbild aus offenen Karten. Das Bild, seine Lage auf der Karte (ATAK) und die Feldgrenze werden dann auf dem Feld-Controller gespeichert, der dafür kein Internet braucht.",
     "sources": "Nur während du das Spiel einrichtest: Dieser Browser lädt die Karte und das Gebiet einmal von OpenStreetMap (© OpenStreetMap-Mitwirkende) und, wo es sie gibt, die offenen Luftbilder des Landes oder der Region (das DGT-Orthofoto auf dem portugiesischen Festland, das PNOA des IGN in Spanien, die Orthofotos des IGN in Frankreich und die von PDOK in den Niederlanden sowie die der öffentlichen Dienste Belgiens, Luxemburgs, der Schweiz, von elf deutschen Ländern, Polens und Tschechiens, jeweils mit ihrem Nachweis). Ist der Datendienst von OpenStreetMap ausgelastet, geht dieselbe Anfrage (nur das Gebiet des Feldes) an einen anderen öffentlichen Server mit denselben Daten (overpass.private.coffee). Sonst wird nichts heruntergeladen, und der Rest der Konsole funktioniert weiter ohne Internet.",
