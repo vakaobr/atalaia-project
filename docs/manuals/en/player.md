@@ -139,7 +139,7 @@ The app **follows** the game. You capture boxes **at the box**, not on the phone
    - **Score**: one card per team. Your team has a thick border. Tap a team card to highlight your team if you have none;
    - **Objectives**: each box and who holds it (**Held by** *(team)* or **Held by nobody**);
    - **Lives**, when the mode counts lives, and eliminated teams;
-   - **What happened**: the last 30 events, in words.
+   - **What happened**: the last 30 events, in words. Boxes and pods coming online, going offline or confirming their setup do not appear: they mean nothing in the game.
 3. If you see **Offline. Reconnecting…**, you are out of Wi-Fi range. The game goes on without you looking. The app reconnects by itself.
 
 ![The player's view: the game's name and time to go, two team cards with points, the boxes and who holds them, and what happened](../../../site/img/screens/app-player-en.png)

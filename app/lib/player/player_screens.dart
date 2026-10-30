@@ -1009,6 +1009,11 @@ class PlayerView extends StatelessWidget {
     final objectiveNames = {
       for (final o in feed.objectives) o.id: o.name(s.code),
     };
+    // Housekeeping events stay out of the player's list; the feed keeps them.
+    final shown = [
+      for (final e in feed.events)
+        if (isPlayerFeedEvent(e.type)) e,
+    ];
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1157,8 +1162,8 @@ class PlayerView extends StatelessWidget {
               ),
           ],
           SectionTitle(s.t('player.events')),
-          if (feed.events.isEmpty) Text(s.t('player.no_events')),
-          for (final e in feed.events.take(30))
+          if (shown.isEmpty) Text(s.t('player.no_events')),
+          for (final e in shown.take(30))
             ListTile(
               dense: true,
               leading: TeamDot(e.team, size: 12),
@@ -1590,6 +1595,34 @@ class _TeamRow extends StatelessWidget {
 
 /// An event of the game in words (the types of protocol/schema/events.yaml
 /// that players care about; others show their type).
+/// Event types the player's list leaves out: node, pod, script and reader
+/// housekeeping with no meaning for someone in the game (and no `event.<type>`
+/// text, which used to show the raw type name). See `protocol/schema/events.yaml`.
+/// Everything not named here is shown, so a new game event appears by default.
+/// Only the player's list uses this: the feed keeps every event, and the
+/// history and staff views are not filtered.
+const playerHiddenEventTypes = <String>{
+  'battery.low',
+  'chrono.checkin',
+  'chrono.spotcheck',
+  'node.modes_failed',
+  'node.offline',
+  'node.online',
+  'node.rebooted',
+  'node.setup_applied',
+  'node.update_failed',
+  'pod.connected',
+  'pod.disconnected',
+  'script.error',
+  'script.halted',
+  'tag.scanned',
+  'target.hit',
+  'visibility.expired',
+};
+
+/// Whether the player's event list shows an event of [type].
+bool isPlayerFeedEvent(String type) => !playerHiddenEventTypes.contains(type);
+
 String eventText(
   Strings s,
   FeedEvent e, [

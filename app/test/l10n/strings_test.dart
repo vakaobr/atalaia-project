@@ -67,6 +67,8 @@ void main() {
       'player.respawn',
       'gm.message',
       'battery.low',
+      'pod.connected', // event types the player's list hides
+      'pod.disconnected',
       'chrono.violation', // an event the phone controller logs (slice S5)
       'settings.json', // the controller store's file (controller_store.dart)
     });
