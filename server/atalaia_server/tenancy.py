@@ -77,6 +77,9 @@ SETTING = "atalaia.tenant"
 NO_TENANT_PATH = "pg_catalog"
 # Answered without a tenant: the container's health check calls 127.0.0.1, not a field's name.
 OPEN_PATHS = frozenset({"/api/v1/health"})
+# The hub's own host answers this one path, and only with ATALAIA_OIDC_RELAY=on (LG-14): the social login callback
+# every field's login comes back to; it reads the registry only, never a field's data.
+RELAY_PATH = "/api/v1/auth/oidc/callback"
 STATUSES = ("active", "suspended")
 HOST_STATUSES = ("pending", "active")
 # A field's custom host name (PKC-6): two or more DNS labels, lower case, the last one letters (so never an address).
@@ -382,6 +385,11 @@ class TenantMiddleware:
             if name == b"host":
                 host = value.decode("latin-1")
                 break
+        if scope["type"] == "http" and state.settings.oidc_relay and scope.get("path") == RELAY_PATH \
+                and host_name(host) == state.settings.hosted_domain:
+            with use(None):
+                await self.app(scope, receive, send)
+            return
         slug = slug_from_host(host, state.settings.hosted_domain)
         try:
             # <slug>.<domain>, else a field's custom host name that passed its DNS challenge (PKC-6).

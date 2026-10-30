@@ -78,6 +78,10 @@
     ATALAIA_OIDC_APPLE_KEY_FILE     (the .p8 private key the client secret JWT is signed with)
                             each social login provider is off until all of its settings are given
                             (atalaia_server/oidc.py; decisions LG-*)
+    ATALAIA_OIDC_RELAY      hosted mode only, "off" by default (decision LG-14): "on" sends every field's social login
+                            through ONE callback on the hub's own host, https://<ATALAIA_HOSTED_DOMAIN>/api/v1/auth/oidc/callback,
+                            the only redirect address the operator registers at Google, Microsoft and Apple
+                            (atalaia_server/api/oidc_relay.py); off, each field's own address is registered
 
     ATALAIA_QUOTA_<NAME>    hosted mode only: one field's limit on a resource (``QUOTA_DEFAULTS`` lists the names
                             and defaults: ACCOUNTS, SCHEDULED_GAMES, REGISTRATIONS, GAMES,
@@ -353,6 +357,7 @@ class Settings:
     hosted_watch_s: float = DEFAULT_HOSTED_WATCH_S
     password_login: bool = True                    # LG-3: "off" turns password login and registration off
     oidc: tuple[OidcClient, ...] = ()              # the configured social login providers (LG-1)
+    oidc_relay: bool = False                       # LG-14: hosted mode's one hub-level callback (opt-in)
     app_android_package: Optional[str] = None      # PKA-1: the app's Digital Asset Links (off when unset)
     app_android_sha256: tuple[str, ...] = ()
     app_ios_app_ids: tuple[str, ...] = ()          # PKA-1: apple-app-site-association (off when unset)
@@ -424,6 +429,9 @@ class Settings:
         self._check_app()
         if len({c.provider for c in self.oidc}) != len(self.oidc):
             raise ConfigError("a social login provider is configured twice")
+        if self.oidc_relay and not self.hosted:
+            raise ConfigError("ATALAIA_OIDC_RELAY is only for hosted mode (ATALAIA_HOSTED=on): a single-field server "
+                              "has one address to register")
 
     def oidc_client(self, provider: str) -> Optional[OidcClient]:
         return next((c for c in self.oidc if c.provider == provider), None)
@@ -536,6 +544,7 @@ class Settings:
             hosted_watch_s=float(_number(env, "ATALAIA_HOSTED_WATCH_S", DEFAULT_HOSTED_WATCH_S, 0.1, 60.0, float)),
             password_login=_on_off(env, "ATALAIA_PASSWORD_LOGIN", default=True),
             oidc=_oidc_clients(env),
+            oidc_relay=_on_off(env, "ATALAIA_OIDC_RELAY"),
             app_android_package=env.get("ATALAIA_APP_ANDROID_PACKAGE", "").strip() or None,
             app_android_sha256=_list(env, "ATALAIA_APP_ANDROID_SHA256"),
             app_ios_app_ids=_list(env, "ATALAIA_APP_IOS_APP_IDS"),

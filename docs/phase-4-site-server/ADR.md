@@ -17,7 +17,7 @@ and ADR-P4-12 (open feeds, registration import and platform adapters),
 were added on 2026-10-19 at the maintainer's request; both are
 proposed, with their open questions in `docs/review/decisions-to-review.md`
 (F13-F23). ADR-P4-13 (the hub-level OIDC callback relay for hosted mode) was added on 2026-10-28 as a
-design only: nothing is built.
+design and built on 2026-10-30 (off by default, `ATALAIA_OIDC_RELAY`; "As built" at the end of that ADR).
 
 ---
 
@@ -3293,9 +3293,9 @@ export one (unknown).  Nothing will be scraped.
 
 ---
 
-### ADR-P4-13: The hub-level OIDC callback relay (design only, not built)
+### ADR-P4-13: The hub-level OIDC callback relay (built 2026-10-30, decisions LG-14 to LG-19)
 
-**Date:** 2026-10-28. **Status:** proposed, to be built with the legal review of hosted mode (P4-6); no code yet.
+**Date:** 2026-10-28. **Status:** built 2026-10-30 behind `ATALAIA_OIDC_RELAY=on` (off by default; turn it on after the legal review of hosted mode, P4-6). See "As built" at the end of this ADR for where the code differs from the text above.
 **Decided by the maintainer** (S21-12's follow-up, 2026-10-28): hosted mode gets one callback address for social login
 (Google, Microsoft, Apple) instead of one per field.
 
@@ -3353,6 +3353,34 @@ One more public endpoint, outside the tenant routing, with a small, testable sur
 and the redirect. The legal review has to cover that the hub operator now sees, in transit, the provider's code and
 the field's name for each social login (not the person's identity: the code is useless without the field's verifier).
 Build it after the legal review (P4-6) and test it with the provider's sandbox clients.
+
+**As built (2026-10-30; decisions LG-14 to LG-19 in `docs/review/decisions-to-review.md`).** The design above stands; these
+points are where the code is more exact or stricter than the text.
+
+- *Setting.* `ATALAIA_OIDC_RELAY=on` (hosted mode only; a single-field server refuses it at start-up). The redirect
+  URI is the same for every provider and field, `https://<hub domain>/api/v1/auth/oidc/callback`; the provider is in
+  the signed state, not in the path.
+- *State.* `r1.<random>.<slug>.<provider>.<s|c>.<expiry>.<mac>`, about 160 characters at most (`MAX_STATE` 256).
+  The MAC is HMAC-SHA256 under a key derived from `ATALAIA_SECRET_KEY` with its own label (`social login relay`).
+  The **host is not in the state**: it carries only `s` (the field's own name) or `c` (started at the custom host name)
+  and the hub reads the host from the registry row, so no host, signed or not, ever comes from the request.
+- *The hub does read the registry* (one row of `public.atalaia_tenants`, no field data and no field's role),
+  which the text above left as belt and braces: a field that does not exist, or is suspended, gets a plain 400 page
+  (the same page and status for both and for a bad or expired state, so the relay is no oracle) and nothing is forwarded.
+- *Forwarded:* the whole signed state and either `code` or `error=denied` (the provider's own error text never goes on).
+- *The field checks too.* Its callback re-reads a state that starts with `r1.`: the signature, the expiry, that the
+  slug is **its own** and that the provider is the one in the path, before it touches the login row. Another field's
+  relayed result is refused at that point, with the first field's row left alone.
+- *Single use.* Unchanged: the login row is deleted by the callback whatever follows, the code is single use at the
+  provider. The relay keeps no state (no table, no memory), so it cannot mark a result as spent; replays are refused by
+  the field. Result lifetime: ten minutes at most (state expiry, the row's own expiry), as the login itself.
+- *Deployment.* The hub's own name needs a DNS record of its own (the wildcard does not cover it) and an ordinary
+  certificate. `Caddyfile.hosted` imports `/etc/caddy/relay.caddy`, which `docker-compose.hosted.yml` fills with
+  `relay-on.caddy` (the apex site: the relay's one path proxied, every other path 404) or `relay-off.caddy` (nothing:
+  the hub's own name gets no certificate, as before), by the same `ATALAIA_OIDC_RELAY` value.
+- *Not done.* A `Referrer-Policy: no-referrer` on the relay's answer: the server's security-headers middleware sets one
+  policy on every response; the relay's answer is a body-less 303, so no page of the hub exists that could refer the
+  code. The hub operator's proxy must still not log query strings on this path (DEPLOY.md).
 
 ---
 

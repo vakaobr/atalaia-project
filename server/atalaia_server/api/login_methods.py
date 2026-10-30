@@ -5,7 +5,8 @@
     GET    /api/v1/auth/methods                        what this server offers (the login pages' buttons)
     POST   /api/v1/auth/oidc/{provider}/start          {purpose, consent?, notice_version?, return_to?, password?}: the provider's URL
     GET    /api/v1/auth/oidc/{provider}/browser        the app's browser starts here (PKA-1): sets the binding cookie
-    GET    /api/v1/auth/oidc/{provider}/callback       where the provider sends the browser back
+    GET    /api/v1/auth/oidc/{provider}/callback       where the provider sends the browser back (a field's own address)
+    GET    /api/v1/auth/oidc/callback                  hosted hub only, ATALAIA_OIDC_RELAY=on: the hub's one address, see oidc_relay.py
     POST   /api/v1/auth/oidc/complete                  {ticket}: a finished social login becomes a session
     POST   /api/v1/auth/passkey/login/options          a passkey login needs no username
     POST   /api/v1/auth/passkey/login                  {challenge_token, credential}: a session with both factors
@@ -68,7 +69,8 @@ from ..audit import record
 from ..auth import Principal, bearer, current_principal, principal_from_token
 from ..db import get_session
 from ..models import PRIVILEGED_ROLES, ROLE_NAMES, AuditLog, OidcLogin, Passkey, User, UserFieldRole, UserIdentity, UserSession
-from ..oidc import NAME_PROVIDERS, PROVIDER_LABELS, OidcError, new_verifier, pkce_challenge, username_from_name
+from ..oidc import (MAX_STATE, NAME_PROVIDERS, PROVIDER_LABELS, OidcError, make_relay_state, new_verifier, read_relay_state,
+                    pkce_challenge, username_from_name)
 from ..tokens import (TokenError, WebauthnChallenge, make_merge_ticket, make_oidc_ticket, make_webauthn_challenge, read_oidc_ticket,
                       read_webauthn_challenge)
 from .auth import (NO_STORE, Strict, username_problem, _check_code, _check_password, _ip_key, _now, _secret, _start_session, _too_many,
@@ -138,7 +140,29 @@ def site_origin(request: Request) -> str:
 
 
 def callback_url(request: Request, provider: str) -> str:
+    """The redirect address the provider is given: the field's own, or (hosted mode with the relay on, LG-14) the
+    hub's one, ``https://<hub domain>/api/v1/auth/oidc/callback``, the same for every field and provider."""
+    settings = request.app.state.settings
+    if relay_on(request):
+        return f"https://{settings.hosted_domain}{BINDING_PATH}/callback"
     return f"{site_origin(request)}{BINDING_PATH}/{provider}/callback"
+
+
+def relay_on(request: Request) -> bool:
+    settings = request.app.state.settings
+    return settings.hosted and settings.oidc_relay and tenancy.current() is not None
+
+
+def new_state(request: Request, provider: str) -> str:
+    """A random state; with the relay on, one the hub signed that names this field (and whether the login began at
+    its custom host name), so the hub's callback can send the browser back here and nowhere else."""
+    tenant = tenancy.current()
+    if not relay_on(request) or tenant is None:
+        return secrets.token_urlsafe(32)
+    settings = request.app.state.settings
+    custom = tenant.serving_host(settings.hosted_domain, request.headers.get("host", "")) != tenant.host(settings.hosted_domain)
+    return make_relay_state(request.app.state.keys.oidc_relay, tenant.slug, provider, custom,
+                            int(request.app.state.clock()) + STATE_TTL_S)
 
 
 def safe_return_to(text: str, origin: Optional[str] = None) -> str:
@@ -292,7 +316,7 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
             await _check_name_round(db, request, principal, provider, body.return_to)
     now = _now()
     await db.execute(delete(OidcLogin).where(OidcLogin.expires_at < now))  # the ones never finished
-    state, binding = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+    state, binding = new_state(request, provider), secrets.token_urlsafe(32)
     nonce, verifier = secrets.token_urlsafe(24), new_verifier()
     redirect_uri = callback_url(request, provider)
     db.add(OidcLogin(state_hash=_hash(state), binding_hash=_hash(binding), provider=provider, purpose=body.purpose,
@@ -363,7 +387,7 @@ async def oidc_browser(provider: str, request: Request, x: str = "", s: str = ""
     the account of whoever opens it without their knowing."""
     gone = HTMLResponse(BROWSER_GONE, status_code=400, headers={**NO_STORE, "Referrer-Policy": "no-referrer"})
     if provider not in PROVIDER_LABELS or provider not in request.app.state.oidc.clients \
-            or not s or len(s) > 128 or not x or len(x) > 128:
+            or not s or len(s) > MAX_STATE or not x or len(x) > 128:
         return gone
     row = await db.scalar(select(OidcLogin).where(OidcLogin.state_hash == _hash(s), OidcLogin.provider == provider))
     if row is None or row.expires_at <= _now() or not hmac.compare_digest(_hash(x), row.binding_hash) \
@@ -390,11 +414,24 @@ async def oidc_browser(provider: str, request: Request, x: str = "", s: str = ""
     return response
 
 
+def _relay_state_is_ours(request: Request, provider: str, state: str) -> bool:
+    """A state the hub signed (LG-14) is accepted only at the field and for the provider it names, and before its
+    expiry: a result relayed for another field is refused here even if its login row somehow existed."""
+    tenant = tenancy.current()
+    try:
+        routing = read_relay_state(request.app.state.keys.oidc_relay, state, request.app.state.clock())
+    except OidcError:
+        return False
+    return tenant is not None and routing.slug == tenant.slug and routing.provider == provider
+
+
 @router.get("/auth/oidc/{provider}/callback")
 async def oidc_callback(provider: str, request: Request, code: Optional[str] = None, state: Optional[str] = None,
                         error: Optional[str] = None, db: AsyncSession = Depends(get_session)) -> RedirectResponse:
     if provider not in PROVIDER_LABELS or provider not in request.app.state.oidc.clients or not state \
-            or len(state) > 128:
+            or len(state) > MAX_STATE:
+        return _back(DEFAULT_RETURN, error="state_invalid")
+    if state.startswith("r1.") and not _relay_state_is_ours(request, provider, state):
         return _back(DEFAULT_RETURN, error="state_invalid")
     row = (await db.execute(delete(OidcLogin).where(OidcLogin.state_hash == _hash(state),
                                                     OidcLogin.provider == provider).returning(OidcLogin)

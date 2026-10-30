@@ -68,6 +68,7 @@ class Keys:
         self.platform_config = base64.urlsafe_b64encode(_derive(secret_key, "platform config"))  # a Fernet key
         self.webauthn = _derive(secret_key, "webauthn challenge")  # signs the passkey ceremonies' challenges (LG-2)
         self.oidc_ticket = _derive(secret_key, "social login ticket")  # signs the tickets of finished social logins (LG-1)
+        self.oidc_relay = _derive(secret_key, "social login relay")  # signs the state the hub-level callback reads (LG-14)
         self.feedback_form = _derive(secret_key, "preview feedback form")  # signs the preview feedback form's token
 
     def __repr__(self) -> str:

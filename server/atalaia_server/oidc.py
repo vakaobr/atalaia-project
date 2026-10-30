@@ -60,6 +60,54 @@ NAME_PROVIDERS = ("google", "microsoft")   # Apple gives a name only once, in a 
 PROVIDER_LABELS = {"google": "Google", "microsoft": "Microsoft", "apple": "Apple"}
 
 
+# The hub-level callback relay (decision LG-14, ADR-P4-13) --------------------------------------------------
+# Hosted mode registers ONE redirect address per provider, on the hub's own host. The ``state`` the field sends the
+# provider then carries, signed by the hub's relay key, which field started the login and for how long, so the hub
+# can send the browser back to that field (and only to a field of its own registry) without a database of its own.
+RELAY_PREFIX = "r1"
+MAX_STATE = 256     # the longest state any of this server's flows produces (about 160 for a relay one)
+
+
+@dataclass(frozen=True)
+class RelayState:
+    raw: str          # the random part (what the login row is keyed on, with the rest)
+    slug: str         # the field that started the login
+    provider: str
+    custom: bool      # started at the field's custom host name rather than <slug>.<hub domain>
+    expires: int      # unix seconds
+
+
+def _relay_mac(key: bytes, raw: str, slug: str, provider: str, custom: bool, expires: int) -> str:
+    message = "|".join((RELAY_PREFIX, raw, slug, provider, "c" if custom else "s", str(expires))).encode("ascii")
+    return base64.urlsafe_b64encode(hmac.new(key, message, hashlib.sha256).digest()).rstrip(b"=").decode("ascii")
+
+
+def make_relay_state(key: bytes, slug: str, provider: str, custom: bool, expires: int) -> str:
+    """A fresh state naming the field: ``r1.<random>.<slug>.<provider>.<s|c>.<expiry>.<mac>``. The random part is
+    what a plain state is; the rest is routing information the hub checks, signed so no one can change the field
+    or the provider (the host the browser goes back to is read from the hub's registry, never from the state)."""
+    raw = secrets.token_urlsafe(32)
+    mac = _relay_mac(key, raw, slug, provider, custom, expires)
+    return ".".join((RELAY_PREFIX, raw, slug, provider, "c" if custom else "s", str(expires), mac))
+
+
+_RELAY_PARTS = re.compile(r"r1\.([A-Za-z0-9_-]{20,64})\.([a-z0-9-]{1,40})\.(google|microsoft|apple)\.([sc])\.([0-9]{1,12})\."
+                          r"([A-Za-z0-9_-]{43})")
+
+
+def read_relay_state(key: bytes, state: str, now: float) -> RelayState:
+    """The routing information of a state the hub signed, else ``OidcError('state_invalid')``: not ours, altered, or
+    older than its expiry."""
+    parts = _RELAY_PARTS.fullmatch(state) if len(state) <= MAX_STATE else None
+    if parts is None:
+        raise OidcError("state_invalid")
+    raw, slug, provider, kind, expires, mac = parts.groups()
+    want = _relay_mac(key, raw, slug, provider, kind == "c", int(expires))
+    if not hmac.compare_digest(want.encode(), mac.encode()) or int(expires) <= now:
+        raise OidcError("state_invalid")
+    return RelayState(raw, slug, provider, kind == "c", int(expires))
+
+
 class OidcError(Exception):
     """A social login failed; ``code`` is the short reason the page can show (never the provider's text)."""
 

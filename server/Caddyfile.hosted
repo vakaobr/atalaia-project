@@ -78,3 +78,15 @@
 https:// {
 	import hub-site
 }
+
+# The hub's own name serves the social login relay's one path when ATALAIA_OIDC_RELAY=on (decision LG-14):
+# docker-compose.hosted.yml mounts relay-on.caddy or relay-off.caddy as /etc/caddy/relay.caddy, by that setting.
+# Off, the hub's own name serves nothing and gets no certificate, as before.
+(apex-tls-acme) {
+}
+
+(apex-tls-internal) {
+	tls internal
+}
+
+import /etc/caddy/relay.caddy

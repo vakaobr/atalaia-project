@@ -194,10 +194,23 @@ change afterwards, or the passkeys stop working. A provider is **off** until you
 email or a name, so you ask the providers for nothing but sign-in. (One exception, on request only: the Account page's "Use my Google name" / "Use my Microsoft name" button, which an account made by that provider's login can press once to get a username suggested, runs a round with the extra scope `profile`; the name is read for that one answer and kept nowhere. Google's consent screen must therefore list `profile`, below. Apple has no such button.)
 
 The one address every provider needs is the **redirect URI**: `https://DOMAIN/api/v1/auth/oidc/PROVIDER/callback`, with
-`DOMAIN` your site's name and `PROVIDER` `google`, `microsoft` or `apple`, typed exactly (https, no trailing slash). In
-a hosted hub each field has its own name, so register `https://<slug>.<hub domain>/api/v1/auth/oidc/PROVIDER/callback`
-for every field that should offer the provider (Google and Microsoft take many redirect URIs; none of the three takes
-a wildcard host).
+`DOMAIN` your site's name and `PROVIDER` `google`, `microsoft` or `apple`, typed exactly (https, no trailing slash).
+
+**A hosted hub registers one address per provider, once** (decision LG-14, ADR-P4-13). Set `ATALAIA_OIDC_RELAY=on` in
+`.env` and register, at each provider, only `https://<hub domain>/api/v1/auth/oidc/callback` (the hub's own name, for
+example `https://hub.example.pt/api/v1/auth/oidc/callback`; the same address for Google, Microsoft and Apple, and for
+every field and custom host name, present and future). Every field's login then comes back to that address first; the
+hub reads the state it signed, looks the field up in its registry (an unknown or suspended field is refused) and sends
+the browser on to the field's own address, which finishes the login. For Apple, the *Domain* is the hub's domain and the
+*Return URL* that one address. What the relay needs besides: a DNS record for the hub's own name (`A`/`AAAA`; the
+wildcard `*.hub.example.pt` does not cover it) and `ATALAIA_OIDC_RELAY=on` in the same `.env`, which also makes Compose mount
+`relay-on.caddy` so Caddy gets an ordinary certificate for that name and proxies that one path (every other path of the
+hub's own name stays a 404). The proxy in front of the hub must not log query strings on that path (they hold the
+provider's one-time code). Only the hub operator sees that code in transit, and it is useless without the field's PKCE
+verifier. With the setting off (the default), or on a single-field server, nothing changes: each address below is
+registered by hand, and in a hosted hub that means `https://<slug>.<hub domain>/api/v1/auth/oidc/PROVIDER/callback` for
+every field that offers the provider (Google and Microsoft take many redirect URIs; none of the three takes a wildcard
+host). Turning the relay on or off while people are signing in cancels the logins in flight (ten minutes at most).
 
 **Google** (Google Cloud console, *APIs and services*, *Credentials*): configure the OAuth consent screen (the app's
 name, your address, the scopes `openid` and **`profile`** (both non-sensitive: no Google verification is needed; `profile` is only used when a person presses "Use my Google name" to get a suggested username, and the name is never stored), no sensitive or restricted scope), then *Create credentials*, *OAuth
@@ -720,9 +733,10 @@ What changes on the custom name: the page addresses the field makes (the public 
 pages' addresses) and a passkey's origin follow the name the request came by, so **passkeys are per name** (an account's
 passkeys made at `<slug>.hub.example.pt` do not work at the custom name, and the other way round; passwords and TOTP do).
 The remote ATAK relay's devices and the controllers keep using `<slug>.hub.example.pt` (its certificate covers the hub's
-sub-domains only). **Social login** (Google, Microsoft, Apple) uses a redirect address that each provider registers one
-by one: the custom name needs its address registered at the provider, as every field's own address does today; the
-hub-level callback relay that will remove that work is a design only (docs/phase-4-site-server/ADR.md, ADR-P4-13). Like
+sub-domains only). **Social login** (Google, Microsoft, Apple) with the hub's callback relay on (`ATALAIA_OIDC_RELAY=on`,
+"Social login" above) needs nothing registered for the custom name: the providers know only the hub's one address, and
+the hub sends the browser back to the name the login began at. With the relay off, the custom name's own address has to
+be registered at each provider, as every field's own address is. Like
 the rest of hosted mode, this has not run on a real hub with real DNS; the tests cover the registry, the routing, the
 `ask` endpoint and the challenge with a fake resolver and a resolver of their own on localhost.
 

@@ -1,0 +1,5 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Mounted as /etc/caddy/relay.caddy by docker-compose.hosted.yml unless ATALAIA_OIDC_RELAY=on (decision LG-14):
+# the hub's own name then serves nothing and gets no certificate. relay-on.caddy is the other choice.

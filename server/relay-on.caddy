@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Mounted as /etc/caddy/relay.caddy by docker-compose.hosted.yml when ATALAIA_OIDC_RELAY=on (decision LG-14;
+# DEPLOY.md, "Social login"). The hub's own name carries the one social login callback Google, Microsoft and Apple are
+# given, and nothing else (every other path is a plain 404 here). It needs its own DNS record (the wildcard does
+# not cover the bare name) and an ordinary certificate, not an on-demand one: the `ask` endpoint says no to the
+# hub's name by design.
+{$ATALAIA_DOMAIN} {
+	import apex-tls-{$ATALAIA_TLS:acme}
+	header {
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		X-Permitted-Cross-Domain-Policies "none"
+		-Server
+		-Via
+		-X-Powered-By
+		defer
+	}
+	@relay {
+		method GET
+		path /api/v1/auth/oidc/callback
+	}
+	handle @relay {
+		reverse_proxy server:8000
+	}
+	handle {
+		respond "Not found" 404
+	}
+}

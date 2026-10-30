@@ -33,6 +33,8 @@ services:
   caddy:
     volumes:
       - ./Caddyfile.hosted:/etc/caddy/Caddyfile:ro
+      # The hub's own name serves the social login relay's one path only with ATALAIA_OIDC_RELAY=on (LG-14).
+      - ./relay-${ATALAIA_OIDC_RELAY:-off}.caddy:/etc/caddy/relay.caddy:ro
     depends_on:
       tls-ask:
         condition: service_healthy
@@ -53,6 +55,9 @@ services:
       ATALAIA_QUOTA_ATAK_CERTS: "${ATALAIA_QUOTA_ATAK_CERTS:-}"
       ATALAIA_QUOTA_STREAMS: "${ATALAIA_QUOTA_STREAMS:-}"
       ATALAIA_HOSTED_WATCH_S: "${ATALAIA_HOSTED_WATCH_S:-}"
+      # One social login callback on the hub's own name for every field (decision LG-14; DEPLOY.md, "Social login"):
+      # "on" or "off" (default); the same setting picks Caddy's relay-on.caddy / relay-off.caddy above.
+      ATALAIA_OIDC_RELAY: "${ATALAIA_OIDC_RELAY:-}"
     # The image's command runs `alembic upgrade head`, which refuses hosted mode: hub migrates instead.
     command: ["uvicorn", "--factory", "atalaia_server.app:create_app", "--host", "0.0.0.0", "--port", "8000",
               "--workers", "1", "--proxy-headers", "--no-server-header"]
