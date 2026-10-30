@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from . import beacons as beaconsmod
 from . import field_levels as levelsmod
 from . import visibility
+from atalaia_sim import join as joinfmt
 from .beacons import BOX_MAJOR as MAJOR
 from .engine import BOX_BEACONS_SETTING as SETTING_ENABLED
 from .engine import ControllerError
@@ -44,6 +45,7 @@ if TYPE_CHECKING:
 LABEL = b"atalaia box beacon uuid v1"
 SETTING_OFF = "box_beacons_off:"     # + game id: JSON list of the node ids the GM disabled
 SETTING_ROOMS = "box_beacon_rooms:"  # + game id: JSON {node id: room} the GM gave
+SETTING_PLACED = "box_places_mirrored:"  # + game id: JSON list of the node ids whose places a primary mirrored (BBC-25)
 ROOM_MAX = 48
 
 
@@ -100,6 +102,11 @@ def rooms(ctrl: "Controller", game_id: int) -> dict[int, str]:
     return {int(k): v for k, v in got.items() if str(k).isdigit() and isinstance(v, str)}
 
 
+def mirrored_nodes(ctrl: "Controller", game_id: int) -> set[int]:
+    got = _json_setting(ctrl, f"{SETTING_PLACED}{game_id}", [])
+    return {n for n in got if isinstance(n, int)} if isinstance(got, list) else set()
+
+
 def _room_text(v: Any) -> str:
     if not isinstance(v, str):
         raise ControllerError("room: a text")
@@ -122,6 +129,10 @@ def _box_nodes(ctrl: "Controller") -> dict[int, str]:
     for nid in game.get("assignments", {}):
         if str(nid).isdigit():
             names.setdefault(int(nid), ctrl.scenario_names.get(int(nid), f"node-{int(nid)}"))
+    # Boxes whose places the primary mirrored (BBC-25) are the game's boxes even before they say HELLO here,
+    # so a promoted standby has them in its registry at once.
+    for nid in mirrored_nodes(ctrl, game["id"]):
+        names.setdefault(nid, ctrl.scenario_names.get(nid, f"node-{nid}"))
     names.pop(ctrl.node_id, None)
     return names
 
@@ -233,6 +244,35 @@ def mirror(ctrl: "Controller", game_id: int) -> Optional[dict[str, Any]]:
     if given:
         out["rooms"] = dict(sorted(given.items()))
     return out or None
+
+
+def mirror_places(ctrl: "Controller", game_id: int) -> Optional[list[list[int]]]:
+    """What a standby controller's join carries in key 22 (decision BBC-25): where the GM placed the live game's
+    boxes, ``[[node id, level, x, y], ...]`` ascending, x and y as 16-bit numbers (joinfmt.quantize), or None
+    when no box is placed. A level the field does not use is the box's level 0, as everywhere it is shown."""
+    placed = ctrl.store.positions(game_id)
+    meta = levelsmod.load(ctrl.store)
+    out = []
+    for nid in sorted(_box_nodes(ctrl)):
+        pos = placed.get(nid)
+        if pos is None or not 1 <= nid <= 0xFFFE:
+            continue
+        level = levelsmod.shown(meta, pos["level"])
+        out.append([nid, min(level, joinfmt.BOX_PLACE_LEVEL_MAX), joinfmt.quantize(pos["x"]),
+                    joinfmt.quantize(pos["y"])])
+    return out or None
+
+
+def apply_places(ctrl: "Controller", game_id: int, places: Optional[list[list[int]]]) -> None:
+    """A standby controller takes the primary's boxes' places from its join (key 22): each listed box is put
+    where the primary has it (on the level it has it), replacing the standby's own place for it, and is known
+    as a box of the game before it says HELLO. A box not listed keeps what the standby has (a place is never
+    removed on the primary). A join made again refreshes them."""
+    if not places:
+        return
+    for nid, level, xq, yq in places:
+        ctrl.store.set_position(game_id, nid, joinfmt.dequantize(xq), joinfmt.dequantize(yq), level)
+    ctrl.store.set_setting(f"{SETTING_PLACED}{game_id}", json.dumps(sorted(p[0] for p in places)))
 
 
 def apply_mirror(ctrl: "Controller", game_id: int, on: bool, mirrored: Optional[dict[str, Any]]) -> None:

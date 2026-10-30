@@ -1895,6 +1895,9 @@ class ControllerEngine {
       // Key 21 (Amendment 21, BBC-20): a standby serves the same registry
       // after a failover.
       boxBeacons: kind == 'controller' ? boxBeaconsMirror(store, id) : null,
+      // Key 22 (Amendment 22, BBC-25): where the GM placed the boxes. Too
+      // many for the join is refused by encodeJoin, never dropped.
+      boxPlaces: kind == 'controller' ? field?.boxPlacesMirror(id) : null,
     );
     var join = joinWith(link: withLink);
     var linked = withLink;
@@ -2148,8 +2151,10 @@ class ControllerEngine {
   /// The primary's box-beacon choices from a standby join (keys 19 and 21,
   /// BBC-5, BBC-20): promoted, this controller serves the same registry and
   /// makes the same joins (engine.py `_mirror_box_beacons`).
-  void _mirrorBoxBeacons(JoinPayload j) =>
-      applyBoxBeaconsMirror(store, j.gameId, j.boxBeacon, j.boxBeacons);
+  void _mirrorBoxBeacons(JoinPayload j) {
+    applyBoxBeaconsMirror(store, j.gameId, j.boxBeacon, j.boxBeacons);
+    field?.applyBoxPlaces(j.gameId, j.boxPlaces); // key 22 (BBC-25)
+  }
 
   /// A join of the game this controller already follows as a standby, made
   /// again by the primary: the settings that travel in the join (the boxes'

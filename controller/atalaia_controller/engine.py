@@ -1314,6 +1314,9 @@ class Controller:
                 # Key 21 (Amendment 21, BBC-20): a standby serves the same registry after a failover.
                 from . import box_beacons
                 join["box_beacons"] = box_beacons.mirror(self, self.game["id"])
+                # Key 22 (Amendment 22, BBC-25): where the GM placed the boxes. Too many for the join is
+                # refused below, never dropped.
+                join["box_places"] = box_beacons.mirror_places(self, self.game["id"])
             # Android props link over Wi-Fi with the field CA and the controller's addresses
             # (keys 13 and 14, RFC 0001 Amendment 4, proposed); boxes use them for firmware
             # updates (protocol/firmware-update.md). A payload too long with them is made
@@ -1427,6 +1430,7 @@ class Controller:
         controller serves the same registry and makes the same joins."""
         from . import box_beacons
         box_beacons.apply_mirror(self, j["game_id"], j["box_beacon"], j.get("box_beacons"))
+        box_beacons.apply_places(self, j["game_id"], j.get("box_places"))  # key 22 (BBC-25)
 
     def _refresh_standby(self, j: dict[str, Any]) -> dict[str, Any]:
         """A join of the game this controller already follows as a standby, made again by the primary: the

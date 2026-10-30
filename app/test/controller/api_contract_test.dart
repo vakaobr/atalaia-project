@@ -763,6 +763,18 @@ void main() {
                         },
                       );
                     }(),
+              boxPlaces: f['box_places'] == null
+                  ? null
+                  : [
+                      for (final r
+                          in (f['box_places']! as List).cast<List<Object?>>())
+                        BoxPlace(
+                          r[0] as int,
+                          r[1] as int,
+                          r[2] as int,
+                          r[3] as int,
+                        ),
+                    ],
             );
             saved[step['save'] as String] = joinToText(
               encodeJoin(join, joinKey),

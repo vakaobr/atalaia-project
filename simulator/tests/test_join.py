@@ -32,6 +32,7 @@ def fields(v: dict) -> dict:
     out.setdefault("forget_modes", False)
     out.setdefault("region", "eu868")
     out.setdefault("box_beacon", True)
+    out.setdefault("box_places", None)  # key 22: lists of [node id, level, x, y]
     mirror = out.get("box_beacons")  # key 21: JSON has text keys, the codec node ids
     out["box_beacons"] = None if mirror is None else {
         k: ({int(n): t for n, t in v.items()} if k == "rooms" else v) for k, v in mirror.items()}
@@ -241,6 +242,70 @@ class BoxBeaconsMirrorTests(unittest.TestCase):
         self.assertEqual(plain, join.encode({k: v for k, v in base.items() if k != "box_beacons"}, KEY))
         self.assertIsNone(join.decode(plain, KEY)["box_beacons"])
         self.assertLess(len(plain), len(join.encode(base, KEY)))
+
+
+class BoxPlacesTests(unittest.TestCase):
+    """Optional key 22 (box_places), RFC 0001 Amendment 22 (decision BBC-25): a standby controller's join
+    carries where the GM placed the boxes, 7 bytes each."""
+
+    def test_valid_round_trip(self) -> None:
+        section = VECTORS["box_places"]
+        self.assertGreaterEqual(len(section["valid"]), 4)
+        for v in section["valid"]:
+            with self.subTest(v["name"]):
+                payload = bytes.fromhex(v["payload"])
+                got = join.decode(payload, KEY)
+                self.assertEqual(got["kind"], "controller")
+                self.assertEqual(got, fields(v))
+                self.assertEqual(join.encode(fields(v), KEY), payload)
+                self.assertEqual(join.to_text(payload), v["text"])
+                self.assertLessEqual(len(payload), join.MAX_LEN)
+
+    def test_invalid_fail_as_body(self) -> None:
+        self.assertGreaterEqual(len(VECTORS["box_places"]["invalid"]), 12)
+        for v in VECTORS["box_places"]["invalid"]:
+            with self.subTest(v["name"]), self.assertRaises(join.JoinError) as cm:
+                join.decode(bytes.fromhex(v["payload"]), KEY)
+            self.assertEqual(cm.exception.reason, "body", f"{v['name']}: {cm.exception}")
+
+    def test_the_quantization_is_the_vectors(self) -> None:
+        for q in VECTORS["box_places"]["quantize"]:
+            with self.subTest(q):
+                self.assertEqual(join.quantize(q["v"]), q["q"])
+        self.assertEqual(join.dequantize(65535), 1.0)
+        self.assertEqual(join.dequantize(0), 0.0)
+
+    def test_the_encoder_refuses_what_the_decoder_does(self) -> None:
+        base = fields(VECTORS["box_places"]["valid"][0])
+        for bad in ([], [[0, 0, 1, 1]], [[65535, 0, 1, 1]], [[4, 10, 1, 1]], [[4, 0, 65536, 1]], [[4, 0, -1, 1]],
+                    [[9, 0, 1, 1], [4, 0, 1, 1]], [[4, 0, 1, 1], [4, 0, 2, 2]], [[4, 0, 1]], [[4, 0, 1, 1.5]],
+                    [[n, 0, 1, 1] for n in range(1, 30)], "boxes", 5):
+            with self.subTest(bad), self.assertRaises(join.JoinError):
+                join.encode({**base, "box_places": bad}, KEY)
+        node = fields(VECTORS["valid"][0])
+        with self.assertRaises(join.JoinError):  # a box's join never carries it
+            join.encode({**node, "box_places": [[4, 0, 1, 1]]}, KEY)
+
+    def test_absent_is_the_join_of_before(self) -> None:
+        base = fields(VECTORS["box_places"]["valid"][0])
+        plain = join.encode({**base, "box_places": None}, KEY)
+        self.assertEqual(plain, join.encode({k: v for k, v in base.items() if k != "box_places"}, KEY))
+        self.assertIsNone(join.decode(plain, KEY)["box_places"])
+        self.assertLess(len(plain), len(join.encode(base, KEY)))
+
+    def test_what_does_not_fit_is_refused_and_says_so(self) -> None:
+        base = fields(VECTORS["box_places"]["valid"][0])
+        long_teams = ["t" * 22 + str(n) for n in range(8)]
+        with self.assertRaises(join.JoinError) as cm:
+            join.encode({**base, "teams": long_teams, "box_beacons": {"rooms": {n: "r" * 48 for n in range(1, 4)}},
+                         "box_places": [[n, 0, 1, 1] for n in range(1, 29)]}, KEY)
+        self.assertEqual(cm.exception.reason, "length")
+        self.assertIn("places take 198", str(cm.exception))
+
+    def test_the_twenty_boxes_of_a_field_fit_with_plenty_of_room(self) -> None:
+        base = fields(VECTORS["box_places"]["valid"][0])
+        payload = join.encode({**base, "box_places": [[n, n % 4, n * 100, n * 200] for n in range(1, 21)]}, KEY)
+        self.assertLess(len(payload), 300)
 
 
 class RegionTests(unittest.TestCase):

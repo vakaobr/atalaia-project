@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 import time
 import unittest
@@ -398,6 +399,63 @@ class StandbyApiTests(unittest.TestCase):
         self.assertEqual(len(self.beacon_view(self.b, READ)[0]), 2)  # the disabled one is left out
         self.assertEqual(self.b.ctrl.store.get_setting("box_beacons"), "on")
         self.assertEqual(b.post("/api/v1/controller/promote", headers=GM).json()["role"], "candidate")
+
+    def test_box_places_travel_to_the_standby_and_a_move_reaches_it(self):
+        """BBC-25: where the GM placed the boxes on the primary (key 22) is the standby's after its join, so a
+        promoted standby locates players by the boxes without anyone placing them again; a box moved after the
+        standby joined reaches it with the next join, as BBC-21 does for the choices."""
+        from atalaia_controller import box_beacons as bb
+        a, b, gid = self.a.client, self.b.client, self.game["id"]
+        boxes = [a.post("/api/v1/join", headers=GM, json={"role": "zone"}).json()["node_id"] for _ in range(3)]
+        self.assertEqual(a.put("/api/v1/field/levels", headers=GM, json={"enabled": True, "count": 3}).status_code, 200)
+        self.assertEqual(b.put("/api/v1/field/levels", headers=GM, json={"enabled": True, "count": 3}).status_code, 200)
+        self.a.ctrl.store.set_position(gid, boxes[0], 0.25, 0.5, 2)
+        self.a.ctrl.store.set_position(gid, boxes[1], 1.0, 0.0, 0)
+        # boxes[2] is not placed: it has no place to mirror.
+        self.assertEqual(self.a.ctrl.store.positions(gid)[boxes[0]]["level"], 2)
+
+        def standby_text():
+            return a.post("/api/v1/join", headers=GM, json={"kind": "controller"}).json()["text"]
+
+        text = standby_text()
+        got = join.decode(join.from_text(text), JOIN_KEY)
+        self.assertEqual(got["box_places"], [[boxes[0], 2, join.quantize(0.25), join.quantize(0.5)],
+                                             [boxes[1], 0, 65535, 0]])
+        self.assertEqual(b.post("/api/v1/controller/join", headers=GM, json={"text": text}).status_code, 201)
+        # Nothing placed on the standby, and no HELLO yet: it lists the boxes from the join alone, in place.
+        by = {x["minor"]: x for x in self.beacon_view(self.b, GM)[0]}
+        self.assertEqual(sorted(by), sorted(boxes[:2]))
+        self.assertEqual((by[boxes[0]]["level"], by[boxes[0]]["x"], by[boxes[0]]["y"]),
+                         (2, join.dequantize(join.quantize(0.25)), join.dequantize(join.quantize(0.5))))
+        self.assertEqual((by[boxes[1]]["level"], by[boxes[1]]["x"], by[boxes[1]]["y"]), (0, 1.0, 0.0))
+        self.assertEqual([(x["id"], x["uuid"]) for x in self.beacon_view(self.b, READ)[0]],
+                         [(x["id"], x["uuid"]) for x in self.beacon_view(self.a, READ)[0]])
+        # A box moved and one placed after the standby joined: the text made earlier does not have them.
+        self.a.ctrl.store.set_position(gid, boxes[1], 0.0, 1.0, 1)
+        self.a.ctrl.store.set_position(gid, boxes[2], 0.5, 0.5, 0)
+        self.assertEqual(len(self.beacon_view(self.b, GM)[0]), 2)
+        self.assertEqual(b.post("/api/v1/controller/join", headers=GM, json={"text": standby_text()}).status_code, 201)
+        by = {x["minor"]: x for x in self.beacon_view(self.b, GM)[0]}
+        self.assertEqual(sorted(by), sorted(boxes))
+        self.assertEqual((by[boxes[1]]["level"], by[boxes[1]]["x"], by[boxes[1]]["y"]), (1, 0.0, 1.0))
+        self.assertEqual((by[boxes[2]]["level"], by[boxes[2]]["x"]), (0, join.dequantize(32768)))
+        # Promoted, the standby places a player who hears a box exactly where the primary would.
+        place = bb.place_of(self.b.ctrl, bb.box_id(boxes[1]))
+        self.assertEqual((place["level"], place["x"], place["y"]), (1, 0.0, 1.0))
+        self.assertEqual(self.b.ctrl.store.get_setting(f"box_places_mirrored:{gid}"), json.dumps(sorted(boxes)))
+
+    def test_box_places_that_do_not_fit_are_refused_not_dropped(self):
+        """BBC-25: more than 28 placed boxes cannot travel in the join: the standby join is refused, and says so."""
+        a, gid = self.a.client, self.game["id"]
+        boxes = [a.post("/api/v1/join", headers=GM, json={"role": "zone"}).json()["node_id"] for _ in range(29)]
+        for n, box in enumerate(boxes):
+            self.a.ctrl.store.set_position(gid, box, (n + 1) / 100, 0.5)
+        r = a.post("/api/v1/join", headers=GM, json={"kind": "controller"})
+        self.assertEqual(r.status_code, 409, r.text)
+        self.assertIn("box_places", r.text)
+        self.assertIn("28", r.text)
+        # A box's own join is not affected: it never carries the places.
+        self.assertEqual(a.post("/api/v1/join", headers=GM, json={"role": "zone"}).status_code, 200)
 
     def test_a_refreshing_join_is_for_the_game_and_key_the_standby_follows(self):
         b = self.b.client

@@ -162,6 +162,7 @@ class MemoryControllerStore implements ControllerStore {
     'issued_nodes',
     'box_beacons_off',
     'box_beacon_rooms',
+    'box_places_mirrored',
   ];
 
   @override

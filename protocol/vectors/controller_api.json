@@ -2527,6 +2527,25 @@
         ]
       },
       {
+        "name": "S7 failover: a standby takes the primary's box places from its join (BBC-25) and a move reaches it with the next join",
+        "join_key": "6465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80818283",
+        "steps": [
+          {"join_encode": {"kind": "controller", "game_id": 77, "game_key": "00112233445566778899aabbccddeeff", "node_id": 2, "controller_id": 1, "channel_hz": 869525000, "max_hops": 2, "teams": ["red", "blue"], "mode_id": "org.atalaia.domination", "role": "controller", "game_seed": 12345, "params": null, "box_places": [[4, 0, 65535, 0], [5, 2, 0, 65535]]}, "save": "j1"},
+          {"request": {"method": "POST", "path": "/api/v1/controller/join", "token": "gm", "body": {"text": "${j1}"}}, "status": 201, "json": {"id": 77, "joined": true}},
+          {"request": {"method": "GET", "path": "/api/v1/games/77/positions", "token": "gm"}, "status": 200, "json": {"4": {"x": 1.0, "y": 0.0, "level": 0}, "5": {"x": 0.0, "y": 1.0, "level": 2}}},
+          {"request": {"method": "GET", "path": "/api/v1/beacons", "token": "gm"}, "status": 200, "json": {"beacons": [{"id": "45253:4", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "kind": "box", "minor": 4, "node_id": 4, "room": "node-4", "room_given": false, "level": 0, "x": 1.0, "y": 0.0, "enabled": true}, {"id": "45253:5", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "kind": "box", "minor": 5, "node_id": 5, "room": "node-5", "room_given": false, "level": 0, "x": 0.0, "y": 1.0, "enabled": true}]}},
+          {"request": {"method": "GET", "path": "/api/v1/beacons", "token": "read"}, "status": 200, "json": {"beacons": [{"id": "45253:4", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "room": "$absent", "x": "$absent"}, {"id": "45253:5", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "room": "$absent", "x": "$absent"}]}},
+          {"request": {"method": "PUT", "path": "/api/v1/field/levels", "token": "gm", "body": {"enabled": true, "count": 3}}, "status": 200},
+          {"request": {"method": "GET", "path": "/api/v1/beacons", "token": "gm"}, "status": 200, "json": {"beacons": [{"id": "45253:4", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "kind": "box", "minor": 4, "node_id": 4, "room": "node-4", "room_given": false, "level": 0, "x": 1.0, "y": 0.0, "enabled": true}, {"id": "45253:5", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "kind": "box", "minor": 5, "node_id": 5, "room": "node-5", "room_given": false, "level": 2, "x": 0.0, "y": 1.0, "enabled": true}]}},
+          {"join_encode": {"kind": "controller", "game_id": 77, "game_key": "00112233445566778899aabbccddeeff", "node_id": 2, "controller_id": 1, "channel_hz": 869525000, "max_hops": 2, "teams": ["red", "blue"], "mode_id": "org.atalaia.domination", "role": "controller", "game_seed": 12345, "params": null, "box_places": [[4, 1, 0, 0], [5, 2, 0, 65535]]}, "save": "j2"},
+          {"request": {"method": "POST", "path": "/api/v1/controller/join", "token": "gm", "body": {"text": "${j2}"}}, "status": 201, "json": {"id": 77, "joined": true}},
+          {"request": {"method": "GET", "path": "/api/v1/beacons", "token": "gm"}, "status": 200, "json": {"beacons": [{"id": "45253:4", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "kind": "box", "minor": 4, "node_id": 4, "room": "node-4", "room_given": false, "level": 1, "x": 0.0, "y": 0.0, "enabled": true}, {"id": "45253:5", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "kind": "box", "minor": 5, "node_id": 5, "room": "node-5", "room_given": false, "level": 2, "x": 0.0, "y": 1.0, "enabled": true}]}},
+          {"join_encode": {"kind": "controller", "game_id": 77, "game_key": "00112233445566778899aabbccddeeff", "node_id": 2, "controller_id": 1, "channel_hz": 869525000, "max_hops": 2, "teams": ["red", "blue"], "mode_id": "org.atalaia.domination", "role": "controller", "game_seed": 12345, "params": null}, "save": "j3"},
+          {"request": {"method": "POST", "path": "/api/v1/controller/join", "token": "gm", "body": {"text": "${j3}"}}, "status": 201, "json": {"id": 77, "joined": true}},
+          {"request": {"method": "GET", "path": "/api/v1/beacons", "token": "gm"}, "status": 200, "json": {"beacons": [{"id": "45253:4", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "kind": "box", "minor": 4, "node_id": 4, "room": "node-4", "room_given": false, "level": 1, "x": 0.0, "y": 0.0, "enabled": true}, {"id": "45253:5", "uuid": "0268EC91-43FA-8DA7-A0DF-68DAFB0D609D", "kind": "box", "minor": 5, "node_id": 5, "room": "node-5", "room_given": false, "level": 2, "x": 0.0, "y": 1.0, "enabled": true}]}}
+        ]
+      },
+      {
         "name": "S7 failover: automatic, the standby claims after three missed beacons, yields to a better claim, keeps its term across a restart",
         "join_key": "6465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80818283",
         "failover_mode": "auto",

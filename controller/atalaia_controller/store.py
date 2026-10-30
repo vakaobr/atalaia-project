@@ -424,7 +424,7 @@ CHRONO_COLUMNS_V16 = (("limit_j", "REAL"),)
 LIVE_STATES = ("ready", "running", "paused")
 # Settings keys kept per game as ``prefix:game_id`` (they go with the game, purge_games).
 GAME_SETTING_PREFIXES = ("checkin.open", "key_tag", "game_time", "field_scores", "field_run", "box_lang",
-                         "issued_nodes")
+                         "issued_nodes", "box_beacons_off", "box_beacon_rooms", "box_places_mirrored")
 
 
 def _private(path: str) -> None:

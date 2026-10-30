@@ -1206,5 +1206,431 @@
         "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0115a102a50178307878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878780278307878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878780378307878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878780478307878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878780578307878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878783d9a28bae347b0d0302cb74cdac91ad2d28f2e9898c7bf74d064a2e9386fd714"
       }
     ]
+  },
+  "box_places": {
+    "description": "Optional key 22 (box_places), RFC 0001 Amendment 22 (decision BBC-25, protocol/box-beacon.md): a standby controller's join carries where the GM placed the Field Boxes, so a promoted standby locates players without the boxes being placed again. One CBOR byte string of 1 to 28 boxes, 7 bytes each in ascending node id order: node id (2 bytes, 1-65534), level (1 byte, 0-9), x and y (2 bytes each, big endian, the fraction of the plan times 65535). In the fields it is a list of [node id, level, x, y] integers. Only a standby controller's payload (kind 1) has it; a box skips it. Absent is byte for byte a join of before. Valid ones made with the simulator's codec; invalid ones by hand, tagged with Python's hmac module. The simulator's and the app's codecs decode and re-encode the valid ones byte for byte and refuse the invalid ones (body). `quantize` is the shared rounding between a plan fraction and the 16-bit number: floor(v * 65535 + 0.5), back by q / 65535 (the controllers store the dequantized value).",
+    "quantize": [
+      {
+        "v": 0.0,
+        "q": 0
+      },
+      {
+        "v": 1.0,
+        "q": 65535
+      },
+      {
+        "v": 0.25,
+        "q": 16384
+      },
+      {
+        "v": 0.5,
+        "q": 32768
+      },
+      {
+        "v": 0.75,
+        "q": 49151
+      },
+      {
+        "v": 0.1,
+        "q": 6554
+      },
+      {
+        "v": 0.333333,
+        "q": 21845
+      },
+      {
+        "v": 0.9999,
+        "q": 65528
+      },
+      {
+        "v": 7.6294e-06,
+        "q": 0
+      }
+    ],
+    "valid": [
+      {
+        "name": "standby_three_boxes",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 1,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "controller",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "controller",
+          "box_places": [
+            [
+              4,
+              0,
+              16384,
+              32768
+            ],
+            [
+              9,
+              1,
+              0,
+              65535
+            ],
+            [
+              65534,
+              9,
+              65535,
+              1
+            ]
+          ]
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c011655000400400080000009010000fffffffe09ffff00012938cab8fc370a9b051363d2c953b66bb0a1219cc47ad8a7e0e6e03cf6628f34",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwEEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JamNvbnRyb2xsZXIKGTA5DAEWVQAEAEAAgAAACQEAAP____4J__8AASk4yrj8NwqbBRNj0slTtmuwoSGcxHrYp-Dm4Dz2Yo80"
+      },
+      {
+        "name": "standby_places_with_choices_and_beacons_off",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 1,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "controller",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "controller",
+          "box_beacon": false,
+          "box_beacons": {
+            "off": [
+              9
+            ],
+            "rooms": {
+              "4": "Cellar"
+            }
+          },
+          "box_places": [
+            [
+              4,
+              0,
+              16384,
+              32768
+            ],
+            [
+              9,
+              1,
+              0,
+              65535
+            ]
+          ]
+        },
+        "payload": "01ae0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0113f415a201810902a1046643656c6c6172164e000400400080000009010000ffff1dc67cbefe81e4c4c703dc28db5cabb2befd502ebc3d0d4f40d3138adbc6855a",
+        "text": "atalaia:join:Aa4BGRCSAlArfhUWKK7Spqv3FYgJz088AwEEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JamNvbnRyb2xsZXIKGTA5DAET9BWiAYEJAqEEZkNlbGxhchZOAAQAQACAAAAJAQAA__8dxny-_oHkxMcD3CjbXKuyvv1QLrw9DU9A0xOK28aFWg"
+      },
+      {
+        "name": "standby_one_box",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 1,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "controller",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "controller",
+          "box_places": [
+            [
+              1,
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c01164700010000000000b08e509788a496aadf0c8f1647a0219d3dbe84bade0cda6fdc98a865345e2a62",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwEEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JamNvbnRyb2xsZXIKGTA5DAEWRwABAAAAAACwjlCXiKSWqt8MjxZHoCGdPb6Eut4M2m_cmKhlNF4qYg"
+      },
+      {
+        "name": "standby_28_boxes_the_most",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 1,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "controller",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "controller",
+          "box_places": [
+            [
+              1,
+              1,
+              2339,
+              4421
+            ],
+            [
+              2,
+              2,
+              4678,
+              8842
+            ],
+            [
+              3,
+              0,
+              7017,
+              13263
+            ],
+            [
+              4,
+              1,
+              9356,
+              17684
+            ],
+            [
+              5,
+              2,
+              11695,
+              22105
+            ],
+            [
+              6,
+              0,
+              14034,
+              26526
+            ],
+            [
+              7,
+              1,
+              16373,
+              30947
+            ],
+            [
+              8,
+              2,
+              18712,
+              35368
+            ],
+            [
+              9,
+              0,
+              21051,
+              39789
+            ],
+            [
+              10,
+              1,
+              23390,
+              44210
+            ],
+            [
+              11,
+              2,
+              25729,
+              48631
+            ],
+            [
+              12,
+              0,
+              28068,
+              53052
+            ],
+            [
+              13,
+              1,
+              30407,
+              57473
+            ],
+            [
+              14,
+              2,
+              32746,
+              61894
+            ],
+            [
+              15,
+              0,
+              35085,
+              779
+            ],
+            [
+              16,
+              1,
+              37424,
+              5200
+            ],
+            [
+              17,
+              2,
+              39763,
+              9621
+            ],
+            [
+              18,
+              0,
+              42102,
+              14042
+            ],
+            [
+              19,
+              1,
+              44441,
+              18463
+            ],
+            [
+              20,
+              2,
+              46780,
+              22884
+            ],
+            [
+              21,
+              0,
+              49119,
+              27305
+            ],
+            [
+              22,
+              1,
+              51458,
+              31726
+            ],
+            [
+              23,
+              2,
+              53797,
+              36147
+            ],
+            [
+              24,
+              0,
+              56136,
+              40568
+            ],
+            [
+              25,
+              1,
+              58475,
+              44989
+            ],
+            [
+              26,
+              2,
+              60814,
+              49410
+            ],
+            [
+              27,
+              0,
+              63153,
+              53831
+            ],
+            [
+              28,
+              1,
+              65492,
+              58252
+            ]
+          ]
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c011658c4000101092311450002021246228a0003001b6933cf000401248c45140005022daf565900060036d2679e0007013ff578e300080249188a28000900523b9b6d000a015b5eacb2000b026481bdf7000c006da4cf3c000d0176c7e081000e027feaf1c6000f00890d030b001001923014500011029b532595001200a47636da001301ad99481f001402b6bc5964001500bfdf6aa9001601c9027bee001702d2258d33001800db489e78001901e46bafbd001a02ed8ec102001b00f6b1d247001c01ffd4e38c7d99b369eea3f7a513a2a08d9d5a424249c08e8750fc7b3f67bf80813ce3e538",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwEEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JamNvbnRyb2xsZXIKGTA5DAEWWMQAAQEJIxFFAAICEkYiigADABtpM88ABAEkjEUUAAUCLa9WWQAGADbSZ54ABwE_9XjjAAgCSRiKKAAJAFI7m20ACgFbXqyyAAsCZIG99wAMAG2kzzwADQF2x-CBAA4Cf-rxxgAPAIkNAwsAEAGSMBRQABECm1MllQASAKR2NtoAEwGtmUgfABQCtrxZZAAVAL_faqkAFgHJAnvuABcC0iWNMwAYANtInngAGQHka6-9ABoC7Y7BAgAbAPax0kcAHAH_1OOMfZmzae6j96UToqCNnVpCQknAjodQ_Hs_Z7-AgTzj5Tg"
+      }
+    ],
+    "invalid": [
+      {
+        "name": "box_places_in_a_node",
+        "why": "key 22 is a standby controller's: a node's payload with it is refused",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c001655000400400080000009010000fffffffe09ffff000131bc9b473695aa440685f86705d4c6ce1cb81e394f6034d8af481c717fc75ad1"
+      },
+      {
+        "name": "box_places_empty",
+        "why": "an empty byte string",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0116409aae2b554a9dd21cfcdd084ef1ac43d978436957727cbc830a3c1839153d9622"
+      },
+      {
+        "name": "box_places_29_boxes",
+        "why": "29 boxes: over the 28 that fit",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c011658cb000101092311450002021246228a0003001b6933cf000401248c45140005022daf565900060036d2679e0007013ff578e300080249188a28000900523b9b6d000a015b5eacb2000b026481bdf7000c006da4cf3c000d0176c7e081000e027feaf1c6000f00890d030b001001923014500011029b532595001200a47636da001301ad99481f001402b6bc5964001500bfdf6aa9001601c9027bee001702d2258d33001800db489e78001901e46bafbd001a02ed8ec102001b00f6b1d247001c01ffd4e38c001d0000010001e225d18aa605a84d2be13adc01288803ca7bdd45eea9d6038ca81b3af8a7a463"
+      },
+      {
+        "name": "box_places_partial_box",
+        "why": "a length that is not a multiple of 7",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c011654000400400080000009010000fffffffe09ffff007b8930266be0f5a8132a2783daed44ff1a47781d814212430305e17d062fae35"
+      },
+      {
+        "name": "box_places_null",
+        "why": "key 22 null: leave an optional field out",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c0116f6a8e7c2ea547bd9b7a44f782026f45dbcef8504579eb9099aec266c687f277a36"
+      },
+      {
+        "name": "box_places_text",
+        "why": "key 22 must be a byte string",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c011665626f786573e86aab9f4a54e2e7a0067d5128020bd8661416eb0014d92f763032c3b90462de"
+      },
+      {
+        "name": "box_places_array",
+        "why": "key 22 must be a byte string, not an array",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c01168184040001017f3002aba62c19fc18164fbc48227ba022b4d4b6eabdc251e2c68107b26ccdd9"
+      },
+      {
+        "name": "box_places_node_zero",
+        "why": "node id 0",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c01164700000000010001d33fe214174b9ed2e6a8f3688ae8454fae7a2d01621c05c71ee81e595cb4459e"
+      },
+      {
+        "name": "box_places_node_65535",
+        "why": "node id 65535",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c011647ffff000001000160455c63c0750422690067c5b1aaae0e0c7716129e20af700fab9c3ca212e9d7"
+      },
+      {
+        "name": "box_places_level_10",
+        "why": "level 10: past the most levels a field has",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c01164700040a0001000147e3bab3ce84dfd715abe28e1a99e9a393d4209ad2d8a1feaa27e9eee93d59cf"
+      },
+      {
+        "name": "box_places_descending",
+        "why": "node ids must ascend",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c01164e000900000100010004000001000173ea8a4db69e7ba7f53ec3ae843a294ea7b732b233e960ef2cde562dbe339841"
+      },
+      {
+        "name": "box_places_twice",
+        "why": "a node twice",
+        "reason": "body",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03010400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e096a636f6e74726f6c6c65720a1930390c01164e0004000001000100040100020002f3368f175fefd8cc559600b94e31d2f99b59c579b5f89a14f04ab17cc4d52980"
+      }
+    ]
   }
 }

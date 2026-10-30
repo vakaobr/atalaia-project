@@ -86,6 +86,7 @@ final class JoinPayload {
     this.region = 'eu868',
     this.boxBeacon = true,
     this.boxBeacons,
+    this.boxPlaces,
   });
 
   final int gameId;
@@ -134,12 +135,115 @@ final class JoinPayload {
   /// null: what the GM set per box.
   final BoxBeaconsMirror? boxBeacons;
 
+  /// Key 22 (RFC 0001 Amendment 22): a standby controller's join only, or
+  /// null: where the GM placed the boxes, ascending by node id.
+  final List<BoxPlace>? boxPlaces;
+
   /// The parts of [modeId]: the main mode, then its modifiers.
   List<String> get modeParts => modeId.split('+');
 
   @override
   String toString() =>
       'JoinPayload(game $gameId, node $nodeId, $modeId/$role, $teams)';
+}
+
+/// A plan fraction (0 to 1) as the 16-bit number key 22 carries:
+/// floor(v * 65535 + 0.5), the same in every codec (no banker's rounding).
+int quantizePlace(double v) => (v * 65535 + 0.5).floor().clamp(0, 65535);
+
+double dequantizePlace(int q) => q / 65535;
+
+/// One box's place in key 22: node id, level, and x and y as 16-bit numbers
+/// ([quantizePlace]).
+final class BoxPlace {
+  const BoxPlace(this.nodeId, this.level, this.x, this.y);
+
+  /// At most this many boxes: 7 bytes each, 196 + the byte string's 2-byte
+  /// head <= 200.
+  static const int max = 28;
+  static const int size = 7;
+  static const int maxLevel = 9;
+
+  final int nodeId;
+  final int level;
+  final int x;
+  final int y;
+
+  @override
+  bool operator ==(Object other) =>
+      other is BoxPlace &&
+      other.nodeId == nodeId &&
+      other.level == level &&
+      other.x == x &&
+      other.y == y;
+
+  @override
+  int get hashCode => Object.hash(nodeId, level, x, y);
+
+  @override
+  String toString() => 'BoxPlace($nodeId, L$level, $x, $y)';
+}
+
+List<BoxPlace>? _checkBoxPlaces(Object? v, JoinKind kind) {
+  if (v == null) return null;
+  if (kind != JoinKind.controller) {
+    throw _body("box_places: only a standby controller's join carries it");
+  }
+  if (v is! List<BoxPlace> || v.isEmpty || v.length > BoxPlace.max) {
+    throw _body(
+      'box_places: 1 to ${BoxPlace.max} boxes (fewer boxes placed, or the '
+      "standby's join is made without them)",
+    );
+  }
+  var last = 0;
+  for (final p in v) {
+    if (p.nodeId < 1 ||
+        p.nodeId > 0xfffe ||
+        p.level < 0 ||
+        p.level > BoxPlace.maxLevel ||
+        p.x < 0 ||
+        p.x > 0xffff ||
+        p.y < 0 ||
+        p.y > 0xffff) {
+      throw _body(
+        'box_places: node id 1-65534, level 0-${BoxPlace.maxLevel}, '
+        'x and y 0-65535',
+      );
+    }
+    if (p.nodeId <= last) {
+      throw _body('box_places: node ids ascending, none twice');
+    }
+    last = p.nodeId;
+  }
+  return List.of(v);
+}
+
+Uint8List _boxPlacesWire(List<BoxPlace> places) => Uint8List.fromList([
+  for (final p in places) ...[
+    p.nodeId >> 8, p.nodeId & 0xff, p.level, //
+    p.x >> 8, p.x & 0xff, p.y >> 8, p.y & 0xff,
+  ],
+]);
+
+List<BoxPlace> _decodeBoxPlaces(Object? v) {
+  if (v is! Uint8List ||
+      v.isEmpty ||
+      v.length > BoxPlace.max * BoxPlace.size ||
+      v.length % BoxPlace.size != 0) {
+    throw _body(
+      'box_places: a byte string of 1 to ${BoxPlace.max} boxes of '
+      '${BoxPlace.size} bytes',
+    );
+  }
+  return [
+    for (var i = 0; i < v.length; i += BoxPlace.size)
+      BoxPlace(
+        (v[i] << 8) | v[i + 1],
+        v[i + 2],
+        (v[i + 3] << 8) | v[i + 4],
+        (v[i + 5] << 8) | v[i + 6],
+      ),
+  ];
 }
 
 /// Key 21: the boxes the GM disabled ([off], ascending) and the rooms the GM
@@ -371,6 +475,7 @@ JoinPayload _validate(Map<String, Object?> j) {
     throw _body('box_beacon: true or false');
   }
   final mirror = _checkBoxBeacons(j['box_beacons'], kind);
+  final places = _checkBoxPlaces(j['box_places'], kind);
   final lang = j['lang'];
   if (lang != null && (lang is! String || !_lang.hasMatch(lang))) {
     throw _body(
@@ -398,6 +503,7 @@ JoinPayload _validate(Map<String, Object?> j) {
     region: region.code,
     boxBeacon: beacon != false,
     boxBeacons: mirror,
+    boxPlaces: places,
   );
 }
 
@@ -425,7 +531,7 @@ const _keys = {
   5: 'channel_hz', 6: 'max_hops', 7: 'teams', 8: 'mode_id', 9: 'role',
   10: 'game_seed', 11: 'params', 12: 'kind', 13: 'ca_sha256', 14: 'urls',
   15: 'lang', 16: 'fetch_modes', 17: 'forget_modes', 18: 'region',
-  19: 'box_beacon', 21: 'box_beacons',
+  19: 'box_beacon', 21: 'box_beacons', 22: 'box_places',
 };
 
 bool _hasBytes(Object? v) => switch (v) {
@@ -495,6 +601,12 @@ JoinPayload decodeJoin(List<int> data, List<int> joinKey) {
       }
       v = _decodeBoxBeacons(v);
     }
+    if (name == 'box_places') {
+      if (v == null) {
+        throw _body('$name is null: leave an optional field out instead');
+      }
+      v = _decodeBoxPlaces(v);
+    }
     if (name == 'region') {
       final r = v is int && v != 0 ? regionsByNumber[v] : null;
       if (r == null) {
@@ -544,6 +656,7 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
     'region': j.region,
     'box_beacon': j.boxBeacon,
     'box_beacons': j.boxBeacons,
+    'box_places': j.boxPlaces,
   });
   final body = <int, Object?>{
     1: v.gameId,
@@ -566,6 +679,7 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
     if (v.region != eu868.code) 18: regionsByCode[v.region]!.number,
     if (!v.boxBeacon) 19: false,
     if (v.boxBeacons != null) 21: v.boxBeacons!.toWire(),
+    if (v.boxPlaces != null) 22: _boxPlacesWire(v.boxPlaces!),
   };
   final signed = Uint8List.fromList([joinVersion, ...cborEncode(body)]);
   final out = Uint8List.fromList([
@@ -575,7 +689,10 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
   if (out.length > joinMaxLength) {
     throw JoinException(
       JoinFailure.length,
-      'the join payload is ${out.length} bytes; at most $joinMaxLength fit',
+      'the join payload is ${out.length} bytes; at most $joinMaxLength fit'
+      '${v.boxPlaces == null ? '' : "; the boxes' places take "
+                '${v.boxPlaces!.length * BoxPlace.size + 2} of them (fewer boxes '
+                'placed, or shorter room names)'}',
     );
   }
   return out;

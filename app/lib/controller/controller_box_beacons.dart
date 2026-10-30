@@ -34,6 +34,9 @@ const _boxBeaconLabel = 'atalaia box beacon uuid v1';
 const boxBeaconsSetting = 'box_beacons';
 const boxBeaconsOffPrefix = 'box_beacons_off:';
 const boxBeaconRoomsPrefix = 'box_beacon_rooms:';
+
+/// Per game: the node ids whose places a primary mirrored (key 22, BBC-25).
+const boxPlacesMirroredPrefix = 'box_places_mirrored:';
 const _boxRoomMax = 48;
 
 /// What a standby controller's join carries (key 21, decision BBC-20): the
@@ -172,8 +175,74 @@ extension BoxBeacons on ControllerField {
       final id = int.tryParse('$k');
       if (id != null) names.putIfAbsent(id, () => scenario[id] ?? 'node-$id');
     }
+    // Boxes whose places the primary mirrored (BBC-25) are the game's boxes
+    // even before they say HELLO here: a promoted standby has them at once.
+    final mirrored = engine.store.getSetting('$boxPlacesMirroredPrefix$gid');
+    if (mirrored != null && mirrored.isNotEmpty) {
+      try {
+        for (final n in jsonDecode(mirrored) as List) {
+          if (n is int) names.putIfAbsent(n, () => scenario[n] ?? 'node-$n');
+        }
+      } on Object {
+        // a damaged setting is as good as none
+      }
+    }
     names.remove(engine.nodeId);
     return names;
+  }
+
+  /// What a standby controller's join carries in key 22 (decision BBC-25):
+  /// where the GM placed the live game's boxes, ascending, or null when no
+  /// box is placed (box_beacons.py `mirror_places`). A level the field does
+  /// not use is the box's level 0, as everywhere it is shown.
+  List<BoxPlace>? boxPlacesMirror(int gameId) {
+    final game = engine.liveGame;
+    if (game == null || game['id'] != gameId) return null;
+    final placed = places(gameId);
+    final inUse = levelsInUse(levelsMeta());
+    final ids = _boxNodes().keys.toList()..sort();
+    final out = <BoxPlace>[];
+    for (final id in ids) {
+      final pos = placed['$id'];
+      if (pos is! Map || id < 1 || id > 0xfffe) continue;
+      final level = pos['level'];
+      final shown = level is int && level >= 0 && level < inUse ? level : 0;
+      out.add(
+        BoxPlace(
+          id,
+          shown > BoxPlace.maxLevel ? BoxPlace.maxLevel : shown,
+          quantizePlace((pos['x']! as num).toDouble()),
+          quantizePlace((pos['y']! as num).toDouble()),
+        ),
+      );
+    }
+    return out.isEmpty ? null : out;
+  }
+
+  /// A standby controller takes the primary's boxes' places from its join
+  /// (key 22): each listed box is put where the primary has it, replacing
+  /// the standby's own place for it, and is known as a box of the game
+  /// before it says HELLO; a box not listed keeps what the standby has
+  /// (box_beacons.py `apply_places`).
+  void applyBoxPlaces(int gameId, List<BoxPlace>? list) {
+    if (list == null || list.isEmpty) return;
+    final all = Map<String, Object?>.of(_places);
+    final game = Map<String, Object?>.of(
+      ((all['$gameId'] as Map?) ?? const {}).cast<String, Object?>(),
+    );
+    for (final p in list) {
+      game['${p.nodeId}'] = {
+        'x': dequantizePlace(p.x),
+        'y': dequantizePlace(p.y),
+        'level': p.level,
+      };
+    }
+    all['$gameId'] = game;
+    engine.store.putDocument(ControllerField._placesDoc, all);
+    engine.store.setSetting(
+      '$boxPlacesMirroredPrefix$gameId',
+      jsonEncode([for (final p in list) p.nodeId]),
+    );
   }
 
   /// Whether [nodeId] is a box of the live game [gameId]: placing it changes

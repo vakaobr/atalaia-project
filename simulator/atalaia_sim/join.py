@@ -34,7 +34,10 @@ Field Box advertises as an iBeacon in this game (protocol/box-beacon.md): True (
 key left out, False is CBOR false (true is refused, so a join has one encoding). box_beacons (key 21,
 RFC 0001 Amendment 21, decision BBC-20) is for a standby controller only (a box skips it): the boxes the
 GM disabled and the rooms the GM gave, {"off": [node ids], "rooms": {node id: "text"}}, so the standby
-serves the same registry after a failover. Keys 20 and 22-31 are skipped.
+serves the same registry after a failover. box_places (key 22, RFC 0001 Amendment 22, decision BBC-25) is
+also a standby controller's only: where the GM placed the boxes, [[node id, level, x, y], ...] with x and y
+as 16-bit fractions of the plan (x / 65535), one byte string of 7 bytes per box (at most 28 boxes), so a
+promoted standby locates players without the boxes being placed again. Keys 20 and 23-31 are skipped.
 
 The codecs check protocol/vectors/join.json.
 """
@@ -45,6 +48,7 @@ import base64
 import hashlib
 import hmac
 import json
+import math
 import re
 from typing import Any, Optional
 
@@ -63,6 +67,9 @@ ROLE_MAX = 31
 PARAMS_MAX = 200
 BOX_BEACONS_MAX = 200  # bytes of key 21's CBOR value
 BOX_OFF_MAX = 32
+BOX_PLACES_MAX = 28   # boxes in key 22: 7 bytes each, 196 + the 2-byte head of the byte string <= 200
+BOX_PLACE_SIZE = 7    # node id (2) + level (1) + x (2) + y (2)
+BOX_PLACE_LEVEL_MAX = 9
 BOX_ROOMS_MAX = 32
 BOX_ROOM_MAX = 48
 TEXT_PREFIX = "atalaia:join:"
@@ -72,9 +79,9 @@ KEYS = {
     "game_id": 1, "game_key": 2, "node_id": 3, "controller_id": 4, "channel_hz": 5,
     "max_hops": 6, "teams": 7, "mode_id": 8, "role": 9, "game_seed": 10, "params": 11, "kind": 12,
     "ca_sha256": 13, "urls": 14, "lang": 15, "fetch_modes": 16, "forget_modes": 17,
-    "region": 18, "box_beacon": 19, "box_beacons": 21,
+    "region": 18, "box_beacon": 19, "box_beacons": 21, "box_places": 22,
 }
-OPTIONAL = ("params", "ca_sha256", "urls", "lang", "box_beacons")
+OPTIONAL = ("params", "ca_sha256", "urls", "lang", "box_beacons", "box_places")
 FLAGS = ("fetch_modes", "forget_modes")  # CBOR true when set, left out otherwise
 REQUIRED = set(KEYS) - set(OPTIONAL) - set(FLAGS) - {"region", "box_beacon"}
 URLS_MAX = 3
@@ -204,7 +211,48 @@ def validate(j: dict[str, Any]) -> dict[str, Any]:
         raise JoinError("body", f"kind must be one of {sorted(KINDS)}")
     out["kind"] = kind
     out["box_beacons"] = _box_beacons(j.get("box_beacons"), kind)
+    out["box_places"] = _box_places(j.get("box_places"), kind)
     return out
+
+
+def quantize(v: float) -> int:
+    """A plan fraction (0 to 1) as the 16-bit number key 22 carries: floor(v * 65535 + 0.5), the same in every
+    codec (no banker's rounding)."""
+    return min(65535, max(0, math.floor(v * 65535 + 0.5)))
+
+
+def dequantize(q: int) -> float:
+    return q / 65535
+
+
+def _box_places(value: Any, kind: str) -> Optional[list[list[int]]]:
+    """Key 22 as ``[[node id, level, x, y], ...]`` ascending by node id (x and y as 0-65535), None when there
+    is none. For a standby controller only; at most BOX_PLACES_MAX boxes."""
+    if value is None:
+        return None
+    if kind != "controller":
+        raise JoinError("body", "box_places: only a standby controller's join carries it")
+    if not isinstance(value, (list, tuple)) or not 1 <= len(value) <= BOX_PLACES_MAX:
+        raise JoinError("body", f"box_places: 1 to {BOX_PLACES_MAX} boxes (fewer boxes placed, or the "
+                                f"standby's join is made without them)")
+    out: list[list[int]] = []
+    for row in value:
+        if (not isinstance(row, (list, tuple)) or len(row) != 4
+                or any(not isinstance(n, int) or isinstance(n, bool) for n in row)):
+            raise JoinError("body", "box_places: each box is [node id, level, x, y] of integers")
+        node, level, x, y = row
+        if not (1 <= node <= 0xFFFE and 0 <= level <= BOX_PLACE_LEVEL_MAX
+                and 0 <= x <= 0xFFFF and 0 <= y <= 0xFFFF):
+            raise JoinError("body", f"box_places: node id 1-65534, level 0-{BOX_PLACE_LEVEL_MAX}, x and y 0-65535")
+        if out and node <= out[-1][0]:
+            raise JoinError("body", "box_places: node ids ascending, none twice")
+        out.append([node, level, x, y])
+    return out
+
+
+def _box_places_wire(places: list[list[int]]) -> bytes:
+    return b"".join(n.to_bytes(2, "big") + bytes([lv]) + x.to_bytes(2, "big") + y.to_bytes(2, "big")
+                    for n, lv, x, y in places)
 
 
 def _box_beacons(value: Any, kind: str) -> Optional[dict[str, Any]]:
@@ -251,6 +299,9 @@ def encode(j: dict[str, Any], join_key: bytes) -> bytes:
         if name == "box_beacons":
             body[KEYS[name]] = _box_beacons_wire(v[name])
             continue
+        if name == "box_places":
+            body[KEYS[name]] = _box_places_wire(v[name])
+            continue
         if name == "box_beacon":
             if not v[name]:  # on is the key's absence; only false is written
                 body[KEYS[name]] = False
@@ -263,8 +314,12 @@ def encode(j: dict[str, Any], join_key: bytes) -> bytes:
     signed = bytes([VERSION]) + cbor.encode(body)
     out = signed + hmac.new(join_key, signed, hashlib.sha256).digest()
     if len(out) > MAX_LEN:
+        extra = ""
+        if v["box_places"]:
+            extra = (f"; the boxes' places take {len(_box_places_wire(v['box_places'])) + 2} of them "
+                     "(fewer boxes placed, or shorter room names)")
         raise JoinError("length", f"the join payload is {len(out)} bytes; at most {MAX_LEN} fit "
-                                  "(shorter team names or fewer parameters)")
+                                  f"(shorter team names or fewer parameters){extra}")
     return out
 
 
@@ -294,7 +349,7 @@ def decode(data: bytes, join_key: bytes) -> dict[str, Any]:
             if not isinstance(v, int) or isinstance(v, bool) or v not in _KIND_NAMES:
                 raise JoinError("body", f"unknown join kind {v!r}")
             v = _KIND_NAMES[v]
-        if name in ("ca_sha256", "urls", "lang", "box_beacons") and v is None:
+        if name in ("ca_sha256", "urls", "lang", "box_beacons", "box_places") and v is None:
             raise JoinError("body", f"{name} is null: leave an optional field out instead")
         if name in FLAGS and v is not True:
             raise JoinError("body", f"{name} is only ever true: leave it out instead")
@@ -304,6 +359,13 @@ def decode(data: bytes, join_key: bytes) -> dict[str, Any]:
             if not isinstance(v, dict) or any(k not in (1, 2) for k in v):
                 raise JoinError("body", "box_beacons: a map with keys 1 (off) and 2 (rooms)")
             v = {name2: v[k] for k, name2 in ((1, "off"), (2, "rooms")) if k in v}
+        if name == "box_places":
+            if (not isinstance(v, bytes) or not BOX_PLACE_SIZE <= len(v) <= BOX_PLACES_MAX * BOX_PLACE_SIZE
+                    or len(v) % BOX_PLACE_SIZE):
+                raise JoinError("body", f"box_places: a byte string of 1 to {BOX_PLACES_MAX} boxes of "
+                                        f"{BOX_PLACE_SIZE} bytes")
+            v = [[int.from_bytes(v[i:i + 2], "big"), v[i + 2], int.from_bytes(v[i + 3:i + 5], "big"),
+                  int.from_bytes(v[i + 5:i + 7], "big")] for i in range(0, len(v), BOX_PLACE_SIZE)]
         if name == "region":
             if not isinstance(v, int) or isinstance(v, bool) or v not in regions.BY_NUMBER or v == 0:
                 raise JoinError("body", f"region {v!r}: a known region from 1 up (EU868 leaves the key out)")

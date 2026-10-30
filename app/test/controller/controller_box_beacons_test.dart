@@ -232,8 +232,10 @@ void main() {
       final standby = ControllerEngine()..joinKey = key;
       addTearDown(standby.close);
       final sfield = ControllerField(standby);
+      // Places the standby can hold exactly (key 22 carries 16-bit numbers).
+      double exact(double v) => dequantizePlace(quantizePlace(v));
       for (final n in [4, 5]) {
-        field.putPlace(gid, n, {'x': 0.1 * n, 'y': 0.5});
+        field.putPlace(gid, n, {'x': exact(0.1 * n), 'y': exact(0.5)});
       }
       // Before the standby joins: box 4 disabled, box 5 given a room.
       field.updateBoxBeacon(4, {'enabled': false});
@@ -247,7 +249,7 @@ void main() {
       // The boxes the standby knows and where the GM put them there.
       for (final n in [4, 5]) {
         standby.store.upsertNode(gid, {'node_id': n, 'name': 'node-$n'});
-        sfield.putPlace(gid, n, {'x': 0.1 * n, 'y': 0.5});
+        sfield.putPlace(gid, n, {'x': 0.3, 'y': 0.9});
       }
       // The primary's later choices reach it by a join made again.
       field.setBoxBeaconsEnabled({'enabled': false});
@@ -289,6 +291,83 @@ void main() {
       expect(sfield.beaconsFor(ApiViewer.gm), field.beaconsFor(ApiViewer.gm));
       expect(standby.store.getSetting('box_beacons_off:$gid'), isNull);
       expect(standby.store.getSetting('box_beacon_rooms:$gid'), isNull);
+    });
+
+    test('a standby takes the primary\'s box places, a move reaches it with '
+        'the next join, and it serves them with no HELLO (BBC-25)', () {
+      final standby = ControllerEngine()..joinKey = key;
+      addTearDown(standby.close);
+      final sfield = ControllerField(standby);
+      field.putLevels({'enabled': true, 'count': 3});
+      sfield.putLevels({'enabled': true, 'count': 3});
+      field.putPlace(gid, 4, {'x': 0.25, 'y': 0.5, 'level': 2});
+      field.putPlace(gid, 5, {'x': 1.0, 'y': 0.0, 'level': 0});
+      final first = engine.issueJoin({'kind': 'controller'})['text']! as String;
+      final j = decodeJoin(joinFromText(first), key);
+      expect(j.boxPlaces, [
+        BoxPlace(4, 2, quantizePlace(0.25), quantizePlace(0.5)),
+        const BoxPlace(5, 0, 65535, 0),
+      ]);
+      expect(standby.joinAsStandby(first)['id'], gid);
+      // Nothing placed on the standby and no HELLO: the boxes are in place.
+      final by = {for (final b in boxes(ApiViewer.gm)) b['minor']: b};
+      expect(by.keys, [4, 5]);
+      final sby = {for (final b in sfield.boxBeacons()) b['minor']: b};
+      expect(sby.keys, [4, 5]);
+      expect(
+        (sby[4]!['level'], sby[4]!['x'], sby[4]!['y']),
+        (
+          2,
+          dequantizePlace(quantizePlace(0.25)),
+          dequantizePlace(quantizePlace(0.5)),
+        ),
+      );
+      expect((sby[5]!['level'], sby[5]!['x'], sby[5]!['y']), (0, 1.0, 0.0));
+      expect(
+        sfield.beaconsFor(ApiViewer.read),
+        field.beaconsFor(ApiViewer.read),
+      );
+      // A box moved and one more placed after the standby joined.
+      field.putPlace(gid, 5, {'x': 0.0, 'y': 1.0, 'level': 1});
+      expect((sfield.boxBeacons().last['level']), 0);
+      standby.joinAsStandby(engine.issueJoin({'kind': 'controller'})['text']);
+      final moved = sfield.boxBeacons().last;
+      expect((moved['level'], moved['x'], moved['y']), (1, 0.0, 1.0));
+      // Promoted, a phone that hears the box is placed where the primary has it.
+      final place = sfield.boxBeaconPlace('$boxBeaconMajor:5')!;
+      expect((place['level'], place['x'], place['y']), (1, 0.0, 1.0));
+      // The standby's levels govern what it shows: not in use, level 0.
+      sfield.putLevels({'enabled': false, 'count': 3});
+      expect(sfield.boxBeacons().first['level'], 0);
+    });
+
+    test('box places that do not fit are refused, not dropped (BBC-25)', () {
+      final big = ControllerEngine()..joinKey = key;
+      addTearDown(big.close);
+      final bfield = ControllerField(big);
+      final g =
+          big.createGame({
+                'name': 'big',
+                'mode_id': 'org.atalaia.domination',
+                'teams': ['red', 'blue'],
+                'assignments': {for (var n = 4; n < 4 + 29; n++) '$n': 'zone'},
+              })['id']!
+              as int;
+      for (var n = 4; n < 4 + 29; n++) {
+        bfield.putPlace(g, n, {'x': 0.5, 'y': 0.5});
+      }
+      expect(
+        () => big.issueJoin({'kind': 'controller'}),
+        throwsA(
+          isA<ControllerError>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('box_places'), contains('28')),
+          ),
+        ),
+      );
+      // A box's own join never carries the places.
+      expect(big.issueJoin({'role': 'zone'})['text'], isNotNull);
     });
 
     test('a join of another game is not a refresh', () {

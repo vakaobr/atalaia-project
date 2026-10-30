@@ -58,7 +58,8 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
-import '../protocol/join_payload.dart' show BoxBeaconsMirror;
+import '../protocol/join_payload.dart'
+    show BoxBeaconsMirror, BoxPlace, dequantizePlace, quantizePlace;
 import 'controller_checkin.dart';
 import 'controller_engine.dart';
 import 'controller_store.dart' show ControllerStore;
