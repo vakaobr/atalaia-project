@@ -65,7 +65,9 @@ class ChannelRuleTests(unittest.TestCase):
         self.assertEqual(eu868.tx_power_dbm(14, 14, 2), 0)
         self.assertEqual(eu868.tx_power_dbm(27, 14, 2), 13)
         self.assertEqual(eu868.tx_power_dbm(14, 0, 2), 14)
-        self.assertEqual(eu868.tx_power_dbm(14, 14, 6), -3)
+        self.assertEqual(eu868.tx_power_dbm(14, 14, 6), -4)  # -3.85 rounded down, never up
+        self.assertEqual(eu868.tx_power_dbm(14, 14, 10), -8)  # a 10 dBi whip on a 25 mW sub-band (-7.85)
+        self.assertEqual(eu868.tx_power_dbm(27, 14, 10), 5)  # and on 869.4-869.65 MHz (5.15)
         self.assertEqual(eu868.tx_power_dbm(14, 30, 5), -9)
         self.assertEqual(eu868.tx_power_dbm(27, 0, 0), 22)
 

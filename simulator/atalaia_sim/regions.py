@@ -248,7 +248,7 @@ def _conducted(limit_dbm: int, fem: int, ant: int, ref: str, free: int) -> int:
         x100 = limit_dbm * 100 - fem * 100 - max(0, ant - free) * 100
     else:
         raise ValueError(f"limit_ref {ref!r}")
-    return int(x100 / 100)
+    return x100 // 100  # round down, also below zero: the conducted power is never rounded up
 
 
 def airtime_ms(packet_bytes: int, sf: int = 7, bw_hz: int = 125_000) -> float:
