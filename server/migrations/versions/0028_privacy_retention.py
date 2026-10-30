@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Privacy review, code part (PRIV-2, PRIV-5, PRIV-7).
 
-Revision ID: 0030_privacy_retention
-Revises: 0025_oidc_notice_version
+Revision ID: 0028_privacy_retention
+Revises: 0027_identity_issuer
 Created: 2026-10-30
 
 - ``users.inactivity_warned_at`` (PRIV-7): when the retention purge warned that an account inactive for the configured
@@ -32,8 +32,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0030_privacy_retention"
-down_revision = "0025_oidc_notice_version"
+revision = "0028_privacy_retention"
+down_revision = "0027_identity_issuer"
 branch_labels = None
 depends_on = None
 
