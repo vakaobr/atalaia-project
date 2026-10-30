@@ -2550,10 +2550,12 @@ class ConsoleBrowserTests(unittest.TestCase):
         small = phone.get_by_test_id("field-grid")
         expect(small).to_have_attribute("data-cols", "52")
         expect(phone.get_by_test_id("grid-size")).to_have_text("Each square is about 17 × 8.6 m on the ground.")
+        expect(phone.locator("[data-testid=field-area] img")).to_be_visible()
+        # The numbers are thinned once the image is laid out; wait for that rather than read the first render.
+        expect(small.locator(".fg-col").first).not_to_have_text("1")  # the corner is the row letter's
         cols = small.locator(".fg-col").count()
         self.assertLess(cols, 52)
         self.assertGreater(cols, 4)
-        self.assertNotEqual(small.locator(".fg-col").first.inner_text(), "1")  # the corner is the row letter's
         expect(small.locator(".fg-row").first).to_have_text("A")
         self.no_horizontal_scroll(phone)
         page.get_by_test_id("grid-toggle").click()
