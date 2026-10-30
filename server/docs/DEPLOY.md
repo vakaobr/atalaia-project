@@ -103,7 +103,7 @@ paste it into a chat.
 The daily purge at `ATALAIA_PURGE_HOUR` also deletes the empty `deleted-...` rows that erased accounts leave, once no audit entry
 (kept 36 months) and no other row refers to them; a hosted hub does it per field, under the field's role, with nothing to set up.
 The server's other settings (`ATALAIA_PURGE_HOUR`,
-`ATALAIA_PRIVACY_NOTICE_VERSION`, `ATALAIA_EXPORT_MIN_INTERVAL_S`, `ATALAIA_EXPORT_MAX_MB` and, for a hub,
+`ATALAIA_PRIVACY_NOTICE_VERSION`, `ATALAIA_SHARING_TERMS_VERSION`, `ATALAIA_EXPORT_MIN_INTERVAL_S`, `ATALAIA_EXPORT_MAX_MB` and, for a hub,
 the per-field limits `ATALAIA_QUOTA_ACCOUNTS`, `_SCHEDULED_GAMES`, `_REGISTRATIONS`, `_GAMES`, `_ATAK_CERTS`,
 `_STREAMS`, `_STORED_MB` and `ATALAIA_HOSTED_WATCH_S`) can be added to `.env` too; the list, with the defaults, is in
 [server/README.md](../README.md). After a change: `docker compose up -d`
@@ -490,8 +490,60 @@ scripts do).
 A hub that hosts many fields on one server (ADR-P4-4 as built, plan phase 21,
 decisions S21-1 to S21-13; its deployment is a Phase 4 follow-up, decisions
 FU4-1 to FU4-10; the design is in [../README.md](../README.md#hosted-mode)).
-**It does not go live before a lawyer has reviewed the privacy notice and the
-data processing agreement (decision P4-6).**
+**It does not go live before the go-live checklist below is complete
+(decision P4-6).**
+
+### Who is responsible for what
+
+(Decisions LEG-40 to LEG-47; the data processing agreement is
+[`docs/templates/dpa-template.md`](../../docs/templates/dpa-template.md), in pt-PT
+[`dpa-template-pt.md`](../../docs/templates/dpa-template-pt.md).)
+
+- **Each field is the controller** of its own players' data.
+- **The hub operator is a processor** for each field (GDPR Art. 28) under the
+  DPA, and keeps a record of its processing as a processor (Art. 30(2)).
+- **The Atalaia project** (the authors of the software) is neither: it sees no
+  field's data.
+- **For the sharing step only, the fields that share are joint controllers**
+  (Art. 26). Cross-field chrono sharing is off by default. A field switches it
+  on on its settings page, where its administrator must first accept the
+  **sharing terms**
+  ([`sharing-terms.md`](../../docs/templates/sharing-terms.md), pt-PT
+  [`sharing-terms-pt.md`](../../docs/templates/sharing-terms-pt.md)); the server records the
+  version, the date and the account that accepted (`fields.sharing_terms_*`),
+  and without the acceptance the switch is refused (`409 sharing_terms_required`).
+  When the terms' version changes (`ATALAIA_SHARING_TERMS_VERSION`, default the
+  shipped text's) the field is asked again and **its sharing is suspended until
+  it accepts**; the hub's shared copies follow at the next retention purge. The
+  hub operator processes the shared tables as processor of the fields jointly.
+- **Where the data is:** EU/EEA data centres only, for the server, its backups
+  and every sub-processor, as the DPA requires. A tunnel or CDN in front of the
+  hub that is a non-EU company needs its own safeguard in the DPA annex; the
+  easiest is not to use one.
+
+### Go-live checklist
+
+Hosted mode is not offered to any field until **every** item is done. The server
+also warns at start-up while hosted mode is on and the privacy notice is still a
+template (built apart, decision LEG-45); that warning is a reminder, not a
+substitute for the list.
+
+1. The **DPA is reviewed by a lawyer and signed**, one per field, with the
+   [BRACKETS] filled in.
+2. The **sharing terms** exist and are accepted per field in the software (or
+   sharing stays off for that field).
+3. The **hosting provider, the backup storage and every sub-processor** are in
+   the DPA's annex, **each in an EU/EEA data centre** (or with the safeguard
+   the DPA names).
+4. Each field's **privacy notice is filled in** and is no longer a template
+   (`ATALAIA_PRIVACY_NOTICE_VERSION` names the field's own file; the
+   server's start-up warning says when it does not).
+5. If the hub operator is a natural person: its activity registration,
+   insurance, its own privacy notice for the fields' contact people and its
+   record of processing are in place (check each with a lawyer).
+6. The deployment is **proved on a real server**: a real domain and wildcard
+   DNS record, public certificates, a backup restored into a fresh hub, the
+   isolation check (`hosted check`) green.
 
 **Status (2026-10-21):** the procedure below is tested in Docker on one
 computer by `python3 tools/docker_server.py deploy-hosted`, with Caddy's own

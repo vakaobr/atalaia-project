@@ -40,7 +40,7 @@ from sqlalchemy import (Boolean, Column, DateTime, LargeBinary, MetaData, String
 from sqlalchemy.dialects.postgresql import ARRAY, UUID, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import tenancy
+from . import sharing_terms, tenancy
 from .models import ChronoReading, Consent, Field, FieldPlayerId, HubShareLink, MarshalKey
 
 SHARING = "chrono_sharing"
@@ -116,7 +116,7 @@ async def is_active(db: AsyncSession, user_id: uuid.UUID, field: Field) -> bool:
     live = await db.scalar(select(Consent.id).where(
         Consent.user_id == user_id, Consent.purpose == SHARING, Consent.field_id == field.id,
         Consent.withdrawn_at.is_(None)))
-    return live is not None and bool(field.chrono_sharing_enabled)
+    return live is not None and sharing_terms.is_live(field)
 
 
 async def sync_user(db: AsyncSession, user_id: uuid.UUID) -> None:

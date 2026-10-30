@@ -25,7 +25,7 @@ from typing import Any, Optional
 import asyncpg
 
 from atalaia_controller import chrono
-from atalaia_server import chrono_registry, hosted, tenancy
+from atalaia_server import chrono_registry, hosted, sharing_terms, tenancy
 from atalaia_server.models import FieldPlayerId
 
 from .base import PASSWORD
@@ -40,8 +40,8 @@ class ShareCase(HubCase):
         self.admin_b = await self.staff(self.tb, self.b, "admin")
         self.gm_a = await self.staff(self.ta, self.a, "gm")
         for client, tenant, admin in ((self.a, self.ta, self.admin_a), (self.b, self.tb, self.admin_b)):
-            r = await client.patch(f"/api/v1/fields/{tenant.field_id}", json={"chrono_sharing_enabled": True},
-                                   headers=admin)
+            r = await client.patch(f"/api/v1/fields/{tenant.field_id}", json={"chrono_sharing_enabled": True,
+                                                     "sharing_terms_accepted": sharing_terms.current()}, headers=admin)
             self.assertEqual(r.status_code, 200, r.text)
         self.key_b = await self.key(self.tb, self.b)
         self.marshal = Marshal()
@@ -91,7 +91,9 @@ class ShareCase(HubCase):
 
     async def switch(self, side: str, on: bool) -> None:
         client, tenant, admin = (self.a, self.ta, self.admin_a) if side == "a" else (self.b, self.tb, self.admin_b)
-        r = await client.patch(f"/api/v1/fields/{tenant.field_id}", json={"chrono_sharing_enabled": on}, headers=admin)
+        r = await client.patch(f"/api/v1/fields/{tenant.field_id}", json={"chrono_sharing_enabled": on,
+                                                                              "sharing_terms_accepted": sharing_terms.current()},
+                               headers=admin)
         self.assertEqual(r.status_code, 200, r.text)
 
     async def person_id(self, p: "Person") -> uuid.UUID:

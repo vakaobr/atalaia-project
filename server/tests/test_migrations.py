@@ -713,6 +713,22 @@ class MigrationTests(unittest.TestCase):
         self.db.fetch("DELETE FROM oidc_logins")
         self.db.fetch("DELETE FROM consents")
         self.db.fetch("DELETE FROM users")
+
+    def test_0030_with_data(self) -> None:
+        """0030_sharing_terms: a field that exists keeps its row with no acceptance (its sharing waits for one), the
+        columns hold an acceptance, and back down they are gone."""
+        command.upgrade(self.cfg, "0029_account_notice_records")
+        self.db.fetch("INSERT INTO fields (name, slug, chrono_sharing_enabled) VALUES ('Arena', 'arena', true)")
+        command.upgrade(self.cfg, "0030_sharing_terms")
+        row = self.db.fetch("SELECT sharing_terms_version, sharing_terms_accepted_at, sharing_terms_accepted_by "
+                            "FROM fields WHERE slug = 'arena'")[0]
+        self.assertEqual((row[0], row[1], row[2]), (None, None, None))
+        self.db.fetch("UPDATE fields SET sharing_terms_version = '2026-10-30', sharing_terms_accepted_at = now()")
+        command.downgrade(self.cfg, "0029_account_notice_records")
+        columns = {r["column_name"] for r in self.db.fetch(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'fields'")}
+        self.assertFalse({c for c in columns if c.startswith("sharing_terms")})
+        self.assertEqual(len(self.db.fetch("SELECT 1 FROM fields")), 1)
         self.db.fetch("DELETE FROM fields")
 
     def test_one_linear_history(self) -> None:

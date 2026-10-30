@@ -41,7 +41,7 @@ from sqlalchemy import and_, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import hub_share
+from . import hub_share, sharing_terms
 from .audit import record
 from .chrono_verify import Key, same_record, verify_reading
 from .models import (ChronoCopyRevocation, ChronoReading, ChronoReject, ChronoViolation, Consent, Field, FieldPlayerId, Game, MarshalKey,
@@ -417,7 +417,7 @@ async def sharing_fields(db: AsyncSession, user_id: uuid.UUID) -> set[uuid.UUID]
     """The fields the person consented to share chrono records with (a live consent each) that share."""
     rows = await db.scalars(select(Consent.field_id).join(Field, Field.id == Consent.field_id).where(
         Consent.user_id == user_id, Consent.purpose == SHARING, Consent.withdrawn_at.is_(None),
-        Field.chrono_sharing_enabled.is_(True)))
+        sharing_terms.live_clause()))
     return {f for f in rows if f is not None}
 
 
@@ -455,7 +455,7 @@ async def shared_for_players(db: AsyncSession, field_id: uuid.UUID, player_ids: 
     holds the id here, both fields sharing, the person's live consent for each), the newest
     ``SHARED_PER_PLAYER`` of them, each as the text that was signed with its field's name and the marshal's
     public key. A player with nothing to show is left out."""
-    if not player_ids or not await db.scalar(select(Field.chrono_sharing_enabled).where(Field.id == field_id)):
+    if not player_ids or not await db.scalar(select(Field.id).where(Field.id == field_id, sharing_terms.live_clause())):
         return []
     linked = set(await db.scalars(select(FieldPlayerId.player_id).where(
         FieldPlayerId.field_id == field_id, FieldPlayerId.player_id.in_(player_ids),

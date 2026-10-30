@@ -96,6 +96,11 @@ class Field(Base):
     # than the field's chrono retention).
     chrono_ban_days: Mapped[Optional[int]] = mapped_column(Integer)
     chrono_sharing_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # The field's acceptance of the sharing terms (migration 0030, decision LEG-41): the version it accepted, when, and
+    # the account that accepted for it. Sharing is live only while the version is the server's current one.
+    sharing_terms_version: Mapped[Optional[str]] = mapped_column(String(64))
+    sharing_terms_accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    sharing_terms_accepted_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     public_scoreboard: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     # The public field page and its feeds (ADR-P4-11, ADR-P4-12; plan phase 15): off by default.
     public_page: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")

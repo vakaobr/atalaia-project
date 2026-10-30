@@ -86,6 +86,7 @@ services:
       ATALAIA_INACTIVE_GRACE_DAYS: "${ATALAIA_INACTIVE_GRACE_DAYS:-}"
       # The erasure ledger (PRIV-4): in a volume the restore never touches, copied beside the backups by backup.sh.
       ATALAIA_ERASURE_LEDGER: /ledger/erasures.jsonl
+      ATALAIA_SHARING_TERMS_VERSION: "${ATALAIA_SHARING_TERMS_VERSION:-}"
       # The operator's privacy notice (CONS-*): server/privacy-notice/ on the host, read-only in the container.
       ATALAIA_PRIVACY_NOTICE_DIR: /privacy-notice
       # The field's data export for its administrator (S21-12): empty means the server's defaults.

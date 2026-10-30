@@ -1289,6 +1289,16 @@ itself, and one function that reads them.
   where they have it, and is rate limited. The privacy notices name the recipients (other sharing fields of
   the hub, with the person's consent).
 
+**Amendment 2026-10-30 (decisions LEG-40 to LEG-47): roles and the sharing terms.** Each field is the
+controller of its players' data and the hub operator its processor under the DPA
+(`docs/templates/dpa-template.md`); for the sharing step only, the fields that share are joint
+controllers (Art. 26) under `docs/templates/sharing-terms.md`. The acceptance is recorded per field
+(`fields.sharing_terms_version`, `_accepted_at`, `_accepted_by`, migration `0030_sharing_terms`) when the
+field's administrator switches sharing on, and the switch is refused without it. Sharing is **live** only
+while the field's accepted version is the server's current one (`sharing_terms.current()`,
+`ATALAIA_SHARING_TERMS_VERSION`): a new version suspends it, in the registry at once and in the hub's
+published rows at the next sync (the purge). In this ADR's "active" above read: the field's switch on **and** the current terms accepted.
+
 **Amendment 2026-10-28 (S21-13, S2113-*): one database role per field.** The row-level security above keys on
 `atalaia.tenant`, which the server's own role may set (`set_config`), so an SQL injection could name another
 field. The grants now do the separating:

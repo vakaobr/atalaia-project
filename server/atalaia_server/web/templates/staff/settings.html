@@ -74,6 +74,21 @@
 <form id="chrono-form" class="staff-form" method="post" novalidate>
 <fieldset disabled>
 <p class="check"><input type="checkbox" id="f-chrono" name="chrono_sharing_enabled"> <label for="f-chrono">$fs_chrono_enabled</label></p>
+<p id="f-chrono-state" class="hint" role="status"></p>
+<h3>$fs_terms_title</h3>
+<p>$fs_terms_intro</p>
+<ol class="terms">
+<li>$fs_terms_1</li>
+<li>$fs_terms_2</li>
+<li>$fs_terms_3</li>
+<li>$fs_terms_4</li>
+<li>$fs_terms_5</li>
+<li>$fs_terms_6</li>
+<li>$fs_terms_7</li>
+</ol>
+<p class="hint" id="f-terms-doc"></p>
+<p id="f-terms-state" class="hint" role="status"></p>
+<p class="check"><input type="checkbox" id="f-terms" name="sharing_terms_accepted"> <label for="f-terms" id="f-terms-label"></label></p>
 <p><button type="submit">$save</button></p>
 </fieldset>
 </form>

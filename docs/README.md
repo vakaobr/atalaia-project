@@ -67,7 +67,8 @@ P4-6):
 | --- | --- |
 | [`templates/privacy-notice-pt.md`](templates/privacy-notice-pt.md), [`templates/privacy-notice-en.md`](templates/privacy-notice-en.md) | The field's privacy notice (a template with the legal positions approved on 2026-10-30; a few points still open, listed in its Part D), in Portuguese and English, with a short in-app notice for account creation and a short check-in poster notice (the field controller's own default check-in notice is in `controller/templates/`) |
 | [`templates/dpia-template.md`](templates/dpia-template.md), [`templates/dpia-template-pt.md`](templates/dpia-template-pt.md) | A data protection impact assessment (GDPR Art. 35) for the field to adopt: the violations register and bans, cross-field sharing, live positions, with the legitimate interest assessment, in English and Portuguese |
-| [`templates/dpa-template.md`](templates/dpa-template.md) | A data processing agreement for a hosted site server (GDPR Art. 28) |
+| [`templates/dpa-template.md`](templates/dpa-template.md), [`templates/dpa-template-pt.md`](templates/dpa-template-pt.md) | A data processing agreement for a hosted site server (GDPR Art. 28), in English and pt-PT: the field is the controller, the hub operator the processor, EU/EEA data centres only |
+| [`templates/sharing-terms.md`](templates/sharing-terms.md), [`templates/sharing-terms-pt.md`](templates/sharing-terms-pt.md) | The Art. 26 terms between the fields that share chrono readings across fields; a field accepts them in the software before it switches sharing on (the version, date and account are recorded) |
 
 ## Decisions to review
 
