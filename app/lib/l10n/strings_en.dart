@@ -684,7 +684,7 @@ const Map<String, String> enStrings = {
   'player.me': 'You: {role}, {team}',
   'player.no_team': 'no team yet',
   'player.positions': 'Positions you see: {n}',
-  'player.share': 'Share my position',
+  'player.share': 'Share my position with the game during this game',
   'player.share_hint':
       'Only during the game; the controller decides who sees it. The organisers and the marshals see it on their ATAK devices.',
   'player.share_on': 'Sharing: {n} position(s) sent',
@@ -1133,7 +1133,7 @@ const Map<String, String> enStrings = {
   'apd.expires_required': 'Valid until, YYYY-MM-DD (required)',
   'apd.date_format': '2027-01-31',
   'apd.hint':
-      'The app does not check it: a marshal compares it with your card.',
+      'The app does not check it. At the entrance a marshal compares what you typed with your physical card, because the field must check it. Once the card is confirmed, the number is erased from the field controller.',
   'apd.need_number': 'This field asks for your APD membership number.',
   'apd.need_expiry': 'This field asks for the date your membership expires.',
   'apd.bad_date': 'Write the date as YYYY-MM-DD, for instance 2027-01-31.',
@@ -1143,8 +1143,18 @@ const Map<String, String> enStrings = {
   'apd.status.expired': 'Membership expired',
   'apd.status.not_accepted': 'APD not accepted here',
   'apd.status.missing': 'Membership missing',
-  'apd.hint_marshal': 'A marshal will look at your membership card.',
+  'apd.hint_marshal':
+      'A marshal will check your membership card against what you typed, and you are let in when they confirm it.',
   'queue.confirm': 'Let in',
+  'queue.confirm_no_card': 'Let in without the card',
+  'queue.card_seen': 'Card seen, matches',
+  'apd.verdict_on': '{verdict} on {date}',
+  'apd.card_by': 'card checked by {who}',
+  'checkin.share_position': 'Share my position with the game during this game',
+  'checkin.share_position_hint':
+      'Optional, and off unless you tick it. Your squad or team (as the game mode allows), the marshals and the game master see your position on the map; the remote game master sees it only if the field turns that on. If you do not tick it, nothing else changes. You can stop sharing at any time during the game.',
+  'checkin.card_why':
+      'Why the card is checked: the field has to check your membership card at the entrance against the data you typed here (a legal duty for fields in Portugal, the field legitimate interest elsewhere). Afterwards only the association, the expiry date, the result and who checked it are kept; the number is erased.',
   'site.err.membership_missing':
       'This field needs your APD membership number to register.',
   'site.err.apd_not_accepted': 'This field does not accept that APD.',

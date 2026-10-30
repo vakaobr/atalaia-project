@@ -82,10 +82,10 @@ No names are ever in it. The app shows the notice once per field and version, th
 ```json
 {"game_id": 4242, "player_id": "p-abcdefgh2345", "player_secret": "<43 characters>",
  "display_name": "Falcão", "federation_number": "12345", "team_preference": "red",
- "notice_version": 1, "replicas": [ <declarations> ]}
+ "notice_version": 1, "share_position": false, "replicas": [ <declarations> ]}
 ```
 
-`federation_number`, `team_preference` and `replicas` are optional. A registered player's app adds `"registration_id"` (the site server's registration, a lowercase UUID) and `"ticket"` (the ticket secret, 43 characters of base64url without padding), always together ([Registered players](#registered-players)). Answers 201 (a new check-in) or 200 (the same identity again), with no caching:
+`federation_number`, `team_preference`, `share_position` and `replicas` are optional. A registered player's app adds `"registration_id"` (the site server's registration, a lowercase UUID) and `"ticket"` (the ticket secret, 43 characters of base64url without padding), always together ([Registered players](#registered-players)). Answers 201 (a new check-in) or 200 (the same identity again), with no caching:
 
 ```json
 {"game_id": 4242, "player_id": "p-abcdefgh2345", "token": "apt1....", "exp": 1792339200,
@@ -97,8 +97,9 @@ Errors: 400 (a field out of its rules), 403 (check-in closed, the game full, a p
 - `display_name`: 1-32 characters, no control characters (a callsign or a first name; what the player wants).
 - `federation_number`: 1-32 printable characters, **never verified automatically**. With `federation = "off"` it is dropped; with `"required"` the check-in is refused without one. Staff tick "card seen" (`federation_seen`).
 - `team_preference`: one of the game's team names.
+- `share_position`: a boolean, **the player's own separate choice**, a box on the form that is **unticked** by default: "Share my position with the game during this game". Absent (an older client) means no, and a client never ticks it for the player. See [Sharing the position](#sharing-the-position).
 
-A self check-in only ever gives the role `player`. With `[checkin] confirm = "staff"` the status stays `pending` until a marshal or the GM confirms it; a pending player already has a token and can declare replicas. When a check-in becomes `checked_in`, the controller logs **`player.checkin` (15)** as its own node with `{"player": "<player_id>"}` and the envelope's team once assigned: never the name, never again for a token refresh.
+A self check-in only ever gives the role `player`. When the field's membership rule checks at check-in (`apd.checkin`) the status stays `pending` **even with `confirm = "auto"`** until a marshal or the GM ticks "card seen, matches" ([apd.md](apd.md#the-card-check)). With `[checkin] confirm = "staff"` the status stays `pending` until a marshal or the GM confirms it; a pending player already has a token and can declare replicas. When a check-in becomes `checked_in`, the controller logs **`player.checkin` (15)** as its own node with `{"player": "<player_id>"}` and the envelope's team once assigned: never the name, never again for a token refresh.
 
 The **player token** is `protocol/player-token.md`'s, keyed with the controller's own per-game token key (decision B8): 32 random bytes made when the game's first token is issued, kept in the controller's SQLite file (mode 0600, and its WAL and shared-memory files too) and never sent anywhere, so tokens survive a restart. `exp` is the game's planned end plus 2 hours (when it has started with a length) or the end of the field's local day, whichever comes first, and at least a minute away. `POST /api/v1/checkin/token` with the token gives a new one.
 
@@ -110,9 +111,34 @@ The **player token** is `protocol/player-token.md`'s, keyed with the controller'
 | --- | --- | --- |
 | GET | `/api/v1/checkin/me` | The check-in with its fields and the declaration with states; `stale_token` when the token no longer matches the row; for the role `marshal`, also `marshal` (below) |
 | PUT | `/api/v1/checkin/me/replicas` | `{"replicas": [ <declarations> ]}` replaces the declaration |
-| DELETE | `/api/v1/checkin/me` | Leave the game: status `left`, the name, federation number and team preference erased, pending declarations withdrawn |
+| PUT | `/api/v1/checkin/me/position-sharing` | `{"share_position": true or false}`: the player turns sharing their position with the game on or off, any time during the game; answers the check-in with the choice. 400 for anything else, 409 once the game ended or the check-in is over. See [Sharing the position](#sharing-the-position) |
+| DELETE | `/api/v1/checkin/me` | Leave the game: status `left`, the name, federation number, card check and team preference erased, the position choice off and the stored position dropped, pending declarations withdrawn |
 | PUT | `/api/v1/checkin/me/marshal-key` | A marshal on the GM's list registers `{"public_key", "marshal_id"?}`, the Ed25519 key that signs their readings, for the id the list gave them (`marshal_id`, if sent, must be that one: 409; not on the list: 403) |
-| POST | `/api/v1/positions` | Player positions (ADR-P3-6), not check-in data |
+| POST | `/api/v1/positions` | Player positions (ADR-P3-6); taken only from a player who chose to share (below) |
+
+### Sharing the position
+
+**A separate, unticked choice at check-in** (decisions LEG-12 to LEG-16, Art. 7(4) GDPR). Each check-in (the app, the
+console's hand check-in) shows its own box, never bundled with the privacy notice or with another consent: "Share my
+position with the game during this game". Its text says **who sees the position**: the player's squad or team as the
+game mode allows (ADR-P3-6), the marshals and the GM, and the remote GM only when the field turns that on. The rules:
+
+- **Declining blocks nothing.** The check-in and the game go on; only the position is not taken. `POST
+  /api/v1/positions` from a player whose row says no is **409** `position_sharing_off`, and no report is stored.
+- **The player can stop (or start) at any time during the game**: `PUT /api/v1/checkin/me/position-sharing`. Stopping drops the stored position at
+  once and refreshes the views.
+- **Recorded on the check-in row**: `position_share` (bool), `position_share_at` (Unix seconds of the choice, on or
+  off) and `position_share_notice` (the privacy notice version in force). They are in `GET /api/v1/checkin/me`, in the
+  staff rows and in the player's own stream view. A check-in that says nothing records `false` with its time; a later
+  `POST /api/v1/checkin` that sends `share_position` changes it, one that does not leaves it.
+- **The app's own switch is the same choice** ("Share my position with the game during this game" at check-in, still
+  changeable during the game): the app starts reporting when the row says yes and records every switch with the PUT
+  above. An older controller without the route answers 404/405: the app then goes on as before.
+- A leaving or removed check-in turns it off and drops the position. Positions are deleted when the game ends, as
+  before ([ADR-P3-6](../docs/phase-3-android-players/ADR.md)).
+
+Vectors: the cases `check-in: position sharing is its own unticked choice...` and `positions: who sees whom...` of
+[`vectors/controller_api.json`](vectors/controller_api.json).
 
 ## Marshals: only from the GM's list
 
@@ -203,8 +229,8 @@ Version 1, at most 128 bytes with the version byte. All three keys are required.
 | Method | Path | Who | |
 | --- | --- | --- | --- |
 | GET | `/api/v1/games/{id}/checkins` | GM token, marshal or gm player token | The check-ins with names, counts, settings, whether check-in is open; each row's `registration_id` and `registered`, and `registrations: {expected, arrived, walkins}` |
-| POST | `/api/v1/games/{id}/checkins` | the same | A hand check-in `{"display_name", "federation_number"?, "team_preference"?, "replicas"?}`: checked in at once; the answer has the controller's new `player_id` |
-| PATCH | `/api/v1/games/{id}/checkins/{player}` | GM token: `team`, `squad`, `role`; staff: `status: "checked_in"` (confirm), `federation_seen`, `replicas` | |
+| POST | `/api/v1/games/{id}/checkins` | the same | A hand check-in `{"display_name", "federation_number"?, "team_preference"?, "replicas"?, "apd_id"?, "membership_number"?, "membership_expires"?, "federation_seen"?, "share_position"?}`: checked in at once (with `apd.checkin`, `federation_seen: true` is the card in the marshal's hand: the number is erased, [apd.md](apd.md#the-card-check); without it the check-in is an override); the answer has the controller's new `player_id` |
+| PATCH | `/api/v1/games/{id}/checkins/{player}` | GM token: `team`, `squad`, `role`; staff: `status: "checked_in"` (confirm; with `apd.checkin` and no card seen an override), `federation_seen` (with `apd.checkin`: **card seen, matches**, which also confirms and erases the number), `replicas` | |
 | DELETE | `/api/v1/games/{id}/checkins/{player}` | GM token | Remove: status `removed`, personal fields erased, the player's tokens refused |
 | POST | `/api/v1/games/{id}/checkins/ticket` | the same | `{"ticket": "atalaia:ticket:..."}`: a registered player's printed ticket, scanned; checked in at once |
 | GET | `/api/v1/games/{id}/chrono-list` | GM token, marshal or gm player token | Players with declarations, and a player whose check-in is `pending` even with none (a marshal lets them in: [apd.md](apd.md)); pending first in check-in order; counts; per player the membership (`apd_id`, `membership_number`, `membership_expires`, `apd_override`, `apd_status`: [apd.md](apd.md)) and `shared_readings`: records of other fields pulled from the site server with the person's consent (`from_other_field`, `field`, never judged or counted: [sync.md](sync.md)) |
@@ -232,7 +258,7 @@ On `WS /api/v1/stream` a player token may connect too. Every message is routed b
 
 ## Personal data
 
-Kept: the field identity (id, hash of the secret), per check-in the display name, the federation number if given, the team preference, the time and the state, the declarations, and for a registered player the registration's id and its ticket's SHA-256. Nothing else. Names and federation numbers never reach events, MQTT, the radio, the controller's log lines or the read token's views (the tests check all four). The display name, federation number, team preference and declarations are erased `[checkin] retention_days` (30) days after the game; a field identity not seen for 365 days is deleted; chrono readings older than the field's `chrono_retention_days` (365 by default) are deleted (decision B12, RET-2), and an ended game's events, scores and nodes `game_retention_days` (365) after it ended (decision RET-1; with a site sync set up never before the site server has all of it, RET-3). The default privacy notice is `controller/templates/checkin-notice-pt.md` and `-en.md` (`{operator}`, `{retention_days}`, `{chrono_retention_days}` and `{game_retention_days}` are filled in), for the legal review of decision P4-6.
+Kept: the field identity (id, hash of the secret), per check-in the display name, the federation number if given (erased once a marshal checks the card: [apd.md](apd.md#the-card-check), which keeps the verdict "valid on <date>" and who checked), the team preference, the position-sharing choice with its time and the notice version, the time and the state, the declarations, and for a registered player the registration's id and its ticket's SHA-256. Nothing else. Names and federation numbers never reach events, MQTT, the radio, the controller's log lines or the read token's views (the tests check all four). The display name, federation number, team preference and declarations are erased `[checkin] retention_days` (30) days after the game; a field identity not seen for 365 days is deleted; chrono readings older than the field's `chrono_retention_days` (365 by default) are deleted (decision B12, RET-2), and an ended game's events, scores and nodes `game_retention_days` (365) after it ended (decision RET-1; with a site sync set up never before the site server has all of it, RET-3). The default privacy notice is `controller/templates/checkin-notice-pt.md` and `-en.md` (`{operator}`, `{retention_days}`, `{chrono_retention_days}` and `{game_retention_days}` are filled in), for the legal review of decision P4-6.
 
 ## Offline
 

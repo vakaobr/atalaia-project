@@ -382,6 +382,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// when the game's teams change, and the field's branding when the
   /// stream says it changed.
   void _onFeed() {
+    _autoShare();
     _syncBuzzService();
     // New orders (an objective revealed to this player, or their squad
     // leader's): two short pulses, no sound, as for the field's boundary
@@ -757,13 +758,45 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  Future<void> _share(bool on) async {
+  /// The player's choice, kept on the check-in with its time and the notice
+  /// version (decision LEG-12). Stopping never fails; a controller from
+  /// before the route (404/405) just goes on as it did.
+  Future<bool> _recordSharing(bool on) async {
+    final field = widget.link.field;
+    if (field == null) return true;
+    final http = _http ??= context.services.fieldHttp(field);
+    try {
+      await CheckinClient(http).setPositionSharing(feed.link.token, on);
+      return true;
+    } on CheckinException catch (e) {
+      if (!on || e.status == 404 || e.status == 405) return true;
+      if (mounted) setState(() => _shareError = e.message);
+      return false;
+    }
+  }
+
+  /// The check-in said yes (an unticked box the player ticked): start
+  /// sharing once, as the switch would. Not again after they stop.
+  bool _autoShared = false;
+  void _autoShare() {
+    if (_autoShared ||
+        widget.link.field == null ||
+        feed.me?['position_share'] != true ||
+        (_reporter?.running ?? false)) {
+      return;
+    }
+    _autoShared = true;
+    unawaited(_share(true, record: false));
+  }
+
+  Future<void> _share(bool on, {bool record = true}) async {
     final services = context.services;
     final s = context.s;
     final app = AppScope.read(context);
     final location = services.location;
     final field = widget.link.field;
     if (!on) {
+      await _recordSharing(false);
       _reporter?.stop();
       _beaconsTimer?.cancel();
       _beaconNote = null;
@@ -791,6 +824,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }
       return;
     }
+    if (record && !await _recordSharing(true)) return;
     final http = _http ??= services.fieldHttp(field);
     final client = CheckinClient(http);
     final scanner = await _beaconScanner(services, client);

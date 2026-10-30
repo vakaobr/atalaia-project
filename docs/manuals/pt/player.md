@@ -66,11 +66,12 @@ A organização afixa um **cartaz de check-in** com um código QR. Não leva nen
    - **Jogo**: escolhe um, se o campo tiver mais do que um aberto.
    - **Nome ou alcunha**: até 32 caracteres. Só a organização e os marshals o veem. Quem joga contigo não.
    - **Número de federado**: só se o campo o pedir. A organização confere o cartão à entrada. A app não o verifica.
-   - **Filiação numa APD**: se o campo a pedir, escolhe a tua APD (ou **Não consta da lista**), escreve o número de associado e a data de validade (AAAA-MM-DD). A app não os verifica: um marshal compara-os com o teu cartão. Se a filiação não for válida para o jogo, o check-in fica à espera de um marshal, que decide. Num campo que a exija para a inscrição, a inscrição é recusada sem filiação válida.
+   - **Filiação numa APD**: se o campo a pedir, escolhe a tua APD (ou **Não consta da lista**), escreve o número de associado e a data de validade (AAAA-MM-DD). A app não os verifica. **Porque se verifica o cartão:** o campo tem de conferir o teu cartão de associado físico à entrada com o que escreveste aqui (uma obrigação legal nos campos em Portugal, o interesse legítimo do campo nos outros), por isso o check-in fica à espera até um marshal comparar os dois e marcar *cartão visto*; o número é então apagado do controlador do campo e ficam só a APD, a validade, o resultado e quem verificou. Se a filiação não for válida para o jogo, o marshal decide. Num campo que a exija para a inscrição, a inscrição é recusada sem filiação válida.
      Num campo fora de Portugal diz **Filiação numa associação**: escolhe a tua associação (clube, federação ou seguradora) em vez de uma APD; a lista é a do país do campo e **Não consta da lista** está sempre lá.
    - **Equipa preferida**: **Qualquer uma**, ou uma equipa. A organização decide a equipa final.
    - **Inscrição online**: só se te inscreveste no site do campo. Vê a [secção 8](#8-se-te-inscreveste-online).
    - **Réplicas que trazes**: marca as réplicas que guardaste antes. Também o podes fazer depois ([secção 4](#4-declara-as-tuas-réplicas)).
+   - **Partilhar a minha posição com o jogo durante este jogo**: uma caixa separada, desmarcada. Marca-a só se quiseres: a tua equipa ou squad (conforme o jogo permitir), os marshals e a organização veem a tua posição, e o GM remoto só se o campo o ativar. Se a deixares desmarcada nada mais muda, e podes deixar de partilhar a qualquer momento durante o jogo.
 8. Toca em **Fazer o check-in**.
 
 Agora vês o **O meu check-in**. Mostra:
@@ -219,7 +220,7 @@ Um objetivo pode dizer **Para a equipa** *(equipa)* ou **Para a equipa** *(equip
 
 ## 6. Partilha a tua posição e o limite do campo
 
-Partilhar a posição é opcional. A tua posição vai só para o controlador do campo, durante o jogo. O controlador decide quem a pode ver: a organização e os marshals, e o teu squad se o jogo o permitir. Se o campo tiver um GM remoto com sessão iniciada no servidor do site, o GM remoto também a vê, enquanto a partilhares; o servidor do site não a guarda. A organização vê-a nos seus aparelhos ATAK, se os usar. A app desenha um mapa do campo com as posições que podes ver (mais abaixo); a consola não desenha quem joga. No *VIP / Carga*, a posição do VIP é o que extrai a equipa.
+Partilhar a posição é opcional, e é a caixa que marcaste ou deixaste desmarcada no check-in (**Partilhar a minha posição com o jogo durante este jogo**). O interruptor abaixo é a mesma escolha: liga-o mais tarde ou desliga-o a qualquer momento. A tua posição vai só para o controlador do campo, durante o jogo. O controlador decide quem a pode ver: a organização e os marshals, e o teu squad se o jogo o permitir. Se o campo tiver um GM remoto com sessão iniciada no servidor do site, o GM remoto também a vê, enquanto a partilhares; o servidor do site não a guarda. A organização vê-a nos seus aparelhos ATAK, se os usar. A app desenha um mapa do campo com as posições que podes ver (mais abaixo); a consola não desenha quem joga. No *VIP / Carga*, a posição do VIP é o que extrai a equipa.
 
 1. Faz o check-in e toca em **Seguir o jogo**.
 2. Enquanto o jogo **decorre**, liga **Partilhar a minha posição**. Diz *Só durante o jogo; o controlador decide quem a vê …*.

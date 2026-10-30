@@ -887,6 +887,7 @@ void main() {
     }) {
       final row = checkin.manualCheckin(ApiViewer.gm, gid, {
         'display_name': name,
+        'share_position': true,
       });
       final pid = row['player_id']! as String;
       checkin.patchCheckin(ApiViewer.gm, gid, pid, {

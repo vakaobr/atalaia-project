@@ -100,6 +100,7 @@ which browsers cannot give headers, also takes ``?token=``.
     POST /api/v1/checkin/token             a new player token (player token)
     GET|DELETE /api/v1/checkin/me          the player's own check-in / leave the game
     PUT  /api/v1/checkin/me/replicas       the player's declaration (replicas for this game)
+    PUT  /api/v1/checkin/me/position-sharing  the player turns sharing their position on or off, any time
     PUT  /api/v1/checkin/me/marshal-key    a marshal registers the Ed25519 key that signs readings
     GET|POST /api/v1/games/{id}/checkins   staff: the list with names / a manual check-in
     GET  /api/v1/games/{id}/checkins.csv   GM: the list as CSV
@@ -1260,6 +1261,10 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.put("/api/v1/checkin/me/replicas")
     def checkin_replicas(v: Viewer = Depends(require_player), body: Any = Body(None)) -> dict[str, Any]:
         return need_checkin().put_my_replicas(v, body_map(body))
+
+    @app.put("/api/v1/checkin/me/position-sharing")
+    def checkin_position_sharing(v: Viewer = Depends(require_player), body: Any = Body(None)) -> JSONResponse:
+        return JSONResponse(need_checkin().set_position_sharing(v, body_map(body)), headers=NO_STORE)
 
     @app.put("/api/v1/checkin/me/marshal-key")
     def checkin_marshal_key(v: Viewer = Depends(require_player), body: Any = Body(None)) -> dict[str, Any]:

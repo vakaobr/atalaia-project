@@ -405,6 +405,31 @@ class GameDaySyncTests(RegistrationCase):
         await self.post("checkins", envelope(game={"game_id": 7, "game_seed": 7}, scheduled_game_id=str(game.id),
                                              walkins=0, registrations=[]), expect=404)
 
+    async def test_the_number_is_erased_when_the_outcome_arrives_or_the_game_ends(self) -> None:
+        """The card is compared at the field (protocol/apd.md "The card check"): the site server drops its copy of
+        the number with the outcome, or at game end for those the outcome did not cover; the APD and the expiry
+        stay to the 30 days."""
+        game = await self.game(starts=1, registration_closes_at=hour(0.5), federation="optional")
+        first = await self.register(game, federation_number="FPA-1")
+        _, _, _ = await self.make_user("rui")
+        second = await self.register(game, headers=await self.auth("rui"), federation_number="FPA-2")
+        meta = {**META, "state": "running", "started_at": 1792000100.0, "scheduled_game_id": str(game.id)}
+        await self.post("games", envelope(meta=meta))
+
+        async def numbers():
+            rows = await self.fetch("SELECT id, federation_number FROM game_registrations")
+            return {str(r["id"]): r["federation_number"] for r in rows}
+
+        self.assertEqual(sorted((await numbers()).values()), ["FPA-1", "FPA-2"])  # the roster still needs them
+        body = envelope(scheduled_game_id=str(game.id), walkins=0, registrations=[
+            {"registration_id": first["id"], "player_id": first["player_id"], "outcome": "checked_in",
+             "declarations": []}])
+        self.assertEqual((await self.post("checkins", body))["applied"], 1)
+        got = await numbers()
+        self.assertEqual((got[first["id"]], got[second["id"]]), (None, "FPA-2"))
+        await self.post("games", envelope(meta={**meta, "state": "ended", "ended_at": 1792003700.0}))
+        self.assertEqual(set((await numbers()).values()), {None})
+
 
 class RegistrationPersonalDataTests(RegistrationCase):
     async def test_access_export_and_erasure(self) -> None:

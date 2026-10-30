@@ -16,7 +16,9 @@ that connection's role may see it:
 A mode can grant a team a temporary view of another team (a UAV sweep): the
 event ``visibility.granted`` (its envelope team sees ``see_team`` for
 ``duration_s``), ended by ``visibility.expired``, which the controller emits
-when the time is up. Positions are deleted when the game ends, and are never
+when the time is up. Reports are taken only from a player who chose to share
+(``share_position`` at check-in, off by default, changeable during the game: protocol/checkin.md) and are
+dropped when they stop sharing. Positions are deleted when the game ends, and are never
 sent on the radio or MQTT. A VIP's GPS reports also go to the game's field.lua
 as the input position.fix (decision P4R6, VIP / Payload), and to nothing else.
 
@@ -168,6 +170,11 @@ class Positions:
         if not isinstance(items, list) or not 1 <= len(items) <= REPORTS_MAX:
             raise ControllerError(f"reports: 1 to {REPORTS_MAX} position reports")
         checked = [check_report(r) for r in items]
+        row = self.ctrl.store.checkin(viewer.game_id, viewer.player_id)
+        if row is None or not row.get("position_share"):
+            # Sharing is the player's own choice at check-in (an unticked box), changeable any time; declining
+            # never blocks the check-in or the game (GDPR Art. 7(4)).
+            raise Conflict("position_sharing_off: this player did not choose to share their position")
         for r, raw in zip(checked, items):
             if raw.get("player_id") not in (None, viewer.player_id):
                 raise ControllerError("player_id: only your own position")

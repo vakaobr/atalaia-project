@@ -430,6 +430,7 @@ class CheckinClient {
     List<Declaration>? replicas,
     String? registrationId,
     String? registrationTicket,
+    bool? sharePosition,
   }) async => CheckinTicket(
     await _call(
       'POST',
@@ -451,6 +452,8 @@ class CheckinClient {
         'apd_id': ?apdId,
         'membership_expires': ?membershipExpires,
         'team_preference': ?teamPreference,
+        // The player's own, separate choice (an unticked box): decision LEG-12.
+        'share_position': ?sharePosition,
         if (replicas != null)
           'replicas': [for (final d in replicas) d.toRequest()],
       },
@@ -506,11 +509,32 @@ class CheckinClient {
     body: {'player': player, 'team': ?team},
   );
 
+  /// The player turns sharing their position with the game on or off, any
+  /// time (an older controller has no such route: 404 or 405).
+  Future<Map<String, Object?>> setPositionSharing(String token, bool on) =>
+      _call(
+        'PUT',
+        '/checkin/me/position-sharing',
+        token: token,
+        body: {'share_position': on},
+      );
+
   Future<Map<String, Object?>> manualCheckin(
     String token,
     int gameId,
     Map<String, Object?> body,
   ) => _call('POST', '/games/$gameId/checkins', token: token, body: body);
+
+  /// The marshal ticks "card seen, matches": the controller records who and
+  /// when, stores the verdict, erases the number and lets the player in
+  /// (protocol/apd.md, "The card check").
+  Future<Map<String, Object?>> cardSeen(String token, int gameId, String pid) =>
+      _call(
+        'PATCH',
+        '/games/$gameId/checkins/$pid',
+        token: token,
+        body: {'federation_seen': true},
+      );
 
   Future<Map<String, Object?>> confirm(String token, int gameId, String pid) =>
       _call(

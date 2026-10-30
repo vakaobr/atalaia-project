@@ -17,6 +17,14 @@ verdict codes (`apd_rule_invalid`, `apd_not_accepted`, ...), the files (`apds.js
 page keep "apd" so that nothing breaks; read "APD" in them as "the membership body" (the association, club or
 federation). Only what a person reads changes with the country (below).
 
+**Why the card is checked, and on what basis** (decisions LEG-1 to LEG-3). The field **must check the physical
+membership card at check-in against the data the player typed in advance**. The legal basis is **Art. 6(1)(c) GDPR**
+(a legal obligation of the field operator) for fields in Portugal, where airsoft membership of a recognised APD is a
+condition of practising the sport, and **Art. 6(1)(f)** (the field's legitimate interest: its insurance and rules)
+everywhere else; the notice and the player-facing texts say so in the four languages. Atalaia still **never
+verifies** anything with anyone: the check is a person comparing a card with what was typed ([The card
+check](#the-card-check)).
+
 Vectors: [`vectors/apd.json`](vectors/apd.json), run by the server, the Pi controller, the phone controller and the app; the sync bodies that carry a rule (`settings.apd` of the field answer, the roster's `apd`) are in [`vectors/sync.json`](vectors/sync.json) (`answers`, `field_settings_*apd*` and `roster_*apd*`; error `bad_apd_rule`).
 
 ## The field's country and the wording
@@ -101,8 +109,12 @@ time zone; today's local date at check-in), the first that applies:
 4. `valid`
 
 The verdict is computed only where a rule asks: at check-in when `rule.checkin`, at registration when
-`rule.register`. When nothing asks, the verdict is null and the data is only shown. The verdict is never stored: it is
-worked out when shown, so a changed rule or a new day changes it.
+`rule.register`. When nothing asks, the verdict is null and the data is only shown. **Until the card is checked the
+verdict is not stored**: it is worked out when shown, so a changed rule or a new day changes it. **When a marshal or
+the GM confirms the card, the verdict as it stood that day is stored** (`apd_verdict` and `apd_verdict_on`, "valid
+on 2027-01-15") because the number it was worked out from is erased then ([The card check](#the-card-check)); from
+then on `apd_status` is that stored verdict, whatever the rule or the date does later (decision LEG-6, which changes
+what this page said before: "the verdict is never stored").
 
 ## Wire names
 
@@ -119,6 +131,9 @@ worked out when shown, so a changed rule or a new day changes it.
 | controller `PUT /api/v1/checkin/settings` | `apd` (a whole rule, replaces) and `country` (two letters, any case; `""` or null: the configured or default one; 400 for anything else; 409 once the site has sent its country with `[sync] branding = "site"`, as for the rule) |
 | controller staff rows, `GET /api/v1/checkin/me` and `GET /api/v1/games/{id}/chrono-list` | `country` (the field's, for the words of the verdict) beside `apd_status` |
 | controller `GET /api/v1/games/{id}/chrono-list`, per player | `apd_id`, `membership_number`, `membership_expires`, `apd_override` and `apd_status` (null when no rule asks), as in the staff rows, for the marshal's queue (decision APDF-4); the Pi and the phone controller both send them, held to the `chrono-list: a pending player without replicas...` case of [`vectors/controller_api.json`](vectors/controller_api.json). A player who has **no declared replica** is listed too while their check-in is `pending` (a marshal has to let them in: decision APDF-3), with `pending: 0` and `declarations: []`; the counts stay the replicas' |
+| a check-in row (staff views, `GET /api/v1/checkin/me`, chrono-list) after the card check | `federation_seen` true, `card_checked_by` (the marshal's player id, or `"gm"` for the GM token), `card_checked_at` (Unix seconds), `apd_verdict_on` (`YYYY-MM-DD`, the local day of the stored verdict; null until the card is confirmed), `apd_status` (the stored verdict), and `membership_number` / `federation_number` **null** (erased). Before the check these are false / null and the number is there |
+| `PATCH /api/v1/games/{id}/checkins/{player}` (staff) | `federation_seen: true`: **card seen, matches** (see below); a body that changes the APD, number or expiry replaces an earlier check |
+| `POST /api/v1/games/{id}/checkins` (hand check-in, staff) | optional `federation_seen`: the card was in the marshal's hand |
 | registration import and export (CSV or JSON) | the columns `apd_id` and `membership_expires` beside `federation_number` (the membership number), optional: see "The import and the exports" below |
 
 Entries in a check-in's or registration's `apd_id` are not validated against any list (an older build or a
@@ -134,17 +149,51 @@ needs a number); `register` with a game whose `federation` is `off` asks for the
 
 ## Checking in (controller)
 
-With `rule.checkin`, a **self check-in** whose verdict is not `valid` is recorded as `pending` even when
-`confirm = "auto"`, and the staff rows show the verdict: a marshal confirms it (PATCH `status: "checked_in"`) as
-they do any pending check-in. A **marshal's confirmation or hand check-in is never refused** because of the
-verdict: when it is not `valid` the controller logs it (`apd override`: the player id and the verdict, no number)
-and keeps `apd_override: true` on the row. A check-in without a rule behaves as before.
+With `rule.checkin`, a **self check-in is always recorded as `pending`**, whatever the verdict and even when
+`confirm = "auto"` (before decision LEG-1 only a verdict other than `valid` waited): the staff rows show the verdict
+and a marshal or the GM checks the card ([The card check](#the-card-check)). The same holds for a registered player
+the marshal scans by ticket (the ticket is not the card): `pending`, not `checked_in`. A **marshal's confirmation or
+hand check-in is never refused**: without the card, or when the verdict is not `valid`, the controller logs it
+(`apd override`: the player id, the **reason** (`no_card` or the verdict) and the verdict, never the number) and keeps
+`apd_override: true` on the row. A check-in without a rule behaves as before.
+
+## The card check
+
+The rule's `checkin` makes the card check mandatory (decisions LEG-1 to LEG-11):
+
+1. **Pending until the card is seen.** A self check-in (and a ticket scan) stays `pending` until a marshal or the GM
+   ticks **"card seen, matches"**: `PATCH .../checkins/{player}` with `federation_seen: true` (the console and the
+   app's marshal queue send it). The tick is the confirmation: the row becomes `checked_in` and `player.checkin` is
+   logged as for any confirmation. This holds **even with a valid verdict and `confirm = "auto"`**.
+2. **Who and when.** The tick records `card_checked_by` (the marshal's player id, or `"gm"` for the GM token) and
+   `card_checked_at`. A staff id is not a membership number; **the number is never put in a log, an audit line, an
+   event or a metric** (the log line is `card check: game, player, staff id, verdict`).
+3. **The verdict is stored.** `apd_verdict` and `apd_verdict_on` keep the verdict on that day ("valid on
+   2027-01-15"; `apd_status` shows it from then on).
+4. **The number is erased on the controller.** `membership_number` / `federation_number` become null the moment the
+   card check is confirmed. **Kept**, for the normal check-in retention (30 days after the game, `retention_days`): the
+   `apd_id`, `membership_expires`, the stored verdict and who checked it. All of them go with the rest of the
+   check-in when it is erased (leaving, removal, retention).
+5. **An override without the card stays possible.** A marshal may still let a player in without seeing a card
+   (PATCH `status: "checked_in"`, the queue's **Let in without the card**, a hand check-in with `federation_seen`
+   absent or false): never refused, `apd_override: true`, logged with the reason (`no_card`), no card fields, and the
+   number is **not** erased (nobody compared it with anything); it goes with the retention like any check-in.
+6. **Correcting data restarts the check.** A PATCH that changes the APD, the number or the expiry clears an earlier
+   card check (who, when, the stored verdict) and puts the new data back; tick again. Ticking off a recorded check
+   (`federation_seen: false` without new data) is 409. The player's app (`POST /api/v1/checkin` again) and an import
+   never put a number back over a recorded card check.
+7. **The site server.** It erases its copy of the number (`game_registrations.federation_number`) when the game's
+   outcome arrives (`POST /api/v1/sync/checkins`) or the game ends; the `apd_id` and the expiry stay to the same
+   30 days as before. The controller's outcome never carried a number.
+
+Without `rule.checkin` nothing here applies: `federation_seen` is the old optional tick and the number stays to the
+retention.
 
 ## The import and the exports
 
 The registration list the site server and the controllers import ([`vectors/registration_import.json`](vectors/registration_import.json); `import_format.py` and its Dart port) has two more optional columns, **`apd_id`** (the id syntax above, or empty: `apd_id_invalid`) and **`membership_expires`** (`YYYY-MM-DD`, a real date in 2000-2100, or empty: `membership_expires_invalid`), beside `federation_number`, which stays the membership number (decision APDF-1). A file without them imports as before; a column the file lacks is left as it is on an update, and an empty cell clears the value. When the game (or the controller's `federation` setting with no rule asking at check-in) asks for no membership, all three are dropped with a warning (`federation_number_dropped`, `apd_id_dropped`, `membership_expires_dropped`); an import never makes a number required for a rule (the importing side only relaxes `federation: off` to `optional` when the rule asks). The vectors' results carry `apd_id` and `membership_expires`; a case may leave them out (null).
 
-The exports write the same two columns right after `federation_number`: the site server's registration export (`display_name, external_ref, team_preference, federation_number, apd_id, membership_expires, replicas, ...`, so an export imports back) and the check-in CSV of the Pi and of the phone controller, which already had `apd_id`, `membership_expires` and `apd_status`; their columns are ignored by the import except those two, so the check-in CSV imports back too.
+The exports write the same two columns right after `federation_number`: the site server's registration export (`display_name, external_ref, team_preference, federation_number, apd_id, membership_expires, replicas, ...`, so an export imports back) and the check-in CSV of the Pi and of the phone controller, which already had `apd_id`, `membership_expires` and `apd_status` and now also `card_checked_by` and `card_checked_at` (an ISO time) right after `card_seen` (decision LEG-11; the number column is empty once the card was checked, `apd_status` is the stored verdict); their columns are ignored by the import except those two, so the check-in CSV imports back too.
 
 ## Personal data
 
@@ -152,3 +201,7 @@ The membership number and expiry are personal data with the same life as the fed
 retention (30 days after the game on the server, the controller's `retention_days`), the same erasure and leaving,
 and the same export; never in a log, an audit line or a Prometheus label; never sent back from a controller to the
 site server (the outcomes carry none). The APD id goes with them: which association a person belongs to is theirs too.
+**The number itself lives shorter** when the rule checks the card: it is erased on the controller when the card check
+is confirmed and on the site server when the outcome arrives or the game ends ([The card check](#the-card-check)),
+which is the approved minimisation (the number is not kept as evidence; the association, the expiry, the stored
+verdict and who checked it are). What stays for the retention: `card_checked_by` (a staff id) and `card_checked_at`.

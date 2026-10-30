@@ -80,6 +80,8 @@ STATUSES = ("expected", "pending", "checked_in", "left", "removed")
 ARRIVED = ("pending", "checked_in", "left")  # at the field (a registration's outcome: checked_in)
 STATES = ("pending", "passed", "refused", "withdrawn")
 NAME_MAX = 32
+# What a check-in forgets of the card check (leaving, removal, retention): protocol/apd.md "The card check".
+ERASED_CARD = {"apd_verdict": None, "apd_verdict_on": None, "card_checked_by": None, "card_checked_at": None}
 FEDERATION_MAX = 32
 SERIES_MAX = 50
 MARSHAL_VALID_FOR_S = 2 * 3600  # how long a phone may act as a marshal offline after the controller said yes (MR-4)
@@ -205,6 +207,15 @@ def _printable(value: str) -> bool:
 
 def _days_ok(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and RETENTION_MIN <= value <= RETENTION_MAX
+
+
+def _share_choice(body: dict[str, Any]) -> Optional[bool]:
+    """The player's own choice to share their position during the game (``share_position``, an unticked box
+    on the form): None when the body does not say, so an older client changes nothing."""
+    v = body.get("share_position")
+    if v is not None and not isinstance(v, bool):
+        raise ControllerError("share_position: true or false")
+    return v
 
 
 def _text(name: str, value: Any, max_chars: int, optional: bool = False) -> Optional[str]:
@@ -556,6 +567,26 @@ class Checkin:
             return None
         return apdfmt.status(rule, apd, number, expires, self.local_day(now).isoformat())
 
+    def _row_verdict(self, st: dict[str, Any], row: dict[str, Any], now: float) -> Optional[str]:
+        """What staff see: the verdict stored when the card was checked, else the one worked out now."""
+        if row.get("apd_verdict"):
+            return row["apd_verdict"]
+        return self._verdict(st, row.get("apd_id"), row["federation_number"], row.get("membership_expires"), now)
+
+    def _card_fields(self, st: dict[str, Any], apd: Optional[str], number: Optional[str], expires: Optional[str],
+                     staff: str, now: float) -> dict[str, Any]:
+        """The columns of a confirmed card check (protocol/apd.md "The card check"): who and when, the verdict
+        as it stood that day, and the number gone (association, expiry and the verdict stay)."""
+        day = self.local_day(now).isoformat()
+        return {"federation_seen": True, "card_checked_by": staff, "card_checked_at": now,
+                "apd_verdict": apdfmt.status(st["apd"], apd, number, expires, day), "apd_verdict_on": day,
+                "federation_number": None}
+
+    @staticmethod
+    def _share_fields(share: Optional[bool], notice: Any, now: float) -> dict[str, Any]:
+        """The position-sharing choice with its time and the notice version it was made under."""
+        return {"position_share": bool(share), "position_share_at": now, "position_share_notice": notice}
+
     def set_settings(self, spec: dict[str, Any]) -> dict[str, Any]:
         unknown = set(spec) - set(SETTINGS_KEYS)
         if unknown:
@@ -868,10 +899,11 @@ class Checkin:
             raise TooMany("too many check-ins from this address; wait a minute")
         allowed = {"game_id", "player_id", "player_secret", "display_name", "federation_number",
                    "team_preference", "notice_version", "replicas", "registration_id", "ticket", "apd_id",
-                   "membership_number", "membership_expires"}
+                   "membership_number", "membership_expires", "share_position"}
         unknown = set(body) - allowed
         if unknown:
             raise ControllerError(f"unknown fields {sorted(unknown)}")
+        share = _share_choice(body)
         game_id = body.get("game_id")
         if isinstance(game_id, bool) or not isinstance(game_id, int):
             raise ControllerError("game_id: the game's id")
@@ -928,7 +960,9 @@ class Checkin:
                 raise ControllerError(f"federation_number: this field asks for your {st['federation_label']} number")
             # A membership the rule does not accept waits for a marshal, who decides (protocol/apd.md).
             verdict = self._verdict(st, apd_id, fed, exp, now)
-            auto_ok = verdict in (None, "valid")
+            # With a rule that checks at check-in, only a marshal or the GM ticking "card seen, matches" lets a
+            # player in, whatever the verdict (protocol/apd.md, "The card check").
+            auto_ok = verdict in (None, "valid") and not st["apd"]["checkin"]
             created = row is None or row["status"] == "expected"  # an expected player arriving is a new check-in
             emit = False
             if created:
@@ -939,7 +973,8 @@ class Checkin:
                 status = "checked_in" if st["confirm"] == "auto" and auto_ok else "pending"
                 fields = {"status": status, "display_name": name, "federation_number": fed,
                           "apd_id": apd_id, "membership_expires": exp, "team_preference": pref, "notice_version": notice,
-                          "checked_in_at": now if status == "checked_in" else None}
+                          "checked_in_at": now if status == "checked_in" else None,
+                          **self._share_fields(share, notice, now)}
                 if row is None:
                     if reg_id is not None:  # no roster here: kept, so the site server can match it later
                         fields.update(registration_id=reg_id, ticket_sha256=ticket_hex)
@@ -954,10 +989,14 @@ class Checkin:
                     emit = status == "checked_in"
                 fields = {"status": status, "display_name": name, "team_preference": pref,
                           "notice_version": notice, "updated_at": now}
-                if (fed, apd_id, exp) != (row["federation_number"], row.get("apd_id"),
-                                          row.get("membership_expires")):
+                # Once a marshal checked the card, the number is gone and the stored verdict stands: the player's
+                # app cannot put the number back or reset the check.
+                if row.get("card_checked_at") is None and (fed, apd_id, exp) != (
+                        row["federation_number"], row.get("apd_id"), row.get("membership_expires")):
                     fields.update(federation_number=fed, apd_id=apd_id, membership_expires=exp,
                                   federation_seen=False)
+                if share is not None:
+                    fields.update(self._share_fields(share, notice, now))
                 if emit:
                     fields["checked_in_at"] = now
                 if reg_id is not None and row["registration_id"] is None:
@@ -977,7 +1016,7 @@ class Checkin:
     def _token_answer(self, game: dict[str, Any], row: dict[str, Any], token: str, exp: int) -> dict[str, Any]:
         return {"game_id": game["id"], "player_id": row["player_id"], "token": token, "exp": exp,
                 "status": row["status"], "team": self._team_name(game, row["team"]), "team_id": row["team"],
-                "squad": row["squad"], "role": row["role"]}
+                "squad": row["squad"], "role": row["role"], "position_share": bool(row.get("position_share"))}
 
     def _registration_proof(self, body: dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
         """``registration_id`` and ``ticket`` (both or neither): the id and the SHA-256 (hex) of the ticket."""
@@ -1050,7 +1089,10 @@ class Checkin:
                "team": self._team_name(game, row["team"]), "team_id": row["team"], "squad": row["squad"],
                "role": row["role"], "manual": row["manual"], "checked_in_at": row["checked_in_at"],
                "seq": row["seq"], "registration_id": row.get("registration_id"),
-               "registered": bool(row.get("registration_id"))}
+               "registered": bool(row.get("registration_id")),
+               "position_share": bool(row.get("position_share")),
+               "position_share_at": row.get("position_share_at"),
+               "position_share_notice": row.get("position_share_notice")}
         if names:
             st = self.settings()
             out.update({"display_name": row["display_name"], "federation_number": row["federation_number"],
@@ -1058,8 +1100,10 @@ class Checkin:
                         "membership_number": row["federation_number"], "apd_id": row.get("apd_id"),
                         "membership_expires": row.get("membership_expires"),
                         "apd_override": bool(row.get("apd_override")),
-                        "apd_status": self._verdict(st, row.get("apd_id"), row["federation_number"],
-                                                    row.get("membership_expires"), self._wall()),
+                        "apd_status": self._row_verdict(st, row, self._wall()),
+                        "apd_verdict_on": row.get("apd_verdict_on"),
+                        "card_checked_by": row.get("card_checked_by"),
+                        "card_checked_at": row.get("card_checked_at"),
                         "country": st["country"]})  # the words of the verdict: protocol/apd.md
         if declarations:
             out["declarations"] = self._decl_views(game["id"], row["player_id"])
@@ -1149,7 +1193,9 @@ class Checkin:
             self.store.update_checkin(gid, pid, status="left", display_name=None, federation_number=None,
                                       apd_id=None, membership_expires=None, apd_override=False,
                                       federation_seen=False, team_preference=None, updated_at=now,
-                                      erased_at=now)
+                                      erased_at=now, **ERASED_CARD, position_share=False,
+                                      position_share_at=now)
+            self.store.delete_player_position(gid, pid)
             for d in self.store.declarations(gid, pid):
                 if d["state"] == "pending":
                     self.store.put_declaration({**d, "state": "withdrawn"}, now)
@@ -1164,6 +1210,35 @@ class Checkin:
         if viewer.kind == "player" and viewer.game_id != game_id:
             raise Forbidden("this token is for another game")
         return self.ctrl.get_game(game_id)
+
+    @staticmethod
+    def _staff_id(viewer: Viewer) -> str:
+        """Who ticked the card: the marshal's player id, or "gm" for the GM token (no membership number ever)."""
+        return viewer.player_id or "gm"
+
+    def set_position_sharing(self, viewer: Viewer, body: dict[str, Any]) -> dict[str, Any]:
+        """PUT /api/v1/checkin/me/position-sharing: the player turns sharing their position with the game on or
+        off, at any time. Off drops the stored position at once. Recorded with the time and notice version."""
+        if set(body) - {"share_position"} or not isinstance(body.get("share_position"), bool):
+            raise ControllerError("share_position: true or false, nothing else")
+        gid, pid = viewer.game_id, viewer.player_id
+        game = self.store.game(gid)
+        if game is None or game["state"] == "ended":
+            raise Conflict("the game has ended")
+        now, on = self._wall(), body["share_position"]
+        with self._lock:
+            row = self.store.checkin(gid, pid)
+            if row is None or row["status"] in ("left", "removed"):
+                raise Conflict("this check-in is over")
+            self.store.update_checkin(gid, pid, updated_at=now, **self._share_fields(on, self.cfg.notice_version, now))
+            if not on:
+                self.store.delete_player_position(gid, pid)
+            row = self.store.checkin(gid, pid)
+            assert row is not None
+        if not on:
+            self.ctrl._emit({"type": "positions", "game": gid, "_positions_refresh": True})
+        self._notify(gid, pid)
+        return self.row_view(game, row, names=False, declarations=False)
 
     def list_checkins(self, viewer: Viewer, game_id: int) -> dict[str, Any]:
         game = self._staff(viewer, game_id)
@@ -1185,9 +1260,13 @@ class Checkin:
         if game["state"] == "ended":
             raise Conflict("the game has ended")
         unknown = set(body) - {"display_name", "federation_number", "team_preference", "replicas", "apd_id",
-                               "membership_number", "membership_expires"}
+                               "membership_number", "membership_expires", "federation_seen", "share_position"}
         if unknown:
             raise ControllerError(f"unknown fields {sorted(unknown)}")
+        share = _share_choice(body)
+        seen = body.get("federation_seen")
+        if seen is not None and not isinstance(seen, bool):
+            raise ControllerError("federation_seen: true or false")
         st = self.settings()
         name = _text("display_name", body.get("display_name"), NAME_MAX)
         decl_m = declared_membership(body)
@@ -1202,7 +1281,13 @@ class Checkin:
         decls = self._check_declarations(body.get("replicas") or [], st)
         now = self._wall()
         verdict = self._verdict(st, apd_id, fed, exp, now)
-        override = verdict not in (None, "valid")  # never refused: a marshal decides, and it is logged
+        carded = bool(st["apd"]["checkin"]) and seen is True  # the card in hand, matching what was typed
+        # Never refused: a marshal decides. A verdict other than valid, or a rule that checks the card with no
+        # card seen, is an override, logged with the reason (never the number).
+        reason = "no_card" if st["apd"]["checkin"] and not carded else (
+            verdict if verdict not in (None, "valid") else None)
+        override = reason is not None
+        extra = self._card_fields(st, apd_id, fed, exp, self._staff_id(viewer), now) if carded else {}
         with self._lock:
             if self.store.count_checkins(game_id) >= st["max_players"]:
                 raise Forbidden(f"game {game_id} is full ({st['max_players']} players)")
@@ -1213,10 +1298,14 @@ class Checkin:
             self.store.add_checkin(game_id, pid, {
                 "status": "checked_in", "display_name": name, "federation_number": fed,
                 "apd_id": apd_id, "membership_expires": exp, "apd_override": override,
-                "federation_seen": fed is not None, "team_preference": pref, "manual": 1,
-                "checked_in_at": now}, now)
+                "federation_seen": carded if st["apd"]["checkin"] else fed is not None, "team_preference": pref, "manual": 1,
+                "checked_in_at": now, **self._share_fields(share, self.cfg.notice_version, now),
+                **extra}, now)
+            if carded:
+                log.info("card check: game %d, %s by %s, verdict %s", game_id, pid, extra["card_checked_by"],
+                         extra["apd_verdict"])
             if override:
-                log.info("apd override: game %d, %s checked in by staff with membership %s", game_id, pid, verdict)
+                log.info("apd override: game %d, %s checked in by staff, reason %s, verdict %s", game_id, pid, reason, verdict)
             self._replace_declarations(game, pid, decls, staff=True, now=now)
             row = self.store.checkin(game_id, pid)
             assert row is not None
@@ -1269,24 +1358,53 @@ class Checkin:
                 fields["status"] = "checked_in"
                 fields["checked_in_at"] = now
                 emit = True
+        st = self.settings()
+        seen = body.get("federation_seen")
+        if "federation_seen" in body and not isinstance(seen, bool):
+            raise ControllerError("federation_seen: true or false")
         if "federation_seen" in body:
-            if not isinstance(body["federation_seen"], bool):
-                raise ControllerError("federation_seen: true or false")
-            fields["federation_seen"] = body["federation_seen"]
+            fields["federation_seen"] = seen
+        redone = False
         if {"apd_id", "membership_number", "membership_expires", "federation_number"} & set(body):
             m = declared_membership(body)  # what a marshal sends replaces the three; null clears
             if (m["number"], m["apd"], m["expires"]) != (row["federation_number"], row.get("apd_id"),
                                                           row.get("membership_expires")):
+                # New data: an earlier card check no longer covers it.
                 fields.update(federation_number=m["number"], apd_id=m["apd"], membership_expires=m["expires"],
-                              federation_seen=False)
-        if emit:  # a confirmation over a verdict other than valid is the marshal's call: kept and logged
-            st = self.settings()
-            verdict = self._verdict(st, fields.get("apd_id", row.get("apd_id")),
-                                    fields.get("federation_number", row["federation_number"]),
-                                    fields.get("membership_expires", row.get("membership_expires")), now)
-            if verdict not in (None, "valid"):
+                              federation_seen=False, **ERASED_CARD)
+                redone = True
+                if "federation_seen" in body:
+                    fields["federation_seen"] = seen
+        card_rule = bool(st["apd"]["checkin"])
+        card_done = row.get("card_checked_at") is not None and not redone
+        if card_rule and seen is False and card_done:
+            raise Conflict("the card check is recorded and the number erased; send the number again to redo it")
+        carded = card_rule and seen is True and not card_done
+        if carded:  # "card seen, matches": records who and when, stores the verdict, erases the number
+            number = fields.get("federation_number", row["federation_number"])
+            fields.update(self._card_fields(st, fields.get("apd_id", row.get("apd_id")), number,
+                                            fields.get("membership_expires", row.get("membership_expires")),
+                                            self._staff_id(viewer), now))
+            if row["status"] in ("pending", "expected") and "status" not in fields:
+                fields["status"] = "checked_in"  # the tick is the confirmation the rule waits for
+                fields["checked_in_at"] = now
+                emit = True
+            log.info("card check: game %d, %s by %s, verdict %s", game_id, pid, fields["card_checked_by"],
+                     fields["apd_verdict"])
+        if emit:  # a confirmation over a verdict other than valid, or with no card seen, is the marshal's call
+            if carded:
+                verdict = fields["apd_verdict"]
+            elif card_done:
+                verdict = row.get("apd_verdict")
+            else:
+                verdict = self._verdict(st, fields.get("apd_id", row.get("apd_id")),
+                                        fields.get("federation_number", row["federation_number"]),
+                                        fields.get("membership_expires", row.get("membership_expires")), now)
+            reason = "no_card" if card_rule and not (carded or card_done) else (
+                verdict if verdict not in (None, "valid") else None)
+            if reason is not None:
                 fields["apd_override"] = True
-                log.info("apd override: game %d, %s confirmed by staff with membership %s", game_id, pid, verdict)
+                log.info("apd override: game %d, %s confirmed by staff, reason %s, verdict %s", game_id, pid, reason, verdict)
         with self._lock:
             if "replicas" in body:
                 decls = self._check_declarations(body["replicas"], self.settings())
@@ -1311,7 +1429,9 @@ class Checkin:
             self.store.update_checkin(game_id, pid, status="removed", display_name=None,
                                       federation_number=None, apd_id=None, membership_expires=None,
                                       apd_override=False, federation_seen=False, team_preference=None,
-                                      updated_at=now, erased_at=now)
+                                      updated_at=now, erased_at=now, **ERASED_CARD, position_share=False,
+                                      position_share_at=now)
+            self.store.delete_player_position(game_id, pid)
             for d in self.store.declarations(game_id, pid):
                 if d["state"] == "pending":
                     self.store.put_declaration({**d, "state": "withdrawn"}, now)
@@ -1344,13 +1464,18 @@ class Checkin:
                 raise Forbidden("this ticket is not this registration's (was a newer one made?)")
             if row["status"] == "removed":
                 raise Forbidden("staff removed this check-in")
-            emit = row["status"] == "expected"
-            if emit:
+            arriving = row["status"] == "expected"
+            emit = False
+            if arriving:
                 st = self.settings()
                 if self.store.count_checkins(game_id) >= st["max_players"]:
                     raise Forbidden(f"game {game_id} is full ({st['max_players']} players)")
-                self.store.update_checkin(game_id, row["player_id"], status="checked_in", checked_in_at=now,
-                                          updated_at=now)
+                if st["apd"]["checkin"]:  # the ticket is not the card: pending until "card seen, matches"
+                    self.store.update_checkin(game_id, row["player_id"], status="pending", updated_at=now)
+                else:
+                    emit = True
+                    self.store.update_checkin(game_id, row["player_id"], status="checked_in", checked_in_at=now,
+                                              updated_at=now)
             row = self.store.checkin(game_id, row["player_id"])
             assert row is not None
         if emit:
@@ -1531,10 +1656,13 @@ class Checkin:
             fields["display_name"] = row.display_name
         if "team_preference" in row.present:
             fields["team_preference"] = row.team_preference
-        if "federation_number" in row.present:
+        # Once the card was checked the number is gone for good: an import never puts it (or a changed
+        # membership) back over the stored verdict.
+        carded = existing.get("card_checked_at") is not None
+        if "federation_number" in row.present and not carded:
             fields["federation_number"] = row.federation_number if asked else None
         for name in ("apd_id", "membership_expires"):
-            if name in row.present:
+            if name in row.present and not carded:
                 fields[name] = getattr(row, name) if asked else None
         self.store.update_checkin(game["id"], existing["player_id"], **fields)
         if row.replicas is not None:
@@ -1558,10 +1686,11 @@ class Checkin:
         if "team_preference" in row.present and row.team_preference != existing["team_preference"]:
             changed.append("team_preference")
         wanted = row.federation_number if asked else None
-        if "federation_number" in row.present and wanted != existing["federation_number"]:
+        carded = existing.get("card_checked_at") is not None  # see _import_update
+        if "federation_number" in row.present and wanted != existing["federation_number"] and not carded:
             changed.append("federation_number")
         for name in ("apd_id", "membership_expires"):
-            if name in row.present and (getattr(row, name) if asked else None) != existing.get(name):
+            if name in row.present and not carded and (getattr(row, name) if asked else None) != existing.get(name):
                 changed.append(name)
         if row.replicas is not None:
             old = [(d["type"], d["class"], d["make_model"]) for d in self.store.declarations(game_id, existing["player_id"])
@@ -1677,16 +1806,16 @@ class Checkin:
         out = io.StringIO()
         w = csv.writer(out, lineterminator="\r\n")
         w.writerow(["player_id", "display_name", "status", "team", "squad", "role", "federation_number",
-                    "apd_id", "membership_expires", "apd_status", "card_seen", "manual", "checked_in_at", "declaration_id", "replica_id", "type", "class",
+                    "apd_id", "membership_expires", "apd_status", "card_seen", "card_checked_by", "card_checked_at", "manual", "checked_in_at", "declaration_id", "replica_id", "type", "class",
                     "make_model", "chrono"])
         st, now = self.settings(), self._wall()
         for r in self.store.checkins(game_id):
             base = [r["player_id"], _csv_safe(r["display_name"]), r["status"],
                     self._team_name(game, r["team"]) or "", r["squad"] or "", r["role"],
                     _csv_safe(r["federation_number"]), r.get("apd_id") or "", r.get("membership_expires") or "",
-                    self._verdict(st, r.get("apd_id"), r["federation_number"], r.get("membership_expires"), now)
-                    or "",
+                    self._row_verdict(st, r, now) or "",
                     "yes" if r["federation_seen"] else "",
+                    r.get("card_checked_by") or "", _iso(r.get("card_checked_at")),
                     "yes" if r["manual"] else "",
                     _iso(r["checked_in_at"])]
             decls = self.store.declarations(game_id, r["player_id"]) or [None]
@@ -1756,8 +1885,7 @@ class Checkin:
                             "apd_id": r.get("apd_id"), "membership_number": r["federation_number"],
                             "membership_expires": r.get("membership_expires"),
                             "apd_override": bool(r.get("apd_override")),
-                            "apd_status": self._verdict(st, r.get("apd_id"), r["federation_number"],
-                                                        r.get("membership_expires"), now),
+                            "apd_status": self._row_verdict(st, r, now),
                             "declarations": decls, "shared_readings": self.shared_view(r["player_id"])})
         players.sort(key=lambda p: (p["pending"] == 0, p["seq"]))
         return {"game_id": gid, "squads": int(game.get("squads") or 0),

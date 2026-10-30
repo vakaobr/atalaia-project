@@ -402,6 +402,8 @@ export class CheckinPanel extends Component {
         if (m.apd) body.apd_id = m.apd;
         if (m.exp) body.membership_expires = m.exp;
         if (m.team) body.team_preference = m.team;
+        if (this.state.list.settings.apd.checkin) body.federation_seen = !!m.card; // the card in hand, matching
+        body.share_position = !!m.share; // its own box, unticked unless the player agreed
         const row = await this.props.app.call('POST', `/games/${g.id}/checkins`, body);
         if (row) {
             this.setState({ manual: null });
@@ -460,11 +462,13 @@ export class CheckinPanel extends Component {
         return html`<tr role="row" data-testid=${`checkin-row-${r.player_id}`} class=${active ? '' : 'muted'}>
             <td role="cell"><strong data-testid="checkin-name">${r.display_name || t('checkin.erased')}</strong>
                 ${r.manual && html` <span class="badge">${t('checkin.by_hand')}</span>`}
+                ${r.position_share && html` <span class="badge" data-testid="checkin-position-shared">${t('checkin.position_shared')}</span>`}
                 ${r.registered && html` <span class="badge" data-testid="checkin-registered-badge">${t('checkin.registered_badge')}</span>`}
                 <div class="small muted">${r.player_id}${r.team_preference ? ` · ${t('checkin.prefers', { team: r.team_preference })}` : ''}</div></td>
             <td role="cell" data-label=${t('checkin.status')}><span class=${`badge status-${r.status}`}>${t(`checkin.statuses.${r.status}`)}</span>
-                ${r.status === 'pending' && html` <button type="button" class="primary" data-testid="checkin-confirm"
-                    onClick=${() => this.patch(r.player_id, { status: 'checked_in' })}>${t('checkin.confirm')}</button>`}
+                ${r.status === 'pending' && s.apd.checkin && html` <span class="small muted" data-testid="checkin-waits-card">${t('checkin.waits_card')}</span>`}
+                ${r.status === 'pending' && html` <button type="button" class=${s.apd.checkin ? '' : 'primary'} data-testid="checkin-confirm"
+                    onClick=${() => this.patch(r.player_id, { status: 'checked_in' })}>${t(s.apd.checkin ? 'checkin.confirm_no_card' : 'checkin.confirm')}</button>`}
                 ${r.status === 'expected' && html` <button type="button" class="primary" data-testid="checkin-arrived"
                     onClick=${() => this.patch(r.player_id, { status: 'checked_in' })}>${t('checkin.arrived')}</button>`}</td>
             <td role="cell" data-label=${squadsOf(g) ? t('checkin.team_squad') : t('checkin.team')}>${active ? html`<select aria-label=${t('checkin.team')} data-testid="checkin-team" value=${r.team || ''}
@@ -480,11 +484,12 @@ export class CheckinPanel extends Component {
                     ${ROLES.filter((ro) => ro !== 'squad_leader' || squadsOf(g) || r.role === ro)
         .map((ro) => html`<option value=${ro}>${t(`checkin.roles.${ro}`)}</option>`)}</select>` : t(`checkin.roles.${r.role}`)}</td>
             ${showMembership(s) && html`<td role="cell" data-label=${s.apd.checkin ? tw(s, 'checkin.apd_column') : s.federation_label}>${
-                s.apd.checkin && this.renderApd(r, s)} ${r.federation_number || '–'}
-                ${r.federation_number && html`<label class="check small"><input type="checkbox" data-testid="checkin-card-seen"
-                    checked=${r.federation_seen} disabled=${!active}
+                s.apd.checkin && this.renderApd(r, s)} ${r.federation_number || (r.card_checked_at ? html`<span class="small muted" data-testid="checkin-number-erased">${t('checkin.number_erased')}</span>` : '–')}
+                ${(r.federation_number || (s.apd.checkin && r.status !== 'expected') || r.card_checked_at) && html`<label class="check small"><input type="checkbox" data-testid="checkin-card-seen"
+                    checked=${r.federation_seen} disabled=${!active || (s.apd.checkin && !!r.card_checked_at)}
                     onChange=${(e) => this.patch(r.player_id, { federation_seen: e.target.checked })} /> ${
-                    r.federation_seen ? t('checkin.card_seen') : t('checkin.not_checked')}</label>`}</td>`}
+                    t('checkin.card_seen')}</label>`}
+                ${r.card_checked_at && html`<div class="small muted" data-testid="checkin-card-by">${t('checkin.card_by', { who: r.card_checked_by, when: new Date(r.card_checked_at * 1000).toLocaleString() })}</div>`}</td>`}
             <td role="cell" data-label=${t('checkin.replicas')} data-testid="checkin-replicas">${decls.length}${decls.length ? ` (${Object.entries(counts)
                 .map(([k, v]) => `${t(`checkin.states.${k}`)} ${v}`).join(', ')})` : ''}
                 ${decls.length > 0 && html` <a class="button small" href=${`labels.html?game=${g.id}&player=${encodeURIComponent(r.player_id)}`}
@@ -502,15 +507,17 @@ export class CheckinPanel extends Component {
         return html`<span data-testid="checkin-apd"><span class="small muted">${apd}${
             r.membership_expires ? ` · ${t('checkin.apd_expires_on', { date: r.membership_expires })}` : ''}</span>
             ${r.apd_status && html` <span class=${`badge apd-${r.apd_status}`} data-testid="checkin-apd-status">${
-                usesApd(s) ? t(`checkin.apd_status.${r.apd_status}`) : t(`checkin.apd_status_m.${r.apd_status}`)}</span>`}
-            ${r.apd_override && html` <span class="badge" data-testid="checkin-apd-override">${t('checkin.apd_override')}</span>`}</span>`;
+                r.apd_verdict_on ? t('checkin.verdict_on', { verdict: usesApd(s) ? t(`checkin.apd_status.${r.apd_status}`) : t(`checkin.apd_status_m.${r.apd_status}`), date: r.apd_verdict_on })
+                    : (usesApd(s) ? t(`checkin.apd_status.${r.apd_status}`) : t(`checkin.apd_status_m.${r.apd_status}`))}</span>`}
+            ${r.apd_override && html` <span class="badge" data-testid="checkin-apd-override">${
+                s.apd.checkin && !r.card_checked_at ? t('checkin.apd_override_no_card') : t('checkin.apd_override')}</span>`}</span>`;
     }
 
     renderManual(g, s) {
         const m = this.state.manual;
         if (!m) {
             return html`<div class="actions"><button type="button" data-testid="checkin-manual"
-                onClick=${() => this.setState({ manual: { name: '', fed: '', apd: '', exp: '', team: '', replicas: [] } })}>${t('checkin.manual')}</button></div>`;
+                onClick=${() => this.setState({ manual: { name: '', fed: '', apd: '', exp: '', team: '', card: false, share: false, replicas: [] } })}>${t('checkin.manual')}</button></div>`;
         }
         const set = (k, v) => this.setState({ manual: { ...m, [k]: v } });
         const setR = (i, k, v) => set('replicas', m.replicas.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
@@ -529,6 +536,12 @@ export class CheckinPanel extends Component {
                     onInput=${(e) => set('fed', e.target.value)} /></div>`}
             ${s.apd.checkin && s.apd.expiry && html`<div class="field"><label for="cm-exp">${t('checkin.apd_expires')}</label>
                 <input id="cm-exp" data-testid="checkin-manual-expires" type="date" value=${m.exp} onInput=${(e) => set('exp', e.target.value)} /></div>`}
+            ${s.apd.checkin && html`<p class="muted small" data-testid="checkin-manual-card-why">${t('checkin.card_why')}</p>
+                <label class="check"><input type="checkbox" data-testid="checkin-manual-card-seen" checked=${m.card}
+                    onChange=${(e) => set('card', e.target.checked)} /> ${t('checkin.card_seen')}</label>`}
+            <label class="check"><input type="checkbox" data-testid="checkin-manual-share" checked=${m.share}
+                onChange=${(e) => set('share', e.target.checked)} /> ${t('checkin.share_position')}</label>
+            <p class="muted small">${t('checkin.share_position_hint')}</p>
             <div class="field"><label for="cm-team">${t('checkin.team_preference')}</label>
                 <select id="cm-team" value=${m.team} onChange=${(e) => set('team', e.target.value)}>
                     <option value="">–</option>${g.teams.map((tm) => html`<option value=${tm}>${tm}</option>`)}</select></div>

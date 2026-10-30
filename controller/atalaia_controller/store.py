@@ -98,7 +98,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-SCHEMA_VERSION = 17
+SCHEMA_VERSION = 18
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes, per level's plan
 FIELD_LEVELS_MAX = 10  # levels of a multi-story field (decision ML-1)
@@ -417,6 +417,18 @@ CHECKIN_COLUMNS_V15 = (
     ("apd_override", "INTEGER NOT NULL DEFAULT 0"),  # 1: staff let the check-in through with a verdict other than valid
 )
 
+# Columns added to checkins in schema 18 (the card check, protocol/apd.md "The card check"; position sharing,
+# protocol/checkin.md "Sharing the position"): what the check-in keeps once the number is erased.
+CHECKIN_COLUMNS_V18 = (
+    ("apd_verdict", "TEXT"),                      # the verdict stored when the card was checked (valid, expired, ...)
+    ("apd_verdict_on", "TEXT"),                   # the local date it was valid or not on (YYYY-MM-DD)
+    ("card_checked_by", "TEXT"),                  # the staff id that ticked "card seen, matches" ("gm" for the GM token)
+    ("card_checked_at", "REAL"),                  # and when
+    ("position_share", "INTEGER NOT NULL DEFAULT 0"),  # 1: the player opted in to share their position
+    ("position_share_at", "REAL"),                # when they chose (on or off)
+    ("position_share_notice", "INTEGER"),         # the privacy notice version they chose under
+)
+
 # Column added to chrono_readings in schema 16 (PKD-3): the class limit (J) the series was judged against, sent to the
 # site server so it can work out how far over a violation went.
 CHRONO_COLUMNS_V16 = (("limit_j", "REAL"),)
@@ -476,6 +488,10 @@ class Store:
                     self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
             have = {r["name"] for r in self._db.execute("PRAGMA table_info(checkins)").fetchall()}
             for name, decl in CHECKIN_COLUMNS_V15:
+                if name not in have:
+                    self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
+            have = {r["name"] for r in self._db.execute("PRAGMA table_info(checkins)").fetchall()}
+            for name, decl in CHECKIN_COLUMNS_V18:
                 if name not in have:
                     self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
             have = {r["name"] for r in self._db.execute("PRAGMA table_info(chrono_readings)").fetchall()}
@@ -1177,7 +1193,8 @@ class Store:
     CHECKIN_FIELDS = ("status", "display_name", "federation_number", "federation_seen", "team_preference",
                       "team", "squad", "role", "manual", "notice_version", "updated_at", "checked_in_at",
                       "erased_at", "registration_id", "ticket_sha256", "from_roster", "apd_id", "membership_expires",
-                      "apd_override")
+                      "apd_override", "apd_verdict", "apd_verdict_on", "card_checked_by", "card_checked_at",
+                      "position_share", "position_share_at", "position_share_notice")
 
     @staticmethod
     def _checkin(row: sqlite3.Row) -> dict[str, Any]:
@@ -1186,6 +1203,7 @@ class Store:
         out["manual"] = bool(out["manual"])
         out["from_roster"] = bool(out.get("from_roster"))
         out["apd_override"] = bool(out.get("apd_override"))
+        out["position_share"] = bool(out.get("position_share"))
         return out
 
     def checkin_by_registration(self, game_id: int, registration_id: str) -> Optional[dict[str, Any]]:
@@ -1517,7 +1535,8 @@ class Store:
             for gid in games:
                 erased += self._exec(
                     "UPDATE checkins SET display_name = NULL, federation_number = NULL, "
-                    "apd_id = NULL, membership_expires = NULL, team_preference = NULL, erased_at = ? WHERE game_id = ? AND erased_at IS NULL",
+                    "apd_id = NULL, membership_expires = NULL, apd_verdict = NULL, apd_verdict_on = NULL, "
+                    "card_checked_by = NULL, card_checked_at = NULL, team_preference = NULL, erased_at = ? WHERE game_id = ? AND erased_at IS NULL",
                     (now, gid)).rowcount
                 declarations += self._exec("DELETE FROM declarations WHERE game_id = ?", (gid,)).rowcount
             idle = [r["player_id"] for r in self._exec(
@@ -1596,6 +1615,10 @@ class Store:
         rows = self._exec("SELECT player_id, report_json FROM player_positions WHERE game_id = ? "
                           "ORDER BY player_id", (game_id,)).fetchall()
         return {r["player_id"]: json.loads(r["report_json"]) for r in rows}
+
+    def delete_player_position(self, game_id: int, player_id: str) -> int:
+        return self._exec("DELETE FROM player_positions WHERE game_id = ? AND player_id = ?",
+                          (game_id, player_id)).rowcount
 
     def delete_player_positions(self, game_id: int) -> int:
         return self._exec("DELETE FROM player_positions WHERE game_id = ?", (game_id,)).rowcount

@@ -232,6 +232,19 @@ class ControllerPositions {
       );
     }
     final checked = [for (final r in items) checkPositionReport(r)];
+    final service = engine.checkin;
+    final mine = service?.checkinRow(viewer.gameId!, viewer.playerId!);
+    // Without a check-in service (a bare engine in a test) there is no
+    // choice to read; every real player token comes from a check-in.
+    if (service != null && (mine == null || mine['position_share'] != true)) {
+      // Sharing is the player's own choice at check-in (an unticked box),
+      // changeable any time; declining never blocks the check-in or the
+      // game (GDPR Art. 7(4)).
+      throw ControllerError.conflict(
+        'position_sharing_off: this player did not choose to share their '
+        'position',
+      );
+    }
     for (final raw in items) {
       final pid = (raw as Map)['player_id'];
       if (pid != null && pid != viewer.playerId) {
@@ -391,6 +404,12 @@ class ControllerPositions {
   void endGame(int gameId) {
     _grants.remove(gameId);
     if (_positions.remove(gameId) != null) _save();
+  }
+
+  /// One player's stored position in one game (they stopped sharing, left
+  /// or were removed).
+  void erasePlayerIn(int gameId, String pid) {
+    if (_positions[gameId]?.remove(pid) != null) _save();
   }
 
   /// A player's data is erased (DELETE /api/v1/players/{id}).

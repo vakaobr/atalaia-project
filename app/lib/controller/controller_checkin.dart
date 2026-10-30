@@ -635,6 +635,13 @@ class ControllerCheckin {
       'apd_id': null,
       'membership_expires': null,
       'apd_override': false,
+      'apd_verdict': null,
+      'apd_verdict_on': null,
+      'card_checked_by': null,
+      'card_checked_at': null,
+      'position_share': false,
+      'position_share_at': null,
+      'position_share_notice': null,
       'team_preference': null,
       'team': 0,
       'squad': 0,
@@ -1118,18 +1125,81 @@ class ControllerCheckin {
     );
   }
 
-  /// A marshal's confirmation of a check-in whose membership does not
-  /// pass is never refused, but it is logged (no number) and marked.
+  /// What staff see: the verdict stored when the card was checked, else the
+  /// one worked out now (protocol/apd.md, "The card check").
+  String? _rowVerdict(Map<String, Object?> row) =>
+      (row['apd_verdict'] as String?) ??
+      _apdVerdict(
+        row['apd_id'] as String?,
+        row['federation_number'] as String?,
+        row['membership_expires'] as String?,
+      );
+
+  /// The columns of a confirmed card check: who and when, the verdict as it
+  /// stood that day, and the number gone.
+  Map<String, Object?> _cardFields(
+    String? apd,
+    String? number,
+    String? expires,
+    String staff,
+    double now,
+  ) {
+    final rule = apdRule();
+    return {
+      'federation_seen': true,
+      'card_checked_by': staff,
+      'card_checked_at': now,
+      'apd_verdict': apdStatus(
+        rule,
+        ApdMembership(apd: apd, number: number, expires: expires),
+        _apdToday(),
+      ),
+      'apd_verdict_on': _apdToday(),
+      'federation_number': null,
+    };
+  }
+
+  /// Who ticked the card: the marshal's player id, or "gm" for the GM token.
+  static String _staffId(ApiViewer viewer) => viewer.playerId ?? 'gm';
+
+  /// The position-sharing choice with its time and notice version.
+  Map<String, Object?> _shareFields(bool? share, Object? notice, double now) =>
+      {
+        'position_share': share == true,
+        'position_share_at': now,
+        'position_share_notice': notice,
+      };
+
+  static bool? _shareChoice(Map<String, Object?> body) {
+    final v = body['share_position'];
+    if (v != null && v is! bool) {
+      throw ControllerError('share_position: true or false');
+    }
+    return v as bool?;
+  }
+
+  static const _erasedCard = <String, Object?>{
+    'apd_verdict': null,
+    'apd_verdict_on': null,
+    'card_checked_by': null,
+    'card_checked_at': null,
+  };
+
+  /// A marshal's confirmation that is not a card check, or whose verdict
+  /// does not pass, is never refused, but it is logged (reason, no number)
+  /// and marked. The reason is `no_card` or the verdict.
   bool _apdOverride(Map<String, Object?> row) {
-    final verdict = _apdVerdict(
-      row['apd_id'] as String?,
-      row['federation_number'] as String?,
-      row['membership_expires'] as String?,
-    );
-    if (verdict == null || verdict == 'valid') return false;
+    final rule = apdRule();
+    final String? verdict = row['card_checked_at'] != null
+        ? row['apd_verdict'] as String?
+        : _rowVerdict(row);
+    final reason = rule.checkin && row['card_checked_at'] == null
+        ? 'no_card'
+        : (verdict == null || verdict == 'valid' ? null : verdict);
+    if (reason == null) return false;
     audit(
       'apd override: ${row['player_id']} confirmed in game '
-      '${row['game_id']} with membership $verdict',
+      '${row['game_id']} by staff, reason $reason, verdict $verdict',
     );
     return true;
   }
@@ -1654,10 +1724,12 @@ class ControllerCheckin {
       'replicas',
       'registration_id',
       'ticket',
+      'share_position',
     };
     final unknown = body.keys.where((k) => !allowed.contains(k)).toList()
       ..sort();
     if (unknown.isNotEmpty) throw ControllerError('unknown fields $unknown');
+    final share = _shareChoice(body);
     final gameId = body['game_id'];
     if (gameId is! int) throw ControllerError("game_id: the game's id");
     final game = engine.store.game(gameId);
@@ -1730,8 +1802,11 @@ class ControllerCheckin {
         '${st['federation_label']} number',
       );
     }
-    // A membership that does not pass leaves the check-in to a marshal.
+    // A membership that does not pass leaves the check-in to a marshal; so
+    // does any rule that checks at check-in: only "card seen, matches"
+    // lets a player in (protocol/apd.md, "The card check").
     final apdPending =
+        rule.checkin ||
         (_apdVerdict(apdId, fed, expires, rule) ?? 'valid') != 'valid';
     final created = row == null || row['status'] == 'expected';
     var emit = false;
@@ -1759,6 +1834,7 @@ class ControllerCheckin {
         'team_preference': pref,
         'notice_version': notice,
         'checked_in_at': status == 'checked_in' ? now : null,
+        ..._shareFields(share, notice, now),
       };
       if (row == null) {
         if (regId != null) {
@@ -1786,14 +1862,19 @@ class ControllerCheckin {
         'notice_version': notice,
         'updated_at': now,
       };
-      if (fed != row['federation_number']) {
-        fields['federation_number'] = fed;
-        fields['federation_seen'] = false;
+      // Once a marshal checked the card the number is gone and the stored
+      // verdict stands: the app cannot put the number back.
+      if (row['card_checked_at'] == null) {
+        if (fed != row['federation_number']) {
+          fields['federation_number'] = fed;
+          fields['federation_seen'] = false;
+        }
+        if (apdId != row['apd_id']) fields['apd_id'] = apdId;
+        if (expires != row['membership_expires']) {
+          fields['membership_expires'] = expires;
+        }
       }
-      if (apdId != row['apd_id']) fields['apd_id'] = apdId;
-      if (expires != row['membership_expires']) {
-        fields['membership_expires'] = expires;
-      }
+      if (share != null) fields.addAll(_shareFields(share, notice, now));
       if (emit) fields['checked_in_at'] = now;
       if (regId != null && row['registration_id'] == null) {
         fields['registration_id'] = regId;
@@ -1839,6 +1920,7 @@ class ControllerCheckin {
     'team_id': row['team'],
     'squad': row['squad'],
     'role': row['role'],
+    'position_share': row['position_share'] == true,
   };
 
   /// `registration_id` and `ticket` (both or neither): the id and the
@@ -1968,6 +2050,9 @@ class ControllerCheckin {
       'seq': row['seq'],
       'registration_id': row['registration_id'],
       'registered': _truthy(row['registration_id']),
+      'position_share': row['position_share'] == true,
+      'position_share_at': row['position_share_at'],
+      'position_share_notice': row['position_share_notice'],
     };
     if (names) {
       out.addAll({
@@ -1979,11 +2064,10 @@ class ControllerCheckin {
         'membership_number': row['federation_number'],
         'membership_expires': row['membership_expires'],
         'apd_override': row['apd_override'] == true,
-        'apd_status': _apdVerdict(
-          row['apd_id'] as String?,
-          row['federation_number'] as String?,
-          row['membership_expires'] as String?,
-        ),
+        'apd_status': _rowVerdict(row),
+        'apd_verdict_on': row['apd_verdict_on'],
+        'card_checked_by': row['card_checked_by'],
+        'card_checked_at': row['card_checked_at'],
         'country': country(),
       });
     }
@@ -2289,6 +2373,45 @@ class ControllerCheckin {
     return {'declarations': _declViews(game['id']! as int, viewer.playerId!)};
   }
 
+  /// PUT /api/v1/checkin/me/position-sharing: the player turns sharing their
+  /// position with the game on or off, at any time. Off drops the stored
+  /// position at once. Recorded with the time and the notice version.
+  Map<String, Object?> setPositionSharing(
+    ApiViewer viewer,
+    Map<String, Object?> body,
+  ) {
+    if (body.keys.any((k) => k != 'share_position') ||
+        body['share_position'] is! bool) {
+      throw ControllerError('share_position: true or false, nothing else');
+    }
+    final gid = viewer.gameId!, pid = viewer.playerId!;
+    final game = engine.store.game(gid);
+    if (game == null || game['state'] == 'ended') {
+      throw ControllerError.conflict('the game has ended');
+    }
+    final row = _row(gid, pid);
+    if (row == null || row['status'] == 'left' || row['status'] == 'removed') {
+      throw ControllerError.conflict('this check-in is over');
+    }
+    final now = _wall();
+    final on = body['share_position']! as bool;
+    _update(gid, pid, {
+      'updated_at': now,
+      ..._shareFields(on, config.noticeVersion, now),
+    });
+    if (!on) {
+      engine.positions?.erasePlayerIn(gid, pid);
+      engine.emit({
+        'type': 'positions',
+        'game': gid,
+        '_positions_refresh': true,
+      });
+    }
+    _save();
+    _notify(gid, pid);
+    return rowView(game, _row(gid, pid)!, names: false, declarations: false);
+  }
+
   /// DELETE /api/v1/checkin/me: the player leaves the game; the personal
   /// fields are erased.
   Map<String, Object?> leave(ApiViewer viewer) {
@@ -2309,10 +2432,14 @@ class ControllerCheckin {
       'apd_id': null,
       'membership_expires': null,
       'apd_override': false,
+      ..._erasedCard,
+      'position_share': false,
+      'position_share_at': now,
       'team_preference': null,
       'updated_at': now,
       'erased_at': now,
     });
+    engine.positions?.erasePlayerIn(gid, pid);
     for (final d in _decls(gid, pid)) {
       if (d['state'] == 'pending') {
         _putDeclaration({...d, 'state': 'withdrawn'}, now);
@@ -2375,10 +2502,17 @@ class ControllerCheckin {
       'membership_expires',
       'team_preference',
       'replicas',
+      'federation_seen',
+      'share_position',
     };
     final unknown = body.keys.where((k) => !allowed.contains(k)).toList()
       ..sort();
     if (unknown.isNotEmpty) throw ControllerError('unknown fields $unknown');
+    final share = _shareChoice(body);
+    final seen = body['federation_seen'];
+    if (seen != null && seen is! bool) {
+      throw ControllerError('federation_seen: true or false');
+    }
     final st = settings();
     final name = _text('display_name', body['display_name'], _nameMax);
     final declared = _declared(body);
@@ -2415,17 +2549,26 @@ class ControllerCheckin {
       'created_at': now,
       'last_seen_at': now,
     };
+    final carded = apdRule().checkin && seen == true;
     _addCheckin(gameId, pid, {
       'status': 'checked_in',
       'display_name': name,
       'federation_number': fed,
-      'federation_seen': fed != null,
+      'federation_seen': apdRule().checkin ? carded : fed != null,
       'apd_id': apdId,
       'membership_expires': expires,
       'team_preference': pref,
       'manual': true,
       'checked_in_at': now,
+      ..._shareFields(share, config.noticeVersion, now),
+      if (carded) ..._cardFields(apdId, fed, expires, _staffId(viewer), now),
     }, now);
+    if (carded) {
+      audit(
+        'card check: game $gameId, $pid by ${_staffId(viewer)}, verdict '
+        '${_row(gameId, pid)!['apd_verdict']}',
+      );
+    }
     _update(gameId, pid, {'apd_override': _apdOverride(_row(gameId, pid)!)});
     _replaceDeclarations(game, pid, decls, staff: true, now: now);
     final row = _row(gameId, pid)!;
@@ -2518,12 +2661,14 @@ class ControllerCheckin {
         emit = true;
       }
     }
+    final seen = body['federation_seen'];
     if (body.containsKey('federation_seen')) {
-      if (body['federation_seen'] is! bool) {
+      if (seen is! bool) {
         throw ControllerError('federation_seen: true or false');
       }
-      fields['federation_seen'] = body['federation_seen'];
+      fields['federation_seen'] = seen;
     }
+    var redone = false;
     if (const [
       'federation_number',
       'membership_number',
@@ -2532,6 +2677,11 @@ class ControllerCheckin {
     ].any(body.containsKey)) {
       // The marshal corrects what the card shows (an empty value clears it).
       final d = _declared(body);
+      final before = [
+        row['federation_number'],
+        row['apd_id'],
+        row['membership_expires'],
+      ];
       if (body.containsKey('federation_number') ||
           body.containsKey('membership_number')) {
         fields['federation_number'] = d.number;
@@ -2541,6 +2691,61 @@ class ControllerCheckin {
       if (body.containsKey('membership_expires')) {
         fields['membership_expires'] = d.expires;
       }
+      final after = [
+        fields.containsKey('federation_number')
+            ? fields['federation_number']
+            : row['federation_number'],
+        fields.containsKey('apd_id') ? fields['apd_id'] : row['apd_id'],
+        fields.containsKey('membership_expires')
+            ? fields['membership_expires']
+            : row['membership_expires'],
+      ];
+      if (before.toString() != after.toString()) {
+        // New data: an earlier card check no longer covers it.
+        fields.addAll(_erasedCard);
+        redone = true;
+        if (body.containsKey('federation_seen')) {
+          fields['federation_seen'] = seen;
+        }
+      }
+    }
+    final cardRule = apdRule().checkin;
+    final cardDone = row['card_checked_at'] != null && !redone;
+    if (cardRule && seen == false && cardDone) {
+      throw ControllerError.conflict(
+        'the card check is recorded and the number erased; send the number '
+        'again to redo it',
+      );
+    }
+    if (cardRule && seen == true && !cardDone) {
+      // "Card seen, matches": records who and when, stores the verdict,
+      // erases the number; the tick is the confirmation the rule waits for.
+      final number = fields.containsKey('federation_number')
+          ? fields['federation_number'] as String?
+          : row['federation_number'] as String?;
+      fields.addAll(
+        _cardFields(
+          (fields.containsKey('apd_id') ? fields['apd_id'] : row['apd_id'])
+              as String?,
+          number,
+          (fields.containsKey('membership_expires')
+                  ? fields['membership_expires']
+                  : row['membership_expires'])
+              as String?,
+          _staffId(viewer),
+          now,
+        ),
+      );
+      if ((row['status'] == 'pending' || row['status'] == 'expected') &&
+          !fields.containsKey('status')) {
+        fields['status'] = 'checked_in';
+        fields['checked_in_at'] = now;
+        emit = true;
+      }
+      audit(
+        'card check: game $gameId, $pid by ${_staffId(viewer)}, verdict '
+        '${fields['apd_verdict']}',
+      );
     }
     if (body.containsKey('replicas')) {
       final decls = _checkDeclarations(body['replicas'], settings());
@@ -2618,17 +2823,24 @@ class ControllerCheckin {
       throw _forbidden('staff removed this check-in');
     }
     final pid = row['player_id']! as String;
-    final emit = row['status'] == 'expected';
-    if (emit) {
+    final arriving = row['status'] == 'expected';
+    var emit = false;
+    if (arriving) {
       final st = settings();
       if (_count(gameId) >= (st['max_players']! as int)) {
         throw _forbidden('game $gameId is full (${st['max_players']} players)');
       }
-      _update(gameId, pid, {
-        'status': 'checked_in',
-        'checked_in_at': now,
-        'updated_at': now,
-      });
+      if (apdRule().checkin) {
+        // The ticket is not the card: pending until "card seen, matches".
+        _update(gameId, pid, {'status': 'pending', 'updated_at': now});
+      } else {
+        emit = true;
+        _update(gameId, pid, {
+          'status': 'checked_in',
+          'checked_in_at': now,
+          'updated_at': now,
+        });
+      }
       _save();
     }
     row = _row(gameId, pid)!;
@@ -2659,6 +2871,8 @@ class ControllerCheckin {
       'membership_expires',
       'apd_status',
       'card_seen',
+      'card_checked_by',
+      'card_checked_at',
       'manual',
       'checked_in_at',
       'declaration_id',
@@ -2679,13 +2893,10 @@ class ControllerCheckin {
         _csvSafe(r['federation_number'] as String?),
         r['apd_id'] ?? '',
         r['membership_expires'] ?? '',
-        _apdVerdict(
-              r['apd_id'] as String?,
-              r['federation_number'] as String?,
-              r['membership_expires'] as String?,
-            ) ??
-            '',
+        _rowVerdict(r) ?? '',
         r['federation_seen'] == true ? 'yes' : '',
+        r['card_checked_by'] ?? '',
+        _iso(r['card_checked_at'] as num?),
         r['manual'] == true ? 'yes' : '',
         _iso(r['checked_in_at'] as num?),
       ];
@@ -2817,11 +3028,7 @@ class ControllerCheckin {
         'membership_number': r['federation_number'],
         'membership_expires': r['membership_expires'],
         'apd_override': r['apd_override'] == true,
-        'apd_status': _apdVerdict(
-          r['apd_id'] as String?,
-          r['federation_number'] as String?,
-          r['membership_expires'] as String?,
-        ),
+        'apd_status': _rowVerdict(r),
         'declarations': decls,
         'shared_readings': sharedView(r['player_id']! as String),
       });
@@ -3877,13 +4084,16 @@ class ControllerCheckin {
     if (row.present.contains('team_preference')) {
       fields['team_preference'] = row.teamPreference;
     }
-    if (row.present.contains('federation_number')) {
+    // Once the card was checked the number is gone for good: an import
+    // never puts it (or a changed membership) back over the stored verdict.
+    final carded = existing['card_checked_at'] != null;
+    if (row.present.contains('federation_number') && !carded) {
       fields['federation_number'] = asked ? row.federationNumber : null;
     }
-    if (row.present.contains('apd_id')) {
+    if (row.present.contains('apd_id') && !carded) {
       fields['apd_id'] = asked ? row.apdId : null;
     }
-    if (row.present.contains('membership_expires')) {
+    if (row.present.contains('membership_expires') && !carded) {
       fields['membership_expires'] = asked ? row.membershipExpires : null;
     }
     _update(game['id']! as int, pid, fields);
@@ -3925,16 +4135,20 @@ class ControllerCheckin {
         row.teamPreference != existing['team_preference']) {
       changed.add('team_preference');
     }
-    if (row.present.contains('federation_number') &&
+    final carded = existing['card_checked_at'] != null; // see _importUpdate
+    if (!carded &&
+        row.present.contains('federation_number') &&
         (asked ? row.federationNumber : null) !=
             existing['federation_number']) {
       changed.add('federation_number');
     }
-    if (row.present.contains('apd_id') &&
+    if (!carded &&
+        row.present.contains('apd_id') &&
         (asked ? row.apdId : null) != existing['apd_id']) {
       changed.add('apd_id');
     }
-    if (row.present.contains('membership_expires') &&
+    if (!carded &&
+        row.present.contains('membership_expires') &&
         (asked ? row.membershipExpires : null) !=
             existing['membership_expires']) {
       changed.add('membership_expires');
@@ -4172,6 +4386,10 @@ class ControllerCheckin {
             ..['federation_number'] = null
             ..['apd_id'] = null
             ..['membership_expires'] = null
+            ..['apd_verdict'] = null
+            ..['apd_verdict_on'] = null
+            ..['card_checked_by'] = null
+            ..['card_checked_at'] = null
             ..['team_preference'] = null
             ..['erased_at'] = now;
           erased++;

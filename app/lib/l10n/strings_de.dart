@@ -711,7 +711,7 @@ const Map<String, String> deStrings = {
   'player.me': 'Du: {role}, {team}',
   'player.no_team': 'noch kein Team',
   'player.positions': 'Sichtbare Positionen: {n}',
-  'player.share': 'Meine Position teilen',
+  'player.share': 'Meine Position während dieses Spiels mit dem Spiel teilen',
   'player.share_hint':
       'Nur während des Spiels; der Controller entscheidet, wer sie sieht. Die Orga und die Marshals sehen sie auf ihren ATAK-Geräten.',
   'player.share_on': 'Wird geteilt: {n} Position(en) gesendet',
@@ -1190,7 +1190,7 @@ const Map<String, String> deStrings = {
   'apd.expires_required': 'Gültig bis, JJJJ-MM-TT (erforderlich)',
   'apd.date_format': '2027-01-31',
   'apd.hint':
-      'Die App prüft sie nicht: Ein Marshal vergleicht sie mit deinem Ausweis.',
+      'Die App prüft sie nicht. Am Eingang vergleicht ein Marshal deine Eingabe mit deinem Ausweis, denn das Feld muss ihn prüfen. Sobald der Ausweis bestätigt ist, wird die Nummer im Controller des Feldes gelöscht.',
   'apd.need_number': 'Dieses Feld verlangt deine APD-Mitgliedsnummer.',
   'apd.need_expiry':
       'Dieses Feld verlangt das Ablaufdatum deiner Mitgliedschaft.',
@@ -1202,8 +1202,19 @@ const Map<String, String> deStrings = {
   'apd.status.expired': 'Mitgliedschaft abgelaufen',
   'apd.status.not_accepted': 'APD hier nicht akzeptiert',
   'apd.status.missing': 'Mitgliedschaft fehlt',
-  'apd.hint_marshal': 'Ein Marshal sieht sich deinen Mitgliedsausweis an.',
+  'apd.hint_marshal':
+      'Ein Marshal gleicht deinen Mitgliedsausweis mit deiner Eingabe ab; du wirst zugelassen, sobald er ihn bestätigt.',
   'queue.confirm': 'Zulassen',
+  'queue.confirm_no_card': 'Ohne Ausweis zulassen',
+  'queue.card_seen': 'Ausweis gesehen, stimmt',
+  'apd.verdict_on': '{verdict} am {date}',
+  'apd.card_by': 'Ausweis geprüft von {who}',
+  'checkin.share_position':
+      'Meine Position während dieses Spiels mit dem Spiel teilen',
+  'checkin.share_position_hint':
+      'Freiwillig und aus, solange du nicht ankreuzt. Dein Squad oder dein Team (soweit der Spielmodus es erlaubt), die Marshals und die Spielleitung sehen deine Position auf der Karte; die Remote-Spielleitung nur, wenn das Feld es einschaltet. Wenn du nicht ankreuzt, ändert sich sonst nichts. Du kannst das Teilen jederzeit während des Spiels beenden.',
+  'checkin.card_why':
+      'Warum der Ausweis geprüft wird: Das Feld muss deinen Mitgliedsausweis am Eingang mit den hier eingegebenen Daten abgleichen (in Portugal eine gesetzliche Pflicht der Felder, sonst das berechtigte Interesse des Feldes). Danach bleiben nur der Verband, das Ablaufdatum, das Ergebnis und die prüfende Person gespeichert; die Nummer wird gelöscht.',
   'site.err.membership_missing':
       'Dieses Feld braucht für die Anmeldung deine APD-Mitgliedsnummer.',
   'site.err.apd_not_accepted': 'Dieses Feld akzeptiert diese APD nicht.',

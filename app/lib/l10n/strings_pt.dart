@@ -697,7 +697,7 @@ const Map<String, String> ptStrings = {
   'player.me': 'Tu: {role}, {team}',
   'player.no_team': 'ainda sem equipa',
   'player.positions': 'Posições que vês: {n}',
-  'player.share': 'Partilhar a minha posição',
+  'player.share': 'Partilhar a minha posição com o jogo durante este jogo',
   'player.share_hint':
       'Só durante o jogo; o controlador decide quem a vê. A organização e os marshals veem-na nos seus dispositivos ATAK.',
   'player.share_on': 'A partilhar: {n} posição(ões) enviada(s)',
@@ -1162,7 +1162,8 @@ const Map<String, String> ptStrings = {
   'apd.expires': 'Válido até (AAAA-MM-DD)',
   'apd.expires_required': 'Válido até, AAAA-MM-DD (obrigatório)',
   'apd.date_format': '2027-01-31',
-  'apd.hint': 'A app não o verifica: o marshal compara-o com o cartão.',
+  'apd.hint':
+      'A app não o verifica. À entrada, um marshal compara o que escreveste com o teu cartão físico, porque o campo tem de o verificar. Depois de o cartão ser confirmado, o número é apagado do controlador do campo.',
   'apd.need_number': 'Este campo pede o número de associado da APD.',
   'apd.need_expiry': 'Este campo pede a data de validade da filiação.',
   'apd.bad_date': 'Escreve-se a data como AAAA-MM-DD, por exemplo 2027-01-31.',
@@ -1172,8 +1173,19 @@ const Map<String, String> ptStrings = {
   'apd.status.expired': 'Filiação caducada',
   'apd.status.not_accepted': 'APD não aceite aqui',
   'apd.status.missing': 'Filiação em falta',
-  'apd.hint_marshal': 'O marshal vai ver o cartão de associado.',
+  'apd.hint_marshal':
+      'Um marshal vai conferir o cartão de associado com o que escreveste, e és admitido quando o confirmar.',
   'queue.confirm': 'Admitir',
+  'queue.confirm_no_card': 'Admitir sem o cartão',
+  'queue.card_seen': 'Cartão visto, confere',
+  'apd.verdict_on': '{verdict} em {date}',
+  'apd.card_by': 'cartão verificado por {who}',
+  'checkin.share_position':
+      'Partilhar a minha posição com o jogo durante este jogo',
+  'checkin.share_position_hint':
+      'Opcional, e desligado se não marcares. A tua equipa ou squad (conforme o modo de jogo permitir), os marshals e a organização veem a tua posição no mapa; o GM remoto só a vê se o campo o ativar. Se não marcares, nada mais muda. Podes deixar de partilhar a qualquer momento durante o jogo.',
+  'checkin.card_why':
+      'Porque se verifica o cartão: o campo tem de conferir o teu cartão de associado à entrada com os dados que escreveste aqui (uma obrigação legal nos campos em Portugal, o interesse legítimo do campo nos outros). Depois só ficam a associação, a data de validade, o resultado e quem verificou; o número é apagado.',
   'site.err.membership_missing':
       'Este campo exige o número de associado da APD para a inscrição.',
   'site.err.apd_not_accepted': 'Este campo não aceita essa APD.',

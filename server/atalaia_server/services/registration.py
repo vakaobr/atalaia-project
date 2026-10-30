@@ -810,6 +810,17 @@ async def link_game(db: AsyncSession, field_id: uuid.UUID, scheduled_id: Optiona
     return True
 
 
+async def erase_numbers(db: AsyncSession, game_id: uuid.UUID) -> int:
+    """The membership number of every registration of the scheduled game that was made into this game, when the
+    game ends (protocol/apd.md, "The card check"): the card was compared at the field, so the number is not
+    kept for the 30 days the APD and expiry stay. Returns how many were cleared."""
+    sched = select(ScheduledGame.id).where(ScheduledGame.controller_game == game_id).scalar_subquery()
+    result = await db.execute(update(GameRegistration).where(
+        GameRegistration.scheduled_game.in_(sched), GameRegistration.federation_number.is_not(None))
+        .values(federation_number=None).execution_options(synchronize_session=False))
+    return result.rowcount or 0
+
+
 async def apply_checkins(db: AsyncSession, field_id: uuid.UUID, game: Game, body: dict[str, Any],
                          now: datetime) -> dict[str, Any]:
     """POST /api/v1/sync/checkins: each registration's outcome and its declarations' final states. A
@@ -837,6 +848,7 @@ async def apply_checkins(db: AsyncSession, field_id: uuid.UUID, game: Game, body
             continue
         reg.status, reg.outcome_at, reg.updated_at = item["outcome"], now, now
         reg.outcome_by = None  # the controller's word replaces a mark staff made
+        reg.federation_number = None  # the card was checked at the field: the number has done its job (LEG-5)
         applied += 1
         for d in item["declarations"]:
             result = await db.execute(update(RegistrationReplica).where(

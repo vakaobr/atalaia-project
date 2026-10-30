@@ -968,6 +968,14 @@ class ControllerApi {
     ),
     _route(
       'PUT',
+      r'/api/v1/checkin/me/position-sharing',
+      _player(
+        (r, v) =>
+            ApiResponse(200, _svc().setPositionSharing(v, r.body), _noStore),
+      ),
+    ),
+    _route(
+      'PUT',
       r'/api/v1/checkin/me/marshal-key',
       _player((r, v) {
         if (v.role != 'marshal') {

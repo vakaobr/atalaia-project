@@ -451,6 +451,9 @@ void main() {
     await tester.tap(find.text('Domingo de manhã · Campo Norte').last);
     await tester.pumpAndSettle();
     await tapKey(tester, 'checkin-submit');
+    // The error is at the top of a form that is now longer than the screen.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 3000));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('checkin-error')), findsOneWidget);
     expect(field.rows, isEmpty);
   });

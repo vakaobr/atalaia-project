@@ -176,7 +176,7 @@ class ApdCheckinTests(P3Case):
         g = self.new_game()
         self.put_rule(checkin=True, expiry=True, accepted=["apd-a"])
         me = self.check_in(g["id"], apd_id="apd-a", membership_number="123", membership_expires=FUTURE)
-        self.assertEqual(me["status"], "checked_in")
+        self.assertEqual(me["status"], "pending")  # a valid verdict still waits for the card (LEG-1)
         row = self.row(g["id"], me)
         self.assertEqual((row["apd_id"], row["federation_number"], row["membership_expires"]),
                          ("apd-a", "123", FUTURE))
@@ -203,7 +203,8 @@ class ApdCheckinTests(P3Case):
                 self.assertEqual(r.status_code, 200, r.text)
                 self.assertEqual((r.json()["status"], r.json()["apd_status"], r.json()["apd_override"]),
                                  ("checked_in", want, True))
-                self.assertTrue(any("apd override" in line and want in line for line in logs.output))
+                self.assertTrue(any("apd override" in line and want in line and "no_card" in line
+                                    for line in logs.output))
                 self.assertFalse(any("MBR-QX" in line for line in logs.output))  # the number is never logged
 
     def test_a_hand_check_in_is_never_refused_and_is_logged(self):
@@ -216,7 +217,8 @@ class ApdCheckinTests(P3Case):
                          ("checked_in", "missing", True))
         self.assertTrue(any("apd override" in line for line in logs.output))
         r = self.client.post(f"/api/v1/games/{g['id']}/checkins", headers=GM,
-                             json={"display_name": "Rui", "membership_number": "9", "apd_id": "apd-a"})
+                             json={"display_name": "Rui", "membership_number": "9", "apd_id": "apd-a",
+                                   "federation_seen": True})
         self.assertEqual((r.json()["apd_status"], r.json()["apd_override"]), ("valid", False))
 
     def test_a_marshal_may_correct_the_membership(self):

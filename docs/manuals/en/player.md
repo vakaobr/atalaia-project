@@ -66,11 +66,12 @@ The organisers put up a **check-in poster** with a QR code. It holds no secret.
    - **Game**: pick one if the field has more than one open.
    - **Name or callsign**: up to 32 characters. Only the organisers and marshals see it. Other players do not.
    - **Federation number**: only if the field asks for it. The organisers look at your card at the desk. The app does not check it.
-   - **APD membership**: if the field asks for it, pick your APD (or **Not in the list**), type your membership number and its expiry date (YYYY-MM-DD). The app does not check them: a marshal compares them with your card. If your membership is not valid for the game, your check-in waits for a marshal, who decides. At a field that requires it to register, the registration is refused without a valid membership.
+   - **APD membership**: if the field asks for it, pick your APD (or **Not in the list**), type your membership number and its expiry date (YYYY-MM-DD). The app does not check them. **Why the card is checked:** the field has to check your physical membership card at the entrance against what you typed here (a legal duty for fields in Portugal, the field's legitimate interest elsewhere), so your check-in waits until a marshal has compared the two and ticked *card seen*; the number is then erased from the field's controller and only the APD, the expiry, the result and who checked it stay. If it is not valid for the game, the marshal decides. At a field that requires it to register, the registration is refused without a valid membership.
      At a field outside Portugal this reads **Association membership**: pick your association (club, federation or insurance body) instead of an APD; the list is the one for the field's country, and **Not in the list** is always there.
    - **Preferred team**: **Any**, or a team. The organisers decide the final team.
    - **Online registration**: only if you registered on the field's site. See [section 8](#8-if-you-registered-online).
    - **Replicas you bring**: tick the replicas you saved earlier. You can also do this later ([section 4](#4-declare-your-replicas)).
+   - **Share my position with the game during this game**: a separate box, unticked. Tick it only if you want to: your squad or team (as the game allows), the marshals and the game master see your position, and the remote GM only if the field turns that on. If you leave it unticked nothing else changes, and you can stop sharing at any time during the game.
 8. Tap **Check in**.
 
 Now you see **My check-in**. It shows:
@@ -219,7 +220,7 @@ An objective can say **For** *(team)* or **For** *(team)***, squad** *(number)*.
 
 ## 6. Share your position and the field boundary
 
-Sharing your position is optional. Your position goes to the field controller only, during the game. The controller decides who may see it: the organisers and marshals, and your squad if the game allows it. If the field has a remote GM signed in on the site server, the remote GM sees it too, while you share it; the site server does not keep it. The organisers see it on their ATAK devices, if they use them. The app draws a map of the field with the positions you may see (see below); the console does not draw players. In *VIP / Payload* the VIP's position is what extracts the team.
+Sharing your position is optional, and it is the box you ticked or left unticked at check-in (**Share my position with the game during this game**). The switch below is the same choice: switch it on later or off at any time. Your position goes to the field controller only, during the game. The controller decides who may see it: the organisers and marshals, and your squad if the game allows it. If the field has a remote GM signed in on the site server, the remote GM sees it too, while you share it; the site server does not keep it. The organisers see it on their ATAK devices, if they use them. The app draws a map of the field with the positions you may see (see below); the console does not draw players. In *VIP / Payload* the VIP's position is what extracts the team.
 
 1. Check in, then tap **Follow the game**.
 2. While the game is **running**, switch on **Share my position**. It says *Only during the game; the controller decides who sees it …*.

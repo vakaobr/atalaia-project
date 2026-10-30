@@ -213,7 +213,17 @@ class FakeField {
       }
       final r = rows[confirmPath.group(1)];
       if (r == null) return err(404, 'no');
-      if (b['status'] == 'checked_in') {
+      if (b['federation_seen'] == true) {
+        // "Card seen, matches": who and when, the stored verdict, no number.
+        r
+          ..['federation_seen'] = true
+          ..['card_checked_by'] = who
+          ..['card_checked_at'] = 1800007200.0
+          ..['apd_verdict_on'] = '2027-01-15'
+          ..['apd_status'] = r['apd_status'] ?? 'valid'
+          ..['federation_number'] = null
+          ..['status'] = 'checked_in';
+      } else if (b['status'] == 'checked_in') {
         if (r['status'] == 'pending' && r['apd_status'] != null) {
           r['apd_override'] = r['apd_status'] != 'valid';
         }
@@ -275,6 +285,11 @@ class FakeField {
         row['apd_id'] = b['apd_id'];
         row['membership_expires'] = b['membership_expires'];
         row['apd_status'] = verdict;
+        // The player's own, separate choice; an older client says nothing.
+        row['position_share'] = b['share_position'] == true
+            ? true
+            : (b.containsKey('share_position') ? false : row['position_share']);
+        row['position_share'] ??= false;
         if (sendsCountry) row['country'] = country;
         // A site server registration's id and ticket (decision S16-8).
         row['registration_id'] = b['registration_id'];
@@ -303,6 +318,13 @@ class FakeField {
                     'public_key': marshalKeys[listed.id],
                     'valid_for_s': 7200, // 2 hours, as both controllers (MR-4)
                   },
+        });
+      case 'PUT /checkin/me/position-sharing':
+        if (who == null) return err(401, 'no');
+        rows[who]!['position_share'] = b['share_position'] == true;
+        return FieldResponse(200, {
+          'player_id': who,
+          'position_share': rows[who]!['position_share'],
         });
       case 'PUT /checkin/me/replicas':
         if (who == null) return err(401, 'no');
@@ -388,6 +410,9 @@ class FakeField {
                 'membership_expires': r['membership_expires'],
                 'apd_status': r['apd_status'],
                 'apd_override': r['apd_override'] == true,
+                'apd_verdict_on': r['apd_verdict_on'],
+                'card_checked_by': r['card_checked_by'],
+                'card_checked_at': r['card_checked_at'],
                 'declarations': r['declarations'],
               },
         ];
