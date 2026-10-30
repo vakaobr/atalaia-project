@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The issuer (and Microsoft's tenant) of a social login is stored with its subject (SRV-8).
 
-Revision ID: 0026_identity_issuer
-Revises: 0025_oidc_notice_version
+Revision ID: 0027_identity_issuer
+Revises: 0026_oidc_app_challenge
 Created: 2026-10-30
 
 ``user_identities`` was unique on ``(provider, subject)``; a subject is only unique within one issuer, so identities of
@@ -22,8 +22,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0026_identity_issuer"
-down_revision = "0025_oidc_notice_version"
+revision = "0027_identity_issuer"
+down_revision = "0026_oidc_app_challenge"
 branch_labels = None
 depends_on = None
 
