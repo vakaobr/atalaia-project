@@ -261,9 +261,6 @@ async function offer() {
     if (providers.length > 0) {
         const notice = await call('GET', '/api/v1/privacy-notice');  // 404: no notice published, nothing to name
         noticeVersion = notice.status === 200 && notice.body && notice.body.version ? notice.body.version : null;
-        const noticeLink = $('notice-link');
-        if (noticeVersion) noticeLink.href = link('/privacy');
-        else noticeLink.hidden = true;
     }
     for (const id of ['notice-seen', 'age-confirmed']) {
         $(id).addEventListener('change', () => {

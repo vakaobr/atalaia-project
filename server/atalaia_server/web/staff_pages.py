@@ -97,7 +97,7 @@ from ..history_models import MAX_DELAY_S, MAX_RETENTION_DAYS, MIN_RETENTION_DAYS
 from ..services import branding as branding_svc
 from ..services import devices, registration, scheduling
 from . import i18n, preview_texts
-from .field_pages import (GET_HEAD, HERE, HTML_TYPE, NOTICE_PHRASE, STARTED, answer, esc, notice_published,
+from .field_pages import (GET_HEAD, HERE, HTML_TYPE, STARTED, answer, esc, notice_published,
                           privacy_link, switcher)
 from .staff_i18n import STRINGS
 
@@ -250,13 +250,12 @@ async def home(request: Request) -> Response:
 @router.api_route("/staff/login", methods=GET_HEAD)
 async def login(request: Request) -> Response:
     p = StaffPage(request)
-    # LIVE-2: the consent's "privacy notice" is a link when one is published, else plain text.
-    consent = esc(p.t["login_consent"])
-    phrase = esc(NOTICE_PHRASE[p.lang])
-    if notice_published(request) and phrase in consent:
+    # LIVE-2: the link to the notice (beside the "I have read it" box) exists only when one is published.
+    link = ""
+    if notice_published(request):
         href = esc(f"/privacy?lang={p.lang}" if p.explicit else "/privacy")
-        consent = consent.replace(phrase, f'<a href="{href}" target="_blank" rel="noopener">{phrase}</a>', 1)
-    content = TEMPLATES["login"].substitute(p.texts(login_consent=consent))
+        link = f'<a id="notice-link" href="{href}" target="_blank" rel="noopener">{esc(p.t["login_notice_read"])}</a>'
+    content = TEMPLATES["login"].substitute(p.texts(notice_link=link))
     return p.render(request, "login", p.t["login_title"], content)
 
 
