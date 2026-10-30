@@ -299,15 +299,18 @@ void main() {
         ..startGame(nowMs: 0);
     });
 
+    // The box's packets carry a rising header seq (the replay window refuses
+    // the rest); the seq the tests name is only for reading.
+    var pktSeq = 0;
     void st(int seq, int owner, Map<int, int> counters, int gameMs) =>
         pc.onPacket(
-          header(4, seq, RfType.state),
+          header(4, pktSeq++, RfType.state),
           state(owner, counters, gameTimeMs: gameMs),
           epoch: 1,
         );
     void captured(int seq, int team, int tSec, {bool neutral = false}) =>
         pc.onPacket(
-          header(4, 100 + seq, RfType.event),
+          header(4, pktSeq++, RfType.event),
           Uint8List.fromList([4, seq, tSec, team, neutral ? 1 : 0]),
           epoch: 1,
         );
