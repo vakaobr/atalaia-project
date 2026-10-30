@@ -334,6 +334,8 @@ Some modes (Kill Confirmed, Respawn and Lives, Player Check-in, Medic Kit, Money
 
 If the console says a tag cannot be made because the game is not running, create the game first: an ended game has no key.
 
+**A tag can be copied.** The signature does not cover the chip, so anyone who can read a tag with a phone can write the same bytes to another tag, and a box takes the copy for the player. It works until the game ends (the game key is new for every game). Treat a tag as a badge: give it no value outside the game, hand tags out at the briefing and keep them in your sight until then. Locking a tag read-only (an NFC app can do it; it cannot be undone, so only for tags you will not write again) stops a player overwriting it, but **does not stop copying**. NTAG 424 DNA chips would; the app does not support them yet. Details: [SECURITY.md](../../../SECURITY.md#player-tags-can-be-copied).
+
 ### Marshals
 
 Only people on the **Marshals** list can act as marshals.

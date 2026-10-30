@@ -128,7 +128,11 @@ O **controlador do campo assina cada etiqueta** com a chave do jogo e o teu tele
 4. Toca em **Escrever a etiqueta**. A app pede a etiqueta ao controlador. Quando disser **Encosta a etiqueta às costas do telemóvel…**, mantém-na quieta até ficar escrita. Aparece depois em **Escritas agora**.
 5. Repete para cada pessoa.
 
-Uma etiqueta só funciona no jogo para que foi gravada. Cada jogo novo precisa de etiquetas novas. A organização também pode gravar etiquetas a partir da consola ou do ecrã de um controlador no telemóvel (vê o [manual da organização](game-master.md#etiquetas-de-quem-joga)).
+Uma etiqueta só funciona no jogo para que foi gravada. Cada jogo novo precisa de etiquetas novas.
+
+**Uma etiqueta pode ser copiada.** A assinatura não cobre o chip, por isso quem consiga ler uma etiqueta com um telemóvel pode gravar os mesmos bytes noutra, e uma caixa toma a cópia por quem joga. Funciona até o jogo acabar (a chave do jogo é nova em cada jogo). Trata a etiqueta como um crachá: não lhe dês valor fora do jogo, entrega as etiquetas no briefing e mantém-nas à vista até lá. Bloquear uma etiqueta só para leitura (uma app NFC consegue; não se desfaz, por isso só nas etiquetas que não vais gravar outra vez) impede que alguém a escreva por cima, mas **não impede a cópia**. As etiquetas NTAG 424 DNA impediriam; a app ainda não as suporta. Pormenores: [SECURITY.md](../../../SECURITY.md#player-tags-can-be-copied).
+
+A organização também pode gravar etiquetas a partir da consola ou do ecrã de um controlador no telemóvel (vê o [manual da organização](game-master.md#etiquetas-de-quem-joga)).
 
 ## 8. Limites sem ligação
 

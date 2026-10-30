@@ -128,7 +128,11 @@ The **field controller signs each tag** with the game's key and your phone write
 4. Tap **Write the tag**. The app asks the controller for the tag. When it says **Hold the tag to the back of the phone…**, hold it still until it is written. It then appears under **Written just now**.
 5. Repeat for each player.
 
-A tag works only in the game it was written for. Every new game needs new tags. The game master can also write tags from the console or from a phone controller's own screen (see the [game master manual](game-master.md#players-tags)).
+A tag works only in the game it was written for. Every new game needs new tags.
+
+**A tag can be copied.** The signature does not cover the chip, so anyone who can read a tag with a phone can write the same bytes to another tag, and a box takes the copy for the player. It works until the game ends (the game key is new for every game). Treat a tag as a badge: give it no value outside the game, hand tags out at the briefing and keep them in your sight until then. Locking a tag read-only (an NFC app can do it; it cannot be undone, so only for tags you will not write again) stops a player overwriting it, but **does not stop copying**. NTAG 424 DNA chips would; the app does not support them yet. Details: [SECURITY.md](../../../SECURITY.md#player-tags-can-be-copied).
+
+The game master can also write tags from the console or from a phone controller's own screen (see the [game master manual](game-master.md#players-tags)).
 
 ## 8. Offline limits
 
