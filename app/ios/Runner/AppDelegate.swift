@@ -5,11 +5,13 @@
 // The "device" channel is answered here: the private folder for the settings
 // (filesDir), the maker, the screen kept on, a buzz, and the location
 // permission (requestPermission, handed to LocationPlugin, which also answers
-// BLUETOOTH_SCAN: beacon ranging needs it). Four features
+// BLUETOOTH_SCAN: beacon ranging needs it). Six features
 // have a Swift file each, registered below (decisions iOS-13 to iOS-15):
 // the QR scanner (QrScanPlugin.swift), `atalaia://` links (LinkPlugin.swift),
 // the position for a player who shares it (LocationPlugin.swift) and the
-// indoor beacons (BeaconScanPlugin.swift, decisions IOSB-1 to IOSB-8). Every
+// indoor beacons (BeaconScanPlugin.swift, decisions IOSB-1 to IOSB-8), and
+// the site login: the browser session for a social login (BrowserPlugin.swift)
+// and passkeys (PasskeyPlugin.swift), decisions IOSL-1 to IOSL-9. Every
 // other method, and every other channel (NFC, kiosk, foreground service, the
 // field's Wi-Fi, the I/O pod), is left out on purpose: Flutter then raises
 // MissingPluginException, which the Dart side reads as "not available"
@@ -37,6 +39,8 @@ import UIKit
       QrScanPlugin.register(messenger: registrar.messenger())
       LocationPlugin.register(messenger: registrar.messenger())
       BeaconScanPlugin.register(messenger: registrar.messenger())
+      BrowserPlugin.register(messenger: registrar.messenger())
+      PasskeyPlugin.register(messenger: registrar.messenger())
     }
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AtalaiaLinks") {
       LinkPlugin.register(registrar: registrar)

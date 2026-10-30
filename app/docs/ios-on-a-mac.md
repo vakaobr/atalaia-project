@@ -134,7 +134,7 @@ Always open the `.xcworkspace` after that.
 | Apps and App IDs | few: about 3 apps per phone and 10 new App IDs a week | no practical limit |
 | Everything this guide tests: network, QR scanning, `atalaia://` links, player feed, positions (on the screen), languages, the GM web view | yes | yes |
 | **NFC tag reading** (the capability and its `com.apple.developer.nfc.readersession.formats` entitlement) | **no**: Xcode refuses the capability for a Personal Team and signing fails | yes |
-| Push notifications, iCloud, Associated Domains, background modes needing a capability | no | yes |
+| Push notifications, iCloud, **Associated Domains (passkeys and the social login on iOS)**, background modes needing a capability | no | yes |
 | TestFlight, installing on other people's phones, the App Store | no | yes |
 
 So: **a free account runs everything the app does on iOS today** (it has no
@@ -533,6 +533,72 @@ The same *Share my position* switch, on a field whose controller lists beacons
 - Bluetooth off cannot be detected without a Bluetooth permission the app does
   not ask for: the beacons are simply not heard and the position stays GPS.
 
+## Site login on iOS (decisions IOSL-1 to IOSL-9), for the maintainer
+
+The account screen's **social login** (Google, Microsoft, Apple through the site
+server) and **passkeys** have Swift sides now: `ios/Runner/BrowserPlugin.swift`
+(an `ASWebAuthenticationSession`) and `ios/Runner/PasskeyPlugin.swift`
+(`ASAuthorizationPlatformPublicKeyCredentialProvider`), on the same channels and
+with the same answers as Android's Kotlin plugins; nothing in `lib/` changed.
+**The Swift has not been compiled or run**: CI's `ios-build` and your iPhone are
+the first check. Without the steps below the app still builds and runs; the
+two features then fail ("not available", or a passkey error) and the password
+login stays.
+
+Both need the **paid Apple Developer Program** (Associated Domains is not
+available to a free Personal Team, section "Free account or paid") and a **site
+server with its own domain**. What to do, once:
+
+1. **The Team ID.** developer.apple.com, Account, Membership details: ten
+   letters and digits (`ABCDE12345`). The bundle id is `org.atalaia.app` (or the
+   suffixed one you signed with: the id in the next step must match what you
+   install).
+2. **The site server serves the association file.** The server already does
+   (decision PKA-1): set `ATALAIA_APP_IOS_APP_IDS=ABCDE12345.org.atalaia.app`
+   (`TEAMID.bundle.id`, up to 8 separated by commas) in its environment and
+   restart; unset it is a 404 and the iOS app logs in with the password only.
+   Check: `curl -i https://DOMAIN/.well-known/apple-app-site-association` must
+   answer 200 with `webcredentials` and your id, with no redirect, over a
+   certificate a phone trusts. The server's `/app/*` paths are in `applinks` too
+   (not needed by the app today). Apple's CDN caches the file for the app's
+   first install and for a while after (use `?mode=developer` on the entitlement
+   below to bypass it on a development build).
+3. **The associated domain in the app.** `ios/Runner/Runner.entitlements` holds
+   `webcredentials:$(ATALAIA_SITE_HOST)`, and the Xcode project defines two
+   build settings on the Runner target: `ATALAIA_SITE_HOST` (placeholder
+   `site.example`: **set it to the site server's host name**, no scheme, no
+   port; for a development build you may write `DOMAIN?mode=developer` in the
+   entitlements file instead) and `ATALAIA_ENTITLEMENTS`, empty, so that a free
+   account still signs: **set it to `Runner/Runner.entitlements`**. In Xcode:
+   Runner target, Build Settings, search "ATALAIA" (user-defined). Then
+   Signing & Capabilities shows "Associated Domains" with the host. One
+   build, one site: a club with its own site server builds its own app, as on
+   Android (`-Patalaia.appLinkHost`).
+4. **Signing.** Section 7, with the paid team selected: Xcode then registers the
+   App ID with the Associated Domains capability by itself (automatic signing),
+   or you tick it on developer.apple.com, Identifiers.
+5. **On the phone.** iOS 16 or later for passkeys, with iCloud Keychain (or
+   another passkey provider) on and a screen lock; **iOS 17.4 or later for the
+   social login**: an `ASWebAuthenticationSession` can end on an https address
+   only from 17.4 (before that only on a custom scheme, which the site's
+   redirect is not), so earlier iPhones answer "not available" and keep the
+   password and passkeys. Install a build whose associated domain is on a
+   site the phone can reach.
+
+What to try, on a paid-team build: log in with a social provider (the
+sheet opens, you sign in, the sheet closes and the account screen shows you
+logged in); add a passkey on the account screen (Face ID or Touch ID, then it
+appears in the list); log out and log in with the passkey; use the passkey for
+a confirmation. A passkey made on the site in Safari should be offered in the
+app, and the other way round (same relying party, the host name).
+
+Known limits: closing the browser sheet or the passkey sheet by hand gives the
+app no sign for the social login (its screen waits until you press its cancel or
+ten minutes pass, as with a closed Custom Tab on Android); a passkey that already
+exists for the account is not hidden from the "add" sheet by the app (the
+system replaces a passkey with the same account and site); Android's
+`no_credential` answer has no iOS twin (closing the sheet is `cancelled`).
+
 ## What does not work on iOS, and why
 
 - **A prop** (the phone as a game box: the core, the game loop, kiosk, the
@@ -549,6 +615,9 @@ The same *Share my position* switch, on a field whose controller lists beacons
   without Apple's MFi programme); and it starts the field's Wi-Fi (a local-only
   hotspot) from code, which iOS does not allow. An iPhone is a player, a marshal
   or a GM, joining a field controller that runs on a Pi, a PC or an Android phone.
+- **Site login** (social login, passkeys): Swift sides exist and are not run;
+  they need the paid program, the site's domain and iOS 16 / 17.4 (see "Site
+  login on iOS" above).
 - **NFC**: the app's Kotlin plugin has no Swift twin yet, and CoreNFC needs a
   paid account's entitlement (iOS-10); the Dart side answers "not available"
   (`MissingPluginException` is read as unavailable) and falls back to typing.
