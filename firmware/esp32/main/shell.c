@@ -301,10 +301,10 @@ static void serial_input_init(void)
     ESP_LOGI(TAG, "USB adoption on: \"@adopt-info\", \"@adopt <hex> [<PIN>|-] [<name>]\"");
 #endif
 #if CONFIG_ATALAIA_SERIAL_JOIN
-    ESP_LOGI(TAG, "serial join on: \"@join atalaia:join:...\", \"@joinkey <hex>\", "
+    ESP_LOGI(TAG, "serial join on: \"@join atalaia:join:...\", \"@joinkey <hex> <admin PIN>\", "
                   "\"@tag <uid> [<tag>]\", \"@wifi <ssid> <password>\", "
                   "\"@setup <PIN>\", "
-                  "\"@update <version> <release id>\", \"@modes\", \"@forgetmodes\" "
+                  "\"@update <version> <release id> <admin PIN>\", \"@modes\", \"@forgetmodes\" "
                   "or \"@lobby\" on the console");
 #endif
 }
@@ -318,6 +318,11 @@ static void serial_input_init(void)
 #define SERIAL_JOIN_ON 1
 #else
 #define SERIAL_JOIN_ON 0
+#endif
+#if CONFIG_ATALAIA_SERIAL_KEYS
+#define SERIAL_KEYS_ON 1
+#else
+#define SERIAL_KEYS_ON 0
 #endif
 
 static void serial_command(const char *cmd)
@@ -370,6 +375,20 @@ static void serial_command(const char *cmd)
         return;
     }
 #endif
+    /* "@joinkey <hex>" and "@update <version> <id>" change what the box trusts or runs: a release
+     * build wants the admin PIN as their last word, a bench build (serial keys) does not
+     * (decision SR-40). The line is rewritten without the PIN once it has been checked. */
+    static char gated[200];
+    if (SERIAL_JOIN_ON && (strncmp(cmd, "joinkey ", 8) == 0 || strncmp(cmd, "update ", 7) == 0)) {
+        static char gate_reply[120];
+        snprintf(gated, sizeof(gated), "%s", cmd);
+        if (!admin_pin_gate_serial(&admin_guard, SERIAL_KEYS_ON, gated, cmd[0] == 'j' ? 1 : 2,
+                                   gate_reply, sizeof(gate_reply))) {
+            ESP_LOGW(TAG, "%.6s: %s", cmd, gate_reply);
+            return;
+        }
+        cmd = gated;
+    }
     bool adopt_cmd =
         SERIAL_ADOPT_ON && (strcmp(cmd, "adopt-info") == 0 || strncmp(cmd, "adopt ", 6) == 0);
     bool joinkey_cmd = SERIAL_JOIN_ON && strncmp(cmd, "joinkey ", 8) == 0;

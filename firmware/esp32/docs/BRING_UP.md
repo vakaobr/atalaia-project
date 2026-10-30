@@ -138,7 +138,10 @@ firmware no longer reads a button there.
    ```
    The log goes to UART0 and to this USB port; what you type on the USB
    port (`@join`, `@joinkey`, `@adopt-info`) reaches the box
-   (`CONFIG_ATALAIA_CONSOLE_USB_INPUT`).
+   (`CONFIG_ATALAIA_CONSOLE_USB_INPUT`). The `@joinkey` and `@update` lines in this guide are
+   typed as written on a **bench build** (`CONFIG_ATALAIA_SERIAL_KEYS`, `sdkconfig.bench`). A
+   release build wants the admin PIN as their last word (`@joinkey <64 hex> <PIN>`,
+   `@update <version> <id> <PIN>`), and refuses both while no PIN is set (decision SR-40).
 3. Verify: boot log shows the firmware version with its commit (`Atalaia firmware
    v0.3.0-dev.412+g8560d54 (core v0.3.0-dev)`, the commit you built; `.dirty` if the tree
    had changes; what `python3 tools/docker_fw.py version` printed), PSRAM detection (2 MB on

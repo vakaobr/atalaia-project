@@ -486,7 +486,7 @@ Radio-specific Kconfig options (under "Atalaia Field Box Configuration > Radio")
 Field game options (under "Field network games"):
 - `ATALAIA_STATE_INTERVAL_S` -- seconds between STATE packets in a joined game (default 15)
 - `ATALAIA_BATTERY_LOW_PCT` -- send `battery.low` below this battery level (default 20; 0 = never; only with a MAX17048 gauge)
-- `ATALAIA_SERIAL_JOIN` -- accept `@join`, `@joinkey`, `@tag`, `@wifi`, `@update`, `@modes`, `@forgetmodes` and `@lobby` lines on the serial console (default on)
+- `ATALAIA_SERIAL_JOIN` -- accept `@join`, `@joinkey`, `@tag`, `@wifi`, `@update`, `@modes`, `@forgetmodes` and `@lobby` lines on the serial console (default on). `@joinkey` and `@update` take the admin PIN as their last word unless `ATALAIA_SERIAL_KEYS` is on (the bench and Wokwi builds)
 - `ATALAIA_SERIAL_ADOPT` -- accept `@adopt-info` and `@adopt` on the serial console: USB adoption by the field controller (default on; protocol/adoption.md)
 - `ATALAIA_CONSOLE_USB_INPUT` -- read the console input from the USB-C port (USB-Serial-JTAG, the Heltec V4's only USB) as well as UART0 (default on; off in the Wokwi build)
 - `ATALAIA_LED_BRIGHTNESS_PCT` -- LED ring brightness at boot (default 40%; under "LEDs")
@@ -628,7 +628,8 @@ step 10c).
   a join round trip, a Lua node) and only then confirms itself; otherwise, or if it crashes
   first, the previous image boots again.
 - **Starting one:** the controller's CMD update (opcode 9) from the GM console, or
-  `@update <version> <release id>` on the serial console (the same checks). Signing releases:
+  `@update <version> <release id> <admin PIN>` on the serial console (the same checks; the PIN
+  is left out on a bench build, decision SR-40). Signing releases:
   [docs/RELEASE_SIGNING.md](docs/RELEASE_SIGNING.md) and `tools/firmware_release.py`.
 
 ## Mode packages fetched for a game
@@ -919,7 +920,8 @@ controller's game.
   an 8-byte check; the console's *Adopt* tab makes it) tapped between games,
   or the **USB cable** from the field controller, which sends `@adopt-info`
   (one `ATALAIA-ADOPT {json}` line: name, MAC, state) and `@adopt <64 hex>
-  [<admin PIN>|-] [<field name>]`; `@joinkey <64 hex>` and the setup
+  [<admin PIN>|-] [<field name>]`; `@joinkey <64 hex> <admin PIN>` (a release build wants the PIN last; a bench
+  build does not) and the setup
   portal's field follow the same rules. An unadopted box (none stored; a
   development key does not count) takes the first field; an adopted box takes
   the same field again and another field's key only with its admin PIN (on
@@ -930,7 +932,8 @@ controller's game.
   the field's name and its key's fingerprint (`XXXX-XXXX`), or asks for the
   PIN. The key stays in the "radio" NVS namespace, the name in `field_name`;
   production boxes need NVS and flash encryption and secure boot (the
-  protocol document, section 2). Host tests: `test/test_adoption.c` against
+  protocol document, section 2), which no released image has yet (SECURITY.md;
+  the plan is [docs/RELEASE_HARDENING.md](docs/RELEASE_HARDENING.md)). Host tests: `test/test_adoption.c` against
   `protocol/vectors/field_card.json`. In software; the field card not yet
   read by a real PN532, the cable not yet used from a real controller.
 - **Pairing by code** -- `main/box_pair.c`, `main/cpace.c` (protocol/adoption.md

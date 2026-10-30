@@ -197,7 +197,7 @@ transition).
 | Reboot reuses nonce | Epoch increments on boot and is persisted before first TX; nonce_ctr = (epoch << 16) | seq |
 | seq wraps at 65535 | Epoch increments on wrap, persisted before transmitting with seq=0; new epoch = new nonce range |
 | NVS write fails on epoch increment | Node halts radio and emits `nonce.nvs_fail`; never transmits with a stale epoch |
-| Attacker dumps flash of stolen box | Gets the epoch but not the game key (encrypted NVS, see ADR-P2-12); cannot forge packets |
+| Attacker dumps flash of stolen box | Gets the epoch but not the game key (encrypted NVS, see ADR-P2-12: only on a production-provisioned box; the images the project releases do not enable it yet, SECURITY.md); cannot forge packets |
 | Controller failover reuses nonce | Different source (node_id) per controller; independent nonce space |
 | Replay of packets from previous epoch | Receivers never accept a lower epoch; trial with epoch+1 only on auth failure |
 

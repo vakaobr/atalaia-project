@@ -645,7 +645,11 @@ menu "Atalaia Field Box Configuration"
                 Wokwi emulator; a join still needs a payload signed with this
                 box's field join key, and a tag one signed with the game key.
                 "@joinkey" follows the adoption rules (protocol/adoption.md):
-                it never replaces another field's key.
+                it never replaces another field's key. Decision SR-40: "@joinkey"
+                and "@update" need the admin PIN as their last word
+                ("@joinkey <64 hex> <PIN>", "@update <version> <id> <PIN>") unless
+                ATALAIA_SERIAL_KEYS is on (the bench and Wokwi builds, whose scripts
+                type them without one).
 
         config ATALAIA_SERIAL_ADOPT
             bool "Accept @adopt-info and @adopt lines on the serial console (USB adoption)"

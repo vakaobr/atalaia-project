@@ -302,8 +302,64 @@ static void test_setup_command(void)
     CHECK(strstr(reply, "no admin PIN is set") != NULL);
 }
 
+/* Decision SR-40: "@joinkey" and "@update" need the admin PIN in a release build, not in a bench
+ * one. */
+static void test_serial_gate(void)
+{
+    admin_pin_t a;
+    char reply[160], line[96];
+    memset(&nvs, 0, sizeof(nvs));
+    boot(&a, "4711");
+
+    /* Release: the PIN goes last, is checked and is cut off. */
+    snprintf(line, sizeof(line), "joinkey 00ff 4711");
+    CHECK(admin_pin_gate_serial(&a, false, line, 1, reply, sizeof(reply)));
+    CHECK(strcmp(line, "joinkey 00ff") == 0);
+    snprintf(line, sizeof(line), "update 0.3.2 rel1  4711");
+    CHECK(admin_pin_gate_serial(&a, false, line, 2, reply, sizeof(reply)));
+    CHECK(strcmp(line, "update 0.3.2 rel1") == 0);
+    /* Without it, with a wrong one, or with extra words: refused, the line is not for the box. */
+    snprintf(line, sizeof(line), "joinkey 00ff");
+    CHECK(!admin_pin_gate_serial(&a, false, line, 1, reply, sizeof(reply)));
+    CHECK(strstr(reply, "admin PIN goes last") != NULL);
+    snprintf(line, sizeof(line), "joinkey 00ff 0000");
+    CHECK(!admin_pin_gate_serial(&a, false, line, 1, reply, sizeof(reply)));
+    CHECK(strstr(reply, "wrong") != NULL && nvs.failures == 1);
+    snprintf(line, sizeof(line), "joinkey 00ff 4711 extra");
+    CHECK(!admin_pin_gate_serial(&a, false, line, 1, reply, sizeof(reply)));
+    snprintf(line, sizeof(line), "update 0.3.2 4711");
+    CHECK(!admin_pin_gate_serial(&a, false, line, 2, reply, sizeof(reply)));
+    /* A wrong PIN counts like any other: the fifth starts the wait, and then the right one is
+     * refused. */
+    for (int i = 0; i < 4; i++) {
+        snprintf(line, sizeof(line), "joinkey 00ff 0000");
+        CHECK(!admin_pin_gate_serial(&a, false, line, 1, reply, sizeof(reply)));
+    }
+    snprintf(line, sizeof(line), "joinkey 00ff 4711");
+    CHECK(!admin_pin_gate_serial(&a, false, line, 1, reply, sizeof(reply)));
+    CHECK(strstr(reply, "locked, try again in") != NULL);
+
+    /* No PIN set: nothing passes. */
+    memset(&nvs, 0, sizeof(nvs));
+    boot(&a, "");
+    snprintf(line, sizeof(line), "joinkey 00ff 4711");
+    CHECK(!admin_pin_gate_serial(&a, false, line, 1, reply, sizeof(reply)));
+    CHECK(strstr(reply, "not_set") != NULL);
+
+    /* Bench: open as before, and a PIN word is cut off unchecked. */
+    snprintf(line, sizeof(line), "joinkey 00ff");
+    CHECK(admin_pin_gate_serial(&a, true, line, 1, reply, sizeof(reply)));
+    CHECK(strcmp(line, "joinkey 00ff") == 0);
+    snprintf(line, sizeof(line), "update 0.3.2 rel1 whatever");
+    CHECK(admin_pin_gate_serial(&a, true, line, 2, reply, sizeof(reply)));
+    CHECK(strcmp(line, "update 0.3.2 rel1") == 0);
+    snprintf(line, sizeof(line), "update 0.3.2");
+    CHECK(!admin_pin_gate_serial(&a, true, line, 2, reply, sizeof(reply)));
+}
+
 void run_admin_pin_tests(void)
 {
+    test_serial_gate();
     test_setup_command();
     test_weak_pins();
     test_no_default_pin();
