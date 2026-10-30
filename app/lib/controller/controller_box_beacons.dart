@@ -223,19 +223,34 @@ extension BoxBeacons on ControllerField {
   /// (key 22): each listed box is put where the primary has it, replacing
   /// the standby's own place for it, and is known as a box of the game
   /// before it says HELLO; a box not listed keeps what the standby has
-  /// (box_beacons.py `apply_places`).
-  void applyBoxPlaces(int gameId, List<BoxPlace>? list) {
-    if (list == null || list.isEmpty) return;
+  /// (box_beacons.py `apply_places`). Answers the `position` messages (the
+  /// ones [putPlace] sends) of the boxes whose place or level changed, for
+  /// the caller to emit (BBC-30).
+  List<Map<String, Object?>> applyBoxPlaces(int gameId, List<BoxPlace>? list) {
+    if (list == null || list.isEmpty) return const [];
+    final moved = <Map<String, Object?>>[];
     final all = Map<String, Object?>.of(_places);
     final game = Map<String, Object?>.of(
       ((all['$gameId'] as Map?) ?? const {}).cast<String, Object?>(),
     );
     for (final p in list) {
-      game['${p.nodeId}'] = {
-        'x': dequantizePlace(p.x),
-        'y': dequantizePlace(p.y),
-        'level': p.level,
-      };
+      final x = dequantizePlace(p.x);
+      final y = dequantizePlace(p.y);
+      final old = game['${p.nodeId}'];
+      game['${p.nodeId}'] = {'x': x, 'y': y, 'level': p.level};
+      if (old is! Map ||
+          old['x'] != x ||
+          old['y'] != y ||
+          old['level'] != p.level) {
+        moved.add({
+          'type': 'position',
+          'game': gameId,
+          'node_id': p.nodeId,
+          'x': x,
+          'y': y,
+          'level': p.level,
+        });
+      }
     }
     all['$gameId'] = game;
     engine.store.putDocument(ControllerField._placesDoc, all);
@@ -243,6 +258,7 @@ extension BoxBeacons on ControllerField {
       '$boxPlacesMirroredPrefix$gameId',
       jsonEncode([for (final p in list) p.nodeId]),
     );
+    return moved;
   }
 
   /// Whether [nodeId] is a box of the live game [gameId]: placing it changes

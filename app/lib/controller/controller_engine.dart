@@ -2141,19 +2141,23 @@ class ControllerEngine {
     // Promoted, it issues joins in the same language.
     final lang = j.lang;
     if (lang != null) store.setSetting('box_lang:${j.gameId}', lang);
-    _mirrorBoxBeacons(j);
+    final moved = _mirrorBoxBeacons(j);
     _activate(store.game(j.gameId) ?? game, j.gameKey, lead: false);
     final out = getGame(j.gameId);
     _emit({'type': 'game', 'game': out});
+    // The boxes' places, as a GM placing them would send (BBC-30).
+    moved.forEach(_emit);
     return out;
   }
 
   /// The primary's box-beacon choices from a standby join (keys 19 and 21,
   /// BBC-5, BBC-20): promoted, this controller serves the same registry and
-  /// makes the same joins (engine.py `_mirror_box_beacons`).
-  void _mirrorBoxBeacons(JoinPayload j) {
+  /// makes the same joins (engine.py `_mirror_box_beacons`). Answers the
+  /// `position` messages of the boxes whose place changed (key 22, BBC-25),
+  /// for the caller to emit (BBC-30).
+  List<Map<String, Object?>> _mirrorBoxBeacons(JoinPayload j) {
     applyBoxBeaconsMirror(store, j.gameId, j.boxBeacon, j.boxBeacons);
-    field?.applyBoxPlaces(j.gameId, j.boxPlaces); // key 22 (BBC-25)
+    return field?.applyBoxPlaces(j.gameId, j.boxPlaces) ?? const [];
   }
 
   /// A join of the game this controller already follows as a standby, made
@@ -2173,7 +2177,8 @@ class ControllerEngine {
     }
     final lang = j.lang;
     if (lang != null) store.setSetting('box_lang:${j.gameId}', lang);
-    _mirrorBoxBeacons(j);
+    // Only the boxes whose place or level changed (BBC-30).
+    _mirrorBoxBeacons(j).forEach(_emit);
     _emit({'type': 'beacons', '_staff': true});
     return getGame(j.gameId);
   }

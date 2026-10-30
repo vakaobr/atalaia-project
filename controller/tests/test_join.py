@@ -444,6 +444,35 @@ class StandbyApiTests(unittest.TestCase):
         self.assertEqual((place["level"], place["x"], place["y"]), (1, 0.0, 1.0))
         self.assertEqual(self.b.ctrl.store.get_setting(f"box_places_mirrored:{gid}"), json.dumps(sorted(boxes)))
 
+    def test_applying_box_places_sends_position_messages_for_changed_boxes_only(self):
+        """BBC-30: the first join and a refresh send the stream messages a GM placing a box sends, for the boxes
+        whose place or level changed; the same places again send none."""
+        a, b, gid = self.a.client, self.b.client, self.game["id"]
+        boxes = [a.post("/api/v1/join", headers=GM, json={"role": "zone"}).json()["node_id"] for _ in range(2)]
+        self.assertEqual(a.put("/api/v1/field/levels", headers=GM, json={"enabled": True, "count": 3}).status_code, 200)
+        self.a.ctrl.store.set_position(gid, boxes[0], 0.25, 0.5, 2)
+        self.a.ctrl.store.set_position(gid, boxes[1], 1.0, 0.0, 0)
+        sent = []
+        original = self.b.ctrl._emit
+        self.b.ctrl._emit = lambda msg: (sent.append(msg), original(msg))[1]
+
+        def standby():
+            text = a.post("/api/v1/join", headers=GM, json={"kind": "controller"}).json()["text"]
+            self.assertEqual(b.post("/api/v1/controller/join", headers=GM, json={"text": text}).status_code, 201)
+            out = [m for m in sent if m["type"] == "position"]
+            sent.clear()
+            return out
+
+        x, y = join.dequantize(join.quantize(0.25)), join.dequantize(join.quantize(0.5))
+        first = standby()
+        self.assertEqual(first, [{"type": "position", "game": gid, "node_id": boxes[0], "x": x, "y": y, "level": 2},
+                                 {"type": "position", "game": gid, "node_id": boxes[1], "x": 1.0, "y": 0.0,
+                                  "level": 0}])
+        self.assertEqual(standby(), [])  # nothing moved
+        self.a.ctrl.store.set_position(gid, boxes[1], 1.0, 0.0, 1)  # only the level changes
+        self.assertEqual(standby(), [{"type": "position", "game": gid, "node_id": boxes[1], "x": 1.0, "y": 0.0,
+                                      "level": 1}])
+
     def test_box_places_that_do_not_fit_are_refused_not_dropped(self):
         """BBC-25: more than 28 placed boxes cannot travel in the join: the standby join is refused, and says so."""
         a, gid = self.a.client, self.game["id"]

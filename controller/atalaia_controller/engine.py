@@ -1419,18 +1419,21 @@ class Controller:
             self.store.create_game(game, key if self.cfg.persist_game_key else None)
             if j.get("lang"):  # promoted, it issues joins in the same language
                 self.store.set_setting(f"box_lang:{j['game_id']}", j["lang"])
-            self._mirror_box_beacons(j)
+            moved = self._mirror_box_beacons(j)
             self._activate(self.store.game(j["game_id"]) or game, key, 0, lead=False)
             out = self.get_game(j["game_id"])
             self._emit({"type": "game", "game": out})
+            for msg in moved:  # the boxes' places, as a GM placing them would send (BBC-30)
+                self._emit(msg)
             return out
 
-    def _mirror_box_beacons(self, j: dict[str, Any]) -> None:
+    def _mirror_box_beacons(self, j: dict[str, Any]) -> list[dict[str, Any]]:
         """The primary's box-beacon choices from a standby join (keys 19 and 21, BBC-5, BBC-20): promoted, this
-        controller serves the same registry and makes the same joins."""
+        controller serves the same registry and makes the same joins. Answers the ``position`` messages of the
+        boxes whose place changed (key 22, BBC-25), for the caller to emit (BBC-30)."""
         from . import box_beacons
         box_beacons.apply_mirror(self, j["game_id"], j["box_beacon"], j.get("box_beacons"))
-        box_beacons.apply_places(self, j["game_id"], j.get("box_places"))  # key 22 (BBC-25)
+        return box_beacons.apply_places(self, j["game_id"], j.get("box_places"))
 
     def _refresh_standby(self, j: dict[str, Any]) -> dict[str, Any]:
         """A join of the game this controller already follows as a standby, made again by the primary: the
@@ -1443,7 +1446,8 @@ class Controller:
             raise Conflict(f"game {game['id']} is still live here; end it first")
         if j.get("lang"):
             self.store.set_setting(f"box_lang:{j['game_id']}", j["lang"])
-        self._mirror_box_beacons(j)
+        for msg in self._mirror_box_beacons(j):  # only the boxes whose place or level changed (BBC-30)
+            self._emit(msg)
         self._emit({"type": "beacons", "_staff": True})  # api.py BEACONS_CHANGED
         return self.get_game(game["id"])
 

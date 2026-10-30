@@ -2289,6 +2289,37 @@ class ConsoleBrowserTests(unittest.TestCase):
         moved = other.locator(f'[data-testid=field-area] .marker[data-node="{BOX}"]')
         expect(moved).to_have_attribute("style", re.compile(r"left: 2[45](\.\d+)?%"))
 
+    def test_standby_console_moves_the_markers_live_when_the_join_is_made_again(self):
+        """BBC-30: a console open on a standby controller's plan sees a box move at once when the primary's
+        join (key 22) is applied again, without a reload; a box whose place did not change is not touched. (The
+        plan draws the boxes the standby has heard, so box 7 says HELLO to it; box 9 is only in the join.)"""
+        game_key = bytes(range(16))
+
+        def standby_text(places):
+            return join.to_text(join.encode({
+                "kind": "controller", "game_id": 77, "game_key": game_key, "node_id": 2, "controller_id": 1,
+                "channel_hz": 869_525_000, "max_hops": 2, "teams": ["red", "blue"], "mode_id": DOMINATION,
+                "role": "controller", "game_seed": 12345, "params": None, "box_places": places,
+            }, JOIN_KEY))
+
+        def apply(places):
+            r = self.field.http.post("/api/v1/controller/join", json={"text": standby_text(places)})
+            self.assertEqual(r.status_code, 201, r.text)
+
+        apply([[BOX, 0, join.quantize(0.25), join.quantize(0.5)], [9, 0, 65535, 0]])
+        self.field.box_hello()
+        self.assertEqual(self.field.http.put("/api/v1/field/image", headers={"Content-Type": "image/png"},
+                                             content=ICON.read_bytes()).status_code, 200)
+        page = self.console()
+        page.get_by_test_id("tab-field").click()
+        moved = page.locator(f'[data-testid=field-area] .marker[data-node="{BOX}"]')
+        expect(moved).to_have_attribute("style", re.compile(r"left: 25(\.\d+)?%"))
+        page.evaluate("window.__sameDocument = 42")
+        apply([[BOX, 0, join.quantize(0.75), join.quantize(0.2)], [9, 0, 65535, 0]])
+        expect(moved).to_have_attribute("style", re.compile(r"left: 75(\.\d+)?%"))
+        expect(moved).to_have_attribute("style", re.compile(r"top: 2[01](\.\d+)?%"))
+        self.assertEqual(page.evaluate("window.__sameDocument"), 42, "the page reloaded")
+
     def test_field_georeference_two_corners(self):
         """Plan phase 9 (P4R18): the GM gives two corners of the field image a latitude and longitude."""
         page = self.console()

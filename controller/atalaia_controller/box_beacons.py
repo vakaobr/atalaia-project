@@ -263,16 +263,27 @@ def mirror_places(ctrl: "Controller", game_id: int) -> Optional[list[list[int]]]
     return out or None
 
 
-def apply_places(ctrl: "Controller", game_id: int, places: Optional[list[list[int]]]) -> None:
+def apply_places(ctrl: "Controller", game_id: int, places: Optional[list[list[int]]]) -> list[dict[str, Any]]:
     """A standby controller takes the primary's boxes' places from its join (key 22): each listed box is put
     where the primary has it (on the level it has it), replacing the standby's own place for it, and is known
     as a box of the game before it says HELLO. A box not listed keeps what the standby has (a place is never
-    removed on the primary). A join made again refreshes them."""
+    removed on the primary). A join made again refreshes them.
+
+    Returns the ``position`` stream messages (the ones PUT /games/{id}/positions/{node} sends) of the boxes
+    whose place or level changed, for the caller to emit once the game is known to the stream (BBC-30): a
+    console open on this standby moves the markers at once."""
     if not places:
-        return
+        return []
+    before = ctrl.store.positions(game_id)
+    moved = []
     for nid, level, xq, yq in places:
-        ctrl.store.set_position(game_id, nid, joinfmt.dequantize(xq), joinfmt.dequantize(yq), level)
+        x, y = joinfmt.dequantize(xq), joinfmt.dequantize(yq)
+        old = before.get(nid)
+        level = ctrl.store.set_position(game_id, nid, x, y, level)
+        if old is None or (old["x"], old["y"], old["level"]) != (x, y, level):
+            moved.append({"type": "position", "game": game_id, "node_id": nid, "x": x, "y": y, "level": level})
     ctrl.store.set_setting(f"{SETTING_PLACED}{game_id}", json.dumps(sorted(p[0] for p in places)))
+    return moved
 
 
 def apply_mirror(ctrl: "Controller", game_id: int, on: bool, mirrored: Optional[dict[str, Any]]) -> None:
