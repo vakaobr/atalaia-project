@@ -2339,6 +2339,28 @@ ids (`field_player_ids`), clears the make, model and tag of its replicas and
 unlinks its marshal keys; the purge removes readings after the field's
 `default_retention_days` (365).)*
 
+**Amendment 2026-10-30 (decisions LEG-*; the maintainer's lawyer approved
+the position):** the **account** is based on **the contract, Art. 6(1)(b)**,
+not on consent: the first row of the table above ("Account ... Consent
+(Art. 6(1)(a)) ... Explicit at registration") is superseded. Consent stays
+only where it is a real, withdrawable choice: cross-field chrono sharing (a
+`consents` row per field), position sharing in a game (a switch, off by
+default, that ends the sharing when switched off; positions never reach the
+site server, see the 2026-10-19 amendment) and "use my Google/Microsoft name"
+(a round run only when the button is pressed, whose result is kept nowhere).
+`users.gdpr_consent_at` keeps its name and becomes "the time the privacy
+notice was last shown". The `account` consent becomes a **notice record**
+(`notice_records`, migration 0031): which version of the notice was shown at
+sign-up, and later each time it was shown again (information under Art. 13;
+the account then acknowledges it, nothing is withdrawn and nothing is
+blocked); erasure stays one action, `DELETE /api/v1/me`. **Minors:** an
+account is made alone from **16** (the capacity to contract, Civil Code arts.
+123 ff. and 127, not the age of digital consent, Law 58/2019 art. 16, which is
+13); there is no date of birth, only a recorded "I am 16 or older"
+confirmation on the sign-up's notice record; younger players use the field's
+check-in without an account, under the field's own rules for parents or
+guardians.
+
 ---
 
 ### ADR-P4-9: Geo utilities in the script API

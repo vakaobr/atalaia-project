@@ -120,8 +120,8 @@ language and version: `privacy-notice-pt-<version>.md`, `privacy-notice-en-<vers
 is mounted read-only in the server's container (`ATALAIA_PRIVACY_NOTICE_DIR=/privacy-notice`); a file is read at each
 request, so there is nothing to restart, and the files are not in the backups (keep them with `.env`). The server then
 serves it at `https://DOMAIN/privacy` and `GET /api/v1/privacy-notice`. **To change the notice:** add the new files, set
-the new `ATALAIA_PRIVACY_NOTICE_VERSION` in `.env` and run `docker compose up -d`; each account is asked to consent again
-at its next sign-in. Keep the older files: they are the record of what accounts agreed to. A hub (hosted mode) has one
+the new `ATALAIA_PRIVACY_NOTICE_VERSION` in `.env` and run `docker compose up -d`; each account is shown the new notice
+again at its next sign-in (it reads it and confirms; this is information, not consent: accounts rest on the contract). Keep the older files: they are the record of what accounts were shown. A hub (hosted mode) has one
 folder for all its fields.
 
 ## What runs, and what can be reached
@@ -258,8 +258,8 @@ key in Apple's console if the file leaks. The server asks Apple for no `name` or
 *private email relay* and its `form_post` answer are not involved.
 
 A server that has a typo in these settings, or some of a provider's settings and not all, does not start: its log says
-which one. A first login with an unknown provider account makes a **new** account (the consent box beside the
-buttons); the server never links a provider to an existing account by email, which it does not know. An existing
+which one. A first login with an unknown provider account makes a **new** account (the two boxes beside the
+buttons: the notice was read, and 16 or older); the server never links a provider to an existing account by email, which it does not know. An existing
 account (your administrator's, say) links a provider while logged in, with `POST /api/v1/auth/oidc/PROVIDER/start`
 (`{"purpose": "link", "password": "..."}`, Bearer) and registers a passkey with `POST /api/v1/me/passkeys/options` and
 `POST /api/v1/me/passkeys` (server/README.md has the list); the staff page `/staff/account` and the Atalaia app's

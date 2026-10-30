@@ -18,6 +18,7 @@ Put the notice the field adopted here, one Markdown file per language and versio
 (the full notice) as the file's text. The text is the operator's; the server only serves it.
 
 The server shows the files of the current version at `/privacy` and, as JSON, at `GET /api/v1/privacy-notice`. When
-the notice changes, add the new files and raise `ATALAIA_PRIVACY_NOTICE_VERSION`: every account is then asked to
-consent again at its next sign-in (the old files can stay as the record). The folder is mounted read-only in the
+the notice changes, add the new files and raise `ATALAIA_PRIVACY_NOTICE_VERSION`: every account is then shown
+the new notice at its next sign-in, and confirms it saw it (information, not consent: an account rests on the
+contract; the old files can stay as the record). The folder is mounted read-only in the
 server's container; files your own copy of this repository adds here are not committed (`.gitignore`).
