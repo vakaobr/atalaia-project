@@ -36,6 +36,24 @@ async def get(path: str, *, host: str, proto: Optional[str], scheme: str = "http
     return sent[0]["status"], dict(sent[0]["headers"])
 
 
+async def websocket(app: Any, path: str, *, host: str, proto: Optional[str], scheme: str = "ws",
+                    public: Optional[str] = None) -> list[dict[str, Any]]:
+    """Runs a websocket scope through the middleware; returns what was sent to the client."""
+    middleware = HttpsRedirectMiddleware(app, get_public_url=lambda: public)
+    headers = [(b"host", host.encode())] + ([(b"x-forwarded-proto", proto.encode())] if proto else [])
+    sent: list[dict[str, Any]] = []
+
+    async def send(message: dict[str, Any]) -> None:
+        sent.append(message)
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "websocket.connect"}
+
+    await middleware({"type": "websocket", "scheme": scheme, "path": path, "query_string": b"",
+                      "headers": headers}, receive, send)
+    return sent
+
+
 class RedirectTests(unittest.IsolatedAsyncioTestCase):
     async def test_a_request_the_proxy_says_was_plain_http_goes_to_https(self) -> None:
         status, headers = await get("/staff/login", host="tests.example.org", proto="http", query=b"x=1&y=2")
@@ -57,6 +75,34 @@ class RedirectTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_an_odd_host_is_not_made_a_redirect_target(self) -> None:
         self.assertEqual((await get("/x", host="a.example.org/evil", proto="http"))[0], 200)
+
+    async def test_a_websocket_over_plain_http_is_refused_with_1008(self) -> None:
+        """Nothing to redirect on an upgrade: it is closed with 1008 (policy violation) and never reaches the app."""
+        reached: list[str] = []
+
+        async def inner(scope: dict[str, Any], receive: Any, send: Any) -> None:
+            reached.append(scope["type"])
+
+        for name, kwargs in (("proxy says http", dict(host="tests.example.org", proto="http")),
+                             ("public address set", dict(host="evil.example", proto="http",
+                                                         public="https://campo.example.pt"))):
+            with self.subTest(name):
+                sent = await websocket(inner, "/api/v1/stream", **kwargs)
+                self.assertEqual(sent, [{"type": "websocket.close", "code": 1008}])
+        self.assertEqual(reached, [])
+
+    async def test_a_websocket_that_is_not_plain_http_goes_through(self) -> None:
+        for name, kwargs in (("wss through the proxy", dict(host="a.example.org", proto="https", scheme="wss")),
+                             ("no proxy header", dict(host="server:8000", proto=None)),
+                             ("loopback", dict(host="127.0.0.1:8000", proto="http"))):
+            reached: list[str] = []
+
+            async def inner(scope: dict[str, Any], receive: Any, send: Any) -> None:
+                reached.append(scope["type"])
+
+            with self.subTest(name):
+                sent = await websocket(inner, "/api/v1/stream", **kwargs)
+                self.assertEqual((sent, reached), ([], ["websocket"]))
 
 
 if __name__ == "__main__":

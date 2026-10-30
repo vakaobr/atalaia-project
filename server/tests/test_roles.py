@@ -5,18 +5,20 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import io
 import json
 import os
 import subprocess
 import sys
 import time
+import unittest.mock
 import uuid
 from typing import Any
 
 import jwt
 
-from atalaia_server import cli, totp
+from atalaia_server import cli, passwords, totp
 from atalaia_server.models import ROLES
 
 from .base import PASSWORD, SECRET_KEY, SERVER, AppTestCase, next_time
@@ -164,6 +166,133 @@ class ResetTotpTests(AppTestCase):
         self.assertIn("not confirmed", runs[1][2])
         self.assertEqual(runs[2][0], 0)
         self.assertIn("TOTP cleared for 'chefe'", runs[2][1])
+
+
+class SetPasswordTests(AppTestCase):
+    NEW = "correct horse battery 99"
+
+    async def setpw(self, username: str, password: str = NEW, yes: bool = True, typed: str = "",
+                    reason: str = "passwordless admin") -> uuid.UUID:
+        return await cli.set_password(self.settings(), username, password, reason, yes, lambda prompt: typed,
+                                      io.StringIO(), actor="system:operator")
+
+    async def make_passwordless(self, username: str, server_admin: bool = True) -> uuid.UUID:
+        user_id, _, _ = await self.make_user(username, server_admin=server_admin)
+        await self.fetch("UPDATE users SET password_hash = NULL, totp_enabled = false, totp_secret_enc = NULL "
+                         "WHERE id = $1", user_id)
+        return user_id
+
+    async def test_sets_a_password_ends_sessions_and_is_audited(self) -> None:
+        user_id, name, secret = await self.make_user("chefe", server_admin=True)
+        headers = await self.auth(name, secret=secret)
+        other_id, other, _ = await self.make_user("outra")
+        user_id = await self.setpw("Chefe")
+        h = (await self.fetch("SELECT password_hash, totp_enabled FROM users WHERE id = $1", user_id))[0]
+        self.assertTrue(await passwords.verify_password(h["password_hash"], self.NEW))
+        self.assertTrue(h["totp_enabled"])  # the second factor is not touched
+        self.assertEqual((await self.client.get("/api/v1/me", headers=headers)).status_code, 401)
+        self.assertEqual((await self.fetch("SELECT count(*) FROM sessions WHERE user_id = $1 AND revoked_at IS NULL",
+                                           user_id))[0][0], 0)
+        o = (await self.fetch("SELECT password_hash FROM users WHERE id = $1", other_id))[0]
+        self.assertTrue(await passwords.verify_password(o["password_hash"], PASSWORD))
+        audit = await self.fetch("SELECT user_id, details FROM audit_log WHERE action = 'password_set'")
+        self.assertEqual(len(audit), 1)
+        self.assertEqual(audit[0]["user_id"], user_id)
+        details = json.loads(audit[0]["details"])
+        self.assertEqual((details["via"], details["actor"], details["reason"], details["had_password"],
+                          details["sessions_revoked"]), ("cli", "system:operator", "passwordless admin", True, 1))
+        self.assertNotIn(self.NEW, json.dumps(details))
+
+    async def test_a_passwordless_staff_account_can_log_in_afterwards(self) -> None:
+        """The case SR-2 leaves to the operator: no password, no second factor."""
+        user_id = await self.make_passwordless("semsenha")
+        await self.setpw("semsenha")
+        h = (await self.fetch("SELECT password_hash FROM users WHERE id = $1", user_id))[0]
+        self.assertTrue(await passwords.verify_password(h["password_hash"], self.NEW))
+        audit = await self.fetch("SELECT details FROM audit_log WHERE action = 'password_set'")
+        self.assertFalse(json.loads(audit[0]["details"])["had_password"])
+        r = await self.client.post("/api/v1/auth/login", json={"username": "semsenha", "password": self.NEW})
+        self.assertEqual(r.status_code, 200, r.text)
+
+    async def test_refusals_change_nothing(self) -> None:
+        await self.make_user("chefe", server_admin=True)
+        for username, password, yes, typed, reason, message in (
+                ("ninguem", self.NEW, True, "", "x", "no account named 'ninguem'"),
+                ("chefe", "curta", True, "", "x", "at least"),
+                ("chefe", "chefe", True, "", "x", "at least"),
+                ("chefe", self.NEW, False, "outro", "x", "not confirmed"),
+                ("chefe", self.NEW, True, "", "  ", "--reason")):
+            with self.subTest(username=username, message=message):
+                with self.assertRaisesRegex(cli.CommandError, message):
+                    await self.setpw(username, password, yes, typed, reason)
+        h = (await self.fetch("SELECT password_hash FROM users WHERE username = 'chefe'"))[0]
+        self.assertTrue(await passwords.verify_password(h["password_hash"], PASSWORD))
+        self.assertEqual((await self.fetch("SELECT count(*) FROM audit_log WHERE action = 'password_set'"))[0][0], 0)
+
+    async def test_the_api_policy_is_the_one_applied(self) -> None:
+        """A password on the breached list or equal to the username is refused for the reason the API gives."""
+        await self.make_user("chefe", server_admin=True)
+        with unittest.mock.patch.object(passwords, "policy_problem", return_value="password_breached") as policy:
+            with self.assertRaisesRegex(cli.CommandError, "breached"):
+                await self.setpw("chefe")
+        policy.assert_called_once_with(self.NEW, "chefe")
+
+    async def test_an_erased_account_is_refused(self) -> None:
+        user_id, _, _ = await self.make_user("apagada")
+        await self.fetch("UPDATE users SET password_hash = 'DELETED' WHERE id = $1", user_id)
+        with self.assertRaisesRegex(cli.CommandError, "no account named"):
+            await self.setpw("apagada")
+
+    async def test_typing_the_username_confirms(self) -> None:
+        await self.make_user("chefe", server_admin=True)
+        await self.setpw("chefe", yes=False, typed=" Chefe ")
+        h = (await self.fetch("SELECT password_hash FROM users WHERE username = 'chefe'"))[0]
+        self.assertTrue(await passwords.verify_password(h["password_hash"], self.NEW))
+
+    async def test_the_command_asks_and_never_takes_the_password_from_argv(self) -> None:
+        await self.make_user("chefe", server_admin=True)
+        saved = {k: os.environ.get(k) for k in ("ATALAIA_DATABASE_URL", "ATALAIA_SECRET_KEY")}
+        os.environ.update({"ATALAIA_DATABASE_URL": self.database_url, "ATALAIA_SECRET_KEY": SECRET_KEY})
+        base = ["set-password", "--username", "chefe", "--reason", "x", "--yes"]
+        try:
+            runs = []
+            for argv, answers, stdin in (
+                    (base + ["--password", self.NEW], [], ""),
+                    (base + ["--password=" + self.NEW], [], ""),
+                    (base, [self.NEW, "outra coisa"], ""),
+                    (base, ["curta", "curta"], ""),
+                    (["set-password", "--username", "chefe", "--reason", "x", "--password-stdin"], [], self.NEW + "\n"),
+                    (base + ["--password-stdin"], [], self.NEW + "\n"),
+                    (base, [self.NEW, self.NEW], "")):
+                out, err = io.StringIO(), io.StringIO()
+                given = iter(answers)
+                try:
+                    with contextlib.redirect_stderr(io.StringIO()):  # argparse's usage message
+                        code = await asyncio.to_thread(cli.main, argv, io.StringIO(stdin), out, err,
+                                                       ask=lambda p: next(given))
+                except SystemExit as e:  # argparse: an unknown option
+                    code = e.code
+                runs.append((code, out.getvalue(), err.getvalue()))
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        self.assertEqual([r[0] for r in runs[:2]], [2, 2])  # there is no --password option
+        self.assertEqual(runs[2][0], 1)
+        self.assertIn("passwords differ", runs[2][2])
+        self.assertEqual(runs[3][0], 1)
+        self.assertIn("at least", runs[3][2])
+        self.assertEqual(runs[4][0], 2)
+        self.assertIn("needs --yes", runs[4][2])
+        self.assertEqual(runs[5][0], 0)
+        self.assertEqual(runs[6][0], 0)
+        self.assertEqual(runs[6][2], "")
+        self.assertIn("Password set for 'chefe'", runs[6][1])
+        for _, o, e in runs:
+            self.assertNotIn(self.NEW, o + e)
+        self.assertEqual((await self.fetch("SELECT count(*) FROM audit_log WHERE action = 'password_set'"))[0][0], 2)
 
 
 def _run_create_admin(env: dict[str, str]) -> dict[str, Any]:

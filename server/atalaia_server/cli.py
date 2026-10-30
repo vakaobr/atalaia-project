@@ -5,6 +5,7 @@
     python -m atalaia_server create-admin --username NAME [--email EMAIL] [--password-stdin] [--field SLUG]
     python -m atalaia_server create-admin --username NAME --generate FILE
     python -m atalaia_server reset-totp --username NAME --reason TEXT [--yes] [--field SLUG]
+    python -m atalaia_server set-password --username NAME --reason TEXT [--yes] [--password-stdin] [--field SLUG]
     python -m atalaia_server demo load|reset
     python -m atalaia_server demo live [--key-out FILE] [--keep N] [--reset]
     python -m atalaia_server demo reviewer --username NAME --out FILE
@@ -39,6 +40,14 @@ and the privileged roles' powers wait for it) and enrols a new secret (``/auth/t
 asks for the username to be typed again unless ``--yes`` is given, and refuses an unknown account, or one with no
 TOTP to clear. The server keeps no recovery codes and no remembered devices: the secret is all there is. In hosted
 mode it needs ``--field SLUG``, as ``create-admin`` does.
+
+``set-password`` gives an existing account a password, or replaces it (decision SP-1): the way out for a passwordless
+staff account with no second factor, which cannot change its login methods until it has one (SR-2, ``step_up_needed``).
+The password is never an argument (it would land in the shell history and ``ps``): it is asked for twice without echo,
+or read from the first line of standard input with ``--password-stdin`` (which needs ``--yes``: standard input is
+taken). It must pass the same policy as the API (``passwords.policy_problem``). Like ``reset-totp`` it asks for the
+username to be typed again unless ``--yes``, revokes every session of the account, writes ``password_set`` to the audit
+log (never the password) and takes ``--field SLUG`` in hosted mode. TOTP and passkeys are not touched.
 
 ``purge`` runs the retention purge (ADR-P4-8) once and prints what it
 deleted (``--dry-run``: what it would delete). The server runs it by itself
@@ -120,6 +129,16 @@ async def create_admin(settings: Settings, username: str, email: Optional[str], 
         await engine.dispose()
 
 
+def _check_password_policy(password: str, username: str) -> None:
+    """Raises ``CommandError`` when the password fails the policy the API applies (``passwords.policy_problem``)."""
+    problem = passwords.policy_problem(password, username)
+    if problem:
+        raise CommandError({"password_too_short": f"the password needs at least {passwords.MIN_LENGTH} characters",
+                            "password_too_long": f"the password may have at most {passwords.MAX_LENGTH} characters",
+                            "password_is_username": "the password may not be the username",
+                            "password_breached": "that password is on the list of breached passwords"}[problem])
+
+
 async def _create_admin(settings: Settings, engine: Any, username: str, email: Optional[str], password: str,
                         read_code: Callable[[str, str], str], out: TextIO, clock: Callable[[], float]) -> uuid.UUID:
     username = username.strip().lower()
@@ -131,12 +150,7 @@ async def _create_admin(settings: Settings, engine: Any, username: str, email: O
                            "starting with a letter or digit")
     if email is not None and not EMAIL.fullmatch(email):
         raise CommandError("that email address is not valid")
-    problem = passwords.policy_problem(password, username)
-    if problem:
-        raise CommandError({"password_too_short": f"the password needs at least {passwords.MIN_LENGTH} characters",
-                            "password_too_long": f"the password may have at most {passwords.MAX_LENGTH} characters",
-                            "password_is_username": "the password may not be the username",
-                            "password_breached": "that password is on the list of breached passwords"}[problem])
+    _check_password_policy(password, username)
     maker = make_sessionmaker(engine, hosted=settings.hosted)
     async with maker() as db:
         if await db.scalar(select(User.id).where(User.username == username)) is not None:
@@ -218,6 +232,55 @@ async def reset_totp(settings: Settings, username: str, reason: str, assume_yes:
                 await db.commit()
                 print(f"TOTP cleared for {username!r} ({user.id}); {revoked} session(s) revoked. "
                       f"It enrols a new secret at the next login.", file=out)
+                return user.id
+    except tenancy.TenantError as e:
+        raise CommandError(str(e)) from None
+    finally:
+        await engine.dispose()
+
+
+async def set_password(settings: Settings, username: str, password: str, reason: str, assume_yes: bool,
+                       confirm: Callable[[str], str], out: TextIO, field: Optional[str] = None,
+                       actor: Optional[str] = None) -> uuid.UUID:
+    """Sets an existing account's password, revokes its sessions and audits it (decision SP-1); returns its id.
+    The password is checked against the API's policy before anything is touched. Asks for the username again unless
+    ``assume_yes``. In hosted mode ``field`` is required."""
+    if settings.hosted != (field is not None):
+        raise CommandError("--field SLUG names the field in hosted mode (ATALAIA_HOSTED=on) and only there")
+    username = username.strip().lower()
+    reason = reason.strip()
+    if not reason:
+        raise CommandError("--reason says why (it goes in the audit log)")
+    if not settings.password_login:
+        raise CommandError("password login is off (ATALAIA_PASSWORD_LOGIN=off): a password would not be usable")
+    _check_password_policy(password, username)
+    engine = make_engine(settings)
+    try:
+        tenant = None
+        if field is not None:
+            tenant = await tenancy.lookup(engine, tenancy.check_slug(field))
+            if tenant is None:
+                raise CommandError(f"no field {field!r} on this hub")
+        with tenancy.use(tenant):
+            async with make_sessionmaker(engine, hosted=settings.hosted)() as db:
+                user = await db.scalar(select(User).where(User.username == username).with_for_update())
+                if user is None or user.password_hash == personal_data.ERASED_PASSWORD:
+                    raise CommandError(f"no account named {username!r}")
+                if not assume_yes:
+                    print(f"This sets {username!r}'s password and signs the account out everywhere.", file=out)
+                    if confirm("Type the username to confirm: ").strip().lower() != username:
+                        raise CommandError("not confirmed: nothing was changed")
+                had_password = user.password_hash is not None
+                user.password_hash = await passwords.hash_password(password)
+                revoked = (await db.execute(update(UserSession).where(
+                    UserSession.user_id == user.id, UserSession.revoked_at.is_(None))
+                    .values(revoked_at=func.now(), mfa=False))).rowcount
+                record(db, "password_set", None, user_id=user.id, resource="user", resource_id=user.id,
+                       details={"via": "cli", "actor": actor or hosted.default_actor(), "reason": reason,
+                                "had_password": had_password, "sessions_revoked": revoked,
+                                "server_admin": user.server_admin})
+                await db.commit()
+                print(f"Password set for {username!r} ({user.id}); {revoked} session(s) revoked.", file=out)
                 return user.id
     except tenancy.TenantError as e:
         raise CommandError(str(e)) from None
@@ -432,6 +495,14 @@ def _parser() -> argparse.ArgumentParser:
     rt.add_argument("--reason", required=True, help="why (goes in the audit log)")
     rt.add_argument("--yes", action="store_true", help="do not ask for the username to be typed again")
     rt.add_argument("--field", help="hosted mode: the field (slug) the account belongs to")
+    sp = sub.add_parser("set-password", allow_abbrev=False,
+                        help="set an existing account's password (asked for, never an argument), sign it out")
+    sp.add_argument("--username", required=True)
+    sp.add_argument("--reason", required=True, help="why (goes in the audit log)")
+    sp.add_argument("--yes", action="store_true", help="do not ask for the username to be typed again")
+    sp.add_argument("--password-stdin", action="store_true",
+                    help="read the password from the first line of standard input (needs --yes)")
+    sp.add_argument("--field", help="hosted mode: the field (slug) the account belongs to")
     demo = sub.add_parser("demo", help="the preview deployment's demo data (decisions PV-*)")
     dsub = demo.add_subparsers(dest="action", required=True)
     dsub.add_parser("load", help="make the demo data or bring it up to date (idempotent)")
@@ -666,6 +737,23 @@ def main(argv: Optional[list[str]] = None, stdin: TextIO = sys.stdin, out: TextI
     if args.command == "reset-totp":
         try:
             asyncio.run(reset_totp(settings, args.username, args.reason, args.yes, confirm, out, field=args.field))
+        except (CommandError, EOFError) as e:
+            print(f"atalaia_server: {e or 'not confirmed: nothing was changed'}", file=err)
+            return 1
+        return 0
+    if args.command == "set-password":
+        if args.password_stdin and not args.yes:
+            print("atalaia_server: --password-stdin needs --yes (standard input carries the password)", file=err)
+            return 2
+        try:
+            if args.password_stdin:
+                password = stdin.readline().rstrip("\r\n")
+            else:
+                password = ask("New password: ")
+                if ask("New password again: ") != password:
+                    raise CommandError("the passwords differ")
+            asyncio.run(set_password(settings, args.username, password, args.reason, args.yes, confirm, out,
+                                     field=args.field))
         except (CommandError, EOFError) as e:
             print(f"atalaia_server: {e or 'not confirmed: nothing was changed'}", file=err)
             return 1

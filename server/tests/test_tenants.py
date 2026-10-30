@@ -546,6 +546,25 @@ class SurfaceTests(HubCase):
                          1)
         self.assertEqual(len(await self.sql(self.tb, "SELECT 1 FROM users WHERE username = 'chefe-a'")), 0)
 
+    async def test_set_password_is_scoped_to_the_field(self) -> None:
+        """SP-1: ``set-password`` needs ``--field`` in hosted mode and touches only that field's account."""
+        await self.user(self.ta, "sp-marta")
+        await self.user(self.tb, "sp-marta")
+        new = "a long new passphrase 42"
+        with self.assertRaises(cli.CommandError):
+            await cli.set_password(self.settings(), "sp-marta", new, "x", True, input, io.StringIO())
+        with self.assertRaises(cli.CommandError):
+            await cli.set_password(self.settings(), "sp-marta", new, "x", True, input, io.StringIO(), field="campo-z")
+        user_id = await cli.set_password(self.settings(), "sp-marta", new, "no password", True, input, io.StringIO(),
+                                         field="campo-a", actor="system:operator")
+        row_a = (await self.sql(self.ta, "SELECT id, password_hash FROM users WHERE username = 'sp-marta'"))[0]
+        row_b = (await self.sql(self.tb, "SELECT password_hash FROM users WHERE username = 'sp-marta'"))[0]
+        self.assertEqual(row_a["id"], user_id)
+        self.assertTrue(await passwords.verify_password(row_a["password_hash"], new))
+        self.assertTrue(await passwords.verify_password(row_b["password_hash"], PASSWORD))
+        self.assertEqual(len(await self.sql(self.ta, "SELECT 1 FROM audit_log WHERE action = 'password_set'")), 1)
+        self.assertEqual(len(await self.sql(self.tb, "SELECT 1 FROM audit_log WHERE action = 'password_set'")), 0)
+
 
 # Row-level security and the fields' database roles, directly as the server's login role ---------------------
 
