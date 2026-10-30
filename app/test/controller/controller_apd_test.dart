@@ -205,7 +205,7 @@ void main() {
         'checkin': true,
         'accepted': ['apd-b'],
       });
-      checkIn(gid, {'apd_id': 'apd-a', 'membership_number': '123'});
+      checkIn(gid, {'apd_id': 'apd-a', 'membership_number': 'MN-70518'});
       expect(row(gid)['status'], 'pending');
       final logged = <String>[];
       svc.audit = logged.add;
@@ -222,7 +222,7 @@ void main() {
       expect(logged, hasLength(1));
       expect(logged.single, contains(pid));
       expect(logged.single, contains('not_accepted'));
-      expect(logged.single, isNot(contains('123')));
+      expect(logged.single, isNot(contains('70518')));
     },
   );
 
