@@ -3273,3 +3273,11 @@ The operator's set-password command (SR-2 lockout).
 | # | Question | Answer chosen | Why | Status |
 | --- | --- | --- | --- | --- |
 | SP-1 | How does an operator unblock a passwordless staff account with no second factor (SR-2)? | `set-password --username NAME --reason TEXT [--yes] [--password-stdin] [--field SLUG]`: no-echo prompt twice (or one stdin line, needs --yes), no argv option, the API's policy_problem, all sessions revoked, password_set audit row, --field in hosted mode; refuses unknown/erased accounts and password login off; TOTP and passkeys untouched. | Same pattern as reset-totp (S11-7); a password in argv leaks to shell history and ps. | built (2026-10-30); open for the maintainer's review |
+
+## The pentest stack's field health check (PT-H-1, 2026-10-30)
+
+The field container of the local pentest stack now reports its health.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| PT-H-1 | Where does the pentest field container's health check live? | Compose healthcheck on the field service (tools/pentest_stack.py), GET http://127.0.0.1:8080/healthz. | fake-idp already uses one; the demo image's inherited :8001 check is overridden. | built (2026-10-30); open for the maintainer's review |
