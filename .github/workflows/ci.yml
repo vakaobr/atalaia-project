@@ -305,7 +305,6 @@ jobs:
     # times Linux's on a private repository (free on a public one, as now), and
     # Dart changes cannot break iOS without flutter-test seeing it. Make it run
     # on pull requests too by dropping the `if`.
-    if: github.event_name == 'push'
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
