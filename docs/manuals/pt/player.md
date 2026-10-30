@@ -139,7 +139,7 @@ A app **acompanha** o jogo. Capturas as caixas **na caixa**, não no telemóvel.
    - **Pontuação**: um cartão por equipa. A tua equipa tem uma margem grossa. Toca no cartão de uma equipa para destacar a tua, se ainda não tens equipa;
    - **Objetivos**: cada caixa e quem a tem (**Da equipa** *(equipa)* ou **De ninguém**);
    - **Vidas**, quando o modo conta vidas, e as equipas eliminadas;
-   - **O que aconteceu**: os últimos 30 acontecimentos, por palavras.
+   - **O que aconteceu**: os últimos 30 acontecimentos, por palavras. Caixas e módulos a ligar, a desligar ou a confirmar a configuração, leituras de etiquetas, acertos em alvos e avisos de bateria não aparecem: não dizem nada sobre o jogo.
 3. Se vires **Sem ligação. A voltar a ligar…**, estás fora do alcance do Wi-Fi. O jogo continua mesmo que não estejas a ver. A app volta a ligar-se sozinha.
 
 ![A vista de quem joga: o nome do jogo e o tempo para o fim, dois cartões de equipa com pontos, as caixas e quem as tem, e o que aconteceu](../../../site/img/screens/app-player-pt.png)
@@ -277,7 +277,7 @@ Alguns campos deixam-te inscrever num jogo no site deles, com uma conta.
 
 Não partilhes o bilhete. Quem o tiver pode fazer o check-in no teu lugar. Podes alterar ou cancelar uma inscrição enquanto estiver aberta: **Alterar a inscrição** ou **Cancelar a inscrição**. O campo apaga os dados da inscrição 30 dias depois do jogo.
 
-**O teu histórico de jogos.** Depois de entrares, toca em **Histórico de jogos** para ver os jogos em que participaste, do mais recente para o mais antigo. Toca num jogo para ver as pontuações, a equipa vencedora e os teus eventos. A app não guarda nada: pergunta ao site de cada vez.
+**O teu histórico de jogos.** Depois de entrares, toca em **Histórico de jogos** para ver os jogos em que participaste, do mais recente para o mais antigo. Toca num jogo para ver as pontuações, a equipa vencedora e os teus eventos. A app não guarda nada: pergunta ao site de cada vez. Os mesmos acontecimentos de rotina também ficam de fora da lista de um jogo aí.
 
 **As tuas formas de entrar.** Depois de entrares, toca em **Formas de entrar na conta** para ligar ou desligar Google, Microsoft ou Apple, juntar, mudar o nome ou remover chaves de acesso, definir, mudar ou remover a palavra-passe e ligar ou desligar o código de autenticação. A conta fica sempre com pelo menos uma forma de entrar, e a app diz por palavras quando uma coisa é recusada. Uma conta com palavra-passe pede-a no topo do ecrã antes de cada alteração; uma conta sem ela pede primeiro uma confirmação com um código de autenticação, uma chave de acesso ou o fornecedor, e depois repete-se a ação. Se uma entrada social abre o navegador do telemóvel mas nunca volta à app, o site ainda não foi preparado para a app: usa a palavra-passe e avisa a organização.
 

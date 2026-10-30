@@ -139,7 +139,7 @@ The app **follows** the game. You capture boxes **at the box**, not on the phone
    - **Score**: one card per team. Your team has a thick border. Tap a team card to highlight your team if you have none;
    - **Objectives**: each box and who holds it (**Held by** *(team)* or **Held by nobody**);
    - **Lives**, when the mode counts lives, and eliminated teams;
-   - **What happened**: the last 30 events, in words. Boxes and pods coming online, going offline or confirming their setup do not appear: they mean nothing in the game.
+   - **What happened**: the last 30 events, in words. Boxes and pods coming online, going offline or confirming their setup do not appear, and neither do tag scans, target hits and battery warnings: they mean nothing in the game.
 3. If you see **Offline. Reconnecting…**, you are out of Wi-Fi range. The game goes on without you looking. The app reconnects by itself.
 
 ![The player's view: the game's name and time to go, two team cards with points, the boxes and who holds them, and what happened](../../../site/img/screens/app-player-en.png)
@@ -277,7 +277,7 @@ Some fields let you register for a game on their site, with an account.
 
 Do not share the ticket. Whoever has it can check in in your place. You can change or cancel a registration while it is open: **Change your registration** or **Cancel the registration**. The field erases your registration data 30 days after the game.
 
-**Your game history.** After you log in, tap **Game history** to see the games you played, newest first. Tap a game for its scores, the winner and your own events. The app keeps nothing: it asks the site each time.
+**Your game history.** After you log in, tap **Game history** to see the games you played, newest first. Tap a game for its scores, the winner and your own events. The app keeps nothing: it asks the site each time. The same housekeeping events are left out of a game's list there too.
 
 **Your login methods.** After you log in, tap **Ways to log in to the account** to link or unlink Google, Microsoft or Apple, add, rename or remove passkeys, set, change or remove your password, and turn the authenticator code on or off. The account keeps at least one way to log in, and the app tells you in words when something is refused. An account with a password asks for it at the top of the screen before each change; an account without one asks you to confirm first with an authenticator code, a passkey or the provider, then repeat the action. If a social login opens the phone's browser but never comes back to the app, the site was not set up for the app yet: use the password, and tell the organisers.
 

@@ -399,7 +399,7 @@ The **Log and alerts** page lists events as they come: captures, bombs, codes, k
 ### Codes
 
 - **Game codes.** The **Codes** modifier, *Bomb*'s team codes and the *Hacking Terminal*'s code are secret to teams. You see them. The log shows who used each code and which team held the box. A solved terminal shows the code it revealed.
-- **Access codes.** The GM and read-only codes come from `python3 -m atalaia_controller tokens`. Players never get the GM code.
+- **Access codes.** The GM and read-only codes come from `python3 -m atalaia_controller tokens`. Players never get the GM code. The codes no longer appear in the controller's log (the console sends them in a header, not in the address); if you shared a log from before this change, delete the generated codes so new ones are made, or set new `gm_token` and `read_token` values in the controller's `[api]` settings, so the old codes stop working.
 
 ### Field map and scoreboard
 

@@ -399,7 +399,7 @@ A página **Registo e alertas** lista os acontecimentos à medida que chegam: ca
 ### Códigos
 
 - **Códigos de jogo.** O modificador **Códigos**, os códigos de equipa da *Bomba* e o código do *Hackeia o terminal* são segredos das equipas. Tu vês-los. O registo mostra quem usou cada código e que equipa tinha a caixa. Um terminal resolvido mostra o código que revelou.
-- **Códigos de acesso.** Os códigos da organização e só de leitura saem de `python3 -m atalaia_controller tokens`. Quem joga nunca recebe o código da organização.
+- **Códigos de acesso.** Os códigos da organização e só de leitura saem de `python3 -m atalaia_controller tokens`. Quem joga nunca recebe o código da organização. Os códigos já não aparecem no registo do controlador (a consola envia-os num cabeçalho, não no endereço); se partilhaste um registo anterior a esta alteração, apaga os códigos gerados ou define novos `gm_token` e `read_token` na secção `[api]` das definições do controlador, para que os antigos deixem de funcionar.
 
 ### Mapa do campo e marcador
 
