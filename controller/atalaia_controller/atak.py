@@ -66,6 +66,7 @@ import logging
 import math
 import re
 import socket
+import ssl
 import threading
 import time
 import xml.etree.ElementTree as ET
@@ -84,6 +85,7 @@ log = logging.getLogger("atalaia.atak")
 
 DEFAULT_MULTICAST = "239.2.3.1:6969"  # ATAK's SA multicast group (ADR-P4-7)
 DEFAULT_STAFF_PORT = 4242             # ATAK's TCP point-to-point input (ADR-P4-7)
+DEFAULT_STAFF_TLS_PORT = 8089         # ATAK's SSL input (TAK's streaming port)
 STAFF_ENDPOINTS_MAX = 8
 XML_DECL = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n"  # as in takcot/examples
 DATAGRAM_MAX = 1400                   # bytes: one event per datagram, under a Wi-Fi MTU
@@ -391,6 +393,33 @@ def check_config(cfg: "Config") -> None:
         parse_endpoint(ep, DEFAULT_STAFF_PORT)
     if not 1.0 <= cfg.atak_interval_s <= 3600.0:
         raise AtakConfigError("atak.interval_s must be 1-3600 seconds")
+    if cfg.atak_staff_tls:
+        if not cfg.atak_staff_tls_ca:
+            raise AtakConfigError("atak.staff_tls needs atak.staff_tls_ca (the CA the devices' TLS input "
+                                  "presents; TLS is never used without checking it)")
+        staff_tls_context(cfg)  # the files are read now: a bad path stops the start, not the first cycle
+    elif cfg.atak_staff_tls_ca or cfg.atak_staff_tls_cert or cfg.atak_staff_tls_key:
+        raise AtakConfigError("atak.staff_tls_ca, staff_tls_cert and staff_tls_key need atak.staff_tls = true")
+    if bool(cfg.atak_staff_tls_cert) != bool(cfg.atak_staff_tls_key):
+        raise AtakConfigError("atak.staff_tls_cert and atak.staff_tls_key go together")
+
+
+def staff_tls_context(cfg: "Config") -> ssl.SSLContext:
+    """TLS to the staff ATAK devices (FLD-5): TLS 1.2 or later, only the configured CA trusted, the
+    controller's client certificate when there is one. The host name is not checked: the devices' own
+    certificates are made for a TAK server name, not for the address the controller dials, so the pinned
+    CA is the trust anchor."""
+    try:
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_REQUIRED
+        ctx.load_verify_locations(cafile=cfg.atak_staff_tls_ca)
+        if cfg.atak_staff_tls_cert:
+            ctx.load_cert_chain(cfg.atak_staff_tls_cert, cfg.atak_staff_tls_key)
+    except (OSError, ssl.SSLError) as exc:
+        raise AtakConfigError(f"atak.staff_tls_*: {exc}") from None
+    return ctx
 
 
 class UdpSender:
@@ -413,10 +442,14 @@ class UdpSender:
 
 
 class TcpSender:
-    """Staff ATAK devices: one connection per endpoint and cycle, the events one after another."""
+    """Staff ATAK devices: one connection per endpoint and cycle, the events one after another; over TLS
+    with ``context`` (``staff_tls_context``)."""
 
-    def __init__(self, endpoints: list[str], timeout: float = TCP_TIMEOUT_S) -> None:
-        self.endpoints = [parse_endpoint(e, DEFAULT_STAFF_PORT) for e in endpoints]
+    def __init__(self, endpoints: list[str], timeout: float = TCP_TIMEOUT_S,
+                 context: Optional[ssl.SSLContext] = None) -> None:
+        self.context = context
+        self.endpoints = [parse_endpoint(e, DEFAULT_STAFF_TLS_PORT if context else DEFAULT_STAFF_PORT)
+                          for e in endpoints]
         self.timeout = timeout
 
     def send(self, events: list[bytes]) -> tuple[int, list[str]]:
@@ -426,8 +459,12 @@ class TcpSender:
         payload = b"".join(events)
         for host, port in self.endpoints:
             try:
-                with socket.create_connection((host, port), timeout=self.timeout) as s:
-                    s.sendall(payload)
+                with socket.create_connection((host, port), timeout=self.timeout) as raw:
+                    if self.context is None:
+                        raw.sendall(payload)
+                    else:
+                        with self.context.wrap_socket(raw, server_hostname=host) as s:
+                            s.sendall(payload)
                 sent += len(events)
             except OSError as exc:
                 errors.append(f"{host}:{port}: {exc}")
@@ -452,8 +489,13 @@ class AtakEmitter:
         # emitter sends after that), so building an emitter that never runs leaks nothing.
         self._udp_given = udp
         self.udp: Optional[Any] = udp
-        self.tcp = tcp if tcp is not None else (TcpSender(cfg.atak_staff_endpoints)
-                                                if cfg.atak_staff_endpoints else None)
+        self.tcp = tcp if tcp is not None else (
+            TcpSender(cfg.atak_staff_endpoints,
+                      context=staff_tls_context(cfg) if cfg.atak_staff_tls else None)
+            if cfg.atak_staff_endpoints else None)
+        if cfg.atak_players and cfg.atak_staff_endpoints and not cfg.atak_staff_tls:
+            log.warning("[atak] players = true without staff_tls: every player's position crosses the "
+                        "network to %s in the clear; use staff_tls, or a wired or VPN link", cfg.atak_staff_endpoints)
         # The site server's stream (remote_gm.RemoteGm) with [atak] remote = true: push_cot(events) queues the
         # events while the site server relays them; on a new socket it asks for the whole picture again.
         self.remote = remote if cfg.atak_remote else None
@@ -890,6 +932,7 @@ class AtakEmitter:
     def status(self) -> dict[str, Any]:
         return {"enabled": True, "multicast": self.cfg.atak_multicast or None,
                 "staff_endpoints": len(self.cfg.atak_staff_endpoints), "players": bool(self.cfg.atak_players),
+                "staff_tls": bool(self.cfg.atak_staff_tls),
                 "interval_s": self.cfg.atak_interval_s, "markers": len(self._markers),
                 "remote": self.remote is not None, "remote_players": self._remote_players_on(),
                 "remote_relay": bool(self.remote is not None and self.remote.atak_relay), **self.stats}

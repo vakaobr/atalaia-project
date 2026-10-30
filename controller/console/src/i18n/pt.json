@@ -14,6 +14,7 @@
     "token": "Código de acesso (da organização ou só de leitura)",
     "enter": "Entrar",
     "bad": "Código de acesso errado.",
+    "use_https": "O código não é enviado por HTTP simples. Abre a consola em {url} (o navegador pede uma vez para confiar no certificado do campo).",
     "expired": "O código de acesso deixou de ser aceite. Volta a entrar.",
     "hint": "O controlador mostra os códigos com: python3 -m atalaia_controller tokens",
     "readonly": "Só leitura",

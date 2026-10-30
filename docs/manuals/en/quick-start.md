@@ -21,7 +21,7 @@ One page for game day. In Portuguese: [Início rápido](../pt/quick-start.md). E
 ## If you run the game
 
 1. Start the field controller (a Raspberry Pi with its USB modem, or the app's **Field controller** on Android). Get the **GM code**: `python3 -m atalaia_controller tokens`.
-2. Open `http://` *controller address* `:8080/console/`. Type the GM code.
+2. Open `https://` *controller address* `:8443/console/` (accept the field's own certificate once). Type the GM code.
 3. Once: **Settings** › choose the radio channel. **Adopt** the new boxes. **Check-in** › **Print the poster** and put it up.
 4. **Game** › name, mode, teams, duration › **Create game**.
 5. **Invite boxes**: tick them, give roles, **Invite**. Wait for **Ready to start**.

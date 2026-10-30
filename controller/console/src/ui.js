@@ -228,6 +228,25 @@ export class ApiError extends Error {
 }
 
 /** Calls the controller's REST API v1 with the token. Returns the JSON answer. */
+/**
+ * Where the console must go to send a token: the HTTPS address of this page's host, or null when the page is
+ * already on HTTPS or on the controller's own loopback address, or this controller has no HTTPS (FLD-4: the
+ * controller refuses the GM token over plain HTTP from another machine, so it is not even sent).
+ */
+export async function httpsAddress() {
+    const { protocol, hostname } = window.location;
+    if (protocol !== 'http:' || ['localhost', '127.0.0.1', '[::1]'].includes(hostname)) return null;
+    try {
+        const r = await fetch('/api/v1/controller/https', { cache: 'no-store' });
+        if (!r.ok) return null;
+        const { port } = await r.json();
+        if (!port) return null;
+        return `https://${hostname}${port === 443 ? '' : `:${port}`}/console/`;
+    } catch (e) {
+        return null;
+    }
+}
+
 export async function api(token, method, path, body, raw) {
     const headers = { Authorization: `Bearer ${token}` };
     let payload;

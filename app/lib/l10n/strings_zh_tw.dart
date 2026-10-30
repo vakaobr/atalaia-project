@@ -815,7 +815,8 @@ const Map<String, String> zhTwStrings = {
   'ctl.battery_ask': '申請豁免',
   'ctl.network': '場地網路',
   'ctl.open': '在場地 Wi-Fi 上開放',
-  'ctl.open_on': '手機、電腦和遊戲道具透過 HTTPS（埠 8443，使用場地的 CA）和 MQTT（埠 1883）連線。',
+  'ctl.open_on':
+      '手機、電腦和遊戲道具透過 HTTPS（埠 8443，使用場地的 CA）和 TLS 加密的 MQTT（埠 8883，同一個 CA）連線。',
   'ctl.open_off': '只有這支手機能連到控制器：網路上沒有任何服務在監聽。',
   'ctl.addresses': '在場地網路上的電腦開啟控制台：',
   'ctl.no_address': '這支手機沒有連上任何 Wi-Fi 網路：請開啟它的熱點，或加入場地的網路。',

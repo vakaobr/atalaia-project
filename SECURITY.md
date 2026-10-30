@@ -29,6 +29,20 @@ What to do about it today, by risk:
 - **Locking a tag read-only does not stop copying**: a locked tag can still be read. It stops a player overwriting or blanking a tag, so it is worth doing for tags that will not be rewritten (a lock cannot be undone, so not for tags you reuse from game to game). The Atalaia tag writer does not lock tags yet: it writes a tag for each game, and a lock would make the tag a one-game item. Lock them with an NFC app if you want it.
 - **Binding a tag to its chip** is the real fix: an NTAG 424 DNA chip signs each read with a counter and its own key (secure unique NFC messages), so a copy of the bytes is useless. It needs those chips (about three times the price of an NTAG213), a reader that can talk to them (the PN532 can, with more firmware work) and a way to provision per-tag keys. That is a design decision for the maintainer (FLD-6, decision SR-44), not built.
 
+## The field controller on the network
+
+The controller's own network surface, as hardened after a security review (decisions SR-50 to SR-59 in `docs/review/decisions-to-review.md`):
+
+- **Tokens go over HTTPS.** With HTTPS on (the default), the GM token and players' tokens are refused on plain HTTP from any address but the controller's own loopback; the read token may read there, for the scoreboard. The check-in poster's and the CA fetch's requests carry no token and stay on HTTP. The GM console works on `https://<controller>:8443/console/`; the browser trusts the field CA once. A field on a closed network it controls can set `[api] http_tokens = true`.
+- **HSTS** is sent on TLS answers only (never on the field's plain-HTTP listener); behind a TLS-ending proxy set `[api] trusted_proxy = true`.
+- **Bodies are capped** before they are parsed: 64 KiB for JSON, more only on upload routes ([controller README](controller/README.md#https-and-the-field-ca)).
+- **MQTT.** Plain MQTT (1883) listens on the Pi's loopback only; scoreboards and GM tools on the field's network use TLS on 8883 with the field CA. Boxes and Android props do not use MQTT.
+- **ATAK.** Multicast never carries player positions. `players = true` sends every player's position to the staff devices; use `[atak] staff_tls` (or the remote relay, which is TLS with client certificates), or a wired or VPN link: without TLS they cross the field's network readable.
+- **Signed modes.** Revocation fails closed and is fetched again before every install and upload; an offline field keeps the last revocation list for `[modes] revocation_max_age_days` (30) and then installs nothing signed; `[modes] min_versions` sets a floor per mode.
+- **The service** runs with `NoNewPrivileges`, `ProtectSystem=strict` (only `/var/lib/atalaia` writable), `ProtectHome`, `PrivateTmp`, restricted socket families, no capabilities and only the serial devices it opens ([controller/deploy/atalaia-controller.service](controller/deploy/atalaia-controller.service)).
+
+Not covered here yet: the phone controller's ATAK feed has no TLS option (use the remote relay or a wired link), and its signed-mode revocation (`controller_signed_modes.dart`) still behaves as the Pi's did before: a missing `revoked.json` counts as none and an upload uses the cached index.
+
 ## In scope
 
 Game integrity matters as much as data security. Issues such as forged Skirmesh-RF packets, replayed events, players seeing enemy positions, or editable chrono records are all in scope.

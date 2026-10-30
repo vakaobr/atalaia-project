@@ -55,7 +55,7 @@ Ainda não testado num campo: nenhum Raspberry Pi com um modem a sério e caixas
    `python3 -m atalaia_controller join-key`
    É o segredo-mestre do campo. As caixas recebem-na uma vez, quando as adotas ([secção 4](#adota-as-caixas)). Dá-a só a quem é da organização e é de confiança.
 
-No primeiro arranque o controlador cria o **certificado** do próprio campo e serve HTTPS na porta 8443, ao lado do HTTP simples na porta 8080. O cartaz de check-in leva a impressão digital dele, para os telemóveis de quem joga verificarem que falam com o teu controlador.
+No primeiro arranque o controlador cria o **certificado** do próprio campo e serve HTTPS na porta 8443, ao lado do HTTP simples na porta 8080. O cartaz de check-in leva a impressão digital dele, para os telemóveis de quem joga verificarem que falam com o teu controlador. O código da organização, e os códigos de quem joga, só são aceites por HTTPS: ninguém no Wi-Fi os consegue ler no ar.
 
 ### Num telemóvel Android
 
@@ -82,7 +82,7 @@ Os telemóveis de quem joga, a consola e os dispositivos de jogo Android usam to
 
 ## 3. Abre a consola da organização
 
-1. Num telemóvel ou portátil no Wi-Fi do campo, abre `http://` *o endereço do controlador* `:8080/console/`. Por exemplo `http://192.168.4.1:8080/console/`.
+1. Num telemóvel ou portátil no Wi-Fi do campo, abre `https://` *o endereço do controlador* `:8443/console/`. Por exemplo `https://192.168.4.1:8443/console/`. Da primeira vez, o navegador avisa que não conhece o certificado: é o do próprio campo (a impressão digital está no cartaz de check-in). Aceita-o uma vez, ou instala-o a partir de `http://` *o endereço do controlador* `:8080/api/v1/controller/ca`. Se abrires antes a página simples `http://…:8080/console/`, a consola não envia o código: mostra o endereço https a usar.
    Na app Atalaia também podes tocar em **Organização**, escrever o endereço do controlador em **Endereço da consola** e tocar em **Abrir a consola**.
 2. Escreve o **Código de acesso (da organização ou só de leitura)** e toca em **Entrar**. A consola lembra-se dele. **Sair** está no canto superior direito.
 3. Um cabeçalho mostra o jogo, o estado e o relógio, o estado do **Rádio** e os alertas. O seletor de língua está ao lado.

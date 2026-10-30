@@ -14,6 +14,7 @@
     "token": "存取代碼（GM 或唯讀）",
     "enter": "進入",
     "bad": "存取代碼錯誤。",
+    "use_https": "存取代碼不會以一般 HTTP 傳送。請改用 {url} 開啟控制台（瀏覽器會詢問一次是否信任場地憑證）。",
     "expired": "這組存取代碼已失效，請重新輸入。",
     "hint": "控制器用這個指令顯示代碼：python3 -m atalaia_controller tokens",
     "readonly": "唯讀",

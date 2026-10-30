@@ -57,6 +57,20 @@ class FieldTls:
         return x509.load_pem_x509_certificate(self.ca_pem).public_bytes(_der())
 
 
+def export_for_broker(tls: FieldTls, dest: str | Path) -> Path:
+    """Mosquitto's copy of the CA certificate and the server's certificate and key, for its TLS listener
+    (controller/deploy/mosquitto-tls.conf, FLD-5). The CA's key never leaves ``tls_dir``. ``dest`` is a folder
+    the service owns whose group is the broker's (setgid, mode 2750): the key is written 0640, so the broker
+    reads it by that group and nobody else does. Written again at every start, so a renewed certificate
+    reaches the broker on its next reload."""
+    d = Path(dest)
+    d.mkdir(parents=True, exist_ok=True)
+    _write(d / "ca.pem", tls.ca_pem, False)
+    _write(d / "server.pem", tls.server_cert.read_bytes(), False)
+    _write(d / "server.key", tls.server_key.read_bytes(), True, mode=0o640)
+    return d
+
+
 def _der():
     from cryptography.hazmat.primitives import serialization  # noqa: PLC0415
 
@@ -147,10 +161,10 @@ def link_names(configured: Iterable[str], found: Iterable[str], container: Optio
     return out
 
 
-def _write(path: Path, data: bytes, private: bool) -> None:
+def _write(path: Path, data: bytes, private: bool, mode: int = 0o600) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-    fd = os.open(tmp, flags, 0o600 if private else 0o644)
+    fd = os.open(tmp, flags, mode if private else 0o644)
     try:
         os.write(fd, data)
         os.fsync(fd)
@@ -158,7 +172,7 @@ def _write(path: Path, data: bytes, private: bool) -> None:
         os.close(fd)
     if private:
         try:
-            os.chmod(tmp, 0o600)
+            os.chmod(tmp, mode)
         except OSError:
             pass
     os.replace(tmp, path)

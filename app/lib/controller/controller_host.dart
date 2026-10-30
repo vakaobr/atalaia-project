@@ -17,8 +17,8 @@
 ///     loopback address (the app's own web view) and, once the GM opens the
 ///     controller to the field's Wi-Fi, on HTTPS with the field CA at every
 ///     address (decision PE24-62);
-///   - the MQTT broker with the Pi's users and ACL, on the loopback address,
-///     or every address once opened (PE24-13);
+///   - the MQTT broker with the Pi's users and ACL, plain on the loopback address only,
+///     and over TLS with the field CA (port 8883) at every address once opened (PE24-13, SR-54);
 ///   - slice S7b: the mode packages, presets, scenarios and branding
 ///     (controller_modes.dart, controller_scenarios.dart,
 ///     controller_branding.dart), signed packages with the app's `[modes]`
@@ -105,6 +105,7 @@ final class ControllerBoot {
     this.httpPort = 8080,
     this.httpsPort = 8443,
     this.mqttPort = 1883,
+    this.mqttTlsPort = 8883,
     this.openAddress = '0.0.0.0',
     this.addresses,
     this.addressCheck = const Duration(seconds: 10),
@@ -152,6 +153,10 @@ final class ControllerBoot {
   final int httpPort;
   final int httpsPort;
   final int mqttPort;
+
+  /// MQTT over TLS on the field's network (the plain [mqttPort] is the
+  /// phone's own loopback address only).
+  final int mqttTlsPort;
 
   /// The address the open listeners take (tests: the loopback address).
   final String openAddress;
@@ -419,12 +424,12 @@ class ControllerHost {
       ..console = ConsoleFiles(boot.console)
       ..caPem = tls.caPem
       ..caSha256Hex = tls.caHex;
-    final where = boot.open
-        ? InternetAddress(boot.openAddress)
-        : InternetAddress.loopbackIPv4;
+    // Plain MQTT stays on the phone (FLD-5); the field's network gets TLS only.
     broker = MqttBroker(
       port: boot.mqttPort,
-      address: where,
+      tls: boot.open ? tls.context() : null,
+      tlsAddress: boot.open ? InternetAddress(boot.openAddress) : null,
+      tlsPort: boot.mqttTlsPort,
       users: {'gm': secrets.gmToken, 'reader': secrets.readToken},
       acl: MqttAcl.field,
     );
@@ -559,6 +564,7 @@ class ControllerHost {
         await old.close();
         await _bindHttps(port);
       }
+      if (boot.open) await broker.renewTls(tls.context());
       _applyLinks();
       onChange?.call();
     } finally {
@@ -589,6 +595,7 @@ class ControllerHost {
       'http_port': http.port,
       'https_port': https?.port,
       'mqtt_port': broker.boundPort,
+      'mqtt_tls_port': broker.boundTlsPort,
       'addresses': addresses,
       'urls': urls,
       'ca_sha256': tls.caHex,

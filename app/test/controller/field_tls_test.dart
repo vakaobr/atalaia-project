@@ -17,6 +17,7 @@ import 'dart:typed_data';
 
 import 'package:atalaia_app/checkin/field_trust.dart';
 import 'package:atalaia_app/controller/field_tls.dart';
+import 'package:atalaia_app/controller/mqtt_broker.dart';
 import 'package:atalaia_app/security/der.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -256,4 +257,71 @@ void main() {
       lessThanOrEqualTo(const Duration(days: 825)),
     );
   });
+
+  test(
+    'the broker speaks MQTT over TLS with the field CA, plain only on loopback (FLD-5)',
+    () async {
+      final tls = FieldTls.ensure(tmp.path, certificateNames(const []));
+      final broker = MqttBroker(
+        port: 0,
+        tls: tls.context(),
+        tlsAddress: InternetAddress.loopbackIPv4,
+        tlsPort: 0,
+      );
+      await broker.start();
+      addTearDown(broker.stop);
+      // CONNECT, clean session, no login, client id "t": CONNACK 0x20 0x02 0x00 0x00.
+      const connect = [
+        0x10,
+        0x0d,
+        0,
+        4,
+        77,
+        81,
+        84,
+        84,
+        4,
+        2,
+        0,
+        30,
+        0,
+        1,
+        116,
+      ];
+      Future<List<int>> hello(Socket s) async {
+        s.add(connect);
+        final first = await s.first.timeout(const Duration(seconds: 5));
+        s.destroy();
+        return first;
+      }
+
+      final secure = await SecureSocket.connect(
+        'localhost',
+        broker.boundTlsPort!,
+        context: SecurityContext(withTrustedRoots: false)
+          ..setTrustedCertificatesBytes(utf8.encode(tls.caPem)),
+      );
+      expect(await hello(secure), [0x20, 0x02, 0x00, 0x00]);
+      // Another CA: the handshake fails.
+      final other = FieldTls.ensure(
+        '${tmp.path}/other',
+        certificateNames(const []),
+      );
+      await expectLater(
+        SecureSocket.connect(
+          'localhost',
+          broker.boundTlsPort!,
+          context: SecurityContext(withTrustedRoots: false)
+            ..setTrustedCertificatesBytes(utf8.encode(other.caPem)),
+        ),
+        throwsA(isA<HandshakeException>()),
+      );
+      // The plain listener is the loopback address's own.
+      final plain = await Socket.connect(
+        InternetAddress.loopbackIPv4,
+        broker.boundPort,
+      );
+      expect(await hello(plain), [0x20, 0x02, 0x00, 0x00]);
+    },
+  );
 }

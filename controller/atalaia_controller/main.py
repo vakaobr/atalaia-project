@@ -39,6 +39,7 @@ from .checkin import Checkin
 from .config import Config, ConfigError, load_config
 from .engine import Controller
 from .firmware_updates import FirmwareUpdates, firmware_dir
+from .guard import WS_MAX_MESSAGE
 from .mqtt import MqttBridge, maybe_bridge
 from .pod_config import PodConfig
 from .positions import Positions
@@ -160,6 +161,11 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
     plan = addrs.plan(saved_poster_urls(store), cfg.checkin_urls)
     warn_dropped(plan.dropped)
     tls = ensure_tls(cfg, plan.san)
+    if tls and cfg.mqtt_tls_export_dir:
+        try:
+            tlsmod.export_for_broker(tls, cfg.mqtt_tls_export_dir)
+        except OSError as exc:
+            log.warning("[mqtt] tls_export_dir %s: Mosquitto's TLS copy not written: %s", cfg.mqtt_tls_export_dir, exc)
     controller.ca_sha256 = tls.ca_sha256 if tls else None
     controller.link_urls = plan.default if tls else []
     if tls and addrs.container and not cfg.tls_names:
@@ -171,7 +177,9 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
     FirmwareUpdates(controller, firmware_dir(cfg.db_path, cfg.firmware_dir), cfg.firmware_release_keys,
                     cfg.firmware_update_timeout_s, variants=cfg.firmware_variants)
     PodConfig(controller)
-    SignedModes(controller, cfg.modes_keys, cfg.modes_revoked, cfg.modes_index)
+    SignedModes(controller, cfg.modes_keys, cfg.modes_revoked, cfg.modes_index,
+                min_versions={k.strip(): v.strip() for k, _, v in (e.partition("=") for e in cfg.modes_min_versions)},
+                revocation_max_age_days=cfg.modes_revocation_max_age_days)
     ModeFetch(controller, cfg.modes_box_keys, cfg.modes_fetch_timeout_s)
     Adoption(controller)
     mqtt = maybe_bridge(cfg, controller)
@@ -224,7 +232,8 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
             modem.stop()
 
     app = create_app(controller, hub, Auth(gm, read), on_start=on_start, on_stop=on_stop,
-                     ca_pem=tls.ca_pem if tls else None)
+                     ca_pem=tls.ca_pem if tls else None, https_port=cfg.tls_port if tls and not cfg.http_tokens else 0,
+                     trusted_proxy=cfg.trusted_proxy)
     return Bundle(cfg, store, controller, modem, mqtt, hub, app, tls, sync, atak, remote)
 
 
@@ -234,10 +243,10 @@ def serve(bundle: Bundle, log_level: str = "info") -> None:
 
     cfg = bundle.cfg
     servers = [uvicorn.Server(uvicorn.Config(bundle.app, host=cfg.host, port=cfg.api_port,
-                                             log_level=log_level, lifespan="on"))]
+                                             log_level=log_level, lifespan="on", ws_max_size=WS_MAX_MESSAGE))]
     if bundle.tls is not None:
         servers.append(uvicorn.Server(uvicorn.Config(
-            bundle.app, host=cfg.host, port=cfg.tls_port, log_level=log_level, lifespan="off",
+            bundle.app, host=cfg.host, port=cfg.tls_port, log_level=log_level, lifespan="off", ws_max_size=WS_MAX_MESSAGE,
             ssl_certfile=str(bundle.tls.server_cert), ssl_keyfile=str(bundle.tls.server_key))))
         log.info("HTTPS on port %d with the field CA %s", cfg.tls_port, bundle.tls.ca_sha256.hex())
 

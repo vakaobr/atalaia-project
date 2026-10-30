@@ -11,14 +11,14 @@ Status: phase 2, plan phase E. Tested in headless Chromium against the real cont
 
 ## Opening it
 
-Start the controller (see [controller/README.md](../README.md#running-it)) and open `http://<controller>:8080/` (it redirects to `/console/`). It asks for an access code:
+Start the controller (see [controller/README.md](../README.md#running-it)) and open `https://<controller>:8443/` (it redirects to `/console/`; the browser asks once to trust the field CA, `GET /api/v1/controller/ca`). On plain HTTP (`http://<controller>:8080/`) the page loads but **does not send a GM or player code**: the controller refuses those over HTTP (security review FLD-4), so the login shows the https address to open instead. On the controller's own machine (`localhost`) HTTP works. It asks for an access code:
 
 - the **GM token** can do everything: create and run games, adjust scores, send messages, make join cards;
 - the **read token** sees everything live but changes nothing (the GM controls are hidden and the API refuses them anyway).
 
 `python3 -m atalaia_controller tokens` prints both. The code is kept in the browser (localStorage) until you sign out.
 
-The code can also come in the address's fragment, as for the scoreboard: `http://<controller>:8080/console/#token=<token>` (`&lang=en` for English). The console takes it out of the address at once (it stays in neither the address bar nor the history; a fragment is never sent to the controller, so it is in no server log) and keeps it as a typed code once the controller accepts it. The app opens the console of a phone controller this way (decision PE24-71).
+The code can also come in the address's fragment, as for the scoreboard: `https://<controller>:8443/console/#token=<token>` (`&lang=en` for English). The console takes it out of the address at once (it stays in neither the address bar nor the history; a fragment is never sent to the controller, so it is in no server log) and keeps it as a typed code once the controller accepts it. The app opens the console of a phone controller this way (decision PE24-71).
 
 ### On a phone controller
 

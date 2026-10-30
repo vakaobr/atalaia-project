@@ -698,11 +698,14 @@ class ControllerApi {
     final res = req.response;
     try {
       final chunks = BytesBuilder(copy: false);
-      final limit = _bodyLimit(req.uri.path);
+      final limit = _bodyLimit(req.method, req.uri.path);
+      if (req.contentLength > limit) {
+        throw _HttpError(413, 'the request body is over $limit bytes');
+      }
       await for (final c in req) {
         chunks.add(c);
         if (chunks.length > limit) {
-          throw _HttpError(413, 'the request body is too large');
+          throw _HttpError(413, 'the request body is over $limit bytes');
         }
       }
       final bytes = chunks.takeBytes();

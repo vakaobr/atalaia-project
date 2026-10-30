@@ -7,7 +7,7 @@
 
 import { html, render, Component, t, loadLanguage, LANGS, api, ApiError, Stream,
          savedToken, saveToken, takeHashToken, serves, AREAS, clock, OFFLINE_MS, fetchBranding,
-         brandingUrl, inWebView } from './ui.js';
+         brandingUrl, inWebView, httpsAddress } from './ui.js';
 import { GameControl, ControllerPanel } from './components/game-control.js';
 import { ScorePanel } from './components/score-panel.js';
 import { LiveFeed } from './components/live-feed.js';
@@ -106,6 +106,12 @@ class App extends Component {
     // ---- login ----------------------------------------------------------------
 
     async login(token) {
+        const secure = await httpsAddress();
+        if (secure) {
+            this.setState({ role: null, loginError: t('login.use_https', { url: secure }) });
+            this.loadBranding();
+            return;
+        }
         try {
             const who = await api(token, 'GET', '/whoami');
             saveToken(token);

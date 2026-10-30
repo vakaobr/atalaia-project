@@ -161,8 +161,10 @@ class SignedModeTests(P3Case):
         status = self.client.get("/api/v1/mode-packages", headers=GM).json()
         self.assertEqual((status["keys"], status["index"]["source"]), ([], None))
 
+    NONE_REVOKED = {"schema_version": 1, "keys": []}
+
     def write_index(self, folder: Path, releases: list[tuple[bytes, dict[str, Any]]], verified: bool = True,
-                    revoked: Any = None) -> Path:
+                    revoked: Any = NONE_REVOKED) -> Path:
         (folder / "packages").mkdir(parents=True, exist_ok=True)
         modes: dict[str, dict[str, Any]] = {}
         for archive, release in releases:
@@ -227,7 +229,11 @@ class SignedModeTests(P3Case):
         status = self.client.get("/api/v1/mode-packages?refresh=1", headers=GM).json()
         self.assertTrue(status["index"]["error"])
         self.assertEqual(status["index"]["entries"], [])
+        # A missing one is an error too, and what was revoked stays revoked meanwhile (FLD-7).
         (folder / "revoked.json").unlink()
+        status = self.client.get("/api/v1/mode-packages?refresh=1", headers=GM).json()
+        self.assertIn("revoked.json", status["index"]["error"])
+        self.assertEqual(status["revoked"], [KEY["key_id"]])
         index.write_text(json.dumps({"schema_version": 1, "modes": [{"id": "org.club.tagger", "name": "x",
                                                                      "versions": [{"version": "0.1.0"}]}]}))
         status = self.client.get("/api/v1/mode-packages?refresh=1", headers=GM).json()
@@ -240,6 +246,7 @@ class SignedModeTests(P3Case):
                                        "license")},
             "url": "packages/tagger.tar", "verified": False}]}]}
         served = {"https://registry.example/v1/index.json": json.dumps(index).encode(),
+                  "https://registry.example/v1/revoked.json": json.dumps(self.NONE_REVOKED).encode(),
                   "https://registry.example/v1/packages/tagger.tar": archive}
         asked = []
 
@@ -257,8 +264,102 @@ class SignedModeTests(P3Case):
                              headers=GM)
         self.assertEqual(r.status_code, 201, r.text)
         self.assertEqual(r.json()["signed"]["verified"], False)  # not reviewed by the project
-        self.assertIn("https://registry.example/v1/revoked.json", asked)  # looked for, missing: none revoked
+        self.assertIn("https://registry.example/v1/revoked.json", asked)  # fetched again for every install
         self.assertIn("https://registry.example/v1/packages/tagger.tar", asked)
+
+    # ---- FLD-7: revocations fail closed, refreshed before every install and upload ----------------
+
+    def revoke(self, folder: Path, key_id: str) -> None:
+        (folder / "revoked.json").write_text(json.dumps({"schema_version": 1, "keys": [{"key_id": key_id}]}))
+
+    def test_an_upload_sees_a_revocation_the_cached_index_did_not(self):
+        folder = Path(self.tmp.name) / "registry"
+        index = self.write_index(folder, [package()])
+        self.reopen_with_index(str(index))
+        self.client.get("/api/v1/mode-packages", headers=GM)  # the index, and its empty list, are cached now
+        self.revoke(folder, KEY["key_id"])
+        archive, release = package(version="0.3.0")
+        self.assertIn("revoked", json.dumps(self.upload(archive, release, expect=400)))
+
+    def test_a_missing_or_broken_revocation_list_installs_nothing(self):
+        folder = Path(self.tmp.name) / "registry"
+        index = self.write_index(folder, [package()])
+        self.reopen_with_index(str(index))
+        archive, release = package(version="0.3.0")
+        for how, change in (("missing", lambda: (folder / "revoked.json").unlink()),
+                            ("broken", lambda: (folder / "revoked.json").write_text("{nope"))):
+            with self.subTest(how):
+                change()
+                out = self.upload(archive, release, expect=400)
+                self.assertIn("revocation list", json.dumps(out))
+        self.assertNotIn("org.club.tagger", [m["id"] for m in self.client.get("/api/v1/modes", headers=GM).json()])
+
+    def test_a_broken_index_does_not_forget_what_was_revoked(self):
+        folder = Path(self.tmp.name) / "registry"
+        index = self.write_index(folder, [package()],
+                                 revoked={"schema_version": 1, "keys": [{"key_id": KEY["key_id"]}]})
+        self.reopen_with_index(str(index))
+        self.assertEqual(self.client.get("/api/v1/mode-packages", headers=GM).json()["revoked"], [KEY["key_id"]])
+        index.write_text("{broken")
+        status = self.client.get("/api/v1/mode-packages?refresh=1", headers=GM).json()
+        self.assertTrue(status["index"]["error"])
+        self.assertEqual(status["revoked"], [KEY["key_id"]])
+        # ... and over a restart: the list is kept in the store.
+        self.reopen_with_index(str(index))
+        self.assertEqual(self.client.get("/api/v1/mode-packages", headers=GM).json()["revoked"], [KEY["key_id"]])
+
+    def test_an_offline_controller_goes_on_with_a_young_list_and_not_an_old_one(self):
+        from atalaia_controller.signed_modes import FetchError
+
+        clock = [1_000_000.0]
+        online = [True]
+        served = json.dumps(self.NONE_REVOKED).encode()
+        index = {"schema_version": 1, "modes": []}
+
+        def fetch(url: str, limit: int) -> bytes:
+            if not online[0]:
+                raise FetchError(f"{url}: no route to host", offline=True)
+            return served if url.endswith("revoked.json") else json.dumps(index).encode()
+
+        self.reopen_with_index("https://registry.example/v1/index.json")
+        sm = self.ctrl.signed_modes
+        sm.fetch, sm._wall = fetch, lambda: clock[0]
+        # Never fetched and offline: nothing is installed.
+        online[0] = False
+        archive, release = package()
+        out = self.upload(archive, release, expect=400)
+        self.assertIn("none was ever fetched", json.dumps(out))
+        # Fetched once (any install while online does it), then offline for 10 days: still installs.
+        online[0] = True
+        self.upload(archive, release)
+        online[0] = False
+        clock[0] += 10 * 86400
+        self.upload(*package(version="0.2.0"))
+        self.assertEqual(self.client.get("/api/v1/mode-packages", headers=GM).json()["revocations_age_s"], 10 * 86400)
+        # 31 days offline: refused, and back online it works again.
+        clock[0] += 21 * 86400
+        out = self.upload(*package(version="0.3.0"), expect=400)
+        self.assertIn("31 days old", json.dumps(out))
+        online[0] = True
+        self.upload(*package(version="0.3.0"))
+        # Another failure (a document that is wrong, not a network that is down) never falls back to the old list.
+        served = b"{nope"
+        out = self.upload(*package(version="0.4.0"), expect=400)
+        self.assertIn("not a good one", json.dumps(out))
+
+    def test_no_index_means_the_fields_own_revoked_list_alone(self):
+        self.upload(*package())  # no [modes] index: nothing to fetch, and it installs (the existing behaviour)
+
+    def test_a_version_floor(self):
+        self.close_bundle()
+        self.cfg.modes_min_versions = ["org.club.tagger=0.2.0"]
+        self.open_bundle()
+        out = self.upload(*package(version="0.1.0"), expect=400)
+        self.assertIn("floor", json.dumps(out))
+        self.assertEqual(self.upload(*package(version="0.2.0"))["version"], "0.2.0")
+        self.upload(*package("org.club.other", version="0.0.1"))  # another mode: no floor
+        self.assertEqual(self.ctrl.signed_modes.below_floor("org.club.tagger", "0.1.9"), "0.2.0")
+        self.assertIsNone(self.ctrl.signed_modes.below_floor("org.club.tagger", "1.0.0-rc.1"))
 
     def test_the_stream_says_the_modes_changed(self):
         with self.client.websocket_connect("/api/v1/stream?token=gm-secret") as ws:
@@ -284,7 +385,8 @@ class ConfigAndStoreTests(unittest.TestCase):
             self.assertEqual(cfg.modes_index, "https://registry.example/index.json")
             for bad in ({"modes_keys": ["not a key"]}, {"modes_revoked": ["XYZ"]},
                         {"modes_index": "http://registry.example/index.json"}, {"modes_index": "ftp://x/i.json"},
-                        {"modes_keys": [KEY["public_key_b64"]] * 9}):
+                        {"modes_keys": [KEY["public_key_b64"]] * 9}, {"modes_min_versions": ["org.x"]},
+                        {"modes_min_versions": ["org.x=one"]}, {"modes_revocation_max_age_days": -1.0}):
                 with self.subTest(bad=bad), self.assertRaises(ConfigError):
                     config(tmp, **bad)
 

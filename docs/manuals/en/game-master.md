@@ -55,7 +55,7 @@ Not yet tested on a field: no Raspberry Pi with a real modem and real boxes has 
    `python3 -m atalaia_controller join-key`
    It is the field's master secret. Boxes get it once, when you adopt them ([section 4](#adopt-the-boxes)). Give it only to staff you trust.
 
-On first start the controller makes the field's own **certificate** and serves HTTPS on port 8443, next to plain HTTP on port 8080. The check-in poster carries its fingerprint, so players' phones can check they talk to your controller.
+On first start the controller makes the field's own **certificate** and serves HTTPS on port 8443, next to plain HTTP on port 8080. The check-in poster carries its fingerprint, so players' phones can check they talk to your controller. The GM code, and players' codes, are accepted over HTTPS only: nobody on the Wi-Fi can read them in the air.
 
 ### On an Android phone
 
@@ -82,7 +82,7 @@ Players' phones, the console and Android props all use one Wi-Fi network at the 
 
 ## 3. Open the GM console
 
-1. On a phone or laptop on the field's Wi-Fi, open `http://` *the controller's address* `:8080/console/`. For example `http://192.168.4.1:8080/console/`.
+1. On a phone or laptop on the field's Wi-Fi, open `https://` *the controller's address* `:8443/console/`. For example `https://192.168.4.1:8443/console/`. The first time, the browser warns that it does not know the certificate: it is the field's own (its fingerprint is on the check-in poster). Accept it once, or install it from `http://` *the controller's address* `:8080/api/v1/controller/ca`. If you open the plain `http://…:8080/console/` page instead, the console does not send the code: it shows the https address to use.
    In the Atalaia app you can also tap **Game master**, type the controller's address under **Console's address** and tap **Open the console**.
 2. Type the **Access code (GM or read-only)** and tap **Enter**. The console remembers it. **Sign out** is at the top right.
 3. A header shows the game, its state and clock, the **Radio** state and any alerts. The language picker is next to it.

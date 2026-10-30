@@ -62,6 +62,12 @@ gm_token = ""                     # empty: generated on first start;
 read_token = ""                   # show them with `python3 -m atalaia_controller tokens`
 tls_port = 8443                   # HTTPS with the field's own CA (made on first start); 0 = off
 tls_dir = ""                      # empty: the tls/ folder next to db_path
+http_tokens = false               # true: accept the GM and players' tokens on plain HTTP too (a closed
+                                  # network you control). false: they are refused there; the console shows
+                                  # the https address (security review FLD-4)
+trusted_proxy = false             # true only behind a reverse proxy that ends TLS and sets X-Forwarded-Proto
+                                  # (the demo image's tunnel): HSTS on https answers, http pages redirected,
+                                  # tokens refused on http. A field's Wi-Fi has no proxy: leave false
 tls_names = []                    # the names and addresses phones use, e.g. ["10.42.0.1", "campo.local"]
 
 [mqtt]
@@ -70,6 +76,10 @@ host = "localhost"
 port = 1883
 username = "controller"
 password = ""
+# Mosquitto's TLS listener on 8883 (controller/deploy/mosquitto-tls.conf; plain 1883 is the Pi's
+# loopback only): a folder the broker's group owns, where the controller writes a copy of the field CA's
+# certificate and the server's certificate and key (never the CA's key) at each start.
+# tls_export_dir = "/var/lib/atalaia/mqtt-tls"
 
 [join]
 key = ""                          # the field join key (64 hex digits) that authenticates join
@@ -144,7 +154,12 @@ multicast = "239.2.3.1:6969"      # UDP, props and zones only (TTL 1: the field'
 interval_s = 30.0                 # every marker again this often; a capture goes at once
 staff_endpoints = []              # staff ATAK devices, ["10.42.0.5:4242"] (TCP; 4242 if no port);
                                   # from the environment, separated by commas
-players = false                   # player GPS positions, to staff_endpoints ONLY (never multicast)
+players = false                   # player GPS positions, to staff_endpoints ONLY (never multicast).
+                                  # Readable on the network unless staff_tls is on: use TLS, or a wired or VPN link
+staff_tls = false                 # TLS to staff_endpoints (8089 if no port: ATAK's SSL input)
+staff_tls_ca = ""                 # PEM file: the CA the devices' TLS input presents (nothing else is trusted)
+staff_tls_cert = ""               # PEM files: this controller's client certificate and key,
+staff_tls_key = ""                # when the devices ask for one
 # true: the same events go to the site server on the sync's stream (this controller opens
 # it), which relays them to the field's enrolled ATAK devices away from the field over
 # TLS with a client certificate each (server/README.md, "Remote ATAK"). Needs
@@ -181,6 +196,10 @@ revoked = []                      # key ids (16 hex digits) that no longer count
 index = ""                        # a registry index: "https://..." or the path of an index.json
                                   # with its packages next to it (a field without internet).
                                   # The community registry's: "https://vakaobr.github.io/atalaia-modes/index.json"
+revocation_max_age_days = 30      # with an index: it is fetched again before every install; if it cannot be
+                                  # reached the last revoked.json counts for this long (0: never), then
+                                  # nothing signed is installed (a missing or broken list always refuses)
+min_versions = []                 # a floor per mode, ["org.example.mode=1.2.0"]: older versions are refused
 box_keys = ["I+m3rO++TcVNhvDHzI28pkNA8UGoTJSi84IWQguq4Mo=", "0nMp0OGboGJZUMsbc/ykqkxQFNdmI/a2k4nQ6YsdTIY="]
                                   # the mode keys (and release keys) built into the boxes' firmware:
                                   # only packages one of them signed are sent to a box that lacks a

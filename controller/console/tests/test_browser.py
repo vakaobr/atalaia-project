@@ -176,7 +176,9 @@ class ConsoleBrowserTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.pw = sync_playwright().start()
-        cls.browser = cls.pw.chromium.launch()
+        # atalaia-field.test is a name that is not the controller's own loopback (as the Pi's address is for a
+        # laptop on the field), but reaches this test's controller.
+        cls.browser = cls.pw.chromium.launch(args=["--host-resolver-rules=MAP atalaia-field.test 127.0.0.1"])
 
     @classmethod
     def tearDownClass(cls):
@@ -232,6 +234,21 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertLessEqual(width[0], width[1], "the page scrolls sideways")
 
     # --- tests ----------------------------------------------------------------
+
+    def test_login_on_plain_http_from_another_machine_sends_no_code_and_says_where_to_go(self):
+        # FLD-4: the GM code is refused over HTTP, so the console does not even send it; it says the https address.
+        ctx = self.browser.new_context()
+        self.contexts.append(ctx)
+        page = ctx.new_page()
+        asked: list[str] = []
+        page.on("request", lambda r: asked.append(r.url))
+        page.goto(f"http://atalaia-field.test:{self.field.port}/console/")
+        page.get_by_test_id("token").fill(GM)
+        page.get_by_test_id("login").click()
+        expect(page.get_by_role("alert")).to_contain_text("https://atalaia-field.test:8443/console/")
+        self.assertFalse([u for u in asked if "/api/v1/whoami" in u], "the code was sent over plain HTTP")
+        self.assertTrue([u for u in asked if u.endswith("/api/v1/controller/https")])
+        # The same page on the controller's own address (what every other test does) logs in as before.
 
     def test_gm_creates_and_runs_a_game_with_live_updates(self):
         page = self.console()
@@ -723,6 +740,7 @@ class ConsoleBrowserTests(unittest.TestCase):
                                                                       "signature", "key_id", "license")},
                                           "url": f"packages/{name}", "verified": verified}]})
         (registry / "index.json").write_text(json.dumps({"schema_version": 1, "modes": entries}))
+        (registry / "revoked.json").write_text(json.dumps({"schema_version": 1, "keys": []}))  # FLD-7: a missing list refuses installs
         self.field.close()
         self.field = Field(cfg={"modes_keys": [KEY["public_key_b64"]], "modes_index": str(registry / "index.json")})
 

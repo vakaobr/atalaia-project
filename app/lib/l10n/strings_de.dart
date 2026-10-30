@@ -1002,7 +1002,7 @@ const Map<String, String> deStrings = {
   'ctl.open': 'Im WLAN des Felds erreichbar',
   'ctl.open_on':
       'Handys, Computer und Spielprops verbinden sich über HTTPS (Port 8443, '
-      'mit der CA des Felds) und MQTT (Port 1883).',
+      'mit der CA des Felds) und MQTT über TLS (Port 8883, dieselbe CA).',
   'ctl.open_off':
       'Nur dieses Handy erreicht den Controller: Im Netz lauscht nichts.',
   'ctl.addresses': 'Die Konsole, auf Computern im Netz des Felds:',

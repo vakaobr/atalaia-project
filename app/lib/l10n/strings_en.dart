@@ -959,7 +959,7 @@ const Map<String, String> enStrings = {
   'ctl.open': "Open on the field's Wi-Fi",
   'ctl.open_on':
       'Phones, computers and game props connect over HTTPS (port 8443, with '
-      "the field's CA) and MQTT (port 1883).",
+      "the field's CA) and MQTT over TLS (port 8883, the same CA).",
   'ctl.open_off':
       'Only this phone reaches the controller: nothing listens on the network.',
   'ctl.addresses': "The console, on computers on the field's network:",

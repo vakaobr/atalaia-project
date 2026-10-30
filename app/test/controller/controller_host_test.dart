@@ -104,6 +104,7 @@ void main() {
     httpPort: 0,
     httpsPort: 0,
     mqttPort: 0,
+    mqttTlsPort: 0,
     openAddress: '127.0.0.1',
     addresses: addresses,
   );

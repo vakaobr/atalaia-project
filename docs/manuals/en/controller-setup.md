@@ -99,9 +99,9 @@ This is the supported way from the [controller guide](../../../controller/README
 
 1. Join the field's Wi-Fi with a phone or a laptop.
 2. Find the Pi's address: on the Pi, run `hostname -I`.
-3. Open `http://` *the Pi's address* `:8080/console/`, for example `http://192.168.4.1:8080/console/`. Type the GM code.
+3. Open `https://` *the Pi's address* `:8443/console/`, for example `https://192.168.4.1:8443/console/`. The browser warns once that it does not know the certificate: it is the field's own, so accept it. Type the GM code. (On plain `http://…:8080` the page opens but the console will not send the code; it shows the https address.)
 
-The controller also serves HTTPS on port 8443, with a certificate from the field's own authority. Phones check it against the check-in poster's fingerprint. If you change the Pi's address or name, add it to `tls_names` and restart the service.
+The controller serves HTTPS on port 8443, with a certificate from the field's own authority, and the GM code is accepted only there. Phones check it against the check-in poster's fingerprint. Plain MQTT (port 1883) is for the Pi itself; a scoreboard on another machine uses MQTT over TLS on port 8883 (`deploy/mosquitto-tls.conf`, see the controller README). If you change the Pi's address or name, add it to `tls_names` and restart the service.
 
 From here, follow the [Game master manual](game-master.md): the radio channel, adopting the boxes, a game from start to end.
 
@@ -139,7 +139,8 @@ The last two can also be set in the GM console (**Check-in › Check-in rules**,
 | --- | --- |
 | The modem's screen says `LINK waiting` | The controller is not running, or `[modem] port` is wrong. Check `ls /dev/ttyACM*` and the service's log |
 | `Permission denied` on the port in the log | The user is not in the `dialout` group (section 4, step 3) |
-| The console does not open | Check the Pi's address, port 8080, and that the phone is on the field Wi-Fi |
+| The console does not open | Check the Pi's address, port 8443 (https), and that the phone is on the field Wi-Fi |
+| The console says to use the https address | You opened `http://…:8080`: the controller does not take the GM code over plain HTTP. Use the `https://…:8443/console/` address it shows |
 | The modem's screen says `RADIO FAULT` | The radio chip did not start. Try another board; check the antenna and the cable |
 | A box does not hear the controller | Same region and channel? Antennas fitted? See the Game master manual's troubleshooting |
 | I forgot the codes | Run the `tokens` and `join-key` commands again (section 5) |

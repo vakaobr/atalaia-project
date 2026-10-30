@@ -170,6 +170,7 @@ from .branding import SLOTS, Branding, etag
 from .addresses import url_host
 from .checkin import Viewer
 from .engine import Controller, ControllerError, StartBlocked
+from .guard import BodyLimit, Hsts, TokenTransport
 from .modes import resolve_params
 from .store import FIELD_IMAGE_MAX
 from .ws import PLAYER_TYPES, Hub, default_route, public
@@ -227,7 +228,8 @@ def _token(request: Request) -> Optional[str]:
 def create_app(controller: Controller, hub: Hub, auth: Auth,
                on_start: Optional[Callable[[], None]] = None,
                on_stop: Optional[Callable[[], None]] = None,
-               ca_pem: Optional[bytes] = None) -> FastAPI:
+               ca_pem: Optional[bytes] = None, https_port: int = 0,
+               trusted_proxy: bool = False) -> FastAPI:
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         if on_start:
@@ -239,6 +241,10 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
                 on_stop()
 
     app = FastAPI(title="Atalaia field controller", version=__version__, lifespan=lifespan)
+    # Added last = outermost: the body limit judges a request first (FLD-9), then the token's transport (FLD-4).
+    app.add_middleware(TokenTransport, auth=auth, https_port=https_port, trusted_proxy=trusted_proxy)
+    app.add_middleware(BodyLimit)
+    app.add_middleware(Hsts, trusted_proxy=trusted_proxy)  # HSTS only on answers served over TLS (LIVE-1)
     checkin = controller.checkin
     players = controller.positions  # player positions (positions.py)
     auth.checkin = checkin
@@ -1100,6 +1106,12 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         return controller.set_team_info(game_id, team, body_map(body))
 
     # --- the field CA (ADR-P3-9, P3-8) -------------------------------------------
+
+    @app.get("/api/v1/controller/https")
+    def field_https() -> JSONResponse:
+        """No token: the HTTPS port (0: off). The console on plain HTTP asks it before it would send a token,
+        which this controller refuses over HTTP (guard.py, FLD-4)."""
+        return JSONResponse({"port": https_port}, headers=NO_STORE)
 
     @app.get("/api/v1/controller/ca")
     def field_ca() -> Response:

@@ -99,9 +99,9 @@ Esta é a maneira suportada, do [guia do controlador](../../../controller/README
 
 1. Liga-te ao Wi-Fi do campo com um telemóvel ou um portátil.
 2. Descobre o endereço do Pi: no Pi, corre `hostname -I`.
-3. Abre `http://` *o endereço do Pi* `:8080/console/`, por exemplo `http://192.168.4.1:8080/console/`. Escreve o código da organização.
+3. Abre `https://` *o endereço do Pi* `:8443/console/`, por exemplo `https://192.168.4.1:8443/console/`. O navegador avisa uma vez que não conhece o certificado: é o do próprio campo, por isso aceita-o. Escreve o código da organização. (Em `http://…:8080` simples a página abre, mas a consola não envia o código: mostra o endereço https.)
 
-O controlador serve também HTTPS na porta 8443, com um certificado da autoridade do próprio campo. Os telemóveis verificam-no com a impressão digital do cartaz de check-in. Se mudares o endereço ou o nome do Pi, junta-o a `tls_names` e reinicia o serviço.
+O controlador serve HTTPS na porta 8443, com um certificado da autoridade do próprio campo, e o código da organização só é aceite aí. Os telemóveis verificam-no com a impressão digital do cartaz de check-in. O MQTT simples (porta 1883) é só para o próprio Pi; um marcador noutra máquina usa MQTT sobre TLS na porta 8883 (`deploy/mosquitto-tls.conf`, ver o README do controlador). Se mudares o endereço ou o nome do Pi, junta-o a `tls_names` e reinicia o serviço.
 
 A partir daqui, segue o [Manual da organização](game-master.md): o canal de rádio, adotar as caixas, um jogo do princípio ao fim.
 
@@ -139,7 +139,8 @@ As duas últimas também se definem na consola do GM (**Check-in › Regras do c
 | --- | --- |
 | O ecrã do modem diz `LINK waiting` | O controlador não está a correr, ou o `[modem] port` está errado. Confirma `ls /dev/ttyACM*` e o registo do serviço |
 | `Permission denied` na porta, no registo | O utilizador não está no grupo `dialout` (secção 4, passo 3) |
-| A consola não abre | Confirma o endereço do Pi, a porta 8080 e que o telemóvel está no Wi-Fi do campo |
+| A consola não abre | Confirma o endereço do Pi, a porta 8443 (https) e que o telemóvel está no Wi-Fi do campo |
+| A consola diz para usar o endereço https | Abriste `http://…:8080`: o controlador não aceita o código da organização por HTTP simples. Usa o endereço `https://…:8443/console/` que ela mostra |
 | O ecrã do modem diz `RADIO FAULT` | O chip de rádio não arrancou. Experimenta outra placa; confirma a antena e o cabo |
 | Uma caixa não ouve o controlador | Mesma região e mesmo canal? Antenas montadas? Vê a resolução de problemas do Manual da organização |
 | Esqueci-me dos códigos | Corre outra vez os comandos `tokens` e `join-key` (secção 5) |

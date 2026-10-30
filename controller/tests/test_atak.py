@@ -890,5 +890,83 @@ class MulticastLoopbackTest(unittest.TestCase):
             rx.close()
 
 
+
+class StaffTlsTests(unittest.TestCase):
+    """The staff feed over TLS (FLD-5): the CA of the devices' input is the trust anchor."""
+
+    def setUp(self):
+        import tempfile  # noqa: PLC0415
+
+        from atalaia_controller import tls  # noqa: PLC0415
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.ours = tls.ensure(Path(self.tmp.name) / "a", ["127.0.0.1"])
+        self.other = tls.ensure(Path(self.tmp.name) / "b", ["127.0.0.1"])
+
+    def device(self, files, got):
+        """A staff device's TLS input on a free port: collects what it is sent."""
+        import ssl  # noqa: PLC0415
+
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(str(files.server_cert), str(files.server_key))
+        srv = socket.socket()
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(2)
+        srv.settimeout(5)
+        self.addCleanup(srv.close)
+
+        def run():
+            try:
+                conn, _ = srv.accept()
+                with ctx.wrap_socket(conn, server_side=True) as s:
+                    got.append(s.recv(4096))
+            except (OSError, ssl.SSLError):
+                got.append(b"handshake failed")
+        t = threading.Thread(target=run, daemon=True)
+        t.start()
+        self.addCleanup(t.join, 5)
+        return srv.getsockname()[1]
+
+    def cfg(self, ca, **kw):
+        return config(self.tmp.name, atak_enabled=True, atak_staff_endpoints=["127.0.0.1"], atak_staff_tls=True,
+                      atak_staff_tls_ca=str(ca), **kw)
+
+    def test_events_arrive_over_tls_from_a_device_with_the_pinned_ca(self):
+        got: list[bytes] = []
+        port = self.device(self.ours, got)
+        cfg = self.cfg(self.ours.dir / "ca.pem")
+        sender = atak.TcpSender([f"127.0.0.1:{port}"], context=atak.staff_tls_context(cfg))
+        self.assertEqual(sender.send([b"<event/>\n"]), (1, []))
+        self.assertTrue(wait_for(lambda: got))
+        self.assertEqual(got[0], b"<event/>\n")
+
+    def test_a_device_with_another_ca_gets_nothing(self):
+        got: list[bytes] = []
+        port = self.device(self.other, got)
+        cfg = self.cfg(self.ours.dir / "ca.pem")
+        sender = atak.TcpSender([f"127.0.0.1:{port}"], context=atak.staff_tls_context(cfg))
+        sent, errors = sender.send([b"<event/>\n"])
+        self.assertEqual(sent, 0)
+        self.assertEqual(len(errors), 1)
+        self.assertTrue(wait_for(lambda: got))
+        self.assertNotEqual(got[0], b"<event/>\n")
+
+    def test_the_default_port_is_atak_ssl_input(self):
+        sender = atak.TcpSender(["10.42.0.5"], context=atak.staff_tls_context(self.cfg(self.ours.dir / "ca.pem")))
+        self.assertEqual(sender.endpoints, [("10.42.0.5", 8089)])
+        self.assertEqual(atak.TcpSender(["10.42.0.5"]).endpoints, [("10.42.0.5", 4242)])
+
+    def test_config_refuses_tls_without_a_ca_or_a_missing_file(self):
+        with self.assertRaises(ConfigError):
+            config(self.tmp.name, atak_enabled=True, atak_staff_endpoints=["10.42.0.5"], atak_staff_tls=True)
+        with self.assertRaises(ConfigError):
+            self.cfg(Path(self.tmp.name) / "nope.pem")
+        with self.assertRaises(ConfigError):
+            config(self.tmp.name, atak_enabled=True, atak_staff_tls_ca="x.pem")  # a CA without staff_tls
+        with self.assertRaises(ConfigError):
+            self.cfg(self.ours.dir / "ca.pem", atak_staff_tls_cert="c.pem")  # a certificate without its key
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -49,6 +49,15 @@ def declaration(replica_id: Optional[str] = None, rclass: str = "rifle", rtype: 
     return d
 
 
+def https_app(app):
+    """The app as if reached over TLS: this Starlette's TestClient gives websockets the scheme ws whatever the URL."""
+    async def shim(scope, receive, send):
+        if scope["type"] == "websocket":
+            scope = {**scope, "scheme": "wss"}
+        await app(scope, receive, send)
+    return shim
+
+
 class Marshal:
     """A marshal's Ed25519 key and signed readings (protocol/chrono-record.md)."""
 
@@ -110,7 +119,7 @@ class P3Case(unittest.TestCase):
         self.svc._wall = lambda: self.now
         self.svc._tz = datetime.timezone.utc
         self.ctrl.positions._wall = lambda: self.now
-        self.client = TestClient(self.bundle.app)
+        self.client = TestClient(https_app(self.bundle.app), base_url="https://testserver")  # the tokens go over HTTPS (guard.py)
 
     def close_bundle(self) -> None:
         self.client.close()

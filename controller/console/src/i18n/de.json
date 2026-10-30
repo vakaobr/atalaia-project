@@ -14,6 +14,7 @@
     "token": "Zugangscode (GM oder nur lesen)",
     "enter": "Anmelden",
     "bad": "Falscher Zugangscode.",
+    "use_https": "Der Code wird nicht über einfaches HTTP gesendet. Öffne die Konsole unter {url} (der Browser fragt einmal, ob er dem Feldzertifikat vertrauen soll).",
     "expired": "Der Zugangscode wird nicht mehr angenommen. Bitte gib ihn erneut ein.",
     "hint": "Der Controller zeigt die Codes mit: python3 -m atalaia_controller tokens",
     "readonly": "Nur lesen",

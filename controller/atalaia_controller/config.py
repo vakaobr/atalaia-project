@@ -50,6 +50,10 @@
     tls_port = 8443             # HTTPS with the field's own CA (ADR-P3-9); 0 = off
     tls_dir = ""                # where the CA and server certificate live; empty: next to db_path
     tls_names = []              # extra host names or IP addresses for the server certificate
+    http_tokens = false         # true: accept the GM and players' tokens on plain HTTP too (default: refused)
+    trusted_proxy = false       # true: a reverse proxy in front ends TLS (the demo image's tunnel); the
+                                # controller then reads X-Forwarded-Proto: HSTS on https, plain-http pages
+                                # redirected, tokens refused. Never on a field's Wi-Fi: no proxy there
 
     [checkin]                   # field check-in (ADR-P3-13, protocol/checkin.md)
     field_id = "field"          # the field's id, as in chrono records
@@ -84,6 +88,8 @@
     port = 1883
     username = ""
     password = ""
+    tls_export_dir = ""         # a folder for Mosquitto's copy of the field CA and server certificate (its TLS
+                                # listener on 8883, controller/deploy/mosquitto-tls.conf); empty: none made
 
     [join]
     key = ""                    # the field join key, 64 hex digits (protocol/join.md);
@@ -143,6 +149,11 @@
                                 # only packages one of them signed are offered to boxes that lack a
                                 # game's mode (mode_fetch.py); empty: none is offered. Default: the
                                 # project's two registry keys, as the firmware's default
+    revocation_max_age_days = 30.0  # with an index set, a package is installed only after its revoked.json is
+                                # fetched again; if the index cannot be reached, the last list fetched counts
+                                # for this many days (a field with no internet), then nothing is installed;
+                                # 0: never go on with an old list (FLD-7)
+    min_versions = []           # a floor per mode: ["org.example.mode=1.2.0"]; older versions are refused
     fetch_timeout_s = 300.0     # a box fetching a game's modes not heard of this long has timed out;
                                 # until then the game waits for it (the GM may stop waiting)
 
@@ -153,7 +164,14 @@
     interval_s = 30.0           # every marker again this often; owner changes go at once
     staff_endpoints = []        # staff ATAK devices, "host:port" (TCP; 4242 if no port); from the
                                 # environment, separated by commas
-    players = false             # player positions to staff_endpoints only, never to multicast
+    players = false             # player positions to staff_endpoints only, never to multicast. They cross
+                                # the field's network readable unless staff_tls is on: use TLS, or a wired
+                                # or VPN link to the staff devices (security review FLD-5)
+    staff_tls = false           # TLS to staff_endpoints (8089 if no port: ATAK's SSL input); needs staff_tls_ca
+    staff_tls_ca = ""           # PEM file: the CA (or certificate) the staff devices' TLS input presents;
+                                # nothing else is trusted, and the host name is not checked against it
+    staff_tls_cert = ""         # PEM files: this controller's client certificate and key, when the
+    staff_tls_key = ""          # devices ask for one (e.g. made by the site server's ATAK enrolment)
     remote = false              # true: push the same CoT events to the site server on the sync's stream
                                 # (the controller opens it, as for the remote GM), which relays them to
                                 # the field's enrolled ATAK devices over TLS with client certificates
@@ -192,8 +210,8 @@ SECTIONS = {
     "radio": ("region", "channel_hz", "max_hops", "controller_pace_ms", "scan_dwell_s", "quiet_threshold_dbm"),
     "health": ("node_offline_s", "battery_low_pct"),
     "modem": ("port", "baudrate", "ping_interval_s"),
-    "api": ("host", "port", "gm_token", "read_token", "tls_port", "tls_dir", "tls_names"),
-    "mqtt": ("enabled", "host", "port", "username", "password"),
+    "api": ("host", "port", "gm_token", "read_token", "tls_port", "tls_dir", "tls_names", "http_tokens", "trusted_proxy"),
+    "mqtt": ("enabled", "host", "port", "username", "password", "tls_export_dir"),
     "join": ("key",),
     "sync": ("enabled", "url", "api_key", "ca_file", "interval_game_s", "interval_idle_s", "timeout_s",
              "branding", "remote_gm", "library"),
@@ -202,9 +220,11 @@ SECTIONS = {
                 "rate_per_minute", "urls",
                 "wifi_ssid", "limit_template", "notice_version", "notice_pt", "notice_en",
                 "retention_days", "chrono_retention_days", "game_retention_days"),
-    "atak": ("enabled", "multicast", "interval_s", "staff_endpoints", "players", "remote", "remote_players"),
+    "atak": ("enabled", "multicast", "interval_s", "staff_endpoints", "players", "remote", "remote_players",
+             "staff_tls", "staff_tls_ca", "staff_tls_cert", "staff_tls_key"),
     "firmware": ("release_keys", "dir", "update_timeout_s", "variants"),
-    "modes": ("keys", "revoked", "index", "box_keys", "fetch_timeout_s"),
+    "modes": ("keys", "revoked", "index", "box_keys", "fetch_timeout_s",
+              "revocation_max_age_days", "min_versions"),
     "adopt": ("usb", "usb_ports"),
 }
 
@@ -245,6 +265,8 @@ class Config:
     gm_token: str = ""
     read_token: str = ""
     tls_port: int = 8443
+    trusted_proxy: bool = False  # a reverse proxy ends TLS: read X-Forwarded-Proto (HSTS, https rule; guard.py)
+    http_tokens: bool = False  # accept the GM and players' tokens on plain HTTP too (guard.py, FLD-4)
     tls_dir: str = ""
     tls_names: list[str] = field(default_factory=list)
     # [mqtt]
@@ -253,6 +275,7 @@ class Config:
     mqtt_port: int = 1883
     mqtt_username: str = ""
     mqtt_password: str = ""
+    mqtt_tls_export_dir: str = ""
     # [join]
     join_key: str = ""
     # [checkin]
@@ -296,6 +319,10 @@ class Config:
     atak_interval_s: float = 30.0
     atak_staff_endpoints: list[str] = field(default_factory=list)
     atak_players: bool = False
+    atak_staff_tls: bool = False
+    atak_staff_tls_ca: str = ""
+    atak_staff_tls_cert: str = ""
+    atak_staff_tls_key: str = ""
     atak_remote: bool = False  # the remote ATAK relay through the site server (Phase 4 follow-up FU5)
     atak_remote_players: bool = False
     # [firmware]
@@ -309,6 +336,8 @@ class Config:
     modes_index: str = ""
     modes_box_keys: list[str] = field(default_factory=lambda: list(PROJECT_MODE_KEYS))
     modes_fetch_timeout_s: float = 300.0
+    modes_revocation_max_age_days: float = 30.0
+    modes_min_versions: list[str] = field(default_factory=list)
     # [adopt]
     adopt_usb: bool = True
     adopt_usb_ports: list[str] = field(default_factory=list)
@@ -453,7 +482,7 @@ def _check_atak(cfg: "Config") -> None:
 
 
 def _check_modes(cfg: "Config") -> None:
-    from .firmware_release import public_key_bytes  # noqa: PLC0415
+    from .firmware_release import public_key_bytes, version_key  # noqa: PLC0415
 
     if len(cfg.modes_keys) > 8 or not all(public_key_bytes(k) for k in cfg.modes_keys):
         raise ConfigError("modes.keys: at most 8 Ed25519 public keys, each 32 bytes in standard base64 "
@@ -463,6 +492,11 @@ def _check_modes(cfg: "Config") -> None:
     if len(cfg.modes_box_keys) > 8 or not all(public_key_bytes(k) for k in cfg.modes_box_keys):
         raise ConfigError("modes.box_keys: at most 8 Ed25519 public keys, each 32 bytes in standard base64 "
                           "(the boxes' CONFIG_ATALAIA_MODE_KEYS and release keys)")
+    if not 0.0 <= cfg.modes_revocation_max_age_days <= 3650.0:
+        raise ConfigError("modes.revocation_max_age_days must be 0-3650")
+    if not all(isinstance(e, str) and "=" in e and version_key(e.partition("=")[2].strip()) is not None
+               and e.partition("=")[0].strip() for e in cfg.modes_min_versions):
+        raise ConfigError('modes.min_versions: entries like "org.example.mode=1.2.0"')
     if not 30.0 <= cfg.modes_fetch_timeout_s <= 3600.0:
         raise ConfigError("modes.fetch_timeout_s must be 30-3600 seconds")
     index = cfg.modes_index.strip()
@@ -471,7 +505,7 @@ def _check_modes(cfg: "Config") -> None:
 
 
 def _check_firmware(cfg: "Config") -> None:
-    from .firmware_release import public_key_bytes  # noqa: PLC0415
+    from .firmware_release import public_key_bytes, version_key  # noqa: PLC0415
 
     if len(cfg.firmware_release_keys) > 8 or not all(public_key_bytes(k) for k in cfg.firmware_release_keys):
         raise ConfigError("firmware.release_keys: at most 8 Ed25519 public keys, each 32 bytes in standard base64 "
@@ -486,6 +520,7 @@ def _check_firmware(cfg: "Config") -> None:
 _ATTR = {("api", "port"): "api_port", ("mqtt", "enabled"): "mqtt_enabled",
          ("mqtt", "host"): "mqtt_host", ("mqtt", "port"): "mqtt_port",
          ("mqtt", "username"): "mqtt_username", ("mqtt", "password"): "mqtt_password",
+         ("mqtt", "tls_export_dir"): "mqtt_tls_export_dir",
          ("join", "key"): "join_key", ("checkin", "confirm"): "checkin_confirm",
          ("checkin", "urls"): "checkin_urls"}
 _ATTR.update({("sync", k): f"sync_{k}" for k in SECTIONS["sync"]})
@@ -495,7 +530,7 @@ _ATTR.update({("firmware", k): f"firmware_{k}" for k in SECTIONS["firmware"]})
 _ATTR.update({("modes", k): f"modes_{k}" for k in SECTIONS["modes"]})
 _ATTR.update({("adopt", k): f"adopt_{k}" for k in SECTIONS["adopt"]})
 # Lists whose items contain ":" (host:port) or "/" (base64): from the environment they are separated by commas.
-COMMA_LISTS = {"atak_staff_endpoints", "firmware_release_keys", "adopt_usb_ports", "modes_keys", "modes_revoked",
+COMMA_LISTS = {"modes_min_versions", "atak_staff_endpoints", "firmware_release_keys", "adopt_usb_ports", "modes_keys", "modes_revoked",
                "modes_box_keys"}
 
 

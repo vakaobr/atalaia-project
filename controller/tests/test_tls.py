@@ -104,6 +104,26 @@ class FieldCaTests(unittest.TestCase):
         self.assertIsInstance(tls.in_container(), bool)
 
 
+class BrokerExportTests(unittest.TestCase):
+    """Mosquitto's copy of the certificate (FLD-5): the CA's certificate and the server's pair, never the CA's key."""
+
+    def test_the_copy_has_what_the_broker_needs_and_not_the_ca_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            made = tls.ensure(os.path.join(tmp, "tls"), ["10.42.0.1"], "Campo")
+            dest = os.path.join(tmp, "mqtt-tls")
+            tls.export_for_broker(made, dest)
+            self.assertEqual(sorted(os.listdir(dest)), ["ca.pem", "server.key", "server.pem"])
+            with open(os.path.join(dest, "server.key"), "rb") as f:
+                self.assertEqual(f.read(), made.server_key.read_bytes())
+            with open(os.path.join(dest, "ca.pem"), "rb") as f:
+                self.assertEqual(f.read(), made.ca_pem)
+            if os.name == "posix":
+                self.assertEqual(stat.S_IMODE(os.stat(os.path.join(dest, "server.key")).st_mode), 0o640)
+                self.assertEqual(stat.S_IMODE(os.stat(os.path.join(dest, "server.pem")).st_mode), 0o644)
+            tls.export_for_broker(made, dest)  # again, as at every start: nothing breaks, no .tmp left
+            self.assertEqual(sorted(os.listdir(dest)), ["ca.pem", "server.key", "server.pem"])
+
+
 class HttpsServerTests(unittest.TestCase):
     """The whole controller on HTTPS, as `run` serves it, reached with only the field CA trusted."""
 

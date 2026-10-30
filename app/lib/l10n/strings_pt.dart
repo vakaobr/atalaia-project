@@ -975,7 +975,7 @@ const Map<String, String> ptStrings = {
   'ctl.open': 'Aberto na rede Wi-Fi do campo',
   'ctl.open_on':
       'Telemóveis, computadores e dispositivos de jogo ligam-se por HTTPS '
-      '(porta 8443, com a CA do campo) e por MQTT (porta 1883).',
+      '(porta 8443, com a CA do campo) e por MQTT sobre TLS (porta 8883, a mesma CA).',
   'ctl.open_off':
       'Só este telemóvel chega ao controlador: nada fica à escuta na rede.',
   'ctl.addresses': 'A consola, nos computadores da rede do campo:',
