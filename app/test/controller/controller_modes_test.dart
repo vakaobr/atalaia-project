@@ -466,8 +466,9 @@ void main() {
           transport: RecordingRadio(),
         );
         Future<Uint8List> fetch(String url, int limit) async {
-          if (!online)
+          if (!online) {
             throw FetchError('$url: no route to host', offline: true);
+          }
           return Uint8List.fromList(served[url]!);
         }
 

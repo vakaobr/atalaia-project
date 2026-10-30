@@ -1919,7 +1919,7 @@ void main() {
       );
 
       test('events arrive from a device with the pinned CA', () async {
-        final ours = FieldTls.ensure(tmp.path + '/a', ['127.0.0.1']);
+        final ours = FieldTls.ensure('${tmp.path}/a', ['127.0.0.1']);
         final rx = await TlsReceiver.open(ours);
         try {
           final sender = TcpCotSender(
@@ -1939,8 +1939,8 @@ void main() {
       });
 
       test('a device with another CA gets nothing', () async {
-        final ours = FieldTls.ensure(tmp.path + '/a', ['127.0.0.1']);
-        final other = FieldTls.ensure(tmp.path + '/b', ['127.0.0.1']);
+        final ours = FieldTls.ensure('${tmp.path}/a', ['127.0.0.1']);
+        final other = FieldTls.ensure('${tmp.path}/b', ['127.0.0.1']);
         final rx = await TlsReceiver.open(other);
         try {
           final sender = TcpCotSender(
@@ -1960,7 +1960,7 @@ void main() {
 
       test('a name the certificate was made for, when the endpoint is an '
           'address', () async {
-        final tls = FieldTls.ensure(tmp.path + '/a', ['tak.example']);
+        final tls = FieldTls.ensure('${tmp.path}/a', ['tak.example']);
         final rx = await TlsReceiver.open(tls);
         try {
           final plain = TcpCotSender(
@@ -1985,7 +1985,7 @@ void main() {
       test(
         'the default port is the ATAK SSL input, and the status says TLS',
         () {
-          final ours = FieldTls.ensure(tmp.path + '/a', ['127.0.0.1']);
+          final ours = FieldTls.ensure('${tmp.path}/a', ['127.0.0.1']);
           expect(
             TcpCotSender(['10.42.0.5'], context: trusting(ours)).endpoints,
             [('10.42.0.5', 8089)],
