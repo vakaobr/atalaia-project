@@ -540,7 +540,7 @@
   },
   "join": {
     "title": "Juntar caixas e controladores",
-    "intro": "Gera os dados de entrada no jogo para uma caixa (cartão NFC ou consola série) ou para um controlador de reserva.",
+    "intro": "Gera os dados de entrada no jogo para uma caixa (cartão NFC ou consola série) ou para um controlador de reserva. A entrada de um controlador de reserva leva também o lugar das caixas na planta e as escolhas das balizas (divisões, caixas desativadas), para que, ao assumir, ele localize quem joga da mesma maneira: gera-a de novo depois de mexeres numa caixa.",
     "kind": "Para",
     "kinds": {
       "node": "uma caixa",

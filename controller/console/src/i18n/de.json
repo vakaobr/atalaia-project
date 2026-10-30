@@ -540,7 +540,7 @@
   },
   "join": {
     "title": "Boxen und Controller beitreten lassen",
-    "intro": "Erstelle die Beitrittsdaten für eine Box (NFC-Karte oder serielle Konsole) oder für einen Bereitschafts-Controller.",
+    "intro": "Erstelle die Beitrittsdaten für eine Box (NFC-Karte oder serielle Konsole) oder für einen Bereitschafts-Controller. Die Beitrittsdaten eines Bereitschafts-Controllers enthalten auch, wo die Boxen auf dem Plan stehen, und die Beacon-Einstellungen (Räume, deaktivierte Boxen). So verortet ein hochgestufter Bereitschafts-Controller die Spielenden genauso: Erzeuge sie neu, nachdem du eine Box verschoben oder geändert hast.",
     "kind": "Für",
     "kinds": {
       "node": "eine Box",

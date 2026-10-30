@@ -894,6 +894,24 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 
 **Reason:** BBC-5, BBC-8 to BBC-10 made the beacon choices settings of the controller that serves them; the failover (ADR-P2-8) already copies the box language through the standby's join but nothing of the beacon choices, so after a failover the registry served to phones and the join's key 19 could differ from what the GM had set on the primary.
 
+## Amendment 22 (2026-10-30): A standby controller's join carries the boxes' places (join key 22)
+
+**Status:** built (decision BBC-25, which reverses BBC-24). The Python and Dart codecs (`simulator/atalaia_sim/join.py`, `app/lib/protocol/join_payload.dart`) carry it, and both controllers apply it (`controller/atalaia_controller/box_beacons.py` `mirror_places`/`apply_places`, `app/lib/controller/controller_box_beacons.dart` `boxPlacesMirror`/`applyBoxPlaces`); the shared cases are the `box_places` section of `protocol/vectors/join.json` and the contract case "S7 failover: a standby takes the primary's box places from its join (BBC-25) and a move reaches it with the next join" in `protocol/vectors/controller_api.json`.
+
+**Supersedes:** nothing (Amendment 21 said a box's place stays each controller's own; this one carries it). No radio frame changes.
+
+**Change:**
+
+1. **A new optional join key, 22 `box_places`** ([protocol/join.md](../../protocol/join.md)), for a payload of kind 1 (a standby controller) only: a CBOR byte string of 1 to 28 boxes of 7 bytes (node id 2 bytes, level 1 byte, x 2 bytes, y 2 bytes, big endian), ascending by node id, x and y the fraction of the level's plan times 65535 (`floor(v * 65535 + 0.5)`, read back as `q / 65535`). Left out when no box is placed. A box's payload with it is refused by the encoders.
+2. **A standby takes key 22 with keys 19 and 21,** at its first join and at every refresh (Amendment 21 part 3): each listed box is put where the primary has it and is a box of the game from then on, before it says HELLO.
+3. **What does not fit is refused** by the encoders (over 28 boxes, or a payload over 448 bytes), with the size the places take in the message.
+
+**Compatibility:** a reader from before skips key 22 (Amendment 1's rule for keys up to 31), the core's codec in the boxes skips it, and a standby from before takes it for nothing, so its boxes are as before (heard and placed there by the GM). Existing vectors and every payload without key 22 are byte for byte unchanged. Keys 20 and 23 to 31 stay free.
+
+**Alternatives considered (BBC-25):** key 21's map with a third part (refused: a reader from before refuses a map key it does not know, and the 200 bytes are shared with the rooms: 20 boxes as text are over 400 bytes); several joins (a chunk numbering and a state of which chunks arrived, for no need: one join fits); a fetch from the primary over the network (a standby may have no network, the radio is the one link the two always share, and it would need its own authentication); a radio frame (a box-visible change and an air-time cost).
+
+**Reason:** after a failover the box beacons are the way players are located indoors (BBC-1), and a standby that had to be told every box's place again by the GM would answer phones wrongly until it was.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit

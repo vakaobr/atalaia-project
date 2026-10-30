@@ -540,7 +540,7 @@
   },
   "join": {
     "title": "Join boxes and controllers",
-    "intro": "Make the join data for a box (NFC card or serial console) or for a standby controller.",
+    "intro": "Make the join data for a box (NFC card or serial console) or for a standby controller. A standby controller's join also carries where the boxes are placed and the beacon choices (rooms, disabled boxes), so a promoted standby places players the same way: generate it again after you move or change a box.",
     "kind": "For",
     "kinds": {
       "node": "a box",
