@@ -725,8 +725,42 @@ static void test_malformed_payloads_rejected(void)
     CHECK(atalaia_cmd_encode(&c, buf, sizeof(buf)) == 0);
 }
 
+/* Review finding FLD-8: skipping an unknown field must not recurse without a limit. */
+static void test_skip_depth_limit(void)
+{
+    atalaia_ack_msg_t a;
+    uint8_t buf[100000];
+    /* ACK {1: 0, 2: 0, 99: <value>} with the value nested `depth` arrays deep. */
+    static const uint8_t head[] = {0xa3, 0x01, 0x00, 0x02, 0x00, 0x18, 0x63};
+    int depths[] = {0, 1, 14, 15, 16, 17, 100, 90000};
+    for (size_t i = 0; i < sizeof(depths) / sizeof(depths[0]); i++) {
+        int depth = depths[i];
+        memcpy(buf, head, sizeof(head));
+        size_t n = sizeof(head);
+        for (int d = 0; d < depth; d++) buf[n++] = 0x81; /* array(1) */
+        buf[n++] = 0x00;
+        /* The skipped value's own array is level 0: 16 levels pass, 17 do not. */
+        bool expect = depth <= 16;
+        CHECK(atalaia_ack_msg_decode(buf, n, &a) == expect);
+    }
+    /* The same for maps, and a map count no input can meet. */
+    uint8_t maps[64];
+    memcpy(maps, head, sizeof(head));
+    size_t n = sizeof(head);
+    for (int d = 0; d < 20; d++) {
+        maps[n++] = 0xa1; /* map(1) */
+        maps[n++] = 0x00; /* key 0 */
+    }
+    maps[n++] = 0x00;
+    CHECK(!atalaia_ack_msg_decode(maps, n, &a));
+    static const uint8_t huge_count[] = {0xa3, 0x01, 0x00, 0x02, 0x00, 0x18, 0x63, 0x9b,
+                                         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+    CHECK(!atalaia_ack_msg_decode(huge_count, sizeof(huge_count), &a));
+}
+
 void run_msg_codec_tests(void)
 {
+    test_skip_depth_limit();
     test_hello_round_trip();
     test_hello_minimal();
     test_ack_msg_round_trip();

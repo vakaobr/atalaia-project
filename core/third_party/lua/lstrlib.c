@@ -361,12 +361,29 @@ typedef struct MatchState {
   const char *p_end;  /* end ('\0') of pattern */
   lua_State *L;
   int matchdepth;  /* control for recursive depth (to avoid C stack overflow) */
+  unsigned steps;  /* ATALAIA PATCH: matching steps since the last charge */
   unsigned char level;  /* total number of captures (finished or unfinished) */
   struct {
     const char *init;
     ptrdiff_t len;
   } capture[LUA_MAXCAPTURES];
 } MatchState;
+
+
+/*
+ * ATALAIA PATCH (SR-41, review finding FLD-8): pattern matching can take
+ * exponential time on a hostile pattern, and the VM's instruction hook does
+ * not run inside a C function. Every METER_STEPS matching steps (and, for a
+ * plain search, in proportion to the work it can take) the installed count
+ * hook is called by hand, so the sandbox's instruction budget (or the
+ * scenario compiler's) pays for the work and stops it when it runs out.
+ */
+#define METER_STEPS	1000
+
+static void meter_charge (lua_State *L) {
+  lua_Hook hook = lua_gethook(L);
+  if (hook != NULL) hook(L, NULL);  /* the hooks here ignore the debug record */
+}
 
 
 /* recursive function */
@@ -571,6 +588,10 @@ static const char *match (MatchState *ms, const char *s, const char *p) {
   if (l_unlikely(ms->matchdepth-- == 0))
     luaL_error(ms->L, "pattern too complex");
   init: /* using goto to optimize tail recursion */
+  if (l_unlikely(++ms->steps >= METER_STEPS)) {  /* ATALAIA PATCH */
+    ms->steps = 0;
+    meter_charge(ms->L);
+  }
   if (p != ms->p_end) {  /* end of pattern? */
     switch (*p) {
       case '(': {  /* start capture */
@@ -760,6 +781,7 @@ static void prepstate (MatchState *ms, lua_State *L,
   ms->src_init = s;
   ms->src_end = s + ls;
   ms->p_end = p + lp;
+  ms->steps = 0;  /* ATALAIA PATCH */
 }
 
 
@@ -781,6 +803,12 @@ static int str_find_aux (lua_State *L, int find) {
   /* explicit request or no special characters? */
   if (find && (lua_toboolean(L, 4) || nospecials(p, lp))) {
     /* do a plain search */
+    /* ATALAIA PATCH: it can take about (ls - init) * lp byte comparisons */
+    if (lua_gethook(L) != NULL) {
+      unsigned long long u = (unsigned long long)((ls - init) / 1024) * lp;
+      for (; u >= METER_STEPS; u -= METER_STEPS)
+        meter_charge(L);  /* stops with an error when the budget is spent */
+    }
     const char *s2 = lmemfind(s + init, ls - init, p, lp);
     if (s2) {
       lua_pushinteger(L, (s2 - s) + 1);

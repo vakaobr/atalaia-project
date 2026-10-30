@@ -8,9 +8,15 @@
  * handler runs with the watchdog on. core/tests/test_sandbox_escape.c is the
  * battery every change here must pass (phase 5 plan phase 5).
  *
- * Known limit: time spent inside C library functions (for example a slow
- * string pattern) is not counted by the instruction hook.
+ * String work inside C library functions is metered too (decision SR-41,
+ * review finding FLD-8): the vendored lstrlib.c calls the instruction hook by
+ * hand while it matches a pattern (find, match, gmatch, gsub), so a hostile
+ * pattern spends the same budget as a loop and ends in "instruction limit
+ * exceeded"; string.rep refuses a result over STRING_REP_MAX bytes and an
+ * empty result of any count (safe_rep). Other C functions are bounded by the
+ * memory cap.
  */
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "lauxlib.h"
@@ -123,6 +129,34 @@ static int safe_xpcall(lua_State *L)
     return 2;
 }
 
+/* The longest string.rep result: a box has 64 to 256 KB for everything. */
+#define STRING_REP_MAX 32768u
+
+/*
+ * string.rep(s, n [, sep]): Lua's loops n times even when s and sep are empty (a hang no
+ * instruction hook sees) and only fails on memory afterwards, so the size is checked first.
+ */
+static int safe_rep(lua_State *L)
+{
+    size_t l, lsep;
+    (void)luaL_checklstring(L, 1, &l);
+    lua_Integer n = luaL_checkinteger(L, 2);
+    (void)luaL_optlstring(L, 3, "", &lsep);
+    if (n <= 0 || l + lsep == 0) {
+        lua_pushliteral(L, "");
+        return 1;
+    }
+    if ((uint64_t)n > STRING_REP_MAX ||
+        (uint64_t)n * (l + lsep) > (uint64_t)STRING_REP_MAX + lsep) {
+        return luaL_error(L, "string.rep: resulting string too large (over %d bytes)",
+                          (int)STRING_REP_MAX);
+    }
+    lua_pushvalue(L, lua_upvalueindex(1)); /* the standard rep */
+    lua_insert(L, 1);
+    lua_call(L, lua_gettop(L) - 1, 1);
+    return 1;
+}
+
 static void remove_field(lua_State *L, const char *table, const char *field)
 {
     if (table == NULL) {
@@ -170,6 +204,12 @@ static int init_state(lua_State *L)
     lua_setglobal(L, "setmetatable");
     lua_pushcfunction(L, safe_xpcall);
     lua_setglobal(L, "xpcall");
+
+    lua_getglobal(L, LUA_STRLIBNAME);
+    lua_getfield(L, -1, "rep");
+    lua_pushcclosure(L, safe_rep, 1);
+    lua_setfield(L, -2, "rep");
+    lua_pop(L, 1);
 
     static const char *const registry_tables[] = {
         REG_HANDLERS,

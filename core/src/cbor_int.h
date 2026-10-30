@@ -270,8 +270,14 @@ static inline bool mc_read_array(mc_reader_t *r, uint64_t *count)
     return true;
 }
 
-/* Skip one CBOR value (used for unknown keys). */
-static inline bool mc_skip_value(mc_reader_t *r)
+/*
+ * How deep a skipped value may nest (arrays and maps inside arrays and maps). The message codecs
+ * read values two or three levels deep; a peer's unknown field gets this many and no more, so a
+ * packet of nothing but 0x81 bytes cannot recurse the C stack away (review finding FLD-8).
+ */
+#define MC_SKIP_MAX_DEPTH 16
+
+static inline bool mc_skip_value_at(mc_reader_t *r, unsigned depth)
 {
     unsigned major;
     uint64_t v;
@@ -291,18 +297,30 @@ static inline bool mc_skip_value(mc_reader_t *r)
         r->p += (size_t)v;
         return true;
     case CBOR_MAJOR_ARRAY:
-        for (uint64_t i = 0; i < v; i++) {
-            if (!mc_skip_value(r)) return false;
+    case CBOR_MAJOR_MAP: {
+        if (depth >= MC_SKIP_MAX_DEPTH) {
+            r->ok = false;
+            return false;
+        }
+        /* Every item takes at least one byte: a count beyond what is left cannot be met. */
+        if (v > mc_remaining(r)) {
+            r->ok = false;
+            return false;
+        }
+        uint64_t items = major == CBOR_MAJOR_MAP ? v * 2 : v;
+        for (uint64_t i = 0; i < items; i++) {
+            if (!mc_skip_value_at(r, depth + 1)) return false;
         }
         return true;
-    case CBOR_MAJOR_MAP:
-        for (uint64_t i = 0; i < v; i++) {
-            if (!mc_skip_value(r)) return false; /* key */
-            if (!mc_skip_value(r)) return false; /* value */
-        }
-        return true;
+    }
     default: r->ok = false; return false;
     }
+}
+
+/* Skip one CBOR value (used for unknown keys). */
+static inline bool mc_skip_value(mc_reader_t *r)
+{
+    return mc_skip_value_at(r, 0);
 }
 
 #endif /* ATALAIA_CBOR_INT_H */

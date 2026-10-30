@@ -258,7 +258,9 @@ static const escape_case_t CASES[] = {
      "  if pcall(xpcall, print) then log('escaped') end\n"
      "end)\n",
      SAFE},
-    {"memory_string", "on('go', function() local s = string.rep('x', 100000000) end)\n", HALTED},
+    /* string.rep refuses a result over 32 KB before it allocates (decision SR-41): an error the
+     * script can catch, not a halt. */
+    {"memory_string", "on('go', function() local s = string.rep('x', 100000000) end)\n", ANY},
     {"memory_table", "on('go', function() local t = {} for i = 1, 1e7 do t[i] = { i } end end)\n",
      HALTED},
     {"memory_coroutines",
@@ -268,6 +270,67 @@ static const escape_case_t CASES[] = {
      HALTED},
     {"memory_handlers",
      "on('go', function() for i = 1, 1e6 do on('x.club.' .. i, function() end) end end)\n", HALTED},
+
+    /* ---- string work in C functions: patterns and rep are metered (decision SR-41, FLD-8) ---- */
+    {"rep_limits",
+     "on('go', function()\n"
+     "  local ok1, e1 = pcall(string.rep, 'x', 1e8)\n"
+     "  local ok2 = pcall(string.rep, 'ab', 20000, 'cd')\n"
+     "  local ok3, e3 = pcall(string.rep, 'x', math.maxinteger)\n"
+     "  if not ok1 and e1:find('too large', 1, true) and not ok2 and not ok3 and\n"
+     "     #string.rep('xy', 3, '-') == 8 and string.rep('ab', 3) == 'ababab' and\n"
+     "     string.rep('x', 0) == '' and string.rep('x', -5) == '' and #string.rep('x', 20000) == "
+     "20000 then\n"
+     "    log('ok')\n"
+     "  end\n"
+     "end)\n",
+     SAFE},
+    {"rep_empty_forever",
+     /* Lua loops once per repeat even when nothing is repeated: a hang without a hook. */
+     "on('go', function()\n"
+     "  if string.rep('', 1e18) == '' and string.rep('', 1e18, '') == '' then log('ok') end\n"
+     "end)\n",
+     SAFE},
+    {"pattern_find_backtracking",
+     "on('go', function() local s = string.rep('a', 2000) .. 'c'\n"
+     "  string.find(s, '.-.-.-.-.-.-b') end)\n",
+     HALTED},
+    {"pattern_match_backtracking",
+     "on('go', function() local s = string.rep('a', 3000)\n"
+     "  string.match(s, '(.-)(.-)(.-)(.-)(.-)x') end)\n",
+     HALTED},
+    {"pattern_gsub_backtracking",
+     "on('go', function() local s = string.rep('a', 3000)\n"
+     "  string.gsub(s, 'a*a*a*a*a*b', 'x') end)\n",
+     HALTED},
+    {"pattern_gmatch_backtracking",
+     "on('go', function() local s = string.rep('a', 3000)\n"
+     "  for w in string.gmatch(s, '.-.-.-.-.-z') do end end)\n",
+     HALTED},
+    {"pattern_in_pcall_loop",
+     "on('go', function() local s = string.rep('a', 3000)\n"
+     "  for i = 1, 1e9 do pcall(string.find, s, '.-.-.-.-.-b') end end)\n",
+     HALTED},
+    {"plain_find_quadratic",
+     /* Plain search is O(subject * pattern) when the first character keeps matching. */
+     "on('go', function() local s = string.rep('a', 30000)\n"
+     "  local big = s .. s .. s .. s\n"
+     "  local p = string.rep('a', 30000) .. 'b'\n"
+     "  for i = 1, 100 do string.find(big, p, 1, true) end end)\n",
+     HALTED},
+    {"patterns_still_work",
+     "on('go', function()\n"
+     "  local text = string.rep('key=value; ', 200)\n"
+     "  local n = 0\n"
+     "  for k, v in string.gmatch(text, '(%w+)=(%w+)') do n = n + 1 end\n"
+     "  local r, c = string.gsub(text, '%s+', ' ')\n"
+     "  if n == 200 and c == 200 and string.find('hello world', 'o w') == 5 and\n"
+     "     string.match('2026-10-30', '(%d+)-(%d+)-(%d+)') == '2026' and\n"
+     "     string.find(text, 'nope', 1, true) == nil and ('x'):rep(3) == 'xxx' then\n"
+     "    log('ok')\n"
+     "  end\n"
+     "end)\n",
+     SAFE},
 
     /* ---- crashing the runtime ---- */
     {"deep_recursion",
