@@ -1239,9 +1239,9 @@ const Map<String, String> zhTwStrings = {
   'player.saved_forget': '忘記此場地',
   'acct.oidc.notice_required': '要建立新帳號，請先勾選已閱讀隱私權聲明（提供者按鈕下面的框），然後再選一次提供者。',
   'acct.oidc.age_confirmation_required':
-      '要建立帳號，必須是 16 以上（含 16）。未滿 16 的玩家不需要帳號，可在場地報到，並依場地對家長或監護人的規定辦理。如果你是 16 以上，請勾選提供者按鈕下面的 16 以上框，然後再選一次提供者。',
+      '建立帳號需年滿 16 歲。未滿 16 歲的玩家不需要帳號，可在場地報到，並依場地對家長或監護人的規定辦理。如果你已年滿 16 歲，請勾選提供者按鈕下面的年齡框，然後再選一次提供者。',
   'site.err.age_confirmation_required':
-      '要建立帳號，必須是 16 以上（含 16）。未滿 16 的玩家不需要帳號，可在場地報到，並依場地對家長或監護人的規定辦理。',
+      '建立帳號需年滿 16 歲。未滿 16 歲的玩家不需要帳號，可在場地報到，並依場地對家長或監護人的規定辦理。',
   'site.err.notice_required': '請先打開並閱讀隱私權聲明，再勾選已閱讀。',
   'site.err.username_invalid': '使用者名稱需要 3 到 64 個字母、數字、點、連字號或底線，必須以字母或數字開始。',
   'site.err.username_reserved': '這個使用者名稱已保留：請換一個。',
@@ -1251,14 +1251,14 @@ const Map<String, String> zhTwStrings = {
   'site.signup_open': '建立帳號',
   'site.signup_title': '在 {host} 建立帳號',
   'site.signup_intro':
-      '有了帳號，你就能報名遊戲並查看自己的紀錄。請先打開並閱讀隱私權聲明，再在下方確認。未滿 16 嗎？你不需要帳號：直接在場地報到即可。',
+      '有了帳號，你就能報名遊戲並查看自己的紀錄。請先打開並閱讀隱私權聲明，再在下方確認。未滿 16 歲嗎？你不需要帳號：直接在場地報到即可。',
   'site.signup_email': '電子郵件（可不填）',
   'site.signup_create': '建立帳號',
   'site.signup_no_notice': '這台伺服器還沒有公布隱私權聲明，所以目前還不能在這裡建立帳號。請詢問場地的主辦單位。',
   'site.new_account_hint': '第一次來嗎？要建立帳號，請閱讀聲明並勾選兩個框。',
   'site.login_notice': '我已閱讀隱私權聲明。',
   'site.login_notice_first': '請先打開上方的隱私權聲明。',
-  'site.login_age': '我是 16 以上（含 16）。未滿 16 的玩家不需要帳號，可在場地報到，並依場地對家長或監護人的規定辦理。',
+  'site.login_age': '我已年滿 16 歲。未滿 16 歲的玩家不需要帳號，可在場地報到，並依場地對家長或監護人的規定辦理。',
   'privacy.title': '隱私權聲明',
   'privacy.read': '閱讀隱私權聲明',
   'privacy.version': '版本 {version}',
