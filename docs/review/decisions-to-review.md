@@ -3158,3 +3158,118 @@ legacct (worktree-agent-ae545086ed9d86722; migration 0029_account_notice_records
 | LEG-33 | Export, erasure, merge? | notice_records covered everywhere. | ADR-P4-8. |
 | LEG-34 | zh-tw age wording in the app? | Avoids 年/歲 until the test font subset is regenerated. | Follow-up: regenerate the font. |
 | LEG-35 | Browser tests? | Updated; pass (55). | |
+
+## The receivers find a node at a random high epoch (SR-110 to SR-119, 2026-10-30)
+
+From the authenticated security test: a lost-store node's epoch, and the controller's own epoch after a restore.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| SR-110 | How do receivers learn a lost-store node's epoch? | Receivers deep-search HELLO/TIME over the whole range, 2048 epochs per budgeted search (~1-2 min); controllers hearing a box >16 above, or a known box's HELLO higher, call SET_PEER_EPOCH and flood CMD 11 peer {src, epoch}, repeated at 4 s and 10 s. | The modem can't hand over packets it can't open; boxes follow at once. | built (2026-10-30); open for the maintainer's review |
+| SR-111 | Can an announcement move an epoch backwards? | Never; only raises. | A stale announcement would deafen receivers. | built (2026-10-30); open for the maintainer's review |
+| SR-112 | Controller epoch for a resumed game with no record? | Random 4096..61439 (Pi and phone, tx_epoch.json); new game/standby first join still 1. | Avoids nonce reuse. | built (2026-10-30); open for the maintainer's review |
+| SR-113 | DB restored from an older backup or deleted? | Pi keeps <db>.epochs (fsynced, 0600) and goes above the higher; phone keeps none (backup off). |  | built (2026-10-30); open for the maintainer's review |
+| SR-114 | SR-26 RAM-only window after a reboot? | Not built; needs a freshness value in HELLO echoed by the controller (wire change); Amendment 24 item 5. | Cheaper options don't close it. | built (2026-10-30); open for the maintainer's review |
+| SR-115 | Which types get the deep search? | HELLO and TIME only. |  | built (2026-10-30); open for the maintainer's review |
+| SR-116 | Cost? | One 2048-decryption slice (~60 ms on the S3) per wide-search budget unit (once/source/2 s, 20/min); RAM -320 B (193,177 B free). | Junk flood bounded. | built (2026-10-30); open for the maintainer's review |
+| SR-117 | When does a controller announce? | Above known and >16 above, or a known box's higher HELLO; not first HELLOs at 1; re-announce only above the last announced. | One burst per real restart. | built (2026-10-30); open for the maintainer's review |
+| SR-118 | Box handling of CMD peer? | Only from its controller; src 1-65534 not itself; epoch 1-65535; raises only; old boxes ignore. |  | built (2026-10-30); open for the maintainer's review |
+| SR-119 | Alternatives refused, accepted risk? | Raw unheard-packet modem frame, random epoch on every standby join, persisting windows refused. Accepted: a recorded high-epoch HELLO/TIME from an earlier lost-store life can deafen a receiver (needs two store losses; DoS only). |  | built (2026-10-30); open for the maintainer's review |
+
+## Stream tokens out of access logs, rand() seeded from the game key (SR-120 to SR-129, 2026-10-30)
+
+Findings LIVE2-1 and LIVE2-2 of the authenticated security test.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| SR-120 | Stream token without the URL? | Sec-WebSocket-Protocol: atalaia.v1 + atalaia.token.<base64url>; app clients use Authorization: Bearer. | Browsers can only set the subprotocol; headers are in no access log. | built (2026-10-30); open for the maintainer's review |
+| SR-121 | Old clients? | ?token= accepted for one transition with a one-time warning; removed two releases after console and app use the header. |  | built (2026-10-30); open for the maintainer's review |
+| SR-122 | Server's subprotocol answer? | Only atalaia.v1. | An echo would put the token in a response header. | built (2026-10-30); open for the maintainer's review |
+| SR-123 | Redaction scope? | Logging filter on uvicorn loggers blanks token-like query values, #token= and Bearer values; controller and site server. | Defence in depth incl. OIDC code/state. | built (2026-10-30); open for the maintainer's review |
+| SR-124 | App uses the subprotocol? | No, Authorization header via dart:io. |  | built (2026-10-30); open for the maintainer's review |
+| SR-125 | Preview demo proxy? | Accepts the subprotocol (and legacy ?token=), forwards upstream by subprotocol. |  | built (2026-10-30); open for the maintainer's review |
+| SR-126 | rand() seed? | HMAC-SHA256(game_key, "atalaia/rand/v1" \|\| seed u32be \|\| node_id u16be), 16 bytes into xoshiro128**; zero key keeps the old seed; shared vectors rand.json in C/Python/Dart. | Seed and node ids are public. | built (2026-10-30); open for the maintainer's review |
+| SR-127 | Key source per host? | The join's game key on box, Pi FieldScript, phone NodeSpec and prop sessions; simulator tests key-less. |  | built (2026-10-30); open for the maintainer's review |
+| SR-128 | game_seed hidden from non-staff? | Yes on both controllers and the site server (admin/gm/marshal only); kept in sync and remote GM. | Hardening. | built (2026-10-30); open for the maintainer's review |
+| SR-129 | Recorded games? | Pre-change recordings replay differently; don't update mid-game. | By design. | built (2026-10-30); open for the maintainer's review |
+
+## The Lua sandbox: table functions, coroutines, timers, the reassembler (SR-130 to SR-139, 2026-10-30)
+
+Findings LIVE2-S1 to S5 and the low notes of the authenticated security test.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| SR-130 | Table functions bounded how? | Marked ltablib.c patch charges the hook per element; sort pivot fixed. | C loops never reach the VM hook; replay determinism. | built (2026-10-30); open for the maintainer's review |
+| SR-131 | field.nodes buffer on a decoder error? | Decode in lua_pcall, free, rethrow. | longjmp skipped free (720 KB leak under ASan). | built (2026-10-30); open for the maintainer's review |
+| SR-132 | C stack on the ESP32? | LUAI_MAXCCALLS 20 (built-ins need <= 14), LUAL_BUFFERSIZE 64, pattern depth 32; game task 24 KB, mode-fetch 20 KB (from heap). Estimated, bench high-water check pending. | 200 levels needed 69-273 KB. | built (2026-10-30); open for the maintainer's review |
+| SR-133 | Lua time per host entry? | 4x instr_limit across callbacks + one limit per 100 ms of game time advanced; each callback >= 250. | after(0) chains held the task. | built (2026-10-30); open for the maintainer's review |
+| SR-134 | Coroutines metered? | create/wrap cost one hook step; watchdog trip hooks the main thread. | 49x amplification measured. | built (2026-10-30); open for the maintainer's review |
+| SR-135 | Coroutine charge too high? | Accepted. | No built-in mode uses them. | built (2026-10-30); open for the maintainer's review |
+| SR-136 | Still unmetered? | string.upper/lower/reverse and `..`. | memcpy-class, memory-capped. | built (2026-10-30); open for the maintainer's review |
+| SR-137 | Timer wrap? | Saturating add; every() stops at game end; real wrap 49.7 days. |  | built (2026-10-30); open for the maintainer's review |
+| SR-138 | field.send / emit / node ids? | send 256 per entry; emit refuses script.*; ids outside 0..65535 are no node. |  | built (2026-10-30); open for the maintainer's review |
+| SR-139 | Reassembler chunk bound (LIVE2-F1)? | Rejects chunk_len > 153, ASan test; Python/Dart growable. |  | built (2026-10-30); open for the maintainer's review |
+
+## Follow-ups of 30 October: preview notice, demo HSTS, phone ATAK TLS and revocation, kept game results (FU30-1 to FU30-19, 2026-10-30)
+
+The follow-ups the security and privacy work left open.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| FU30-1 | Where does the preview install its notice? | preview.sh up (so update too) + a notice subcommand. | An update replaces src/. | built (2026-10-30); open for the maintainer's review |
+| FU30-2 | Missing version files? | pt and en required, up stops before building; empty version warns. |  | built (2026-10-30); open for the maintainer's review |
+| FU30-3 | Other versions removed? | No. | Older files stay as record. | built (2026-10-30); open for the maintainer's review |
+| FU30-4 | Demo HSTS? | max-age=31536000 when X-Forwarded-Proto is https, incl. the 405; no includeSubDomains/preload. | Longer or preload is the maintainer's call. | built (2026-10-30); open for the maintainer's review |
+| FU30-5 | Phone revocation? | The Pi's rules exactly (refetch, no fallback on a wrong list, last good list kept, 30-day grace). | FLD-7 parity. | built (2026-10-30); open for the maintainer's review |
+| FU30-6 | Missing revoked.json on the phone? | Blocks the install. |  | built (2026-10-30); open for the maintainer's review |
+| FU30-7 | Floor and offline age on the phone? | min_versions, revocation_max_age_days on the Mode packages screen (4 languages). |  | built (2026-10-30); open for the maintainer's review |
+| FU30-8 | Screens ListView -> SingleChildScrollView? | Done (testability). |  | built (2026-10-30); open for the maintainer's review |
+| FU30-9 | Phone ATAK TLS material? | PEM text in settings; CA required for staff_tls. | No files on a phone. | built (2026-10-30); open for the maintainer's review |
+| FU30-10 | Hostname check on phone ATAK TLS? | Always checked (endpoint host or staff_tls_name), chain against the pinned CA only. | Stricter than the Pi. | built (2026-10-30); open for the maintainer's review |
+| FU30-11 | Other TLS details? | Port 8089, TLS >= 1.2, no system roots, warning for players=true without TLS. |  | built (2026-10-30); open for the maintainer's review |
+| FU30-12 | Contract cases? | Floor only; revocation unit-tested in Dart. | Needs network. | built (2026-10-30); open for the maintainer's review |
+| FU30-13 | Where are team results written? | Store.purge_games, same transaction, INSERT OR IGNORE. |  | built (2026-10-30); open for the maintainer's review |
+| FU30-14 | Which games? | Ended within 365 days when purged. |  | built (2026-10-30); open for the maintainer's review |
+| FU30-15 | Content? | Name, mode, teams, totals, winner, state, duration, dates; no game_id/seed, squads, members, crests. | SR-88. | built (2026-10-30); open for the maintainer's review |
+| FU30-16 | Who reads them? | GET /api/v1/game-results (GM or read token, max 500); players 403; not on the demo proxy. |  | built (2026-10-30); open for the maintainer's review |
+| FU30-17 | Phone storage? | In the check-in document. |  | built (2026-10-30); open for the maintainer's review |
+| FU30-18 | Deterministic contract case? | Controller(wall=...) on the Pi. |  | built (2026-10-30); open for the maintainer's review |
+| FU30-19 | Notice templates? | Team-results row location now "field controller and site server". | Maintainer/lawyer to confirm wording. | built (2026-10-30); open for the maintainer's review |
+
+## The docs pass of 30 October (DOCS-5 to DOCS-9, 2026-10-30)
+
+Roadmap, SECURITY.md and the pt architecture page after the legal review and the security work.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| DOCS-5 | Where does BBC-30 go on the roadmap? | Appended to the existing standby bullet in phase 3. | Extends it. | built (2026-10-30); open for the maintainer's review |
+| DOCS-6 | "Legal review before hosted mode" after the lawyer's approval? | Replaced with the hosted go-live conditions (signed DPA per field, sharing terms, filled-in notice); hosted not offered yet. | Positions approved; conditions not met. | built (2026-10-30); open for the maintainer's review |
+| DOCS-7 | Retention wording? | Game history 90 days (team results 365), chrono 365. | Code defaults. | built (2026-10-30); open for the maintainer's review |
+| DOCS-8 | SECURITY.md after several branches? | In scope next to Reporting; new sections grouped; "what has been tested where" first. |  | built (2026-10-30); open for the maintainer's review |
+| DOCS-9 | pt architecture page still had the box fetching the field logo? | Removed (5 places). | LOGO-5. | built (2026-10-30); open for the maintainer's review |
+
+## Stale phase state lines (SD-1 to SD-3, 2026-10-30)
+
+Phase STATE and STATUS lines that called built work next or not built.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| SD-1 | Phase 2 plan phase F: next or done? | Next, stated as hardware-blocked. | Needs the boards. | built (2026-10-30); open for the maintainer's review |
+| SD-2 | Phase 4 console screen for the remote GM log: built? | Kept "Not built". | No console code found; positions and the GM page are built. | built (2026-10-30); open for the maintainer's review |
+| SD-3 | Phase 4 iOS line? | iOS app built and compiled in CI (iOS-1..16), not yet on a phone; site login on iOS (ASWebAuthenticationSession, ASAuthorization) not built. | The agent first kept "Not built"; app/ios/ and the CI job exist (coordinator correction). | built (2026-10-30); open for the maintainer's review |
+
+## The player's event list hides housekeeping events (PF-1, 2026-10-30)
+
+Raw event type names no longer show to players.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| PF-1 | Which events does the player's list hide, and how? | Deny set playerHiddenEventTypes (node.* except node.tamper, pod.*, script.*, battery.low, tag.scanned, target.hit, chrono.checkin, chrono.spotcheck, visibility.expired), applied where the player's live list and game history are drawn; FieldFeed and staff views unchanged. | They had no player-facing text and showed as raw type names; a deny set keeps new game events visible by default. | built (2026-10-30); open for the maintainer's review |
+
+## Unblocking a staff account with no second factor (SP-1, 2026-10-30)
+
+The operator's set-password command (SR-2 lockout).
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| SP-1 | How does an operator unblock a passwordless staff account with no second factor (SR-2)? | `set-password --username NAME --reason TEXT [--yes] [--password-stdin] [--field SLUG]`: no-echo prompt twice (or one stdin line, needs --yes), no argv option, the API's policy_problem, all sessions revoked, password_set audit row, --field in hosted mode; refuses unknown/erased accounts and password login off; TOTP and passkeys untouched. | Same pattern as reset-totp (S11-7); a password in argv leaks to shell history and ps. | built (2026-10-30); open for the maintainer's review |
