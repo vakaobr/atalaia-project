@@ -7,4 +7,5 @@
 #   docker run --rm -v "$PWD:/project" -w /project/firmware/esp32 atalaia-idf \
 #       idf.py build
 #
-FROM espressif/idf:v5.3.2
+# Pinned by digest, the same as the workflows and tools/docker_fw.py (security review SC-3).
+FROM espressif/idf:v5.3.2@sha256:5b8f58d9d9caa45b689a31a0b6a0cc53b84594e0ba5fdd8d28eeef7d6123242a

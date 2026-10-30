@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# What CI installs to run the simulator, the game modes (security review SC-3): the same two libraries as simulator/requirements.txt, which stays a
+# loose list for people. ci-sim-requirements.txt pins them and their dependency chain with PyPI
+# hashes; jobs install it with pip --require-hashes --no-deps --only-binary=:all:. To refresh, from the
+# repository root:
+#   docker run --rm -v "$PWD/tools:/w" -w /w python:3.12.14-slim sh -c '
+#     pip install -q uv==0.9.30 &&
+#     uv pip compile --universal --python-version 3.12 --exclude-newer YYYY-MM-DD \
+#       --generate-hashes --no-header ci-sim-requirements.in -o ci-sim-requirements.txt'
+# then put the SPDX header back at the top of the .txt file (same for ci-lint-requirements).
+PyYAML
+cryptography

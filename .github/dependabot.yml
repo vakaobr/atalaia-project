@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Weekly update pull requests for what the workflows and the hash-pinned requirement files pin
+# Weekly update pull requests for what the workflows and the hash-pinned requirement files pin (the
+# tools/ folder holds release-requirements, ci-sim-requirements, ci-lint-requirements and ci-yaml-requirements)
 # (SC-4 to SC-6). The actions are pinned by commit SHA with a version comment, and Dependabot moves
 # both. Every update is a normal pull request: CI runs on it and a maintainer reads it, like any change.
 # The ESP-IDF image (pinned by digest in the workflows) and the Dockerfiles' base images are not

@@ -55,7 +55,7 @@ All three apply to that build folder only, and are reset when left out.
                                                Applies to that build folder; on when left out.
 
 Works from any folder and any shell (cmd, PowerShell, bash). Docker must be
-running. `build`, `wokwi`, `modem`, `pod` and `bench` use the espressif/idf:v5.3.2 image, the same as
+running. `build`, `wokwi`, `modem`, `pod` and `bench` use the espressif/idf:v5.3.2 image (pinned by digest), the same as
 CI's esp32-build job, and write into firmware/esp32/ so that flashing tools
 and the Wokwi extension find the files. `test` runs CI's firmware-test
 commands in the atalaia-dev image (built on first use, like docker_sim.py)
@@ -83,7 +83,8 @@ PROJECT_RELEASE_KEYS_HEX = "e6dccf90dd002529fe837e023f9f658a70917ff7dc69615cec60
 PROJECT_MODE_KEYS_HEX = "23e9b7acefbe4dc54d86f0c7cc8dbca64340f141a84c94a2f38216420baae0ca d27329d0e19ba0625950cb1b73fca4aa4c5014d76623f6b69389d0e98b1d4c86"
 VERSION_H = REPO / "core" / "include" / "atalaia" / "version.h"
 FW_VERSION_LEN = 31  # esp_app_desc_t's version (32 bytes with its NUL)
-IDF_IMAGE = "espressif/idf:v5.3.2"
+# Pinned by digest, the same as the workflows (security review SC-3): move all of them together.
+IDF_IMAGE = "espressif/idf:v5.3.2@sha256:5b8f58d9d9caa45b689a31a0b6a0cc53b84594e0ba5fdd8d28eeef7d6123242a"
 DEV_IMAGE = "atalaia-dev"
 DEV_LABEL = "org.atalaia.dockerfile"
 # ATALAIA_VOLUME_SUFFIX keeps the build cache of two checkouts (e.g. a git worktree) apart.

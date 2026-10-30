@@ -36,7 +36,8 @@ permissions:
 env:
   ATALAIA_REPOSITORY: vakaobr/atalaia-project
   # Pin to an Atalaia release tag or commit when the registry is created, and move it on
-  # purpose (a pull request of its own): the checks are the tools at this ref (decision P5G-4).
+  # purpose (a pull request of its own): the checks are the tools at this ref (decision P5G-4). A ref
+  # older than the hashed tools/ci-*-requirements.txt files cannot install the tools below.
   ATALAIA_REF: main
   ATALAIA: ${{ github.workspace }}/atalaia
 
@@ -45,28 +46,28 @@ jobs:
     name: Index, keys, signatures, sources and licences
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: registry
           persist-credentials: false
       - name: The base branch, to check that no published version changed
         if: github.event_name == 'pull_request'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: base
           persist-credentials: false
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.ATALAIA_REPOSITORY }}
           ref: ${{ env.ATALAIA_REF }}
           path: atalaia
           persist-credentials: false
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Install tools
-        run: pip install -r "$ATALAIA/simulator/requirements.txt" check-jsonschema reuse
+        run: python3 -m pip install --require-hashes --no-deps --only-binary ":all:" --no-binary reuse -r "$ATALAIA/tools/ci-sim-requirements.txt" -r "$ATALAIA/tools/ci-lint-requirements.txt"
       - id: check-schemas
         name: The index and the revocation list against the JSON Schemas
         working-directory: registry
@@ -91,24 +92,24 @@ jobs:
     env:
       ATALAIA_CORE_LIB: ${{ github.workspace }}/build/libatalaia_core.so
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: registry
           persist-credentials: false
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.ATALAIA_REPOSITORY }}
           ref: ${{ env.ATALAIA_REF }}
           path: atalaia
           persist-credentials: false
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libmbedtls-dev
-          pip install -r "$ATALAIA/simulator/requirements.txt"
+          python3 -m pip install --require-hashes --no-deps --only-binary ":all:" -r "$ATALAIA/tools/ci-sim-requirements.txt"
       - name: Build the core
         run: |
           cmake -S "$ATALAIA/core" -B build -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON -DBUILD_TESTING=OFF
@@ -124,20 +125,20 @@ jobs:
     name: Sandbox-escape battery
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.ATALAIA_REPOSITORY }}
           ref: ${{ env.ATALAIA_REF }}
           path: atalaia
           persist-credentials: false
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libmbedtls-dev
-          pip install -r "$ATALAIA/simulator/requirements.txt"
+          python3 -m pip install --require-hashes --no-deps --only-binary ":all:" -r "$ATALAIA/tools/ci-sim-requirements.txt"
       - name: The C battery under ASan and UBSan
         run: |
           cmake -S "$ATALAIA/core" -B build-asan -DCMAKE_BUILD_TYPE=Debug \
@@ -166,28 +167,28 @@ jobs:
       group: pages
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: registry
           persist-credentials: false
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.ATALAIA_REPOSITORY }}
           ref: ${{ env.ATALAIA_REF }}
           path: atalaia
           persist-credentials: false
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Install tools
-        run: pip install -r "$ATALAIA/simulator/requirements.txt"
+        run: python3 -m pip install --require-hashes --no-deps --only-binary ":all:" -r "$ATALAIA/tools/ci-sim-requirements.txt"
       - id: check-site
         name: Build what the registry publishes
         working-directory: registry
         run: python "$ATALAIA/tools/registry_check.py" site . ../_site
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

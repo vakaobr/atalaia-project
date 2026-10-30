@@ -38,7 +38,7 @@ jobs:
           ATALAIA_CORE_LIB: ${{ github.workspace }}/build/libatalaia_core.so
           ATALAIA_CORE_STUB_LIB: ${{ github.workspace }}/build/libatalaia_core_stub.so
         run: |
-          pip install -r simulator/requirements.txt
+          python3 -m pip install --require-hashes --no-deps --only-binary ":all:" -r tools/ci-sim-requirements.txt
           cd simulator
           python -m unittest discover -s tests -v
           python -m atalaia_sim test
@@ -392,7 +392,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install tools
-        run: pip install -r simulator/requirements.txt check-jsonschema
+        run: python3 -m pip install --require-hashes --no-deps --only-binary ":all:" --no-binary reuse -r tools/ci-sim-requirements.txt -r tools/ci-lint-requirements.txt
       - name: Generated files are up to date
         run: python tools/protogen.py --check
       - name: The field frame vectors are up to date
@@ -490,7 +490,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libmbedtls-dev
-          pip install -r simulator/requirements.txt
+          python3 -m pip install --require-hashes --no-deps --only-binary ":all:" -r tools/ci-sim-requirements.txt
       - name: The C battery under ASan and UBSan
         run: |
           cmake -S core -B build-asan -DCMAKE_BUILD_TYPE=Debug \
@@ -528,7 +528,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libmbedtls-dev
-          pip install -r simulator/requirements.txt check-jsonschema reuse
+          python3 -m pip install --require-hashes --no-deps --only-binary ":all:" --no-binary reuse -r tools/ci-sim-requirements.txt -r tools/ci-lint-requirements.txt
       - name: Build the core
         run: |
           cmake -S core -B build -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON -DBUILD_TESTING=OFF
@@ -573,7 +573,7 @@ jobs:
           python-version: "3.12"
       - name: Lint
         run: |
-          pip install reuse
+          python3 -m pip install --require-hashes --no-deps --only-binary ":all:" --no-binary reuse -r tools/ci-lint-requirements.txt
           reuse lint
 
   esp32-build:
@@ -693,7 +693,7 @@ jobs:
           ctest --test-dir /tmp/fw-test --output-on-failure
       - name: The modes page's animations are what the screens draw
         run: |
-          python3 -m pip install pyyaml
+          python3 -m pip install --require-hashes --no-deps --only-binary ":all:" -r tools/ci-yaml-requirements.txt
           python3 tools/gen_mode_gifs.py --check --frames-exe /tmp/fw-test/mode_gif_frames
 
   dco:

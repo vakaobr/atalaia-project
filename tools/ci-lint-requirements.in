@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The command line tools CI runs over the repository and the registry template: JSON Schema
+# validation and REUSE licence lint (security review SC-3). ci-lint-requirements.txt pins them and
+# their dependency chains with PyPI hashes (refresh like ci-sim-requirements.in).
+#
+# reuse publishes a source archive only (its one wheel is built for glibc 2.41 and CPython 3.10, which
+# no runner has), so the jobs install with --no-binary reuse: pip checks the source archive's hash,
+# then builds it; the build backend (poetry-core) comes unpinned from PyPI, build time only.
+check-jsonschema
+reuse
