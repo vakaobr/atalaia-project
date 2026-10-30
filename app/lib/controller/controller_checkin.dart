@@ -115,7 +115,8 @@ const _identityDays = 365;
 
 /// How long the field keeps chrono records and an ended game's data, in days
 /// (decisions RET-1, RET-2; the Pi's `chrono_retention_days` and
-/// `game_retention_days`): a setting of the field, 365 by default.
+/// `game_retention_days`): a setting of the field: 365 by default for chrono records, 90 for game data (maintainer decision
+/// 2026-10-30).
 const retentionKeys = ['chrono_retention_days', 'game_retention_days'];
 const retentionMinDays = 30;
 const retentionMaxDays = 3653;
@@ -206,7 +207,7 @@ class CheckinConfig {
     this.apdsJson = '',
     this.retentionDays = 30,
     this.chronoRetentionDays = 365,
-    this.gameRetentionDays = 365,
+    this.gameRetentionDays = 90,
     this.utcDay = false,
   });
 
@@ -3766,6 +3767,19 @@ class ControllerCheckin {
   List<Object?> playerReadings(String pid) => [
     for (final r in _readingsOf(playerId: pid)) r['record'],
   ];
+
+  /// Other fields' copies of these players' chrono records are dropped (PRIV-5:
+  /// the site server's `copies_revoked`: the person erased their account or
+  /// withdrew a chrono-sharing consent); returns how many records went. The
+  /// field's own readings are not touched.
+  int revokeShared(Iterable<String> playerIds) {
+    var n = 0;
+    for (final pid in playerIds.toSet()) {
+      n += _deleteShared(playerId: pid);
+    }
+    if (n > 0) _save();
+    return n;
+  }
 
   int deletePlayerReadings(String pid) {
     _deleteShared(playerId: pid); // other fields' copies of them (S14-5)

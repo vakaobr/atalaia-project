@@ -681,6 +681,10 @@ Json checkChrono(Object? raw) {
 const maxSchedule = 200;
 const maxRoster = 5000;
 const maxShared = 100;
+
+/// Players in a schedule answer's `copies_revoked` (PRIV-5; the newest within the retention).
+const maxRevoked = 1000;
+const revokeReasons = ['erasure', 'withdrawn'];
 const maxClaims = 500;
 const maxDeclarations = 20;
 const _scheduledStates = ['published', 'in_progress', 'completed', 'cancelled'];
@@ -721,7 +725,7 @@ Json _answerEnvelope(
 }
 
 Json checkSchedule(Object? raw) {
-  final body = _answerEnvelope(raw, ['games']);
+  final body = _answerEnvelope(raw, ['games'], ['copies_revoked']);
   final seen = <Object?>{};
   final games = _list(body['games'], 'games', maxSchedule);
   for (var i = 0; i < games.length; i++) {
@@ -779,6 +783,27 @@ Json checkSchedule(Object? raw) {
       nullable: true,
     );
     _text(_default(g, 'location', null), '$path.location', 512, nullable: true);
+  }
+  // PRIV-5: the field's players whose pulled copies of other fields' chrono records are to be dropped (the person
+  // erased their account, or withdrew a field's chrono-sharing consent); a server that has none leaves the key out.
+  final revoked = _list(
+    _default(body, 'copies_revoked', <Object?>[]),
+    'copies_revoked',
+    maxRevoked,
+  );
+  final seenPairs = <String>{};
+  for (var i = 0; i < revoked.length; i++) {
+    final path = 'copies_revoked[$i]';
+    final r = _obj(revoked[i], path);
+    _keys(r, path, ['player_id', 'reason', 'at']);
+    _text(r['player_id'], '$path.player_id', 14, pattern: playerIdRe);
+    if (!revokeReasons.contains(r['reason'])) {
+      _fail('bad_value', '$path.reason');
+    }
+    _num(r['at'], '$path.at', 0, _timeMax);
+    if (!seenPairs.add('${r['player_id']}/${r['reason']}')) {
+      _fail('duplicate_player', '$path.player_id');
+    }
   }
   return body;
 }

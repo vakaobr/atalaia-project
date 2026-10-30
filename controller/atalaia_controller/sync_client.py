@@ -739,15 +739,27 @@ class SyncClient:
         if not hasattr(self.transport, "get"):
             return
         self.game_day_error = None
-        schedule = self._get(f"/api/v1/sync/schedule?days={SCHEDULE_DAYS}", "schedule")
+        schedule = self._get(f"/api/v1/sync/schedule?days={SCHEDULE_DAYS}&revocations=1", "schedule")
         if schedule is None:
             return
         now = self._wall()
         self.store.set_schedule(schedule["games"], now)
         self.schedule_pulled_at = now
+        self._drop_revoked_copies(schedule.get("copies_revoked") or [])
         self._pull_rosters()
         self._answer_claims()
         self._push_checkins()
+
+    def _drop_revoked_copies(self, revoked: list[dict[str, Any]]) -> None:
+        """PRIV-5: the site server says which of this field's players erased their account or withdrew a chrono-sharing
+        consent: the copies of other fields' records pulled for them are dropped now, before this cycle's pull, and the
+        controller keeps nothing of them that the person has taken back (Art. 17(2)). Idempotent: a record sent every
+        cycle until the field's retention period ends does nothing once the copies are gone."""
+        if not revoked or self.checkin is None:
+            return
+        dropped = self.checkin.revoke_shared([r["player_id"] for r in revoked])
+        if dropped:
+            log.info("shared chrono: %d copies dropped for %d revoked player(s)", dropped, len(revoked))
 
     def _linked(self) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         out = []

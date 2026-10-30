@@ -29,7 +29,7 @@ void main() {
     final answers = v['answers']! as Map;
     expect(
       (list(answers['valid']).length, list(answers['invalid']).length),
-      (23, 82),
+      (24, 86),
     );
     expect({
       for (final c in list(answers['valid'])) c['kind'],

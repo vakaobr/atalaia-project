@@ -236,18 +236,18 @@ class SiteSettingsTests(SiteBrandingCase):
 
     def test_the_site_retention_days_replace_the_controllers_and_lock_them(self) -> None:
         """RET-2: the field's chrono and game retention come with the other settings; the console cannot change them."""
-        self.site.settings = {**copy.deepcopy(SETTINGS), "chrono_retention_days": 180, "game_retention_days": 90}
+        self.site.settings = {**copy.deepcopy(SETTINGS), "chrono_retention_days": 180, "game_retention_days": 120}
         self.cycle()
         st = self.svc.settings()
-        self.assertEqual((st["chrono_retention_days"], st["game_retention_days"]), (180, 90))
+        self.assertEqual((st["chrono_retention_days"], st["game_retention_days"]), (180, 120))
         self.assertEqual(self.client.put("/api/v1/checkin/settings", json={"game_retention_days": 400},
                                          headers=GM).status_code, 409)
         self.assertEqual(self.client.put("/api/v1/checkin/settings", json={"max_players": 50},
                                          headers=GM).status_code, 200)  # the rest stays the GM's
         self.restart()
+        self.assertEqual(self.svc.settings()["game_retention_days"], 120)
+        self.cfg.sync_branding = "local"  # the field went back to its own: the controller's 90 again
         self.assertEqual(self.svc.settings()["game_retention_days"], 90)
-        self.cfg.sync_branding = "local"  # the field went back to its own: the controller's 365 again
-        self.assertEqual(self.svc.settings()["game_retention_days"], 365)
 
     def test_a_site_without_retention_days_leaves_the_controllers(self) -> None:
         self.site.settings = copy.deepcopy(SETTINGS)

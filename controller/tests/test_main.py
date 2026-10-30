@@ -69,7 +69,7 @@ class ConfigTests(unittest.TestCase):
     def test_retention_days(self):
         cfg = load_config(self.write('[checkin]\nchrono_retention_days = 90\ngame_retention_days = 3653\n'), env={})
         self.assertEqual((cfg.chrono_retention_days, cfg.game_retention_days), (90, 3653))
-        self.assertEqual(load_config(None, env={}).game_retention_days, 365)  # RET-1: a year by default
+        self.assertEqual(load_config(None, env={}).game_retention_days, 90)  # RET-1: 90 days by default (2026-10-30)
         for text in ('[checkin]\ngame_retention_days = 29\n', '[checkin]\nchrono_retention_days = 3654\n',
                      '[checkin]\nchrono_retention_days = true\n'):
             with self.subTest(text), self.assertRaises(ConfigError):
@@ -78,7 +78,7 @@ class ConfigTests(unittest.TestCase):
     def test_example_file_loads(self):
         cfg = load_config(str(CONTROLLER_DIR / "controller.example.toml"), env={})
         self.assertEqual(cfg.port, "/dev/ttyACM0")
-        self.assertEqual((cfg.chrono_retention_days, cfg.game_retention_days), (365, 365))
+        self.assertEqual((cfg.chrono_retention_days, cfg.game_retention_days), (365, 90))
 
 
 class TokenTests(unittest.TestCase):

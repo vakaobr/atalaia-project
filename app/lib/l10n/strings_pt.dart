@@ -1528,6 +1528,10 @@ const Map<String, String> ptStrings = {
       'O aviso de privacidade mudou entretanto. Abre-o, lê a nova versão e tenta de novo.',
   'acct.oidc.notice_version_changed':
       'O aviso de privacidade mudou entretanto. Abre-o, lê a nova versão e tenta de novo.',
+  'site.err.privacy_notice_unpublished':
+      'Este servidor ainda não publicou o seu aviso de privacidade, por isso não cria contas novas. Quem já tem conta entra como sempre. Avisar quem gere o servidor.',
+  'acct.oidc.privacy_notice_unpublished':
+      'Este servidor ainda não publicou o seu aviso de privacidade, por isso não cria contas novas. Quem já tem conta entra como sempre. Avisar quem gere o servidor.',
   'hub.title': 'Cronografagem entre campos',
   'hub.open': 'Partilha da cronografagem entre campos',
   'hub.intro':

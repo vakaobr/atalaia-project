@@ -1038,7 +1038,7 @@ class ControllerSync {
   Future<void> _gameDay() async {
     gameDayError = null;
     final sched = await _get(
-      '/api/v1/sync/schedule?days=$_scheduleDays',
+      '/api/v1/sync/schedule?days=$_scheduleDays&revocations=1',
       'schedule',
     );
     if (sched == null) return;
@@ -1048,9 +1048,24 @@ class ControllerSync {
       now,
     );
     schedulePulledAt = now;
+    _dropRevokedCopies(sched['copies_revoked']);
     await _pullRosters();
     await _answerClaims();
     await _pushCheckins();
+  }
+
+  /// PRIV-5: the site server says which of this field's players erased their
+  /// account or withdrew a chrono-sharing consent: the copies of other fields'
+  /// records pulled for them are dropped now, before this cycle's pull
+  /// (Art. 17(2)). Idempotent: the record comes every cycle until the field's
+  /// retention period ends, and does nothing once the copies are gone.
+  void _dropRevokedCopies(Object? revoked) {
+    final checkin = engine.checkin;
+    if (checkin == null || revoked is! List || revoked.isEmpty) return;
+    checkin.revokeShared([
+      for (final r in revoked)
+        (r! as Map<String, Object?>)['player_id']! as String,
+    ]);
   }
 
   List<(Map<String, Object?>, Map<String, Object?>)> _linked() {

@@ -1107,6 +1107,38 @@ void main() {
         expect(c.sharedChronoSupported, isTrue); // no pull was tried
       });
 
+      test(
+        'an erased account or a withdrawn consent (copies_revoked) takes the '
+        'copies away even after the start (PRIV-5)',
+        () async {
+          final first = await record();
+          site.gets['/api/v1/sync/chrono'] = answer([
+            (falcao, [first]),
+          ]);
+          expect(await c.runOnce(), isTrue, reason: c.lastError);
+          expect(await shown(), [first['_id']]);
+          engine.startGame(gid, force: true);
+          expect(await c.runOnce(), isTrue, reason: c.lastError);
+          expect(await shown(), [
+            first['_id'],
+          ]); // kept: nothing changes after the start
+          site.gets['/api/v1/sync/schedule'] = {
+            ...scheduled(),
+            'copies_revoked': [
+              {'player_id': falcao, 'reason': 'erasure', 'at': t0.toInt()},
+            ],
+          };
+          expect(await c.runOnce(), isTrue, reason: c.lastError);
+          expect(await shown(), isEmpty);
+          expect(
+            await c.runOnce(),
+            isTrue,
+            reason: c.lastError,
+          ); // every cycle: nothing more
+          expect(await shown(), isEmpty);
+        },
+      );
+
       test('an older site server has the roster but not the records', () async {
         site.gets.remove('/api/v1/sync/chrono');
         site.gets['/api/v1/sync/roster'] = roster();
@@ -1405,11 +1437,11 @@ void main() {
         return a;
       }
 
-      site.gets['/api/v1/sync/field'] = days(chrono: 180, game: 90);
+      site.gets['/api/v1/sync/field'] = days(chrono: 180, game: 120);
       final c = client(branding: 'site');
       expect(await c.runOnce(), isTrue, reason: c.lastError);
       expect(checkin.retentionDays('chrono_retention_days'), 180);
-      expect(checkin.retentionDays('game_retention_days'), 90);
+      expect(checkin.retentionDays('game_retention_days'), 120);
       final locked = api.handle(
         'PUT',
         Uri.parse('/api/v1/checkin/settings'),
@@ -1421,7 +1453,7 @@ void main() {
       // A site server that does not send them leaves the last ones.
       site.gets['/api/v1/sync/field'] = days();
       expect(await c.runOnce(), isTrue, reason: c.lastError);
-      expect(checkin.retentionDays('game_retention_days'), 90);
+      expect(checkin.retentionDays('game_retention_days'), 120);
     });
 
     test('not pulled with local branding', () async {

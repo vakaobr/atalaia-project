@@ -1244,6 +1244,10 @@ const Map<String, String> zhTwStrings = {
   'privacy.changed': '聲明在這段時間內已經更新。請閱讀新版本並重新確認。',
   'site.err.notice_version_changed': '隱私權聲明在這段時間內已經更新。請打開並閱讀新版本，然後再試一次。',
   'acct.oidc.notice_version_changed': '隱私權聲明在這段時間內已經更新。請打開並閱讀新版本，然後再試一次。',
+  'site.err.privacy_notice_unpublished':
+      '這台伺服器尚未公布隱私權聲明，因此暫不建立新帳號。已有帳號仍可登入。請通知管理這台伺服器的人。',
+  'acct.oidc.privacy_notice_unpublished':
+      '這台伺服器尚未公布隱私權聲明，因此暫不建立新帳號。已有帳號仍可登入。請通知管理這台伺服器的人。',
   'hub.title': '測速分享',
   'hub.open': '場地之間的測速分享',
   'hub.intro': '如果你在這台伺服器的多個場地玩，可以連結你的帳號，讓每個場地看到你在其他場地通過的測速（唯讀）。每個場地仍然需要你的同意。',

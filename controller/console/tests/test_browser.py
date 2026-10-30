@@ -4320,18 +4320,18 @@ class ConsoleBrowserTests(unittest.TestCase):
             .to_have_text("APD não aceite")
 
     def test_checkin_settings_set_how_long_chrono_and_game_data_are_kept(self):
-        """Decisions RET-1 and RET-2: the field's chrono and game retention are settings of the check-in tab, 365 days
+        """Decisions RET-1 and RET-2: the field's chrono and game retention are settings of the check-in tab, chrono 365 and game data 90 days
         by default, saved with the others; the page labels them in the console's language."""
         self.field.create_game()
         page = self.console()
         page.get_by_test_id("tab-checkin").click()
-        expect(page.get_by_test_id("checkin-game-retention")).to_have_value("365")
+        expect(page.get_by_test_id("checkin-game-retention")).to_have_value("90")
         expect(page.get_by_test_id("checkin-chrono-retention")).to_have_value("365")
         expect(page.locator("label[for=cs-game-days]")).to_have_text("Dados dos jogos guardados (dias)")
-        page.get_by_test_id("checkin-game-retention").fill("90")
+        page.get_by_test_id("checkin-game-retention").fill("120")
         page.get_by_test_id("checkin-chrono-retention").fill("180")
         page.get_by_test_id("checkin-settings-save").click()
-        self.assertTrue(wait_for(lambda: self.field.http.get("/api/v1/checkin/settings").json()["game_retention_days"] == 90, 5))
+        self.assertTrue(wait_for(lambda: self.field.http.get("/api/v1/checkin/settings").json()["game_retention_days"] == 120, 5))
         self.assertEqual(self.field.http.get("/api/v1/checkin/settings").json()["chrono_retention_days"], 180)
 
     def test_marshal_list_in_the_checkin_tab(self):

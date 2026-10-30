@@ -75,7 +75,7 @@
     notice_en = ""
     retention_days = 30         # a check-in's personal data after its game (ADR-P4-8's guest rule)
     chrono_retention_days = 365 # chrono readings, other fields' readings and a marshal's earlier keys: days kept (30-3653)
-    game_retention_days = 365   # an ended game's events, scores and nodes: days kept after it ended (30-3653);
+    game_retention_days = 90    # an ended game's events, scores and nodes: days kept after it ended (30-3653);
                                 # with [sync] enabled, never before the site server has all of it
 
     [mqtt]
@@ -278,7 +278,7 @@ class Config:
     notice_en: str = ""
     retention_days: int = 30
     chrono_retention_days: int = 365
-    game_retention_days: int = 365
+    game_retention_days: int = 90
     # [sync]
     sync_enabled: bool = False
     sync_url: str = ""

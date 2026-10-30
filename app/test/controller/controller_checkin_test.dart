@@ -280,7 +280,7 @@ void main() {
         (call('GET', '/api/v1/checkin/settings').body! as Map)
             .cast<String, Object?>();
     expect(settings()['chrono_retention_days'], 365);
-    expect(settings()['game_retention_days'], 365);
+    expect(settings()['game_retention_days'], 90);
     for (final bad in [29, 3654, '90', true, null]) {
       expect(
         call(

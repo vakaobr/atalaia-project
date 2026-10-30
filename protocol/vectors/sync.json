@@ -10369,6 +10369,31 @@
     }
    },
    {
+    "name": "schedule_with_copies_revoked",
+    "kind": "schedule",
+    "body": {
+     "sync_version": 1,
+     "games": [],
+     "copies_revoked": [
+      {
+       "player_id": "p-abcdefghijkl",
+       "reason": "erasure",
+       "at": 1792400400
+      },
+      {
+       "player_id": "p-abcdefghijkl",
+       "reason": "withdrawn",
+       "at": 1792400500
+      },
+      {
+       "player_id": "p-mnopqrstuvwx",
+       "reason": "erasure",
+       "at": 1792400600
+      }
+     ]
+    }
+   },
+   {
     "name": "roster",
     "kind": "roster",
     "body": {
@@ -11681,6 +11706,78 @@
     },
     "error": "unknown_field",
     "path": "games[0].created_by"
+   },
+   {
+    "name": "schedule_copies_revoked_bad_reason",
+    "kind": "schedule",
+    "body": {
+     "sync_version": 1,
+     "games": [],
+     "copies_revoked": [
+      {
+       "player_id": "p-abcdefghijkl",
+       "reason": "consent",
+       "at": 1792400400
+      }
+     ]
+    },
+    "error": "bad_value",
+    "path": "copies_revoked[0].reason"
+   },
+   {
+    "name": "schedule_copies_revoked_not_a_player_id",
+    "kind": "schedule",
+    "body": {
+     "sync_version": 1,
+     "games": [],
+     "copies_revoked": [
+      {
+       "player_id": "Ana",
+       "reason": "erasure",
+       "at": 1792400400
+      }
+     ]
+    },
+    "error": "bad_text",
+    "path": "copies_revoked[0].player_id"
+   },
+   {
+    "name": "schedule_copies_revoked_twice",
+    "kind": "schedule",
+    "body": {
+     "sync_version": 1,
+     "games": [],
+     "copies_revoked": [
+      {
+       "player_id": "p-abcdefghijkl",
+       "reason": "erasure",
+       "at": 1792400400
+      },
+      {
+       "player_id": "p-abcdefghijkl",
+       "reason": "erasure",
+       "at": 1792400500
+      }
+     ]
+    },
+    "error": "duplicate_player",
+    "path": "copies_revoked[1].player_id"
+   },
+   {
+    "name": "schedule_copies_revoked_missing_at",
+    "kind": "schedule",
+    "body": {
+     "sync_version": 1,
+     "games": [],
+     "copies_revoked": [
+      {
+       "player_id": "p-abcdefghijkl",
+       "reason": "erasure"
+      }
+     ]
+    },
+    "error": "missing",
+    "path": "copies_revoked[0].at"
    },
    {
     "name": "roster_with_an_email",

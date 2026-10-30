@@ -1558,6 +1558,10 @@ const Map<String, String> deStrings = {
       'Der Datenschutzhinweis hat sich inzwischen geändert. Öffne ihn, lies die neue Version und versuche es erneut.',
   'acct.oidc.notice_version_changed':
       'Der Datenschutzhinweis hat sich inzwischen geändert. Öffne ihn, lies die neue Version und versuche es erneut.',
+  'site.err.privacy_notice_unpublished':
+      'Dieser Server hat seine Datenschutzerklärung noch nicht veröffentlicht und legt deshalb keine neuen Konten an. Bestehende Konten melden sich wie gewohnt an. Sag es den Betreibenden des Servers.',
+  'acct.oidc.privacy_notice_unpublished':
+      'Dieser Server hat seine Datenschutzerklärung noch nicht veröffentlicht und legt deshalb keine neuen Konten an. Bestehende Konten melden sich wie gewohnt an. Sag es den Betreibenden des Servers.',
   'hub.title': 'Chrono-Freigabe',
   'hub.open': 'Chrono-Freigabe zwischen Spielfeldern',
   'hub.intro':

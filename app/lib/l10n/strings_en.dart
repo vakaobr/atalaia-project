@@ -1487,6 +1487,10 @@ const Map<String, String> enStrings = {
       'The privacy notice has changed in the meantime. Open it, read the new version and try again.',
   'acct.oidc.notice_version_changed':
       'The privacy notice has changed in the meantime. Open it, read the new version and try again.',
+  'site.err.privacy_notice_unpublished':
+      'This server has not published its privacy notice yet, so it is not making new accounts. Existing accounts log in as always. Tell whoever runs the server.',
+  'acct.oidc.privacy_notice_unpublished':
+      'This server has not published its privacy notice yet, so it is not making new accounts. Existing accounts log in as always. Tell whoever runs the server.',
   'hub.title': 'Chrono sharing',
   'hub.open': 'Chrono sharing between fields',
   'hub.intro':

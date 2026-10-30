@@ -248,9 +248,9 @@ class CheckinTests(P3Case):
         self.assertEqual(self.svc.purge(force=True)["identities"], 1)
         self.assertIsNone(self.ctrl.store.field_player(me["player_id"]))
 
-    def test_the_retention_settings_default_to_a_year_and_are_the_gms(self):
+    def test_the_retention_settings_default_to_a_year_and_90_days_and_are_the_gms(self):
         st = self.client.get("/api/v1/checkin/settings", headers=GM).json()
-        self.assertEqual((st["chrono_retention_days"], st["game_retention_days"]), (365, 365))
+        self.assertEqual((st["chrono_retention_days"], st["game_retention_days"]), (365, 90))
         for bad in (29, 3654, "90", True, None):
             r = self.client.put("/api/v1/checkin/settings", json={"game_retention_days": bad}, headers=GM)
             self.assertEqual(r.status_code, 400, bad)
@@ -294,17 +294,18 @@ class CheckinTests(P3Case):
         store.upsert_node(old["id"], 4, "alpha", "zone", {})
         logged = store.count_events(old["id"])
         self.assertGreaterEqual(logged, 1)
-        self.now = T0 + 364 * 86400
-        self.assertEqual(self.svc.purge(force=True)["games"], 0)
-        self.now = T0 + 366 * 86400
+        self.now = T0 + 89 * 86400
+        self.assertEqual(self.svc.purge(force=True)["games"], 0)  # 90 days by default (2026-10-30)
+        self.now = T0 + 91 * 86400
         out = self.svc.purge(force=True)
         self.assertEqual((out["games"], out["game_events"]), (1, logged))
         self.assertIsNone(store.game(old["id"]))
         self.assertEqual((store.count_events(old["id"]), store.scores(old["id"]), store.nodes(old["id"])), (0, {}, []))
         self.assertEqual(store.checkins(old["id"]), [])
         self.assertIsNone(store.token_key(old["id"]))
-        self.assertIsNotNone(store.game(young["id"]))  # not a year yet
+        self.assertIsNotNone(store.game(young["id"]))  # not 90 days yet
         self.assertIsNotNone(store.game(live["id"]))   # never a game that has not ended
+        self.now = T0 + 366 * 86400
         self.client.put("/api/v1/checkin/settings", json={"game_retention_days": 30}, headers=GM)
         self.assertEqual(self.svc.purge(force=True)["games"], 1)  # the field's own days
 

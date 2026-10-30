@@ -56,6 +56,7 @@ class FakeSite:
         self.unsupported = False
         self.shared: list[dict[str, Any]] = []  # other fields' records by player (S14-5)
         self.no_shared_endpoint = False  # an older site server: the roster, but no shared chrono
+        self.revoked: list[dict[str, Any]] = []  # the schedule answer's copies_revoked (PRIV-5)
 
     def get(self, path: str) -> dict[str, Any]:
         self.gets.append(path)
@@ -63,6 +64,8 @@ class FakeSite:
             raise SyncError("Not Found", 404)
         if path.startswith("/api/v1/sync/schedule"):
             answer = {"sync_version": 1, "games": copy.deepcopy(self.schedule)}
+            if self.revoked:
+                answer["copies_revoked"] = copy.deepcopy(self.revoked)
             kind = "schedule"
         elif path.startswith("/api/v1/sync/roster"):
             sid = path.rsplit("=", 1)[1]
@@ -420,6 +423,21 @@ class SharedChronoTests(GameDayCase):
         self.cycle()
         self.assertEqual([g for g in self.site.gets if "/sync/chrono" in g], pulls)  # no new pull
         self.assertEqual(len(self.bundle.store.shared_readings(self.pid)), 1)  # kept as it was
+
+    def test_an_erased_account_takes_the_copies_away_even_after_the_game_starts(self) -> None:
+        """PRIV-5 (Art. 17(2)): the schedule answer names the players who erased their account or withdrew a consent;
+        their copies go at once, game started or not, and the field's own readings stay."""
+        self.site.shared = [self.shared(self.pid, self.record()), self.shared(self.coruja["player_id"], self.record())]
+        self.cycle()
+        self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True})
+        self.assertEqual(len(self.bundle.store.shared_readings(self.pid)), 1)
+        self.assertIn("revocations=1", [g for g in self.site.gets if "/sync/schedule" in g][-1])
+        self.site.revoked = [{"player_id": self.pid, "reason": "erasure", "at": int(T0)}]
+        self.cycle()
+        self.assertEqual(self.bundle.store.shared_readings(self.pid), [])
+        self.assertEqual(len(self.bundle.store.shared_readings(self.coruja["player_id"])), 1)  # someone else: kept
+        self.cycle()  # the record comes every cycle until the retention ends: nothing more to do
+        self.assertEqual(self.bundle.store.shared_readings(self.pid), [])
 
     def test_an_older_site_server(self) -> None:
         self.site.no_shared_endpoint = True

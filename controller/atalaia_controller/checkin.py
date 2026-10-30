@@ -93,7 +93,7 @@ TOKEN_GRACE_S = 2 * 3600
 TOKEN_MIN_S = 60
 IDENTITY_DAYS = 365
 CHRONO_RETENTION_DAYS = 365  # the default of ``chrono_retention_days`` (the field's setting, 30-3653)
-GAME_RETENTION_DAYS = 365    # the default of ``game_retention_days`` (decision RET-1)
+GAME_RETENTION_DAYS = 90     # the default of ``game_retention_days`` (decision RET-1; 90 days: maintainer decision 2026-10-30)
 RETENTION_KEYS = ("chrono_retention_days", "game_retention_days")
 RETENTION_MIN, RETENTION_MAX = 30, 3653
 PLAYER_HIDDEN = ("max_players", *RETENTION_KEYS)  # settings the player's app is not told
@@ -2276,6 +2276,12 @@ class Checkin:
         for gid in games:
             self.ctrl._emit({"type": "checkin", "game": gid, "player_id": pid, "erased": True, "_staff": True})
         return {"player_id": pid, "erased": True, "readings_deleted": readings}
+
+    def revoke_shared(self, player_ids: list[str]) -> int:
+        """Other fields' copies of these players' chrono records are dropped (PRIV-5: the site server's
+        ``copies_revoked``); returns how many records went. The field's own readings are not touched."""
+        with self._lock:
+            return sum(self.store.delete_shared_readings(player_id=pid) for pid in set(player_ids))
 
     def erase_chrono(self, pid: str) -> dict[str, Any]:
         """DELETE /api/v1/players/{player}/chrono: the player's readings, and other fields' copies of them (S14-5)."""
