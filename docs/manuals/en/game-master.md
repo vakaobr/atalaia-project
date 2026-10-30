@@ -483,6 +483,7 @@ The **site server** is optional. It keeps what lasts longer than one game. Games
 | **Radio: no modem** or **Radio down: the USB modem does not answer.** | Check the USB modem is plugged in, `[modem] port` is right and the modem's firmware is flashed. |
 | The modem screen says it is built for another region | Use a modem and boxes built for the field's region, or change the region back. No game can start until they match. |
 | **No free box heard yet.** | The boxes must be adopted and show **READY**. Wait up to a minute, tap **Look for boxes**, and check the radio region and range. |
+| **Look for boxes** says it did not look on the earlier channels, and gives a number of minutes | Sweeps of the earlier channels are limited on channels with little air time (on a 1 % channel, two or three an hour) so the radio stays within its legal share. Wait the minutes it says; the question on the field's own channel still went out. A 0.1 % channel allows no sweep: a box still missing must be adopted again. |
 | A box says **refused: in another game** | Power-cycle it, or end its old game. |
 | **Start waits for a box … for:** *role* | Invite or join a box for that role, or tap **Start anyway**. |
 | **The poster cannot be made** | **HTTPS is off**, **no address** or **too long**: set `[api] tls_names` or `[checkin] urls` and a shorter field name. |

@@ -483,6 +483,7 @@ O **servidor do site** é opcional. Guarda o que dura para lá de um jogo. Nenhu
 | **Rádio: sem modem** ou **Rádio em baixo: o modem USB não responde.** | Verifica que o modem USB está ligado, que `[modem] port` está certo e que o firmware do modem está gravado. |
 | O ecrã do modem diz que foi feito para outra região | Usa um modem e caixas feitos para a região do campo, ou volta à região anterior. Nenhum jogo pode começar até coincidirem. |
 | **Ainda não se ouviu nenhuma caixa livre.** | As caixas têm de estar adotadas e mostrar **PRONTA**. Espera até um minuto, toca em **Procurar caixas** e confirma a região do rádio e o alcance. |
+| **Procurar caixas** diz que não procurou nos canais anteriores e indica um número de minutos | As procuras nos canais anteriores são limitadas em canais com pouco tempo de emissão (num canal de 1%, duas ou três por hora) para o rádio ficar dentro da sua parte legal. Espera os minutos indicados; a pergunta no canal do campo seguiu na mesma. Um canal de 0,1% não permite nenhuma procura: uma caixa que continue em falta tem de ser adotada de novo. |
 | Uma caixa diz **recusou: noutro jogo** | Desliga-a e volta a ligá-la, ou termina o jogo antigo dela. |
 | **O início espera por uma caixa … para:** *papel* | Convida ou junta uma caixa para esse papel, ou toca em **Começar mesmo assim**. |
 | **O cartaz não pode ser feito** | **O HTTPS está desligado**, **nenhum endereço** ou **grande demais**: define `[api] tls_names` ou `[checkin] urls` e um nome de campo mais curto. |

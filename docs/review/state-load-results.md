@@ -3,12 +3,12 @@ SPDX-FileCopyrightText: 2026 The Atalaia contributors
 SPDX-License-Identifier: CC-BY-SA-4.0
 -->
 
-# What a state change, a channel change and a sweep cost in air time (decisions RL-1 to RL-8)
+# What a state change, a channel change and a sweep cost in air time (decisions RL-1 to RL-9)
 
 [RFC 0001 Amendment 19](../rfcs/0001-skirmesh-rf-wire-format.md) (decisions RB-1 to RB-12, 2026-10-29) added frames that
 the [relay study](relay-study-results.md) (decisions SL-7 to SL-37) never had: a start, pause or resume is repeated as TIME at
 +1, +2.5, +5 and +10 s, a channel change sends MOVE three times, *Find boxes* sweeps the last four channels with two MOVEs
-each. The Amendment said the study "does not model them". It does now: `simulator/atalaia_sim/relay_study.py` takes a
+each (and, since RL-9, within an hourly air cap on small sub-bands). The Amendment said the study "does not model them". It does now: `simulator/atalaia_sim/relay_study.py` takes a
 list of state changes (`Engine(state_changes=...)`, `Policy.time_repeat_gaps_ms`) and `simulator/atalaia_sim/state_load.py`
 runs the same field and seeds with and without the repeats; `simulator/tests/test_state_load.py` pins the schedule and the
 arithmetic. Every number below is the model's (the study's caveats, decision SL-18, apply); regenerate with
@@ -87,7 +87,8 @@ MHz (10 %, the default 869.525 MHz, the band the relay study and Amendment 13's 
 | a box's TIME relays added, 20 boxes, typical | 0.31 s | 0.09 % | 0.9 % | 8.6 % |
 | a channel change (3 MOVEs), on the old channel's sub-band | 0.28 s | 0.08 % | 0.77 % | 7.7 % |
 | a sweep of four channels, on each one's sub-band | 0.18 s each | 0.05 % | 0.51 % | 5.1 % |
-| *worst case*: Find boxes once a minute for an hour (60 sweeps, no game live), all four channels in one sub-band | 44 s | 12 % | 123 % | 1230 % |
+| *worst case without the cap*: Find boxes once a minute for an hour (60 sweeps, no game live), all four channels in one sub-band | 44 s | 12 % | 123 % | 1230 % |
+| *worst case with the cap* (RL-9): 2 sweeps of four channels in a sub-band under 10 % (none on 0.1 %); 60 on the 10 % one, unchanged | 1.5 s | (44 s, 12 %, no cap) | 4.1 % | 0 |
 
 What follows from it:
 
@@ -104,11 +105,12 @@ What follows from it:
 * **On a 0.1 % sub-band** the repeats alone are 64 % of the hour's 3.6 s, and a typical game's change frames 92 %. The channel
   was never usable for a game's controller (its 120 TIME beacons an hour are 9.9 s); `usable_for_games` and the scan already
   exclude it.
-* **The sweep is the one rate in this family that can spend a small sub-band**: the once-a-minute cap protects a 0.1 % band
-  only as long as nobody presses *Find boxes* five times in an hour, and the cap does not stop 49 sweeps an hour from
+* **The sweep was the one rate in this family that could spend a small sub-band**: the once-a-minute limit protects a 0.1 %
+  band only as long as nobody presses *Find boxes* five times in an hour, and it did not stop 49 sweeps an hour from
   spending a 1 % band's 36 s when the remembered channels share it. A sweep runs only while no game is live, so a run of
   sweeps cannot take air from a game in progress, but the sliding hour carries over: a game started right after a run of
-  sweeps on the field's own sub-band starts with less budget left. On the 10 % default the worst case is 12 % of the budget.
+  sweeps on the field's own sub-band starts with less budget left. The maintainer approved the cap on 2026-10-30 (RL-9, section 6).
+  On the 10 % default the worst case is 12 % of the budget and the once-a-minute limit stays.
 
 ## 5. Mitigations considered
 
@@ -123,10 +125,49 @@ What follows from it:
   at 30), and the controller's own 329 ms does not depend on the field. Cutting repeats for big fields would take
   away the repair where lost frames are most likely (the more boxes, the more hidden pairs) to save under 0.1 % of a
   10 % budget.
-* **Cap *Find boxes* sweeps per rolling hour** (say six, 4.4 s): small, but not needed on the default sub-band and the
-  modem already refuses what crosses the limit. Left as a follow-up for fields on 1 % channels; the test plan below
-  reads `tx_status` after a run of sweeps.
+* **Cap *Find boxes* sweeps per rolling hour.** First left as a follow-up (a cap of six, 4.4 s, was suggested); built
+  as RL-9 once the maintainer approved it (section 6), with a different number.
 
-**Result: no change to the controller.** The repeats stay as built (RB-8); the numbers above are locked by tests, and the
+**Result: the repeats stay as built (RB-8), and the sweep gets an hourly air cap (RL-9, section 6).** the numbers above are locked by tests, and the
 trigger for revisiting is a field-test measurement (the runbook) showing the modem refusing frames on the default
 sub-band, or a game running on a 1 % channel with more than a handful of pauses.
+
+## 6. The hourly cap on sweeps (decision RL-9, built 2026-10-30)
+
+**The rule.** A sweep's MOVEs (two on each remembered channel, 185 ms a channel) are charged to the sub-band each channel is
+in. Over a rolling hour (not a clock hour: each sweep leaves the window exactly 3600 s after it started) the sweeps may use
+**5 % of that sub-band's duty-cycle budget**, and only sub-bands under 10 % are capped. The region tables (`regions.py`,
+`radio_region.dart`) give the duty cycle; `lobby.Inviter.sweep_refusal` (Python) and `FieldInviter.sweepRefusal` (Dart) do the
+sum, in integer microseconds, so both controllers refuse the same sweep (shared case *S7c Find boxes: the hourly cap ...*
+in `protocol/vectors/controller_api.json`). A sweep is all or nothing; when more than one sub-band is over, the one that
+waits longest is named. A channel outside the region's table counts as 1 %. The history lives in the controller's memory
+(a restart forgets it, as it forgets invites; the modem's own duty-cycle guard still refuses frames over the limit).
+
+| sub-band | budget an hour | 5 % for sweeps | sweeps of four channels an hour (all four in it) | worst case |
+| --- | --- | --- | --- | --- |
+| 10 % (g2, the default) | 360 s | no cap | 60 (once a minute) | 44 s = 12 % |
+| 1 % (g, g3, AS923-TW) | 36 s | 1.8 s | 2 (a sweep of one channel: 9) | 1.5 s = 4.1 % |
+| 0.1 % (g1) | 3.6 s | 0.18 s | 0 (one channel is 0.185 s) | none |
+
+(`python -m atalaia_sim.state_load` prints it; `test_state_load.py` locks it.)
+
+**Why 5 %.** The relay model puts the controller on a 1 % channel at about 0.9 % of the hour with 20 boxes, 0.04 point
+below the limit once a typical hour's repeats are in (section 4); the repeats of the 7 changes of a typical hour cost it
+2.3 s, 6.4 % of the budget, and all its state-change frames 3.3 s, 9 %. A sweep that comes right before a game spends air
+the game then lacks, so the sweeps should stay clearly below what one typical hour's changes already take: 5 % (1.8 s) is
+under the repeats alone (2.3 s), enough for the two or three sweeps a GM needs after a channel change (a sweep repairs
+boxes that were away; one or two settle it) and low enough that the hour's other traffic is not moved by more than 0.05
+point. The suggested 12 % (six sweeps, 4.4 s) was weighed and dropped: it is more than the repeats and more than the
+controller's whole margin. 10 % would allow four sweeps of four channels; a field that needs more sweeps than two an hour on a 1 %
+channel has a channel problem, and the console's warning on 1 % channels already says so. On 0.1 % no sweep ever fits: the
+channel is already unusable for games (`usable_for_games`).
+
+**Why 10 % keeps only the minute.** The worst case there is 44 s of 360 s (12 %), only between games, and the modem's guard
+refuses a frame that would cross the limit anyway; a cap of 5 % there (18 s, 24 sweeps) would only change a worst case that
+a GM pressing a button once a minute for an hour would hit. Left alone, as the maintainer said it could be.
+
+**What the GM sees.** `POST /api/v1/boxes/discover` answers `{"sent", "sweep", "sweep_refused"}`: `sweep_refused` is null,
+or `{"reason": "cap", "band", "duty_pct", "share_pct", "limit_ms", "used_ms", "cost_ms", "retry_after_s"}`; `retry_after_s`
+(seconds until a sweep fits again, counted from the request) is null when a sweep never fits that sub-band. The console
+says so under the button, in four languages, with the minutes to the next sweep. A second press inside the minute is still
+the quiet empty sweep of RB-16 (the first sweep did happen); a refusal by the cap is never quiet.
