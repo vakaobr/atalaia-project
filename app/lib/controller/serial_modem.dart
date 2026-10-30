@@ -327,7 +327,10 @@ class SerialModem extends ControllerModem {
 
   @override
   void setPeerEpochs(Map<int, int> epochs) {
-    _peers.addAll(epochs);
+    // Never backwards (SR-111): what is sent again after a reconnect is the highest.
+    epochs.forEach((node, epoch) {
+      if (epoch > (_peers[node] ?? 0)) _peers[node] = epoch;
+    });
     _sendPeers(epochs);
   }
 

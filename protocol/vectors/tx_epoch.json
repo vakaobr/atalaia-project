@@ -1,0 +1,20 @@
+{
+  "description": "The epoch a controller takes for its own frames in a game (RFC 0001 Amendment 9, per game key, and Amendment 23's item 5 for a lost record, decision SR-29). `table` is the controller's list of (game key, last epoch) records, most recent first, as the store keeps it (by the key's tag); `key` is the game's key, `resuming` says the controller is taking its stored game up again after a restart (not creating or joining a game). The expected result is either `epoch` (exact), `error` (the epochs of that key are used up: 65535), or `lost_range` true (a random epoch inside the top-level `lost_range`: a resumed game with no record of its key may have used any epoch from 1 with it, so it must not start at 1). Python (controller/atalaia_controller/store.py next_tx_epoch) and Dart (app/lib/controller/controller_radio.dart nextTxEpoch) must give exactly these; the firmware's box does the same for its own store (test_radio_protocol.c).",
+  "lost_range": [4096, 61439],
+  "cases": [
+    {"name": "a_new_game_starts_at_1", "key": "00000000000000000000000000000001", "table": [], "resuming": false, "epoch": 1},
+    {"name": "a_new_key_with_other_keys_recorded_starts_at_1", "key": "00000000000000000000000000000001",
+     "table": [{"key": "00000000000000000000000000000002", "epoch": 9}], "resuming": false, "epoch": 1},
+    {"name": "a_restart_goes_on_above_its_epoch", "key": "00000000000000000000000000000001",
+     "table": [{"key": "00000000000000000000000000000002", "epoch": 9}, {"key": "00000000000000000000000000000001", "epoch": 5}], "resuming": true, "epoch": 6},
+    {"name": "a_rejoin_of_a_known_key_goes_on_above_its_epoch", "key": "00000000000000000000000000000001",
+     "table": [{"key": "00000000000000000000000000000001", "epoch": 5}], "resuming": false, "epoch": 6},
+    {"name": "a_resumed_game_with_no_list_takes_a_high_epoch", "key": "00000000000000000000000000000001", "table": [], "resuming": true, "lost_range": true},
+    {"name": "a_resumed_game_pushed_out_of_the_list_takes_a_high_epoch", "key": "00000000000000000000000000000001",
+     "table": [{"key": "00000000000000000000000000000002", "epoch": 3}], "resuming": true, "lost_range": true},
+    {"name": "a_high_epoch_goes_on_by_one", "key": "00000000000000000000000000000001",
+     "table": [{"key": "00000000000000000000000000000001", "epoch": 41000}], "resuming": true, "epoch": 41001},
+    {"name": "the_last_epoch_is_used_up", "key": "00000000000000000000000000000001",
+     "table": [{"key": "00000000000000000000000000000001", "epoch": 65535}], "resuming": true, "error": true}
+  ]
+}

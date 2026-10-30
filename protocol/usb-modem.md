@@ -63,7 +63,7 @@ Between games, boxes and controllers exchange **field frames** ([field-frames.md
 
 The modem forwards a packet only if it belongs to the configured game, carries the encrypted bit, is not its own packet relayed back, authenticates, and passes the source's **replay window** (RFC 0001 Amendment 23): the highest `epoch << 16 | seq` of the source and a bitmap of the 64 before it. A counter already seen (flood copies arrive several times) is dropped, and so is one 64 or more below the highest, which is a recording played back, however long after (a 30-second table used to let one through). Both count as `rx_dupes` in STATUS and the radio report. The window is checked after the packet authenticates and is kept per source (up to 64 sources, then the oldest is forgotten); CONFIGURE for another game, or CLEAR, forgets every window. The modem never relays: the controller does not rebroadcast (ADR-P2-6).
 
-To authenticate, the modem tries the source's last known epoch and then up to `epoch_window` epochs above it (16 by default, `CONFIG_ATALAIA_MODEM_EPOCH_WINDOW`), or epochs 0 to `epoch_window` for a source it has not heard yet; a HELLO or a TIME up to 256 above (RFC 0001 Amendment 9: a box back from a crash loop says HELLO first); never a lower epoch, so replays stay rejected. ADR-P2-2 tries only one epoch above, which never recovers a box that rebooted twice out of range (decision D4). The controller can also tell the modem a box's epoch with SET_PEER_EPOCH; it does so after every reconnect, from the epochs it has seen.
+To authenticate, the modem tries the source's last known epoch and then up to `epoch_window` epochs above it (16 by default, `CONFIG_ATALAIA_MODEM_EPOCH_WINDOW`), or epochs 0 to `epoch_window` for a source it has not heard yet; a HELLO or a TIME up to 256 above (RFC 0001 Amendment 9: a box back from a crash loop says HELLO first); and, for those two types, the rest of the range 2048 epochs at a time (the *deep search*: a box or controller that took a random high epoch after losing its epoch store, RFC 0001 Amendment 24, decision SR-110), within the same budget; never a lower epoch, so replays stay rejected. ADR-P2-2 tries only one epoch above, which never recovers a box that rebooted twice out of range (decision D4). The controller can also tell the modem a box's epoch with SET_PEER_EPOCH; it does so after every reconnect, from the epochs it has seen, and when it hears a box at an epoch more than 16 above the last it knew or a restarted box's HELLO (Amendment 24). SET_PEER_EPOCH only ever raises a source's epoch: a pair at or below the epoch the modem holds changes nothing (decision SR-111).
 
 ## Commands
 
@@ -75,7 +75,7 @@ Every command except PING, IDENT and MEASURE is answered by a STATUS frame when 
 | `0x02` | CONFIGURE | game_id (2), node_id (2), epoch (2), max_hops (1), channel_hz (4), key (16): 27 bytes, all big-endian |
 | `0x03` | SET_CHANNEL | channel_hz (uint32 BE) |
 | `0x04` | STATUS | none |
-| `0x05` | SET_PEER_EPOCH | any number of (source uint16, epoch uint16) pairs |
+| `0x05` | SET_PEER_EPOCH | any number of (source uint16, epoch uint16) pairs; only raises (a lower or equal epoch is ignored) |
 | `0x06` | CLEAR | none: forget the key and the game (sent when the game ends) |
 | `0x07` | IDENT | none: answered with IDENT |
 | `0x08` | MEASURE | channel_hz (uint32 BE), dwell_ms (uint16 BE, 10-10000), flags (1; bit 0: also count LoRa channel-activity detections): answered with NOISE |

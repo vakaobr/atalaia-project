@@ -516,6 +516,7 @@ class Controller:
             fc.register_node(int(node_id), f"node-{node_id}", role)
         fc.on_event = self._on_event
         fc.on_node = self._on_node
+        fc.on_peer_epoch = self._on_peer_epoch
         fc.on_scores = self._on_scores
         fc.on_role = self._on_role
         # The mode's optional scoring contract: a projected score between STATEs (decision BSC-2).
@@ -1991,6 +1992,14 @@ class Controller:
                 return
             self.fc.on_packet(rx.header.source, rx.header, rx.payload,
                               {"epoch": rx.epoch, "rssi": rx.rssi, "snr": rx.snr})
+
+    def _on_peer_epoch(self, node_id: int, epoch: int) -> None:
+        """A box was heard at an epoch the receivers may not follow (a restart, or a lost epoch store:
+        RFC 0001 Amendment 24, decision SR-110): the modem is told too (SET_PEER_EPOCH; it only
+        ever goes up). The field controller has sent the boxes their CMD."""
+        log.info("node %d is at epoch %d; the receivers are told", node_id, epoch)
+        if self.modem is not None:
+            self.modem.set_peer_epochs({node_id: epoch})
 
     def _on_tx_ack(self, seq: int, status: str) -> None:
         self.tx_status[status] += 1

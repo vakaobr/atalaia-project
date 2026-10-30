@@ -46,6 +46,7 @@ from .packet import (
     time_encode,
     vf_ack,
 )
+from .peer_epoch import PeerEpochs
 from .protocol import MESSAGE_TYPES
 from .radio_model import RadioModel
 from .replay import FRESH, ReplayWindow
@@ -89,6 +90,9 @@ CMD_UPDATE = 9
 # The I/O pod's settings (RFC 0001 Amendment 17, protocol/pod-config.md): params {"v", "rev", ...};
 # the controller sends it to the node id of the phone a pod serves, and the pod's radio takes it.
 CMD_POD = 10
+# A node's epoch, for the receivers (RFC 0001 Amendment 24, decision SR-110): params {"src", "epoch"}.
+# Internal: the controller sends it itself, so it has no name in CMD_OPCODES (the GM's list).
+CMD_PEER_EPOCH = 11
 CMD_OPCODES = {
     "start": CMD_START,
     "pause": CMD_PAUSE,
@@ -339,12 +343,16 @@ class FieldController:
 
         self.acks = AckTracker()
         self._replay: dict[int, ReplayWindow] = {}  # source -> its replay window
+        self._peer_epochs = PeerEpochs()  # the epochs this controller named to the receivers (SR-110)
         self.replays_refused = 0  # authenticated packets the windows refused (copies and replays)
         self._events_seen: set[tuple[int, int, int, str]] = set()
 
         # Hooks for the host (all optional).
         self.on_event: Optional[Callable[[dict[str, Any]], None]] = None
         self.on_node: Optional[Callable[[FieldNode, str], None]] = None
+        # A box heard at an epoch the receivers may not follow (SR-110): (node, epoch), for the host to
+        # tell its modem (SET_PEER_EPOCH); the controller has sent the CMD to the boxes itself.
+        self.on_peer_epoch: Optional[Callable[[int, int], None]] = None
         self.on_scores: Optional[Callable[[dict[str, int]], None]] = None
         self.on_role: Optional[Callable[[str, int], None]] = None
 
@@ -486,7 +494,7 @@ class FieldController:
         if isinstance(cmd, str) and cmd not in CMD_OPCODES:
             raise ValueError(f"unknown command {cmd!r}")
         opcode = CMD_OPCODES[cmd] if isinstance(cmd, str) else int(cmd)
-        if not 0 <= opcode <= CMD_POD:
+        if not 0 <= opcode <= CMD_POD:  # CMD_PEER_EPOCH is the controller's own
             raise ValueError(f"unknown command opcode {opcode}")
         return self._send_cmd(opcode, params, dest, now_ms=now_ms)
 
@@ -509,6 +517,14 @@ class FieldController:
         if dest is not None and dest != BROADCAST:
             msg["dest"] = dest
         return self._send("CMD", cmd_encode(msg), PRIO_CRITICAL, now_ms)
+
+    def _announce_peer_epoch(self, node_id: int, epoch: int, now_ms: int) -> None:
+        """A box was heard at an epoch the receivers may not follow (peer_epoch.py, SR-110): the host
+        tells its modem, and the leader tells every box (CMD peer, flooded; it only moves a table up)."""
+        if self.on_peer_epoch is not None:
+            self.on_peer_epoch(node_id, epoch)
+        if self.election.is_leader:
+            self._send_cmd(CMD_PEER_EPOCH, {"src": node_id, "epoch": epoch}, now_ms=now_ms)
 
     def _send_ack(self, node_id: int, epoch: int, now_ms: int) -> None:
         self._send("ACK", ack_encode(self.acks.ack_payload(node_id, epoch)), PRIO_NORMAL, now_ms)
@@ -558,6 +574,7 @@ class FieldController:
 
         self.acks.record(source_node, epoch, header.seq)
         node = self._node(source_node)
+        prior_epoch = node.epoch
         node.last_seen_ms = self._now
         node.last_seen_game_ms = self.game_time_ms
         node.heard = True
@@ -577,6 +594,9 @@ class FieldController:
 
         if vf_ack(header.version_flags) and self.election.is_leader:
             self._send_ack(source_node, epoch, self._now)
+        kind = "HELLO" if msg_type == MESSAGE_TYPES["HELLO"] else ""
+        if self._peer_epochs.heard(source_node, prior_epoch, epoch, kind, self._now):
+            self._announce_peer_epoch(source_node, epoch, self._now)
         self._check_health(node, self._now)
 
     def _on_state(self, node: FieldNode, payload: bytes) -> None:
@@ -753,6 +773,9 @@ class FieldController:
                 self.send_time_beacon(now_ms=now_ms)
         else:
             self._repeats = []
+        if self.election.is_leader:
+            for node_id, epoch in self._peer_epochs.due(now_ms):  # the repeats of an announcement
+                self._send_cmd(CMD_PEER_EPOCH, {"src": node_id, "epoch": epoch}, now_ms=now_ms)
         for node in list(self.nodes.values()):
             self._check_health(node, now_ms)
         return deliveries

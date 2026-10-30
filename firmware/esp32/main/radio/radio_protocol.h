@@ -113,6 +113,15 @@ typedef struct {
 #define ATALAIA_WIDE_PER_MIN 20
 #define ATALAIA_WIDE_SOURCES 8
 
+/* The deep search (RFC 0001 Amendment 24, decision SR-110): a HELLO or TIME that the wide search
+ * could not open is tried against the next ATALAIA_DEEP_SLICE epochs of the whole range above it, a
+ * slice per search the budget above allows, the source's cursor moving on and wrapping, so a box
+ * that took a random high epoch after losing its epoch store (SR-27), or a controller that did
+ * (SR-29), is found within a minute or two (65536 / 2048 slices of one search every 2 s at most)
+ * without any controller's help. The slice is the cost of one search: about 60 ms of decryptions.
+ */
+#define ATALAIA_DEEP_SLICE 2048
+
 /* ---- Radio protocol state ------------------------------------------------- */
 
 typedef struct {
@@ -140,6 +149,8 @@ typedef struct {
     struct {
         uint16_t source;
         uint32_t ms;
+        uint32_t
+            deep_next; /* the next epoch the deep search tries for this source (0: not started) */
         bool valid;
     } wide_recent[ATALAIA_WIDE_SOURCES];
     uint32_t wide_ms[ATALAIA_WIDE_PER_MIN];
@@ -147,6 +158,8 @@ typedef struct {
     uint8_t wide_next;
     uint32_t wide_searches; /* wide searches made */
     uint32_t wide_refused;  /* wide searches the budget refused */
+    uint32_t deep_searches; /* deep slices tried (SR-110) */
+    uint32_t deep_found;    /* sources a deep slice found at a far higher epoch */
 
     /* Authenticated packets the replay window refused (RFC 0001 Amendment 23). last_replay is the
      * verdict of the latest on_recv_window call that authenticated a packet: the caller tells a
@@ -196,7 +209,8 @@ void atalaia_radio_epoch_tag(const uint8_t key[ATALAIA_RF_KEY_SIZE],
  * twice under one key breaks AES-CCM (decision SR-27, FLD-10). The floor is far above any epoch a
  * game reaches (a reboot or a 65536-packet wrap each add one); the ceiling leaves 4096 epochs
  * before the space ends. No receiver that knew the box looks that far, so it is heard again only
- * once a controller names its epoch (SET_PEER_EPOCH) or the game is joined again with a new key.
+ * once it is found: by the receivers' deep search of its HELLO (ATALAIA_DEEP_SLICE, decision
+ * SR-110), or at once when a controller names its epoch (SET_PEER_EPOCH, CMD peer).
  */
 #define ATALAIA_EPOCH_LOST_MIN 4096u
 #define ATALAIA_EPOCH_LOST_MAX 61439u
@@ -214,9 +228,12 @@ void atalaia_radio_proto_set_key(atalaia_radio_proto_t *rp, const uint8_t key[AT
 void atalaia_radio_proto_set_epoch(atalaia_radio_proto_t *rp, uint16_t epoch);
 
 /*
- * Set a source's epoch in the receiver table (resync from HELLO/STATE).
+ * Set a source's epoch in the receiver table (resync from HELLO/STATE; a controller's
+ * SET_PEER_EPOCH and a CMD peer). It only ever goes up (decision SR-111): an epoch at or below the
+ * one the table has is ignored (an equal one only makes the source trusted), so a stale or replayed
+ * announcement cannot make a receiver refuse a source it hears. Returns true when the table moved.
  */
-void atalaia_radio_proto_set_source_epoch(atalaia_radio_proto_t *rp, uint16_t source,
+bool atalaia_radio_proto_set_source_epoch(atalaia_radio_proto_t *rp, uint16_t source,
                                           uint16_t epoch);
 
 /*

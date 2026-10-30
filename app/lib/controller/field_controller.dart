@@ -27,6 +27,7 @@ import 'dart:typed_data';
 
 import '../core/node_types.dart';
 import 'controller_failover.dart';
+import 'peer_epoch.dart';
 import '../radio/replay.dart';
 import '../radio/rf_codec.dart';
 
@@ -310,6 +311,15 @@ class FieldController {
   int replaysRefused = 0;
   final _eventsSeen = <(int, int, int, String)>{};
 
+  /// The epochs this controller named to the receivers (peer_epoch.dart, RFC
+  /// 0001 Amendment 24, decision SR-110).
+  final _peerEpochs = PeerEpochs();
+
+  /// A box was heard at an epoch the receivers may not follow: (node, epoch),
+  /// for the host to tell its modem (SET_PEER_EPOCH); the controller has sent
+  /// the boxes their CMD itself.
+  void Function(int node, int epoch)? onPeerEpoch;
+
   void Function(Map<String, Object?> record)? onEvent;
   void Function(FieldNode node, String kind)? onNode;
   void Function(Map<String, int> totals)? onScores;
@@ -482,6 +492,16 @@ class FieldController {
     );
   }
 
+  /// A box was heard at an epoch the receivers may not follow (peer_epoch.dart,
+  /// SR-110): the host tells its modem, and the leader tells every box (CMD
+  /// peer, flooded; it only moves a table up).
+  void _announcePeerEpoch(int nodeId, int epoch) {
+    onPeerEpoch?.call(nodeId, epoch);
+    if (election.isLeader) {
+      _sendCmd(cmdPeerEpoch, {'src': nodeId, 'epoch': epoch});
+    }
+  }
+
   /// CMD update (opcode 9, RFC 0001 Amendment 6) to [dest]: the GM's alone
   /// (controller_firmware.dart), never a mode's field.lua, so not in
   /// [cmdOpcodes].
@@ -523,7 +543,9 @@ class FieldController {
       return;
     }
     acks.record(header.source, epoch, header.seq);
-    final node = _node(header.source)
+    final node = _node(header.source);
+    final priorEpoch = node.epoch;
+    node
       ..lastSeenMs = _now
       ..lastSeenGameMs = gameTimeMs
       ..heard = true
@@ -541,6 +563,15 @@ class FieldController {
     }
     if (header.ackRequested && election.isLeader) {
       _send(RfType.ack, acks.ack(header.source, epoch).encode(), RfPrio.normal);
+    }
+    if (_peerEpochs.heard(
+      header.source,
+      priorEpoch,
+      epoch,
+      header.type == RfType.hello,
+      _now,
+    )) {
+      _announcePeerEpoch(header.source, epoch);
     }
     _checkHealth(node, _now);
   }
@@ -750,6 +781,11 @@ class FieldController {
       }
     } else {
       _repeats = [];
+    }
+    if (election.isLeader) {
+      for (final (node, epoch) in _peerEpochs.due(nowMs)) {
+        _sendCmd(cmdPeerEpoch, {'src': node, 'epoch': epoch});
+      }
     }
     for (final node in nodes.values.toList()) {
       _checkHealth(node, nowMs);

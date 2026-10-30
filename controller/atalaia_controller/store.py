@@ -91,18 +91,27 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
+import secrets
 import sqlite3
 import threading
 import time
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+log = logging.getLogger(__name__)
+
 SCHEMA_VERSION = 18
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes, per level's plan
 FIELD_LEVELS_MAX = 10  # levels of a multi-story field (decision ML-1)
 EPOCH_KEYS = 8  # game keys whose TX epoch is kept (as the box's epoch store, radio_protocol.h)
+# A game resumed with no record of its key's epoch (the record was lost or pushed out) goes on at a random
+# epoch in this range, never at 1: the controller's epochs 1.. may all have been used with this key (RFC 0001
+# Amendment 23, decision SR-29; as a box does, ATALAIA_EPOCH_LOST_MIN/MAX in radio_protocol.h, SR-27).
+EPOCH_LOST_MIN = 4096
+EPOCH_LOST_MAX = 61439
 
 
 def epoch_tag(key: bytes) -> str:
@@ -466,6 +475,7 @@ class Store:
 
     def __init__(self, path: str) -> None:
         self.path = path
+        self.epoch_lost = False  # the last next_tx_epoch took a random epoch (SR-29)
         if path != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
             # Created private before SQLite opens it: its WAL and shm files take its mode.
@@ -564,21 +574,87 @@ class Store:
         + 1; a new key starts at 1, so a box new to the game (epochs 0..16) hears it. The one
         tx_epoch of earlier versions is used only while tx_epochs does not exist, and only by a
         game the controller resumes (resuming: its game); a new game starts at 1. One row write:
-        a crash leaves the old list or the new one."""
+        a crash leaves the old list or the new one.
+
+        A game resumed with no record for its key (the list lost, or the key pushed out of it by
+        newer ones) may have used any epoch from 1 with this key: starting at 1 again would repeat
+        nonces, so it starts at a random epoch in [EPOCH_LOST_MIN, EPOCH_LOST_MAX] (RFC 0001
+        Amendment 23, decision SR-29), as a box does after a lost epoch store (SR-27); boxes find
+        it by their deep search of its TIME beacons (decision SR-110). The list is also kept in a
+        file beside the database, written whole before the epoch is used: a database restored from
+        a backup older than the last run, or deleted, has the file's epochs to go on above (the
+        higher of the two counts), so neither case repeats a nonce or starts below what the boxes
+        already heard."""
         tag = epoch_tag(key)
         with self._lock:
             saved = self.get_setting("tx_epochs")
             table: list[list[Any]] = json.loads(saved) if saved else []
+            side = self._read_epoch_file()
+            table = [[t, max(int(e), side.get(t, 0))] for t, e in table] + \
+                [[t, e] for t, e in side.items() if all(t != r[0] for r in table)]
             current = next((int(e) for t, e in table if t == tag), None)
-            if saved is None and resuming and self.get_setting("tx_epoch"):
+            if saved is None and current is None and resuming and self.get_setting("tx_epoch"):
                 current = int(self.get_setting("tx_epoch") or "0")
             if current is not None and current >= 0xFFFF:
                 raise RuntimeError("the controller's nonce epochs for this game are exhausted; "
                                    "start a new game")
-            epoch = 1 if current is None else current + 1
+            if current is None and resuming:
+                epoch = EPOCH_LOST_MIN + secrets.randbelow(EPOCH_LOST_MAX - EPOCH_LOST_MIN + 1)
+                self.epoch_lost = True
+                log.warning("game with key tag %s resumed with no record of its epoch: the controller "
+                            "goes on at the random epoch %d; boxes find it within a minute or two",
+                            tag, epoch)
+            else:
+                epoch = 1 if current is None else current + 1
+                self.epoch_lost = False
             table = [[tag, epoch]] + [r for r in table if r[0] != tag]
-            self.set_setting("tx_epochs", json.dumps(table[:EPOCH_KEYS]))
+            table = table[:EPOCH_KEYS]
+            # The file first: if the database write is lost the epoch is still on disk, and the other
+            # way round it would be used with nothing remembering it.
+            self._write_epoch_file(table)
+            self.set_setting("tx_epochs", json.dumps(table))
             return epoch
+
+    def _epoch_file(self) -> Optional[str]:
+        return None if self.path == ":memory:" else self.path + ".epochs"
+
+    def _read_epoch_file(self) -> dict[str, int]:
+        """The copy of tx_epochs beside the database: tag -> epoch; empty when there is none or it
+        cannot be read (the database's list is then what there is)."""
+        path = self._epoch_file()
+        if path is None:
+            return {}
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                rows = json.load(f)
+            return {str(t): int(e) for t, e in rows if isinstance(t, str) and 0 <= int(e) <= 0xFFFF}
+        except FileNotFoundError:
+            return {}
+        except (OSError, ValueError, TypeError):
+            log.warning("the epoch file %s cannot be read; the database's list is used", path)
+            return {}
+
+    def _write_epoch_file(self, table: list[list[Any]]) -> None:
+        """Replaces the epoch file whole (a temporary file, synced, then renamed): a power cut leaves the
+        old list or the new one. A failure is logged, not raised: the database still has the list."""
+        path = self._epoch_file()
+        if path is None:
+            return
+        tmp = path + ".tmp"
+        try:
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(table, f)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, path)
+            dir_fd = os.open(os.path.dirname(os.path.abspath(path)), os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError as exc:
+            log.warning("the epoch file %s was not written: %s", path, exc)
 
     # --- modes --------------------------------------------------------------
 

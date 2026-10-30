@@ -60,6 +60,9 @@ enum {
     FIELD_CMD_REBOOT = 7,
     FIELD_CMD_MODE = 8,   /* a command for the mode script: cmd.mode, its params name it */
     FIELD_CMD_UPDATE = 9, /* a firmware update over Wi-Fi: params {"id", "version"} */
+    /* 10 is the I/O pod's settings (Amendment 17), taken by the pod's radio. */
+    FIELD_CMD_PEER_EPOCH =
+        11, /* a node's epoch, for the receivers: params {"src", "epoch"} (Amendment 24) */
 };
 
 /* Game states as TIME carries them. */
@@ -114,6 +117,7 @@ typedef struct {
     uint32_t rx_ok, rx_rejected, rx_duplicates, relayed;
     uint32_t rx_replays; /* authentic but 64+ counters below the source's highest (SR-20) */
     uint32_t cmds_stale, times_stale; /* a CMD or TIME older than one already applied (SR-21) */
+    uint32_t peer_epochs; /* nodes whose epoch a controller named, moving the table up (SR-110) */
     uint32_t relay_skipped, relay_cancelled, relay_no_slot; /* Amendment 13's rules at work */
     uint32_t cmds, times, states_sent, hellos_sent, tx_refused;
     /* Listen before talk (RFC 0001 Amendment 14), copied from the radio task's counters when the

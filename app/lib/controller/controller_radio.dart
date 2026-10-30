@@ -16,7 +16,7 @@
 library;
 
 import 'dart:convert';
-import 'dart:math' show max;
+import 'dart:math' show Random, max;
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
@@ -202,12 +202,27 @@ String epochTag(List<int> key) {
 /// Game keys whose TX epoch is kept (as a box's epoch store).
 const epochKeys = 8;
 
+/// A game resumed with no record of its key's epoch takes a random epoch in
+/// this range, never 1 (RFC 0001 Amendment 23, decision SR-29; the box's
+/// ATALAIA_EPOCH_LOST_MIN and _MAX, protocol/vectors/tx_epoch.json).
+const epochLostMin = 4096;
+const epochLostMax = 61439;
+
 /// The controller's epoch for this run in the game with [key], written
 /// before any packet is sent with it (ADR-P2-2; store.py `next_tx_epoch`):
 /// the setting `tx_epochs` keeps `[tag, epoch]` for the last [epochKeys]
 /// keys, most recent first. A key with a record goes on at its epoch + 1; a
-/// new key starts at 1.
-int nextTxEpoch(ControllerStore store, List<int> key) {
+/// new key starts at 1. A game the controller [resuming] after a restart
+/// with no record of its key (the list lost, or the key pushed out of it)
+/// may have used any epoch from 1 with it, so it starts at a random epoch in
+/// [epochLostMin]..[epochLostMax] instead (SR-29); boxes find it by their deep
+/// search of its TIME beacons (SR-110). [random] is for the tests.
+int nextTxEpoch(
+  ControllerStore store,
+  List<int> key, {
+  bool resuming = false,
+  Random? random,
+}) {
   final tag = epochTag(key);
   final saved = store.getSetting('tx_epochs');
   final table = <List<Object?>>[
@@ -227,7 +242,14 @@ int nextTxEpoch(ControllerStore store, List<int> key) {
       'start a new game',
     );
   }
-  final epoch = current == null ? 1 : current + 1;
+  final int epoch;
+  if (current == null && resuming) {
+    epoch =
+        epochLostMin +
+        (random ?? Random.secure()).nextInt(epochLostMax - epochLostMin + 1);
+  } else {
+    epoch = current == null ? 1 : current + 1;
+  }
   final rows = [
     [tag, epoch],
     for (final row in table)
@@ -272,9 +294,10 @@ class RadioTransport implements FieldTransport {
     this.paceMs = 0,
     this.queueMax = paceQueueMax,
     int Function()? nowMs,
+    bool resuming = false,
   }) : _key = key,
        _nowMs = nowMs ?? (() => 0) {
-    epoch = nextTxEpoch(store, key);
+    epoch = nextTxEpoch(store, key, resuming: resuming);
     configureModem();
   }
 

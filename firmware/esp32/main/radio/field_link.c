@@ -13,6 +13,7 @@
 #include "atalaia/ack.h"
 #include "atalaia/codec.h"
 #include "atalaia/flood.h"
+#include "screen_json.h"
 
 static void say(field_link_t *l, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 
@@ -493,6 +494,21 @@ static void on_cmd(field_link_t *l, const atalaia_header_t *h, uint16_t epoch, c
     if (c.dest != 0xFFFF && c.dest != l->join.node_id) return;
     /* Commands come from the controller we follow (or anyone before the first TIME). */
     if (h->source != l->leader && l->have_time) return;
+    if (c.cmd == FIELD_CMD_PEER_EPOCH) {
+        /* The controller says what epoch a node is at (RFC 0001 Amendment 24, SR-110): a node that
+         * lost its epoch store sends at an epoch far above what this box knows. The table only ever
+         * goes up, so a repeated or old announcement changes nothing; not a game state, so not
+         * ordered. */
+        long src = 0, ep = 0;
+        if (screen_json_int(c.params_json, "src", &src) &&
+            screen_json_int(c.params_json, "epoch", &ep) && src > 0 && src < 0xFFFF &&
+            src != l->join.node_id && ep > 0 && ep <= 0xFFFF &&
+            atalaia_radio_proto_set_source_epoch(&l->proto, (uint16_t)src, (uint16_t)ep)) {
+            say(l, "node %ld is at epoch %ld", src, ep);
+            l->stats.peer_epochs++;
+        }
+        return;
+    }
     if (c.cmd <= FIELD_CMD_END) {
         /* START, PAUSE, RESUME and END are ordered: one older than the last applied is refused. */
         uint32_t ctr = atalaia_replay_ctr(epoch, h->seq);

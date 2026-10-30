@@ -617,11 +617,64 @@ static void test_recv_after_a_crash_loop(void)
     /* ...its HELLO is not, and then the rest is heard again. */
     CHECK(recv_typed(&rp, 4, 38, ATALAIA_MSG_HELLO, 16, &got) && got == 38);
     CHECK(recv_typed(&rp, 4, 38, ATALAIA_MSG_EVENT, 16, &got) && got == 38);
-    /* A controller's TIME too; but not past the restart window, and never lower. */
+    /* A controller's TIME too; and never lower. */
     CHECK(recv_typed(&rp, 4, 38 + ATALAIA_RESTART_EPOCH_WINDOW, ATALAIA_MSG_TIME, 16, &got));
-    CHECK(!recv_typed(&rp, 4, 38 + 2 * ATALAIA_RESTART_EPOCH_WINDOW + 1, ATALAIA_MSG_HELLO, 16,
-                      &got));
     CHECK(!recv_typed(&rp, 4, 37, ATALAIA_MSG_HELLO, 16, &got));
+    CHECK(!recv_typed(&rp, 4, 38 + ATALAIA_RESTART_EPOCH_WINDOW - 1, ATALAIA_MSG_TIME, 16, &got));
+}
+
+/* A box that lost its epoch store takes an epoch in [4096, 61439] (SR-27); the receivers find it by
+ * the deep search of its HELLO, a slice of the range a retry (SR-110), with no controller's help.
+ * Only a HELLO or a TIME is searched so far; the table only goes up; a lower epoch is never found.
+ */
+static void test_deep_search_finds_a_lost_store_box(void)
+{
+    static atalaia_radio_proto_t rp;
+    atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, NULL);
+    atalaia_radio_proto_set_key(&rp, test_key);
+    atalaia_radio_proto_set_source_epoch(&rp, 4, 3);
+    uint16_t got = 0;
+    /* An EVENT is never searched far, a HELLO is, a slice at a time. */
+    CHECK(!recv_typed(&rp, 4, 40000, ATALAIA_MSG_EVENT, 16, &got));
+    CHECK(rp.deep_searches == 0);
+    int tries = 0;
+    while (!recv_typed(&rp, 4, 40000, ATALAIA_MSG_HELLO, 16, &got)) {
+        tries++;
+        CHECK(tries <= 65536 / ATALAIA_DEEP_SLICE + 1);
+        if (tries > 65536 / ATALAIA_DEEP_SLICE + 1) return;
+    }
+    CHECK(got == 40000 && rp.deep_found == 1);
+    /* The slice is a bounded cost: (40000 - 260) / 2048 slices before it, each at most once per
+     * gap. */
+    CHECK(tries >= 19 && rp.deep_searches == (uint32_t)tries + 1);
+    /* Now it is the source's epoch: its other packets are heard, a lower epoch never. */
+    CHECK(recv_typed(&rp, 4, 40000, ATALAIA_MSG_EVENT, 16, &got) && got == 40000);
+    CHECK(!recv_typed(&rp, 4, 39999, ATALAIA_MSG_HELLO, 16, &got));
+    CHECK(!recv_typed(&rp, 4, 3, ATALAIA_MSG_HELLO, 16, &got));
+    /* A source never heard is searched from epoch 0 the same way. */
+    tries = 0;
+    while (!recv_typed(&rp, 9, 61000, ATALAIA_MSG_TIME, 16, &got) && tries < 100) tries++;
+    CHECK(got == 61000 && tries < 100); /* 30 slices, 20 a minute */
+    /* The cursor wraps: a source at epoch 300 (inside the first slice) is found at once. */
+    CHECK(recv_typed(&rp, 12, 300, ATALAIA_MSG_HELLO, 16, &got) && got == 300);
+}
+
+/* A controller's announcement (SET_PEER_EPOCH, CMD peer) only ever moves a source's epoch up. */
+static void test_set_source_epoch_never_goes_back(void)
+{
+    static atalaia_radio_proto_t rp;
+    atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, NULL);
+    atalaia_radio_proto_set_key(&rp, test_key);
+    uint16_t got = 0;
+    CHECK(atalaia_radio_proto_set_source_epoch(&rp, 6, 100));
+    CHECK(!atalaia_radio_proto_set_source_epoch(&rp, 6, 50));  /* lower: ignored */
+    CHECK(!atalaia_radio_proto_set_source_epoch(&rp, 6, 100)); /* equal: nothing moves */
+    CHECK(recv_window(&rp, 6, 100, 16, &got) && got == 100);   /* still heard at 100 */
+    CHECK(!recv_window(&rp, 6, 50, 16, &got));
+    CHECK(atalaia_radio_proto_set_source_epoch(&rp, 6, 5000));
+    CHECK(recv_window(&rp, 6, 5000, 16, &got) && got == 5000);
+    CHECK(!atalaia_radio_proto_set_source_epoch(&rp, 6, 4999));
+    CHECK(!recv_window(&rp, 6, 100, 16, &got));
 }
 
 /* A crypto backend that counts decryptions (the test stub underneath). */
@@ -664,8 +717,9 @@ static void test_wide_search_budget(void)
         rx.timestamp_ms = 5000u + (uint32_t)i * 10u;
         CHECK(!atalaia_radio_proto_on_recv_window(&rp, &rx, 16, &out_hdr, out, &out_len, &got));
     }
-    /* Without the budget: 257 each, 257000. With it: 17 each, plus 20 wide searches of 240. */
-    CHECK(decrypts == 1000 * 17 + ATALAIA_WIDE_PER_MIN * 240);
+    /* Without the budget: 257 each, 257000. With it: 17 each, plus 20 wide searches of 240 and a
+     * deep slice (SR-110) each. */
+    CHECK(decrypts == 1000 * 17 + ATALAIA_WIDE_PER_MIN * (240 + ATALAIA_DEEP_SLICE));
     CHECK(rp.wide_searches == ATALAIA_WIDE_PER_MIN &&
           rp.wide_refused == 1000 - ATALAIA_WIDE_PER_MIN);
     /* A genuine HELLO a minute later is searched and heard; its retry inside the gap is not
@@ -829,5 +883,7 @@ void run_radio_protocol_tests(void)
     test_recv_window();
     test_recv_after_a_crash_loop();
     test_wide_search_budget();
+    test_deep_search_finds_a_lost_store_box();
+    test_set_source_epoch_never_goes_back();
     test_provisional_source();
 }

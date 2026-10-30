@@ -857,7 +857,12 @@ class ControllerEngine {
   /// Puts a game on the radio (engine.py `_activate`): [lead] false for a
   /// game joined as a standby controller, which follows the TIME beacons
   /// until it is promoted (ADR-P2-8; PE24 slice S7).
-  void _activate(Map<String, Object?> game, Uint8List key, {bool lead = true}) {
+  void _activate(
+    Map<String, Object?> game,
+    Uint8List key, {
+    bool lead = true,
+    bool resuming = false,
+  }) {
     final gameNode = (game['node_id'] as int?) ?? config.nodeId;
     final election = Election(
       gameNode,
@@ -888,6 +893,7 @@ class ControllerEngine {
             wifi: _toWifi,
             paceMs: config.controllerPaceMs,
             nowMs: nowMs,
+            resuming: resuming,
           );
     // The key's tag (not secret) outlives the key, so a GAME_OVER can still
     // name this game after a restart without the key (decision OT-13; sent
@@ -913,6 +919,7 @@ class ControllerEngine {
     });
     fc
       ..onEvent = _onEvent
+      ..onPeerEpoch = _onPeerEpoch
       ..onNode = _onNode
       ..onScores = _onScores
       ..onRole = _onRole
@@ -1031,7 +1038,7 @@ class ControllerEngine {
     }
     // A joined standby restarts as a follower; the GM promotes it again if
     // needed.
-    _activate(game, key, lead: game['joined'] != true);
+    _activate(game, key, lead: game['joined'] != true, resuming: true);
     final fc = _fc!;
     fc.restoreAdjustments(_adjustments(id));
     for (final node in store.nodes(id)) {
@@ -2352,6 +2359,14 @@ class ControllerEngine {
         'status': status,
       });
     }
+  }
+
+  /// A box was heard at an epoch the receivers may not follow (a restart, or
+  /// a lost epoch store: RFC 0001 Amendment 24, decision SR-110): the modem is
+  /// told too (SET_PEER_EPOCH; it only ever goes up). The field controller has
+  /// sent the boxes their CMD (engine.py `_on_peer_epoch`).
+  void _onPeerEpoch(int node, int epoch) {
+    modem?.setPeerEpochs({node: epoch});
   }
 
   void _onModemState(String state) {

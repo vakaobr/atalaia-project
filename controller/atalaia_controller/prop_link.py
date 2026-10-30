@@ -31,7 +31,7 @@ import threading
 from typing import TYPE_CHECKING, Any, Optional
 
 from atalaia_sim import codec
-from atalaia_sim.field_controller import CMD_OPCODES, STATE_NAMES
+from atalaia_sim.field_controller import CMD_OPCODES, CMD_PEER_EPOCH, STATE_NAMES
 from atalaia_sim.packet import Header, cmd_decode, hello_encode, state_encode, time_decode, vf_make
 from atalaia_sim.protocol import MESSAGE_TYPES
 
@@ -126,6 +126,8 @@ class PropLinks:
                 c = cmd_decode(payload)
             except Exception:
                 return False
+            if c.get("cmd") == CMD_PEER_EPOCH:
+                return False  # the radio's own (Amendment 24): a prop on Wi-Fi has no epochs
             msg = {"type": "cmd", "cmd": OPCODE_NAMES.get(c.get("cmd"), str(c.get("cmd"))),
                    "opcode": c.get("cmd"), "params": c.get("params") or {}}
             dest = c.get("dest")

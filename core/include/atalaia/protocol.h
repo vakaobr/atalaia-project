@@ -85,7 +85,7 @@ enum {
 
 /* CBOR keys of CMD payload fields. */
 enum {
-    ATALAIA_PL_CMD_CMD = 1,    /* opcode: 0-10 (9: firmware update, RFC 0001 Amendment 6; 10: an I/O pod's settings, Amendment 17) */
+    ATALAIA_PL_CMD_CMD = 1,    /* opcode: 0-11 (9: firmware update, RFC 0001 Amendment 6; 10: an I/O pod's settings, Amendment 17; 11: a node's epoch for the receivers, Amendment 24) */
     ATALAIA_PL_CMD_PARAMS = 2, /* command-specific parameters */
     ATALAIA_PL_CMD_DEST = 3,   /* destination node; absent = broadcast */
 };

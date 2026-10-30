@@ -325,10 +325,20 @@ void atalaia_radio_proto_set_epoch(atalaia_radio_proto_t *rp, uint16_t epoch)
     rp->seq = 0;
 }
 
-void atalaia_radio_proto_set_source_epoch(atalaia_radio_proto_t *rp, uint16_t source,
+bool atalaia_radio_proto_set_source_epoch(atalaia_radio_proto_t *rp, uint16_t source,
                                           uint16_t epoch)
 {
     int idx = find_source(rp, source);
+    if (idx >= 0 && rp->source_epochs[idx].valid) {
+        /* Never backwards (SR-111): what a controller names is trusted, but an epoch at or below
+         * the one heard would make this receiver refuse a source it hears (a stale or replayed
+         * announcement). An equal one only settles the source. */
+        if (epoch < rp->source_epochs[idx].epoch) return false;
+        if (epoch == rp->source_epochs[idx].epoch) {
+            rp->source_epochs[idx].provisional = false;
+            return false;
+        }
+    }
     if (idx < 0) {
         idx = alloc_source_slot(rp);
         atalaia_replay_init(&rp->source_epochs[idx].replay);
@@ -337,6 +347,7 @@ void atalaia_radio_proto_set_source_epoch(atalaia_radio_proto_t *rp, uint16_t so
     rp->source_epochs[idx].epoch = epoch;
     rp->source_epochs[idx].valid = true;
     rp->source_epochs[idx].provisional = false; /* told by the controller: trusted */
+    return true;
 }
 
 bool atalaia_radio_proto_send_payload(atalaia_radio_proto_t *rp, uint8_t msg_type, uint8_t prio,
@@ -444,12 +455,40 @@ static bool wide_allowed(atalaia_radio_proto_t *rp, uint16_t source, uint32_t no
             if (now - rp->wide_recent[i].ms > now - rp->wide_recent[slot].ms) slot = i;
         }
     }
+    if (!rp->wide_recent[slot].valid || rp->wide_recent[slot].source != source) {
+        rp->wide_recent[slot].deep_next = 0;
+    }
     rp->wide_recent[slot].source = source;
     rp->wide_recent[slot].ms = now;
     rp->wide_recent[slot].valid = true;
     rp->wide_ms[g] = now;
     rp->wide_set[g] = true;
     rp->wide_next = (uint8_t)((g + 1u) % ATALAIA_WIDE_PER_MIN);
+    return true;
+}
+
+/* One slice of the deep search for source (SR-110): the epochs from its cursor on,
+ * ATALAIA_DEEP_SLICE of them, the cursor then at the next. It wraps to `lo` past 65535, so a source
+ * whose epoch is out of reach is looked for again from the start. wide_allowed has just made the
+ * source's entry. */
+static bool deep_search(atalaia_radio_proto_t *rp, const radio_rx_msg_t *rx, uint16_t source,
+                        uint32_t lo, atalaia_header_t *out_hdr, uint8_t *out_payload,
+                        size_t *out_payload_len, uint16_t *found)
+{
+    if (lo > 65535u) return false;
+    int at = -1;
+    for (int i = 0; i < ATALAIA_WIDE_SOURCES; i++) {
+        if (rp->wide_recent[i].valid && rp->wide_recent[i].source == source) at = i;
+    }
+    if (at < 0) return false;
+    uint32_t from = rp->wide_recent[at].deep_next;
+    if (from < lo || from > 65535u) from = lo;
+    uint32_t to = from + ATALAIA_DEEP_SLICE - 1u;
+    if (to > 65535u) to = 65535u;
+    rp->wide_recent[at].deep_next = to + 1u;
+    rp->deep_searches++;
+    if (!try_epochs(rp, rx, from, to, out_hdr, out_payload, out_payload_len, found)) return false;
+    rp->deep_found++;
     return true;
 }
 
@@ -497,6 +536,11 @@ bool atalaia_radio_proto_on_recv_window(atalaia_radio_proto_t *rp, const radio_r
         ok = try_epochs(rp, rx_msg, (uint32_t)first + window + 1u,
                         (uint32_t)first + ATALAIA_RESTART_EPOCH_WINDOW, out_hdr, out_payload,
                         out_payload_len, &epoch);
+        if (!ok && (hdr.type == ATALAIA_MSG_HELLO || hdr.type == ATALAIA_MSG_TIME)) {
+            ok =
+                deep_search(rp, rx_msg, source, (uint32_t)first + ATALAIA_RESTART_EPOCH_WINDOW + 1u,
+                            out_hdr, out_payload, out_payload_len, &epoch);
+        }
         if (!ok) return false;
         if (idx >= 0) provisional = rp->source_epochs[idx].provisional;
     }

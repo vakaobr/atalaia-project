@@ -1112,6 +1112,46 @@ static void test_older_state_frames_are_refused(void)
     CHECK(b.link.game_state == FIELD_GAME_PAUSED);
 }
 
+/* A box that lost its epoch store sends at a random high epoch (SR-27); the controller names it in
+ * a CMD peer (RFC 0001 Amendment 24, SR-110) and a box hears it from then on. Only ever upwards. */
+static void test_cmd_peer_epoch(void)
+{
+    static box_t b;
+    memset(&b, 0, sizeof(b));
+    CHECK(box_up(&b, NULL, 1));
+    ctl_t c, lost;
+    ctl_up(&c, 0, 3);
+    ctl_up(&lost, 5, 9000);
+    uint8_t pl[] = {0xa0};
+    uint32_t ok0 = b.link.stats.rx_ok;
+    /* Node 5 at 9000 is not heard (a STATE is never searched far)... */
+    int before = lost.sink.count;
+    CHECK(atalaia_radio_proto_send_payload(&lost.proto, ATALAIA_MSG_STATE, 0, false, pl, 1, NULL));
+    field_link_on_packet(&b.link, lost.sink.pkt[before], lost.sink.len[before], -50);
+    CHECK(b.link.stats.rx_ok == ok0);
+    /* ...until the controller names its epoch. */
+    send_cmd(&c, &b, FIELD_CMD_PEER_EPOCH, 0xFFFF, "{\"src\":5,\"epoch\":9000}");
+    CHECK(b.link.stats.peer_epochs == 1 && b.shell.ncmds == 0);
+    before = lost.sink.count;
+    CHECK(atalaia_radio_proto_send_payload(&lost.proto, ATALAIA_MSG_STATE, 0, false, pl, 1, NULL));
+    field_link_on_packet(&b.link, lost.sink.pkt[before], lost.sink.len[before], -50);
+    CHECK(b.link.stats.rx_ok == ok0 + 2); /* the CMD and the STATE */
+    /* A lower epoch, a repeat, our own id and nonsense change nothing. */
+    send_cmd(&c, &b, FIELD_CMD_PEER_EPOCH, 0xFFFF, "{\"src\":5,\"epoch\":100}");
+    send_cmd(&c, &b, FIELD_CMD_PEER_EPOCH, 0xFFFF, "{\"src\":5,\"epoch\":9000}");
+    send_cmd(&c, &b, FIELD_CMD_PEER_EPOCH, 0xFFFF, "{\"src\":7,\"epoch\":9000}");
+    send_cmd(&c, &b, FIELD_CMD_PEER_EPOCH, 0xFFFF, "{\"src\":8,\"epoch\":0}");
+    send_cmd(&c, &b, FIELD_CMD_PEER_EPOCH, 0xFFFF, "{\"src\":8}");
+    CHECK(b.link.stats.peer_epochs == 1);
+    before = lost.sink.count;
+    CHECK(atalaia_radio_proto_send_payload(&lost.proto, ATALAIA_MSG_STATE, 0, false, pl, 1, NULL));
+    field_link_on_packet(&b.link, lost.sink.pkt[before], lost.sink.len[before], -50);
+    CHECK(b.link.stats.rx_ok == ok0 + 8);
+    /* A box that is not the one addressed ignores it. */
+    send_cmd(&c, &b, FIELD_CMD_PEER_EPOCH, 9, "{\"src\":6,\"epoch\":9000}");
+    CHECK(b.link.stats.peer_epochs == 1);
+}
+
 void run_field_link_tests(void)
 {
     test_hello_event_retry_and_ack();
@@ -1119,6 +1159,7 @@ void run_field_link_tests(void)
     test_retry_limits_and_telemetry();
     test_retry_backoff_schedule();
     test_cmd_time_and_leader();
+    test_cmd_peer_epoch();
     test_late_start_from_time();
     test_recorded_cmd_replayed_after_31_s_is_refused();
     test_older_state_frames_are_refused();

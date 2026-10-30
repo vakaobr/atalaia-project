@@ -706,6 +706,47 @@ static void test_rx_epoch_window(void)
     modem_on_air_rx(&modem, pkt, n, -60, 0);
     CHECK(rx_frame(last_of(MODEM_FRAME_RX), &h, text, &rssi, &snr, &epoch));
     CHECK(epoch == 22 && strcmp(text, "far") == 0);
+
+    /* The controller's word only ever moves a source up (SR-111): a lower epoch, stale or
+     * replayed, does not take it back, and a packet 20 above the real one is still heard. */
+    put16(peer + 3, 1);
+    host_send(MODEM_FRAME_CMD, peer, sizeof(peer));
+    clear_out();
+    n = air_packet(0x1234, 9, 4, 22 + 10, KEY, "still", pkt);
+    modem_on_air_rx(&modem, pkt, n, -60, 0);
+    CHECK(rx_frame(last_of(MODEM_FRAME_RX), &h, text, &rssi, &snr, &epoch));
+    CHECK(epoch == 32 && strcmp(text, "still") == 0);
+}
+
+/* A source at a random high epoch (a box that lost its epoch store, SR-27) is found by the modem's
+ * deep search of its HELLOs, with no host involved (SR-110). */
+static void test_deep_search_finds_a_lost_store_box(void)
+{
+    setup(true, 16);
+    configure(0x1234, 0, 1, 2, 869525000, KEY);
+    uint8_t pkt[RADIO_MAX_PKT_LEN];
+    atalaia_header_t h;
+    char text[64];
+    int8_t rssi, snr;
+    uint16_t epoch = 0;
+    int heard = -1;
+    for (int i = 0; i < 40 && heard < 0; i++) {
+        clear_out();
+        atalaia_header_t hello = {.version_flags = ATALAIA_VF_MAKE(1, 1, 1, 1),
+                                  .game_id = 0x1234,
+                                  .source = 9,
+                                  .seq = (uint16_t)(1 + i),
+                                  .hop_limit = 2,
+                                  .type = ATALAIA_MSG_HELLO};
+        size_t n = atalaia_packet_encrypt(&hello, 41000, KEY, (const uint8_t *)"hi", 2, pkt,
+                                          RADIO_MAX_PKT_LEN, &atalaia_crypto_test_stub);
+        modem_on_air_rx(&modem, pkt, n, -60, 0);
+        io_state.now += ATALAIA_WIDE_GAP_MS;
+        if (last_of(MODEM_FRAME_RX) >= 0) heard = i;
+    }
+    CHECK(heard >= 19 && heard < 35);
+    CHECK(rx_frame(last_of(MODEM_FRAME_RX), &h, text, &rssi, &snr, &epoch));
+    CHECK(epoch == 41000);
 }
 
 static void test_clear_forgets_the_game(void)
@@ -1044,6 +1085,7 @@ void run_modem_tests(void)
     test_rx_refuses_a_replay_after_the_window();
     test_rx_drops_foreign_and_forged();
     test_rx_epoch_window();
+    test_deep_search_finds_a_lost_store_box();
     test_clear_forgets_the_game();
     test_measure();
     test_field_frames();

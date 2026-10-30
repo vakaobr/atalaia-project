@@ -195,6 +195,51 @@ void main() {
       expect(nextTxEpoch(s, key(1)), 1);
       expect(s.getSetting('tx_epochs'), isNot(contains('0101')));
     });
+
+    test('the epoch of a resumed game with no record: the shared vectors '
+        '(SR-29)', () {
+      final v = loadVectors('tx_epoch.json');
+      final range = (v['lost_range'] as List).cast<int>();
+      List<int> bytes(String hex) => [
+        for (var i = 0; i < hex.length; i += 2)
+          int.parse(hex.substring(i, i + 2), radix: 16),
+      ];
+      for (final c in cases(v, 'cases')) {
+        final name = c['name'] as String;
+        final store = MemoryControllerStore();
+        final table = (c['table'] as List).cast<Map<String, dynamic>>();
+        if (table.isNotEmpty) {
+          store.setSetting(
+            'tx_epochs',
+            jsonEncode([
+              for (final r in table)
+                [epochTag(bytes(r['key'] as String)), r['epoch']],
+            ]),
+          );
+        }
+        final key = bytes(c['key'] as String);
+        final resuming = c['resuming'] as bool;
+        if (c['error'] == true) {
+          expect(
+            () => nextTxEpoch(store, key, resuming: resuming),
+            throwsStateError,
+            reason: name,
+          );
+        } else if (c['lost_range'] == true) {
+          for (var i = 0; i < 20; i++) {
+            final got = nextTxEpoch(store, key, resuming: resuming);
+            expect(got, inInclusiveRange(range[0], range[1]), reason: name);
+            store.setSetting('tx_epochs', '[]');
+          }
+        } else {
+          expect(
+            nextTxEpoch(store, key, resuming: resuming),
+            c['epoch'],
+            reason: name,
+          );
+        }
+      }
+    });
   });
 
   group('a restart', () {

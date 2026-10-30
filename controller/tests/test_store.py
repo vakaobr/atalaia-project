@@ -139,6 +139,76 @@ class StoreTests(unittest.TestCase):
         finally:
             other.close()
 
+    def test_tx_epoch_shared_vectors(self):
+        """protocol/vectors/tx_epoch.json, shared with the phone controller's nextTxEpoch."""
+        path = Path(__file__).resolve().parents[2] / "protocol" / "vectors" / "tx_epoch.json"
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        lo, hi = doc["lost_range"]
+        for case in doc["cases"]:
+            with self.subTest(case["name"]):
+                store = Store(":memory:")
+                try:
+                    if case["table"]:
+                        rows = [[epoch_tag(bytes.fromhex(r["key"])), r["epoch"]] for r in case["table"]]
+                        store.set_setting("tx_epochs", json.dumps(rows))
+                    key = bytes.fromhex(case["key"])
+                    if case.get("error"):
+                        with self.assertRaises(RuntimeError):
+                            store.next_tx_epoch(key, case["resuming"])
+                    elif case.get("lost_range"):
+                        with self.assertLogs("atalaia_controller.store", "WARNING"):
+                            for _ in range(20):
+                                got = store.next_tx_epoch(key, case["resuming"])
+                                self.assertTrue(lo <= got <= hi, got)
+                                self.assertTrue(store.epoch_lost)
+                                store.delete_setting("tx_epochs")
+                    else:
+                        self.assertEqual(store.next_tx_epoch(key, case["resuming"]), case["epoch"])
+                        self.assertFalse(store.epoch_lost)
+                finally:
+                    store.close()
+
+    def test_a_resumed_game_with_a_lost_record_does_not_repeat_nonces(self):
+        """SR-29: the list gone (or the key pushed out of it) and the game resumed from its stored key:
+        epoch 1.. may all have been used with it, so the controller takes a random high epoch, never 1."""
+        key = bytes(range(16))
+        self.assertEqual(self.store.next_tx_epoch(key), 1)
+        self.store.delete_setting("tx_epochs")
+        os.remove(self.path + ".epochs")  # and the copy beside the database
+        with self.assertLogs("atalaia_controller.store", "WARNING"):
+            got = self.store.next_tx_epoch(key, resuming=True)
+        self.assertTrue(4096 <= got <= 61439 and self.store.epoch_lost)
+        self.assertEqual(self.store.next_tx_epoch(key, resuming=True), got + 1)
+        self.assertFalse(self.store.epoch_lost)
+
+    def test_a_database_restored_from_an_older_backup_goes_on_above_the_file(self):
+        """SR-29: the database is an older copy (epoch 2 where the controller had reached 6), or was
+        deleted; the epoch file beside it still has 6 (and the list of keys)."""
+        key = bytes(range(16))
+        for _ in range(6):
+            self.store.next_tx_epoch(key)
+        self.store.set_setting("tx_epochs", json.dumps([[epoch_tag(key), 2]]))  # the older copy
+        self.assertEqual(self.store.next_tx_epoch(key, resuming=True), 7)
+        self.store.close()
+        os.remove(self.path)  # the database lost, the file kept
+        for suffix in ("-wal", "-shm"):
+            if os.path.exists(self.path + suffix):
+                os.remove(self.path + suffix)
+        self.store = Store(self.path)
+        self.assertEqual(self.store.next_tx_epoch(key, resuming=True), 8)
+        self.assertEqual(self.store.next_tx_epoch(bytes(16)), 1)  # another game is still new
+        self.assertFalse(self.store.epoch_lost)
+
+    def test_an_unreadable_epoch_file_is_ignored_and_rewritten(self):
+        key = bytes(range(16))
+        self.assertEqual(self.store.next_tx_epoch(key), 1)
+        with open(self.path + ".epochs", "w") as f:
+            f.write("not json")
+        self.assertEqual(self.store.next_tx_epoch(key, resuming=True), 2)
+        with open(self.path + ".epochs") as f:
+            self.assertEqual(json.load(f)[0], [epoch_tag(key), 2])
+        self.assertEqual(stat.S_IMODE(os.stat(self.path + ".epochs").st_mode), 0o600)
+
     def test_epoch_tag_vectors(self):
         """protocol/vectors/epoch_tag.json, shared with the firmware's test_radio_protocol.c."""
         path = Path(__file__).resolve().parents[2] / "protocol" / "vectors" / "epoch_tag.json"

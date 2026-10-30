@@ -991,8 +991,12 @@ controller's game.
   than the last of theirs the box applied. The counts are `rx_duplicates`, `rx_replays`, `cmds_stale` and
   `times_stale` in `field_link_stats_t`. The window is in RAM: a box that just rebooted takes the first
   packet of each source as new. A box that resumes its game with no epoch record for its key (its store
-  was lost) takes a random epoch in 4096 to 61439 instead of 1, so no earlier nonce repeats (FLD-10); no
-  receiver follows it until a controller names its epoch or the game is joined again.
+  was lost) takes a random epoch in 4096 to 61439 instead of 1, so no earlier nonce repeats (FLD-10). Every
+  receiver finds such a node by the **deep search** of its HELLO or TIME (RFC 0001 Amendment 24, decision SR-110:
+  `ATALAIA_DEEP_SLICE` epochs of the range per search of the wide-search budget, so a minute or two), and a
+  controller that hears it names its epoch in **CMD peer** (opcode 11, params `{"src", "epoch"}`; `FIELD_CMD_PEER_EPOCH`,
+  `peer_epochs` in `field_link_stats_t`) and to the modem (SET_PEER_EPOCH). A source's epoch in the table only
+  ever goes up (`atalaia_radio_proto_set_source_epoch` returns false and changes nothing for a lower one).
 - **Listen before talk** -- (RFC 0001 Amendment 14, decisions SL-25 to SL-31; Kconfig
   `ATALAIA_LBT`, on by default, in every image that transmits: the Field Box, the USB modem
   and the I/O pod) before each transmission the radio task asks the radio whether the
