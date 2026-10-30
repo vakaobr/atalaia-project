@@ -69,7 +69,8 @@ static void test_no_legal_power(void)
     radio_limits_init(&l, 30, 2); /* 14 + 2.15 - 2 - 30 = -15.85 dBm needed on g */
     CHECK(!radio_limits_set_channel(&l, 868100000u));
     CHECK(l.band == ATALAIA_BAND_COUNT && !radio_limits_can_send(&l, PKT, 1000));
-    CHECK(radio_limits_set_channel(&l, 869525000u) && l.tx_power_dbm == -3); /* g2 still fits: -2.85 rounded down */
+    CHECK(radio_limits_set_channel(&l, 869525000u) &&
+          l.tx_power_dbm == -3); /* g2 still fits: -2.85 rounded down */
 }
 
 static void test_no_channel_no_tx(void)
