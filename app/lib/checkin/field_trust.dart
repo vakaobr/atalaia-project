@@ -25,8 +25,11 @@ import 'package:crypto/crypto.dart';
 
 import '../protocol/checkin_poster.dart';
 import '../security/bytes.dart';
+import '../security/pem.dart';
 import '../storage/app_store.dart';
 import 'field_route.dart';
+
+export '../security/pem.dart' show pemToDer;
 
 /// Fetches the PEM text at [url] (the CA endpoint), however its TLS looks.
 typedef CaFetcher = Future<String> Function(Uri url);
@@ -90,13 +93,26 @@ final class PinnedField {
     if (lastUrl != null) 'last_url': lastUrl,
   };
 
+  /// A stored pin whose PEM holds more than one certificate (kept before
+  /// APP-1) is narrowed to its first, the one whose hash was checked against
+  /// the poster, and only if that is the pinned hash; otherwise the pin is
+  /// dropped and the field is fetched again on its next poster.
   static PinnedField? fromJson(Map<String, Object?> j) {
     try {
+      final sha = hexDecode(j['ca_sha256']! as String);
+      final all = pemCertificates(j['ca_pem']! as String);
+      if (all == null || all.isEmpty) return null;
+      if (!constantTimeEquals(
+        Uint8List.fromList(sha256.convert(all.first).bytes),
+        sha,
+      )) {
+        return null;
+      }
       return PinnedField(
         fieldId: j['field_id']! as String,
         fieldName: j['field_name']! as String,
-        caPem: j['ca_pem']! as String,
-        caSha256: hexDecode(j['ca_sha256']! as String),
+        caPem: derToPem(all.first),
+        caSha256: sha,
         urls: (j['urls']! as List).cast<String>(),
         wifiSsid: j['wifi_ssid'] as String?,
         lastUrl: j['last_url'] as String?,
@@ -117,19 +133,6 @@ final class PinnedField {
     return HttpClient(context: securityContext())
       ..connectionTimeout = const Duration(seconds: 8)
       ..idleTimeout = const Duration(seconds: 15);
-  }
-}
-
-/// The DER bytes of the first certificate in [pem], or null.
-Uint8List? pemToDer(String pem) {
-  final m = RegExp(
-    r'-----BEGIN CERTIFICATE-----([A-Za-z0-9+/=\s]+)-----END CERTIFICATE-----',
-  ).firstMatch(pem);
-  if (m == null) return null;
-  try {
-    return base64.decode(m.group(1)!.replaceAll(RegExp(r'\s'), ''));
-  } on FormatException {
-    return null;
   }
 }
 
@@ -246,11 +249,13 @@ class FieldTrust {
         cancel,
       ) async {
         final pem = await _fetch(Uri.parse('$u/api/v1/controller/ca'));
-        final der = pemToDer(pem);
+        // Exactly one certificate (APP-1): the hash below is of that one, and
+        // the context trusts everything in what is kept.
+        final der = singleCertificate(pem);
         if (der == null) {
           definite ??= TrustException(
             TrustFailure.notACertificate,
-            'the controller did not send a certificate',
+            'the controller did not send exactly one certificate',
           );
           throw RouteError(FailKind.tls, 'not a certificate');
         }
@@ -264,7 +269,7 @@ class FieldTrust {
           );
           throw RouteError(FailKind.tls, 'another certificate');
         }
-        return (pem, got);
+        return (derToPem(der), got);
       });
       return r;
     } on RaceFailed catch (e) {

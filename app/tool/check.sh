@@ -14,7 +14,9 @@
 #                                     (core/CMakePresets.json) and check the libraries
 #   sh app/tool/check.sh apk          flutter build apk --debug (Gradle builds the
 #                                     core with the NDK) and check the APK's libraries,
-#                                     and that it carries no Google Play services
+#                                     and that it carries no Google Play services;
+#                                     then a release build with no keystore, which must
+#                                     stop and say so (APP-2)
 #   sh app/tool/check.sh format       format lib/, test/, integration_test/ and tool/ in place
 #   sh app/tool/check.sh lock         resolve pubspec.yaml again and write pubspec.lock
 #   sh app/tool/check.sh gen          write lib/modes/builtin_modes.g.dart from modes/
@@ -205,6 +207,16 @@ case "$MODE" in
         fi
         echo "ok   no Google Play services or ML Kit classes in the APK"
         echo "ok   $apk ($(wc -c < "$apk") bytes)"
+        # A release build must not fall back to the debug key (security review APP-2): with no
+        # release keystore and no explicit opt-in it has to stop and say what to set.
+        if ATALAIA_RELEASE_STORE_FILE= ATALAIA_RELEASE_STORE_PASSWORD= ATALAIA_RELEASE_KEY_ALIAS= \
+                ATALAIA_RELEASE_KEY_PASSWORD= flutter build apk --release > /tmp/apk-release.log 2>&1; then
+            echo "check.sh: a release APK was built with no release keystore (APP-2)" >&2
+            exit 1
+        fi
+        grep -q 'No release keystore' /tmp/apk-release.log \
+            || { tail -30 /tmp/apk-release.log; echo "check.sh: the release build failed, but not for want of a keystore" >&2; exit 1; }
+        echo "ok   a release build with no keystore stops and says so"
         # A writable folder to put the APK in (tools/docker_app.py mounts app/build/).
         if [ -n "${ATALAIA_APK_OUT:-}" ]; then
             cp "$apk" "$ATALAIA_APK_OUT/atalaia-debug.apk"

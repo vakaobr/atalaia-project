@@ -11,6 +11,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:atalaia_app/site/site_auth.dart';
 import 'package:atalaia_app/site/site_client.dart';
 
 class FakeSite {
@@ -270,6 +271,10 @@ class FakeSite {
 
   /// A server that takes `notice_version` on the social sign-up's start.
   var startTakesNoticeVersion = true;
+  // A server before APP-4 refuses `app_challenge` (422) and its ticket needs no verifier.
+  var startTakesAppChallenge = true;
+  String? lastAppChallenge;
+  String? lastVerifier;
 
   /// A 422 for another reason on the start (a field the body got wrong).
   var startValidationError = false;
@@ -571,24 +576,31 @@ class FakeSite {
             ],
           });
         }
-        // A server before the notice version refuses the field (422).
-        if (b.containsKey('notice_version')) {
-          if (!startTakesNoticeVersion) {
-            // What FastAPI says of a field the model forbids (app.py).
-            return SiteResponse(422, {
-              'detail': [
+        // A server before the notice version (or before APP-4) refuses the
+        // field (422), naming every one it does not know, as FastAPI does.
+        final unknown = [
+          if (b.containsKey('notice_version') && !startTakesNoticeVersion)
+            'notice_version',
+          if (b.containsKey('app_challenge') && !startTakesAppChallenge)
+            'app_challenge',
+        ];
+        if (unknown.isNotEmpty) {
+          return SiteResponse(422, {
+            'detail': [
+              for (final f in unknown)
                 {
-                  'loc': ['body', 'notice_version'],
+                  'loc': ['body', f],
                   'msg': 'Extra inputs are not permitted',
                   'type': 'extra_forbidden',
                 },
-              ],
-            });
-          }
-          if (b['notice_version'] != noticeVersion) {
-            return err(409, 'notice_version_changed');
-          }
+            ],
+          });
         }
+        if (b.containsKey('notice_version') &&
+            b['notice_version'] != noticeVersion) {
+          return err(409, 'notice_version_changed');
+        }
+        lastAppChallenge = b['app_challenge'] as String?;
         lastNoticeVersion = b['notice_version'] as String?;
         lastReturnTo = '${b['return_to']}';
         lastStartPurpose = '${b['purpose']}';
@@ -601,6 +613,13 @@ class FakeSite {
         });
       case 'POST /auth/oidc/complete':
         if (b['ticket'] != goodTicket) return err(401, 'invalid_ticket');
+        lastVerifier = b['verifier'] as String?;
+        final challenge = lastAppChallenge;
+        if (challenge != null &&
+            (lastVerifier == null ||
+                verifierChallenge(lastVerifier!) != challenge)) {
+          return err(401, 'invalid_ticket');
+        }
         return _session();
       case 'POST /auth/passkey/login/options':
         return const SiteResponse(200, {

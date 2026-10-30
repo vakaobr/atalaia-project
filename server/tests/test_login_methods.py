@@ -9,6 +9,7 @@ from __future__ import annotations
 import dataclasses
 import io
 import json
+import secrets
 import tempfile
 import uuid
 import zipfile
@@ -21,6 +22,7 @@ import httpx
 
 from atalaia_server import personal_data, quotas
 from atalaia_server.config import OidcClient, Settings
+from atalaia_server.oidc import pkce_challenge
 
 from .base import METRICS_TOKEN, PASSWORD, SECRET_KEY, AppTestCase
 from .login_fakes import FakeIdp, SoftAuthenticator, apple_key_pem
@@ -230,6 +232,48 @@ class AppLinkTests(LoginTestCase):
         params = self.idp.authorize(answer["authorization_url"])
         path, query, _ = self.landed(await self.callback("google", params, "app-user", client=self.other_client()))
         self.assertEqual((path, query.get("oidc_error")), ("/app/oidc", "state_invalid"))
+
+    async def finish_app_login(self, answer: dict[str, Any]) -> tuple[Any, str]:
+        browser = self.other_client()
+        r = await browser.get(answer["browser_url"])
+        params = self.idp.authorize(r.headers["location"])
+        _, _, fragment = self.landed(await self.callback("google", params, "app-bound", client=browser))
+        return browser, fragment[5:]
+
+    async def test_an_app_ticket_needs_the_verifier_of_the_app_that_began_it(self) -> None:
+        """APP-4: whoever lifts the ticket from the return link does not have the verifier."""
+        verifier = secrets.token_urlsafe(32)
+        answer = await self.app_start(app_challenge=pkce_challenge(verifier))
+        browser, ticket = await self.finish_app_login(answer)
+        url = "/api/v1/auth/oidc/complete"
+        for bad in (None, secrets.token_urlsafe(32), "short"):
+            r = await browser.post(url, json={"ticket": ticket, **({} if bad is None else {"verifier": bad})})
+            self.assertIn(r.status_code, (401, 422), (bad, r.text))
+        done = await browser.post(url, json={"ticket": ticket, "verifier": verifier})  # wrong guesses burned nothing
+        self.assertEqual(done.status_code, 200, done.text)
+        again = await browser.post(url, json={"ticket": ticket, "verifier": verifier})
+        self.assertEqual(again.status_code, 401)  # one use
+
+    async def test_the_app_challenge_is_for_the_app_return_only(self) -> None:
+        r = await self.client.post("/api/v1/auth/oidc/google/start", json={
+            "purpose": "login", "consent": True, "app_challenge": pkce_challenge("x" * 43)})
+        self.assertEqual((r.status_code, r.json()["detail"]), (422, "app_challenge_not_for_browser"))
+        r = await self.client.post("/api/v1/auth/oidc/google/start", json={
+            "purpose": "login", "consent": True, "return_to": f"{ORIGIN}/app/oidc", "app_challenge": "nope"})
+        self.assertEqual(r.status_code, 422)
+
+    async def test_an_older_app_without_a_challenge_works_unless_the_operator_refuses_it(self) -> None:
+        answer = await self.app_start()  # no app_challenge: an app from before APP-4
+        browser, ticket = await self.finish_app_login(answer)
+        done = await browser.post("/api/v1/auth/oidc/complete", json={"ticket": ticket})
+        self.assertEqual(done.status_code, 200, done.text)
+        self.app.state.settings = dataclasses.replace(self.app.state.settings, oidc_app_require_challenge=True)
+        r = await self.client.post("/api/v1/auth/oidc/google/start", json={
+            "purpose": "login", "consent": True, "return_to": f"{ORIGIN}/app/oidc"})
+        self.assertEqual((r.status_code, r.json()["detail"]), (426, "app_challenge_required"))
+        # The staff page is not an app: it never needs one.
+        _, r = await self.begin("google")
+        self.assertEqual(r.status_code, 200)
 
     async def test_the_browser_address_is_for_the_app_that_began_it(self) -> None:
         answer = await self.app_start()

@@ -3,11 +3,11 @@
 """Ways to log in besides a password: social login, passkeys, and the staff second factor (decisions LG-*).
 
     GET    /api/v1/auth/methods                        what this server offers (the login pages' buttons)
-    POST   /api/v1/auth/oidc/{provider}/start          {purpose, consent?, notice_version?, return_to?, password?}: the provider's URL
+    POST   /api/v1/auth/oidc/{provider}/start          {purpose, consent?, notice_version?, return_to?, password?, app_challenge?}: the provider's URL
     GET    /api/v1/auth/oidc/{provider}/browser        the app's browser starts here (PKA-1): sets the binding cookie
     GET    /api/v1/auth/oidc/{provider}/callback       where the provider sends the browser back (a field's own address)
     GET    /api/v1/auth/oidc/callback                  hosted hub only, ATALAIA_OIDC_RELAY=on: the hub's one address, see oidc_relay.py
-    POST   /api/v1/auth/oidc/complete                  {ticket}: a finished social login becomes a session
+    POST   /api/v1/auth/oidc/complete                  {ticket, verifier?}: a finished social login becomes a session
     POST   /api/v1/auth/passkey/login/options          a passkey login needs no username
     POST   /api/v1/auth/passkey/login                  {challenge_token, credential}: a session with both factors
     POST   /api/v1/auth/stepup/totp                    Bearer, {code}: this session now counts as having a second factor
@@ -35,6 +35,15 @@ page that began the login, carrying a one-minute single-use signed ticket in the
 a server or a referrer); the page sends it to ``/auth/oidc/complete``, a same-site call that makes the session
 and sets the refresh cookie as every other login does, with the access token in the answer and no token ever in
 a URL or a cookie the API reads.
+
+The app's ticket is bound to the app instance that began the login (APP-4, PKCE style, RFC 7636 S256): the app
+makes a random verifier, sends its hash as ``app_challenge`` at ``/start`` (only with the app's return path), the
+row keeps it, the ticket carries it (``acr``), and ``/auth/oidc/complete`` wants the ``verifier`` that hashes to it
+(a wrong or missing one is a 401 that does not spend the ticket). Whoever lifts the ticket from the return link
+does not have the verifier. The staff pages need none (the binding cookie covers them). An app from before APP-4
+sends no challenge and still works unless ``ATALAIA_OIDC_APP_REQUIRE_CHALLENGE=on``, which refuses it with 426
+``app_challenge_required``; a new app asking an older server is told 422 ``extra_forbidden`` on ``body.app_challenge``
+and asks again without it (as for ``notice_version``).
 
 A social login never sets ``sessions.mfa``: the roles that need a second factor count only after a TOTP or
 passkey step-up (``/auth/stepup/*``). A passkey login sets it: it is something you have and something you are
@@ -89,6 +98,7 @@ BINDING_PATH = "/api/v1/auth/oidc"
 STATE_TTL_S = 600
 DEFAULT_RETURN = "/staff/login"
 RETURN_TO = re.compile(r"/staff/[A-Za-z0-9/_.?=&%-]{0,380}")
+APP_SECRET_RE = r"^[A-Za-z0-9_-]{43}$"   # 32 bytes, base64url without padding: a verifier or its SHA-256
 APP_RETURN = "/app/oidc"      # the app's own path on this host: an Android App Link or an iOS Universal Link
 APP_RETURN_TO = re.compile(r"/app/oidc(?:\?[A-Za-z0-9_.=&%-]{0,380})?")
 
@@ -102,10 +112,14 @@ class StartIn(Strict):
     notice_version: Optional[str] = Field(default=None, max_length=64)  # the privacy notice the person was shown
     return_to: str = Field(default=DEFAULT_RETURN, max_length=400)
     password: str = Field(default="", max_length=4096)
+    # The app's PKCE-style binding (APP-4): base64url(SHA-256(verifier)) of a secret the app keeps; the ticket this
+    # login ends in is only good with that verifier at /auth/oidc/complete. Only for the app's return (/app/oidc).
+    app_challenge: Optional[str] = Field(default=None, pattern=APP_SECRET_RE)
 
 
 class TicketIn(Strict):
     ticket: str = Field(max_length=2048)
+    verifier: Optional[str] = Field(default=None, pattern=APP_SECRET_RE)
 
 
 class ConfirmIn(Strict):
@@ -321,6 +335,12 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
             await _check_password(db, request, user, body.password, "identity_link")
         if body.purpose == "name":
             await _check_name_round(db, request, principal, provider, body.return_to)
+    return_to = safe_return_to(body.return_to, site_origin(request))
+    for_app = APP_RETURN_TO.fullmatch(return_to) is not None
+    if body.app_challenge is not None and not for_app:
+        raise HTTPException(422, "app_challenge_not_for_browser")  # the staff pages hold the cookie instead
+    if for_app and body.app_challenge is None and request.app.state.settings.oidc_app_require_challenge:
+        raise HTTPException(426, "app_challenge_required")  # an app from before APP-4: update it
     now = _now()
     await db.execute(delete(OidcLogin).where(OidcLogin.expires_at < now))  # the ones never finished
     state, binding = new_state(request, provider), secrets.token_urlsafe(32)
@@ -328,13 +348,13 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
     redirect_uri = callback_url(request, provider)
     db.add(OidcLogin(state_hash=_hash(state), binding_hash=_hash(binding), provider=provider, purpose=body.purpose,
                      user_id=user_id, session_id=session_id, nonce=nonce, code_verifier=verifier,
-                     redirect_uri=redirect_uri, return_to=safe_return_to(body.return_to, site_origin(request)),
+                     redirect_uri=redirect_uri, return_to=return_to, app_challenge=body.app_challenge,
                      consent=body.consent, notice_version=body.notice_version if body.consent else None,
                      expires_at=now + timedelta(seconds=STATE_TTL_S)))
     await db.commit()
     url = request.app.state.oidc.authorization_url(provider, redirect_uri, state, nonce,
                                                    pkce_challenge(verifier), profile=body.purpose == "name")
-    if APP_RETURN_TO.fullmatch(safe_return_to(body.return_to, site_origin(request))):
+    if for_app:
         # The app calls this itself, so the binding cookie would land in the app, not in the browser that goes
         # to the provider: the app opens this address in the browser, which sets the cookie there (PKA-1).
         query = urlencode({"x": binding, "s": state})
@@ -477,7 +497,8 @@ async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provid
             return _back(row.return_to, error="state_invalid")
         identity.last_login_at = now
         await db.commit()
-        return _back(row.return_to, ticket=make_oidc_ticket(request.app.state.keys, user.id, provider))
+        return _back(row.return_to, ticket=make_oidc_ticket(request.app.state.keys, user.id, provider,
+                                                          app_challenge=row.app_challenge))
     # An unknown subject makes an account, under the same rules as registering: consent given, the per-address
     # registration limit. Never matched to an existing account by email (the server never asks for one).
     if not row.consent:
@@ -506,7 +527,8 @@ async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provid
     record(db, "register", request, user_id=user.id, resource="user", resource_id=user.id,
            details={"method": "oidc", "provider": provider})
     await db.commit()
-    return _back(row.return_to, ticket=make_oidc_ticket(request.app.state.keys, user.id, provider, new_account=True))
+    return _back(row.return_to, ticket=make_oidc_ticket(request.app.state.keys, user.id, provider, new_account=True,
+                                                          app_challenge=row.app_challenge))
 
 
 async def _oidc_link(db: AsyncSession, request: Request, row: OidcLogin, provider: str,
@@ -584,9 +606,14 @@ async def _oidc_name(db: AsyncSession, request: Request, row: OidcLogin, provide
 async def oidc_complete(body: TicketIn, request: Request, db: AsyncSession = Depends(get_session)) -> JSONResponse:
     """A finished social login becomes a session (``mfa`` false: see the module's text)."""
     try:
-        user_id, provider, jti, expires_at, new_account = read_oidc_ticket(request.app.state.keys, body.ticket)
+        user_id, provider, jti, expires_at, new_account, challenge = read_oidc_ticket(request.app.state.keys, body.ticket)
     except TokenError:
         raise HTTPException(401, "invalid_ticket") from None
+    # A ticket made for the app is good only for the app that began the login (APP-4): whoever lifted it from the
+    # return link does not have the verifier. Checked before the ticket is spent, so a wrong guess burns nothing.
+    if challenge is not None and (body.verifier is None or not hmac.compare_digest(
+            challenge, pkce_challenge(body.verifier))):
+        raise HTTPException(401, "invalid_ticket")
     used = request.app.state.used_challenges
     if used.spent(jti) or not used.spend(jti, expires_at):
         raise HTTPException(401, "invalid_ticket")

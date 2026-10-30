@@ -131,6 +131,41 @@ void main() {
       };
     });
 
+    test('a social login is bound to the app: the verifier hash at the start, '
+        'the verifier itself at the end (APP-4)', () async {
+      await auth.oidc('google', consent: true);
+      final challenge = site.lastAppChallenge!;
+      expect(challenge, matches(RegExp(r'^[A-Za-z0-9_-]{43}$')));
+      final verifier = site.lastVerifier!;
+      expect(verifier, matches(RegExp(r'^[A-Za-z0-9_-]{43}$')));
+      expect(verifier, isNot(challenge));
+      expect(verifierChallenge(verifier), challenge);
+      // RFC 7636's own example: S256 of the verifier.
+      expect(
+        verifierChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'),
+        'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+      );
+    });
+
+    test('a server before APP-4 refuses the field: asked again without it, '
+        'no verifier sent', () async {
+      site.startTakesAppChallenge = false;
+      site.startTakesNoticeVersion = false;
+      final name = await auth.oidc(
+        'google',
+        consent: true,
+        noticeVersion: site.noticeVersion,
+      );
+      expect(name, 'falcao');
+      expect(
+        site.requests.where((r) => r == 'POST /auth/oidc/google/start'),
+        hasLength(2),
+      );
+      expect(site.lastAppChallenge, isNull);
+      expect(site.lastNoticeVersion, isNull);
+      expect(site.lastVerifier, isNull);
+    });
+
     test('a social login: the app\'s own return link, the browser, the '
         'ticket, a session', () async {
       final name = await auth.oidc('google', consent: true);

@@ -253,6 +253,7 @@ class OidcLogin(Base):
     return_to: Mapped[str] = mapped_column(String(512), nullable=False)
     consent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     notice_version: Mapped[Optional[str]] = mapped_column(String(64))  # the notice the person saw (CONS-7)
+    app_challenge: Mapped[Optional[str]] = mapped_column(String(64))  # SHA-256 of the app's verifier (APP-4)
     created_at: Mapped[datetime] = _created()
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

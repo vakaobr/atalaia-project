@@ -55,6 +55,7 @@ import 'package:crypto/crypto.dart';
 
 import '../chrono/reading.dart' show newUuid;
 import '../modes/mode_catalog.dart' show ModeException;
+import '../security/pem.dart';
 import 'controller_branding.dart';
 import 'controller_engine.dart';
 import 'controller_images.dart';
@@ -176,6 +177,10 @@ class SyncConfig {
     if (!apiKeyOk(apiKey)) {
       return "api_key: the field's key from the site server (43 characters)";
     }
+    final ca = caPem;
+    if (ca != null && ca.trim().isNotEmpty && singleCertificate(ca) == null) {
+      return 'ca_pem: exactly one certificate (the site server\'s CA)';
+    }
     if (branding != 'local' && branding != 'site') {
       return "branding: 'local' or 'site'";
     }
@@ -255,8 +260,14 @@ class HttpSyncTransport implements SyncTransport {
 
   static SecurityContext? _context(String? pem) {
     if (pem == null || pem.trim().isEmpty) return null;
-    return SecurityContext(withTrustedRoots: false)
-      ..setTrustedCertificatesBytes(utf8.encode(pem));
+    // One certificate only (APP-1); anything else trusts nothing, so every
+    // request fails instead of going to a server the operator never named.
+    final der = singleCertificate(pem);
+    final context = SecurityContext(withTrustedRoots: false);
+    if (der != null) {
+      context.setTrustedCertificatesBytes(utf8.encode(derToPem(der)));
+    }
+    return context;
   }
 
   final String base;

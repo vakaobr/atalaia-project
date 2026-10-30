@@ -14,6 +14,7 @@ import 'package:atalaia_app/checkin/field_identity.dart';
 import 'package:atalaia_app/checkin/field_trust.dart';
 import 'package:atalaia_app/checkin/my_replicas.dart';
 import 'package:atalaia_app/protocol/checkin_poster.dart';
+import 'package:atalaia_app/security/bytes.dart';
 import 'package:atalaia_app/storage/app_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -90,6 +91,55 @@ void main() {
         utf8.encode('atalaia test field CA, DER'),
       );
     });
+
+    test('a bundle with a second certificate is refused (APP-1)', () async {
+      final real = FakeField();
+      final attacker = FakeField(der: Uint8List.fromList(List.filled(40, 7)));
+      for (final bundle in [
+        real.pem + attacker.pem, // the real CA first: its hash matches
+        attacker.pem + real.pem,
+        '${real.pem}-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----\n',
+        'junk\n${real.pem}',
+      ]) {
+        final store = MemoryAppStore();
+        final trust = FieldTrust(store, fetch: (_) async => bundle);
+        await expectLater(
+          trust.pin(parsePoster(real.posterText())),
+          throwsA(isA<TrustException>()),
+          reason: bundle,
+        );
+        expect(await trust.all(), isEmpty);
+      }
+    });
+
+    test(
+      'a pin stored with two certificates is narrowed to the first, '
+      'or dropped when that is not the pinned one (APP-1 migration)',
+      () async {
+        final real = FakeField();
+        final attacker = FakeField(der: Uint8List.fromList(List.filled(40, 7)));
+        Map<String, Object?> stored(String pem, List<int> sha) => {
+          'field_id': real.fieldId,
+          'field_name': real.fieldName,
+          'ca_pem': pem,
+          'ca_sha256': hexEncode(sha),
+          'urls': real.urls,
+          'wifi_ssid': null,
+        };
+        final store = MemoryAppStore();
+        await store.saveList('trusted_fields', [
+          stored(real.pem + attacker.pem, real.sha256Bytes),
+        ]);
+        var all = await FieldTrust(store, fetch: real.fetchCa).all();
+        expect(all.single.caPem, real.pem);
+        expect(all.single.caSha256, real.sha256Bytes);
+        await store.saveList('trusted_fields', [
+          stored(attacker.pem + real.pem, real.sha256Bytes),
+        ]);
+        all = await FieldTrust(store, fetch: real.fetchCa).all();
+        expect(all, isEmpty);
+      },
+    );
 
     test('a prop trusts the join payload CA for its game only', () async {
       final field = FakeField();

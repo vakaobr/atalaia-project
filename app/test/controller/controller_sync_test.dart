@@ -671,6 +671,17 @@ void main() {
         SyncConfig(url: site.url, apiKey: 'x').problem(),
         contains('api_key'),
       );
+      // One CA certificate only (APP-1): a bundle trusts more than anyone hashed.
+      const one =
+          '-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n';
+      expect(
+        SyncConfig(url: site.url, apiKey: key, caPem: one).problem(),
+        isNull,
+      );
+      expect(
+        SyncConfig(url: site.url, apiKey: key, caPem: one + one).problem(),
+        contains('ca_pem'),
+      );
     });
 
     test('the game never waits for the network', () async {

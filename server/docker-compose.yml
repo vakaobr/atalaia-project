@@ -78,6 +78,8 @@ services:
       ATALAIA_LOG_LEVEL: "${ATALAIA_LOG_LEVEL:-info}"
       ATALAIA_PURGE_HOUR: "${ATALAIA_PURGE_HOUR:-}"
       ATALAIA_PRIVACY_NOTICE_VERSION: "${ATALAIA_PRIVACY_NOTICE_VERSION:-}"
+      # on refuses an app's social login that sends no PKCE-style verifier hash (APP-4); empty accepts older apps.
+      ATALAIA_OIDC_APP_REQUIRE_CHALLENGE: "${ATALAIA_OIDC_APP_REQUIRE_CHALLENGE:-}"
       # The operator's privacy notice (CONS-*): server/privacy-notice/ on the host, read-only in the container.
       ATALAIA_PRIVACY_NOTICE_DIR: /privacy-notice
       # The field's data export for its administrator (S21-12): empty means the server's defaults.

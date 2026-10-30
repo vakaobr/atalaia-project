@@ -33,6 +33,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
+
 import '../platform/services.dart';
 import 'site_client.dart';
 
@@ -156,7 +158,12 @@ final class TotpEnrolment {
 
 /// The answer of `POST /auth/oidc/{provider}/start`.
 final class OidcStart {
-  const OidcStart(this.browserUrl);
+  const OidcStart(this.browserUrl, {this.bound = false});
+
+  /// Whether the server took the app's verifier hash (APP-4): then the
+  /// ticket is only good with the verifier, which the app presents at
+  /// `/auth/oidc/complete`. An older server does not take it (false).
+  final bool bound;
 
   /// The address to open in the browser (null: the server did not give one,
   /// which an older server does not).
@@ -273,6 +280,21 @@ class OidcFailure implements Exception {
   String toString() => 'OidcFailure($code)';
 }
 
+/// A PKCE-style secret for one social login (APP-4): 32 random bytes,
+/// base64url without padding (43 characters).
+String newVerifier([Random? random]) {
+  final r = random ?? Random.secure();
+  return base64Url
+      .encode(List<int>.generate(32, (_) => r.nextInt(256)))
+      .replaceAll('=', '');
+}
+
+/// `BASE64URL(SHA-256(verifier))` without padding (RFC 7636 S256): what the
+/// app sends at the start, the verifier itself going only to `complete`.
+String verifierChallenge(String verifier) => base64Url
+    .encode(sha256.convert(ascii.encode(verifier)).bytes)
+    .replaceAll('=', '');
+
 String newNonce([Random? random]) {
   final r = random ?? Random.secure();
   return base64Url
@@ -321,7 +343,9 @@ class SiteAuth {
   /// app also meets from older self-hosted servers, is asked again without the
   /// field (decision APF-10). Every other 422 is the caller's to see. A server
   /// that takes the field refuses a notice that changed since with 409
-  /// `notice_version_changed`.
+  /// `notice_version_changed`. [appChallenge] is the hash of the app's
+  /// verifier (APP-4), dropped the same way for a server that does not know
+  /// it ([OidcStart.bound] then says false).
   Future<OidcStart> oidcStart(
     String provider, {
     required String purpose,
@@ -329,6 +353,7 @@ class SiteAuth {
     bool consent = false,
     String password = '',
     String? noticeVersion,
+    String? appChallenge,
   }) async {
     final body = {
       'purpose': purpose,
@@ -340,19 +365,30 @@ class SiteAuth {
     Future<SiteResponse> ask(Map<String, Object?> b) => purpose == 'login'
         ? _http.send('POST', path, body: b)
         : session.callRaw('POST', path, body: b);
-    final withVersion = consent && noticeVersion != null && noticeVersion != '';
-    var r = await ask({
-      ...body,
-      if (withVersion) 'notice_version': noticeVersion,
-    });
-    if (withVersion && r.refusesUnknownField('notice_version')) {
-      r = await ask(body);
+    final optional = <String, String>{
+      if (consent && noticeVersion != null && noticeVersion != '')
+        'notice_version': noticeVersion,
+      'app_challenge': ?appChallenge,
+    };
+    // Each field a server older than it refuses by name is dropped and the
+    // request asked again, once (a 422 names every one at the same time).
+    var r = await ask({...body, ...optional});
+    final refused = [
+      for (final f in optional.keys)
+        if (r.refusesUnknownField(f)) f,
+    ];
+    if (refused.isNotEmpty) {
+      refused.forEach(optional.remove);
+      r = await ask({...body, ...optional});
     }
     final json = await _ok(r);
     final url = Uri.tryParse('${json['browser_url'] ?? ''}');
     final ok = url != null && url.scheme == 'https' && url.host.isNotEmpty;
     // Only the site's own address: nothing else is a place for the browser.
-    return OidcStart(ok && url.host == session.site.host ? url : null);
+    return OidcStart(
+      ok && url.host == session.site.host ? url : null,
+      bound: optional.containsKey('app_challenge'),
+    );
   }
 
   /// Runs a whole social login in the system browser: asks the site, opens
@@ -372,6 +408,7 @@ class SiteAuth {
     final b = browser, rs = returns;
     if (b == null || rs == null) throw OidcFailure('browser_unavailable');
     final nonce = newNonce();
+    final verifier = newVerifier();
     final start = await oidcStart(
       provider,
       purpose: purpose,
@@ -379,6 +416,7 @@ class SiteAuth {
       consent: consent,
       password: password,
       noticeVersion: noticeVersion,
+      appChallenge: verifierChallenge(verifier),
     );
     final url = start.browserUrl;
     if (url == null) throw OidcFailure('browser_unavailable');
@@ -397,7 +435,7 @@ class SiteAuth {
     final done = await _http.send(
       'POST',
       '/auth/oidc/complete',
-      body: {'ticket': ticket},
+      body: {'ticket': ticket, if (start.bound) 'verifier': verifier},
     );
     if (!done.ok) throw SiteException(done.status, done.detail);
     return session.adopt(done);

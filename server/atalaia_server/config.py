@@ -337,6 +337,8 @@ class Settings:
     purge_hour: Optional[int] = 3
     privacy_notice_version: str = DEFAULT_NOTICE_VERSION
     privacy_notice_dir: Optional[str] = None
+    # Refuse an app's social-login start that carries no app_challenge (APP-4): off while older apps are in use.
+    oidc_app_require_challenge: bool = False
     public_url: Optional[str] = None
     test_adapter: bool = False
     firmware_keys: tuple[str, ...] = ()
@@ -522,6 +524,7 @@ class Settings:
             purge_hour=_purge_hour(env),
             privacy_notice_version=env.get("ATALAIA_PRIVACY_NOTICE_VERSION", "").strip() or DEFAULT_NOTICE_VERSION,
             privacy_notice_dir=env.get("ATALAIA_PRIVACY_NOTICE_DIR", "").strip() or None,
+            oidc_app_require_challenge=_on_off(env, "ATALAIA_OIDC_APP_REQUIRE_CHALLENGE"),
             public_url=env.get("ATALAIA_PUBLIC_URL", "").strip() or None,
             test_adapter=_on_off(env, "ATALAIA_TEST_ADAPTER"),
             firmware_keys=tuple(k for k in env.get("ATALAIA_FIRMWARE_KEYS", "").split(",") if k.strip()),

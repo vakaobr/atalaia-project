@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+
+The opt-in network policy of a build made with -Patalaia.cleartextLan=true
+(security review APP-3): cleartext HTTP to any address, which is what
+Android's manifest flag did for every build before. Android cannot name an
+address range, so a field whose controller's console has no fixed address
+(a phone hotspot, a router's DHCP) needs this. It only reaches the web view
+and Java networking; the app's own clients are not under it (see
+network_security_config.xml). Every other build uses that stricter file.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
