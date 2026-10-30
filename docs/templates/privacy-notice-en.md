@@ -464,7 +464,7 @@ CHOICE]** is one the field can change; the others are fixed in the code.
 | Claims of a phone's player identifier | site server | 30 days after they were made |
 | Scheduled games and their registrations | site server | 24 months after the game ended |
 | Games, their events, scores and nodes (your game history) | site server | **Game history with your player id: 90 days** after the game ended |
-| Team and squad results without player ids (no member lists; a squad under 3 players is folded into its team) | site server | **365 days** after the game ended |
+| Team and squad results without player ids (no member lists; a squad under 3 players is folded into its team) | field controller and site server | **365 days** after the game ended |
 | Chronograph readings, violations, replicas, marshal keys | site server | **[FIELD CHOICE:]** 365 days by default, per field (30 to 3653 days, set by the field's administrator) |
 | A ban's outcome | site server | Until its **end date**: 12 months by default, never longer than the chronograph readings above |
 | The verdict snapshot of an association-card check (association, expiry, result, who checked) | field controller and site server | Like the check-in's other data (30 days after the game by default) |

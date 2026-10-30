@@ -24,6 +24,7 @@ import 'package:atalaia_app/controller/controller_engine.dart';
 import 'package:atalaia_app/controller/controller_field.dart';
 import 'package:atalaia_app/controller/controller_positions.dart'
     show ControllerPositions;
+import 'package:atalaia_app/controller/field_tls.dart';
 import 'package:atalaia_app/controller/controller_sync_format.dart'
     show XmlElement, cotEvent, parseXmlElement;
 import 'package:atalaia_app/ffi/bindings.dart';
@@ -242,6 +243,39 @@ class TcpReceiver {
 
   final ServerSocket srv;
   final connections = <List<int>>[];
+  int get port => srv.port;
+
+  Future<void> close() => srv.close();
+}
+
+/// A staff ATAK device's TLS input on the loopback, with a certificate of
+/// [tls]'s CA: keeps the bytes of each connection that got through.
+class TlsReceiver {
+  TlsReceiver._(this.srv) {
+    srv.listen((conn) {
+      final data = <int>[];
+      conn.listen(
+        data.addAll,
+        onDone: () {
+          connections.add(data);
+          conn.destroy();
+        },
+        onError: (Object _) {},
+      );
+    }, onError: (Object _) => handshakeFailures++);
+  }
+
+  static Future<TlsReceiver> open(FieldTls tls) async => TlsReceiver._(
+    await SecureServerSocket.bind(
+      InternetAddress.loopbackIPv4,
+      0,
+      tls.context(),
+    ),
+  );
+
+  final SecureServerSocket srv;
+  final connections = <List<int>>[];
+  var handshakeFailures = 0;
   int get port => srv.port;
 
   Future<void> close() => srv.close();
@@ -748,6 +782,58 @@ void main() {
         throwsA(isA<AtakConfigError>()),
       );
     });
+
+    test(
+      'staff_tls needs its CA, and the PEM is read when checked (FLD-5)',
+      () {
+        final tmp = Directory.systemTemp.createTempSync('atalaia-atak-tls-');
+        addTearDown(() => tmp.deleteSync(recursive: true));
+        final tls = FieldTls.ensure(tmp.path, ['127.0.0.1']);
+        final ok = AtakConfig.fromSection({
+          'enabled': true,
+          'staff_endpoints': '10.42.0.5',
+          'staff_tls': true,
+          'staff_tls_ca': tls.caPem,
+          'staff_tls_name': ' tak.example ',
+        });
+        ok.checkConfig();
+        expect(ok.staffTlsName, 'tak.example');
+        expect(AtakConfig.fromSection({'staff_tls': true}).staffTls, isTrue);
+        for (final s in <Map<String, Object?>>[
+          {'staff_tls': true}, // no CA: never TLS without checking it
+          {'staff_tls': true, 'staff_tls_ca': 'not a certificate'},
+          {'staff_tls_ca': tls.caPem}, // a CA without staff_tls
+          {'staff_tls_name': 'tak.example'},
+          {
+            'staff_tls': true,
+            'staff_tls_ca': tls.caPem,
+            'staff_tls_cert':
+                tls.serverChainPem, // a certificate without its key
+          },
+          {
+            'staff_tls': true,
+            'staff_tls_ca': tls.caPem,
+            'staff_tls_key': tls.serverKeyPem,
+          },
+        ]) {
+          expect(
+            () => AtakConfig.fromSection(s).checkConfig(),
+            throwsA(isA<AtakConfigError>()),
+            reason: '$s',
+          );
+        }
+        AtakConfig.fromSection({
+          'staff_tls': true,
+          'staff_tls_ca': tls.caPem,
+          'staff_tls_cert': tls.serverChainPem,
+          'staff_tls_key': tls.serverKeyPem,
+        }).checkConfig(); // a client certificate and its key
+        expect(
+          () => AtakConfig.fromSection({'staff_tls': 'yes'}),
+          throwsA(isA<AtakConfigError>()),
+        );
+      },
+    );
   });
 
   group('the emitter on the engine', () {
@@ -1196,6 +1282,7 @@ void main() {
         'multicast',
         'staff_endpoints',
         'players',
+        'staff_tls',
         'interval_s',
         'markers',
         'remote',
@@ -1820,6 +1907,92 @@ void main() {
       } finally {
         await rx.close();
       }
+    });
+
+    group('TCP over TLS to the staff devices (FLD-5)', () {
+      late Directory tmp;
+      setUp(() => tmp = Directory.systemTemp.createTempSync('atalaia-atak-'));
+      tearDown(() => tmp.deleteSync(recursive: true));
+
+      SecurityContext trusting(FieldTls tls) => atakStaffTlsContext(
+        AtakConfig(staffTls: true, staffTlsCa: tls.caPem),
+      );
+
+      test('events arrive from a device with the pinned CA', () async {
+        final ours = FieldTls.ensure(tmp.path + '/a', ['127.0.0.1']);
+        final rx = await TlsReceiver.open(ours);
+        try {
+          final sender = TcpCotSender(
+            ['127.0.0.1:${rx.port}'],
+            context: trusting(ours),
+            timeout: const Duration(seconds: 10),
+          );
+          final a = drop('a'), b = drop('b');
+          final (sent, errors) = await sender.send([_utf8(a), _utf8(b)]);
+          expect(sent, 2);
+          expect(errors, isEmpty);
+          expect(await waitFor(() => rx.connections.length == 1), isTrue);
+          expect(splitStream(rx.connections.single), [a, b]);
+        } finally {
+          await rx.close();
+        }
+      });
+
+      test('a device with another CA gets nothing', () async {
+        final ours = FieldTls.ensure(tmp.path + '/a', ['127.0.0.1']);
+        final other = FieldTls.ensure(tmp.path + '/b', ['127.0.0.1']);
+        final rx = await TlsReceiver.open(other);
+        try {
+          final sender = TcpCotSender(
+            ['127.0.0.1:${rx.port}'],
+            context: trusting(ours),
+            timeout: const Duration(seconds: 10),
+          );
+          final (sent, errors) = await sender.send([_utf8(drop('a'))]);
+          expect(sent, 0);
+          expect(errors, hasLength(1));
+          expect(await waitFor(() => rx.handshakeFailures > 0), isTrue);
+          expect(rx.connections.where((c) => c.isNotEmpty), isEmpty);
+        } finally {
+          await rx.close();
+        }
+      });
+
+      test('a name the certificate was made for, when the endpoint is an '
+          'address', () async {
+        final tls = FieldTls.ensure(tmp.path + '/a', ['tak.example']);
+        final rx = await TlsReceiver.open(tls);
+        try {
+          final plain = TcpCotSender(
+            ['127.0.0.1:${rx.port}'],
+            context: trusting(tls),
+            timeout: const Duration(seconds: 10),
+          );
+          expect((await plain.send([_utf8(drop('a'))])).$1, 0);
+          final named = TcpCotSender(
+            ['127.0.0.1:${rx.port}'],
+            context: trusting(tls),
+            serverName: 'tak.example',
+            timeout: const Duration(seconds: 10),
+          );
+          expect((await named.send([_utf8(drop('b'))])).$1, 1);
+          expect(await waitFor(() => rx.connections.isNotEmpty), isTrue);
+        } finally {
+          await rx.close();
+        }
+      });
+
+      test(
+        'the default port is the ATAK SSL input, and the status says TLS',
+        () {
+          final ours = FieldTls.ensure(tmp.path + '/a', ['127.0.0.1']);
+          expect(
+            TcpCotSender(['10.42.0.5'], context: trusting(ours)).endpoints,
+            [('10.42.0.5', 8089)],
+          );
+          expect(TcpCotSender(['10.42.0.5']).endpoints, [('10.42.0.5', 4242)]);
+        },
+      );
     });
   });
 }

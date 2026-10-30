@@ -40,6 +40,11 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
   var _remoteGm = false;
   var _atakOn = false, _players = false, _remote = false;
   var _remotePlayers = false;
+  var _staffTls = false;
+  final _tlsCa = TextEditingController();
+  final _tlsCert = TextEditingController();
+  final _tlsKey = TextEditingController();
+  final _tlsName = TextEditingController();
   String? _savedKey;
   var _loaded = false;
 
@@ -72,6 +77,11 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
     _players = a.players;
     _remote = a.remote;
     _remotePlayers = a.remotePlayers;
+    _staffTls = a.staffTls;
+    _tlsCa.text = a.staffTlsCa;
+    _tlsCert.text = a.staffTlsCert;
+    _tlsKey.text = a.staffTlsKey;
+    _tlsName.text = a.staffTlsName;
   }
 
   @override
@@ -80,6 +90,10 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
     _key.dispose();
     _multicast.dispose();
     _staff.dispose();
+    _tlsCa.dispose();
+    _tlsCert.dispose();
+    _tlsKey.dispose();
+    _tlsName.dispose();
     super.dispose();
   }
 
@@ -108,6 +122,11 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
       'multicast': _multicast.text.trim(),
       'staff_endpoints': _staff.text.trim(),
       'players': _players,
+      'staff_tls': _staffTls,
+      'staff_tls_ca': _staffTls ? _tlsCa.text.trim() : '',
+      'staff_tls_cert': _staffTls ? _tlsCert.text.trim() : '',
+      'staff_tls_key': _staffTls ? _tlsKey.text.trim() : '',
+      'staff_tls_name': _staffTls ? _tlsName.text.trim() : '',
       'remote': _atakOn && sync != null && _remote,
       'remote_players': _atakOn && sync != null && _remote && _remotePlayers,
     };
@@ -136,6 +155,7 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
     TextEditingController c,
     String key, {
     bool secret = false,
+    bool pem = false,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: TextField(
@@ -144,6 +164,11 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
       obscureText: secret,
       autocorrect: false,
       enableSuggestions: !secret,
+      // A PEM text has lines: a single-line field would drop them.
+      keyboardType: pem ? TextInputType.multiline : null,
+      minLines: pem ? 2 : null,
+      maxLines: pem ? 6 : 1,
+      style: pem ? const TextStyle(fontFamily: 'monospace') : null,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
@@ -172,96 +197,131 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
     final saved = _savedKey;
     return Scaffold(
       appBar: AppBar(title: Text(s.t('ctl_site.title'))),
-      body: ListView(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        children: [
-          Text(s.t('ctl_site.intro')),
-          const SizedBox(height: 16),
-          _switch(
-            'failover-auto',
-            s.t('ctl_site.failover_auto'),
-            _failover == 'auto',
-            (v) => _failover = v ? 'auto' : 'manual',
-            hint: s.t('ctl_site.failover_hint'),
-          ),
-          const Divider(height: 32),
-          _switch(
-            'sync-on',
-            s.t('ctl_site.sync'),
-            _syncOn,
-            (v) => _syncOn = v,
-            hint: s.t('ctl_site.sync_hint'),
-          ),
-          if (_syncOn) ...[
-            _text(s.t('ctl_site.url'), _url, 'sync-url'),
-            _text(
-              saved == null
-                  ? s.t('ctl_site.key')
-                  : s.t('ctl_site.key_set', {'fp': keyFingerprint(saved)}),
-              _key,
-              'sync-key',
-              secret: true,
-            ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(s.t('ctl_site.intro')),
+            const SizedBox(height: 16),
             _switch(
-              'sync-branding',
-              s.t('ctl_site.branding'),
-              _brandingSite,
-              (v) => _brandingSite = v,
+              'failover-auto',
+              s.t('ctl_site.failover_auto'),
+              _failover == 'auto',
+              (v) => _failover = v ? 'auto' : 'manual',
+              hint: s.t('ctl_site.failover_hint'),
             ),
+            const Divider(height: 32),
             _switch(
-              'sync-library',
-              s.t('ctl_site.library'),
-              _library,
-              (v) => _library = v,
-            ),
-            _switch(
-              'sync-remote-gm',
-              s.t('ctl_site.remote_gm'),
-              _remoteGm,
-              (v) => _remoteGm = v,
-              hint: s.t('ctl_site.remote_gm_hint'),
-            ),
-          ],
-          const Divider(height: 32),
-          _switch(
-            'atak-on',
-            s.t('ctl_site.atak'),
-            _atakOn,
-            (v) => _atakOn = v,
-            hint: s.t('ctl_site.atak_hint'),
-          ),
-          if (_atakOn) ...[
-            _text(s.t('ctl_site.multicast'), _multicast, 'atak-multicast'),
-            _text(s.t('ctl_site.staff'), _staff, 'atak-staff'),
-            _switch(
-              'atak-players',
-              s.t('ctl_site.players'),
-              _players,
-              (v) => _players = v,
+              'sync-on',
+              s.t('ctl_site.sync'),
+              _syncOn,
+              (v) => _syncOn = v,
+              hint: s.t('ctl_site.sync_hint'),
             ),
             if (_syncOn) ...[
-              _switch(
-                'atak-remote',
-                s.t('ctl_site.remote'),
-                _remote,
-                (v) => _remote = v,
+              _text(s.t('ctl_site.url'), _url, 'sync-url'),
+              _text(
+                saved == null
+                    ? s.t('ctl_site.key')
+                    : s.t('ctl_site.key_set', {'fp': keyFingerprint(saved)}),
+                _key,
+                'sync-key',
+                secret: true,
               ),
-              if (_remote)
-                _switch(
-                  'atak-remote-players',
-                  s.t('ctl_site.remote_players'),
-                  _remotePlayers,
-                  (v) => _remotePlayers = v,
-                ),
+              _switch(
+                'sync-branding',
+                s.t('ctl_site.branding'),
+                _brandingSite,
+                (v) => _brandingSite = v,
+              ),
+              _switch(
+                'sync-library',
+                s.t('ctl_site.library'),
+                _library,
+                (v) => _library = v,
+              ),
+              _switch(
+                'sync-remote-gm',
+                s.t('ctl_site.remote_gm'),
+                _remoteGm,
+                (v) => _remoteGm = v,
+                hint: s.t('ctl_site.remote_gm_hint'),
+              ),
             ],
+            const Divider(height: 32),
+            _switch(
+              'atak-on',
+              s.t('ctl_site.atak'),
+              _atakOn,
+              (v) => _atakOn = v,
+              hint: s.t('ctl_site.atak_hint'),
+            ),
+            if (_atakOn) ...[
+              _text(s.t('ctl_site.multicast'), _multicast, 'atak-multicast'),
+              _text(s.t('ctl_site.staff'), _staff, 'atak-staff'),
+              _switch(
+                'atak-players',
+                s.t('ctl_site.players'),
+                _players,
+                (v) => _players = v,
+              ),
+              _switch(
+                'atak-staff-tls',
+                s.t('ctl_site.staff_tls'),
+                _staffTls,
+                (v) => _staffTls = v,
+                hint: s.t('ctl_site.staff_tls_hint'),
+              ),
+              if (_staffTls) ...[
+                _text(
+                  s.t('ctl_site.staff_tls_ca'),
+                  _tlsCa,
+                  'atak-tls-ca',
+                  pem: true,
+                ),
+                _text(
+                  s.t('ctl_site.staff_tls_cert'),
+                  _tlsCert,
+                  'atak-tls-cert',
+                  pem: true,
+                ),
+                _text(
+                  s.t('ctl_site.staff_tls_key'),
+                  _tlsKey,
+                  'atak-tls-key',
+                  pem: true,
+                ),
+                _text(
+                  s.t('ctl_site.staff_tls_name'),
+                  _tlsName,
+                  'atak-tls-name',
+                ),
+              ],
+              if (_syncOn) ...[
+                _switch(
+                  'atak-remote',
+                  s.t('ctl_site.remote'),
+                  _remote,
+                  (v) => _remote = v,
+                ),
+                if (_remote)
+                  _switch(
+                    'atak-remote-players',
+                    s.t('ctl_site.remote_players'),
+                    _remotePlayers,
+                    (v) => _remotePlayers = v,
+                  ),
+              ],
+            ],
+            const SizedBox(height: 16),
+            FilledButton(
+              key: const Key('site-save'),
+              onPressed: _save,
+              child: Text(s.t('common.save')),
+            ),
           ],
-          const SizedBox(height: 16),
-          FilledButton(
-            key: const Key('site-save'),
-            onPressed: _save,
-            child: Text(s.t('common.save')),
-          ),
-        ],
+        ),
       ),
     );
   }

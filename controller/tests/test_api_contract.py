@@ -280,7 +280,9 @@ class ContractCase(unittest.TestCase):
         Adoption(env.ctrl, lister=lambda: [])
         FirmwareUpdates(env.ctrl, Path(env.tmp) / "firmware", env.cfg.firmware_release_keys, clock=wall)
         # Slice S7b: signed mode packages and the modes sent to boxes, as main.build sets them up.
-        SignedModes(env.ctrl, env.case.get("mode_keys", []), env.case.get("mode_revoked", []), "")
+        SignedModes(env.ctrl, env.case.get("mode_keys", []), env.case.get("mode_revoked", []), "",
+                    min_versions={k.strip(): v.strip() for k, _, v in
+                                  (e.partition("=") for e in env.case.get("mode_min_versions", []))})
         ModeFetch(env.ctrl, env.case.get("box_keys", []), clock=wall)
         if env.case.get("https"):
             env.ctrl.ca_sha256 = bytes(range(32))

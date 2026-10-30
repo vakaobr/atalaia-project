@@ -452,8 +452,9 @@ privacy notice promises more, tell people yourself or set `off`.
 games 90 days too (`game_retention_days`, a field setting of 30-3653; chrono records keep their own 365). A controller
 with a site sync still never deletes a game before the site server has all of it (RET-3). What carries a player id (events, per-player data, a game's history in accounts) goes at that point; the **team results**
 (final totals per team, the winner, when it ran; no player id, no member list, no squads) are written to `game_results`
-by the purge just before and kept 365 days after the game ended (`GET /api/v1/fields/{id}/history/results`). A controller
-keeps nothing of a game after its 90 days: with a site sync the server has the team results. Existing fields keep the
+by the purge just before and kept 365 days after the game ended (`GET /api/v1/fields/{id}/history/results`). The Pi
+and the phone controller write the same aggregate themselves when their purge drops a game (the team totals, the winner and the dates; no player id, no member list, no squad) and keep it 365 days after the game ended
+(`GET /api/v1/game-results`, GM or read token), so a standalone controller loses no more than the server does (SR-88). Existing fields keep the
 value they have stored (the migration only changes the default): lower it on the history and settings pages. Whether
 team-only results with no player ids may be kept longer is still open with the maintainer.
 

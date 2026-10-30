@@ -49,7 +49,7 @@ The controller's own network surface, as hardened after a security review (decis
 - **Signed modes.** Revocation fails closed and is fetched again before every install and upload; an offline field keeps the last revocation list for `[modes] revocation_max_age_days` (30) and then installs nothing signed; `[modes] min_versions` sets a floor per mode.
 - **The service** runs with `NoNewPrivileges`, `ProtectSystem=strict` (only `/var/lib/atalaia` writable), `ProtectHome`, `PrivateTmp`, restricted socket families, no capabilities and only the serial devices it opens ([controller/deploy/atalaia-controller.service](controller/deploy/atalaia-controller.service)).
 
-Not covered here yet: the phone controller's ATAK feed has no TLS option (use the remote relay or a wired link), and its signed-mode revocation (`controller_signed_modes.dart`) still behaves as the Pi's did before: a missing `revoked.json` counts as none and an upload uses the cached index.
+The phone controller does the same (decisions FU30-9 and FU30-10): its signed-mode revocation (`controller_signed_modes.dart`) is fetched again before every install and upload, fails closed, keeps the last good list across restarts, honours `revocation_max_age_days` and `min_versions`; its ATAK feed can use TLS to the staff devices with a pinned CA (`staff_tls`, `staff_tls_ca` and, optionally, `staff_tls_cert` and `staff_tls_key` as PEM text, and `staff_tls_name`, because Dart's TLS always checks the certificate's names where the Pi's does not).
 
 ## Recorded radio packets are refused
 

@@ -1125,6 +1125,17 @@ const Map<String, String> enStrings = {
   'ctl_site.staff': 'Staff ATAK devices (host:port, comma between)',
   'ctl_site.players':
       'Player positions to the staff devices (never to multicast)',
+  'ctl_site.staff_tls':
+      'TLS to the staff devices (ATAK\'s SSL input, port 8089)',
+  'ctl_site.staff_tls_hint':
+      'Player positions then cross the network encrypted. The staff devices\' certificate is checked against the CA below, never against the system\'s.',
+  'ctl_site.staff_tls_ca':
+      'CA certificate the staff devices present (PEM text)',
+  'ctl_site.staff_tls_cert':
+      'This controller\'s client certificate (PEM text; optional)',
+  'ctl_site.staff_tls_key': 'Its private key (PEM text; with the certificate)',
+  'ctl_site.staff_tls_name':
+      'Name in the devices\' certificates (only when the endpoints are addresses; optional)',
   'ctl_site.remote': 'Remote ATAK through the site server',
   'ctl_site.remote_players': 'Player positions through the site server too',
   'ctl_site.bad_sync': 'Site server: {why}',

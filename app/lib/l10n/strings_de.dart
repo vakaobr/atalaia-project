@@ -1182,6 +1182,18 @@ const Map<String, String> deStrings = {
   'ctl_site.staff': 'ATAK-Geräte der Orga (Host:Port, durch Kommas getrennt)',
   'ctl_site.players':
       'Spielerpositionen an die Geräte der Orga (nie per Multicast)',
+  'ctl_site.staff_tls':
+      'TLS zu den Orga-Geräten (SSL-Eingang von ATAK, Port 8089)',
+  'ctl_site.staff_tls_hint':
+      'Die Spielerpositionen laufen dann verschlüsselt durchs Netz. Das Zertifikat der Orga-Geräte wird nur gegen die CA unten geprüft, nie gegen die des Systems.',
+  'ctl_site.staff_tls_ca':
+      'CA-Zertifikat, das die Orga-Geräte vorzeigen (PEM-Text)',
+  'ctl_site.staff_tls_cert':
+      'Client-Zertifikat dieses Controllers (PEM-Text; optional)',
+  'ctl_site.staff_tls_key':
+      'Dazu der private Schlüssel (PEM-Text; zusammen mit dem Zertifikat)',
+  'ctl_site.staff_tls_name':
+      'Name in den Zertifikaten der Geräte (nur wenn die Endpunkte Adressen sind; optional)',
   'ctl_site.remote': 'Remote-ATAK über den Site-Server',
   'ctl_site.remote_players': 'Auch Spielerpositionen über den Site-Server',
   'ctl_site.bad_sync': 'Site-Server: {why}',

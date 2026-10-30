@@ -1154,6 +1154,18 @@ const Map<String, String> ptStrings = {
       'Dispositivos ATAK da organização (anfitrião:porta, separados por vírgulas)',
   'ctl_site.players':
       'Posições dos jogadores para os dispositivos da organização (nunca para multicast)',
+  'ctl_site.staff_tls':
+      'TLS para os dispositivos da organização (entrada SSL do ATAK, porta 8089)',
+  'ctl_site.staff_tls_hint':
+      'As posições dos jogadores passam então cifradas pela rede. O certificado dos dispositivos da organização é verificado só com a AC abaixo, nunca com a do sistema.',
+  'ctl_site.staff_tls_ca':
+      'Certificado da AC que os dispositivos da organização apresentam (texto PEM)',
+  'ctl_site.staff_tls_cert':
+      'Certificado de cliente deste controlador (texto PEM; opcional)',
+  'ctl_site.staff_tls_key':
+      'A sua chave privada (texto PEM; junto com o certificado)',
+  'ctl_site.staff_tls_name':
+      'Nome nos certificados dos dispositivos (só quando os endereços são IP; opcional)',
   'ctl_site.remote': 'ATAK remoto através do servidor do site',
   'ctl_site.remote_players':
       'Também as posições dos jogadores através do servidor do site',

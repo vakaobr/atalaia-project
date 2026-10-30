@@ -481,7 +481,7 @@ DO CAMPO]** é um que o campo pode alterar; os outros estão fixos no código.
 | Reclamações de um identificador de jogador de um telemóvel | servidor | 30 dias depois de feitas |
 | Jogos marcados e as suas inscrições | servidor | 24 meses depois de o jogo terminar |
 | Jogos, os seus eventos, pontuações e nós (o teu histórico de jogos) | servidor | **Histórico de jogos com o teu identificador: 90 dias** depois de o jogo terminar |
-| Resultados de equipa e de squad sem identificadores de pessoas (sem listas de elementos; um squad com menos de 3 pessoas é incluído na sua equipa) | servidor | **365 dias** depois de o jogo terminar |
+| Resultados de equipa e de squad sem identificadores de pessoas (sem listas de elementos; um squad com menos de 3 pessoas é incluído na sua equipa) | controlador e servidor | **365 dias** depois de o jogo terminar |
 | Leituras de cronógrafo, infrações, réplicas, chaves de marshals | servidor | **[ESCOLHA DO CAMPO:]** 365 dias por omissão, por campo (de 30 a 3653 dias, definidos por quem administra o campo) |
 | O desfecho de um banimento | servidor | Até à sua **data de fim**: 12 meses por omissão, nunca mais do que as leituras de cronógrafo acima |
 | O retrato do veredicto de uma verificação do cartão de associado (associação, validade, resultado, quem verificou) | controlador e servidor | Como os restantes dados do check-in (30 dias depois do jogo por omissão) |

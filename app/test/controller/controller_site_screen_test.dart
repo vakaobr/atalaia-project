@@ -6,9 +6,13 @@
 // refused, the key shown afterwards only by its fingerprint, the controller
 // started with them, and the screen in every language at 320 px.
 
+import 'dart:io';
+
+import 'package:atalaia_app/controller/controller_atak.dart';
 import 'package:atalaia_app/controller/controller_screen.dart';
 import 'package:atalaia_app/controller/controller_site_screen.dart';
 import 'package:atalaia_app/controller/controller_sync.dart';
+import 'package:atalaia_app/controller/field_tls.dart';
 import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/storage/app_store.dart';
 import 'package:atalaia_app/ui/settings_screen.dart';
@@ -69,6 +73,41 @@ void main() {
       expect(find.textContaining(keyFingerprint(key)), findsOneWidget);
       expect(find.text(key), findsNothing);
       expect((await h.store.loadSettings()).controllerSync?['api_key'], key);
+    },
+    variant: onAndroid,
+  );
+
+  testWidgets(
+    'ATAK over TLS to the staff devices: the CA is needed, PEM text keeps '
+    'its lines, the saved settings round-trip (FLD-5)',
+    (tester) async {
+      await phone(tester);
+      final tmp = Directory.systemTemp.createTempSync('atalaia-site-tls-');
+      addTearDown(() => tmp.deleteSync(recursive: true));
+      final ca = FieldTls.ensure(tmp.path, ['127.0.0.1']).caPem;
+      final h = harness();
+      await tester.pumpWidget(h.app(home: const ControllerSiteScreen()));
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'atak-on');
+      await tester.enterText(find.byKey(const Key('atak-staff')), '10.42.0.5');
+      await tapKey(tester, 'atak-staff-tls');
+      await tapKey(tester, 'site-save'); // no CA yet
+      expect(h.settings.controllerAtak, isNull);
+      expect(find.textContaining('staff_tls_ca'), findsWidgets);
+      await tester.pump(const Duration(seconds: 10));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('atak-tls-ca')), ca);
+      await tester.enterText(
+        find.byKey(const Key('atak-tls-name')),
+        'tak.example',
+      );
+      await tapKey(tester, 'site-save');
+      final saved = AtakConfig.fromSection(h.settings.controllerAtak!);
+      expect(saved.staffTls, isTrue);
+      expect(saved.staffTlsCa, ca.trim());
+      expect(saved.staffTlsCa, contains('\n')); // the lines are kept
+      expect(saved.staffTlsName, 'tak.example');
+      saved.checkConfig();
     },
     variant: onAndroid,
   );

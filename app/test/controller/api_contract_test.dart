@@ -405,6 +405,9 @@ void main() {
           ModesConfig(
             keys: [...?(c['mode_keys'] as List?)?.cast<String>()],
             revoked: [...?(c['mode_revoked'] as List?)?.cast<String>()],
+            minVersions: [
+              ...?(c['mode_min_versions'] as List?)?.cast<String>(),
+            ],
           ),
           wallSeconds: () => wallStart + now / 1000,
         );
