@@ -529,7 +529,12 @@ pulls on a solder joint.
    ([section 6](#6-board-revision-and-antennas)), USB-C connector reachable.
 2. Mount the interconnect board next to it. Wire board **3V3**, **GND**,
    **GPIO 17** (SDA) and **GPIO 18** (SCL) to the hub's 3V3, GND, SDA and
-   SCL "in" pins: four short wires, under 15 cm.
+   SCL "in" pins: four short wires, under 15 cm. GPIO 17 and 18 are not on
+   the two long pin rows: they are two of the four extra holes on the
+   board's top edge (the antenna end, opposite the USB-C), marked
+   **18 17 16 15** on the back, which usually come without pins: solder a
+   short 2x2 header or the wires there. GPIO 15 and 16 (audio, section 9.7)
+   are the other two.
 3. **Leave every other board pin unconnected.** In particular never wire
    GPIO 0, 45 or 46 (boot straps; 46 also drives the V4.2's front-end
    module), GPIO 5 (the V4.3's front-end module), the board-internal

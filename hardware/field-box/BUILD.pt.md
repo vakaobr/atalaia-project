@@ -564,7 +564,12 @@ prende cada molho com abraçadeiras para nada puxar uma soldadura.
    ([secção 6](#6-revisão-da-placa-e-antenas)) e o conector USB-C acessível.
 2. Monta a placa de interligação ao lado dela. Liga **3V3**, **GND**,
    **GPIO 17** (SDA) e **GPIO 18** (SCL) da placa aos pinos «in» 3V3, GND, SDA
-   e SCL do hub: quatro fios curtos, com menos de 15 cm.
+   e SCL do hub: quatro fios curtos, com menos de 15 cm. Os GPIO 17 e 18 não
+   estão nas duas filas compridas de pinos: são dois dos quatro furos extra
+   na ponta de cima da placa (a ponta das antenas, oposta ao USB-C),
+   marcados **18 17 16 15** no verso, que normalmente vêm sem pinos: solda
+   aí um conector 2x2 curto ou os fios. Os GPIO 15 e 16 (áudio, secção 9.7)
+   são os outros dois.
 3. **Deixa todos os outros pinos da placa por ligar.** Em particular, nunca
    ligues o GPIO 0, 45 ou 46 (pinos de arranque; o 46 comanda também o módulo
    de entrada da V4.2), o GPIO 5 (o módulo de entrada da V4.3), os GPIO
