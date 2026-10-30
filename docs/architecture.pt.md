@@ -179,6 +179,15 @@ O controlador espaça as suas próprias tramas (RFC 0001, Emenda 15), os rádios
 escutam antes de falar (Emenda 14), e o orçamento de duty cycle da subbanda do
 canal é aplicado no modem, no pod e nas caixas.
 
+**Mudanças de estado e de canal.** Um início, uma pausa ou um retomar sai como um CMD
+e um TIME, e o controlador repete o estado num TIME 1, 2,5, 5 e 10 s depois, para que
+uma caixa que perdeu as duas tramas não espere pelo sinal de 30 s (Emenda 19). Quando
+o canal do campo muda, o controlador di-lo no canal antigo numa trama de campo, MOVE
+(três vezes, com 2,5 s de intervalo), para que as caixas livres o sigam; o *Procurar
+caixas* varre os últimos quatro canais à procura de caixas que a perderam, no máximo
+uma vez por minuto e, numa subbanda com menos de 10 % de ciclo de trabalho, dentro de
+5 % do orçamento dessa subbanda numa hora deslizante.
+
 **Pelo cabo.** O controlador e o modem falam em pacotes em claro, em tramas `0xA5`
 com um CRC-16 ([`protocol/usb-modem.md`](../protocol/usb-modem.md)). O modem sela-os
 e abre-os, por isso a chave do jogo vive no modem para os pacotes de jogo. As
@@ -194,7 +203,10 @@ relatório de falha (`node.modes_failed`, `node.update_failed`) usa o LoRa.
 
 Ainda não testado em hardware real: o pod, a retransmissão entre muitas caixas (o
 teste de campo com 5 e 10 caixas) e as tramas de campo com mais de uma caixa. Já
-correram jogos inteiros com um modem e caixas numa bancada.
+correram jogos inteiros com um modem e caixas numa bancada. O MOVE e as repetições do
+TIME respondem a dois achados da bancada de 29 de outubro (uma pesquisa de rádio mudou
+o canal e uma caixa parada deixou de ouvir; um início chegou a uma caixa 21 s tarde);
+ambos estão corrigidos em software, e falta a verificação em duas placas.
 
 ## 3. Um jogo, do convite ao fim
 
@@ -247,6 +259,12 @@ sabe nesse momento, por isso repetir não faz mal. Os pontos de uma caixa chegam
 controlador com o seu STATE, por isso o marcador pode ficar atrás do ecrã da própria
 caixa até cerca de 15 s.
 
+**Como acaba um jogo.** A organização termina-o, o tempo de jogo acaba, ou o modo di-lo:
+num modo com `field.lua` decide o script; num modo sem ele, o primeiro `game.end` de
+uma caixa do jogo em curso termina-o no controlador, com o vencedor do evento (uma das
+equipas do jogo) ou em empate. Uma explosão da Bomba / Rush é um desses eventos: ganha
+a equipa que armou a bomba. Um jogo em pausa ignora o `game.end` de uma caixa.
+
 **O que não circula.** A consola do GM nunca fala LoRa: só fala com o controlador.
 A chave do jogo só viaja dentro do convite selado (ou num cartão), nunca num
 anúncio. O controlador guarda a chave do jogo na sua base de dados até o jogo
@@ -298,7 +316,14 @@ sai dele.
 
 **Posições.** Quem joga pode partilhar a sua posição durante um jogo em curso, como
 um ponto GPS ou, em espaços interiores, como o id do iBeacon mais forte que o
-telemóvel ouve (só escuta os beacons registados). O controlador guarda o último
+telemóvel ouve (só escuta os beacons registados). O registo tem as etiquetas da
+organização e, a seu lado, as Field Box do jogo em curso que foram colocadas: uma caixa
+que entrou num jogo emite como iBeacon (um UUID derivado da chave de entrada do campo,
+um major fixo, o id do nó como minor), por isso uma caixa na parede também diz a um
+telemóvel o seu piso e a sua sala. Um telemóvel que já está a partilhar volta a ler o
+registo quando ele muda. Um controlador de reserva recebe as escolhas das balizas das
+caixas e os lugares das caixas na sua carga de entrada, por isso, depois de uma passagem
+de testemunho, o registo é o mesmo. O controlador guarda o último
 ponto de cada pessoa, só para esse jogo. Quem joga vê a sua própria posição (e a do
 seu squad, se o jogo o permitir), a chefia de um squad vê o seu squad, um VIP vê a
 sua equipa, os marshals e o GM veem todas, e o código de leitura nenhuma.
@@ -309,7 +334,8 @@ diagrama não há internet: tudo funciona com o servidor do site desligado.
 
 Ainda não testado em hardware real: tudo isto com um telemóvel a sério (a lista de
 verificação do iPhone passou para a app iOS, mas nada foi ainda a um campo), o NFC
-num telemóvel e os beacons BLE.
+num telemóvel e os beacons BLE: o plugin CoreLocation do iPhone compila no CI e não foi
+corrido num iPhone, e nenhum telemóvel ouviu ainda o beacon de uma Field Box a sério.
 
 ## 5. Sincronização entre o controlador e o servidor do site
 
@@ -484,6 +510,15 @@ acesso ou com um fornecedor. As funções que gerem um campo (`admin`, `gm`,
 `marshal` e a administração do servidor) só contam numa sessão com segundo fator, e
 uma conta não pode remover o seu último segundo fator enquanto uma função precisar
 dele.
+
+**Contas.** Uma conta social nova pode escolher o seu nome de utilizador na página da
+conta, qualquer conta pode mudar o seu nome com o seu próprio método de início de
+sessão, e duas contas da mesma pessoa podem ser fundidas depois de a pessoa provar as
+duas (nunca para dentro ou a partir de uma conta com função de equipa). Um registo por
+conta social guarda a versão do aviso de privacidade que a pessoa viu. A limpeza diária
+da retenção apaga os restos anonimizados de uma conta eliminada ou fundida quando nada
+os referencia. O início de sessão com a Google e a Microsoft foi experimentado com os
+fornecedores a sério no servidor de testes do projeto; o da Apple não.
 
 **O que não circula.** O controlador não usa estas contas: autentica-se no servidor
 do site com a chave de API do campo, e a app autentica-se no controlador com um

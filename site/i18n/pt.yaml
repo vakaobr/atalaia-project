@@ -746,12 +746,15 @@ roadmap:
       - "A barra do tempo de jogo: enquanto corre um jogo com limite de tempo, uma faixa na base do ecrã pequeno mostra quanto falta, e o ecrã OLED mostra um relógio. Em software, ainda não vista num painel a sério."
       - "A configuração que um cenário envia às caixas é enviada outra vez até cada caixa a confirmar, e a caixa já envia essa confirmação. Só em software e testes no computador, não numa placa a sério."
       - "Mudar de campo, no menu de administração da caixa, passa uma caixa adotada para outro campo, pelo código. Só testes no computador, não numa placa a sério."
-      - "O logótipo do campo no ecrã grande da caixa. Em software, ainda não visto num painel a sério."
+      - "A caixa já não mostra o logótipo do campo: mostra a torre da Atalaia no ecrã de arranque, um ficheiro que quem constrói pode substituir ao compilar (as imagens das versões publicadas levam sempre a torre, e a compilação da versão verifica-o). Foi a transferência do logótipo que esgotou a memória da caixa na bancada. Uma caixa que guardou um logótipo antigo apaga-o no primeiro arranque (testes no computador)."
       - "Uma tabela de partições maior: os dois espaços de firmware da caixa têm 4 MB cada (a imagem ocupava 93 % de 2 MB), e as definições e as chaves ficam onde estavam. Só em testes no computador e compilações, sem ter sido gravada numa placa. Uma caixa com a tabela antiga precisa de uma gravação por USB; depois disso, as atualizações pelo ar funcionam como antes."
+      - "A Field Box como iBeacon: da entrada num jogo até ao fim, a caixa emite uma baliza Bluetooth (a cada 500 ms, nunca enquanto usa o Wi-Fi), para que um telemóvel perto dela possa colocar quem joga num piso ou numa sala. O identificador do campo deriva da sua chave de adesão, e a organização pode desligar as caixas como balizas, por campo ou por caixa. A memória interna da caixa foi refeita depois de ter acabado na bancada à entrada num jogo (o Wi-Fi falhou e o cão de guarda reiniciou): medido na bancada, ficam livres 241 KB no arranque e 102 KB no mínimo num jogo com a baliza ligada, e o CI falha a compilação se o orçamento encolher demasiado. Ainda não se verificou que um telemóvel ouve a baliza de uma caixa a sério."
+      - "Depois de uma recusa ou falha de uma atualização ou da obtenção de um modo, o ecrã da caixa volta ao ecrã do estado passados 8 segundos (na bancada, uma recusa ficou no ecrã até alguém olhar). Só testes no computador."
     next:
       - Uma caixa montada que aguente um jogo de clube de 2 horas sem reiniciar.
       - "Ver a barra do tempo num painel a sério."
-      - "Experimentar o reenvio da configuração, o Mudar de campo e o logótipo numa placa a sério."
+      - "Experimentar o reenvio da configuração e o Mudar de campo numa placa a sério."
+      - "Ouvir a baliza de uma Field Box com um telemóvel a sério, e arrancar o Wi-Fi à entrada num jogo com o novo orçamento de memória."
       - "Gravar a nova tabela de partições numa placa a sério (uma gravação por USB, sem apagar, para uma caixa com a antiga)."
     gate: >-
       Prova: uma caixa aguenta um jogo de clube de 2 horas sem reiniciar. <strong>Em aberto</strong>
@@ -761,7 +764,8 @@ roadmap:
     short: >-
       Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização e um pacote de
       modos, testados em software; na bancada, placas a sério jogam jogos inteiros com o controlador
-      pelo rádio. À espera de 5 caixas montadas num campo.
+      pelo rádio, e o que a bancada achou está corrigido em software. À espera de 5 caixas montadas
+      num campo.
     done:
       - O protocolo de rádio cifrado Skirmesh-RF e o modem de rádio USB.
       - O controlador de campo com a sua API.
@@ -787,11 +791,16 @@ roadmap:
       - "<strong>Sabotagem</strong>, um modo novo: a Bomba em rondas até acabar o tempo de jogo. Os atacantes armam, os defensores desarmam; uma explosão é um ponto para os atacantes, um desarme um ponto para os defensores; depois a caixa descansa e começa a ronda seguinte. Vence a equipa com mais pontos, pontos iguais são empate. No simulador e em testes, e entre as predefinições da Field Box; ainda não numa placa a sério."
       - "O pequeno ecrã do modem de rádio USB fala português, inglês, alemão e chinês tradicional, como o da caixa. Só testes no computador, não numa placa a sério."
       - "Os formulários da consola de GM guardam o que a organização escreveu até haver gravação: quem se regista ou o relógio da consola já não repõem os valores gravados."
-      - "O logótipo do campo também pode ser carregado em JPEG ou WebP; a consola de GM converte-o para a caixa. Em software, ainda não visto num painel a sério."
+      - "Uma mudança do canal do campo já não deixa as caixas livres perdidas: o controlador diz-lhes para onde foi (uma nova mensagem de rádio selada, MOVE, dita três vezes no canal antigo), e o Procurar caixas pode varrer os últimos quatro canais à procura de caixas que a perderam. Encontrado na bancada, onde uma pesquisa de rádio mudou o canal e uma caixa parada deixou de ouvir. Feito nos dois controladores, no simulador e no código da caixa; falta a verificação em duas placas."
+      - "Um início, uma pausa ou um retomar chega às caixas em cerca de um segundo, e não em até 30: o controlador repete o estado numa mensagem TIME 1, 2,5, 5 e 10 segundos depois (na bancada, uma caixa soube de um início 21 segundos tarde). Falta a verificação em duas placas. No modelo de tempo de antena, as repetições, o MOVE e uma varredura custam ao controlador cerca de 2 segundos de emissão numa hora típica, na sub-banda predefinida."
+      - "A consola de GM diz o que uma mudança de canal faz às caixas livres (quantos dos três MOVE já foram ditos, e depois que o controlador mudou), e as Definições têm um botão Procurar caixas que mostra o resultado de uma varredura. Uma varredura tem um limite por hora nas sub-bandas com menos de 10 % de ciclo de trabalho (5 % do orçamento da sub-banda), e a consola di-lo quando recusa e quando a seguinte é possível. Em software, nos dois controladores."
+      - "A pontuação projetada acompanha uma captura: entre duas mensagens STATE de uma caixa, o controlador continua a contar para a equipa que um evento de captura indicou, até ao STATE seguinte da caixa. Na bancada a projeção falhou quando se perdeu um STATE logo a seguir a uma captura; com esta mudança a mesma configuração passou na bancada, e uma penalização da caixa também foi verificada lá."
+      - "O fim de jogo de uma caixa termina o jogo: num modo sem lógica de campo no controlador (o limite de tempo do Sabotagem, a Bomba), o primeiro game.end de uma caixa do jogo termina-o, com o vencedor da caixa ou em empate. Na Bomba / Rush uma explosão termina agora o jogo, ganhando a equipa que armou a bomba; um desarme não. Encontrado na bancada com o Sabotagem, e a explosão da Bomba também foi verificada lá."
     next:
       - As placas de rádio e 5 caixas montadas para o teste no campo.
       - Um teste no campo com 20 caixas, com e sem escuta antes de falar.
       - "Ligar ou não o espaçamento do controlador, decidido a partir do teste no campo com 20 caixas."
+      - "Verificar em duas placas que uma mudança de canal mantém uma caixa parada e que um início lhe chega em cerca de um segundo (o guia está escrito)."
     gate: >-
       Prova: 5 caixas num espaço de <a href="{{ page.to.glossary }}#glossario-cqb">CQB</a> e num campo
       exterior, sem uma única captura perdida. <strong>Em aberto.</strong>
@@ -843,16 +852,18 @@ roadmap:
         - "A app guarda mais segredos selados com o Keystore do Android: a chave do servidor do site, os segredos dos jogadores e a sessão no site."
         - "As etiquetas NFC de quem joga são assinadas pelo controlador de campo e escritas a partir da consola da organização, do controlador no telemóvel ou da app do marshal. Os marshals deixam de ter a chave do campo para isso."
         - "Etiquetas das réplicas: a app mostra, partilha ou imprime o autocolante com o QR de cada réplica, e a consola imprime-os para quem já fez check-in. A fila do marshal lê-os."
-        - "Posições em interiores: a organização põe balizas BLE na planta, e um telemóvel Android que ouça uma indica a sua sala em vez do GPS. Feito em software e com simulações, sem balizas a sério. O iOS fica só com GPS."
+        - "Posições em interiores: a organização põe balizas BLE na planta, e um telemóvel que ouça uma indica a sua sala em vez do GPS. No Android, feito em software e com simulações, sem balizas a sério. Num iPhone, um plugin sobre o CoreLocation da Apple faz o mesmo com a app no ecrã (senão, GPS e o último piso); está feito e compila no CI, e ainda não foi experimentado num iPhone."
         - "A app segue um jogo a partir do código QR do marcador, mesmo quando o controlador no telemóvel serve HTTPS com a sua própria CA do campo. Em software, não experimentado num telemóvel a sério."
         - "Quem joga diz em que piso está e vê a planta do campo com as posições que pode ver."
         - "Histórico de jogos na app: os jogos em que a pessoa participou, do mais recente para o mais antigo."
-        - "Início de sessão com Google, Microsoft, Apple ou uma chave de acesso (passkey) na app, com um ecrã de conta. Só Android; não experimentado num telemóvel a sério nem com os fornecedores reais."
+        - "Início de sessão com Google, Microsoft, Apple ou uma chave de acesso (passkey) na app, com um ecrã de conta. Só Android; o início de sessão da app não foi experimentado num telemóvel a sério (o lado do servidor do site foi experimentado com a Google e a Microsoft, ver fase 4)."
         - "O plano do campo do jogador pode mostrar a quadrícula do campo e a célula do próprio jogador."
         - "Quem é árbitro pode associar um autocolante NFC a uma réplica ao registá-la."
         - "O telemóvel de um marshal já não guarda a chave de entrada do campo: só uma caixa de jogo (o seu cartão de entrada) e o controlador no telemóvel a guardam, e uma atualização apaga-a do telemóvel de um marshal."
         - "As ligações ao marcador que fixam a CA do próprio campo ficam guardadas por campo e são esquecidas quando a CA muda."
         - "Enquanto um jogo em direto está aberto na vista de quem joga, um serviço Android em primeiro plano, com uma notificação, mantém a app a correr, e os avisos por vibração continuam com a app fechada ou o ecrã apagado. No iOS não. Não experimentado num telemóvel a sério."
+        - "As Field Box contam como balizas: uma caixa colocada regista-se como baliza ao lado das da organização, e um telemóvel que já está a partilhar apanha as alterações ao registo durante o jogo. Em software, sem testar com um telemóvel e uma caixa a sério."
+        - "O aviso de privacidade e o consentimento na app: um pedido Ler e confirmar quando o consentimento da conta está desatualizado, o aviso na língua da app, sem bloquear nada. Um registo por conta social leva a versão do aviso que a pessoa viu, e continua a funcionar com um servidor próprio mais antigo. A ligação do cronógrafo entre os campos de um hub alojado (um código de uso único) só aparece no modo alojado. Em software."
     g_props:
       title: Dispositivos Android e módulo de E/S
       items:
@@ -864,6 +875,7 @@ roadmap:
         - "A app volta a ligar-se sozinha a um módulo de E/S perdido. Não experimentado com um módulo a sério."
         - "Os props Android vão buscar pacotes de modo assinados ao seu controlador, como as caixas. Em software."
         - "A consola de GM pode enviar as definições de um módulo de E/S pelo rádio: as cores dos quatro botões, o brilho do anel de LEDs, o volume e se o interruptor da caixa avisa. O módulo autentica o comando como qualquer outro, guarda as definições na sua flash e responde; o controlador volta a enviá-lo até ouvir a resposta. Antes, eram definidas quando o firmware era compilado. Em software e contra o código do módulo num computador, não experimentado com um módulo a sério."
+        - "A penalização de uma caixa de um dispositivo Android passa a chegar ao controlador, pela ligação Wi-Fi e pela ligação de rádio. Em software."
     g_controller:
       title: O telemóvel como controlador de campo
       items:
@@ -894,6 +906,7 @@ roadmap:
           de cenários recebidas de lá), o GM remoto e o feed para o ATAK."
         - "A consola da organização cabe num telemóvel: as tabelas de check-in e de marshals empilham-se, sem deslocar a página para o lado."
         - "O próprio ecrã do controlador no telemóvel importa uma lista de inscrições (um ficheiro CSV ou JSON escolhido com o seletor de ficheiros do Android), sem precisar da consola de GM."
+        - "Um controlador de reserva recebe do seu convite de adesão as escolhas das balizas das caixas (o interruptor do campo, as caixas desativadas, as salas) e os lugares das caixas, para que, depois de uma passagem de testemunho, os telemóveis recebam o mesmo registo de balizas. Em software, nos dois controladores."
     g_ios:
       title: iOS
       items:
@@ -902,6 +915,7 @@ roadmap:
           à mão, a leitura de QR com a câmara, o check-in com o cartaz do campo por HTTPS, a
           partilha da posição com a aplicação no ecrã, o aviso de fora do campo e a sua vibração, e
           as ligações atalaia://."
+        - "Balizas em interiores: um plugin em Swift sobre o CoreLocation, nos mesmos canais do Android, só pede a permissão de localização e funciona com a app no ecrã. Compila no CI; ninguém o correu ainda num iPhone."
     next:
       - "O teste no campo com telemóveis e módulos a sério (fase G do plano) espera pelo hardware.
         Até agora a app correu em emuladores Android e num iPhone ligado ao controlador da bancada,
@@ -909,15 +923,16 @@ roadmap:
       - O telemóvel como controlador de campo espera por um telemóvel a sério.
       - "No iOS, o NFC pede uma conta Apple paga; o dispositivo Android e o telemóvel como
         controlador do campo ficam só em Android."
-      - "As balizas em interiores no iOS pedem um plugin em Swift, escrito num Mac."
+      - "Experimentar o plugin de balizas num iPhone (compilado num Mac), e as balizas a sério, também no Android."
       - "Experimentar o código QR do marcador, a escolha do piso, o histórico de jogos e a religação ao módulo de E/S num telemóvel e num módulo a sério."
-      - "Experimentar o início de sessão da app num telemóvel a sério e com os fornecedores reais."
+      - "Experimentar o início de sessão da app num telemóvel a sério."
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do site e jogo avançado
     short: >-
       Servidor do site, marcação de jogos e inscrições, cenários personalizados, modos avançados,
-      ATAK. Todos os passos de software estão feitos; faltam um servidor a sério, uma revisão
+      ATAK. Todos os passos de software estão feitos; o início de sessão com a Google e a Microsoft já
+      foi experimentado a sério num servidor de testes. Faltam um servidor a sério, uma revisão
       jurídica e os testes em hardware.
     done:
       - "<strong>Modos avançados</strong>: Mestre e Satélites, o «Hackeia o terminal», VIP / Carga e
@@ -1003,13 +1018,16 @@ roadmap:
         - "reset-totp: quem opera o servidor repõe o código de dois fatores de uma conta que perdeu o autenticador."
         - "Os controladores de campo vão buscar os registos de cronógrafo de outros campos de quem está na sua lista de inscritos, só com o consentimento de cada pessoa. Guardam-nos à parte das suas próprias leituras e nunca os avaliam."
         - "Os controladores recebem do servidor do site as definições e a imagem do campo, e uma alteração chega logo ao Pi e ao controlador no telemóvel. Em software."
-        - "Início de sessão com Google, Microsoft ou Apple e com passkeys (chaves de acesso). As palavras-passe são opcionais; a equipa continua a precisar de um segundo fator. Testado num computador, não com os fornecedores de início de sessão a sério."
+        - "Início de sessão com Google, Microsoft ou Apple e com passkeys (chaves de acesso). As palavras-passe são opcionais; a equipa continua a precisar de um segundo fator. A Google e a Microsoft foram experimentadas com os fornecedores a sério no servidor de testes (tests.atalaia-project.link); a Apple ainda não."
         - "Uma página de conta para a equipa, onde cada pessoa gere os seus inícios de sessão: passkeys, contas associadas, palavra-passe e código de dois fatores."
         - "As alterações a cenários, predefinições e calendário chegam logo aos controladores."
         - "Durante quanto tempo o campo guarda os dados é uma definição do campo: os dados de jogo (eventos, pontuações, registos) e os registos de cronografagem têm cada um o seu prazo, 365 dias por omissão, definido no controlador, na consola de GM ou na página de definições do servidor do site. A limpeza diária apaga um jogo terminado com essa idade, nunca antes de o servidor do site o ter por inteiro. O campo, sem uso, de retenção por conta desapareceu."
         - "O apagamento de uma pessoa num controlador de campo chega sozinho ao servidor do site na sincronização seguinte (nunca com o nome), e apaga lá também os registos de cronografagem dessa pessoa."
         - "O primeiro rascunho completo do aviso de privacidade, em português e inglês, reescrito a partir do que cada parte da Atalaia faz hoje. É um rascunho, não é aconselhamento jurídico e ainda não foi revisto por um/a jurista."
         - "O servidor do site publica o aviso de privacidade que a operação lhe dá, como página e pela API em quatro línguas, e pede às contas que consintam de novo quando a versão muda. Nada fica bloqueado: a exportação e o apagamento continuam disponíveis. Testado num computador."
+        - "Uma conta social escolhe o nome de utilizador na página da Conta logo depois de ser criada (pode ser saltado; o nome do próprio fornecedor só se a pessoa o pedir). Qualquer conta pode mudar o seu nome com o seu próprio método de início de sessão, e duas contas da mesma pessoa podem ser fundidas depois de a pessoa provar as duas (nunca para dentro ou a partir de uma conta com função de equipa). O erro de consentimento em falta aparece junto da caixa de seleção. Testado num computador; o passo do nome de utilizador e a fusão ainda faltam experimentar no servidor de testes."
+        - "Um registo por conta social guarda a versão do aviso de privacidade que a pessoa realmente viu: o servidor recusa uma versão desatualizada e verifica outra vez antes de criar a conta. Testado num computador."
+        - "A limpeza diária da retenção também apaga as contas anonimizadas (o que uma eliminação ou uma fusão deixa) quando nada as referencia. Testado num computador."
     g_games:
       title: Jogos, clubes e páginas da organização
       items:
@@ -1099,14 +1117,14 @@ roadmap:
         - "Modo alojado: uma quota de armazenamento e domínios próprios por campo."
         - "Modo alojado: cada campo tem um papel de base de dados só seu, e por isso uma injeção de SQL já não consegue passar para os dados de outro campo mudando a definição que a segurança ao nível da linha usava. Uma lacuna que exige uma segunda instrução SQL continua aberta e está escrita. Testado contra o PostgreSQL em Docker."
         - "Modo alojado: os campos que partilham registos de cronografagem passam a fazê-lo entre os campos de um centro, por uma vista só de leitura que exige consentimento; uma pessoa liga as suas contas em dois campos com um código de uso único, e nada é associado por e-mail ou nome. Testado contra o PostgreSQL em Docker."
-        - "Uma demonstração em direto, só de leitura, para o servidor de pré-visualização: o controlador de campo a sério, com três Field Box simuladas, joga jogos de Domínio sem parar, e quem visita vê a consola de GM, o marcador e a vista de quem joga, sem nada para alterar e sem dados pessoais. No ar desde 29 de outubro de 2026, em demo.atalaia-project.link."
+        - "Uma demonstração em direto, só de leitura, para o servidor de pré-visualização: o controlador de campo a sério, com três Field Box simuladas, joga jogos sem parar, alternando um campo aberto e um edifício inventado de três pisos (uma planta por piso, quinze balizas, doze jogadores simulados: seis localizados por baliza, cinco por GPS com o piso escolhido, um indeciso), e quem visita vê a consola de GM, o marcador e a vista de quem joga, sem nada para alterar e sem dados pessoais. No ar desde 29 de outubro de 2026, em demo.atalaia-project.link; a vista de quem joga é testada num navegador sem ecrã."
     next:
       - Um servidor a sério com domínio.
       - A revisão jurídica dos modelos antes de o modo alojado abrir. Não é oferecido antes disso.
       - "Os testes em hardware: placas reais, um telemóvel com ATAK real, uma ligação 4G real, um
         cronógrafo real."
       - O módulo de alvo, que as regras das Janelas de Alvo esperam.
-      - "Testar os inícios de sessão com a Google, a Microsoft e a Apple a sério."
+      - "Experimentar o início de sessão da Apple com o fornecedor a sério, e o passo do nome de utilizador e a fusão de contas no servidor de testes."
       - "jogarairsoft.pt: o responsável do projeto escreveu-lhes a 28 de outubro de 2026 a propor uma integração (os eventos, equipas e APDs deles para nós; o nosso feed de jogos, perfis de campo, clubes públicos e resultados para eles). À espera da resposta; nada está prometido."
     gate: >-
       Prova: um <a href="{{ page.to.glossary }}#glossario-milsim">milsim</a> de fim de semana decorre

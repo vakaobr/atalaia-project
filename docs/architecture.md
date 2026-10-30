@@ -178,6 +178,14 @@ join). The modem and the controller never relay. The controller spaces its own f
 the duty-cycle budget of the channel's sub-band is enforced in the modem, the
 pod and the boxes.
 
+**State and channel changes.** A start, pause or resume goes out as a CMD and a
+TIME, and the controller repeats the state as a TIME 1, 2.5, 5 and 10 s later, so a
+box that lost both frames does not wait for the 30 s beacon (Amendment 19). When the
+field's channel changes, the controller says so on the old channel in a field frame,
+MOVE (three times, 2.5 s apart), so the free boxes follow it; *Find boxes* sweeps the
+last four channels for boxes that missed it, at most once a minute and, on a
+sub-band under 10 % duty, within 5 % of that sub-band's budget over a rolling hour.
+
 **Over the cable.** The controller and the modem speak plaintext packets in
 `0xA5` frames with a CRC-16 ([`protocol/usb-modem.md`](../protocol/usb-modem.md)).
 The modem seals and opens them, so the game key lives in the modem for game
@@ -193,7 +201,10 @@ update) or a failure report (`node.modes_failed`, `node.update_failed`) uses LoR
 
 Not yet run on real hardware: the pod, the relay between many boxes (the field
 test with 5 and 10 boxes), and field frames with more than one box. Whole games
-with a modem and boxes on a bench have run.
+with a modem and boxes on a bench have run. MOVE and the TIME repeats answer two
+findings of the bench of 29 October (a radio scan moved the channel and an idle box
+heard nothing more; a start reached a box 21 s late); both are fixed in software,
+and the check on two boards is still to do.
 
 ## 3. A game, from the invite to the end
 
@@ -245,6 +256,12 @@ times; each repeat carries what the controller knows then, so repeats do no harm
 A box's points reach the controller with its STATE, so the scoreboard can trail a
 box's own screen by up to about 15 s.
 
+**How a game ends.** The GM ends it, the game time runs out, or the mode says so:
+in a mode with a `field.lua` the script decides; in a mode without one, the first
+`game.end` from a box of the live game ends it on the controller, with the event's
+winner (one of the game's teams) or as a draw. A Bomb / Rush explosion is such an
+event: the team that armed the bomb wins. A paused game ignores a box's `game.end`.
+
 **What does not flow.** The GM console never speaks LoRa: it talks only to the
 controller. The game key travels only inside the sealed invite (or on a card), never in an announcement. The controller
 keeps the game key in its database until the game ends, so that a restarted
@@ -294,7 +311,13 @@ signed by the controller, which holds the game key; the key never leaves it.
 
 **Positions.** A player may share their position during a running game, either
 as a GPS fix or, indoors, as the id of the strongest iBeacon the phone hears (it
-listens for the registered beacons only). The controller keeps the latest fix per
+listens for the registered beacons only). The registry holds the GM's tags and,
+beside them, the Field Boxes of the live game that have been placed: a box joined to
+a game advertises as an iBeacon (a UUID derived from the field's join key, a fixed
+major, the node id as minor), so a box on a wall also tells a phone its floor and
+room. A phone that is already sharing re-reads the registry when it changes. A
+standby controller gets the box-beacon choices and the boxes' places in its join, so
+after a failover the registry is the same. The controller keeps the latest fix per
 player, for that game only. A player sees their own (and their squad's if the game
 allows it), a squad leader their squad, a VIP their team, marshals and the GM
 everyone, and the read code nobody.
@@ -306,7 +329,8 @@ server off.
 
 Not yet run on real hardware: all of it with a real phone (the iPhone checklist
 passed for the iOS app, but nothing has been in a field), NFC on a phone, and
-the BLE beacons.
+the BLE beacons: the iPhone's CoreLocation plugin compiles on CI and has not been
+run on an iPhone, and no phone has yet heard a real Field Box's beacon.
 
 ## 5. Controller and site server sync
 
@@ -471,6 +495,14 @@ to the app by a link. Password login can be turned off, then accounts log in wit
 a passkey or a provider. The roles that manage a field (`admin`, `gm`, `marshal`,
 and server administrators) count only in a session with a second factor, and an
 account cannot remove its last second factor while a role needs one.
+
+**Accounts.** A new social account can choose its username on the account page, any
+account can rename itself with its own login method, and two accounts of one person
+can be merged once the person has proved both (never into or from an account with a
+staff role). A social sign-up records the privacy-notice version the person saw. The
+daily retention purge deletes the anonymised remains of an erased or merged account
+once nothing refers to it. Google and Microsoft sign-in have been tried against the
+real providers on the project's test server; Apple has not.
 
 **What does not flow.** The controller does not use these accounts: it
 authenticates to the site server with the field's API key and the app
