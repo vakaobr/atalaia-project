@@ -480,6 +480,13 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         return [g if visibility.is_staff(v, g["id"]) else controller.players_game(g, v)
                 for g in controller.list_games()]
 
+    @app.get("/api/v1/game-results", dependencies=[Depends(require_console)])
+    def game_results(limit: int = 100) -> dict[str, Any]:
+        """The team results of games whose own data the retention purge deleted (SR-88): name, mode, teams, the
+        teams' final totals, the winner and the dates, kept 365 days after the game ended. No player id, no member
+        list, no squad. Read-only; the GM or read token (the player's token is refused)."""
+        return {"results": controller.store.game_results(max(1, min(500, limit)))}
+
     @app.post("/api/v1/games", status_code=201, dependencies=[Depends(require_gm)])
     def create_game(body: Any = Body(None)) -> dict[str, Any]:
         return controller.create_game(body_map(body))

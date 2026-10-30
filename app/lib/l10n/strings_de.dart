@@ -1140,6 +1140,13 @@ const Map<String, String> deStrings = {
       'Zeile {line}: kein Modusschlüssel (Base64 von 32 Bytes).',
   'ctl_modes.bad_id': 'Zeile {line}: keine Schlüssel-ID (16 Hexziffern).',
   'ctl_modes.bad_index': 'Der Index ist eine https://-Adresse oder eine Datei.',
+  'ctl_modes.min_versions':
+      'Mindestversion pro Modus (eine pro Zeile, ID=Version, zum Beispiel org.example.mode=1.2.0; optional)',
+  'ctl_modes.max_age':
+      'Tage, die die letzte Widerrufsliste noch gilt, wenn der Index nicht erreichbar ist (0 bis 3650; Standard 30)',
+  'ctl_modes.bad_floor':
+      'Zeile {line}: keine Mindestversion (ID=Version, zum Beispiel org.example.mode=1.2.0).',
+  'ctl_modes.bad_age': 'Die Tage sind eine Zahl von 0 bis 3650.',
   'ctl_modes.saved': 'Gespeichert: gilt ab dem nächsten Start des Controllers.',
   // The phone controller's slice S7 settings (PE24-118 onward).
   'ctl_site.tile': 'Site-Server, Ausfallübernahme und ATAK (Feld-Controller)',

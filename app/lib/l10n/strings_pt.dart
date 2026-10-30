@@ -1109,6 +1109,13 @@ const Map<String, String> ptStrings = {
   'ctl_modes.bad_id':
       'Linha {line}: não é um id de chave (16 dígitos hexadecimais).',
   'ctl_modes.bad_index': 'O índice é um endereço https:// ou um ficheiro.',
+  'ctl_modes.min_versions':
+      'Versão mínima por modo (uma por linha, id=versão, por exemplo org.exemplo.modo=1.2.0; opcional)',
+  'ctl_modes.max_age':
+      'Dias em que a última lista de revogações ainda vale quando o índice não responde (0 a 3650; 30 por omissão)',
+  'ctl_modes.bad_floor':
+      'Linha {line}: não é uma versão mínima (id=versão, por exemplo org.exemplo.modo=1.2.0).',
+  'ctl_modes.bad_age': 'Os dias são um número de 0 a 3650.',
   'ctl_modes.saved':
       'Guardado: aplica-se quando o controlador voltar a arrancar.',
   // The phone controller's slice S7 settings (PE24-118 onward).

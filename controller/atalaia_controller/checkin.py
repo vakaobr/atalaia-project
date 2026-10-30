@@ -94,6 +94,7 @@ TOKEN_MIN_S = 60
 IDENTITY_DAYS = 365
 CHRONO_RETENTION_DAYS = 365  # the default of ``chrono_retention_days`` (the field's setting, 30-3653)
 GAME_RETENTION_DAYS = 90     # the default of ``game_retention_days`` (decision RET-1; 90 days: maintainer decision 2026-10-30)
+GAME_RESULTS_DAYS = 365       # team results of a purged game (no player ids), kept this long after it ended (SR-88)
 RETENTION_KEYS = ("chrono_retention_days", "game_retention_days")
 RETENTION_MIN, RETENTION_MAX = 30, 3653
 PLAYER_HIDDEN = ("max_players", *RETENTION_KEYS)  # settings the player's app is not told
@@ -2326,8 +2327,12 @@ class Checkin:
         (decision RET-3): the field's only copy would go. Without a sync, age alone decides."""
         days = self.retention_days("game_retention_days")
         confirmed = self.sync_confirmed if getattr(self.cfg, "sync_enabled", False) else None
-        done = self.store.purge_games(now - days * 86400, confirmed_only=confirmed)
-        return {"games": done["games"], "game_events": done["events"], "games_unsynced_kept": done["kept"]}
+        done = self.store.purge_games(now - days * 86400, confirmed_only=confirmed,
+                                      keep_results_after=now - GAME_RESULTS_DAYS * 86400)
+        # The team results (no player id, SR-88) are kept 365 days after the game ended, apart from the game's data.
+        expired = self.store.purge_game_results(now - GAME_RESULTS_DAYS * 86400)
+        return {"games": done["games"], "game_events": done["events"], "games_unsynced_kept": done["kept"],
+                "game_results_expired": expired}
 
     def sync_confirmed(self, game: dict[str, Any]) -> bool:
         return bool(self.store.sync_state(game["id"], game["game_seed"])["final"])

@@ -293,22 +293,43 @@ void main() {
     final v = loadVectors('mode_package.json');
     final key = (v['signing_key'] as Map)['public_key_b64'] as String;
     final archive = hexDecode((v['archive'] as Map)['hex'] as String);
+    const noneRevoked = {'schema_version': 1, 'keys': <Object?>[]};
+    // The release's fields as the console uploads them (.release.json).
+    final release = {
+      for (final e in ((v['releases'] as List).first as Map).entries)
+        if (const {
+          'id',
+          'version',
+          'kind',
+          'min_tier',
+          'size',
+          'sha256',
+          'signature',
+        }.contains(e.key))
+          '${e.key}': e.value,
+    };
+    Matcher refusal(String text) => isA<ModeException>().having(
+      (e) => e.message,
+      'message',
+      contains(text),
+    );
 
     (ControllerSignedModes, ControllerEngine) setUp(
       Directory dir, {
       List<String> revoked = const [],
       bool revokedFile = false,
+      List<String> minVersions = const [],
     }) {
       File('${dir.path}/index.json').writeAsStringSync(jsonEncode(v['index']));
       Directory('${dir.path}/packages').createSync();
       File(
         '${dir.path}/packages/org.example.relay-1.2.0-rc.1.tar',
       ).writeAsBytesSync(archive);
-      if (revokedFile) {
-        File(
-          '${dir.path}/revoked.json',
-        ).writeAsStringSync(jsonEncode(v['revoked']));
-      }
+      // The list is fetched before every install (FLD-7): a missing one
+      // refuses it, so a registry with nothing revoked still has the file.
+      File(
+        '${dir.path}/revoked.json',
+      ).writeAsStringSync(jsonEncode(revokedFile ? v['revoked'] : noneRevoked));
       final engine = ControllerEngine(core: core, transport: RecordingRadio());
       final signed = ControllerSignedModes(
         engine.modes,
@@ -316,6 +337,7 @@ void main() {
           keys: [key],
           revoked: revoked,
           index: '${dir.path}/index.json',
+          minVersions: minVersions,
         ),
       );
       engine.signedModes = signed;
@@ -364,6 +386,191 @@ void main() {
         signed.installFromIndex('org.example.relay', '1.2.0-rc.1'),
         throwsA(isA<ModeException>()),
       );
+    });
+
+    // ---- FLD-7 on the phone: revocations fail closed, refreshed before every
+    // install and upload (the Pi's tests in test_signed_modes.py) ----------
+
+    test('an upload sees a revocation the cached index did not', () async {
+      final dir = Directory.systemTemp.createTempSync('atalaia-index-');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final (signed, _) = setUp(dir);
+      await signed.status(); // the index and its empty list are cached now
+      File(
+        '${dir.path}/revoked.json',
+      ).writeAsStringSync(jsonEncode(v['revoked']));
+      await expectLater(
+        signed.upload(archive, release),
+        throwsA(refusal('revoked')),
+      );
+    });
+
+    test('a missing or broken revocation list installs nothing', () async {
+      final dir = Directory.systemTemp.createTempSync('atalaia-index-');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final (signed, engine) = setUp(dir);
+      File('${dir.path}/revoked.json').deleteSync();
+      await expectLater(
+        signed.upload(archive, release),
+        throwsA(refusal('revocation list')),
+      );
+      File('${dir.path}/revoked.json').writeAsStringSync('{nope');
+      await expectLater(
+        signed.upload(archive, release),
+        throwsA(refusal('revocation list')),
+      );
+      File('${dir.path}/revoked.json').writeAsStringSync(
+        jsonEncode({'schema_version': 2, 'keys': <Object?>[]}),
+      );
+      await expectLater(
+        signed.installFromIndex('org.example.relay', '1.2.0-rc.1'),
+        throwsA(isA<ModeException>()),
+      );
+      expect(
+        engine.modes.all().map((m) => m.id),
+        isNot(contains('org.example.relay')),
+      );
+    });
+
+    test('a broken index does not forget what was revoked, even after a '
+        'restart', () async {
+      final dir = Directory.systemTemp.createTempSync('atalaia-index-');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final (signed, engine) = setUp(dir, revokedFile: true);
+      expect((await signed.status())['revoked'], ['21fe31dfa154a261']);
+      File('${dir.path}/index.json').writeAsStringSync('{broken');
+      var status = await signed.status(refresh: true);
+      expect((status['index']! as Map)['error'], isNotNull);
+      expect(status['revoked'], ['21fe31dfa154a261']);
+      // A new controller on the same store: the list was kept in it.
+      final again = ControllerSignedModes(
+        engine.modes,
+        ModesConfig(keys: [key], index: '${dir.path}/index.json'),
+      );
+      status = await again.status(refresh: true);
+      expect(status['revoked'], ['21fe31dfa154a261']);
+    });
+
+    test(
+      'an offline controller goes on with a young list and not an old one',
+      () async {
+        final served = <String, List<int>>{
+          'https://registry.example/v1/revoked.json': utf8.encode(
+            jsonEncode(noneRevoked),
+          ),
+        };
+        var online = true;
+        var wall = 1800000000.0;
+        final engine = ControllerEngine(
+          core: core,
+          transport: RecordingRadio(),
+        );
+        Future<Uint8List> fetch(String url, int limit) async {
+          if (!online)
+            throw FetchError('$url: no route to host', offline: true);
+          return Uint8List.fromList(served[url]!);
+        }
+
+        final signed = ControllerSignedModes(
+          engine.modes,
+          ModesConfig(
+            keys: [key],
+            index: 'https://registry.example/v1/index.json',
+          ),
+          fetch: fetch,
+          wallSeconds: () => wall,
+        );
+        // Never fetched and offline: nothing is installed.
+        online = false;
+        await expectLater(
+          signed.upload(archive, release),
+          throwsA(refusal('none was ever fetched')),
+        );
+        // Fetched once (any install while online does it), then offline for 10
+        // days: still installs.
+        online = true;
+        await signed.upload(archive, release);
+        online = false;
+        wall += 10 * 86400;
+        await signed.upload(archive, release);
+        expect((await signed.status())['revocations_age_s'], 10 * 86400);
+        // 31 days offline: refused, and back online it works again.
+        wall += 21 * 86400;
+        await expectLater(
+          signed.upload(archive, release),
+          throwsA(refusal('31 days old')),
+        );
+        online = true;
+        await signed.upload(archive, release);
+        // A list that is wrong (a network that is up) never falls back to the
+        // old one.
+        served['https://registry.example/v1/revoked.json'] = utf8.encode(
+          '{nope',
+        );
+        await expectLater(
+          signed.upload(archive, release),
+          throwsA(refusal('not a good one')),
+        );
+        // revocation_max_age_days = 0: never an old list.
+        online = false;
+        final strict = ControllerSignedModes(
+          engine.modes,
+          ModesConfig(
+            keys: [key],
+            index: 'https://registry.example/v1/index.json',
+            revocationMaxAgeDays: 0,
+          ),
+          fetch: fetch,
+          wallSeconds: () => wall + 1,
+        );
+        await expectLater(
+          strict.upload(archive, release),
+          throwsA(refusal('days old')),
+        );
+      },
+    );
+
+    test('no index means the fields own revoked list alone', () async {
+      final engine = ControllerEngine(core: core, transport: RecordingRadio());
+      final signed = ControllerSignedModes(
+        engine.modes,
+        ModesConfig(keys: [key]),
+      );
+      final out = await signed.upload(archive, release);
+      expect(out['id'], 'org.example.relay');
+    });
+
+    test('a version floor', () async {
+      final dir = Directory.systemTemp.createTempSync('atalaia-index-');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final (signed, _) = setUp(
+        dir,
+        minVersions: ['org.example.relay=1.2.0', 'org.other=0.0.1'],
+      );
+      await expectLater(
+        signed.upload(archive, release),
+        throwsA(refusal('floor')),
+      );
+      await expectLater(
+        signed.installFromIndex('org.example.relay', '1.2.0-rc.1'),
+        throwsA(refusal('floor')),
+      );
+      expect(signed.belowFloor('org.example.relay', '1.1.9'), '1.2.0');
+      expect(signed.belowFloor('org.example.relay', '1.2.0'), isNull);
+      expect(signed.belowFloor('org.example.relay', '1.2.0-rc.1'), '1.2.0');
+      expect(signed.belowFloor('org.example.relay', '2.0.0'), isNull);
+      expect(signed.belowFloor('org.club.other', '0.0.1'), isNull);
+    });
+
+    test('a floor at the version lets it in', () async {
+      final dir = Directory.systemTemp.createTempSync('atalaia-index-');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final (signed, _) = setUp(
+        dir,
+        minVersions: ['org.example.relay=1.2.0-rc.1'],
+      );
+      final out = await signed.upload(archive, release);
+      expect(out['version'], '1.2.0-rc.1');
     });
 
     test('an index that cannot be read offers nothing', () async {
@@ -448,6 +655,30 @@ void main() {
       modesConfigProblem(const ModesConfig(index: 'http://x/index.json')),
       ('ctl_modes.bad_index', 0),
     );
+    // FLD-7: the floor per mode and how long an old revocation list counts.
+    final strict = ModesConfig(
+      keys: [key],
+      minVersions: const ['org.example.relay=1.2.0'],
+      revocationMaxAgeDays: 7,
+    );
+    expect(modesConfigProblem(strict), isNull);
+    expect(ModesConfig.fromJson(strict.toJson()).toJson(), strict.toJson());
+    expect(
+      ModesConfig.fromJson({'keys': <Object?>[]}).revocationMaxAgeDays,
+      30,
+    );
+    for (final bad in ['org.x', 'org.x=one', '=1.0.0']) {
+      expect(modesConfigProblem(ModesConfig(minVersions: [bad])), (
+        'ctl_modes.bad_floor',
+        1,
+      ));
+    }
+    for (final bad in [-1.0, 3651.0, double.nan]) {
+      expect(modesConfigProblem(ModesConfig(revocationMaxAgeDays: bad)), (
+        'ctl_modes.bad_age',
+        0,
+      ));
+    }
     final settings = AppSettings()..controllerModes = good.toJson();
     expect(
       AppSettings.fromJson(

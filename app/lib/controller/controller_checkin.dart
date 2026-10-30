@@ -113,6 +113,10 @@ const _tokenGraceS = 2 * 3600;
 const _tokenMinS = 60;
 const _identityDays = 365;
 
+/// A purged game's team results are kept this long after the game ended
+/// (SR-88; the Pi's `GAME_RESULTS_DAYS`).
+const gameResultsDays = 365;
+
 /// How long the field keeps chrono records and an ended game's data, in days
 /// (decisions RET-1, RET-2; the Pi's `chrono_retention_days` and
 /// `game_retention_days`): a setting of the field: 365 by default for chrono records, 90 for game data (maintainer decision
@@ -498,6 +502,12 @@ class ControllerCheckin {
   /// `{player_id, chrono, identity, erased_at}`.
   var _erasures = <Map<String, Object?>>[];
 
+  /// The team results of games the retention purge deleted (SR-88; the Pi's
+  /// `game_results`, schema 19): name, mode, teams, the teams' final totals,
+  /// the winner, how it ended and when. No player id, no member list, no
+  /// squad. Kept [gameResultsDays] after the game ended.
+  var _gameResults = <Map<String, Object?>>[];
+
   double _wall() => engine.wallSeconds();
 
   // --- the document ---------------------------------------------------------
@@ -549,6 +559,7 @@ class ControllerCheckin {
     _replicas = _mapOf(doc['replicas']);
     _marshalHistory = _listOf(doc['marshal_history']);
     _erasures = _listOf(doc['erasures']);
+    _gameResults = _listOf(doc['game_results']);
     _tokenKeys = {
       if (doc['token_keys'] is Map)
         for (final e in (doc['token_keys'] as Map).entries)
@@ -569,6 +580,7 @@ class ControllerCheckin {
     'token_keys': _tokenKeys,
     'marshal_history': _marshalHistory,
     'erasures': _erasures,
+    'game_results': _gameResults,
   });
 
   // --- the store's queries (store.py) ---------------------------------------
@@ -4435,6 +4447,7 @@ class ControllerCheckin {
       (e) => (e['erased_at']! as num) < now - chronoDays * 86400,
     );
     final games = _purgeGames(now);
+    final resultsGone = _purgeGameResults(now);
     final out = {
       'checkins': erased,
       'declarations': declarations,
@@ -4445,6 +4458,7 @@ class ControllerCheckin {
       'marshal_keys': keysBefore - _marshalHistory.length,
       'erasure_records': erasuresBefore - _erasures.length,
       ...games,
+      'game_results_expired': resultsGone,
     };
     if (out.values.any((v) => v > 0)) _save();
     return out;
@@ -4477,6 +4491,7 @@ class ControllerCheckin {
           continue;
         }
       }
+      if (ended > now - gameResultsDays * 86400) _keepResult(g, ended);
       events += engine.store.eventLog(gid).length;
       _checkins.removeWhere((r) => r['game_id'] == gid);
       _declarations.removeWhere((_, d) => d['game_id'] == gid);
@@ -4495,6 +4510,84 @@ class ControllerCheckin {
       });
     }
     return {'games': games, 'game_events': events, 'games_unsynced_kept': kept};
+  }
+
+  /// The team with the most points; null on a tie or with no points at all
+  /// (the site server's rule, the Pi's `Store.winner_of`).
+  static String? winnerOf(Map<String, int> totals) {
+    if (totals.isEmpty) return null;
+    final best = totals.values.reduce((a, b) => a > b ? a : b);
+    final leaders = [
+      for (final e in totals.entries)
+        if (e.value == best) e.key,
+    ];
+    return leaders.length == 1 && best > 0 ? leaders.single : null;
+  }
+
+  /// Writes an ended game's team results just before the game is deleted
+  /// (SR-88): the totals as the controller holds them, nothing about a
+  /// player or a squad. A game already written is left.
+  void _keepResult(Map<String, Object?> g, num ended) {
+    final gid = g['id']! as int;
+    final seed = g['game_seed'];
+    if (_gameResults.any(
+      (r) => r['game_id'] == gid && r['game_seed'] == seed,
+    )) {
+      return;
+    }
+    final have = engine.store.scores(gid);
+    final teams = [for (final t in (g['teams']! as List)) '$t'];
+    final totals = {for (final t in teams) t: have[t] ?? 0};
+    _gameResults.add({
+      'game_id': gid,
+      'game_seed': seed,
+      'name': g['name'],
+      'mode_id': g['mode_id'],
+      'teams': teams,
+      'team_totals': totals,
+      'winner': winnerOf(totals),
+      'state': g['state'],
+      'duration_ms': (g['duration_ms'] as num?)?.toInt() ?? 0,
+      'started_at': g['started_at'],
+      'ended_at': ended,
+    });
+  }
+
+  /// Results older than their 365 days go.
+  int _purgeGameResults(double now) {
+    final n = _gameResults.length;
+    _gameResults.removeWhere(
+      (r) => (r['ended_at']! as num) < now - gameResultsDays * 86400,
+    );
+    return n - _gameResults.length;
+  }
+
+  /// `GET /api/v1/game-results`: the kept team results, newest first. No
+  /// player id, no member list, no squad (SR-88).
+  Map<String, Object?> gameResults({int limit = 100}) {
+    final rows = [..._gameResults]
+      ..sort((a, b) {
+        final c = (b['ended_at']! as num).compareTo(a['ended_at']! as num);
+        return c != 0
+            ? c
+            : (b['game_id']! as int).compareTo(a['game_id']! as int);
+      });
+    return {
+      'results': [
+        for (final r in rows.take(limit.clamp(1, 500).toInt()))
+          {
+            'name': r['name'],
+            'mode_id': r['mode_id'],
+            'teams': r['teams'],
+            'team_totals': r['team_totals'],
+            'winner': r['winner'],
+            'state': r['state'],
+            'duration_ms': r['duration_ms'],
+            'started_at': r['started_at'],
+            'ended_at': r['ended_at'],
+          },
+      ],
+    };
   }
 
   // --- erasure records (S14-10, decision RET-4) ---------------------------------

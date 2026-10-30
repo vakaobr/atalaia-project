@@ -913,6 +913,10 @@ const Map<String, String> zhTwStrings = {
   'ctl_modes.bad_key': '行 {line}：不是模式金鑰（32 位元組的 base64）。',
   'ctl_modes.bad_id': '行 {line}：不是金鑰 ID（16 位十六進位數字）。',
   'ctl_modes.bad_index': '目錄必須是 https:// 網址或檔案。',
+  'ctl_modes.min_versions': '各模式的最低版本（每行一個，ID=版本，例如 org.example.mode=1.2.0；選填）',
+  'ctl_modes.max_age': '索引無法連線時，最近一份撤回清單仍有效的天數（0 至 3650；預設 30）',
+  'ctl_modes.bad_floor': '行 {line}：不是最低版本（ID=版本，例如 org.example.mode=1.2.0）。',
+  'ctl_modes.bad_age': '天數必須是 0 至 3650 的數字。',
   'ctl_modes.saved': '已儲存：控制器下次啟動時生效。',
   // The phone controller's slice S7 settings (PE24-118 onward).
   'ctl_site.tile': '場地伺服器、故障轉移與 ATAK（場地控制器）',

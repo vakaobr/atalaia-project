@@ -259,7 +259,8 @@ class ContractCase(unittest.TestCase):
         MQTT bridge; the clock, the radio and the recorded MQTT messages go on across restarts."""
         now = env.now
         env.store = Store(env.cfg.db_path)
-        env.ctrl = Controller(env.cfg, env.store, modem=env.modem, core=CORE, clock=lambda: now[0],
+        wall = lambda: VECTORS["wall_start"] + now[0]  # noqa: E731
+        env.ctrl = Controller(env.cfg, env.store, modem=env.modem, core=CORE, clock=lambda: now[0], wall=wall,
                               join_key=bytes.fromhex(env.case.get("join_key", "")))
         # The controller then the store, on a restart or at the end of the case.
         env.stops = contextlib.ExitStack()
@@ -271,7 +272,6 @@ class ContractCase(unittest.TestCase):
             env.hub.max_queue = env.case["stream_max_queue"]
         MqttBridge(env.cfg, env.ctrl).client = env.mqtt  # type: ignore[assignment]
         PropLinks(env.ctrl)  # WS /api/v1/prop
-        wall = lambda: VECTORS["wall_start"] + now[0]  # noqa: E731
         svc = Checkin(env.ctrl)  # no field CA: HTTPS off, as on the phone until its slice S6
         svc._wall = wall
         svc._tz = datetime.timezone.utc

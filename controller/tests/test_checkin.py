@@ -309,6 +309,51 @@ class CheckinTests(P3Case):
         self.client.put("/api/v1/checkin/settings", json={"game_retention_days": 30}, headers=GM)
         self.assertEqual(self.svc.purge(force=True)["games"], 1)  # the field's own days
 
+    def test_a_purged_games_team_results_stay_365_days_without_a_player(self):
+        """SR-88: written as the game goes, no player id, no member list, no squad; gone 365 days after it ended."""
+        store = self.ctrl.store
+        games = []
+        for _ in range(3):
+            g = self.new_game()
+            self.check_in(g["id"], name=NAME)
+            self.client.post(f"/api/v1/games/{g['id']}/end", json={}, headers=GM)
+            games.append(g)
+        won, tied, old = games
+        store.update_game(won["id"], ended_at=T0)
+        store.update_game(tied["id"], ended_at=T0 + 3 * 86400)
+        store.update_game(old["id"], ended_at=T0 - 200 * 86400)
+        store.save_scores(won["id"], {"red": 9, "blue": 4})
+        store.save_scores(tied["id"], {"red": 3, "blue": 3})
+        self.now = T0 + 89 * 86400
+        self.assertEqual(self.svc.purge(force=True)["games"], 1)  # only the old one is past 90 days
+        self.now = T0 + 95 * 86400
+        out = self.svc.purge(force=True)
+        self.assertEqual((out["games"], out["game_results_expired"]), (2, 0))
+        got = store.game_results()  # newest first: tied (T0 + 3 days), won (T0), old
+        self.assertEqual(len(got), 3)
+        self.assertEqual((got[1]["winner"], got[1]["team_totals"]), ("red", {"red": 9, "blue": 4}))
+        self.assertEqual((got[0]["winner"], got[0]["team_totals"]), (None, {"red": 3, "blue": 3}))  # a tie has none
+        self.assertEqual((got[2]["winner"], got[2]["team_totals"]), (None, {"red": 0, "blue": 0}))   # no points
+        for r in got:
+            self.assertEqual(set(r), {"name", "mode_id", "teams", "team_totals", "winner", "state", "duration_ms",
+                                      "started_at", "ended_at"})
+        self.assertEqual(self.client.get("/api/v1/game-results", headers=GM).json()["results"], got)
+        self.now = T0 + 366 * 86400
+        self.assertEqual(self.svc.purge(force=True)["game_results_expired"], 2)  # the ones that ended up to T0
+        self.assertEqual([r["team_totals"] for r in store.game_results()], [{"red": 3, "blue": 3}])
+        self.now = T0 + 376 * 86400
+        self.svc.purge(force=True)
+        self.assertEqual(store.game_results(), [])
+
+    def test_a_game_past_a_year_when_it_goes_leaves_no_result(self):
+        old = self.new_game()
+        self.client.post(f"/api/v1/games/{old['id']}/end", json={}, headers=GM)
+        self.ctrl.store.update_game(old["id"], ended_at=T0)
+        self.client.put("/api/v1/checkin/settings", json={"game_retention_days": 730}, headers=GM)
+        self.now = T0 + 731 * 86400
+        self.assertEqual(self.svc.purge(force=True)["games"], 1)
+        self.assertEqual(self.ctrl.store.game_results(), [])
+
     def test_a_game_the_site_server_has_not_confirmed_is_kept(self):
         """RET-3: with the sync on, the controller's copy is the only one until the site server has all of it."""
         self.cfg.sync_enabled = True

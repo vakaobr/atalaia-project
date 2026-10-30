@@ -32,6 +32,17 @@ import 'mode_package.dart';
       return ('ctl_modes.bad_id', i + 1);
     }
   }
+  for (var i = 0; i < config.minVersions.length; i++) {
+    final e = config.minVersions[i];
+    final at = e.indexOf('=');
+    if (at < 1 || versionKey(e.substring(at + 1).trim()) == null) {
+      return ('ctl_modes.bad_floor', i + 1);
+    }
+  }
+  if (!(config.revocationMaxAgeDays >= 0 &&
+      config.revocationMaxAgeDays <= 3650)) {
+    return ('ctl_modes.bad_age', 0);
+  }
   final index = config.index;
   if (index.isNotEmpty &&
       (index.startsWith('http://') ||
@@ -60,6 +71,8 @@ class _ControllerModesScreenState extends State<ControllerModesScreen> {
   late final TextEditingController _boxKeys;
   late final TextEditingController _revoked;
   late final TextEditingController _index;
+  late final TextEditingController _floors;
+  late final TextEditingController _maxAge;
   var _loaded = false;
 
   @override
@@ -72,6 +85,8 @@ class _ControllerModesScreenState extends State<ControllerModesScreen> {
     _boxKeys = TextEditingController(text: c.boxKeys.join('\n'));
     _revoked = TextEditingController(text: c.revoked.join('\n'));
     _index = TextEditingController(text: c.index);
+    _floors = TextEditingController(text: c.minVersions.join('\n'));
+    _maxAge = TextEditingController(text: '${c.revocationMaxAgeDays}');
   }
 
   @override
@@ -80,6 +95,8 @@ class _ControllerModesScreenState extends State<ControllerModesScreen> {
     _boxKeys.dispose();
     _revoked.dispose();
     _index.dispose();
+    _floors.dispose();
+    _maxAge.dispose();
     super.dispose();
   }
 
@@ -93,6 +110,10 @@ class _ControllerModesScreenState extends State<ControllerModesScreen> {
       revoked: [for (final l in _lines(_revoked.text)) l.toLowerCase()],
       index: _index.text.trim(),
       fetchTimeoutS: old.fetchTimeoutS,
+      minVersions: _lines(_floors.text),
+      revocationMaxAgeDays:
+          double.tryParse(_maxAge.text.trim().replaceAll(',', '.')) ??
+          double.nan,
     );
     final problem = modesConfigProblem(config);
     if (problem != null) {
@@ -123,21 +144,26 @@ class _ControllerModesScreenState extends State<ControllerModesScreen> {
     final s = context.s;
     return Scaffold(
       appBar: AppBar(title: Text(s.t('ctl_modes.title'))),
-      body: ListView(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        children: [
-          Text(s.t('ctl_modes.intro')),
-          const SizedBox(height: 16),
-          _field(s.t('ctl_modes.keys'), _keys, 'mode-keys'),
-          _field(s.t('ctl_modes.box_keys'), _boxKeys, 'box-keys'),
-          _field(s.t('ctl_modes.revoked'), _revoked, 'revoked-keys'),
-          _field(s.t('ctl_modes.index'), _index, 'mode-index'),
-          FilledButton(
-            key: const Key('modes-save'),
-            onPressed: _save,
-            child: Text(s.t('common.save')),
-          ),
-        ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(s.t('ctl_modes.intro')),
+            const SizedBox(height: 16),
+            _field(s.t('ctl_modes.keys'), _keys, 'mode-keys'),
+            _field(s.t('ctl_modes.box_keys'), _boxKeys, 'box-keys'),
+            _field(s.t('ctl_modes.revoked'), _revoked, 'revoked-keys'),
+            _field(s.t('ctl_modes.index'), _index, 'mode-index'),
+            _field(s.t('ctl_modes.max_age'), _maxAge, 'revocation-max-age'),
+            _field(s.t('ctl_modes.min_versions'), _floors, 'min-versions'),
+            FilledButton(
+              key: const Key('modes-save'),
+              onPressed: _save,
+              child: Text(s.t('common.save')),
+            ),
+          ],
+        ),
       ),
     );
   }

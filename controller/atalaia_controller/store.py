@@ -84,6 +84,12 @@ request (the GM's erasure, a player's own chrono erasure), with what was erased 
 shared copies, ``identity`` the field identity, check-ins and declarations) and when, until the site server has
 acknowledged it (``POST /api/v1/sync/erasures``) or the chrono retention has passed. A schema 16 file gets the
 empty table.
+
+Schema 19 (maintainer decision 2026-10-30, SR-88) adds ``game_results``: a game's team results, written by
+``purge_games`` as the game is deleted at its retention (90 days by default) and deleted 365 days after the game
+ended (``purge_game_results``). The game's name, mode, teams, the teams' final totals, the winner, how it
+ended and when it ran: **no player id, no member list, no squad** (a squad of fewer than three would identify
+its members). Read-only in the API (``GET /api/v1/game-results``). A schema 18 file gets the empty table.
 """
 
 from __future__ import annotations
@@ -102,7 +108,8 @@ from typing import Any, Callable, Optional
 
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 18
+SCHEMA_VERSION = 19
+GAME_RESULTS_DAYS = 365  # team results (no player ids) outlive the game's own data by this long, from its end
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes, per level's plan
 FIELD_LEVELS_MAX = 10  # levels of a multi-story field (decision ML-1)
@@ -386,6 +393,21 @@ CREATE TABLE IF NOT EXISTS erasures (
     identity  INTEGER NOT NULL DEFAULT 0,              -- 1: the field identity, check-ins and declarations
     erased_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS game_results (
+    game_id     INTEGER NOT NULL,                      -- schema 19: a purged game's team results, no player ids
+    game_seed   INTEGER NOT NULL,
+    name        TEXT NOT NULL,
+    mode_id     TEXT NOT NULL,
+    teams_json  TEXT NOT NULL,
+    totals_json TEXT NOT NULL,                         -- {team: final total}
+    winner      TEXT,                                  -- NULL: a tie or no points
+    state       TEXT NOT NULL,
+    duration_ms INTEGER NOT NULL,
+    started_at  REAL,
+    ended_at    REAL NOT NULL,
+    PRIMARY KEY (game_id, game_seed)
+);
+CREATE INDEX IF NOT EXISTS idx_game_results_ended ON game_results (ended_at);
 CREATE TABLE IF NOT EXISTS player_positions (
     game_id     INTEGER NOT NULL,
     player_id   TEXT NOT NULL,
@@ -1650,13 +1672,47 @@ class Store:
         """Records older than the chrono retention go: the site server's copies are past it too."""
         return self._exec("DELETE FROM erasures WHERE erased_at < ?", (erased_before,)).rowcount
 
-    def purge_games(self, ended_before: float, confirmed_only: Optional[Callable[[dict[str, Any]], bool]] = None
-                    ) -> dict[str, Any]:
+    @staticmethod
+    def winner_of(totals: dict[str, int]) -> Optional[str]:
+        """The team with the most points; None on a tie or with no points at all (the site server's rule)."""
+        if not totals:
+            return None
+        best = max(totals.values())
+        leaders = [t for t, v in totals.items() if v == best]
+        return leaders[0] if len(leaders) == 1 and best > 0 else None
+
+    def game_results(self, limit: int = 100) -> list[dict[str, Any]]:
+        """The kept team results, newest first: name, mode, teams, totals, winner, state, dates. No player ids."""
+        rows = self._exec("SELECT * FROM game_results ORDER BY ended_at DESC, game_id DESC LIMIT ?",
+                          (max(1, int(limit)),)).fetchall()
+        return [{"name": r["name"], "mode_id": r["mode_id"],
+                 "teams": json.loads(r["teams_json"]), "team_totals": json.loads(r["totals_json"]),
+                 "winner": r["winner"], "state": r["state"], "duration_ms": r["duration_ms"],
+                 "started_at": r["started_at"], "ended_at": r["ended_at"]} for r in rows]
+
+    def purge_game_results(self, ended_before: float) -> int:
+        """Results older than their 365 days (``GAME_RESULTS_DAYS``) go."""
+        return self._exec("DELETE FROM game_results WHERE ended_at < ?", (ended_before,)).rowcount
+
+    def _keep_result(self, game: dict[str, Any]) -> None:
+        """Writes an ended game's team results just before the game is deleted (SR-88): the totals as the controller
+        holds them, nothing about a player or a squad. A game already written is left."""
+        have = self.scores(game["id"])
+        totals = {t: int(have.get(t, 0)) for t in game["teams"]}
+        self._exec("INSERT OR IGNORE INTO game_results (game_id, game_seed, name, mode_id, teams_json, totals_json, "
+                   "winner, state, duration_ms, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                   (game["id"], game["game_seed"], game["name"], game["mode_id"], json.dumps(game["teams"]),
+                    json.dumps(totals), self.winner_of(totals), game["state"], int(game["duration_ms"] or 0),
+                    game["started_at"], game["ended_at"] or game["created_at"]))
+
+    def purge_games(self, ended_before: float, confirmed_only: Optional[Callable[[dict[str, Any]], bool]] = None,
+                    keep_results_after: Optional[float] = None) -> dict[str, Any]:
         """Retention of a game's data (decision RET-1): every ended game that ended before ``ended_before`` goes
         with its events, scores, nodes, positions, check-ins, declarations, token key, plan positions, schedule
         link, sync bookkeeping and per-game settings. ``confirmed_only``: a game it answers False for is kept
         (the site server has not confirmed it, RET-3) and counted in ``kept``. The chrono readings, which have
-        their own retention, stay."""
+        their own retention, stay. ``keep_results_after``: a game that ended after it first leaves its team results
+        (``game_results``, SR-88; no player ids)."""
         done = {"games": 0, "events": 0, "kept": 0, "ids": []}
         with self._lock:
             rows = self._exec("SELECT * FROM games WHERE state = 'ended' AND COALESCE(ended_at, created_at) < ? "
@@ -1667,6 +1723,8 @@ class Store:
                     done["kept"] += 1
                     continue
                 gid, seed = game["id"], game["game_seed"]
+                if keep_results_after is not None and (game["ended_at"] or game["created_at"]) > keep_results_after:
+                    self._keep_result(game)
                 done["events"] += self._exec("DELETE FROM events WHERE game_id = ?", (gid,)).rowcount
                 for table in ("scores", "nodes", "positions", "declarations", "checkins", "player_positions",
                               "token_keys"):

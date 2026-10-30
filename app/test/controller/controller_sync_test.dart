@@ -881,6 +881,50 @@ void main() {
       expect(c.syncState(gid, seed)['final'], isFalse); // its bookkeeping went
     });
 
+    test('a purged game leaves its team results for 365 days, with no player '
+        'id (SR-88)', () {
+      final gid = play();
+      engine.store.saveScores(gid, {'red': 9, 'blue': 4});
+      final tie = play();
+      engine.store.saveScores(tie, {'red': 3, 'blue': 3});
+      expect(checkin.gameResults()['results'], isEmpty);
+      wall += 95 * 86400;
+      final out = checkin.purge(force: true)!;
+      expect((out['games'], out['game_results_expired']), (2, 0));
+      expect(engine.store.game(gid), isNull);
+      final results = (checkin.gameResults()['results']! as List)
+          .cast<Map<String, Object?>>();
+      expect(results, hasLength(2));
+      final won = results.firstWhere((r) => r['winner'] != null);
+      expect(won['team_totals'], {'red': 9, 'blue': 4});
+      expect(won['winner'], 'red');
+      expect(results.where((r) => r['winner'] == null), hasLength(1)); // a tie
+      for (final r in results) {
+        expect(r.keys.toSet(), {
+          'name',
+          'mode_id',
+          'teams',
+          'team_totals',
+          'winner',
+          'state',
+          'duration_ms',
+          'started_at',
+          'ended_at',
+        });
+      }
+      wall += 271 * 86400; // 366 days after the games ended
+      expect(checkin.purge(force: true)!['game_results_expired'], 2);
+      expect(checkin.gameResults()['results'], isEmpty);
+    });
+
+    test('a game past a year when it goes leaves no result', () {
+      play();
+      checkin.setSettings({'game_retention_days': 730});
+      wall += 731 * 86400;
+      expect(checkin.purge(force: true)!['games'], 1);
+      expect(checkin.gameResults()['results'], isEmpty);
+    });
+
     test('the field\'s own days, and no sync: age alone decides', () {
       final gid = play();
       wall += 40 * 86400;

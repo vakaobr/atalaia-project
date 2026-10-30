@@ -341,7 +341,7 @@ class FieldScript:
 
 class Controller:
     def __init__(self, cfg: Config, store: Store, *, modem: Optional[radio_modem.RadioModem] = None,
-                 core: Optional[Core] = None, clock: Callable[[], float] = time.monotonic,
+                 core: Optional[Core] = None, clock: Callable[[], float] = time.monotonic, wall: Callable[[], float] = time.time,
                  join_key: bytes = b"") -> None:
         self.cfg = cfg
         # The field join key authenticates join payloads (protocol/join.md); never on the API.
@@ -351,6 +351,7 @@ class Controller:
         self.core = core
         self.modes = ModeRegistry(store, cfg.modes_dirs, core)
         self._clock = clock
+        self._wall = wall  # the wall clock of a game's created_at, started_at and ended_at (a contract case moves it)
         self._t0 = clock()
         self._lock = threading.RLock()
         self._listeners: list[Callable[[dict[str, Any]], None]] = []
@@ -829,7 +830,7 @@ class Controller:
                 "preset_id": preset["id"] if preset else None, "teams": teams, "params": params,
                 "assignments": clean, "duration_ms": duration,
                 "game_seed": random.SystemRandom().randrange(1, 0xFFFFFFFF),
-                "state": "ready", "term": 1, "created_at": time.time(),
+                "state": "ready", "term": 1, "created_at": self._wall(),
                 "node_id": self.cfg.node_id, "channel_hz": self.field_channel,
                 "max_hops": self.cfg.max_hops, "joined": False, "squads": squads,
                 "team_info": team_info,
@@ -1434,7 +1435,7 @@ class Controller:
                 "id": j["game_id"], "name": f"Game {j['game_id']} (standby)", "mode_id": pkg.id,
                 "preset_id": None, "teams": j["teams"], "params": params, "assignments": {},
                 "duration_ms": 0, "game_seed": j["game_seed"], "state": "ready", "term": 0,
-                "created_at": time.time(), "node_id": j["node_id"], "channel_hz": j["channel_hz"],
+                "created_at": self._wall(), "node_id": j["node_id"], "channel_hz": j["channel_hz"],
                 "max_hops": j["max_hops"], "joined": True, "controller_id": j["controller_id"],
             }
             key = j["game_key"]
@@ -1591,7 +1592,7 @@ class Controller:
                 self._start_field()
             except ModeError as exc:
                 raise ControllerError(str(exc)) from None
-            out = self._set_state(game_id, "running", started_at=time.time())
+            out = self._set_state(game_id, "running", started_at=self._wall())
             self._after_field()
             self._save_game_time(force=True)
             return out
@@ -1657,7 +1658,7 @@ class Controller:
                 self.positions.end_game(game_id)  # ADR-P3-6: positions last as long as the game
             tag = epoch_tag(self._key) if self._key else self.store.get_setting(f"key_tag:{game_id}")
             key_lost = self.key_lost
-            out = self._set_state(game_id, "ended", ended_at=time.time())
+            out = self._set_state(game_id, "ended", ended_at=self._wall())
             self._deactivate()
             if self.reinvite is not None:
                 self.reinvite.forget_game(game_id)  # no invite into a game that is over
@@ -1694,7 +1695,7 @@ class Controller:
         self.store.update_game(game_id, game_key=None)
         self.store.delete_setting(f"key_tag:{game_id}")
         log.info("standby: left game %d (%s)", game_id, reason)
-        out = self._set_state(game_id, "ended", ended_at=time.time())
+        out = self._set_state(game_id, "ended", ended_at=self._wall())
         self._deactivate()
         return self.public_game(self.store.game(game_id) or out)
 
@@ -1974,7 +1975,7 @@ class Controller:
             return
         times: dict[str, float] = {}
         if state == "running" and not self.game.get("started_at"):
-            times["started_at"] = time.time()
+            times["started_at"] = self._wall()
             self.game["started_at"] = times["started_at"]
         self._set_state(self.game["id"], state, **times)
 

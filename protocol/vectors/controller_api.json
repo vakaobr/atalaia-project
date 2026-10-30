@@ -484,6 +484,31 @@
       ]
     },
     {
+      "name": "team results are kept 365 days without player ids after the game's own data is purged at 90 days (SR-88)",
+      "steps": [
+        {"request": {"method": "GET", "path": "/api/v1/game-results", "token": "read"}, "status": 200, "json": {"results": []}},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"rx": {"source": 4, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 200, "json": {"state": "running"}},
+        {"rx": {"source": 4, "seq": 1, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 10, "counters": {"1": 7, "2": 2}, "epoch": 1}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm", "body": {"reason": "time"}}, "status": 200, "json": {"state": "ended"}},
+        {"advance_ms": 86400000},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "read"}, "status": 200, "json": {"state": "ended"}},
+        {"request": {"method": "GET", "path": "/api/v1/game-results", "token": "read"}, "status": 200, "json": {"results": []}},
+        {"advance_ms": 7862400000},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "read"}, "status": 404},
+        {"request": {"method": "GET", "path": "/api/v1/game-results", "token": "read"}, "status": 200,
+         "json": {"results": [{"name": "Sunday", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "team_totals": {"red": 7, "blue": 2}, "winner": "red", "state": "ended", "duration_ms": "$any", "started_at": "$any", "ended_at": "$any", "game_id": "$absent", "players": "$absent", "player_ids": "$absent", "members": "$absent", "squads": "$absent", "assignments": "$absent"}]}},
+        {"request": {"method": "GET", "path": "/api/v1/game-results", "token": "gm"}, "status": 200, "json": {"results": [{"name": "Sunday"}]}},
+        {"request": {"method": "GET", "path": "/api/v1/game-results", "token": "none"}, "status": 401},
+        {"request": {"method": "GET", "path": "/api/v1/game-results", "token": "bad"}, "status": 401},
+        {"request": {"method": "POST", "path": "/api/v1/game-results", "token": "gm", "body": {}}, "status": 405},
+        {"request": {"method": "DELETE", "path": "/api/v1/game-results", "token": "gm"}, "status": 405},
+        {"advance_ms": 23760000000},
+        {"request": {"method": "GET", "path": "/api/v1/game-results", "token": "read"}, "status": 200, "json": {"results": []}}
+      ]
+    },
+    {
       "name": "box penalties: STATE key 9 (lost) is subtracted from the totals, merged by maximum (RFC 0001 Amendment 18, BSC-1)",
       "steps": [
         {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Penalty", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "assignments": {"4": "zone", "5": "zone"}}}, "status": 201, "save": {"gid": "id"}},

@@ -322,6 +322,17 @@ class ControllerApi {
       _route('POST', r'/api/v1/nodes/([^/]+)/cmd', _gm(_nodeCmd)),
       _route('GET', r'/api/v1/games/([^/]+)/log', _viewer(_log)),
       _route('GET', r'/api/v1/controller', _read(_status)),
+      // SR-88: the team results of purged games, no player ids (the Pi's api.py).
+      _route(
+        'GET',
+        r'/api/v1/game-results',
+        _read(
+          (r, who) => ApiResponse(
+            200,
+            _svc().gameResults(limit: r.queryInt('limit') ?? 100),
+          ),
+        ),
+      ),
       // Slice S6: the field CA (no token), as the Pi's api.py `field_ca`.
       _route('GET', r'/api/v1/controller/ca', _fieldCa),
       // Slice S7: failover (controller_failover.dart), as the Pi's api.py.

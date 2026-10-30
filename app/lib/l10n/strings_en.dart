@@ -1084,6 +1084,13 @@ const Map<String, String> enStrings = {
   'ctl_modes.bad_key': 'Line {line}: not a mode key (base64 of 32 bytes).',
   'ctl_modes.bad_id': 'Line {line}: not a key id (16 hex digits).',
   'ctl_modes.bad_index': 'The index is an https:// address or a file.',
+  'ctl_modes.min_versions':
+      'Version floor per mode (one per line, id=version, for example org.example.mode=1.2.0; optional)',
+  'ctl_modes.max_age':
+      'Days the last revocation list still counts when the index cannot be reached (0 to 3650; 30 by default)',
+  'ctl_modes.bad_floor':
+      'Line {line}: not a floor (id=version, for example org.example.mode=1.2.0).',
+  'ctl_modes.bad_age': 'The days are a number from 0 to 3650.',
   'ctl_modes.saved': 'Saved: they apply when the controller next starts.',
   // The phone controller's slice S7 settings (PE24-118 onward).
   'ctl_site.tile': 'Site server, failover and ATAK (field controller)',
