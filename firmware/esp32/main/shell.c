@@ -368,6 +368,23 @@ static void serial_command(const char *cmd)
         return;
     }
 #endif
+#if CONFIG_ATALAIA_SKIP_SETUP
+    /* A bench build only (serial keys; docs/runbooks/epoch-recovery-bench.md, RFC 0001 Amendments
+     * 24 and 25):
+     * "@epochwipe" removes the box's epoch store and "@epochwipe all" its epoch floor too, so that
+     * the next boot finds a stored game with no record of its key (a lost store). The game key
+     * stays. */
+    if (strcmp(cmd, "epochwipe") == 0 || strcmp(cmd, "epochwipe all") == 0) {
+        bool all = cmd[9] != '\0';
+        if (atalaia_radio_nvs_esp_wipe_epochs(all)) {
+            ESP_LOGW(TAG, "epochwipe: %s removed; restart the box to take a lost-store epoch",
+                     all ? "the epoch store and the epoch floor were" : "the epoch store was");
+        } else {
+            ESP_LOGE(TAG, "epochwipe: failed");
+        }
+        return;
+    }
+#endif
 #if CONFIG_ATALAIA_LBT_BENCH
     /* Decision SL-25's bench test of listen-before-talk: "@lbt tx", "@lbt probe", ... */
     if (strcmp(cmd, "lbt") == 0 || strncmp(cmd, "lbt ", 4) == 0) {

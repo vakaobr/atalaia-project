@@ -435,7 +435,11 @@ final class RfCmd {
   /// Null (or 0xFFFF): every node.
   final int? dest;
 
-  String get name => cmd < rfCommands.length ? rfCommands[cmd] : 'cmd_$cmd';
+  String get name => cmd < rfCommands.length
+      ? rfCommands[cmd]
+      : cmd == 11
+      ? 'peer' // a node's epoch for the receivers (Amendment 24): the controller's own
+      : 'cmd_$cmd';
 
   bool isFor(int node) => dest == null || dest == 0xffff || dest == node;
 

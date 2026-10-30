@@ -998,7 +998,7 @@ controller's game.
   `ATALAIA_DEEP_SLICE` epochs of the range per search of the wide-search budget, so a minute or two), and a
   controller that hears it names its epoch in **CMD peer** (opcode 11, params `{"src", "epoch"}`; `FIELD_CMD_PEER_EPOCH`,
   `peer_epochs` in `field_link_stats_t`) and to the modem (SET_PEER_EPOCH). A source's epoch in the table only
-  ever goes up (`atalaia_radio_proto_set_source_epoch` returns false and changes nothing for a lower one).
+  ever goes up (`atalaia_radio_proto_set_source_epoch` returns false and changes nothing for a lower one). A second loss of the store cannot draw lower (RFC 0001 Amendment 25, decision EP-2): the box keeps the highest epoch it ever used with any key in its own NVS entry `epfloor` (`read_floor` / `write_floor` of the NVS ops), written before an epoch above it is used, and a lost store's epoch is drawn in `[max(4096, floor + 1), 61439]`; with no room above the floor, or a floor it cannot read or a draw it cannot record, the box does not transmit (`tx_blocked`).
 - **Listen before talk** -- (RFC 0001 Amendment 14, decisions SL-25 to SL-31; Kconfig
   `ATALAIA_LBT`, on by default, in every image that transmits: the Field Box, the USB modem
   and the I/O pod) before each transmission the radio task asks the radio whether the

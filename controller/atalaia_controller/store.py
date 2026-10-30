@@ -467,7 +467,7 @@ CHRONO_COLUMNS_V16 = (("limit_j", "REAL"),)
 LIVE_STATES = ("ready", "running", "paused")
 # Settings keys kept per game as ``prefix:game_id`` (they go with the game, purge_games).
 GAME_SETTING_PREFIXES = ("checkin.open", "key_tag", "game_time", "field_scores", "field_run", "box_lang",
-                         "issued_nodes", "box_beacons_off", "box_beacon_rooms", "box_places_mirrored")
+                         "issued_nodes", "controllers_heard", "box_beacons_off", "box_beacon_rooms", "box_places_mirrored")
 
 
 def _private(path: str) -> None:
@@ -611,9 +611,12 @@ class Store:
         with self._lock:
             saved = self.get_setting("tx_epochs")
             table: list[list[Any]] = json.loads(saved) if saved else []
-            side = self._read_epoch_file()
+            side, side_floor = self._read_epoch_file()
             table = [[t, max(int(e), side.get(t, 0))] for t, e in table] + \
                 [[t, e] for t, e in side.items() if all(t != r[0] for r in table)]
+            # The highest epoch this controller has ever used with any key, kept apart from the list (the
+            # list forgets keys: only 8 are kept): a lost record's random epoch goes above it (EP-2).
+            floor = max([int(self.get_setting("tx_epoch_floor") or 0), side_floor] + [int(e) for _, e in table])
             current = next((int(e) for t, e in table if t == tag), None)
             if saved is None and current is None and resuming and self.get_setting("tx_epoch"):
                 current = int(self.get_setting("tx_epoch") or "0")
@@ -621,42 +624,51 @@ class Store:
                 raise RuntimeError("the controller's nonce epochs for this game are exhausted; "
                                    "start a new game")
             if current is None and resuming:
-                epoch = EPOCH_LOST_MIN + secrets.randbelow(EPOCH_LOST_MAX - EPOCH_LOST_MIN + 1)
+                low = max(EPOCH_LOST_MIN, floor + 1)
+                if low > EPOCH_LOST_MAX:
+                    raise RuntimeError("the controller has used epochs up to %d; none is left above them for "
+                                       "a game it has lost the record of: start a new game" % floor)
+                epoch = low + secrets.randbelow(EPOCH_LOST_MAX - low + 1)
                 self.epoch_lost = True
                 log.warning("game with key tag %s resumed with no record of its epoch: the controller "
-                            "goes on at the random epoch %d; boxes find it within a minute or two",
-                            tag, epoch)
+                            "goes on at the random epoch %d (above %d, the highest it ever used); boxes find "
+                            "it within a minute or two", tag, epoch, floor)
             else:
                 epoch = 1 if current is None else current + 1
                 self.epoch_lost = False
+            floor = max(floor, epoch)
             table = [[tag, epoch]] + [r for r in table if r[0] != tag]
             table = table[:EPOCH_KEYS]
             # The file first: if the database write is lost the epoch is still on disk, and the other
             # way round it would be used with nothing remembering it.
-            self._write_epoch_file(table)
+            self._write_epoch_file(table, floor)
+            self.set_setting("tx_epoch_floor", str(floor))
             self.set_setting("tx_epochs", json.dumps(table))
             return epoch
 
     def _epoch_file(self) -> Optional[str]:
         return None if self.path == ":memory:" else self.path + ".epochs"
 
-    def _read_epoch_file(self) -> dict[str, int]:
-        """The copy of tx_epochs beside the database: tag -> epoch; empty when there is none or it
-        cannot be read (the database's list is then what there is)."""
+    def _read_epoch_file(self) -> tuple[dict[str, int], int]:
+        """The copy of tx_epochs beside the database: (tag -> epoch, floor); empty when there is none or it
+        cannot be read (the database's list is then what there is). The file is a list of [tag, epoch]
+        (the first version) or {"keys": [[tag, epoch], ...], "floor": n}."""
         path = self._epoch_file()
         if path is None:
-            return {}
+            return {}, 0
         try:
             with open(path, "r", encoding="utf-8") as f:
-                rows = json.load(f)
-            return {str(t): int(e) for t, e in rows if isinstance(t, str) and 0 <= int(e) <= 0xFFFF}
+                doc = json.load(f)
+            rows, floor = (doc.get("keys", []), int(doc.get("floor", 0))) if isinstance(doc, dict) else (doc, 0)
+            keys = {str(t): int(e) for t, e in rows if isinstance(t, str) and 0 <= int(e) <= 0xFFFF}
+            return keys, floor if 0 <= floor <= 0xFFFF else 0
         except FileNotFoundError:
-            return {}
-        except (OSError, ValueError, TypeError):
+            return {}, 0
+        except (OSError, ValueError, TypeError, AttributeError):
             log.warning("the epoch file %s cannot be read; the database's list is used", path)
-            return {}
+            return {}, 0
 
-    def _write_epoch_file(self, table: list[list[Any]]) -> None:
+    def _write_epoch_file(self, table: list[list[Any]], floor: int = 0) -> None:
         """Replaces the epoch file whole (a temporary file, synced, then renamed): a power cut leaves the
         old list or the new one. A failure is logged, not raised: the database still has the list."""
         path = self._epoch_file()
@@ -666,7 +678,7 @@ class Store:
         try:
             fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(table, f)
+                json.dump({"keys": table, "floor": floor}, f)
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp, path)

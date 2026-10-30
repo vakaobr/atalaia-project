@@ -345,6 +345,7 @@ class FieldController:
         self._replay: dict[int, ReplayWindow] = {}  # source -> its replay window
         self._peer_epochs = PeerEpochs()  # the epochs this controller named to the receivers (SR-110)
         self.replays_refused = 0  # authenticated packets the windows refused (copies and replays)
+        self.controllers_heard: set[int] = set()  # other controllers' node ids heard on the air (EP-3)
         self._events_seen: set[tuple[int, int, int, str]] = set()
 
         # Hooks for the host (all optional).
@@ -353,6 +354,9 @@ class FieldController:
         # A box heard at an epoch the receivers may not follow (SR-110): (node, epoch), for the host to
         # tell its modem (SET_PEER_EPOCH); the controller has sent the CMD to the boxes itself.
         self.on_peer_epoch: Optional[Callable[[int, int], None]] = None
+        # Another controller was heard on the air (its TIME or CLAIM authenticated): its node id has used
+        # epochs under this key and must not be given to a new device (EP-3). Called once per controller id.
+        self.on_controller_heard: Optional[Callable[[int], None]] = None
         self.on_scores: Optional[Callable[[dict[str, int]], None]] = None
         self.on_role: Optional[Callable[[str, int], None]] = None
 
@@ -564,6 +568,11 @@ class FieldController:
             self.replays_refused += 1
             return  # a flood copy of a packet already handled, or a recording played back
         msg_type = header.type
+        if msg_type in (MESSAGE_TYPES["TIME"], MESSAGE_TYPES["CLAIM"]) and header.source != self.node_id \
+                and header.source not in self.controllers_heard:
+            self.controllers_heard.add(header.source)
+            if self.on_controller_heard is not None:
+                self.on_controller_heard(header.source)
 
         if msg_type == MESSAGE_TYPES["TIME"]:
             self._on_time(source_node, payload)

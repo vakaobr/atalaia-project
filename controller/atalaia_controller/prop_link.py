@@ -44,7 +44,8 @@ DOMAIN = b"atalaia-prop-link-v1\x00"
 NONCE_SIZE = 32
 QUEUE_MAX = 256
 AUTH_TIMEOUT_S = 10.0
-OPCODE_NAMES = {v: k for k, v in CMD_OPCODES.items()}
+# CMD peer (opcode 11, Amendment 24) is the controller's own and not in the GM's list, but a prop is told it too (EP-1).
+OPCODE_NAMES = {**{v: k for k, v in CMD_OPCODES.items()}, CMD_PEER_EPOCH: "peer"}
 PRIOS = {"telemetry": 0, "normal": 1, "critical": 2}
 
 
@@ -126,8 +127,6 @@ class PropLinks:
                 c = cmd_decode(payload)
             except Exception:
                 return False
-            if c.get("cmd") == CMD_PEER_EPOCH:
-                return False  # the radio's own (Amendment 24): a prop on Wi-Fi has no epochs
             msg = {"type": "cmd", "cmd": OPCODE_NAMES.get(c.get("cmd"), str(c.get("cmd"))),
                    "opcode": c.get("cmd"), "params": c.get("params") or {}}
             dest = c.get("dest")

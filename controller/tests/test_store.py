@@ -152,16 +152,26 @@ class StoreTests(unittest.TestCase):
                         rows = [[epoch_tag(bytes.fromhex(r["key"])), r["epoch"]] for r in case["table"]]
                         store.set_setting("tx_epochs", json.dumps(rows))
                     key = bytes.fromhex(case["key"])
+                    if case.get("floor"):
+                        store.set_setting("tx_epoch_floor", str(case["floor"]))
                     if case.get("error"):
                         with self.assertRaises(RuntimeError):
                             store.next_tx_epoch(key, case["resuming"])
                     elif case.get("lost_range"):
-                        with self.assertLogs("atalaia_controller.store", "WARNING"):
-                            for _ in range(20):
-                                got = store.next_tx_epoch(key, case["resuming"])
-                                self.assertTrue(lo <= got <= hi, got)
-                                self.assertTrue(store.epoch_lost)
-                                store.delete_setting("tx_epochs")
+                        for _ in range(20):
+                            # The same state each time: the draw is random, and the floor moves with it.
+                            again = Store(":memory:")
+                            try:
+                                if case["table"]:
+                                    again.set_setting("tx_epochs", json.dumps(rows))
+                                if case.get("floor"):
+                                    again.set_setting("tx_epoch_floor", str(case["floor"]))
+                                with self.assertLogs("atalaia_controller.store", "WARNING"):
+                                    got = again.next_tx_epoch(key, case["resuming"])
+                                self.assertTrue(max(lo, case.get("lost_min", 0)) <= got <= hi, got)
+                                self.assertTrue(again.epoch_lost)
+                            finally:
+                                again.close()
                     else:
                         self.assertEqual(store.next_tx_epoch(key, case["resuming"]), case["epoch"])
                         self.assertFalse(store.epoch_lost)
@@ -206,8 +216,58 @@ class StoreTests(unittest.TestCase):
             f.write("not json")
         self.assertEqual(self.store.next_tx_epoch(key, resuming=True), 2)
         with open(self.path + ".epochs") as f:
-            self.assertEqual(json.load(f)[0], [epoch_tag(key), 2])
+            self.assertEqual(json.load(f)["keys"][0], [epoch_tag(key), 2])
         self.assertEqual(stat.S_IMODE(os.stat(self.path + ".epochs").st_mode), 0o600)
+
+    def test_a_second_store_loss_cannot_draw_below_the_first(self):
+        """EP-2: a lost record's epoch is above the highest the controller ever used, so a receiver that
+        followed the first draw (it never goes back) still hears the second, and no nonce of the first
+        life repeats. The floor is its own record: the list losing the key, in both places, does not take it."""
+        key = bytes(range(16))
+        self.store.next_tx_epoch(key)
+        for _ in range(5):  # several losses: each draw is above the last epoch used
+            self.store.set_setting("tx_epochs", "[]")
+            with open(self.path + ".epochs", "w") as f:
+                f.write("[]")  # the file's list lost too (the floor is in the database)
+            floor = int(self.store.get_setting("tx_epoch_floor"))
+            with self.assertLogs("atalaia_controller.store", "WARNING"):
+                got = self.store.next_tx_epoch(key, resuming=True)
+            self.assertGreater(got, floor)
+            self.assertTrue(self.store.epoch_lost)
+            self.store.next_tx_epoch(key, resuming=True)  # a restart or two in between
+            self.store.next_tx_epoch(key, resuming=True)
+
+    def test_the_floor_survives_in_the_file_when_the_database_is_lost(self):
+        """EP-2 and EP-3: the database deleted, the file kept: a lost record's epoch is above the file's floor."""
+        key = bytes(range(16))
+        with self.assertLogs("atalaia_controller.store", "WARNING"):
+            first = self.store.next_tx_epoch(key, resuming=True)
+        self.store.close()
+        os.remove(self.path)
+        for suffix in ("-wal", "-shm"):
+            if os.path.exists(self.path + suffix):
+                os.remove(self.path + suffix)
+        self.store = Store(self.path)
+        other = bytes(16)
+        with self.assertLogs("atalaia_controller.store", "WARNING"):
+            got = self.store.next_tx_epoch(other, resuming=True)  # another key, no record anywhere
+        self.assertGreater(got, first)
+
+    def test_a_lost_record_with_no_epoch_left_above_the_floor_is_refused(self):
+        key = bytes(range(16))
+        self.store.set_setting("tx_epoch_floor", "61439")
+        with self.assertRaises(RuntimeError):
+            self.store.next_tx_epoch(key, resuming=True)
+        self.assertEqual(self.store.next_tx_epoch(key), 1)  # a new game is not affected
+
+    def test_an_epoch_file_of_the_first_version_is_still_read(self):
+        key = bytes(range(16))
+        self.store.next_tx_epoch(key)
+        self.store.delete_setting("tx_epochs")
+        self.store.delete_setting("tx_epoch_floor")
+        with open(self.path + ".epochs", "w") as f:
+            json.dump([[epoch_tag(key), 5]], f)  # a list, as before the floor
+        self.assertEqual(self.store.next_tx_epoch(key, resuming=True), 6)
 
     def test_epoch_tag_vectors(self):
         """protocol/vectors/epoch_tag.json, shared with the firmware's test_radio_protocol.c."""

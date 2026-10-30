@@ -356,8 +356,8 @@ bool field_link_init(field_link_t *l, const atalaia_join_t *join,
     }
     if (l->proto.epoch_lost) {
         say(l,
-            "epoch store lost: radio epoch restarted at %u; controllers will not hear this box "
-            "until they are told its epoch or it joins again",
+            "epoch store lost: radio epoch restarted at %u; receivers find this box by their deep "
+            "search within a minute or two, or at once when a controller names its epoch",
             (unsigned)l->proto.epoch);
     }
     /* Events from before a reboot that were never acknowledged. */

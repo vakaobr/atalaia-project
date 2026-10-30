@@ -82,6 +82,12 @@ typedef struct {
     /* n random bytes from the hardware generator (0=ok, -1=error); may be NULL, which only a box
      * that has lost its epoch store needs (ATALAIA_EPOCH_LOST_MIN, decision SR-27). */
     int (*random_bytes)(void *ctx, uint8_t *buf, size_t n);
+    /* The epoch floor (decision EP-2): the highest epoch this box ever used with any key, a u16
+     * kept apart from the epoch blob (its own NVS entry), so a loss of the blob alone does not take
+     * it. A lost store's random epoch is drawn above it. read_floor: 0=ok, -1=none, -2=error. Both
+     * may be NULL (no floor kept: the draw is as before, SR-27). */
+    int (*read_floor)(void *ctx, uint16_t *floor);
+    int (*write_floor)(void *ctx, uint16_t floor); /* 0=ok, -1=error */
     void *ctx;
 } atalaia_radio_nvs_ops_t;
 
@@ -214,6 +220,16 @@ void atalaia_radio_epoch_tag(const uint8_t key[ATALAIA_RF_KEY_SIZE],
  */
 #define ATALAIA_EPOCH_LOST_MIN 4096u
 #define ATALAIA_EPOCH_LOST_MAX 61439u
+/*
+ * A second loss of the store must not draw below the first (decision EP-2): receivers never lower
+ * a source's epoch (Amendment 24 item 3), so a draw under the epochs the box already used would be
+ * deaf to every receiver that heard them, and could repeat a nonce of the first life. The box keeps
+ * the highest epoch it ever used with any key as a separate u16 (read_floor / write_floor), written
+ * before an epoch above it is used, and a lost store's epoch is drawn in
+ * [max(ATALAIA_EPOCH_LOST_MIN, floor + 1), ATALAIA_EPOCH_LOST_MAX]. With no room left above the
+ * floor the box does not transmit (tx_blocked), as with no random source: it is joined again with a
+ * new key.
+ */
 
 /* Packets a (re)started node sends first (HELLO, TIME) are searched this many
  * epochs above the source's last one: a box that rebooted in a crash loop is

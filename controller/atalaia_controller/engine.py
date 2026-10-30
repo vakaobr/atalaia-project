@@ -519,6 +519,8 @@ class Controller:
         fc.on_event = self._on_event
         fc.on_node = self._on_node
         fc.on_peer_epoch = self._on_peer_epoch
+        fc.controllers_heard = self._controllers_heard(game["id"])
+        fc.on_controller_heard = self._on_controller_heard
         fc.on_scores = self._on_scores
         fc.on_role = self._on_role
         # The mode's optional scoring contract: a projected score between STATEs (decision BSC-2).
@@ -1227,6 +1229,7 @@ class Controller:
         used = {self.node_id, self.cfg.node_id, 0xFFFF}
         used.update(int(n) for n in self.game["assignments"])
         used.update(self._issued_ids())  # a standby controller's id too (BN-18)
+        used.update(self._controller_ids_on_air())  # a controller that has led or claimed (EP-3)
         if self.fc is not None:
             used.update(self.fc.nodes)
         if self.game.get("controller_id") is not None:
@@ -1301,6 +1304,14 @@ class Controller:
             assigned = self.game["assignments"].get(str(node_id))
             if kind == "controller" and (assigned is not None or node_id in fc.nodes):
                 raise Conflict(f"node id {node_id} is a box in this game")
+            if kind == "controller" and node_id in self._controller_ids_on_air():
+                # EP-3: a controller that led or claimed in this game has used epochs under this key as this
+                # id; a device that lost its stores (database and epoch file) and is joined again under it
+                # would repeat its nonces and be deaf to every receiver that heard the old epochs. A
+                # controller joined again gets a new id (leave the node id out).
+                raise Conflict(f"node id {node_id} belongs to a controller that has been on the air in this "
+                               "game: a controller joined again gets a new node id (Join), as a replacement "
+                               "box does")
             issued = self._issued_ids()
             known = fc.nodes.get(node_id)
             if not same_device and (node_id in issued or (known is not None and known.heard)):
@@ -2003,6 +2014,29 @@ class Controller:
         log.info("node %d is at epoch %d; the receivers are told", node_id, epoch)
         if self.modem is not None:
             self.modem.set_peer_epochs({node_id: epoch})
+
+    def _controllers_heard(self, game_id: int) -> set[int]:
+        saved = self.store.get_setting(f"controllers_heard:{game_id}")
+        return set(json.loads(saved)) if saved else set()
+
+    def _on_controller_heard(self, node_id: int) -> None:
+        """Another controller's TIME or CLAIM was heard: its node id has used epochs under this key, kept so
+        that no new device is given the id (EP-3; issue_join)."""
+        if self.game is None or self.fc is None:
+            return
+        heard = self._controllers_heard(self.game["id"]) | {node_id}
+        self.store.set_setting(f"controllers_heard:{self.game['id']}", json.dumps(sorted(heard)))
+
+    def _controller_ids_on_air(self) -> set[int]:
+        """The node ids of controllers that have transmitted in the live game: the one that issued the join
+        (a promoted standby's game names it) and every controller heard (TIME or CLAIM)."""
+        assert self.game is not None
+        ids = self._controllers_heard(self.game["id"])
+        if self.fc is not None:
+            ids |= self.fc.controllers_heard
+        if self.game.get("controller_id") is not None:
+            ids.add(int(self.game["controller_id"]))
+        return ids
 
     def _on_tx_ack(self, seq: int, status: str) -> None:
         self.tx_status[status] += 1

@@ -9,6 +9,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' show max;
 import 'dart:typed_data';
 
 import 'package:atalaia_app/controller/controller_engine.dart';
@@ -196,6 +197,21 @@ void main() {
       expect(s.getSetting('tx_epochs'), isNot(contains('0101')));
     });
 
+    test('a second loss of the record draws above the first (EP-2)', () {
+      final store = open();
+      final key = List.filled(16, 1);
+      expect(nextTxEpoch(store, key), 1);
+      for (var i = 0; i < 5; i++) {
+        final floor = int.parse(store.getSetting('tx_epoch_floor')!);
+        store.setSetting('tx_epochs', '[]'); // the list lost
+        final got = nextTxEpoch(store, key, resuming: true);
+        expect(got, greaterThan(floor));
+        nextTxEpoch(store, key, resuming: true); // a restart in between
+      }
+      // The floor is in the same file as the list, kept when a key is pushed out of it.
+      expect(open().getSetting('tx_epoch_floor'), isNotNull);
+    });
+
     test('the epoch of a resumed game with no record: the shared vectors '
         '(SR-29)', () {
       final v = loadVectors('tx_epoch.json');
@@ -206,34 +222,41 @@ void main() {
       ];
       for (final c in cases(v, 'cases')) {
         final name = c['name'] as String;
-        final store = MemoryControllerStore();
-        final table = (c['table'] as List).cast<Map<String, dynamic>>();
-        if (table.isNotEmpty) {
-          store.setSetting(
-            'tx_epochs',
-            jsonEncode([
-              for (final r in table)
-                [epochTag(bytes(r['key'] as String)), r['epoch']],
-            ]),
-          );
+        MemoryControllerStore fresh() {
+          final store = MemoryControllerStore();
+          final table = (c['table'] as List).cast<Map<String, dynamic>>();
+          if (table.isNotEmpty) {
+            store.setSetting(
+              'tx_epochs',
+              jsonEncode([
+                for (final r in table)
+                  [epochTag(bytes(r['key'] as String)), r['epoch']],
+              ]),
+            );
+          }
+          if (c['floor'] != null) {
+            store.setSetting('tx_epoch_floor', '${c['floor']}');
+          }
+          return store;
         }
+
         final key = bytes(c['key'] as String);
         final resuming = c['resuming'] as bool;
         if (c['error'] == true) {
           expect(
-            () => nextTxEpoch(store, key, resuming: resuming),
+            () => nextTxEpoch(fresh(), key, resuming: resuming),
             throwsStateError,
             reason: name,
           );
         } else if (c['lost_range'] == true) {
+          final low = max(range[0], (c['lost_min'] as int?) ?? 0);
           for (var i = 0; i < 20; i++) {
-            final got = nextTxEpoch(store, key, resuming: resuming);
-            expect(got, inInclusiveRange(range[0], range[1]), reason: name);
-            store.setSetting('tx_epochs', '[]');
+            final got = nextTxEpoch(fresh(), key, resuming: resuming);
+            expect(got, inInclusiveRange(low, range[1]), reason: name);
           }
         } else {
           expect(
-            nextTxEpoch(store, key, resuming: resuming),
+            nextTxEpoch(fresh(), key, resuming: resuming),
             c['epoch'],
             reason: name,
           );

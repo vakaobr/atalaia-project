@@ -250,6 +250,27 @@ bool atalaia_radio_epoch_key_retired(const atalaia_radio_nvs_ops_t *nvs,
     return store_find(&st, tag) < 0 && store_retired(&st, tag);
 }
 
+/* The epoch floor (EP-2): 0 when none is kept; false on a read error. */
+static bool floor_read(const atalaia_radio_nvs_ops_t *nvs, uint16_t *floor)
+{
+    *floor = 0;
+    if (nvs->read_floor == NULL) return true;
+    int rc = nvs->read_floor(nvs->ctx, floor);
+    if (rc == -1) *floor = 0;
+    return rc == 0 || rc == -1;
+}
+
+/* Raises the floor to at least epoch, before an epoch that high is used. False if it could not be
+ * written. */
+static bool floor_raise(const atalaia_radio_nvs_ops_t *nvs, uint16_t epoch)
+{
+    if (nvs->write_floor == NULL) return true;
+    uint16_t cur = 0;
+    if (!floor_read(nvs, &cur)) return false;
+    if (epoch <= cur) return true;
+    return nvs->write_floor(nvs->ctx, epoch) == 0;
+}
+
 /* Stores epoch as this key's (seq wrap). The store is read again, so it never goes back. */
 static bool store_epoch(atalaia_radio_proto_t *rp, uint16_t epoch, bool resuming)
 {
@@ -258,6 +279,8 @@ static bool store_epoch(atalaia_radio_proto_t *rp, uint16_t epoch, bool resuming
     int at = store_find(&st, rp->epoch_tag);
     if (at >= 0 && st.epoch[at] >= epoch) return false; /* never store a lower or equal epoch */
     if (at < 0 && store_retired(&st, rp->epoch_tag)) return false;
+    (void)floor_raise(rp->nvs,
+                      epoch); /* the floor is protection only: the store is the record here */
     store_put(&st, rp->epoch_tag, epoch);
     return save_store(rp, &st);
 }
@@ -293,10 +316,32 @@ bool atalaia_radio_proto_boot_epoch(atalaia_radio_proto_t *rp, bool resuming)
             rp->tx_blocked = true;
             return false;
         }
-        new_epoch = (uint16_t)(ATALAIA_EPOCH_LOST_MIN +
-                               ((uint32_t)(r[0] << 8 | r[1]) %
-                                (ATALAIA_EPOCH_LOST_MAX - ATALAIA_EPOCH_LOST_MIN + 1u)));
+        /* Above every epoch this box ever used with any key (EP-2): the floor kept apart from the
+         * blob, and the blob's own records (an older store may have no floor). */
+        uint16_t floor = 0;
+        if (!floor_read(rp->nvs, &floor)) {
+            rp->tx_blocked = true;
+            return false;
+        }
+        for (int i = 0; i < st.count; i++) {
+            if (st.epoch[i] > floor) floor = st.epoch[i];
+        }
+        uint32_t low = floor + 1u > ATALAIA_EPOCH_LOST_MIN ? floor + 1u : ATALAIA_EPOCH_LOST_MIN;
+        if (low > ATALAIA_EPOCH_LOST_MAX) {
+            rp->tx_blocked = true; /* no epoch is left above what this box used: join it again */
+            return false;
+        }
+        new_epoch =
+            (uint16_t)(low + ((uint32_t)(r[0] << 8 | r[1]) % (ATALAIA_EPOCH_LOST_MAX - low + 1u)));
+        /* The floor is written before the epoch is used, and a draw that cannot be recorded is not
+         * used: a second loss would otherwise draw below it. */
+        if (!floor_raise(rp->nvs, new_epoch)) {
+            rp->tx_blocked = true;
+            return false;
+        }
         rp->epoch_lost = true;
+    } else {
+        (void)floor_raise(rp->nvs, new_epoch); /* protection only: the blob has this epoch too */
     }
 
     /* Persist BEFORE first TX. */

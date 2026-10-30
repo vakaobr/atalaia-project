@@ -160,6 +160,7 @@ class MemoryControllerStore implements ControllerStore {
     'field_run',
     'box_lang',
     'issued_nodes',
+    'controllers_heard',
     'box_beacons_off',
     'box_beacon_rooms',
     'box_places_mirrored',

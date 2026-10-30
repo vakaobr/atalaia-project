@@ -926,6 +926,7 @@ class ControllerEngine {
     fc
       ..onEvent = _onEvent
       ..onPeerEpoch = _onPeerEpoch
+      ..onControllerHeard = _onControllerHeard
       ..onNode = _onNode
       ..onScores = _onScores
       ..onRole = _onRole
@@ -1763,6 +1764,33 @@ class ControllerEngine {
         : {for (final n in jsonDecode(saved) as List) n as int};
   }
 
+  Set<int> _controllersHeard(int gameId) {
+    final saved = store.getSetting('controllers_heard:$gameId');
+    return saved == null
+        ? {}
+        : {for (final n in jsonDecode(saved) as List) n as int};
+  }
+
+  /// Another controller's TIME or CLAIM was heard: its node id has used
+  /// epochs under this key, kept so that no new device is given the id
+  /// (decision EP-3).
+  void _onControllerHeard(int node) {
+    final g = _game;
+    if (g == null) return;
+    final id = g['id']! as int;
+    final heard = (_controllersHeard(id)..add(node)).toList()..sort();
+    store.setSetting('controllers_heard:$id', jsonEncode(heard));
+  }
+
+  /// The node ids of controllers that have transmitted in the live game: the
+  /// one that issued the join (a promoted standby's game names it) and every
+  /// controller heard (TIME or CLAIM).
+  Set<int> _controllerIdsOnAir(FieldController fc) => {
+    ..._controllersHeard(_game!['id']! as int),
+    ...fc.controllersHeard,
+    if (_game!['controller_id'] is int) _game!['controller_id']! as int,
+  };
+
   Set<int> _usedIds(FieldController fc) {
     final g = _game!;
     return {
@@ -1771,6 +1799,7 @@ class ControllerEngine {
       broadcastNode,
       for (final n in (g['assignments']! as Map).keys) int.parse('$n'),
       ..._issuedIds(),
+      ..._controllerIdsOnAir(fc),
       ...fc.nodes.keys,
       if (g['controller_id'] is int) g['controller_id']! as int,
     };
@@ -1874,6 +1903,17 @@ class ControllerEngine {
     if (kind == 'controller' &&
         (assigned != null || fc.nodes.containsKey(node))) {
       throw ControllerError.conflict('node id $node is a box in this game');
+    }
+    if (kind == 'controller' && _controllerIdsOnAir(fc).contains(node)) {
+      // EP-3: a controller that led or claimed in this game has used epochs
+      // under this key as this id; a device that lost its stores and is
+      // joined again under it would repeat its nonces and be deaf to every
+      // receiver that heard the old epochs. It gets a new id.
+      throw ControllerError.conflict(
+        'node id $node belongs to a controller that has been on the air in '
+        'this game: a controller joined again gets a new node id (Join), as '
+        'a replacement box does',
+      );
     }
     final issued = _issuedIds();
     final known = fc.nodes[node];

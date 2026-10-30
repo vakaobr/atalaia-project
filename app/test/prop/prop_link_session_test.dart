@@ -215,6 +215,16 @@ void main() {
         'opcode': 8,
         'params': {'name': 'refill'},
       });
+      // The controller's CMD peer (opcode 11, Amendment 24; EP-1): for a
+      // pod's receiver if this phone has one (none here), never for the
+      // mode's script.
+      end.push({
+        'type': 'cmd',
+        'cmd': 'peer',
+        'opcode': 11,
+        'params': {'src': 4, 'epoch': 41000},
+        'dest': null,
+      });
       end.push({
         'type': 'cmd',
         'cmd': 'end',
@@ -222,6 +232,7 @@ void main() {
       });
       await settle();
       expect(link.unacked, 0);
+      expect(node.inputs.map((i) => i.$1), isNot(contains('cmd.peer')));
       expect(s.gmMessage, 'Última volta');
       expect(
         node.inputs.map((i) => i.$1),

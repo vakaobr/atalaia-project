@@ -659,6 +659,14 @@ class PropSession extends ChangeNotifier {
             // A mode command (RFC 0001 Amendment 5): a medic kit's refill
             // from the GM, the controller's count of a player's heals.
             if (running) unawaited(_input('cmd.mode', params));
+          case 'peer':
+            // A node's epoch for the receivers (RFC 0001 Amendment 24, decision EP-1): over Wi-Fi the prop has
+            // no radio of its own, but a pod's receiver follows what the controller names, as a box does.
+            if (radio?.applyPeerEpoch(params) ?? false) {
+              _log(
+                'peer epoch ${params['src']} at ${params['epoch']} told to the pod',
+              );
+            }
           case 'message':
             gmMessage = params['text'] is String
                 ? params['text']! as String

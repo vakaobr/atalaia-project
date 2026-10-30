@@ -134,10 +134,15 @@ class Field {
   }
 
   /// The controller transmits a packet (through its modem).
-  void controllerSends(int type, Uint8List payload, {int prio = 0}) {
+  void controllerSends(
+    int type,
+    Uint8List payload, {
+    int prio = 0,
+    int source = 0,
+  }) {
     final h = RfHeader.v1(
       gameId: 4242,
-      source: 0,
+      source: source,
       seq: _ctlSeq++,
       hopLimit: 2,
       type: type,
@@ -413,6 +418,70 @@ void main() {
       await radio.close();
     },
   );
+
+  test('a node named by the controller is heard far above its last epoch '
+      '(EP-1)', () async {
+    // The pod's receiver follows a source only 16 epochs above the last it
+    // heard (and an unknown one from epoch 0). A controller (node 3 here)
+    // whose modem is at epoch 3000 (it restarted far above, SR-110) is not
+    // heard by a command until the prop applies the controller's CMD peer,
+    // which arrives over Wi-Fi (applyPeerEpoch, from the session) or on the
+    // radio (a CMD opcode 11 the pod hands to its phone).
+    final radio = field.radio(stateEvery: const Duration(seconds: 30));
+    final messages = <LinkMessage>[];
+    radio.messages.listen(messages.add);
+    radio.start();
+    await until(() => radio.linked, 'the radio linked');
+    final mark = field.ctl.frames.length;
+    field.ctl.send(
+      ModemLink.cmd,
+      radioConfigure(
+        gameId: 4242,
+        nodeId: 3,
+        epoch: 3000,
+        maxHops: 2,
+        channelHz: 869525000,
+        key: gameKey,
+      ),
+    );
+    await field.ctl.wait(ModemLink.status, from: mark);
+    List<String?> texts() => [
+      for (final c in messages.whereType<LinkCommand>())
+        c.params['text'] as String?,
+    ];
+    field.controllerSends(
+      RfType.cmd,
+      const RfCmd(cmd: 5, params: {'text': 'a'}, dest: 7).encode(),
+      source: 3,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    expect(texts(), isEmpty); // epoch 3000 is out of the pod's reach
+    // Refused, as the receivers refuse them: its own id, a lower epoch than named.
+    expect(radio.applyPeerEpoch({'src': 7, 'epoch': 3000}), isFalse);
+    expect(radio.applyPeerEpoch({'src': 3, 'epoch': 0}), isFalse);
+    expect(radio.applyPeerEpoch({'src': 3, 'epoch': '3000'}), isFalse);
+    expect(radio.applyPeerEpoch({'src': 3, 'epoch': 3000}), isTrue);
+    expect(
+      radio.applyPeerEpoch({'src': 3, 'epoch': 2000}),
+      isFalse,
+    ); // never down
+    expect(radio.peerEpochs, {3: 3000});
+    field.controllerSends(
+      RfType.cmd,
+      const RfCmd(cmd: 5, params: {'text': 'b'}, dest: 7).encode(),
+      source: 3,
+    );
+    await until(() => texts().isNotEmpty, 'the command at epoch 3000');
+    expect(texts(), ['b']);
+    // The radio's own CMD peer (opcode 11): taken, not passed on as a command.
+    field.controllerSends(
+      RfType.cmd,
+      const RfCmd(cmd: 11, params: {'src': 5, 'epoch': 7000}).encode(),
+      source: 3,
+    );
+    await until(() => radio.peerEpochs[5] == 7000, 'the radio CMD peer taken');
+    expect(messages.whereType<LinkCommand>().map((c) => c.cmd), ['message']);
+  });
 
   test('Wi-Fi and the radio: the radio only while Wi-Fi is down', () async {
     final sockets = <_WifiController>[];

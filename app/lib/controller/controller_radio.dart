@@ -215,8 +215,10 @@ const epochLostMax = 61439;
 /// new key starts at 1. A game the controller [resuming] after a restart
 /// with no record of its key (the list lost, or the key pushed out of it)
 /// may have used any epoch from 1 with it, so it starts at a random epoch in
-/// [epochLostMin]..[epochLostMax] instead (SR-29); boxes find it by their deep
-/// search of its TIME beacons (SR-110). [random] is for the tests.
+/// [epochLostMin]..[epochLostMax] instead (SR-29), and above the setting
+/// `tx_epoch_floor`, the highest epoch it ever used with any key (EP-2); boxes
+/// find it by their deep search of its TIME beacons (SR-110). [random] is for
+/// the tests.
 int nextTxEpoch(
   ControllerStore store,
   List<int> key, {
@@ -243,13 +245,25 @@ int nextTxEpoch(
     );
   }
   final int epoch;
+  // The highest epoch ever used with any key, kept apart from the list (which
+  // forgets keys): a lost record's random epoch goes above it (EP-2).
+  var floor = int.tryParse(store.getSetting('tx_epoch_floor') ?? '') ?? 0;
+  for (final row in table) {
+    floor = max(floor, row[1]! as int);
+  }
   if (current == null && resuming) {
-    epoch =
-        epochLostMin +
-        (random ?? Random.secure()).nextInt(epochLostMax - epochLostMin + 1);
+    final low = max(epochLostMin, floor + 1);
+    if (low > epochLostMax) {
+      throw StateError(
+        'the controller has used epochs up to $floor; none is left above '
+        'them for a game it has lost the record of: start a new game',
+      );
+    }
+    epoch = low + (random ?? Random.secure()).nextInt(epochLostMax - low + 1);
   } else {
     epoch = current == null ? 1 : current + 1;
   }
+  store.setSetting('tx_epoch_floor', '${max(floor, epoch)}');
   final rows = [
     [tag, epoch],
     for (final row in table)

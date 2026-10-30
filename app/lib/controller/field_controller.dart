@@ -320,6 +320,14 @@ class FieldController {
   /// the boxes their CMD itself.
   void Function(int node, int epoch)? onPeerEpoch;
 
+  /// The node ids of other controllers heard on the air (their TIME or CLAIM
+  /// authenticated): they have used epochs under this key, so no new device
+  /// is given the id (decision EP-3; the engine's `issueJoin`).
+  final controllersHeard = <int>{};
+
+  /// Called once for each controller id added to [controllersHeard].
+  void Function(int node)? onControllerHeard;
+
   void Function(Map<String, Object?> record)? onEvent;
   void Function(FieldNode node, String kind)? onNode;
   void Function(Map<String, int> totals)? onScores;
@@ -533,6 +541,11 @@ class FieldController {
         ReplayVerdict.fresh) {
       replaysRefused++;
       return; // a flood copy, or a recording played back
+    }
+    if ((header.type == RfType.time || header.type == RfType.claim) &&
+        header.source != nodeId &&
+        controllersHeard.add(header.source)) {
+      onControllerHeard?.call(header.source);
     }
     if (header.type == RfType.time) {
       _onTime(header.source, payload);

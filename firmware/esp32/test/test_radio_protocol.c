@@ -831,6 +831,121 @@ static void test_lost_epoch_store_starts_high(void)
     CHECK(!atalaia_radio_proto_boot_epoch(&rp, true) && rp.tx_blocked);
 }
 
+/* EP-2: a second loss of the epoch store must not draw below the first. Receivers never lower a
+ * source's epoch (Amendment 24), so a draw under what the box already used would be deaf to every
+ * receiver that heard it, and could repeat a nonce of the first life. The box keeps the highest
+ * epoch it ever used with any key in an entry of its own (read_floor / write_floor); the blob alone
+ * lost leaves it, and a lost store's epoch is drawn above it. */
+static void test_second_store_loss_draws_above_the_first(void)
+{
+    uint8_t key[16], other[16];
+    memset(key, 0x5a, sizeof(key));
+    memset(other, 0x6b, sizeof(other));
+    for (uint32_t seed = 1; seed <= 100; seed++) {
+        epoch_fake_t f;
+        memset(&f, 0, sizeof(f));
+        f.rnd = seed * 2654435761u;
+        atalaia_radio_nvs_ops_t ops = EPOCH_FAKE_OPS(&f, NULL, NULL, NULL);
+        atalaia_radio_proto_t rp;
+        atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, &ops);
+        atalaia_radio_proto_set_key(&rp, key);
+        CHECK(atalaia_radio_proto_boot_epoch(&rp, true) && rp.epoch_lost);
+        uint16_t last = rp.epoch;
+        CHECK(f.have_floor && f.floor == last);
+        /* Reboots in that life go on above it, and the floor follows. */
+        for (int i = 0; i < 3; i++) {
+            CHECK(atalaia_radio_proto_boot_epoch(&rp, true) && !rp.epoch_lost);
+            CHECK(rp.epoch == last + 1u && f.floor == rp.epoch);
+            last = rp.epoch;
+        }
+        /* The blob is lost again (the floor entry is not): the draw is above every epoch used. */
+        for (int loss = 0; loss < 4; loss++) {
+            f.len = 0;
+            if (last >= ATALAIA_EPOCH_LOST_MAX - 100) break;
+            CHECK(atalaia_radio_proto_boot_epoch(&rp, true) && rp.epoch_lost);
+            CHECK(rp.epoch > last && rp.epoch <= ATALAIA_EPOCH_LOST_MAX);
+            CHECK(epoch_fake_of(&f, key) == rp.epoch && f.floor == rp.epoch);
+            last = rp.epoch;
+            CHECK(atalaia_radio_proto_boot_epoch(&rp, true) && rp.epoch == last + 1u);
+            last = rp.epoch;
+        }
+        /* Another game's lost record is above what this box used in this one. */
+        f.len = 0;
+        atalaia_radio_proto_set_key(&rp, other);
+        if (last < ATALAIA_EPOCH_LOST_MAX - 100) {
+            CHECK(atalaia_radio_proto_boot_epoch(&rp, true) && rp.epoch > last);
+        }
+    }
+
+    /* A store with no floor entry (a box from before it): the blob's own epochs are the floor. */
+    {
+        epoch_fake_t f;
+        memset(&f, 0, sizeof(f));
+        f.rnd = 77;
+        atalaia_radio_nvs_ops_t ops = EPOCH_FAKE_OPS(&f, NULL, NULL, NULL);
+        atalaia_radio_proto_t rp;
+        atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, &ops);
+        atalaia_radio_proto_set_key(&rp, key);
+        CHECK(atalaia_radio_proto_boot_epoch(&rp, true));
+        uint16_t first = rp.epoch;
+        f.have_floor = false;
+        atalaia_radio_proto_set_key(&rp, other);
+        CHECK(atalaia_radio_proto_boot_epoch(&rp, true) && rp.epoch > first && rp.epoch_lost);
+    }
+
+    /* Both records lost (the blob and the floor entry): nothing remembers, the draw is as before
+     * (SR-27); this is the case the amendment names as left. */
+    {
+        epoch_fake_t f;
+        memset(&f, 0, sizeof(f));
+        atalaia_radio_nvs_ops_t ops = EPOCH_FAKE_OPS(&f, NULL, NULL, NULL);
+        atalaia_radio_proto_t rp;
+        atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, &ops);
+        atalaia_radio_proto_set_key(&rp, key);
+        f.len = 0;
+        f.have_floor = false;
+        CHECK(atalaia_radio_proto_boot_epoch(&rp, true) && rp.epoch >= ATALAIA_EPOCH_LOST_MIN);
+    }
+
+    /* No room above the floor: the box does not transmit, and writes nothing. */
+    {
+        epoch_fake_t f;
+        memset(&f, 0, sizeof(f));
+        f.floor = ATALAIA_EPOCH_LOST_MAX;
+        f.have_floor = true;
+        atalaia_radio_nvs_ops_t ops = EPOCH_FAKE_OPS(&f, NULL, NULL, NULL);
+        atalaia_radio_proto_t rp;
+        atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, &ops);
+        atalaia_radio_proto_set_key(&rp, key);
+        CHECK(!atalaia_radio_proto_boot_epoch(&rp, true) && rp.tx_blocked && f.writes == 0);
+        /* A new game is not affected: its key is new, it starts at 1. */
+        atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, &ops);
+        atalaia_radio_proto_set_key(&rp, key);
+        CHECK(atalaia_radio_proto_boot_epoch(&rp, false) && rp.epoch == 1);
+    }
+
+    /* A floor that cannot be read, or a draw that cannot be recorded, is not used. */
+    {
+        epoch_fake_t f;
+        memset(&f, 0, sizeof(f));
+        f.floor_fails = true;
+        atalaia_radio_nvs_ops_t ops = EPOCH_FAKE_OPS(&f, NULL, NULL, NULL);
+        atalaia_radio_proto_t rp;
+        atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, &ops);
+        atalaia_radio_proto_set_key(&rp, key);
+        CHECK(!atalaia_radio_proto_boot_epoch(&rp, true) && rp.tx_blocked && f.writes == 0);
+        f.floor_fails = false;
+        f.floor_write_fail = true;
+        atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, &ops);
+        atalaia_radio_proto_set_key(&rp, key);
+        CHECK(!atalaia_radio_proto_boot_epoch(&rp, true) && rp.tx_blocked && f.writes == 0);
+        /* An ordinary boot does not need the floor to be written: it only adds protection. */
+        atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, &ops);
+        atalaia_radio_proto_set_key(&rp, other);
+        CHECK(atalaia_radio_proto_boot_epoch(&rp, false) && rp.epoch == 1 && !rp.tx_blocked);
+    }
+}
+
 /* Review finding 4 (decision BN-21): a receiver that no longer knows a source (its slot reused)
  * took an old recorded HELLO at a low epoch, and then dropped the source's real packets more than
  * 16 above it. A first epoch is now provisional: the real packets are searched up (within the
@@ -872,6 +987,7 @@ void run_radio_protocol_tests(void)
     test_boot_epoch_power_cuts();
     test_boot_epoch_migration();
     test_lost_epoch_store_starts_high();
+    test_second_store_loss_draws_above_the_first();
     test_replay_window_per_source();
     test_seq_wrap_increments_epoch();
     test_seq_wrap_nvs_fail_blocks_tx();

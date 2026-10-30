@@ -222,6 +222,23 @@ static int nvs_random_bytes(void *ctx, uint8_t *buf, size_t n)
     return 0;
 }
 
+/* "epfloor": the highest epoch ever used with any key (EP-2), a file of its own beside "epochs". */
+static int nvs_read_floor(void *ctx, uint16_t *floor)
+{
+    (void)ctx;
+    uint8_t b[2];
+    if (read_file("epfloor", b, 2) != 2) return -1;
+    *floor = (uint16_t)(b[0] << 8 | b[1]);
+    return 0;
+}
+
+static int nvs_write_floor(void *ctx, uint16_t floor)
+{
+    (void)ctx;
+    uint8_t b[2] = {(uint8_t)(floor >> 8), (uint8_t)floor};
+    return write_file("epfloor", b, 2);
+}
+
 static const atalaia_radio_nvs_ops_t nvs_ops = {
     .read_legacy_epoch = nvs_read_legacy_epoch,
     .read_epochs = nvs_read_epochs,
@@ -230,6 +247,8 @@ static const atalaia_radio_nvs_ops_t nvs_ops = {
     .write_key = nvs_write_key,
     .erase_key = nvs_erase_key,
     .random_bytes = nvs_random_bytes,
+    .read_floor = nvs_read_floor,
+    .write_floor = nvs_write_floor,
     .ctx = NULL,
 };
 
