@@ -81,9 +81,7 @@ header:
 
 hero:
   status: >-
-    Pré-alfa · software das fases 1 e 2 pronto, placas a sério já jogam jogos inteiros com o
-    controlador de campo na bancada, fase 3 pronta em software, fases 4 e 5 feitas em software
-    · ainda não pronta para o campo
+    Pré-alfa · software das fases 1 e 2 pronto; placas a sério já jogam jogos inteiros com o controlador de campo na bancada, com teclado; fase 3 pronta em software, a app iOS verificada num iPhone; o servidor do site da fase 4 a correr num servidor de testes; fase 5 feita em software · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -2044,7 +2042,7 @@ diagrams:
 architecture:
   title: "Como tudo se liga"
   intro: "Que parte do Atalaia fala com que parte, por que ligação, e o que passa por ela. Debaixo de cada diagrama: o que circula e o que não circula."
-  status: "O Atalaia está em pré-alfa. Em placas reais, numa bancada, já correram: arranque, rádio, botões, adoção e uma atualização por rádio. O resto está feito e testado só em software."
+  status: "O Atalaia está em pré-alfa. Em placas reais, numa bancada, já correram: arranque, rádio, botões e teclado, adoção, uma atualização por rádio e jogos inteiros com o controlador de campo. A app iOS passou a sua lista de verificação num iPhone. O resto está feito e testado só em software."
   reading: "Para ler o primeiro diagrama: uma linha contínua funciona sem internet no campo, uma linha tracejada precisa de internet."
   flows: "O que circula"
   not: "O que não circula"

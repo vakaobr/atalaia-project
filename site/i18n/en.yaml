@@ -78,9 +78,7 @@ header:
 
 hero:
   status: >-
-    Pre-alpha · phase 1 and 2 software done, real boards playing whole games with the field
-    controller on the bench, phase 3 done in software, phases 4 and 5 built in software · not
-    field-ready yet
+    Pre-alpha · phases 1 and 2 done in software; real boards play whole games with the field controller on the bench, keypad included; phase 3 done in software, the iOS app checked on an iPhone; phase 4's site server running on a test server; phase 5 built in software · not field-ready yet
   title: The open <span class="nowrap">force-on-force</span> platform
   lead: >-
     Atalaia is an open platform for the electronic props of airsoft, paintball and milsim: the
@@ -1969,7 +1967,7 @@ diagrams:
 architecture:
   title: "How it fits together"
   intro: "Which part of Atalaia talks to which, over what link, and what travels on it. Under each diagram: what flows, and what does not."
-  status: "Atalaia is pre-alpha. On real boards, on a bench, these have run: boot, the radio, buttons, adoption and an update over the air. The rest is built and tested in software only."
+  status: "Atalaia is pre-alpha. On real boards, on a bench, these have run: boot, the radio, buttons and a keypad, adoption, an update over the air, and whole games with the field controller. The iOS app has passed its checklist on an iPhone. The rest is built and tested in software only."
   reading: "Reading the first diagram: a solid line works with no internet at the field, a dashed line needs the internet."
   flows: "What flows"
   not: "What does not flow"
