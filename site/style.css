@@ -110,7 +110,7 @@ a:focus-visible, .button:focus-visible { outline: 2px solid var(--signal); outli
 .skip:focus { left: 8px; }
 
 h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 700; line-height: 1.05; }
-h1 { font-size: clamp(2.8rem, 7.5vw, 5rem); max-width: 14ch; }
+h1 { font-size: clamp(2.8rem, 7.5vw, 5rem); }
 h2 { font-size: clamp(2rem, 4vw, 2.6rem); }
 h3 { font-size: 1.4rem; font-weight: 600; line-height: 1.15; }
 
@@ -229,7 +229,7 @@ nav a:hover { color: var(--on-slate); }
 /* ---- hero: the hill and the watchtower ---- */
 
 .hero {
-  padding: 72px 0 clamp(150px, 18vw, 210px);
+  padding: 32px 0 clamp(150px, 18vw, 210px);
   color: var(--on-slate);
   background-color: var(--slate);
   background-image:
