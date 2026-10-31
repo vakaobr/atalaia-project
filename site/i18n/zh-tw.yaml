@@ -1316,6 +1316,9 @@ safety:
 footer:
   licences: >-
     Atalaia 是自由軟體：核心、韌體、App 和模式採用 GPL-3.0-or-later；場地控制器和場地伺服器採用 AGPL-3.0-or-later；硬體採用 CERN-OHL-S-2.0；文件和本頁採用 CC BY-SA 4.0。
+  flags: >-
+    語言旗幟：Twemoji Country Flags，圖案出自 Twemoji（Twitter, Inc 與貢獻者），CC BY 4.0，已精簡為四面旗幟。
+  flags_licence: CC BY 4.0
   licensing: 授權說明
   manuals: 給玩家、主辦、裁判和盒子操作員的使用手冊（英文與葡萄牙文）
   independent: >-

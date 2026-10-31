@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: CC-BY-SA-4.0
  *
  * Palette taken from the Atalaia badge: slate tower, sand hills, signal fire.
- * Fonts: Barlow and Barlow Condensed (SIL OFL 1.1), self-hosted in ./fonts.
+ * Fonts: Barlow and Barlow Condensed (SIL OFL 1.1), self-hosted in ./fonts; the four language flags
+ * in a subset of Twemoji Country Flags (graphics CC-BY 4.0, see ../LICENSES/CC-BY-4.0.txt).
  */
 
 @font-face { font-family: "Barlow"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/barlow-latin-400-normal.woff2") format("woff2"); }
@@ -11,6 +12,11 @@
 @font-face { font-family: "Barlow"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/barlow-latin-600-normal.woff2") format("woff2"); }
 @font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/barlow-condensed-latin-600-normal.woff2") format("woff2"); }
 @font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/barlow-condensed-latin-700-normal.woff2") format("woff2"); }
+
+/* The language flags: Chrome and Edge on Windows draw a flag emoji as two letters, so these four are
+   drawn by a small colour font. Its unicode-range holds only the regional-indicator letters (a flag is
+   two of them), so no other text uses it. */
+@font-face { font-family: "Twemoji Country Flags"; font-style: normal; font-weight: 400; font-display: swap; unicode-range: U+1F1E6-1F1FF; src: url("fonts/twemoji-country-flags-subset.woff2") format("woff2"); }
 
 :root {
   color-scheme: light dark;
@@ -151,15 +157,21 @@ nav a:hover { color: var(--on-slate); }
   text-underline-offset: 6px;
 }
 
-/* Language switcher: PT · EN, the current language lit like a beacon. */
-.lang { align-items: center; gap: 2px; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.05em; }
-.lang a { padding: 2px 7px; border-radius: var(--radius); }
-.lang a[aria-current] { color: var(--slate); background: var(--signal); }
-.lang .sep { color: var(--on-slate-muted); }
+/* Language switcher: flags at the top right, in a strip above the menu (it comes last in the HTML, so
+   a keyboard reaches the menu first); the current language lit like a beacon. */
+.top { display: flex; flex-direction: column; }
+.top > .wrap, .top > .lang-bar { width: 100%; }
+.lang-bar { order: -1; border-bottom: 1px solid var(--granite); }
+.lang-bar > .lang { box-sizing: border-box; }
+.lang { justify-content: flex-end; align-items: center; gap: 4px; padding-top: 3px; padding-bottom: 3px; }
+.lang a { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; min-height: 32px; padding: 0 6px; border-radius: var(--radius); line-height: 1; }
+.lang a:hover { background: var(--granite); }
+.lang a[aria-current] { background: var(--signal); }
+.lang a:focus-visible { outline: 2px solid var(--on-slate); outline-offset: 1px; }
+.lang .flag { font-family: "Twemoji Country Flags", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-size: 1.35rem; letter-spacing: 0; }
 @media (max-width: 640px) {
-  /* Brand and switcher share the first row; the section links wrap below. */
-  .lang { order: 2; margin-left: auto; }
-  .sections { order: 3; flex-basis: 100%; margin-left: 0; padding-bottom: 10px; }
+  /* The section links wrap below the brand. */
+  .sections { flex-basis: 100%; margin-left: 0; padding-bottom: 10px; }
 }
 
 .sr-only {
@@ -197,7 +209,7 @@ nav a:hover { color: var(--on-slate); }
   font-size: 0.92rem;
 }
 .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 4px rgba(240, 122, 26, 0.25); }
-.lead { font-size: 1.2rem; max-width: 60ch; margin: 22px 0 30px; color: var(--on-slate); }
+.lead { font-size: 1.2rem; margin: 22px 0 30px; color: var(--on-slate); }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .button {
   display: inline-block;
@@ -212,7 +224,7 @@ nav a:hover { color: var(--on-slate); }
 .hero .button:hover { border-color: var(--on-slate); color: var(--on-slate); }
 .hero .button.primary { background: var(--signal); border-color: var(--signal); color: var(--slate); }
 .hero .button.primary:hover { filter: brightness(1.08); color: var(--slate); }
-.name { color: var(--on-slate-muted); font-size: 0.98rem; margin: 30px 0 0; max-width: 62ch; }
+.name { color: var(--on-slate-muted); font-size: 0.98rem; margin: 30px 0 0; }
 
 /* ---- the head of a subpage: the hero's slate and hills, shorter ---- */
 
@@ -296,7 +308,7 @@ nav a:hover { color: var(--on-slate); }
 /* The modes page's animated pictures (tools/gen_mode_gifs.py): 360 x 444, the Field Box's two
    screens as a game goes on; cards are wide enough to show them at their own size. */
 .cards.with-gifs { grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); }
-.gifs-intro { color: var(--muted); max-width: 70ch; margin: 0 0 24px; }
+.gifs-intro { color: var(--muted); margin: 0 0 24px; }
 .modegif { margin: 16px 0 0; }
 .modegif img { display: block; width: 100%; max-width: 360px; height: auto; margin: 0 auto; }
 .modegif figcaption { max-width: 360px; margin: 8px auto 0; font-size: 0.88rem; color: var(--muted); }
@@ -533,7 +545,7 @@ pre {
 
 .foot { background: var(--slate); color: var(--on-slate-muted); padding: 32px 0 44px; font-size: 0.92rem; }
 .foot a { color: var(--on-slate); }
-.foot-inner p { margin: 0 0 8px; max-width: 80ch; }
+.foot-inner p { margin: 0 0 8px; }
 
 /* Firmware screenshots captured in the emulator */
 .screens { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-top: 8px; }
@@ -603,7 +615,6 @@ html:has(.viewer[open]) { overflow: hidden; }
 .guide > section + section { margin-top: 44px; border-top: 3px solid var(--rule); }
 .guide h2 { font-size: clamp(1.8rem, 4vw, 2.3rem); }
 .guide h3 { margin-top: 28px; font-size: 1.2rem; }
-.guide p, .guide li { max-width: 75ch; }
 .guide .status-note { margin: 0 0 20px; padding: 10px 14px; border-left: 3px solid var(--signal); background: var(--surface); }
 .guide .warn { padding: 10px 14px; border-left: 3px solid var(--signal); background: var(--surface); font-weight: 600; }
 .toc { display: flex; flex-wrap: wrap; gap: 6px 22px; font-weight: 600; }
@@ -622,11 +633,10 @@ html:has(.viewer[open]) { overflow: hidden; }
 .wiring .zoom { padding: 8px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); }
 .wiring .zoom:hover { border-color: var(--signal); }
 .wiring img { display: block; width: 100%; height: auto; }
-.wiring figcaption { margin-top: 6px; max-width: 75ch; color: var(--muted); font-size: 0.95rem; }
+.wiring figcaption { margin-top: 6px; color: var(--muted); font-size: 0.95rem; }
 .wiring figcaption a { white-space: nowrap; }
 /* Where a photo of the first build will go (plan phase HW2): dashed, like the planned parts of the diagrams. */
 .photo { margin: 24px 0 0; padding: 18px 16px; border: 2px dashed var(--muted); border-radius: var(--radius); color: var(--muted); font-size: 0.95rem; }
-.photo figcaption { max-width: 70ch; }
 
 /* The architecture diagrams (site/img/diagrams/arch-*.svg, drawn by tools/render_diagrams.py): wide, so each
    scrolls sideways inside its own box instead of shrinking its text; the SVG follows the light or dark setting

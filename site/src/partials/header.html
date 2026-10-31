@@ -5,7 +5,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 The skip link and the header of every page. The section links lead to the
 subpages and to sections of the main page, in this page's language;
 page.nav.<page> marks the link of the page being read. The language switcher
-leads to this same page in the other languages.
+(flags, top right) leads to this same page in the other languages.
 #}
   <a class="skip" href="#main">{{ header.skip }}</a>
 
@@ -31,15 +31,17 @@ leads to this same page in the other languages.
         <a href="{{ page.to.glossary }}"{{ page.nav.glossary }}>{{ header.glossary }}</a>
         <a href="https://github.com/vakaobr/atalaia-project">GitHub</a>
       </nav>
-      {# Each language is named in its own language, whichever page this is. #}
-      <nav class="lang" aria-label="{{ header.language|text }}">
-        <a href="{{ page.href.pt }}" hreflang="pt-PT" lang="pt-PT"{{ page.current.pt }}>PT<span class="sr-only"> · Português</span></a>
-        <span class="sep" aria-hidden="true">·</span>
-        <a href="{{ page.href.en }}" hreflang="en" lang="en"{{ page.current.en }}>EN<span class="sr-only"> · English</span></a>
-        <span class="sep" aria-hidden="true">·</span>
-        <a href="{{ page.href.de }}" hreflang="de" lang="de"{{ page.current.de }}>DE<span class="sr-only"> · Deutsch</span></a>
-        <span class="sep" aria-hidden="true">·</span>
-        <a href="{{ page.href.zh_tw }}" hreflang="zh-Hant-TW" lang="zh-Hant-TW"{{ page.current.zh_tw }}>中文<span class="sr-only"> · 繁體中文（台灣）</span></a>
+    </div>
+    {# The language switcher: a strip at the top right of the page (CSS puts it above the menu), one
+       emoji flag a language, drawn by the Twemoji flag font on systems with no flag emoji (Windows).
+       Each language is named in its own language, whichever page this is; the name is the link's
+       aria-label and title, so the flag alone is never the only label. #}
+    <div class="lang-bar">
+      <nav class="wrap lang" aria-label="{{ header.language|text }}">
+        <a href="{{ page.href.pt }}" hreflang="pt-PT" lang="pt-PT" aria-label="Português" title="Português"{{ page.current.pt }}><span class="flag" aria-hidden="true">&#x1F1F5;&#x1F1F9;</span></a>
+        <a href="{{ page.href.en }}" hreflang="en" lang="en" aria-label="English" title="English"{{ page.current.en }}><span class="flag" aria-hidden="true">&#x1F1EC;&#x1F1E7;</span></a>
+        <a href="{{ page.href.de }}" hreflang="de" lang="de" aria-label="Deutsch" title="Deutsch"{{ page.current.de }}><span class="flag" aria-hidden="true">&#x1F1E9;&#x1F1EA;</span></a>
+        <a href="{{ page.href.zh_tw }}" hreflang="zh-Hant-TW" lang="zh-Hant-TW" aria-label="繁體中文（台灣）" title="繁體中文（台灣）"{{ page.current.zh_tw }}><span class="flag" aria-hidden="true">&#x1F1F9;&#x1F1FC;</span></a>
       </nav>
     </div>
     {# Only an AI-drafted language fills it in (P5H-11, P5K-12); empty, it is hidden. #}

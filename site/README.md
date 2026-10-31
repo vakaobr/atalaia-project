@@ -41,7 +41,7 @@ which keeps English's ASCII folders (Han letters in an address are percent-encod
 | `img/` | The badge and illustrations (see [Images](#images)) |
 | `img/wiring/` | The Field Box's two wiring drawings, copied from `hardware/field-box/wiring/` by `tools/build_site.py` (see [The build guides page](#the-build-guides-page)). Generated |
 | `img/diagrams/` | The two radio diagrams in each language and layout. Generated (see [Diagrams](#diagrams)) |
-| `fonts/` | Barlow and Barlow Condensed (latin subset, WOFF2), self-hosted so the page loads nothing from other sites; SIL OFL 1.1, see [LICENSES/OFL-1.1.txt](../LICENSES/OFL-1.1.txt) |
+| `fonts/` | Barlow and Barlow Condensed (latin subset, WOFF2; SIL OFL 1.1, see [LICENSES/OFL-1.1.txt](../LICENSES/OFL-1.1.txt)) and a four-flag subset of Twemoji Country Flags for the language switcher (CC BY 4.0, credited in the footer), all self-hosted so the page loads nothing from other sites; see [fonts/README.md](fonts/README.md) |
 | `style.css` | The look: slate, sand and signal orange taken from the badge, with the hero's hills and tower drawn in inline SVG (the subpages' heads reuse the hills) |
 | `src/<page>.html` | The template of each page, built in every language |
 | `src/partials/` | The parts every page shares: `head.html` (title, description, canonical and `hreflang` addresses, social preview tags), `header.html` (navigation and language switcher) and `footer.html` |
@@ -169,7 +169,7 @@ It needs Python 3 and PyYAML (the dev container has both: see [tools/README.md](
   that language's file.
 - Links to the repository's documents point at the English documents in every language; the
   Portuguese page says "(em inglês)" next to them, the German one "(auf Englisch)".
-- The language switcher in the header names each language in its own language and leads to the
+- The language switcher is four emoji flags at the top right of every page; each link names its language in its own language (`aria-label`, `title`) and leads to the
   same page in the other languages. Try the site with a local server
   (`python3 -m http.server -d site`).
 

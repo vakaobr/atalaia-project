@@ -1899,6 +1899,9 @@ footer:
     A Atalaia é software livre: GPL-3.0-or-later para o núcleo, o firmware, a app e os modos;
     AGPL-3.0-or-later para o controlador de campo e o servidor do site; CERN-OHL-S-2.0 para o
     hardware; CC BY-SA 4.0 para a documentação e esta página.
+  flags: >-
+    Bandeiras dos idiomas: Twemoji Country Flags, arte do Twemoji (Twitter, Inc e colaboradores), CC BY 4.0, reduzida a quatro bandeiras.
+  flags_licence: CC BY 4.0
   licensing: Licenças
   manuals: Manuais para quem joga, a organização, os marshals e quem opera as caixas
   independent: >-
