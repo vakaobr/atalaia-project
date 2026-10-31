@@ -1935,7 +1935,7 @@ footer:
     Diese Seite setzt keine Cookies und lädt nichts von anderen Seiten.
   privacy: Datenschutzerklärung (Entwurf)
   privacy_note: >-
-    Die Erklärung, die ein Site-Server seinen Spielenden zeigt; dieser Text ist ein Entwurf als Vorlage für Betreibende, noch nicht von einer juristischen Fachperson geprüft (auf Englisch und Portugiesisch).
+    Die Erklärung, die ein Site-Server seinen Spielenden zeigt. Sie ist eine Vorlage für Betreibende: Sie gibt die rechtlichen Positionen wieder, die der Anwalt oder die Anwältin des Maintainers am 30. Oktober 2026 gebilligt hat, aber der Wortlaut selbst ist noch ein Entwurf, noch nicht von einer juristischen Fachperson geprüft, und jedes Feld muss ihn prüfen und als eigenen übernehmen (auf Englisch und Portugiesisch).
   privacy_href: https://github.com/vakaobr/atalaia-project/tree/main/docs/templates
 
 # The two radio diagrams: site/src/diagrams/*.svg, built into site/img/diagrams/.

@@ -1332,7 +1332,7 @@ footer:
     獨立、由社群經營；與任何商業道具製造商都沒有關係。本頁不設定 cookie，也不從其他網站載入任何東西。
   privacy: 隱私權聲明（草稿）
   privacy_note: >-
-    場地伺服器向玩家顯示的聲明；此處是給營運者的草稿範本（英文），尚未經法律專業人士審閱。
+    場地伺服器向玩家顯示的聲明。這是給營運者的範本：它寫明維護者的律師在 2026 年 10 月 30 日認可的法律立場，但文字本身仍是草稿（英文與葡萄牙文），尚未經法律專業人士審閱，各場地必須自行核對並採用為自己的聲明。
   privacy_href: https://github.com/vakaobr/atalaia-project/tree/main/docs/templates
 
 # The two radio diagrams: site/src/diagrams/*.svg, built into site/img/diagrams/.

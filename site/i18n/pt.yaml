@@ -1918,7 +1918,7 @@ footer:
     dispositivos de jogo. Esta página não usa cookies nem carrega nada de outros sites.
   privacy: Aviso de privacidade (rascunho)
   privacy_note: >-
-    O aviso que um servidor do site mostra a quem joga; este texto é um modelo de rascunho para operadores, ainda não revisto por um jurista.
+    O aviso que um servidor do site mostra a quem joga. É um modelo para operadores: diz as posições jurídicas que a assessoria jurídica do responsável do projeto aprovou a 30 de outubro de 2026, mas o texto em si continua a ser um rascunho, ainda não revisto por um jurista, e cada campo tem de o conferir e adotar como seu.
   privacy_href: https://github.com/vakaobr/atalaia-project/tree/main/docs/templates
 
 # Os dois diagramas do rádio: site/src/diagrams/*.svg, gerados em site/img/diagrams/.

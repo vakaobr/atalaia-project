@@ -1843,7 +1843,7 @@ footer:
     cookies and loads nothing from other sites.
   privacy: Privacy notice (draft)
   privacy_note: >-
-    The notice a site server shows its players; this text is a draft template for operators, not yet reviewed by a lawyer.
+    The notice a site server shows its players. It is a template for operators: it states the legal positions the project maintainer's lawyer approved on 30 October 2026, but the wording itself is still a draft, not yet reviewed by a lawyer, and each field must check it and adopt it as its own.
   privacy_href: https://github.com/vakaobr/atalaia-project/tree/main/docs/templates
 
 # The two radio diagrams: site/src/diagrams/*.svg, built into site/img/diagrams/.
