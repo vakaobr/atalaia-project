@@ -62,9 +62,9 @@ typedef struct {
 
 static uint32_t (*ov_game_ms)(void);
 static int (*ov_holds)(oled_hold_t *holds, int max);
-static uint32_t ov_hold_ms;   /* the mode's hold time to take a zone ("@mode"); 0 none */
-static bool ov_domination;    /* the running mode scores per team on this box */
-static oled_text_t ov_base;   /* the last screen's OLED lines: zone, owner, mode-sent bar */
+static uint32_t ov_hold_ms; /* the mode's hold time to take a zone ("@mode"); 0 none */
+static bool ov_domination;  /* the running mode scores per team on this box */
+static oled_text_t ov_base; /* the last screen's OLED lines: zone, owner, mode-sent bar */
 static bool ov_base_on;
 static team_total_t ov_totals[TOTALS_MAX];
 static int ov_totals_n;
@@ -122,8 +122,8 @@ static void ov_mode(const char *data)
  * games clear the totals. */
 static void ov_screen(const char *name, const char *data)
 {
-    static const char *const between[] = {"ready", "waiting", "status", "preset_select",
-                                          "start_confirm", NULL};
+    static const char *const between[] = {"ready",         "waiting",       "status",
+                                          "preset_select", "start_confirm", NULL};
     for (int i = 0; between[i]; i++) {
         if (strcmp(name, between[i]) == 0) ov_totals_clear();
     }
@@ -1265,8 +1265,8 @@ static void ov_draw_hold(void)
         oled_hold_t holds[OLED_HOLDS_MAX];
         int n = ov_holds(holds, OLED_HOLDS_MAX);
         oled_text_t t = ov_base;
-        if (n > 0 && oled_text_hold(&t, holds, n > OLED_HOLDS_MAX ? OLED_HOLDS_MAX : n,
-                                    ov_hold_ms)) {
+        if (n > 0 &&
+            oled_text_hold(&t, holds, n > OLED_HOLDS_MAX ? OLED_HOLDS_MAX : n, ov_hold_ms)) {
             pct = t.bar > 100 ? 100 : t.bar;
             snprintf(team, sizeof(team), "%.23s", t.foot);
         }

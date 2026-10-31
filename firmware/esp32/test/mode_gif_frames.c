@@ -162,6 +162,7 @@ int main(int argc, char **argv)
 
         /* The TFT. */
         lv_display_set_default(tft_display);
+        screen_set_overlay_readers(game_clock, hold_reader); /* the box's own hold bar, held time */
         if (mode && strcmp(mode, mode_shown) != 0) {
             screen_render(SCREEN_MODE_MESSAGE, mode);
             snprintf(mode_shown, sizeof(mode_shown), "%s", mode);
@@ -170,6 +171,7 @@ int main(int argc, char **argv)
             fprintf(stderr, "mode_gif_frames: line %d: template %s not recognised\n", lineno, f[2]);
             return 1;
         }
+        screen_overlay_tick();
         test_display_render();
         test_display_rgb888(rgb);
         fwrite(rgb, 1, sizeof(rgb), out);

@@ -609,8 +609,8 @@ static const screen_case_t cases[] = {
     /* What the box adds on the TFT (TZ-1 to TZ-5): the game's clock at 3:45 (a zone taken at 1:35
      * has been held 2:10), the teams' totals at this box in the corner (blue held first, with 7;
      * red holds now, with 12), and the capture's hold bar while a team holds its button. */
-    {"yaml_domination_captured_live", "captured",
-     "{\"team\":\"red\",\"points\":12,\"since\":95}", DOM},
+    {"yaml_domination_captured_live", "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}",
+     DOM},
     {"yaml_domination_captured_live_pt", "captured",
      "{\"team\":\"red\",\"points\":12,\"since\":95}", DOM},
     {"yaml_domination_neutral_holding", "neutral", "{}", DOM},
