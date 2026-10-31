@@ -681,6 +681,14 @@ html:has(.viewer[open]) { overflow: hidden; }
 .wiring img { display: block; width: 100%; height: auto; }
 .wiring figcaption { margin-top: 6px; color: var(--muted); font-size: 0.95rem; }
 .wiring figcaption a { white-space: nowrap; }
+/* The Field Box's first real photo and clip (the bench build of 2026-10-31): scaled to the column, never wider than
+   760 px; the clip's pause button is the modegif one. */
+.buildphoto, .realbox { margin: 20px 0 0; }
+.buildphoto img, .realbox video { display: block; width: 100%; max-width: 760px; height: auto; margin: 0 auto; border-radius: var(--radius); background: #000; }
+.realbox figcaption { max-width: 760px; margin: 8px auto 0; color: var(--muted); font-size: 0.95rem; }
+.buildphoto figcaption { max-width: 760px; margin: 8px auto 0; color: var(--muted); font-size: 0.95rem; }
+.band .realbox video { max-width: 640px; }
+.band .realbox figcaption { max-width: 640px; }
 /* Where a photo of the first build will go (plan phase HW2): dashed, like the planned parts of the diagrams. */
 .photo { margin: 24px 0 0; padding: 18px 16px; border: 2px dashed var(--muted); border-radius: var(--radius); color: var(--muted); font-size: 0.95rem; }
 

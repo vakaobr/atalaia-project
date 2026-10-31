@@ -557,6 +557,18 @@ screens:
     Três modos, tal como a caixa os mostra: animações desenhadas pelo código do próprio firmware da
     Field Box, não maquetadas. O botão por baixo de cada imagem pausa-a. Mais abaixo, as capturas da
     aplicação.
+  real:
+    title: A caixa a sério, na bancada
+    intro: >-
+      Os modos acima são animações desenhadas pelo código do firmware. Isto é a montagem de bancada da
+      Field Box (uma placa e fios soltos, sem caixa) a jogar Domínio de verdade.
+    alt: >-
+      Vídeo mudo, em ciclo, de uma montagem de bancada da Field Box a jogar Domínio: o ecrã mostra a
+      zona ocupada pela equipa vermelha e, passados uns segundos, pela azul.
+    caption: >-
+      A primeira Field Box, numa montagem de bancada (31 de outubro de 2026): uma captura passa de
+      vermelha a azul no ecrã. Sem caixa, ainda com fios soltos.
+    more: Ver a montagem e a fotografia →
   gifs_more: Ver todos os modos →
   box_title: Os ecrãs da caixa, passo a passo
   box_intro: >-
@@ -741,8 +753,9 @@ roadmap:
   p1:
     title: Uma caixa
     short: >-
-      Firmware da Field Box e manual de montagem; na bancada, uma placa a sério joga jogos inteiros.
-      À espera da primeira caixa montada.
+      Firmware da Field Box e manual de montagem; na bancada, uma placa a sério joga jogos inteiros,
+      já com ecrã, teclado e botões montados com fios soltos (fotografia e vídeo na página de
+      montagem). Falta ainda uma caixa montada.
     done:
       - Firmware ESP32 da Field Box, com predefinições na própria caixa, a correr num emulador.
       - O pequeno ecrã da caixa mostra a barra de progresso, os pontos e o tempo de posse, em quatro línguas.
@@ -758,6 +771,7 @@ roadmap:
       - "A Field Box como iBeacon: da entrada num jogo até ao fim, a caixa emite uma baliza Bluetooth (a cada 500 ms, nunca enquanto usa o Wi-Fi), para que um telemóvel perto dela possa colocar quem joga num piso ou numa sala. O identificador do campo deriva da sua chave de adesão, e a organização pode desligar as caixas como balizas, por campo ou por caixa. A memória interna da caixa foi refeita depois de ter acabado na bancada à entrada num jogo (o Wi-Fi falhou e o cão de guarda reiniciou): medido na bancada, ficam livres 241 KB no arranque e 102 KB no mínimo num jogo com a baliza ligada, e o CI falha a compilação se o orçamento encolher demasiado. Ainda não se verificou que um telemóvel ouve a baliza de uma caixa a sério."
       - "Depois de uma recusa ou falha de uma atualização ou da obtenção de um modo, o ecrã da caixa volta ao ecrã do estado passados 8 segundos (na bancada, uma recusa ficou no ecrã até alguém olhar). Só testes no computador."
       - "Os comandos da consola série que dão à caixa a chave de entrada ou lançam uma atualização (@joinkey, @update) pedem o PIN de administração numa versão de lançamento, e recusam enquanto não houver PIN; uma versão de bancada mantém-nos abertos para os scripts da bancada. Só em testes no computador, não numa placa real."
+      - "A primeira montagem de bancada da Field Box (31 de outubro de 2026): uma placa Heltec V4 com o ecrã TFT de 2,8\", o OLED, um teclado de 4×3 e botões de equipa, com fios soltos e sem caixa, a jogar Domínio com o controlador da bancada. Há <a href=\"{{ page.to.build }}#field-box-first-build\">fotografia e vídeo</a>."
     next:
       - Uma caixa montada que aguente um jogo de clube de 2 horas sem reiniciar.
       - "Ver a barra do tempo num painel a sério."
@@ -1233,10 +1247,11 @@ build:
     verificações e as tabelas de problemas e soluções, estão no repositório (em inglês).
     Para pôr o firmware numa placa, <a href="https://github.com/vakaobr/atalaia-project/releases">transfere uma versão publicada</a> ou compila-a: o <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/pt/firmware.md">guia do firmware</a> explica as duas formas. O controlador de campo tem o seu <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/pt/controller-setup.md">guia de montagem</a>.
   status: >-
-    <strong>Ainda não se montou nenhuma caixa a partir destes guias.</strong> Os pinos são
-    verificados automaticamente contra o firmware, mas todos os passos físicos (caixa, alimentação,
-    autonomia, alcance do rádio) estão por testar, e as fotografias chegam com as primeiras
-    montagens. Se montares uma, conta-nos o que encontraste.
+    <strong>Nenhuma caixa foi montada a partir destes guias, e a Field Box ainda não tem caixa.</strong>
+    Há só uma <a href="#field-box-first-build">montagem de bancada da Field Box</a> (fios soltos), a
+    jogar. Os pinos são verificados automaticamente contra o firmware, mas todos os passos físicos
+    (caixa, alimentação, autonomia, alcance do rádio) estão por testar, e as fotografias das outras
+    caixas chegam com as primeiras montagens. Se montares uma, conta-nos o que encontraste.
   toc: Nesta página
   parts: Peças
   pins: Pinos
@@ -1325,6 +1340,29 @@ build:
       remetem para ele em todos os passos que partilham.
     pins_shared: >-
       Os GPIO 1, 35 e 44 são pinos da placa que a Field Box partilha de propósito, cada um para este único uso: o 1 é a entrada de tensão da bateria da placa (o medidor lê a bateria por I2C), o 35 o seu LED branco (que pisca de leve com o anel) e o 44 a linha de receção da UART0 (a consola USB não é afetada).
+    bench:
+      title: A primeira montagem, na bancada
+      intro: >-
+        A Field Box já existe fora do papel, mas só numa montagem de bancada: a primeira placa a correr
+        um jogo inteiro, com o ecrã, os botões e o teclado ligados por fios soltos e ainda sem caixa.
+        Não é um produto acabado nem uma caixa montada segundo os guias.
+      photo_alt: >-
+        Fotografia da montagem de bancada: uma placa Heltec V4 com o seu pequeno ecrã OLED, ligada por
+        muitos fios coloridos a um ecrã TFT de 2,8 polegadas que mostra «READY» e «Next game», a um
+        teclado de membrana de 12 teclas (4 por 3) e a quatro botões de pressão com tampas verde, azul e
+        pretas. Tudo está solto sobre uma secretária, com um teclado de computador ao fundo.
+      photo_caption: >-
+        A primeira Field Box na bancada, a 31 de outubro de 2026: uma placa Heltec V4, o ecrã TFT de
+        2,8" (ILI9341), o OLED da própria placa, um teclado de 4×3 e botões de equipa, ligados com fios
+        soltos, sem caixa. É a primeira placa a correr um jogo, e uma montagem de bancada, não uma caixa
+        acabada.
+      video_alt: >-
+        Vídeo mudo, em ciclo, da mesma montagem de bancada a jogar Domínio. O ecrã mostra uma zona
+        ocupada pela equipa vermelha, com 3 pontos; passados uns segundos a zona passa para a equipa
+        azul e o ecrã e o OLED mudam de vermelho para azul.
+      video_caption: >-
+        A mesma montagem a jogar Domínio com o controlador da bancada (31 de outubro de 2026): a zona
+        passa da equipa vermelha para a azul. Nove segundos em ciclo, sem som; o ecrã está em português.
     wiring:
       title: >-
         Esquemas de ligações
@@ -1646,8 +1684,8 @@ glossary:
       altifalante e leitor NFC numa caixa estanque, por cerca de
       <span class="nowrap">70–110&nbsp;€</span> em peças; o Satélite é uma caixa mais pequena para
       um ponto secundário, por cerca de <span class="nowrap">30–40&nbsp;€</span>. O firmware e o
-      manual de montagem da Field Box já estão prontos; os primeiros protótipos esperam pelas peças
-      (fase&nbsp;1).
+      manual de montagem da Field Box já estão prontos; a primeira montagem de bancada (fios soltos, sem
+      caixa) já joga (fase&nbsp;1).
   milsim:
     id: glossario-milsim
     term: Milsim

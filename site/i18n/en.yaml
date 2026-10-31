@@ -541,6 +541,18 @@ screens:
   intro: >-
     Three modes as the box shows them: animations drawn by the Field Box's own firmware code, not
     mocked up. The button under each picture pauses it. Further down, the app's screenshots.
+  real:
+    title: The real box, on the bench
+    intro: >-
+      The modes above are animations drawn by the firmware's code. This is the Field Box's bench build
+      (one board and loose wires, no enclosure) playing Domination for real.
+    alt: >-
+      Silent, looping video of a Field Box bench build playing Domination: the screen shows the zone
+      held by the red team and, a few seconds later, by the blue team.
+    caption: >-
+      The first Field Box, as a bench build (31 October 2026): a capture changes from red to blue on
+      the screen. No enclosure yet, loose wires still.
+    more: See the build and the photo →
   gifs_more: See every mode →
   box_title: The box's screens, step by step
   box_intro: >-
@@ -722,8 +734,9 @@ roadmap:
   p1:
     title: Single box
     short: >-
-      Field Box firmware and a build manual; a real board plays whole games on the bench. Waiting
-      for the first built box.
+      Field Box firmware and a build manual; a real board plays whole games on the bench, now with
+      its screen, keypad and buttons wired up on loose wires (photo and clip on the build page).
+      Still waiting for an assembled box.
     done:
       - ESP32 firmware for the Field Box, with presets on the device, running in an emulator.
       - The box's small screen shows the hold bar, points and held time, in four languages.
@@ -739,6 +752,7 @@ roadmap:
       - "The Field Box as an iBeacon: from its join to the end of the game, a box advertises a Bluetooth beacon (every 500 ms, never while its Wi-Fi is in use), so a phone near it can place a player on a floor or in a room. The field's own identifier is derived from its join key, and the GM can switch the boxes off as beacons, per field or per box. The box's internal memory was reworked after the bench ran out of it at a game's join (the Wi-Fi failed, then a watchdog reset): measured on the bench, 241 KB are free at boot and 102 KB at the lowest in a game with the beacon on, and CI fails the build if the budget shrinks too far. Not yet checked that a phone hears a real box's beacon."
       - "After an update's or a mode fetch's refusal or failure, the box's screen goes back to the state's screen after 8 seconds (on the bench a refusal stayed on the screen until someone looked). Host tests only."
       - "The serial console commands that give a box its join key or start an update (@joinkey, @update) ask for the admin PIN in a release build and refuse while none is set; a bench build keeps them open for the bench scripts. Host tests only, not on a real board."
+      - "The Field Box's first bench build (31 October 2026): a Heltec V4 board with the 2.8\" TFT, the OLED, a 4×3 keypad and team buttons, on loose wires with no enclosure, playing Domination with the bench controller. There is a <a href=\"{{ page.to.build }}#field-box-first-build\">photo and a clip</a>."
     next:
       - A built box that runs a 2-hour club game with no restarts.
       - "Seeing the timer bar on a real panel."
@@ -1195,10 +1209,11 @@ build:
     repository.
     To put the firmware on a board, <a href="https://github.com/vakaobr/atalaia-project/releases">download a ready-made release</a> or build it yourself: the <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">firmware guide</a> explains both. The field controller has its own <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">setup guide</a>.
   status: >-
-    <strong>No box of any kind has been built from these guides yet.</strong> Their pins are checked
-    automatically against the firmware, but every physical step (enclosure, power, runtime, radio
-    range) is untested, and the photos will come with the first builds. If you build one, please
-    tell us what you find.
+    <strong>No box has been built from these guides, and the Field Box has no enclosure yet.</strong>
+    There is only a <a href="#field-box-first-build">bench build of the Field Box</a> (loose wires),
+    playing games. Its pins are checked automatically against the firmware, but every physical step
+    (enclosure, power, runtime, radio range) is untested, and the photos of the other boxes will come
+    with their first builds. If you build one, please tell us what you find.
   toc: On this page
   parts: Parts
   pins: Pins
@@ -1280,6 +1295,29 @@ build:
       troubleshooting; the guides below refer to it for every step they share.
     pins_shared: >-
       GPIO 1, 35 and 44 are board pins that the Field Box shares on purpose, each for this one use only: 1 is the board's battery-voltage input (the gauge reads the battery over I2C instead), 35 its white LED (it flickers faintly with the ring) and 44 UART0's receive line (the USB console is unaffected).
+    bench:
+      title: The first build, on the bench
+      intro: >-
+        The Field Box now exists off paper, but only as a bench build: the first board to run a whole
+        game, with the screen, buttons and keypad on loose wires and no enclosure yet. It is not a
+        finished product, nor a box built from the guides.
+      photo_alt: >-
+        Photo of the bench build: a Heltec V4 board with its small OLED screen, joined by many coloured
+        wires to a 2.8-inch TFT screen showing "READY" and "Next game", a 12-key (4 by 3) membrane
+        keypad and four push buttons with green, blue and black caps. Everything lies loose on a desk,
+        with a computer keyboard behind.
+      photo_caption: >-
+        The first Field Box on the bench, 31 October 2026: a Heltec V4 board, the 2.8" TFT (ILI9341),
+        the board's own OLED, a 4×3 keypad and team buttons, on loose wires, with no enclosure. It is
+        the first board to run a game, and a bench build, not a finished box.
+      video_alt: >-
+        Silent, looping video of the same bench build playing Domination. The screen shows a zone held
+        by the red team with 3 points; after a few seconds the zone passes to the blue team and the
+        screen and the OLED change from red to blue.
+      video_caption: >-
+        The same build playing Domination with the bench controller (31 October 2026): the zone
+        changes from the red team to the blue. Nine seconds on a loop, no sound; the screen is in
+        Portuguese.
     wiring:
       title: >-
         Wiring diagrams
@@ -1584,8 +1622,8 @@ glossary:
       the main one, with big arcade buttons, a keypad, a screen, lights, a speaker and an NFC reader
       in a weatherproof case, for roughly <span class="nowrap">€70–110</span> in parts; the
       Satellite is a smaller box for a secondary point, for about
-      <span class="nowrap">€30–40</span>. The Field Box's firmware and build manual are ready; its first
-      prototypes wait for their parts (phase&nbsp;1).
+      <span class="nowrap">€30–40</span>. The Field Box's firmware and build manual are ready; a first
+      bench build (loose wires, no enclosure) already plays (phase&nbsp;1).
   milsim:
     id: glossary-milsim
     term: Milsim

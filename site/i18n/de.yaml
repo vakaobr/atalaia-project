@@ -574,6 +574,18 @@ screens:
     Drei Modi, wie die Box sie zeigt: Animationen, die der Code der Field-Box-Firmware selbst
     zeichnet, nicht nachgebaut. Die Schaltfläche unter jedem Bild pausiert es. Weiter unten die
     Screenshots der App.
+  real:
+    title: Die echte Box auf dem Labortisch
+    intro: >-
+      Die Modi oben sind Animationen, die der Code der Firmware zeichnet. Hier spielt der Aufbau der
+      Field Box auf dem Labortisch (ein Board an losen Kabeln, ohne Gehäuse) wirklich Domination.
+    alt: >-
+      Stummes Video in Endlosschleife eines Field-Box-Aufbaus beim Spielen von Domination: Das
+      Display zeigt die Zone des roten Teams und einige Sekunden später die des blauen.
+    caption: >-
+      Die erste Field Box als Aufbau auf dem Labortisch (31. Oktober 2026): Eine Eroberung wechselt auf
+      dem Display von Rot zu Blau. Noch ohne Gehäuse, mit losen Kabeln.
+    more: Den Aufbau und das Foto ansehen →
   gifs_more: Alle Modi ansehen →
   box_title: Die Bildschirme der Box, Schritt für Schritt
   box_intro: >-
@@ -762,7 +774,8 @@ roadmap:
     title: Eine Box
     short: >-
       Firmware der Field Box und ein Bauhandbuch; auf dem Labortisch spielt ein echtes Board ganze
-      Spiele. Es wartet auf die erste gebaute Box.
+      Spiele, inzwischen mit Display, Tastenfeld und Tastern an losen Kabeln (Foto und Clip auf der
+      Bauseite). Es fehlt noch eine zusammengebaute Box.
     done:
       - ESP32-Firmware der Field Box mit Presets auf dem Gerät, lauffähig in einem Emulator.
       - Der kleine Bildschirm der Box zeigt Haltebalken, Punkte und Haltezeit, in vier Sprachen.
@@ -778,6 +791,7 @@ roadmap:
       - "Die Field Box als iBeacon: Vom Beitritt bis zum Spielende sendet eine Box ein Bluetooth-Beacon (alle 500 ms, nie während ihr WLAN in Gebrauch ist), sodass ein Handy in ihrer Nähe Spielende auf einer Etage oder in einem Raum verorten kann. Die Kennung des Feldes wird aus seinem Beitrittsschlüssel abgeleitet, und die Spielleitung kann die Boxen als Beacons abschalten, je Feld oder je Box. Der interne Speicher der Box wurde überarbeitet, nachdem er auf dem Labortisch beim Beitritt zu einem Spiel ausging (das WLAN scheiterte, dann folgte ein Watchdog-Reset): Auf dem Labortisch gemessen sind beim Start 241 KB frei und im Spiel mit eingeschaltetem Beacon mindestens 102 KB, und die CI lässt den Build scheitern, wenn das Budget zu stark schrumpft. Noch nicht geprüft, ob ein Handy das Beacon einer echten Box hört."
       - "Nach der Ablehnung oder dem Scheitern eines Updates oder eines Modus-Abrufs kehrt der Bildschirm der Box nach 8 Sekunden zum Bildschirm des Zustands zurück (auf dem Labortisch blieb eine Ablehnung stehen, bis jemand hinsah). Nur Host-Tests."
       - "Die Befehle der seriellen Konsole, die einer Box den Beitrittsschlüssel geben oder ein Update starten (@joinkey, @update), verlangen in einem Release-Build die Admin-PIN und lehnen ab, solange keine gesetzt ist; ein Bench-Build lässt sie für die Bench-Skripte offen. Nur Host-Tests, nicht auf einem echten Board."
+      - "Der erste Labortisch-Aufbau der Field Box (31. Oktober 2026): ein Heltec-V4-Board mit dem 2,8-Zoll-TFT, dem OLED, einem 4×3-Tastenfeld und Team-Tastern, an losen Kabeln und ohne Gehäuse, spielt Domination mit dem Controller vom Labortisch. Es gibt ein <a href=\"{{ page.to.build }}#field-box-first-build\">Foto und einen Clip</a>."
     next:
       - Eine gebaute Box, die ein zweistündiges Club-Spiel ohne Neustart durchhält.
       - "Die Zeitleiste an einem echten Display sehen."
@@ -1264,9 +1278,11 @@ build:
     Fehlersuche liegen im Repository (auf Englisch und Portugiesisch).
     Um die Firmware auf eine Platine zu bringen, <a href="https://github.com/vakaobr/atalaia-project/releases">lade eine fertige Version herunter</a> oder baue sie selbst: die <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">Firmware-Anleitung</a> (Englisch) erklärt beides. Der Feld-Controller hat eine eigene <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">Einrichtungsanleitung</a> (Englisch).
   status: >-
-    <strong>Nach diesen Anleitungen wurde noch keine einzige Box gebaut.</strong> Ihre Pins werden
-    automatisch mit der Firmware abgeglichen, aber jeder Schritt am echten Teil (Gehäuse,
-    Stromversorgung, Laufzeit, Funkreichweite) ist ungetestet, und die Fotos kommen mit den ersten
+    <strong>Nach diesen Anleitungen wurde noch keine Box gebaut, und die Field Box hat noch kein
+    Gehäuse.</strong> Es gibt nur einen <a href="#field-box-first-build">Aufbau der Field Box auf dem
+    Labortisch</a> (lose Kabel), der Spiele spielt. Die Pins werden automatisch mit der Firmware
+    abgeglichen, aber jeder Schritt am echten Teil (Gehäuse, Stromversorgung, Laufzeit,
+    Funkreichweite) ist ungetestet, und die Fotos der anderen Boxen kommen mit deren ersten
     Aufbauten. Wenn du eine baust, erzähl uns, was du dabei findest.
   toc: Auf dieser Seite
   parts: Teile
@@ -1355,6 +1371,30 @@ build:
       darauf.
     pins_shared: >-
       GPIO 1, 35 und 44 sind Pins des Boards, die die Field Box absichtlich mitbenutzt, jeder nur für diesen einen Zweck: 1 ist der Akkuspannungs-Eingang des Boards (die Akkuanzeige liest den Akku per I2C), 35 seine weiße LED (sie flackert leicht mit dem Ring) und 44 die Empfangsleitung von UART0 (die USB-Konsole bleibt unberührt).
+    bench:
+      title: Der erste Aufbau auf dem Labortisch
+      intro: >-
+        Die Field Box gibt es jetzt außerhalb des Papiers, aber nur als Aufbau auf dem Labortisch: das
+        erste Board, das ein ganzes Spiel spielt, mit Display, Tastern und Tastenfeld an losen Kabeln
+        und noch ohne Gehäuse. Es ist kein fertiges Produkt und keine nach den Anleitungen gebaute Box.
+      photo_alt: >-
+        Foto des Labortisch-Aufbaus: ein Heltec-V4-Board mit seinem kleinen OLED-Display, über viele
+        bunte Kabel verbunden mit einem 2,8-Zoll-TFT-Display, das «READY» und «Next game» zeigt, einem
+        Folientastenfeld mit 12 Tasten (4 mal 3) und vier Drucktastern mit grünen, blauen und
+        schwarzen Kappen. Alles liegt lose auf einem Schreibtisch, dahinter eine Computertastatur.
+      photo_caption: >-
+        Die erste Field Box auf dem Labortisch, 31. Oktober 2026: ein Heltec-V4-Board, das
+        2,8-Zoll-TFT (ILI9341), das OLED des Boards, ein 4×3-Tastenfeld und Team-Taster an losen
+        Kabeln, ohne Gehäuse. Es ist das erste Board, das ein Spiel spielt, und ein Aufbau auf dem
+        Labortisch, keine fertige Box.
+      video_alt: >-
+        Stummes Video in Endlosschleife desselben Aufbaus beim Spielen von Domination. Das Display
+        zeigt eine Zone des roten Teams mit 3 Punkten; nach einigen Sekunden geht die Zone an das
+        blaue Team, und Display und OLED wechseln von Rot zu Blau.
+      video_caption: >-
+        Derselbe Aufbau beim Spielen von Domination mit dem Controller vom Labortisch (31. Oktober
+        2026): Die Zone wechselt vom roten zum blauen Team. Neun Sekunden in Schleife, ohne Ton; das
+        Display ist auf Portugiesisch.
     wiring:
       title: >-
         Schaltpläne
@@ -1667,7 +1707,7 @@ glossary:
       Lautsprecher und NFC-Leser in einem wetterfesten Gehäuse, für etwa
       <span class="nowrap">70–110&nbsp;€</span> an Teilen; der Satellit ist eine kleinere Box für einen
       Nebenpunkt, für etwa <span class="nowrap">30–40&nbsp;€</span>. Firmware und Bauhandbuch der Field
-      Box sind fertig; ihre ersten Prototypen warten auf ihre Teile (Phase&nbsp;1).
+      Box sind fertig; ein erster Aufbau auf dem Labortisch (lose Kabel, ohne Gehäuse) spielt schon (Phase&nbsp;1).
   milsim:
     id: glossar-milsim
     term: Milsim

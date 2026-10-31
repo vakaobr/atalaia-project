@@ -13,8 +13,10 @@ The pin tables are the same in every language, so their GPIO numbers live here,
 not in the language files: each GPIO cell names its Kconfig symbol in
 data-kconfig, and tools/check_wiring.py (in tools/check.sh) fails if a number
 is not that symbol's default in firmware/esp32/main/Kconfig.projbuild. The
-photo placeholders (class "photo") stay until the first builds' photos (plan
-phase HW2); never a mock-up or generated photo. See site/README.md.
+photo placeholders (class "photo") of the Satellite, the pod and the target stay until
+their first builds' photos (plan phase HW2); never a mock-up or generated photo. The
+Field Box already has its first real photo and clip (the bench build of 2026-10-31,
+#field-box-first-build). See site/README.md.
 #}
 <html lang="{{ page.lang }}">
 <head>
@@ -61,6 +63,23 @@ phase HW2); never a mock-up or generated photo. See site/README.md.
         <section id="field-box" aria-labelledby="field-box-title">
           <h2 id="field-box-title">{{ build.field_box.title }}</h2>
           <p>{{ build.field_box.text }}</p>
+
+          <h3 id="field-box-first-build">{{ build.field_box.bench.title }}</h3>
+          <p>{{ build.field_box.bench.intro }}</p>
+          <figure class="buildphoto">
+            <picture>
+              <source type="image/webp" srcset="{{ page.root }}img/field-box-bench-960.webp 960w, {{ page.root }}img/field-box-bench-1600.webp 1600w" sizes="(min-width: 800px) 760px, calc(100vw - 32px)">
+              <img src="{{ page.root }}img/field-box-bench-960.jpg" srcset="{{ page.root }}img/field-box-bench-960.jpg 960w, {{ page.root }}img/field-box-bench-1600.jpg 1600w" sizes="(min-width: 800px) 760px, calc(100vw - 32px)" width="1600" height="1200" loading="lazy" decoding="async" alt="{{ build.field_box.bench.photo_alt|text }}">
+            </picture>
+            <figcaption>{{ build.field_box.bench.photo_caption }}</figcaption>
+          </figure>
+          <figure class="buildphoto realbox" data-play="{{ gifs.play|text }}" data-pause="{{ gifs.pause|text }}">
+            <video muted loop playsinline autoplay preload="metadata" width="720" height="406" poster="{{ page.root }}img/field-box-demo-poster.jpg" aria-label="{{ build.field_box.bench.video_alt|text }}">
+              <source src="{{ page.root }}img/field-box-demo.webm" type="video/webm">
+              <source src="{{ page.root }}img/field-box-demo.mp4" type="video/mp4">
+            </video>
+            <figcaption>{{ build.field_box.bench.video_caption }}</figcaption>
+          </figure>
 
           <h3>{{ build.pins }}</h3>
           <p>{{ build.pins_intro }}</p>
@@ -262,5 +281,6 @@ phase HW2); never a mock-up or generated photo. See site/README.md.
   </main>
 
 {% include footer %}
+{% include realvideo %}
 </body>
 </html>

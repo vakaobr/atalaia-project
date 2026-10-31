@@ -1,0 +1,38 @@
+  {# The real box's clip (decision FB-4): a muted, looping <video> from this site's own files. With
+     "prefers-reduced-motion" this script, inline and loading nothing, pauses it so the poster shows; it also
+     adds a button under each clip that pauses or plays it. Without the script the clip autoplays, muted.
+     Keep "{" and "}" in the script apart: two together are a placeholder. #}
+  <script>
+    (function () {
+      "use strict";
+      var figures = document.querySelectorAll("figure.realbox");
+      if (!figures.length) return;
+      var reduced = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+      Array.prototype.forEach.call(figures, function (figure) {
+        var video = figure.querySelector("video");
+        if (!video) return;
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "modegif-button";
+        function update() {
+          button.textContent = video.paused ? figure.getAttribute("data-play") : figure.getAttribute("data-pause");
+        }
+        if (reduced) {
+          video.removeAttribute("autoplay");
+          video.pause();
+        }
+        button.addEventListener("click", function () {
+          if (video.paused) {
+            var started = video.play();
+            if (started && started.catch) started.catch(function () {});
+          } else {
+            video.pause();
+          }
+        });
+        video.addEventListener("play", update);
+        video.addEventListener("pause", update);
+        update();
+        figure.appendChild(button);
+      });
+    })();
+  </script>

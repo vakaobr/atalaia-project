@@ -207,6 +207,15 @@ the pages. Code blocks and anything else that is the same in every language stay
           </figure>
         </div>
         <p class="more"><a href="{{ page.to.modes }}">{{ screens.gifs_more }}</a></p>
+        <h3 id="real-box" class="subhead">{{ screens.real.title }}</h3>
+        <p class="intro">{{ screens.real.intro }}</p>
+        <figure class="realbox" data-play="{{ gifs.play|text }}" data-pause="{{ gifs.pause|text }}">
+          <video muted loop playsinline autoplay preload="metadata" width="720" height="406" poster="{{ page.root }}img/field-box-demo-poster.jpg" aria-label="{{ screens.real.alt|text }}">
+            <source src="{{ page.root }}img/field-box-demo.webm" type="video/webm">
+            <source src="{{ page.root }}img/field-box-demo.mp4" type="video/mp4">
+          </video>
+          <figcaption>{{ screens.real.caption }} <a href="{{ page.to.build }}#field-box-first-build">{{ screens.real.more }}</a></figcaption>
+        </figure>
         <h3 id="app-screens" class="subhead">{{ screens.app_title }}</h3>
         <p class="intro">{{ screens.app_intro }}</p>
         <div class="screens app-screens">
@@ -351,6 +360,7 @@ python ../tools/docker_sim.py serve ../modes/bomb</code></pre>
 
 {% include viewer %}
 {% include modegif %}
+{% include realvideo %}
 
 {% include footer %}
 </body>

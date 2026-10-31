@@ -22,11 +22,11 @@ which keeps English's ASCII folders (Han letters in an address are percent-encod
 
 | Page | Portuguese | English | German | Chinese | Template | What it holds |
 | --- | --- | --- | --- | --- | --- | --- |
-| Main page | `/` | `/en/` | `/de/` | `/zh-tw/` | `src/index.html` | The hero, how a game works, why Atalaia, how it fits together, a short radio section, three game modes, "What it looks like" (three mode animations, then the app's screenshots), try it, the roadmap in one line per phase, the community hub, getting involved, the name and field safety |
+| Main page | `/` | `/en/` | `/de/` | `/zh-tw/` | `src/index.html` | The hero, how a game works, why Atalaia, how it fits together, a short radio section, three game modes, "What it looks like" (three mode animations, the real box's clip, then the app's screenshots), try it, the roadmap in one line per phase, the community hub, getting involved, the name and field safety |
 | Game modes | `/modos/` | `/en/modes/` | `/de/modi/` | `/zh-tw/modes/` | `src/modes.html` | Every mode (each with its animation), the Codes modifier, the Medic Kit, "your mode" and the box's step-by-step screenshots |
 | Radio | `/radio/` | `/en/radio/` | `/de/funk/` | `/zh-tw/radio/` | `src/radio.html` | How the radio works: both diagrams with their lead-ins, and the channel |
 | Roadmap | `/roadmap/` | `/en/roadmap/` | `/de/roadmap/` | `/zh-tw/roadmap/` | `src/roadmap.html` | The six phases, each as a one-line summary, bullets of what is done (the long lists fold into a `<details>`), bullets of what is next or waiting, and its gate, with a link to the phase's `STATUS.md`. "Roadmap" stays in English in Portuguese too |
-| Build guides | `/montagem/` | `/en/build-guides/` | `/de/bauen/` | `/zh-tw/build-guides/` | `src/build.html` | Safety rules for every build; the Satellite, the I/O pod and the target addon shortened from `hardware/<node>/BUILD.md` (the full guides, in English), with their pin tables and photo placeholders; a pointer to the Field Box's build manual (phase 5 plan phase 12, decisions P5J-1 to P5J-13) |
+| Build guides | `/montagem/` | `/en/build-guides/` | `/de/bauen/` | `/zh-tw/build-guides/` | `src/build.html` | Safety rules for every build; the Satellite, the I/O pod and the target addon shortened from `hardware/<node>/BUILD.md` (the full guides, in English), with their pin tables and photo placeholders; the Field Box's first bench build, with its photo and clip; a pointer to the Field Box's build manual (phase 5 plan phase 12, decisions P5J-1 to P5J-13) |
 | How it fits together | `/como-se-liga/` | `/en/how-it-fits/` | `/de/zusammenspiel/` | `/zh-tw/how-it-fits/` | `src/architecture.html` | The seven architecture diagrams of `docs/architecture.md` as SVG, each with a short "what flows / what does not" text and a link to the doc (decision SITEARCH-1). Linked from the navigation, the roadmap and the build guides |
 | Glossary | `/glossario/` | `/en/glossary/` | `/de/glossar/` | `/zh-tw/glossary/` | `src/glossary.html` | Every glossary entry; the glossary links of every page lead here |
 
@@ -95,6 +95,26 @@ the rest of this folder (see [REUSE.toml](../REUSE.toml)); the top-level README 
 
 Each main page loads only its own hero image (WebP, with JPEG for older browsers, at 960 or 1600
 pixels wide as the screen needs) and lazy-loads everything below it.
+
+### Field Box photo and clip
+
+The first real Field Box, a bench build (loose wires, no enclosure) the maintainer photographed and
+filmed on 2026-10-31. Never call it a finished box in the texts (`build.field_box.bench.*`,
+`screens.real.*`, in the four languages). The files are the maintainer's own, under the folder's CC BY-SA 4.0
+licence (`REUSE.toml`), with every piece of metadata (EXIF, GPS, device, the container's tags) stripped
+by ffmpeg `-map_metadata -1` and `bitexact`, and the clip's audio removed:
+
+| Files | What they are | Where they appear |
+| --- | --- | --- |
+| `field-box-bench-960/1600` (`.jpg`, `.webp`) | The bench photo, 4:3 (the 2048 × 1536 original resized; 154 + 324 KB JPEG, 124 + 254 KB WebP) | `#field-box-first-build` on the build guides page, a `<picture>` like the hero's |
+| `field-box-demo.mp4`, `.webm`, `field-box-demo-poster.jpg` | A 9 s muted loop (the original's 0:50 to 0:59: a Domination capture changes from red to blue), 720 × 406, H.264 126 KB, VP9 165 KB, poster 49 KB; the box's screen in the video is in Portuguese | The same section, and "The real box, on the bench" under the mode animations on the main page |
+
+The clip is a `<video muted loop playsinline autoplay preload="metadata">` with the poster, from this
+site's own files (nothing from other sites, no cookie). A small inline script (`src/partials/realvideo.html`,
+included by the main and build pages) pauses it for `prefers-reduced-motion: reduce`, so the poster shows, and adds
+the GIFs' pause / play button under it (a loop longer than five seconds needs one); without JavaScript the
+clip autoplays. To replace it, cut with ffmpeg, keep it muted, small and metadata-free, and look at
+every frame for faces or private information first.
 
 ### Screenshots
 
@@ -203,8 +223,10 @@ every language: each GPIO cell names its Kconfig symbol (`<td data-kconfig="ATAL
 and `tools/check_wiring.py` (in `tools/check.sh`) fails if a number is not that symbol's default
 in `firmware/esp32/main/Kconfig.projbuild`. When a pin default changes, change the number here,
 in `hardware/satellite/BUILD.md` and in `hardware/io-pod/BUILD.md` together. The dashed
-`figure.photo` boxes mark where the first builds' photos go (plan phase HW2); never a mock-up or
-generated picture. Portuguese words: guia de montagem, caixa satélite, módulo de E/S, módulo de
+`figure.photo` boxes mark where the first builds' photos go (plan phase HW2) for the Satellite, the
+I/O pod and the target addon; never a mock-up or generated picture. The Field Box's section no
+longer has one: it opens with its first real photo and clip, the bench build of 2026-10-31
+(`#field-box-first-build`, see [Field Box photo and clip](#field-box-photo-and-clip)). Portuguese words: guia de montagem, caixa satélite, módulo de E/S, módulo de
 alvo; German: Bauanleitung, Satellit, I/O-Pod, Ziel-Addon.
 
 The Field Box's section has a pin table of the same kind and its two WireViz wiring drawings
