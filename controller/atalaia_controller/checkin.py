@@ -93,6 +93,7 @@ TOKEN_GRACE_S = 2 * 3600
 TOKEN_MIN_S = 60
 IDENTITY_DAYS = 365
 CHRONO_RETENTION_DAYS = 365  # the default of ``chrono_retention_days`` (the field's setting, 30-3653)
+NOTICE_CHANGED = "notice_version_changed: the privacy notice changed: read it again (GET /api/v1/checkin)"
 GAME_RETENTION_DAYS = 90     # the default of ``game_retention_days`` (decision RET-1; 90 days: maintainer decision 2026-10-30)
 GAME_RESULTS_DAYS = 365       # team results of a purged game (no player ids), kept this long after it ended (SR-88)
 RETENTION_KEYS = ("chrono_retention_days", "game_retention_days")
@@ -583,6 +584,12 @@ class Checkin:
                 "apd_verdict": apdfmt.status(st["apd"], apd, number, expires, day), "apd_verdict_on": day,
                 "federation_number": None}
 
+    def share_in_force(self, row: Optional[dict[str, Any]]) -> bool:
+        """A player's yes to sharing their position counts only if it was given under the notice in force now
+        (NV-3): a choice made under an older notice is off until they are asked again."""
+        return bool(row and row.get("position_share")
+                    and row.get("position_share_notice") == self.cfg.notice_version)
+
     @staticmethod
     def _share_fields(share: Optional[bool], notice: Any, now: float) -> dict[str, Any]:
         """The position-sharing choice with its time and the notice version it was made under."""
@@ -930,7 +937,7 @@ class Checkin:
             self._team_id(game, pref, "team_preference")
         notice = body.get("notice_version")
         if notice != self.cfg.notice_version:
-            raise Conflict("the privacy notice changed: read it again (GET /api/v1/checkin)")
+            raise Conflict(NOTICE_CHANGED)
         replicas = body.get("replicas")
         decls = None
         if replicas is not None:
@@ -1017,7 +1024,7 @@ class Checkin:
     def _token_answer(self, game: dict[str, Any], row: dict[str, Any], token: str, exp: int) -> dict[str, Any]:
         return {"game_id": game["id"], "player_id": row["player_id"], "token": token, "exp": exp,
                 "status": row["status"], "team": self._team_name(game, row["team"]), "team_id": row["team"],
-                "squad": row["squad"], "role": row["role"], "position_share": bool(row.get("position_share"))}
+                "squad": row["squad"], "role": row["role"], "position_share": self.share_in_force(row)}
 
     def _registration_proof(self, body: dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
         """``registration_id`` and ``ticket`` (both or neither): the id and the SHA-256 (hex) of the ticket."""
@@ -1091,7 +1098,7 @@ class Checkin:
                "role": row["role"], "manual": row["manual"], "checked_in_at": row["checked_in_at"],
                "seq": row["seq"], "registration_id": row.get("registration_id"),
                "registered": bool(row.get("registration_id")),
-               "position_share": bool(row.get("position_share")),
+               "position_share": self.share_in_force(row),
                "position_share_at": row.get("position_share_at"),
                "position_share_notice": row.get("position_share_notice")}
         if names:
@@ -1220,8 +1227,11 @@ class Checkin:
     def set_position_sharing(self, viewer: Viewer, body: dict[str, Any]) -> dict[str, Any]:
         """PUT /api/v1/checkin/me/position-sharing: the player turns sharing their position with the game on or
         off, at any time. Off drops the stored position at once. Recorded with the time and notice version."""
-        if set(body) - {"share_position"} or not isinstance(body.get("share_position"), bool):
-            raise ControllerError("share_position: true or false, nothing else")
+        if set(body) - {"share_position", "notice_version"} or not isinstance(body.get("share_position"), bool):
+            raise ControllerError("share_position: true or false, and optionally notice_version")
+        # An app that says which notice it showed must have shown the one in force (NV-4).
+        if "notice_version" in body and body["notice_version"] != self.cfg.notice_version:
+            raise Conflict(NOTICE_CHANGED)
         gid, pid = viewer.game_id, viewer.player_id
         game = self.store.game(gid)
         if game is None or game["state"] == "ended":

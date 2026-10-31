@@ -1303,7 +1303,7 @@ void main() {
               .encode(List.filled(32, 1))
               .replaceAll('=', ''),
           'display_name': 'Falcão',
-          'notice_version': 1,
+          'notice_version': 2,
           'registration_id': '7a000000-0000-4000-8000-000000000001',
           'ticket': base64Url.encode(List.filled(32, 9)).replaceAll('=', ''),
         }),
@@ -1943,7 +1943,7 @@ void main() {
             .encode(List.filled(32, 1))
             .replaceAll('=', ''),
         'display_name': 'Falcão Secreto',
-        'notice_version': 1,
+        'notice_version': 2,
       }),
     );
     expect(r.status, 201);

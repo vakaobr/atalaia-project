@@ -294,6 +294,35 @@ void main() {
     expect(find.byKey(const Key('checkin-notice')), findsOneWidget);
   });
 
+  testWidgets('a notice that changed while the form was open is read again, '
+      'not shown as an error, and the position box is unticked (NV-2)', (
+    tester,
+  ) async {
+    final field = FakeField();
+    await start(tester, language: AppLanguage.en, field: field);
+    await tapKey(tester, 'checkin-scan');
+    await tapKey(tester, 'checkin-notice-ok');
+    await tester.enterText(find.byKey(const Key('checkin-name')), 'Falcão');
+    await tapKey(tester, 'checkin-share-position');
+    field.notice = 2; // the field published a new notice meanwhile
+    await tapKey(tester, 'checkin-submit');
+    expect(find.byKey(const Key('checkin-notice')), findsOneWidget);
+    expect(
+      find.textContaining('The privacy notice changed. Read it and confirm'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('refused'), findsNothing);
+    expect(field.rows, isEmpty);
+    await tapKey(tester, 'checkin-notice-ok');
+    final box = tester.widget<CheckboxListTile>(
+      find.byKey(const Key('checkin-share-position')),
+    );
+    expect(box.value, false, reason: 'asked again, never ticked for them');
+    await tester.enterText(find.byKey(const Key('checkin-name')), 'Falcão');
+    await tapKey(tester, 'checkin-submit');
+    expect(field.rows.values.single['position_share'], false);
+  });
+
   testWidgets(
     'a poster with another certificate for a known field is refused',
     (tester) async {

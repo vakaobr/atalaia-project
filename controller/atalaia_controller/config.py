@@ -74,7 +74,7 @@
     urls = []                   # the poster's https addresses; empty: from tls_names and this host
     wifi_ssid = ""              # the field network's name on the poster
     limit_template = "portugal" # the chrono limits the classes come from (app/lib/chrono/limit_templates)
-    notice_version = 1          # raise it when the privacy notice changes
+    notice_version = 2          # raise it when the privacy notice changes (2: the card check and the separate position box, LEG-1..16; NV-1)
     notice_pt = ""              # privacy notice files (Markdown); empty: the default ones
     notice_en = ""
     retention_days = 30         # a check-in's personal data after its game (ADR-P4-8's guest rule)
@@ -296,7 +296,7 @@ class Config:
     checkin_urls: list[str] = field(default_factory=list)
     wifi_ssid: str = ""
     limit_template: str = "portugal"
-    notice_version: int = 1
+    notice_version: int = 2
     notice_pt: str = ""
     notice_en: str = ""
     retention_days: int = 30

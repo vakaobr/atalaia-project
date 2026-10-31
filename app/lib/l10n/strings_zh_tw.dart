@@ -497,6 +497,7 @@ const Map<String, String> zhTwStrings = {
   'checkin.connecting': '正在連線到場地控制器…',
   'checkin.notice_title': '你在{field}的資料',
   'checkin.notice_ok': '我已閱讀，繼續',
+  'checkin.notice_changed': '隱私聲明已經更新。請閱讀並再次確認。在你重新勾選之前，不會分享你的位置。',
   'checkin.trusted': '場地憑證 {ca}',
   'checkin.no_games': '這個場地目前沒有開放報到的遊戲。',
   'checkin.game': '遊戲',

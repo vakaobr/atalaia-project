@@ -106,7 +106,7 @@ void main() {
         'player_id': pid,
         'player_secret': _secret(n),
         'display_name': 'Falcão',
-        'notice_version': 1,
+        'notice_version': 2,
         ...extra,
       },
     );
@@ -342,7 +342,7 @@ void main() {
           'player_id': who,
           'player_secret': _secret(n),
           'display_name': 'Falcão',
-          'notice_version': 1,
+          'notice_version': 2,
           'apd_id': 'apd-a',
           'membership_number': number,
           'membership_expires': '2100-01-31',
@@ -473,7 +473,7 @@ void main() {
       expect(row(gid, silent['player_id']! as String)['position_share'], false);
       expect(
         row(gid, silent['player_id']! as String)['position_share_notice'],
-        1,
+        2,
       );
       expect(checkIn(gid, {'share_position': 'yes'}).status, 400);
     });
@@ -498,7 +498,7 @@ void main() {
         expect(r.status, 200, reason: '${r.body}');
         expect(asMap(r)['position_share'], false);
         expect(asMap(r)['position_share_at'], t0 + 60);
-        expect(asMap(r)['position_share_notice'], 1);
+        expect(asMap(r)['position_share_notice'], 2);
         expect(positions(), isEmpty);
         expect(position(tok, 2000).status, 409);
         expect(
@@ -521,6 +521,51 @@ void main() {
       },
     );
 
+    test('a notice bump turns an older yes off until asked again (NV-3)', () {
+      final me = asMap(checkIn(gid, {'share_position': true}));
+      final tok = me['token']! as String;
+      expect(position(tok, 1000).status, 200);
+      // The field raises the notice version (a restart with the new config).
+      ControllerCheckin(
+        engine,
+        CheckinConfig(
+          limitsYaml: limits,
+          utcDay: true,
+          apdsJson: _list,
+          country: 'PT',
+          noticeVersion: 3,
+        ),
+      );
+      final r = position(tok, 2000);
+      expect(r.status, 409, reason: '${r.body}');
+      expect('${(r.body! as Map)['detail']}', contains('position_sharing_off'));
+      expect(
+        (call('GET', '/api/v1/positions').body! as Map)['positions'],
+        <Object?>[],
+      );
+      expect(
+        asMap(call('GET', '/api/v1/checkin/me', token: tok))['position_share'],
+        false,
+      );
+      // An old-version check-in is refused with the code the app reads.
+      final stale = checkIn(gid, {'share_position': true});
+      expect(stale.status, 409);
+      expect(
+        '${(stale.body! as Map)['detail']}',
+        startsWith('notice_version_changed'),
+      );
+      // The switch names the notice shown: stale refused, current accepted.
+      ApiResponse put(int v) => call(
+        'PUT',
+        '/api/v1/checkin/me/position-sharing',
+        token: tok,
+        body: {'share_position': true, 'notice_version': v},
+      );
+      expect(put(2).status, 409);
+      expect(put(3).status, 200);
+      expect(position(tok, 3000).status, 200);
+    });
+
     test('a hand check-in records the choice, and leaving drops it', () {
       var r = call(
         'POST',
@@ -528,7 +573,7 @@ void main() {
         body: {'display_name': 'Ana', 'share_position': true},
       );
       expect(asMap(r)['position_share'], true);
-      expect(asMap(r)['position_share_notice'], 1);
+      expect(asMap(r)['position_share_notice'], 2);
       r = call(
         'POST',
         '/api/v1/games/$gid/checkins',

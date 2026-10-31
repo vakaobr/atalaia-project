@@ -48,7 +48,7 @@ class CheckinTests(P3Case):
         self.assertEqual(info["field"]["id"], "field")
         self.assertEqual(info["settings"]["confirm"], "auto")
         self.assertIn("rifle", info["limits"]["classes"])
-        self.assertEqual(info["notice"]["version"], 1)
+        self.assertEqual(info["notice"]["version"], 2)
         self.assertIn("30", info["notice"]["pt"])  # the retention in the default notice
         self.assertNotIn("Falc", self.client.get("/api/v1/checkin").text)
         self.client.post(f"/api/v1/games/{g['id']}/checkin/close", headers=GM)
@@ -97,7 +97,7 @@ class CheckinTests(P3Case):
         self.client.post(f"/api/v1/games/{g['id']}/checkin/open", headers=GM)
         self.check_in(g["id"], expect=201)
         self.check_in(g["id"], name="", expect=400)
-        self.check_in(g["id"], notice_version=2, expect=409)
+        self.check_in(g["id"], notice_version=1, expect=409)
         self.check_in(9999 if g["id"] != 9999 else 9998, expect=404)
         r = self.client.post("/api/v1/checkin", json={"game_id": g["id"], "player_id": "x"})
         self.assertEqual(r.status_code, 400)

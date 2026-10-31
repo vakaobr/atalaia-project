@@ -193,7 +193,7 @@ class PositionSharingTests(P3Case):
         silent = self.check_in(self.gid, name="Rui", share_position=None)  # an older app says nothing: not sharing
         row = self.ctrl.store.checkin(self.gid, silent["player_id"])
         self.assertEqual(row["position_share"], False)
-        self.assertEqual(row["position_share_notice"], 1)
+        self.assertEqual(row["position_share_notice"], 2)
         self.assertEqual(row["position_share_at"], T0)
         for who in (no, silent):
             self.assertEqual(who["status"], "checked_in")  # the check-in and the game go on (Art. 7(4))
@@ -201,6 +201,34 @@ class PositionSharingTests(P3Case):
             self.assertEqual(r.status_code, 409, r.text)
             self.assertIn("position_sharing_off", r.text)
         self.assertEqual(self.report(yes["token"]).status_code, 200)
+
+    def test_a_notice_bump_turns_an_older_yes_off_until_asked_again(self):
+        """NV-3: a yes given under an older notice is not a yes under the new one."""
+        me = self.check_in(self.gid, share_position=True)
+        self.assertEqual(self.report(me["token"]).status_code, 200)
+        self.assertEqual(len(self.client.get("/api/v1/positions", headers=GM).json()["positions"]), 1)
+        self.svc.cfg.notice_version = 3  # the field raises the version
+        r = self.report(me["token"], 2000)
+        self.assertEqual(r.status_code, 409, r.text)
+        self.assertIn("position_sharing_off", r.text)
+        self.assertEqual(self.client.get("/api/v1/positions", headers=GM).json()["positions"], [])
+        mine = self.client.get("/api/v1/checkin/me", headers=bearer(me["token"])).json()
+        self.assertFalse(mine["position_share"])
+        # A check-in with the old version is refused with a code the app turns into "read it again".
+        r = self.client.post("/api/v1/checkin", json={
+            "game_id": self.gid, "player_id": me["_ident"][0], "player_secret": me["_ident"][1],
+            "display_name": "Falcão", "notice_version": 2, "share_position": True})
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("notice_version_changed", r.text)
+        # The switch in the app names the notice it showed: a stale one is refused, the current one is a new yes.
+        put = lambda body: self.client.put("/api/v1/checkin/me/position-sharing", headers=bearer(me["token"]),
+                                           json=body)
+        stale = put({"share_position": True, "notice_version": 2})
+        self.assertEqual(stale.status_code, 409)
+        self.assertIn("notice_version_changed", stale.text)
+        self.assertFalse(self.client.get("/api/v1/checkin/me", headers=bearer(me["token"])).json()["position_share"])
+        self.assertEqual(put({"share_position": True, "notice_version": 3}).status_code, 200)
+        self.assertEqual(self.report(me["token"], 3000).status_code, 200)
 
     def test_the_player_stops_and_starts_any_time_and_stopping_drops_the_position(self):
         me = self.check_in(self.gid, share_position=True)
@@ -211,7 +239,7 @@ class PositionSharingTests(P3Case):
                             json={"share_position": False})
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual((r.json()["position_share"], r.json()["position_share_at"],
-                          r.json()["position_share_notice"]), (False, T0 + 60, 1))
+                          r.json()["position_share_notice"]), (False, T0 + 60, 2))
         self.assertEqual(self.client.get("/api/v1/positions", headers=GM).json()["positions"], [])
         self.assertEqual(self.report(me["token"], 2000).status_code, 409)
         bad = self.client.put("/api/v1/checkin/me/position-sharing", headers=bearer(me["token"]),
@@ -235,7 +263,7 @@ class PositionSharingTests(P3Case):
         r = self.client.post(f"/api/v1/games/{self.gid}/checkins", headers=GM,
                              json={"display_name": "Ana", "share_position": True})
         self.assertEqual((r.status_code, r.json()["position_share"], r.json()["position_share_notice"]),
-                         (201, True, 1))
+                         (201, True, 2))
         r = self.client.post(f"/api/v1/games/{self.gid}/checkins", headers=GM, json={"display_name": "Rui"})
         self.assertEqual(r.json()["position_share"], False)
 

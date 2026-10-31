@@ -82,7 +82,7 @@ No names are ever in it. The app shows the notice once per field and version, th
 ```json
 {"game_id": 4242, "player_id": "p-abcdefgh2345", "player_secret": "<43 characters>",
  "display_name": "Falcão", "federation_number": "12345", "team_preference": "red",
- "notice_version": 1, "share_position": false, "replicas": [ <declarations> ]}
+ "notice_version": 2, "share_position": false, "replicas": [ <declarations> ]}
 ```
 
 `federation_number`, `team_preference`, `share_position` and `replicas` are optional. A registered player's app adds `"registration_id"` (the site server's registration, a lowercase UUID) and `"ticket"` (the ticket secret, 43 characters of base64url without padding), always together ([Registered players](#registered-players)). Answers 201 (a new check-in) or 200 (the same identity again), with no caching:
@@ -92,7 +92,7 @@ No names are ever in it. The app shows the notice once per field and version, th
  "status": "checked_in", "team": null, "team_id": 0, "squad": 0, "role": "player"}
 ```
 
-Errors: 400 (a field out of its rules), 403 (check-in closed, the game full, a poster pinned to another game, or staff removed this check-in), 404 (no such game), 409 (a known id with another secret, or `notice_version` is not the current one: read the notice again), 429 (too many from this address).
+Errors: 400 (a field out of its rules), 403 (check-in closed, the game full, a poster pinned to another game, or staff removed this check-in), 404 (no such game), 409 (a known id with another secret, or `notice_version` is not the current one: the detail starts with `notice_version_changed`, and the app fetches the notice again, shows it and asks the player to confirm; the default notice version is 2 since the card check and the separate position box, decision NV-1), 429 (too many from this address).
 
 - `display_name`: 1-32 characters, no control characters (a callsign or a first name; what the player wants).
 - `federation_number`: 1-32 printable characters, **never verified automatically**. With `federation = "off"` it is dropped; with `"required"` the check-in is refused without one. Staff tick "card seen" (`federation_seen`).
@@ -111,7 +111,7 @@ The **player token** is `protocol/player-token.md`'s, keyed with the controller'
 | --- | --- | --- |
 | GET | `/api/v1/checkin/me` | The check-in with its fields and the declaration with states; `stale_token` when the token no longer matches the row; for the role `marshal`, also `marshal` (below) |
 | PUT | `/api/v1/checkin/me/replicas` | `{"replicas": [ <declarations> ]}` replaces the declaration |
-| PUT | `/api/v1/checkin/me/position-sharing` | `{"share_position": true or false}`: the player turns sharing their position with the game on or off, any time during the game; answers the check-in with the choice. 400 for anything else, 409 once the game ended or the check-in is over. See [Sharing the position](#sharing-the-position) |
+| PUT | `/api/v1/checkin/me/position-sharing` | `{"share_position": true or false, "notice_version"?}`: the player turns sharing their position with the game on or off, any time during the game; answers the check-in with the choice. A `notice_version` that is not the current one is 409 `notice_version_changed` (the app names the notice it showed). 400 for anything else, 409 once the game ended or the check-in is over. See [Sharing the position](#sharing-the-position) |
 | DELETE | `/api/v1/checkin/me` | Leave the game: status `left`, the name, federation number, card check and team preference erased, the position choice off and the stored position dropped, pending declarations withdrawn |
 | PUT | `/api/v1/checkin/me/marshal-key` | A marshal on the GM's list registers `{"public_key", "marshal_id"?}`, the Ed25519 key that signs their readings, for the id the list gave them (`marshal_id`, if sent, must be that one: 409; not on the list: 403) |
 | POST | `/api/v1/positions` | Player positions (ADR-P3-6); taken only from a player who chose to share (below) |
@@ -131,6 +131,7 @@ game mode allows (ADR-P3-6), the marshals and the GM, and the remote GM only whe
   off) and `position_share_notice` (the privacy notice version in force). They are in `GET /api/v1/checkin/me`, in the
   staff rows and in the player's own stream view. A check-in that says nothing records `false` with its time; a later
   `POST /api/v1/checkin` that sends `share_position` changes it, one that does not leaves it.
+- **A yes counts only under the notice in force** (decision NV-3). When the field raises `notice_version`, a choice recorded under an older version is off: `POST /api/v1/positions` is 409 `position_sharing_off`, `position_share` reads `false` in the answers and the stored position is not shown, until the player says yes again under the new notice (a check-in or the PUT above). The row keeps what was recorded.
 - **The app's own switch is the same choice** ("Share my position with the game during this game" at check-in, still
   changeable during the game): the app starts reporting when the row says yes and records every switch with the PUT
   above. An older controller without the route answers 404/405: the app then goes on as before.

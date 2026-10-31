@@ -155,7 +155,7 @@ class P3Case(unittest.TestCase):
                  expect: int = 201, **extra: Any) -> dict[str, Any]:
         pid, secret = ident or new_identity()
         body = {"game_id": game_id, "player_id": pid, "player_secret": secret, "display_name": name,
-                "notice_version": 1, "share_position": True, **extra}
+                "notice_version": 2, "share_position": True, **extra}
         if body["share_position"] is None:  # a client that says nothing (an older app)
             del body["share_position"]
         r = self.client.post("/api/v1/checkin", json=body, headers={"X-Forwarded-For": "ignored"})

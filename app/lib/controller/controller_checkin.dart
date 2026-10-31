@@ -65,6 +65,13 @@ final _marshalIdRe = RegExp(r'^[A-Za-z0-9._:-]{1,64}$');
 final _hex64 = RegExp(r'^[0-9a-fA-F]{64}$');
 final _base64Re = RegExp(r'^[A-Za-z0-9+/]*={0,2}$');
 final _noticeHeader = RegExp(r'^<!--.*?-->\s*', dotAll: true);
+
+/// The 409 for a stale privacy-notice version; the app reads the code before
+/// the colon and asks the player to read the notice again (NV-2).
+const noticeChanged =
+    'notice_version_changed: the privacy notice changed: read it again '
+    '(GET /api/v1/checkin)';
+
 const _base32 = 'abcdefghijklmnopqrstuvwxyz234567';
 
 const replicaTypes = [
@@ -205,7 +212,7 @@ class CheckinConfig {
     this.ratePerMinute = 10,
     this.urls = const [],
     this.wifiSsid = '',
-    this.noticeVersion = 1,
+    this.noticeVersion = 2,
     this.noticePt = '',
     this.noticeEn = '',
     this.apdsJson = '',
@@ -1175,6 +1182,14 @@ class ControllerCheckin {
   /// Who ticked the card: the marshal's player id, or "gm" for the GM token.
   static String _staffId(ApiViewer viewer) => viewer.playerId ?? 'gm';
 
+  /// A player's yes to sharing their position counts only if it was given
+  /// under the notice in force now (NV-3): a choice made under an older
+  /// notice is off until they are asked again.
+  bool shareInForce(Map<String, Object?>? row) =>
+      row != null &&
+      row['position_share'] == true &&
+      row['position_share_notice'] == config.noticeVersion;
+
   /// The position-sharing choice with its time and notice version.
   Map<String, Object?> _shareFields(bool? share, Object? notice, double now) =>
       {
@@ -1768,9 +1783,7 @@ class ControllerCheckin {
     if (pref != null) _teamId(game, pref, 'team_preference');
     final notice = body['notice_version'];
     if (notice != config.noticeVersion) {
-      throw ControllerError.conflict(
-        'the privacy notice changed: read it again (GET /api/v1/checkin)',
-      );
+      throw ControllerError.conflict(noticeChanged);
     }
     final replicas = body['replicas'];
     final decls = replicas == null ? null : _checkDeclarations(replicas, st);
@@ -1933,7 +1946,7 @@ class ControllerCheckin {
     'team_id': row['team'],
     'squad': row['squad'],
     'role': row['role'],
-    'position_share': row['position_share'] == true,
+    'position_share': shareInForce(row),
   };
 
   /// `registration_id` and `ticket` (both or neither): the id and the
@@ -2063,7 +2076,7 @@ class ControllerCheckin {
       'seq': row['seq'],
       'registration_id': row['registration_id'],
       'registered': _truthy(row['registration_id']),
-      'position_share': row['position_share'] == true,
+      'position_share': shareInForce(row),
       'position_share_at': row['position_share_at'],
       'position_share_notice': row['position_share_notice'],
     };
@@ -2393,9 +2406,17 @@ class ControllerCheckin {
     ApiViewer viewer,
     Map<String, Object?> body,
   ) {
-    if (body.keys.any((k) => k != 'share_position') ||
+    if (body.keys.any((k) => k != 'share_position' && k != 'notice_version') ||
         body['share_position'] is! bool) {
-      throw ControllerError('share_position: true or false, nothing else');
+      throw ControllerError(
+        'share_position: true or false, and optionally notice_version',
+      );
+    }
+    // An app that says which notice it showed must have shown the one in
+    // force (NV-4).
+    if (body.containsKey('notice_version') &&
+        body['notice_version'] != config.noticeVersion) {
+      throw ControllerError.conflict(noticeChanged);
     }
     final gid = viewer.gameId!, pid = viewer.playerId!;
     final game = engine.store.game(gid);

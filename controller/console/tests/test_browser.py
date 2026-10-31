@@ -4164,7 +4164,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         secret = b64.urlsafe_b64encode(os.urandom(32)).rstrip(b"=").decode("ascii")
         r = httpx.post(self.field.base + "/api/v1/checkin", json={
             "game_id": game_id, "player_id": pid, "player_secret": secret, "display_name": name,
-            "notice_version": 1, **extra}, timeout=10)
+            "notice_version": 2, **extra}, timeout=10)
         self.assertIn(r.status_code, (200, 201), r.text)
         return r.json()
 

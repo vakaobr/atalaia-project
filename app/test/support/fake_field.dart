@@ -258,7 +258,12 @@ class FakeField {
         });
       case 'POST /checkin':
         final pid = b['player_id']! as String;
-        if (b['notice_version'] != notice) return err(409, 'notice changed');
+        if (b['notice_version'] != notice) {
+          return err(
+            409,
+            'notice_version_changed: the privacy notice changed: read it again',
+          );
+        }
         final known = secrets[pid];
         if (known != null && known != b['player_secret']) {
           return err(409, 'someone else');
@@ -321,6 +326,12 @@ class FakeField {
         });
       case 'PUT /checkin/me/position-sharing':
         if (who == null) return err(401, 'no');
+        if (b.containsKey('notice_version') && b['notice_version'] != notice) {
+          return err(
+            409,
+            'notice_version_changed: the privacy notice changed: read it again',
+          );
+        }
         rows[who]!['position_share'] = b['share_position'] == true;
         return FieldResponse(200, {
           'player_id': who,

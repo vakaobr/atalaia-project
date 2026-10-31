@@ -758,6 +758,63 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
+  /// The field's notice changed since the player read it: fetch the new text,
+  /// show it with "read and confirm", remember the version the player
+  /// confirmed and return it; null when they decline or it cannot be read.
+  /// Sharing stays off meanwhile (NV-4).
+  Future<int?> _readNoticeAgain(CheckinClient client, String fieldId) async {
+    final s = context.s;
+    final app = AppScope.read(context);
+    final FieldInfo info;
+    try {
+      info = await client.info();
+    } on CheckinException catch (e) {
+      if (mounted) setState(() => _shareError = e.message);
+      return null;
+    }
+    if (!mounted) return null;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        key: const Key('player-notice-changed'),
+        title: Text(s.t('checkin.notice_title', {'field': info.fieldName})),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(s.t('checkin.notice_changed')),
+              const SizedBox(height: 12),
+              Text(
+                info
+                    .noticeText(s.code)
+                    .replaceAll('**', '')
+                    .replaceAll('*', ''),
+                key: const Key('player-notice-text'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            key: const Key('player-notice-cancel'),
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(s.t('common.cancel')),
+          ),
+          FilledButton(
+            key: const Key('player-notice-ok'),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(s.t('checkin.notice_ok')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return null;
+    await app.update(
+      (x) => x.noticeSeen = {...x.noticeSeen, fieldId: info.noticeVersion},
+    );
+    return info.noticeVersion;
+  }
+
   /// The player's choice, kept on the check-in with its time and the notice
   /// version (decision LEG-12). Stopping never fails; a controller from
   /// before the route (404/405) just goes on as it did.
@@ -765,10 +822,34 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final field = widget.link.field;
     if (field == null) return true;
     final http = _http ??= context.services.fieldHttp(field);
+    final client = CheckinClient(http);
+    final app = AppScope.read(context);
     try {
-      await CheckinClient(http).setPositionSharing(feed.link.token, on);
+      // The notice this phone showed for the field, so a controller whose
+      // notice moved on asks again instead of recording a yes to text the
+      // player never saw (NV-4).
+      await client.setPositionSharing(
+        feed.link.token,
+        on,
+        noticeVersion: on ? app.settings.noticeSeen[field.fieldId] : null,
+      );
       return true;
     } on CheckinException catch (e) {
+      if (on && e.noticeChanged) {
+        final fresh = await _readNoticeAgain(client, field.fieldId);
+        if (fresh == null) return false;
+        try {
+          await client.setPositionSharing(
+            feed.link.token,
+            true,
+            noticeVersion: fresh,
+          );
+          return true;
+        } on CheckinException catch (e2) {
+          if (mounted) setState(() => _shareError = e2.message);
+          return false;
+        }
+      }
       if (!on || e.status == 404 || e.status == 405) return true;
       if (mounted) setState(() => _shareError = e.message);
       return false;

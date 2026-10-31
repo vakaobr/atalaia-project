@@ -200,7 +200,12 @@ class _CheckinScreenState extends State<CheckinScreen> {
     final f = _field!;
     final v = _info!.noticeVersion;
     await app.update((x) => x.noticeSeen = {...x.noticeSeen, f.fieldId: v});
-    if (mounted) setState(() => _step = _Step.form);
+    if (mounted) {
+      setState(() {
+        _step = _Step.form;
+        _error = null;
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -315,6 +320,34 @@ class _CheckinScreenState extends State<CheckinScreen> {
       );
     } on CheckinException catch (e) {
       if (!mounted) return;
+      if (e.noticeChanged) {
+        // The field's notice moved on since the player read it (NV-2): not a
+        // raw error. Fetch the new text, show it, and ask again; the position
+        // box goes back to unticked.
+        try {
+          final fresh = await _client!.info();
+          if (!mounted) return;
+          final seen = AppScope.read(context).settings.noticeSeen;
+          if (seen[field.fieldId] == fresh.noticeVersion) {
+            // Seen already, yet refused: forget it so the text shows again.
+            await app.update(
+              (x) => x.noticeSeen = {...x.noticeSeen}..remove(field.fieldId),
+            );
+          }
+          if (!mounted) return;
+          setState(() {
+            _info = fresh;
+            _share = false;
+            _step = _Step.notice;
+            _error = 'checkin.notice_changed';
+            _errorArgs = const {};
+          });
+          return;
+        } on CheckinException catch (_) {
+          if (!mounted) return;
+          // Could not fetch it: the generic error below.
+        }
+      }
       setState(() {
         _step = _Step.form;
         _error = e.offline ? 'checkin.unreachable' : 'checkin.error';

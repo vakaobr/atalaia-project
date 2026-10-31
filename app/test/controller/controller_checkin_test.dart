@@ -107,7 +107,7 @@ void main() {
         'player_id': pid,
         'player_secret': _secret(players),
         'display_name': name,
-        'notice_version': 1,
+        'notice_version': 2,
         'replicas': ?replicas,
       },
     );

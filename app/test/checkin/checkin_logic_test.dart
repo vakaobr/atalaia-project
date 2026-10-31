@@ -229,7 +229,11 @@ void main() {
         throwsA(
           isA<CheckinException>()
               .having((e) => e.status, 'status', 409)
-              .having((e) => e.message, 'message', 'notice changed'),
+              .having(
+                (e) => e.message,
+                'message',
+                'notice_version_changed: the privacy notice changed: read it again',
+              ),
         ),
       );
       field.offline = true;

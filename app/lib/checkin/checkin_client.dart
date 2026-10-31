@@ -211,6 +211,14 @@ class CheckinException implements Exception {
 
   bool get offline => status == 0;
 
+  /// The controller's privacy notice is not the version the app showed (409
+  /// `notice_version_changed`; an older controller's text said "privacy
+  /// notice changed"): read the notice again, do not show a raw error.
+  bool get noticeChanged =>
+      status == 409 &&
+      (message.startsWith('notice_version_changed') ||
+          message.contains('privacy notice changed'));
+
   @override
   String toString() => 'CheckinException($status): $message';
 }
@@ -511,13 +519,19 @@ class CheckinClient {
 
   /// The player turns sharing their position with the game on or off, any
   /// time (an older controller has no such route: 404 or 405).
-  Future<Map<String, Object?>> setPositionSharing(String token, bool on) =>
-      _call(
-        'PUT',
-        '/checkin/me/position-sharing',
-        token: token,
-        body: {'share_position': on},
-      );
+  ///
+  /// [noticeVersion] is the notice the player was shown; a controller whose
+  /// notice moved on refuses with 409 `notice_version_changed` (NV-4).
+  Future<Map<String, Object?>> setPositionSharing(
+    String token,
+    bool on, {
+    int? noticeVersion,
+  }) => _call(
+    'PUT',
+    '/checkin/me/position-sharing',
+    token: token,
+    body: {'share_position': on, 'notice_version': ?noticeVersion},
+  );
 
   Future<Map<String, Object?>> manualCheckin(
     String token,

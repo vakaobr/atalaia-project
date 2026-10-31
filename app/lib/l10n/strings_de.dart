@@ -601,6 +601,8 @@ const Map<String, String> deStrings = {
   'checkin.connecting': 'Verbindung zum Controller des Felds…',
   'checkin.notice_title': 'Deine Daten bei {field}',
   'checkin.notice_ok': 'Gelesen, weiter',
+  'checkin.notice_changed':
+      'Der Datenschutzhinweis hat sich geändert. Lies ihn und bestätige erneut. Das Teilen deiner Position bleibt aus, bis du es neu ankreuzt.',
   'checkin.trusted': 'Zertifikat des Felds {ca}',
   'checkin.no_games': 'An diesem Feld ist kein Spiel für den Check-in offen.',
   'checkin.game': 'Spiel',

@@ -99,7 +99,7 @@ void main() {
               .encode(List.filled(32, 1))
               .replaceAll('=', ''),
           'display_name': 'r1',
-          'notice_version': 1,
+          'notice_version': 2,
         }),
       );
       expect(checkedIn.status, 201);

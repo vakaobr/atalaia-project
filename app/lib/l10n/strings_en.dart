@@ -573,6 +573,8 @@ const Map<String, String> enStrings = {
   'checkin.connecting': 'Connecting to the field\'s controller…',
   'checkin.notice_title': 'Your data at {field}',
   'checkin.notice_ok': 'I have read it, go on',
+  'checkin.notice_changed':
+      'The privacy notice changed. Read it and confirm again. Sharing your position stays off until you tick it again.',
   'checkin.trusted': 'Field certificate {ca}',
   'checkin.no_games': 'No game is open for check-in at this field.',
   'checkin.game': 'Game',

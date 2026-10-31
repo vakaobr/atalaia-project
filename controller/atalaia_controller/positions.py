@@ -153,13 +153,23 @@ class Positions:
                 return True
         return False
 
+    def _share_ok(self, row: Optional[dict[str, Any]]) -> bool:
+        """The player's yes to sharing, under the notice in force (a bare controller in a test has no check-in
+        service: the stored flag alone)."""
+        svc = self.ctrl.checkin
+        if svc is None:
+            return bool(row and row.get("position_share"))
+        return svc.share_in_force(row)
+
     def visible(self, viewer: "Viewer", game_id: Optional[int] = None) -> list[dict[str, Any]]:
         if game_id is None:
             game_id = viewer.game_id if viewer.kind == "player" else (
                 self.ctrl.game["id"] if self.ctrl.game else None)
         if game_id is None:
             return []
-        return [p for p in self.ctrl.store.player_positions(game_id).values() if self.can_see(viewer, p)]
+        rows = {r["player_id"]: r for r in self.ctrl.store.checkins(game_id)}
+        return [p for p in self.ctrl.store.player_positions(game_id).values()
+                if self.can_see(viewer, p) and (self.ctrl.checkin is None or self._share_ok(rows.get(p["player_id"])))]
 
     # --- reports -------------------------------------------------------------------
 
@@ -171,7 +181,7 @@ class Positions:
             raise ControllerError(f"reports: 1 to {REPORTS_MAX} position reports")
         checked = [check_report(r) for r in items]
         row = self.ctrl.store.checkin(viewer.game_id, viewer.player_id)
-        if row is None or not row.get("position_share"):
+        if not self._share_ok(row):
             # Sharing is the player's own choice at check-in (an unticked box), changeable any time; declining
             # never blocks the check-in or the game (GDPR Art. 7(4)).
             raise Conflict("position_sharing_off: this player did not choose to share their position")

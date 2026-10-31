@@ -245,7 +245,7 @@ class ArrivalTests(GameDayCase):
         self.app_checkin(self.gid, new_identity(), self.reg, self.ticket_text, expect=409)
         r = self.client.post("/api/v1/checkin", json={"game_id": self.gid, "player_id": self.ident[0],
                                                       "player_secret": self.ident[1], "display_name": "F",
-                                                      "notice_version": 1, "registration_id": self.reg["registration_id"]})
+                                                      "notice_version": 2, "registration_id": self.reg["registration_id"]})
         self.assertEqual(r.status_code, 400)
         out = self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text)
         self.assertEqual((out["status"], out["token"][:5]), ("checked_in", "apt1."))

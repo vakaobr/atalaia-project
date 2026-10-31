@@ -589,6 +589,8 @@ const Map<String, String> ptStrings = {
   'checkin.connecting': 'A ligar ao controlador do campo…',
   'checkin.notice_title': 'Os teus dados em {field}',
   'checkin.notice_ok': 'Li e quero continuar',
+  'checkin.notice_changed':
+      'O aviso de privacidade mudou. Lê-o e confirma outra vez. A partilha da tua posição fica desligada até a marcares de novo.',
   'checkin.trusted': 'Certificado do campo {ca}',
   'checkin.no_games': 'Não há nenhum jogo aberto para check-in neste campo.',
   'checkin.game': 'Jogo',
