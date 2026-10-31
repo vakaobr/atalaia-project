@@ -401,9 +401,13 @@ gifs:
 screens:
   title: 實際畫面
   intro: >-
-    八張擷取自真正 Field Box 韌體（ESP32、LVGL 9.2、320&nbsp;×&nbsp;240&nbsp;TFT）的畫面，在
-    <a href="https://wokwi.com">Wokwi</a> 模擬器中執行。這裡的盒子介面是英文的。韌體現在已經能在真實的
-    Heltec V4.3 上執行；這些截圖來自模擬器。點一下截圖可以看大圖。
+    三種模式在盒子上的樣子：動畫由 Field Box 韌體自己的程式碼繪製，不是後製的示意圖。每張圖下方的按鈕可以暫停動畫。再往下是 App 的截圖。
+  gifs_more: 看全部模式 →
+  box_title: 盒子的畫面，一步一步來
+  box_intro: >-
+    八張擷取自真正 Field Box 韌體（ESP32、LVGL 9.2、320&nbsp;×&nbsp;240&nbsp;TFT）的畫面，在 <a
+    href="https://wokwi.com">Wokwi</a> 模擬器中執行，從遊戲管理員的 PIN 碼到拆除炸彈。這裡的盒子介面是英文的。韌體現在已經能在真實的 Heltec V4.3
+    上執行；這些截圖來自模擬器。點一下截圖可以看大圖。
   note: >-
     <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">組裝手冊</a>
     （英文）有 Heltec WiFi LoRa 32&nbsp;V4 的完整接線圖和第一次燒錄的教學。

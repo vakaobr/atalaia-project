@@ -539,10 +539,15 @@ gifs:
 screens:
   title: What it looks like
   intro: >-
+    Three modes as the box shows them: animations drawn by the Field Box's own firmware code, not
+    mocked up. The button under each picture pauses it. Further down, the app's screenshots.
+  gifs_more: See every mode →
+  box_title: The box's screens, step by step
+  box_intro: >-
     Eight captures from the real Field Box firmware (ESP32, LVGL 9.2, 320&nbsp;×&nbsp;240&nbsp;TFT)
-    running in the <a href="https://wokwi.com">Wokwi</a> emulator. The box UI is in English.
-    The firmware now runs on a real Heltec V4.3; these screenshots are from the emulator. Tap or
-    click a screenshot to see it larger.
+    running in the <a href="https://wokwi.com">Wokwi</a> emulator, from the game master's PIN to the
+    bomb being defused. The box UI is in English. The firmware now runs on a real Heltec V4.3; these
+    screenshots are from the emulator. Tap or click a screenshot to see it larger.
   note: >-
     The <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">build
     manual</a> has the full wiring diagram and first-flash guide for the Heltec WiFi LoRa 32&nbsp;V4.

@@ -72,6 +72,42 @@ class SiteFlags(unittest.TestCase):
                 self.assertEqual(errors, [])
                 ctx.close()
 
+    def test_mode_animations_and_box_screens(self):
+        """The main page shows three mode GIFs with working play/pause buttons; the modes page holds the box's stills."""
+        for lang_dir, modes_dir in (("", "modos/"), ("en/", "en/modes/"), ("de/", "de/modi/"), ("zh-tw/", "zh-tw/modes/")):
+            for width in (375, 768, 1280):
+                for reduced in ("no-preference", "reduce"):
+                    ctx = self.browser.new_context(viewport={"width": width, "height": 800}, reduced_motion=reduced)
+                    page = ctx.new_page()
+                    with self.subTest(lang=lang_dir, width=width, motion=reduced):
+                        page.goto(self.base + lang_dir, wait_until="load")
+                        figures = page.query_selector_all(".gif-row figure.modegif")
+                        self.assertEqual(len(figures), 3)
+                        self.assertEqual(len(page.query_selector_all(".gif-row button.modegif-button")), 3)
+                        self.assertEqual(len(page.query_selector_all("a.zoom[href*='bomb-']")), 0)
+                        self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                        for fig in figures:
+                            fig.scroll_into_view_if_needed()
+                            page.wait_for_function("(f) => f.querySelector('img').complete", arg=fig)
+                        src = page.evaluate("document.querySelector('.gif-row img').currentSrc")
+                        self.assertEqual(src.endswith("-still.gif"), reduced == "reduce")
+                        button = page.query_selector(".gif-row button.modegif-button")
+                        button.focus()
+                        self.assertNotEqual(button.evaluate("(b) => getComputedStyle(b).outlineStyle"), "none")
+                        before = button.inner_text()
+                        page.keyboard.press("Enter")
+                        self.assertNotEqual(button.inner_text(), before)
+                        now = page.evaluate("document.querySelector('.gif-row img').currentSrc")
+                        self.assertEqual(now.endswith("-still.gif"), reduced == "no-preference")
+                        page.goto(self.base + modes_dir, wait_until="load")
+                        self.assertEqual(len(page.query_selector_all("[aria-labelledby=box-screens] a.zoom")), 8)
+                        self.assertGreaterEqual(len(page.query_selector_all("figure.modegif button.modegif-button")), 14)
+                        self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                        page.click("[aria-labelledby=box-screens] a.zoom")
+                        self.assertTrue(page.evaluate("document.getElementById('viewer').open"))
+                        page.keyboard.press("Escape")
+                    ctx.close()
+
     def check_page(self, page, url, width):
         page.goto(url, wait_until="load")
         page.evaluate("document.fonts.ready")

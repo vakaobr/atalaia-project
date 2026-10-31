@@ -571,10 +571,17 @@ gifs:
 screens:
   title: So sieht es aus
   intro: >-
-    Acht Aufnahmen der echten Firmware der Field Box (ESP32, LVGL 9.2, 320&nbsp;×&nbsp;240&nbsp;TFT),
-    die im Emulator <a href="https://wokwi.com">Wokwi</a> läuft. Die Oberfläche der Box ist hier auf
-    Englisch. Die Firmware läuft inzwischen auf einem echten Heltec V4.3; diese Bilder stammen aus dem
-    Emulator. Tippe oder klicke auf ein Bild, um es größer zu sehen.
+    Drei Modi, wie die Box sie zeigt: Animationen, die der Code der Field-Box-Firmware selbst
+    zeichnet, nicht nachgebaut. Die Schaltfläche unter jedem Bild pausiert es. Weiter unten die
+    Screenshots der App.
+  gifs_more: Alle Modi ansehen →
+  box_title: Die Bildschirme der Box, Schritt für Schritt
+  box_intro: >-
+    Acht Aufnahmen der echten Firmware der Field Box (ESP32, LVGL 9.2,
+    320&nbsp;×&nbsp;240&nbsp;TFT), die im Emulator <a href="https://wokwi.com">Wokwi</a> läuft, von
+    der PIN der Spielleitung bis zum Entschärfen der Bombe. Die Oberfläche der Box ist hier auf
+    Englisch. Die Firmware läuft inzwischen auf einem echten Heltec V4.3; diese Bilder stammen aus
+    dem Emulator. Tippe oder klicke auf ein Bild, um es größer zu sehen.
   note: >-
     Das <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">Bauhandbuch</a>
     (auf Englisch und Portugiesisch) enthält den vollständigen Schaltplan und die Anleitung zum ersten Flashen für den

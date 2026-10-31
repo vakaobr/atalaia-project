@@ -554,10 +554,16 @@ gifs:
 screens:
   title: O que se vê
   intro: >-
-    Oito capturas do firmware real da Field Box (ESP32, LVGL 9.2, ecrã de 320&nbsp;×&nbsp;240)
-    a correr no emulador <a href="https://wokwi.com">Wokwi</a>. A interface da caixa está em inglês.
-    O firmware já corre numa Heltec V4.3 a sério; as capturas são do emulador. Toca ou clica numa
-    captura para a ver em grande.
+    Três modos, tal como a caixa os mostra: animações desenhadas pelo código do próprio firmware da
+    Field Box, não maquetadas. O botão por baixo de cada imagem pausa-a. Mais abaixo, as capturas da
+    aplicação.
+  gifs_more: Ver todos os modos →
+  box_title: Os ecrãs da caixa, passo a passo
+  box_intro: >-
+    Oito capturas do firmware real da Field Box (ESP32, LVGL 9.2, ecrã de 320&nbsp;×&nbsp;240) a
+    correr no emulador <a href="https://wokwi.com">Wokwi</a>: do PIN do mestre de jogo ao desarmar
+    da bomba. A interface da caixa está em inglês. O firmware já corre numa Heltec V4.3 a sério; as
+    capturas são do emulador. Toca ou clica numa captura para a ver em grande.
   note: >-
     O <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.pt.md">manual
     de montagem</a> tem o esquema de ligações completo e o guia da primeira gravação do firmware,

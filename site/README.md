@@ -5,8 +5,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Project page
 
-nothing loaded from other sites, and two small inline scripts, the header menus' Escape and click-outside (the menus are `<details>` and work without it) and the main page's screenshot viewer
-nothing loaded from other sites, and one small inline script, the main page's screenshot viewer
+nothing loaded from other sites, and two small inline scripts, the header menus' Escape and click-outside (the menus are `<details>` and work without it) and the screenshot viewer (main and modes pages) and the mode animations' pause button (src/partials/modegif.html)
+nothing loaded from other sites, and one small inline script, the screenshot viewer (main and modes pages) and the mode animations' pause button (src/partials/modegif.html)
 (see [Screenshots](#screenshots)), without which every page still works. The
 [Pages workflow](../.github/workflows/pages.yml) publishes this folder on every push to `main`
 that changes it, leaving out `src/`, `i18n/` and this README.
@@ -22,8 +22,8 @@ which keeps English's ASCII folders (Han letters in an address are percent-encod
 
 | Page | Portuguese | English | German | Chinese | Template | What it holds |
 | --- | --- | --- | --- | --- | --- | --- |
-| Main page | `/` | `/en/` | `/de/` | `/zh-tw/` | `src/index.html` | The hero, how a game works, why Atalaia, how it fits together, a short radio section, three game modes, the screenshots, try it, the roadmap in one line per phase, the community hub, getting involved, the name and field safety |
-| Game modes | `/modos/` | `/en/modes/` | `/de/modi/` | `/zh-tw/modes/` | `src/modes.html` | Every mode, the Codes modifier, the Medic Kit and "your mode" |
+| Main page | `/` | `/en/` | `/de/` | `/zh-tw/` | `src/index.html` | The hero, how a game works, why Atalaia, how it fits together, a short radio section, three game modes, "What it looks like" (three mode animations, then the app's screenshots), try it, the roadmap in one line per phase, the community hub, getting involved, the name and field safety |
+| Game modes | `/modos/` | `/en/modes/` | `/de/modi/` | `/zh-tw/modes/` | `src/modes.html` | Every mode (each with its animation), the Codes modifier, the Medic Kit, "your mode" and the box's step-by-step screenshots |
 | Radio | `/radio/` | `/en/radio/` | `/de/funk/` | `/zh-tw/radio/` | `src/radio.html` | How the radio works: both diagrams with their lead-ins, and the channel |
 | Roadmap | `/roadmap/` | `/en/roadmap/` | `/de/roadmap/` | `/zh-tw/roadmap/` | `src/roadmap.html` | The six phases, each as a one-line summary, bullets of what is done (the long lists fold into a `<details>`), bullets of what is next or waiting, and its gate, with a link to the phase's `STATUS.md`. "Roadmap" stays in English in Portuguese too |
 | Build guides | `/montagem/` | `/en/build-guides/` | `/de/bauen/` | `/zh-tw/build-guides/` | `src/build.html` | Safety rules for every build; the Satellite, the I/O pod and the target addon shortened from `hardware/<node>/BUILD.md` (the full guides, in English), with their pin tables and photo placeholders; a pointer to the Field Box's build manual (phase 5 plan phase 12, decisions P5J-1 to P5J-13) |
@@ -98,7 +98,7 @@ pixels wide as the screen needs) and lazy-loads everything below it.
 
 ### Screenshots
 
-`img/screens/` holds the screenshots of "What it looks like", shown at their own size:
+`img/screens/` holds the screenshots shown at their own size: the box's on the modes page ("The box's screens, step by step"), the app's and the Medic Kit's in "What it looks like" on the main page:
 
 | Files | What they are |
 | --- | --- |
@@ -107,8 +107,7 @@ pixels wide as the screen needs) and lazy-loads everything below it.
 | `app-medic-*.png` | The Medic Kit's screens (320 × 240) as the app draws them, from `app/test/goldens/images/templates/medic_*.png`; the kit's screens are Portuguese by default, so every language shows the same copies |
 
 When the app's golden images change (`python tools/docker_app.py goldens`), copy them again.
-Each screenshot is a link to its own image. A small inline script at the end of
-`src/index.html` opens the link in a `<dialog>` on the page instead: the image as large as the
+Each screenshot is a link to its own image. A small inline script (`src/partials/viewer.html`, with the dialog it opens; included by the main and modes pages) opens the link in a `<dialog>` on the page instead: the image as large as the
 screen allows (up to three times its size, in whole steps when small, so its pixels stay sharp),
 its alt text as the caption, previous and next (buttons or the arrow keys), closed with Esc, the
 close button or a click outside the image, with the focus back on the screenshot. Without
@@ -131,8 +130,8 @@ class="modegif">` in the mode's card in `src/modes.html` (copy a neighbour's) an
 `caption` under `gifs.<id>` in the four language files.
 
 A card's picture is a `<picture>` whose `<source>` for `prefers-reduced-motion: reduce` is the still
-frame, with `loading="lazy"` and the alt text and caption of `gifs.<id>`; a small inline script at
-the end of `src/modes.html` adds a pause button under each (play, for someone who asked for less
+frame, with `loading="lazy"` and the alt text and caption of `gifs.<id>`; a small inline script
+(`src/partials/modegif.html`, included by the main and modes pages) adds a pause button under each (play, for someone who asked for less
 motion; clicking it swaps the image for the animated GIF). Every mode has a picture in each of the
 four languages (the box's templates are in all four; the messages a mode's script writes, such as
 "Kill confirmed: b1", stay English); a `languages: [en]` entry in the script would make one `-en`

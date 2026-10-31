@@ -1,0 +1,35 @@
+  {# The animations (decisions GIF-6, GIF-7). With "prefers-reduced-motion" the <picture> shows
+     the still picture and nothing moves; this script, the page's only one here (inline, loading
+     nothing), adds a button under each picture that pauses it or, for someone who asked for
+     less motion, plays it. Without the script the animation plays, or the still shows.
+     Keep "{" and "}" in the script apart: two together are a placeholder. #}
+  <script>
+    (function () {
+      "use strict";
+      var cards = document.querySelector("[data-play]");
+      if (!cards || !window.matchMedia) return;
+      var playLabel = cards.getAttribute("data-play");
+      var pauseLabel = cards.getAttribute("data-pause");
+      var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var figures = cards.querySelectorAll("figure.modegif");
+      Array.prototype.forEach.call(figures, function (figure) {
+        var image = figure.querySelector("img");
+        var button = document.createElement("button");
+        var playing = !reduced;
+        button.type = "button";
+        button.className = "modegif-button";
+        function update() {
+          button.textContent = playing ? pauseLabel : playLabel;
+        }
+        button.addEventListener("click", function () {
+          var source = figure.querySelector("source");
+          if (source) source.parentNode.removeChild(source);
+          playing = !playing;
+          image.src = playing ? figure.getAttribute("data-anim") : figure.getAttribute("data-still");
+          update();
+        });
+        update();
+        figure.appendChild(button);
+      });
+    })();
+  </script>
