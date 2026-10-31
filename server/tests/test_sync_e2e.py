@@ -308,7 +308,7 @@ class SyncEndToEndTests(unittest.TestCase):
         bea_phone = ("p-beabeabeabea", secret())
         first = ctrl.create_game({"name": "Treino", "mode_id": DOMINATION, "teams": ["red", "blue"]})
         svc.check_in({"game_id": first["id"], "player_id": bea_phone[0], "player_secret": bea_phone[1],
-                      "display_name": "Bea", "notice_version": 1}, "phone")
+                      "display_name": "Bea", "notice_version": Config.notice_version}, "phone")
         ctrl.end_game(first["id"], "time")
 
         sid = self.db.fetch(
@@ -346,12 +346,12 @@ class SyncEndToEndTests(unittest.TestCase):
         # own identity and ticket, and a walk-in.
         ana_phone = (reg_ana["player_id"], secret())
         svc.check_in({"game_id": gid, "player_id": ana_phone[0], "player_secret": ana_phone[1], "display_name": "Falcão",
-                      "notice_version": 1, "registration_id": reg_ana["id"], "ticket": reg_ana["ticket"]}, "a")
+                      "notice_version": Config.notice_version, "registration_id": reg_ana["id"], "ticket": reg_ana["ticket"]}, "a")
         ticket = checkin_ticket.parse(reg_bea["ticket_text"])
         svc.ticket_checkin(Viewer("gm"), gid, {"ticket": reg_bea["ticket_text"]})  # a marshal scans it
         self.assertEqual(ticket["player_id"], bea_phone[0])
         svc.check_in({"game_id": gid, "player_id": "p-zezezezezeze", "player_secret": secret(),
-                      "display_name": "Zé", "notice_version": 1}, "z")
+                      "display_name": "Zé", "notice_version": Config.notice_version}, "z")
         # Ana's declared replica passes the chrono at the gate.
         key = Ed25519PrivateKey.generate()
         pub = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
