@@ -703,7 +703,10 @@ under the DPA):
   (`POST /api/v1/me/hub-share/code` at one field, `.../link` at the other). A hub made by an older release needs
   `hosted migrate` before the new server starts (`hub` does it); `hosted check` says so otherwise. `hosted delete`
   removes the field's published records with it, and a restore of a hub brings the tables back with the rest (the
-  check runs after it).
+  check runs after it). The page for it is `/staff/account/hub-share` (HLC-*), linked from the account page of a hub
+  only; it needs `public.atalaia_share_peers(uuid)` (a third function, to list the other fields a person is linked
+  at), which `hosted migrate` makes, so a hub of an earlier release is migrated before the new server starts;
+  `hosted check` reports it missing otherwise.
 
 ### Updates
 

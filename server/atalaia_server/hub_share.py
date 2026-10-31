@@ -206,13 +206,32 @@ async def forget_player(db: AsyncSession, field_id: uuid.UUID, player_id: str) -
 
 # Linking -------------------------------------------------------------------------------------------
 
+_PEERS = text("SELECT field_name, active, updated_at FROM public.atalaia_share_peers(:person)")
+
+
 async def status(db: AsyncSession, user_id: uuid.UUID) -> dict[str, Any]:
+    """Where the account's link stands. ``linked``, ``linked_at`` and ``sharing`` are the app's (APF-4); the rest is
+    for the staff page (HLC-2): ``field`` (this field's id and name, the field's own switch and terms, and whether
+    the account's consent for it is live) and ``others``, the other fields the person is linked at (name, whether
+    sharing is on there, since when; never what they hold)."""
     _tenant()
+    field = await _field(db)
+    consent = await db.scalar(select(Consent.id).where(
+        Consent.user_id == user_id, Consent.purpose == SHARING, Consent.field_id == field.id,
+        Consent.withdrawn_at.is_(None))) is not None
+    out: dict[str, Any] = {
+        "linked": False, "linked_at": None, "sharing": False,
+        "field": {"id": str(field.id), "name": field.name, "enabled": bool(field.chrono_sharing_enabled),
+                  "live": sharing_terms.is_live(field)},
+        "consent": consent, "others": []}
     link = await db.get(HubShareLink, user_id)
     if link is None:
-        return {"linked": False, "linked_at": None, "sharing": False}
-    return {"linked": True, "linked_at": link.linked_at.isoformat(),
-            "sharing": await is_active(db, user_id, await _field(db))}
+        return out
+    out["linked"], out["linked_at"] = True, link.linked_at.isoformat()
+    out["sharing"] = consent and sharing_terms.is_live(field)
+    out["others"] = [{"field_name": r.field_name, "sharing": bool(r.active), "since": _iso(r.updated_at)}
+                     for r in (await db.execute(_PEERS, {"person": link.person_id})).all()]
+    return out
 
 
 async def new_code(db: AsyncSession, user_id: uuid.UUID) -> dict[str, Any]:

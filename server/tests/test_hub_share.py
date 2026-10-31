@@ -234,7 +234,9 @@ class LinkTests(ShareCase):
     async def test_codes_are_once_timed_and_for_another_field(self) -> None:
         p = await self.person()
         r = await self.a.get("/api/v1/me/hub-share", headers=p.auth_a)
-        self.assertEqual(r.json(), {"linked": False, "linked_at": None, "sharing": False})
+        first = r.json()
+        self.assertEqual((first["linked"], first["linked_at"], first["sharing"]), (False, None, False))
+        self.assertEqual((first["consent"], first["others"]), (False, []))  # HLC-2: what the staff page reads too
         r = await self.a.post("/api/v1/me/hub-share/code", headers=p.auth_a)
         self.assertEqual(r.status_code, 201)
         code = r.json()["code"]
@@ -262,6 +264,53 @@ class LinkTests(ShareCase):
         auth = await self.auth(self.b, stranger)
         r = await self.b.post("/api/v1/me/hub-share/link", json={"code": r.json()["code"]}, headers=auth)
         self.assertEqual((r.status_code, r.json()["detail"]), (400, "invalid_code"))
+
+    async def test_the_state_the_staff_page_reads(self) -> None:
+        """HLC-2: this field (id, name, its switch and terms), whether the account's consent is live, and the other
+        fields the person is linked at with whether sharing is on there: each side sees only the other's name and
+        state, and it follows consent, the field's switch and unlinking."""
+        p = await self.person()
+
+        async def state(side: str) -> dict[str, Any]:
+            client, auth = (self.a, p.auth_a) if side == "a" else (self.b, p.auth_b)
+            r = await client.get("/api/v1/me/hub-share", headers=auth)
+            self.assertEqual(r.status_code, 200, r.text)
+            return r.json()
+
+        a0, b0 = await state("a"), await state("b")
+        self.assertEqual(a0["field"], {"id": str(self.ta.field_id), "name": a0["field"]["name"], "enabled": True,
+                                       "live": True})
+        self.assertNotEqual(a0["field"]["name"], b0["field"]["name"])
+        self.assertEqual(b0["field"]["id"], str(self.tb.field_id))
+        await self.link(p)
+        a1, b1 = await state("a"), await state("b")
+        self.assertEqual((a1["linked"], a1["others"]), (True, [{"field_name": b0["field"]["name"], "sharing": False,
+                                                                 "since": a1["others"][0]["since"]}]))
+        self.assertEqual([o["field_name"] for o in b1["others"]], [a0["field"]["name"]])
+        self.assertEqual({k: v for k, v in b1["others"][0].items() if k != "since"},
+                         {"field_name": a0["field"]["name"], "sharing": False})
+        await self.consent(p, "a")
+        a2, b2 = await state("a"), await state("b")
+        self.assertEqual((a2["consent"], a2["sharing"], b2["consent"]), (True, True, False))
+        self.assertTrue(b2["others"][0]["sharing"])   # A is sharing; B is told so
+        self.assertFalse(a2["others"][0]["sharing"])  # B's consent is still missing
+        await self.consent(p, "b")
+        self.assertTrue((await state("a"))["others"][0]["sharing"])
+        # The field's switch off: its own state says so, and the other field's list follows.
+        await self.switch("a", False)
+        a3, b3 = await state("a"), await state("b")
+        self.assertEqual((a3["field"]["enabled"], a3["field"]["live"], a3["consent"], a3["sharing"]),
+                         (False, False, True, False))
+        self.assertFalse(b3["others"][0]["sharing"])
+        await self.switch("a", True)
+        await self.consent(p, "a", give=False)
+        a4, b4 = await state("a"), await state("b")
+        self.assertEqual((a4["consent"], a4["sharing"], b4["others"][0]["sharing"]), (False, False, False))
+        # Unlinking at B: B has no link left and A no longer lists B; A's own link stays (it is still the person's).
+        r = await self.b.delete("/api/v1/me/hub-share", headers=p.auth_b)
+        self.assertEqual(r.status_code, 204)
+        a5, b5 = await state("a"), await state("b")
+        self.assertEqual((b5["linked"], b5["others"], a5["others"]), (False, [], []))
 
     async def test_one_person_one_account_per_field(self) -> None:
         p = await self.person()
@@ -381,6 +430,36 @@ class IsolationTests(ShareCase):
             async with conn.transaction():  # a person nobody asked about
                 await as_field(conn, self.ta)
                 self.assertEqual(await conn.fetchval(query, [uuid.uuid4()]), 0)
+        finally:
+            await conn.close()
+
+
+    async def test_the_peers_function_names_fields_only_for_a_member_of_the_callers_tenant(self) -> None:
+        """HLC-2: ``atalaia_share_peers`` answers the other fields' names and states for a person the caller is a
+        member for, nobody else's, and not to the server's login role."""
+        p = await self.published()
+        with tenancy.use(self.ta):
+            async with self.app.state.sessionmaker() as db:
+                from atalaia_server import hub_share
+                person = (await db.get(hub_share.HubShareLink, p.user_a)).person_id
+        query = "SELECT field_name, active FROM public.atalaia_share_peers($1)"
+        conn = await connect_driver_safe(self.hub.app_url)
+        try:
+            for tenant, other in ((self.ta, "Campo B"), (self.tb, "Campo A")):
+                async with conn.transaction():
+                    await as_field(conn, tenant)
+                    rows = await conn.fetch(query, person)
+                    self.assertEqual([(r["field_name"], r["active"]) for r in rows], [(other, True)])
+            async with conn.transaction():  # a person the caller is no member for: nothing
+                await as_field(conn, self.ta)
+                self.assertEqual(await conn.fetch(query, uuid.uuid4()), [])
+            async with conn.transaction():  # the caller's tenant is not the one asked about
+                await conn.execute("SELECT set_config('atalaia.tenant', $1, true)", self.tb.schema)
+                await as_field(conn, self.ta)
+                self.assertEqual(len(await conn.fetch(query, person)), 1)
+            with self.assertRaises(asyncpg.InsufficientPrivilegeError):  # the login role: no right to it
+                async with conn.transaction():
+                    await conn.fetch(query, person)
         finally:
             await conn.close()
 

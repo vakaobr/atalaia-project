@@ -726,6 +726,7 @@ class RowSecurityTests(HubCase):
             "set role": "SET ROLE {owner}",
             "sharing tables": "SELECT * FROM public.atalaia_share_members",
             "sharing function": "SELECT * FROM public.atalaia_share_read(ARRAY[gen_random_uuid()], 5)",
+            "peers function": "SELECT * FROM public.atalaia_share_peers(gen_random_uuid())",
             "grant to itself": "GRANT SELECT ON {s}.users TO CURRENT_USER",
         }
         try:
@@ -1107,6 +1108,8 @@ class HubCheckTests(HubCase):
             ("ALTER FUNCTION public.atalaia_share_redeem(bytea) RESET search_path", "no fixed search_path"),
             (f"REVOKE EXECUTE ON FUNCTION public.atalaia_share_redeem(bytea) FROM {ra}", "cannot run"),
             (f"REVOKE EXECUTE ON FUNCTION public.atalaia_caller_tenant() FROM {rb}", "cannot run"),
+            (f"REVOKE EXECUTE ON FUNCTION public.atalaia_share_peers(uuid) FROM {ra}", "cannot run"),
+            ("GRANT EXECUTE ON FUNCTION public.atalaia_share_peers(uuid) TO PUBLIC", "can be run by anyone"),
             (f"GRANT EXECUTE ON FUNCTION public.atalaia_share_redeem(bytea) TO {app}", f"{app} can run"),
         ]
         for statement, problem in breaks:

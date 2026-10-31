@@ -46,6 +46,8 @@ PAGES = {
     "data": f"/staff/fields/{FIELD}/data",
     # FS-*
     "settings": f"/staff/fields/{FIELD}/settings",
+    # HLC-*
+    "hubshare": "/staff/account/hub-share",
 }
 
 
@@ -86,6 +88,7 @@ def parse(text: str) -> Scripts:
 
 class StaffPageTests(AppTestCase):
     async def test_every_page_in_every_language(self) -> None:
+        self.app.state.limits.requests = RequestLimit(100000, 60)  # every page in every language is many requests
         csp = dict(HEADERS)["content-security-policy"]
         for name, path in PAGES.items():
             for lang, html_lang, header in (("pt", "pt-PT", "pt"), ("en", "en", "en"), ("de", "de", "de"),

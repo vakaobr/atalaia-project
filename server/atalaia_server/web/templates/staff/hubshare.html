@@ -1,0 +1,60 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$hub_title</h1>
+<p><a id="hub-back" href="$account_page">$hub_back</a></p>
+<p id="hub-none" class="notice" role="note" hidden>$hub_not_hosted</p>
+<div id="hub-main" hidden>
+<p>$hub_intro</p>
+<section id="hub-state-section" class="acct" aria-labelledby="hub-state-title">
+<h2 id="hub-state-title">$hub_state_title</h2>
+<p id="hub-field"></p>
+<p id="hub-state"></p>
+<p id="hub-sharing"></p>
+</section>
+<section id="hub-consent-section" class="acct" aria-labelledby="hub-consent-title">
+<h2 id="hub-consent-title">$hub_consent_title</h2>
+<p>$hub_consent_text</p>
+<p>$notice_link</p>
+<p id="hub-field-off" class="hint" role="note" hidden>$hub_field_off</p>
+<p id="consent-state"></p>
+<form id="consent-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<p class="check"><input type="checkbox" id="consent-tick" name="consent"> <label for="consent-tick">$hub_consent_tick</label></p>
+<button type="submit" id="consent-give">$hub_consent_give</button>
+</fieldset>
+</form>
+<p><button type="button" id="consent-withdraw" class="danger" hidden>$hub_consent_withdraw</button></p>
+<p class="hint">$hub_consent_other</p>
+</section>
+<section id="hub-make-section" class="acct" aria-labelledby="hub-make-title">
+<h2 id="hub-make-title">$hub_make_title</h2>
+<p>$hub_make_text</p>
+<p><button type="button" id="code-make" disabled>$hub_make</button></p>
+<div id="code-box" hidden>
+<p><code id="code-value" class="data"></code> <button type="button" id="code-copy" hidden>$hub_copy</button></p>
+<p id="code-note" class="hint"></p>
+</div>
+</section>
+<section id="hub-enter-section" class="acct" aria-labelledby="hub-enter-title">
+<h2 id="hub-enter-title">$hub_enter_title</h2>
+<p>$hub_enter_text</p>
+<form id="link-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="link-code">$hub_enter_label</label>
+<input id="link-code" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="64">
+<p class="hint">$hub_enter_hint</p>
+<button type="submit" id="link-go">$hub_enter_button</button>
+</fieldset>
+</form>
+</section>
+<section id="hub-others-section" class="acct" aria-labelledby="hub-others-title">
+<h2 id="hub-others-title">$hub_others_title</h2>
+<ul id="hub-others" class="acct-list"></ul>
+<p id="hub-others-none" hidden>$hub_others_none</p>
+</section>
+<section id="hub-unlink-section" class="acct" aria-labelledby="hub-unlink-title" hidden>
+<h2 id="hub-unlink-title">$hub_unlink_title</h2>
+<p>$hub_unlink_text</p>
+<p><button type="button" id="unlink" class="danger">$hub_unlink</button></p>
+</section>
+</div>

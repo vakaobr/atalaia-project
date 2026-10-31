@@ -4,7 +4,10 @@
 (SVX-2; ADR-P4-4's amendment of 2026-10-28; ``hub_share.py``). Hosted mode only: a single-field server
 answers 404 ``not_hosted``.
 
-    GET    /api/v1/me/hub-share         Bearer                 {linked, linked_at, sharing}
+    GET    /api/v1/me/hub-share         Bearer                 {linked, linked_at, sharing, field: {id, name, enabled,
+                                                               live}, consent, others: [{field_name, sharing, since}]}
+                                                               (the app reads the first three; the staff page
+                                                               /staff/account/hub-share reads all, HLC-*)
     POST   /api/v1/me/hub-share/code    Bearer                 a link code for another field of the hub (shown once,
                                                                15 minutes, used once): {code, expires_at, expires_in}
     POST   /api/v1/me/hub-share/link    Bearer, {code}         link this account to the person the code names

@@ -111,7 +111,7 @@ class AccountPageTests(AppTestCase):
 
     async def test_every_text_of_the_page_is_in_the_four_languages(self) -> None:
         template = (staff_pages.TEMPLATE_DIR / "account.html").read_text(encoding="utf-8")
-        used = set(re.findall(r"\$([a-z][a-z0-9_]*)", template))
+        used = set(re.findall(r"\$([a-z][a-z0-9_]*)", template)) - {"hub_share_href"}  # an address, not a text
         used |= set(re.findall(r"\bt\('([a-z0-9_]+)'", SCRIPT))
         self.assertGreater(len(used), 40)
         for lang, strings in STRINGS.items():

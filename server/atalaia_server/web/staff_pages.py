@@ -13,6 +13,11 @@
                                                        set, change or remove the password, turn TOTP on or off,
                                                        and the confirmation those ask for (decisions ACC-*); linked
                                                        from every page's header
+    GET /staff/account/hub-share                       the hub link code (hosted mode, decisions HLC-*): make a link
+                                                       code at one field and enter it at another, which fields the
+                                                       person is linked at, the consent chrono sharing needs at this
+                                                       field, unlink; linked from the account page when the server is
+                                                       a hosted hub
     GET /staff/fields/<field>/history                  the field's games, filters, the history settings
     GET /staff/fields/<field>/games/<game>             one game: its score timeline, its event log, its boxes
     GET /staff/fields/<field>/schedule                 the field's scheduled games: create, edit, publish, cancel,
@@ -262,8 +267,19 @@ async def login(request: Request) -> Response:
 @router.api_route("/staff/account", methods=GET_HEAD)
 async def account(request: Request) -> Response:
     p = StaffPage(request)
-    content = TEMPLATES["account"].substitute(p.texts())
+    content = TEMPLATES["account"].substitute(p.texts(hub_share_href=esc(p.link("/staff/account/hub-share"))))
     return p.render(request, "account", p.t["acct_title"], content, section="account")
+
+
+@router.api_route("/staff/account/hub-share", methods=GET_HEAD)
+async def hub_share_page(request: Request) -> Response:
+    p = StaffPage(request)
+    link = ""  # the notice the consent is given under, when the operator published one (as on the login page)
+    if notice_published(request):
+        href = esc(f"/privacy?lang={p.lang}" if p.explicit else "/privacy")
+        link = f'<a id="notice-link" href="{href}" target="_blank" rel="noopener">{esc(p.t["hub_consent_notice"])}</a>'
+    content = TEMPLATES["hubshare"].substitute(p.texts(account_page=esc(p.link("/staff/account")), notice_link=link))
+    return p.render(request, "hubshare", p.t["hub_title"], content, section="account")
 
 
 @router.api_route("/staff/fields/{field}/history", methods=GET_HEAD)

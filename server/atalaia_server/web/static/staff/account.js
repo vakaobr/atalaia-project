@@ -543,10 +543,21 @@ async function inactivityNotice() {
     }
 }
 
+/** HLC-1: the link to the hub link code page shows only on a hosted hub (a single-field server answers 404). */
+async function offerHubShare() {
+    try {
+        await api('GET', '/api/v1/me/hub-share');
+    } catch (err) {
+        return;
+    }
+    $('hub-share-link').hidden = false;
+}
+
 async function main() {
     const ctx = await boot();
     if (!ctx) return;
     $('account-link').setAttribute('aria-current', 'page');
+    offerHubShare();
     inactivityNotice();  // PRIV-7: an account that was due to be anonymised for inactivity is told so
     try {
         await reload();

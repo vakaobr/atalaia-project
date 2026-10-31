@@ -3228,6 +3228,14 @@ for _lang, _texts in _CONSENT.items():
     assert not _clash, sorted(_clash)
     STRINGS[_lang].update(_texts)
 
+# HLC-*: the page for the hub link code (``/staff/account/hub-share``); every key is new.
+from .staff_i18n_hub import STAFF as _HUB  # noqa: E402
+
+for _lang, _texts in _HUB.items():
+    _clash = set(STRINGS[_lang]) & set(_texts)
+    assert not _clash, sorted(_clash)
+    STRINGS[_lang].update(_texts)
+
 # SVX-1: the remote ATAK page says when a certificate is near expiry. Every key is new.
 _ATAK_EXPIRY: dict[str, dict[str, str]] = {
     "pt": {
