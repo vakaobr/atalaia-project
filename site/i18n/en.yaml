@@ -74,6 +74,9 @@ header:
   registry: Registry
   glossary: Glossary
   architecture: "How it fits"
+  group_learn: Learn
+  group_community: Community
+  build_guides: Build guides
   language: Language
 
 hero:

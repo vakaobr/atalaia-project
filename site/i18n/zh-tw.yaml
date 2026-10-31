@@ -74,6 +74,9 @@ header:
   registry: 模式登錄庫
   glossary: 名詞解釋
   architecture: "整體架構"
+  group_learn: 了解
+  group_community: 社群
+  build_guides: 組裝指南
   language: 語言
 
 hero:

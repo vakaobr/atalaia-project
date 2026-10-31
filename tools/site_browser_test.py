@@ -111,12 +111,56 @@ class SiteFlags(unittest.TestCase):
                                 "return [s.outlineStyle, s.outlineWidth]; })()")
         self.assertNotEqual(outline[0], "none")
         self.assertNotEqual(outline[1], "0px")
+        self.check_menus(page, url, width)
         # The footer's text uses its container's width.
         sizes = page.evaluate("(() => { const p = document.querySelector('.foot-inner p');"
                               "return [p.getBoundingClientRect().width, p.parentElement.clientWidth - "
                               "parseFloat(getComputedStyle(p.parentElement).paddingLeft) - "
                               "parseFloat(getComputedStyle(p.parentElement).paddingRight)]; })()")
         self.assertAlmostEqual(sizes[0], sizes[1], delta=1)
+
+
+    def check_menus(self, page, url, width):
+        """The three menus: keyboard open and close, one open at a time, nothing off screen, the current page marked."""
+        menus = page.query_selector_all("nav.sections details.menu")
+        self.assertEqual(len(menus), 3)
+        # One compact row under the brand: the summaries and GitHub are on the same line.
+        tops = page.evaluate("[...document.querySelectorAll('nav.sections > *')].map(e => Math.round(e.getBoundingClientRect().top))")
+        self.assertLessEqual(max(tops) - min(tops), 4, f"the menu wraps: {tops}")
+        # The current page: its link is marked, and the menu that holds it shows it.
+        current = page.query_selector_all("nav.sections a[aria-current=page]")
+        marked = page.query_selector_all("nav.sections details[data-current]")
+        self.assertEqual(len(current), len(marked))
+        self.assertLessEqual(len(current), 1)
+        if current:
+            self.assertTrue(current[0].evaluate("(a) => a.closest('details').hasAttribute('data-current')"))
+        for index in range(3):
+            summary = menus[index].query_selector("summary")
+            self.assertFalse(menus[index].evaluate("(d) => d.open"))
+            summary.focus()
+            self.assertNotEqual(summary.evaluate("(s) => getComputedStyle(s).outlineStyle"), "none")
+            page.keyboard.press("Enter")
+            self.assertTrue(menus[index].evaluate("(d) => d.open"))
+            # Opening one closes the others (name="nav"; the page's script covers the rest).
+            self.assertEqual(page.evaluate("document.querySelectorAll('nav.sections details[open]').length"), 1)
+            links = menus[index].query_selector_all("a")
+            self.assertGreaterEqual(len(links), 2)
+            for link in links:
+                box = link.bounding_box()
+                self.assertGreaterEqual(box["x"], 0)
+                self.assertLessEqual(box["x"] + box["width"], width - 16 + 1)
+                self.assertGreater(box["width"], 40)
+            page.keyboard.press("Tab")
+            self.assertTrue(menus[index].evaluate("(d) => d.contains(document.activeElement)"))
+            self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+            page.keyboard.press("Escape")
+            self.assertFalse(menus[index].evaluate("(d) => d.open"))
+            self.assertTrue(summary.evaluate("(s) => s === document.activeElement"))
+            # Space opens and closes it again.
+            page.keyboard.press("Space")
+            self.assertTrue(menus[index].evaluate("(d) => d.open"))
+            page.keyboard.press("Space")
+            self.assertFalse(menus[index].evaluate("(d) => d.open"))
 
 
 if __name__ == "__main__":

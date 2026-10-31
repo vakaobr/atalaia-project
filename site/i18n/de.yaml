@@ -79,6 +79,9 @@ header:
   registry: Registry
   glossary: Glossar
   architecture: "Zusammenspiel"
+  group_learn: Lernen
+  group_community: Community
+  build_guides: Bauanleitungen
   language: Sprache
 
 hero:

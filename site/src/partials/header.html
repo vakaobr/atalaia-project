@@ -19,17 +19,36 @@ page.nav.<page> marks the link of the page being read. The language switcher
         </svg>
         Atalaia
       </a>
+      {# Three menus and GitHub. Each menu is a <details>: it opens with Enter or Space and needs no script;
+         name="nav" makes the browser close the others (browsers without it leave several open), and the small
+         script at the end adds Escape and a click outside. page.group.<name> marks the menu that holds the
+         page being read, page.nav.<page> the page's own link. #}
       <nav class="sections" aria-label="{{ header.sections|text }}">
-        <a href="{{ page.to.modes }}"{{ page.nav.modes }}>{{ header.modes }}</a>
-        <a href="{{ page.to.radio }}"{{ page.nav.radio }}>{{ header.radio }}</a>
-        <a href="{{ page.to.index }}#try">{{ header.try }}</a>
-        <a href="{{ page.to.roadmap }}"{{ page.nav.roadmap }}>{{ header.roadmap }}</a>
-        <a href="{{ page.to.build }}"{{ page.nav.build }}>{{ header.build }}</a>
-        <a href="{{ page.to.architecture }}"{{ page.nav.architecture }}>{{ header.architecture }}</a>
-        <a href="{{ page.to.index }}#hub">{{ header.hub }}</a>
-        <a href="https://vakaobr.github.io/atalaia-modes/">{{ header.registry }}</a>
-        <a href="{{ page.to.glossary }}"{{ page.nav.glossary }}>{{ header.glossary }}</a>
-        <a href="https://github.com/vakaobr/atalaia-project">GitHub</a>
+        <details class="menu" name="nav"{{ page.group.learn }}>
+          <summary>{{ header.group_learn }}</summary>
+          <ul>
+            <li><a href="{{ page.to.modes }}"{{ page.nav.modes }}>{{ header.modes }}</a></li>
+            <li><a href="{{ page.to.radio }}"{{ page.nav.radio }}>{{ header.radio }}</a></li>
+            <li><a href="{{ page.to.architecture }}"{{ page.nav.architecture }}>{{ header.architecture }}</a></li>
+            <li><a href="{{ page.to.glossary }}"{{ page.nav.glossary }}>{{ header.glossary }}</a></li>
+          </ul>
+        </details>
+        <details class="menu" name="nav"{{ page.group.build }}>
+          <summary>{{ header.build }}</summary>
+          <ul>
+            <li><a href="{{ page.to.build }}"{{ page.nav.build }}>{{ header.build_guides }}</a></li>
+            <li><a href="{{ page.to.index }}#try">{{ header.try }}</a></li>
+            <li><a href="{{ page.to.roadmap }}"{{ page.nav.roadmap }}>{{ header.roadmap }}</a></li>
+          </ul>
+        </details>
+        <details class="menu" name="nav"{{ page.group.community }}>
+          <summary>{{ header.group_community }}</summary>
+          <ul>
+            <li><a href="{{ page.to.index }}#hub">{{ header.hub }}</a></li>
+            <li><a href="https://vakaobr.github.io/atalaia-modes/">{{ header.registry }}</a></li>
+          </ul>
+        </details>
+        <a class="plain" href="https://github.com/vakaobr/atalaia-project">GitHub</a>
       </nav>
     </div>
     {# The language switcher: a strip at the top right of the page (CSS puts it above the menu), one
@@ -44,6 +63,19 @@ page.nav.<page> marks the link of the page being read. The language switcher
         <a href="{{ page.href.zh_tw }}" hreflang="zh-Hant-TW" lang="zh-Hant-TW" aria-label="繁體中文（台灣）" title="繁體中文（台灣）"{{ page.current.zh_tw }}><span class="flag" aria-hidden="true">&#x1F1F9;&#x1F1FC;</span></a>
       </nav>
     </div>
+    {# Optional: Escape closes the open menu (focus goes back to its summary) and a click outside closes it. #}
+    <script>
+      (function () {
+        var menus = document.querySelectorAll(".sections details");
+        document.addEventListener("keydown", function (e) {
+          if (e.key !== "Escape") return;
+          menus.forEach(function (m) { if (m.open) { m.open = false; m.querySelector("summary").focus(); } });
+        });
+        document.addEventListener("click", function (e) {
+          menus.forEach(function (m) { if (m.open && !m.contains(e.target)) m.open = false; });
+        });
+      })();
+    </script>
     {# Only an AI-drafted language fills it in (P5H-11, P5K-12); empty, it is hidden. #}
     <p class="translation-notice" role="note">{{ header.translation_notice }}</p>
   </header>

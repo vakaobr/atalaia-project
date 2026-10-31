@@ -5,7 +5,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Project page
 
-The project page at <https://atalaia-project.link/>. It is static HTML and CSS: no cookies,
+nothing loaded from other sites, and two small inline scripts, the header menus' Escape and click-outside (the menus are `<details>` and work without it) and the main page's screenshot viewer
 nothing loaded from other sites, and one small inline script, the main page's screenshot viewer
 (see [Screenshots](#screenshots)), without which every page still works. The
 [Pages workflow](../.github/workflows/pages.yml) publishes this folder on every push to `main`
@@ -169,6 +169,7 @@ It needs Python 3 and PyYAML (the dev container has both: see [tools/README.md](
   that language's file.
 - Links to the repository's documents point at the English documents in every language; the
   Portuguese page says "(em inglês)" next to them, the German one "(auf Englisch)".
+- The header menu is three `<details>` menus (Learn: modes, radio, how it fits, glossary; Build: build guides, try it, roadmap; Community: community hub, registry) and GitHub; `name="nav"` closes the others, `data-current` marks the menu that holds the page being read and `aria-current` its link (`NAV_GROUPS` in `tools/build_site.py`).
 - The language switcher is four emoji flags at the top right of every page; each link names its language in its own language (`aria-label`, `title`) and leads to the
   same page in the other languages. Try the site with a local server
   (`python3 -m http.server -d site`).

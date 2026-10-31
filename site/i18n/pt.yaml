@@ -77,6 +77,9 @@ header:
   registry: Registo
   glossary: Glossário
   architecture: "Como se liga"
+  group_learn: Aprender
+  group_community: Comunidade
+  build_guides: Guias de montagem
   language: Idioma
 
 hero:

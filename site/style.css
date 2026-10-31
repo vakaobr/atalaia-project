@@ -147,15 +147,53 @@ code { font-family: var(--mono); font-size: 0.88em; }
 nav { display: flex; flex-wrap: wrap; gap: 4px 22px; font-size: 0.98rem; }
 nav a { color: var(--on-slate-muted); text-decoration: none; }
 nav a:hover { color: var(--on-slate); }
-.sections { margin-left: auto; }
-/* The link of the page being read. */
-.sections a[aria-current="page"] {
-  color: var(--on-slate);
-  text-decoration: underline;
-  text-decoration-color: var(--signal);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 6px;
+.sections { margin-left: auto; align-items: center; gap: 4px 20px; position: relative; }
+
+/* The menus: <details> that need no script (the inline script in the header only adds Escape and a click
+   outside). The menu that holds the page being read has data-current, its link has aria-current. */
+.menu { position: relative; }
+.menu > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 2px;
+  color: var(--on-slate-muted);
+  cursor: pointer;
+  list-style: none;
 }
+.menu > summary::-webkit-details-marker { display: none; }
+.menu > summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: translateY(-2px) rotate(45deg);
+}
+.menu[open] > summary::after { transform: translateY(1px) rotate(225deg); }
+.menu > summary:hover, .menu[open] > summary { color: var(--on-slate); }
+.menu[data-current] > summary { color: var(--on-slate); box-shadow: inset 0 -2px 0 var(--signal); }
+.menu > summary:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.menu ul {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 6;
+  min-width: 13rem;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--slate);
+  border: 1px solid var(--granite);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.menu:last-of-type ul { left: auto; right: 0; }
+.menu li a { display: block; padding: 9px 12px; border-radius: var(--radius); }
+.menu li a:hover { background: var(--granite); color: var(--on-slate); }
+/* The link of the page being read. */
+.menu li a[aria-current="page"] { color: var(--on-slate); font-weight: 600; box-shadow: inset 3px 0 0 var(--signal); }
+.sections > a { padding: 6px 2px; }
 
 /* Language switcher: flags at the top right, in a strip above the menu (it comes last in the HTML, so
    a keyboard reaches the menu first); the current language lit like a beacon. */
@@ -171,7 +209,12 @@ nav a:hover { color: var(--on-slate); }
 .lang .flag { font-family: "Twemoji Country Flags", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-size: 1.35rem; letter-spacing: 0; }
 @media (max-width: 640px) {
   /* The section links wrap below the brand. */
-  .sections { flex-basis: 100%; margin-left: 0; padding-bottom: 10px; }
+  .sections { flex-basis: 100%; margin-left: 0; padding-bottom: 8px; justify-content: space-between; gap: 4px 6px; font-size: 0.88rem; }
+  .menu > summary { gap: 5px; padding: 6px 0; }
+  .sections > a { padding: 6px 0; }
+  /* One compact row; a menu opens under the row, as wide as it needs, inside the gutters. */
+  .menu { position: static; }
+  .menu ul, .menu:last-of-type ul { left: 0; right: auto; max-width: 100%; box-sizing: border-box; }
 }
 
 .sr-only {
