@@ -129,8 +129,8 @@ You hold your team's button on the box. The box shows what is happening.
 | **WAITING** · **Game** *N* · **The game hasn't started** | Joined. Waits for the organisers' **Start**. |
 | **GAME ON** | The game started. The mode's own screen follows. |
 | **ZONE · NEUTRAL** · **Hold to capture** | A zone nobody holds (Domination, Hold-All, Last Stand, Master and Satellites). Hold your team's button. A bar fills. |
-| **ZONE HELD** · team | A team holds the zone. The ring takes its colour. The small OLED shows how long it has held it. |
-| **Hold to take it over** | Another team can take the zone the same way. |
+| **ZONE HELD** · team | A team holds the zone. The ring takes its colour. Both screens show how long it has held it, counting up (**held 1:23**). In Domination the big screen also shows each team's points at this box, in team colours, in its top right corner. |
+| **Hold to take it over** | Another team can take the zone the same way. While a team holds its button, a bar with that team's name fills along the bottom of the big screen, as it does on the OLED. |
 | **READY** · **Hold to arm** | *Bomb / Rush*: the bomb is not armed yet. Attackers hold their button. |
 | **ARMED** · time **until detonation** | The bomb is armed. Defenders hold their button to defuse. |
 | **DEFUSED** / **EXPLODED** | The bomb ended. The winning team is named. After an explosion the game ends. |

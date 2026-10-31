@@ -26,6 +26,9 @@
 
 #include <stdbool.h>
 
+#include <stdint.h>
+
+#include "oled_view.h"
 #include "screen_types.h"
 
 /*
@@ -46,6 +49,27 @@ bool screen_render(const char *template_name, const char *data_json);
  * nothing draws nothing.
  */
 void screen_timer_bar(long left_s, long total_s);
+
+/*
+ * What the box adds to the mode's screens on the TFT (decision TZ-1 to TZ-5): game_ms is the
+ * game's clock in ms (NULL: none), holds fills the team buttons held down now (as for
+ * oled_view_set_hold_reader; NULL: none). Read from the display task.
+ *  - a zone's screen (neutral, captured) that has no bar of its own shows the capture's hold bar
+ *    and the team holding, from the mode's hold time, as the OLED does (oled_text_hold());
+ *  - a template's data with "since" gets "held": the game seconds since then, so a captured
+ *    screen can show "held {held|clock}" counting up;
+ *  - under Domination, each team's points at this box (the last "points" its captured and final
+ *    screens carried for it) in the top right, in team colours.
+ */
+void screen_set_overlay_readers(uint32_t (*game_ms)(void),
+                                int (*holds)(oled_hold_t *holds, int max));
+
+/* Called by the display task every loop: steps the hold bar and the held time (a second at a
+ * time), changing only the widgets whose text or width changed. */
+void screen_overlay_tick(void);
+
+/* Test inspection: 1 and the points when the box has a total for the team at this box. */
+int screen_overlay_total(const char *team, long *points);
 
 /* Test inspection: the seconds the bar shows as left, -1 when it is hidden. */
 long screen_timer_bar_left(void);

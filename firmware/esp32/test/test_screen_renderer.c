@@ -11,6 +11,7 @@
 
 #include "check.h"
 #include "screen_renderer.h"
+#include "screen_template.h"
 
 /* ---- individual template tests ---- */
 
@@ -183,8 +184,34 @@ static void test_timer_bar(void)
     CHECK(screen_timer_bar_left() == -1);
 }
 
+/* Under Domination the box keeps each team's last points at this zone (TZ-3). */
+static void test_overlay_totals(void)
+{
+    long pts = -1;
+    screen_renderer_reset();
+    screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.domination {\"capture_hold_ms\":3000}");
+    CHECK(screen_render("neutral", "{}"));
+    CHECK(!screen_overlay_total("red", &pts));
+    CHECK(screen_render("captured", "{\"team\":\"blue\",\"points\":7,\"since\":20}"));
+    CHECK(screen_render("captured", "{\"team\":\"red\",\"points\":12,\"since\":95}"));
+    CHECK(screen_render("captured", "{\"team\":\"red\",\"points\":13,\"since\":95}"));
+    CHECK(screen_overlay_total("blue", &pts) && pts == 7); /* kept: it scores no more */
+    CHECK(screen_overlay_total("RED", &pts) && pts == 13);
+    CHECK(screen_render("final_score", "{\"owner\":\"blue\",\"points\":9}"));
+    CHECK(screen_overlay_total("blue", &pts) && pts == 9);
+    CHECK(screen_render("ready", "{}")); /* between games: a clean start */
+    CHECK(!screen_overlay_total("red", &pts));
+
+    /* Another mode's "points" are not a team's total. */
+    screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.progressive_domination {}");
+    CHECK(screen_render("captured", "{\"team\":\"red\",\"points\":2,\"since\":5}"));
+    CHECK(!screen_overlay_total("red", &pts));
+    screen_renderer_reset();
+}
+
 void run_screen_renderer_tests(void)
 {
+    test_overlay_totals();
     test_timer_bar();
     test_render_standby();
     test_render_countdown();

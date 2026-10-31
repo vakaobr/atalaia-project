@@ -1243,6 +1243,7 @@ static void task_lvgl(void *arg)
     (void)arg;
     ESP_LOGI(TAG, "lvgl task started");
     display_port_init(hal.display);
+    screen_set_overlay_readers(game_clock_ms, held_buttons);
     lv_obj_t *oled_scr = display_port_oled_init(hal.oled);
     if (oled_scr) {
         /* The whole version; the splash shows its short form (FV-8). */
@@ -1263,6 +1264,7 @@ static void task_lvgl(void *arg)
             if (oled_scr) oled_view_handle(oled_scr, su.template_name, su.data_json, now_ms());
         }
         if (oled_scr) oled_view_poll(oled_scr, now_ms());
+        screen_overlay_tick();
         long left_s, total_s;
         game_timer_seconds(&left_s, &total_s);
         screen_timer_bar(left_s, total_s);

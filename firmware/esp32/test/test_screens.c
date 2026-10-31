@@ -606,6 +606,16 @@ static const screen_case_t cases[] = {
     {"timer_bar_neutral", "neutral", "{\"hold_s\":3}", NULL},
     {"timer_bar_yaml_domination", "neutral", "{\"hold_s\":3}", DOM},
     {"timer_bar_last_minute", "countdown", "{\"left\":47}", NULL},
+    /* What the box adds on the TFT (TZ-1 to TZ-5): the game's clock at 3:45 (a zone taken at 1:35
+     * has been held 2:10), the teams' totals at this box in the corner (blue held first, with 7;
+     * red holds now, with 12), and the capture's hold bar while a team holds its button. */
+    {"yaml_domination_captured_live", "captured",
+     "{\"team\":\"red\",\"points\":12,\"since\":95}", DOM},
+    {"yaml_domination_captured_live_pt", "captured",
+     "{\"team\":\"red\",\"points\":12,\"since\":95}", DOM},
+    {"yaml_domination_neutral_holding", "neutral", "{}", DOM},
+    {"yaml_domination_captured_holding_de", "captured",
+     "{\"team\":\"red\",\"points\":12,\"since\":95}", DOM},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 
@@ -692,10 +702,42 @@ static void check_glyphs(const char *name)
     if (font_check_labels(lv_screen_active(), msg, sizeof(msg)) > 0) fail(name, msg);
 }
 
+/* The box's own readers, as the shell sets them: the game's clock and the buttons held. */
+static uint32_t test_game_ms(void)
+{
+    return 225000;
+}
+
+static int test_holds_ms; /* ms the blue button has been held; 0 none */
+
+static int test_holds(oled_hold_t *holds, int max)
+{
+    if (!test_holds_ms || max < 1) return 0;
+    snprintf(holds[0].team, sizeof(holds[0].team), "blue");
+    holds[0].ms = (uint32_t)test_holds_ms;
+    return 1;
+}
+
 static void render(const screen_case_t *c)
 {
     box_lang_set_code(language(c->name));
     if (c->mode) screen_render(SCREEN_MODE_MESSAGE, c->mode);
+    test_holds_ms = 0;
+    if (strstr(c->name, "_live")) {
+        screen_set_overlay_readers(test_game_ms, test_holds);
+        /* Blue held the zone before, with 7 points. */
+        screen_render("captured", "{\"team\":\"blue\",\"points\":7,\"since\":20}");
+    }
+    if (strstr(c->name, "_holding")) {
+        screen_set_overlay_readers(test_game_ms, test_holds);
+        test_holds_ms = 1500;
+        screen_render("captured", "{\"team\":\"red\",\"points\":12,\"since\":95}");
+        screen_render("neutral", "{}");
+        if (strstr(c->name, "captured")) {
+            screen_render(c->template_name, c->data);
+            test_holds_ms = 2250;
+        }
+    }
     if (!screen_render(c->template_name, c->data)) fail(c->name, "template not recognised");
     if (c->mode && !screen_template_widget_count()) fail(c->name, "not drawn from its template");
     for (size_t i = 0; i < sizeof(timer_bars) / sizeof(timer_bars[0]); i++) {
@@ -704,6 +746,7 @@ static void render(const screen_case_t *c)
         if (screen_timer_bar_left() != timer_bars[i].left)
             fail(c->name, "the timer bar is not shown");
     }
+    screen_overlay_tick();
     test_display_render();
     test_display_rgb888(rendered);
 }

@@ -129,8 +129,8 @@ Manténs premido o botão da tua equipa na caixa. A caixa mostra o que se passa.
 | **À ESPERA** · **Jogo** *N* · **O jogo ainda não começou** | Juntou-se. Espera pelo **Começar** da organização. |
 | **JOGO EM CURSO** | O jogo começou. Segue-se o ecrã próprio do modo. |
 | **ZONA · LIVRE** · **Mantém premido** | Uma zona que nenhuma equipa tem (Domínio, Domínio Total, Último Elemento, Mestre e Satélites). Mantém premido o botão da tua equipa. Uma barra enche. |
-| **ZONA OCUPADA** · equipa | Uma equipa tem a zona. O anel fica com a cor dela. O OLED pequeno mostra há quanto tempo a tem. |
-| **Mantém o botão premido para a tomar** | Outra equipa pode tomar a zona da mesma maneira. |
+| **ZONA OCUPADA** · equipa | Uma equipa tem a zona. O anel fica com a cor dela. Os dois ecrãs mostram há quanto tempo a tem, a contar em frente (**ocupada há 1:23**). No Domínio o ecrã grande mostra também os pontos de cada equipa nesta caixa, com as cores das equipas, no canto de cima à direita. |
+| **Mantém o botão premido para a tomar** | Outra equipa pode tomar a zona da mesma maneira. Enquanto uma equipa mantém o botão premido, uma barra com o nome dela enche ao longo da margem de baixo do ecrã grande, como no OLED. |
 | **PRONTA** · **Mantém premido para armar** | *Bomba / Rush*: a bomba ainda não está armada. Os atacantes mantêm premido o botão. |
 | **ARMADA** · tempo **até à explosão** | A bomba está armada. Os defensores mantêm premido o botão para a desarmar. |
 | **DESARMADA** / **EXPLODIU** | A bomba terminou. A equipa vencedora é nomeada. Depois de uma explosão o jogo termina. |

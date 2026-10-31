@@ -29,6 +29,7 @@
 
 #include "box_text.h"
 #include "oled_logo.h"
+#include "oled_view.h"
 #include "screen_json.h"
 #include "screen_template.h"
 
@@ -45,6 +46,122 @@ static const char *known_templates[] = {
     "pin_entry",    "preset_select", "waiting",    "playing",    "ready",
     "timer_adjust", "start_confirm", "wifi_setup", NULL,
 };
+
+/* ------------------------------------------------------------------ */
+/* The box's own overlay on the TFT (decision TZ-1 to TZ-5)            */
+/* ------------------------------------------------------------------ */
+
+/* Besides the mode's screen the TFT shows, from what the box knows itself: the capture's hold
+ * bar and the team holding (the OLED's logic, oled_text_hold(), BN-26), the live "held 1:23" of
+ * a captured zone, and each team's points at this box in a top corner. */
+#define TOTALS_MAX 6
+typedef struct {
+    char team[24];
+    long points;
+} team_total_t;
+
+static uint32_t (*ov_game_ms)(void);
+static int (*ov_holds)(oled_hold_t *holds, int max);
+static uint32_t ov_hold_ms;   /* the mode's hold time to take a zone ("@mode"); 0 none */
+static bool ov_domination;    /* the running mode scores per team on this box */
+static oled_text_t ov_base;   /* the last screen's OLED lines: zone, owner, mode-sent bar */
+static bool ov_base_on;
+static team_total_t ov_totals[TOTALS_MAX];
+static int ov_totals_n;
+static bool ov_totals_dirty;
+static long ov_cur_held = -1; /* the "held" the last data had injected; -1 none */
+
+static bool ov_same(const char *a, const char *b)
+{
+    for (; *a && *b; a++, b++) {
+        if ((*a | 0x20) != (*b | 0x20)) return false;
+    }
+    return *a == *b;
+}
+
+static void ov_total_set(const char *team, long points)
+{
+    for (int i = 0; i < ov_totals_n; i++) {
+        if (!ov_same(ov_totals[i].team, team)) continue;
+        if (ov_totals[i].points != points) {
+            ov_totals[i].points = points;
+            ov_totals_dirty = true;
+        }
+        return;
+    }
+    if (ov_totals_n >= TOTALS_MAX) return;
+    snprintf(ov_totals[ov_totals_n].team, sizeof(ov_totals[0].team), "%s", team);
+    ov_totals[ov_totals_n].points = points;
+    ov_totals_n++;
+    ov_totals_dirty = true;
+}
+
+static void ov_totals_clear(void)
+{
+    if (ov_totals_n) ov_totals_dirty = true;
+    ov_totals_n = 0;
+}
+
+/* The mode announced (data "<mode id> <params>"): its hold time, and whether its zone screens'
+ * "points" are the holder's total at this box (Domination only: Progressive Domination's are what
+ * its held minutes paid). A new mode is a new game: the totals start again. */
+static void ov_mode(const char *data)
+{
+    static const char dom[] = "org.atalaia.domination";
+    ov_hold_ms = data ? oled_mode_hold_ms(data) : 0;
+    ov_domination = data && strncmp(data, dom, sizeof(dom) - 1) == 0 &&
+                    (data[sizeof(dom) - 1] == ' ' || data[sizeof(dom) - 1] == '+' ||
+                     data[sizeof(dom) - 1] == '\0');
+    ov_base_on = false;
+    ov_totals_clear();
+}
+
+/* A screen arrived. A zone's captured screen carries the holder's points (its own zone's:
+ * score.get(owner), re-sent every tick), the final screen the last holder's; a team that lost the
+ * zone keeps the total it had, as this zone scores it no more. The shell's own screens between
+ * games clear the totals. */
+static void ov_screen(const char *name, const char *data)
+{
+    static const char *const between[] = {"ready", "waiting", "status", "preset_select",
+                                          "start_confirm", NULL};
+    for (int i = 0; between[i]; i++) {
+        if (strcmp(name, between[i]) == 0) ov_totals_clear();
+    }
+    ov_base_on = oled_text_for("", name, data, &ov_base);
+    if (!ov_domination) return;
+    char team[24] = "";
+    long points;
+    bool captured =
+        strcmp(name, "captured") == 0 && screen_json_str(data, "team", team, sizeof(team));
+    bool final =
+        strcmp(name, "final_score") == 0 && screen_json_str(data, "owner", team, sizeof(team));
+    if ((captured || final) && team[0] && screen_json_int(data, "points", &points))
+        ov_total_set(team, points);
+}
+
+static bool ov_totals_visible(const char *name)
+{
+    return ov_domination && ov_totals_n > 0 &&
+           (strcmp(name, "neutral") == 0 || strcmp(name, "captured") == 0 ||
+            strcmp(name, "final_score") == 0);
+}
+
+void screen_set_overlay_readers(uint32_t (*game_ms)(void),
+                                int (*holds)(oled_hold_t *holds, int max))
+{
+    ov_game_ms = game_ms;
+    ov_holds = holds;
+}
+
+int screen_overlay_total(const char *team, long *points)
+{
+    for (int i = 0; i < ov_totals_n; i++) {
+        if (!ov_same(ov_totals[i].team, team)) continue;
+        if (points) *points = ov_totals[i].points;
+        return 1;
+    }
+    return 0;
+}
 
 /* ------------------------------------------------------------------ */
 /* LVGL rendering                                                      */
@@ -960,6 +1077,34 @@ static void clean_screen(lv_obj_t *scr)
     screen_template_forget();
 }
 
+/* The box's extras for a template's data: the box's language as "lang", unless the mode gives
+ * one (box_text.h), and "held", the seconds since the data's "since" by the game's clock (the
+ * live "held 1:23" of a captured zone). Returns data itself when there is nothing to add. */
+static long ov_drawn_held = -1;
+
+static const char *add_extras(const char *data)
+{
+    static char with[SCREEN_DATA_MAX + 48];
+    char lang_kv[24] = "", held_kv[40] = "", given[8];
+    long since, other;
+    ov_cur_held = -1;
+    if (box_lang_given() && !screen_json_str(data, "lang", given, sizeof(given)))
+        snprintf(lang_kv, sizeof(lang_kv), "\"lang\":\"%s\"", box_lang_code(box_lang()));
+    if (ov_game_ms && screen_json_int(data, "since", &since) && since >= 0 &&
+        !screen_json_int(data, "held", &other)) {
+        long now = (long)(ov_game_ms() / 1000u);
+        ov_cur_held = now > since ? now - since : 0;
+        snprintf(held_kv, sizeof(held_kv), "\"held\":%ld,\"live\":1", ov_cur_held);
+    }
+    if (!lang_kv[0] && !held_kv[0]) return data;
+    const char *rest = strchr(data, '{');
+    rest = rest != NULL ? rest + 1 : "}";
+    while (*rest == ' ') rest++;
+    snprintf(with, sizeof(with), "{%s%s%s%s%s", lang_kv, lang_kv[0] && held_kv[0] ? "," : "",
+             held_kv, *rest == '}' ? "" : ",", rest);
+    return with;
+}
+
 static void lvgl_render(const char *template_name, const char *data_json)
 {
     if (!lv_is_initialized() || !lv_display_get_default()) return;
@@ -976,27 +1121,19 @@ static void lvgl_render(const char *template_name, const char *data_json)
     /* The mode's own template first; "~" marks it in shown_template. */
     const builtin_screen_t *yaml = screen_template_find(template_name);
     if (yaml) {
-        /* The box's language as "lang", unless the mode gives one (box_text.h). */
-        static char with_lang[SCREEN_DATA_MAX + 16];
-        char given[8];
-        if (box_lang_given() && !screen_json_str(data, "lang", given, sizeof(given))) {
-            const char *rest = strchr(data, '{');
-            rest = rest != NULL ? rest + 1 : "}";
-            while (*rest == ' ') rest++;
-            snprintf(with_lang, sizeof(with_lang), "{\"lang\":\"%s\"%s%s",
-                     box_lang_code(box_lang()), *rest == '}' ? "" : ",", rest);
-            data = with_lang;
-        }
+        data = add_extras(data);
         char key[SCREEN_TEMPLATE_MAX];
         snprintf(key, sizeof(key), "~%s", template_name);
         if (strcmp(shown_template, key) == 0) {
             screen_template_update(data);
+            ov_drawn_held = ov_cur_held;
             return;
         }
         clean_screen(scr);
         set_bg(scr, COLOR_BG);
         if (screen_template_build(scr, yaml, data)) {
             snprintf(shown_template, sizeof(shown_template), "%s", key);
+            ov_drawn_held = ov_cur_held;
             return;
         }
         /* It did not parse (CI checks every template, so this is a bug): the C screen, if any. */
@@ -1014,9 +1151,12 @@ static void lvgl_render(const char *template_name, const char *data_json)
     }
 }
 
+static void ov_forget(void);
+
 static void lvgl_forget(void)
 {
     shown_template[0] = '\0';
+    ov_forget();
 }
 
 /* The game timer's bar (ADR-P1-3): a strip along the bottom edge on the display's top layer,
@@ -1042,6 +1182,132 @@ static void lvgl_timer_bar(bool visible, long left_s, long total_s)
     set_bg(timer_fill, left_s <= TIMER_BAR_LAST ? COLOR_DANGER : COLOR_ACCENT);
 }
 
+/* The overlay's widgets, on the display's top layer like the timer bar so every screen keeps
+ * them and clean_screen() leaves them: a strip over the footer with the taker's name and the hold
+ * bar, and the teams' totals in the top right. Both are built on first use and only their text,
+ * width and colour change. */
+#define OV_STRIP_H 30
+#define OV_TRACK_W 190
+#define OV_TRACK_H 14
+static lv_obj_t *ov_strip, *ov_team, *ov_track, *ov_fill, *ov_chips, *ov_chip[TOTALS_MAX];
+static int ov_drawn_pct = -2; /* the bar's share shown; -1 hidden */
+static char ov_drawn_team[24];
+
+static void ov_build(void)
+{
+    if (ov_strip || !lv_is_initialized() || !lv_display_get_default()) return;
+    lv_obj_t *top = lv_display_get_layer_top(lv_display_get_default());
+    ov_strip = box(top, SCREEN_W, OV_STRIP_H, COLOR_BG);
+    lv_obj_align(ov_strip, LV_ALIGN_BOTTOM_LEFT, 0, -TIMER_BAR_H - 2);
+    ov_team = lv_label_create(ov_strip);
+    lv_obj_set_style_text_font(ov_team, &lv_font_atalaia_14, 0);
+    lv_obj_set_width(ov_team, SCREEN_W - OV_TRACK_W - 30);
+    lv_label_set_long_mode(ov_team, LV_LABEL_LONG_DOT);
+    lv_obj_align(ov_team, LV_ALIGN_LEFT_MID, 10, 0);
+    ov_track = box(ov_strip, OV_TRACK_W, OV_TRACK_H, COLOR_PANEL);
+    lv_obj_set_style_radius(ov_track, 4, 0);
+    lv_obj_align(ov_track, LV_ALIGN_RIGHT_MID, -10, 0);
+    ov_fill = box(ov_track, 0, OV_TRACK_H, COLOR_ACCENT);
+    lv_obj_set_style_radius(ov_fill, 4, 0);
+    lv_obj_align(ov_fill, LV_ALIGN_LEFT_MID, 0, 0);
+    lv_obj_add_flag(ov_strip, LV_OBJ_FLAG_HIDDEN);
+
+    ov_chips = lv_obj_create(top);
+    lv_obj_remove_style_all(ov_chips);
+    lv_obj_set_size(ov_chips, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(ov_chips, LV_FLEX_FLOW_ROW);
+    lv_obj_set_style_pad_column(ov_chips, 3, 0);
+    lv_obj_align(ov_chips, LV_ALIGN_TOP_RIGHT, -4, 4);
+    for (int i = 0; i < TOTALS_MAX; i++) {
+        lv_obj_t *c = lv_label_create(ov_chips);
+        lv_obj_set_style_text_font(c, &lv_font_atalaia_14, 0);
+        lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(c, 1, 0);
+        lv_obj_set_style_border_color(c, lv_color_hex(COLOR_TEXT), 0);
+        lv_obj_set_style_pad_hor(c, 4, 0);
+        lv_obj_set_style_pad_ver(c, 1, 0);
+        lv_obj_add_flag(c, LV_OBJ_FLAG_HIDDEN);
+        ov_chip[i] = c;
+    }
+    lv_obj_add_flag(ov_chips, LV_OBJ_FLAG_HIDDEN);
+}
+
+/* The corner's totals, redrawn only when a total or the screen's kind changed. */
+static int ov_chips_shown = -1; /* 1 shown, 0 hidden, -1 not known */
+
+static void ov_draw_totals(void)
+{
+    bool visible = ov_totals_visible(last_template);
+    if ((int)visible == ov_chips_shown && !(visible && ov_totals_dirty)) return;
+    ov_chips_shown = visible;
+    ov_totals_dirty = false;
+    show(ov_chips, visible);
+    if (!visible) return;
+    for (int i = 0; i < TOTALS_MAX; i++) {
+        show(ov_chip[i], i < ov_totals_n);
+        if (i >= ov_totals_n) continue;
+        uint32_t rgb = team_rgb(ov_totals[i].team);
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%ld", ov_totals[i].points);
+        lv_label_set_text(ov_chip[i], buf);
+        lv_obj_set_style_bg_color(ov_chip[i], lv_color_hex(rgb), 0);
+        lv_obj_set_style_text_color(ov_chip[i], lv_color_hex(text_on(rgb)), 0);
+    }
+}
+
+/* The hold bar: on a zone's screen that has none of its own, while a team that does not hold the
+ * zone holds its button (oled_text_hold(): the team held longest, in the steps of a hold event). */
+static void ov_draw_hold(void)
+{
+    int pct = -1;
+    char team[24] = "";
+    if (ov_base_on && ov_holds && ov_base.zone && ov_base.bar < 0) {
+        oled_hold_t holds[OLED_HOLDS_MAX];
+        int n = ov_holds(holds, OLED_HOLDS_MAX);
+        oled_text_t t = ov_base;
+        if (n > 0 && oled_text_hold(&t, holds, n > OLED_HOLDS_MAX ? OLED_HOLDS_MAX : n,
+                                    ov_hold_ms)) {
+            pct = t.bar > 100 ? 100 : t.bar;
+            snprintf(team, sizeof(team), "%.23s", t.foot);
+        }
+    }
+    if (pct == ov_drawn_pct && strcmp(team, ov_drawn_team) == 0) return;
+    ov_drawn_pct = pct;
+    snprintf(ov_drawn_team, sizeof(ov_drawn_team), "%s", team);
+    show(ov_strip, pct >= 0);
+    if (pct < 0) return;
+    uint32_t rgb = team_rgb(team);
+    screen_template_fold_text(team, 14);
+    lv_label_set_text(ov_team, team);
+    lv_obj_set_style_text_color(ov_team, lv_color_hex(rgb), 0);
+    set_bg(ov_fill, rgb);
+    lv_obj_set_width(ov_fill, OV_TRACK_W * pct / 100);
+}
+
+static void ov_forget(void)
+{
+    ov_drawn_pct = -2;
+    ov_chips_shown = -1;
+    ov_totals_dirty = true;
+    ov_drawn_held = -1;
+}
+
+static void lvgl_overlay(void)
+{
+    ov_build();
+    if (!ov_strip) return;
+    ov_draw_hold();
+    ov_draw_totals();
+    /* The captured zone's held time, a second at a time: only the labels that changed. */
+    if (shown_template[0] == '~' && ov_game_ms && last_data[0]) {
+        const char *data = add_extras(last_data);
+        if (ov_cur_held >= 0 && ov_cur_held != ov_drawn_held) {
+            ov_drawn_held = ov_cur_held;
+            screen_template_update(data);
+        }
+    }
+}
+
 #endif /* ATALAIA_SCREEN_LVGL */
 
 /* ------------------------------------------------------------------ */
@@ -1055,6 +1321,7 @@ bool screen_render(const char *template_name, const char *data_json)
     /* The running mode, for its own templates (in order with the screens). */
     if (strcmp(template_name, SCREEN_MODE_MESSAGE) == 0) {
         screen_template_set_mode(data_json);
+        ov_mode(data_json);
 #if ATALAIA_SCREEN_LVGL
         lvgl_forget(); /* the same name may now be another mode's template */
 #endif
@@ -1079,9 +1346,11 @@ bool screen_render(const char *template_name, const char *data_json)
         last_data[0] = '\0';
     }
     call_count++;
+    ov_screen(template_name, data_json ? data_json : "{}");
 
 #if ATALAIA_SCREEN_LVGL
     lvgl_render(template_name, data_json);
+    lvgl_overlay();
 #endif
 
     return true;
@@ -1099,6 +1368,13 @@ void screen_timer_bar(long left_s, long total_s)
 #endif
 }
 
+void screen_overlay_tick(void)
+{
+#if ATALAIA_SCREEN_LVGL
+    if (last_template[0]) lvgl_overlay();
+#endif
+}
+
 long screen_timer_bar_left(void)
 {
     return timer_bar_on ? timer_bar_left : -1;
@@ -1111,6 +1387,12 @@ void screen_renderer_reset(void)
     call_count = 0;
     screen_timer_bar(-1, 0);
     screen_template_reset();
+    ov_game_ms = NULL;
+    ov_holds = NULL;
+    ov_hold_ms = 0;
+    ov_domination = false;
+    ov_base_on = false;
+    ov_totals_clear();
 #if ATALAIA_SCREEN_LVGL
     lvgl_forget();
 #endif
