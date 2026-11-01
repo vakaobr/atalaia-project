@@ -206,8 +206,10 @@ void field_link_reset_sync(field_link_t *l);
 /* Number of events still waiting for an ACK (outbox and log backlog). */
 size_t field_link_pending(const field_link_t *l);
 
-/* Sends node.rebooted (critical) from the link itself (event seq 0, game time t_ms). */
-void field_link_send_rebooted(field_link_t *l, uint32_t t_ms);
+/* Sends node.rebooted (critical) from the link itself (event seq 0, game time t_ms). reason is
+ * why the box restarted, a word of reset_reason.h ("power", "panic", "watchdog", ...); NULL or
+ * empty sends "unknown". Only [0-9A-Za-z._+-] is kept, up to 15 characters. */
+void field_link_send_rebooted(field_link_t *l, uint32_t t_ms, const char *reason);
 
 /* Sends battery.low with the level in percent (telemetry: one packet, no ACK; event seq 0,
  * game time t_ms). */

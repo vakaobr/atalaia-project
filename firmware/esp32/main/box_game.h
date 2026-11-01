@@ -235,6 +235,8 @@ typedef struct {
     /* The box took part in its game only to say over LoRa that the fetch failed (P5E-8): its
      * link reports "waiting", and it leaves once the event is acknowledged (not an ended game). */
     bool fetch_failed_link;
+    /* Why this boot happened (reset_reason.h), sent as node.rebooted's reason on a resume. */
+    char reset_reason[16];
 } box_game_t;
 
 void box_game_init(box_game_t *g, node_runner_t *runner, preset_t *preset_buf,
@@ -264,6 +266,10 @@ const char *box_join_result_name(box_join_result_t r);
  * Returns true if the box is in a joined game.
  */
 bool box_game_resume(box_game_t *g, uint32_t now_ms);
+
+/* Why the box restarted: a word of reset_reason.h, set before box_game_resume so the controller
+ * hears a crash as one ("panic", "watchdog") and not as a power cut. Not set: "unknown". */
+void box_game_set_reset_reason(box_game_t *g, const char *reason);
 
 /* A packet heard on the radio. */
 void box_game_on_packet(box_game_t *g, const uint8_t *pkt, size_t len, int8_t rssi);

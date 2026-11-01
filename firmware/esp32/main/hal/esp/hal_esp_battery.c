@@ -6,7 +6,6 @@
 #include "../hal_battery.h"
 #include "hal_esp_i2c.h"
 
-#include "driver/i2c.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 
@@ -19,7 +18,6 @@ static const char *TAG = "hal_bat";
  * expander (hal_esp_i2c.c). The ATALAIA_BATT_SDA/SCL Kconfig pins must
  * match the NFC pins; one I2C port drives all of them.
  */
-#define CONFIG_ATALAIA_BATT_I2C_PORT HAL_ESP_I2C_PORT
 
 /* MAX17048 register addresses */
 #define MAX17048_I2C_ADDR 0x36
@@ -32,9 +30,9 @@ static const char *TAG = "hal_bat";
 static esp_err_t max17048_read_reg(uint8_t reg, uint16_t *value)
 {
     uint8_t data[2];
-    esp_err_t err = i2c_master_write_read_device(CONFIG_ATALAIA_BATT_I2C_PORT, MAX17048_I2C_ADDR,
-                                                 &reg, 1, data, 2, pdMS_TO_TICKS(100));
-    if (err != ESP_OK) return err;
+    if (hal_esp_i2c_write_read(MAX17048_I2C_ADDR, &reg, 1, data, 2, 100) != HAL_ESP_I2C_OK) {
+        return ESP_FAIL;
+    }
 
     /* MAX17048 returns MSB first */
     *value = ((uint16_t)data[0] << 8) | data[1];

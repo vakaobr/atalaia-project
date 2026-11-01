@@ -34,6 +34,8 @@ int main(void)
     run_modem_screen_tests();
     run_builtin_presets_tests();
     run_key_filter_tests();
+    run_i2c_health_tests();
+    run_reset_reason_tests();
     run_event_log_tests();
     run_time_sync_tests();
     run_radio_stub_tests();

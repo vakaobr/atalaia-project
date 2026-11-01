@@ -254,16 +254,6 @@ void field_link_event(field_link_t *l, const atalaia_event_t *ev, const char *da
     }
 }
 
-void field_link_send_rebooted(field_link_t *l, uint32_t t_ms)
-{
-    atalaia_event_t ev;
-    if (!atalaia_event_init(&ev, l->join.node_id, 0, t_ms, "node.rebooted", ATALAIA_TEAM_NONE,
-                            ATALAIA_SQUAD_NONE, ATALAIA_PRIO_CRITICAL)) {
-        return;
-    }
-    field_link_event(l, &ev, "{\"reason\":\"power\"}");
-}
-
 void field_link_send_battery_low(field_link_t *l, uint8_t percent, uint32_t t_ms)
 {
     atalaia_event_t ev;
@@ -288,6 +278,21 @@ static void plain_code(char *out, size_t cap, const char *in)
         }
     }
     out[n] = '\0';
+}
+
+void field_link_send_rebooted(field_link_t *l, uint32_t t_ms, const char *reason)
+{
+    atalaia_event_t ev;
+    if (!atalaia_event_init(&ev, l->join.node_id, 0, t_ms, "node.rebooted", ATALAIA_TEAM_NONE,
+                            ATALAIA_SQUAD_NONE, ATALAIA_PRIO_CRITICAL)) {
+        return;
+    }
+    char code[16];
+    plain_code(code, sizeof(code), reason);
+    if (code[0] == '\0') strcpy(code, "unknown");
+    char data[48];
+    snprintf(data, sizeof(data), "{\"reason\":\"%s\"}", code);
+    field_link_event(l, &ev, data);
 }
 
 void field_link_send_update_failed(field_link_t *l, const char *release, const char *reason,

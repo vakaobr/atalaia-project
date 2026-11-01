@@ -301,3 +301,8 @@ Findings from two real Heltec V4.3 boards and the Pi controller; the fixes are b
 - **The antenna's gain is a build option** (`tools/docker_fw.py ... --antenna-dbi=N`, 0 to 20 dBi, 2 by default), and the conducted power is rounded down, also below 0 dBm (a 10 dBi antenna on a 25 mW sub-band gave -7 dBm instead of -8). Host tests.
 - **Team results without player ids are kept 365 days on the Pi controller (FU30-13 to FU30-19, SR-88)**, written when the purge drops a game at 90 days; `GET /api/v1/game-results`, read-only. Not tried on a Pi at a field.
 - **Not done:** none of this has been tried on a real board, a real Pi or a field.
+
+## Bench 2026-10-31: the I2C crash and the reboot reason (I2C-1 to I2C-6; host tests and a firmware build only)
+
+- **A flaky I2C bus no longer reboots a box (I2C-1 to I2C-4).** The four parts on the shared bus moved to ESP-IDF's `i2c_master` driver with a per-device health record (suspend after 3 failures, retry after 0.5 s doubling to 30 s) and a bus reset on a run of failures; the legacy driver's handler left unowned interrupts uncleared and spun past the interrupt watchdog. **Not tried on real hardware**: `docs/runbooks/i2c-fault-bench.md`.
+- **`node.rebooted` says why (I2C-5, I2C-6).** The box sends `esp_reset_reason()` as `power`, `brownout`, `software`, `panic`, `watchdog`, `deepsleep` or `unknown` instead of a constant `power`; the controllers pass it through; the console's feed calls a panic or watchdog restart a crash (four languages). The phone app shows no text for the event, so it needed no change.

@@ -38,6 +38,8 @@ void run_oled_view_tests(void);
 void run_modem_screen_tests(void);
 void run_builtin_presets_tests(void);
 void run_key_filter_tests(void);
+void run_i2c_health_tests(void);
+void run_reset_reason_tests(void);
 void run_event_log_tests(void);
 void run_time_sync_tests(void);
 void run_radio_stub_tests(void);

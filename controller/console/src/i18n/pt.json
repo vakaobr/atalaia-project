@@ -237,9 +237,19 @@
       "node_online": "Uma caixa ligou-se",
       "node_offline": "Uma caixa deixou de dar notícias",
       "node_rebooted": "Uma caixa reiniciou ({reason})",
+      "node_rebooted_crash": "Uma caixa falhou e reiniciou ({reason})",
       "node_setup_applied": "{zone} confirmou a configuração do cenário",
       "battery_low": "Uma caixa tem a bateria fraca",
       "nobody": "Alguém por identificar"
+    },
+    "reboot_reasons": {
+      "power": "corte ou arranque de energia",
+      "brownout": "quebra de tensão",
+      "software": "reinício por software (atualização ou comando)",
+      "panic": "erro fatal do programa",
+      "watchdog": "watchdog: o programa bloqueou",
+      "deepsleep": "saída do sono profundo",
+      "unknown": "motivo desconhecido"
     },
     "puzzles": {
       "code": "código",

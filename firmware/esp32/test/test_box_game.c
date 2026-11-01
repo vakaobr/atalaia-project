@@ -400,6 +400,30 @@ static bool last_of(uint8_t type, atalaia_header_t *h, uint8_t *pl, size_t *n)
     return false;
 }
 
+/* The data JSON of the last event of this type sent; false when none. */
+static bool last_event_data(const char *type, char *data, size_t cap)
+{
+    bool found = false;
+    for (int i = 0; i < shell.count; i++) {
+        atalaia_header_t h;
+        uint8_t pl[PKT_CAP];
+        size_t n;
+        if (!atalaia_packet_decrypt(shell.pkt[i], shell.len[i], game.link.proto.epoch, GAME_KEY, &h,
+                                    pl, &n, &atalaia_crypto_test_stub) ||
+            h.type != ATALAIA_MSG_EVENT) {
+            continue;
+        }
+        atalaia_event_t ev;
+        char buf[128];
+        if (atalaia_event_decode(pl, n, &ev, buf, sizeof(buf), NULL) &&
+            strcmp(ev.type, type) == 0) {
+            snprintf(data, cap, "%s", buf);
+            found = true;
+        }
+    }
+    return found;
+}
+
 static int events_named(const char *type)
 {
     int c = 0;
@@ -659,6 +683,41 @@ static void test_end_without_acks(void)
     CHECK(game.phase == BOX_IDLE && !game.link.proto.has_key);
 }
 
+/* Each reset cause reaches the controller in its own word; a word that needs escaping, or none,
+ * never breaks the event. */
+static void resume_with_reason(const char *reason, const char *expect)
+{
+    fixture(false);
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    uint32_t now = 10;
+    cmd(FIELD_CMD_START);
+    run_ms(&now, 2500);
+    node_runner_stop(&runner);
+    fixture(true);
+    if (reason != NULL) box_game_set_reset_reason(&game, reason);
+    CHECK(box_game_resume(&game, 5));
+    char data[128];
+    char want[64];
+    snprintf(want, sizeof(want), "\"reason\":\"%s\"", expect);
+    CHECK(last_event_data("node.rebooted", data, sizeof(data)));
+    CHECK(strstr(data, want) != NULL);
+}
+
+static void test_reboot_reason_words(void)
+{
+    resume_with_reason("power", "power");
+    resume_with_reason("watchdog", "watchdog");
+    resume_with_reason("software", "software");
+    resume_with_reason(NULL, "unknown"); /* the shell never said */
+    resume_with_reason("", "unknown");
+    resume_with_reason("a\"b\\c d", "abcd"); /* kept to the characters that need no escape */
+    resume_with_reason("0123456789abcdefghij", "0123456789abcde"); /* 15 at most */
+}
+
 static void test_resume_after_reboot(void)
 {
     fixture(false);
@@ -682,9 +741,17 @@ static void test_resume_after_reboot(void)
     /* Battery pulled: the same flash, a new boot. */
     fixture(true);
     CHECK(game.have_join_key);
+    box_game_set_reset_reason(&game, "panic"); /* what the shell reads from the chip */
     CHECK(box_game_resume(&game, 5));
     CHECK(game.phase == BOX_PLAYING && runner.running);
     CHECK(game.link.proto.epoch == 2 && epoch_fake_of(&flash.epochs, GAME_KEY) == 2);
+    {
+        /* The controller hears a crash as one, not as a power cut. */
+        char data[128];
+        CHECK(last_event_data("node.rebooted", data, sizeof(data)));
+        CHECK(strstr(data, "\"reason\":\"panic\"") != NULL);
+        CHECK(strstr(data, "power") == NULL);
+    }
     CHECK(runner.game_time_ms >= 2000 && runner.game_time_ms <= played);
     CHECK(runner.node_id == NODE);
     CHECK(events_named("node.rebooted") == 1);
@@ -2278,6 +2345,7 @@ void run_box_game_tests(void)
     test_radio_report();
     test_end_without_acks();
     test_resume_after_reboot();
+    test_reboot_reason_words();
     test_screens_follow_the_game();
     test_screen_language();
     test_old_card_refused();

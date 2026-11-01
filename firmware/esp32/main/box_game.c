@@ -781,6 +781,11 @@ box_join_result_t box_game_join_tag(box_game_t *g, const uint8_t *mem, size_t le
     return box_game_join(g, payload, n);
 }
 
+void box_game_set_reset_reason(box_game_t *g, const char *reason)
+{
+    snprintf(g->reset_reason, sizeof(g->reset_reason), "%s", reason ? reason : "");
+}
+
 bool box_game_resume(box_game_t *g, uint32_t now_ms)
 {
     g->now_ms = now_ms ? now_ms : 1;
@@ -814,7 +819,7 @@ bool box_game_resume(box_game_t *g, uint32_t now_ms)
             g->runner->preset_index = g->preset_index;
             g->phase = BOX_PLAYING;
             g->link.game_state = FIELD_GAME_RUNNING;
-            field_link_send_rebooted(&g->link, saved.game_time_ms);
+            field_link_send_rebooted(&g->link, saved.game_time_ms, g->reset_reason);
             say(g, "resumed game %u at %lu ms after a reboot", g->join.game_id,
                 (unsigned long)saved.game_time_ms);
         }

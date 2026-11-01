@@ -237,9 +237,19 @@
       "node_online": "A box came online",
       "node_offline": "A box went offline",
       "node_rebooted": "A box restarted ({reason})",
+      "node_rebooted_crash": "A box crashed and restarted ({reason})",
       "node_setup_applied": "{zone} confirmed its scenario setup",
       "battery_low": "A box's battery is low",
       "nobody": "Nobody known"
+    },
+    "reboot_reasons": {
+      "power": "power cut or power-on",
+      "brownout": "supply voltage dip",
+      "software": "software restart (update or command)",
+      "panic": "program crash",
+      "watchdog": "watchdog: the program hung",
+      "deepsleep": "wake from deep sleep",
+      "unknown": "reason unknown"
     },
     "puzzles": {
       "code": "code",

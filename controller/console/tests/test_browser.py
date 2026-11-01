@@ -5122,6 +5122,30 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertEqual(one, ["red captured Alpha", "P1 is back in (2 lives)", "Bomb armed by blue (30 s)",
                                "The game ended: ended by box Gate", "The game ended: ended by box 5",
                                "The game ended"])
+        # A box's restart says why; a panic or a watchdog reset is said as a crash, in every
+        # language, not as a power cut (firmware reset_reason.h; bench 2026-10-31).
+        reboots = page.evaluate("""async () => {
+            const m = await import('/console/ui.js');
+            await m.loadLanguage('en');
+            return ['power', 'panic', 'watchdog', 'software', 'mystery', ''].map((reason) =>
+                m.eventWords({ type: 'node.rebooted', node: 3, data: reason ? { reason } : {} }));
+        }""")
+        self.assertEqual(reboots, ["A box restarted (power cut or power-on)",
+                                   "A box crashed and restarted (program crash)",
+                                   "A box crashed and restarted (watchdog: the program hung)",
+                                   "A box restarted (software restart (update or command))",
+                                   "A box restarted (mystery)", "A box restarted ()"])
+        for lang in ("pt", "de", "zh-tw"):
+            crash, power = page.evaluate("""async (lang) => {
+                const m = await import('/console/ui.js');
+                await m.loadLanguage(lang);
+                return [m.eventWords({ type: 'node.rebooted', node: 3, data: { reason: 'panic' } }),
+                        m.eventWords({ type: 'node.rebooted', node: 3, data: { reason: 'power' } })];
+            }""", lang)
+            self.assertNotEqual(crash, power, lang)
+            for text in (crash, power):
+                self.assertNotIn("feed.", text, lang)
+                self.assertNotIn("{", text, lang)
         # "ended by box <name or node id>" in every language (GE-5).
         for lang in ("pt", "de", "zh-tw"):
             text = page.evaluate("""async (lang) => {

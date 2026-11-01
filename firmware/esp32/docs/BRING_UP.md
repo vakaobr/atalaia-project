@@ -401,8 +401,9 @@ and two boards at least 1 m apart, both antennas fitted.
 4. Pause, resume and end from the console: the box follows. After the end
    the log shows `left game <id>; the game key is erased`.
 5. Battery pull during a game: the box comes back in the same game (`field:
-   ... resumed game`), with `node.rebooted` in the console's feed and no
-   capture lost.
+   ... resumed game`), with `node.rebooted` (reason `power`) in the console's feed
+   and no capture lost. A panic or watchdog restart shows as "A box crashed and
+   restarted" instead; `docs/runbooks/i2c-fault-bench.md` makes one on purpose.
 6. Range: walk the box away until the console marks it offline; with a
    third box joined half-way, the far box's captures reach the console
    again through the middle box's relay.

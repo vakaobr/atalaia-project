@@ -117,6 +117,13 @@ export function eventWords(e) {
         const r = t(`firmware.reasons.${reason}`);
         if (!r.startsWith('firmware.')) reason = r;
     }
+    // A box that restarted: why, in words; a panic or a watchdog reset is a crash, said as one
+    // (the firmware reads esp_reset_reason(): firmware/esp32/main/reset_reason.h).
+    if (e.type === 'node.rebooted') {
+        const r = t(`feed.reboot_reasons.${reason}`);
+        if (!r.startsWith('feed.')) reason = r;
+        if (d.reason === 'panic' || d.reason === 'watchdog') key += '_crash';
+    }
     // A scenario's objectives: which one is the staff's (decision M6-5); a reveal without a
     // team is for every team.
     if (String(e.type || '').startsWith('scenario.objective.')) {

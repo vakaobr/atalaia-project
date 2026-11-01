@@ -54,6 +54,7 @@
 #include "radio/event_log.h"
 #include "radio/radio_stats.h"
 #include "radio/radio_task.h"
+#include "reset_reason.h"
 #if CONFIG_ATALAIA_LBT_BENCH
 #include "radio/lbt_bench.h"
 #endif
@@ -1544,6 +1545,15 @@ void app_main(void)
 
         /* A field game stored before a reboot comes first (ADR-P2-12): rejoin it. */
         state_persist_data_t saved;
+        /* Why this boot happened goes to the controller with node.rebooted: a panic or a
+         * watchdog reset is a crash, not a power cut. */
+        reset_cause_t cause = reset_cause_this_boot();
+        if (reset_cause_is_crash(cause)) {
+            ESP_LOGW(TAG, "the last restart was a crash (%s)", reset_cause_name(cause));
+        } else {
+            ESP_LOGI(TAG, "reset reason: %s", reset_cause_name(cause));
+        }
+        box_game_set_reset_reason(&box, reset_cause_name(cause));
         bool resumed = box_game_resume(&box, (uint32_t)(esp_timer_get_time() / 1000));
         if (resumed) ESP_LOGI(TAG, "rejoined field game %u", box.join.game_id);
 

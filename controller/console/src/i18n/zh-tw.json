@@ -231,9 +231,19 @@
       "node_online": "一個盒子已上線",
       "node_offline": "一個盒子已離線",
       "node_rebooted": "一個盒子重新啟動（{reason}）",
+      "node_rebooted_crash": "一個盒子當機並重新啟動（{reason}）",
       "node_setup_applied": "{zone}已確認情境設定",
       "battery_low": "一個盒子電量偏低",
       "nobody": "不明"
+    },
+    "reboot_reasons": {
+      "power": "斷電或開機",
+      "brownout": "電壓驟降",
+      "software": "軟體重新啟動（更新或指令）",
+      "panic": "程式嚴重錯誤",
+      "watchdog": "看門狗逾時（程式卡住）",
+      "deepsleep": "從深度睡眠喚醒",
+      "unknown": "原因不明"
     },
     "puzzles": {
       "code": "密碼",

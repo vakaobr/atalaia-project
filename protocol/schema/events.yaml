@@ -105,7 +105,7 @@ events:
   gm.message:       { id: 18, prio: normal,    data: [text, audience] }
   node.online:      { id: 19, prio: telemetry, data: [fw, tier] }
   node.offline:     { id: 20, prio: telemetry, data: [last_seen] }
-  node.rebooted:    { id: 21, prio: critical,  data: [reason] }
+  node.rebooted:    { id: 21, prio: critical,  data: [reason] }           # why: power, brownout, software, panic, watchdog, deepsleep, unknown (firmware reset_reason.h); panic and watchdog are crashes
   battery.low:      { id: 22, prio: telemetry, data: [percent] }
   script.error:     { id: 23, prio: normal,    data: [message] }          # a handler failed; the node keeps running
   script.halted:    { id: 24, prio: critical,  data: [reason] }           # the sandbox stopped the script

@@ -207,6 +207,30 @@ commit them with the change. Rendered images land in
 `firmware/esp32/build-test/screens/` (or `<build>/screens/` with `ctest`),
 next to a `.diff.png` for each mismatch.
 
+### The I2C bus must never take the box down
+
+The OLED, the PCF8574 keypad, the PN532 and the MAX17048 share one bus (GPIO 17/18). Bench,
+2026-10-31: a keypad with bad solder joints rebooted a box six times in three minutes with
+"Interrupt wdt timeout on CPU0" in `i2c_isr_handler_default`. Cause: ESP-IDF v5.3's legacy I2C
+driver (`driver/i2c.h`) only handles an interrupt while a transaction it started is running; any
+other interrupt (a start/stop, timeout or arbitration loss that noise raises after a transaction
+timed out and the driver reset the controller) is neither handled nor cleared, the level-triggered
+interrupt fires again at once, and the CPU never leaves the handler until the interrupt watchdog
+resets it. The fix (decision I2C-1) is in two layers, both in `main/hal/esp/hal_esp_i2c.c`:
+
+- **The driver.** Every part now goes through `i2c_master` (`driver/i2c_master.h`), whose handler
+  clears what it reads first thing, with a timeout on every transaction, a controller reset and
+  bus clear after each failed one, and a glitch filter (7 cycles) on SDA/SCL.
+- **The health layer** (`main/i2c_health.c`, pure logic, host-tested). Each device has a record:
+  3 failures in a row suspend it (every call then answers "suspended" at once, nothing on the
+  bus), a trial is allowed after 0.5 s, doubling to 30 s while it keeps failing, and one success
+  brings it back. A run of 3 failures on the bus (any device) also resets the bus, at most once a
+  second. All of it is logged once per change under the tag `hal_i2c`: `device 0x20 suspended
+  after 3 failures`, `still failing`, `answers again`. The keypad then reads as "no key", the OLED
+  frame is skipped, NFC polls find nothing and the battery level reads unknown, while the game
+  runs on the buttons. `hal_esp_i2c_stats()` has the counters (ok, errors, skipped, suspensions,
+  recoveries, bus resets).
+
 ### The on-board OLED
 
 The Heltec V4's own 0.96" OLED (SSD1306, 128x64, I2C 0x3C on the shared bus,
@@ -1058,7 +1082,13 @@ controller's game.
   the bench board has no gauge fitted.
 - **After a reboot** -- the stored join brings the box back: a new epoch
   (that game's last + 1), HELLO, the saved game state, `node.rebooted`, and
-  the unacknowledged events from the flash log.
+  the unacknowledged events from the flash log. `node.rebooted`'s `reason` is
+  why the chip came up (`esp_reset_reason()`, mapped in `main/reset_reason.c`,
+  decision I2C-5): `power`, `brownout`, `software` (an update or a reboot
+  command), `panic`, `watchdog`, `deepsleep` or `unknown`. A panic or a
+  watchdog reset is a crash: the console says "A box crashed and restarted"
+  and the boot log says so too. It is sent when a game was being played
+  (that is when the box reports a reboot at all).
 - **The radio report** -- (decision SL-18) while a game is on the box, once a minute and once
   more when it ends, one JSON line on the serial port (USB-C, 115200 baud) under the log tag
   `radio_stats`: `I (123456) radio_stats: {"t_s":120,"game":4243,"node":7,"sent":9,"retries":31,

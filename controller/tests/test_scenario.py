@@ -183,6 +183,16 @@ class ScenarioControllerTests(unittest.TestCase):
         self.rx(7, 0, "EVENT", ev(7, 0, 40_000, "node.rebooted", reason="power"), epoch=2)
         self.assertEqual([d for d, p in self.setups()], [7])
 
+        # A crash is logged as one: the box's reset reason (panic, watchdog) reaches the log and the
+        # API as it said it, never turned into "power" (bench 2026-10-31); the setup goes again.
+        for i, reason in enumerate(("panic", "watchdog")):
+            self.modem.sent.clear()
+            self.rx(7, 0, "EVENT", ev(7, 0, 50_000 + i * 1000, "node.rebooted", reason=reason), epoch=3 + i)
+            self.assertEqual([d for d, p in self.setups()], [7])
+        reasons = [e["data"]["reason"] for e in self.client.get(f"/api/v1/games/{self.gid}/log", headers=GM).json()
+                   if e["type"] == "node.rebooted" and e["node"] == 7]
+        self.assertEqual(reasons, ["power", "panic", "watchdog"])
+
     def test_which_objective_is_for_staff_only(self):
         self.start()
         self.rx(4, 1, "EVENT", ev(4, 1, 30_000, "zone.captured", team=RED), epoch=1)

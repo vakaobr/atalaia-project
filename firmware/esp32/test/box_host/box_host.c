@@ -974,6 +974,7 @@ int main(int argc, char **argv)
                   radio_region_default_channel_hz(host_region));
 
     uint32_t last = mono_ms();
+    box_game_set_reset_reason(&game, "power"); /* the host's "battery pull" is a power cut */
     bool resumed = box_game_resume(&game, last);
     if (resumed) out("LOG rejoined the stored game");
     button_tracker_t buttons;
