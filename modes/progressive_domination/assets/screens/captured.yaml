@@ -6,7 +6,9 @@
 # last box), held_min (full minutes held), need_min (minutes that complete it),
 # points (what those minutes paid), share (0-1 of the time that completes it),
 # taker and progress (0-1) while another team holds its input to take it over;
-# lang (pt, en, de or zh-tw) from the box.
+# lang (pt, en, de or zh-tw) from the box. The Field Box also adds age (the seconds
+# since "since" by the game's clock) and live (1), updated every second, so its screen
+# counts up "held for 1:23"; without them (a phone) it says "since <time>".
 template: captured
 layout:
   - type: row
@@ -27,8 +29,11 @@ layout:
     value: "{share}"
     style: { width: 220, height: 12, color: team }
   - type: label
+    text: "{lang == 'pt' && 'ocupada há' || lang == 'de' && 'gehalten seit' || lang == 'zh-tw' && '已佔領' || 'held'} {age|clock}"
+    style: { font_size: 14, color: muted, visible: "{!taker && live}" }
+  - type: label
     text: "{lang == 'pt' && 'desde' || lang == 'de' && 'seit' || lang == 'zh-tw' && '佔領於' || 'held since'} {since|clock}"
-    style: { font_size: 14, color: muted, visible: "{!taker}" }
+    style: { font_size: 14, color: muted, visible: "{!taker && !live}" }
   - type: label
     text: "{lang == 'pt' && 'A tomar:' || lang == 'de' && 'Übernahme:' || lang == 'zh-tw' && '奪取中' || 'Taking:'} {taker|upper}"
     style: { font_size: 14, color: "{taker}", visible: "{taker}" }

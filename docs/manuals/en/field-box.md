@@ -128,8 +128,8 @@ You hold your team's button on the box. The box shows what is happening.
 | **READY** · the Atalaia tower · **Next game** | Adopted, in no game. It can be invited. |
 | **WAITING** · **Game** *N* · **The game hasn't started** | Joined. Waits for the organisers' **Start**. |
 | **GAME ON** | The game started. The mode's own screen follows. |
-| **ZONE · NEUTRAL** · **Hold to capture** | A zone nobody holds (Domination, Hold-All, Last Stand, Master and Satellites). Hold your team's button. A bar fills. |
-| **ZONE HELD** · team | A team holds the zone. The ring takes its colour. Both screens show how long it has held it, counting up (**held 1:23**). In Domination the big screen also shows each team's points at this box, in team colours, in its top right corner. |
+| **ZONE · NEUTRAL** · **Hold to capture** | A zone nobody holds (Domination, Hold-All, Last Stand, Master and Satellites; in Master and Satellites the header says **MASTER** or **SATELLITE** once the controller has told the box which it is). Hold your team's button. A bar fills. |
+| **ZONE HELD** · team | A team holds the zone. The ring takes its colour. Both screens show how long it has held it, counting up (**held 1:23**). In Domination the big screen also shows each team's points at this box, in team colours, in its top right corner. In Master and Satellites the header names the box (**MASTER HELD**, **SATELLITE HELD**), and the master's big screen counts up the held time and shows each team's score the same way. Progressive Domination and VIP Payload's checkpoints count up the held time on the big screen too. |
 | **Hold to take it over** | Another team can take the zone the same way. While a team holds its button, a bar with that team's name fills along the bottom of the big screen, as it does on the OLED. |
 | **READY** · **Hold to arm** | *Bomb / Rush*: the bomb is not armed yet. Attackers hold their button. |
 | **ARMED** · time **until detonation** | The bomb is armed. Defenders hold their button to defuse. |

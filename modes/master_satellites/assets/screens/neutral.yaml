@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Nobody holds the box (a master or a satellite) in a running game (decision
-# BN-11). No data of the mode's; the hold time comes from the game's
+# BN-11). Data: role (master or satellite, from the controller; missing until it
+# has told this box: the header then says zone); the hold time comes from the game's
 # parameters, lang (pt, en, de or zh-tw) from the box.
 template: neutral
 layout:
@@ -10,7 +11,7 @@ layout:
     style: { width: fill, height: 44, background: panel }
     children:
       - type: label
-        text: "{lang == 'pt' && 'ZONA' || lang == 'de' && 'ZONE' || lang == 'zh-tw' && '據點' || 'ZONE'}"
+        text: "{role == 'master' && (lang == 'pt' && 'MESTRE' || lang == 'de' && 'MASTER' || lang == 'zh-tw' && '主站' || 'MASTER') || role == 'satellite' && (lang == 'pt' && 'SATÉLITE' || lang == 'de' && 'SATELLIT' || lang == 'zh-tw' && '衛星' || 'SATELLITE') || (lang == 'pt' && 'ZONA' || lang == 'de' && 'ZONE' || lang == 'zh-tw' && '據點' || 'ZONE')}"
         style: { font_size: 20, width: fill, align: center }
   - type: spacer
     height: fill

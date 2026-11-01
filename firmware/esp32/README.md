@@ -258,18 +258,24 @@ limit, no game, a field game, game over) hides it. Reference images:
 The TFT also shows what the box itself knows (decisions TZ-1 to TZ-5, in `screen_renderer.c`, on
 LVGL's top layer like the timer bar; the shell sets the readers with `screen_set_overlay_readers()`
 and the LVGL task calls `screen_overlay_tick()` each pass):
-- a zone's screen with no bar of its own shows the capture's hold bar and the holding team's name
+- a zone's screen with no bar of its own (neutral and captured, Master and Satellites' `master_status`,
+  VIP Payload's `checkpoint_free` and `checkpoint_held`: `oled_text_for()` marks them `zone`, so the
+  OLED draws the bar there too, decision TFT-3) shows the capture's hold bar and the holding team's name
   in a strip over the footer, from the OLED's own logic (`oled_text_for()` and `oled_text_hold()`,
   BN-26) and the mode's `capture_hold_ms`; Bomb's arm and defuse bars are the mode's own data and
   already drew in its templates;
-- a template's data with `since` gets `held` and `live` added (game seconds since the capture, by the
-  game clock the OLED reads), redrawn once a second through `screen_template_update()`, so only the
-  changed label is touched. Domination's captured screen says `held 1:23`; without `live` (a phone) it
-  keeps `held since <time>`;
+- a template's data with `since` gets `age`, `live` and, when the data has no `held` of its own, `held`
+  added (game seconds since the capture, by the game clock the OLED reads), redrawn once a second through
+  `screen_template_update()`, so only the changed label is touched. Domination's captured screen says
+  `held 1:23`; without `live` (a phone) it keeps `held since <time>`. Master and Satellites' `held` is its
+  satellites, so its screens, Progressive Domination's captured and VIP Payload's `checkpoint_held` read
+  `age` (decision TFT-4);
 - under Domination, each team's points at this box in team-coloured chips in the top right: the last
   `points` the captured and final screens carried for that team (its own zone's total, re-sent every
-  tick), kept when another team takes the zone and cleared at a new `@mode` or between games.
-Reference images: `test/screens/yaml_domination_*_live*.png`, `*_holding*.png`.
+  tick), kept when another team takes the zone and cleared at a new `@mode` or between games. Under
+  Master and Satellites the chips are the `total` of the master's status (the team's score), shown on the
+  master; the satellites show none. Progressive Domination and VIP Payload have none (decision TFT-2).
+Reference images: `test/screens/yaml_domination_*_live*.png`, `*_holding*.png`, and the same for `yaml_master_satellites_*`, `yaml_progressive_domination_captured_*` and `yaml_vip_checkpoint_*`.
 
 It is a second LVGL display, rendered in RGB565 and packed to one bit per
 pixel on flush (`oled_pack`); only the 128-byte pages that changed go over

@@ -55,6 +55,7 @@ static const char *known_templates[] = {
  * bar and the team holding (the OLED's logic, oled_text_hold(), BN-26), the live "held 1:23" of
  * a captured zone, and each team's points at this box in a top corner. */
 #define TOTALS_MAX 6
+enum { OV_NONE, OV_DOMINATION, OV_MASTER };
 typedef struct {
     char team[24];
     long points;
@@ -63,7 +64,7 @@ typedef struct {
 static uint32_t (*ov_game_ms)(void);
 static int (*ov_holds)(oled_hold_t *holds, int max);
 static uint32_t ov_hold_ms; /* the mode's hold time to take a zone ("@mode"); 0 none */
-static bool ov_domination;  /* the running mode scores per team on this box */
+static int ov_scoring; /* what the zone screens' points are: OV_NONE, OV_DOMINATION or OV_MASTER */
 static oled_text_t ov_base; /* the last screen's OLED lines: zone, owner, mode-sent bar */
 static bool ov_base_on;
 static team_total_t ov_totals[TOTALS_MAX];
@@ -102,16 +103,25 @@ static void ov_totals_clear(void)
     ov_totals_n = 0;
 }
 
-/* The mode announced (data "<mode id> <params>"): its hold time, and whether its zone screens'
- * "points" are the holder's total at this box (Domination only: Progressive Domination's are what
- * its held minutes paid). A new mode is a new game: the totals start again. */
+/* True when data is the mode's id (alone, with "+modifiers" or followed by its params). */
+static bool ov_is_mode(const char *data, const char *id)
+{
+    size_t n = strlen(id);
+    return strncmp(data, id, n) == 0 && (data[n] == ' ' || data[n] == '+' || data[n] == '\0');
+}
+
+/* The mode announced (data "<mode id> <params>"): its hold time, and whether it has per-team
+ * totals to show at this box (decision TZ-3, TFT-2): Domination's zone screens carry the holder's
+ * total ("points"), Master and Satellites' master screen the holder's team total ("total");
+ * Progressive Domination's "points" are what its held minutes paid on one box and VIP Payload's
+ * boxes do not score, so they have none. A new mode is a new game: the totals start again. */
 static void ov_mode(const char *data)
 {
-    static const char dom[] = "org.atalaia.domination";
     ov_hold_ms = data ? oled_mode_hold_ms(data) : 0;
-    ov_domination = data && strncmp(data, dom, sizeof(dom) - 1) == 0 &&
-                    (data[sizeof(dom) - 1] == ' ' || data[sizeof(dom) - 1] == '+' ||
-                     data[sizeof(dom) - 1] == '\0');
+    ov_scoring = !data                                               ? OV_NONE
+                 : ov_is_mode(data, "org.atalaia.domination")        ? OV_DOMINATION
+                 : ov_is_mode(data, "org.atalaia.master_satellites") ? OV_MASTER
+                                                                     : OV_NONE;
     ov_base_on = false;
     ov_totals_clear();
 }
@@ -128,9 +138,16 @@ static void ov_screen(const char *name, const char *data)
         if (strcmp(name, between[i]) == 0) ov_totals_clear();
     }
     ov_base_on = oled_text_for("", name, data, &ov_base);
-    if (!ov_domination) return;
+    if (ov_scoring == OV_NONE) return;
     char team[24] = "";
     long points;
+    if (ov_scoring == OV_MASTER) {
+        if (strcmp(name, "master_status") == 0 &&
+            screen_json_str(data, "team", team, sizeof(team)) && team[0] &&
+            screen_json_int(data, "total", &points))
+            ov_total_set(team, points);
+        return;
+    }
     bool captured =
         strcmp(name, "captured") == 0 && screen_json_str(data, "team", team, sizeof(team));
     bool final =
@@ -141,9 +158,9 @@ static void ov_screen(const char *name, const char *data)
 
 static bool ov_totals_visible(const char *name)
 {
-    return ov_domination && ov_totals_n > 0 &&
+    return ov_scoring != OV_NONE && ov_totals_n > 0 &&
            (strcmp(name, "neutral") == 0 || strcmp(name, "captured") == 0 ||
-            strcmp(name, "final_score") == 0);
+            strcmp(name, "master_status") == 0 || strcmp(name, "final_score") == 0);
 }
 
 void screen_set_overlay_readers(uint32_t (*game_ms)(void),
@@ -1119,23 +1136,29 @@ static void clean_screen(lv_obj_t *scr)
 }
 
 /* The box's extras for a template's data: the box's language as "lang", unless the mode gives
- * one (box_text.h), and "held", the seconds since the data's "since" by the game's clock (the
- * live "held 1:23" of a captured zone). Returns data itself when there is nothing to add. */
+ * one (box_text.h), and "age" (and "held" when the data has none), the seconds since the data's
+ * "since" by the game's clock, with "live": 1 (the live "held 1:23" of a captured zone). Returns
+ * data itself when there is nothing to add. */
 static long ov_drawn_held = -1;
 
 static const char *add_extras(const char *data)
 {
-    static char with[SCREEN_DATA_MAX + 48];
-    char lang_kv[24] = "", held_kv[40] = "", given[8];
+    static char with[SCREEN_DATA_MAX + 80];
+    char lang_kv[24] = "", held_kv[64] = "", given[8];
     long since, other;
     ov_cur_held = -1;
     if (box_lang_given() && !screen_json_str(data, "lang", given, sizeof(given)))
         snprintf(lang_kv, sizeof(lang_kv), "\"lang\":\"%s\"", box_lang_code(box_lang()));
-    if (ov_game_ms && screen_json_int(data, "since", &since) && since >= 0 &&
-        !screen_json_int(data, "held", &other)) {
+    if (ov_game_ms && screen_json_int(data, "since", &since) && since >= 0) {
+        /* "age" always; "held" too unless the mode uses that name (Master and Satellites' is the
+         * satellites its holder has). "live" tells the template the clock is there. */
         long now = (long)(ov_game_ms() / 1000u);
         ov_cur_held = now > since ? now - since : 0;
-        snprintf(held_kv, sizeof(held_kv), "\"held\":%ld,\"live\":1", ov_cur_held);
+        if (screen_json_int(data, "held", &other))
+            snprintf(held_kv, sizeof(held_kv), "\"age\":%ld,\"live\":1", ov_cur_held);
+        else
+            snprintf(held_kv, sizeof(held_kv), "\"held\":%ld,\"age\":%ld,\"live\":1", ov_cur_held,
+                     ov_cur_held);
     }
     if (!lang_kv[0] && !held_kv[0]) return data;
     const char *rest = strchr(data, '{');
@@ -1431,7 +1454,7 @@ void screen_renderer_reset(void)
     ov_game_ms = NULL;
     ov_holds = NULL;
     ov_hold_ms = 0;
-    ov_domination = false;
+    ov_scoring = OV_NONE;
     ov_base_on = false;
     ov_totals_clear();
 #if ATALAIA_SCREEN_LVGL

@@ -252,6 +252,23 @@ static void test_box_hold_bar(void)
     t = map("BOMB", "standby", "{\"arm\":\"red\"}");
     CHECK(!oled_text_hold(&t, &blue, 1, 3000));
     CHECK(t.bar == -1);
+
+    /* The master's status and VIP Payload's checkpoints are zones too (TFT-3): the bar of a team
+     * taking them, never of their own holder; their name and team text stay. */
+    t = map("MASTER", "master_status", "{\"team\":\"red\",\"held\":1,\"of\":3,\"since\":95}");
+    CHECK(t.zone && !t.head_right[0] && t.since == -1);
+    CHECK(oled_text_hold(&t, &blue, 1, 3000));
+    CHECK(t.bar == 50);
+    CHECK(strcmp(t.foot, "BLUE") == 0);
+    t = map("MASTER", "master_status", "{\"team\":\"red\",\"held\":1,\"of\":3}");
+    CHECK(!oled_text_hold(&t, &red, 1, 3000));
+    CHECK(strcmp(t.foot, "RED") == 0);
+    t = map("VIP", "checkpoint_held", "{\"team\":\"red\",\"since\":95}");
+    CHECK(oled_text_hold(&t, &blue, 1, 3000));
+    CHECK(t.bar == 50);
+    t = map("VIP", "checkpoint_free", "{}");
+    CHECK(oled_text_hold(&t, &blue, 1, 3000));
+    CHECK(t.bar == 50);
 }
 
 static void test_pack(void)

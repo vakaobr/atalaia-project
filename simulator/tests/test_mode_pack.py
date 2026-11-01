@@ -420,5 +420,57 @@ class TemplateLanguageTests(unittest.TestCase):
                     self.assertEqual(CORE.screen_text(of_who, data, {}), want + who)
 
 
+    @unittest.skipIf(CORE is None, "needs the shared core library")
+    def test_master_and_satellites_name_the_box_in_every_language(self):
+        """A box the controller told what it is says so, free and held (TFT-1): the pt words
+        agree (a mestre is feminine, a satélite masculine) and no header is empty, which a
+        template whose string literals do not fit the evaluator's scratch silently is."""
+        import yaml
+
+        def label(name, marker):
+            doc = yaml.safe_load((MODES / "master_satellites" / "assets" / "screens" /
+                                  f"{name}.yaml").read_text(encoding="utf-8"))
+
+            def walk(node):
+                if isinstance(node, dict):
+                    if isinstance(node.get("text"), str) and marker in node["text"]:
+                        yield node["text"]
+                    for v in node.values():
+                        yield from walk(v)
+                elif isinstance(node, list):
+                    for v in node:
+                        yield from walk(v)
+            found = list(walk(doc))
+            self.assertEqual(len(found), 1, (name, marker))
+            return found[0]
+
+        cases = (
+            ("neutral", "'SATÉLITE'", {"role": "master"}, {"pt": "MESTRE", "en": "MASTER", "de": "MASTER", "zh-tw": "主站"}),
+            ("neutral", "'SATÉLITE'", {"role": "satellite"}, {"pt": "SATÉLITE", "en": "SATELLITE", "de": "SATELLIT", "zh-tw": "衛星"}),
+            ("neutral", "'SATÉLITE'", {}, {"pt": "ZONA", "en": "ZONE", "de": "ZONE", "zh-tw": "據點"}),
+            ("master_status", "'MESTRE OCUPADA'", {}, {"pt": "MESTRE OCUPADA", "en": "MASTER HELD", "de": "MASTER BESETZT", "zh-tw": "主站已佔領"}),
+            ("captured", "'SATÉLITE OCUPADO'", {}, {"pt": "SATÉLITE OCUPADO", "en": "SATELLITE HELD", "de": "SATELLIT BESETZT", "zh-tw": "衛星已佔領"}),
+            ("captured", "'MESTRE OCUPADA'", {}, {"pt": "MESTRE OCUPADA", "en": "MASTER HELD", "de": "MASTER BESETZT", "zh-tw": "主站已佔領"}),
+            ("captured", "'ZONA OCUPADA'", {}, {"pt": "ZONA OCUPADA", "en": "ZONE HELD", "de": "ZONE BESETZT", "zh-tw": "據點已佔領"}),
+        )
+        for name, marker, data, want in cases:
+            text = label(name, marker)
+            for lang, expected in want.items():
+                with self.subTest(name, marker=marker, role=data.get("role"), lang=lang):
+                    self.assertEqual(CORE.screen_text(text, dict(data, lang=lang), {}), expected)
+
+        held = {"pt": ("ocupada há 2:10", "ocupado há 2:10"), "en": ("held 2:10",) * 2,
+                "de": ("gehalten seit 2:10",) * 2, "zh-tw": ("已佔領 2:10",) * 2}
+        for name, marker in (("master_status", "{age|clock}"), ("captured", "{age|clock}")):
+            text = label(name, marker)
+            for lang, (feminine, masculine) in held.items():
+                with self.subTest("age", name=name, lang=lang):
+                    got = CORE.screen_text(text, {"lang": lang, "age": 130, "live": 1, "role": "satellite"}, {})
+                    self.assertEqual(got, masculine if name == "captured" else feminine)
+                    if name == "captured":
+                        got = CORE.screen_text(text, {"lang": lang, "age": 130, "live": 1}, {})
+                        self.assertEqual(got, feminine)
+
+
 if __name__ == "__main__":
     unittest.main()

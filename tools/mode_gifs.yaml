@@ -87,12 +87,12 @@ scripts:
     params: {capture_hold_ms: 3000, tick_s: 10}
     poster: 4
     steps:
-      - {screen: neutral, data: {}, game_s: 20, s: 2.0}
-      - {screen: neutral, data: {}, game_s: 20, tween: {n: 9, frame_s: 0.25, hold_team: red, hold_ms: [0, 3000]}, s: 0.2}
-      - {screen: captured, data: {team: red, since: 24}, game_s: 24, s: 1.2}
-      - {screen: master_status, data: {team: red, since: 24, held: 1, of: 3, points: 0}, game_s: 60, s: 2.0}
-      - {screen: master_status, data: {team: red, since: 24, held: 2, of: 3, points: 3}, game_s: 100, s: 2.0}
-      - {screen: master_status, data: {team: red, since: 24, held: 3, of: 3, points: 9}, game_s: 160, s: 2.2}
+      - {screen: neutral, data: {role: master}, game_s: 20, s: 2.0}
+      - {screen: neutral, data: {role: master}, game_s: 20, tween: {n: 9, frame_s: 0.25, hold_team: red, hold_ms: [0, 3000]}, s: 0.2}
+      - {screen: captured, data: {team: red, since: 24, role: master}, game_s: 24, s: 1.2}
+      - {screen: master_status, data: {team: red, since: 24, held: 1, of: 3, points: 2, total: 0}, game_s: 60, s: 2.0}
+      - {screen: master_status, data: {team: red, since: 24, held: 2, of: 3, points: 3, total: 12}, game_s: 100, s: 2.0}
+      - {screen: master_status, data: {team: red, since: 24, held: 3, of: 3, points: 4, total: 31}, game_s: 160, s: 2.2}
       - {screen: final_score, data: {owner: red}, game_s: 600, s: 3.0}
 
   hacking_terminal:
@@ -136,7 +136,7 @@ scripts:
     steps:
       - {screen: checkpoint_free, data: {}, game_s: 30, s: 1.8}
       - {screen: checkpoint_free, data: {}, game_s: 30, tween: {n: 9, frame_s: 0.25, hold_team: blue, hold_ms: [0, 3000]}, s: 0.2}
-      - {screen: checkpoint_held, data: {team: blue, since: 33}, game_s: 33, s: 2.0}
+      - {screen: checkpoint_held, data: {team: blue, since: 33}, game_s: 63, s: 2.0}
       - {screen: payload, data: {team: red, state: moving, metres: 100}, s: 0.4,
          tween: {n: 9, frame_s: 0.25, set: {metres: [100, 60]}}}
       - {screen: payload, data: {team: red, state: weak, metres: 40}, s: 2.2}

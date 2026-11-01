@@ -207,6 +207,29 @@ static void test_overlay_totals(void)
     CHECK(screen_render("captured", "{\"team\":\"red\",\"points\":2,\"since\":5}"));
     CHECK(!screen_overlay_total("red", &pts));
     screen_renderer_reset();
+
+    /* Master and Satellites: the master's status carries the holder's team total (TFT-2); a
+     * satellite's captured screen and a status without a total add none. */
+    screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.master_satellites {\"capture_hold_ms\":3000}");
+    CHECK(screen_render("captured", "{\"team\":\"blue\",\"since\":5,\"points\":9}"));
+    CHECK(!screen_overlay_total("blue", &pts));
+    CHECK(screen_render("master_status", "{\"team\":\"blue\",\"since\":5,\"held\":1,\"of\":2}"));
+    CHECK(!screen_overlay_total("blue", &pts));
+    CHECK(screen_render("master_status",
+                        "{\"team\":\"blue\",\"since\":5,\"held\":1,\"of\":2,\"total\":7}"));
+    CHECK(screen_render("master_status",
+                        "{\"team\":\"red\",\"since\":50,\"held\":0,\"of\":2,\"total\":12}"));
+    CHECK(screen_overlay_total("blue", &pts) && pts == 7);
+    CHECK(screen_overlay_total("red", &pts) && pts == 12);
+    CHECK(screen_render("neutral", "{\"role\":\"master\"}")); /* kept while the master is free */
+    CHECK(screen_overlay_total("red", &pts) && pts == 12);
+    screen_renderer_reset();
+
+    /* VIP Payload's boxes do not score: no totals. */
+    screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.vip_payload {}");
+    CHECK(screen_render("checkpoint_held", "{\"team\":\"red\",\"since\":5,\"points\":3}"));
+    CHECK(!screen_overlay_total("red", &pts));
+    screen_renderer_reset();
 }
 
 void run_screen_renderer_tests(void)

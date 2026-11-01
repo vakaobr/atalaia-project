@@ -633,6 +633,55 @@ static const screen_case_t cases[] = {
     {"yaml_domination_neutral_holding", "neutral", "{}", DOM},
     {"yaml_domination_captured_holding_de", "captured",
      "{\"team\":\"red\",\"points\":12,\"since\":95}", DOM},
+    /* The other modes' zones (TFT-1 to TFT-4). Master and Satellites: a box the controller has told
+     * what it is says so when free and when held ("MESTRE OCUPADA" feminine, "SATÉLITE OCUPADO"
+     * masculine in pt); the master counts up the held time, shows the teams' totals in the corner
+     * (blue held first, with 7; red holds now, with 12) and the bar of a team taking it over. */
+    {"yaml_master_satellites_neutral_master", "neutral", "{\"role\":\"master\"}", MASTER},
+    {"yaml_master_satellites_neutral_master_pt", "neutral", "{\"role\":\"master\"}", MASTER},
+    {"yaml_master_satellites_neutral_satellite_pt", "neutral", "{\"role\":\"satellite\"}", MASTER},
+    {"yaml_master_satellites_neutral_satellite_de", "neutral", "{\"role\":\"satellite\"}", MASTER},
+    {"yaml_master_satellites_neutral_master_zh-tw", "neutral", "{\"role\":\"master\"}", MASTER},
+    {"yaml_master_satellites_neutral_pt", "neutral", "{}", MASTER},
+    {"yaml_master_satellites_captured_satellite_pt", "captured",
+     "{\"team\":\"blue\",\"since\":95,\"role\":\"satellite\"}", MASTER},
+    {"yaml_master_satellites_captured_satellite_zh-tw", "captured",
+     "{\"team\":\"blue\",\"since\":95,\"role\":\"satellite\"}", MASTER},
+    {"yaml_master_satellites_captured_live_satellite_pt", "captured",
+     "{\"team\":\"blue\",\"since\":95,\"role\":\"satellite\"}", MASTER},
+    {"yaml_master_satellites_captured_live_satellite_de", "captured",
+     "{\"team\":\"blue\",\"since\":95,\"role\":\"satellite\"}", MASTER},
+    {"yaml_master_satellites_status_live", "master_status",
+     "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4,\"total\":12}", MASTER},
+    {"yaml_master_satellites_status_live_pt", "master_status",
+     "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4,\"total\":12}", MASTER},
+    {"yaml_master_satellites_status_live_zh-tw", "master_status",
+     "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4,\"total\":12}", MASTER},
+    {"yaml_master_satellites_status_holding_pt", "master_status",
+     "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4,\"total\":12}", MASTER},
+    {"yaml_master_satellites_neutral_holding", "neutral", "{\"role\":\"satellite\"}", MASTER},
+    /* Progressive Domination: the held time counts up; no corner totals (its points are one box's).
+     */
+    {"yaml_progressive_domination_captured_live", "captured",
+     "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"held_min\":2,\"need_min\":10,"
+     "\"points\":4,\"share\":0.2}",
+     PROG},
+    {"yaml_progressive_domination_captured_live_pt", "captured",
+     "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"held_min\":2,\"need_min\":10,"
+     "\"points\":4,\"share\":0.2}",
+     PROG},
+    {"yaml_progressive_domination_captured_holding_de", "captured",
+     "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"held_min\":2,\"need_min\":10,"
+     "\"points\":4,\"share\":0.2}",
+     PROG},
+    /* VIP Payload: a checkpoint counts up its held time and shows the bar of a team taking it. */
+    {"yaml_vip_checkpoint_held_live_en", "checkpoint_held", "{\"team\":\"blue\",\"since\":95}",
+     VIP_EN},
+    {"yaml_vip_checkpoint_held_live_pt", "checkpoint_held", "{\"team\":\"blue\",\"since\":95}",
+     VIP},
+    {"yaml_vip_checkpoint_held_holding_de", "checkpoint_held", "{\"team\":\"red\",\"since\":95}",
+     VIP_DE},
+    {"yaml_vip_checkpoint_free_holding_en", "checkpoint_free", "{}", VIP_EN},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 
@@ -740,17 +789,29 @@ static void render(const screen_case_t *c)
     box_lang_set_code(language(c->name));
     if (c->mode) screen_render(SCREEN_MODE_MESSAGE, c->mode);
     test_holds_ms = 0;
+    bool master = c->mode && strstr(c->mode, "master_satellites");
     if (strstr(c->name, "_live")) {
         screen_set_overlay_readers(test_game_ms, test_holds);
         /* Blue held the zone before, with 7 points. */
-        screen_render("captured", "{\"team\":\"blue\",\"points\":7,\"since\":20}");
+        if (master)
+            screen_render("master_status",
+                          "{\"team\":\"blue\",\"since\":20,\"held\":0,\"of\":3,\"points\":2,"
+                          "\"total\":7}");
+        else
+            screen_render("captured", "{\"team\":\"blue\",\"points\":7,\"since\":20}");
     }
     if (strstr(c->name, "_holding")) {
         screen_set_overlay_readers(test_game_ms, test_holds);
         test_holds_ms = 1500;
-        screen_render("captured", "{\"team\":\"red\",\"points\":12,\"since\":95}");
+        if (master)
+            screen_render("master_status",
+                          "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4,"
+                          "\"total\":12}");
+        else
+            screen_render("captured", "{\"team\":\"red\",\"points\":12,\"since\":95}");
         screen_render("neutral", "{}");
-        if (strstr(c->name, "captured")) {
+        if (strstr(c->name, "captured") || strstr(c->name, "status") ||
+            strstr(c->name, "checkpoint_held")) {
             screen_render(c->template_name, c->data);
             test_holds_ms = 2250;
         }

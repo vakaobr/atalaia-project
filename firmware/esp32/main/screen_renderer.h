@@ -54,12 +54,15 @@ void screen_timer_bar(long left_s, long total_s);
  * What the box adds to the mode's screens on the TFT (decision TZ-1 to TZ-5): game_ms is the
  * game's clock in ms (NULL: none), holds fills the team buttons held down now (as for
  * oled_view_set_hold_reader; NULL: none). Read from the display task.
- *  - a zone's screen (neutral, captured) that has no bar of its own shows the capture's hold bar
+ *  - a zone's screen (neutral, captured; Master and Satellites' master_status; VIP Payload's
+ *    checkpoint_free and checkpoint_held) that has no bar of its own shows the capture's hold bar
  *    and the team holding, from the mode's hold time, as the OLED does (oled_text_hold());
- *  - a template's data with "since" gets "held": the game seconds since then, so a captured
- *    screen can show "held {held|clock}" counting up;
+ *  - a template's data with "since" gets "age" (and "held", when the data has none): the game
+ *    seconds since then, and "live": 1, so a captured screen can show "held {age|clock}"
+ *    counting up (Master and Satellites' "held" is its satellites, hence "age");
  *  - under Domination, each team's points at this box (the last "points" its captured and final
- *    screens carried for it) in the top right, in team colours.
+ *    screens carried for it), and under Master and Satellites each team's total (the "total" of
+ *    the master's status), in the top right, in team colours (decision TFT-2).
  */
 void screen_set_overlay_readers(uint32_t (*game_ms)(void),
                                 int (*holds)(oled_hold_t *holds, int max));

@@ -3,7 +3,9 @@
 #
 # A team holds the checkpoint. Data: team, since (game time of the capture,
 # in seconds). The box does not score: the controller does, while it is held.
-# Texts in params.lang (pt, the default, en, de or zh-tw).
+# Texts in params.lang (pt, the default, en, de or zh-tw). The Field Box also adds age
+# (the seconds since "since" by the game's clock) and live (1), updated every second, so
+# its screen counts up "held for 1:23"; without them (a phone) it says "since <time>".
 template: checkpoint_held
 layout:
   - type: row
@@ -18,8 +20,11 @@ layout:
     text: "{team|upper}"
     style: { font_size: 48, color: team }
   - type: label
+    text: "{params.lang == 'en' && 'held' || params.lang == 'de' && 'gehalten seit' || params.lang == 'zh-tw' && '已佔領' || 'capturado há'} {age|clock}"
+    style: { font_size: 20, color: muted, visible: "{live}" }
+  - type: label
     text: "{params.lang == 'en' && 'held since' || params.lang == 'de' && 'seit' || params.lang == 'zh-tw' && '佔領於' || 'desde'} {since|clock}"
-    style: { font_size: 20, color: muted }
+    style: { font_size: 20, color: muted, visible: "{!live}" }
   - type: spacer
     height: fill
   - type: label
