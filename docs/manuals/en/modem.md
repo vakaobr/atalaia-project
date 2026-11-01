@@ -9,7 +9,7 @@ The **radio modem** is the controller's radio: a Heltec WiFi LoRa 32 V4 board, f
 
 This page is the whole path, from a bare board to a box joining a game through the modem. The other guides link here: the [firmware guide](firmware.md#9-the-modem-board), the [controller setup guide](controller-setup.md#3-prepare-the-modem-board) and the [Game master manual](game-master.md#on-a-raspberry-pi-or-another-linux-computer).
 
-> **What was tested, and what was not.** A modem flashed like this ran with the controller and real boxes on a bench (2026-10-21): on a computer, the controller in Docker. **Not yet run on a Raspberry Pi**: the Linux port names, the `dialout` group and the `systemd` steps below follow the project's files and the controller guide, and no Pi has run them. Not tried on macOS. The browser flasher is not tried with a real board. Not tested on a field.
+> **What was tested, and what was not.** A modem flashed like this ran with the controller and real boxes on a bench (2026-10-21): the controller in Docker on Windows (WSL2), the modem on a Windows COM port, which the container reached through a small COM-to-TCP bridge (see the advanced note in section 7). **Not yet run on a Raspberry Pi**: the Linux port names, the `dialout` group and the `systemd` steps below follow the project's files and the controller guide, and no Pi has run them. Not tried on macOS. The browser flasher is not tried with a real board. Not tested on a field.
 
 ## 1. The path in short
 
@@ -221,7 +221,9 @@ If the controller is not installed yet, do [controller setup guide, section 4](c
 
    It should say `active (running)`. The `systemd` file lets the service open `/dev/ttyACM*` and `/dev/ttyUSB*`, and the `atalaia` user is in `dialout` (controller setup guide, section 4, step 3), so no more setup is needed for the port.
 
-On another computer, `port` is what the system calls it: `COM5` on Windows. A controller in Docker reaches a board on the host through a COM-to-TCP bridge (`socket://host.docker.internal:PORT`): see the [controller guide](../../../controller/README.md). That is how the bench ran.
+On another computer, `port` is what the system calls it: `COM5` on Windows.
+
+**Controller in Docker on Windows or macOS (advanced).** Docker Desktop and WSL cannot pass a USB serial port into a container. The supported way is to run the controller natively. If you must use Docker, bridge the port to TCP on the host (a small program that serves the COM port on a local TCP port, for example pyserial's `tools/tcp_serial_redirect.py`, plus a relay if the container cannot reach the host's loopback) and give the container a pyserial URL as the port: `port = "socket://host.docker.internal:7601"` (the number is only an example). The controller opens its port with pyserial's `serial_for_url`, so `socket://` URLs work, and this is how the bench ran. The bridge is your own setup, not shipped by the project, and the modem's screen and the checks in section 8 apply as before.
 
 ## 8. Check that the controller and the modem talk
 

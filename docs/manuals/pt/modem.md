@@ -9,7 +9,7 @@ O **modem de rádio** é o rádio do controlador: uma placa Heltec WiFi LoRa 32 
 
 Esta página é o caminho todo, de uma placa nova até uma caixa a juntar-se a um jogo através do modem. Os outros guias remetem para aqui: o [guia do firmware](firmware.md#9-a-placa-modem), o [guia de montagem do controlador](controller-setup.md#3-preparar-a-placa-modem) e o [Manual da organização](game-master.md#num-raspberry-pi-ou-outro-computador-linux). Em inglês: [Set up the radio modem](../en/modem.md).
 
-> **O que foi testado e o que não foi.** Um modem gravado assim correu com o controlador e caixas reais numa bancada (2026-10-21): num computador, com o controlador em Docker. **Ainda não correu num Raspberry Pi**: os nomes de portas do Linux, o grupo `dialout` e os passos de `systemd` abaixo seguem os ficheiros do projeto e o guia do controlador, e nenhum Pi os correu. Não experimentado em macOS. O gravador no navegador não foi experimentado com uma placa real. Não testado num campo.
+> **O que foi testado e o que não foi.** Um modem gravado assim correu com o controlador e caixas reais numa bancada (2026-10-21): o controlador em Docker no Windows (WSL2), o modem numa porta COM do Windows, a que o contentor chegava por uma pequena ponte COM-para-TCP (vê a nota avançada na secção 7). **Ainda não correu num Raspberry Pi**: os nomes de portas do Linux, o grupo `dialout` e os passos de `systemd` abaixo seguem os ficheiros do projeto e o guia do controlador, e nenhum Pi os correu. Não experimentado em macOS. O gravador no navegador não foi experimentado com uma placa real. Não testado num campo.
 
 ## 1. O caminho em resumo
 
@@ -223,7 +223,9 @@ Se o controlador ainda não estiver instalado, faz primeiro a [secção 4 do gui
 
    Deve dizer `active (running)`. O ficheiro de `systemd` deixa o serviço abrir `/dev/ttyACM*` e `/dev/ttyUSB*`, e o utilizador `atalaia` está em `dialout` (guia de montagem do controlador, secção 4, passo 3), por isso não é preciso mais nada para a porta.
 
-Noutro computador, `port` é o nome que o sistema lhe dá: `COM5` no Windows. Um controlador em Docker chega a uma placa do anfitrião por uma ponte COM-para-TCP (`socket://host.docker.internal:PORTA`): vê o [guia do controlador](../../../controller/README.md). Foi assim que a bancada correu.
+Noutro computador, `port` é o nome que o sistema lhe dá: `COM5` no Windows.
+
+**Controlador em Docker no Windows ou no macOS (avançado).** O Docker Desktop e o WSL não passam uma porta série USB para um contentor. O caminho suportado é correr o controlador diretamente no sistema. Se tiveres mesmo de usar Docker, liga a porta ao TCP no anfitrião (um pequeno programa que serve a porta COM numa porta TCP local, por exemplo o `tools/tcp_serial_redirect.py` do pyserial, mais um relé se o contentor não alcançar o loopback do anfitrião) e dá ao contentor um URL do pyserial como porta: `port = "socket://host.docker.internal:7601"` (o número é só um exemplo). O controlador abre a porta com o `serial_for_url` do pyserial, por isso os URL `socket://` funcionam, e foi assim que a bancada correu. A ponte é montagem tua, não vem com o projeto, e o ecrã do modem e as verificações da secção 8 valem como antes.
 
 ## 8. Confirmar que o controlador e o modem falam
 

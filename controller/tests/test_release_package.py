@@ -69,5 +69,15 @@ class Splash(unittest.TestCase):
         self.assertIn("sdkconfig", tool.splash_problem(self.build, self.repo))
 
 
+class ReleaseNotesGuides(unittest.TestCase):
+    def test_every_guide_the_notes_link_exists(self) -> None:
+        source = (REPO / "tools" / "release_package.py").read_text(encoding="utf-8")
+        import re
+        guides = re.findall(r"\{args\.tag\}/(docs/manuals/en/[a-z-]+\.md)", source)
+        self.assertIn("docs/manuals/en/modem.md", guides)
+        for guide in guides:
+            self.assertTrue((REPO / guide).is_file(), guide)
+
+
 if __name__ == "__main__":
     unittest.main()
