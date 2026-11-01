@@ -262,7 +262,9 @@ and the LVGL task calls `screen_overlay_tick()` each pass):
   VIP Payload's `checkpoint_free` and `checkpoint_held`: `oled_text_for()` marks them `zone`, so the
   OLED draws the bar there too, decision TFT-3) shows the capture's hold bar and the holding team's name
   in a strip over the footer, from the OLED's own logic (`oled_text_for()` and `oled_text_hold()`,
-  BN-26) and the mode's `capture_hold_ms`; Bomb's arm and defuse bars are the mode's own data and
+  BN-26) and the mode's `capture_hold_ms`. On the OLED a held `master_status` or `checkpoint_held` that
+  carries `since` reads as Domination's captured screen (the team big, `held for 1:23` below from the
+  game clock, decision TFT-8); Progressive Domination's captured already did; Bomb's arm and defuse bars are the mode's own data and
   already drew in its templates;
 - a template's data with `since` gets `age`, `live` and, when the data has no `held` of its own, `held`
   added (game seconds since the capture, by the game clock the OLED reads), redrawn once a second through

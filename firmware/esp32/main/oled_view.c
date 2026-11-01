@@ -317,13 +317,24 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
         return true;
     }
 
-    /* Zones of other modes: the Master's status, VIP Payload's checkpoints. They keep the
-     * name-and-team text below; only the box's hold bar (BN-26) joins them, and the owner it
-     * must not show as taking the zone (decision TFT-3). */
+    /* Zones of other modes: the Master's status, VIP Payload's checkpoints. They are zones
+     * for the box's hold bar (BN-26), and the owner it must not show as taking the zone
+     * (decision TFT-3). A held one that says when it was taken ("since") reads as Domination's
+     * captured screen: the team big, how long it has held it below (oled_text_held, decision
+     * TFT-8); without a time (or a team, or free) it keeps the name-and-team text below. */
     if (strcmp(t, "master_status") == 0 || strcmp(t, "checkpoint_held") == 0 ||
         strcmp(t, "checkpoint_free") == 0) {
         out->zone = true;
         if (screen_json_str(data, "team", s, sizeof(s))) set(out->owner, sizeof(out->owner), s);
+        if (out->owner[0] && screen_json_int(data, "since", &v) && v >= 0) {
+            out->since = v;
+            set(s, sizeof(s), out->owner);
+            upper(s);
+            set(out->big, sizeof(out->big), s);
+            out->bar = share_pct(data, "progress");
+            set_text(out->foot, sizeof(out->foot), TX_ZONE_HELD_UP);
+            return true;
+        }
     }
 
     /* Everything else, the modes' own templates included: a countdown when

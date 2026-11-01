@@ -75,14 +75,14 @@ static const timer_bar_case_t timer_bars[] = {
 #define HACK_EN  "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"en\"}"
 #define HACK_DE  "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"de\"}"
 #define HACK_ZH  "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"zh-tw\"}"
-#define VIP      "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"pt\"}"
-#define VIP_EN   "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"en\"}"
-#define VIP_DE   "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"de\"}"
-#define VIP_ZH   "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"zh-tw\"}"
-#define OBJ      "org.atalaia.objectives {}"
-#define MONEY    "org.atalaia.money_factory {\"capacity\":50,\"capture_hold_ms\":3000}"
-#define PROG     "org.atalaia.progressive_domination {\"capture_hold_ms\":3000,\"complete_min\":10}"
-#define SAB      "org.atalaia.sabotage {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
+/* VIP / Payload's screens follow the box's language (the case's suffix), whatever its old `lang`
+ * parameter says (decision TFT-9): VIP_OLD_LANG is a game saved with lang "en". */
+#define VIP          "org.atalaia.vip_payload {\"capture_hold_ms\":3000}"
+#define VIP_OLD_LANG "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"en\"}"
+#define OBJ          "org.atalaia.objectives {}"
+#define MONEY        "org.atalaia.money_factory {\"capacity\":50,\"capture_hold_ms\":3000}"
+#define PROG         "org.atalaia.progressive_domination {\"capture_hold_ms\":3000,\"complete_min\":10}"
+#define SAB          "org.atalaia.sabotage {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
 
 /* Data as the modes (modes/bomb, modes/domination, modes/codes) and the shell send it. */
 static const screen_case_t cases[] = {
@@ -360,13 +360,13 @@ static const screen_case_t cases[] = {
     {"yaml_hack_solved_en", "hack_solved", "{\"capture\":false}", HACK_EN},
     /* VIP / Payload: a checkpoint (the box's role), and the payload's screen (an Android prop's,
      * drawn here too: the box carries every template). */
-    {"yaml_vip_checkpoint_free", "checkpoint_free", "{}", VIP},
-    {"yaml_vip_checkpoint_held_en", "checkpoint_held", "{\"team\":\"blue\",\"since\":95}", VIP_EN},
-    {"yaml_vip_payload_moving", "payload", "{\"team\":\"red\",\"state\":\"moving\",\"metres\":75}",
-     VIP},
+    {"yaml_vip_checkpoint_free_pt", "checkpoint_free", "{}", VIP},
+    {"yaml_vip_checkpoint_held_en", "checkpoint_held", "{\"team\":\"blue\",\"since\":95}", VIP},
+    {"yaml_vip_payload_moving_pt", "payload",
+     "{\"team\":\"red\",\"state\":\"moving\",\"metres\":75}", VIP},
     {"yaml_vip_payload_weak_en", "payload", "{\"team\":\"red\",\"state\":\"weak\",\"metres\":40}",
-     VIP_EN},
-    {"yaml_vip_payload_extracted", "payload",
+     VIP},
+    {"yaml_vip_payload_extracted_pt", "payload",
      "{\"team\":\"red\",\"state\":\"extracted\",\"metres\":0}", VIP},
     /* Objectives: what a scenario's setup makes of a node (no parameters: the language and the
      * objective's name come in the setup, as data). */
@@ -455,7 +455,7 @@ static const screen_case_t cases[] = {
      "{\"wires\":\"1 2 3 4\",\"cut\":0,\"of\":4,\"locked\":20}", HACK_DE},
     {"yaml_medic_idle_de", "medic_idle", "{\"remaining\":4}", MEDIC_DE},
     {"yaml_vip_payload_weak_de", "payload", "{\"team\":\"red\",\"state\":\"weak\",\"metres\":40}",
-     VIP_DE},
+     VIP},
     {"yaml_obj_capture_de", "obj_capture",
      "{\"label\":\"Brücke\",\"only\":\"red\",\"hold_ms\":3000}", OBJ},
     {"yaml_money_neutral_taking_de", "neutral", "{\"stock\":5,\"taker\":\"blue\",\"progress\":0.4}",
@@ -481,7 +481,7 @@ static const screen_case_t cases[] = {
      HACK_ZH},
     {"yaml_medic_healed_zh-tw", "medic_healed",
      "{\"player\":\"b1\",\"team\":\"blue\",\"remaining\":3,\"used\":1,\"max\":2}", MEDIC_ZH},
-    {"yaml_vip_checkpoint_free_zh-tw", "checkpoint_free", "{}", VIP_ZH},
+    {"yaml_vip_checkpoint_free_zh-tw", "checkpoint_free", "{}", VIP},
     {"yaml_obj_tags_zh-tw", "obj_tags",
      "{\"team\":\"blue\",\"have\":1,\"count\":2,\"note\":\"wrong_team\"}", OBJ},
     {"yaml_obj_bomb_armed_zh-tw", "obj_bomb",
@@ -676,12 +676,15 @@ static const screen_case_t cases[] = {
      PROG},
     /* VIP Payload: a checkpoint counts up its held time and shows the bar of a team taking it. */
     {"yaml_vip_checkpoint_held_live_en", "checkpoint_held", "{\"team\":\"blue\",\"since\":95}",
-     VIP_EN},
+     VIP},
     {"yaml_vip_checkpoint_held_live_pt", "checkpoint_held", "{\"team\":\"blue\",\"since\":95}",
      VIP},
     {"yaml_vip_checkpoint_held_holding_de", "checkpoint_held", "{\"team\":\"red\",\"since\":95}",
-     VIP_DE},
-    {"yaml_vip_checkpoint_free_holding_en", "checkpoint_free", "{}", VIP_EN},
+     VIP},
+    /* A game saved with the old lang "en" on a Portuguese box: the box's language wins. */
+    {"yaml_vip_checkpoint_held_old_lang_pt", "checkpoint_held", "{\"team\":\"blue\",\"since\":95}",
+     VIP_OLD_LANG},
+    {"yaml_vip_checkpoint_free_holding_en", "checkpoint_free", "{}", VIP},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 

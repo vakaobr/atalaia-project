@@ -142,11 +142,11 @@ Os outros modos têm ecrãs próprios: *Baixa Confirmada* (**carrega no botão e
 
 **O logótipo.** A caixa mostra a torre da Atalaia, no ecrã de arranque (o pequeno e o grande, com a versão do firmware ao lado) e no ecrã **PRONTA**, e no ecrã de *Bomba / Rush* enquanto a bomba não está armada. O logótipo do próprio campo (as *Definições* da consola) aparece na app, no placar e no cartaz, não na caixa: a caixa ia buscá-lo pela Wi-Fi do campo e já não vai. Quem monta a caixa pode compilá-la com outra imagem de arranque: [guia de firmware, secção 4](firmware.md#4-as-opções-de-quem-monta).
 
-No OLED pequeno vês o modo em cima, um valor grande (a fase, o tempo ou a equipa) e uma dica por baixo. Enquanto uma equipa mantém premido o botão, o OLED mostra uma barra que enche.
+No OLED pequeno vês o modo em cima, um valor grande (a fase, o tempo ou a equipa) e uma dica por baixo. Numa zona ocupada (Domínio, Domínio Progressivo, Mestre e Satélites, pontos de controlo do VIP e Carga) a dica é há quanto tempo a equipa a tem (**ocupada 1:23**). Enquanto uma equipa mantém premido o botão, o OLED mostra uma barra que enche.
 
 Num jogo com limite de tempo que começou na própria caixa, o ecrã grande tem uma barra fina ao longo da margem de baixo que mostra quanto falta do jogo (fica vermelha no último minuto), e o OLED mostra o tempo que falta, em minutos e segundos, à direita da linha de cima. Um jogo **Sem limite** não tem nenhuma das duas. Um jogo conduzido pelo controlador do campo acaba quando a organização o termina, por isso não tem barra.
 
-As *Ligaduras*, o *Hackeia o terminal* e o *VIP / Carga* não seguem a língua da caixa. Cada um usa a língua do ecrã da sua própria definição **Língua** no jogo, e por omissão é o português. Pede à organização que a defina.
+As *Ligaduras* e o *Hackeia o terminal* não seguem a língua da caixa. Cada um usa a língua do ecrã da sua própria definição **Língua** no jogo; se estiver vazia, é a língua do jogo. O *VIP / Carga* segue a língua da caixa, como os outros modos (a sua antiga definição **Língua** já não é usada).
 
 ## 7. O que te dizem as luzes e os ecrãs
 

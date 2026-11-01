@@ -3,7 +3,8 @@
 #
 # A team holds the checkpoint. Data: team, since (game time of the capture,
 # in seconds). The box does not score: the controller does, while it is held.
-# Texts in params.lang (pt, the default, en, de or zh-tw). The Field Box also adds age
+# Texts in the box's language, data lang (pt, en, de or zh-tw;
+# English without one). The Field Box also adds age
 # (the seconds since "since" by the game's clock) and live (1), updated every second, so
 # its screen counts up "held for 1:23"; without them (a phone) it says "since <time>".
 template: checkpoint_held
@@ -12,7 +13,7 @@ layout:
     style: { width: fill, height: 44, background: team }
     children:
       - type: label
-        text: "{params.lang == 'en' && 'CHECKPOINT HELD' || params.lang == 'de' && 'CHECKPOINT BESETZT' || params.lang == 'zh-tw' && '檢查點已佔領' || 'PONTO CAPTURADO'}"
+        text: "{lang == 'pt' && 'PONTO CAPTURADO' || lang == 'de' && 'CHECKPOINT BESETZT' || lang == 'zh-tw' && '檢查點已佔領' || 'CHECKPOINT HELD'}"
         style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
@@ -20,15 +21,15 @@ layout:
     text: "{team|upper}"
     style: { font_size: 48, color: team }
   - type: label
-    text: "{params.lang == 'en' && 'held' || params.lang == 'de' && 'gehalten seit' || params.lang == 'zh-tw' && '已佔領' || 'capturado há'} {age|clock}"
+    text: "{lang == 'pt' && 'capturado há' || lang == 'de' && 'gehalten seit' || lang == 'zh-tw' && '已佔領' || 'held'} {age|clock}"
     style: { font_size: 20, color: muted, visible: "{live}" }
   - type: label
-    text: "{params.lang == 'en' && 'held since' || params.lang == 'de' && 'seit' || params.lang == 'zh-tw' && '佔領於' || 'desde'} {since|clock}"
+    text: "{lang == 'pt' && 'desde' || lang == 'de' && 'seit' || lang == 'zh-tw' && '佔領於' || 'held since'} {since|clock}"
     style: { font_size: 20, color: muted, visible: "{!live}" }
   - type: spacer
     height: fill
   - type: label
-    text: "{params.lang == 'en' && 'Hold your button to take it over' || params.lang == 'de' && 'Halte den Knopf zum Übernehmen' || params.lang == 'zh-tw' && '按住你的按鈕即可奪取' || 'Mantém o teu botão para o tomar'}"
+    text: "{lang == 'pt' && 'Mantém o teu botão para o tomar' || lang == 'de' && 'Halte den Knopf zum Übernehmen' || lang == 'zh-tw' && '按住你的按鈕即可奪取' || 'Hold your button to take it over'}"
     style:
       font_size: 14
       color: muted

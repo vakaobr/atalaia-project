@@ -254,21 +254,39 @@ static void test_box_hold_bar(void)
     CHECK(t.bar == -1);
 
     /* The master's status and VIP Payload's checkpoints are zones too (TFT-3): the bar of a team
-     * taking them, never of their own holder; their name and team text stay. */
+     * taking them, never of their own holder. Held with a capture time they read as Domination's
+     * captured screen, the team big and the held time below (TFT-8). */
     t = map("MASTER", "master_status", "{\"team\":\"red\",\"held\":1,\"of\":3,\"since\":95}");
-    CHECK(t.zone && !t.head_right[0] && t.since == -1);
+    CHECK(t.zone && !t.head_right[0] && t.since == 95);
+    CHECK(strcmp(t.big, "RED") == 0);
+    CHECK(strcmp(t.foot, "ZONE HELD") == 0); /* until the game's clock gives the held time */
+    CHECK(oled_text_held(&t, 230));
+    CHECK(strcmp(t.foot, "held for 2:15") == 0);
+    t = map("MASTER", "master_status", "{\"team\":\"red\",\"held\":1,\"of\":3,\"since\":95}");
     CHECK(oled_text_hold(&t, &blue, 1, 3000));
     CHECK(t.bar == 50);
     CHECK(strcmp(t.foot, "BLUE") == 0);
+    CHECK(!oled_text_held(&t, 230)); /* the held time waits for the bar to go */
+    /* Without a capture time: the name and the team, as before. */
     t = map("MASTER", "master_status", "{\"team\":\"red\",\"held\":1,\"of\":3}");
+    CHECK(t.since == -1);
     CHECK(!oled_text_hold(&t, &red, 1, 3000));
     CHECK(strcmp(t.foot, "RED") == 0);
     t = map("VIP", "checkpoint_held", "{\"team\":\"red\",\"since\":95}");
+    CHECK(strcmp(t.big, "RED") == 0 && t.since == 95);
+    CHECK(oled_text_held(&t, 230));
+    CHECK(strcmp(t.foot, "held for 2:15") == 0);
+    t = map("VIP", "checkpoint_held", "{\"team\":\"red\",\"since\":95}");
+    CHECK(!oled_text_hold(&t, &red, 1, 3000)); /* never the holder's own button */
     CHECK(oled_text_hold(&t, &blue, 1, 3000));
     CHECK(t.bar == 50);
     t = map("VIP", "checkpoint_free", "{}");
     CHECK(oled_text_hold(&t, &blue, 1, 3000));
     CHECK(t.bar == 50);
+    /* Progressive Domination's captured screen carries it already (TFT-8). */
+    t = map("PROGRESSIVE", "captured", "{\"team\":\"red\",\"since\":95,\"points\":6}");
+    CHECK(oled_text_held(&t, 230));
+    CHECK(strcmp(t.foot, "held for 2:15") == 0);
 }
 
 static void test_pack(void)

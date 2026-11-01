@@ -142,11 +142,11 @@ Other modes have their own screens: *Kill Confirmed* (**press your button, then 
 
 **The logo.** The box shows the Atalaia tower, on its boot screen (the small screen and the big one, with the firmware version beside it) and on the **READY** screen, and on the *Bomb / Rush* screen while the bomb is not armed. The field's own logo (the console's *Settings*) shows in the app, on the scoreboard and on the poster, not on the box: a box used to fetch it over the field Wi-Fi, which it no longer does. A builder can build a box with another splash: [firmware guide, section 4](firmware.md#4-the-options-a-builder-sets).
 
-On the small OLED you see the mode on top, one big value (the phase, the timer or the team) and a hint under it. While a team holds its button, the OLED shows a bar that fills.
+On the small OLED you see the mode on top, one big value (the phase, the timer or the team) and a hint under it. On a held zone (Domination, Progressive Domination, Master and Satellites, VIP Payload's checkpoints) the hint is how long the team has held it (**held for 1:23**). While a team holds its button, the OLED shows a bar that fills.
 
 In a game with a time limit that you started on the box, the big screen has a thin bar along its bottom edge that shows how much of the game is left (it turns red in the last minute), and the OLED shows the time left, as minutes and seconds, at the right of its top line. A game with **No limit** has neither. A game that the field controller runs ends when the game master ends it, so it has no bar.
 
-*Medic Kit*, *Hacking Terminal* and *VIP / Payload* do not follow the box language. Each takes its screen language from its own **Language** setting in the game, and that is Portuguese by default. Ask the organisers to set it.
+*Medic Kit* and *Hacking Terminal* do not follow the box language. Each takes its screen language from its own **Language** setting in the game; left empty, it is the game's language. *VIP / Payload* follows the box language, like the other modes (its old **Language** setting is no longer used).
 
 ## 7. What the lights and screens tell you
 

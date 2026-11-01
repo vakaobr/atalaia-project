@@ -131,7 +131,6 @@ scripts:
   vip_payload:
     mode: org.atalaia.vip_payload
     params: {capture_hold_ms: 3000}
-    lang_param: true
     poster: 2
     steps:
       - {screen: checkpoint_free, data: {}, game_s: 30, s: 1.8}
