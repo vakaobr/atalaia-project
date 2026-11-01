@@ -57,10 +57,10 @@ SPDX-FileCopyrightText = "2026 The Atalaia contributors"
 SPDX-License-Identifier = "CERN-OHL-S-2.0"
 
 # The Field Box's first bench build, on the project page's build and main pages: a photo and a clip the
-# maintainer took of their own bench on 2026-10-31 (resized, audio removed, all metadata stripped by
-# ffmpeg). Same licence as the rest of site/ (the maintainer's own work, released under CC-BY-SA-4.0).
+# maintainer took of their own bench on 2026-10-31 and 2026-11-01 (resized, audio removed, all metadata
+# stripped by ffmpeg). Same licence as the rest of site/ (the maintainer's own work, released under CC-BY-SA-4.0).
 [[annotations]]
-path = ["site/img/field-box-bench-*", "site/img/field-box-demo*"]
+path = ["site/img/field-box-bench-*", "site/img/field-box-ready-*", "site/img/field-box-demo*"]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 The Atalaia contributors"
 SPDX-License-Identifier = "CC-BY-SA-4.0"

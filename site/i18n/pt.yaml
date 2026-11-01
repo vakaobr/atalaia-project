@@ -563,11 +563,14 @@ screens:
       Os modos acima são animações desenhadas pelo código do firmware. Isto é a montagem de bancada da
       Field Box (uma placa e fios soltos, sem caixa) a jogar Domínio de verdade.
     alt: >-
-      Vídeo mudo, em ciclo, de uma montagem de bancada da Field Box a jogar Domínio: o ecrã mostra a
-      zona ocupada pela equipa vermelha e, passados uns segundos, pela azul.
+      Vídeo mudo, em ciclo, da montagem de bancada da Field Box a jogar Domínio: o ecrã mostra a zona
+      ocupada pela equipa vermelha, com 3 pontos; uma barra azul enche-se na parte de baixo e a zona passa
+      para a equipa azul. Aparece então o tempo de ocupação, a contar (de 0:01 em diante), e, no canto de cima à
+      direita, os pontos de cada equipa.
     caption: >-
-      A primeira Field Box, numa montagem de bancada (31 de outubro de 2026): uma captura passa de
-      vermelha a azul no ecrã. Sem caixa, ainda com fios soltos.
+      A Field Box na bancada (1 de novembro de 2026), com o ecrã TFT novo: a barra de retenção enche-se, a
+      equipa azul toma a zona, o tempo de ocupação conta e os pontos de cada equipa aparecem no canto. Sem caixa,
+      ainda com fios soltos.
     more: Ver a montagem e a fotografia →
   gifs_more: Ver todos os modos →
   box_title: Os ecrãs da caixa, passo a passo
@@ -1357,12 +1360,22 @@ build:
         soltos, sem caixa. É a primeira placa a correr um jogo, e uma montagem de bancada, não uma caixa
         acabada.
       video_alt: >-
-        Vídeo mudo, em ciclo, da mesma montagem de bancada a jogar Domínio. O ecrã mostra uma zona
-        ocupada pela equipa vermelha, com 3 pontos; passados uns segundos a zona passa para a equipa
-        azul e o ecrã e o OLED mudam de vermelho para azul.
+        Vídeo mudo, em ciclo, da mesma montagem de bancada a jogar Domínio, com o ecrã TFT novo. O ecrã mostra
+        uma zona ocupada pela equipa vermelha, com 3 pontos; uma barra azul enche-se na parte de baixo, a zona passa
+        para a equipa azul e o ecrã e o OLED mudam de vermelho para azul. Depois o ecrã mostra «ocupada há 0:01»,
+        a contar, e, no canto de cima à direita, os pontos de cada equipa.
       video_caption: >-
-        A mesma montagem a jogar Domínio com o controlador da bancada (31 de outubro de 2026): a zona
-        passa da equipa vermelha para a azul. Nove segundos em ciclo, sem som; o ecrã está em português.
+        A mesma montagem a jogar Domínio com o controlador da bancada (1 de novembro de 2026): a barra de retenção
+        enche-se, a zona passa da equipa vermelha para a azul, o tempo de ocupação conta e os pontos de cada equipa
+        aparecem no canto. Onze segundos em ciclo, sem som; o ecrã está em português.
+      photo2_alt: >-
+        Fotografia da mesma montagem de bancada, com o ecrã TFT novo: o ecrã mostra «PRONTA», a torre amarela do
+        logótipo do Atalaia e «Próximo jogo», com «Uma tecla: escolher jogo aqui» por baixo. À esquerda, a placa Heltec
+        V4 com o seu OLED, que repete «Próximo jogo»; à direita, um botão verde. Fios soltos por todo o lado, sobre uma
+        secretária.
+      photo2_caption: >-
+        A mesma montagem a 1 de novembro de 2026, com o ecrã TFT novo: o ecrã «PRONTA / Próximo jogo», com a
+        torre amarela do Atalaia, à espera de um jogo. Continua a ser uma montagem de bancada, sem caixa.
     wiring:
       title: >-
         Esquemas de ligações

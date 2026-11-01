@@ -99,15 +99,16 @@ pixels wide as the screen needs) and lazy-loads everything below it.
 ### Field Box photo and clip
 
 The first real Field Box, a bench build (loose wires, no enclosure) the maintainer photographed and
-filmed on 2026-10-31. Never call it a finished box in the texts (`build.field_box.bench.*`,
+filmed on 2026-10-31 (the first photo) and 2026-11-01 (the second photo and the clip, with the improved TFT screens). Never call it a finished box in the texts (`build.field_box.bench.*`,
 `screens.real.*`, in the four languages). The files are the maintainer's own, under the folder's CC BY-SA 4.0
 licence (`REUSE.toml`), with every piece of metadata (EXIF, GPS, device, the container's tags) stripped
 by ffmpeg `-map_metadata -1` and `bitexact`, and the clip's audio removed:
 
 | Files | What they are | Where they appear |
 | --- | --- | --- |
-| `field-box-bench-960/1600` (`.jpg`, `.webp`) | The bench photo, 4:3 (the 2048 × 1536 original resized; 154 + 324 KB JPEG, 124 + 254 KB WebP) | `#field-box-first-build` on the build guides page, a `<picture>` like the hero's |
-| `field-box-demo.mp4`, `.webm`, `field-box-demo-poster.jpg` | A 9 s muted loop (the original's 0:50 to 0:59: a Domination capture changes from red to blue), 720 × 406, H.264 126 KB, VP9 165 KB, poster 49 KB; the box's screen in the video is in Portuguese | The same section, and "The real box, on the bench" under the mode animations on the main page |
+| `field-box-bench-960/1600` (`.jpg`, `.webp`) | The first bench photo (2026-10-31), 4:3 (the 2048 × 1536 original resized; 154 + 324 KB JPEG, 124 + 254 KB WebP) | `#field-box-first-build` on the build guides page, a `<picture>` like the hero's |
+| `field-box-ready-960/1600` (`.jpg`, `.webp`) | The second bench photo (2026-11-01, 16:9, the 1600 × 900 original resized; 127 + 251 KB JPEG, 109 + 199 KB WebP): the new TFT screen showing "PRONTA / Próximo jogo" with the yellow Atalaia tower | The same section, under the first photo, a `<picture>` with its own caption |
+| `field-box-demo.mp4`, `.webm`, `field-box-demo-poster.jpg` | An 11 s muted loop (the 2026-11-01 recording's 59.5 s to 70.5 s: the red zone's 3 points, the blue hold bar filling, blue taking the zone, the live held time from 0:01 and the per-team point chips in the top-right corner), 720 × 406, 24 fps, H.264 132 KB, VP9 150 KB, poster 47 KB; the box's screen in the video is in Portuguese. Replaces the 2026-10-31 clip | The same section, and "The real box, on the bench" under the mode animations on the main page |
 
 The clip is a `<video muted loop playsinline autoplay preload="metadata">` with the poster, from this
 site's own files (nothing from other sites, no cookie). A small inline script (`src/partials/realvideo.html`,

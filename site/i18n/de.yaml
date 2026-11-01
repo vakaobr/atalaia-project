@@ -580,11 +580,13 @@ screens:
       Die Modi oben sind Animationen, die der Code der Firmware zeichnet. Hier spielt der Aufbau der
       Field Box auf dem Labortisch (ein Board an losen Kabeln, ohne Gehäuse) wirklich Domination.
     alt: >-
-      Stummes Video in Endlosschleife eines Field-Box-Aufbaus beim Spielen von Domination: Das
-      Display zeigt die Zone des roten Teams und einige Sekunden später die des blauen.
+      Stummes Video in Endlosschleife des Field-Box-Aufbaus beim Spielen von Domination: Das Display zeigt
+      die Zone des roten Teams mit 3 Punkten; unten füllt sich ein blauer Balken, und die Zone geht an das blaue
+      Team. Danach zählt die Haltezeit hoch (ab 0:01), und oben rechts erscheinen die Punkte jedes Teams.
     caption: >-
-      Die erste Field Box als Aufbau auf dem Labortisch (31. Oktober 2026): Eine Eroberung wechselt auf
-      dem Display von Rot zu Blau. Noch ohne Gehäuse, mit losen Kabeln.
+      Die Field Box auf dem Labortisch (1. November 2026) mit dem neuen TFT-Display: Der Haltebalken füllt sich,
+      das blaue Team erobert die Zone, die Haltezeit zählt hoch, und die Punkte jedes Teams erscheinen in der
+      Ecke. Noch ohne Gehäuse, mit losen Kabeln.
     more: Den Aufbau und das Foto ansehen →
   gifs_more: Alle Modi ansehen →
   box_title: Die Bildschirme der Box, Schritt für Schritt
@@ -1388,13 +1390,24 @@ build:
         Kabeln, ohne Gehäuse. Es ist das erste Board, das ein Spiel spielt, und ein Aufbau auf dem
         Labortisch, keine fertige Box.
       video_alt: >-
-        Stummes Video in Endlosschleife desselben Aufbaus beim Spielen von Domination. Das Display
-        zeigt eine Zone des roten Teams mit 3 Punkten; nach einigen Sekunden geht die Zone an das
-        blaue Team, und Display und OLED wechseln von Rot zu Blau.
+        Stummes Video in Endlosschleife desselben Aufbaus beim Spielen von Domination, mit dem neuen
+        TFT-Display. Das Display zeigt eine Zone des roten Teams mit 3 Punkten; unten füllt sich ein blauer Balken,
+        die Zone geht an das blaue Team, und Display und OLED wechseln von Rot zu Blau. Dann zeigt das Display
+        „ocupada há 0:01“ (gehalten seit 0:01), hochzählend, und oben rechts die Punkte jedes Teams.
       video_caption: >-
-        Derselbe Aufbau beim Spielen von Domination mit dem Controller vom Labortisch (31. Oktober
-        2026): Die Zone wechselt vom roten zum blauen Team. Neun Sekunden in Schleife, ohne Ton; das
-        Display ist auf Portugiesisch.
+        Derselbe Aufbau beim Spielen von Domination mit dem Controller vom Labortisch (1. November 2026): Der
+        Haltebalken füllt sich, die Zone wechselt vom roten zum blauen Team, die Haltezeit zählt hoch, und die
+        Punkte jedes Teams erscheinen in der Ecke. Elf Sekunden in Schleife, ohne Ton; das Display ist auf
+        Portugiesisch.
+      photo2_alt: >-
+        Foto desselben Labortisch-Aufbaus mit dem neuen TFT-Display: Das Display zeigt „PRONTA“ (bereit), den gelben
+        Turm des Atalaia-Logos und „Próximo jogo“ (nächstes Spiel), darunter „Uma tecla: escolher jogo aqui“ (eine
+        Taste: hier ein Spiel wählen). Links das Heltec-V4-Board mit seinem OLED, das „Próximo jogo“ wiederholt;
+        rechts ein grüner Drucktaster. Überall lose Kabel, auf einem Schreibtisch.
+      photo2_caption: >-
+        Derselbe Aufbau am 1. November 2026 mit dem neuen TFT-Display: der Bildschirm „PRONTA / Próximo jogo“ (bereit /
+        nächstes Spiel) mit dem gelben Atalaia-Turm, wartend auf ein Spiel. Weiterhin ein Aufbau auf dem Labortisch,
+        ohne Gehäuse.
     wiring:
       title: >-
         Schaltpläne

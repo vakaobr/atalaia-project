@@ -547,11 +547,13 @@ screens:
       The modes above are animations drawn by the firmware's code. This is the Field Box's bench build
       (one board and loose wires, no enclosure) playing Domination for real.
     alt: >-
-      Silent, looping video of a Field Box bench build playing Domination: the screen shows the zone
-      held by the red team and, a few seconds later, by the blue team.
+      Silent, looping video of the Field Box bench build playing Domination: the screen shows the zone held
+      by the red team with 3 points; a blue bar fills along the bottom and the zone passes to the blue team. The
+      held time then counts up (from 0:01) and, in the top-right corner, each team's points appear.
     caption: >-
-      The first Field Box, as a bench build (31 October 2026): a capture changes from red to blue on
-      the screen. No enclosure yet, loose wires still.
+      The Field Box on the bench (1 November 2026), with the new TFT screen: the hold bar fills, the blue team
+      takes the zone, the held time counts up and each team's points show in the corner. No enclosure yet, loose
+      wires still.
     more: See the build and the photo →
   gifs_more: See every mode →
   box_title: The box's screens, step by step
@@ -1311,13 +1313,22 @@ build:
         the board's own OLED, a 4×3 keypad and team buttons, on loose wires, with no enclosure. It is
         the first board to run a game, and a bench build, not a finished box.
       video_alt: >-
-        Silent, looping video of the same bench build playing Domination. The screen shows a zone held
-        by the red team with 3 points; after a few seconds the zone passes to the blue team and the
-        screen and the OLED change from red to blue.
+        Silent, looping video of the same bench build playing Domination, with the new TFT screen. The screen
+        shows a zone held by the red team with 3 points; a blue bar fills along the bottom, the zone passes to the
+        blue team and the screen and the OLED change from red to blue. Then the screen shows "held for 0:01",
+        counting up, and, in the top-right corner, each team's points.
       video_caption: >-
-        The same build playing Domination with the bench controller (31 October 2026): the zone
-        changes from the red team to the blue. Nine seconds on a loop, no sound; the screen is in
-        Portuguese.
+        The same build playing Domination with the bench controller (1 November 2026): the hold bar fills, the zone
+        changes from the red team to the blue, the held time counts up and each team's points show in the corner.
+        Eleven seconds on a loop, no sound; the screen is in Portuguese.
+      photo2_alt: >-
+        Photo of the same bench build with the new TFT screen: the screen shows "PRONTA" (ready), the yellow tower of
+        the Atalaia logo and "Próximo jogo" (next game), with "Uma tecla: escolher jogo aqui" (one key: choose a game
+        here) beneath. On the left, the Heltec V4 board with its OLED, which repeats "Próximo jogo"; on the right, a
+        green push button. Loose wires everywhere, on a desk.
+      photo2_caption: >-
+        The same build on 1 November 2026, with the new TFT screen: the "PRONTA / Próximo jogo" (ready / next game)
+        screen with the yellow Atalaia tower, waiting for a game. Still a bench build, with no enclosure.
     wiring:
       title: >-
         Wiring diagrams
