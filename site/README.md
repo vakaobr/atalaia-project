@@ -110,9 +110,11 @@ by ffmpeg `-map_metadata -1` and `bitexact`, and the clip's audio removed:
 | `field-box-ready-960/1600` (`.jpg`, `.webp`) | The second bench photo (2026-11-01, 16:9, the 1600 × 900 original resized; 127 + 251 KB JPEG, 109 + 199 KB WebP): the new TFT screen showing "PRONTA / Próximo jogo" with the yellow Atalaia tower | The same section, under the first photo, a `<picture>` with its own caption |
 | `field-box-demo.mp4`, `.webm`, `field-box-demo-poster.jpg` | An 11 s muted loop (the 2026-11-01 recording's 59.5 s to 70.5 s: the red zone's 3 points, the blue hold bar filling, blue taking the zone, the live held time from 0:01 and the per-team point chips in the top-right corner), 720 × 406, 24 fps, H.264 132 KB, VP9 150 KB, poster 47 KB; the box's screen in the video is in Portuguese. Replaces the 2026-10-31 clip | The same section, and "The real box, on the bench" under the mode animations on the main page |
 
-The clip is a `<video muted loop playsinline autoplay preload="metadata">` with the poster, from this
+| `master-satellites-test-run.mp4`, `.webm`, `master-satellites-test-run-poster.jpg` | A 17.8 s muted clip of a Master and Satellites test game on four real boxes (the 2026-11-01 recording: 22.5 to 29.0 s the master, the box with the big screen, is taken by red; 54.0 to 56.8 s a satellite's OLED shows red holding it; 98.0 to 106.5 s the master reads "1 de 3 satélites, 3 pontos a cada 10 s", then passes to blue; three pieces joined with clean cuts, the camera swings left out), 720 × 406, 24 fps, H.264 Main crf 33 219 KB, VP9 crf 46 252 KB, poster 48 KB; the screens are in Portuguese | The "Master and Satellites" card on the modes page, under its animation (`modes.master_satellites.real_*`) |
+
+The clips are `<video muted loop playsinline autoplay preload="metadata">` with the poster, from this
 site's own files (nothing from other sites, no cookie). A small inline script (`src/partials/realvideo.html`,
-included by the main and build pages) pauses it for `prefers-reduced-motion: reduce`, so the poster shows, and adds
+included by the main, build and modes pages) pauses it for `prefers-reduced-motion: reduce`, so the poster shows, and adds
 the GIFs' pause / play button under it (a loop longer than five seconds needs one); without JavaScript the
 clip autoplays. To replace it, cut with ffmpeg, keep it muted, small and metadata-free, and look at
 every frame for faces or private information first.

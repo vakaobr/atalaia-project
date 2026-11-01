@@ -380,9 +380,23 @@ modes:
     text: >-
       Teams nehmen eine Master-Box und ihre Satelliten ein. Nur der Master punktet, und jeder
       Satellit, den dasselbe Team hält, erhöht seine Punkte; wechselt der Master den Besitz, werden
-      alle Satelliten wieder frei. In Software geschrieben und getestet, noch nicht auf echten Boxen
-      gespielt.
+      alle Satelliten wieder frei. In Software geschrieben und getestet, und inzwischen auf echten Boxen
+      probegespielt (siehe das Video unten).
     meta: Mehrere Boxen · braucht den Feld-Controller
+    real_alt: >-
+      Stummes Video eines Testspiels von Master und Satelliten auf dem Prüftisch, drei kurze Ausschnitte
+      aneinandergefügt. Zuerst wird der Master, die Box mit dem großen Bildschirm, von „LIVRE“ (frei) von Rot
+      eingenommen; der Bildschirm zeigt „MASTER OCUPADO“, „RED“, „0 de 3 satélites“. Dann zeigt eine
+      Satelliten-Box, dass Rot sie hält. Zuletzt zeigt der Master für Rot „1 de 3 satélites, 3 pontos a cada
+      10 s“ und geht dann an Blau, wieder bei „0 de 3 satélites“. Die Bildschirme sind auf Portugiesisch.
+    real_caption: >-
+      Testlauf auf dem Prüftisch, 1. November 2026 (drei Ausschnitte desselben Spiels, aneinandergefügt): vier
+      Boxen, und die mit dem großen Bildschirm ist der Master. Rot nimmt den Master und einen Satelliten ein,
+      die Punkte des Masters steigen, danach nimmt Blau den Master ein. Der Lauf hat uns drei Dinge auf dem
+      großen Bildschirm gezeigt, die wir gerade korrigieren: Der portugiesische Bildschirm sagte „MASTER“
+      statt „MESTRE“, der Master zeigte vor der ersten Einnahme „ZONA“, und er zeigte den Zeitpunkt der
+      Einnahme („desde“) statt der Zeit, die er schon gehalten wird. Ohne Ton; die Bildschirme sind auf
+      Portugiesisch.
   target_windows:
     title: Zielfenster
     text: >-

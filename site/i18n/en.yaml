@@ -358,8 +358,21 @@ modes:
     text: >-
       Teams capture a master box and its satellites. Only the master scores, and every satellite its
       holder also holds raises its points; when the master changes hands, every satellite goes back
-      to neutral. Written and tested in software, not yet played on real boxes.
+      to neutral. Written and tested in software, and now test-played on real boxes (see the clip below).
     meta: Several boxes · needs the field controller
+    real_alt: >-
+      Silent video of a Master and Satellites test game on the bench, three short pieces joined. First the
+      master, the box with the big screen, goes from "LIVRE" (free) to taken by red, and its screen reads
+      "MASTER OCUPADO", "RED", "0 de 3 satélites". Then a satellite box shows red holding it. Last, the master
+      reads "1 de 3 satélites, 3 pontos a cada 10 s" for red, then passes to blue, back at "0 de 3 satélites".
+      The screens are in Portuguese.
+    real_caption: >-
+      Test run on the bench, 1 November 2026 (three pieces of one game, joined): four boxes, and the one with the
+      big screen is the master. Red takes the master and a satellite, the master's points go up, and then blue
+      takes the master. The run showed three things on the big screen that we are now fixing: the Portuguese
+      screen said "MASTER" instead of "MESTRE", the master read "ZONA" before its first capture, and it showed
+      the time it was taken ("desde") instead of how long it has been held. No sound; the screens are in
+      Portuguese.
   target_windows:
     title: Target Windows
     text: >-
