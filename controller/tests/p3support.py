@@ -119,6 +119,11 @@ class P3Case(unittest.TestCase):
         self.svc._wall = lambda: self.now
         self.svc._tz = datetime.timezone.utc
         self.ctrl.positions._wall = lambda: self.now
+        self.ctrl.positions._mono = lambda: self.now  # grants run on monotonic time: the test moves both
+        # The clock guard (wallclock.py) judges the test's time, which moves by days, not the machine's.
+        guard = self.ctrl.clock_guard
+        guard._wall = guard._mono = lambda: self.now
+        guard.release_date = guard._records = 0.0  # (the test writes records of times it has not reached)
         self.client = TestClient(https_app(self.bundle.app), base_url="https://testserver")  # the tokens go over HTTPS (guard.py)
 
     def close_bundle(self) -> None:

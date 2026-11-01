@@ -275,7 +275,7 @@ class ContractCase(unittest.TestCase):
         svc = Checkin(env.ctrl)  # no field CA: HTTPS off, as on the phone until its slice S6
         svc._wall = wall
         svc._tz = datetime.timezone.utc
-        Positions(env.ctrl, wall=wall)
+        Positions(env.ctrl, wall=wall, mono=wall)
         # Slice S7c: adoption (no USB, as on a phone) and firmware updates, as main.build sets them up.
         Adoption(env.ctrl, lister=lambda: [])
         FirmwareUpdates(env.ctrl, Path(env.tmp) / "firmware", env.cfg.firmware_release_keys, clock=wall)

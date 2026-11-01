@@ -72,6 +72,7 @@ import time
 import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
+from . import wallclock
 from . import field_grid as gridmod
 from . import field_levels as levelsmod
 from . import georef as georefmod
@@ -480,7 +481,7 @@ class TcpSender:
 class AtakEmitter:
     """Follows the controller's messages and sends the picture over UDP and to staff over TCP."""
 
-    def __init__(self, cfg: "Config", controller: "Controller", *, wall: Callable[[], float] = time.time,
+    def __init__(self, cfg: "Config", controller: "Controller", *, wall: Callable[[], float] = wallclock.now,
                  udp: Optional[Any] = None, tcp: Optional[Any] = None, remote: Optional[Any] = None) -> None:
         self.cfg = cfg
         self.ctrl = controller

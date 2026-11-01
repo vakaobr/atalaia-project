@@ -1433,6 +1433,23 @@
     "pending_note_one": "Há {n} réplica declarada por cronografar.",
     "back": "Voltar"
   },
+  "clock": {
+    "wrong": "O relógio do controlador está errado.",
+    "reason_before_release": "Indica {now}, antes de esta versão do programa existir ({floor}). Um Raspberry Pi 4 não tem relógio próprio e, depois de um corte de energia, arranca com uma hora antiga.",
+    "reason_behind_records": "Indica {now}, antes de dados que já guardou ({floor}).",
+    "hint_gm": "As datas, os códigos e os certificados dependem dele, e nada é apagado enquanto não estiver certo. Se a hora deste dispositivo estiver certa, acerta-se a partir dele:",
+    "hint_read": "Peça-se à organização do jogo que o acerte a partir da consola.",
+    "set": "Acertar o relógio do controlador por este dispositivo",
+    "set_done": "O relógio do controlador é agora {time}.",
+    "wrong_short": "(errado)",
+    "title": "Relógio do controlador",
+    "intro": "Em campo, o controlador não tem internet. Um Raspberry Pi 4 não tem relógio próprio e, depois de um corte de energia, arranca com a hora do último desligar (ou 1970); um Pi 5 só mantém a hora com a sua bateria. Os jogos e os temporizadores não dependem dele; as datas, os códigos de quem joga, os certificados e o apagar de dados antigos dependem.",
+    "controller_time": "Hora do controlador",
+    "device_time": "Hora deste dispositivo",
+    "jump": "O relógio saltou {seconds} s às {time}. Os temporizadores não são afetados.",
+    "forward_only": "Só avança: nunca para antes dos dados mais recentes que o controlador guarda, e nunca mais de 14 dias de cada vez quando já parece certo.",
+    "read_only": "Só a organização do jogo o acerta."
+  },
   "box_language": {
     "title": "Língua das caixas",
     "intro": "A língua dos ecrãs das caixas: Pronta, à espera do início, zona livre, armada, fim do jogo. Um jogo mantém a língua com que foi criado, e todas as entradas (cartão, código QR, texto, convite por rádio) a levam. As caixas com firmware mais antigo ficam em inglês.",

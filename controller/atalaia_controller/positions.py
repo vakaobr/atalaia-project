@@ -40,9 +40,9 @@ from __future__ import annotations
 import math
 import re
 import threading
-import time
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
+from . import wallclock
 from . import beacons as beaconsmod
 from . import box_beacons as boxbeacons
 from .engine import Conflict, ControllerError
@@ -107,11 +107,14 @@ def check_report(r: Any) -> dict[str, Any]:
 
 
 class Positions:
-    def __init__(self, controller: "Controller", wall: Callable[[], float] = time.time) -> None:
+    def __init__(self, controller: "Controller", wall: Callable[[], float] = wallclock.now,
+                 mono: Optional[Callable[[], float]] = None) -> None:
         self.ctrl = controller
         self._wall = wall
+        # A grant's time runs on the controller's monotonic clock: a wall clock that jumps must not end or extend it.
+        self._mono = mono or (lambda: controller.now_ms() / 1000.0)
         self._lock = threading.Lock()
-        # (game, team that sees, team seen) -> expiry (wall seconds)
+        # (game, team that sees, team seen) -> expiry (monotonic seconds)
         self.grants: dict[tuple[int, str, str], float] = {}
         controller.positions = self
 
@@ -149,7 +152,7 @@ class Positions:
             mine = self._team_name(pos["game_id"], viewer.team)
             theirs = self._team_name(pos["game_id"], pos["team"])
             exp = self.grants.get((pos["game_id"], mine or "", theirs or ""))
-            if exp is not None and exp > self._wall():
+            if exp is not None and exp > self._mono():
                 return True
         return False
 
@@ -250,12 +253,12 @@ class Positions:
                 or not isinstance(dur, (int, float)) or not 0 < dur <= GRANT_MAX_S:
             return
         with self._lock:
-            self.grants[(game_id, team, see)] = self._wall() + float(dur)
+            self.grants[(game_id, team, see)] = self._mono() + float(dur)
         self.ctrl._emit({"type": "positions", "game": game_id, "_positions_refresh": True})
 
     def tick(self) -> None:
         """Ends grants whose time is up, with visibility.expired from the controller."""
-        now = self._wall()
+        now = self._mono()
         with self._lock:
             done = [k for k, exp in self.grants.items() if exp <= now]
             for k in done:

@@ -105,6 +105,35 @@ The controller serves HTTPS on port 8443, with a certificate from the field's ow
 
 From here, follow the [Game master manual](game-master.md): the radio channel, adopting the boxes, a game from start to end.
 
+## The clock
+
+A field has no internet, so the controller cannot ask the network for the time. **A Raspberry Pi 4 has no clock of its own.** After a power cut it starts with the time it last saved (the system's *fake-hwclock* keeps the time of the last orderly shutdown or hourly save), or with 1 January 1970 if it has none. A **Raspberry Pi 5 has a real-time clock, but it keeps time only with its optional battery** (the RTC battery connector); without it, it behaves like a Pi 4. Put the battery on a Pi 5 if you can. Phones and laptops have the right time, so a controller with a wrong clock is the one that is out of step.
+
+What the controller does about it (the details are in the [controller README](../../../controller/README.md#the-wall-clock)):
+
+- **Games, timers and the radio do not use the clock.** Game time, pauses, timeouts and rate limits run on a clock that only counts forward, so a wrong or a jumping time never changes a game's length.
+- **It notices.** At start and every few seconds it compares its clock with the day this software was released and with the newest time it has already seen (it saves that every few minutes, so a Pi 4 that comes up days behind is caught too). If the clock is earlier, the log says `the clock is wrong` and the console shows a yellow banner **The controller's clock is wrong** on every screen.
+- **It keeps its certificates valid.** The field's certificates are issued for a window that starts before this software's release date, so a phone with the right time accepts them even if the controller's clock was wrong when they were made. A field certificate made at 1970 by an older version (it would have expired in 1980) is replaced when the controller starts; players then scan the poster again and the app asks to trust the field once more.
+- **It deletes nothing while the clock is wrong**, nor for an hour after the clock jumps forward by a day or more. The retention periods (see [How long the controller keeps data](#how-long-the-controller-keeps-data)) would otherwise count from a wrong date.
+- **Check-ins made while the clock is wrong get codes that end at the wrong time.** After you set the clock, a code made at 1970 is already over: players check in again (the app asks).
+
+**To set the clock**, open the console on a phone or laptop (their time is right), and in the yellow banner, or in **Settings › Controller clock**, tap **Set the controller's clock from this device**. Only the GM code can do it. The controller moves its clock **forward only**: it refuses a time earlier than the newest data it holds, earlier than its current time, or (when its clock looks right) more than 14 days ahead. A move backwards would let expired player codes and certificates work again. The setting lasts until the Pi restarts; a Pi 4 without a battery needs it after every power cut (the banner reminds you). To keep the time across restarts, set the system clock too, as `root` on the Pi: `sudo timedatectl set-time "2026-11-02 14:30:00"` (the controller's user cannot do this itself, on purpose), or give the Pi a way to learn the time: an RTC module, the Pi 5's battery, or a router that gives the time to the Pi over NTP while it is on the internet.
+
+If the console refuses ("... is earlier than ..."), either the phone's time is wrong too, or the controller has already seen a later time because its clock was *ahead* for a while. The controller never goes back by itself: fix it as `root` with `sudo timedatectl set-time` and restart the service; the records made while it was ahead keep their dates.
+
+## Using a travel router
+
+A small **travel router** (a pocket router on a power bank) is the simplest field Wi-Fi: the Pi and the phones all join the router's Wi-Fi.
+
+1. **Join the Pi to the router.** The Pi joins the router's Wi-Fi like a phone, or plugs into its LAN socket with a cable (better: no Wi-Fi to lose).
+2. **Give the Pi a fixed address.** In the router's settings, make a *DHCP reservation* (also called a *static lease* or *address binding*) for the Pi's MAC address, for example `192.168.8.10`. Do not use a different address on each start: the check-in poster and the QR codes carry the controller's address. Find the MAC address on the Pi with `ip link show`. (You can set a static address on the Pi instead, outside the router's DHCP range; the reservation is easier to undo.)
+3. **Tell the controller its address.** Put it in `[api] tls_names` in `/etc/atalaia/controller.toml`, for example `["192.168.8.10", "campo.local"]`, and restart the service, so the certificate covers it (section 6).
+4. **The router must work with no internet.** Many travel routers insist on an uplink: they show a "no internet" page, or keep the Wi-Fi on but hand out no address until they are set up. Test it before the day: switch off the router's uplink (no cable, no hotspot), switch it on, and join with a phone. The phone may say "no internet"; that is fine. If it drops the Wi-Fi because there is no internet, turn off that phone's *Switch to mobile data automatically* (Android) or *Wi-Fi Assist* (iPhone), or use a router that does not need it.
+5. **Do NOT let the router isolate its clients.** Switch off *AP isolation* / *client isolation* / *wireless isolation*, and do not put the phones on the **guest network**: guest networks usually isolate clients so that phones cannot reach other devices, including the Pi. With isolation on, the phones join the Wi-Fi but cannot open the controller, the check-in fails and the console does not load. Test it: from a phone on the Wi-Fi, open `https://192.168.8.10:8443/console/` (the address you reserved).
+6. **The address the players use.** Players do not type it: the **check-in poster** carries the controller's https address and fingerprint in its QR code. The poster is made in the console (**Check-in** tab, **Print the poster**, see the [Game master manual](game-master.md#check-in-rules-and-the-poster)); its **The controller's https addresses** box shows the addresses the QR code holds, one per line, and you can fix them there (for example, to the reserved address). Print it again whenever the address changes. The console also shows the address to use, when you open the plain `http://` page by mistake.
+
+If the router's address range changes (for example, it is a different router at the next field), the reserved address changes too: check the poster and `tls_names` before the day.
+
 ## 7. Backups
 
 Everything the controller keeps is in two places: `/etc/atalaia/controller.toml` (your settings), and the folder `/var/lib/atalaia/` (the database with the access codes, the join key, games, presets and the check-in list; the `tls` folder with the field's certificate authority; the `firmware` folder with firmware images).

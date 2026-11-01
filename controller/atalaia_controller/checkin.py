@@ -57,6 +57,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import yaml
 
+from . import wallclock
 from . import REPO_ROOT, chrono, player_token
 from . import apd as apdfmt
 from . import checkin_poster as posterfmt
@@ -375,7 +376,7 @@ def poster_change(printed: Optional[dict[str, Any]], urls: list[str],
 
 class Checkin:
     def __init__(self, controller: "Controller", *, ca_sha256: Optional[bytes] = None,
-                 default_urls: Optional[list[str]] = None, wall: Callable[[], float] = time.time,
+                 default_urls: Optional[list[str]] = None, wall: Callable[[], float] = wallclock.now,
                  tz: Optional[datetime.tzinfo] = None, addresses: Optional[FieldAddresses] = None) -> None:
         self.ctrl = controller
         self.cfg = controller.cfg
@@ -2312,8 +2313,10 @@ class Checkin:
 
     def purge(self, force: bool = False) -> Optional[dict[str, Any]]:
         now = self._wall()
-        if not force and now - self._last_purge < 600:
+        if not force and 0 <= now - self._last_purge < 600:  # a clock set back lets it run: it is gated below
             return None
+        if not self.ctrl.clock_guard.purge_allowed():
+            return None  # a wrong or just-jumped clock deletes nothing (wallclock.py)
         self._last_purge = now
         out = self.store.purge_checkins(now - self.cfg.retention_days * 86400, now - IDENTITY_DAYS * 86400,
                                         now)

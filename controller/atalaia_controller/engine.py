@@ -59,6 +59,7 @@ from atalaia_sim.mode import COMMAND_NAME, SEPARATOR, ModeError, hold_scoring
 from atalaia_sim.packet import Header, vf_make
 from atalaia_sim.protocol import MESSAGE_TYPES
 
+from . import wallclock
 from . import channels, radio_modem, radio_region, visibility
 from . import scenario_service as scenarios
 from .access_tokens import AccessTokens
@@ -342,8 +343,8 @@ class FieldScript:
 
 class Controller:
     def __init__(self, cfg: Config, store: Store, *, modem: Optional[radio_modem.RadioModem] = None,
-                 core: Optional[Core] = None, clock: Callable[[], float] = time.monotonic, wall: Callable[[], float] = time.time,
-                 join_key: bytes = b"") -> None:
+                 core: Optional[Core] = None, clock: Callable[[], float] = time.monotonic,
+                 wall: Callable[[], float] = wallclock.now, join_key: bytes = b"") -> None:
         self.cfg = cfg
         # The field join key authenticates join payloads (protocol/join.md); never on the API.
         self.join_key = join_key
@@ -355,6 +356,7 @@ class Controller:
         self._wall = wall  # the wall clock of a game's created_at, started_at and ended_at (a contract case moves it)
         self._t0 = clock()
         self.access_tokens = AccessTokens(store, wall)  # short-lived scoped API tokens (access_tokens.py)
+        self.clock_guard = wallclock.ClockGuard(store, wall=wall, mono=clock)  # a wrong wall clock (wallclock.py)
         self._lock = threading.RLock()
         self._listeners: list[Callable[[dict[str, Any]], None]] = []
         self._thread: Optional[threading.Thread] = None
@@ -464,6 +466,7 @@ class Controller:
 
     def start(self) -> None:
         self._stop.clear()
+        self.clock_guard.start()
         self._thread = threading.Thread(target=self._run, name="controller-tick", daemon=True)
         self._thread.start()
 
@@ -1089,7 +1092,7 @@ class Controller:
     def _next_move_rev(self) -> int:
         """A revision above every earlier one, and at least the wall clock in seconds, so a restored
         backup (an older counter) still gives boxes a number above what they hold."""
-        return min(0xFFFFFFFF, max(self.move_rev() + 1, int(time.time())))
+        return min(0xFFFFFFFF, max(self.move_rev() + 1, int(wallclock.now())))
 
     def set_field_channel(self, channel_hz: Any, source: Any = "manual") -> dict[str, Any]:
         """The GM's choice for the field (accepting the default counts): stored, sent to the modem. A
@@ -1110,7 +1113,7 @@ class Controller:
             self.store.set_setting("radio.channel_hz", str(hz))
             self.store.set_setting("radio.channel_source", source)
             self.store.set_setting("radio.channel_confirmed", "1")
-            self.store.set_setting("radio.channel_set_at", str(time.time()))
+            self.store.set_setting("radio.channel_set_at", str(wallclock.now()))
             moved = False
             if hz != old:
                 history = [old] + [h for h in self.channel_history() if h not in (old, hz)]
@@ -1145,7 +1148,7 @@ class Controller:
                 self.store.set_setting("radio.channel_hz", str(region.default_channel_hz))
                 self.store.set_setting("radio.channel_source", "default")
                 self.store.set_setting("radio.channel_confirmed", "0")
-                self.store.set_setting("radio.channel_set_at", str(time.time()))
+                self.store.set_setting("radio.channel_set_at", str(wallclock.now()))
                 self.store.set_setting("radio.last_scan", "")
                 self.store.set_setting("radio.channel_history", "[]")  # another region's channels
                 self._last_scan = None
@@ -1889,6 +1892,7 @@ class Controller:
                 "role": fc.election.role if fc else None,
                 "term": fc.term if fc else None,
                 "live_game": self.game["id"] if self.game else None,
+                "clock": self.clock_guard.status(),
                 "key_lost": self.key_lost,
                 "radio": self.radio_state,
                 "modem": {
@@ -1922,6 +1926,7 @@ class Controller:
 
     def tick(self) -> None:
         self.access_tokens.purge()  # expired and revoked tokens, at most every 10 minutes
+        self.clock_guard.tick()
         if self.checkin is not None:
             self.checkin.purge()  # retention (ADR-P3-13), at most every 10 minutes
         if self.branding is not None:

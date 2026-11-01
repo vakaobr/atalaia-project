@@ -1433,6 +1433,23 @@
     "pending_note_one": "{n} declared replica not chronographed yet.",
     "back": "Back"
   },
+  "clock": {
+    "wrong": "The controller's clock is wrong.",
+    "reason_before_release": "It says {now}, which is before this software was released ({floor}). A Raspberry Pi 4 has no clock of its own and starts from an old time after a power cut.",
+    "reason_behind_records": "It says {now}, which is earlier than data it already holds ({floor}).",
+    "hint_gm": "Timestamps and certificates depend on it, and nothing is deleted until it is right. Set it from this device if this device's time is right:",
+    "hint_read": "Ask the game master to set it from the console.",
+    "set": "Set the controller's clock from this device",
+    "set_done": "The controller's clock is now {time}.",
+    "wrong_short": "(wrong)",
+    "title": "Controller clock",
+    "intro": "The controller has no internet in the field. A Raspberry Pi 4 has no clock of its own and comes up with the time of its last shutdown (or 1970) after a power cut; a Pi 5 keeps time only with its battery. Games and timers do not depend on it; timestamps, player codes, certificates and the deleting of old data do.",
+    "controller_time": "Controller's time",
+    "device_time": "This device's time",
+    "jump": "The clock jumped {seconds} s at {time}. Timers are not affected.",
+    "forward_only": "It only moves forward, never before the newest data the controller holds, and never more than 14 days at a time when it already looks right.",
+    "read_only": "Only the game master sets it."
+  },
   "box_language": {
     "title": "Box language",
     "intro": "The language of the box screens: Ready, waiting for the start, neutral zone, armed, game over. A game keeps the language it was created with, and every join (card, QR code, text, radio invite) carries it. Boxes with older firmware stay in English.",

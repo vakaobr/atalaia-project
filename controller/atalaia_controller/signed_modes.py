@@ -30,7 +30,6 @@ the project*), and whether its key is still trusted here.
 from __future__ import annotations
 
 import json
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -39,6 +38,7 @@ from typing import Any, Callable, Optional
 
 from atalaia_sim.mode import ModeError
 
+from . import wallclock
 from . import firmware_release as fr
 from . import mode_package as mp
 
@@ -82,7 +82,7 @@ def https_fetch(url: str, limit: int) -> bytes:
 class SignedModes:
     def __init__(self, controller: Any, keys: list[str], revoked: list[str], index: str,
                  fetch: Callable[[str, int], bytes] = https_fetch, min_versions: Optional[dict[str, str]] = None,
-                 revocation_max_age_days: float = 30.0, wall: Callable[[], float] = time.time) -> None:
+                 revocation_max_age_days: float = 30.0, wall: Callable[[], float] = wallclock.now) -> None:
         self.controller = controller
         self.keys = list(keys)
         self.revoked_config = set(revoked)
@@ -191,16 +191,16 @@ class SignedModes:
         if not self.index_source:
             return {"error": None, "entries": []}
         if (not refresh and self._index is not None and "entries" in self._index
-                and time.time() - self._index["fetched_at"] < INDEX_TTL_S):
+                and wallclock.now() - self._index["fetched_at"] < INDEX_TTL_S):
             return self._index
         try:
             entries = mp.parse_index(json.loads(self._read(self.index_source, INDEX_MAX)))
             self._fetch_revocations()  # a missing revoked.json is an error too (FLD-7)
-            self._index = {"entries": entries, "fetched_at": time.time(), "error": None}
+            self._index = {"entries": entries, "fetched_at": wallclock.now(), "error": None}
         except (FetchError, mp.PackageError, ValueError, UnicodeDecodeError) as exc:
             # Fail closed: an index that cannot be read whole offers nothing. What was revoked stays revoked
             # (self._rev is not touched).
-            self._index = {"error": str(exc), "entries": [], "fetched_at": time.time()}
+            self._index = {"error": str(exc), "entries": [], "fetched_at": wallclock.now()}
         return self._index
 
     # ---- installing -----------------------------------------------------------------------

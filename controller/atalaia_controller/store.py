@@ -106,9 +106,10 @@ import os
 import secrets
 import sqlite3
 import threading
-import time
 from pathlib import Path
 from typing import Any, Callable, Optional
+
+from . import wallclock
 
 log = logging.getLogger(__name__)
 
@@ -639,6 +640,18 @@ class Store:
         self._exec("INSERT INTO settings (key, value) VALUES (?, ?) "
                    "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
 
+    def newest_wall_time(self) -> float:
+        """The newest wall-clock timestamp the store holds (0.0 when empty): the controller's clock cannot
+        honestly be earlier (wallclock.py)."""
+        best = 0.0
+        for sql in ("SELECT MAX(received_at) AS t FROM events", "SELECT MAX(created_at) AS t FROM games",
+                    "SELECT MAX(started_at) AS t FROM games", "SELECT MAX(ended_at) AS t FROM games",
+                    "SELECT MAX(received_at) AS t FROM remote_commands"):
+            row = self._exec(sql).fetchone()
+            if row is not None and row["t"] is not None:
+                best = max(best, float(row["t"]))
+        return best
+
     def delete_setting(self, key: str) -> None:
         self._exec("DELETE FROM settings WHERE key = ?", (key,))
 
@@ -770,7 +783,7 @@ class Store:
                    "ON CONFLICT(id) DO UPDATE SET version = excluded.version, "
                    "files_json = excluded.files_json, installed_at = excluded.installed_at, "
                    "signed_json = excluded.signed_json, package = excluded.package",
-                   (mode_id, version, json.dumps(files), time.time(),
+                   (mode_id, version, json.dumps(files), wallclock.now(),
                     json.dumps(signed) if signed is not None else None,
                     package if signed is not None else None))
 
@@ -792,7 +805,7 @@ class Store:
     # --- presets ------------------------------------------------------------
 
     def save_preset(self, name: str, mode_id: str, params: dict[str, Any]) -> dict[str, Any]:
-        now = time.time()
+        now = wallclock.now()
         with self._lock:
             self._exec("INSERT INTO presets (name, mode_id, params_json, created_at, updated_at) "
                        "VALUES (?, ?, ?, ?, ?) ON CONFLICT(name) DO UPDATE SET "
@@ -888,7 +901,7 @@ class Store:
                    "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(game_id, node_id) DO UPDATE SET "
                    "name = excluded.name, role = excluded.role, info_json = excluded.info_json, "
                    "last_seen = excluded.last_seen",
-                   (game_id, node_id, name, role, json.dumps(info), time.time()))
+                   (game_id, node_id, name, role, json.dumps(info), wallclock.now()))
 
     def nodes(self, game_id: int) -> list[dict[str, Any]]:
         rows = self._exec("SELECT * FROM nodes WHERE game_id = ? ORDER BY node_id", (game_id,)).fetchall()
@@ -905,7 +918,7 @@ class Store:
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (game_id, ev["node"], ev["seq"], ev["t"], ev["type"], ev.get("team"), ev.get("squad"),
              ev.get("prio", "normal"), json.dumps(ev.get("data") or {}), ev.get("epoch"),
-             ev.get("pkt_seq"), time.time()))
+             ev.get("pkt_seq"), wallclock.now()))
         return cur.rowcount == 1
 
     def events(self, game_id: int, since_ms: Optional[int] = None,
@@ -1044,7 +1057,7 @@ class Store:
 
     def add_remote_command(self, entry: dict[str, Any]) -> dict[str, Any]:
         """Logs one remote command and what came of it; drops entries older than REMOTE_LOG_DAYS."""
-        now = time.time()
+        now = wallclock.now()
         with self._lock:
             self._exec("DELETE FROM remote_commands WHERE received_at < ?", (now - REMOTE_LOG_DAYS * 86400,))
             cur = self._exec(
@@ -1132,7 +1145,7 @@ class Store:
         self._exec("INSERT INTO field_levels (level, content_type, data, updated_at) VALUES (?, ?, ?, ?) "
                    "ON CONFLICT(level) DO UPDATE SET content_type = excluded.content_type, "
                    "data = excluded.data, updated_at = excluded.updated_at",
-                   (level, content_type, data, time.time()))
+                   (level, content_type, data, wallclock.now()))
 
     def field_image(self, level: int = 0) -> Optional[tuple[str, bytes, float]]:
         row = self._exec("SELECT content_type, data, updated_at FROM field_levels WHERE level = ?",
@@ -1186,7 +1199,7 @@ class Store:
 
     def add_map_feature(self, level: int, data: dict[str, Any]) -> int:
         """A new feature (``data`` without its level); returns its id."""
-        now = time.time()
+        now = wallclock.now()
         with self._lock:
             self._exec("INSERT INTO map_features (level, data_json, created_at, updated_at) VALUES (?, ?, ?, ?)",
                        (level, json.dumps(data, separators=(",", ":"), ensure_ascii=False), now, now))
@@ -1194,7 +1207,7 @@ class Store:
 
     def put_map_feature(self, feature_id: int, level: int, data: dict[str, Any]) -> bool:
         return self._exec("UPDATE map_features SET level = ?, data_json = ?, updated_at = ? WHERE id = ?",
-                          (level, json.dumps(data, separators=(",", ":"), ensure_ascii=False), time.time(),
+                          (level, json.dumps(data, separators=(",", ":"), ensure_ascii=False), wallclock.now(),
                            feature_id)).rowcount == 1
 
     def delete_map_feature(self, feature_id: int) -> bool:
@@ -1211,7 +1224,7 @@ class Store:
             raise ValueError(f"the field image is over {FIELD_IMAGE_MAX} bytes")
         if not 0 <= level < FIELD_LEVELS_MAX:
             raise ValueError(f"level: 0 to {FIELD_LEVELS_MAX - 1}")
-        now = time.time()
+        now = wallclock.now()
         text = json.dumps(boundary, separators=(",", ":"), ensure_ascii=False)
         with self._lock:
             self._db.execute("BEGIN IMMEDIATE")
@@ -1270,7 +1283,7 @@ class Store:
 
     def add_beacon(self, major: int, minor: int, level: int, data: dict[str, Any]) -> bool:
         """A new beacon (``data``: uuid, room, zone, x, y); False when major and minor are taken."""
-        now = time.time()
+        now = wallclock.now()
         return self._exec("INSERT OR IGNORE INTO beacons (major, minor, level, data_json, created_at, updated_at) "
                           "VALUES (?, ?, ?, ?, ?, ?)",
                           (major, minor, level, json.dumps(data, separators=(",", ":"), ensure_ascii=False),
@@ -1278,7 +1291,7 @@ class Store:
 
     def put_beacon(self, major: int, minor: int, level: int, data: dict[str, Any]) -> bool:
         return self._exec("UPDATE beacons SET level = ?, data_json = ?, updated_at = ? WHERE major = ? AND minor = ?",
-                          (level, json.dumps(data, separators=(",", ":"), ensure_ascii=False), time.time(),
+                          (level, json.dumps(data, separators=(",", ":"), ensure_ascii=False), wallclock.now(),
                            major, minor)).rowcount == 1
 
     def delete_beacon(self, major: int, minor: int) -> bool:
@@ -1293,7 +1306,7 @@ class Store:
                 data = json.loads(r["data_json"])
                 data["x"] = data["y"] = None
                 self._exec("UPDATE beacons SET level = 0, data_json = ?, updated_at = ? WHERE major = ? AND minor = ?",
-                           (json.dumps(data, separators=(",", ":"), ensure_ascii=False), time.time(),
+                           (json.dumps(data, separators=(",", ":"), ensure_ascii=False), wallclock.now(),
                             r["major"], r["minor"]))
                 moved += 1
             return moved
@@ -1305,7 +1318,7 @@ class Store:
         """Stores a checked image once; False if the same bytes were already stored."""
         cur = self._exec("INSERT OR IGNORE INTO images (id, kind, content_type, width, height, data, created_at) "
                          "VALUES (?, ?, ?, ?, ?, ?, ?)", (image_id, kind, content_type, width, height, data,
-                                                         time.time()))
+                                                         wallclock.now()))
         return cur.rowcount == 1
 
     def image(self, image_id: str, with_data: bool = True) -> Optional[dict[str, Any]]:
@@ -1360,7 +1373,7 @@ class Store:
     def save_team_preset(self, name: str, colour: Optional[str], crest_id: Optional[str],
                          preset_id: Optional[int] = None) -> dict[str, Any]:
         """A new team preset, or (with preset_id) a change to one; a name is unique (ValueError)."""
-        now = time.time()
+        now = wallclock.now()
         with self._lock:
             try:
                 if preset_id is None:
@@ -1390,7 +1403,7 @@ class Store:
                 return None
             key = os.urandom(32)
             self._exec("INSERT INTO token_keys (game_id, key, created_at) VALUES (?, ?, ?)",
-                       (game_id, key, time.time()))
+                       (game_id, key, wallclock.now()))
             return key
 
     def field_player(self, player_id: str) -> Optional[dict[str, Any]]:

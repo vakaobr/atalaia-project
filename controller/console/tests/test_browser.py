@@ -2247,6 +2247,30 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("radio-region")).to_have_text("台灣（AS923，920–925 MHz）")
         expect(page.get_by_test_id("radio-limits")).to_have_text("10% 的時間 · 天線端 500 mW")
 
+    def test_wrong_controller_clock_is_flagged_and_a_gm_sets_it_from_this_device(self):
+        """A Pi 4 has no real-time clock (wallclock.py): the console says the controller's clock is wrong and the
+        GM sets it, forward only, from the browser's."""
+        from atalaia_controller import wallclock
+
+        guard = self.field.bundle.controller.clock_guard
+        guard._hw = time.time()  # what the controller saw before the "power cut"
+        wallclock._offset = -5 * 86400.0
+        self.addCleanup(wallclock.reset)
+        page = self.console()  # European Portuguese by default
+        banner = page.get_by_test_id("clock-wrong")
+        expect(banner).to_contain_text("O relógio do controlador está errado.")
+        self.assertFalse(self.field.http.get("/api/v1/clock").json()["ok"])
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("clock-settings")).to_contain_text("Relógio do controlador")
+        page.get_by_test_id("clock-set").click()
+        expect(banner).to_be_hidden()
+        self.assertTrue(self.field.http.get("/api/v1/clock").json()["ok"])
+        self.assertLess(abs(wallclock.now() - time.time()), 30)
+        # Backwards is refused, in the API too.
+        self.assertEqual(self.field.http.put("/api/v1/clock", json={"epoch": time.time() - 86400}).status_code, 409)
+        page.get_by_test_id("lang").first.select_option("de")
+        expect(page.get_by_test_id("clock-settings")).to_contain_text("Uhr des Controllers")
+
     def test_box_language_follows_the_console_or_the_setting(self):
         """Join key 15 (RFC 0001 Amendment 10): with "auto" a game takes the language of the console it
         was created in; the setting in Settings fixes one for the field's next games."""
@@ -4150,7 +4174,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v16').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v17').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):

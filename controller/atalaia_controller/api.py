@@ -68,6 +68,8 @@ which browsers cannot give headers, takes it in the ``Sec-WebSocket-Protocol`` h
     PUT|DELETE /api/v1/team-presets/{id}   GM
     GET  /api/v1/games/{id}/teams          a game's team colours, display names and crests (no token)
     PUT  /api/v1/games/{id}/teams/{team}   GM: {"display_name"?, "crest_id"?, "team_preset_id"?}
+    GET  /api/v1/clock                     the controller's clock: ok, now, floor, reason, offset, last jump
+    PUT  /api/v1/clock                     GM: {"epoch"} set it forward from this device (never backwards)
     GET|PUT /api/v1/settings/box-language  the boxes' screen language: "auto" (the console's), "pt", "en", "de", "zh-tw"
     GET|PUT /api/v1/settings/map-fetching  may the console fetch maps (OSM, Overpass, Nominatim, aerial imagery): {"map_fetching": bool}
     GET  /api/v1/radio                     the field's radio region and channel, its limits, candidates, last scan
@@ -169,6 +171,7 @@ from . import map_features as mapmod
 from . import beacons as beaconsmod
 from . import box_beacons as boxbeacons
 from . import images, player_tags, visibility
+from .wallclock import ClockError
 from . import scenario_service as scenarios
 from .branding import SLOTS, Branding, etag
 from .addresses import url_host
@@ -387,6 +390,10 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.exception_handler(ControllerError)
     async def controller_error(request: Request, exc: ControllerError):
         return JSONResponse({"detail": str(exc)}, status_code=exc.status)
+
+    @app.exception_handler(ClockError)
+    async def clock_error(request: Request, exc: ClockError):
+        return JSONResponse({"detail": str(exc), "code": exc.code}, status_code=exc.status)
 
     @app.exception_handler(StartBlocked)
     async def start_blocked(request: Request, exc: StartBlocked):
@@ -708,6 +715,17 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.put("/api/v1/settings/box-language", dependencies=[Depends(require_gm)])
     def put_box_language(body: Any = Body(None)) -> dict[str, Any]:
         return controller.set_box_language(body_map(body).get("box_language"))
+
+    # --- the controller's wall clock (wallclock.py, decisions CLK-*) ------------
+
+    @app.get("/api/v1/clock", dependencies=[Depends(require_console)])
+    def get_clock() -> dict[str, Any]:
+        return controller.clock_guard.status()
+
+    @app.put("/api/v1/clock", dependencies=[Depends(require_gm)])
+    def put_clock(body: Any = Body(None)) -> dict[str, Any]:
+        """The GM sets the clock forward from the device it uses: {"epoch": seconds since 1970}."""
+        return controller.clock_guard.set(body_map(body).get("epoch"))
 
     # --- the console's map fetching (LEG-50): off, the field-map page reaches nothing outside ----
 

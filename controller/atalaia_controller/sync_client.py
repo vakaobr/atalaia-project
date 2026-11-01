@@ -116,7 +116,6 @@ import logging
 import re
 import ssl
 import threading
-import time
 import urllib.error
 import urllib.request
 import uuid
@@ -125,6 +124,7 @@ from urllib.parse import urlsplit
 
 from atalaia_sim.mode import ModeError
 
+from . import wallclock
 from . import __version__, images
 from .modes import resolve_params
 from .sync_format import (ANSWERS, MAX_ERASURES, MAX_EVENTS, MAX_MARSHALS, MAX_READINGS, MAX_REPLICAS, MAX_ROSTER,
@@ -286,7 +286,7 @@ class SyncClient:
     """Pushes the store's games to the site server; ``start`` runs it in a thread."""
 
     def __init__(self, cfg: Any, store: Any, *, api_key: Optional[str] = None,
-                 transport: Optional[Any] = None, wall: Callable[[], float] = time.time,
+                 transport: Optional[Any] = None, wall: Callable[[], float] = wallclock.now,
                  checkin: Optional[Any] = None, branding: Optional[Any] = None,
                  controller: Optional[Any] = None) -> None:
         self.cfg = cfg

@@ -1433,6 +1433,23 @@
     "pending_note_one": "{n} angemeldete Replik noch nicht gechront.",
     "back": "Zurück"
   },
+  "clock": {
+    "wrong": "Die Uhr des Controllers geht falsch.",
+    "reason_before_release": "Sie zeigt {now}, also vor der Veröffentlichung dieser Software ({floor}). Ein Raspberry Pi 4 hat keine eigene Uhr und startet nach einem Stromausfall mit einer alten Zeit.",
+    "reason_behind_records": "Sie zeigt {now}, früher als Daten, die der Controller schon hat ({floor}).",
+    "hint_gm": "Zeitstempel und Zertifikate hängen davon ab, und bis sie stimmt, wird nichts gelöscht. Wenn die Zeit dieses Geräts stimmt, kann sie von hier gesetzt werden:",
+    "hint_read": "Die Spielleitung soll sie in der Konsole setzen.",
+    "set": "Uhr des Controllers von diesem Gerät setzen",
+    "set_done": "Die Uhr des Controllers zeigt jetzt {time}.",
+    "wrong_short": "(falsch)",
+    "title": "Uhr des Controllers",
+    "intro": "Im Feld hat der Controller kein Internet. Ein Raspberry Pi 4 hat keine eigene Uhr und startet nach einem Stromausfall mit der Zeit des letzten Herunterfahrens (oder 1970); ein Pi 5 behält die Zeit nur mit seiner Batterie. Spiele und Timer hängen nicht davon ab; Zeitstempel, Spielercodes, Zertifikate und das Löschen alter Daten schon.",
+    "controller_time": "Zeit des Controllers",
+    "device_time": "Zeit dieses Geräts",
+    "jump": "Die Uhr ist um {seconds} s gesprungen, um {time}. Timer sind nicht betroffen.",
+    "forward_only": "Sie geht nur vorwärts, nie vor die neuesten Daten des Controllers und, wenn sie schon plausibel ist, nie mehr als 14 Tage auf einmal.",
+    "read_only": "Nur die Spielleitung setzt sie."
+  },
   "box_language": {
     "title": "Sprache der Boxen",
     "intro": "Die Sprache der Bildschirme der Boxen: Bereit, Warten auf den Start, freie Zone, scharf, Spiel vorbei. Ein Spiel behält die Sprache, mit der es erstellt wurde, und jeder Beitritt (Karte, QR-Code, Text, Funk-Einladung) trägt sie. Boxen mit älterer Firmware bleiben auf Englisch.",
