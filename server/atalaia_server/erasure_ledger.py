@@ -131,7 +131,7 @@ def append(path: Optional[str], entries: Iterable[dict[str, Any]]) -> bool:
                 os.close(fd)
         return True
     except OSError:
-        log.exception("the erasure ledger %s could not be written: %d erasure(s) are not in it", path, len(rows))
+        log.exception("the erasure ledger %s could not be written; erasures not in it: %d", path, len(rows))
         return False
 
 
@@ -170,14 +170,14 @@ def main(argv: list[str]) -> int:
         for entry in entries:
             sys.stdout.write(_line(entry) + "\n")
         if bad:
-            print(f"erasure ledger: {bad} line(s) not valid were left out", file=sys.stderr)
+            print(f"erasure ledger: {bad} {'line' if bad == 1 else 'lines'} not valid left out", file=sys.stderr)
         return 0
     try:
         added, bad = merge(path, sys.stdin)
     except OSError as exc:
         print(f"erasure ledger: {exc}", file=sys.stderr)
         return 1
-    print(f"erasure ledger: {added} entr{'y' if added == 1 else 'ies'} added, {bad} line(s) not valid left out",
+    print(f"erasure ledger: {added} entr{'y' if added == 1 else 'ies'} added, {bad} {'line' if bad == 1 else 'lines'} not valid left out",
           file=sys.stderr)
     return 0
 

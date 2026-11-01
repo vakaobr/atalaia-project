@@ -1569,11 +1569,13 @@ class Controller:
                     have = joined[role]
                     if prefix == "min_" and have < value:
                         warnings.append({"code": "min", "param": name, "role": role, "value": value, "have": have,
-                                         "text": f"{have} {role} node(s) joined; {name} is {value}"})
+                                         "text": f"{have} {role} {'node' if have == 1 else 'nodes'} joined; "
+                                                 f"{name} is {value}"})
                     elif prefix == "last_" and 0 < have <= value:
                         warnings.append({"code": "last", "param": name, "role": role, "value": value,
                                          "have": have,
-                                         "text": f"only {have} {role} node(s) joined and {name} is {value}: "
+                                         "text": f"only {have} {role} {'node' if have == 1 else 'nodes'} joined and "
+                                                 f"{name} is {value}: "
                                                  "the countdown can run from the start"})
             return {"needed": needed, "joined": dict(sorted(joined.items())), "missing": missing,
                     "warnings": warnings, "ok": not missing}

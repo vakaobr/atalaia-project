@@ -104,7 +104,7 @@ from ..services import devices, registration, scheduling
 from . import i18n, preview_texts
 from .field_pages import (GET_HEAD, HERE, HTML_TYPE, STARTED, answer, esc, notice_published,
                           privacy_link, switcher)
-from .staff_i18n import STRINGS
+from .staff_i18n import STRINGS, count_text
 
 router = APIRouter(include_in_schema=False)
 
@@ -351,7 +351,7 @@ async def presets(field: str, request: Request) -> Response:
 async def field_devices(field: str, request: Request) -> Response:
     t = STRINGS[StaffPage(request).lang]
     options = "".join(f'<option value="{d}"{" selected" if d == devices.DEVICE_DAYS else ""}>'
-                      f'{esc(t["days_n"].format(n=d))}</option>' for d in DEVICE_DAYS)
+                      f'{esc(count_text(t, "days_n", d))}</option>' for d in DEVICE_DAYS)
     intro = t["devices_intro"].format(pct=devices.BATTERY_LOW_PCT, s=devices.SILENT_S)
     return _field_page(request, field, "devices", "devices", "devices_title", day_options=options,
                        devices_intro_text=esc(intro))

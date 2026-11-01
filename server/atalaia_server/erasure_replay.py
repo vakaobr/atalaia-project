@@ -83,7 +83,8 @@ async def apply_ledger(settings: Settings, out: TextIO, path: Optional[str] = No
     if not path:
         raise ValueError("ATALAIA_ERASURE_LEDGER is not set: there is no ledger to apply")
     entries, bad = erasure_ledger.read(path)
-    print(f"Erasure ledger {path}: {len(entries)} entries" + (f", {bad} line(s) not valid left out" if bad else ""),
+    print(f"Erasure ledger {path}: {len(entries)} {'entry' if len(entries) == 1 else 'entries'}"
+          + (f", {bad} {'line' if bad == 1 else 'lines'} not valid left out" if bad else ""),
           file=out)
     total: dict[str, int] = {}
     engine = make_engine(settings)

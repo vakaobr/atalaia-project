@@ -339,6 +339,7 @@ const Map<String, String> enStrings = {
   'event.score.delta': 'Points for {team}: {amount}',
   'event.code.used': '{team} used a code',
   'event.player.respawn': '{player} is back in ({lives} lives)',
+  'event.player.respawn_one': '{player} is back in ({lives} life)',
   'event.player.checkin': '{player} checked in',
   'event.kill.confirmed': 'Kill confirmed by {team} ({player})',
   'event.kill.denied': "{team} recovered {player}'s tag",
@@ -1093,7 +1094,7 @@ const Map<String, String> enStrings = {
   // The phone controller's [modes] settings (slice S7b of PE24).
   'ctl_modes.title': 'Mode packages',
   'ctl_modes.tile': 'Mode packages (field controller)',
-  'ctl_modes.tile_hint': '{keys} trusted keys, {box} box keys',
+  'ctl_modes.tile_hint': 'Trusted keys: {keys}, box keys: {box}',
   'ctl_modes.intro':
       'The keys this phone\'s field controller trusts for signed mode packages, the keys built into the boxes\' firmware (the controller offers the boxes only packages they take), revoked keys and the registry\'s index: a Pi\'s [modes] settings. They apply when the controller next starts.',
   'ctl_modes.keys': 'Trusted mode keys (one per line, base64)',
@@ -1443,6 +1444,8 @@ const Map<String, String> enStrings = {
   'ctl_import.imported': 'Imported.',
   'ctl_import.counts':
       '{rows} rows: {created} new, {updated} changed, {unchanged} unchanged, {skipped} skipped, {refused} refused.',
+  'ctl_import.counts_one':
+      '{rows} row: new {created}, changed {updated}, unchanged {unchanged}, skipped {skipped}, refused {refused}.',
   'ctl_import.ignored': 'Columns not read: {names}',
   'ctl_import.more': 'and {n} more',
   'ctl_import.missing':

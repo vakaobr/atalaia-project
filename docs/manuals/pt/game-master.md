@@ -361,7 +361,7 @@ Com um servidor do site, **Da agenda do site** lista os jogos publicados para os
 
 1. Abre o separador **Jogo**. O jogo está **pronto**. Vê as **Definições do jogo** se as quiseres rever.
 2. Se uma função não tem caixa, a consola diz **Nenhuma caixa se juntou para:** *funções*.
-3. Se há réplicas declaradas por cronografar, diz **Há n réplica(s) declarada(s) por cronografar**.
+3. Se há réplicas declaradas por cronografar, diz **Há n réplicas declaradas por cronografar** (**Há 1 réplica declarada por cronografar**, se for só uma).
 4. Toca em **Começar**. Pergunta **Começar o jogo agora?**. Toca em **Sim**.
 5. Se uma função não tem caixa, o botão diz **Começar mesmo assim** e pergunta **Começar mesmo assim?**. Começar assim fica registado e todas as consolas são avisadas: **Jogo começado sem caixa para:** *funções*.
 6. Na janela **Caixas para este jogo**, **Começar o jogo** pergunta **Rever primeiro as outras definições do jogo?**. **Rever definições** fecha a janela e abre as **Definições do jogo**. **Começar agora** começa o jogo. **Voltar** volta atrás.

@@ -58,7 +58,7 @@ Quando o campo verifica a filiação em APD, o cartão de quem joga na lista mos
 3. Cada cartão é uma pessoa, com a equipa e as réplicas declaradas. Um símbolo junto de cada réplica diz **por cronografar**, **aprovada** ou **recusada**. Quem ainda não foi confirmado mostra **à espera de confirmação**. Uma réplica sem registo mostra **ainda sem registo**.
 4. Para encontrar uma réplica pela etiqueta, toca no ícone de **ler** e aponta a câmara à etiqueta QR dela.
 5. Toca numa réplica para a cronografar ([secção 4](#4-cronografa-uma-réplica)).
-6. Se cronografares várias réplicas sem ligação, toca em **Enviar** *n* **série(s) por enviar** quando voltares ao Wi-Fi do campo. Uma série que o controlador não aceita fica no teu telemóvel.
+6. Se cronografares várias réplicas sem ligação, toca em **Enviar** *n* **séries por enviar** (**Enviar 1 série por enviar**, se for só uma) quando voltares ao Wi-Fi do campo. Uma série que o controlador não aceita fica no teu telemóvel.
 7. Alguém sem a app: toca em **Check-in à mão**, escreve o nome e toca em **Fazer o check-in**. Quando o campo pede filiação, o formulário tem também a **APD** (ou associação), o **número de associado** e a **validade** (AAAA-MM-DD): escreve o que diz o cartão da pessoa e marca **Cartão visto, confere** enquanto tens o cartão na mão (o número é então apagado, como acima; desmarcado, é um check-in sem o cartão). O formulário tem ainda uma caixa separada, **Partilhar a minha posição com o jogo durante este jogo**: marca-a só se a pessoa concordar; desmarcada não muda o check-in. Nada é verificado e nunca és impedido por causa do veredicto; uma exceção fica registada sem o número. O controlador dá-lhe um identificador.
 
 A organização também vê esta lista na consola dela. A lista precisa de a organização confirmar que és marshal.
@@ -155,8 +155,8 @@ Conta voltar ao Wi-Fi do campo de duas em duas horas.
 | **Pede à organização para te acrescentar como marshal** | A organização tem de te acrescentar em **Check-in › Marshals**. Depois toca em **Perguntar outra vez**. |
 | **A organização retirou-te da lista de marshals** | A organização retirou-te. As séries por enviar ficam no telemóvel. Pede-lhe que te volte a acrescentar. |
 | **Registar o disparo** está cinzento | Precisas de uma réplica, de um limite para a classe dela e de uma velocidade. Escolhe primeiro uma réplica. |
-| **Não foi enviado … Fica neste telemóvel para enviar depois.** | Não foi possível chegar ao controlador. Liga-te ao Wi-Fi do campo e toca em **Enviar** *n* **série(s) por enviar** na lista. |
-| **n série(s) não foram aceites porque o controlador não te tem na lista de marshals** | Pede à organização que te volte a acrescentar. As séries esperam no teu telemóvel. |
+| **Não foi enviado … Fica neste telemóvel para enviar depois.** | Não foi possível chegar ao controlador. Liga-te ao Wi-Fi do campo e toca em **Enviar** *n* **séries por enviar** (ou **Enviar 1 série por enviar**) na lista. |
+| **n séries não foram aceites porque o controlador não te tem na lista de marshals** (**1 série não foi aceite …**, se for só uma) | Pede à organização que te volte a acrescentar. As séries esperam no teu telemóvel. |
 | **Esta réplica não está declarada neste jogo** | Escolhe a declaração da pessoa na lista. Ela tem de declarar primeiro a réplica. |
 | A etiqueta NFC não grava | **Esta etiqueta está bloqueada**, **é pequena demais** ou **não aceita dados NDEF**: usa uma etiqueta NTAG nova. Mantém a etiqueta quieta. Num iPhone não podes gravar etiquetas. |
 | **Não é possível falar com o controlador do campo: liga-te ao Wi-Fi do campo e tenta outra vez.** | As etiquetas de quem joga precisam do controlador para cada etiqueta. Liga-te ao Wi-Fi do campo e tenta outra vez. |

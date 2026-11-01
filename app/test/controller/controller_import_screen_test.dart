@@ -183,6 +183,7 @@ void main() {
       expect(
         find.textContaining(
           s.t('ctl_import.counts', {
+            'n': 3,
             'rows': 3,
             'created': 1,
             'updated': 0,

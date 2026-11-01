@@ -19,6 +19,14 @@ full-width punctuation after Han and a half-width space between Han and Latin le
 
 from __future__ import annotations
 
+def count_text(strings: dict[str, str], key: str, n: int, **values: object) -> str:
+    """The text ``key`` for a count: ``<key>_one`` when ``n == 1`` and the language has it (Chinese has no
+    plural), else ``key``, with ``{n}`` and the other ``{name}`` values filled in. The page's script does the same
+    in ``static/staff/staff.js`` (decision PLU-2)."""
+    text = strings[f"{key}_one"] if n == 1 and f"{key}_one" in strings else strings[key]
+    return text.format(n=n, **values)
+
+
 STRINGS: dict[str, dict[str, str]] = {
     "pt": {
         # Every page
@@ -210,7 +218,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "check_ok": "Sem erros. O núcleo carregou o cenário.",
         "check_ok_no_core": "Sem erros no manifesto, mas o núcleo não está disponível neste servidor: guardar vai "
                             "falhar.",
-        "check_errors": "{n} problema(s) a corrigir.",
+        "check_errors": "{n} problemas a corrigir.",
+        "check_errors_one": "{n} problema a corrigir.",
         "check_saved_revision": "Este cenário já está na biblioteca, na revisão {n}.",
         "problem_level_error": "erro",
         "problem_level_warning": "aviso",
@@ -241,6 +250,9 @@ STRINGS: dict[str, dict[str, str]] = {
                          "em silêncio: sem notícias há mais de {s} s num jogo a decorrer.",
         "devices_days": "Jogos dos últimos",
         "days_n": "{n} dias",
+        "days_n_one": "{n} dia",
+        "days_within": "{n} dias",
+        "days_within_one": "{n} dia",
         "devices_none": "Nenhuma caixa nos jogos deste período.",
         "col_battery": "Bateria",
         "col_link": "Rádio",
@@ -565,6 +577,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "rep_make": "Marca e modelo (opcional)",
         "rep_registry": "do registo de quem se inscreveu",
         "rep_limit": "No máximo {n} réplicas.",
+        "rep_limit_one": "No máximo {n} réplica.",
         "rep_not_asked": "Este jogo não pede réplicas declaradas.",
         "io_title": "Exportar e importar",
         "io_export_intro": "O ficheiro CSV da lista leva os dados pessoais de quem se inscreveu: guardá-lo só enquanto o jogo precisar e apagá-lo depois. Cada exportação fica no registo de auditoria, sem nomes.",
@@ -581,10 +594,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "io_dry": "Verificação feita: nada foi guardado.",
         "io_done": "Importação feita.",
         "io_counts": "{rows} linhas: {created} novas, {updated} mudadas, {unchanged} iguais, {skipped} saltadas, {refused} recusadas.",
+        "io_counts_one": "{rows} linha: novas {created}, mudadas {updated}, iguais {unchanged}, saltadas {skipped}, recusadas {refused}.",
         "io_missing": "Inscrições desta origem que não vêm no ficheiro (não são retiradas): {n}.",
         "io_ignored": "Colunas não importadas: {names}.",
         "io_issues": "Linhas que pedem atenção",
         "io_more": "E mais {n} linhas.",
+        "io_more_one": "E mais {n} linha.",
         "io_locked": "Só se importa para um jogo publicado que ainda não começou.",
         "io_res_created": "nova",
         "io_res_updated": "mudada",
@@ -649,7 +664,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "fb_status_seen": "vistas",
         "fb_status_done": "tratadas",
         "fb_status_all": "todas",
-        "feedback_counts": "{new} novas, {seen} vistas, {done} tratadas",
+        "feedback_counts": "novas: {new}, vistas: {seen}, tratadas: {done}",
         "feedback_none": "Não há opiniões neste estado.",
         "fb_col_when": "Quando",
         "fb_col_kind": "Assunto",
@@ -748,7 +763,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "acct_username_saved": "Nome de utilizador guardado.",
         "acct_merge_title": "Juntar contas",
         "acct_merge_text": "Este login de {provider} pertence a outra conta ({name}). Juntar essa conta a esta? Os logins, as chaves de acesso, as funções, as inscrições e o resto passam para esta conta; a outra deixa de existir.",
-        "acct_merge_moves": "Passam para esta conta: logins ({logins}) e {n} chave(s) de acesso.",
+        "acct_merge_moves": "Passam para esta conta: logins ({logins}) e {n} chaves de acesso.",
+        "acct_merge_moves_one": "Passam para esta conta: logins ({logins}) e {n} chave de acesso.",
         "acct_merge_pw_dropped": "A palavra-passe da outra conta é descartada; esta conta mantém a sua.",
         "acct_merge_pw_not_carried": "A outra conta tem palavra-passe, mas não é passada para esta, que fica sem palavra-passe.",
         "acct_merge_go": "Juntar a outra conta a esta",
@@ -983,7 +999,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "check_ok": "No errors. The core loaded the scenario.",
         "check_ok_no_core": "No errors in the manifest, but the core is not available on this server: saving will "
                             "fail.",
-        "check_errors": "{n} problem(s) to fix.",
+        "check_errors": "{n} problems to fix.",
+        "check_errors_one": "{n} problem to fix.",
         "check_saved_revision": "This scenario is already in the library, at revision {n}.",
         "problem_level_error": "error",
         "problem_level_warning": "warning",
@@ -1012,6 +1029,9 @@ STRINGS: dict[str, dict[str, str]] = {
                          "silent: not heard for more than {s} s in a running game.",
         "devices_days": "Games of the last",
         "days_n": "{n} days",
+        "days_n_one": "{n} day",
+        "days_within": "{n} days",
+        "days_within_one": "{n} day",
         "devices_none": "No boxes in this period's games.",
         "col_battery": "Battery",
         "col_link": "Radio",
@@ -1334,6 +1354,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "rep_make": "Make and model (optional)",
         "rep_registry": "from the registrant's registry",
         "rep_limit": "At most {n} replicas.",
+        "rep_limit_one": "At most {n} replica.",
         "rep_not_asked": "This game does not ask for declared replicas.",
         "io_title": "Export and import",
         "io_export_intro": "The list's CSV file carries the registrants' personal data: keep it only as long as the game needs it and delete it afterwards. Each export is in the audit log, without names.",
@@ -1350,10 +1371,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "io_dry": "Check done: nothing was saved.",
         "io_done": "Import done.",
         "io_counts": "{rows} rows: {created} new, {updated} changed, {unchanged} the same, {skipped} skipped, {refused} refused.",
+        "io_counts_one": "{rows} row: new {created}, changed {updated}, the same {unchanged}, skipped {skipped}, refused {refused}.",
         "io_missing": "Registrations from this source that are not in the file (they are not withdrawn): {n}.",
         "io_ignored": "Columns not imported: {names}.",
         "io_issues": "Rows that need attention",
         "io_more": "And {n} more rows.",
+        "io_more_one": "And {n} more row.",
         "io_locked": "A list is imported only into a published game that has not started.",
         "io_res_created": "new",
         "io_res_updated": "changed",
@@ -1517,7 +1540,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "acct_username_saved": "Username saved.",
         "acct_merge_title": "Merge accounts",
         "acct_merge_text": "This {provider} login belongs to another account ({name}). Merge that account into this one? Its logins, passkeys, roles, registrations and the rest move to this account; the other account stops existing.",
-        "acct_merge_moves": "Moving to this account: logins ({logins}) and {n} passkey(s).",
+        "acct_merge_moves": "Moving to this account: logins ({logins}) and {n} passkeys.",
+        "acct_merge_moves_one": "Moving to this account: logins ({logins}) and {n} passkey.",
         "acct_merge_pw_dropped": "The other account's password is discarded; this account keeps its own.",
         "acct_merge_pw_not_carried": "The other account has a password, but it is not carried over: this account stays without a password.",
         "acct_merge_go": "Merge the other account into this one",
@@ -1754,7 +1778,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "check_ok": "Keine Fehler. Der Kern hat das Szenario geladen.",
         "check_ok_no_core": "Keine Fehler im Manifest, aber der Kern ist auf diesem Server nicht verfügbar: Speichern "
                             "wird fehlschlagen.",
-        "check_errors": "{n} Problem(e) zu beheben.",
+        "check_errors": "{n} Probleme zu beheben.",
+        "check_errors_one": "{n} Problem zu beheben.",
         "check_saved_revision": "Dieses Szenario ist schon in der Bibliothek, in Revision {n}.",
         "problem_level_error": "Fehler",
         "problem_level_warning": "Warnung",
@@ -1783,6 +1808,9 @@ STRINGS: dict[str, dict[str, str]] = {
                          "unter {pct} %; still: in einem laufenden Spiel seit mehr als {s} s nichts von ihr gehört.",
         "devices_days": "Spiele der letzten",
         "days_n": "{n} Tage",
+        "days_n_one": "{n} Tag",
+        "days_within": "{n} Tagen",
+        "days_within_one": "{n} Tag",
         "devices_none": "Keine Boxen in den Spielen dieses Zeitraums.",
         "col_battery": "Akku",
         "col_link": "Funk",
@@ -2110,6 +2138,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "rep_make": "Hersteller und Modell (optional)",
         "rep_registry": "aus dem Register der angemeldeten Person",
         "rep_limit": "Höchstens {n} Repliken.",
+        "rep_limit_one": "Höchstens {n} Replik.",
         "rep_not_asked": "Dieses Spiel fragt keine Repliken ab.",
         "io_title": "Exportieren und importieren",
         "io_export_intro": "Die CSV-Datei der Liste enthält personenbezogene Daten der Angemeldeten: Nur so lange aufbewahren, wie das Spiel sie braucht, und danach löschen. Jeder Export steht im Audit-Protokoll, ohne Namen.",
@@ -2126,10 +2155,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "io_dry": "Prüfung fertig: Nichts wurde gespeichert.",
         "io_done": "Import fertig.",
         "io_counts": "{rows} Zeilen: {created} neu, {updated} geändert, {unchanged} gleich, {skipped} übersprungen, {refused} abgelehnt.",
+        "io_counts_one": "{rows} Zeile: neu {created}, geändert {updated}, gleich {unchanged}, übersprungen {skipped}, abgelehnt {refused}.",
         "io_missing": "Anmeldungen dieser Quelle, die nicht in der Datei stehen (sie werden nicht zurückgezogen): {n}.",
         "io_ignored": "Nicht importierte Spalten: {names}.",
         "io_issues": "Zeilen, die Aufmerksamkeit brauchen",
         "io_more": "Und {n} weitere Zeilen.",
+        "io_more_one": "Und {n} weitere Zeile.",
         "io_locked": "Eine Liste lässt sich nur in ein veröffentlichtes Spiel importieren, das noch nicht begonnen hat.",
         "io_res_created": "neu",
         "io_res_updated": "geändert",
@@ -2293,7 +2324,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "acct_username_saved": "Benutzername gespeichert.",
         "acct_merge_title": "Konten zusammenführen",
         "acct_merge_text": "Dieser {provider}-Login gehört zu einem anderen Konto ({name}). Dieses Konto in das aktuelle zusammenführen? Seine Logins, Passkeys, Rollen, Anmeldungen und alles Übrige wechseln in dieses Konto; das andere Konto gibt es danach nicht mehr.",
-        "acct_merge_moves": "Wechseln in dieses Konto: Logins ({logins}) und {n} Passkey(s).",
+        "acct_merge_moves": "Wechseln in dieses Konto: Logins ({logins}) und {n} Passkeys.",
+        "acct_merge_moves_one": "Wechseln in dieses Konto: Logins ({logins}) und {n} Passkey.",
         "acct_merge_pw_dropped": "Das Passwort des anderen Kontos wird verworfen; dieses Konto behält seins.",
         "acct_merge_pw_not_carried": "Das andere Konto hat ein Passwort, es wird aber nicht übernommen: Dieses Konto bleibt ohne Passwort.",
         "acct_merge_go": "Das andere Konto in dieses zusammenführen",
@@ -2546,6 +2578,7 @@ STRINGS: dict[str, dict[str, str]] = {
                          "超過 {s} 秒沒有消息。",
         "devices_days": "遊戲範圍",
         "days_n": "最近 {n} 天",
+        "days_within": "{n} 天",
         "devices_none": "這段期間的遊戲中沒有盒子。",
         "col_battery": "電量",
         "col_link": "無線電",
@@ -3239,22 +3272,28 @@ for _lang, _texts in _HUB.items():
 # SVX-1: the remote ATAK page says when a certificate is near expiry. Every key is new.
 _ATAK_EXPIRY: dict[str, dict[str, str]] = {
     "pt": {
-        "atak_expiring": "Atenção: {n} certificado(s) expiram em {days} dias ou menos: {devices}. Emitir um novo "
+        "atak_expiring": "Atenção: {n} certificados expiram em {days} ou menos: {devices}. Emitir um novo "
                          "certificado para o dispositivo e revogar o antigo.",
+        "atak_expiring_one": "Atenção: {n} certificado expira em {days} ou menos: {devices}. Emitir um novo "
+                             "certificado para o dispositivo e revogar o antigo.",
         "atak_expiring_short": "expira em breve",
     },
     "en": {
-        "atak_expiring": "Attention: {n} certificate(s) expire within {days} days: {devices}. Issue a new "
+        "atak_expiring": "Attention: {n} certificates expire within {days}: {devices}. Issue a new "
                          "certificate for the device and revoke the old one.",
+        "atak_expiring_one": "Attention: {n} certificate expires within {days}: {devices}. Issue a new "
+                             "certificate for the device and revoke the old one.",
         "atak_expiring_short": "expires soon",
     },
     "de": {
-        "atak_expiring": "Achtung: {n} Zertifikat(e) laufen innerhalb von {days} Tagen ab: {devices}. Stelle für das "
+        "atak_expiring": "Achtung: {n} Zertifikate laufen innerhalb von {days} ab: {devices}. Stelle für das "
                          "Gerät ein neues Zertifikat aus und widerrufe das alte.",
+        "atak_expiring_one": "Achtung: {n} Zertifikat läuft innerhalb von {days} ab: {devices}. Stelle für das "
+                             "Gerät ein neues Zertifikat aus und widerrufe das alte.",
         "atak_expiring_short": "läuft bald ab",
     },
     "zh-tw": {
-        "atak_expiring": "注意：有 {n} 張憑證將在 {days} 天內到期：{devices}。請為該裝置簽發新憑證，並撤銷舊的。",
+        "atak_expiring": "注意：有 {n} 張憑證將在 {days}內到期：{devices}。請為該裝置簽發新憑證，並撤銷舊的。",
         "atak_expiring_short": "即將到期",
     },
 }

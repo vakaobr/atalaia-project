@@ -230,7 +230,7 @@ async def reset_totp(settings: Settings, username: str, reason: str, assume_yes:
                                 "was_enabled": was_enabled, "sessions_revoked": revoked,
                                 "server_admin": user.server_admin})
                 await db.commit()
-                print(f"TOTP cleared for {username!r} ({user.id}); {revoked} session(s) revoked. "
+                print(f"TOTP cleared for {username!r} ({user.id}); {revoked} {'session' if revoked == 1 else 'sessions'} revoked. "
                       f"It enrols a new secret at the next login.", file=out)
                 return user.id
     except tenancy.TenantError as e:
@@ -280,7 +280,7 @@ async def set_password(settings: Settings, username: str, password: str, reason:
                                 "had_password": had_password, "sessions_revoked": revoked,
                                 "server_admin": user.server_admin})
                 await db.commit()
-                print(f"Password set for {username!r} ({user.id}); {revoked} session(s) revoked.", file=out)
+                print(f"Password set for {username!r} ({user.id}); {revoked} {'session' if revoked == 1 else 'sessions'} revoked.", file=out)
                 return user.id
     except tenancy.TenantError as e:
         raise CommandError(str(e)) from None
@@ -592,8 +592,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def _say_quota_hits(waiting: int, out: TextIO) -> None:
     if waiting:
-        print(f"{waiting} note(s) of fields refused for a quota are waiting: python -m atalaia_server hosted "
-              "quota-hits", file=out)
+        notes = "note of a field refused for a quota is" if waiting == 1 else "notes of fields refused for a quota are"
+        print(f"{waiting} {notes} waiting: python -m atalaia_server hosted quota-hits", file=out)
 
 
 def _run_domain(args: argparse.Namespace, url: str, actor: Optional[str], out: TextIO) -> None:
@@ -675,7 +675,7 @@ def run_hosted(args: argparse.Namespace, url: str, out: TextIO) -> None:
         if not groups:
             print("No field was refused for a quota since the last look.", file=out)
         for g in groups:
-            print(f"{g['slug']}: refused for {g['quota']} (limit {g['limit']}), {g['count']} note(s), "
+            print(f"{g['slug']}: refused for {g['quota']} (limit {g['limit']}), {g['count']} {'note' if g['count'] == 1 else 'notes'}, "
                   f"{g['first'].isoformat()} to {g['last'].isoformat()}; recorded in the hub's audit log.", file=out)
     elif action == "domain":
         _run_domain(args, url, actor, out)

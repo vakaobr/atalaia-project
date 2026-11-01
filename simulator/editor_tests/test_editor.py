@@ -800,6 +800,17 @@ class EditorTests(unittest.TestCase):
         self.assertEqual(page.evaluate("() => window.atalaiaEditor.project().mode.id"), "org.atalaia.domination")
         expect(page.locator("#code")).to_contain_text("local function show()")
 
+    def test_the_test_button_says_one_box_in_the_singular(self):
+        # A count of 1 takes the "<key>_one" text (decision PLU-2): "1 box", "1 caixa", "1 Box".
+        for lang, text in (("en", "Domination is running in the simulator with 1 box."),
+                           ("pt", "Domination está a correr no simulador com 1 caixa."),
+                           ("de", "Domination läuft im Simulator mit 1 Box.")):
+            page = self.open(lang)
+            self.choose_example(page, "domination")
+            page.fill("#test-boxes", "1")
+            page.click("#test")
+            expect(page.locator("#test-message")).to_have_text(text)
+
     def test_the_test_button_plays_the_mode_in_the_simulator(self):
         page = self.open("en")
         self.choose_example(page, "holdall")

@@ -361,7 +361,7 @@ With a site server, **From the schedule** lists the games published for the comi
 
 1. Open the **Game** tab. The game is **ready**. Check **Game settings** if you want to review them.
 2. If a role has no box, the console says **No box has joined for:** *roles*.
-3. If some declared replicas are not chronographed, it says **n declared replica(s) not chronographed yet**.
+3. If some declared replicas are not chronographed, it says **n declared replicas not chronographed yet** (**1 declared replica not chronographed yet** for one).
 4. Tap **Start**. It asks **Start the game now?**. Tap **Yes**.
 5. If a role has no box, the button says **Start anyway** and asks **Start anyway?**. Starting anyway is logged and every console is told: **Game started without a box for:** *roles*.
 6. In the **Boxes for this game** dialog, **Start game** asks **Review the game's other settings first?**. **Review settings** closes the dialog and opens **Game settings**. **Start now** starts the game. **Back** goes back.

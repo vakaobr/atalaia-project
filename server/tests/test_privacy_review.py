@@ -364,7 +364,7 @@ class LedgerReplayTests(LedgerCase):
         out = io.StringIO()
         erasure_ledger.append(self.ledger, [erasure_ledger.account_entry(uuid.uuid4(), None)])
         self.assertEqual(sum((await erasure_replay.apply_ledger(self.app.state.settings, out)).values()), 0)
-        self.assertIn("1 entries", out.getvalue())
+        self.assertIn("1 entry", out.getvalue())
 
 
 class RepeatRuleTests(LedgerCase):

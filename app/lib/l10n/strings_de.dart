@@ -361,6 +361,7 @@ const Map<String, String> deStrings = {
   'event.score.delta': 'Punkte für Team {team}: {amount}',
   'event.code.used': 'Team {team} hat einen Code benutzt',
   'event.player.respawn': '{player} ist wieder drin ({lives} Leben)',
+  'event.player.respawn_one': '{player} ist wieder drin ({lives} Leben)',
   'event.player.checkin': '{player} hat eingecheckt',
   'event.kill.confirmed': 'Kill bestätigt von Team {team} ({player})',
   'event.kill.denied': 'Team {team} hat den Tag von {player} zurückgeholt',
@@ -1147,7 +1148,7 @@ const Map<String, String> deStrings = {
   'ctl_modes.title': 'Moduspakete',
   'ctl_modes.tile': 'Moduspakete (Feld-Controller)',
   'ctl_modes.tile_hint':
-      '{keys} vertrauenswürdige Schlüssel, {box} Box-Schlüssel',
+      'Vertrauenswürdige Schlüssel: {keys}, Box-Schlüssel: {box}',
   'ctl_modes.intro':
       'Die Schlüssel, denen der Feld-Controller dieses Handys bei signierten Moduspaketen vertraut, die Schlüssel in der Firmware der Boxen (der Controller bietet den Boxen nur Pakete an, die sie annehmen), widerrufene Schlüssel und der Index des Registers: der Abschnitt [modes] eines Pi. Sie gelten ab dem nächsten Start des Controllers.',
   'ctl_modes.keys':
@@ -1514,6 +1515,8 @@ const Map<String, String> deStrings = {
   'ctl_import.imported': 'Importiert.',
   'ctl_import.counts':
       '{rows} Zeilen: {created} neu, {updated} geändert, {unchanged} unverändert, {skipped} übersprungen, {refused} abgelehnt.',
+  'ctl_import.counts_one':
+      '{rows} Zeile: neu {created}, geändert {updated}, unverändert {unchanged}, übersprungen {skipped}, abgelehnt {refused}.',
   'ctl_import.ignored': 'Nicht gelesene Spalten: {names}',
   'ctl_import.more': 'und {n} weitere',
   'ctl_import.missing':

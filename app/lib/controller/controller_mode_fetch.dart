@@ -352,7 +352,8 @@ class ControllerModeFetch {
           e.key,
     ]..sort();
     if (nodes.isEmpty) return null;
-    return "boxes are fetching this game's modes: node(s) ${nodes.join(', ')}; "
+    return "boxes are fetching this game's modes: "
+        "${nodes.length == 1 ? 'node' : 'nodes'} ${nodes.join(', ')}; "
         'wait for them, or stop waiting (DELETE /api/v1/mode-fetch) before '
         'the game starts';
   }

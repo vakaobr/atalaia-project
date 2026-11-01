@@ -1280,7 +1280,9 @@ class ControllerEngine {
             'role': role,
             'value': value,
             'have': have,
-            'text': '$have $role node(s) joined; $name is $value',
+            'text':
+                '$have $role ${have == 1 ? 'node' : 'nodes'} joined; '
+                '$name is $value',
           });
         } else if (prefix == 'last_' && have > 0 && have <= value) {
           warnings.add({
@@ -1290,7 +1292,8 @@ class ControllerEngine {
             'value': value,
             'have': have,
             'text':
-                'only $have $role node(s) joined and $name is $value: '
+                'only $have $role ${have == 1 ? 'node' : 'nodes'} joined and '
+                '$name is $value: '
                 'the countdown can run from the start',
           });
         }

@@ -16,6 +16,7 @@
     "test_open": "Abrir o jogo",
     "test_sending": "A carregar o modo no simulador…",
     "test_running": "{name} está a correr no simulador com {boxes} caixas.",
+    "test_running_one": "{name} está a correr no simulador com 1 caixa.",
     "test_running_errors": "{name} está a correr no simulador, com erros nos scripts: vê os Problemas.",
     "test_failed": "O simulador não conseguiu carregar este modo; o jogo dele continua como estava. Vê os Problemas.",
     "test_offline": "O simulador não responde ({error}). O python -m atalaia_sim serve está a correr?",

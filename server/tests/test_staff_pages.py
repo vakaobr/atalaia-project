@@ -22,7 +22,7 @@ from atalaia_server import sync
 from atalaia_server.ratelimit import Limits, RequestLimit
 from atalaia_server.security_headers import HEADERS
 from atalaia_server.web import i18n, staff_pages
-from atalaia_server.web.staff_i18n import STRINGS
+from atalaia_server.web.staff_i18n import STRINGS, count_text
 
 from .base import AppTestCase
 
@@ -255,7 +255,9 @@ class StaffScriptTests(AppTestCase):
     async def test_every_text_a_script_asks_for_exists_in_every_language(self) -> None:
         self.assertEqual(tuple(STRINGS), i18n.LANGUAGES)
         for lang, strings in STRINGS.items():
-            self.assertEqual(set(strings), set(STRINGS["en"]), lang)
+            # Chinese has no plural, so no "<key>_one" singulars (decision PLU-2)
+            keys = {k for k in strings if not k.endswith("_one")}
+            self.assertEqual(keys, {k for k in STRINGS["en"] if not k.endswith("_one")}, lang)
         asked: set[str] = set()
         for text in self.sources().values():
             asked |= set(re.findall(r"\bt\('([a-z0-9_]+)'", text))
@@ -265,6 +267,69 @@ class StaffScriptTests(AppTestCase):
             for key, value in strings.items():
                 self.assertEqual(set(re.findall(r"\{(\w+)\}", value)),
                                  set(re.findall(r"\{(\w+)\}", STRINGS["en"][key])), (lang, key))
+
+    async def test_the_singular_texts_are_the_same_in_pt_en_de_and_never_in_zh_tw(self) -> None:
+        """A count of 1 takes "<key>_one" (decision PLU-2): the same keys in pt, en and de, each with its
+        plural, each with the count, and no "(s)" spelling anywhere."""
+        ones = {lang: sorted(k for k in strings if k.endswith("_one")) for lang, strings in STRINGS.items()}
+        self.assertEqual(ones["zh-tw"], [])
+        self.assertEqual(ones["pt"], ones["en"])
+        self.assertEqual(ones["de"], ones["en"])
+        for key in ("check_errors_one", "acct_merge_moves_one", "io_counts_one", "io_more_one", "rep_limit_one",
+                    "days_n_one", "days_within_one", "atak_expiring_one"):
+            self.assertIn(key, ones["en"])
+        for lang in ("pt", "en", "de"):
+            for key in ones[lang]:
+                base = key[:-4]
+                self.assertIn(base, STRINGS[lang], (lang, key))
+                self.assertNotEqual(STRINGS[lang][key], STRINGS[lang][base], (lang, key))
+                self.assertEqual(set(re.findall(r"\{(\w+)\}", STRINGS[lang][key])),
+                                 set(re.findall(r"\{(\w+)\}", STRINGS[lang][base])), (lang, key))
+        for lang, strings in STRINGS.items():
+            for key, value in strings.items():
+                self.assertIsNone(re.search(r"[A-Za-zçãõ]\((s|es|ões|e|n|en)\)", value), (lang, key))
+
+    async def test_count_text_picks_the_singular_for_one(self) -> None:
+        for lang, one, many in (("pt", "1 problema a corrigir.", "2 problemas a corrigir."),
+                                ("en", "1 problem to fix.", "2 problems to fix."),
+                                ("de", "1 Problem zu beheben.", "2 Probleme zu beheben.")):
+            self.assertEqual(count_text(STRINGS[lang], "check_errors", 1), one)
+            self.assertEqual(count_text(STRINGS[lang], "check_errors", 2), many)
+            self.assertEqual(count_text(STRINGS[lang], "check_errors", 0), many.replace("2", "0"))
+        self.assertEqual(count_text(STRINGS["pt"], "days_n", 1), "1 dia")
+        self.assertEqual(count_text(STRINGS["pt"], "days_n", 30), "30 dias")
+        self.assertEqual(count_text(STRINGS["en"], "days_n", 1), "1 day")
+        self.assertEqual(count_text(STRINGS["de"], "days_within", 1), "1 Tag")
+        self.assertEqual(count_text(STRINGS["de"], "days_within", 7), "7 Tagen")
+        # Chinese has no singular text: the plain one for every count
+        self.assertEqual(count_text(STRINGS["zh-tw"], "check_errors", 1), "有 1 個問題需要修正。")
+
+    async def test_the_script_takes_the_singular_for_one(self) -> None:
+        """staff.js's t() with n === 1 and "<key>_one" (run in node on the real file and dictionary)."""
+        import json as _json
+        import shutil
+        import subprocess
+        import tempfile
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("node is not installed")
+        source = (STATIC / "staff.js").read_text(encoding="utf-8")
+        start = source.index("export function t(key, vars)")
+        end = source.index("\n}\n", start) + 3
+        body = source[start:end].replace("export function", "function")
+        with tempfile.TemporaryDirectory() as tmp:
+            script = Path(tmp) / "t.js"
+            script.write_text(f"const STRINGS = {_json.dumps(STRINGS['pt'])};\n{body}\n"
+                              "console.log(JSON.stringify([t('check_errors', {n: 1}), t('check_errors', {n: 2}),"
+                              " t('check_errors', {n: 0}), t('io_counts', {n: 1, rows: 1, created: 1, updated: 0,"
+                              " unchanged: 0, skipped: 0, refused: 0}), t('check_ok'), t('nope', {n: 1})]));\n",
+                              encoding="utf-8")
+            out = subprocess.run([node, str(script)], capture_output=True, text=True, check=True).stdout
+        got = _json.loads(out)
+        self.assertEqual(got[:3], ["1 problema a corrigir.", "2 problemas a corrigir.", "0 problemas a corrigir."])
+        self.assertTrue(got[3].startswith("1 linha: novas 1"), got[3])
+        self.assertEqual(got[4], STRINGS["pt"]["check_ok"])
+        self.assertEqual(got[5], "nope")
 
     async def test_the_texts_a_script_builds_a_key_from_exist(self) -> None:
         """``t(`sched_status_${status}`)`: the keys made from a value, for every value the API can give."""

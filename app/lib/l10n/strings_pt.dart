@@ -350,6 +350,7 @@ const Map<String, String> ptStrings = {
   'event.score.delta': 'Pontos para a equipa {team}: {amount}',
   'event.code.used': 'A equipa {team} usou um código',
   'event.player.respawn': '{player} voltou ao jogo ({lives} vidas)',
+  'event.player.respawn_one': '{player} voltou ao jogo ({lives} vida)',
   'event.player.checkin': '{player} registou presença',
   'event.kill.confirmed': 'Baixa confirmada pela equipa {team} ({player})',
   'event.kill.denied': 'A equipa {team} recuperou a etiqueta de {player}',
@@ -1114,7 +1115,8 @@ const Map<String, String> ptStrings = {
   // The phone controller's [modes] settings (slice S7b of PE24).
   'ctl_modes.title': 'Pacotes de modos',
   'ctl_modes.tile': 'Pacotes de modos (controlador de campo)',
-  'ctl_modes.tile_hint': '{keys} chaves de confiança, {box} chaves das caixas',
+  'ctl_modes.tile_hint':
+      'Chaves de confiança: {keys}, chaves das caixas: {box}',
   'ctl_modes.intro':
       'As chaves em que o controlador de campo deste telemóvel confia para pacotes de modos assinados, as chaves gravadas no firmware das caixas (o controlador só lhes oferece pacotes que aceitam), as chaves revogadas e o índice do registo: a secção [modes] de um Pi. Aplicam-se quando o controlador voltar a arrancar.',
   'ctl_modes.keys': 'Chaves de modos de confiança (uma por linha, base64)',
@@ -1481,6 +1483,8 @@ const Map<String, String> ptStrings = {
   'ctl_import.imported': 'Importado.',
   'ctl_import.counts':
       '{rows} linhas: {created} novas, {updated} alteradas, {unchanged} iguais, {skipped} ignoradas, {refused} recusadas.',
+  'ctl_import.counts_one':
+      '{rows} linha: novas {created}, alteradas {updated}, iguais {unchanged}, ignoradas {skipped}, recusadas {refused}.',
   'ctl_import.ignored': 'Colunas não lidas: {names}',
   'ctl_import.more': 'e mais {n}',
   'ctl_import.missing':

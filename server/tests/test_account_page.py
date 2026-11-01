@@ -116,7 +116,7 @@ class AccountPageTests(AppTestCase):
         self.assertGreater(len(used), 40)
         for lang, strings in STRINGS.items():
             self.assertEqual([k for k in sorted(used) if k not in strings], [], lang)
-        for key in sorted(k for k in STRINGS["en"] if k.startswith(("acct_", "nav_account"))):
+        for key in sorted(k for k in STRINGS["en"] if k.startswith(("acct_", "nav_account")) and not k.endswith("_one")):  # (no zh-tw singulars)
             texts = {lang: STRINGS[lang][key] for lang in STRINGS}
             self.assertGreater(len(set(texts.values())), 1, key)  # not one text copied into every language
 

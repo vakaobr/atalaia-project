@@ -223,6 +223,42 @@ void main() {
     expect(en.t('player.share_on', {'n': 1}), 'Sharing: 1 position sent');
     expect(de.t('site.left', {'n': 1}), '1 Platz');
     expect(de.t('site.left', {'n': 4}), '4 Plätze');
+    expect(
+      pt.t('event.player.respawn', {'n': 1, 'player': 'Ana', 'lives': 1}),
+      'Ana voltou ao jogo (1 vida)',
+    );
+    expect(
+      pt.t('event.player.respawn', {'n': 2, 'player': 'Ana', 'lives': 2}),
+      'Ana voltou ao jogo (2 vidas)',
+    );
+    expect(
+      en.t('event.player.respawn', {'n': 1, 'player': 'Ana', 'lives': 1}),
+      'Ana is back in (1 life)',
+    );
+    expect(
+      pt.t('ctl_import.counts', {
+        'n': 1,
+        'rows': 1,
+        'created': 1,
+        'updated': 0,
+        'unchanged': 0,
+        'skipped': 0,
+        'refused': 0,
+      }),
+      startsWith('1 linha: novas 1,'),
+    );
+    expect(
+      de.t('ctl_import.counts', {
+        'n': 1,
+        'rows': 1,
+        'created': 1,
+        'updated': 0,
+        'unchanged': 0,
+        'skipped': 0,
+        'refused': 0,
+      }),
+      startsWith('1 Zeile: neu 1,'),
+    );
     // Chinese has no plural: the same text for 1 and for 2.
     expect(zh.t('replica.count', {'n': 1}), '已登錄 1 把槍');
     // A text without a singular form keeps its text.

@@ -22,9 +22,12 @@ const PRIVILEGED = ['admin', 'gm', 'marshal'];
 
 // ---- texts --------------------------------------------------------------------------------
 
-/** The page's text for key, with {name} replaced by vars.name. */
+/** The page's text for key, with {name} replaced by vars.name. With vars.n === 1 the singular text
+ * "<key>_one" when the language has it (1 problem, not 1 problems; Chinese has none; decision PLU-2). */
 export function t(key, vars) {
-    let text = Object.prototype.hasOwnProperty.call(STRINGS, key) ? STRINGS[key] : key;
+    const one = `${key}_one`;
+    const own = (k) => Object.prototype.hasOwnProperty.call(STRINGS, k);
+    let text = vars && Number(vars.n) === 1 && own(one) ? STRINGS[one] : own(key) ? STRINGS[key] : key;
     if (vars) {
         text = text.replace(/\{(\w+)\}/g, (m, name) => (name in vars ? String(vars[name]) : m));
     }

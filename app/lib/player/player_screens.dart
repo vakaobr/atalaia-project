@@ -1737,6 +1737,8 @@ String eventText(
     'player': str('player') ?? '',
     'owner': str('owner') ?? '',
     'lives': d['lives_left'] ?? '',
+    // The count a text puts a noun after takes its singular at 1 (`_one`).
+    if (e.type == 'player.respawn') 'n': d['lives_left'],
     'amount': d['amount'] ?? '',
     'winner': name(str('winner') ?? ''),
     'text': str('text') ?? '',

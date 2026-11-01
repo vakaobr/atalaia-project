@@ -43,7 +43,7 @@ def cmd_test(args: argparse.Namespace) -> int:
         if screens:
             total += 1
             problems = check_screens(core, mode_dir)
-            print(f"{'FAIL' if problems else 'ok  '} {mode.id} / {len(screens)} screen template(s)")
+            print(f"{'FAIL' if problems else 'ok  '} {mode.id} / {len(screens)} screen {'template' if len(screens) == 1 else 'templates'}")
             for problem in problems:
                 print(f"     {problem}")
             for warning in screen_warnings(core, mode_dir):
@@ -66,7 +66,7 @@ def cmd_test(args: argparse.Namespace) -> int:
                     print("     event log:")
                     for line in result.log:
                         print(f"       {line}")
-    print(f"\n{total - failed} of {total} test(s) passed")
+    print(f"\n{total - failed} of {total} {'test' if total == 1 else 'tests'} passed")
     return 1 if failed else 0
 
 

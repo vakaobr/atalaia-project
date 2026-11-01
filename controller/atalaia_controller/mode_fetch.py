@@ -253,7 +253,8 @@ class ModeFetch:
             nodes = sorted(n for n, a in self.attempts.items() if a["game"] == live and a["state"] in ACTIVE)
         if not nodes:
             return None
-        return (f"boxes are fetching this game's modes: node(s) {', '.join(map(str, nodes))}; wait for them, or "
+        return (f"boxes are fetching this game's modes: {'node' if len(nodes) == 1 else 'nodes'} "
+                f"{', '.join(map(str, nodes))}; wait for them, or "
                 "stop waiting (DELETE /api/v1/mode-fetch) before the game starts")
 
     def holds(self, node_id: int) -> bool:

@@ -201,7 +201,8 @@ class FirmwareUpdates:
             nodes = sorted(n for n, a in self.attempts.items() if a["state"] in ACTIVE)
         if not nodes:
             return None
-        return (f"firmware updates are on their way to box(es) {', '.join(map(str, nodes))}: wait for them, "
+        return (f"firmware updates are on their way to {'box' if len(nodes) == 1 else 'boxes'} "
+                f"{', '.join(map(str, nodes))}: wait for them, "
                 "or cancel them (DELETE /api/v1/firmware/updates) before the game starts")
 
     def cancel(self) -> list[int]:

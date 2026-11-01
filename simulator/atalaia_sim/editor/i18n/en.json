@@ -16,6 +16,7 @@
     "test_open": "Open the game",
     "test_sending": "Loading the mode into the simulator…",
     "test_running": "{name} is running in the simulator with {boxes} boxes.",
+    "test_running_one": "{name} is running in the simulator with 1 box.",
     "test_running_errors": "{name} is running in the simulator, with script errors: see Problems.",
     "test_failed": "The simulator could not load this mode; its game goes on as it was. See Problems.",
     "test_offline": "The simulator does not answer ({error}). Is python -m atalaia_sim serve running?",
