@@ -393,9 +393,10 @@ modes:
       Testlauf auf dem Prüftisch, 1. November 2026 (drei Ausschnitte desselben Spiels, aneinandergefügt): vier
       Boxen, und die mit dem großen Bildschirm ist der Master. Rot nimmt den Master und einen Satelliten ein,
       die Punkte des Masters steigen, danach nimmt Blau den Master ein. Der Lauf hat uns drei Dinge auf dem
-      großen Bildschirm gezeigt, die wir gerade korrigieren: Der portugiesische Bildschirm sagte „MASTER“
-      statt „MESTRE“, der Master zeigte vor der ersten Einnahme „ZONA“, und er zeigte den Zeitpunkt der
-      Einnahme („desde“) statt der Zeit, die er schon gehalten wird. Ohne Ton; die Bildschirme sind auf
+      großen Bildschirm gezeigt: Der portugiesische Bildschirm sagte „MASTER“ statt „MESTRE“, der Master
+      zeigte vor der ersten Einnahme „ZONA“, und er zeigte den Zeitpunkt der Einnahme („desde“) statt der
+      Zeit, die er schon gehalten wird. Alle drei sind nach diesem Lauf in der Firmware behoben (der Clip
+      zeigt noch die alten Bildschirme; eine neue Aufnahme folgt). Ohne Ton; die Bildschirme sind auf
       Portugiesisch.
   target_windows:
     title: Zielfenster
@@ -490,9 +491,10 @@ gifs:
     caption: "Sabotage: Bombenrunden mit Punktestand, eine Explosion für die Angreifenden, eine Entschärfung für die Verteidigenden, bis die Zeit um ist."
   master_satellites:
     alt: >-
-      Animation von Master und Satelliten: Eine Satelliten-Box wird von neutral zu rot, wenn Rot
-      den Knopf hält; danach zeigt die Master-Box, wie viele Satelliten Rot hält (1, 2, dann 3
-      von 3) und die Punkte pro Takt, und zum Schluss den Bildschirm für das Spielende.
+      Animation von Master und Satelliten: Die Master-Box mit der Überschrift MASTER wird von
+      neutral zu rot, wenn Rot den Knopf hält, und zeigt „MASTER BESETZT“ mit der Haltezeit; danach
+      zeigt sie, wie viele Satelliten Rot hält (1, 2, dann 3 von 3), die Punkte pro Takt und die
+      Gesamtpunkte von Rot in der Ecke, und zum Schluss den Bildschirm für das Spielende.
     caption: >-
       Master und Satelliten: Satelliten werden wie Domination-Zonen eingenommen; die Master-Box
       zählt, wie viele ein Team hält, und zahlt für jeden mehr Punkte.

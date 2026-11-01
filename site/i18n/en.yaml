@@ -369,9 +369,10 @@ modes:
     real_caption: >-
       Test run on the bench, 1 November 2026 (three pieces of one game, joined): four boxes, and the one with the
       big screen is the master. Red takes the master and a satellite, the master's points go up, and then blue
-      takes the master. The run showed three things on the big screen that we are now fixing: the Portuguese
-      screen said "MASTER" instead of "MESTRE", the master read "ZONA" before its first capture, and it showed
-      the time it was taken ("desde") instead of how long it has been held. No sound; the screens are in
+      takes the master. The run showed three things on the big screen: the Portuguese screen said "MASTER" instead
+      of "MESTRE", the master read "ZONA" before its first capture, and it showed the time it was taken
+      ("desde") instead of how long it has been held. All three are fixed in the firmware after this run
+      (the clip still shows the old screens; a new recording will follow). No sound; the screens are in
       Portuguese.
   target_windows:
     title: Target Windows
@@ -462,9 +463,10 @@ gifs:
     caption: "Sabotage: bomb rounds with a score, an explosion for the attackers, a defuse for the defenders, until the time is up."
   master_satellites:
     alt: >-
-      Animation of Master and Satellites: a satellite box turns from neutral to red when red
-      holds its button; then the master box shows how many satellites red holds (1, 2, then 3 of
-      3) and the points per tick, and finally the game-over screen.
+      Animation of Master and Satellites: the master box, headed MASTER, turns from neutral to
+      red when red holds its button and reads "MASTER HELD" with how long it has been held; then it
+      shows how many satellites red holds (1, 2, then 3 of 3), the points per tick and red's total
+      in the corner, and finally the game-over screen.
     caption: >-
       Master and Satellites: satellites are claimed like Domination zones; the master box counts
       how many a team holds and pays more points for each.

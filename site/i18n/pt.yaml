@@ -380,10 +380,11 @@ modes:
     real_caption: >-
       Teste na bancada, 1 de novembro de 2026 (três pedaços do mesmo jogo, juntos): quatro caixas, e a do ecrã
       grande é a mestre. A equipa vermelha captura a mestre e um satélite, os pontos da mestre sobem, e depois a
-      azul captura a mestre. O teste mostrou três coisas no ecrã grande que estamos a corrigir: o ecrã em
-      português dizia «MASTER» em vez de «MESTRE», a mestre mostrava «ZONA» antes da primeira captura e
-      mostrava a hora a que foi capturada («desde») em vez de há quanto tempo está a ser mantida. Sem som; os
-      ecrãs estão em português.
+      azul captura a mestre. O teste mostrou três coisas no ecrã grande: o ecrã em português dizia «MASTER» em
+      vez de «MESTRE», a mestre mostrava «ZONA» antes da primeira captura e mostrava a hora a que foi
+      capturada («desde») em vez de há quanto tempo está a ser mantida. As três já estão corrigidas no
+      firmware depois deste teste (o vídeo ainda mostra os ecrãs antigos; seguir-se-á uma gravação nova). Sem
+      som; os ecrãs estão em português.
   target_windows:
     title: Janelas de Alvo
     text: >-
@@ -475,9 +476,10 @@ gifs:
     caption: "Sabotagem: rondas de bomba com marcador, uma explosão para os atacantes, um desarme para os defensores, até acabar o tempo."
   master_satellites:
     alt: >-
-      Animação de Mestre e Satélites: uma caixa satélite passa de livre a vermelha quando a
-      equipa vermelha prime o botão; depois a caixa mestre mostra quantos satélites a equipa
-      vermelha tem (1, 2 e 3 de 3) e os pontos por intervalo, e por fim o ecrã de fim de jogo.
+      Animação de Mestre e Satélites: a caixa mestre, com o título MESTRE, passa de livre a
+      vermelha quando a equipa vermelha prime o botão e diz «MESTRE OCUPADA» com há quanto tempo está
+      mantida; depois mostra quantos satélites a equipa vermelha tem (1, 2 e 3 de 3), os pontos por
+      intervalo e o total da vermelha no canto, e por fim o ecrã de fim de jogo.
     caption: >-
       Mestre e Satélites: os satélites capturam-se como as zonas do Domínio; a caixa mestre
       conta quantos uma equipa tem e paga mais pontos por cada um.
