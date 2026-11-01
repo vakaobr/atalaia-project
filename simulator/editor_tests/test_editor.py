@@ -339,7 +339,8 @@ class EditorTests(unittest.TestCase):
         if out["field_lua"]:
             (folder / "field.lua").write_text(out["field_lua"], encoding="utf-8")
 
-    def round_trip(self, name: str, has_field: bool):
+    def round_trip(self, name: str, has_field: bool, skip: tuple[str, ...] = ()):
+        """skip: names of the mode's tests the example is not meant to pass (decision TFT-7)."""
         page = self.open()
         proj = json.loads((EDITOR / "examples" / f"{name}.json").read_text(encoding="utf-8"))
         out = self.generate(page, proj)
@@ -368,6 +369,8 @@ class EditorTests(unittest.TestCase):
             mode = load_mode(folder)
             self.assertEqual(len(mode.tests), len(load_mode(original).tests))
             for test in mode.tests:
+                if test.name.startswith(skip):
+                    continue
                 result = run_test(CORE, mode, test)
                 with self.subTest(test=test.name):
                     self.assertTrue(result.passed, f"{result.name}: {result.message}\n" + "\n".join(result.log))
@@ -409,7 +412,11 @@ class EditorTests(unittest.TestCase):
     def test_master_satellites_round_trip_with_two_roles_and_screens(self):
         """Plan phase 3's example: two roles running one box script, a mode command from the
         controller (cmd.mode "status"), the mode's own screen, the controller's list index."""
-        out = self.round_trip("master_satellites", has_field=True)
+        # The example is the teaching version: it has no `role` command (the hand-written mode tells
+        # each box master or satellite, and carries the team's total in its status; TFT-1, TFT-2), so
+        # it does not run roles.yaml (decision TFT-7); its screens fall back to the plain zone wording.
+        out = self.round_trip("master_satellites", has_field=True,
+                              skip=("roles.yaml",))
         self.assertIn('on("cmd.mode", function(e)\n  if e.name ~= "status" then\n    return\n  end\n', out["node_lua"])
         self.assertIn('ui.screen("master_status", {', out["node_lua"])
         self.assertIn('field.send(id, "mode", { name = "status", team = owner,', out["field_lua"])
