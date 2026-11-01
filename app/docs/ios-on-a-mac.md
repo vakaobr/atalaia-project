@@ -456,7 +456,12 @@ installed app and its permissions. If iOS asks again to trust the developer
 later a debug build started without a debugger shows the splash and exits. For
 normal use, reinstall the release build: `flutter build ios --release` then
 `xcrun devicectl device install app --device <udid> build/ios/iphoneos/Runner.app`
-(or `flutter run --release -d <udid>`).
+(or `flutter run --release -d <udid>`). Installing over the test build keeps
+the app's data, permissions and the developer trust; uninstalling first loses
+them. With Xcode 27.2 the build ends with "Build succeeded but the expected
+app at build/ios/iphoneos/Runner.app not found": harmless, Xcode wrote the
+app to `build/ios/Release-iphoneos/Runner.app` instead, so install that one
+(`ls build/ios/` shows which folder this Xcode used; seen on 2026-11-01).
 
 **Location needs a field check-in first.** The position-sharing switch appears
 only after a field check-in (Participante > Check-in with the poster), not after
