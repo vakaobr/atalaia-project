@@ -239,6 +239,7 @@ const Map<String, String> deStrings = {
   'pod.find': 'Pods suchen',
   'pod.found_none': 'Kein Pod gefunden.',
   'pod.linked': 'Pod über {kind} verbunden: Firmware {fw}, {n} Funktionen.',
+  'pod.linked_one': 'Pod über {kind} verbunden: Firmware {fw}, {n} Funktion.',
   'pod.open_failed': 'Die Verbindung zum Pod ließ sich nicht öffnen.',
   'pod.no_ident': 'Der Pod hat nicht geantwortet.',
   'pod.reconnecting':
@@ -311,6 +312,7 @@ const Map<String, String> deStrings = {
   'player.pick_team': 'Tippe auf dein Team, um es hervorzuheben.',
   'player.eliminated': 'ausgeschieden',
   'player.lives_left': '{n} Leben',
+  'player.lives_left_one': '{n} Leben',
   'player.objectives': 'Ziele',
   'player.node': 'Box {n}',
   'player.held_by': 'Gehalten von Team {team}',
@@ -438,6 +440,8 @@ const Map<String, String> deStrings = {
   'marshal.readings':
       '{n} Messwerte auf diesem Handy. Sie werden 365 Tage aufbewahrt und dann '
       'gelöscht.',
+  'marshal.readings_one':
+      '{n} Messwert auf diesem Handy. Er wird 365 Tage aufbewahrt und dann gelöscht.',
   'marshal.erase': 'Messwerte einer Person löschen',
   'marshal.erase_do': 'Löschen',
   'marshal.checking': 'Frage den Feld-Controller …',
@@ -448,6 +452,8 @@ const Map<String, String> deStrings = {
       'Der Feld-Controller hat dich nicht auf seiner Marshal-Liste. Bitte die Spielleitung, dich als Marshal einzutragen.',
   'marshal.revoked':
       'Die Spielleitung hat dich von der Marshal-Liste genommen; dieses Handy ist hier kein Marshal mehr. Die {n} noch nicht gesendeten Serien bleiben auf diesem Handy und können gesendet werden, wenn die Spielleitung dich wieder einträgt.',
+  'marshal.revoked_one':
+      'Die Spielleitung hat dich von der Marshal-Liste genommen; dieses Handy ist hier kein Marshal mehr. Die {n} noch nicht gesendete Serie bleibt auf diesem Handy und kann gesendet werden, wenn die Spielleitung dich wieder einträgt.',
   'marshal.offline_never':
       'Der Feld-Controller ist nicht erreichbar, und dieses Handy wurde hier noch nicht als Marshal bestätigt. Verbinde dich einmal mit dem Netz des Felds und frag erneut.',
   'marshal.offline_expired':
@@ -505,6 +511,7 @@ const Map<String, String> deStrings = {
   'replica.add': 'Replik registrieren',
   'replica.none': 'Noch keine Repliken registriert.',
   'replica.count': '{n} Repliken registriert',
+  'replica.count_one': '{n} Replik registriert',
   'replica.owner': 'ID der spielenden Person',
   'replica.type': 'Typ',
   'replica.class': 'Klasse',
@@ -675,10 +682,15 @@ const Map<String, String> deStrings = {
   'queue.manual_do': 'Einchecken',
   'queue.manual_done': 'Eingecheckt: {id}',
   'queue.send_pending': '{n} noch nicht gesendete Serien senden',
+  'queue.send_pending_one': '{n} noch nicht gesendete Serie senden',
   'queue.send_failed':
       '{n} Serien wurden nicht angenommen; sie bleiben auf diesem Handy.',
+  'queue.send_failed_one':
+      '{n} Serie wurde nicht angenommen; sie bleibt auf diesem Handy.',
   'queue.held':
       '{n} Serien wurden nicht angenommen, weil der Controller dich nicht auf seiner Marshal-Liste hat; sie bleiben auf diesem Handy.',
+  'queue.held_one':
+      '{n} Serie wurde nicht angenommen, weil der Controller dich nicht auf seiner Marshal-Liste hat; sie bleibt auf diesem Handy.',
   'queue.waiting_confirmation': 'wartet auf Bestätigung',
   'queue.sticker_title': 'NFC-Aufkleber verwenden?',
   'queue.sticker_body':
@@ -716,7 +728,8 @@ const Map<String, String> deStrings = {
   'player.share': 'Meine Position während dieses Spiels mit dem Spiel teilen',
   'player.share_hint':
       'Nur während des Spiels; der Controller entscheidet, wer sie sieht. Die Orga und die Marshals sehen sie auf ihren ATAK-Geräten.',
-  'player.share_on': 'Wird geteilt: {n} Position(en) gesendet',
+  'player.share_on': 'Wird geteilt: {n} Positionen gesendet',
+  'player.share_on_one': 'Wird geteilt: {n} Position gesendet',
   'player.share_stopped':
       'Teilen beendet: Das Spiel ist vorbei oder der Check-in hat sich geändert.',
   'player.no_location': 'Dieses Handy hat keinen Standort.',
@@ -768,7 +781,9 @@ const Map<String, String> deStrings = {
   'player.my_room': 'Deine Position: {room}',
   'player.map_title': 'Feldplan',
   'player.map_semantics': 'Plan des Felds, {level}: {n} Positionen',
+  'player.map_semantics_one': 'Plan des Felds, {level}: {n} Position',
   'player.map_off_plan': '{n} Positionen nicht auf diesem Plan',
+  'player.map_off_plan_one': '{n} Position nicht auf diesem Plan',
   'player.map_level_unknown':
       'Leere Punkte: Spielende, die noch nicht gesagt haben, auf welchem Stockwerk sie sind.',
   'player.map_level_unknown_short': 'Stockwerk unbekannt',
@@ -833,6 +848,7 @@ const Map<String, String> deStrings = {
   'site.cancelled_reason': 'Dieses Spiel wurde abgesagt: {reason}',
   'site.open_until': 'Anmeldung offen bis {when}',
   'site.left': '{n} Plätze',
+  'site.left_one': '{n} Platz',
   'site.opens': 'Anmeldung öffnet {when}',
   'site.full': 'Ausgebucht',
   'site.closed': 'Anmeldung geschlossen',
@@ -847,6 +863,7 @@ const Map<String, String> deStrings = {
   'site.replicas': 'Repliken, die du nutzt (bis zu {n})',
   'site.class_not_here': '{class}: Diese Klasse gibt es auf diesem Feld nicht',
   'site.too_many': 'Dieses Feld erlaubt bis zu {n} Repliken pro Person.',
+  'site.too_many_one': 'Dieses Feld erlaubt bis zu {n} Replik pro Person.',
   'site.register': 'Anmelden',
   'site.save': 'Änderungen speichern',
   'site.changed': 'Anmeldung geändert.',
@@ -1096,6 +1113,8 @@ const Map<String, String> deStrings = {
       'Keine: Dieser Controller nimmt kein Firmware-Release für die Boxen an.',
   'ctl.fw_keys_set':
       '{n} Schlüssel: Releases, die sie signieren, werden angenommen.',
+  'ctl.fw_keys_set_one':
+      '{n} Schlüssel: Releases, die er signiert, werden angenommen.',
   'ctl.fw_keys_hint':
       'Die öffentlichen Hälften der Release-Schlüssel (Base64, je 44 '
       'Zeichen), einer pro Zeile, wie in [firmware] release_keys des Pi. '
@@ -1415,6 +1434,8 @@ const Map<String, String> deStrings = {
       'Keine: Dieses Prop führt nur die in der App eingebauten Modi aus.',
   'propmodes.keys_set':
       '{n} Schlüssel: Ein Modus, den sie signieren, darf vom Controller geladen werden.',
+  'propmodes.keys_set_one':
+      '{n} Schlüssel: Ein Modus, den er signiert, darf vom Controller geladen werden.',
   'propmodes.keys_hint':
       'Die öffentlichen Hälften (Base64, je 44 Zeichen) der Modus-Schlüssel, denen dieses Prop vertraut, einer pro Zeile, höchstens 4: wie die in die Firmware einer Feldbox eingebauten Modus-Schlüssel. Ein Spiel, dessen Modus die App nicht hat, wird nur dann vom Controller geladen, wenn ein Schlüssel dieser Liste ihn signiert hat. Füge keinen Schlüssel hinzu, den du nicht vom Projekt oder von deinem Verein bekommen hast.',
   'propmodes.keys_bad':
@@ -1477,6 +1498,7 @@ const Map<String, String> deStrings = {
   'ctl_import.offline': 'Der Controller hat nicht geantwortet. Läuft er?',
   'ctl_import.failed': 'Der Controller hat die Liste abgelehnt: {detail}',
   'ctl_import.rows_more': '{n} weitere Zeilen werden nicht angezeigt.',
+  'ctl_import.rows_more_one': '{n} weitere Zeile wird nicht angezeigt.',
   'ctl_import.title': 'Anmeldeliste importieren',
   'ctl_import.intro':
       'Für ein Feld ohne Feldserver: Eine Anmeldeliste einer anderen Plattform (CSV oder JSON, im Importformat des Feldservers) wird zu den erwarteten Spielenden dieses Spiels, und ein Marshal hakt jede Person bei der Ankunft ab. Gelesen werden nur display_name, external_ref, team_preference, federation_number und replicas; jede andere Spalte (eine E-Mail, eine Telefonnummer) wird nur genannt, nie gelesen.',
@@ -1496,6 +1518,8 @@ const Map<String, String> deStrings = {
   'ctl_import.more': 'und {n} weitere',
   'ctl_import.missing':
       '{n} importierte Spielende, die noch nicht angekommen sind, fehlen in dieser Datei (sie bleiben).',
+  'ctl_import.missing_one':
+      '{n} importierte Person, die noch nicht angekommen ist, fehlt in dieser Datei (sie bleibt).',
   'ctl_import.row': 'Zeile',
   'ctl_import.result': 'Ergebnis',
   'ctl_import.line': 'Zeile {n}',

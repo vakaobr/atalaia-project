@@ -411,4 +411,26 @@ void main() {
       '1:00 1:00:00 0:00',
     );
   });
+
+  test('a count of one takes the singular, in the app and in the core', () {
+    final yaml = File(
+      '../modes/domination/assets/screens/captured.yaml',
+    ).readAsStringSync();
+    final text = RegExp(r'text: "(\{points\} .*)"').firstMatch(yaml)!.group(1)!;
+    const want = {
+      ('pt', 1): '1 ponto nesta caixa',
+      ('pt', 2): '2 pontos nesta caixa',
+      ('en', 1): '1 point on this box',
+      ('en', 0): '0 points on this box',
+      ('de', 1): '1 Punkt auf dieser Box',
+      ('de', 12): '12 Punkte auf dieser Box',
+      ('zh-tw', 1): '1 分（這個盒子）',
+      ('zh-tw', 12): '12 分（這個盒子）',
+    };
+    want.forEach((key, expected) {
+      final data = <String, Object?>{'lang': key.$1, 'points': key.$2};
+      expect(interpolate(text, TemplateScope(data: data)), expected);
+      expect(core.screenText(text, data, const {}), expected);
+    });
+  });
 }

@@ -5132,6 +5132,53 @@ class ConsoleBrowserTests(unittest.TestCase):
             self.assertIn("Gate", text, lang)
             self.assertNotIn("feed.events", text)
 
+    def test_a_count_of_one_takes_the_singular(self):
+        """1 event, 1 life, 1 point: a text with a count of exactly 1 uses its `_one` form in
+        Portuguese, English and German (Chinese has no plural); the others keep the plural."""
+        page = self.page()
+        cases = {
+            "en": [("feed.count", 1, "1 event"), ("feed.count", 2, "2 events"),
+                   ("labels.count", 1, "1 label"), ("scenario.has_errors", 1, "1 error: fix it before installing."),
+                   ("scenario.has_errors", 3, "3 errors: fix them before installing."),
+                   ("adopt.silent", 1, "1 port did not answer")],
+            "pt": [("feed.count", 1, "1 acontecimento"), ("feed.count", 2, "2 acontecimentos"),
+                   ("alerts.count", 1, "1 alerta"), ("alerts.count", 0, "0 alertas"),
+                   ("checkin.schedule_registered", 1, "1 inscrição"),
+                   ("poster_prompt.announce_resumed", 1, "Contagem retomada: falta 1 segundo."),
+                   ("poster_prompt.announce_resumed", 5, "Contagem retomada: faltam 5 segundos.")],
+            "de": [("feed.count", 1, "1 Ereignis"), ("feed.count", 2, "2 Ereignisse"),
+                   ("game.squads_each", 1, "1 Squad pro Team"), ("game.squads_each", 2, "2 Squads pro Team"),
+                   ("adopt.silent", 1, "1 Anschluss hat nicht geantwortet")],
+            "zh-tw": [("feed.count", 1, None), ("feed.count", 2, None)],
+        }
+        for lang, items in cases.items():
+            for key, n, want in items:
+                got = page.evaluate("""async ([lang, key, n]) => {
+                    const m = await import('/console/ui.js');
+                    await m.loadLanguage(lang);
+                    return m.t(key, { n });
+                }""", [lang, key, n])
+                if want is None:  # no singular form: the same text, with the number in it
+                    self.assertIn(str(n), got, f"{lang} {key}")
+                    self.assertNotEqual(got, key)
+                else:
+                    self.assertEqual(got, want, f"{lang} {key} {n}")
+        words = page.evaluate("""async () => {
+            const m = await import('/console/ui.js');
+            const out = [];
+            for (const lang of ['en', 'pt', 'de']) {
+                await m.loadLanguage(lang);
+                out.push(m.eventWords({ type: 'player.respawn', node: 3, data: { player: 'P1', lives_left: 1 } }));
+                out.push(m.eventWords({ type: 'money.deposited', team: 'red', node: 3, data: { player: 'P1', amount: 1 } }));
+                out.push(m.eventWords({ type: 'money.deposited', team: 'red', node: 3, data: { player: 'P1', amount: 5 } }));
+            }
+            return out;
+        }""")
+        self.assertEqual(words, [
+            "P1 is back in (1 life)", "P1 (red) banked 1: 1 point", "P1 (red) banked 5: 5 points",
+            "P1 voltou ao jogo (1 vida)", "P1 (red) depositou 1: 1 ponto", "P1 (red) depositou 5: 5 pontos",
+            "P1 ist wieder drin (1 Leben)", "P1 (red) hat 1 eingezahlt: 1 Punkt", "P1 (red) hat 5 eingezahlt: 5 Punkte"])
+
     # --- field and team branding (decisions BR1-BR24) -------------------------------
 
     def loaded(self, locator) -> None:

@@ -19,10 +19,10 @@ layout:
     text: "{team|upper}"
     style: { font_size: 48, color: team }
   - type: label
-    text: "{held} {lang == 'pt' && 'de' || lang == 'de' && 'von' || lang == 'zh-tw' && '/' || 'of'} {of} {lang == 'pt' && 'satélites' || lang == 'de' && 'Satelliten' || lang == 'zh-tw' && '個衛星' || 'satellites'}"
+    text: "{held} {lang == 'pt' && 'de' || lang == 'de' && 'von' || lang == 'zh-tw' && '/' || 'of'} {of} {lang == 'pt' && of == 1 && 'satélite' || lang == 'pt' && 'satélites' || lang == 'de' && of == 1 && 'Satellit' || lang == 'de' && 'Satelliten' || lang == 'zh-tw' && '個衛星' || of == 1 && 'satellite' || 'satellites'}"
     style: { font_size: 20 }
   - type: label
-    text: "{points} {lang == 'pt' && 'pontos a cada' || lang == 'de' && 'Punkte alle' || lang == 'zh-tw' && '分，每' || 'points every'} {params.tick_s} s"
+    text: "{points} {lang == 'pt' && points == 1 && 'ponto a cada' || lang == 'pt' && 'pontos a cada' || lang == 'de' && points == 1 && 'Punkt alle' || lang == 'de' && 'Punkte alle' || lang == 'zh-tw' && '分，每' || points == 1 && 'point every' || 'points every'} {params.tick_s} s"
     style: { font_size: 20, color: "{points > 0 && 'white' || 'danger'}" }
   - type: label
     text: "{lang == 'pt' && 'desde' || lang == 'de' && 'seit' || lang == 'zh-tw' && '佔領於' || 'held since'} {since|clock}"

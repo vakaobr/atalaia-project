@@ -21,7 +21,7 @@ layout:
     text: "{team|upper}"
     style: { font_size: 48, color: team }
   - type: label
-    text: "{held_min} / {need_min} {lang == 'zh-tw' && '分鐘' || 'min'}  ·  {points} {lang == 'pt' && 'pontos' || lang == 'de' && 'Punkte' || lang == 'zh-tw' && '分' || 'points'}"
+    text: "{held_min} / {need_min} {lang == 'zh-tw' && '分鐘' || 'min'}  ·  {points} {lang == 'pt' && points == 1 && 'ponto' || lang == 'pt' && 'pontos' || lang == 'de' && points == 1 && 'Punkt' || lang == 'de' && 'Punkte' || lang == 'zh-tw' && '分' || points == 1 && 'point' || 'points'}"
     style: { font_size: 20 }
   - type: progress_bar
     value: "{share}"

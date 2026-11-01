@@ -52,6 +52,7 @@
     "role": "O controlador agora é {role} (mandato {term}).",
     "node_offline": "A caixa {node} não dá notícias há mais de 90 s.",
     "count": "{n} alertas",
+    "count_one": "{n} alerta",
     "start_forced": "Jogo começado sem caixa para: {roles}"
   },
   "game": {
@@ -103,10 +104,12 @@
       "paused": "em pausa",
       "ended": "terminado"
     },
-    "confirm_start_pending": "Há {n} réplica(s) declarada(s) por cronografar. Começar mesmo assim?",
+    "confirm_start_pending": "Há {n} réplicas declaradas por cronografar. Começar mesmo assim?",
+    "confirm_start_pending_one": "Há {n} réplica declarada por cronografar. Começar mesmo assim?",
     "squads": "Squads por equipa",
     "squads_hint": "0 = sem squads (jogos pequenos: só equipas). Num milsim ou num jogo grande, cada equipa divide-se em squads.",
     "squads_each": "{n} squads por equipa",
+    "squads_each_one": "{n} squad por equipa",
     "disclosure": "A quem vão os objetivos de um squad",
     "disclosure_scenario": "Como diz o cenário ({value})",
     "disclosure_members": "Todos os elementos do squad",
@@ -176,6 +179,7 @@
     "filter": "Filtrar acontecimentos",
     "critical_only": "Só críticos",
     "count": "{n} acontecimentos",
+    "count_one": "{n} acontecimento",
     "empty": "Ainda não há acontecimentos.",
     "events": {
       "medic_heal": "{player} recebeu tratamento (ligaduras no kit: {remaining}; tratamentos neste jogo: {used})",
@@ -187,6 +191,7 @@
       "vip_extracted_vip": "A equipa {team} extraiu o seu VIP ({player})",
       "money_collected": "{player} ({team}) recolheu {amount} de dinheiro",
       "money_deposited": "{player} ({team}) depositou {amount}: {amount} pontos",
+      "money_deposited_one": "{player} ({team}) depositou {amount}: {amount} ponto",
       "progressive_activated": "A caixa {zone} está ativa (n.º {step}): é a única que pode ser capturada",
       "progressive_completed": "{team} completou a caixa {zone} (n.º {step}): ficou bloqueada",
       "scenario_started": "O cenário {scenario} começou",
@@ -212,6 +217,7 @@
       "score_delta": "Pontos para a equipa {team}: {amount}",
       "code_used": "A equipa {team} usou um código",
       "player_respawn": "{player} voltou ao jogo ({lives} vidas)",
+      "player_respawn_one": "{player} voltou ao jogo ({lives} vida)",
       "player_checkin": "{player} registou presença",
       "kill_confirmed": "Baixa confirmada pela equipa {team} ({player})",
       "kill_denied": "A equipa {team} recuperou a etiqueta de {player}",
@@ -583,7 +589,8 @@
     "scenario_name": "Caixa do cenário",
     "scenario_none": "— nenhuma (escolher a função) —",
     "scenario_box": "caixa {node}",
-    "scenario_hint": "O cenário encontra as suas caixas por estes nomes: {done} de {n} já têm caixa."
+    "scenario_hint": "O cenário encontra as suas caixas por estes nomes: {done} de {n} já têm caixa.",
+    "scenario_hint_one": "O cenário encontra a sua caixa por este nome: {done} de {n} já tem caixa."
   },
   "presets": {
     "title": "Predefinições",
@@ -721,9 +728,11 @@
     "checked": "Verificado, ainda nada importado.",
     "imported": "Importado.",
     "counts": "{rows} linhas: {created} novas, {updated} alteradas, {unchanged} iguais, {skipped} ignoradas, {refused} recusadas.",
+    "counts_one": "{rows} linha: novas {created}, alteradas {updated}, iguais {unchanged}, ignoradas {skipped}, recusadas {refused}.",
     "ignored": "Colunas não lidas: {names}",
     "more": "e mais {n}",
     "missing": "{n} pessoas importadas que ainda não chegaram não estão neste ficheiro (ficam).",
+    "missing_one": "{n} pessoa importada que ainda não chegou não está neste ficheiro (fica).",
     "row": "Linha",
     "result": "Resultado",
     "line": "linha {n}",
@@ -952,6 +961,7 @@
     "schedule_create": "Criar o jogo",
     "schedule_made": "já criado: jogo {ids}",
     "schedule_registered": "{n} inscrições",
+    "schedule_registered_one": "{n} inscrição",
     "problems": {
       "https_off": "O HTTPS está desligado no controlador ([api] tls_port = 0): o cartaz precisa do certificado do campo.",
       "no_address": "O cartaz não tem nenhum endereço https do controlador: indica os endereços abaixo, [checkin] urls ou [api] tls_names.",
@@ -980,6 +990,7 @@
     "intro": "Imprime esta página: uma etiqueta de 30 × 30 mm por réplica, para recortar e colar. O código leva só a etiqueta da réplica (ATL- e oito caracteres), nada sobre quem joga. A app do marshal lê-o na lista do cronógrafo.",
     "print": "Imprimir",
     "count": "{n} etiquetas",
+    "count_one": "{n} etiqueta",
     "qr_label": "Etiqueta QR {code}"
   },
   "branding": {
@@ -1045,7 +1056,8 @@
     "ok": "Sem problemas: o field.lua gerado carrega no núcleo.",
     "ok_no_core": "Sem problemas no manifesto (o núcleo não está carregado neste controlador).",
     "ok_warnings": "Sem erros, com avisos:",
-    "has_errors": "{n} erro(s): corrige antes de instalar.",
+    "has_errors": "{n} erros: corrige-os antes de instalar.",
+    "has_errors_one": "{n} erro: corrige-o antes de instalar.",
     "whole": "(manifesto)",
     "levels": {
       "error": "Erro",
@@ -1258,7 +1270,8 @@
     "scan": "Procurar caixas",
     "scanning": "A procurar…",
     "none": "Nenhuma caixa encontrada. Verifica o cabo (de dados, não só de carga) e se a caixa está ligada.",
-    "silent": "{n} porta(s) não responderam",
+    "silent": "{n} portas não responderam",
+    "silent_one": "{n} porta não respondeu",
     "busy": "tem um jogo: termina-o primeiro",
     "locked": "demasiados PIN errados: espera {min} min (reiniciar não encurta a espera)",
     "adopt": "Adotar",
@@ -1340,6 +1353,7 @@
     "body": "Quem joga faz o check-in lendo o cartaz do campo. Se ainda não está afixado, imprime-o antes de as pessoas chegarem para «{game}». É o mesmo para todos os jogos.",
     "countdown": "Fecha em {n} s",
     "announce": "Esta mensagem fecha-se sozinha em {n} segundos.",
+    "announce_one": "Esta mensagem fecha-se sozinha em {n} segundo.",
     "never": "Não mostrar outra vez",
     "open": "Abrir a página do cartaz",
     "close": "Fechar",
@@ -1349,7 +1363,8 @@
     "resume": "Retomar a contagem",
     "paused": "Em pausa: fica aberta até a fechares",
     "announce_paused": "Contagem em pausa.",
-    "announce_resumed": "Contagem retomada: faltam {n} segundos."
+    "announce_resumed": "Contagem retomada: faltam {n} segundos.",
+    "announce_resumed_one": "Contagem retomada: falta {n} segundo."
   },
   "invites": {
     "open": "Convidar caixas",
@@ -1404,7 +1419,8 @@
     "start_question": "Rever primeiro as outras definições do jogo?",
     "review": "Rever definições",
     "start_now": "Começar agora",
-    "pending_note": "Há {n} réplica(s) declarada(s) por cronografar.",
+    "pending_note": "Há {n} réplicas declaradas por cronografar.",
+    "pending_note_one": "Há {n} réplica declarada por cronografar.",
     "back": "Voltar"
   },
   "box_language": {

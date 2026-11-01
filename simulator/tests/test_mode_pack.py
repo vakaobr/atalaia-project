@@ -336,5 +336,89 @@ class TemplateLanguageTests(unittest.TestCase):
             self.assertEqual(CORE.screen_text(turn, {}, {"lang": lang}), want, lang)
 
 
+    @unittest.skipIf(CORE is None, "needs the shared core library")
+    def test_a_count_of_one_takes_the_singular(self):
+        """"1 ponto", "1 point", "1 Punkt": a template that puts a noun after a count picks the
+        singular form for exactly 1 (Chinese has no plural, so it reads the same)."""
+        import yaml
+
+        def texts(path):
+            def walk(node):
+                if isinstance(node, dict):
+                    if isinstance(node.get("text"), str):
+                        yield node["text"]
+                    for v in node.values():
+                        yield from walk(v)
+                elif isinstance(node, list):
+                    for v in node:
+                        yield from walk(v)
+            return list(walk(yaml.safe_load(path.read_text(encoding="utf-8"))))
+
+        def pick(path, marker):
+            found = [t for t in texts(path) if marker in t]
+            self.assertEqual(len(found), 1, (path, marker))
+            return found[0]
+
+        root = MODES.parent
+        screens = lambda mode, name: MODES / mode / "assets" / "screens" / f"{name}.yaml"
+        on_box = (("pt", 1, "1 ponto nesta caixa"), ("pt", 0, "0 pontos nesta caixa"),
+                  ("pt", 2, "2 pontos nesta caixa"), ("en", 1, "1 point on this box"),
+                  ("en", 0, "0 points on this box"), ("en", 12, "12 points on this box"),
+                  ("de", 1, "1 Punkt auf dieser Box"), ("de", 2, "2 Punkte auf dieser Box"),
+                  ("zh-tw", 1, "1 分（這個盒子）"), ("zh-tw", 2, "2 分（這個盒子）"))
+        for path in (screens("domination", "captured"), screens("domination", "final_score"),
+                     root / "registry/examples/org.example.hill/assets/screens/captured.yaml",
+                     root / "registry/examples/org.example.hill/assets/screens/final_score.yaml"):
+            text = pick(path, "{points}")
+            for lang, n, want in on_box:
+                with self.subTest(path.name, lang=lang, n=n):
+                    self.assertEqual(CORE.screen_text(text, {"lang": lang, "points": n}, {}), want)
+
+        text = pick(screens("progressive_domination", "captured"), "{held_min}")
+        for lang, n, want in (("pt", 1, "3 / 10 min  ·  1 ponto"), ("pt", 5, "3 / 10 min  ·  5 pontos"),
+                              ("en", 1, "3 / 10 min  ·  1 point"), ("en", 5, "3 / 10 min  ·  5 points"),
+                              ("de", 1, "3 / 10 min  ·  1 Punkt"), ("de", 5, "3 / 10 min  ·  5 Punkte")):
+            with self.subTest("progressive", lang=lang, n=n):
+                data = {"lang": lang, "points": n, "held_min": 3, "need_min": 10}
+                self.assertEqual(CORE.screen_text(text, data, {}), want)
+
+        status = screens("master_satellites", "master_status")
+        sats = pick(status, "{held}")
+        for lang, of, want in (("pt", 1, "1 de 1 satélite"), ("pt", 4, "1 de 4 satélites"),
+                               ("en", 1, "1 of 1 satellite"), ("en", 4, "1 of 4 satellites"),
+                               ("de", 1, "1 von 1 Satellit"), ("de", 4, "1 von 4 Satelliten")):
+            with self.subTest("satellites", lang=lang, of=of):
+                self.assertEqual(CORE.screen_text(sats, {"lang": lang, "held": 1, "of": of}, {}), want)
+        every = pick(status, "{points}")
+        for lang, n, want in (("pt", 1, "1 ponto a cada 10 s"), ("pt", 3, "3 pontos a cada 10 s"),
+                              ("en", 1, "1 point every 10 s"), ("en", 3, "3 points every 10 s"),
+                              ("de", 1, "1 Punkt alle 10 s"), ("de", 3, "3 Punkte alle 10 s")):
+            with self.subTest("every", lang=lang, n=n):
+                self.assertEqual(CORE.screen_text(every, {"lang": lang, "points": n},
+                                                  {"tick_s": 10}), want)
+
+        hits = pick(screens("target_windows", "standby"), "{hits}")
+        for lang, n, want in (("pt", 1, "1 acerto que conta"), ("pt", 2, "2 acertos que contam"),
+                              ("en", 1, "1 scoring hit"), ("en", 2, "2 scoring hits"),
+                              ("de", 1, "1 Treffer mit Punkten"), ("de", 2, "2 Treffer mit Punkten")):
+            with self.subTest("hits", lang=lang, n=n):
+                self.assertEqual(CORE.screen_text(hits, {"lang": lang, "hits": n}, {}), want)
+
+        respawn = screens("respawn", "respawn")
+        left = pick(respawn, "'vidas restantes'")
+        for lang, n, want in (("pt", 1, "vida restante"), ("pt", 0, "vidas restantes"),
+                              ("pt", 3, "vidas restantes"), ("en", 1, "life left"),
+                              ("en", 3, "lives left"), ("de", 1, "Leben übrig")):
+            with self.subTest("lives", lang=lang, n=n):
+                self.assertEqual(CORE.screen_text(left, {"lang": lang, "lives": n}, {}), want)
+        for name, who in (("team", "RED"), ("player", "b1")):
+            of_who = pick(respawn, "'lives left for '}{%s}" % ("team|upper" if name == "team" else "player"))
+            for lang, n, want in (("pt", 1, "vida de "), ("pt", 2, "vidas de "),
+                                  ("en", 1, "life left for "), ("en", 2, "lives left for ")):
+                with self.subTest("lives_of", who=name, lang=lang, n=n):
+                    data = {"lang": lang, "lives": n, name: "red" if name == "team" else "b1"}
+                    self.assertEqual(CORE.screen_text(of_who, data, {}), want + who)
+
+
 if __name__ == "__main__":
     unittest.main()

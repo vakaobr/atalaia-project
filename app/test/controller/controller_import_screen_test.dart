@@ -411,6 +411,8 @@ void main() {
       (k) => k.startsWith('ctl_import.') || k.startsWith('ctl.import'),
     )) {
       for (final lang in tables.keys) {
+        // Chinese has no plural, so no singular form (`<key>_one`).
+        if (k.endsWith('_one') && lang == 'zh-tw') continue;
         expect(tables[lang]!.containsKey(k), isTrue, reason: '$lang $k');
       }
     }

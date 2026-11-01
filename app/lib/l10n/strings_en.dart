@@ -222,6 +222,7 @@ const Map<String, String> enStrings = {
   'pod.find': 'Find pods',
   'pod.found_none': 'No pod found.',
   'pod.linked': 'Pod linked over {kind}: firmware {fw}, {n} capabilities.',
+  'pod.linked_one': 'Pod linked over {kind}: firmware {fw}, {n} capability.',
   'pod.open_failed': 'Could not open the link to the pod.',
   'pod.no_ident': 'The pod did not answer.',
   'pod.reconnecting': 'The link to the pod was lost. Reconnecting (try {n})…',
@@ -291,6 +292,7 @@ const Map<String, String> enStrings = {
   'player.pick_team': 'Tap your team to highlight it.',
   'player.eliminated': 'eliminated',
   'player.lives_left': '{n} lives',
+  'player.lives_left_one': '{n} life',
   'player.objectives': 'Objectives',
   'player.node': 'Box {n}',
   'player.held_by': 'Held by {team}',
@@ -411,6 +413,8 @@ const Map<String, String> enStrings = {
   'marshal.records': 'Stored readings',
   'marshal.readings':
       '{n} readings on this phone. They are kept for 365 days, then deleted.',
+  'marshal.readings_one':
+      '{n} reading on this phone. It is kept for 365 days, then deleted.',
   'marshal.erase': "Erase someone's readings",
   'marshal.erase_do': 'Erase',
   'marshal.checking': 'Asking the field controller…',
@@ -421,6 +425,8 @@ const Map<String, String> enStrings = {
       'The field controller does not have you on its marshal list. Ask the GM to add you as a marshal.',
   'marshal.revoked':
       'The GM took you off the marshal list, so this phone is no longer a marshal here. The {n} series not yet sent stay on this phone and can be sent if the GM adds you again.',
+  'marshal.revoked_one':
+      'The GM took you off the marshal list, so this phone is no longer a marshal here. The {n} series not yet sent stays on this phone and can be sent if the GM adds you again.',
   'marshal.offline_never':
       "The field controller cannot be reached, and this phone has not been confirmed as a marshal here yet. Join the field's network once and ask again.",
   'marshal.offline_expired':
@@ -479,6 +485,7 @@ const Map<String, String> enStrings = {
   'replica.add': 'Register a replica',
   'replica.none': 'No replicas registered yet.',
   'replica.count': '{n} replicas registered',
+  'replica.count_one': '{n} replica registered',
   'replica.owner': "Player's id",
   'replica.type': 'Type',
   'replica.class': 'Class',
@@ -649,9 +656,14 @@ const Map<String, String> enStrings = {
   'queue.manual_do': 'Check in',
   'queue.manual_done': 'Checked in: {id}',
   'queue.send_pending': 'Send {n} series not sent yet',
+  'queue.send_pending_one': 'Send {n} series not sent yet',
   'queue.send_failed': '{n} series were not accepted; they stay on this phone.',
+  'queue.send_failed_one':
+      '{n} series was not accepted; it stays on this phone.',
   'queue.held':
       '{n} series were not accepted because the controller does not have you on its marshal list; they stay on this phone.',
+  'queue.held_one':
+      '{n} series was not accepted because the controller does not have you on its marshal list; it stays on this phone.',
   'queue.waiting_confirmation': 'waiting for confirmation',
   'queue.sticker_title': 'Use an NFC sticker?',
   'queue.sticker_body':
@@ -689,7 +701,8 @@ const Map<String, String> enStrings = {
   'player.share': 'Share my position with the game during this game',
   'player.share_hint':
       'Only during the game; the controller decides who sees it. The organisers and the marshals see it on their ATAK devices.',
-  'player.share_on': 'Sharing: {n} position(s) sent',
+  'player.share_on': 'Sharing: {n} positions sent',
+  'player.share_on_one': 'Sharing: {n} position sent',
   'player.share_stopped':
       'Sharing stopped: the game ended or the check-in changed.',
   'player.no_location': 'This phone has no location.',
@@ -739,7 +752,9 @@ const Map<String, String> enStrings = {
   'player.my_room': 'Your position: {room}',
   'player.map_title': 'Field map',
   'player.map_semantics': 'Map of the field, {level}: {n} positions',
+  'player.map_semantics_one': 'Map of the field, {level}: {n} position',
   'player.map_off_plan': '{n} positions not on this plan',
+  'player.map_off_plan_one': '{n} position not on this plan',
   'player.map_level_unknown':
       'Hollow dots: players who have not said which floor they are on.',
   'player.map_level_unknown_short': 'floor not known',
@@ -802,6 +817,7 @@ const Map<String, String> enStrings = {
   'site.cancelled_reason': 'This game has been cancelled: {reason}',
   'site.open_until': 'Registration open until {when}',
   'site.left': '{n} places',
+  'site.left_one': '{n} place',
   'site.opens': 'Registration opens {when}',
   'site.full': 'Full',
   'site.closed': 'Registration closed',
@@ -816,6 +832,7 @@ const Map<String, String> enStrings = {
   'site.replicas': 'Replicas you will use (up to {n})',
   'site.class_not_here': '{class}: this field has no such class',
   'site.too_many': 'This field takes up to {n} replicas per person.',
+  'site.too_many_one': 'This field takes up to {n} replica per person.',
   'site.register': 'Register',
   'site.save': 'Save the changes',
   'site.changed': 'Registration changed.',
@@ -1045,7 +1062,8 @@ const Map<String, String> enStrings = {
   'ctl.fw_keys': 'Firmware release keys',
   'ctl.fw_keys_none':
       'None: this controller takes no firmware release for the boxes.',
-  'ctl.fw_keys_set': '{n} key(s): releases they sign are taken.',
+  'ctl.fw_keys_set': '{n} keys: releases they sign are taken.',
+  'ctl.fw_keys_set_one': '{n} key: releases it signs are taken.',
   'ctl.fw_keys_hint':
       "The release keys' public halves (base64, 44 characters each), one "
       "per line, as in the Pi's [firmware] release_keys. The boxes check "
@@ -1346,7 +1364,9 @@ const Map<String, String> enStrings = {
   'propmodes.keys_none':
       'None: this prop runs only the modes built into the app.',
   'propmodes.keys_set':
-      '{n} key(s): a mode they sign may be fetched from the controller.',
+      '{n} keys: a mode they sign may be fetched from the controller.',
+  'propmodes.keys_set_one':
+      '{n} key: a mode it signs may be fetched from the controller.',
   'propmodes.keys_hint':
       "The public halves (base64, 44 characters each) of the mode keys this prop trusts, one per line, at most 4: as the mode keys built into a Field Box's firmware. A game whose mode the app lacks is fetched from its controller only when a key in this list signed it. Never add a key you were not given by the project or your club.",
   'propmodes.keys_bad':
@@ -1407,6 +1427,7 @@ const Map<String, String> enStrings = {
   'ctl_import.offline': 'The controller did not answer. Is it running?',
   'ctl_import.failed': 'The controller refused the list: {detail}',
   'ctl_import.rows_more': '{n} more rows are not shown.',
+  'ctl_import.rows_more_one': '{n} more row is not shown.',
   'ctl_import.title': 'Import a registration list',
   'ctl_import.intro':
       'For a field with no site server: a list of registrations from another platform (CSV or JSON, the site server\'s import format) becomes this game\'s expected players, and a marshal ticks each one when they arrive. Only display_name, external_ref, team_preference, federation_number and replicas are read; any other column (an email, a phone number) is only named, never read.',
@@ -1426,6 +1447,8 @@ const Map<String, String> enStrings = {
   'ctl_import.more': 'and {n} more',
   'ctl_import.missing':
       '{n} imported players that have not arrived are not in this file (they stay).',
+  'ctl_import.missing_one':
+      '{n} imported player who has not arrived is not in this file (they stay).',
   'ctl_import.row': 'Row',
   'ctl_import.result': 'Result',
   'ctl_import.line': 'line {n}',

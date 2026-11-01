@@ -124,7 +124,9 @@ export function eventWords(e) {
         else team = team || t('feed.events.nobody');
         if (!d.objective) key += '_hidden';
     }
-    const s = t(key, { team, player: d.player || '', remaining: d.remaining,
+    // The count a feed text puts a noun after: the lives of a respawn, the points of a deposit.
+    const n = e.type === 'player.respawn' ? d.lives_left : d.amount;
+    const s = t(key, { n, team, player: d.player || '', remaining: d.remaining,
                        used: d.player_heals_used, amount: d.amount, puzzle, code: d.code || '',
                        objective: d.objective || '', scenario: d.scenario || '', reason,
                        zone: d.zone || (e.node === undefined ? '' : `${t('nodes.node')} ${e.node}`), step: d.step,
@@ -141,11 +143,20 @@ export function posterProblem(p) {
     return s === key ? (p.problem || '') : s;
 }
 
-/** t('game.start') or t('feed.count', {n: 3}): the text in the current language. */
+/** t('game.start') or t('feed.count', {n: 3}): the text in the current language; with n: 1 the
+ * singular form `<key>_one` when the language has it. */
 export function t(key, vars) {
-    let s = key.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), dict);
-    if (typeof s !== 'string') {
-        s = key.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), fallback);
+    const find = (table, k) => k.split('.').reduce((o, p) => (o && o[p] !== undefined ? o[p] : undefined), table);
+    let s;
+    // A count of exactly 1 takes the singular form "<key>_one" of the current language when it has
+    // one (1 event, not 1 events); Chinese has no plural and no such keys.
+    if (vars && Number(vars.n) === 1) {
+        s = find(dict, `${key}_one`);
+        if (typeof s !== 'string') s = undefined;
+    }
+    if (s === undefined) {
+        s = find(dict, key);
+        if (typeof s !== 'string') s = find(fallback, key);
     }
     if (typeof s !== 'string') return key;
     if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : m));

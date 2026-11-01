@@ -52,6 +52,7 @@
     "role": "Dieser Controller ist jetzt {role} (Amtszeit {term}).",
     "node_offline": "Box {node} ist seit über 90 s nicht mehr zu hören.",
     "count": "{n} Warnungen",
+    "count_one": "{n} Warnung",
     "start_forced": "Spiel ohne Box gestartet für: {roles}"
   },
   "game": {
@@ -103,10 +104,12 @@
       "paused": "pausiert",
       "ended": "beendet"
     },
-    "confirm_start_pending": "{n} angemeldete Replik(en) noch nicht gechront. Trotzdem starten?",
+    "confirm_start_pending": "{n} angemeldete Repliken noch nicht gechront. Trotzdem starten?",
+    "confirm_start_pending_one": "{n} angemeldete Replik noch nicht gechront. Trotzdem starten?",
     "squads": "Squads pro Team",
     "squads_hint": "0 = keine Squads (kleine Spiele: nur Teams). Bei Milsim oder großen Spielen teilt sich jedes Team in Squads.",
     "squads_each": "{n} Squads pro Team",
+    "squads_each_one": "{n} Squad pro Team",
     "disclosure": "An wen die Ziele eines Squads gehen",
     "disclosure_scenario": "Wie das Szenario sagt ({value})",
     "disclosure_members": "Alle im Squad",
@@ -176,6 +179,7 @@
     "filter": "Ereignisse filtern",
     "critical_only": "Nur kritische",
     "count": "{n} Ereignisse",
+    "count_one": "{n} Ereignis",
     "empty": "Noch keine Ereignisse.",
     "events": {
       "medic_heal": "{player} wurde geheilt (Heilungen im Kit übrig: {remaining}; Heilungen in diesem Spiel: {used})",
@@ -187,6 +191,7 @@
       "vip_extracted_vip": "{team} hat seinen VIP extrahiert ({player})",
       "money_collected": "{player} ({team}) hat {amount} Geld eingesammelt",
       "money_deposited": "{player} ({team}) hat {amount} eingezahlt: {amount} Punkte",
+      "money_deposited_one": "{player} ({team}) hat {amount} eingezahlt: {amount} Punkt",
       "progressive_activated": "Box {zone} ist jetzt aktiv (Nr. {step}): nur sie kann eingenommen werden",
       "progressive_completed": "{team} hat Box {zone} abgeschlossen (Nr. {step}): sie ist gesperrt",
       "scenario_started": "Das Szenario {scenario} hat begonnen",
@@ -212,6 +217,7 @@
       "score_delta": "Punkte für Team {team}: {amount}",
       "code_used": "Team {team} hat einen Code benutzt",
       "player_respawn": "{player} ist wieder drin ({lives} Leben)",
+      "player_respawn_one": "{player} ist wieder drin ({lives} Leben)",
       "player_checkin": "{player} hat eingecheckt",
       "kill_confirmed": "Kill bestätigt von Team {team} ({player})",
       "kill_denied": "Team {team} hat den Tag von {player} zurückgeholt",
@@ -583,7 +589,8 @@
     "scenario_name": "Szenario-Box",
     "scenario_none": "— keine (Rolle wählen) —",
     "scenario_box": "Box {node}",
-    "scenario_hint": "Das Szenario findet seine Boxen über diese Namen: {done} von {n} haben eine Box."
+    "scenario_hint": "Das Szenario findet seine Boxen über diese Namen: {done} von {n} haben eine Box.",
+    "scenario_hint_one": "Das Szenario findet seine Box über diesen Namen: {done} von {n} hat eine Box."
   },
   "presets": {
     "title": "Vorlagen",
@@ -721,9 +728,11 @@
     "checked": "Geprüft, noch nichts importiert.",
     "imported": "Importiert.",
     "counts": "{rows} Zeilen: {created} neu, {updated} geändert, {unchanged} unverändert, {skipped} übersprungen, {refused} abgelehnt.",
+    "counts_one": "{rows} Zeile: neu {created}, geändert {updated}, unverändert {unchanged}, übersprungen {skipped}, abgelehnt {refused}.",
     "ignored": "Nicht gelesene Spalten: {names}",
     "more": "und {n} weitere",
     "missing": "{n} importierte Spielende, die noch nicht angekommen sind, fehlen in dieser Datei (sie bleiben).",
+    "missing_one": "{n} importierte Person, die noch nicht angekommen ist, fehlt in dieser Datei (sie bleibt).",
     "row": "Zeile",
     "result": "Ergebnis",
     "line": "Zeile {n}",
@@ -952,6 +961,7 @@
     "schedule_create": "Spiel erstellen",
     "schedule_made": "erstellt: Spiel {ids}",
     "schedule_registered": "{n} angemeldet",
+    "schedule_registered_one": "{n} angemeldet",
     "problems": {
       "https_off": "HTTPS ist auf dem Controller aus ([api] tls_port = 0): Das Plakat braucht das Zertifikat des Felds.",
       "no_address": "Das Plakat hat keine https-Adresse für den Controller: Trag die Adressen unten ein, [checkin] urls oder [api] tls_names.",
@@ -980,6 +990,7 @@
     "intro": "Druck diese Seite: ein Etikett von 30 × 30 mm pro Replik zum Ausschneiden und Aufkleben. Der Code enthält nur das Etikett der Replik (ATL- und acht Zeichen), nichts über die spielende Person. Die App des Marshals scannt ihn in der Chrono-Liste.",
     "print": "Drucken",
     "count": "{n} Etiketten",
+    "count_one": "{n} Etikett",
     "qr_label": "QR-Etikett {code}"
   },
   "branding": {
@@ -1046,6 +1057,7 @@
     "ok_no_core": "Keine Probleme im Manifest (der Core ist auf diesem Controller nicht geladen).",
     "ok_warnings": "Keine Fehler, aber Warnungen:",
     "has_errors": "{n} Fehler: Behebe sie vor der Installation.",
+    "has_errors_one": "{n} Fehler: Behebe ihn vor der Installation.",
     "whole": "(Manifest)",
     "levels": {
       "error": "Fehler",
@@ -1258,7 +1270,8 @@
     "scan": "Nach Boxen suchen",
     "scanning": "Suche …",
     "none": "Keine Box gefunden. Prüfe das Kabel (ein Datenkabel, nicht nur Strom) und ob die Box eingeschaltet ist.",
-    "silent": "{n} Anschluss/Anschlüsse haben nicht geantwortet",
+    "silent": "{n} Anschlüsse haben nicht geantwortet",
+    "silent_one": "{n} Anschluss hat nicht geantwortet",
     "busy": "einem Spiel beigetreten: Beende es zuerst",
     "locked": "zu viele falsche PINs: Warte {min} min (ein Neustart verkürzt das nicht)",
     "adopt": "Aufnehmen",
@@ -1340,6 +1353,7 @@
     "body": "Die Spielenden checken ein, indem sie das Plakat des Feldes scannen. Hängt es noch nicht, druck es aus, bevor sie zu „{game}“ kommen. Es ist für alle Spiele gleich.",
     "countdown": "Schließt in {n} s",
     "announce": "Diese Meldung schließt sich in {n} Sekunden von selbst.",
+    "announce_one": "Diese Meldung schließt sich in {n} Sekunde von selbst.",
     "never": "Nicht mehr anzeigen",
     "open": "Plakatseite öffnen",
     "close": "Schließen",
@@ -1349,7 +1363,8 @@
     "resume": "Countdown fortsetzen",
     "paused": "Angehalten: bleibt offen, bis du es schließt",
     "announce_paused": "Countdown angehalten.",
-    "announce_resumed": "Countdown fortgesetzt: noch {n} Sekunden."
+    "announce_resumed": "Countdown fortgesetzt: noch {n} Sekunden.",
+    "announce_resumed_one": "Countdown fortgesetzt: noch {n} Sekunde."
   },
   "invites": {
     "open": "Boxen einladen",
@@ -1404,7 +1419,8 @@
     "start_question": "Zuerst die übrigen Einstellungen des Spiels prüfen?",
     "review": "Einstellungen prüfen",
     "start_now": "Jetzt starten",
-    "pending_note": "{n} angemeldete Replik(en) noch nicht gechront.",
+    "pending_note": "{n} angemeldete Repliken noch nicht gechront.",
+    "pending_note_one": "{n} angemeldete Replik noch nicht gechront.",
     "back": "Zurück"
   },
   "box_language": {

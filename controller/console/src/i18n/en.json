@@ -52,6 +52,7 @@
     "role": "This controller is now {role} (term {term}).",
     "node_offline": "Box {node} has not been heard for more than 90 s.",
     "count": "{n} alerts",
+    "count_one": "{n} alert",
     "start_forced": "Game started without a box for: {roles}"
   },
   "game": {
@@ -103,10 +104,12 @@
       "paused": "paused",
       "ended": "ended"
     },
-    "confirm_start_pending": "{n} declared replica(s) not chronographed yet. Start anyway?",
+    "confirm_start_pending": "{n} declared replicas not chronographed yet. Start anyway?",
+    "confirm_start_pending_one": "{n} declared replica not chronographed yet. Start anyway?",
     "squads": "Squads per team",
     "squads_hint": "0 = no squads (small games: teams only). In a milsim or a big game each team splits into squads.",
     "squads_each": "{n} squads per team",
+    "squads_each_one": "{n} squad per team",
     "disclosure": "Who a squad's objectives go to",
     "disclosure_scenario": "As the scenario says ({value})",
     "disclosure_members": "Every member of the squad",
@@ -176,6 +179,7 @@
     "filter": "Filter events",
     "critical_only": "Critical only",
     "count": "{n} events",
+    "count_one": "{n} event",
     "empty": "No events yet.",
     "events": {
       "medic_heal": "{player} was healed (heals left in the kit: {remaining}; heals in this game: {used})",
@@ -187,6 +191,7 @@
       "vip_extracted_vip": "{team} extracted its VIP ({player})",
       "money_collected": "{player} ({team}) collected {amount} money",
       "money_deposited": "{player} ({team}) banked {amount}: {amount} points",
+      "money_deposited_one": "{player} ({team}) banked {amount}: {amount} point",
       "progressive_activated": "Box {zone} is active now (number {step}): the only one that can be captured",
       "progressive_completed": "{team} completed box {zone} (number {step}): it is locked",
       "scenario_started": "The scenario {scenario} started",
@@ -212,6 +217,7 @@
       "score_delta": "Points for {team}: {amount}",
       "code_used": "{team} used a code",
       "player_respawn": "{player} is back in ({lives} lives)",
+      "player_respawn_one": "{player} is back in ({lives} life)",
       "player_checkin": "{player} checked in",
       "kill_confirmed": "Kill confirmed by {team} ({player})",
       "kill_denied": "{team} recovered {player}'s tag",
@@ -583,7 +589,8 @@
     "scenario_name": "Scenario box",
     "scenario_none": "— none (pick the role) —",
     "scenario_box": "box {node}",
-    "scenario_hint": "The scenario finds its boxes by these names: {done} of {n} have a box."
+    "scenario_hint": "The scenario finds its boxes by these names: {done} of {n} have a box.",
+    "scenario_hint_one": "The scenario finds its box by this name: {done} of {n} has a box."
   },
   "presets": {
     "title": "Presets",
@@ -721,9 +728,11 @@
     "checked": "Checked, nothing imported yet.",
     "imported": "Imported.",
     "counts": "{rows} rows: {created} new, {updated} changed, {unchanged} unchanged, {skipped} skipped, {refused} refused.",
+    "counts_one": "{rows} row: new {created}, changed {updated}, unchanged {unchanged}, skipped {skipped}, refused {refused}.",
     "ignored": "Columns not read: {names}",
     "more": "and {n} more",
     "missing": "{n} imported players that have not arrived are not in this file (they stay).",
+    "missing_one": "{n} imported player who has not arrived is not in this file (they stay).",
     "row": "Row",
     "result": "Result",
     "line": "line {n}",
@@ -952,6 +961,7 @@
     "schedule_create": "Create the game",
     "schedule_made": "made: game {ids}",
     "schedule_registered": "{n} registered",
+    "schedule_registered_one": "{n} registered",
     "problems": {
       "https_off": "HTTPS is off on the controller ([api] tls_port = 0): the poster needs the field's certificate.",
       "no_address": "The poster has no https address for the controller: set the addresses below, [checkin] urls or [api] tls_names.",
@@ -980,6 +990,7 @@
     "intro": "Print this page: one label of 30 × 30 mm for each replica, to cut out and stick on. The code holds only the replica's label (ATL- and eight characters), nothing about the player. The marshal's app scans it in the chrono queue.",
     "print": "Print",
     "count": "{n} labels",
+    "count_one": "{n} label",
     "qr_label": "QR label {code}"
   },
   "branding": {
@@ -1045,7 +1056,8 @@
     "ok": "No problems: the generated field.lua loads in the core.",
     "ok_no_core": "No problems in the manifest (the core is not loaded on this controller).",
     "ok_warnings": "No errors, with warnings:",
-    "has_errors": "{n} error(s): fix them before installing.",
+    "has_errors": "{n} errors: fix them before installing.",
+    "has_errors_one": "{n} error: fix it before installing.",
     "whole": "(manifest)",
     "levels": {
       "error": "Error",
@@ -1258,7 +1270,8 @@
     "scan": "Look for boxes",
     "scanning": "Looking…",
     "none": "No box found. Check the cable (a data cable, not only power) and that the box is switched on.",
-    "silent": "{n} port(s) did not answer",
+    "silent": "{n} ports did not answer",
+    "silent_one": "{n} port did not answer",
     "busy": "a game is joined: end it first",
     "locked": "too many wrong PINs: wait {min} min (a restart does not shorten it)",
     "adopt": "Adopt",
@@ -1340,6 +1353,7 @@
     "body": "Players check in by scanning the field's poster. If it is not up yet, print it before they arrive for “{game}”. It is the same for every game.",
     "countdown": "Closes in {n} s",
     "announce": "This message closes by itself in {n} seconds.",
+    "announce_one": "This message closes by itself in {n} second.",
     "never": "Don't show this again",
     "open": "Open the poster page",
     "close": "Close",
@@ -1349,7 +1363,8 @@
     "resume": "Resume the countdown",
     "paused": "Paused: it stays open until you close it",
     "announce_paused": "Countdown paused.",
-    "announce_resumed": "Countdown resumed: {n} seconds left."
+    "announce_resumed": "Countdown resumed: {n} seconds left.",
+    "announce_resumed_one": "Countdown resumed: {n} second left."
   },
   "invites": {
     "open": "Invite boxes",
@@ -1404,7 +1419,8 @@
     "start_question": "Review the game's other settings first?",
     "review": "Review settings",
     "start_now": "Start now",
-    "pending_note": "{n} declared replica(s) not chronographed yet.",
+    "pending_note": "{n} declared replicas not chronographed yet.",
+    "pending_note_one": "{n} declared replica not chronographed yet.",
     "back": "Back"
   },
   "box_language": {

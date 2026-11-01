@@ -50,6 +50,7 @@ A language's code is the same everywhere (`status.yaml`, the console's `LANGS`, 
 - Keep every placeholder exactly (`{team}`, `%1`, `%s`, `{{ page.to.glossary }}`); you may
   move it in the sentence.
 - Keep texts short where the English is short: buttons, tabs, the box's screens.
+- A noun after a count has a singular for exactly 1 (*1 ponto*, *1 point*, *1 Punkt*), never "1 pontos". In a mode screen put `points == 1 &&` before the plural in the language's branch (`modes/README.md`); in the app and the GM console add a text `<key>_one` next to `<key>` (with the same placeholders, `n` the count) and the code picks it when `n` is 1. Chinese has no plural, so it needs neither. Write the plural as a plural, not `série(s)`.
 - Decimal separators, quotation marks and dates as your language writes them.
 - Chinese, Japanese or Korean: the box's fonts carry only the letters its texts (and the built-in
   modes' screens) use, the OLED

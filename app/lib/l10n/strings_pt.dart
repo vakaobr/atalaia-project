@@ -232,6 +232,7 @@ const Map<String, String> ptStrings = {
   'pod.find': 'Procurar módulos',
   'pod.found_none': 'Nenhum módulo encontrado.',
   'pod.linked': 'Módulo ligado por {kind}: firmware {fw}, {n} capacidades.',
+  'pod.linked_one': 'Módulo ligado por {kind}: firmware {fw}, {n} capacidade.',
   'pod.open_failed': 'Não foi possível abrir a ligação ao módulo.',
   'pod.no_ident': 'O módulo não respondeu.',
   'pod.reconnecting':
@@ -302,6 +303,7 @@ const Map<String, String> ptStrings = {
   'player.pick_team': 'Toca na tua equipa para a destacar.',
   'player.eliminated': 'eliminada',
   'player.lives_left': '{n} vidas',
+  'player.lives_left_one': '{n} vida',
   'player.objectives': 'Objetivos',
   'player.node': 'Caixa {n}',
   'player.held_by': 'Da equipa {team}',
@@ -425,6 +427,8 @@ const Map<String, String> ptStrings = {
   'marshal.readings':
       '{n} medições neste telemóvel. Guardam-se 365 dias e depois são '
       'apagadas.',
+  'marshal.readings_one':
+      '{n} medição neste telemóvel. Guarda-se 365 dias e depois é apagada.',
   'marshal.erase': 'Apagar as medições de alguém',
   'marshal.erase_do': 'Apagar',
   'marshal.checking': 'A perguntar ao controlador do campo…',
@@ -434,7 +438,9 @@ const Map<String, String> ptStrings = {
   'marshal.not_listed':
       'O controlador do campo não te tem na lista de marshals. Pede à organização para te acrescentar como marshal.',
   'marshal.revoked':
-      'A organização retirou-te da lista de marshals, por isso este telemóvel já não é de marshal neste campo. As {n} série(s) por enviar ficam neste telemóvel e podem ser enviadas se a organização te voltar a acrescentar.',
+      'A organização retirou-te da lista de marshals, por isso este telemóvel já não é de marshal neste campo. As {n} séries por enviar ficam neste telemóvel e podem ser enviadas se a organização te voltar a acrescentar.',
+  'marshal.revoked_one':
+      'A organização retirou-te da lista de marshals, por isso este telemóvel já não é de marshal neste campo. A {n} série por enviar fica neste telemóvel e pode ser enviada se a organização te voltar a acrescentar.',
   'marshal.offline_never':
       'Sem ligação ao controlador do campo, e este telemóvel ainda não foi confirmado como marshal aqui. Liga-te uma vez à rede do campo e pergunta outra vez.',
   'marshal.offline_expired':
@@ -494,6 +500,7 @@ const Map<String, String> ptStrings = {
   'replica.add': 'Registar réplica',
   'replica.none': 'Ainda não há réplicas registadas.',
   'replica.count': '{n} réplicas registadas',
+  'replica.count_one': '{n} réplica registada',
   'replica.owner': 'Identificador de quem joga',
   'replica.type': 'Tipo',
   'replica.class': 'Classe',
@@ -662,10 +669,14 @@ const Map<String, String> ptStrings = {
   'queue.manual': 'Check-in à mão',
   'queue.manual_do': 'Fazer o check-in',
   'queue.manual_done': 'Check-in feito: {id}',
-  'queue.send_pending': 'Enviar {n} série(s) por enviar',
-  'queue.send_failed': '{n} série(s) não foram aceites; ficam neste telemóvel.',
+  'queue.send_pending': 'Enviar {n} séries por enviar',
+  'queue.send_pending_one': 'Enviar {n} série por enviar',
+  'queue.send_failed': '{n} séries não foram aceites; ficam neste telemóvel.',
+  'queue.send_failed_one': '{n} série não foi aceite; fica neste telemóvel.',
   'queue.held':
-      '{n} série(s) não foram aceites porque o controlador não te tem na lista de marshals; ficam neste telemóvel.',
+      '{n} séries não foram aceites porque o controlador não te tem na lista de marshals; ficam neste telemóvel.',
+  'queue.held_one':
+      '{n} série não foi aceite porque o controlador não te tem na lista de marshals; fica neste telemóvel.',
   'queue.waiting_confirmation': 'à espera de confirmação',
   'queue.sticker_title': 'Usar um autocolante NFC?',
   'queue.sticker_body':
@@ -702,7 +713,8 @@ const Map<String, String> ptStrings = {
   'player.share': 'Partilhar a minha posição com o jogo durante este jogo',
   'player.share_hint':
       'Só durante o jogo; o controlador decide quem a vê. A organização e os marshals veem-na nos seus dispositivos ATAK.',
-  'player.share_on': 'A partilhar: {n} posição(ões) enviada(s)',
+  'player.share_on': 'A partilhar: {n} posições enviadas',
+  'player.share_on_one': 'A partilhar: {n} posição enviada',
   'player.share_stopped':
       'A partilha parou: o jogo terminou ou o check-in mudou.',
   'player.no_location': 'Este telemóvel não tem localização.',
@@ -751,7 +763,9 @@ const Map<String, String> ptStrings = {
   'player.my_room': 'A tua posição: {room}',
   'player.map_title': 'Mapa do campo',
   'player.map_semantics': 'Mapa do campo, {level}: {n} posições',
+  'player.map_semantics_one': 'Mapa do campo, {level}: {n} posição',
   'player.map_off_plan': '{n} posições fora desta planta',
+  'player.map_off_plan_one': '{n} posição fora desta planta',
   'player.map_level_unknown':
       'Pontos vazios: quem ainda não disse em que piso está.',
   'player.map_level_unknown_short': 'piso desconhecido',
@@ -813,6 +827,7 @@ const Map<String, String> ptStrings = {
   'site.cancelled_reason': 'Este jogo foi cancelado: {reason}',
   'site.open_until': 'Inscrições abertas até {when}',
   'site.left': '{n} lugares',
+  'site.left_one': '{n} lugar',
   'site.opens': 'As inscrições abrem a {when}',
   'site.full': 'Esgotado',
   'site.closed': 'Inscrições fechadas',
@@ -827,6 +842,7 @@ const Map<String, String> ptStrings = {
   'site.replicas': 'Réplicas que vais usar (até {n})',
   'site.class_not_here': '{class}: este campo não tem esta classe',
   'site.too_many': 'Este campo aceita até {n} réplicas por pessoa.',
+  'site.too_many_one': 'Este campo aceita até {n} réplica por pessoa.',
   'site.register': 'Fazer a inscrição',
   'site.save': 'Guardar as alterações',
   'site.changed': 'Inscrição alterada.',
@@ -1065,7 +1081,8 @@ const Map<String, String> ptStrings = {
   'ctl.fw_keys_none':
       'Nenhuma: este controlador não aceita versões de firmware para as '
       'caixas.',
-  'ctl.fw_keys_set': '{n} chave(s): aceita as versões que assinam.',
+  'ctl.fw_keys_set': '{n} chaves: aceita as versões que assinam.',
+  'ctl.fw_keys_set_one': '{n} chave: aceita as versões que assina.',
   'ctl.fw_keys_hint':
       'As metades públicas das chaves de versão (base64, 44 caracteres '
       'cada), uma por linha, como em [firmware] release_keys do Pi. As '
@@ -1383,7 +1400,9 @@ const Map<String, String> ptStrings = {
   'propmodes.keys_none':
       'Nenhuma: este dispositivo só corre os modos incluídos na aplicação.',
   'propmodes.keys_set':
-      '{n} chave(s): pode obter do controlador um modo que elas assinem.',
+      '{n} chaves: pode obter do controlador um modo que elas assinem.',
+  'propmodes.keys_set_one':
+      '{n} chave: pode obter do controlador um modo que ela assine.',
   'propmodes.keys_hint':
       'As metades públicas (base64, 44 caracteres cada) das chaves de modo em que este dispositivo confia, uma por linha, no máximo 4: como as chaves de modo incluídas no firmware de uma caixa. Um jogo cujo modo a aplicação não tem só é obtido do controlador se uma chave desta lista o assinou. Não acrescentes uma chave que não te foi dada pelo projeto ou pelo teu clube.',
   'propmodes.keys_bad':
@@ -1446,6 +1465,7 @@ const Map<String, String> ptStrings = {
   'ctl_import.offline': 'O controlador não respondeu. Está a funcionar?',
   'ctl_import.failed': 'O controlador recusou a lista: {detail}',
   'ctl_import.rows_more': 'Mais {n} linhas não são mostradas.',
+  'ctl_import.rows_more_one': 'Mais {n} linha não é mostrada.',
   'ctl_import.title': 'Importar uma lista de inscrições',
   'ctl_import.intro':
       'Para um campo sem servidor do campo: uma lista de inscrições de outra plataforma (CSV ou JSON, no formato de importação do servidor do campo) passa a ser as pessoas esperadas deste jogo, e um marshal assinala cada pessoa à chegada. Só se leem display_name, external_ref, team_preference, federation_number e replicas; qualquer outra coluna (um email, um telefone) é apenas nomeada, nunca lida.',
@@ -1465,6 +1485,8 @@ const Map<String, String> ptStrings = {
   'ctl_import.more': 'e mais {n}',
   'ctl_import.missing':
       '{n} pessoas importadas que ainda não chegaram não estão neste ficheiro (ficam).',
+  'ctl_import.missing_one':
+      '{n} pessoa importada que ainda não chegou não está neste ficheiro (fica).',
   'ctl_import.row': 'Linha',
   'ctl_import.result': 'Resultado',
   'ctl_import.line': 'linha {n}',

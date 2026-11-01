@@ -206,6 +206,48 @@ void main() {
     expect(AppLanguage.pt.locale.toString(), 'pt_PT');
   });
 
+  test('a count of one takes the singular form of the text', () {
+    const pt = Strings(AppLanguage.pt);
+    const en = Strings(AppLanguage.en);
+    const de = Strings(AppLanguage.de);
+    const zh = Strings(AppLanguage.zhTw);
+    expect(pt.t('player.lives_left', {'n': 1}), '1 vida');
+    expect(pt.t('player.lives_left', {'n': 0}), '0 vidas');
+    expect(pt.t('player.lives_left', {'n': 3}), '3 vidas');
+    expect(pt.t('replica.count', {'n': 1}), '1 réplica registada');
+    expect(pt.t('queue.send_pending', {'n': 1}), 'Enviar 1 série por enviar');
+    expect(pt.t('queue.send_pending', {'n': 2}), 'Enviar 2 séries por enviar');
+    expect(en.t('replica.count', {'n': 1}), '1 replica registered');
+    expect(en.t('replica.count', {'n': 2}), '2 replicas registered');
+    expect(en.t('site.left', {'n': 1}), '1 place');
+    expect(en.t('player.share_on', {'n': 1}), 'Sharing: 1 position sent');
+    expect(de.t('site.left', {'n': 1}), '1 Platz');
+    expect(de.t('site.left', {'n': 4}), '4 Plätze');
+    // Chinese has no plural: the same text for 1 and for 2.
+    expect(zh.t('replica.count', {'n': 1}), '已登錄 1 把槍');
+    // A text without a singular form keeps its text.
+    expect(en.t('player.positions', {'n': 1}), 'Positions you see: 1');
+  });
+
+  test('every singular form belongs to a text with the same placeholders', () {
+    final holes = RegExp(r'\{(\w+)\}');
+    for (final table in [ptStrings, enStrings, deStrings, zhTwStrings]) {
+      for (final k in table.keys.where((k) => k.endsWith('_one'))) {
+        final base = k.substring(0, k.length - 4);
+        expect(table.containsKey(base), isTrue, reason: '$k has no $base');
+        expect(
+          holes.allMatches(table[k]!).map((m) => m.group(1)).toSet(),
+          holes.allMatches(table[base]!).map((m) => m.group(1)).toSet(),
+          reason: k,
+        );
+      }
+    }
+    expect(
+      enStrings.keys.where((k) => k.endsWith('_one')).length,
+      greaterThan(10),
+    );
+  });
+
   // German (plan phase 10, decision P5H-2): drafted by an AI model, to be
   // reviewed by a native-speaking player. Other work adds keys to English
   // and Portuguese without German; such a key shows in English, so German
