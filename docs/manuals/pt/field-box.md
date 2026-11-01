@@ -140,7 +140,7 @@ Manténs premido o botão da tua equipa na caixa. A caixa mostra o que se passa.
 
 Os outros modos têm ecrãs próprios: *Baixa Confirmada* (**carrega no botão e lê as etiquetas**), *Reentradas e Vidas* (**Lê a tua etiqueta para voltares ao jogo**), *Ligaduras* (**Lê a tua etiqueta** e **mantém premido o botão**) e *Hackeia o terminal* (um enigma no teclado). A [página dos modos](https://atalaia-project.link/modos/) mostra-os.
 
-**O logótipo.** A caixa mostra a torre da Atalaia, no ecrã de arranque e no ecrã **PRONTA**, e no ecrã de *Bomba / Rush* enquanto a bomba não está armada. O logótipo do próprio campo (as *Definições* da consola) aparece na app, no placar e no cartaz, não na caixa: a caixa ia buscá-lo pela Wi-Fi do campo e já não vai. Quem monta a caixa pode compilá-la com outra imagem de arranque: [guia de firmware, secção 4](firmware.md#4-as-opções-de-quem-monta).
+**O logótipo.** A caixa mostra a torre da Atalaia, no ecrã de arranque (o pequeno e o grande, com a versão do firmware ao lado) e no ecrã **PRONTA**, e no ecrã de *Bomba / Rush* enquanto a bomba não está armada. O logótipo do próprio campo (as *Definições* da consola) aparece na app, no placar e no cartaz, não na caixa: a caixa ia buscá-lo pela Wi-Fi do campo e já não vai. Quem monta a caixa pode compilá-la com outra imagem de arranque: [guia de firmware, secção 4](firmware.md#4-as-opções-de-quem-monta).
 
 No OLED pequeno vês o modo em cima, um valor grande (a fase, o tempo ou a equipa) e uma dica por baixo. Enquanto uma equipa mantém premido o botão, o OLED mostra uma barra que enche.
 
@@ -216,7 +216,7 @@ Um telemóvel Android também pode ser uma caixa. Na app escolhe **Dispositivo d
 | O ecrã está na língua errada | A organização define a **Língua das caixas** antes de criar o jogo. |
 | A caixa só mostra inglês | Firmware mais antigo. A organização pode atualizá-lo. |
 | **PIN bloqueado · tente daqui a N min** | Espera. A contagem sobrevive a um reinício. Não continues a adivinhar. |
-| A caixa reiniciou num jogo | Volta no mesmo jogo. A organização vê **node.rebooted** no registo dela. |
+| A caixa reiniciou num jogo | Volta no mesmo jogo. A organização vê **node.rebooted** no registo dela, com o motivo que a caixa indica (alimentação, queda de tensão, software, falha do programa, watchdog); o fluxo da consola diz **Uma caixa falhou e reiniciou** quando foi uma falha do programa ou um reinício do watchdog. Um fio solto no teclado ou no ecrã já não reinicia a caixa: a peça que falha é posta de lado por um tempo e o jogo continua (o teclado conta então como sem tecla). |
 | O ecrã pequeno está apagado | Fala com quem montou a caixa. O ecrã grande pode continuar a funcionar. |
 
 Para avarias de montagem e de bancada, vê [a tabela de resolução de problemas do manual de montagem](../../../hardware/field-box/BUILD.pt.md#13-resolução-de-problemas).

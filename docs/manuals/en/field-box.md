@@ -140,7 +140,7 @@ You hold your team's button on the box. The box shows what is happening.
 
 Other modes have their own screens: *Kill Confirmed* (**press your button, then scan the tags**), *Respawn and Lives* (**Scan your tag to come back in**), *Medic Kit* (**Scan your tag**, **then hold the button**) and *Hacking Terminal* (a puzzle on the keypad). The [modes page](https://atalaia-project.link/en/modes/) shows them.
 
-**The logo.** The box shows the Atalaia tower, on its boot screen and on the **READY** screen, and on the *Bomb / Rush* screen while the bomb is not armed. The field's own logo (the console's *Settings*) shows in the app, on the scoreboard and on the poster, not on the box: a box used to fetch it over the field Wi-Fi, which it no longer does. A builder can build a box with another splash: [firmware guide, section 4](firmware.md#4-the-options-a-builder-sets).
+**The logo.** The box shows the Atalaia tower, on its boot screen (the small screen and the big one, with the firmware version beside it) and on the **READY** screen, and on the *Bomb / Rush* screen while the bomb is not armed. The field's own logo (the console's *Settings*) shows in the app, on the scoreboard and on the poster, not on the box: a box used to fetch it over the field Wi-Fi, which it no longer does. A builder can build a box with another splash: [firmware guide, section 4](firmware.md#4-the-options-a-builder-sets).
 
 On the small OLED you see the mode on top, one big value (the phase, the timer or the team) and a hint under it. While a team holds its button, the OLED shows a bar that fills.
 
@@ -216,7 +216,7 @@ An Android phone can be a box too. In the app choose **Game prop**, then **Join 
 | The screen is in the wrong language | The organisers set the **Box language** before creating the game. |
 | The box shows English only | An older firmware. The organisers can update it. |
 | **PIN locked · try again in N min** | Wait. The count survives a restart. Do not keep guessing. |
-| The box rebooted in a game | It comes back in the same game. The organisers see **node.rebooted** in their log. |
+| The box rebooted in a game | It comes back in the same game. The organisers see **node.rebooted** in their log, with the reason the box gives (power, brownout, software, panic, watchdog); the console's feed says **A box crashed and restarted** for a program crash or a watchdog reset. A flaky keypad or screen wire no longer reboots a box: the failing part is set aside for a while and the game goes on (a keypad then reads as no key). |
 | The small screen is dark | Ask the builder. The big screen can still work. |
 
 For building and bench faults see [the build manual's troubleshooting table](../../../hardware/field-box/BUILD.md#13-troubleshooting).

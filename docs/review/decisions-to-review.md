@@ -3316,3 +3316,235 @@ RFC 0001 Amendment 25: the epoch floor, the former-leader id rule and Wi-Fi prop
 | EP-10 | Epoch file format? | {"keys":[...],"floor":n}; the bare list is still read. | Back-compat for existing Pi installs. | built (2026-10-30); open for the maintainer's review |
 | EP-11 | Alternatives refused? | Box climbing on unacknowledged HELLO; a standby taking CMD peer naming itself; a floor key in the join payload; a random epoch per standby join (SR-119). | Heavier, wire changes, or break failover. | built (2026-10-30); open for the maintainer's review |
 | EP-12 | Firmware? | Yes: radio_protocol.c/.h, radio_nvs_esp.c/.h, shell.c, field_link.c text; host-tested and ASan-clean; ESP image built by the queue. |  | built (2026-10-30); open for the maintainer's review |
+
+## A database role per field (S2113-1 to S2113-8, 2026-10-28)
+
+Commit `4fcd2888`. Closes S21-13: a SQL injection could switch fields with `set_config`. A live hub upgrade needs a maintenance window (`hosted-roles.sh`, then `hosted migrate`; see DEPLOY.md). Missing from this list until now.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| S2113-1 | How is each field's access separated from the others now? | One NOLOGIN database role per field, `atalaia_t_<field_id hex>` (from the registry's field_id, never user text), that alone holds the grants on its schema, tables, sequences and its rows of the hub's sharing tables; the server's login role holds none and SET LOCAL ROLEs to the field's role at the start of every request transaction. | Grants, not a rewritable setting, keep fields apart: naming another field in atalaia.tenant gets "permission denied". Closes S21-13. | built (2026-10-28); open for the maintainer's review |
+| S2113-2 | What does the server's login role keep? | Registry SELECT, quota-inbox INSERT, and SET ROLE to each field's role (WITH INHERIT FALSE, SET TRUE); nothing on any field's tables or the sharing tables. The server refuses to start otherwise and `hosted check` reports it. | Least privilege; a request that loses its scope fails closed. | built (2026-10-28); open for the maintainer's review |
+| S2113-3 | How does cross-tenant chrono sharing keep working? | The atalaia_share_* tables and the two SECURITY DEFINER functions are granted to the field roles only; the policy and functions read the caller's field from the role in use (atalaia_caller_tenant()), not from atalaia.tenant. | The old policy keyed on the rewritable setting. | built (2026-10-28); open for the maintainer's review |
+| S2113-4 | How is the role switch kept from being undone by an injected statement? | EXECUTE on pg_catalog.set_config revoked from PUBLIC, granted to the owner and atalaia_app only (hosted-roles.sh as superuser); the server refuses to start while any role can call it; asyncpg's introspection told not to call it (_server_caps.jit=False, jit=off; asyncpg hash-pinned, tested). | SET ROLE is authorised by the session user, so a field role could otherwise set_config('role', other). | built (2026-10-28); open for the maintainer's review |
+| S2113-5 | Who creates and drops the roles, and how do existing hubs get them? | The owner role, now with CREATEROLE: `hosted create`/`hosted migrate` make role and grants, `hosted delete` drops it; migration 0023_tenant_roles creates the roles of existing fields during `hosted migrate`; no-op in single-field mode. | Roles are cluster objects; the existing per-schema migration path runs as the owner. | built (2026-10-28); open for the maintainer's review |
+| S2113-6 | Backups and restore? | Backups unchanged; a hosted restore uses --no-acl, re-runs hosted-roles.sh, then `hosted migrate` (recreates roles and grants); `hosted check` must pass. | Roles belong to the cluster, not the dump. | built (2026-10-28); open for the maintainer's review |
+| S2113-7 | Which parts stay as they were? | Tenant-schema RLS policies stay keyed on atalaia.tenant (defence in depth); registry lookups, watcher, TLS ask, quota notes as the login role; migrations and commands as the owner; backups as superuser; single-field mode unchanged. | Keeps the designed cross-tenant paths explicit. | built (2026-10-28); open for the maintainer's review |
+| S2113-8 | What is left open? | A second statement that is a SET ROLE command would still switch fields; the driver sends one statement per call (tested), so an injection cannot add one. A login role and pool per field would close it fully; not built. | That costs a pool and rotating password per field (~1,000 at the design limit); the maintainer's call. | built (2026-10-28); open for the maintainer's review |
+
+## A staff page for the hub link code (HLC-1 to HLC-12, 2026-10-31)
+
+Commit `35a79740`. A hub needs `hosted migrate` before the new server (new function `atalaia_share_peers`). Texts in four languages; German and Traditional Chinese are AI-drafted and not native-reviewed.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| HLC-1 | Where is the link code page, and who sees the link? | /staff/account/hub-share; the account page links to it only when GET /me/hub-share answers, so single-field servers show no link. | It is the hosted hub's feature (SVX-2); the API decides, no duplicate hosted flag. | built (2026-10-31); open for the maintainer's review |
+| HLC-2 | How does the page show linked accounts? | GET /me/hub-share also returns field, consent and others (other fields' names, sharing, since) from a new SECURITY DEFINER function atalaia_share_peers(uuid) that answers only for a person the caller is a member of and gives no records. | Tenants cannot read other tenants' rows; a function is the only crossing, like atalaia_share_read. | built (2026-10-31); open for the maintainer's review |
+| HLC-3 | How is consent shown and recorded? | A text on what crosses and how to withdraw, a tick, PUT /me/consents/chrono-sharing/{field}; withdrawal is DELETE after a confirm. | The API's existing way; text follows the sharing terms. | built (2026-10-31); open for the maintainer's review |
+| HLC-4 | Is the other field's consent given here? | No; the page says it is given on that field's own account page. | Consents are per field, in that field's database. | built (2026-10-31); open for the maintainer's review |
+| HLC-5 | Expired, used and wrong code wording? | One message naming all three (and that a code from this field does not work here). | The API answers invalid_code for all on purpose. | built (2026-10-31); open for the maintainer's review |
+| HLC-6 | Rate limit (10/hour) shown how? | The shared "Too many requests. Try again in N s" with N from Retry-After. | Same as every staff page. | built (2026-10-31); open for the maintainer's review |
+| HLC-7 | How long is a made code on screen? | Shown once, hidden after 15 minutes or on linking, never stored in the browser; copy button where the clipboard exists. | The server keeps only a hash. | built (2026-10-31); open for the maintainer's review |
+| HLC-8 | Field switch or terms off? | Consent and linking stay available; the page says nothing is shared until the field changes it. | The person's choices are theirs; the switch is the field admin's. | built (2026-10-31); open for the maintainer's review |
+| HLC-9 | Unlinking? | Confirm, then DELETE /me/hub-share; the page says what leaves the other fields' view and that unused codes are deleted. | Matches the API. | built (2026-10-31); open for the maintainer's review |
+| HLC-10 | Browser tests with a single-field suite? | Real server for the page; hub calls faked with page.route (stateful, real refusals); the real API tested in test_hub_share.py. | A hosted hub needs wildcard hosts and TLS. | built (2026-10-31); open for the maintainer's review |
+| HLC-11 | Texts? | pt-PT, en, de, zh-tw; de and zh-tw AI-drafted, not native-reviewed. | Same status as other staff texts. | built (2026-10-31); open for the maintainer's review |
+| HLC-12 | Consent button in the app's hub screen? | Left open, not built (same PUT/DELETE). | Out of scope. | built (2026-10-31); open for the maintainer's review |
+
+## The check-in notice moves to version 2 (NV-1 to NV-8, 2026-10-31)
+
+Commit `57083b97`. Decision LEG-18a (the maintainer, 2026-10-31): bump the privacy notice version. Update the Pi and phone controllers together.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| NV-1 | What does LEG-18's bump mean? | Check-in notice_version 1 -> 2 as the default on the Pi and phone controller, shared contract cases moved together; the app has no number of its own; the site server's ATALAIA_PRIVACY_NOTICE_VERSION and the preview's preview-2026-10-31 untouched. | The check-in notice and the account notice are separate records. | built (2026-10-31); open for the maintainer's review |
+| NV-2 | What does an older client or stale form see? | 409 notice_version_changed; the app fetches the new text, shows "read and confirm" in four languages and unticks the position box. | A 409 on an unread notice must not look like a failure; a yes is never carried over. | built (2026-10-31); open for the maintainer's review |
+| NV-3 | Does a position yes under version 1 survive? | No: it counts only under the version in force; reports refused, positions hidden, position_share false until the player says yes again; the stored row kept as recorded. | Consent to old wording is not consent to new (Art. 7). | built (2026-10-31); open for the maintainer's review |
+| NV-4 | How does the in-app switch avoid a yes to unseen text? | PUT .../position-sharing takes an optional notice_version; stale = 409, the app shows the new notice and retries; older apps sending nothing accepted as before. | The switch used to stamp the current version unseen. | built (2026-10-31); open for the maintainer's review |
+| NV-5 | Is the notice text edited? | No: pt and en templates already state the card check and the separate unticked position box; no de/zh-tw notice added (controller serves pt and en). | No lawyer-approved de/zh-tw text; no machine-translated legal text. Open for the maintainer. | built (2026-10-31); open for the maintainer's review |
+| NV-6 | Site server notice version bumped too? | No. | Account notice is separate; the preview already runs preview-2026-10-31. | built (2026-10-31); open for the maintainer's review |
+| NV-7 | Project page footer on the privacy template? | States the positions the lawyer approved on 2026-10-30, but the wording is still a draft not reviewed by a lawyer; each field checks and adopts it. Four languages. | LEG-0 approves positions; the template banner records no review of its wording. | built (2026-10-31); open for the maintainer's review |
+| NV-8 | What stays unverified? | Console browser tests (hand check-in on version 2) and a real-device walk-through not run. | Mixed Pi 2 / phone 1 makes the app ask again at check-in. | built (2026-10-31); open for the maintainer's review |
+
+## The Field Box screen shows the hold bar, the held time and the corner points (TZ-1 to TZ-6, 2026-10-31)
+
+Commit `377a3433`. The maintainer asked for the OLED's hold bar and live held time on the colour screen too; unit and picture tests, and a first run on the bench board; not in a field.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| TZ-1 | Where does the TFT's hold bar come from? | The OLED's own oled_text_for()/oled_text_hold(), same hold reader and capture_hold_ms; drawn only when the screen data has no bar of its own | Same behaviour on both screens, no duplicated logic; Bomb and Progressive Domination already send their bars | built (2026-10-31); open for the maintainer's review |
+| TZ-2 | How does the TFT show the live held time? | Renderer adds held/live to the template data from the game clock and patches that one label each second; Domination's captured.yaml keeps a "held since" fallback for phones | Only the changed label redraws; OLED untouched (maintainer: it was already right) | built (2026-10-31); open for the maintainer's review |
+| TZ-3 | What do the corner totals count? | Under Domination only, each team's last points while it held this box's zone; kept after losing it; cleared at a new @mode or between games | The box only learns the holder's points from screen data; other modes' points are not team totals | built (2026-10-31); open for the maintainer's review |
+| TZ-4 | How are the totals drawn? | Number-only chips in team colours (up to 6), top right, on neutral, captured and final_score | Compact, fits the 44 px header, no new fonts | built (2026-10-31); open for the maintainer's review |
+| TZ-5 | Where do the overlays live? | LVGL top layer in screen_renderer.c, screen_overlay_tick() updates only changed widgets | Survive screen changes, no slow full redraws | built (2026-10-31); open for the maintainer's review |
+| TZ-6 | Does the GIF generator draw the TFT overlay too? | Yes: `mode_gif_frames.c` sets the overlay readers. | `--check` must match the device; the master_satellites and progressive_domination GIFs changed (hold bar). | built (2026-10-31); open for the maintainer's review |
+
+## The first real Field Box on the project page (FB-1 to FB-8, 2026-10-31)
+
+Commit `55dcfe10`. A photo and a short muted clip of the first Field Box bench build, on the build page and the home page.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| FB-1 | Where does the photo go? | Build page, first item of the Field Box section (#field-box-first-build) | First real build; anchor for links | built (2026-10-31); open for the maintainer's review |
+| FB-2 | How is the build described? | A bench build: loose wires, no enclosure, first board to run a game, not a finished box | Honest; "no box from the guides" stays true | built (2026-10-31); open for the maintainer's review |
+| FB-3 | Which clip? | 0:50-0:59 of the 1:51 video, 9 s red then blue, 720x406, muted, mp4+webm+poster (126/165/49 KB) | Clean capture flip, no faces, small | built (2026-10-31); open for the maintainer's review |
+| FB-4 | Reduced motion? | Inline realvideo.html pauses it (poster shows) + pause/play button reusing the GIF labels | GIF script swaps img sources; loops over 5 s need a pause control | built (2026-10-31); open for the maintainer's review |
+| FB-5 | Where else? | Home page subsection after the mode GIFs, before the app screenshots | Maintainer asked | built (2026-10-31); open for the maintainer's review |
+| FB-6 | Which texts changed? | Roadmap p1 short + done bullet, build status, glossary Field Box entry, 4 languages | The Field Box statements that became untrue | built (2026-10-31); open for the maintainer's review |
+| FB-7 | Licence? | CC-BY-SA-4.0 REUSE entry, source noted (maintainer's bench 2026-10-31) | Same as the rest of site/ | built (2026-10-31); open for the maintainer's review |
+| FB-8 | Metadata? | ffmpeg -map_metadata -1 + bitexact; checked by marker walk, identify, strings, ffprobe | No exiftool in the images | built (2026-10-31); open for the maintainer's review |
+
+## A second bench photo and a clip of the improved screens (FBM-1 to FBM-4, 2026-11-01)
+
+Commit `0d1f19f6`.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| FBM-1 | Which part of the 2026-11-01 recording becomes the clip? | 59.5–70.5 s (11 s), not the coordinator's 66–77 s | The coordinator miscounted frames; 66–77 s starts after the capture and ends on a blurry OLED close-up | built (2026-11-01); open for the maintainer's review |
+| FBM-2 | Keep the published clip and poster names? | Yes | Markup, reduced-motion script and README reference them | built (2026-11-01); open for the maintainer's review |
+| FBM-3 | How is the new photo added? | Second stacked picture under the 2026-10-31 photo, field-box-ready-* | Keeps the first-build record; stacked stays readable on phones | built (2026-11-01); open for the maintainer's review |
+| FBM-4 | Encoding/sizes? | Same recipe as 55dcfe10, ~132/150 KB clip, photos 109–251 KB | Page weight unchanged | built (2026-11-01); open for the maintainer's review |
+
+## The Field Box screen shows a boot splash (TS-1 to TS-5, 2026-11-01)
+
+Commit `f3b56b11`. The tower and the firmware version on the colour screen at start, as the small screen already did; host tests and a reference image; not yet checked on a bench board.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| TS-1 | What does the TFT splash show? | OLED splash scaled up: tower from assets/splash.pgm 96 px in accent colour left, "ATALAIA" + version lines right | Same logo/version on both screens; no new asset | built (2026-11-01); open for the maintainer's review |
+| TS-2 | How long? | ≥ ATALAIA_TFT_SPLASH_MS (2500) from draw, longer until the first screen is ready | Blank after splash worse than a longer splash | built (2026-11-01); open for the maintainer's review |
+| TS-3 | How not to delay boot? | Pure-logic tft_splash.c timer in the display task; latest held screen drawn after; @mode not held | No busy sleep; host-testable | built (2026-11-01); open for the maintainer's review |
+| TS-4 | Version string? | oled_version_lines() split: v0.6.0-dev.124 / 1f31026 | Consistent with OLED | built (2026-11-01); open for the maintainer's review |
+| TS-5 | No TFT / failed driver? | Nothing drawn | Stub/no-TFT builds unchanged | built (2026-11-01); open for the maintainer's review |
+
+## A bench finding: board 5 rebooted during a Domination demo (2026-10-31)
+
+Not a decision row; it led to the I2C fix (I2C-1 to I2C-6, below).
+
+- Board 5 (bench image with a keypad on a PCF8574 and the small screen on I2C pins 17/18) rebooted six times in about three minutes during game 1212 ("Interrupt wdt timeout on CPU0" in the I2C interrupt handler, from the idle task). The board's header has several bad joints, so a flaky bus was the likely trigger, but a bad bus must not panic a box.
+- A bench script that opened the serial port with pyserial's defaults (DTR and RTS asserted) reset the box once; the bench boot-log tool opens it with both off and does not.
+- Rerun as game 1209 with the keypad module unplugged and the port opened without the reset pulse: four captures, no reboot and no panic in two minutes. That points at the keypad module's wiring on this board as the trigger.
+- The controller logged each panic restart as `node.rebooted` with reason "power", which misreported a crash. Both are fixed by `eff2cd36`.
+
+## A flaky I2C bus no longer reboots a box, and a reboot says its real reason (I2C-1 to I2C-6, 2026-11-01)
+
+Commit `eff2cd36`. Cause found from the bench crash of board 5 (see the finding below): the old driver's interrupt handler returned without clearing interrupts it did not own after a timed-out transaction, so the interrupt fired again and again until the watchdog reset the box; the keypad's 10 ms timeouts with immediate retries made it likely. The reboot message said "power" for every restart. Bench test of the fix still pending (`docs/runbooks/i2c-fault-bench.md`; needs board 5 reflowed or the keypad).
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| I2C-1 | Fix legacy use or migrate? | Migrate keypad, OLED, PN532, MAX17048 to i2c_master (hal_esp_i2c) | Legacy handler can't avoid the storm; new one clears first, has timeouts, reset, glitch filter | built (2026-11-01); open for the maintainer's review |
+| I2C-2 | Device keeps failing? | Suspend after 3 in a row; trial after 0.5 s doubling to 30 s; one success restores | A bad joint costs one part, never a reboot | built (2026-11-01); open for the maintainer's review |
+| I2C-3 | Bus reset? | After 3 consecutive bus failures, ≤1/s, mutex-serialised | Clocks out a slave holding SDA | built (2026-11-01); open for the maintainer's review |
+| I2C-4 | Which reads count? | PN532 ready-polls are quiet | It NACKs while busy | built (2026-11-01); open for the maintainer's review |
+| I2C-5 | Reset reason? | esp_reset_reason() -> power/brownout/software/panic/watchdog/deepsleep/unknown; default unknown | Old constant misreported crashes | built (2026-11-01); open for the maintainer's review |
+| I2C-6 | Where do crashes show? | Console feed "crashed and restarted" in 4 languages; app/simulator unchanged | GM needs to see a crash | built (2026-11-01); open for the maintainer's review |
+
+## Counts of one take the singular: "1 ponto" (PLU-1 to PLU-5, 2026-11-01)
+
+Commit `5ae86ad6`. Screens, app and console.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| PLU-1 | Plural helper in the template language? | No: `points == 1 && 'ponto' \|\|` chains per language | Evaluator already supports it in core, box and app; helper = 3 implementations | built (2026-11-01); open for the maintainer's review |
+| PLU-2 | App/console singular? | `<key>_one` beside `<key>`, used when n == 1; zh-tw exempt | One rule, no ICU, no caller changes | built (2026-11-01); open for the maintainer's review |
+| PLU-3 | "(s)" spellings? | Real plural + `_one` singular | "(s)" reads badly in pt-PT/de | built (2026-11-01); open for the maintainer's review |
+| PLU-4 | Codes "+1 points for RED"? | Reworded "Points for RED: +50" | Pluralising blew the Reduced box's 64 KB Lua heap | built (2026-11-01); open for the maintainer's review |
+| PLU-5 | Regenerate site/img/modes GIFs? | Only target_windows-en/-pt | verify fails on stale GIFs | built (2026-11-01); open for the maintainer's review |
+
+## The singular sweep, part 2, and the editor example (PLU-6 to PLU-10, TFT-7, 2026-11-01)
+
+Commit `595c11a1`. Staff pages, controller texts, editor, manuals and operator commands. Not done: dev tools, serial logs and the lawyer's templates.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| PLU-6 | Staff page singulars? | `<key>_one` in staff.js t() + count_text() server-side; zh-TW none | Same rule as PLU-2 | built (2026-11-01); open for the maintainer's review |
+| PLU-7 | "within N days", N=1? | New days_within key carries the unit's plural | Sentence needs only an n singular | built (2026-11-01); open for the maintainer's review |
+| PLU-8 | Several counts in one sentence? | Plural unchanged; singular label-first; mode-keys line label-first | Avoids "1 novas" | built (2026-11-01); open for the maintainer's review |
+| PLU-9 | English controller/CLI texts? | Inline 1 ? singular : plural in Python and Dart | Fixed English texts | built (2026-11-01); open for the maintainer's review |
+| PLU-10 | Dev tools, serial logs, legal templates? | Left as is | Not user-facing / lawyer's call (DPA templates "field(s)") | built (2026-11-01); open for the maintainer's review |
+| TFT-7 | Editor example vs the hand-written mode's role command and status total? | The example stays the teaching version; its round trip skips roles.yaml | Rebuilding the blocks needs a node-id table and a reboot handler; other mode tests still pass | built (2026-11-01); open for the maintainer's review |
+
+## A real-hardware test run of Master and Satellites on the modes page (MSC-1 to MSC-5, 2026-11-01)
+
+Commit `4fe57515`.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| MSC-1 | Where? | Modes page, Master and Satellites card, under its GIF | Where a reader looks; build page busy with modem docs | built (2026-11-01); open for the maintainer's review |
+| MSC-2 | Cut? | 3 pieces, 17.8 s (22.5–29.0, 54.0–56.8, 98.0–106.5) | Master captured, satellite, bonus, master to blue; no blurry swings | built (2026-11-01); open for the maintainer's review |
+| MSC-3 | Framing? | Progress: names MASTER/ZONA/desde being fixed; card no longer says never played on real boxes | Maintainer asked for it as progressive improvement | built (2026-11-01); open for the maintainer's review |
+| MSC-4 | Encoding? | Field Box recipe, VP9 crf 46 (252 KB) | crf 40 was 441 KB | built (2026-11-01); open for the maintainer's review |
+| MSC-5 | Licence/partial? | Existing CC-BY-SA-4.0 annotation; realvideo partial on modes page | Same as Field Box files | built (2026-11-01); open for the maintainer's review |
+
+## The test-run caption says the three findings are fixed (MSF-1 to MSF-3, 2026-11-01)
+
+Commit `1f83dba3`.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| MSF-1 | Findings in the caption? | Kept, "fixed in the firmware after this run" | Progressive-improvement story | built (2026-11-01); open for the maintainer's review |
+| MSF-2 | Hardware claim? | Clip shows old screens, new recording to follow; no hardware-test claim | Not bench-tested yet | built (2026-11-01); open for the maintainer's review |
+| MSF-3 | GIF alt text? | Rewritten in 4 languages | It described a satellite; animation shows the master | built (2026-11-01); open for the maintainer's review |
+
+## One guide to set up the radio modem (MDM-1 to MDM-6, 2026-11-01)
+
+Commits `be62b0b4` and `596418de`. `docs/manuals/{en,pt}/modem.md`; tested on the bench on 2026-10-21 with the controller in Docker on WSL2, not on a Raspberry Pi, macOS or in a field.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| MDM-1 | New page or reworked section? | New docs/manuals/{en,pt}/modem.md; firmware §9 a pointer | Three audiences, one page avoids drift | built (2026-11-01); open for the maintainer's review |
+| MDM-2 | Prebuilt or build by default? | Release zip first; build for V4.2/Taiwan/antenna/language | Release ships V4.3 EU868 modem | built (2026-11-01); open for the maintainer's review |
+| MDM-3 | Erase first? | New or ex-box board yes; re-flash modem no; v0.4→v0.5 no | Box secrets shouldn't linger on a modem | built (2026-11-01); open for the maintainer's review |
+| MDM-4 | Port name? | /dev/ttyACM0, by-id when two boards | ACM numbering unstable; adoption compares real paths | built (2026-11-01); open for the maintainer's review |
+| MDM-5 | How "tested" is stated? | Bench 2026-10-21, controller in Docker on WSL2 via COM-to-TCP bridge; not Pi/macOS/field | Honesty | built (2026-11-01); open for the maintainer's review |
+| MDM-6 | Where region mismatch shows? | Console Settings; GM troubleshooting corrected | Modem screen has no region line | built (2026-11-01); open for the maintainer's review |
+
+## Master and Satellites, Progressive Domination and VIP Payload screens match the others (TFT-1 to TFT-6, 2026-11-01)
+
+Commit `5e32a100`. Found on the bench video of 2026-11-01. The screen-text finding behind it is the next section.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| TFT-1 | How does a box know master/satellite; pt gender? | field.lua sends mode command `role` at start, every 30 s, after reboot; MESTRE OCUPADA (f) / SATÉLITE OCUPADO (m); ZONA if never told | Scripts don't know their role; mode's pt says "a mestre", "os satélites" | built (2026-11-01); open for the maintainer's review |
+| TFT-2 | Corner totals where? | Domination + Master/Satellites master (total = team field score); not ProgDom/VIP | Only those are team totals | built (2026-11-01); open for the maintainer's review |
+| TFT-3 | Hold bar on master_status / VIP checkpoints? | oled_text_for marks them as zones (OLED also gets the bar now) | One logic for both screens | built (2026-11-01); open for the maintainer's review |
+| TFT-4 | Live time field name? | Renderer adds age/live whenever `since`; `held` only if absent | M&S `held` = satellites | built (2026-11-01); open for the maintainer's review |
+| TFT-5 | pt live line? | ocupada há / ocupado há / capturado há per header gender | Agreement with header | built (2026-11-01); open for the maintainer's review |
+| TFT-6 | GIFs/editor example? | Regenerated 3 modes' GIFs with realistic data | Checks fail on stale files | built (2026-11-01); open for the maintainer's review |
+
+## A screen text that does not fit is refused, and a failed one shows "?" (TPL-1 to TPL-6, 2026-11-01)
+
+Commit `7ef36a7d`. The box's text evaluator used one 256-byte buffer for literals and data, so a long text silently produced an empty header. Bench check pending: the box log line on overflow, and the LVGL stack headroom (+160 bytes, not measured).
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| TPL-1 | Why blank, what fix? | Literals and data strings shared 256 B; now literals 256 (len+1, all branches) and data 160, so load-time check is exact | Static bound unsound while data shares the buffer | built (2026-11-01); open for the maintainer's review |
+| TPL-2 | Where refused? | Core template check (sim, registry_check, firmware compile, Dart), Python adds mode/screen/widget/size | One chokepoint | built (2026-11-01); open for the maintainer's review |
+| TPL-3 | Failed render shows? | `?`, logged once per expression (ESP_LOGW / templateLogHook) | Never silent blank; first literal = wrong language | built (2026-11-01); open for the maintainer's review |
+| TPL-4 | Size? | Literals 256 (max shipped 186), data 160; +160 B stack on 8 KB LVGL task (not measured) | Keeps all templates valid | built (2026-11-01); open for the maintainer's review |
+| TPL-5 | Near-limit warning? | atalaia_sim test warns from 230 B | Notice before a translation tips it over | built (2026-11-01); open for the maintainer's review |
+| TPL-6 | Error echo length? | ≤40 bytes, cut at a character | Fits 160 B error buffer | built (2026-11-01); open for the maintainer's review |
+
+## A site browser test that cannot skip silently (TI-1 to TI-6, 2026-11-01)
+
+Commit `b208bd9c`. Three agents had found the old test skipping silently in the image without Playwright; run it with `python3 tools/docker_site_browser.py`.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| TI-1 | Playwright for the site test? | tools/dev/site-browser image, hash-pinned 1.49.0, docker_site_browser.py | Base image lacks the module | built (2026-11-01); open for the maintainer's review |
+| TI-2 | Missing Playwright? | Fail; ATALAIA_SKIP_SITE_BROWSER=1 to skip | Silent skip hid it from 3 agents | built (2026-11-01); open for the maintainer's review |
+| TI-3 | Cleanup? | Container always; image only with ATALAIA_VOLUME_SUFFIX | Y: disk | built (2026-11-01); open for the maintainer's review |
+| TI-4 | Product bug behind the console 409? | Yes (public_game race), already fixed in be9321a8 without a test; tests added | Keep it fixed | built (2026-11-01); open for the maintainer's review |
+| TI-5 | Sleep/retry in browser test? | No | Deterministic engine test instead | built (2026-11-01); open for the maintainer's review |
+| TI-6 | Gate on site/ changes? | No, always run (~70 s parallel) | verify.sh has no diff gating | built (2026-11-01); open for the maintainer's review |
+
+## A lost epoch record no longer exhausts the range (EPW-1 to EPW-4, 2026-11-01)
+
+Commits `4279cbdb`, `b6da4231` and `76ce606f` (controllers). What looked like a flaky test was a product bug. EPW-2 is the maintainer's call. The Field Box side (EPW-2b to EPW-4b) is still in the merge queue and is not listed yet.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| EPW-1 | How to draw a lost record's epoch? | No record: uniform [4096,61439]. With a floor: lower half of room above floor+1+1024. Epoch file missing but epoch_file_seen: margin 8192 + warning | ≥15 losses worst case; k=120 → 0, k=1460 → 2.2% (orig 3.5%) | built (2026-11-01); open for the maintainer's review |
+| EPW-2 | Refuse to resume on suspected stale floor? | No (margin instead) | Refusal removes residual risk but makes the game unrecoverable | open: the maintainer's call (raised 2026-11-01) |
+| EPW-3 | Receiver report / key rotation? | Not done | Wire change / GM re-join of every box | built (2026-11-01); open for the maintainer's review |
+| EPW-4 | Field Box draw? | Follow-up (same range-exhaustion shape; floor never stale) | Needs docker_fw | built (2026-11-01); open for the maintainer's review |
