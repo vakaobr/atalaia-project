@@ -188,8 +188,7 @@ void main() {
               registrationId: '0192f3a0-0000-7000-8000-0000000a0001',
               playerId: 'p-abcdefghijkl',
               ticket: 'x' * 43,
-              ticketText:
-                  'atalaia:ticket:oWJyaVAZJvOgAAB3AIAAAAAACgABYnBpbnAtYWJjZGVmZ2hpamts',
+              ticketText: 'atalaia:ticket:oWJyaVAZJvOgAAB3AIAAAAAACgABYnBpbnAtYWJjZGVmZ2hpamts',
               gameTitle: 'Domingo de manhã',
               fieldName: 'Campo Norte',
               startsAt: DateTime.utc(2026, 11, 8, 9),

@@ -311,9 +311,8 @@ class FakeSite {
 
 void main() {
   late AtalaiaCore core;
-  final limits = File(
-    'lib/chrono/limit_templates/portugal.yaml',
-  ).readAsStringSync();
+  final limits = File('lib/chrono/limit_templates/portugal.yaml')
+      .readAsStringSync();
   final fixtures =
       (loadVectors('controller_api.json')['fixtures']! as Map)['values']!
           as Map;

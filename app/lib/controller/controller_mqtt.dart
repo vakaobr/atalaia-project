@@ -32,8 +32,12 @@ import 'mqtt_broker.dart';
 const mqttPrefix = 'field/v1';
 
 /// Where the bridge publishes: [MqttBroker.publish], or a test's recorder.
-typedef MqttPublish =
-    void Function(String topic, Object payload, {int qos, bool retain});
+typedef MqttPublish = void Function(
+  String topic,
+  Object payload, {
+  int qos,
+  bool retain,
+});
 
 class ControllerMqtt {
   ControllerMqtt(this.engine, this._publish) {

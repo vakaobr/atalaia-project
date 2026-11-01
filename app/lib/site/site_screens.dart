@@ -1494,9 +1494,8 @@ class _ClaimPlayerIdScreenState extends State<ClaimPlayerIdScreen> {
     final id = _ids!.firstWhere((x) => x.fieldId == _picked);
     setState(() => (_busy = true, _error = null));
     try {
-      await SiteApi(
-        widget.session,
-      ).claim(widget.field.id, id.playerId, id.secret);
+      await SiteApi(widget.session)
+          .claim(widget.field.id, id.playerId, id.secret);
       await _load();
     } on SiteException catch (e) {
       if (mounted) setState(() => _error = siteError(context.s, e));

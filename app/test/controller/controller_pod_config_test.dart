@@ -46,9 +46,8 @@ void main() {
             dest: v['dest'] as int,
           );
           expect(
-            [
-              for (final b in cmd.encode()) b.toRadixString(16).padLeft(2, '0'),
-            ].join(),
+            [for (final b in cmd.encode()) b.toRadixString(16).padLeft(2, '0')]
+                .join(),
             s['cmd_cbor'],
             reason: '$name',
           );

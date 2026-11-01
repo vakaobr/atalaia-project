@@ -148,8 +148,7 @@ const Map<String, String> enStrings = {
   'prop.pod_opened':
       'Someone opened the I/O pod during the game. Tell the game master.',
   'prop.pod_reconnecting': 'The I/O pod link was lost. Reconnecting (try {n})…',
-  'prop.pod_refused':
-      'A different pod answered, so the I/O pod is not linked any more. Link a pod again.',
+  'prop.pod_refused': 'A different pod answered, so the I/O pod is not linked any more. Link a pod again.',
   'prop.pod_unlink': 'Unlink the I/O pod',
   'prop.hold': 'Hold\n{team}',
   'prop.nfc_hint': 'Hold the tag to the back of the phone.',
@@ -226,8 +225,7 @@ const Map<String, String> enStrings = {
   'pod.open_failed': 'Could not open the link to the pod.',
   'pod.no_ident': 'The pod did not answer.',
   'pod.reconnecting': 'The link to the pod was lost. Reconnecting (try {n})…',
-  'pod.refused':
-      'A different pod answered, so the link was not restored. Link a pod again.',
+  'pod.refused': 'A different pod answered, so the link was not restored. Link a pod again.',
   'pod.unlink': 'Unlink the pod',
 
   // Capabilities
@@ -278,8 +276,7 @@ const Map<String, String> enStrings = {
   'player.bad_link': 'The address or the access code is missing.',
   'player.link_unreachable':
       'The controller does not answer. Are you on the field\'s Wi-Fi?',
-  'player.link_mismatch':
-      'The controller answering is not the one this code was made for. Do not go on, and tell the organisers.',
+  'player.link_mismatch': 'The controller answering is not the one this code was made for. Do not go on, and tell the organisers.',
   'player.link_not_controller':
       'What answers at this address is not a field controller.',
   'player.connecting': 'Connecting to the field controller…',
@@ -361,8 +358,7 @@ const Map<String, String> enStrings = {
   'event.vip.extracted': '{team} reached the extraction zone',
   'event.money.collected': '{player} collected {amount} money',
   'event.money.deposited': '{player} banked {amount} for {team}',
-  'event.progressive.activated':
-      'Box {zone} is active now (number {step}): the only one that can be captured',
+  'event.progressive.activated': 'Box {zone} is active now (number {step}): the only one that can be captured',
   'event.progressive.completed': '{team} completed box {zone} (number {step})',
   'event.scenario.started': 'The scenario has started',
   'event.scenario.objective.completed': '{team} completed an objective',
@@ -420,23 +416,15 @@ const Map<String, String> enStrings = {
   'marshal.erase_do': 'Erase',
   'marshal.checking': 'Asking the field controller…',
   'marshal.you_are': 'You are marshal {id} ({name})',
-  'marshal.id_from_gm':
-      "The id and name come from the GM's marshal list; the field controller confirmed them.",
-  'marshal.not_listed':
-      'The field controller does not have you on its marshal list. Ask the GM to add you as a marshal.',
-  'marshal.revoked':
-      'The GM took you off the marshal list, so this phone is no longer a marshal here. The {n} series not yet sent stay on this phone and can be sent if the GM adds you again.',
-  'marshal.revoked_one':
-      'The GM took you off the marshal list, so this phone is no longer a marshal here. The {n} series not yet sent stays on this phone and can be sent if the GM adds you again.',
-  'marshal.offline_never':
-      "The field controller cannot be reached, and this phone has not been confirmed as a marshal here yet. Join the field's network once and ask again.",
-  'marshal.offline_expired':
-      "The field controller cannot be reached, and its confirmation of {at} has run out. Join the field's network and ask again.",
-  'marshal.offline_ok':
-      "Offline: the field controller confirmed you as marshal {id} on {at}. That holds until {until}; after that, join the field's network to confirm again.",
+  'marshal.id_from_gm': "The id and name come from the GM's marshal list; the field controller confirmed them.",
+  'marshal.not_listed': 'The field controller does not have you on its marshal list. Ask the GM to add you as a marshal.',
+  'marshal.revoked': 'The GM took you off the marshal list, so this phone is no longer a marshal here. The {n} series not yet sent stay on this phone and can be sent if the GM adds you again.',
+  'marshal.revoked_one': 'The GM took you off the marshal list, so this phone is no longer a marshal here. The {n} series not yet sent stays on this phone and can be sent if the GM adds you again.',
+  'marshal.offline_never': "The field controller cannot be reached, and this phone has not been confirmed as a marshal here yet. Join the field's network once and ask again.",
+  'marshal.offline_expired': "The field controller cannot be reached, and its confirmation of {at} has run out. Join the field's network and ask again.",
+  'marshal.offline_ok': "Offline: the field controller confirmed you as marshal {id} on {at}. That holds until {until}; after that, join the field's network to confirm again.",
   'marshal.retry': 'Ask again',
-  'marshal.expired_now':
-      "The field controller's confirmation has run out: ask again before recording.",
+  'marshal.expired_now': "The field controller's confirmation has run out: ask again before recording.",
 
   // Chrono
   'chrono.title': 'Chronograph',
@@ -544,8 +532,7 @@ const Map<String, String> enStrings = {
 
   // Field check-in, replicas to chrono, positions (plan phase E)
   'checkin.title': 'Check in at the field',
-  'checkin.intro':
-      'Scan the field\'s check-in poster with the camera (or paste its text). The phone reaches the field\'s controller over the field\'s Wi-Fi; no internet needed.',
+  'checkin.intro': 'Scan the field\'s check-in poster with the camera (or paste its text). The phone reaches the field\'s controller over the field\'s Wi-Fi; no internet needed.',
   'checkin.scan': 'Scan the poster',
   'checkin.scan_hint': 'Point at the QR code on the check-in poster',
   'checkin.by_text': 'Or paste the poster\'s text',
@@ -565,24 +552,19 @@ const Map<String, String> enStrings = {
   'diag.line': '{kind} · {url} · {time}',
   'checkin.unreachable':
       'The field\'s controller does not answer. Are you on the field\'s Wi-Fi?',
-  'checkin.join_wifi':
-      'The field\'s controller does not answer: join the Wi-Fi network “{ssid}” and try again.',
-  'checkin.mismatch':
-      'The controller answering is not the poster\'s (poster {poster}, controller {got}). Do not go on, and tell the organisers.',
+  'checkin.join_wifi': 'The field\'s controller does not answer: join the Wi-Fi network “{ssid}” and try again.',
+  'checkin.mismatch': 'The controller answering is not the poster\'s (poster {poster}, controller {got}). Do not go on, and tell the organisers.',
   'checkin.not_controller':
       'What answers at this address is not a field controller.',
-  'checkin.changed':
-      'This field was trusted with another certificate ({old}); the poster shows {new}. If the organisers confirm the controller changed, forget the field and scan the poster again.',
+  'checkin.changed': 'This field was trusted with another certificate ({old}); the poster shows {new}. If the organisers confirm the controller changed, forget the field and scan the poster again.',
   'checkin.forget_field': 'Forget this field',
   'checkin.error': 'The controller refused: {error}',
-  'checkin.offline':
-      'No connection to the field\'s controller: try again on the field\'s network.',
+  'checkin.offline': 'No connection to the field\'s controller: try again on the field\'s network.',
   'checkin.expired': 'This check-in is no longer valid: check in again.',
   'checkin.connecting': 'Connecting to the field\'s controller…',
   'checkin.notice_title': 'Your data at {field}',
   'checkin.notice_ok': 'I have read it, go on',
-  'checkin.notice_changed':
-      'The privacy notice changed. Read it and confirm again. Sharing your position stays off until you tick it again.',
+  'checkin.notice_changed': 'The privacy notice changed. Read it and confirm again. Sharing your position stays off until you tick it again.',
   'checkin.trusted': 'Field certificate {ca}',
   'checkin.no_games': 'No game is open for check-in at this field.',
   'checkin.game': 'Game',
@@ -619,8 +601,7 @@ const Map<String, String> enStrings = {
   'checkin.declare': 'Pick the replicas',
   'checkin.follow': 'Follow the game',
   'checkin.leave': 'Leave the game',
-  'checkin.leave_body':
-      'Your name and federation number are erased from this game. Replicas already chronographed stay on record.',
+  'checkin.leave_body': 'Your name and federation number are erased from this game. Replicas already chronographed stay on record.',
   'checkin.left': 'You left the game; your data was erased.',
   'chrono_state.pending': 'not chronographed',
   'chrono_state.passed': 'passed',
@@ -628,8 +609,7 @@ const Map<String, String> enStrings = {
   'chrono_state.withdrawn': 'withdrawn',
   'chrono_state.refused_today': 'refused today',
   'declare.title': 'Replicas for this game',
-  'declare.intro':
-      'Pick the replicas you will use in this game (up to {max}). Take them to the marshals for the chronograph.',
+  'declare.intro': 'Pick the replicas you will use in this game (up to {max}). Take them to the marshals for the chronograph.',
   'declare.none': 'No replicas yet: add yours.',
   'declare.add': 'Add a replica',
   'declare.type': 'Type',
@@ -640,17 +620,14 @@ const Map<String, String> enStrings = {
   'declare.locked':
       'A chronographed replica stays declared: ask a marshal to change it.',
   'queue.title': 'Replicas to chrono',
-  'queue.hint':
-      'The field\'s list: who declared replicas that have not been through the chronograph yet.',
-  'queue.check_in_first':
-      'Check in at the field with the poster first; the organisers then give you the marshal role.',
+  'queue.hint': 'The field\'s list: who declared replicas that have not been through the chronograph yet.',
+  'queue.check_in_first': 'Check in at the field with the poster first; the organisers then give you the marshal role.',
   'queue.not_marshal': 'This list is for marshals and the organisers only.',
   'queue.counts':
       'To chrono: {pending} · passed: {passed} · refused: {refused}',
   'queue.scan': 'Scan a replica\'s label',
   'queue.scan_hint': 'Point at the replica\'s QR label',
-  'queue.not_found':
-      'This replica is not declared in this game: pick the player\'s declaration.',
+  'queue.not_found': 'This replica is not declared in this game: pick the player\'s declaration.',
   'queue.refresh': 'Refresh',
   'queue.empty': 'Nobody has declared replicas yet.',
   'queue.manual': 'Check in by hand',
@@ -661,14 +638,11 @@ const Map<String, String> enStrings = {
   'queue.send_failed': '{n} series were not accepted; they stay on this phone.',
   'queue.send_failed_one':
       '{n} series was not accepted; it stays on this phone.',
-  'queue.held':
-      '{n} series were not accepted because the controller does not have you on its marshal list; they stay on this phone.',
-  'queue.held_one':
-      '{n} series was not accepted because the controller does not have you on its marshal list; it stays on this phone.',
+  'queue.held': '{n} series were not accepted because the controller does not have you on its marshal list; they stay on this phone.',
+  'queue.held_one': '{n} series was not accepted because the controller does not have you on its marshal list; it stays on this phone.',
   'queue.waiting_confirmation': 'waiting for confirmation',
   'queue.sticker_title': 'Use an NFC sticker?',
-  'queue.sticker_body':
-      "Hold the replica's NFC sticker to the phone to register it by the sticker, or use the printed QR label.",
+  'queue.sticker_body': "Hold the replica's NFC sticker to the phone to register it by the sticker, or use the printed QR label.",
   'queue.sticker_qr': 'Use the QR label',
   'queue.sticker_taken':
       'That sticker is already registered to another replica.',
@@ -678,10 +652,8 @@ const Map<String, String> enStrings = {
   'label.share': 'Share / print label',
   'label.share_all': 'Share / print all labels',
   'label.share_title': 'Replica labels',
-  'label.hint':
-      'Stick this label on the replica. The marshal scans it to find the replica in the chrono queue. It holds only this code, nothing about you. It prints at 30 × 30 mm; several labels go on one A4 sheet.',
-  'label.share_unavailable':
-      'This phone cannot hand a file to the share sheet. Use Show label instead.',
+  'label.hint': 'Stick this label on the replica. The marshal scans it to find the replica in the chrono queue. It holds only this code, nothing about you. It prints at 30 × 30 mm; several labels go on one A4 sheet.',
+  'label.share_unavailable': 'This phone cannot hand a file to the share sheet. Use Show label instead.',
   'label.share_failed': 'The share sheet did not open.',
   'label.none_yet':
       'The label shows here once you have declared this replica for a game.',
@@ -700,18 +672,15 @@ const Map<String, String> enStrings = {
   'player.no_team': 'no team yet',
   'player.positions': 'Positions you see: {n}',
   'player.share': 'Share my position with the game during this game',
-  'player.share_hint':
-      'Only during the game; the controller decides who sees it. The organisers and the marshals see it on their ATAK devices.',
+  'player.share_hint': 'Only during the game; the controller decides who sees it. The organisers and the marshals see it on their ATAK devices.',
   'player.share_on': 'Sharing: {n} positions sent',
   'player.share_on_one': 'Sharing: {n} position sent',
   'player.share_stopped':
       'Sharing stopped: the game ended or the check-in changed.',
   'player.no_location': 'This phone has no location.',
   'player.location_denied': 'No permission for the location.',
-  'player.location_denied_ios':
-      'No permission for the location. Allow it in Settings > Atalaia > Location (While Using the App), and check that Location Services is on.',
-  'player.share_ios_note':
-      'On iPhone your position is shared only while Atalaia is open on the screen: it pauses when you switch to another app or lock the phone, and goes on when you come back.',
+  'player.location_denied_ios': 'No permission for the location. Allow it in Settings > Atalaia > Location (While Using the App), and check that Location Services is on.',
+  'player.share_ios_note': 'On iPhone your position is shared only while Atalaia is open on the screen: it pauses when you switch to another app or lock the phone, and goes on when you come back.',
   'player.sharing_title': 'Atalaia: sharing your position',
   'player.sharing_text': 'During the game',
   // The out-of-bounds warning (decisions MF-31 to MF-40)
@@ -732,24 +701,18 @@ const Map<String, String> enStrings = {
   'prop.gm_message': 'Game master: {text}',
   // Indoor beacons (decisions BLE-1 to BLE-9)
   'player.beacons_why_title': 'Indoor positions',
-  'player.beacons_why':
-      'This field has Bluetooth beacons indoors. To tell which room you are in, Atalaia can listen for them while you share your position: only the field\'s own beacons, and it sends only which one is strongest. Android asks for the Bluetooth and location permissions for this. Without them your position stays GPS only.',
+  'player.beacons_why': 'This field has Bluetooth beacons indoors. To tell which room you are in, Atalaia can listen for them while you share your position: only the field\'s own beacons, and it sends only which one is strongest. Android asks for the Bluetooth and location permissions for this. Without them your position stays GPS only.',
   'player.beacons_allow': 'Continue',
   'player.beacons_skip': 'Not now',
   'player.beacons_on':
       'Listening for the field\'s beacons: indoors your position is the room.',
   'player.beacons_skipped':
       'Indoor positions are off. Your GPS position is still shared.',
-  'player.beacons_denied':
-      'Indoor positions are off: no permission for Bluetooth. Your GPS position is still shared.',
-  'player.beacons_off':
-      'Indoor positions are off: Bluetooth is switched off. Switch it on and share again.',
-  'player.beacons_unavailable':
-      'This phone cannot listen for the field\'s beacons. Your GPS position is still shared.',
-  'player.beacons_why_ios':
-      'This field has Bluetooth beacons indoors. To tell which room you are in, Atalaia can listen for them while you share your position: only the field\'s own beacons, and it sends only which one is strongest. iPhone asks for the location permission for this (Bluetooth is used by the beacons, not asked for). Without it your position stays GPS only.',
-  'player.beacons_on_ios':
-      'Listening for the field\'s beacons, only while Atalaia is open on the screen: indoors your position is the room. With the phone locked or another app in front, your position goes back to GPS and keeps the last floor.',
+  'player.beacons_denied': 'Indoor positions are off: no permission for Bluetooth. Your GPS position is still shared.',
+  'player.beacons_off': 'Indoor positions are off: Bluetooth is switched off. Switch it on and share again.',
+  'player.beacons_unavailable': 'This phone cannot listen for the field\'s beacons. Your GPS position is still shared.',
+  'player.beacons_why_ios': 'This field has Bluetooth beacons indoors. To tell which room you are in, Atalaia can listen for them while you share your position: only the field\'s own beacons, and it sends only which one is strongest. iPhone asks for the location permission for this (Bluetooth is used by the beacons, not asked for). Without it your position stays GPS only.',
+  'player.beacons_on_ios': 'Listening for the field\'s beacons, only while Atalaia is open on the screen: indoors your position is the room. With the phone locked or another app in front, your position goes back to GPS and keeps the last floor.',
   'player.my_room': 'Your position: {room}',
   'player.map_title': 'Field map',
   'player.map_semantics': 'Map of the field, {level}: {n} positions',
@@ -766,8 +729,7 @@ const Map<String, String> enStrings = {
   'player.level_n': 'Level {n}',
   'player.level_title': 'Which floor are you on?',
   'player.level_unknown': 'Not sure',
-  'player.level_hint':
-      'Your team sees you on that floor. Your phone cannot tell floors apart by itself.',
+  'player.level_hint': 'Your team sees you on that floor. Your phone cannot tell floors apart by itself.',
   'player.level_beacon': 'Your floor comes from the room beacon: {level}.',
   'player.feature.safe_zone': 'Safe zone',
   'player.feature.respawn': 'Respawn',
@@ -777,8 +739,7 @@ const Map<String, String> enStrings = {
   'player.feature.objective': 'Objective',
   'player.feature.other': 'Other',
   'player.feature.boundary': 'Field boundary',
-  'player.share_hint_squads':
-      'Only during the game; the controller decides who sees it: your squad if the game allows it, and the organisers and the marshals on their ATAK devices.',
+  'player.share_hint_squads': 'Only during the game; the controller decides who sees it: your squad if the game allows it, and the organisers and the marshals on their ATAK devices.',
   'checkin.team_squad': '{team} › squad {squad}',
   'branding.logo': 'Logo of {name}',
   // Online registration on the field's site server (decision S16-13)
@@ -1095,8 +1056,7 @@ const Map<String, String> enStrings = {
   'ctl_modes.title': 'Mode packages',
   'ctl_modes.tile': 'Mode packages (field controller)',
   'ctl_modes.tile_hint': 'Trusted keys: {keys}, box keys: {box}',
-  'ctl_modes.intro':
-      'The keys this phone\'s field controller trusts for signed mode packages, the keys built into the boxes\' firmware (the controller offers the boxes only packages they take), revoked keys and the registry\'s index: a Pi\'s [modes] settings. They apply when the controller next starts.',
+  'ctl_modes.intro': 'The keys this phone\'s field controller trusts for signed mode packages, the keys built into the boxes\' firmware (the controller offers the boxes only packages they take), revoked keys and the registry\'s index: a Pi\'s [modes] settings. They apply when the controller next starts.',
   'ctl_modes.keys': 'Trusted mode keys (one per line, base64)',
   'ctl_modes.box_keys': 'The boxes\' mode keys (one per line, base64)',
   'ctl_modes.revoked': 'Revoked key ids (one per line, 16 hex digits)',
@@ -1105,12 +1065,9 @@ const Map<String, String> enStrings = {
   'ctl_modes.bad_key': 'Line {line}: not a mode key (base64 of 32 bytes).',
   'ctl_modes.bad_id': 'Line {line}: not a key id (16 hex digits).',
   'ctl_modes.bad_index': 'The index is an https:// address or a file.',
-  'ctl_modes.min_versions':
-      'Version floor per mode (one per line, id=version, for example org.example.mode=1.2.0; optional)',
-  'ctl_modes.max_age':
-      'Days the last revocation list still counts when the index cannot be reached (0 to 3650; 30 by default)',
-  'ctl_modes.bad_floor':
-      'Line {line}: not a floor (id=version, for example org.example.mode=1.2.0).',
+  'ctl_modes.min_versions': 'Version floor per mode (one per line, id=version, for example org.example.mode=1.2.0; optional)',
+  'ctl_modes.max_age': 'Days the last revocation list still counts when the index cannot be reached (0 to 3650; 30 by default)',
+  'ctl_modes.bad_floor': 'Line {line}: not a floor (id=version, for example org.example.mode=1.2.0).',
   'ctl_modes.bad_age': 'The days are a number from 0 to 3650.',
   'ctl_modes.saved': 'Saved: they apply when the controller next starts.',
   // The phone controller's slice S7 settings (PE24-118 onward).
@@ -1119,26 +1076,22 @@ const Map<String, String> enStrings = {
   'ctl_site.on': 'on',
   'ctl_site.off': 'off',
   'ctl_site.title': 'Site server, failover and ATAK',
-  'ctl_site.intro':
-      'This phone\'s field controller as a Pi\'s controller.toml has it: its failover, the field\'s site server (the games, logs and scores go there when the internet is there; rosters, branding and the scenario library come from it) and the ATAK feed. They apply when the controller next starts.',
+  'ctl_site.intro': 'This phone\'s field controller as a Pi\'s controller.toml has it: its failover, the field\'s site server (the games, logs and scores go there when the internet is there; rosters, branding and the scenario library come from it) and the ATAK feed. They apply when the controller next starts.',
   'ctl_site.failover': 'Failover',
   'ctl_site.failover_auto': 'Automatic failover',
   'ctl_site.manual': 'Manual',
   'ctl_site.auto': 'Automatic',
-  'ctl_site.failover_hint':
-      'Manual: the GM promotes a standby controller. Automatic: a standby takes over after three missed beacons (30 s). A phone on battery yields to a Pi on mains when both stand.',
+  'ctl_site.failover_hint': 'Manual: the GM promotes a standby controller. Automatic: a standby takes over after three missed beacons (30 s). A phone on battery yields to a Pi on mains when both stand.',
   'ctl_site.sync': 'Site server',
   'ctl_site.sync_hint': 'Offline first: a game never waits for the network.',
   'ctl_site.url': 'Address (https://…)',
   'ctl_site.key': 'The field\'s API key (from the site server)',
   'ctl_site.key_set': 'API key {fp}… (type a new one to replace it)',
-  'ctl_site.branding':
-      'The field\'s branding, saved teams and check-in settings from the site server',
+  'ctl_site.branding': 'The field\'s branding, saved teams and check-in settings from the site server',
   'ctl_site.library':
       'The field\'s scenarios and game presets from the site server',
   'ctl_site.remote_gm': 'Remote GM',
-  'ctl_site.remote_gm_hint':
-      'The field\'s GMs on the site server may start, pause and end the live game. Off by default.',
+  'ctl_site.remote_gm_hint': 'The field\'s GMs on the site server may start, pause and end the live game. Off by default.',
   'ctl_site.atak': 'ATAK feed (Cursor on Target)',
   'ctl_site.atak_hint':
       'The boxes and zones on ATAK maps, over the field\'s Wi-Fi.',
@@ -1148,15 +1101,13 @@ const Map<String, String> enStrings = {
       'Player positions to the staff devices (never to multicast)',
   'ctl_site.staff_tls':
       'TLS to the staff devices (ATAK\'s SSL input, port 8089)',
-  'ctl_site.staff_tls_hint':
-      'Player positions then cross the network encrypted. The staff devices\' certificate is checked against the CA below, never against the system\'s.',
+  'ctl_site.staff_tls_hint': 'Player positions then cross the network encrypted. The staff devices\' certificate is checked against the CA below, never against the system\'s.',
   'ctl_site.staff_tls_ca':
       'CA certificate the staff devices present (PEM text)',
   'ctl_site.staff_tls_cert':
       'This controller\'s client certificate (PEM text; optional)',
   'ctl_site.staff_tls_key': 'Its private key (PEM text; with the certificate)',
-  'ctl_site.staff_tls_name':
-      'Name in the devices\' certificates (only when the endpoints are addresses; optional)',
+  'ctl_site.staff_tls_name': 'Name in the devices\' certificates (only when the endpoints are addresses; optional)',
   'ctl_site.remote': 'Remote ATAK through the site server',
   'ctl_site.remote_players': 'Player positions through the site server too',
   'ctl_site.bad_sync': 'Site server: {why}',
@@ -1171,8 +1122,7 @@ const Map<String, String> enStrings = {
   'apd.expires': 'Valid until (YYYY-MM-DD)',
   'apd.expires_required': 'Valid until, YYYY-MM-DD (required)',
   'apd.date_format': '2027-01-31',
-  'apd.hint':
-      'The app does not check it. At the entrance a marshal compares what you typed with your physical card, because the field must check it. Once the card is confirmed, the number is erased from the field controller.',
+  'apd.hint': 'The app does not check it. At the entrance a marshal compares what you typed with your physical card, because the field must check it. Once the card is confirmed, the number is erased from the field controller.',
   'apd.need_number': 'This field asks for your APD membership number.',
   'apd.need_expiry': 'This field asks for the date your membership expires.',
   'apd.bad_date': 'Write the date as YYYY-MM-DD, for instance 2027-01-31.',
@@ -1182,26 +1132,22 @@ const Map<String, String> enStrings = {
   'apd.status.expired': 'Membership expired',
   'apd.status.not_accepted': 'APD not accepted here',
   'apd.status.missing': 'Membership missing',
-  'apd.hint_marshal':
-      'A marshal will check your membership card against what you typed, and you are let in when they confirm it.',
+  'apd.hint_marshal': 'A marshal will check your membership card against what you typed, and you are let in when they confirm it.',
   'queue.confirm': 'Let in',
   'queue.confirm_no_card': 'Let in without the card',
   'queue.card_seen': 'Card seen, matches',
   'apd.verdict_on': '{verdict} on {date}',
   'apd.card_by': 'card checked by {who}',
   'checkin.share_position': 'Share my position with the game during this game',
-  'checkin.share_position_hint':
-      'Optional, and off unless you tick it. Your squad or team (as the game mode allows), the marshals and the game master see your position on the map; the remote game master sees it only if the field turns that on. If you do not tick it, nothing else changes. You can stop sharing at any time during the game.',
-  'checkin.card_why':
-      'Why the card is checked: the field has to check your membership card at the entrance against the data you typed here (a legal duty for fields in Portugal, the field legitimate interest elsewhere). Afterwards only the association, the expiry date, the result and who checked it are kept; the number is erased.',
+  'checkin.share_position_hint': 'Optional, and off unless you tick it. Your squad or team (as the game mode allows), the marshals and the game master see your position on the map; the remote game master sees it only if the field turns that on. If you do not tick it, nothing else changes. You can stop sharing at any time during the game.',
+  'checkin.card_why': 'Why the card is checked: the field has to check your membership card at the entrance against the data you typed here (a legal duty for fields in Portugal, the field legitimate interest elsewhere). Afterwards only the association, the expiry date, the result and who checked it are kept; the number is erased.',
   'site.err.membership_missing':
       'This field needs your APD membership number to register.',
   'site.err.apd_not_accepted': 'This field does not accept that APD.',
   'site.err.membership_expired':
       'The membership has expired by the day of this game.',
   // The remote GM may see shared positions (PKD-5)
-  'player.share_remote_gm':
-      'If the field has a remote GM signed in on the site server, the remote GM sees your position too while you share it. The site server does not keep it.',
+  'player.share_remote_gm': 'If the field has a remote GM signed in on the site server, the remote GM sees your position too while you share it. The site server does not keep it.',
   // The account's login methods and the login without a password (PKA-1);
   // the texts are the site server's own (staff_i18n.py) where the same.
   'acct.passkey_cancelled':
@@ -1213,8 +1159,7 @@ const Map<String, String> enStrings = {
   'acct.oidc.denied': 'The login was refused at the provider.',
   'acct.oidc.too_many_attempts':
       'Too many new accounts from this address. Try again later.',
-  'acct.oidc.quota_exceeded':
-      'This field has reached its limit of accounts. Talk to the field\'s staff.',
+  'acct.oidc.quota_exceeded': 'This field has reached its limit of accounts. Talk to the field\'s staff.',
   'acct.oidc.id_token_invalid':
       'The provider\'s answer was not accepted. Try again.',
   'acct.oidc.token_exchange_failed':
@@ -1224,16 +1169,12 @@ const Map<String, String> enStrings = {
   'acct.oidc.try_again': 'Try again.',
   'acct.oidc.other': 'Could not log in with the provider.',
   'acct.title': 'Ways to log in',
-  'acct.intro':
-      'The ways to log in to this account: password, Google, Microsoft or Apple, passkeys and the TOTP code. Every change is recorded in the server\'s audit log.',
+  'acct.intro': 'The ways to log in to this account: password, Google, Microsoft or Apple, passkeys and the TOTP code. Every change is recorded in the server\'s audit log.',
   'acct.confirm_title': 'Confirm it is you',
   'acct.confirm_password': 'Current password',
-  'acct.confirm_password_hint':
-      'The changes below ask for the current password. Type it here before making them.',
-  'acct.confirm_recent':
-      'This account has no password: the changes ask for a confirmation made in the last 10 minutes (logging in counts too). Confirm with one of the ways below, then repeat the action.',
-  'acct.stepup_needed':
-      'This account has a second factor (TOTP or a passkey) or a staff role: changing how it logs in (passkeys, TOTP, password, linked accounts, merging accounts) asks for the TOTP code or the passkey first. A Google, Microsoft or Apple login is not enough.',
+  'acct.confirm_password_hint': 'The changes below ask for the current password. Type it here before making them.',
+  'acct.confirm_recent': 'This account has no password: the changes ask for a confirmation made in the last 10 minutes (logging in counts too). Confirm with one of the ways below, then repeat the action.',
+  'acct.stepup_needed': 'This account has a second factor (TOTP or a passkey) or a staff role: changing how it logs in (passkeys, TOTP, password, linked accounts, merging accounts) asks for the TOTP code or the passkey first. A Google, Microsoft or Apple login is not enough.',
   'acct.confirm_with': 'Confirm with {provider}',
   'acct.confirmed': 'Confirmed. Repeat the action.',
   'acct.reauthed': 'Confirmed with the provider. Repeat the action.',
@@ -1248,8 +1189,7 @@ const Map<String, String> enStrings = {
   'acct.linked': 'Login linked to the account.',
   'acct.unlinked': 'Login unlinked.',
   'acct.passkeys_title': 'Passkeys',
-  'acct.passkeys_intro':
-      'A passkey logs in with no password and no code, and counts as the second factor for the admin, GM and marshal roles.',
+  'acct.passkeys_intro': 'A passkey logs in with no password and no code, and counts as the second factor for the admin, GM and marshal roles.',
   'acct.passkeys_none': 'No passkeys.',
   'acct.passkey_name': 'Name of the new passkey',
   'acct.passkey_add': 'Add a passkey',
@@ -1270,8 +1210,7 @@ const Map<String, String> enStrings = {
   'acct.pw_title': 'Password',
   'acct.pw_state_set': 'This account has a password.',
   'acct.pw_state_none': 'This account has no password.',
-  'acct.pw_off':
-      'Password login is turned off on this server: a password cannot be set or changed.',
+  'acct.pw_off': 'Password login is turned off on this server: a password cannot be set or changed.',
   'acct.pw_new': 'New password',
   'acct.pw_set_button': 'Set a password',
   'acct.pw_change_button': 'Change the password',
@@ -1283,35 +1222,26 @@ const Map<String, String> enStrings = {
   'acct.totp_on': 'TOTP is on for this account.',
   'acct.totp_off': 'TOTP is not on for this account.',
   'acct.totp_enable': 'Turn TOTP on',
-  'acct.totp_enrol_intro':
-      'Add this secret to the authenticator app ({digits} digits, a new code every {s} s) and type the code the app shows below.',
+  'acct.totp_enrol_intro': 'Add this secret to the authenticator app ({digits} digits, a new code every {s} s) and type the code the app shows below.',
   'acct.totp_secret': 'Secret',
   'acct.totp_uri': 'otpauth address (for apps that take one)',
   'acct.totp_confirm': 'Turn on with this code',
   'acct.totp_enabled': 'TOTP turned on.',
-  'acct.totp_disable_intro':
-      'To turn it off: the app\'s current code, plus the password above if the account has one.',
+  'acct.totp_disable_intro': 'To turn it off: the app\'s current code, plus the password above if the account has one.',
   'acct.totp_disable': 'Turn TOTP off',
   'acct.totp_disabled': 'TOTP turned off.',
   'acct.oidc.already_linked': 'This account already has that login linked.',
   'acct.oidc.identity_taken':
       'That login is already linked to another account.',
-  'acct.oidc.provider_already_linked':
-      'This account already has a login from that provider. Unlink the existing one first.',
-  'acct.oidc.identity_mismatch':
-      'That is not the login linked to this account. Use the same provider account.',
+  'acct.oidc.provider_already_linked': 'This account already has a login from that provider. Unlink the existing one first.',
+  'acct.oidc.identity_mismatch': 'That is not the login linked to this account. Use the same provider account.',
   'acct.e.last_login_method':
       'That is the account\'s last way to log in: add another one first.',
-  'acct.e.second_factor_required_by_role':
-      'A role on this account needs a second factor (TOTP or a passkey): keep at least one.',
-  'acct.e.totp_required_by_role':
-      'A role on this account needs a second factor: add a passkey before turning TOTP off.',
-  'acct.e.password_login_disabled':
-      'Password login is turned off on this server, so a password cannot be set or changed.',
-  'acct.e.confirmation_required':
-      'Confirm it is you first (see the confirmation above), then repeat the action.',
-  'acct.e.mfa_required':
-      'This action asks for a second factor (TOTP or a passkey): confirm with the code or the passkey in the confirmation panel above, then repeat it.',
+  'acct.e.second_factor_required_by_role': 'A role on this account needs a second factor (TOTP or a passkey): keep at least one.',
+  'acct.e.totp_required_by_role': 'A role on this account needs a second factor: add a passkey before turning TOTP off.',
+  'acct.e.password_login_disabled': 'Password login is turned off on this server, so a password cannot be set or changed.',
+  'acct.e.confirmation_required': 'Confirm it is you first (see the confirmation above), then repeat the action.',
+  'acct.e.mfa_required': 'This action asks for a second factor (TOTP or a passkey): confirm with the code or the passkey in the confirmation panel above, then repeat it.',
   'acct.e.invalid_password': 'Wrong password.',
   'acct.e.invalid_code': 'Wrong code.',
   'acct.e.no_password': 'This account has no password.',
@@ -1336,8 +1266,7 @@ const Map<String, String> enStrings = {
   'acct.e.provider_not_configured': 'This server does not offer that login.',
   'acct.browser_unavailable': 'Could not open the phone\'s browser.',
   'acct.oidc.cancelled': 'The login was cancelled.',
-  'acct.oidc.browser_unavailable':
-      'Could not open the phone\'s browser, or this server does not take a login through the app.',
+  'acct.oidc.browser_unavailable': 'Could not open the phone\'s browser, or this server does not take a login through the app.',
   'acct.waiting': 'Waiting for {provider} in the browser…',
   'acct.waiting_cancel': 'Cancel',
   'acct.open': 'Ways to log in to the account',
@@ -1368,39 +1297,30 @@ const Map<String, String> enStrings = {
       '{n} keys: a mode they sign may be fetched from the controller.',
   'propmodes.keys_set_one':
       '{n} key: a mode it signs may be fetched from the controller.',
-  'propmodes.keys_hint':
-      "The public halves (base64, 44 characters each) of the mode keys this prop trusts, one per line, at most 4: as the mode keys built into a Field Box's firmware. A game whose mode the app lacks is fetched from its controller only when a key in this list signed it. Never add a key you were not given by the project or your club.",
+  'propmodes.keys_hint': "The public halves (base64, 44 characters each) of the mode keys this prop trusts, one per line, at most 4: as the mode keys built into a Field Box's firmware. A game whose mode the app lacks is fetched from its controller only when a key in this list signed it. Never add a key you were not given by the project or your club.",
   'propmodes.keys_bad':
       'Each key is 44 base64 characters (32 bytes); at most 4.',
   'propmodes.fetching':
       "Getting the game's mode from the controller and checking its signature…",
-  'propmodes.err.no_key':
-      'This phone trusts no mode key, so it takes no mode from the controller. Add the key of the project or your club in Settings.',
-  'propmodes.err.unreachable':
-      "Could not reach the controller with the field's certificate. Join the field's Wi-Fi and try again.",
-  'propmodes.err.not_offered':
-      'The controller does not offer {mode}, or the game has already started. Ask the GM to send it signed, or to start from built-in modes.',
+  'propmodes.err.no_key': 'This phone trusts no mode key, so it takes no mode from the controller. Add the key of the project or your club in Settings.',
+  'propmodes.err.unreachable': "Could not reach the controller with the field's certificate. Join the field's Wi-Fi and try again.",
+  'propmodes.err.not_offered': 'The controller does not offer {mode}, or the game has already started. Ask the GM to send it signed, or to start from built-in modes.',
   'propmodes.err.download':
       'The download of {mode} broke or was not the size announced. Try again.',
-  'propmodes.err.bad_release':
-      'Refused: the signed release of {mode} is not in the accepted form. It was not run.',
-  'propmodes.err.bad_signature':
-      'Refused: {mode} is not signed, or not signed by a key this phone trusts. It was not run.',
+  'propmodes.err.bad_release': 'Refused: the signed release of {mode} is not in the accepted form. It was not run.',
+  'propmodes.err.bad_signature': 'Refused: {mode} is not signed, or not signed by a key this phone trusts. It was not run.',
   'propmodes.err.kind': 'Refused: {mode} is not a kind of package a prop runs.',
   'propmodes.err.tier':
       'Refused: {mode} needs a stronger device than this phone.',
-  'propmodes.err.builtin':
-      'Refused: {mode} has the id of a mode built into the app; those are never replaced.',
+  'propmodes.err.builtin': 'Refused: {mode} has the id of a mode built into the app; those are never replaced.',
   'propmodes.err.too_big':
       'Refused: {mode} is too large for a prop (256 KiB at most).',
   'propmodes.err.bad_hash':
       'Refused: {mode} is not the file that was signed. It was not run.',
-  'propmodes.err.bad_archive':
-      'Refused: the package of {mode} is damaged or not in the accepted form. It was not run.',
+  'propmodes.err.bad_archive': 'Refused: the package of {mode} is damaged or not in the accepted form. It was not run.',
   'propmodes.err.load':
       'Refused: {mode} does not load in the sandbox. It was not run.',
-  'propmodes.err.no_space':
-      'No room for {mode}: the phone keeps at most 8 fetched modes, 512 KiB in all.',
+  'propmodes.err.no_space': 'No room for {mode}: the phone keeps at most 8 fetched modes, 512 KiB in all.',
   'propmodes.err.other': 'The mode could not be fetched ({mode}).',
   // The membership texts of a field outside Portugal (decision MEM-4)
   'apd.section_m': 'Association membership',
@@ -1415,43 +1335,34 @@ const Map<String, String> enStrings = {
   // The registration import on the phone controller's own screen (decision PIM-1);
   // the file and row texts are the console's (checkin_import in its i18n).
   'ctl.import': 'Registration list',
-  'ctl.import_hint':
-      'For a field with no site server: import a list of registrations (CSV or JSON) from another platform as this game\'s expected players. Check it first; nothing changes until you import.',
+  'ctl.import_hint': 'For a field with no site server: import a list of registrations (CSV or JSON) from another platform as this game\'s expected players. Check it first; nothing changes until you import.',
   'ctl.import_open': 'Import a registration list',
   'ctl.import_none': 'Start a game to import a registration list into it.',
   'ctl_import.pick': 'Choose a file',
   'ctl_import.pick_again': 'Choose another file',
   'ctl_import.picked': 'File: {name}',
   'ctl_import.no_file': 'No file chosen yet.',
-  'ctl_import.no_picker':
-      'This phone cannot open a file chooser here. Import the list from the GM console in a browser instead.',
+  'ctl_import.no_picker': 'This phone cannot open a file chooser here. Import the list from the GM console in a browser instead.',
   'ctl_import.offline': 'The controller did not answer. Is it running?',
   'ctl_import.failed': 'The controller refused the list: {detail}',
   'ctl_import.rows_more': '{n} more rows are not shown.',
   'ctl_import.rows_more_one': '{n} more row is not shown.',
   'ctl_import.title': 'Import a registration list',
-  'ctl_import.intro':
-      'For a field with no site server: a list of registrations from another platform (CSV or JSON, the site server\'s import format) becomes this game\'s expected players, and a marshal ticks each one when they arrive. Only display_name, external_ref, team_preference, federation_number and replicas are read; any other column (an email, a phone number) is only named, never read.',
+  'ctl_import.intro': 'For a field with no site server: a list of registrations from another platform (CSV or JSON, the site server\'s import format) becomes this game\'s expected players, and a marshal ticks each one when they arrive. Only display_name, external_ref, team_preference, federation_number and replicas are read; any other column (an email, a phone number) is only named, never read.',
   'ctl_import.source': 'Source',
-  'ctl_import.source_hint':
-      'The other platform\'s name (a-z, 0-9, dot, dash, underscore). The same source and external_ref update the same player.',
-  'ctl_import.basis':
-      'This field is responsible for the list: it has its own legal basis for holding these players\' data.',
+  'ctl_import.source_hint': 'The other platform\'s name (a-z, 0-9, dot, dash, underscore). The same source and external_ref update the same player.',
+  'ctl_import.basis': 'This field is responsible for the list: it has its own legal basis for holding these players\' data.',
   'ctl_import.check': 'Check the file',
   'ctl_import.run': 'Import',
   'ctl_import.order': 'Check first: nothing is changed until Import.',
   'ctl_import.checked': 'Checked, nothing imported yet.',
   'ctl_import.imported': 'Imported.',
-  'ctl_import.counts':
-      '{rows} rows: {created} new, {updated} changed, {unchanged} unchanged, {skipped} skipped, {refused} refused.',
-  'ctl_import.counts_one':
-      '{rows} row: new {created}, changed {updated}, unchanged {unchanged}, skipped {skipped}, refused {refused}.',
+  'ctl_import.counts': '{rows} rows: {created} new, {updated} changed, {unchanged} unchanged, {skipped} skipped, {refused} refused.',
+  'ctl_import.counts_one': '{rows} row: new {created}, changed {updated}, unchanged {unchanged}, skipped {skipped}, refused {refused}.',
   'ctl_import.ignored': 'Columns not read: {names}',
   'ctl_import.more': 'and {n} more',
-  'ctl_import.missing':
-      '{n} imported players that have not arrived are not in this file (they stay).',
-  'ctl_import.missing_one':
-      '{n} imported player who has not arrived is not in this file (they stay).',
+  'ctl_import.missing': '{n} imported players that have not arrived are not in this file (they stay).',
+  'ctl_import.missing_one': '{n} imported player who has not arrived is not in this file (they stay).',
   'ctl_import.row': 'Row',
   'ctl_import.result': 'Result',
   'ctl_import.line': 'line {n}',
@@ -1507,81 +1418,62 @@ const Map<String, String> enStrings = {
   // The site server's privacy notice and showing it again (CONS-*, LEG-*), sign-up, the notice
   // version of a social sign-up, and the chrono link between a hosted hub's
   // fields (SVX-2).
-  'acct.oidc.notice_required':
-      'To make a new account, first tick that you have read the privacy notice (below the provider buttons), then choose the provider again.',
-  'acct.oidc.age_confirmation_required':
-      'You must be 16 or older to make an account. Younger players check in at the field without an account, under the field\'s rules for parents or guardians. If you are 16 or older, tick the age box (below the provider buttons), then choose the provider again.',
-  'site.err.age_confirmation_required':
-      'You must be 16 or older to make an account. Younger players check in at the field without an account, under the field\'s rules for parents or guardians.',
+  'acct.oidc.notice_required': 'To make a new account, first tick that you have read the privacy notice (below the provider buttons), then choose the provider again.',
+  'acct.oidc.age_confirmation_required': 'You must be 16 or older to make an account. Younger players check in at the field without an account, under the field\'s rules for parents or guardians. If you are 16 or older, tick the age box (below the provider buttons), then choose the provider again.',
+  'site.err.age_confirmation_required': 'You must be 16 or older to make an account. Younger players check in at the field without an account, under the field\'s rules for parents or guardians.',
   'site.err.notice_required':
       'Open and read the privacy notice, then tick that you have read it.',
-  'site.err.username_invalid':
-      'The username needs 3 to 64 letters, digits, dots, dashes or underscores, and must start with a letter or digit.',
+  'site.err.username_invalid': 'The username needs 3 to 64 letters, digits, dots, dashes or underscores, and must start with a letter or digit.',
   'site.err.username_reserved': 'That username is reserved: choose another.',
   'site.err.email_invalid': 'That email address is not valid.',
   'site.err.username_or_email_taken':
       'That username or email address is already taken.',
-  'site.err.quota_exceeded':
-      'This field has reached its limit of accounts. Talk to the field\'s staff.',
+  'site.err.quota_exceeded': 'This field has reached its limit of accounts. Talk to the field\'s staff.',
   'site.signup_open': 'Create an account',
   'site.signup_title': 'Create an account at {host}',
-  'site.signup_intro':
-      'An account lets you register for games and see your history. Open the privacy notice and read it first, then confirm below. Younger than 16? You do not need an account: check in at the field.',
+  'site.signup_intro': 'An account lets you register for games and see your history. Open the privacy notice and read it first, then confirm below. Younger than 16? You do not need an account: check in at the field.',
   'site.signup_email': 'Email (optional)',
   'site.signup_create': 'Create account',
-  'site.signup_no_notice':
-      'This server has not published its privacy notice, so no account can be made here yet. Ask the field\'s organisers.',
+  'site.signup_no_notice': 'This server has not published its privacy notice, so no account can be made here yet. Ask the field\'s organisers.',
   'site.new_account_hint':
       'New here? To create an account, read the notice and tick both boxes.',
   'site.login_notice': 'I have read the privacy notice.',
   'site.login_notice_first': 'Open the privacy notice above first.',
-  'site.login_age':
-      'I am 16 or older. Younger players check in at the field without an account, under the field\'s rules for parents or guardians.',
+  'site.login_age': 'I am 16 or older. Younger players check in at the field without an account, under the field\'s rules for parents or guardians.',
   'privacy.title': 'Privacy notice',
   'privacy.read': 'Read the privacy notice',
   'privacy.version': 'Version {version}',
   'privacy.lang_fallback':
       'This notice has no {requested} text: shown in {shown}.',
-  'privacy.none':
-      'The server has not published the privacy notice\'s text yet. Ask the field\'s organisers.',
-  'privacy.intro_outdated':
-      'The privacy notice has changed since the version last shown to this account (version {old}, now {version}). Read the notice and confirm you have seen it. The account keeps working as it is.',
-  'privacy.intro_missing':
-      'There is no record that this account has seen the privacy notice (version {version}). Read the notice and confirm you have seen it.',
+  'privacy.none': 'The server has not published the privacy notice\'s text yet. Ask the field\'s organisers.',
+  'privacy.intro_outdated': 'The privacy notice has changed since the version last shown to this account (version {old}, now {version}). Read the notice and confirm you have seen it. The account keeps working as it is.',
+  'privacy.intro_missing': 'There is no record that this account has seen the privacy notice (version {version}). Read the notice and confirm you have seen it.',
   'privacy.read_and_confirm': 'Read and confirm',
   'privacy.accept': 'I have read the privacy notice.',
   'privacy.confirm': 'Confirm',
   'privacy.tick_first': 'Tick first that you have read the notice.',
   'privacy.done': 'Recorded: the notice was seen.',
-  'privacy.changed':
-      'The notice has changed in the meantime. Read the new version and confirm again.',
-  'site.err.notice_version_changed':
-      'The privacy notice has changed in the meantime. Open it, read the new version and try again.',
-  'acct.oidc.notice_version_changed':
-      'The privacy notice has changed in the meantime. Open it, read the new version and try again.',
-  'site.err.privacy_notice_unpublished':
-      'This server has not published its privacy notice yet, so it is not making new accounts. Existing accounts log in as always. Tell whoever runs the server.',
-  'acct.oidc.privacy_notice_unpublished':
-      'This server has not published its privacy notice yet, so it is not making new accounts. Existing accounts log in as always. Tell whoever runs the server.',
+  'privacy.changed': 'The notice has changed in the meantime. Read the new version and confirm again.',
+  'site.err.notice_version_changed': 'The privacy notice has changed in the meantime. Open it, read the new version and try again.',
+  'acct.oidc.notice_version_changed': 'The privacy notice has changed in the meantime. Open it, read the new version and try again.',
+  'site.err.privacy_notice_unpublished': 'This server has not published its privacy notice yet, so it is not making new accounts. Existing accounts log in as always. Tell whoever runs the server.',
+  'acct.oidc.privacy_notice_unpublished': 'This server has not published its privacy notice yet, so it is not making new accounts. Existing accounts log in as always. Tell whoever runs the server.',
   'hub.title': 'Chrono sharing',
   'hub.open': 'Chrono sharing between fields',
-  'hub.intro':
-      'If you play at several fields of this server, you can link your accounts so that each field sees the chrono checks you passed at another (read only). Every field still needs your consent.',
+  'hub.intro': 'If you play at several fields of this server, you can link your accounts so that each field sees the chrono checks you passed at another (read only). Every field still needs your consent.',
   'hub.not_hosted': 'This server has a single field: there is nothing to link.',
   'hub.linked': 'Account linked since {when}.',
   'hub.unlinked':
       'This account is not linked to your accounts at other fields yet.',
   'hub.sharing_on': 'Sharing: the other fields see your chrono checks.',
-  'hub.sharing_off':
-      'Not sharing yet: your consent at this field is missing, or the field has sharing off.',
+  'hub.sharing_off': 'Not sharing yet: your consent at this field is missing, or the field has sharing off.',
   'hub.consent_hint':
       'Sharing needs your consent at each field and the field\'s own switch.',
   'hub.make_title': 'Make a code',
   'hub.make_text':
       'Make a code and enter it in your account at the other field.',
   'hub.make': 'Make a code',
-  'hub.code_note':
-      'Valid for {minutes} minutes and can be used once. It is not shown again.',
+  'hub.code_note': 'Valid for {minutes} minutes and can be used once. It is not shown again.',
   'hub.copy': 'Copy',
   'hub.enter_title': 'Enter another field\'s code',
   'hub.enter_text':
@@ -1591,8 +1483,7 @@ const Map<String, String> enStrings = {
   'hub.code_needed': 'Enter the code.',
   'hub.linked_ok': 'Accounts linked.',
   'hub.unlink_title': 'Unlink',
-  'hub.unlink_text':
-      'Unlinking takes this field\'s chrono records out of the other fields\' view.',
+  'hub.unlink_text': 'Unlinking takes this field\'s chrono records out of the other fields\' view.',
   'hub.unlink': 'Unlink',
   'hub.unlink_confirm': 'Unlink the accounts?',
   'hub.unlink_body':

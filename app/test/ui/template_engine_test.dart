@@ -479,9 +479,8 @@ void main() {
   });
 
   test('a count of one takes the singular, in the app and in the core', () {
-    final yaml = File(
-      '../modes/domination/assets/screens/captured.yaml',
-    ).readAsStringSync();
+    final yaml = File('../modes/domination/assets/screens/captured.yaml')
+        .readAsStringSync();
     final text = RegExp(r'text: "(\{points\} .*)"').firstMatch(yaml)!.group(1)!;
     const want = {
       ('pt', 1): '1 ponto nesta caixa',

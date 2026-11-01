@@ -72,49 +72,46 @@ void main() {
       expect(routes.failures('campo-norte'), isEmpty);
     });
 
-    test(
-      'a reconnect tries the winner first; if it is gone, races again',
-      () async {
-        final asked = <String>[];
-        final sockets = <FakeSocket>[];
-        var liveUp = true;
-        final routes = FieldRoutes(stagger: const Duration(seconds: 5));
-        final f = FieldFeed(
-          FieldLink(Uri.parse(dead), 'tok', field: pinned([dead, live])),
-          connect: (uri) async {
-            asked.add(uri.host);
-            if (uri.host == '192.168.1.158' || !liveUp) throw refused();
-            final s = FakeSocket();
-            sockets.add(s);
-            return s;
-          },
-          routes: routes,
-        );
-        addTearDown(f.dispose);
-        unawaited(f.start());
-        await settle();
-        expect(f.state, FeedState.open);
-        expect(asked, ['192.168.1.158', '192.168.1.183']);
+    test('a reconnect tries the winner first; if it is gone, races again', () async {
+      final asked = <String>[];
+      final sockets = <FakeSocket>[];
+      var liveUp = true;
+      final routes = FieldRoutes(stagger: const Duration(seconds: 5));
+      final f = FieldFeed(
+        FieldLink(Uri.parse(dead), 'tok', field: pinned([dead, live])),
+        connect: (uri) async {
+          asked.add(uri.host);
+          if (uri.host == '192.168.1.158' || !liveUp) throw refused();
+          final s = FakeSocket();
+          sockets.add(s);
+          return s;
+        },
+        routes: routes,
+      );
+      addTearDown(f.dispose);
+      unawaited(f.start());
+      await settle();
+      expect(f.state, FeedState.open);
+      expect(asked, ['192.168.1.158', '192.168.1.183']);
 
-        // The link drops: the reconnect goes to the winner, and only to it.
-        asked.clear();
-        await sockets.last.drop(1006);
-        await Future<void>.delayed(const Duration(milliseconds: 1100));
-        expect(asked, ['192.168.1.183']);
-        expect(f.state, FeedState.open);
+      // The link drops: the reconnect goes to the winner, and only to it.
+      asked.clear();
+      await sockets.last.drop(1006);
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
+      expect(asked, ['192.168.1.183']);
+      expect(f.state, FeedState.open);
 
-        // Everything is down: the kinds and addresses are kept, the feed retries.
-        liveUp = false;
-        asked.clear();
-        await sockets.last.drop(1006);
-        await Future<void>.delayed(const Duration(milliseconds: 2100));
-        expect(f.state, FeedState.closed);
-        expect(asked.toSet(), {'192.168.1.158', '192.168.1.183'});
-        final fails = routes.failures(f.routeKey);
-        expect(fails.map((x) => x.kind).toSet(), {FailKind.refused});
-        expect(fails.map((x) => x.url).toSet(), {dead, live});
-      },
-    );
+      // Everything is down: the kinds and addresses are kept, the feed retries.
+      liveUp = false;
+      asked.clear();
+      await sockets.last.drop(1006);
+      await Future<void>.delayed(const Duration(milliseconds: 2100));
+      expect(f.state, FeedState.closed);
+      expect(asked.toSet(), {'192.168.1.158', '192.168.1.183'});
+      final fails = routes.failures(f.routeKey);
+      expect(fails.map((x) => x.kind).toSet(), {FailKind.refused});
+      expect(fails.map((x) => x.url).toSet(), {dead, live});
+    });
 
     test('a plain scoreboard link has its own key and one address', () async {
       final routes = FieldRoutes(stagger: _stagger);

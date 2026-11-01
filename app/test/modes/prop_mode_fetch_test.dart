@@ -111,9 +111,8 @@ class FakeController implements ModeHttp {
     int? length,
   }) async {
     requests.add(url.path);
-    final m = RegExp(
-      r'^/api/v1/mode-packages/([^/]+)/(release|package)$',
-    ).firstMatch(url.path)!;
+    final m = RegExp(r'^/api/v1/mode-packages/([^/]+)/(release|package)$')
+        .firstMatch(url.path)!;
     final body = (m.group(2) == 'release' ? releases : archives)[m.group(1)];
     if (body == null) return ModeHttpReply(404, Uint8List(0));
     if (length != null && body.length != length) {

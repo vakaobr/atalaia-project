@@ -24,47 +24,41 @@ void main() {
       (loadVectors('mode_package.json')['signing_key'] as Map)['public_key_b64']
           as String;
 
-  testWidgets(
-    'the tile on Android, a bad key refused, the settings saved',
-    (tester) async {
-      await phone(tester);
-      final h = harness();
-      await tester.pumpWidget(h.app(home: const SettingsScreen()));
-      await tester.pumpAndSettle();
-      await tapKey(tester, 'controller-modes');
-      expect(find.byType(ControllerModesScreen), findsOneWidget);
-      await tester.enterText(find.byKey(const Key('mode-keys')), 'not a key');
-      await tapKey(tester, 'modes-save');
-      expect(
-        find.text(
-          Strings(AppLanguage.pt).t('ctl_modes.bad_key', {'line': '1'}),
-        ),
-        findsOneWidget,
-      );
-      expect(h.settings.controllerModes, isEmpty);
-      // The message goes, so that it covers nothing.
-      await tester.pump(const Duration(seconds: 10));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const Key('mode-keys')), ' $key \n\n');
-      await tester.enterText(find.byKey(const Key('box-keys')), key);
-      await tester.enterText(
-        find.byKey(const Key('revoked-keys')),
-        '0123456789ABCDEF',
-      );
-      await tapKey(tester, 'modes-save');
-      final saved = ModesConfig.fromJson(h.settings.controllerModes);
-      expect(saved.keys, [key]);
-      expect(saved.boxKeys, [key]);
-      expect(saved.revoked, ['0123456789abcdef']);
-      expect(
-        ModesConfig.fromJson(
-          (await h.store.loadSettings()).controllerModes,
-        ).keys,
-        [key],
-      );
-    },
-    variant: onAndroid,
-  );
+  testWidgets('the tile on Android, a bad key refused, the settings saved', (
+    tester,
+  ) async {
+    await phone(tester);
+    final h = harness();
+    await tester.pumpWidget(h.app(home: const SettingsScreen()));
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'controller-modes');
+    expect(find.byType(ControllerModesScreen), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('mode-keys')), 'not a key');
+    await tapKey(tester, 'modes-save');
+    expect(
+      find.text(Strings(AppLanguage.pt).t('ctl_modes.bad_key', {'line': '1'})),
+      findsOneWidget,
+    );
+    expect(h.settings.controllerModes, isEmpty);
+    // The message goes, so that it covers nothing.
+    await tester.pump(const Duration(seconds: 10));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('mode-keys')), ' $key \n\n');
+    await tester.enterText(find.byKey(const Key('box-keys')), key);
+    await tester.enterText(
+      find.byKey(const Key('revoked-keys')),
+      '0123456789ABCDEF',
+    );
+    await tapKey(tester, 'modes-save');
+    final saved = ModesConfig.fromJson(h.settings.controllerModes);
+    expect(saved.keys, [key]);
+    expect(saved.boxKeys, [key]);
+    expect(saved.revoked, ['0123456789abcdef']);
+    expect(
+      ModesConfig.fromJson((await h.store.loadSettings()).controllerModes).keys,
+      [key],
+    );
+  }, variant: onAndroid);
 
   testWidgets('the controller starts with them', (tester) async {
     await phone(tester);

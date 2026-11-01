@@ -34,12 +34,12 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/core_libs.dart';
 import '../support/recording_radio.dart';
 
-final _vectors =
-    jsonDecode(File('../protocol/vectors/atak_xml.json').readAsStringSync())
-        as Map<String, Object?>;
-final _cot =
-    jsonDecode(File('../protocol/vectors/cot.json').readAsStringSync())
-        as Map<String, Object?>;
+final _vectors = jsonDecode(
+  File('../protocol/vectors/atak_xml.json').readAsStringSync(),
+) as Map<String, Object?>;
+final _cot = jsonDecode(
+  File('../protocol/vectors/cot.json').readAsStringSync(),
+) as Map<String, Object?>;
 
 List<Map<String, Object?>> _list(Object? v) => [
   for (final e in v! as List) (e as Map).cast<String, Object?>(),
@@ -867,9 +867,8 @@ void main() {
       checkin = ControllerCheckin(
         engine,
         CheckinConfig(
-          limitsYaml: File(
-            'lib/chrono/limit_templates/portugal.yaml',
-          ).readAsStringSync(),
+          limitsYaml: File('lib/chrono/limit_templates/portugal.yaml')
+              .readAsStringSync(),
         ),
       );
       positions = ControllerPositions(engine);

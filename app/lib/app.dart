@@ -46,8 +46,10 @@ typedef ConsoleViewBuilder = Widget Function(BuildContext context, Uri url);
 
 /// Where a field's branding comes from: its addresses, over its pinned CA
 /// when there is one (a check-in or a join payload), else plain HTTP(S).
-typedef BrandingSourceFor =
-    BrandingSource Function(List<String> urls, PinnedField? field);
+typedef BrandingSourceFor = BrandingSource Function(
+  List<String> urls,
+  PinnedField? field,
+);
 
 BrandingSource ioBrandingSource(List<String> urls, PinnedField? field) =>
     IoBrandingSource(

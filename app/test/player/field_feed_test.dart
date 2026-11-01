@@ -79,9 +79,9 @@ void main() {
         'http://field.local:8080',
       );
       expect(
-        FieldLink.parse(
-          'https://campo.pt/scoreboard.html#token=t',
-        )!.stream.scheme,
+        FieldLink.parse('https://campo.pt/scoreboard.html#token=t')!
+            .stream
+            .scheme,
         'wss',
       );
     });
@@ -109,9 +109,8 @@ void main() {
       );
       // Plain HTTP and links without ca work as before.
       expect(
-        FieldLink.parse(
-          'http://10.0.0.1:8080/scoreboard#token=a&ca=$ca',
-        )!.caSha256,
+        FieldLink.parse('http://10.0.0.1:8080/scoreboard#token=a&ca=$ca')!
+            .caSha256,
         isNull,
       );
       expect(FieldLink.parse('https://h/scoreboard#token=a')!.caSha256, isNull);

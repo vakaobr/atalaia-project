@@ -322,9 +322,8 @@ void main() {
     }) {
       File('${dir.path}/index.json').writeAsStringSync(jsonEncode(v['index']));
       Directory('${dir.path}/packages').createSync();
-      File(
-        '${dir.path}/packages/org.example.relay-1.2.0-rc.1.tar',
-      ).writeAsBytesSync(archive);
+      File('${dir.path}/packages/org.example.relay-1.2.0-rc.1.tar')
+          .writeAsBytesSync(archive);
       // The list is fetched before every install (FLD-7): a missing one
       // refuses it, so a registry with nothing revoked still has the file.
       File(
@@ -396,9 +395,8 @@ void main() {
       addTearDown(() => dir.deleteSync(recursive: true));
       final (signed, _) = setUp(dir);
       await signed.status(); // the index and its empty list are cached now
-      File(
-        '${dir.path}/revoked.json',
-      ).writeAsStringSync(jsonEncode(v['revoked']));
+      File('${dir.path}/revoked.json')
+          .writeAsStringSync(jsonEncode(v['revoked']));
       await expectLater(
         signed.upload(archive, release),
         throwsA(refusal('revoked')),
@@ -614,13 +612,11 @@ void main() {
       wallSeconds: () => wall,
     );
     final branding = ControllerBranding(engine);
-    final png = File(
-      '../controller/tests/fixtures/branding/crest-red.png',
-    ).existsSync();
+    final png = File('../controller/tests/fixtures/branding/crest-red.png')
+        .existsSync();
     if (!png) return; // the Pi's fixtures are not in this checkout
-    final data = File(
-      '../controller/tests/fixtures/branding/crest-red.png',
-    ).readAsBytesSync();
+    final data = File('../controller/tests/fixtures/branding/crest-red.png')
+        .readAsBytesSync();
     final (ref, created) = branding.addCrest(data, 'image/png');
     expect(created, isTrue);
     expect(branding.purge(force: true), 0);

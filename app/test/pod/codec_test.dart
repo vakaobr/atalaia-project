@@ -24,9 +24,8 @@ Object? _plain(Object? v) => switch (v) {
 Map<String, Object?> _vectors() =>
     _plain(
           loadYaml(
-            File(
-              '../protocol/vectors/capability_proxy.yaml',
-            ).readAsStringSync(),
+            File('../protocol/vectors/capability_proxy.yaml')
+                .readAsStringSync(),
           ),
         )!
         as Map<String, Object?>;

@@ -64,8 +64,7 @@ const Map<String, String> zhTwStrings = {
   'settings.kiosk': 'Kiosk 模式',
   'settings.kiosk_hint': '遊戲進行中，手機會固定在 App 上。如果有人跳出，App 會發出警告。',
   'settings.vibrate': '遊戲事件時震動',
-  'settings.vibrate_hint':
-      '主辦訊息、己方據點被佔領或失守、遊戲開始與結束、漸進佔領的下一個據點啟用、以及新命令（目標或小隊長的命令）時短暫震動，沒有聲音。依手機本身的靜音設定。',
+  'settings.vibrate_hint': '主辦訊息、己方據點被佔領或失守、遊戲開始與結束、漸進佔領的下一個據點啟用、以及新命令（目標或小隊長的命令）時短暫震動，沒有聲音。依手機本身的靜音設定。',
   'settings.about': '關於',
   'settings.version': 'Atalaia {version}',
   'settings.core': '遊戲核心 {version}',
@@ -574,8 +573,7 @@ const Map<String, String> zhTwStrings = {
   'label.share': '分享或列印標籤',
   'label.share_all': '分享或列印所有標籤',
   'label.share_title': '槍的標籤',
-  'label.hint':
-      '把這張標籤貼在槍上。裁判會掃描它，在測速清單中找到這把槍。標籤只有這組代碼，沒有任何關於你的資料。列印出來是 30 × 30 mm；一張 A4 放得下多張標籤。',
+  'label.hint': '把這張標籤貼在槍上。裁判會掃描它，在測速清單中找到這把槍。標籤只有這組代碼，沒有任何關於你的資料。列印出來是 30 × 30 mm；一張 A4 放得下多張標籤。',
   'label.share_unavailable': '這支手機無法把檔案傳給分享選單。請改用「顯示標籤」。',
   'label.share_failed': '分享選單沒有開啟。',
   'label.none_yet': '你為某場遊戲申報這把槍之後，標籤就會顯示在這裡。',
@@ -621,8 +619,7 @@ const Map<String, String> zhTwStrings = {
   'prop.gm_message': '主辦：{text}',
   // 場地內部的藍牙信標（決定 BLE-1 到 BLE-9）
   'player.beacons_why_title': '場地內部的位置',
-  'player.beacons_why':
-      '這個場地的內部裝了藍牙信標。為了知道你在哪個空間，Atalaia 可以在你分享位置時掃描它們：只掃描場地自己的信標，只送出哪一個最近。Android 會為此詢問藍牙和定位權限。沒有這些權限，你的位置就只有 GPS。',
+  'player.beacons_why': '這個場地的內部裝了藍牙信標。為了知道你在哪個空間，Atalaia 可以在你分享位置時掃描它們：只掃描場地自己的信標，只送出哪一個最近。Android 會為此詢問藍牙和定位權限。沒有這些權限，你的位置就只有 GPS。',
   'player.beacons_allow': '繼續',
   'player.beacons_skip': '現在不要',
   'player.beacons_on': '正在掃描場地的信標：在場地內部時，你的位置就是那個空間。',
@@ -630,10 +627,8 @@ const Map<String, String> zhTwStrings = {
   'player.beacons_denied': '場地內部的位置已關閉：沒有藍牙權限。仍會分享你的 GPS 位置。',
   'player.beacons_off': '場地內部的位置已關閉：藍牙沒有開啟。請開啟後再重新分享。',
   'player.beacons_unavailable': '這支手機無法掃描場地的信標。仍會分享你的 GPS 位置。',
-  'player.beacons_why_ios':
-      '這個場地的內部裝了藍牙信標。為了知道你在哪個空間，Atalaia 可以在你分享位置時掃描它們：只掃描場地自己的信標，只送出哪一個最近。iPhone 會為此詢問定位權限（藍牙由信標使用，不會詢問）。沒有這個權限，你的位置就只有 GPS。',
-  'player.beacons_on_ios':
-      '正在掃描場地的信標，僅限 Atalaia 在螢幕上開啟時：在場地內部時，你的位置就是那個空間。手機鎖定或其他 App 在前景時，你的位置會回到 GPS，並保留最後的級別。',
+  'player.beacons_why_ios': '這個場地的內部裝了藍牙信標。為了知道你在哪個空間，Atalaia 可以在你分享位置時掃描它們：只掃描場地自己的信標，只送出哪一個最近。iPhone 會為此詢問定位權限（藍牙由信標使用，不會詢問）。沒有這個權限，你的位置就只有 GPS。',
+  'player.beacons_on_ios': '正在掃描場地的信標，僅限 Atalaia 在螢幕上開啟時：在場地內部時，你的位置就是那個空間。手機鎖定或其他 App 在前景時，你的位置會回到 GPS，並保留最後的級別。',
   'player.my_room': '你的位置：{room}',
   'player.map_title': '場地地圖',
   'player.map_semantics': '場地地圖，{level}：{n} 個位置',
@@ -905,8 +900,7 @@ const Map<String, String> zhTwStrings = {
   'ctl_modes.title': '模式包',
   'ctl_modes.tile': '模式包（場地控制器）',
   'ctl_modes.tile_hint': '{keys} 把信任金鑰，{box} 把盒子金鑰',
-  'ctl_modes.intro':
-      '這支手機的場地控制器信任的模式包簽署金鑰、盒子韌體內建的金鑰（控制器只提供盒子會接受的模式包）、已撤回的金鑰，和登錄目錄的網址：等同 Pi 的 [modes] 設定。控制器下次啟動時生效。',
+  'ctl_modes.intro': '這支手機的場地控制器信任的模式包簽署金鑰、盒子韌體內建的金鑰（控制器只提供盒子會接受的模式包）、已撤回的金鑰，和登錄目錄的網址：等同 Pi 的 [modes] 設定。控制器下次啟動時生效。',
   'ctl_modes.keys': '信任的模式金鑰（每行一把，base64）',
   'ctl_modes.box_keys': '盒子的模式金鑰（每行一把，base64）',
   'ctl_modes.revoked': '已撤回的金鑰 ID（每行一個，16 位十六進位數字）',
@@ -925,8 +919,7 @@ const Map<String, String> zhTwStrings = {
   'ctl_site.on': '開',
   'ctl_site.off': '關',
   'ctl_site.title': '場地伺服器、故障轉移與 ATAK',
-  'ctl_site.intro':
-      '這支手機的場地控制器設定，等同 Pi 的 controller.toml：故障轉移、場地的網站伺服器（有網路時，遊戲、紀錄和分數會上傳；報名名單、場地品牌和劇本庫從那裡下載），以及 ATAK 資訊。控制器下次啟動時生效。',
+  'ctl_site.intro': '這支手機的場地控制器設定，等同 Pi 的 controller.toml：故障轉移、場地的網站伺服器（有網路時，遊戲、紀錄和分數會上傳；報名名單、場地品牌和劇本庫從那裡下載），以及 ATAK 資訊。控制器下次啟動時生效。',
   'ctl_site.failover': '故障轉移',
   'ctl_site.failover_auto': '自動故障轉移',
   'ctl_site.manual': '手動',
@@ -984,10 +977,8 @@ const Map<String, String> zhTwStrings = {
   'apd.verdict_on': '{date}：{verdict}',
   'apd.card_by': '會員卡由 {who} 查驗',
   'checkin.share_position': '在這場遊戲期間與遊戲分享我的位置',
-  'checkin.share_position_hint':
-      '可自由選擇，不勾選就不分享。你的小隊或隊伍（依遊戲模式允許）、裁判和主辦方會在地圖上看到你的位置；遠端 GM 只有在場地開啟時才看得到。不勾選也不會改變其他任何事。遊戲期間你隨時可以停止分享。',
-  'checkin.card_why':
-      '為何要查驗會員卡：場地必須在入場時，把你的會員卡與你在此填寫的資料對照（在葡萄牙這是場地的法律規定，其他地區則是場地的正當需求）。之後只保留協會、到期時間、結果與查驗人；編號會被刪除。',
+  'checkin.share_position_hint': '可自由選擇，不勾選就不分享。你的小隊或隊伍（依遊戲模式允許）、裁判和主辦方會在地圖上看到你的位置；遠端 GM 只有在場地開啟時才看得到。不勾選也不會改變其他任何事。遊戲期間你隨時可以停止分享。',
+  'checkin.card_why': '為何要查驗會員卡：場地必須在入場時，把你的會員卡與你在此填寫的資料對照（在葡萄牙這是場地的法律規定，其他地區則是場地的正當需求）。之後只保留協會、到期時間、結果與查驗人；編號會被刪除。',
   'site.err.membership_missing': '報名需要填寫這個場地要求的 APD 會員編號。',
   'site.err.apd_not_accepted': '這個場地不接受該 APD。',
   'site.err.membership_expired': '會員在這場遊戲當天已過期。',
@@ -1009,15 +1000,13 @@ const Map<String, String> zhTwStrings = {
   'acct.oidc.try_again': '請再試一次。',
   'acct.oidc.other': '無法透過提供者登入。',
   'acct.title': '登入方式',
-  'acct.intro':
-      '這個帳號的登入方式：密碼、Google、Microsoft 或 Apple、密碼金鑰和 TOTP 驗證碼。每次變更都會記錄在伺服器的稽核紀錄中。',
+  'acct.intro': '這個帳號的登入方式：密碼、Google、Microsoft 或 Apple、密碼金鑰和 TOTP 驗證碼。每次變更都會記錄在伺服器的稽核紀錄中。',
   'acct.confirm_title': '確認是你本人',
   'acct.confirm_password': '目前的密碼',
   'acct.confirm_password_hint': '下面的變更需要目前的密碼。請先在這裡輸入。',
   'acct.confirm_recent':
       '這個帳號沒有密碼：變更需要最近 10 分鐘內完成的確認（登入也算）。請用下面其中一種方式確認，再重做一次。',
-  'acct.stepup_needed':
-      '這個帳號有第二重驗證（TOTP 或密碼金鑰）或工作人員角色：要更改登入方式（密碼金鑰、TOTP、密碼、已連結的帳號）或把兩個帳號合在一起，必須先輸入 TOTP 驗證碼或使用密碼金鑰。只用 Google、Microsoft 或 Apple 登入是不夠的。',
+  'acct.stepup_needed': '這個帳號有第二重驗證（TOTP 或密碼金鑰）或工作人員角色：要更改登入方式（密碼金鑰、TOTP、密碼、已連結的帳號）或把兩個帳號合在一起，必須先輸入 TOTP 驗證碼或使用密碼金鑰。只用 Google、Microsoft 或 Apple 登入是不夠的。',
   'acct.confirm_with': '用 {provider} 確認',
   'acct.confirmed': '已確認。請重做一次。',
   'acct.reauthed': '已透過提供者確認。請重做一次。',
@@ -1083,8 +1072,7 @@ const Map<String, String> zhTwStrings = {
   'acct.e.totp_required_by_role': '這個帳號的角色需要第二重驗證：停用 TOTP 前請先新增密碼金鑰。',
   'acct.e.password_login_disabled': '這台伺服器已關閉密碼登入，無法設定或變更密碼。',
   'acct.e.confirmation_required': '請先確認是你本人（見上方的確認），再重做一次。',
-  'acct.e.mfa_required':
-      '這個動作需要第二重驗證（TOTP 或密碼金鑰）：請在上方的確認區用驗證碼或密碼金鑰確認，再重做一次。沒有密碼也沒有第二重驗證的工作人員帳號，需要由伺服器管理員處理。',
+  'acct.e.mfa_required': '這個動作需要第二重驗證（TOTP 或密碼金鑰）：請在上方的確認區用驗證碼或密碼金鑰確認，再重做一次。沒有密碼也沒有第二重驗證的工作人員帳號，需要由伺服器管理員處理。',
   'acct.e.invalid_password': '密碼錯誤。',
   'acct.e.invalid_code': '驗證碼錯誤。',
   'acct.e.no_password': '這個帳號沒有密碼。',
@@ -1134,8 +1122,7 @@ const Map<String, String> zhTwStrings = {
   'propmodes.keys': '下載模式的模式金鑰',
   'propmodes.keys_none': '沒有：這個道具只執行內建在 App 裡的模式。',
   'propmodes.keys_set': '{n} 把金鑰：可以從控制器下載它們簽署的模式。',
-  'propmodes.keys_hint':
-      '這個道具信任的模式金鑰的公開部分（base64，每把 44 個字元），每行一把，最多 4 把，就像內建在場地盒韌體裡的模式金鑰。App 沒有的遊戲模式，只有在這份清單裡的金鑰簽署過時，才會從控制器下載。請不要加入不是專案或你的社團給你的金鑰。',
+  'propmodes.keys_hint': '這個道具信任的模式金鑰的公開部分（base64，每把 44 個字元），每行一把，最多 4 把，就像內建在場地盒韌體裡的模式金鑰。App 沒有的遊戲模式，只有在這份清單裡的金鑰簽署過時，才會從控制器下載。請不要加入不是專案或你的社團給你的金鑰。',
   'propmodes.keys_bad': '每把金鑰是 44 個 base64 字元（32 位元組）；最多 4 把。',
   'propmodes.fetching': '正在從控制器取得這場遊戲的模式並檢查簽章…',
   'propmodes.err.no_key': '這支手機不信任任何模式金鑰，所以不接受控制器的模式。請在設定裡加入專案或你的社團的金鑰。',
@@ -1179,8 +1166,7 @@ const Map<String, String> zhTwStrings = {
   'ctl_import.failed': '控制器拒絕了名單：{detail}',
   'ctl_import.rows_more': '還有 {n} 列未顯示。',
   'ctl_import.title': '匯入報名名單',
-  'ctl_import.intro':
-      '適用於沒有場地伺服器的場地：其他平台的報名名單（CSV 或 JSON，採場地伺服器的匯入格式）會成為這場遊戲的預期玩家，裁判在玩家抵達時逐一勾選。只讀取 display_name、external_ref、team_preference、federation_number 與 replicas；其他欄位（電子郵件、電話）只列出名稱，不會讀取。',
+  'ctl_import.intro': '適用於沒有場地伺服器的場地：其他平台的報名名單（CSV 或 JSON，採場地伺服器的匯入格式）會成為這場遊戲的預期玩家，裁判在玩家抵達時逐一勾選。只讀取 display_name、external_ref、team_preference、federation_number 與 replicas；其他欄位（電子郵件、電話）只列出名稱，不會讀取。',
   'ctl_import.source': '來源',
   'ctl_import.source_hint':
       '其他平台的名稱（a-z、0-9、點、連字號、底線）。相同的來源與 external_ref 會更新同一位玩家。',
@@ -1190,8 +1176,7 @@ const Map<String, String> zhTwStrings = {
   'ctl_import.order': '請先檢查：按下「匯入」之前不會有任何變動。',
   'ctl_import.checked': '已檢查，尚未匯入。',
   'ctl_import.imported': '已匯入。',
-  'ctl_import.counts':
-      '{rows} 列：新增 {created}、變更 {updated}、未變 {unchanged}、略過 {skipped}、拒絕 {refused}。',
+  'ctl_import.counts': '{rows} 列：新增 {created}、變更 {updated}、未變 {unchanged}、略過 {skipped}、拒絕 {refused}。',
   'ctl_import.ignored': '未讀取的欄位：{names}',
   'ctl_import.more': '另有 {n} 個',
   'ctl_import.missing': '有 {n} 位先前匯入、尚未抵達的玩家不在此檔案中（保留不動）。',
@@ -1239,8 +1224,7 @@ const Map<String, String> zhTwStrings = {
   'player.saved': '已記住的場地',
   'player.saved_forget': '忘記此場地',
   'acct.oidc.notice_required': '要建立新帳號，請先勾選已閱讀隱私權聲明（提供者按鈕下面的框），然後再選一次提供者。',
-  'acct.oidc.age_confirmation_required':
-      '建立帳號需年滿 16 歲。未滿 16 歲的玩家不需要帳號，可在場地報到，並依場地對家長或監護人的規定辦理。如果你已年滿 16 歲，請勾選提供者按鈕下面的年齡框，然後再選一次提供者。',
+  'acct.oidc.age_confirmation_required': '建立帳號需年滿 16 歲。未滿 16 歲的玩家不需要帳號，可在場地報到，並依場地對家長或監護人的規定辦理。如果你已年滿 16 歲，請勾選提供者按鈕下面的年齡框，然後再選一次提供者。',
   'site.err.age_confirmation_required':
       '建立帳號需年滿 16 歲。未滿 16 歲的玩家不需要帳號，可在場地報到，並依場地對家長或監護人的規定辦理。',
   'site.err.notice_required': '請先打開並閱讀隱私權聲明，再勾選已閱讀。',
@@ -1265,8 +1249,7 @@ const Map<String, String> zhTwStrings = {
   'privacy.version': '版本 {version}',
   'privacy.lang_fallback': '這份聲明沒有 {requested} 版本，改以 {shown} 顯示。',
   'privacy.none': '伺服器還沒有公布隱私權聲明的內容：請詢問場地的主辦單位。',
-  'privacy.intro_outdated':
-      '自從上次向這個帳號顯示的版本之後，隱私權聲明已經更新（版本 {old}，現在是 {version}）。請閱讀聲明並確認你已看過。帳號不會有任何改變。',
+  'privacy.intro_outdated': '自從上次向這個帳號顯示的版本之後，隱私權聲明已經更新（版本 {old}，現在是 {version}）。請閱讀聲明並確認你已看過。帳號不會有任何改變。',
   'privacy.intro_missing': '沒有紀錄顯示這個帳號看過隱私權聲明（版本 {version}）。請閱讀聲明並確認你已看過。',
   'privacy.read_and_confirm': '閱讀並確認',
   'privacy.accept': '我已閱讀隱私權聲明。',

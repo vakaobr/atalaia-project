@@ -167,14 +167,14 @@ void main() {
     });
 
     test("the field-map origins are the Pi's api.py's (MF-64)", () {
-      final src = File(
-        '../controller/atalaia_controller/api.py',
-      ).readAsStringSync();
+      final src = File('../controller/atalaia_controller/api.py')
+          .readAsStringSync();
       final start = src.indexOf('FIELD_MAP_ORTHOPHOTOS = (');
       final end = src.indexOf('_ORTHOPHOTOS = " ".join');
-      final origins = RegExp(
-        r'"(https://[^"]+)"',
-      ).allMatches(src.substring(start, end)).map((m) => m[1]!).toList();
+      final origins = RegExp(r'"(https://[^"]+)"')
+          .allMatches(src.substring(start, end))
+          .map((m) => m[1]!)
+          .toList();
       expect(origins.length, greaterThan(20));
       final csp = policy(fieldMapSecurityHeaders['Content-Security-Policy']!);
       final imgs = csp['img-src']!

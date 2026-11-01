@@ -257,10 +257,8 @@ class FakeSite {
   /// operator has not published one).
   var noticeVersion = '2026-11';
   Map<String, String> noticeTexts = {
-    'pt':
-        '# Aviso de privacidade\n\nTratamos o teu **nome**.\n\n- guardamos o registo\n- apagamos a pedido',
-    'en':
-        '# Privacy notice\n\nWe keep your **name**.\n\n- we keep the registration\n- we erase on request',
+    'pt': '# Aviso de privacidade\n\nTratamos o teu **nome**.\n\n- guardamos o registo\n- apagamos a pedido',
+    'en': '# Privacy notice\n\nWe keep your **name**.\n\n- we keep the registration\n- we erase on request',
     'de': '# Datenschutzhinweis\n\nWir speichern deinen Namen.',
   };
 
@@ -395,9 +393,9 @@ class FakeSite {
 
     const ok = SiteResponse(204, null);
     final id = RegExp(r'^/me/passkeys/([^/]+)$').firstMatch(path)?.group(1);
-    final provider = RegExp(
-      r'^/me/identities/([a-z]+)$',
-    ).firstMatch(path)?.group(1);
+    final provider = RegExp(r'^/me/identities/([a-z]+)$')
+        .firstMatch(path)
+        ?.group(1);
     switch ('$method $path') {
       case 'GET /me/login-methods':
         return SiteResponse(200, {
@@ -754,9 +752,8 @@ class FakeSite {
       regs[id] = r;
       return SiteResponse(201, _withTicket(r));
     }
-    final mine = RegExp(
-      r'^/me/registrations/([0-9a-f-]+)(/ticket)?$',
-    ).firstMatch(path);
+    final mine = RegExp(r'^/me/registrations/([0-9a-f-]+)(/ticket)?$')
+        .firstMatch(path);
     if (mine != null) {
       final r = regs[mine.group(1)];
       if (r == null) return err(404, 'registration_not_found');

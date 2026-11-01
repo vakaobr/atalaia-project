@@ -33,9 +33,8 @@ void main() {
   late ControllerEngine engine;
   late ControllerCheckin svc;
   late ControllerApi api;
-  final limits = File(
-    'lib/chrono/limit_templates/portugal.yaml',
-  ).readAsStringSync();
+  final limits = File('lib/chrono/limit_templates/portugal.yaml')
+      .readAsStringSync();
 
   setUp(() {
     wall = t0;
