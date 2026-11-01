@@ -12,7 +12,9 @@ pinned Flutter; it was first built on a Mac on 2026-10-26 (Xcode 27.1, macOS
 27.0, Apple silicon: `flutter build ios --release --no-codesign`) and the same
 day installed and opened on an iPhone 15 Pro Max (iOS 27.2 beta, Xcode 27.2,
 free Personal Team), where checks 1 to 4 below passed; CI's `ios-build` job
-compiles it on a Mac runner. If a step differs on your machine, the
+compiles it on a Mac runner. On 2026-11-01 a second Mac (Xcode 27.2, iOS
+27.2 SDK) built it for the simulator and for a device with no warnings from
+the app's own Swift files. If a step differs on your machine, the
 troubleshooting list at the end is where to look first, and please write down
 what you found.
 

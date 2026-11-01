@@ -108,7 +108,7 @@ final class BrowserPlugin: NSObject {
   }
 }
 
-extension BrowserPlugin: @preconcurrency ASWebAuthenticationPresentationContextProviding {
+extension BrowserPlugin: ASWebAuthenticationPresentationContextProviding {
   func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
     BrowserPlugin.anchorWindow()
   }
