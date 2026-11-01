@@ -75,8 +75,8 @@ protocol additions). A core bug found by Kill Confirmed was fixed: a penalty
 
 Pure Dart in `app/` (a Flutter project with no UI or platform folders yet),
 run with `python tools/docker_app.py` and CI's "Player app logic (Dart)" job
-(since plan phase C: `flutter-test`) in `ghcr.io/cirruslabs/flutter:3.44.0`
-(pinned by digest).
+(since plan phase C: `flutter-test`) in `atalaia-flutter:3.44.9`
+(cirruslabs' 3.44.0 image pinned by digest, SDK swapped for 3.44.9, pinned by SHA-256).
 
 | Deliverable | Where | State |
 | --- | --- | --- |

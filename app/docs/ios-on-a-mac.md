@@ -24,7 +24,7 @@ what you found.
   cable (Lightning or USB-C). iOS 15 or later (an iPhone 6s or later); for NFC, an iPhone 7 or later.
 - An Apple ID. A **free** one is enough for these first tests (see
   [Free account or paid](#free-account-or-paid)).
-- Xcode, CocoaPods and Flutter 3.44.0, installed below.
+- Xcode, CocoaPods and Flutter 3.44.9, installed below.
 
 ## 1. Xcode and the command line tools
 
@@ -54,24 +54,24 @@ repository has no `Podfile` and `pod install` is normally not needed. Flutter
 and `flutter doctor` still want CocoaPods installed, and if a later plugin
 brings a Podfile you will need it (step 6).
 
-## 3. Flutter 3.44.0 (the version the project pins)
+## 3. Flutter 3.44.9 (the version the project pins)
 
 With [fvm](https://fvm.app) (several Flutter versions side by side):
 
 ```sh
 brew tap leoafarias/fvm && brew install fvm
-fvm install 3.44.0
+fvm install 3.44.9
 ```
 
 or the exact tag, by hand:
 
 ```sh
-git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git ~/flutter-3.44.0
-export PATH="$HOME/flutter-3.44.0/bin:$PATH"      # also in ~/.zshrc
+git clone --depth 1 --branch 3.44.9 https://github.com/flutter/flutter.git ~/flutter-3.44.9
+export PATH="$HOME/flutter-3.44.9/bin:$PATH"      # also in ~/.zshrc
 ```
 
-Then `flutter --version` must say 3.44.0 (Dart 3.12). With fvm, write
-`fvm flutter` for `flutter` below, or run `fvm use 3.44.0` inside `app/`.
+Then `flutter --version` must say 3.44.9 (Dart 3.12.2). With fvm, write
+`fvm flutter` for `flutter` below, or run `fvm use 3.44.9` inside `app/`.
 Run `flutter doctor -v`: the Xcode, CocoaPods and "Connected device" lines
 must be green once the iPhone is plugged in (Android and Chrome lines may stay
 red; this app needs neither here).
@@ -229,7 +229,9 @@ stops, copy the first error into the session.
   iPhone as the run destination and press Run once.
 - **`flutter build ios --simulator` fails with "Binary ... Flutter.framework/Flutter
   does not contain architectures "arm64 x86_64""** (Xcode 27.2, Flutter
-  3.44.0): Flutter's tooling runs `lipo <binary> -verify_arch arm64 x86_64`,
+  3.44.0 only; fixed in 3.44.9, the pinned version, which verifies each
+  architecture on its own, so update if `flutter --version` says 3.44.0):
+  Flutter's tooling runs `lipo <binary> -verify_arch arm64 x86_64`,
   which Xcode 27.2's `lipo` refuses ("-verify_arch requires exactly one input
   file") although the framework has both. Not the app's fault; builds for an
   iPhone are not affected. Use `flutter run -d <simulator id>`, which builds
