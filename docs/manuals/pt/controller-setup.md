@@ -33,8 +33,8 @@ Põe a antena do modem na vertical, ao ar livre, longe de metal e do powerbank. 
 
 ## 3. Preparar a placa modem
 
-1. Compila o firmware do modem e grava a placa. Os passos estão no [guia do firmware, secção 9](firmware.md#9-a-placa-modem). Usa a mesma região das tuas caixas.
-2. Liga-a ao Pi. O ecrã pequeno dela mostra **MODEM MODE**. Ao início diz `LINK waiting` (a língua da compilação, inglês por omissão). Está certo: o controlador ainda não está a correr. Quando o controlador arranca, o ecrã passa para a língua das tuas caixas (a definição **língua das caixas**): em português vês `LINK aguarda`, em alemão `LINK wartet`, em chinês `等待` na barra de cima. O resto deste guia usa as palavras em inglês.
+1. Grava a placa com a imagem do modem: transfere-a ou compila-a e escreve-a com o esptool. O caminho todo, para Windows, Linux e macOS, está em [Montar o modem de rádio](modem.md) (secções 3 e 4). Usa a mesma região das tuas caixas.
+2. Liga-a ao Pi e descobre a porta (`ls /dev/ttyACM*`; [Montar o modem de rádio, secção 6](modem.md#6-ligar-ao-controlador-e-descobrir-a-porta)). O ecrã pequeno dela mostra **MODEM MODE**. Ao início diz `LINK waiting` (a língua da compilação, inglês por omissão). Está certo: o controlador ainda não está a correr. Quando o controlador arranca, o ecrã passa para a língua das tuas caixas (a definição **língua das caixas**): em português vês `LINK aguarda`, em alemão `LINK wartet`, em chinês `等待` na barra de cima. O resto deste guia usa as palavras em inglês.
 
 ## 4. Instalar o controlador
 
@@ -68,7 +68,7 @@ Esta é a maneira suportada, do [guia do controlador](../../../controller/README
 
    O `dialout` deixa-o abrir a porta USB do modem.
 4. Edita o ficheiro de definições: `sudo nano /etc/atalaia/controller.toml`. As que precisas:
-   - `[modem] port`: a porta do modem. Normalmente `/dev/ttyACM0`. Para confirmar, corre `ls /dev/ttyACM*` com o modem ligado.
+   - `[modem] port`: a porta do modem. Normalmente `/dev/ttyACM0`. Para confirmar, corre `ls /dev/ttyACM*` com o modem ligado; com uma Field Box ligada também, usa o nome estável em `/dev/serial/by-id/` ([Montar o modem de rádio, secção 6](modem.md#6-ligar-ao-controlador-e-descobrir-a-porta)). Uma porta vazia quer dizer sem rádio.
    - `[radio] region`: `eu868` ou `as923-tw`. Tem de coincidir com o modem e com as caixas.
    - `[checkin] field_name`: o nome do teu campo. Quem joga vê-o. `wifi_ssid`: o nome do Wi-Fi do campo, impresso no cartaz de check-in.
    - `[api] tls_names`: os endereços que os telemóveis usam para chegar ao Pi, por exemplo `["192.168.4.1", "campo.local"]`.
@@ -84,7 +84,7 @@ Esta é a maneira suportada, do [guia do controlador](../../../controller/README
 ## 5. Primeiro arranque
 
 1. Confirma que corre: `sudo systemctl status atalaia-controller`. Deve dizer `active (running)`. Para o registo: `sudo journalctl -u atalaia-controller -n 50`.
-2. Olha para o ecrã pequeno da placa modem. **LINK OK** quer dizer que o controlador está a falar com ela. `waiting` quer dizer que não: confirma a definição da porta e o cabo. `DOWN` quer dizer que estava a falar e parou: confirma o Pi.
+2. Olha para o ecrã pequeno da placa modem. **LINK OK** quer dizer que o controlador está a falar com ela. `waiting` quer dizer que não: confirma a definição da porta e o cabo. `DOWN` quer dizer que estava a falar e parou: confirma o Pi. O cabeçalho da consola deve dizer também **Rádio: ligado**. Todas as verificações, e uma entrada num jogo através do modem, estão em [Montar o modem de rádio, secções 8 e 9](modem.md#8-confirmar-que-o-controlador-e-o-modem-falam).
 3. No primeiro arranque o controlador cria os segredos do campo: os dois códigos de acesso, a **chave de entrada do campo** e o certificado do próprio campo. Mostra-os. O comando corre na pasta do controlador, como o utilizador dele:
 
    ```
@@ -137,7 +137,7 @@ As duas últimas também se definem na consola do GM (**Check-in › Regras do c
 
 | Problema | O que fazer |
 | --- | --- |
-| O ecrã do modem diz `LINK waiting` | O controlador não está a correr, ou o `[modem] port` está errado. Confirma `ls /dev/ttyACM*` e o registo do serviço |
+| O ecrã do modem diz `LINK waiting` | O controlador não está a correr, ou o `[modem] port` está errado. Confirma `ls /dev/ttyACM*` e o registo do serviço. Mais na [tabela de problemas do modem](modem.md#10-resolução-de-problemas) |
 | `Permission denied` na porta, no registo | O utilizador não está no grupo `dialout` (secção 4, passo 3) |
 | A consola não abre | Confirma o endereço do Pi, a porta 8443 (https) e que o telemóvel está no Wi-Fi do campo |
 | A consola diz para usar o endereço https | Abriste `http://…:8080`: o controlador não aceita o código da organização por HTTP simples. Usa o endereço `https://…:8443/console/` que ela mostra |

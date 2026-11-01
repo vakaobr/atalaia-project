@@ -40,7 +40,7 @@ For the people who run a field: setting up the *field controller*, preparing a g
 
 Not yet tested on a field: no Raspberry Pi with a real modem and real boxes has run a game yet. For a step-by-step setup that does not assume you are a developer, use the [controller setup guide](controller-setup.md). The full commands are in the [controller guide](../../../controller/README.md#running-it). In short:
 
-1. Flash a spare Heltec V4.3 board with the modem firmware and plug it into the Pi's USB. This is the **USB radio modem**. Its small screen shows `LINK OK` when the controller is talking to it. See the [firmware guide](../../../firmware/esp32/README.md#usb-radio-modem-variant).
+1. Flash a spare Heltec V4 board (the same revision as your boxes) with the modem firmware and plug it into the Pi's USB. This is the **USB radio modem**. Its small screen shows `LINK OK` when the controller is talking to it. The whole path, flashing it, finding its port and checking it, is in [Set up the radio modem](modem.md).
 2. Install the packages and build the core, as in the guide.
 3. Copy `controller/controller.example.toml` to `controller.toml` and edit it. The settings you will want:
    - `[modem] port`: the modem's port (usually `/dev/ttyACM0`). Empty means no radio: games can be created but nothing reaches the boxes.
@@ -485,8 +485,8 @@ The **site server** is optional. It keeps what lasts longer than one game. Games
 | --- | --- |
 | The console shows **No connection to the field controller. Reconnecting…** | Check your Wi-Fi and the controller's address. Check the controller is running. |
 | **Wrong access code.** | Use the code from `python3 -m atalaia_controller tokens`. The GM code, not the read-only one, changes things. |
-| **Radio: no modem** or **Radio down: the USB modem does not answer.** | Check the USB modem is plugged in, `[modem] port` is right and the modem's firmware is flashed. |
-| The modem screen says it is built for another region | Use a modem and boxes built for the field's region, or change the region back. No game can start until they match. |
+| **Radio: no modem** or **Radio down: the USB modem does not answer.** | Check the USB modem is plugged in, `[modem] port` is right and the modem's firmware is flashed. The [modem troubleshooting table](modem.md#10-troubleshooting) goes through it. |
+| **The USB modem is built for …, but the field is in …** (in **Settings**, under **Radio region**) | Use a modem and boxes built for the field's region, or change the region back. No game can start until they match. The modem's own screen does not show its region: the console does. |
 | **No free box heard yet.** | The boxes must be adopted and show **READY**. Wait up to a minute, tap **Look for boxes**, and check the radio region and range. |
 | **Look for boxes** says it did not look on the earlier channels, and gives a number of minutes | Sweeps of the earlier channels are limited on channels with little air time (on a 1 % channel, two or three an hour) so the radio stays within its legal share. Wait the minutes it says; the question on the field's own channel still went out. A 0.1 % channel allows no sweep: a box still missing must be adopted again. |
 | A box says **refused: in another game** | Power-cycle it, or end its old game. |

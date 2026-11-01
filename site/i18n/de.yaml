@@ -1292,7 +1292,7 @@ build:
     eigens gefertigte Leiterplatte. Hier stehen die Pins und Schaltpläne der Field Box sowie die Anleitungen für den Satelliten, den I/O-Pod und
     das Ziel-Addon, gekürzt; die vollständigen Anleitungen mit allen Prüfungen und den Tabellen zur
     Fehlersuche liegen im Repository (auf Englisch und Portugiesisch).
-    Um die Firmware auf eine Platine zu bringen, <a href="https://github.com/vakaobr/atalaia-project/releases">lade eine fertige Version herunter</a> oder baue sie selbst: die <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">Firmware-Anleitung</a> (Englisch) erklärt beides. Der Feld-Controller hat eine eigene <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">Einrichtungsanleitung</a> (Englisch).
+    Um die Firmware auf eine Platine zu bringen, <a href="https://github.com/vakaobr/atalaia-project/releases">lade eine fertige Version herunter</a> oder baue sie selbst: die <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">Firmware-Anleitung</a> (Englisch) erklärt beides. Der Feld-Controller hat eine eigene <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">Einrichtungsanleitung</a> (Englisch). Das Modem hat eine eigene <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/modem.md">Modem-Anleitung</a> (Englisch).
   status: >-
     <strong>Nach diesen Anleitungen wurde noch keine Box gebaut, und die Field Box hat noch kein
     Gehäuse.</strong> Es gibt nur einen <a href="#field-box-first-build">Aufbau der Field Box auf dem
@@ -1604,6 +1604,50 @@ build:
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/io-pod/BUILD.md">Bauanleitung
       des I/O-Pods</a>, und die Prüfungen des Pods mit einem Handy in der
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/firmware/esp32/docs/BRING_UP.md">Inbetriebnahme-Liste</a>.
+  modem:
+    title: Funkmodem
+    what: >-
+      Das Funkgerät des Controllers: ein zweites Heltec WiFi LoRa 32&nbsp;V4, mit dem Modem-Image geflasht
+      und in den USB-Anschluss des Feld-Controllers gesteckt. Ohne es läuft der Controller und die Konsole
+      öffnet sich, aber nichts erreicht die Boxen und von ihnen wird nichts gehört. Es hat kein WLAN und
+      braucht deshalb nur die LoRa-Antenne.
+    tested: >-
+      Ein so geflashtes Modem lief auf einem Prüfstand mit dem Controller und echten Boxen (ein Computer,
+      der Controller in Docker). Auf einem Raspberry Pi ist es noch nicht gelaufen, auch nicht unter macOS
+      und nicht auf einem Spielfeld.
+    steps:
+      antenna: >-
+        Bringe die <strong>LoRa-Antenne an, bevor die Platine irgendeinen Strom hat</strong>, auch zum
+        Flashen, und nimm ein USB-C-<em>Datenkabel</em>. Lege die Funkregion fest: Modem und Boxen müssen
+        sie teilen.
+      image: >-
+        Lade <code>atalaia-modem-&lt;Version&gt;-usb.zip</code> und <code>SHA256SUMS</code> von den
+        <a href="https://github.com/vakaobr/atalaia-project/releases">Releases</a> herunter (V4.3, EU868)
+        oder baue es selbst: <code>python tools/docker_fw.py modem</code> (V4.2, Taiwan, andere Antennen).
+      flash: >-
+        Lösche mit esptool 4.8.1 eine neue Platine und schreibe die Dateien aus <code>flash_args</code>:
+        <code>esptool --chip esp32s3 -p PORT write_flash "@flash_args"</code>, mit dem Port
+        <code>COM5</code> unter Windows, <code>/dev/ttyACM0</code> unter Linux, <code>/dev/cu.usbmodem…</code>
+        unter macOS. Unter Linux trittst du zuerst der Gruppe <code>dialout</code> bei.
+      screen: >-
+        Der Bildschirm der Platine zeigt den Turm und <strong>MODEM MODE</strong>, dann <code>LINK wartet</code>
+        (zuerst auf Englisch: <code>LINK waiting</code>). Das ist ein gesundes Modem, das noch keinen
+        Controller hat. <strong>RADIO FAULT</strong> heißt, dass der Funkchip nicht gestartet ist.
+      port: >-
+        Stecke es in den Controller, finde den Port (<code>ls /dev/ttyACM*</code>), trage ihn in
+        <code>[modem] port</code> von <code>/etc/atalaia/controller.toml</code> ein und starte den Dienst
+        neu (<code>sudo systemctl restart atalaia-controller</code>).
+      check: >-
+        Der Bildschirm zeigt <strong>LINK OK</strong>, die Kopfzeile der Konsole zeigt
+        <strong>Funk: aktiv</strong>, und das Protokoll des Controllers enthält <code>modem link up</code>.
+      join: >-
+        Schalte eine aufgenommene Box ein, lege ein Spiel an und lade die Box ein: sie geht über
+        <em>sende</em>, <em>eingeladen</em> zu <em>beigetreten</em>, und der Bildschirm des Modems zählt Pakete.
+    full: >-
+      Alle Befehle für jedes System, wie man den Port findet, und eine Tabelle zur Fehlersuche (Ladekabel
+      ohne Daten, falscher Port, Port von einem anderen Programm belegt, <code>dialout</code>, andere Region,
+      <code>LINK waiting</code> oder <code>DOWN</code>, <code>RADIO FAULT</code>, falsche Partitionstabelle):
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/modem.md">Set up the radio modem</a> (Englisch).
   target:
     title: Ziel-Addon
     status: >-

@@ -40,7 +40,7 @@ Para quem dirige um campo: montar o *controlador de campo*, preparar um jogo, di
 
 Ainda não testado num campo: nenhum Raspberry Pi com um modem a sério e caixas a sério correu um jogo até hoje. Para uma montagem passo a passo que não presume que és programador, usa o [guia de montagem do controlador](controller-setup.md). Os comandos completos estão no [guia do controlador](../../../controller/README.md#running-it) (em inglês). Em resumo:
 
-1. Grava o firmware do modem numa placa Heltec V4.3 sobresselente e liga-a ao USB do Pi. É o **modem de rádio USB**. O ecrã pequeno dele mostra `LINK OK` quando o controlador está a falar com ele. Vê o [guia do firmware](../../../firmware/esp32/README.md#usb-radio-modem-variant).
+1. Grava o firmware do modem numa placa Heltec V4 sobresselente (da mesma revisão das tuas caixas) e liga-a ao USB do Pi. É o **modem de rádio USB**. O ecrã pequeno dele mostra `LINK OK` quando o controlador está a falar com ele. O caminho todo, gravá-lo, descobrir a porta e confirmá-lo, está em [Montar o modem de rádio](modem.md).
 2. Instala os pacotes e compila o núcleo, como no guia.
 3. Copia `controller/controller.example.toml` para `controller.toml` e edita-o. As definições que vais querer:
    - `[modem] port`: a porta do modem (normalmente `/dev/ttyACM0`). Vazio quer dizer sem rádio: dá para criar jogos, mas nada chega às caixas.
@@ -485,8 +485,8 @@ O **servidor do site** é opcional. Guarda o que dura para lá de um jogo. Nenhu
 | --- | --- |
 | A consola mostra **Sem ligação ao controlador de campo. A voltar a ligar…** | Verifica o teu Wi-Fi e o endereço do controlador. Verifica que o controlador está a correr. |
 | **Código de acesso errado.** | Usa o código de `python3 -m atalaia_controller tokens`. Só o código da organização muda coisas, não o só de leitura. |
-| **Rádio: sem modem** ou **Rádio em baixo: o modem USB não responde.** | Verifica que o modem USB está ligado, que `[modem] port` está certo e que o firmware do modem está gravado. |
-| O ecrã do modem diz que foi feito para outra região | Usa um modem e caixas feitos para a região do campo, ou volta à região anterior. Nenhum jogo pode começar até coincidirem. |
+| **Rádio: sem modem** ou **Rádio em baixo: o modem USB não responde.** | Verifica que o modem USB está ligado, que `[modem] port` está certo e que o firmware do modem está gravado. A [tabela de problemas do modem](modem.md#10-resolução-de-problemas) percorre tudo isto. |
+| **O modem USB foi feito para …, mas o campo está em …** (em **Definições**, em **Região de rádio**) | Usa um modem e caixas feitos para a região do campo, ou volta à região anterior. Nenhum jogo pode começar até coincidirem. O ecrã do próprio modem não mostra a região dele: a consola mostra. |
 | **Ainda não se ouviu nenhuma caixa livre.** | As caixas têm de estar adotadas e mostrar **PRONTA**. Espera até um minuto, toca em **Procurar caixas** e confirma a região do rádio e o alcance. |
 | **Procurar caixas** diz que não procurou nos canais anteriores e indica um número de minutos | As procuras nos canais anteriores são limitadas em canais com pouco tempo de emissão (num canal de 1%, duas ou três por hora) para o rádio ficar dentro da sua parte legal. Espera os minutos indicados; a pergunta no canal do campo seguiu na mesma. Um canal de 0,1% não permite nenhuma procura: uma caixa que continue em falta tem de ser adotada de novo. |
 | Uma caixa diz **recusou: noutro jogo** | Desliga-a e volta a ligá-la, ou termina o jogo antigo dela. |

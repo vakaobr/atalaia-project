@@ -9,7 +9,7 @@ For the person who builds a box or a prop and has to put the software on it. You
 
 > **Not field-ready yet.** The firmware releases on GitHub are marked pre-release for that reason. Atalaia is pre-alpha. Real Heltec V4.3 boards have been flashed and used on a bench with the field controller: boot, radio, buttons, the board's own OLED, adoption by USB cable and by code, and an update over the air. Nothing else in this guide has run on a real board. Steps that depend on hardware that was not tried say **Not yet tested on a real board**.
 
-The hardware is in the build manuals: [Field Box](../../../hardware/field-box/BUILD.md), [Satellite](../../../hardware/satellite/BUILD.md), [I/O pod](../../../hardware/io-pod/BUILD.md). The controller is in the [controller setup guide](controller-setup.md).
+The hardware is in the build manuals: [Field Box](../../../hardware/field-box/BUILD.md), [Satellite](../../../hardware/satellite/BUILD.md), [I/O pod](../../../hardware/io-pod/BUILD.md). The controller is in the [controller setup guide](controller-setup.md), and its radio modem board in [Set up the radio modem](modem.md).
 
 ## Contents
 
@@ -43,7 +43,7 @@ Two ways. Download a release if you only want to put the project's firmware on a
 
 ### 2.1 Download a release (the easy way)
 
-The project publishes firmware on GitHub: [the Releases page](https://github.com/vakaobr/atalaia-project/releases). The first one is **v0.4.0**, marked **pre-release**: pre-alpha and **not field-tested**. Read its notes first.
+The project publishes firmware on GitHub: [the Releases page](https://github.com/vakaobr/atalaia-project/releases). Take the newest one (v0.5.0 on 2026-11-01; the first was v0.4.0). Each is marked **pre-release**: pre-alpha and **not field-tested**. Read its notes first.
 
 Pick the files for your board:
 
@@ -150,7 +150,7 @@ PY -m esptool --chip esp32s3 -p COM5 -b 921600 write_flash "@flash_args"
 
 Keep the quotes: PowerShell reads a bare `@` differently. `flash_args` is a file the build made. It lists the files and where they go. If the connection fails, use download mode, or try `-b 460800` or `-b 115200`.
 
-For the modem and the pod, go to `build-modem` or `build-pod` instead.
+For the modem and the pod, go to `build-modem` or `build-pod` instead. The modem has its own page, with these commands for each system: [Set up the radio modem](modem.md).
 
 **USB flash required once, from v0.5.** A box flashed with v0.4.0 or earlier has the old partition table (2 MB program slots). From v0.5 the program slots are 4 MB, and an update over the air cannot change the partition table, so flash such a box over USB once, with the command above and **without** `erase_flash`: the settings, the keys and the adoption stay where they are (the table's first four partitions did not move). What is lost is the storage partition, which moved: the box formats it on the first start and fetches the game modes and the field's logo again at the next join. A box still on the old table refuses to run the new firmware: its screen says *Flash over USB* and the log says `WRONG PARTITION TABLE`. A box that was offered the new image over the air by an older firmware goes back to its old one by itself. After the one USB flash, updates over the air work as before. The USB radio modem and the I/O pod share the table: one already flashed with v0.4.0 or earlier only logs `WRONG PARTITION TABLE` and keeps working, but flash it over USB once as well (without `erase_flash`) so it has the new layout.
 
@@ -305,20 +305,16 @@ If the radio does not work, check the board revision first ([section 4](#4-the-o
 
 ## 9. The modem board
 
-The controller's radio is a second Heltec V4 plugged into its USB port. It runs the modem image.
+The controller's radio is a second Heltec V4 plugged into its USB port. It runs the modem image. **The whole path, with the flash commands for Windows, Linux and macOS, the port, the controller's `[modem]` setting, the checks and a troubleshooting table, is in [Set up the radio modem](modem.md).** What a builder needs to know about the image itself:
 
-1. Fit the **LoRa antenna**. The modem has no Wi-Fi, so it needs no 2.4 GHz antenna.
-2. Build it for the same board revision and the same region as the boxes: `python tools/docker_fw.py modem` (with `--region=as923-tw` for Taiwan). For a V4.2, edit `firmware/esp32/build-modem/sdkconfig` as in [section 4](#4-the-options-a-builder-sets).
-3. Flash from `firmware/esp32/build-modem` as in [section 3](#3-flash-it). If the board is already plugged into a running controller, stop the controller first: it holds the port.
-4. Plug it into the controller. Its small screen shows the tower and **MODEM MODE**, then the status:
-   - **LINK**: `waiting` (the controller has not talked to it yet: it is not running, or the modem is on another port), `OK`, or `DOWN` (it talked, then stopped for 12 seconds).
-   - The game number, the channel, the packets sent and received with their failures, and the airtime left.
-   - **RADIO FAULT** if the radio chip did not start.
+- **Download it** (`atalaia-modem-<version>-usb.zip`, section 2.1) or **build it** with `python tools/docker_fw.py modem` into `firmware/esp32/build-modem/`. The released one is V4.3, EU868, English until the controller connects. Build the modem for the same board revision and the same region as the boxes (`--region=as923-tw` for Taiwan; for a V4.2, edit `build-modem/sdkconfig` as in [section 4](#4-the-options-a-builder-sets)).
+- **Flash it** like any board ([section 3](#3-flash-it)), from the unzipped folder or from `firmware/esp32/build-modem`. If the board is plugged into a running controller, stop the controller first: it holds the port. The modem has no over-the-air update.
+- **Fit the LoRa antenna before power.** The modem has no Wi-Fi, so it needs no 2.4 GHz antenna.
+- **Its small screen** shows the tower and **MODEM MODE** for about two seconds, then the status: **LINK** `waiting` (the controller has not talked to it: it is not running, or the modem is on another port), `OK`, or `DOWN` (it talked, then stopped for 12 seconds); the game number, the channel, the packets sent and received with their failures, and the airtime left; **RADIO FAULT** if the radio chip did not start.
+- **The screen's language** is the boxes' (English, Portuguese, German or Traditional Chinese). The controller tells the modem which one every time it connects: the **box language** setting in the GM console, or with `auto` the language of the console that created the game. Before that, and on the first splash, the modem uses its build's language, `en` by default. To make it another one, set `CONFIG_ATALAIA_MODEM_LANG="pt"` (or `de`, `zh-tw`) in `firmware/esp32/build-modem/sdkconfig` and build again, as in [section 4](#4-the-options-a-builder-sets). In Portuguese the words are `aguarda`, `OK`, `PERDIDO` and `FALHA NO LORA` (the small font has no accents); in German `wartet`, `OK`, `GETRENNT` and `FUNKFEHLER`; in Chinese the link is in the top bar (`等待`, `正常`, `離線`) and a radio fault is `無線電錯誤`. An older modem image, built before this, stays in English.
+- **Its port** goes into the controller's `[modem] port` setting: [Set up the radio modem, section 7](modem.md#7-put-the-port-in-the-controllers-settings-and-restart-it).
 
-   The screen is in the language of your boxes (English, Portuguese, German or Traditional Chinese). The controller tells the modem which one every time it connects: the **box language** setting in the GM console, or with `auto` the language of the console that created the game. Before the controller has talked to it, and on the first splash, the modem uses its build's language, `en` by default. To make it another one, set `CONFIG_ATALAIA_MODEM_LANG="pt"` (or `de`, `zh-tw`) in `firmware/esp32/build-modem/sdkconfig` and build again, as in [section 4](#4-the-options-a-builder-sets). In Portuguese the words are `aguarda`, `OK`, `PERDIDO` and `FALHA NO LORA` (the small font has no accents); in German `wartet`, `OK`, `GETRENNT` and `FUNKFEHLER`; in Chinese the link is in the top bar (`等待`, `正常`, `離線`) and a radio fault is `無線電錯誤`. An older modem image, built before this, stays in English.
-5. Put its port into the controller's `[modem] port` setting. On Linux it is usually `/dev/ttyACM0`. The [controller setup guide](controller-setup.md) shows how.
-
-The modem is the only image whose USB port carries data frames, so its log is on UART0, not on USB. A modem like this has run with the controller and real boxes on a bench (2026-10-21). Not yet tested on a Raspberry Pi.
+The modem is the only image whose USB port carries data frames, so its log is on UART0 (GPIO 43 and 44), not on USB: do not open its USB port with a serial monitor, and expect no log from [section 3.4](#34-restart-and-watch). A modem like this has run with the controller and real boxes on a bench (2026-10-21). Not yet tested on a Raspberry Pi.
 
 ## 10. The I/O pod variants
 

@@ -33,8 +33,8 @@ Put the modem's antenna upright, in the open, away from metal and from the power
 
 ## 3. Prepare the modem board
 
-1. Build the modem firmware and flash the board. The steps are in the [firmware guide, section 9](firmware.md#9-the-modem-board). Use the same region as your boxes.
-2. Plug it into the Pi. Its small screen shows **MODEM MODE**. At first it says `LINK waiting`. That is right: the controller is not running yet. Once the controller runs, the screen switches to the language of your boxes (the **box language** setting), so in Portuguese you will see `LINK aguarda`, in German `LINK wartet`, in Chinese `等待` in the top bar; the rest of this guide uses the English words.
+1. Flash the board with the modem image: download it or build it, then write it with esptool. The whole path, for Windows, Linux and macOS, is in [Set up the radio modem](modem.md) (sections 3 and 4). Use the same region as your boxes.
+2. Plug it into the Pi and find its port (`ls /dev/ttyACM*`; [Set up the radio modem, section 6](modem.md#6-plug-it-into-the-controller-and-find-its-port)). Its small screen shows **MODEM MODE**. At first it says `LINK waiting`. That is right: the controller is not running yet. Once the controller runs, the screen switches to the language of your boxes (the **box language** setting), so in Portuguese you will see `LINK aguarda`, in German `LINK wartet`, in Chinese `等待` in the top bar; the rest of this guide uses the English words.
 
 ## 4. Install the controller
 
@@ -68,7 +68,7 @@ This is the supported way from the [controller guide](../../../controller/README
 
    `dialout` lets it open the modem's USB port.
 4. Edit the settings file: `sudo nano /etc/atalaia/controller.toml`. The ones you need:
-   - `[modem] port`: the modem's port. Usually `/dev/ttyACM0`. To check, run `ls /dev/ttyACM*` with the modem plugged in.
+   - `[modem] port`: the modem's port. Usually `/dev/ttyACM0`. To check, run `ls /dev/ttyACM*` with the modem plugged in; with a Field Box plugged in too, use the stable name under `/dev/serial/by-id/` ([Set up the radio modem, section 6](modem.md#6-plug-it-into-the-controller-and-find-its-port)). An empty port means no radio.
    - `[radio] region`: `eu868` or `as923-tw`. It must match the modem and the boxes.
    - `[checkin] field_name`: your field's name. Players see it. `wifi_ssid`: the field Wi-Fi's name, printed on the check-in poster.
    - `[api] tls_names`: the addresses phones use to reach the Pi, for example `["192.168.4.1", "campo.local"]`.
@@ -84,7 +84,7 @@ This is the supported way from the [controller guide](../../../controller/README
 ## 5. First start
 
 1. Check that it runs: `sudo systemctl status atalaia-controller`. It should say `active (running)`. For the log: `sudo journalctl -u atalaia-controller -n 50`.
-2. Look at the modem board's small screen. **LINK OK** means the controller is talking to it. `waiting` means it is not: check the port setting and the cable. `DOWN` means it was talking and stopped: check the Pi.
+2. Look at the modem board's small screen. **LINK OK** means the controller is talking to it. `waiting` means it is not: check the port setting and the cable. `DOWN` means it was talking and stopped: check the Pi. The console's header should say **Radio: up** too. All the checks, and a join through the modem, are in [Set up the radio modem, sections 8 and 9](modem.md#8-check-that-the-controller-and-the-modem-talk).
 3. On the first start the controller makes the field's secrets: the two access codes, the **field join key**, and the field's own certificate. Show them. The command runs in the controller's folder, as its user:
 
    ```
@@ -137,7 +137,7 @@ The last two can also be set in the GM console (**Check-in › Check-in rules**,
 
 | Problem | What to do |
 | --- | --- |
-| The modem's screen says `LINK waiting` | The controller is not running, or `[modem] port` is wrong. Check `ls /dev/ttyACM*` and the service's log |
+| The modem's screen says `LINK waiting` | The controller is not running, or `[modem] port` is wrong. Check `ls /dev/ttyACM*` and the service's log. More in the [modem troubleshooting table](modem.md#10-troubleshooting) |
 | `Permission denied` on the port in the log | The user is not in the `dialout` group (section 4, step 3) |
 | The console does not open | Check the Pi's address, port 8443 (https), and that the phone is on the field Wi-Fi |
 | The console says to use the https address | You opened `http://…:8080`: the controller does not take the GM code over plain HTTP. Use the `https://…:8443/console/` address it shows |

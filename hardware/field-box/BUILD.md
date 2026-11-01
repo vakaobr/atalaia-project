@@ -845,7 +845,8 @@ for the setup page, adoption and updates. Things to know first:
   hears little or transmits weakly; if BRING_UP.md's radio step looks
   wrong, check this first.
 - **Region:** the box, the controller's modem and the controller must all be
-  built for the same radio region (EU868 by default).
+  built for the same radio region (EU868 by default). The controller's modem
+  has its own guide: [Set up the radio modem](../../docs/manuals/en/modem.md).
 - **No game use before the transmit-power check** of BRING_UP.md (radio
   step): the 14 dB front-end gain the firmware assumes has not been
   measured yet.

@@ -893,7 +893,8 @@ saber primeiro:
   pouco ou emite fraco; se o passo de rádio do BRING_UP.md parecer errado,
   verifica isto primeiro.
 - **Região:** a caixa, o modem do controlador e o controlador têm de ser todos
-  compilados para a mesma região de rádio (EU868 por omissão).
+  compilados para a mesma região de rádio (EU868 por omissão). O modem do
+  controlador tem um guia próprio: [Montar o modem de rádio](../../docs/manuals/pt/modem.md).
 - **Nenhum uso em jogo antes da verificação da potência de emissão** do
   BRING_UP.md (passo do rádio): o ganho de 14 dB do módulo de entrada que o
   firmware assume ainda não foi medido.

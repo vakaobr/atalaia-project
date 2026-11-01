@@ -297,7 +297,10 @@ hardware arrives.
 ## USB radio modem variant
 
 The same project builds the field controller's radio: a Heltec V4.3
-plugged into the Raspberry Pi over USB (ADR-P2-4). `sdkconfig.modem`
+plugged into the Raspberry Pi over USB (ADR-P2-4). The builder's and the
+organiser's path (flash commands per system, the port, the controller's
+`[modem] port`, checks, troubleshooting) is the manual
+[Set up the radio modem](../../docs/manuals/en/modem.md). `sdkconfig.modem`
 sets `CONFIG_ATALAIA_MODEM_MODE`, which builds `main/modem/` instead of
 the Field Box shell: the radio HAL and radio task, plus a serial task
 that moves the frames of [protocol/usb-modem.md](../../protocol/usb-modem.md)

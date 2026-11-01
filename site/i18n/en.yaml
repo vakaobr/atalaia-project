@@ -1222,7 +1222,7 @@ build:
     circuit board. This page has the Field Box's pins and wiring diagrams and the guides for the Satellite, the I/O pod and the target addon,
     shortened; the full guides, with every check and the troubleshooting tables, are in the
     repository.
-    To put the firmware on a board, <a href="https://github.com/vakaobr/atalaia-project/releases">download a ready-made release</a> or build it yourself: the <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">firmware guide</a> explains both. The field controller has its own <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">setup guide</a>.
+    To put the firmware on a board, <a href="https://github.com/vakaobr/atalaia-project/releases">download a ready-made release</a> or build it yourself: the <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">firmware guide</a> explains both. The field controller has its own <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">setup guide</a>. The radio modem has its own <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/modem.md">modem guide</a>.
   status: >-
     <strong>No box has been built from these guides, and the Field Box has no enclosure yet.</strong>
     There is only a <a href="#field-box-first-build">bench build of the Field Box</a> (loose wires),
@@ -1517,6 +1517,48 @@ build:
       pod build guide</a>, and the pod's checks with a phone in the
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/firmware/esp32/docs/BRING_UP.md">bring-up
       list</a>.
+  modem:
+    title: Radio modem
+    what: >-
+      The controller's radio: a second Heltec WiFi LoRa 32&nbsp;V4, flashed with the modem image and
+      plugged into the field controller's USB port. Without it the controller runs and the console
+      opens, but nothing reaches the boxes and nothing is heard from them. It has no Wi-Fi, so it
+      needs only the LoRa antenna.
+    tested: >-
+      A modem flashed like this ran with the controller and real boxes on a bench (a computer, the
+      controller in Docker). It has not run on a Raspberry Pi yet, not on macOS, and not on a field.
+    steps:
+      antenna: >-
+        Fit the <strong>LoRa antenna before the board has any power</strong>, also for flashing, and
+        use a USB-C <em>data</em> cable. Decide the radio region: the modem and the boxes must share it.
+      image: >-
+        Download <code>atalaia-modem-&lt;version&gt;-usb.zip</code> and <code>SHA256SUMS</code> from the
+        <a href="https://github.com/vakaobr/atalaia-project/releases">releases</a> (V4.3, EU868), or
+        build it: <code>python tools/docker_fw.py modem</code> (V4.2, Taiwan, other antennas).
+      flash: >-
+        With esptool 4.8.1, erase a new board and write the files of <code>flash_args</code>:
+        <code>esptool --chip esp32s3 -p PORT write_flash "@flash_args"</code>, with the port
+        <code>COM5</code> on Windows, <code>/dev/ttyACM0</code> on Linux, <code>/dev/cu.usbmodem…</code>
+        on macOS. On Linux, join the <code>dialout</code> group first.
+      screen: >-
+        The board's screen shows the tower and <strong>MODEM MODE</strong>, then <code>LINK waiting</code>.
+        That is a healthy modem that has no controller yet. <strong>RADIO FAULT</strong> means the radio chip
+        did not start.
+      port: >-
+        Plug it into the controller, find its port (<code>ls /dev/ttyACM*</code>), put it in
+        <code>[modem] port</code> of <code>/etc/atalaia/controller.toml</code> and restart the service
+        (<code>sudo systemctl restart atalaia-controller</code>).
+      check: >-
+        The screen says <strong>LINK OK</strong>, the console's header says <strong>Radio: up</strong>, and the
+        controller's log has <code>modem link up</code>.
+      join: >-
+        Switch on an adopted box, create a game and invite the box: it goes <em>sending</em>, <em>invited</em>,
+        <em>joined</em>, and the modem's screen counts packets.
+    full: >-
+      Every command for each system, how to find the port, and a troubleshooting table (charge-only cable,
+      wrong port, port held by another program, <code>dialout</code>, region mismatch, <code>LINK waiting</code>
+      or <code>DOWN</code>, <code>RADIO FAULT</code>, wrong partition table):
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/modem.md">Set up the radio modem</a>.
   target:
     title: Target addon
     status: >-

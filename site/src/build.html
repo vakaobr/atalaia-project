@@ -42,6 +42,7 @@ and 2026-11-01, #field-box-first-build). See site/README.md.
           <a href="#field-box">{{ build.field_box.title }}</a>
           <a href="#satellite">{{ build.satellite.title }}</a>
           <a href="#io-pod">{{ build.pod.title }}</a>
+          <a href="#radio-modem">{{ build.modem.title }}</a>
           <a href="#target-addon">{{ build.target.title }}</a>
         </nav>
 
@@ -247,6 +248,24 @@ and 2026-11-01, #field-box-first-build). See site/README.md.
             <li>{{ build.pod.open.settings }}</li>
           </ul>
           <p class="more">{{ build.pod.full }}</p>
+        </section>
+
+        <section id="radio-modem" aria-labelledby="radio-modem-title">
+          <h2 id="radio-modem-title">{{ build.modem.title }}</h2>
+          <p>{{ build.modem.what }}</p>
+          <p class="warn">{{ build.modem.tested }}</p>
+
+          <h3>{{ build.steps }}</h3>
+          <ol class="ways">
+            <li>{{ build.modem.steps.antenna }}</li>
+            <li>{{ build.modem.steps.image }}</li>
+            <li>{{ build.modem.steps.flash }}</li>
+            <li>{{ build.modem.steps.screen }}</li>
+            <li>{{ build.modem.steps.port }}</li>
+            <li>{{ build.modem.steps.check }}</li>
+            <li>{{ build.modem.steps.join }}</li>
+          </ol>
+          <p class="more">{{ build.modem.full }}</p>
         </section>
 
         <section id="target-addon" aria-labelledby="target-addon-title">

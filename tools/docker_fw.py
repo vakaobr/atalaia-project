@@ -364,7 +364,7 @@ def modem() -> int:
     code = variant(MODEM_BUILD, MODEM_DEFAULTS)
     if code == 0:
         print(f"\nModem firmware: firmware/esp32/{MODEM_BUILD}/atalaia_esp32.bin "
-              "(flash it to the board plugged into the controller; see controller/README.md)")
+              "(flash it to the board that goes into the controller: docs/manuals/en/modem.md)")
     return code
 
 

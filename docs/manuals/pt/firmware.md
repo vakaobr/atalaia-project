@@ -9,7 +9,7 @@ Para quem monta uma caixa ou um adereço e tem de lhe pôr o software. Não prec
 
 > **Ainda não está pronto para o campo.** As versões do firmware no GitHub estão marcadas como pré-lançamento (*pre-release*) por isso mesmo. A Atalaia está em pré-alfa. Placas Heltec V4.3 a sério já foram gravadas e usadas numa bancada com o controlador de campo: arranque, rádio, botões, o ecrã OLED da própria placa, adoção por cabo USB e por código, e uma atualização pelo ar. Mais nada neste guia correu numa placa a sério. Os passos que dependem de hardware que não foi experimentado dizem **Ainda não testado numa placa real**.
 
-O hardware está nos manuais de montagem: [Field Box](../../../hardware/field-box/BUILD.pt.md), [Satélite](../../../hardware/satellite/BUILD.md), [módulo de E/S](../../../hardware/io-pod/BUILD.md) (os dois últimos, em inglês). O controlador está no [guia de montagem do controlador](controller-setup.md).
+O hardware está nos manuais de montagem: [Field Box](../../../hardware/field-box/BUILD.pt.md), [Satélite](../../../hardware/satellite/BUILD.md), [módulo de E/S](../../../hardware/io-pod/BUILD.md) (os dois últimos, em inglês). O controlador está no [guia de montagem do controlador](controller-setup.md), e a placa modem dele em [Montar o modem de rádio](modem.md).
 
 ## Índice
 
@@ -43,7 +43,7 @@ Há duas maneiras. Transfere uma versão publicada se só queres pôr na placa o
 
 ### 2.1 Transferir uma versão publicada (o caminho fácil)
 
-O projeto publica o firmware no GitHub: [a página de Releases](https://github.com/vakaobr/atalaia-project/releases). A primeira é a **v0.4.0**, marcada como **pré-lançamento**: pré-alfa e **não testada num campo**. Lê primeiro as notas dela.
+O projeto publica o firmware no GitHub: [a página de Releases](https://github.com/vakaobr/atalaia-project/releases). Escolhe a mais recente (a v0.5.0 em 2026-11-01; a primeira foi a v0.4.0). Cada uma está marcada como **pré-lançamento**: pré-alfa e **não testada num campo**. Lê primeiro as notas dela.
 
 Escolhe os ficheiros da tua placa:
 
@@ -150,7 +150,7 @@ PY -m esptool --chip esp32s3 -p COM5 -b 921600 write_flash "@flash_args"
 
 Mantém as aspas: o PowerShell lê um `@` solto de maneira diferente. O `flash_args` é um ficheiro que a compilação fez. Lista os ficheiros e onde vão. Se a ligação falhar, usa o modo de gravação, ou experimenta `-b 460800` ou `-b 115200`.
 
-Para o modem e para o módulo de E/S, vai a `build-modem` ou a `build-pod`.
+Para o modem e para o módulo de E/S, vai a `build-modem` ou a `build-pod`. O modem tem uma página própria, com estes comandos para cada sistema: [Montar o modem de rádio](modem.md).
 
 **É preciso instalar por USB uma vez, a partir da v0.5.** Uma caixa gravada com a v0.4.0 ou anterior tem a tabela de partições antiga (espaços de programa de 2 MB). A partir da v0.5 os espaços de programa têm 4 MB e uma atualização pelo ar não consegue mudar a tabela de partições, por isso grava essa caixa por USB uma vez, com o comando acima e **sem** `erase_flash`: as definições, as chaves e a adoção ficam onde estavam (as primeiras quatro partições da tabela não mudaram de sítio). Perde-se a partição de armazenamento, que mudou de sítio: a caixa formata-a no primeiro arranque e volta a obter os modos de jogo e o logótipo do campo na associação seguinte. Uma caixa ainda com a tabela antiga recusa-se a correr o firmware novo: o ecrã mostra *Instala por USB* e o registo diz `WRONG PARTITION TABLE`. Uma caixa a quem um firmware mais antigo ofereceu a imagem nova pelo ar volta sozinha à antiga. Depois dessa gravação por USB, as atualizações pelo ar funcionam como antes. O modem de rádio USB e o módulo de E/S partilham a tabela: um já gravado com a v0.4.0 ou anterior só regista `WRONG PARTITION TABLE` e continua a funcionar, mas grava-o também por USB uma vez (sem `erase_flash`) para ficar com a disposição nova.
 
@@ -305,20 +305,16 @@ Se o rádio não funcionar, confirma primeiro a revisão da placa ([secção 4](
 
 ## 9. A placa modem
 
-O rádio do controlador é uma segunda Heltec V4 ligada à porta USB dele. Corre a imagem do modem.
+O rádio do controlador é uma segunda Heltec V4 ligada à porta USB dele. Corre a imagem do modem. **O caminho todo, com os comandos de gravação para Windows, Linux e macOS, a porta, a definição `[modem]` do controlador, as verificações e uma tabela de resolução de problemas, está em [Montar o modem de rádio](modem.md).** O que quem monta precisa de saber sobre a imagem em si:
 
-1. Monta a **antena LoRa**. O modem não tem Wi-Fi, por isso não precisa de antena de 2,4 GHz.
-2. Compila-o para a mesma revisão de placa e para a mesma região das caixas: `python tools/docker_fw.py modem` (com `--region=as923-tw` para Taiwan). Para uma V4.2, edita `firmware/esp32/build-modem/sdkconfig` como na [secção 4](#4-as-opções-de-quem-monta).
-3. Grava a partir de `firmware/esp32/build-modem` como na [secção 3](#3-grava-o). Se a placa já estiver ligada a um controlador em funcionamento, pára primeiro o controlador: ele tem a porta.
-4. Liga-a ao controlador. O ecrã pequeno dela mostra a torre e **MODO MODEM**, e depois o estado:
-   - **LINK**: `waiting` (o controlador ainda não falou com ela: não está a correr, ou o modem está noutra porta), `OK`, ou `DOWN` (falou e depois parou durante 12 segundos).
-   - O número do jogo, o canal, os pacotes enviados e recebidos com as falhas, e o tempo de emissão que resta.
-   - **FALHA NO LORA** se o chip de rádio não arrancou.
+- **Transfere-a** (`atalaia-modem-<versão>-usb.zip`, secção 2.1) ou **compila-a** com `python tools/docker_fw.py modem` para `firmware/esp32/build-modem/`. A publicada é V4.3, EU868, em inglês até o controlador se ligar. Compila o modem para a mesma revisão de placa e a mesma região das caixas (`--region=as923-tw` para Taiwan; para uma V4.2, edita `build-modem/sdkconfig` como na [secção 4](#4-as-opções-de-quem-monta)).
+- **Grava-o** como qualquer placa ([secção 3](#3-grava-o)), a partir da pasta descompactada ou de `firmware/esp32/build-modem`. Se a placa já estiver ligada a um controlador em funcionamento, pára primeiro o controlador: ele tem a porta. O modem não tem atualização pelo ar.
+- **Monta a antena LoRa antes de haver energia.** O modem não tem Wi-Fi, por isso não precisa de antena de 2,4 GHz.
+- **O ecrã pequeno dele** mostra a torre e **MODEM MODE** durante cerca de dois segundos, e depois o estado: **LINK** `waiting` (o controlador ainda não falou com ele: não está a correr, ou o modem está noutra porta), `OK`, ou `DOWN` (falou e depois parou durante 12 segundos); o número do jogo, o canal, os pacotes enviados e recebidos com as falhas, e o tempo de emissão que resta; **FALHA NO LORA** se o chip de rádio não arrancou.
+- **A língua do ecrã** é a das caixas (inglês, português, alemão ou chinês tradicional). O controlador diz ao modem qual é de cada vez que se liga: a definição **língua das caixas** na consola da organização, ou, com `auto`, a língua da consola que criou o jogo. Antes disso, e no primeiro ecrã de arranque, o modem usa a língua da compilação, `en` por omissão. Para ser outra, põe `CONFIG_ATALAIA_MODEM_LANG="pt"` (ou `de`, `zh-tw`) em `firmware/esp32/build-modem/sdkconfig` e compila outra vez, como na [secção 4](#4-as-opções-de-quem-monta). Em português as palavras são `aguarda`, `OK`, `PERDIDO` e `FALHA NO LORA` (o tipo de letra pequeno não tem acentos); em alemão `wartet`, `OK`, `GETRENNT` e `FUNKFEHLER`; em chinês a ligação está na barra de cima (`等待`, `正常`, `離線`) e uma falha do rádio é `無線電錯誤`. Uma imagem de modem mais antiga, compilada antes disto, fica em inglês.
+- **A porta dele** vai para a definição `[modem] port` do controlador: [Montar o modem de rádio, secção 7](modem.md#7-pôr-a-porta-nas-definições-do-controlador-e-reiniciá-lo).
 
-   O ecrã está na língua das tuas caixas (inglês, português, alemão ou chinês tradicional). O controlador diz ao modem qual é de cada vez que se liga: a definição **língua das caixas** na consola da organização, ou, com `auto`, a língua da consola que criou o jogo. Antes de o controlador lhe ter falado, e no primeiro ecrã de arranque, o modem usa a língua da compilação, `en` por omissão. Para ser outra, põe `CONFIG_ATALAIA_MODEM_LANG="pt"` (ou `de`, `zh-tw`) em `firmware/esp32/build-modem/sdkconfig` e compila outra vez, como na [secção 4](#4-as-opções-de-quem-monta). Em português as palavras são `aguarda`, `OK`, `PERDIDO` e `FALHA NO LORA` (o tipo de letra pequeno não tem acentos); em alemão `wartet`, `OK`, `GETRENNT` e `FUNKFEHLER`; em chinês a ligação está na barra de cima (`等待`, `正常`, `離線`) e uma falha do rádio é `無線電錯誤`. Uma imagem de modem mais antiga, compilada antes disto, fica em inglês.
-5. Põe a porta dela na definição `[modem] port` do controlador. No Linux costuma ser `/dev/ttyACM0`. O [guia de montagem do controlador](controller-setup.md) mostra como.
-
-O modem é a única imagem cuja porta USB leva tramas de dados, por isso o registo dele está na UART0, e não no USB. Um modem assim já correu com o controlador e caixas reais numa bancada (2026-10-21). Ainda não testado num Raspberry Pi.
+O modem é a única imagem cuja porta USB leva tramas de dados, por isso o registo dele está na UART0 (GPIO 43 e 44), e não no USB: não abras a porta USB dele com um monitor série, e não esperes registo da [secção 3.4](#34-reiniciar-e-observar). Um modem assim já correu com o controlador e caixas reais numa bancada (2026-10-21). Ainda não testado num Raspberry Pi.
 
 ## 10. As variantes do módulo de E/S
 
