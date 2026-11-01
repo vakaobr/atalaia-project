@@ -212,11 +212,21 @@ class Core:
             self.lib.atalaia_scenario_free(ptr)
         return json.loads(text.decode("utf-8"))
 
+    def expression_literal_bytes(self, expr: str) -> int:
+        """The bytes the 'text' literals of one screen expression (no braces) take of the 256 the
+        evaluator gives them: each its length + 1, all of them (&& and || skip none). Looked up on
+        first use, so a core from before the limit was checked still loads; AttributeError then."""
+        fn = self.lib.atalaia_tpl_expr_literal_bytes
+        fn.argtypes = [ctypes.c_char_p, ctypes.c_size_t]
+        fn.restype = ctypes.c_size_t
+        raw = expr.encode()
+        return fn(raw, len(raw))
+
     def check_screen(self, source: bytes) -> Optional[str]:
         """Parses a screen template with the core's parser (the one the Field Box uses);
         returns why it is refused, or None."""
         tpl = ctypes.create_string_buffer(self.lib.atalaia_tpl_sizeof())
-        err = ctypes.create_string_buffer(160)
+        err = ctypes.create_string_buffer(256)
         if self.lib.atalaia_tpl_parse(tpl, source, len(source), err, len(err)):
             return None
         return err.value.decode(errors="replace")

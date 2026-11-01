@@ -180,7 +180,7 @@ a `@mode <mode id> <params>` message in the screen queue, so a name resolves
 to the running mode's template (main mode first, then its modifiers). Bomb
 and Domination use templates; when a mode has no template of a name, the C
 screens below are drawn. Templates come from the image only: there is no
-upload path yet, so LittleFS is not read for them (decision K10).
+upload path yet, so LittleFS is not read for them (decision K10). An expression whose `'text'` literals need more than 256 bytes is refused when the template is parsed, built in or fetched (decision TPL-1; `modes/README.md`, "Authoring limits"); one that fails to render anyway shows `?` and the box logs `screen expression {...}` once at warning level.
 
 The C screen templates (`main/screen_renderer.c`, ADR-P1-2) are C functions
 that build LVGL 9.2 widget trees for the 320x240 TFT: `standby`,

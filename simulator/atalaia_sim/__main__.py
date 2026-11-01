@@ -14,7 +14,7 @@ import yaml
 
 from .core import Core, LibraryNotFound, find_library
 from .mode import ModeError, compose, find_modes, load_mode
-from .screens import check_screens, screen_files
+from .screens import check_screens, screen_files, screen_warnings
 from .sim import SimError, Simulation
 from .testing import DEFAULT_TEAMS, run_test
 
@@ -46,6 +46,8 @@ def cmd_test(args: argparse.Namespace) -> int:
             print(f"{'FAIL' if problems else 'ok  '} {mode.id} / {len(screens)} screen template(s)")
             for problem in problems:
                 print(f"     {problem}")
+            for warning in screen_warnings(core, mode_dir):
+                print(f"     warning: {warning}")
             failed += 1 if problems else 0
         tests = mode.tests
         if not tests:

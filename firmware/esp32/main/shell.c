@@ -50,6 +50,7 @@
 #include "preset_ui.h"
 #include "screen_renderer.h"
 #include "screen_template.h"
+#include "atalaia/screen_template.h"
 #include "state_persist.h"
 #include "radio/event_log.h"
 #include "radio/radio_stats.h"
@@ -111,6 +112,11 @@
 #endif
 
 static const char *TAG = "atalaia";
+
+static void tpl_log(const char *message)
+{
+    ESP_LOGW(TAG, "%s", message);
+}
 
 #define STORAGE_PATH "/littlefs"
 
@@ -1498,6 +1504,8 @@ void app_main(void)
      * forgotten; their screens come from storage. */
     mode_store_init(STORAGE_PATH);
     screen_template_set_fetched(mode_store_screen);
+    /* An expression that fails at render time shows "?" and is named here once (TPL-1). */
+    atalaia_tpl_set_log(tpl_log);
     state_persist_init(STORAGE_PATH "/state");
     seed_presets();
     load_preset_list();

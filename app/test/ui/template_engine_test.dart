@@ -328,6 +328,72 @@ void main() {
     }
   });
 
+  test(
+    'the literals have their own 256 bytes, and a failed render shows ?',
+    () {
+      // Decision TPL-1: the check is exact whatever the data, in Dart and in C.
+      String lit(int n) => "'${'a' * n}'";
+      final exprs = [
+        lit(255),
+        lit(256),
+        '${lit(100)} || x && ${lit(100)} || ${lit(100)}',
+        "lang == ${lit(120)} || lang == ${lit(120)} || lang == 'é'",
+        '${lit(60)} + ${lit(60)}',
+        "'é' + ${lit(253)}", // 3 bytes + 254: over, by a multi-byte one
+        '1 + ${lit(300)} + (',
+        '(${lit(200)}',
+      ];
+      for (final e in exprs) {
+        expect(
+          expressionError(e),
+          core.screenExpressionError(e),
+          reason: 'expression: $e',
+        );
+        expect(
+          expressionLiteralBytes(e),
+          core.screenExpressionLiteralBytes(e),
+          reason: 'expression: $e',
+        );
+      }
+      expect(expressionError(lit(255)), isNull);
+      expect(expressionError(lit(256)), contains('need 257 bytes of 256'));
+      // The error message through a template: same words, same cut echo.
+      final src =
+          'template: x\nlayout:\n  - type: label\n'
+          '    text: "{lang == ${lit(140)} || lang == ${lit(140)}}"\n';
+      expect(_cut(screenTemplateError(src)), core.checkScreen(src));
+      expect(screenTemplateError(src), contains('need 282 bytes of 256'));
+      // Failing anyway (a template that skipped the check): "?", logged once.
+      final logged = <String>[];
+      templateLogHook = logged.add;
+      resetTemplateLog();
+      const scope = TemplateScope();
+      final broken = 'A {${lit(300)}} B {1 + 1}';
+      expect(interpolate(broken, scope), 'A ? B 2');
+      expect(interpolate(broken, scope), 'A ? B 2');
+      expect(logged, hasLength(1));
+      expect(logged.single, contains('need 301 bytes of 256'));
+      expect(core.screenText(broken, const {}, const {}), 'A ? B 2');
+      // Data strings: cut at their own 160 bytes, "?" when none is left.
+      final data = {'a': 'x' * 150, 'b': 'y' * 150, 'c': 'z' * 150};
+      for (final t in ['{a}', '{a && b}', '{a && b && c}', '{c}{a}{b}']) {
+        expect(
+          interpolate(t, TemplateScope(data: data)),
+          core.screenText(t, data, const {}),
+          reason: t,
+        );
+      }
+      expect(interpolate('{a && b && c}', TemplateScope(data: data)), '?');
+      // The literals' 250 bytes and two long data strings do not fight.
+      final both = '{a == b || a && ${lit(250)}}';
+      expect(
+        interpolate(both, TemplateScope(data: data)),
+        core.screenText(both, data, const {}),
+      );
+      templateLogHook = null;
+    },
+  );
+
   test('generated expressions: same check results as the core', () {
     final r = Random(1);
     for (var n = 0; n < 4000; n++) {
