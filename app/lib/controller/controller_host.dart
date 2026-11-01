@@ -334,9 +334,10 @@ class ControllerHost {
     String? savedPoster, {
     List<String>? addresses,
     List<String> checkinUrls = const [],
-  }) => _fieldAddresses(
-    addresses,
-  ).plan(saved: savedPosterUrls(savedPoster), checkinUrls: checkinUrls).san;
+  }) =>
+      _fieldAddresses(addresses)
+          .plan(saved: savedPosterUrls(savedPoster), checkinUrls: checkinUrls)
+          .san;
 
   Future<List<String>> _currentAddresses() async =>
       boot.addresses ?? await _addressesOf();

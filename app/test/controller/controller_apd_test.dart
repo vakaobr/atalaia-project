@@ -38,9 +38,8 @@ void main() {
   late ControllerEngine engine;
   late ControllerCheckin svc;
   late ControllerApi api;
-  final limits = File(
-    'lib/chrono/limit_templates/portugal.yaml',
-  ).readAsStringSync();
+  final limits = File('lib/chrono/limit_templates/portugal.yaml')
+      .readAsStringSync();
 
   setUp(() {
     wall = t0;
@@ -115,9 +114,9 @@ void main() {
   /// The staff row of the player [who] (default: the latest to check in).
   Map<String, Object?> row(int gid, [String? who]) {
     final list = svc.listCheckins(ApiViewer.gm, gid)['checkins']! as List;
-    return (list.firstWhere((r) => (r as Map)['player_id'] == (who ?? pid))
-            as Map)
-        .cast<String, Object?>();
+    return (list.firstWhere(
+      (r) => (r as Map)['player_id'] == (who ?? pid),
+    ) as Map).cast<String, Object?>();
   }
 
   test('the rule is a check-in setting: default, saved, refused when bad', () {

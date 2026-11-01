@@ -185,19 +185,16 @@ void main() {
       );
     });
 
-    test(
-      'the callback the browser session ends on is read as a social login return',
-      () {
-        // What BrowserPlugin hands to LinkPlugin.deliver, which sends it as "link".
-        final back = OidcReturn.parse(
-          'https://club.example/app/oidc?s=AAAAAAAAAAAAAAAAAAAA#oidc=ticket123',
-        );
-        expect(back, isNotNull);
-        expect(back!.site, Uri.parse('https://club.example'));
-        expect(back.nonce, 'AAAAAAAAAAAAAAAAAAAA');
-        expect(back.ticket, 'ticket123');
-      },
-    );
+    test('the callback the browser session ends on is read as a social login return', () {
+      // What BrowserPlugin hands to LinkPlugin.deliver, which sends it as "link".
+      final back = OidcReturn.parse(
+        'https://club.example/app/oidc?s=AAAAAAAAAAAAAAAAAAAA#oidc=ticket123',
+      );
+      expect(back, isNotNull);
+      expect(back!.site, Uri.parse('https://club.example'));
+      expect(back.nonce, 'AAAAAAAAAAAAAAAAAAAA');
+      expect(back.ticket, 'ticket123');
+    });
 
     test('passkeys: available, create and get pass the request JSON', () async {
       final calls = mockMethods('org.atalaia.app/passkeys', (call) async {

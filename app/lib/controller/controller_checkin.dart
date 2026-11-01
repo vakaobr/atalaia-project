@@ -1416,8 +1416,7 @@ class ControllerCheckin {
     if (ca == null) {
       out['text'] = null;
       out['problem_code'] = 'https_off';
-      out['problem'] =
-          "HTTPS is off on this phone controller: the poster needs the field's CA";
+      out['problem'] = "HTTPS is off on this phone controller: the poster needs the field's CA";
     } else if ((p['urls']! as List).isEmpty) {
       out['text'] = null;
       out['problem_code'] = 'no_address';
@@ -4212,9 +4211,8 @@ class ControllerCheckin {
           '${r['type']}|${r['class']}|${r['make_model']}',
       ];
       if (old.length != wanted.length ||
-          [
-            for (var i = 0; i < old.length; i++) old[i] != wanted[i],
-          ].any((x) => x)) {
+          [for (var i = 0; i < old.length; i++) old[i] != wanted[i]]
+              .any((x) => x)) {
         changed.add('replicas');
       }
     }

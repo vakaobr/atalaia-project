@@ -26,9 +26,9 @@ class MessageSchema {
   MessageSchema._(this.names, this.fields);
 
   factory MessageSchema.load() {
-    final doc =
-        loadYaml(File('../protocol/schema/messages.yaml').readAsStringSync())
-            as YamlMap;
+    final doc = loadYaml(
+      File('../protocol/schema/messages.yaml').readAsStringSync(),
+    ) as YamlMap;
     final names = <int, String>{
       for (final m in doc['messages'] as YamlList)
         (m as YamlMap)['id'] as int: m['name'] as String,

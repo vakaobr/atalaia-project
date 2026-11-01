@@ -59,9 +59,8 @@ void main() {
       ControllerCheckin(
         engine,
         CheckinConfig(
-          limitsYaml: File(
-            'lib/chrono/limit_templates/portugal.yaml',
-          ).readAsStringSync(),
+          limitsYaml: File('lib/chrono/limit_templates/portugal.yaml')
+              .readAsStringSync(),
           utcDay: true,
         ),
       );

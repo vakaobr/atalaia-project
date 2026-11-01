@@ -204,9 +204,8 @@ class FakeField {
     final who = token == null ? null : tokens[token];
     FieldResponse err(int status, String detail) =>
         FieldResponse(status, {'detail': detail});
-    final confirmPath = RegExp(
-      r'^/games/42/checkins/(p-[a-z0-9]+)$',
-    ).firstMatch(path);
+    final confirmPath = RegExp(r'^/games/42/checkins/(p-[a-z0-9]+)$')
+        .firstMatch(path);
     if (method == 'PATCH' && confirmPath != null) {
       if (who == null || _role(token!, who) != 'marshal') {
         return err(403, 'staff only');

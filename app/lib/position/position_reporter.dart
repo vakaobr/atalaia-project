@@ -32,8 +32,9 @@ import '../checkin/checkin_client.dart';
 import '../platform/location.dart';
 import 'beacon_scanner.dart';
 
-typedef SendReports =
-    Future<Map<String, Object?>> Function(List<Map<String, Object?>> reports);
+typedef SendReports = Future<Map<String, Object?>> Function(
+  List<Map<String, Object?>> reports,
+);
 
 class PositionReporter extends ChangeNotifier {
   PositionReporter({

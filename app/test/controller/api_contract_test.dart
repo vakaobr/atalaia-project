@@ -252,9 +252,8 @@ void main() {
   final tokens = (vectors['tokens'] as Map).cast<String, String>();
   final schema = EventSchema.load();
   final wallStart = vectors['wall_start'] as int;
-  final limits = File(
-    'lib/chrono/limit_templates/portugal.yaml',
-  ).readAsStringSync();
+  final limits = File('lib/chrono/limit_templates/portugal.yaml')
+      .readAsStringSync();
   late AtalaiaCore core;
 
   setUpAll(() => core = AtalaiaCore.open(coreLibraryPath()));
@@ -961,11 +960,10 @@ void main() {
                 key['sid']! as Uint8List,
                 key['sealed']! as Uint8List,
               );
-              check(
-                spec['opened'] ?? const <String, Object?>{},
-                {'join_key': _hex(join), 'field_name': name},
-                'step $i: the sealed key',
-              );
+              check(spec['opened'] ?? const <String, Object?>{}, {
+                'join_key': _hex(join),
+                'field_name': name,
+              }, 'step $i: the sealed key');
               final result = (spec['result'] as String?) ?? 'adopted';
               final fp = spec['fingerprint'] != null
                   ? _unhex(spec['fingerprint']! as String)

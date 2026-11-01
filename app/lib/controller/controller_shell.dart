@@ -44,8 +44,9 @@ final class ControllerAssets {
   final String apdsJson;
 }
 
-typedef ControllerAssetsLoader =
-    Future<ControllerAssets> Function(String limitTemplate);
+typedef ControllerAssetsLoader = Future<ControllerAssets> Function(
+  String limitTemplate,
+);
 
 /// [ControllerAssetsLoader] from the APK's assets (rootBundle).
 Future<ControllerAssets> bundledControllerAssets(String limitTemplate) async {

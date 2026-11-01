@@ -1011,8 +1011,7 @@ class ControllerEngine {
     _field = null;
     _fieldScores = {};
     _boxEnd = null;
-    _radio
-        ?.flush(); // frames still waiting for their gap go now: the key goes next
+    _radio?.flush(); // frames still waiting for their gap go now: the key goes next
     modem?.clear(); // the modem forgets the key
     _radio = null;
     _fc = null;
@@ -1890,9 +1889,8 @@ class ControllerEngine {
     final int node;
     if (nodeIdValue == null) {
       final used = _usedIds(fc);
-      node = [
-        for (var i = 1; i < 0xffff; i++) i,
-      ].firstWhere((i) => !used.contains(i));
+      node = [for (var i = 1; i < 0xffff; i++) i]
+          .firstWhere((i) => !used.contains(i));
     } else {
       node = _int(nodeIdValue, 'node_id');
     }

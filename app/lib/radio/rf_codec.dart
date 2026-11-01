@@ -19,17 +19,16 @@ import '../protocol/cbor.dart';
 
 /// The core's EVENT payload (atalaia/codec.h through dart:ffi), or null when
 /// the codec refuses the event.
-typedef EventEncoder =
-    Uint8List? Function({
-      required int node,
-      required int seq,
-      required int tMs,
-      required String type,
-      required int team,
-      required int squad,
-      required int prio,
-      required String? dataJson,
-    });
+typedef EventEncoder = Uint8List? Function({
+  required int node,
+  required int seq,
+  required int tMs,
+  required String type,
+  required int team,
+  required int squad,
+  required int prio,
+  required String? dataJson,
+});
 
 /// Message types (the header's last byte).
 abstract final class RfType {

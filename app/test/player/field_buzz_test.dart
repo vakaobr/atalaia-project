@@ -127,29 +127,26 @@ void main() {
       },
     );
 
-    test(
-      'the activation buzz follows the setting, the spectator rule and the rate limit',
-      () {
-        on = false;
-        final off = make();
-        expect(off.onEvent(_ev('progressive.activated')), isNull);
-        on = true;
-        expect(
-          make(role: 'spectator').onEvent(_ev('progressive.activated')),
-          isNull,
-        );
-        final b = make();
-        // activation right after a completion of the player's team: one buzz
-        expect(
-          b.onEvent(_ev('progressive.completed', team: 'red')),
-          Buzz.captured,
-        );
-        expect(b.onEvent(_ev('progressive.activated')), isNull);
-        clock = clock.add(const Duration(seconds: 2));
-        expect(b.onEvent(_ev('progressive.activated')), Buzz.boxActivated);
-        expect(played, [Buzz.captured.pattern, Buzz.boxActivated.pattern]);
-      },
-    );
+    test('the activation buzz follows the setting, the spectator rule and the rate limit', () {
+      on = false;
+      final off = make();
+      expect(off.onEvent(_ev('progressive.activated')), isNull);
+      on = true;
+      expect(
+        make(role: 'spectator').onEvent(_ev('progressive.activated')),
+        isNull,
+      );
+      final b = make();
+      // activation right after a completion of the player's team: one buzz
+      expect(
+        b.onEvent(_ev('progressive.completed', team: 'red')),
+        Buzz.captured,
+      );
+      expect(b.onEvent(_ev('progressive.activated')), isNull);
+      clock = clock.add(const Duration(seconds: 2));
+      expect(b.onEvent(_ev('progressive.activated')), Buzz.boxActivated);
+      expect(played, [Buzz.captured.pattern, Buzz.boxActivated.pattern]);
+    });
 
     test('events that do not buzz', () {
       final b = make();

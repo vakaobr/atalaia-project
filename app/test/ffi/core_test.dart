@@ -30,9 +30,9 @@ void main() {
 
   test('the version is the one core/CMakeLists.txt and version.h declare', () {
     final cmake = File('../core/CMakeLists.txt').readAsStringSync();
-    final number = RegExp(
-      r'project\(atalaia_core VERSION (\S+)',
-    ).firstMatch(cmake)!.group(1);
+    final number = RegExp(r'project\(atalaia_core VERSION (\S+)')
+        .firstMatch(cmake)!
+        .group(1);
     // A development core adds version.h's pre-release ("0.3.0-dev", FV-1).
     final pre = RegExp(r'#define ATALAIA_VERSION_PRERELEASE "([^"]*)"')
         .firstMatch(
@@ -43,13 +43,9 @@ void main() {
   });
 
   group('event vectors (protocol/vectors/events.yaml) through the C codec', () {
-    final doc =
-        plain(
-              loadYaml(
-                File('../protocol/vectors/events.yaml').readAsStringSync(),
-              ),
-            )
-            as Map<String, Object?>;
+    final doc = plain(
+      loadYaml(File('../protocol/vectors/events.yaml').readAsStringSync()),
+    ) as Map<String, Object?>;
     final schema = EventSchema.load();
     for (final c in (doc['valid']! as List).cast<Map<String, Object?>>()) {
       test(c['name']! as String, () {
@@ -126,9 +122,8 @@ void main() {
   });
 
   test('screen templates: the core parses, refuses and fills in', () {
-    final countdown = File(
-      '../modes/bomb/assets/screens/countdown.yaml',
-    ).readAsStringSync();
+    final countdown = File('../modes/bomb/assets/screens/countdown.yaml')
+        .readAsStringSync();
     expect(core.checkScreen(countdown), isNull);
     expect(core.checkScreen('template: x\nwidgets: 3\n'), isNotNull);
     expect(
@@ -201,8 +196,7 @@ void main() {
         final node = CoreNode.create(
           core,
           NodeSpec(
-            source:
-                "on('go', function() for i = 1, 4 do log(rand(1, 1000000)) end end)",
+            source: "on('go', function() for i = 1, 4 do log(rand(1, 1000000)) end end)",
             chunkName: '@rand.lua',
             nodeId: nodeId,
             gameSeed: seed,
@@ -246,8 +240,7 @@ void main() {
     final node = CoreNode.create(
       core,
       const NodeSpec(
-        source:
-            'log(tostring(io) .. " " .. tostring(os) .. " " .. tostring(package))',
+        source: 'log(tostring(io) .. " " .. tostring(os) .. " " .. tostring(package))',
         chunkName: '@sandbox.lua',
       ),
       handlers: NodeHandlers(onLog: logs.add),

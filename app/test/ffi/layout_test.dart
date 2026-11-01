@@ -23,9 +23,9 @@ void main() {
 
   setUpAll(() {
     final stub = AtalaiaCore.open(stubLibraryPath());
-    layout =
-        jsonDecode(stub.bindings.stubLayout().toDartString())
-            as Map<String, dynamic>;
+    layout = jsonDecode(
+      stub.bindings.stubLayout().toDartString(),
+    ) as Map<String, dynamic>;
   });
 
   /// Compares sizeof and every field offset of [cName] with the Dart struct

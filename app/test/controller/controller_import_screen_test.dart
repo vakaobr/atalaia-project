@@ -48,9 +48,8 @@ void main() {
   late ControllerApi api;
   late int gameId;
   final calls = <Map<String, Object?>>[];
-  final limits = File(
-    'lib/chrono/limit_templates/portugal.yaml',
-  ).readAsStringSync();
+  final limits = File('lib/chrono/limit_templates/portugal.yaml')
+      .readAsStringSync();
 
   setUp(() {
     engine = ControllerEngine(
@@ -383,11 +382,9 @@ void main() {
       ])
         code:
             (jsonDecode(
-                      File(
-                        '../controller/console/src/i18n/$code.json',
-                      ).readAsStringSync(),
-                    )
-                    as Map<String, dynamic>)['checkin_import']
+                  File('../controller/console/src/i18n/$code.json')
+                      .readAsStringSync(),
+                ) as Map<String, dynamic>)['checkin_import']
                 as Map<String, dynamic>,
     };
     final tables = {

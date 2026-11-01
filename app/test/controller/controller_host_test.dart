@@ -31,9 +31,8 @@ import '../support/core_libs.dart';
 import '../support/pod_host.dart';
 
 final joinKey = Uint8List.fromList(List.generate(32, (i) => 100 + i));
-final limits = File(
-  'lib/chrono/limit_templates/portugal.yaml',
-).readAsStringSync();
+final limits = File('lib/chrono/limit_templates/portugal.yaml')
+    .readAsStringSync();
 
 Future<bool> waitFor(
   FutureOr<bool> Function() ok, {

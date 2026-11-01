@@ -1675,9 +1675,10 @@ bool _cotText(String? value, int limit) =>
     value != null &&
     value.runes.length <= limit &&
     value ==
-        _pyStrip(
-          value,
-        ).split(RegExp(r'\s+')).where((w) => w.isNotEmpty).join(' ');
+        _pyStrip(value)
+            .split(RegExp(r'\s+'))
+            .where((w) => w.isNotEmpty)
+            .join(' ');
 
 bool _argb(String? value) {
   if (value == null || !_cotArgbRe.hasMatch(value)) return false;

@@ -507,9 +507,8 @@ void main() {
     await tester.pumpAndSettle();
     await tapVisible(tester, find.byKey(const Key('vibrate-on-events')));
     await tester.pumpAndSettle();
-    await AppScope.read(
-      tester.element(find.byType(SettingsScreen)),
-    ).update((x) => x.joinKeyHex = key);
+    await AppScope.read(tester.element(find.byType(SettingsScreen)))
+        .update((x) => x.joinKeyHex = key);
     await tester.pumpAndSettle();
     final file = File('${dir.path}/settings.json');
     expect(file.existsSync(), isTrue, reason: 'settings.json in the folder');
@@ -768,38 +767,36 @@ void main() {
 
   // --- 9: marshal validation ---------------------------------------------------
 
-  itest(
-    '9. a player who is not on the GM\'s marshal list is refused',
-    (tester) async {
-      if (_skipped(_needs(_controller.isNotEmpty, _noController))) {
-        return;
-      }
-      final (player, why) = await _checkIn();
-      if (player == null) {
-        markTestSkipped(why!);
-        return;
-      }
-      addTearDown(player.leave);
-      final settings = AppSettings();
-      await tester.pumpWidget(
-        deviceApp(settings: settings, store: await player.store(settings)),
-      );
-      await waitFor(tester, find.byKey(const Key('role-marshal')));
-      await tapVisible(tester, find.byKey(const Key('role-marshal')));
-      final pt = _s(AppLanguage.pt);
-      await waitFor(tester, find.text(pt.t('marshal.not_listed')));
-      expect(find.byKey(const Key('marshal-status')), findsOneWidget);
-      expect(
-        find.byKey(const Key('marshal-chrono')),
-        findsNothing,
-        reason: 'the tools stay closed',
-      );
-      expect(settings.marshalValidation, isNull);
-      expect(settings.marshalId, isEmpty);
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-    timeout: const Timeout(Duration(minutes: 2)),
-  );
+  itest('9. a player who is not on the GM\'s marshal list is refused', (
+    tester,
+  ) async {
+    if (_skipped(_needs(_controller.isNotEmpty, _noController))) {
+      return;
+    }
+    final (player, why) = await _checkIn();
+    if (player == null) {
+      markTestSkipped(why!);
+      return;
+    }
+    addTearDown(player.leave);
+    final settings = AppSettings();
+    await tester.pumpWidget(
+      deviceApp(settings: settings, store: await player.store(settings)),
+    );
+    await waitFor(tester, find.byKey(const Key('role-marshal')));
+    await tapVisible(tester, find.byKey(const Key('role-marshal')));
+    final pt = _s(AppLanguage.pt);
+    await waitFor(tester, find.text(pt.t('marshal.not_listed')));
+    expect(find.byKey(const Key('marshal-status')), findsOneWidget);
+    expect(
+      find.byKey(const Key('marshal-chrono')),
+      findsNothing,
+      reason: 'the tools stay closed',
+    );
+    expect(settings.marshalValidation, isNull);
+    expect(settings.marshalId, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, timeout: const Timeout(Duration(minutes: 2)));
 
   itest(
     '9. a player the GM lists is accepted, and refused again once removed',
@@ -895,23 +892,21 @@ void main() {
     timeout: const Timeout(Duration(minutes: 2)),
   );
 
-  itest(
-    '10. the controller\'s own console loads in the web view',
-    (tester) async {
-      if (_skipped(
-        _androidHasIt ??
-            _needsDevice ??
-            _needs(_controller.isNotEmpty, _noController),
-      )) {
-        return;
-      }
-      await _openConsole(tester, _controller);
-      // The console's page is titled "Atalaia", and asks for a code itself.
-      await _expectTitle(tester, 'Atalaia');
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-    timeout: const Timeout(Duration(minutes: 2)),
-  );
+  itest('10. the controller\'s own console loads in the web view', (
+    tester,
+  ) async {
+    if (_skipped(
+      _androidHasIt ??
+          _needsDevice ??
+          _needs(_controller.isNotEmpty, _noController),
+    )) {
+      return;
+    }
+    await _openConsole(tester, _controller);
+    // The console's page is titled "Atalaia", and asks for a code itself.
+    await _expectTitle(tester, 'Atalaia');
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, timeout: const Timeout(Duration(minutes: 2)));
 
   // --- 11: the haptics ----------------------------------------------------------
 

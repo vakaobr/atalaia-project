@@ -38,41 +38,38 @@ void main() {
       expect(field.caFetches, 1);
     });
 
-    test(
-      'a poster with another fingerprint is refused with both short forms',
-      () async {
-        final field = FakeField();
-        final trust = FieldTrust(MemoryAppStore(), fetch: field.fetchCa);
-        await trust.pin(parsePoster(field.posterText()));
-        final other = Uint8List(32)..fillRange(0, 32, 0xab);
-        final forged = parsePoster(field.posterText(ca: other));
-        await expectLater(
-          trust.pin(forged),
-          throwsA(
-            isA<TrustException>()
-                .having((e) => e.reason, 'reason', TrustFailure.changed)
-                .having(
-                  (e) => e.knownShort,
-                  'known',
-                  shortFingerprint(field.sha256Bytes),
-                )
-                .having((e) => e.newShort, 'new', 'ABAB ABAB ABAB ABAB'),
+    test('a poster with another fingerprint is refused with both short forms', () async {
+      final field = FakeField();
+      final trust = FieldTrust(MemoryAppStore(), fetch: field.fetchCa);
+      await trust.pin(parsePoster(field.posterText()));
+      final other = Uint8List(32)..fillRange(0, 32, 0xab);
+      final forged = parsePoster(field.posterText(ca: other));
+      await expectLater(
+        trust.pin(forged),
+        throwsA(
+          isA<TrustException>()
+              .having((e) => e.reason, 'reason', TrustFailure.changed)
+              .having(
+                (e) => e.knownShort,
+                'known',
+                shortFingerprint(field.sha256Bytes),
+              )
+              .having((e) => e.newShort, 'new', 'ABAB ABAB ABAB ABAB'),
+        ),
+      );
+      await trust.forget(field.fieldId);
+      // Only after forgetting the field; then the controller's answer decides.
+      await expectLater(
+        trust.pin(forged),
+        throwsA(
+          isA<TrustException>().having(
+            (e) => e.reason,
+            'reason',
+            TrustFailure.mismatch,
           ),
-        );
-        await trust.forget(field.fieldId);
-        // Only after forgetting the field; then the controller's answer decides.
-        await expectLater(
-          trust.pin(forged),
-          throwsA(
-            isA<TrustException>().having(
-              (e) => e.reason,
-              'reason',
-              TrustFailure.mismatch,
-            ),
-          ),
-        );
-      },
-    );
+        ),
+      );
+    });
 
     test('a controller that sends no certificate is not trusted', () async {
       final trust = FieldTrust(MemoryAppStore(), fetch: (_) async => 'hello');
@@ -246,44 +243,41 @@ void main() {
     });
   });
 
-  test(
-    "my replicas keep their declaration id in a game and their field's registry id",
-    () async {
-      final store = CheckinStore(MemoryAppStore());
-      final r = MyReplica(
-        id: 'r1',
-        type: 'aeg',
-        replicaClass: 'rifle',
-        makeModel: 'TM AK',
-      );
-      r.replicaIds['campo-norte'] = '0a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3d';
-      await store.saveReplica(r);
-      await store.saveReplica(
-        MyReplica(id: 'r2', type: 'gbb', replicaClass: 'cqb'),
-      );
-      final c = FieldCheckin(
-        fieldId: 'campo-norte',
-        gameId: 42,
-        gameName: 'Domingo',
-        playerId: 'p-abcdefgh2345',
-        token: 't',
-        exp: 0,
-        status: 'checked_in',
-        role: 'player',
-      );
-      final first = store.declarationsFor(c, ['r1', 'r2']);
-      final again = store.declarationsFor(c, ['r1']);
-      expect(again.single.declarationId, first.first.declarationId);
-      expect(first.first.replicaId, '0a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3d');
-      expect(first.last.replicaId, isNull);
-      for (final d in first) {
-        expect(declarationProblem(d.toRequest()), isNull);
-      }
-      await store.saveCheckin(c);
-      final loaded = CheckinStore(store.store);
-      await loaded.load();
-      expect(loaded.latest('campo-norte')!.declarations, c.declarations);
-      expect(loaded.replicas.map((x) => x.id), ['r1', 'r2']);
-    },
-  );
+  test("my replicas keep their declaration id in a game and their field's registry id", () async {
+    final store = CheckinStore(MemoryAppStore());
+    final r = MyReplica(
+      id: 'r1',
+      type: 'aeg',
+      replicaClass: 'rifle',
+      makeModel: 'TM AK',
+    );
+    r.replicaIds['campo-norte'] = '0a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3d';
+    await store.saveReplica(r);
+    await store.saveReplica(
+      MyReplica(id: 'r2', type: 'gbb', replicaClass: 'cqb'),
+    );
+    final c = FieldCheckin(
+      fieldId: 'campo-norte',
+      gameId: 42,
+      gameName: 'Domingo',
+      playerId: 'p-abcdefgh2345',
+      token: 't',
+      exp: 0,
+      status: 'checked_in',
+      role: 'player',
+    );
+    final first = store.declarationsFor(c, ['r1', 'r2']);
+    final again = store.declarationsFor(c, ['r1']);
+    expect(again.single.declarationId, first.first.declarationId);
+    expect(first.first.replicaId, '0a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3d');
+    expect(first.last.replicaId, isNull);
+    for (final d in first) {
+      expect(declarationProblem(d.toRequest()), isNull);
+    }
+    await store.saveCheckin(c);
+    final loaded = CheckinStore(store.store);
+    await loaded.load();
+    expect(loaded.latest('campo-norte')!.declarations, c.declarations);
+    expect(loaded.replicas.map((x) => x.id), ['r1', 'r2']);
+  });
 }

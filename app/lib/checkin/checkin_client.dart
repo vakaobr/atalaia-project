@@ -61,8 +61,11 @@ abstract interface class FieldHttp {
 /// the race's probe (a "does this address answer, and is it the field's
 /// controller"). The same security context as every request, so an address
 /// held by another device fails here exactly as it would later.
-typedef FieldProbe =
-    Future<void> Function(PinnedField field, Uri url, RaceCancel cancel);
+typedef FieldProbe = Future<void> Function(
+  PinnedField field,
+  Uri url,
+  RaceCancel cancel,
+);
 
 Future<void> ioProbe(PinnedField field, Uri url, RaceCancel cancel) async {
   final task = await SecureSocket.startConnect(
