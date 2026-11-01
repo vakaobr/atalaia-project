@@ -25,7 +25,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   # HMAC-SHA256 for player tags, player tokens and join payloads (Dart team, pure Dart).
-  crypto: 3.0.7
+  crypto: 3.0.8
   # Ed25519 for chrono records; the pure-Dart implementation (DartEd25519) is used.
   cryptography: 2.9.0
   # calloc, malloc and UTF-8 strings for the dart:ffi bridge to the core (Dart team).
