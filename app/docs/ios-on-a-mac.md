@@ -418,6 +418,8 @@ the controller's console follows.
 
 The other on-device tests run the same way (`flutter test integration_test/<file>
 -d <iPhone or simulator id>`). State on 2026-10-26:
+`integration_test/keystore_test.dart` (the Keychain vault, see "Secrets at
+rest" below) passes in the simulator (5/5, 2026-11-01).
 `integration_test/site_registration_test.dart` passes on the iPhone (1/1) and in
 the simulator; `integration_test/check_in_test.dart` failed on the iPhone on its
 fixed 10-year server certificate (see Troubleshooting), now makes a 365-day one at
@@ -598,6 +600,37 @@ ten minutes pass, as with a closed Custom Tab on Android); a passkey that alread
 exists for the account is not hidden from the "add" sheet by the app (the
 system replaces a passkey with the same account and site); Android's
 `no_credential` answer has no iOS twin (closing the sheet is `cancelled`).
+
+## Secrets at rest: the Keychain (decisions IOSK-1 to IOSK-6)
+
+The few secrets the app keeps (the field join key, the marshal's private key,
+the read code, the player's secret at each field, the site refresh token, a
+scoreboard link's token) are sealed as on Android: `secrets.enc` in the app's
+private folder holds them encrypted with AES-256-GCM (the same format as
+Android's), and `settings.json` has none of them. The key is one item in the
+app's Keychain (`KeychainVaultPlugin.swift`, channel `org.atalaia.app/keystore`,
+the same as Android's `KeystorePlugin.kt`):
+
+- **Accessibility** `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`:
+  readable once the phone has been unlocked after a restart; never in an
+  iCloud or Finder backup, never synced by iCloud Keychain, never moved to a new
+  phone. No Face ID or passcode prompt (Android's key asks for none either).
+- **Earlier installs** kept the secrets in `settings.json`. The first start of
+  this version seals them, reads the sealed file back, and only then rewrites
+  `settings.json` without them; if the Keychain fails, nothing is lost and the
+  next start tries again (the same code as Android's migration,
+  `lib/storage/app_store.dart`).
+- **A lost key** (a new phone, a damaged file) reads as "no secrets": the app
+  asks to join the field and log in again, as on Android.
+- **After uninstalling**, iOS may keep the Keychain item (iOS keeps an app's
+  Keychain items when it is deleted). It is a random key with no personal data
+  and opens nothing once the folder is gone; a reinstall reuses it for new
+  secrets.
+
+Tested by `integration_test/keystore_test.dart` (the real Keychain: seal and
+open, a tampered or short file, the store's round trip, the migration of a
+plaintext file, data sealed by another key) in the simulator and on an iPhone:
+`flutter test integration_test/keystore_test.dart -d <id>`.
 
 ## What does not work on iOS, and why
 
