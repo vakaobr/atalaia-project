@@ -1630,6 +1630,66 @@
       "failed": "falhou"
     }
   },
+  "access_tokens": {
+    "title": "Códigos de acesso temporários",
+    "intro": "Dá ao telemóvel de um árbitro, a um GM visitante, a um teste automático ou a um ecrã de espetadores um código próprio, em vez do código do GM ou do código só de leitura. Cada código tem um nome, diz o que pode fazer, deixa de funcionar sozinho passado o tempo escolhido (7 dias, no máximo) e pode ser revogado de imediato. Um código feito aqui não pode fazer outros códigos.",
+    "label": "Nome",
+    "label_hint": "Árbitro Ana, sábado",
+    "scope": "Pode fazer",
+    "scopes": {
+      "read": "Só ler",
+      "marshals": "Ler e gerir marshals",
+      "gm": "GM completo"
+    },
+    "scope_help": {
+      "read": "Como o código só de leitura: acompanhar o jogo, sem mudar nada.",
+      "marshals": "Só de leitura, mais juntar, mudar e retirar marshals. Mais nada.",
+      "gm": "Tudo o que o código do GM faz, exceto fazer códigos de acesso."
+    },
+    "lifetime": "Válido durante",
+    "lifetimes": {
+      "1h": "1 hora",
+      "4h": "4 horas",
+      "8h": "8 horas (um dia de jogo)",
+      "1d": "1 dia",
+      "3d": "3 dias",
+      "7d": "7 dias (o máximo)"
+    },
+    "game": "Jogo",
+    "all_games": "Qualquer jogo",
+    "game_help": "Limita a um só jogo o que o código pode mudar. As listas de jogos e o feed em direto continuam a mostrar todos os jogos.",
+    "create": "Fazer código de acesso",
+    "made": "Código de acesso “{label}” feito.",
+    "once": "Copia-o agora: só aparece esta vez e não se pode voltar a consultar, só revogar.",
+    "summary": "{scope}, válido até {until}.",
+    "summary_game": "Só o jogo {game}.",
+    "address": "Endereço do controlador",
+    "qr_label": "Código QR que inicia sessão num telemóvel com o novo código de acesso",
+    "qr_help": "Lê-o com a câmara do telemóvel para abrir a consola (o marcador, no caso de um código só de leitura) com a sessão já iniciada. Mostra-o só a quem for usá-lo: quem o tiver pode agir com ele até expirar ou ser revogado.",
+    "no_link": "Este controlador ainda não tem nenhum endereço para pôr num código QR: vê os endereços do cartaz de check-in. Escreve o código à mão.",
+    "done": "Concluído",
+    "empty": "Não há códigos de acesso.",
+    "list": "Códigos de acesso",
+    "expires": "Termina",
+    "last_used": "Última utilização",
+    "status": "Estado",
+    "statuses": {
+      "active": "Ativo",
+      "expired": "Expirado",
+      "revoked": "Revogado"
+    },
+    "revoke": "Revogar",
+    "confirm_revoke": "Revogar “{label}”? Deixa de funcionar de imediato.",
+    "activity": "Atividade recente",
+    "audit": {
+      "created": "feito",
+      "used": "utilizado",
+      "refused": "recusado",
+      "revoked": "revogado",
+      "expired": "expirado"
+    },
+    "failed": "Não foi possível carregar a lista."
+  },
   "scoreboard_share": {
     "title": "Partilhar o marcador com quem joga",
     "intro": "Quem joga lê este código QR com a app (Participante > Seguir um jogo sem check-in) para ver o tempo, os pontos e os acontecimentos do jogo no telemóvel. O código só deixa ver: não muda nada.",

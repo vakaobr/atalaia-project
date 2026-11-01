@@ -90,6 +90,10 @@ Schema 19 (maintainer decision 2026-10-30, SR-88) adds ``game_results``: a game'
 ended (``purge_game_results``). The game's name, mode, teams, the teams' final totals, the winner, how it
 ended and when it ran: **no player id, no member list, no squad** (a squad of fewer than three would identify
 its members). Read-only in the API (``GET /api/v1/game-results``). A schema 18 file gets the empty table.
+
+Schema 20 (maintainer decision 2026-11-01) adds ``access_tokens`` (the short-lived, scoped, revocable tokens the GM
+makes, access_tokens.py: only the SHA-256 of the secret is stored, never the token) and ``token_audit`` (who made,
+used, was refused and revoked which token; no secrets). A schema 19 file gets the empty tables.
 """
 
 from __future__ import annotations
@@ -108,7 +112,8 @@ from typing import Any, Callable, Optional
 
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
+TOKEN_AUDIT_DAYS = 365  # the access tokens' audit log (access_tokens.py)
 GAME_RESULTS_DAYS = 365  # team results (no player ids) outlive the game's own data by this long, from its end
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes, per level's plan
@@ -443,6 +448,27 @@ CREATE TABLE IF NOT EXISTS player_positions (
     report_json TEXT NOT NULL,
     received_at REAL NOT NULL,
     PRIMARY KEY (game_id, player_id)
+);
+CREATE TABLE IF NOT EXISTS access_tokens (
+    id           TEXT PRIMARY KEY,                     -- schema 20: public part of the token (8 hex digits)
+    label        TEXT NOT NULL,
+    scope        TEXT NOT NULL,                        -- read, gm or marshals
+    game_id      INTEGER,                              -- limited to this game, or NULL
+    secret_hash  TEXT NOT NULL,                        -- SHA-256 of the secret part, hex
+    created_at   REAL NOT NULL,
+    expires_at   REAL NOT NULL,
+    last_used_at REAL,
+    last_used_from TEXT,
+    revoked_at   REAL
+);
+CREATE TABLE IF NOT EXISTS token_audit (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    at          REAL NOT NULL,
+    kind        TEXT NOT NULL,                         -- created, used, refused, revoked, expired
+    token_id    TEXT,
+    label       TEXT,
+    scope       TEXT,
+    detail      TEXT
 );
 """
 
@@ -972,6 +998,45 @@ class Store:
             return self._exec("DELETE FROM sync_state").rowcount
 
     # --- the remote GM's log (schema 8, plan phase 19) ----------------------------------
+
+    # --- access tokens (access_tokens.py) --------------------------------------------
+
+    def add_access_token(self, row: dict[str, Any]) -> None:
+        self._exec("INSERT INTO access_tokens (id, label, scope, game_id, secret_hash, created_at, expires_at) "
+                   "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                   (row["id"], row["label"], row["scope"], row["game_id"], row["secret_hash"],
+                    row["created_at"], row["expires_at"]))
+
+    def access_token(self, token_id: str) -> Optional[dict[str, Any]]:
+        row = self._exec("SELECT * FROM access_tokens WHERE id = ?", (token_id,)).fetchone()
+        return dict(row) if row is not None else None
+
+    def access_tokens(self) -> list[dict[str, Any]]:
+        rows = self._exec("SELECT * FROM access_tokens ORDER BY created_at, id").fetchall()
+        return [dict(r) for r in rows]
+
+    def revoke_access_token(self, token_id: str, now: float) -> bool:
+        return self._exec("UPDATE access_tokens SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
+                          (now, token_id)).rowcount == 1
+
+    def touch_access_token(self, token_id: str, now: float, source: str) -> None:
+        self._exec("UPDATE access_tokens SET last_used_at = ?, last_used_from = ? WHERE id = ?",
+                   (now, source, token_id))
+
+    def purge_access_tokens(self, expired_before: float) -> int:
+        """Drops the tokens that expired (or were revoked and expired) before ``expired_before``, and old audit rows."""
+        with self._lock:
+            self._exec("DELETE FROM token_audit WHERE at < ?", (expired_before - TOKEN_AUDIT_DAYS * 86400,))
+            return self._exec("DELETE FROM access_tokens WHERE expires_at < ?", (expired_before,)).rowcount
+
+    def add_token_audit(self, at: float, kind: str, token_id: Optional[str], label: Optional[str],
+                        scope: Optional[str], detail: str = "") -> None:
+        self._exec("INSERT INTO token_audit (at, kind, token_id, label, scope, detail) VALUES (?, ?, ?, ?, ?, ?)",
+                   (at, kind, token_id, label, scope, detail))
+
+    def token_audit(self, limit: int = 200) -> list[dict[str, Any]]:
+        rows = self._exec("SELECT * FROM token_audit ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
 
     def remote_command(self, command_id: str) -> Optional[dict[str, Any]]:
         row = self._exec("SELECT * FROM remote_commands WHERE command_id = ?", (command_id,)).fetchone()

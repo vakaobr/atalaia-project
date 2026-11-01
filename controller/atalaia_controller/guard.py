@@ -158,7 +158,7 @@ def _loopback(host: Optional[str]) -> bool:
 
 
 class TokenTransport:
-    """``auth``: an Auth (its ``role`` tells the GM and read tokens apart); ``https_port``: 0 = HTTPS off,
+    """``auth``: an Auth (its ``transport_role`` tells the GM and read tokens, and an access token by its scope, apart); ``https_port``: 0 = HTTPS off,
     nothing is refused (the controller would be unusable)."""
 
     def __init__(self, app: Any, auth: Any, https_port: int, trusted_proxy: bool = False) -> None:
@@ -186,7 +186,7 @@ class TokenTransport:
             token = stream_token(scope)
         if not token:
             return False
-        if self.auth.role(token) == "read":  # reading only: the scoreboard's page and its stream
+        if self.auth.transport_role(token) == "read":  # reading only: the scoreboard's page and its stream
             if scope["type"] == "websocket":
                 return scope["path"] != "/api/v1/stream"
             return scope["method"] not in ("GET", "HEAD", "OPTIONS")

@@ -29,6 +29,7 @@ import { BrandingSettings, TeamPresets, FieldBrand, accentRef } from './componen
 import { discover } from './components/box-invites.js';
 import { RemoteGmLog } from './components/remote-gm-log.js';
 import { ScoreboardShare } from './components/scoreboard-share.js';
+import { AccessTokens } from './components/access-tokens.js';
 import { PosterPrompt, PosterPromptSetting, posterPromptWanted } from './components/poster-prompt.js';
 
 const TABS = ['game', 'checkin', 'field', 'nodes', 'join', 'adopt', 'presets', 'scenarios', 'feed', 'controller', 'settings'];
@@ -118,7 +119,7 @@ class App extends Component {
             saveToken(token);
             this.token = token; // used at once below: setState is applied later
             this.features = Array.isArray(who.features) ? who.features : null;
-            this.setState({ token, role: who.role, loginError: '', features: this.features });
+            this.setState({ token, role: who.role, loginError: '', features: this.features, accessTokens: who.access_tokens === true });
             this.startStream();
             this.loadCatalogue();
             this.checkPosterChanged(who.role);
@@ -151,7 +152,7 @@ class App extends Component {
         this.token = '';
         this.features = null;
         saveToken('');
-        this.setState({ token: '', role: null, features: null, connected: null, loginError: reason || '',
+        this.setState({ token: '', role: null, features: null, accessTokens: false, connected: null, loginError: reason || '',
                         game: null, status: null, nodes: {}, feed: [], alerts: [], radio: null, posterPrompt: null });
     }
 
@@ -603,7 +604,7 @@ class App extends Component {
             return html`${this.serves('radio') && html`<${RadioSettings} app=${this} />`}<${BoxLanguageSettings} app=${this} /><${MapFetchingSettings} app=${this} />${
                 this.state.role === 'gm' && this.serves('checkin') && html`<${PosterPromptSetting} />`}${
                 this.serves('branding') && html`<${BrandingSettings} app=${this} />`}${
-                this.serves('presets') && html`<${TeamPresets} app=${this} />`}`;
+                this.serves('presets') && html`<${TeamPresets} app=${this} />`}<${AccessTokens} app=${this} />`;
         default:
             return null;
         }

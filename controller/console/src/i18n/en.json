@@ -1630,6 +1630,66 @@
       "failed": "failed"
     }
   },
+  "access_tokens": {
+    "title": "Access tokens",
+    "intro": "Give a referee's phone, a visiting GM, an automated test or a spectator screen its own code instead of the GM or read-only code. Each code has a label, says what it may do, stops working by itself after the time you choose (7 days at most) and can be revoked at once. A code made here cannot make other codes.",
+    "label": "Label",
+    "label_hint": "Referee Ana, Saturday",
+    "scope": "May do",
+    "scopes": {
+      "read": "Read only",
+      "marshals": "Read and manage marshals",
+      "gm": "Full GM"
+    },
+    "scope_help": {
+      "read": "Like the read-only code: follow the game, change nothing.",
+      "marshals": "Read-only, plus add, change and remove marshals. Nothing else.",
+      "gm": "Everything the GM code does, except making access tokens."
+    },
+    "lifetime": "Valid for",
+    "lifetimes": {
+      "1h": "1 hour",
+      "4h": "4 hours",
+      "8h": "8 hours (a game day)",
+      "1d": "1 day",
+      "3d": "3 days",
+      "7d": "7 days (the most)"
+    },
+    "game": "Game",
+    "all_games": "Any game",
+    "game_help": "Limits what the code can change to one game. Lists of games and the live feed still show every game.",
+    "create": "Make access token",
+    "made": "Access token “{label}” made.",
+    "once": "Copy it now: it is shown only once and cannot be looked up again, only revoked.",
+    "summary": "{scope}, valid until {until}.",
+    "summary_game": "Only game {game}.",
+    "address": "Controller's address",
+    "qr_label": "QR code that signs a phone in with the new access token",
+    "qr_help": "Scan it with the phone's camera to open the console (the scoreboard, for a read-only code) already signed in. Show it only to that person: whoever has it can act with it until it expires or is revoked.",
+    "no_link": "This controller has no address to put in a QR code yet: see the check-in poster's addresses. Type the code in by hand.",
+    "done": "Done",
+    "empty": "No access tokens.",
+    "list": "Access tokens",
+    "expires": "Expires",
+    "last_used": "Last used",
+    "status": "State",
+    "statuses": {
+      "active": "Active",
+      "expired": "Expired",
+      "revoked": "Revoked"
+    },
+    "revoke": "Revoke",
+    "confirm_revoke": "Revoke “{label}”? It stops working at once.",
+    "activity": "Recent activity",
+    "audit": {
+      "created": "made",
+      "used": "used",
+      "refused": "refused",
+      "revoked": "revoked",
+      "expired": "expired"
+    },
+    "failed": "The list could not be loaded."
+  },
   "scoreboard_share": {
     "title": "Share the scoreboard with players",
     "intro": "Players scan this QR code with the app (Player > Follow a game without checking in) to see the time, the points and the events of the game on their phones. The code only lets them watch: it changes nothing.",

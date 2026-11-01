@@ -1729,7 +1729,7 @@ class ConsoleBrowserTests(unittest.TestCase):
     # app/lib/controller/controller_api.dart (slice S7a added the radio and the field plan)
     PHONE_FEATURES = ["checkin", "join", "box_language", "positions", "radio", "field"]
     # The console's calls in the areas a phone controller does not serve yet.
-    PHONE_HIDDEN = re.compile(r"/api/v1/(presets|team-presets|crests|field/branding|boxes|adopt|firmware|atak"
+    PHONE_HIDDEN = re.compile(r"/api/v1/(tokens|presets|team-presets|crests|field/branding|boxes|adopt|firmware|atak"
                               r"|scenarios|schedule|mode-packages|mode-fetch|controller/promote|controller/join"
                               r"|games/\d+/(invites|teams))")   # remote-gm is served: S7 slice, the Controller tab's log
 
@@ -1739,6 +1739,7 @@ class ConsoleBrowserTests(unittest.TestCase):
             resp = route.fetch()
             body = resp.json()
             body["features"] = self.PHONE_FEATURES
+            body.pop("access_tokens", None)  # the phone controller has no access tokens
             route.fulfill(response=resp, json=body)
         page.route("**/api/v1/whoami", whoami)
         page.on("request", lambda r: requests.append(r.url))
@@ -1764,6 +1765,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("radio-current")).to_be_visible()  # slice S7a
         expect(page.get_by_test_id("branding-settings")).to_have_count(0)
         expect(page.get_by_test_id("team-presets")).to_have_count(0)
+        expect(page.get_by_test_id("access-tokens")).to_have_count(0)  # no such thing on the phone controller
         page.get_by_test_id("tab-controller").click()
         missing = page.get_by_test_id("controller-missing")
         expect(missing).to_contain_text("Este controlador ainda não serve estas partes da consola")
@@ -4148,7 +4150,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v15').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v16').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):
@@ -5040,6 +5042,70 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(dialog).to_be_visible()                    # held while the control has focus
         page.keyboard.press("Escape")
         expect(dialog).to_be_hidden(timeout=1500)
+
+    # --- access tokens: short-lived, scoped, revocable (access_tokens.py) ---------------------------
+
+    def test_access_tokens_are_made_shown_once_used_and_revoked(self):
+        if not ZBARIMG:
+            self.skipTest("zbarimg is not installed")
+        self.field.create_game()
+        page = self.console()
+        page.get_by_test_id("tab-settings").click()
+        box = page.get_by_test_id("access-tokens")
+        expect(box).to_contain_text("Códigos de acesso temporários")
+        expect(page.get_by_test_id("tokens-empty")).to_be_visible()
+        expect(page.get_by_test_id("token-scope-help")).to_contain_text("Como o código só de leitura")
+        page.get_by_test_id("token-label").fill("Árbitro Ana")
+        page.get_by_test_id("token-scope").select_option("marshals")
+        expect(page.get_by_test_id("token-game")).to_be_disabled()      # a game limit is for read and gm
+        page.get_by_test_id("token-scope").select_option("gm")
+        page.get_by_test_id("token-ttl").select_option("3600")
+        page.get_by_test_id("token-create").click()
+        made = page.get_by_test_id("token-made")
+        expect(made).to_be_visible()
+        token = page.get_by_test_id("token-value").inner_text()
+        self.assertRegex(token, r"^atk_[0-9a-f]{8}\.[A-Za-z0-9_-]{43}$")
+        expect(made).to_contain_text("só aparece esta vez")
+        want = f"http://10.42.0.1:{self.field.port}/console/#token={token}"
+        with tempfile.TemporaryDirectory() as tmp:
+            shot = os.path.join(tmp, "token.png")
+            page.get_by_test_id("token-qr").screenshot(path=shot)
+            out = read_qr(shot)
+        self.assertEqual((out.returncode, out.stdout), (0, want), out.stderr)
+        # The list says what it is, never the code again.
+        row = page.get_by_test_id("token-row")
+        expect(row).to_have_count(1)
+        expect(row).to_contain_text("Árbitro Ana")
+        expect(row).to_have_attribute("data-status", "active")
+        page.get_by_test_id("token-done").click()
+        expect(page.get_by_test_id("token-made")).to_have_count(0)
+        self.assertNotIn(token.split(".")[1], page.content())
+        # The token logs a phone into the console, as a GM, without this panel (it cannot make tokens).
+        phone = self.console(token)
+        phone.get_by_test_id("tab-settings").click()
+        expect(phone.get_by_test_id("box-language-settings")).to_be_visible()
+        expect(phone.get_by_test_id("access-tokens")).to_have_count(0)
+        expect(phone.get_by_test_id("readonly")).to_have_count(0)
+        # Revoking ends it at once: the phone's next call is refused and it is sent back to the login.
+        page.once("dialog", lambda d: d.accept())
+        page.get_by_test_id("token-revoke").click()
+        expect(page.get_by_test_id("token-row")).to_have_attribute("data-status", "revoked")
+        self.assertEqual(httpx.get(self.field.base + "/api/v1/whoami",
+                                   headers={"Authorization": f"Bearer {token}"}).status_code, 401)
+        phone.reload()
+        expect(phone.get_by_test_id("login")).to_be_visible()
+        self.drop_errors("401")
+        # A read scope token is a read-only console, and the read code never gets the panel either.
+        r = self.field.http.post("/api/v1/tokens", json={"label": "Ecrã", "scope": "read", "ttl_s": 3600})
+        self.assertEqual(r.status_code, 201)
+        self.assertTrue(r.json()["links"][0].startswith(f"http://10.42.0.1:{self.field.port}/scoreboard#token=atk_"))
+        reader = self.console(r.json()["token"])
+        expect(reader.get_by_test_id("readonly")).to_be_visible()
+        reader.get_by_test_id("tab-settings").click()
+        expect(reader.get_by_test_id("access-tokens")).to_have_count(0)
+        read = self.console(READ)
+        read.get_by_test_id("tab-settings").click()
+        expect(read.get_by_test_id("access-tokens")).to_have_count(0)
 
     # --- "share with players": the scoreboard's QR code (decision PD13) -------------------
 

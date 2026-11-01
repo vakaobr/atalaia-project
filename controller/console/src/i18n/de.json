@@ -1630,6 +1630,66 @@
       "failed": "fehlgeschlagen"
     }
   },
+  "access_tokens": {
+    "title": "Zugangscodes auf Zeit",
+    "intro": "Gib dem Handy einer Schiedsperson, einem Gast-GM, einem automatischen Test oder einem Zuschauerbildschirm einen eigenen Code statt des GM- oder Nur-Lese-Codes. Jeder Code hat eine Bezeichnung, legt fest, was er darf, läuft nach der gewählten Zeit (höchstens 7 Tage) von selbst ab und lässt sich sofort widerrufen. Ein hier erzeugter Code kann keine weiteren Codes erzeugen.",
+    "label": "Bezeichnung",
+    "label_hint": "Schiedsrichterin Ana, Samstag",
+    "scope": "Darf",
+    "scopes": {
+      "read": "Nur lesen",
+      "marshals": "Lesen und Marshals verwalten",
+      "gm": "Voller GM"
+    },
+    "scope_help": {
+      "read": "Wie der Nur-Lese-Code: das Spiel verfolgen, nichts ändern.",
+      "marshals": "Nur lesen, dazu Marshals hinzufügen, ändern und entfernen. Sonst nichts.",
+      "gm": "Alles, was der GM-Code kann, außer Zugangscodes zu erzeugen."
+    },
+    "lifetime": "Gültig für",
+    "lifetimes": {
+      "1h": "1 Stunde",
+      "4h": "4 Stunden",
+      "8h": "8 Stunden (ein Spieltag)",
+      "1d": "1 Tag",
+      "3d": "3 Tage",
+      "7d": "7 Tage (das Maximum)"
+    },
+    "game": "Spiel",
+    "all_games": "Jedes Spiel",
+    "game_help": "Beschränkt auf ein Spiel, was der Code ändern darf. Spielelisten und der Live-Feed zeigen weiterhin alle Spiele.",
+    "create": "Zugangscode erzeugen",
+    "made": "Zugangscode „{label}“ erzeugt.",
+    "once": "Jetzt kopieren: Er wird nur dieses eine Mal angezeigt und lässt sich nicht erneut abrufen, nur widerrufen.",
+    "summary": "{scope}, gültig bis {until}.",
+    "summary_game": "Nur Spiel {game}.",
+    "address": "Adresse des Controllers",
+    "qr_label": "QR-Code, der ein Handy mit dem neuen Zugangscode anmeldet",
+    "qr_help": "Mit der Handykamera scannen, um die Konsole (bei einem Nur-Lese-Code die Anzeigetafel) bereits angemeldet zu öffnen. Nur der Person zeigen, die ihn nutzt: Wer ihn hat, kann damit handeln, bis er abläuft oder widerrufen wird.",
+    "no_link": "Dieser Controller hat noch keine Adresse für einen QR-Code: siehe die Adressen auf dem Check-in-Plakat. Den Code von Hand eintippen.",
+    "done": "Fertig",
+    "empty": "Keine Zugangscodes.",
+    "list": "Zugangscodes",
+    "expires": "Läuft ab",
+    "last_used": "Zuletzt benutzt",
+    "status": "Zustand",
+    "statuses": {
+      "active": "Aktiv",
+      "expired": "Abgelaufen",
+      "revoked": "Widerrufen"
+    },
+    "revoke": "Widerrufen",
+    "confirm_revoke": "„{label}“ widerrufen? Er funktioniert sofort nicht mehr.",
+    "activity": "Letzte Aktivität",
+    "audit": {
+      "created": "erzeugt",
+      "used": "benutzt",
+      "refused": "abgelehnt",
+      "revoked": "widerrufen",
+      "expired": "abgelaufen"
+    },
+    "failed": "Die Liste konnte nicht geladen werden."
+  },
   "scoreboard_share": {
     "title": "Anzeigetafel mit Spielenden teilen",
     "intro": "Spielende scannen diesen QR-Code mit der App (Spielen > Ein Spiel ohne Check-in verfolgen), um Zeit, Punkte und Ereignisse des Spiels auf dem Handy zu sehen. Der Code erlaubt nur das Zuschauen: Er ändert nichts.",

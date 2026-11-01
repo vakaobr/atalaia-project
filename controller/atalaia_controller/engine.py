@@ -61,6 +61,7 @@ from atalaia_sim.protocol import MESSAGE_TYPES
 
 from . import channels, radio_modem, radio_region, visibility
 from . import scenario_service as scenarios
+from .access_tokens import AccessTokens
 from .pairing import Pairing
 from .reinvite import Reinvite
 from .config import Config
@@ -353,6 +354,7 @@ class Controller:
         self._clock = clock
         self._wall = wall  # the wall clock of a game's created_at, started_at and ended_at (a contract case moves it)
         self._t0 = clock()
+        self.access_tokens = AccessTokens(store, wall)  # short-lived scoped API tokens (access_tokens.py)
         self._lock = threading.RLock()
         self._listeners: list[Callable[[dict[str, Any]], None]] = []
         self._thread: Optional[threading.Thread] = None
@@ -1919,6 +1921,7 @@ class Controller:
     # --- the tick -------------------------------------------------------------
 
     def tick(self) -> None:
+        self.access_tokens.purge()  # expired and revoked tokens, at most every 10 minutes
         if self.checkin is not None:
             self.checkin.purge()  # retention (ADR-P3-13), at most every 10 minutes
         if self.branding is not None:

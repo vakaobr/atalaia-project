@@ -152,11 +152,13 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from atalaia_sim.mode import ModeError
-from fastapi import Body, Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import Body, Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, WebSocketException
+from starlette.requests import HTTPConnection
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
+from . import access_tokens as acc
 from . import checkin as checkinmod
 from . import schedule as schedulemod
 from . import field_grid as gridmod
@@ -198,8 +200,10 @@ class Auth:
         self.gm_token = gm_token
         self.read_token = read_token
         self.checkin: Optional[checkinmod.Checkin] = None  # set by create_app
+        self.access: Optional[acc.AccessTokens] = None  # set by create_app (access_tokens.py)
 
     def role(self, token: Optional[str]) -> Optional[str]:
+        """The role of the GM or read token (the two that never expire); None for anything else."""
         if not token:
             return None
         if hmac.compare_digest(token.encode(), self.gm_token.encode()):
@@ -208,17 +212,36 @@ class Auth:
             return "read"
         return None
 
+    def transport_role(self, token: Optional[str]) -> Optional[str]:
+        """The most a token can be, for the plain-HTTP guard: a valid access token by its scope's ceiling."""
+        if token and token.startswith(acc.PREFIX) and self.access is not None:
+            row = self.access.verify(token)
+            return acc.ceiling_role(row["scope"]) if row else None
+        return self.role(token)
+
     def viewer(self, token: Optional[str]) -> Optional[Viewer]:
-        """Who a token is: the GM or read token, or a valid player token (None: refused)."""
+        """Who a token is: the GM or read token, an access token (by its scope's base role) or a valid
+        player token (None: refused)."""
         role = self.role(token)
         if role is not None:
             return Viewer(role)
+        if token and token.startswith(acc.PREFIX) and self.access is not None:
+            row = self.access.verify(token)
+            return Viewer(acc.BASE_ROLE[row["scope"]]) if row else None
         if token and token.startswith("apt") and self.checkin is not None:
             try:
                 return self.checkin.resolve(token)
             except checkinmod.Unauthorized:
                 return None
         return None
+
+
+class Who:
+    """A GM or read token (``row`` None) or a valid access token (``row``: its stored record) of one request."""
+
+    def __init__(self, role: str, row: Optional[dict[str, Any]] = None) -> None:
+        self.role = role  # the base role: what the token is on a route no grant names
+        self.row = row
 
 
 def _token(request: Request) -> Optional[str]:
@@ -245,7 +268,65 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
             if on_stop:
                 on_stop()
 
-    app = FastAPI(title="Atalaia field controller", version=__version__, lifespan=lifespan)
+    auth.access = controller.access_tokens
+    unset = object()
+
+    def client_of(conn: HTTPConnection) -> str:
+        return conn.client.host if conn.client else "?"
+
+    def resolve(conn: HTTPConnection) -> Optional[Who]:
+        """Who the GM, read or access token of this request is (once per request); None: none of those
+        (no token, a player's token, or a refused one: the routes' own checks then answer 401)."""
+        cached = getattr(conn.state, "who", unset)
+        if cached is not unset:
+            return cached
+        token = _token(conn)
+        if conn.scope["type"] == "websocket" and not token:
+            token = stream_token(conn.scope)
+        who: Optional[Who] = None
+        if token and token.startswith(acc.PREFIX):
+            try:
+                row = auth.access.verify(token, client_of(conn)) if auth.access is not None else None
+            except acc.TooManyFailures:
+                if conn.scope["type"] == "websocket":
+                    raise WebSocketException(4429, "too many wrong tokens from this address")
+                raise HTTPException(429, "too many wrong tokens from this address; wait a minute")
+            if row is not None:
+                who = Who(acc.BASE_ROLE[row["scope"]], row)
+        elif token:
+            role = auth.role(token)
+            who = Who(role) if role else None
+        conn.state.who = who
+        return who
+
+    def route_of(conn: HTTPConnection) -> tuple[str, str]:
+        route = conn.scope.get("route")
+        return conn.scope.get("method", "GET"), getattr(route, "path", conn.url.path)
+
+    def role_here(conn: HTTPConnection, who: Who) -> str:
+        """The role this token has on this route: an access token's scope may grant more than its base role."""
+        if who.row is None:
+            return who.role
+        return acc.effective_role(who.row["scope"], *route_of(conn))
+
+    def gate(conn: HTTPConnection) -> None:
+        """In front of every route, HTTP and WebSocket (``FastAPI(dependencies=...)``): the one place an
+        access token's scope, game limit and use are judged. The routes' require_* read ``role_here``."""
+        who = resolve(conn)
+        if who is None or who.row is None:
+            return
+        method, path = route_of(conn)
+        why = acc.denial(who.row, method, path, conn.path_params)
+        if why is not None:
+            auth.access.note_refused(who.row, why, client_of(conn))
+            if conn.scope["type"] == "websocket":
+                raise WebSocketException(4403, why)
+            raise HTTPException(403, why)
+        auth.access.note_use(who.row, client_of(conn))
+
+    app = FastAPI(title="Atalaia field controller", version=__version__, lifespan=lifespan,
+                  dependencies=[Depends(gate)])
+    app.state.gate = gate
     # Added last = outermost: the body limit judges a request first (FLD-9), then the token's transport (FLD-4).
     app.add_middleware(TokenTransport, auth=auth, https_port=https_port, trusted_proxy=trusted_proxy)
     app.add_middleware(BodyLimit)
@@ -259,7 +340,8 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     branding = controller.branding if controller.branding is not None else Branding(controller)
 
     def viewer(request: Request) -> Viewer:
-        v = auth.viewer(_token(request))
+        who = resolve(request)
+        v = Viewer(who.role) if who is not None else auth.viewer(_token(request))
         if v is None:
             raise HTTPException(401, "a GM, read or player token is needed", {"WWW-Authenticate": "Bearer"})
         return v
@@ -270,10 +352,10 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
 
     def require_console(request: Request) -> str:
         """The GM or read token (the console's views of the controller itself)."""
-        role = auth.role(_token(request))
-        if role is None:
+        who = resolve(request)
+        if who is None:
             raise HTTPException(401, "a read or GM token is needed", {"WWW-Authenticate": "Bearer"})
-        return role
+        return role_here(request, who)
 
     def require_player(request: Request) -> Viewer:
         v = viewer(request)
@@ -286,16 +368,21 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
             raise HTTPException(503, "field check-in is not set up on this controller")
         return checkin
 
-    def client_of(request: Request) -> str:
-        return request.client.host if request.client else "?"
-
     def require_gm(request: Request) -> str:
-        role = auth.role(_token(request))
-        if role is None:
+        who = resolve(request)
+        if who is None:
             raise HTTPException(401, "the GM token is needed", {"WWW-Authenticate": "Bearer"})
+        role = role_here(request, who)
         if role != "gm":
             raise HTTPException(403, "the read token cannot change the game; use the GM token")
         return role
+
+    def require_main_gm(request: Request) -> str:
+        """The GM token itself, not an access token of any scope (the access tokens' own routes)."""
+        who = resolve(request)
+        if who is not None and who.row is not None:
+            raise HTTPException(403, "access tokens are made and revoked with the main GM token only")
+        return require_gm(request)
 
     @app.exception_handler(ControllerError)
     async def controller_error(request: Request, exc: ControllerError):
@@ -335,10 +422,19 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         return {"ok": True, "version": __version__, "radio": controller.radio_state}
 
     @app.get("/api/v1/whoami")
-    def whoami(v: Viewer = Depends(require_read)) -> dict[str, Any]:
+    def whoami(request: Request, v: Viewer = Depends(require_read)) -> dict[str, Any]:
         """Which token this is ("gm", "read" or "player"): the console hides GM controls for "read",
-        and the tabs and panels of an area missing from "features" (decision PE24-70)."""
+        and the tabs and panels of an area missing from "features" (decision PE24-70). An access token
+        (access_tokens.py) says what it is in "token"; "access_tokens" is true for the main GM token,
+        the only one that manages them (the Android controller does not give the key: no such panel)."""
         out: dict[str, Any] = {"role": v.kind, "version": __version__, "features": list(FEATURES)}
+        who = resolve(request)
+        if who is not None and who.row is not None:
+            r = who.row
+            out["token"] = {"id": r["id"], "label": r["label"], "scope": r["scope"], "game_id": r["game_id"],
+                            "expires_at": r["expires_at"]}
+        elif who is not None and who.role == "gm":
+            out["access_tokens"] = True
         if v.kind == "player":
             out.update({"player_role": v.role, "player_id": v.player_id, "game_id": v.game_id,
                         "team": v.team, "squad": v.squad, "stale": v.stale})
@@ -1418,17 +1514,55 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         lists (the app's Player > Follow a game takes it); then, when HTTPS is on, the poster's https
         addresses with the field CA's SHA-256 as ``&ca=<64 hex>`` in the fragment (never sent to the
         server), which the app fetches from /api/v1/controller/ca, checks and pins. Secret: never cached."""
+        links = field_links("/scoreboard", auth.read_token, ca=True)
+        return JSONResponse({"links": links}, headers=NO_STORE)
+
+    def field_links(page: str, token: str, ca: bool) -> list[str]:
+        """``<address><page>#token=<token>`` for every address of this controller the check-in poster lists
+        (http on the API port, then https with ``&ca=`` when asked and the field has a CA)."""
+        if checkin is None:
+            return []
         hosts: list[str] = []
-        fields = need_checkin().poster_fields()
+        fields = checkin.poster_fields()
         for u in fields["urls"]:
             host = url_host(u)
             if host and host not in hosts:
                 hosts.append(host)
-        links = [f"http://{'[' + h + ']' if ':' in h else h}:{controller.cfg.api_port}/scoreboard#token={auth.read_token}"
+        links = [f"http://{'[' + h + ']' if ':' in h else h}:{controller.cfg.api_port}{page}#token={token}"
                  for h in hosts]
         if fields["ca_sha256"]:
-            links += [f"{u}/scoreboard#token={auth.read_token}&ca={fields['ca_sha256'].hex()}" for u in fields["urls"]]
-        return JSONResponse({"links": links}, headers=NO_STORE)
+            suffix = f"&ca={fields['ca_sha256'].hex()}" if ca else ""
+            links += [f"{u}{page}#token={token}{suffix}" for u in fields["urls"]]
+        return links
+
+    # --- access tokens (access_tokens.py): the main GM token only ---------------------------------
+
+    @app.exception_handler(acc.TokenError)
+    async def token_error(request: Request, exc: acc.TokenError):
+        return JSONResponse({"detail": str(exc)}, status_code=exc.status, headers=NO_STORE)
+
+    @app.post("/api/v1/tokens", status_code=201, dependencies=[Depends(require_main_gm)])
+    def token_create(body: Any = Body(None)) -> JSONResponse:
+        """Makes an access token: {label, scope: read|gm|marshals, ttl_s?, game_id?}. The token is in this
+        answer and nowhere else, ever; ``links`` are addresses that log a phone in (a QR code)."""
+        made = controller.access_tokens.create(body_map(body))
+        page = "/scoreboard" if made["scope"] == "read" else "/console/"
+        made["links"] = field_links(page, made["token"], ca=made["scope"] == "read")
+        return JSONResponse(made, status_code=201, headers=NO_STORE)
+
+    @app.get("/api/v1/tokens", dependencies=[Depends(require_main_gm)])
+    def token_list() -> JSONResponse:
+        return JSONResponse({"tokens": controller.access_tokens.list(), "scopes": list(acc.SCOPES),
+                             "default_ttl_s": acc.DEFAULT_TTL_S, "max_ttl_s": acc.MAX_TTL_S,
+                             "min_ttl_s": acc.MIN_TTL_S}, headers=NO_STORE)
+
+    @app.get("/api/v1/tokens/audit", dependencies=[Depends(require_main_gm)])
+    def token_audit(limit: int = 200) -> JSONResponse:
+        return JSONResponse({"audit": controller.access_tokens.audit(limit)}, headers=NO_STORE)
+
+    @app.delete("/api/v1/tokens/{token_id}", dependencies=[Depends(require_main_gm)])
+    def token_revoke(token_id: str) -> JSONResponse:
+        return JSONResponse(controller.access_tokens.revoke(token_id), headers=NO_STORE)
 
     def own_or_gm(v: Viewer, player_id: str) -> None:
         if not (v.is_gm_token or (v.kind == "player" and v.player_id == player_id)):
@@ -1505,7 +1639,8 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.websocket("/api/v1/stream")
     async def stream(ws: WebSocket) -> None:
         # Authorization header, the token subprotocol or, deprecated, ?token= (stream_auth.py, LIVE2-1).
-        v = auth.viewer(stream_token(ws.scope))
+        stream_tok = stream_token(ws.scope)
+        v = auth.viewer(stream_tok)
         if v is None:
             await ws.close(code=4401)
             return
@@ -1531,7 +1666,18 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
                     if isinstance(msg, dict) and msg.get("type") == "ping":
                         await ws.send_json({"type": "pong"})
 
-            tasks = [asyncio.ensure_future(sender()), asyncio.ensure_future(receiver())]
+            async def expiry() -> None:
+                # An access token that expires or is revoked ends its open stream (within 5 s).
+                if not (stream_tok and stream_tok.startswith(acc.PREFIX)):
+                    await asyncio.Event().wait()
+                while True:
+                    await asyncio.sleep(acc.STREAM_RECHECK_S)
+                    if auth.viewer(stream_tok) is None:
+                        await ws.close(code=4401)
+                        return
+
+            tasks = [asyncio.ensure_future(sender()), asyncio.ensure_future(receiver()),
+                     asyncio.ensure_future(expiry())]
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             for task in pending:
                 task.cancel()
