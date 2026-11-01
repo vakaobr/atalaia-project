@@ -15,7 +15,9 @@ import io
 import logging
 import os
 import stat
+import threading
 import unittest
+from unittest import mock
 
 from p3support import GM, READ, T0, Marshal, P3Case, bearer, declaration, new_identity
 from atalaia_controller import player_token
@@ -522,6 +524,55 @@ class StreamAndPrivacyTests(P3Case):
             for secret in ("Falc", "Peregrino", FED, "Sem App Nome"):
                 self.assertNotIn(secret, text)
         self.assertIn(me["player_id"], str(published))  # the event, with the id
+
+
+class GameEndsDuringAGetTests(P3Case):
+    """A GET of the live game (the check-in tab's chrono-list, GET /games/{id}) that meets the game's end
+    answers as for an ended game, never 409. The console's Check-in tab reloads the list on every stream
+    message, so a reload in flight when the GM ends the game is normal (found as a flaky console test,
+    test_checkin_tab_follows_the_live_game, 2026-10-26; engine.public_game)."""
+
+    def test_end_between_the_live_check_and_the_start_check(self):
+        g = self.new_game()
+        real = self.ctrl.start_check
+
+        def end_first():
+            self.ctrl.end_game(g["id"])  # the other thread's end, at the worst moment
+            return real()
+
+        with mock.patch.object(self.ctrl, "start_check", side_effect=end_first):
+            r = self.client.get(f"/api/v1/games/{g['id']}/chrono-list", headers=GM)
+            self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(self.ctrl.store.game(g["id"])["state"], "ended")
+        r = self.client.get(f"/api/v1/games/{g['id']}", headers=GM)
+        self.assertEqual((r.status_code, r.json()["live"]), (200, False))
+
+    def test_gets_while_games_end_never_conflict(self):
+        answers: list[tuple[str, int]] = []
+        gid: list[int] = []
+        stop = threading.Event()
+
+        def hammer():
+            while not stop.is_set():
+                if gid:
+                    for path in ("chrono-list", ""):
+                        r = self.client.get(f"/api/v1/games/{gid[-1]}/{path}".rstrip("/"), headers=GM)
+                        answers.append((path, r.status_code))
+
+        threads = [threading.Thread(target=hammer) for _ in range(3)]
+        for t in threads:
+            t.start()
+        try:
+            for _ in range(40):
+                g = self.new_game()
+                gid.append(g["id"])
+                self.assertEqual(self.client.post(f"/api/v1/games/{g['id']}/end", json={}, headers=GM).status_code, 200)
+        finally:
+            stop.set()
+            for t in threads:
+                t.join()
+        self.assertTrue(answers)
+        self.assertEqual({code for _, code in answers}, {200})
 
 
 if __name__ == "__main__":

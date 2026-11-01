@@ -655,7 +655,10 @@ class Controller:
 
     def public_game(self, game: dict[str, Any]) -> dict[str, Any]:
         out = dict(game)
-        live = self.game is not None and self.game["id"] == game["id"]
+        # One look at the live game and its engine: another thread (the game's end) can clear either
+        # between two reads, and a GET must never fail because of that.
+        cur, fc = self.game, self.fc
+        live = cur is not None and cur["id"] == game["id"]
         out["live"] = live
         meta = self.scenario_meta(game.get("mode_id"))
         if meta is not None:
@@ -664,12 +667,12 @@ class Controller:
                                               scenarios.reveal(self, game, meta))
             names = self.scenario_names if live else scenarios.node_names(self, game["id"])
             out["scenario_nodes"] = {str(k): v for k, v in sorted(names.items())}
-        if live and self.fc is not None:
-            out["game_time_ms"] = self.fc.game_time_ms
-            out["term"] = self.fc.term
+        if live and fc is not None:
+            out["game_time_ms"] = fc.game_time_ms
+            out["term"] = fc.term
         if live and self.key_lost:
             out["key_lost"] = True
-        if live and game.get("state") == "ready" and self.fc is not None and not game.get("joined"):
+        if live and game.get("state") == "ready" and fc is not None and not game.get("joined"):
             try:
                 out["start_check"] = self.start_check()
             except Conflict:

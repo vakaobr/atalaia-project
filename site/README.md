@@ -204,6 +204,25 @@ external addresses; if a page of the page table is missing in a language, or a t
 partial is unused; or if the site holds a generated page or diagram that nothing makes any more
 (delete it, or restore its page). `tools/check.sh` runs the same check.
 
+### The browser test
+
+`tools/site_browser_test.py` opens every generated page in all four languages at phone and desktop
+widths, in both colour schemes and with and without reduced motion, in headless Chromium: the flag
+links, the menus by keyboard, the footer, no sideways scroll, the mode animations. Run it with
+
+```sh
+python tools/docker_site_browser.py            # builds tools/dev/site-browser/Dockerfile on first use
+python tools/docker_site_browser.py -k flags   # only the tests whose name matches
+```
+
+The image is Playwright's own (`mcr.microsoft.com/playwright/python:v1.49.0-noble`), whose `python3`
+has no `playwright` module, plus the client pinned with hashes in `tools/dev/site-browser/`
+(`requirements.in` / `requirements.txt`, refresh recipe in the `.in` file). The runner removes its
+container (and, with `ATALAIA_VOLUME_SUFFIX` set, its image) when it is done. Run outside that image
+the test **fails** with "Playwright is not installed"; only `ATALAIA_SKIP_SITE_BROWSER=1` skips it, on
+purpose. Build the pages first (`python3 tools/build_site.py`) when you changed `src/` or `i18n/`: the
+test reads `site/` as it is.
+
 ### Adding a page
 
 1. Add it to `PAGES` in `tools/build_site.py`: its name and its folder in each language (a

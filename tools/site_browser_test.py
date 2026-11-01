@@ -2,8 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The project page's language flags and footer in a real browser (headless Chromium, Playwright).
 
-    docker run --rm -v "$PWD":/src:ro -w /src mcr.microsoft.com/playwright/python:v1.49.0-noble \
-        python3 tools/site_browser_test.py
+    python tools/docker_site_browser.py          (the way to run it: builds the image, runs, cleans up)
+    python tools/docker_site_browser.py -k flags only tests whose name matches
+
+The image is tools/dev/site-browser/Dockerfile: Playwright's Ubuntu image (Chromium only; its python3
+has no `playwright` module) plus the hash-pinned Playwright client. Run outside that image, the test
+FAILS when Playwright is missing; it never passes by skipping. Set ATALAIA_SKIP_SITE_BROWSER=1 to skip
+it on purpose (a machine with no browser), and the run says so.
 
 It serves site/ and opens every generated page, at a phone width and a desktop width, in the light
 and the dark colour scheme, and checks that: the four flags are links to the same page in each
@@ -17,6 +22,7 @@ from __future__ import annotations
 
 import functools
 import http.server
+import os
 import threading
 import unittest
 from pathlib import Path
@@ -42,7 +48,11 @@ class SiteFlags(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if sync_playwright is None:
-            raise unittest.SkipTest("Playwright is not installed")
+            if os.environ.get("ATALAIA_SKIP_SITE_BROWSER") == "1":
+                raise unittest.SkipTest("Playwright is not installed (ATALAIA_SKIP_SITE_BROWSER=1)")
+            raise RuntimeError(
+                "Playwright is not installed: run python tools/docker_site_browser.py (or set "
+                "ATALAIA_SKIP_SITE_BROWSER=1 to skip this test on purpose)")
         handler = functools.partial(Quiet, directory=str(SITE))
         cls.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
         threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()

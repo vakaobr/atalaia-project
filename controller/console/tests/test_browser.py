@@ -211,7 +211,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = ctx.new_page()
         page.on("pageerror", lambda e: self.errors.append(f"pageerror: {e}"))
         page.on("console", lambda m: self.errors.append(f"console: {m.text}") if m.type == "error" else None)
-        page.on("response", lambda r: self.errors.append(f"HTTP {r.status} {r.request.method} {r.url}")
+        page.on("response", lambda r: self.errors.append(f"HTTP {r.status} {r.request.method} {r.url}{self.body_of(r)}")
                 if r.status >= 400 else None)
         if setup is not None:
             setup(page)  # routes or listeners before the first request
@@ -224,6 +224,14 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("login").click()
         expect(page.get_by_test_id("tab-game")).to_be_visible()
         return page
+
+    @staticmethod
+    def body_of(response) -> str:
+        """The first bytes of a failed answer, for the report (the controller says why it refused)."""
+        try:
+            return " -> " + response.text()[:200]
+        except Exception:  # noqa: BLE001 - the page may have gone before the body arrived
+            return ""
 
     def drop_errors(self, *needles: str) -> None:
         """Forgets the console's reports of failures a test caused on purpose (a busy server, no answer)."""
