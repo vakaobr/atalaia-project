@@ -560,10 +560,12 @@ usa para reconhecer o teu telemóvel; as tuas réplicas; os teus bilhetes de
 inscrição; e, se usares uma conta do servidor, o token de renovação. **No
 Android, os segredos** (a chave de adesão ao campo, a chave privada do marshal, o código de leitura, o teu segredo em cada campo e o token de
 renovação do servidor) **estão selados com uma chave no Android Keystore** e
-nunca num ficheiro legível. **Num iPhone, os mesmos segredos ficam na pasta
-privada da app, protegidos pela proteção das apps do sistema; hoje não estão
-no Porta-chaves** [RESPONSÁVEL DO PROJETO: confirmar a redação].
-Desinstalar a app apaga tudo. A app não tem nenhuma biblioteca de análise,
+nunca num ficheiro legível. **Num iPhone, os mesmos segredos estão
+selados com uma chave no Porta-chaves do iOS**, guardada só neste telemóvel e
+nunca numa cópia de segurança [RESPONSÁVEL DO PROJETO: confirmar a redação].
+Desinstalar a app apaga tudo (num iPhone, o iOS pode manter essa chave, que
+não contém dados pessoais e não abre nada depois de os dados da app serem
+apagados). A app não tem nenhuma biblioteca de análise,
 publicidade ou relatórios de falhas.
 
 ## 10. Segurança

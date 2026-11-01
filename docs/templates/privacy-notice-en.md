@@ -540,9 +540,10 @@ account, the refresh token. **On Android the secrets** (the field's join
 key, the marshal's private key, the read code, your secret at each field
 and the site refresh token) **are sealed with a key in the Android
 Keystore** and never stored in a readable file. **On an iPhone the same
-secrets are kept in the app's private folder, protected by the system's
-app sandbox; they are not in the Keychain today** [MAINTAINER:
-confirm the wording]. Uninstalling the app deletes all of it. The app has
+secrets are sealed with a key in the iOS Keychain**, kept on this phone only
+and never in a backup [MAINTAINER: confirm the wording]. Uninstalling the
+app deletes all of it (on an iPhone, iOS may keep that key, which contains
+no personal data and opens nothing once the app's data is gone). The app has
 no analytics, advertising or crash-reporting library.
 
 ## 10. Security

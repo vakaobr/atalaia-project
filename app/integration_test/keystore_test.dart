@@ -1,12 +1,13 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// On an Android device or emulator: the real AndroidKeyStore behind the
-// secrets at rest (decision PD6, KeystorePlugin.kt). A sealed value is not
-// the plain one, opens again, changes if tampered with (read as a lost key,
-// never a crash), and a plaintext settings file from an earlier version is
-// migrated and its plaintext removed. On iOS the plugin does not exist and the
-// store must keep its earlier behaviour; on the host there is no plugin either.
+// On a phone, simulator or emulator: the real vault behind the secrets at
+// rest (decision PD6): the AndroidKeyStore on Android (KeystorePlugin.kt), a
+// key in the Keychain on iOS (KeychainVaultPlugin.swift, IOSK-1 to IOSK-6).
+// A sealed value is not the plain one, opens again, changes if tampered with
+// (read as a lost key, never a crash), and a plaintext settings file from an
+// earlier version is migrated and its plaintext removed. On the host there
+// is no plugin and the store must keep its earlier behaviour.
 
 import 'dart:convert';
 import 'dart:io';
@@ -44,8 +45,8 @@ void main() {
     ..marshalSeedHex = _seed
     ..readToken = 'read-code-1';
 
-  group('on Android', () {
-    testWidgets('the Keystore is available, and seals and opens', (_) async {
+  group('on a phone (Android Keystore, iOS Keychain)', () {
+    testWidgets('the vault is available, and seals and opens', (_) async {
       expect(await vault.available(), isTrue);
       final plain = Uint8List.fromList(utf8.encode('the join key'));
       final sealed = await vault.seal(plain);
@@ -54,6 +55,8 @@ void main() {
       expect(await vault.open(sealed), plain);
       // GCM: a fresh nonce each time
       expect(await vault.seal(plain), isNot(sealed));
+      // the key stays: a new vault object (the app's next start) opens it
+      expect(await ChannelSecretVault().open(sealed), plain);
     });
 
     testWidgets('a changed or short sealed value is a lost key', (_) async {
@@ -129,7 +132,7 @@ void main() {
         _joinKey,
       );
     });
-  }, skip: !onAndroidDevice);
+  }, skip: onHost);
 
   group('without the plugin', () {
     testWidgets('the store keeps its earlier behaviour', (_) async {
@@ -140,5 +143,5 @@ void main() {
       expect(sealedFile().existsSync(), isFalse);
       expect((await store.loadSettings()).marshalSeedHex, _seed);
     });
-  }, skip: onAndroidDevice);
+  }, skip: !onHost);
 }

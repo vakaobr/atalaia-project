@@ -13,7 +13,8 @@
 /// token that the site server sets as the `__Secure-atalaia_refresh`
 /// cookie. The access token stays in memory only; the refresh token is kept
 /// in the app's private storage with the other secrets (decision PD6:
-/// Android's app sandbox, backups off), never logged and never shown. Each
+/// sealed with the Keystore's or the Keychain's key, backups off), never
+/// logged and never shown. Each
 /// refresh (`POST /api/v1/auth/refresh`, the cookie and `X-Atalaia-Refresh:
 /// 1`) spends the old token and sets a new one; the server ends the session
 /// when a spent token comes back (a copy used elsewhere). So refreshes run
