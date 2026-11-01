@@ -225,11 +225,21 @@ void atalaia_radio_epoch_tag(const uint8_t key[ATALAIA_RF_KEY_SIZE],
  * a source's epoch (Amendment 24 item 3), so a draw under the epochs the box already used would be
  * deaf to every receiver that heard them, and could repeat a nonce of the first life. The box keeps
  * the highest epoch it ever used with any key as a separate u16 (read_floor / write_floor), written
- * before an epoch above it is used, and a lost store's epoch is drawn in
- * [max(ATALAIA_EPOCH_LOST_MIN, floor + 1), ATALAIA_EPOCH_LOST_MAX]. With no room left above the
- * floor the box does not transmit (tx_blocked), as with no random source: it is joined again with a
- * new key.
+ * before an epoch above it is used, so nothing above the floor was ever used (it is never restored
+ * from a backup: decision EPW-2, so the controllers' wider margin for a suspect floor is not needed
+ * here).
+ *
+ * Where the lost record's epoch is drawn (decision EPW-1, RFC 0001 Amendment 25's note: the draw
+ * the Pi and the phone make, protocol/vectors/tx_epoch.json): with no floor at all, uniformly over
+ * [LOST_MIN, LOST_MAX]; with a floor, uniformly in the LOWER HALF of the room above
+ * max(LOST_MIN, floor + 1 + ATALAIA_EPOCH_LOST_MARGIN), so each loss takes at most half of what is
+ * left and a few losses cannot use the range up. Where the margin does not fit below LOST_MAX it
+ * gives way (start = floor + 1). With no room left above the floor (floor LOST_MAX) the function
+ * returns false and the box does not transmit (tx_blocked), as with no random source: it is joined
+ * again with a new key.
  */
+#define ATALAIA_EPOCH_LOST_MARGIN 1024u
+bool atalaia_radio_epoch_lost_bounds(uint16_t floor, uint16_t *lo, uint16_t *hi);
 
 /* Packets a (re)started node sends first (HELLO, TIME) are searched this many
  * epochs above the source's last one: a box that rebooted in a crash loop is

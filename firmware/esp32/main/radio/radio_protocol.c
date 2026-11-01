@@ -285,6 +285,23 @@ static bool store_epoch(atalaia_radio_proto_t *rp, uint16_t epoch, bool resuming
     return save_store(rp, &st);
 }
 
+bool atalaia_radio_epoch_lost_bounds(uint16_t floor, uint16_t *lo, uint16_t *hi)
+{
+    if (floor == 0) {
+        *lo = ATALAIA_EPOCH_LOST_MIN;
+        *hi = ATALAIA_EPOCH_LOST_MAX;
+        return true;
+    }
+    uint32_t low = floor + 1u > ATALAIA_EPOCH_LOST_MIN ? floor + 1u : ATALAIA_EPOCH_LOST_MIN;
+    if (low > ATALAIA_EPOCH_LOST_MAX) return false;
+    uint32_t start = floor + 1u + ATALAIA_EPOCH_LOST_MARGIN;
+    if (start < ATALAIA_EPOCH_LOST_MIN) start = ATALAIA_EPOCH_LOST_MIN;
+    if (start > ATALAIA_EPOCH_LOST_MAX) start = low; /* the margin gives way, never the floor */
+    *lo = (uint16_t)start;
+    *hi = (uint16_t)(start + (ATALAIA_EPOCH_LOST_MAX - start + 2u) / 2u - 1u);
+    return true;
+}
+
 bool atalaia_radio_proto_boot_epoch(atalaia_radio_proto_t *rp, bool resuming)
 {
     if (rp->nvs == NULL) return true;
@@ -326,13 +343,12 @@ bool atalaia_radio_proto_boot_epoch(atalaia_radio_proto_t *rp, bool resuming)
         for (int i = 0; i < st.count; i++) {
             if (st.epoch[i] > floor) floor = st.epoch[i];
         }
-        uint32_t low = floor + 1u > ATALAIA_EPOCH_LOST_MIN ? floor + 1u : ATALAIA_EPOCH_LOST_MIN;
-        if (low > ATALAIA_EPOCH_LOST_MAX) {
+        uint16_t lo, hi;
+        if (!atalaia_radio_epoch_lost_bounds(floor, &lo, &hi)) {
             rp->tx_blocked = true; /* no epoch is left above what this box used: join it again */
             return false;
         }
-        new_epoch =
-            (uint16_t)(low + ((uint32_t)(r[0] << 8 | r[1]) % (ATALAIA_EPOCH_LOST_MAX - low + 1u)));
+        new_epoch = (uint16_t)(lo + ((uint32_t)(r[0] << 8 | r[1]) % ((uint32_t)hi - lo + 1u)));
         /* The floor is written before the epoch is used, and a draw that cannot be recorded is not
          * used: a second loss would otherwise draw below it. */
         if (!floor_raise(rp->nvs, new_epoch)) {

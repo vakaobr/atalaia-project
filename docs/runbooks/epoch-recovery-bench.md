@@ -37,7 +37,7 @@ The bench build adds two serial commands, for these steps only:
 ## 2. A second loss draws above the first (EP-2)
 
 1. On A, after step 1, let it reboot **three times** (reset) in the game: each epoch is one above the last (`E1+1`, `E1+2`, `E1+3`), and `epfloor` follows (it is written before the epoch is used; no console line, it is read back in the next step).
-2. `@epochwipe` on A again and restart. **Pass:** the log line's epoch `E2` is **greater than `E1+3`**, in `E1+4..61439`, whatever the random draw gave. Repeat the wipe three or four times: every `E` is above the last. A draw below an earlier one is a fail (and must be reported with both numbers: the draw is uniform above the floor, so a single failure is a bug, not bad luck).
+2. `@epochwipe` on A again and restart. **Pass:** the log line's epoch `E2` is **at least `E1+3+1+1024`** (the draw skips a margin of 1024 above the floor) and no more than the middle of what is left (the lower half of the room above that margin, decision EPW-1), whatever the random draw gave. Repeat the wipe three or four times: every `E` is above the last. A draw below an earlier one is a fail (and must be reported with both numbers: the draw is uniform in the lower half of the room above the floor plus a margin of 1024, never below the floor, so a single failure is a bug, not bad luck; the Pi and the phone draw the same way, shared vectors `protocol/vectors/tx_epoch.json`).
 3. After each wipe, A is found again as in step 1 (it may take longer when `E` is far above the controller's last name for it; the controller names a box heard more than 16 above its last epoch).
 
 ## 3. Both records lost (the case Amendment 25 leaves)

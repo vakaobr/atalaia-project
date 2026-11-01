@@ -14,6 +14,7 @@
 
 #include "check.h"
 #include "epoch_store_fake.h"
+#include "tx_epoch_vectors.h"
 #include "radio/radio_protocol.h"
 
 /* ---- NVS test stub -------------------------------------------------------- */
@@ -831,6 +832,78 @@ static void test_lost_epoch_store_starts_high(void)
     CHECK(!atalaia_radio_proto_boot_epoch(&rp, true) && rp.tx_blocked);
 }
 
+/* EPW-1: where a lost record's epoch is drawn is the one design the Pi and the phone use
+ * (protocol/vectors/tx_epoch.json, lost_lo / lost_hi per case): no floor, the whole range; a floor,
+ * the lower half of the room above floor + 1 + the margin (the margin gives way near the top);
+ * floor LOST_MAX, no room. The box's floor is its own NVS entry, written before use and never
+ * restored from a backup, so it has no "suspect" wider margin (decision EPW-2). */
+static void test_lost_epoch_draw_vectors(void)
+{
+    CHECK(TX_EPOCH_VECTOR_LOST_MIN == ATALAIA_EPOCH_LOST_MIN &&
+          TX_EPOCH_VECTOR_LOST_MAX == ATALAIA_EPOCH_LOST_MAX &&
+          TX_EPOCH_VECTOR_MARGIN == ATALAIA_EPOCH_LOST_MARGIN);
+    uint8_t key[16];
+    memset(key, 0x5a, sizeof(key));
+    for (size_t i = 0; i < TX_EPOCH_LOST_VECTOR_COUNT; i++) {
+        const tx_epoch_lost_vector_t *v = &tx_epoch_lost_vectors[i];
+        uint16_t lo = 0, hi = 0;
+        CHECK(atalaia_radio_epoch_lost_bounds(v->floor, &lo, &hi) == !v->refused);
+        if (!v->refused) CHECK(lo == v->lost_lo && hi == v->lost_hi);
+        /* And the boot takes its epoch there (lowest, highest and in between). */
+        for (uint32_t seed = 1; seed <= 40; seed++) {
+            epoch_fake_t f;
+            memset(&f, 0, sizeof(f));
+            f.rnd = seed * 2654435761u;
+            if (v->floor > 0) {
+                f.floor = v->floor;
+                f.have_floor = true;
+            }
+            atalaia_radio_nvs_ops_t ops = EPOCH_FAKE_OPS(&f, NULL, NULL, NULL);
+            atalaia_radio_proto_t rp;
+            atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, &ops);
+            atalaia_radio_proto_set_key(&rp, key);
+            bool ok = atalaia_radio_proto_boot_epoch(&rp, true);
+            CHECK(ok == !v->refused);
+            if (v->refused) {
+                CHECK(rp.tx_blocked && f.writes == 0);
+            } else {
+                CHECK(rp.epoch >= v->lost_lo && rp.epoch <= v->lost_hi && rp.epoch_lost);
+            }
+        }
+    }
+    /* The ends of the draw: the first and last value the random source can give. */
+    uint16_t lo, hi;
+    CHECK(atalaia_radio_epoch_lost_bounds(0, &lo, &hi) && lo == 4096 && hi == 61439);
+    CHECK(atalaia_radio_epoch_lost_bounds(61439, &lo, &hi) == false);
+}
+
+/* EPW-1: store losses in a row (each draw becomes the next floor) must not use the range up after
+ * two or three: the pre-fix uniform draw above the floor halved the room each time. */
+static void test_repeated_losses_fit(void)
+{
+    uint8_t key[16];
+    memset(key, 0x5a, sizeof(key));
+    int worst = 1000;
+    for (uint32_t seed = 1; seed <= 300; seed++) {
+        epoch_fake_t f;
+        memset(&f, 0, sizeof(f));
+        f.rnd = seed * 2654435761u;
+        atalaia_radio_nvs_ops_t ops = EPOCH_FAKE_OPS(&f, NULL, NULL, NULL);
+        atalaia_radio_proto_t rp;
+        atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, &ops);
+        atalaia_radio_proto_set_key(&rp, key);
+        int losses = 0;
+        for (;; losses++) {
+            f.len = 0; /* the blob is lost, the floor entry is not */
+            if (!atalaia_radio_proto_boot_epoch(&rp, true)) break;
+            CHECK(rp.epoch_lost && rp.epoch <= ATALAIA_EPOCH_LOST_MAX);
+            if (losses > 100) break;
+        }
+        if (losses < worst) worst = losses;
+    }
+    CHECK(worst >= 10);
+}
+
 /* EP-2: a second loss of the epoch store must not draw below the first. Receivers never lower a
  * source's epoch (Amendment 24), so a draw under what the box already used would be deaf to every
  * receiver that heard it, and could repeat a nonce of the first life. The box keeps the highest
@@ -988,6 +1061,8 @@ void run_radio_protocol_tests(void)
     test_boot_epoch_migration();
     test_lost_epoch_store_starts_high();
     test_second_store_loss_draws_above_the_first();
+    test_lost_epoch_draw_vectors();
+    test_repeated_losses_fit();
     test_replay_window_per_source();
     test_seq_wrap_increments_epoch();
     test_seq_wrap_nvs_fail_blocks_tx();
