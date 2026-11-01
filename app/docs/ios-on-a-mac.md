@@ -419,7 +419,8 @@ the controller's console follows.
 The other on-device tests run the same way (`flutter test integration_test/<file>
 -d <iPhone or simulator id>`). State on 2026-10-26:
 `integration_test/keystore_test.dart` (the Keychain vault, see "Secrets at
-rest" below) passes in the simulator (5/5, 2026-11-01).
+rest" below) passes in the simulator and on an iPhone 15 Pro Max (iOS 27.2,
+free Personal Team), 5/5 each, 2026-11-01.
 `integration_test/site_registration_test.dart` passes on the iPhone (1/1) and in
 the simulator; `integration_test/check_in_test.dart` failed on the iPhone on its
 fixed 10-year server certificate (see Troubleshooting), now makes a 365-day one at
