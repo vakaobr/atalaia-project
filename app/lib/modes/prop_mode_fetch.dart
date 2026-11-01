@@ -54,8 +54,7 @@ const propModeKeysMax = 4;
 /// (docs/community/keys.md), as in the Field Box's firmware.
 const builtInModeKeys = String.fromEnvironment(
   'ATALAIA_MODE_KEYS',
-  defaultValue:
-      'I+m3rO++TcVNhvDHzI28pkNA8UGoTJSi84IWQguq4Mo= 0nMp0OGboGJZUMsbc/ykqkxQFNdmI/a2k4nQ6YsdTIY=',
+  defaultValue: 'I+m3rO++TcVNhvDHzI28pkNA8UGoTJSi84IWQguq4Mo= 0nMp0OGboGJZUMsbc/ykqkxQFNdmI/a2k4nQ6YsdTIY=',
 );
 
 /// The keys a prop trusts for a mode package: those built in, then the
@@ -281,9 +280,10 @@ class PropModeCache {
         version: release.version,
       );
     }
-    final bad = ModeCatalog([
-      manifest,
-    ]).screenProblems().entries.where((e) => e.value != null);
+    final bad = ModeCatalog([manifest])
+        .screenProblems()
+        .entries
+        .where((e) => e.value != null);
     if (bad.isNotEmpty) {
       throw ModeFetchException(
         'load',
@@ -550,20 +550,21 @@ class PropModeFetcher {
         path: '/api/v1/mode-packages/${Uri.encodeComponent(id)}',
         query: '',
       );
+      final ModeHttpReply r;
       try {
-        final r = await http.get(
-          b.replace(path: '${b.path}/release'),
-          maxBytes: 512,
-        );
-        if (r.status != 200) {
-          return failed(ModeFetchException('not_offered', 'HTTP ${r.status}'));
-        }
-        text = r.body;
-        base = b;
-        break;
+        r = await http.get(b.replace(path: '${b.path}/release'), maxBytes: 512);
       } on ModeFetchException catch (e) {
         if (e.code != 'unreachable') return failed(e);
+        continue; // this address did not answer: the next one
       }
+      // An address that answered decides, outside the try: failed() throws,
+      // and that must reach the caller, not the catch above (reported once).
+      if (r.status != 200) {
+        return failed(ModeFetchException('not_offered', 'HTTP ${r.status}'));
+      }
+      text = r.body;
+      base = b;
+      break;
     }
     if (text == null || base == null) {
       return failed(ModeFetchException('unreachable', 'no address answered'));
@@ -635,9 +636,8 @@ class PropModeFetcher {
     });
     final mac = reportMac(join.gameKey, body);
     for (final u in urls) {
-      final url = Uri.parse(
-        u,
-      ).replace(path: '/api/v1/mode-packages/report', query: '');
+      final url = Uri.parse(u)
+          .replace(path: '/api/v1/mode-packages/report', query: '');
       final status = await http.post(url, body, {
         'Content-Type': 'text/plain',
         'X-Atalaia-Mac': mac,
