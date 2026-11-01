@@ -212,7 +212,7 @@ final class PasskeyPlugin: NSObject {
   }
 }
 
-extension PasskeyPlugin: @preconcurrency ASAuthorizationControllerDelegate {
+extension PasskeyPlugin: ASAuthorizationControllerDelegate {
   func authorizationController(
     controller: ASAuthorizationController,
     didCompleteWithAuthorization authorization: ASAuthorization
@@ -293,7 +293,7 @@ extension PasskeyPlugin: @preconcurrency ASAuthorizationControllerDelegate {
   }
 }
 
-extension PasskeyPlugin: @preconcurrency ASAuthorizationControllerPresentationContextProviding {
+extension PasskeyPlugin: ASAuthorizationControllerPresentationContextProviding {
   func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
     BrowserPlugin.anchorWindow()
   }
