@@ -9,7 +9,7 @@
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' show max;
+import 'dart:math' show Random, max, min;
 import 'dart:typed_data';
 
 import 'package:atalaia_app/controller/controller_engine.dart';
@@ -216,6 +216,7 @@ void main() {
         '(SR-29)', () {
       final v = loadVectors('tx_epoch.json');
       final range = (v['lost_range'] as List).cast<int>();
+      final window = v['lost_window'] as int;
       List<int> bytes(String hex) => [
         for (var i = 0; i < hex.length; i += 2)
           int.parse(hex.substring(i, i + 2), radix: 16),
@@ -252,7 +253,11 @@ void main() {
           final low = max(range[0], (c['lost_min'] as int?) ?? 0);
           for (var i = 0; i < 20; i++) {
             final got = nextTxEpoch(fresh(), key, resuming: resuming);
-            expect(got, inInclusiveRange(low, range[1]), reason: name);
+            expect(
+              got,
+              inInclusiveRange(low, min(range[1], low + window - 1)),
+              reason: name,
+            );
           }
         } else {
           expect(
@@ -262,6 +267,64 @@ void main() {
           );
         }
       }
+    });
+  });
+
+  group('a lost record, worst-case draws (EP-2)', () {
+    // A Random that always answers the top of its range (or the bottom).
+    Random worst({required bool top}) => _FixedRandom(top);
+    final key = List<int>.generate(16, (i) => i);
+
+    test('the draw never leaves its window, at the bounds', () {
+      for (final floor in [0, 4094, 4095, 4096, 50000, 59390, 59391, 61000]) {
+        for (final top in [false, true]) {
+          final store = MemoryControllerStore()
+            ..setSetting('tx_epoch_floor', '$floor');
+          final low = max(epochLostMin, floor + 1);
+          final got = nextTxEpoch(
+            store,
+            key,
+            resuming: true,
+            random: worst(top: top),
+          );
+          final last = min(epochLostMax, low + epochLostWindow - 1);
+          expect(got, top ? last : low, reason: 'floor $floor top $top');
+        }
+      }
+    });
+
+    test('a floor at the very top has no room and is refused', () {
+      final store = MemoryControllerStore()
+        ..setSetting('tx_epoch_floor', '$epochLostMax');
+      expect(
+        () => nextTxEpoch(store, key, resuming: true, random: worst(top: true)),
+        throwsStateError,
+      );
+    });
+
+    test('at least 27 losses fit, each above the last, even at the top of '
+        'every window', () {
+      final store = MemoryControllerStore();
+      var last = 0;
+      var losses = 0;
+      while (true) {
+        store.setSetting('tx_epochs', '[]');
+        final int got;
+        try {
+          got = nextTxEpoch(
+            store,
+            key,
+            resuming: true,
+            random: worst(top: true),
+          );
+        } on StateError {
+          break;
+        }
+        expect(got, greaterThan(last));
+        last = got;
+        losses++;
+      }
+      expect(losses, greaterThanOrEqualTo(27));
     });
   });
 
@@ -478,4 +541,18 @@ void main() {
       engine.close();
     });
   });
+}
+
+class _FixedRandom implements Random {
+  _FixedRandom(this.top);
+  final bool top;
+
+  @override
+  int nextInt(int max) => top ? max - 1 : 0;
+
+  @override
+  bool nextBool() => top;
+
+  @override
+  double nextDouble() => top ? 0.999 : 0;
 }

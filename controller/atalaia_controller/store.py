@@ -119,6 +119,12 @@ EPOCH_KEYS = 8  # game keys whose TX epoch is kept (as the box's epoch store, ra
 # Amendment 23, decision SR-29; as a box does, ATALAIA_EPOCH_LOST_MIN/MAX in radio_protocol.h, SR-27).
 EPOCH_LOST_MIN = 4096
 EPOCH_LOST_MAX = 61439
+# The draw covers only this many epochs from its low end (floor + 1, or EPOCH_LOST_MIN), not the whole range up
+# to EPOCH_LOST_MAX: each loss raises the floor to its draw, so a uniform draw over what is left halves the room
+# every time, and a game could be refused after two or three losses by bad luck (a draw near the top). With a
+# window the floor rises by at most this much a loss, so the range holds at least 27 losses whatever the draws
+# (the window is also one deep-search slice of the receivers, ATALAIA_DEEP_SLICE, so a draw is found at once).
+EPOCH_LOST_WINDOW = 2048
 
 
 def epoch_tag(key: bytes) -> str:
@@ -587,7 +593,8 @@ class Store:
     def delete_setting(self, key: str) -> None:
         self._exec("DELETE FROM settings WHERE key = ?", (key,))
 
-    def next_tx_epoch(self, key: bytes, resuming: bool = False) -> int:
+    def next_tx_epoch(self, key: bytes, resuming: bool = False,
+                      randbelow: Optional[Callable[[int], int]] = None) -> int:
         """The controller's epoch for this run in the game with this key, written before any TX
         (ADR-P2-2; per game key since RFC 0001's amendment of 2026-10-22).
 
@@ -606,7 +613,12 @@ class Store:
         file beside the database, written whole before the epoch is used: a database restored from
         a backup older than the last run, or deleted, has the file's epochs to go on above (the
         higher of the two counts), so neither case repeats a nonce or starts below what the boxes
-        already heard."""
+        already heard.
+
+        The draw is in the first EPOCH_LOST_WINDOW epochs of that range ([low, low + EPOCH_LOST_WINDOW - 1],
+        cut at EPOCH_LOST_MAX), so every loss leaves room for the next ones (see EPOCH_LOST_WINDOW); only a
+        floor at the very top, or after about 27 losses, is refused. randbelow(n) (default secrets.randbelow)
+        is for the tests."""
         tag = epoch_tag(key)
         with self._lock:
             saved = self.get_setting("tx_epochs")
@@ -628,7 +640,7 @@ class Store:
                 if low > EPOCH_LOST_MAX:
                     raise RuntimeError("the controller has used epochs up to %d; none is left above them for "
                                        "a game it has lost the record of: start a new game" % floor)
-                epoch = low + secrets.randbelow(EPOCH_LOST_MAX - low + 1)
+                epoch = low + (randbelow or secrets.randbelow)(min(EPOCH_LOST_WINDOW, EPOCH_LOST_MAX - low + 1))
                 self.epoch_lost = True
                 log.warning("game with key tag %s resumed with no record of its epoch: the controller "
                             "goes on at the random epoch %d (above %d, the highest it ever used); boxes find "

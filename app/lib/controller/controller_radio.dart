@@ -16,7 +16,7 @@
 library;
 
 import 'dart:convert';
-import 'dart:math' show Random, max;
+import 'dart:math' show Random, max, min;
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
@@ -208,6 +208,14 @@ const epochKeys = 8;
 const epochLostMin = 4096;
 const epochLostMax = 61439;
 
+/// The draw covers only this many epochs from its low end (floor + 1, or
+/// [epochLostMin]), not the whole range up to [epochLostMax]: each loss raises
+/// the floor to its draw, so a uniform draw over what is left halves the room
+/// every time and a game could be refused after a few losses by bad luck. With
+/// the window at least 27 losses fit whatever the draws (store.py
+/// EPOCH_LOST_WINDOW, protocol/vectors/tx_epoch.json `lost_window`).
+const epochLostWindow = 2048;
+
 /// The controller's epoch for this run in the game with [key], written
 /// before any packet is sent with it (ADR-P2-2; store.py `next_tx_epoch`):
 /// the setting `tx_epochs` keeps `[tag, epoch]` for the last [epochKeys]
@@ -259,7 +267,11 @@ int nextTxEpoch(
         'them for a game it has lost the record of: start a new game',
       );
     }
-    epoch = low + (random ?? Random.secure()).nextInt(epochLostMax - low + 1);
+    epoch =
+        low +
+        (random ?? Random.secure()).nextInt(
+          min(epochLostWindow, epochLostMax - low + 1),
+        );
   } else {
     epoch = current == null ? 1 : current + 1;
   }
