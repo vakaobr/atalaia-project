@@ -15,8 +15,8 @@ publish_to: none
 version: 0.5.0
 
 environment:
-  sdk: ^3.12.0
-  flutter: ">=3.44.0"
+  sdk: ^3.13.0
+  flutter: ">=3.47.0"
 
 dependencies:
   flutter:
@@ -36,7 +36,7 @@ dependencies:
   pointycastle: 4.0.0
   # QR code matrices for the qr_code template widget (kevmoo.com, pure Dart);
   # the app draws the modules itself (lib/ui/qr_painter.dart).
-  qr: 4.0.0
+  qr: 4.0.1
   # The GM role shows the field controller's GM console (flutter.dev; the
   # system WebView on Android, WKWebView on iOS).
   webview_flutter: 4.14.1
