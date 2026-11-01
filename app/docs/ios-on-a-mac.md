@@ -486,6 +486,20 @@ opening, and Settings > Atalaia > Local Network is where to turn it on). Keep
 the phone unlocked, as for `flutter run`; tests run as a debug build, which is
 fine while Flutter is attached.
 
+The marshal checks (item 9) check a test player in as a phone does after
+scanning the poster: the field's CA from the controller's plain HTTP address
+(`/api/v1/controller/ca`), then the check-in over HTTPS with that CA only, by
+default on the same host's port 8443
+(`--dart-define=ATALAIA_TEST_CONTROLLER_HTTPS=https://host:port` for another). State on 2026-11-01, iPhone 15 Pro Max (iOS 27.2) against a
+bench controller: 11 passed, 2 skipped (item 6's camera and item 8's
+location prompt, both left to a person).
+The test player and its marshal are both named `itest-ios`; before and after
+the run the test removes every marshal and every check-in of that name in a
+game that has not ended (with the GM token), so a run cut short (the app
+closed on the phone, the cable pulled) leaves nothing behind after the next
+one. Do not touch the phone while the test drives the app: closing the app
+stops the run.
+
 | Checklist | Test | What it checks |
 | --- | --- | --- |
 | 1 | the app starts in Portuguese | a fresh start shows Portuguese (the app's default, not the phone's language): the "O que vais fazer neste telemóvel?" title and the role cards |
