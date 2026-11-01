@@ -20,8 +20,8 @@ import unittest
 from pathlib import Path
 
 import support  # noqa: F401
-from atalaia_controller.store import (EPOCH_KEYS, EPOCH_LOST_MAX, EPOCH_LOST_MIN, EPOCH_LOST_WINDOW, SCHEMA_VERSION, Store,
-                                      epoch_tag)
+from atalaia_controller.store import (EPOCH_KEYS, EPOCH_LOST_MARGIN, EPOCH_LOST_MAX, EPOCH_LOST_MIN, EPOCH_LOST_WIDE_MAX,
+                                      EPOCH_LOST_WINDOW, SCHEMA_VERSION, Store, epoch_lost_bounds, epoch_tag)
 
 
 def event(**kw):
@@ -145,7 +145,6 @@ class StoreTests(unittest.TestCase):
         path = Path(__file__).resolve().parents[2] / "protocol" / "vectors" / "tx_epoch.json"
         doc = json.loads(path.read_text(encoding="utf-8"))
         lo, hi = doc["lost_range"]
-        window = doc["lost_window"]
         for case in doc["cases"]:
             with self.subTest(case["name"]):
                 store = Store(":memory:")
@@ -170,8 +169,7 @@ class StoreTests(unittest.TestCase):
                                     again.set_setting("tx_epoch_floor", str(case["floor"]))
                                 with self.assertLogs("atalaia_controller.store", "WARNING"):
                                     got = again.next_tx_epoch(key, case["resuming"])
-                                low = max(lo, case.get("lost_min", 0))
-                                self.assertTrue(low <= got <= min(hi, low + window - 1), got)
+                                self.assertTrue(case["lost_lo"] <= got <= case["lost_hi"], got)
                                 self.assertTrue(again.epoch_lost)
                             finally:
                                 again.close()
@@ -241,13 +239,19 @@ class StoreTests(unittest.TestCase):
             self.store.next_tx_epoch(key, resuming=True)
 
     def test_the_lost_draw_stays_in_its_window_at_the_bounds(self):
-        """EP-2: the draw is in [low, low + EPOCH_LOST_WINDOW - 1] cut at EPOCH_LOST_MAX, whatever the random
-        value (lowest and highest answers injected), so a second loss always has room."""
+        """EP-2 / EPW-1: the draw is inside epoch_lost_bounds whatever the random value (lowest and highest
+        answers injected), above the floor, and above the margin for forgotten epochs while it fits."""
         key = bytes(range(16))
-        for floor in (0, 4094, 4095, 4096, 50000, 59390, 59391, 61000, EPOCH_LOST_MAX - 1):
-            low = max(EPOCH_LOST_MIN, floor + 1)
-            top = min(EPOCH_LOST_MAX, low + EPOCH_LOST_WINDOW - 1)
-            for pick, want in ((lambda n: 0, low), (lambda n: n - 1, top)):
+        self.assertEqual(epoch_lost_bounds(0), (EPOCH_LOST_MIN, EPOCH_LOST_WIDE_MAX))
+        self.assertIsNone(epoch_lost_bounds(EPOCH_LOST_MAX))
+        for floor in (1, 3, 4094, 4095, 4096, 32767, 50000, 60000, 60414, 60415, 60416, 61000, EPOCH_LOST_MAX - 1):
+            lo, hi = epoch_lost_bounds(floor)
+            self.assertGreater(lo, floor)
+            self.assertLessEqual(hi, EPOCH_LOST_MAX)
+            self.assertLessEqual(hi - lo + 1, EPOCH_LOST_WINDOW)
+            if floor + 1 + EPOCH_LOST_MARGIN + EPOCH_LOST_WINDOW - 1 <= EPOCH_LOST_MAX:
+                self.assertGreaterEqual(lo, floor + 1 + EPOCH_LOST_MARGIN)  # a stale floor's forgotten epochs are skipped
+            for pick, want in ((lambda n: 0, lo), (lambda n: n - 1, hi)):
                 with self.subTest(floor=floor, want=want):
                     store = Store(":memory:")
                     try:
@@ -257,24 +261,45 @@ class StoreTests(unittest.TestCase):
                     finally:
                         store.close()
 
-    def test_at_least_27_store_losses_fit_even_at_the_top_of_every_window(self):
+    def test_at_least_14_store_losses_fit_even_at_the_top_of_every_draw(self):
         """The product bug behind the 2-in-200 flake: a uniform draw over what was left halved the room each
-        loss, so two or three unlucky losses refused the game. With the window the worst case (always the
-        top) still leaves room for 27 losses, each above the last."""
+        loss. Worst case (the highest draw every time, starting from no record at all): 14 losses fit, each
+        above the last, and from a small floor 28."""
         key = bytes(range(16))
-        last, losses = 0, 0
-        while True:
-            self.store.set_setting("tx_epochs", "[]")
-            with open(self.path + ".epochs", "w") as f:
-                f.write("[]")
+        for start, least in ((0, 14), (5, 28)):
+            store = Store(":memory:")
             try:
-                with self.assertLogs("atalaia_controller.store", "WARNING"):
-                    got = self.store.next_tx_epoch(key, True, randbelow=lambda n: n - 1)
-            except RuntimeError:
-                break
-            self.assertGreater(got, last)
-            last, losses = got, losses + 1
-        self.assertGreaterEqual(losses, 27)
+                if start:
+                    store.set_setting("tx_epoch_floor", str(start))
+                last, losses = start, 0
+                while True:
+                    store.set_setting("tx_epochs", "[]")
+                    try:
+                        with self.assertLogs("atalaia_controller.store", "WARNING"):
+                            got = store.next_tx_epoch(key, True, randbelow=lambda n: n - 1)
+                    except RuntimeError:
+                        break
+                    self.assertGreater(got, last)
+                    last, losses = got, losses + 1
+                self.assertGreaterEqual(losses, least, start)
+            finally:
+                store.close()
+
+    def test_a_stale_floor_cannot_be_landed_on(self):
+        """EPW-1: a database restored from an old backup (and its epoch file lost) has a floor below the
+        epochs used since; those, up to EPOCH_LOST_MARGIN of them, are never drawn, whatever the random value."""
+        key = bytes(range(16))
+        for floor in (10, 5000, 30000):
+            for forgotten in (1, 100, EPOCH_LOST_MARGIN):
+                for pick in (lambda n: 0, lambda n: n - 1, lambda n: n // 2):
+                    store = Store(":memory:")
+                    try:
+                        store.set_setting("tx_epoch_floor", str(floor))
+                        with self.assertLogs("atalaia_controller.store", "WARNING"):
+                            got = store.next_tx_epoch(key, True, randbelow=pick)
+                        self.assertGreater(got, floor + forgotten, (floor, forgotten))
+                    finally:
+                        store.close()
 
     def test_the_floor_survives_in_the_file_when_the_database_is_lost(self):
         """EP-2 and EP-3: the database deleted, the file kept: a lost record's epoch is above the file's floor."""

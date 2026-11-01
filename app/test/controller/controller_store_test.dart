@@ -9,7 +9,7 @@
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' show Random, max, min;
+import 'dart:math' show Random;
 import 'dart:typed_data';
 
 import 'package:atalaia_app/controller/controller_engine.dart';
@@ -215,8 +215,6 @@ void main() {
     test('the epoch of a resumed game with no record: the shared vectors '
         '(SR-29)', () {
       final v = loadVectors('tx_epoch.json');
-      final range = (v['lost_range'] as List).cast<int>();
-      final window = v['lost_window'] as int;
       List<int> bytes(String hex) => [
         for (var i = 0; i < hex.length; i += 2)
           int.parse(hex.substring(i, i + 2), radix: 16),
@@ -250,12 +248,11 @@ void main() {
             reason: name,
           );
         } else if (c['lost_range'] == true) {
-          final low = max(range[0], (c['lost_min'] as int?) ?? 0);
           for (var i = 0; i < 20; i++) {
             final got = nextTxEpoch(fresh(), key, resuming: resuming);
             expect(
               got,
-              inInclusiveRange(low, min(range[1], low + window - 1)),
+              inInclusiveRange(c['lost_lo'] as int, c['lost_hi'] as int),
               reason: name,
             );
           }
@@ -270,25 +267,36 @@ void main() {
     });
   });
 
-  group('a lost record, worst-case draws (EP-2)', () {
-    // A Random that always answers the top of its range (or the bottom).
+  group('a lost record, worst-case draws (EP-2, EPW-1)', () {
+    // A Random that always answers the top (or the bottom) of its range.
     Random worst({required bool top}) => _FixedRandom(top);
     final key = List<int>.generate(16, (i) => i);
 
-    test('the draw never leaves its window, at the bounds', () {
-      for (final floor in [0, 4094, 4095, 4096, 50000, 59390, 59391, 61000]) {
+    test('the draw stays in epochLostBounds and above the margin, at the '
+        'bounds', () {
+      expect(epochLostBounds(0), (epochLostMin, epochLostWideMax));
+      expect(epochLostBounds(epochLostMax), isNull);
+      for (final floor in [
+        1, 3, 4094, 4095, 4096, 32767, 50000, 60000, 60414, 60415, //
+        60416, 61000, epochLostMax - 1,
+      ]) {
+        final (lo, hi) = epochLostBounds(floor)!;
+        expect(lo, greaterThan(floor));
+        expect(hi, lessThanOrEqualTo(epochLostMax));
+        expect(hi - lo + 1, lessThanOrEqualTo(epochLostWindow));
+        if (floor + epochLostMargin + epochLostWindow <= epochLostMax) {
+          expect(lo, greaterThanOrEqualTo(floor + 1 + epochLostMargin));
+        }
         for (final top in [false, true]) {
           final store = MemoryControllerStore()
             ..setSetting('tx_epoch_floor', '$floor');
-          final low = max(epochLostMin, floor + 1);
           final got = nextTxEpoch(
             store,
             key,
             resuming: true,
             random: worst(top: top),
           );
-          final last = min(epochLostMax, low + epochLostWindow - 1);
-          expect(got, top ? last : low, reason: 'floor $floor top $top');
+          expect(got, top ? hi : lo, reason: 'floor $floor top $top');
         }
       }
     });
@@ -302,29 +310,51 @@ void main() {
       );
     });
 
-    test('at least 27 losses fit, each above the last, even at the top of '
-        'every window', () {
-      final store = MemoryControllerStore();
-      var last = 0;
-      var losses = 0;
-      while (true) {
-        store.setSetting('tx_epochs', '[]');
-        final int got;
-        try {
-          got = nextTxEpoch(
-            store,
-            key,
-            resuming: true,
-            random: worst(top: true),
-          );
-        } on StateError {
-          break;
+    test('a stale floor cannot be landed on (epochs used since, up to the '
+        'margin)', () {
+      for (final floor in [10, 5000, 30000]) {
+        for (final forgotten in [1, 100, epochLostMargin]) {
+          for (final top in [false, true]) {
+            final store = MemoryControllerStore()
+              ..setSetting('tx_epoch_floor', '$floor');
+            final got = nextTxEpoch(
+              store,
+              key,
+              resuming: true,
+              random: worst(top: top),
+            );
+            expect(got, greaterThan(floor + forgotten));
+          }
         }
-        expect(got, greaterThan(last));
-        last = got;
-        losses++;
       }
-      expect(losses, greaterThanOrEqualTo(27));
+    });
+
+    test('at least 14 losses fit from no record, 28 from a small floor, each '
+        'above the last, even at the top of every draw', () {
+      for (final (start, least) in [(0, 14), (5, 28)]) {
+        final store = MemoryControllerStore();
+        if (start > 0) store.setSetting('tx_epoch_floor', '$start');
+        var last = start;
+        var losses = 0;
+        while (true) {
+          store.setSetting('tx_epochs', '[]');
+          final int got;
+          try {
+            got = nextTxEpoch(
+              store,
+              key,
+              resuming: true,
+              random: worst(top: true),
+            );
+          } on StateError {
+            break;
+          }
+          expect(got, greaterThan(last));
+          last = got;
+          losses++;
+        }
+        expect(losses, greaterThanOrEqualTo(least), reason: 'start $start');
+      }
     });
   });
 

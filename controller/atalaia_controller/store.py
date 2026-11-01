@@ -119,12 +119,37 @@ EPOCH_KEYS = 8  # game keys whose TX epoch is kept (as the box's epoch store, ra
 # Amendment 23, decision SR-29; as a box does, ATALAIA_EPOCH_LOST_MIN/MAX in radio_protocol.h, SR-27).
 EPOCH_LOST_MIN = 4096
 EPOCH_LOST_MAX = 61439
-# The draw covers only this many epochs from its low end (floor + 1, or EPOCH_LOST_MIN), not the whole range up
-# to EPOCH_LOST_MAX: each loss raises the floor to its draw, so a uniform draw over what is left halves the room
-# every time, and a game could be refused after two or three losses by bad luck (a draw near the top). With a
-# window the floor rises by at most this much a loss, so the range holds at least 27 losses whatever the draws
-# (the window is also one deep-search slice of the receivers, ATALAIA_DEEP_SLICE, so a draw is found at once).
-EPOCH_LOST_WINDOW = 2048
+# Where a lost record's epoch is drawn (decision EPW-1, RFC 0001 Amendment 25 follow-up). A uniform draw over
+# everything above the floor halves the room at every loss (each draw becomes the next floor), so two or three
+# unlucky losses used the range up. The floor is written before an epoch is used, so with a floor that survived
+# nothing above it was ever used; but a floor can be STALE (a database restored from an old backup whose epoch file
+# is lost too): the epochs used since are then above it, by the number of boots, joins and seq wraps since the
+# backup (a few a day), and a draw landing on or below one repeats a nonce or is refused as stale by the receivers.
+# So:
+#  - no record at all (floor 0, Amendment 23's case; the earlier epochs can be anywhere): uniform over the lower
+#    half, [EPOCH_LOST_MIN, EPOCH_LOST_WIDE_MAX], keeping the upper half for later losses;
+#  - a floor: uniform in a window of EPOCH_LOST_WINDOW epochs that starts EPOCH_LOST_MARGIN above it, so up to
+#    EPOCH_LOST_MARGIN forgotten epochs above a stale floor cannot be hit, and margin + window is one deep-search
+#    slice of the receivers (ATALAIA_DEEP_SLICE, 2048): the node is found at once. Each loss costs at most
+#    margin + window, so the range holds at least 14 losses after the widest first draw, 28 from a small floor.
+#    Near the top the margin, then the window, shrink; only a floor of EPOCH_LOST_MAX itself has no room.
+EPOCH_LOST_WIDE_MAX = 32767
+EPOCH_LOST_MARGIN = 1024
+EPOCH_LOST_WINDOW = 1024
+
+
+def epoch_lost_bounds(floor: int) -> Optional[tuple[int, int]]:
+    """The inclusive range a lost record's epoch is drawn in, above `floor` (the highest epoch the controller
+    ever used with any key; 0 = no record); None when no epoch is left above it."""
+    if floor <= 0:
+        return EPOCH_LOST_MIN, EPOCH_LOST_WIDE_MAX
+    low = max(EPOCH_LOST_MIN, floor + 1)
+    if low > EPOCH_LOST_MAX:
+        return None
+    start = max(EPOCH_LOST_MIN, floor + 1 + EPOCH_LOST_MARGIN)
+    if start > EPOCH_LOST_MAX:
+        start = low  # no room for the margin: the margin gives way, never the floor
+    return start, min(EPOCH_LOST_MAX, start + EPOCH_LOST_WINDOW - 1)
 
 
 def epoch_tag(key: bytes) -> str:
@@ -615,10 +640,9 @@ class Store:
         higher of the two counts), so neither case repeats a nonce or starts below what the boxes
         already heard.
 
-        The draw is in the first EPOCH_LOST_WINDOW epochs of that range ([low, low + EPOCH_LOST_WINDOW - 1],
-        cut at EPOCH_LOST_MAX), so every loss leaves room for the next ones (see EPOCH_LOST_WINDOW); only a
-        floor at the very top, or after about 27 losses, is refused. randbelow(n) (default secrets.randbelow)
-        is for the tests."""
+        The draw is in epoch_lost_bounds(floor), a window above the floor (see EPOCH_LOST_MARGIN), not the
+        whole range, so every loss leaves room for the next ones and a stale floor is not landed on.
+        randbelow(n) (default secrets.randbelow) is for the tests."""
         tag = epoch_tag(key)
         with self._lock:
             saved = self.get_setting("tx_epochs")
@@ -636,11 +660,12 @@ class Store:
                 raise RuntimeError("the controller's nonce epochs for this game are exhausted; "
                                    "start a new game")
             if current is None and resuming:
-                low = max(EPOCH_LOST_MIN, floor + 1)
-                if low > EPOCH_LOST_MAX:
+                bounds = epoch_lost_bounds(floor)
+                if bounds is None:
                     raise RuntimeError("the controller has used epochs up to %d; none is left above them for "
                                        "a game it has lost the record of: start a new game" % floor)
-                epoch = low + (randbelow or secrets.randbelow)(min(EPOCH_LOST_WINDOW, EPOCH_LOST_MAX - low + 1))
+                low, high = bounds
+                epoch = low + (randbelow or secrets.randbelow)(high - low + 1)
                 self.epoch_lost = True
                 log.warning("game with key tag %s resumed with no record of its epoch: the controller "
                             "goes on at the random epoch %d (above %d, the highest it ever used); boxes find "

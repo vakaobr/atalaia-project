@@ -208,13 +208,27 @@ const epochKeys = 8;
 const epochLostMin = 4096;
 const epochLostMax = 61439;
 
-/// The draw covers only this many epochs from its low end (floor + 1, or
-/// [epochLostMin]), not the whole range up to [epochLostMax]: each loss raises
-/// the floor to its draw, so a uniform draw over what is left halves the room
-/// every time and a game could be refused after a few losses by bad luck. With
-/// the window at least 27 losses fit whatever the draws (store.py
-/// EPOCH_LOST_WINDOW, protocol/vectors/tx_epoch.json `lost_window`).
-const epochLostWindow = 2048;
+/// Where a lost record's epoch is drawn (decision EPW-1; store.py
+/// `epoch_lost_bounds` has the reasons). With no record at all (floor 0) it is
+/// [epochLostMin]..[epochLostWideMax], the lower half, keeping room for later
+/// losses. With a floor it is a window of [epochLostWindow] epochs starting
+/// [epochLostMargin] above it, so the epochs used since a stale floor are not
+/// landed on and every loss leaves room for the next (at least 14 fit).
+const epochLostWideMax = 32767;
+const epochLostMargin = 1024;
+const epochLostWindow = 1024;
+
+/// The inclusive range a lost record's epoch is drawn in, above [floor] (the
+/// highest epoch ever used with any key, 0 for no record); null when no epoch
+/// is left above it. Shared vectors: protocol/vectors/tx_epoch.json.
+(int, int)? epochLostBounds(int floor) {
+  if (floor <= 0) return (epochLostMin, epochLostWideMax);
+  final low = max(epochLostMin, floor + 1);
+  if (low > epochLostMax) return null;
+  var start = max(epochLostMin, floor + 1 + epochLostMargin);
+  if (start > epochLostMax) start = low;
+  return (start, min(epochLostMax, start + epochLostWindow - 1));
+}
 
 /// The controller's epoch for this run in the game with [key], written
 /// before any packet is sent with it (ADR-P2-2; store.py `next_tx_epoch`):
@@ -260,18 +274,16 @@ int nextTxEpoch(
     floor = max(floor, row[1]! as int);
   }
   if (current == null && resuming) {
-    final low = max(epochLostMin, floor + 1);
-    if (low > epochLostMax) {
+    final bounds = epochLostBounds(floor);
+    if (bounds == null) {
       throw StateError(
         'the controller has used epochs up to $floor; none is left above '
         'them for a game it has lost the record of: start a new game',
       );
     }
     epoch =
-        low +
-        (random ?? Random.secure()).nextInt(
-          min(epochLostWindow, epochLostMax - low + 1),
-        );
+        bounds.$1 +
+        (random ?? Random.secure()).nextInt(bounds.$2 - bounds.$1 + 1);
   } else {
     epoch = current == null ? 1 : current + 1;
   }
