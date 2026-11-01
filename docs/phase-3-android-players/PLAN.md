@@ -248,7 +248,7 @@ token format are specified in `protocol/chrono-record.md` and
 checks too (B3-B9); the player token key is the controller's own, not the
 game key (B8); the templates are `portugal.yaml`, `uk.yaml`, `germany.yaml`
 and `generic_cqb.yaml`, all marked unverified (B10); the image is
-`atalaia-flutter:3.44.9` (`tools/dev/flutter/Dockerfile`), run by
+`atalaia-flutter:3.47.9` (`tools/dev/flutter/Dockerfile`), run by
 `python tools/docker_app.py` (B2).
 
 ### Goal

@@ -3,7 +3,7 @@
 #
 # The Atalaia app (README.md). Dependencies are pinned to exact versions and
 # pubspec.lock is committed; tools/docker_app.py and CI run
-# `flutter pub get --enforce-lockfile` in atalaia-flutter:3.44.9.
+# `flutter pub get --enforce-lockfile` in atalaia-flutter:3.47.9.
 # To change a dependency: edit the pin here, then `python tools/docker_app.py lock`.
 name: atalaia_app
 description: >-

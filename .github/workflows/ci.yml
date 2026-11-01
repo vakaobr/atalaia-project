@@ -218,9 +218,9 @@ jobs:
   flutter-test:
     name: Player app (Dart, with the core through dart:ffi)
     # The pinned Flutter image that `python tools/docker_app.py` uses (Flutter
-    # 3.44.9, Dart 3.12.2: cirruslabs' 3.44.0 image pinned by digest with the
-    # official 3.44.9 SDK pinned by SHA-256, tools/dev/flutter/Dockerfile, built
-    # in a first step; cirruslabs has no 3.44.9 tag). That image has no CMake, so the
+    # 3.47.9, Dart 3.13.7: cirruslabs' 3.44.0 image pinned by digest with the
+    # official 3.47.9 SDK pinned by SHA-256, tools/dev/flutter/Dockerfile, built
+    # in a first step; cirruslabs has no 3.47.9 tag). That image has no CMake, so the
     # core and the FFI stub are built here first, as shared libraries for this
     # runner (Ubuntu 24.04, like the image), without mbedtls, which the image
     # lacks. app/tool/check.sh resolves the packages from the committed
@@ -254,10 +254,10 @@ jobs:
             -DMBEDCRYPTO_LIB=$(ls /usr/lib/*/libmbedcrypto.a | head -n 1)
           cmake --build build/box_host
       - name: Build the pinned Flutter image (tools/dev/flutter/Dockerfile, SDK checked by SHA-256)
-        run: docker build -t atalaia-flutter:3.44.9 tools/dev/flutter
+        run: docker build -t atalaia-flutter:3.47.9 tools/dev/flutter
       - name: Analyze, check the formatting and test
         run: |
-          docker run --rm -v "$PWD:/src:ro" -v "$PWD/build:/core-build:ro" -w /src             -e ATALAIA_CORE_LIB=/core-build/libatalaia_core.so             -e ATALAIA_CORE_STUB_LIB=/core-build/libatalaia_core_stub.so             -e ATALAIA_POD_HOST=/core-build/pod_host/pod_host             -e ATALAIA_MODEM_HOST=/core-build/modem_host/modem_host             -e ATALAIA_BOX_HOST=/core-build/box_host/box_host             atalaia-flutter:3.44.9             sh /src/app/tool/check.sh check
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/build:/core-build:ro" -w /src             -e ATALAIA_CORE_LIB=/core-build/libatalaia_core.so             -e ATALAIA_CORE_STUB_LIB=/core-build/libatalaia_core_stub.so             -e ATALAIA_POD_HOST=/core-build/pod_host/pod_host             -e ATALAIA_MODEM_HOST=/core-build/modem_host/modem_host             -e ATALAIA_BOX_HOST=/core-build/box_host/box_host             atalaia-flutter:3.47.9             sh /src/app/tool/check.sh check
 
   core-android-ndk:
     name: Core cross-compiled for Android (NDK, three ABIs)
@@ -273,10 +273,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Build the pinned Flutter image (tools/dev/flutter/Dockerfile, SDK checked by SHA-256)
-        run: docker build -t atalaia-flutter:3.44.9 tools/dev/flutter
+        run: docker build -t atalaia-flutter:3.47.9 tools/dev/flutter
       - name: Cross-compile and check
         run: |
-          docker run --rm -v "$PWD:/src:ro" -w /src             atalaia-flutter:3.44.9             sh /src/app/tool/check.sh ndk
+          docker run --rm -v "$PWD:/src:ro" -w /src             atalaia-flutter:3.47.9             sh /src/app/tool/check.sh ndk
 
   flutter-build-android:
     name: Android APK (Gradle builds the core with the NDK)
@@ -292,11 +292,11 @@ jobs:
         with:
           persist-credentials: false
       - name: Build the pinned Flutter image (tools/dev/flutter/Dockerfile, SDK checked by SHA-256)
-        run: docker build -t atalaia-flutter:3.44.9 tools/dev/flutter
+        run: docker build -t atalaia-flutter:3.47.9 tools/dev/flutter
       - name: Build and check the APK
         run: |
           docker run --rm -v "$PWD:/src:ro" -w /src \
-            atalaia-flutter:3.44.9 \
+            atalaia-flutter:3.47.9 \
             sh /src/app/tool/check.sh apk
 
   ios-build:
@@ -307,7 +307,7 @@ jobs:
     # Linux (decisions PD10, iOS-1 to iOS-7). It proves the project builds; it
     # makes no IPA to install (that needs signing, app/docs/ios-on-a-mac.md).
     # The core is not built: the app's game loop does not run on iOS (no prop,
-    # no phone controller there), so there is no dylib to link. Flutter 3.44.9
+    # no phone controller there), so there is no dylib to link. Flutter 3.47.9
     # (3.44.0's thinFramework fails with Xcode 27's lipo), the same as the Docker image, from the action pinned by commit as above.
     # Only on pushes to main, not on every pull request: macOS minutes cost ten
     # times Linux's on a private repository (free on a public one, as now), and
@@ -322,7 +322,7 @@ jobs:
           persist-credentials: false
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
-          flutter-version: 3.44.9
+          flutter-version: 3.47.9
           channel: stable
       - name: The GM console and the check-in notices into the app's assets (PE24-61)
         working-directory: app
@@ -343,7 +343,7 @@ jobs:
     # `flutter test integration_test`, which builds the debug APK (Gradle
     # builds the core with the NDK) and drives the real app: the roles, a
     # Bomb prop on the real core, a join text, the player view over a
-    # WebSocket (app/integration_test/). Flutter 3.44.9 comes from
+    # WebSocket (app/integration_test/). Flutter 3.47.9 comes from
     # subosito/flutter-action because the emulator and the Flutter tool must
     # run on the same machine; both actions are pinned by commit.
     runs-on: ubuntu-24.04
@@ -360,7 +360,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
-          flutter-version: 3.44.9
+          flutter-version: 3.47.9
           channel: stable
       - name: Pinned NDK and CMake (as app/tool/check.sh)
         run: |

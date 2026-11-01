@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# The app's checks, run inside atalaia-flutter:3.44.9 by
+# The app's checks, run inside atalaia-flutter:3.47.9 by
 # tools/docker_app.py and by CI's flutter-test, core-android-ndk and
 # flutter-build-android jobs:
 #

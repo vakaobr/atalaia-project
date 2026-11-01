@@ -28,9 +28,9 @@ running. Two images are used:
   modem_host and box_host, mbedtls linked in statically), which the pod and
   radio-link tests and the phone controller's end-to-end tests run. Both
   images are Ubuntu 24.04, so they run in the other one.
-- atalaia-flutter:3.44.9 (tools/dev/flutter/Dockerfile, built on first use and
+- atalaia-flutter:3.47.9 (tools/dev/flutter/Dockerfile, built on first use and
   whenever that file changes: cirruslabs' 3.44.0 image, pinned by digest, about
-  2.3 GB, with the official 3.44.9 SDK, pinned by SHA-256, swapped in) runs
+  2.3 GB, with the official 3.47.9 SDK, pinned by SHA-256, swapped in) runs
   app/tool/check.sh. It has no CMake: the NDK 28.2.13676358
   and CMake 3.22.1 come from the Android SDK manager on first use (about
   1 GB) and Gradle 9.1.0 with its dependencies on the first `apk`.
@@ -64,8 +64,8 @@ import docker_sim  # noqa: E402  (the atalaia-dev image)
 
 REPO = Path(__file__).resolve().parents[1]
 # The Flutter image: tools/dev/flutter/Dockerfile (cirruslabs' 3.44.0 image, pinned by
-# digest, with the official 3.44.9 SDK, pinned by SHA-256, swapped in).
-IMAGE = "atalaia-flutter:3.44.9"
+# digest, with the official 3.47.9 SDK, pinned by SHA-256, swapped in).
+IMAGE = "atalaia-flutter:3.47.9"
 FLUTTER_DIR = REPO / "tools" / "dev" / "flutter"
 IMAGE_LABEL = "org.atalaia.flutter-dockerfile"
 SUFFIX = os.environ.get("ATALAIA_VOLUME_SUFFIX", "")
