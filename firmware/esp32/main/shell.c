@@ -28,6 +28,7 @@
 #include "atalaia/join.h"
 #include "box_pair.h"
 #include "status_hold.h"
+#include "tft_splash.h"
 #include "box_text.h"
 #include "atalaia/packet.h"
 #include "atalaia/version.h"
@@ -1181,6 +1182,11 @@ static void task_game(void *arg)
 #define CONFIG_ATALAIA_OLED_SPLASH_MS 0
 #endif
 
+/* The TFT's boot splash needs a panel: the stub HAL has none. */
+#ifndef CONFIG_ATALAIA_TFT_SPLASH_MS
+#define CONFIG_ATALAIA_TFT_SPLASH_MS 2500
+#endif
+
 static uint32_t now_ms(void)
 {
     return (uint32_t)(esp_timer_get_time() / 1000);
@@ -1242,7 +1248,25 @@ static void task_lvgl(void *arg)
 {
     (void)arg;
     ESP_LOGI(TAG, "lvgl task started");
-    display_port_init(hal.display);
+    const bool tft_up = display_port_init(hal.display);
+    tft_splash_t tft_splash;
+    tft_splash_begin(&tft_splash, now_ms(), 0);
+    if (tft_up && CONFIG_ATALAIA_TFT_SPLASH_MS > 0) {
+        /* The logo and the version at once; the screens that follow wait their turn, nothing
+         * blocks (decision TS-2). The version is JSON-safe (a project version has no quote). */
+        char data[SCREEN_DATA_MAX];
+        char ver[48];
+        size_t n = 0;
+        for (const char *c = esp_app_get_description()->version; *c && n < sizeof(ver) - 1; c++) {
+            if (*c != '"' && *c != '\\' && (unsigned char)*c >= 0x20) ver[n++] = *c;
+        }
+        ver[n] = '\0';
+        snprintf(data, sizeof(data), "{\"version\":\"%s\"}", ver);
+        if (screen_render("splash", data)) {
+            display_port_handle();
+            tft_splash_begin(&tft_splash, now_ms(), CONFIG_ATALAIA_TFT_SPLASH_MS);
+        }
+    }
     screen_set_overlay_readers(game_clock_ms, held_buttons);
     lv_obj_t *oled_scr = display_port_oled_init(hal.oled);
     if (oled_scr) {
@@ -1258,12 +1282,24 @@ static void task_lvgl(void *arg)
         screen_update_t su;
         while (xQueueReceive(screen_queue, &su, 0) == pdTRUE) {
             ESP_LOGI(TAG, "screen %s %s", su.template_name, su.data_json);
+            /* The mode's own message changes no pixel: it goes through at once. */
+            if (strcmp(su.template_name, SCREEN_MODE_MESSAGE) != 0 &&
+                tft_splash_offer(&tft_splash, su.template_name, su.data_json, now_ms())) {
+                if (oled_scr) oled_view_handle(oled_scr, su.template_name, su.data_json, now_ms());
+                continue;
+            }
             if (!screen_render(su.template_name, su.data_json)) {
                 ESP_LOGW(TAG, "unknown screen template '%s'", su.template_name);
             }
             if (oled_scr) oled_view_handle(oled_scr, su.template_name, su.data_json, now_ms());
         }
         if (oled_scr) oled_view_poll(oled_scr, now_ms());
+        screen_update_t first;
+        if (tft_splash_due(&tft_splash, now_ms(), &first)) {
+            if (!screen_render(first.template_name, first.data_json)) {
+                ESP_LOGW(TAG, "unknown screen template '%s'", first.template_name);
+            }
+        }
         screen_overlay_tick();
         long left_s, total_s;
         game_timer_seconds(&left_s, &total_s);

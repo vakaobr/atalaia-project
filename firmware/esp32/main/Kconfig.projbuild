@@ -872,6 +872,16 @@ menu "Atalaia Field Box Configuration"
 
     # ---- Boot splash (decision LOGO-6) ----------------------------------------
     menu "Boot splash"
+        config ATALAIA_TFT_SPLASH_MS
+            int "Boot splash time on the TFT (ms, 0 = none)"
+            default 2500
+            range 0 10000
+            help
+                The logo and the firmware version on the big screen from the moment
+                it is up. It stays at least this long and, when the first game
+                screen is not ready by then, until it is. Never delays the radio or
+                the game. Without a TFT nothing is drawn.
+
         config ATALAIA_SPLASH_LOGO
             string "Boot splash image (plain-text PGM, 30 x 60)"
             default "assets/splash.pgm"

@@ -39,7 +39,7 @@ It runs the game's rules by itself, and it talks to the field controller by radi
 ## 2. Power on, power off and charging
 
 1. Check that the antennas are fitted.
-2. Switch the **main switch** on. The small OLED shows the Atalaia tower and the firmware version for 2 seconds. Then the big screen shows the box's first screen ([section 3](#3-first-time-setup-new-box) or [section 5](#5-get-the-box-into-a-game)).
+2. Switch the **main switch** on. The small OLED and the big screen both show the Atalaia tower and the firmware version: the OLED for 2 seconds, the big screen for about 2.5 seconds (longer only if the box's first screen is not ready by then). Then the big screen shows the box's first screen ([section 3](#3-first-time-setup-new-box) or [section 5](#5-get-the-box-into-a-game)).
 3. To switch off, use the main switch.
 
 **Charging.** Plug a 5 V USB-C charger into the panel socket with the **main switch on**. With the switch off, the battery is cut off and does not charge. Charge in a place you can supervise, not inside a closed transport case. Charge only between about 0 °C and 45 °C. Do not charge a cold box straight from a winter field.

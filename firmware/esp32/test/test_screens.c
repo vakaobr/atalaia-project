@@ -128,6 +128,9 @@ static const screen_case_t cases[] = {
     {"ready", "ready", "{}", NULL},
     {"standby_waiting", "standby", "{}", NULL},
     {"ready_picker", "ready", "{\"picker\":true}", NULL},
+    /* The TFT boot splash (TS-1): a development build's version and a release's. */
+    {"splash", "splash", "{\"version\":\"0.6.0-dev.124+g1f31026\"}", NULL},
+    {"splash_release", "splash", "{\"version\":\"0.6.0\"}", NULL},
     /* A zone nobody holds and a zone a team holds, for the modes without their own (BN-11). */
     {"neutral", "neutral", "{\"hold_s\":3}", NULL},
     {"captured", "captured", "{\"team\":\"red\",\"since\":95}", NULL},

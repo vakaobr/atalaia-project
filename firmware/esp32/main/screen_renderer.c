@@ -44,7 +44,7 @@ static const char *known_templates[] = {
     "standby",      "countdown",     "defused",    "exploded",   "final_score",
     "paused",       "neutral",       "captured",   "code_entry", "status",
     "pin_entry",    "preset_select", "waiting",    "playing",    "ready",
-    "timer_adjust", "start_confirm", "wifi_setup", NULL,
+    "timer_adjust", "start_confirm", "wifi_setup", "splash",     NULL,
 };
 
 /* ------------------------------------------------------------------ */
@@ -363,6 +363,46 @@ static lv_obj_t *splash_logo(lv_obj_t *scr, int y)
     lv_obj_set_style_image_recolor_opa(img, LV_OPA_COVER, 0);
     lv_obj_align(img, LV_ALIGN_CENTER, 0, y);
     return img;
+}
+
+/* ---- splash: the boot screen of the TFT (decision TS-1) ----------------------- */
+/* Data: version (the firmware's whole version). The OLED's boot splash scaled up: the towers on
+ * the left, ATALAIA and the version in the OLED's two lines (oled_version_lines) on the right. */
+
+#define SPLASH_LOGO_X 44
+#define SPLASH_TEXT_X (SPLASH_LOGO_X + OLED_LOGO_W * SPLASH_H / OLED_LOGO_H + 24)
+
+static void build_splash(lv_obj_t *scr)
+{
+    set_bg(scr, COLOR_BG);
+    lv_obj_t *img = splash_logo(scr, 0);
+    lv_obj_align(img, LV_ALIGN_LEFT_MID, SPLASH_LOGO_X, 0);
+    const int w = SCREEN_W - SPLASH_TEXT_X - 8;
+    slot[0] = lv_label_create(scr);
+    lv_obj_set_style_text_font(slot[0], &lv_font_atalaia_28, 0);
+    lv_obj_set_style_text_color(slot[0], lv_color_hex(COLOR_TEXT), 0);
+    lv_obj_set_style_text_letter_space(slot[0], 2, 0);
+    lv_label_set_text(slot[0], "ATALAIA");
+    lv_obj_align(slot[0], LV_ALIGN_LEFT_MID, SPLASH_TEXT_X, -34);
+    slot[1] = lv_label_create(scr);
+    lv_obj_set_style_text_font(slot[1], &lv_font_atalaia_20, 0);
+    lv_obj_set_style_text_color(slot[1], lv_color_hex(COLOR_ACCENT), 0);
+    one_line(slot[1], w);
+    lv_obj_align(slot[1], LV_ALIGN_LEFT_MID, SPLASH_TEXT_X, 4);
+    slot[2] = lv_label_create(scr);
+    lv_obj_set_style_text_font(slot[2], &lv_font_atalaia_14, 0);
+    lv_obj_set_style_text_color(slot[2], lv_color_hex(COLOR_MUTED), 0);
+    one_line(slot[2], w);
+    lv_obj_align(slot[2], LV_ALIGN_LEFT_MID, SPLASH_TEXT_X, 32);
+}
+
+static void update_splash(const char *data)
+{
+    char version[64], line1[40], line2[24];
+    if (!screen_json_str(data, "version", version, sizeof(version))) version[0] = '\0';
+    oled_version_lines(version, line1, sizeof(line1), line2, sizeof(line2));
+    lv_label_set_text(slot[1], line1);
+    lv_label_set_text(slot[2], line2);
 }
 
 /* ---- standby: the bomb waits to be armed ----------------------------- */
@@ -1064,6 +1104,7 @@ static const template_fns_t templates[] = {
     {"timer_adjust", build_timer_adjust, update_timer_adjust},
     {"start_confirm", build_start_confirm, update_start_confirm},
     {"wifi_setup", build_wifi_setup, update_wifi_setup},
+    {"splash", build_splash, update_splash},
 };
 
 /* Clears the screen for a new template. */

@@ -733,6 +733,18 @@ The rules the code keeps:
   with margin. Put a new big static buffer in PSRAM (`ATALAIA_PSRAM_BSS`) or raise the threshold with a
   reason; never lower it.
 
+## The TFT's boot splash (decisions TS-1 to TS-5)
+
+As soon as the display is up, the big screen shows the `splash` screen (`screen_renderer.c`): the OLED's
+tower scaled to 96 pixels in the accent colour on the left, "ATALAIA" and the version on the right, in
+the OLED splash's two lines (`oled_version_lines()`: `v0.6.0-dev.124` and the commit `1f31026`). It stays
+`ATALAIA_TFT_SPLASH_MS` (Kconfig *Boot splash*, default 2500, 0 = none) from the moment it is drawn, and
+longer when the first game screen is not ready by then: the display task keeps the screens that arrive
+meanwhile (`tft_splash.c`, the latest alone, the mode's `@mode` message goes through) and draws it when
+the time is over. Nothing sleeps: radio and game start as before. No panel (the driver failed): nothing is
+drawn. The same asset (`assets/splash.pgm`) as the OLED, so "Your own splash logo" below changes both.
+Host tests: `test_tft_splash.c` (timing), `splash` and `splash_release` in `test/screens/`.
+
 ## Your own splash logo (decisions LOGO-5, LOGO-6)
 
 The box shows the Atalaia tower and nothing else: on the on-board OLED's boot screen (30 x 60) and, scaled

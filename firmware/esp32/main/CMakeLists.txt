@@ -148,6 +148,7 @@ else()
         "cpace.c"
         "box_pair.c"
         "status_hold.c"
+        "tft_splash.c"
         "target_addon.c"
     )
     set(ATALAIA_EMBED EMBED_FILES "wifi_setup.html")

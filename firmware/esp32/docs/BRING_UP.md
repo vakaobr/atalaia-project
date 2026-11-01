@@ -156,7 +156,11 @@ firmware no longer reads a button there.
    the tower splash with the version for 2 s, then the PIN screen (or the
    setup screen), upright with the USB port on the left
    (`CONFIG_ATALAIA_OLED_FLIP` turns it round). Two `slow redraw` warnings
-   around then are the OLED's full frames on the 100 kHz bus.
+   around then are the OLED's full frames on the 100 kHz bus. The TFT shows
+   its own boot splash as soon as it is up (the tower on the left; ATALAIA, the
+   version and the commit on the right) for about 2.5 s
+   (`CONFIG_ATALAIA_TFT_SPLASH_MS`), then the first screen; it must be upright
+   in landscape, 320 x 240.
 
 ## Step 2: Vext and External Peripherals
 

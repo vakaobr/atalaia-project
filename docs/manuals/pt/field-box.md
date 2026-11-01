@@ -39,7 +39,7 @@ Corre as regras do jogo sozinha e fala com o controlador de campo por rádio. Se
 ## 2. Ligar, desligar e carregar
 
 1. Confirma que as antenas estão montadas.
-2. Liga o **interruptor principal**. O OLED pequeno mostra a torre da Atalaia e a versão do firmware durante 2 segundos. Depois o ecrã grande mostra o primeiro ecrã da caixa ([secção 3](#3-primeira-configuração-caixa-nova) ou [secção 5](#5-põe-a-caixa-num-jogo)).
+2. Liga o **interruptor principal**. O OLED pequeno e o ecrã grande mostram a torre da Atalaia e a versão do firmware: o OLED durante 2 segundos, o ecrã grande durante cerca de 2,5 segundos (mais tempo só se o primeiro ecrã da caixa ainda não estiver pronto). Depois o ecrã grande mostra o primeiro ecrã da caixa ([secção 3](#3-primeira-configuração-caixa-nova) ou [secção 5](#5-põe-a-caixa-num-jogo)).
 3. Para desligar, usa o interruptor principal.
 
 **Carregar.** Liga um carregador USB-C de 5 V à ficha do painel com o **interruptor principal ligado**. Com o interruptor desligado, a bateria fica isolada e não carrega. Carrega num sítio que possas vigiar, não dentro de uma mala de transporte fechada. Carrega só entre cerca de 0 °C e 45 °C. Não carregues uma caixa fria logo à saída de um campo no inverno.
