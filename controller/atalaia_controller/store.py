@@ -119,37 +119,35 @@ EPOCH_KEYS = 8  # game keys whose TX epoch is kept (as the box's epoch store, ra
 # Amendment 23, decision SR-29; as a box does, ATALAIA_EPOCH_LOST_MIN/MAX in radio_protocol.h, SR-27).
 EPOCH_LOST_MIN = 4096
 EPOCH_LOST_MAX = 61439
-# Where a lost record's epoch is drawn (decision EPW-1, RFC 0001 Amendment 25 follow-up). A uniform draw over
-# everything above the floor halves the room at every loss (each draw becomes the next floor), so two or three
-# unlucky losses used the range up. The floor is written before an epoch is used, so with a floor that survived
-# nothing above it was ever used; but a floor can be STALE (a database restored from an old backup whose epoch file
-# is lost too): the epochs used since are then above it, by the number of boots, joins and seq wraps since the
-# backup (a few a day), and a draw landing on or below one repeats a nonce or is refused as stale by the receivers.
-# So:
-#  - no record at all (floor 0, Amendment 23's case; the earlier epochs can be anywhere): uniform over the lower
-#    half, [EPOCH_LOST_MIN, EPOCH_LOST_WIDE_MAX], keeping the upper half for later losses;
-#  - a floor: uniform in a window of EPOCH_LOST_WINDOW epochs that starts EPOCH_LOST_MARGIN above it, so up to
-#    EPOCH_LOST_MARGIN forgotten epochs above a stale floor cannot be hit, and margin + window is one deep-search
-#    slice of the receivers (ATALAIA_DEEP_SLICE, 2048): the node is found at once. Each loss costs at most
-#    margin + window, so the range holds at least 14 losses after the widest first draw, 28 from a small floor.
-#    Near the top the margin, then the window, shrink; only a floor of EPOCH_LOST_MAX itself has no room.
-EPOCH_LOST_WIDE_MAX = 32767
+# Where a lost record's epoch is drawn (decision EPW-1, RFC 0001 Amendment 25 follow-up, which has the analysis
+# and the numbers). The floor is written before an epoch is used, so with a floor that survived nothing above it
+# was ever used. A STALE floor (a database restored from an old backup, its epoch file lost) has the epochs used
+# since right above it, contiguous: floor+1 .. floor+k, one per boot, join or seq wrap. So:
+#  - no record at all (floor 0, Amendment 23's case, earlier epochs can be anywhere): uniform over the whole
+#    range [EPOCH_LOST_MIN, EPOCH_LOST_MAX], as before;
+#  - a floor: uniform in the LOWER HALF of what is left above floor + margin: [floor + 1 + margin, +half of the
+#    room). The margin skips the first forgotten epochs (EPOCH_LOST_MARGIN, 1024: months of a stale backup); the
+#    half-room rule makes each loss take at most half of what is left, so the range cannot be used up by two or
+#    three unlucky draws (about 16 losses fit in the worst case);
+#  - the epoch file is missing although the database says one was written (EPOCH_LOST_MARGIN_SUSPECT, 8192): the
+#    database may be an old backup, so the margin is eight times larger (years of use).
 EPOCH_LOST_MARGIN = 1024
-EPOCH_LOST_WINDOW = 1024
+EPOCH_LOST_MARGIN_SUSPECT = 8192
 
 
-def epoch_lost_bounds(floor: int) -> Optional[tuple[int, int]]:
+def epoch_lost_bounds(floor: int, suspect: bool = False) -> Optional[tuple[int, int]]:
     """The inclusive range a lost record's epoch is drawn in, above `floor` (the highest epoch the controller
-    ever used with any key; 0 = no record); None when no epoch is left above it."""
+    ever used with any key; 0 = no record); None when no epoch is left above it. `suspect`: the epoch file
+    is missing although the database says one was written (the database may be an old backup)."""
     if floor <= 0:
-        return EPOCH_LOST_MIN, EPOCH_LOST_WIDE_MAX
+        return EPOCH_LOST_MIN, EPOCH_LOST_MAX
     low = max(EPOCH_LOST_MIN, floor + 1)
     if low > EPOCH_LOST_MAX:
         return None
-    start = max(EPOCH_LOST_MIN, floor + 1 + EPOCH_LOST_MARGIN)
+    start = max(EPOCH_LOST_MIN, floor + 1 + (EPOCH_LOST_MARGIN_SUSPECT if suspect else EPOCH_LOST_MARGIN))
     if start > EPOCH_LOST_MAX:
         start = low  # no room for the margin: the margin gives way, never the floor
-    return start, min(EPOCH_LOST_MAX, start + EPOCH_LOST_WINDOW - 1)
+    return start, start + (EPOCH_LOST_MAX - start + 2) // 2 - 1
 
 
 def epoch_tag(key: bytes) -> str:
@@ -654,13 +652,19 @@ class Store:
             # list forgets keys: only 8 are kept): a lost record's random epoch goes above it (EP-2).
             floor = max([int(self.get_setting("tx_epoch_floor") or 0), side_floor] + [int(e) for _, e in table])
             current = next((int(e) for t, e in table if t == tag), None)
+            epoch_path = self._epoch_file()
+            suspect = (epoch_path is not None and not os.path.exists(epoch_path)
+                       and self.get_setting("epoch_file_seen") == "1")
             if saved is None and current is None and resuming and self.get_setting("tx_epoch"):
                 current = int(self.get_setting("tx_epoch") or "0")
             if current is not None and current >= 0xFFFF:
                 raise RuntimeError("the controller's nonce epochs for this game are exhausted; "
                                    "start a new game")
+            if suspect:
+                log.warning("the epoch file %s is missing although it was written before: the database may be "
+                            "an old backup; a lost record's epoch is drawn far above the floor %d", epoch_path, floor)
             if current is None and resuming:
-                bounds = epoch_lost_bounds(floor)
+                bounds = epoch_lost_bounds(floor, suspect)
                 if bounds is None:
                     raise RuntimeError("the controller has used epochs up to %d; none is left above them for "
                                        "a game it has lost the record of: start a new game" % floor)
@@ -678,7 +682,8 @@ class Store:
             table = table[:EPOCH_KEYS]
             # The file first: if the database write is lost the epoch is still on disk, and the other
             # way round it would be used with nothing remembering it.
-            self._write_epoch_file(table, floor)
+            if self._write_epoch_file(table, floor):
+                self.set_setting("epoch_file_seen", "1")  # a missing file is then a loss, not a first run
             self.set_setting("tx_epoch_floor", str(floor))
             self.set_setting("tx_epochs", json.dumps(table))
             return epoch
@@ -705,12 +710,12 @@ class Store:
             log.warning("the epoch file %s cannot be read; the database's list is used", path)
             return {}, 0
 
-    def _write_epoch_file(self, table: list[list[Any]], floor: int = 0) -> None:
+    def _write_epoch_file(self, table: list[list[Any]], floor: int = 0) -> bool:
         """Replaces the epoch file whole (a temporary file, synced, then renamed): a power cut leaves the
         old list or the new one. A failure is logged, not raised: the database still has the list."""
         path = self._epoch_file()
         if path is None:
-            return
+            return False
         tmp = path + ".tmp"
         try:
             fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -726,6 +731,8 @@ class Store:
                 os.close(dir_fd)
         except OSError as exc:
             log.warning("the epoch file %s was not written: %s", path, exc)
+            return False
+        return True
 
     # --- modes --------------------------------------------------------------
 

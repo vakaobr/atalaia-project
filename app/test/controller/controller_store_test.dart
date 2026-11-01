@@ -274,7 +274,7 @@ void main() {
 
     test('the draw stays in epochLostBounds and above the margin, at the '
         'bounds', () {
-      expect(epochLostBounds(0), (epochLostMin, epochLostWideMax));
+      expect(epochLostBounds(0), (epochLostMin, epochLostMax));
       expect(epochLostBounds(epochLostMax), isNull);
       for (final floor in [
         1, 3, 4094, 4095, 4096, 32767, 50000, 60000, 60414, 60415, //
@@ -283,8 +283,9 @@ void main() {
         final (lo, hi) = epochLostBounds(floor)!;
         expect(lo, greaterThan(floor));
         expect(hi, lessThanOrEqualTo(epochLostMax));
-        expect(hi - lo + 1, lessThanOrEqualTo(epochLostWindow));
-        if (floor + epochLostMargin + epochLostWindow <= epochLostMax) {
+        expect(hi, greaterThanOrEqualTo(lo));
+        expect(hi - lo + 1, lessThanOrEqualTo((epochLostMax - lo + 2) ~/ 2));
+        if (floor + 1 + epochLostMargin <= epochLostMax) {
           expect(lo, greaterThanOrEqualTo(floor + 1 + epochLostMargin));
         }
         for (final top in [false, true]) {
@@ -329,9 +330,9 @@ void main() {
       }
     });
 
-    test('at least 14 losses fit from no record, 28 from a small floor, each '
-        'above the last, even at the top of every draw', () {
-      for (final (start, least) in [(0, 14), (5, 28)]) {
+    test('at least 15 losses fit from a small floor, each above the last, '
+        'even at the top of every draw', () {
+      for (final (start, least) in [(5, 15)]) {
         final store = MemoryControllerStore();
         if (start > 0) store.setSetting('tx_epoch_floor', '$start');
         var last = start;

@@ -16,7 +16,7 @@
 library;
 
 import 'dart:convert';
-import 'dart:math' show Random, max, min;
+import 'dart:math' show Random, max;
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
@@ -209,25 +209,23 @@ const epochLostMin = 4096;
 const epochLostMax = 61439;
 
 /// Where a lost record's epoch is drawn (decision EPW-1; store.py
-/// `epoch_lost_bounds` has the reasons). With no record at all (floor 0) it is
-/// [epochLostMin]..[epochLostWideMax], the lower half, keeping room for later
-/// losses. With a floor it is a window of [epochLostWindow] epochs starting
-/// [epochLostMargin] above it, so the epochs used since a stale floor are not
-/// landed on and every loss leaves room for the next (at least 14 fit).
-const epochLostWideMax = 32767;
+/// `epoch_lost_bounds` and RFC 0001 Amendment 25's note have the reasons).
+/// With no record at all (floor 0) it is the whole range. With a floor it is
+/// the lower half of what is left above `floor + 1 + epochLostMargin`: the
+/// margin skips the epochs used since a stale floor, and the half-room rule
+/// leaves room for later losses (about 16 fit in the worst case).
 const epochLostMargin = 1024;
-const epochLostWindow = 1024;
 
 /// The inclusive range a lost record's epoch is drawn in, above [floor] (the
 /// highest epoch ever used with any key, 0 for no record); null when no epoch
 /// is left above it. Shared vectors: protocol/vectors/tx_epoch.json.
 (int, int)? epochLostBounds(int floor) {
-  if (floor <= 0) return (epochLostMin, epochLostWideMax);
+  if (floor <= 0) return (epochLostMin, epochLostMax);
   final low = max(epochLostMin, floor + 1);
   if (low > epochLostMax) return null;
   var start = max(epochLostMin, floor + 1 + epochLostMargin);
   if (start > epochLostMax) start = low;
-  return (start, min(epochLostMax, start + epochLostWindow - 1));
+  return (start, start + (epochLostMax - start + 2) ~/ 2 - 1);
 }
 
 /// The controller's epoch for this run in the game with [key], written
