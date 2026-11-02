@@ -48,10 +48,10 @@ Two ways, as for the boxes ([firmware guide, section 2](firmware.md#2-get-the-fi
    sha256sum -c --ignore-missing SHA256SUMS
    ```
 
-   On macOS: `shasum -a 256 -c SHA256SUMS`. On Windows `cmd`: `certutil -hashfile atalaia-modem-0.5.0-usb.zip SHA256`, then compare the line with the one in `SHA256SUMS`.
+   On macOS: `shasum -a 256 -c SHA256SUMS`. On Windows `cmd`: `certutil -hashfile atalaia-modem-0.6.1-usb.zip SHA256`, then compare the line with the one in `SHA256SUMS`.
 4. Unzip it into a folder of its own. It holds the bootloader, the partition table, the program, a `flash_args` file and a `README.txt` that repeats the commands below.
 
-   Windows `cmd`: `mkdir atalaia-modem` then `tar -xf atalaia-modem-0.5.0-usb.zip -C atalaia-modem` (or right-click, *Extract All*). Linux and macOS: `unzip atalaia-modem-0.5.0-usb.zip -d atalaia-modem`.
+   Windows `cmd`: `mkdir atalaia-modem` then `tar -xf atalaia-modem-0.6.1-usb.zip -C atalaia-modem` (or right-click, *Extract All*). Linux and macOS: `unzip atalaia-modem-0.6.1-usb.zip -d atalaia-modem`.
 
 **What the released modem is:** the Heltec **V4.3**, the **EU868** region (868 MHz), listen before talk on, an antenna of 2 dBi assumed, the project's keys built in, the screen in English until the controller tells it the boxes' language. **For a V4.2, for Taiwan (AS923), for an antenna of more than 2 dBi or for a screen that starts in another language, build it yourself.**
 
