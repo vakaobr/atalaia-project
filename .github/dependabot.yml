@@ -5,6 +5,10 @@
 # tools/ folder holds release-requirements, ci-sim-requirements, ci-lint-requirements and ci-yaml-requirements)
 # (SC-4 to SC-6). The actions are pinned by commit SHA with a version comment, and Dependabot moves
 # both. Every update is a normal pull request: CI runs on it and a maintainer reads it, like any change.
+# The commit-message prefixes make each title a Conventional Commit (pr-title.yml), e.g.
+# "ci: bump actions/checkout from ..." or "chore(server): bump fastapi from ...": Dependabot adds the
+# colon. ci and chore are left out of the CHANGELOG and raise no version (release-please-config.json);
+# retitle a bump that fixes something users see as fix(<scope>): ... before merging it.
 # The ESP-IDF image (pinned by digest in the workflows) and the Dockerfiles' base images are not
 # listed: their versions are chosen together with the firmware toolchain, by hand.
 version: 2
@@ -26,7 +30,7 @@ updates:
       default-days: 14
     open-pull-requests-limit: 3
     commit-message:
-      prefix: "controller"
+      prefix: "chore(controller)"
   - package-ecosystem: pip
     directory: /server
     schedule:
@@ -35,7 +39,7 @@ updates:
       default-days: 14
     open-pull-requests-limit: 3
     commit-message:
-      prefix: "server"
+      prefix: "chore(server)"
   - package-ecosystem: pip
     directory: /tools
     schedule:
@@ -44,7 +48,7 @@ updates:
       default-days: 14
     open-pull-requests-limit: 2
     commit-message:
-      prefix: "release tooling"
+      prefix: "chore(tools)"
   - package-ecosystem: pub
     directory: /app
     schedule:
@@ -53,4 +57,4 @@ updates:
       default-days: 14
     open-pull-requests-limit: 3
     commit-message:
-      prefix: "app"
+      prefix: "chore(app)"

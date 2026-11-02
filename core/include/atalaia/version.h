@@ -8,8 +8,9 @@
 /* The project's version, which is the core's (decision FV-1): the release being developed,
  * with a pre-release while it is ("dev": 0.3.0-dev sorts after 0.2.0 and before 0.3.0). A
  * release empties ATALAIA_VERSION_PRERELEASE and is tagged v<MAJOR.MINOR.PATCH>; the next
- * commit raises the numbers and sets "dev" again. A firmware build adds its commit
- * (tools/docker_fw.py: 0.3.0-dev.<commits>+g<hash>; firmware/esp32/CMakeLists.txt). */
+ * commit raises the numbers and sets "dev" again (release-please's release pull request and
+ * tools/prepare_release.py: release-pr, then open-dev; CONTRIBUTING.md). A firmware build adds
+ * its commit (tools/docker_fw.py: 0.3.0-dev.<commits>+g<hash>; firmware/esp32/CMakeLists.txt). */
 #define ATALAIA_VERSION_MAJOR      0
 #define ATALAIA_VERSION_MINOR      6
 #define ATALAIA_VERSION_PATCH      0
