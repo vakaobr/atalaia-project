@@ -3,6 +3,10 @@
 #
 # Generated from requirements.in with uv pip compile --universal --generate-hashes
 # --exclude-newer 2026-10-16 (see requirements.in); do not edit by hand.
+# A single package bumped since then (its release at least two weeks old) is
+# added with --upgrade-package NAME --exclude-newer-package NAME=<its release
+# day, or a time just after its upload when a newer release came out the same
+# day>; the commit that bumps it gives the full command.
 # On a Raspberry Pi or Ubuntu the distribution packages are enough and are what CI tests:
 #   sudo apt install python3-fastapi python3-uvicorn python3-websockets \
 #        python3-paho-mqtt python3-serial python3-yaml python3-cryptography mosquitto
@@ -195,9 +199,9 @@ cryptography==50.0.2 \
     --hash=sha256:fa8f5efb344d6908a1ce62f4a24e2e5780f825d6f53f5f50ec5ffacac72936cb \
     --hash=sha256:fdd28f912fccfec1846a94e2e1e8f9b0012f557f0c46fe4f3eb0d7a87afcf90b
     # via -r requirements.in
-fastapi==0.143.3 \
-    --hash=sha256:75e8bd68e2f52f77d29b2879749c257d64de2d85282d25270caf2bfccce5efe5 \
-    --hash=sha256:b9ab567ee57afb4454004ce04c889f8f0160ac47946b99795887cd6e88484848
+fastapi==0.148.0 \
+    --hash=sha256:06ee16c50e429daf993a58ecbb5306d284c4c1ee8135380af39a5e1cfa715187 \
+    --hash=sha256:2848088aa482c875c180ef92b7139fec345393d09cdcf258ba4b8555ab068a3b
     # via -r requirements.in
 h11==0.16.0 \
     --hash=sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1 \
