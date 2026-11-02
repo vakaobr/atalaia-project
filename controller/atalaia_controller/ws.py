@@ -59,8 +59,12 @@ class Hub:
     def __init__(self, max_queue: int = 256, route: Optional[Route] = None) -> None:
         self.max_queue = max_queue
         self.route: Route = route or default_route
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None  # the latest subscriber's
         self._clients: dict[asyncio.Queue, Any] = {}
+        # Each queue's event loop: an asyncio.Queue is filled on its own loop only. A server has one
+        # loop; FastAPI's TestClient runs each WebSocket on a loop of its own, and a queue filled from
+        # another loop's thread could miss waking its reader for good (a hung test, PLK-6).
+        self._loops: dict[asyncio.Queue, asyncio.AbstractEventLoop] = {}
         self._lock = threading.Lock()
         self.dropped_clients = 0
 
@@ -70,11 +74,13 @@ class Hub:
         with self._lock:
             self._loop = loop
             self._clients[queue] = viewer
+            self._loops[queue] = loop
         return queue
 
     def unsubscribe(self, queue: asyncio.Queue) -> None:
         with self._lock:
             self._clients.pop(queue, None)
+            self._loops.pop(queue, None)
 
     @property
     def client_count(self) -> int:
@@ -83,17 +89,17 @@ class Hub:
     def publish(self, msg: dict[str, Any]) -> None:
         """Thread-safe: called by the engine's listeners."""
         with self._lock:
-            loop = self._loop
-            if loop is None or not self._clients:
-                return
-        try:
-            loop.call_soon_threadsafe(self._fanout, msg)
-        except RuntimeError:  # the loop has closed
-            pass
+            loops = set(self._loops.values())
+        for loop in loops:
+            try:
+                loop.call_soon_threadsafe(self._fanout, msg, loop)
+            except RuntimeError:  # the loop has closed
+                pass
 
-    def _fanout(self, msg: dict[str, Any]) -> None:
+    def _fanout(self, msg: dict[str, Any], loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
+        """On ``loop``: the message to that loop's clients (every client when None)."""
         with self._lock:
-            clients = list(self._clients.items())
+            clients = [(q, v) for q, v in self._clients.items() if loop is None or self._loops.get(q) is loop]
         for queue, viewer in clients:
             try:
                 out = self.route(viewer, msg)
