@@ -1,0 +1,17 @@
+{
+  "description": "The per-source replay window (RFC 0001 Amendment 23, decision SR-20). Every receiver keeps, per source node, the highest nonce counter (epoch * 65536 + seq) of an authenticated packet and a bitmap of the 64 counters up to it. A counter above the highest is fresh and moves the window; one inside the window (0..63 below the highest) is fresh once and a duplicate after; one 64 or more below is too old. A source's first packet is always fresh. The C core (core/src/replay.c, tested through core/tests/replay_vectors.h), the Python port (simulator/atalaia_sim/replay.py) and the Dart port (app/lib/radio/replay.dart) must give exactly these verdicts, each case starting from an empty window. 'steps' are [epoch, seq, verdict] in arrival order; verdict is fresh, duplicate or too_old.",
+  "width": 64,
+  "cases": [
+    {"name": "first_packet_is_fresh", "steps": [[1, 0, "fresh"]]},
+    {"name": "in_order_then_flood_copies", "steps": [[1, 0, "fresh"], [1, 1, "fresh"], [1, 1, "duplicate"], [1, 0, "duplicate"]]},
+    {"name": "out_of_order_inside_window", "steps": [[1, 10, "fresh"], [1, 5, "fresh"], [1, 5, "duplicate"], [1, 10, "duplicate"], [1, 9, "fresh"]]},
+    {"name": "exactly_63_below_is_kept", "steps": [[1, 100, "fresh"], [1, 37, "fresh"], [1, 37, "duplicate"]]},
+    {"name": "exactly_64_below_is_too_old", "steps": [[1, 100, "fresh"], [1, 36, "too_old"]]},
+    {"name": "recorded_cmd_replayed_long_after", "steps": [[1, 5, "fresh"], [1, 6, "fresh"], [1, 500, "fresh"], [1, 6, "too_old"], [1, 5, "too_old"]]},
+    {"name": "jump_of_64_clears_the_bitmap", "steps": [[1, 0, "fresh"], [1, 64, "fresh"], [1, 0, "too_old"], [1, 1, "fresh"], [1, 1, "duplicate"], [1, 64, "duplicate"]]},
+    {"name": "seq_wrap_into_the_next_epoch", "steps": [[1, 65534, "fresh"], [1, 65535, "fresh"], [2, 0, "fresh"], [1, 65535, "duplicate"], [1, 65534, "duplicate"], [2, 0, "duplicate"], [2, 1, "fresh"], [1, 65533, "fresh"]]},
+    {"name": "lower_epoch_is_too_old", "steps": [[3, 5, "fresh"], [2, 5, "too_old"], [3, 4, "fresh"], [3, 4, "duplicate"]]},
+    {"name": "a_rebooted_source_moves_the_window_up", "steps": [[1, 200, "fresh"], [7, 0, "fresh"], [1, 200, "too_old"], [7, 0, "duplicate"], [7, 1, "fresh"]]},
+    {"name": "top_of_the_counter_space", "steps": [[65535, 65535, "fresh"], [65535, 65535, "duplicate"], [65535, 65534, "fresh"], [65535, 65534, "duplicate"]]}
+  ]
+}

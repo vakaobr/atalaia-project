@@ -284,61 +284,56 @@ void main() {
   });
 
   for (final lang in AppLanguage.values) {
-    testWidgets(
-      '320 px wide and the accessibility guidelines (${lang.code})',
-      (tester) async {
-        await small(tester);
-        final h = harness(language: lang);
-        final handle = tester.ensureSemantics();
-        await tester.pumpWidget(h.app(home: const ControllerScreen()));
-        await tester.pumpAndSettle();
-        Future<void> guidelines() async {
-          await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-          await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-          await expectLater(tester, meetsGuideline(textContrastGuideline));
-        }
+    testWidgets('320 px wide and the accessibility guidelines (${lang.code})', (
+      tester,
+    ) async {
+      await small(tester);
+      final h = harness(language: lang);
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(h.app(home: const ControllerScreen()));
+      await tester.pumpAndSettle();
+      Future<void> guidelines() async {
+        await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+      }
 
-        // Start is on the first screen, with no scroll.
-        final start = tester.getRect(find.byKey(const Key('ctl-start')));
-        expect(start.bottom, lessThan(640));
-        await guidelines();
-        await tester.tap(find.byKey(const Key('ctl-start')));
-        await tester.pumpAndSettle();
-        h.controllerRuns.single.emit({
-          'game': {
-            'id': 1,
-            'name': 'Um nome de jogo bem comprido',
-            'state': 'paused',
-          },
-        });
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-        expect(
-          tester.getRect(find.byKey(const Key('ctl-stop'))).bottom,
-          lessThan(640),
-        );
-        await guidelines();
-        // Down the whole screen, nothing overflows.
-        for (var i = 0; i < 12; i++) {
-          await tester.drag(
-            find.byType(Scrollable).first,
-            const Offset(0, -400),
-          );
-          await tester.pumpAndSettle();
-          expect(tester.takeException(), isNull);
-        }
-        // Every part meets them, all of it on one tall screen: a text that a
-        // scroll leaves half under the app bar would be read on the bar's
-        // colours by the contrast check (slice S7c made the list longer).
-        tester.view.physicalSize = const Size(320, 4000);
+      // Start is on the first screen, with no scroll.
+      final start = tester.getRect(find.byKey(const Key('ctl-start')));
+      expect(start.bottom, lessThan(640));
+      await guidelines();
+      await tester.tap(find.byKey(const Key('ctl-start')));
+      await tester.pumpAndSettle();
+      h.controllerRuns.single.emit({
+        'game': {
+          'id': 1,
+          'name': 'Um nome de jogo bem comprido',
+          'state': 'paused',
+        },
+      });
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.getRect(find.byKey(const Key('ctl-stop'))).bottom,
+        lessThan(640),
+      );
+      await guidelines();
+      // Down the whole screen, nothing overflows.
+      for (var i = 0; i < 12; i++) {
+        await tester.drag(find.byType(Scrollable).first, const Offset(0, -400));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        await guidelines();
-        await h.services.controller.stop();
-        handle.dispose();
-      },
-      variant: onAndroid,
-    );
+      }
+      // Every part meets them, all of it on one tall screen: a text that a
+      // scroll leaves half under the app bar would be read on the bar's
+      // colours by the contrast check (slice S7c made the list longer).
+      tester.view.physicalSize = const Size(320, 4000);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await guidelines();
+      await h.services.controller.stop();
+      handle.dispose();
+    }, variant: onAndroid);
   }
 
   test('the console gets the GM token in the fragment, never the query', () {

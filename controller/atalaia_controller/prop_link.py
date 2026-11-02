@@ -31,7 +31,7 @@ import threading
 from typing import TYPE_CHECKING, Any, Optional
 
 from atalaia_sim import codec
-from atalaia_sim.field_controller import CMD_OPCODES, STATE_NAMES
+from atalaia_sim.field_controller import CMD_OPCODES, CMD_PEER_EPOCH, STATE_NAMES
 from atalaia_sim.packet import Header, cmd_decode, hello_encode, state_encode, time_decode, vf_make
 from atalaia_sim.protocol import MESSAGE_TYPES
 
@@ -44,7 +44,8 @@ DOMAIN = b"atalaia-prop-link-v1\x00"
 NONCE_SIZE = 32
 QUEUE_MAX = 256
 AUTH_TIMEOUT_S = 10.0
-OPCODE_NAMES = {v: k for k, v in CMD_OPCODES.items()}
+# CMD peer (opcode 11, Amendment 24) is the controller's own and not in the GM's list, but a prop is told it too (EP-1).
+OPCODE_NAMES = {**{v: k for k, v in CMD_OPCODES.items()}, CMD_PEER_EPOCH: "peer"}
 PRIOS = {"telemetry": 0, "normal": 1, "critical": 2}
 
 

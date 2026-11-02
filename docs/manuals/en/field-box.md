@@ -39,7 +39,7 @@ It runs the game's rules by itself, and it talks to the field controller by radi
 ## 2. Power on, power off and charging
 
 1. Check that the antennas are fitted.
-2. Switch the **main switch** on. The small OLED shows the Atalaia tower and the firmware version for 2 seconds. Then the big screen shows the box's first screen ([section 3](#3-first-time-setup-new-box) or [section 5](#5-get-the-box-into-a-game)).
+2. Switch the **main switch** on. The small OLED and the big screen both show the Atalaia tower and the firmware version: the OLED for 2 seconds, the big screen for about 2.5 seconds (longer only if the box's first screen is not ready by then). Then the big screen shows the box's first screen ([section 3](#3-first-time-setup-new-box) or [section 5](#5-get-the-box-into-a-game)).
 3. To switch off, use the main switch.
 
 **Charging.** Plug a 5 V USB-C charger into the panel socket with the **main switch on**. With the switch off, the battery is cut off and does not charge. Charge in a place you can supervise, not inside a closed transport case. Charge only between about 0 °C and 45 °C. Do not charge a cold box straight from a winter field.
@@ -128,9 +128,9 @@ You hold your team's button on the box. The box shows what is happening.
 | **READY** · the Atalaia tower · **Next game** | Adopted, in no game. It can be invited. |
 | **WAITING** · **Game** *N* · **The game hasn't started** | Joined. Waits for the organisers' **Start**. |
 | **GAME ON** | The game started. The mode's own screen follows. |
-| **ZONE · NEUTRAL** · **Hold to capture** | A zone nobody holds (Domination, Hold-All, Last Stand, Master and Satellites). Hold your team's button. A bar fills. |
-| **ZONE HELD** · team | A team holds the zone. The ring takes its colour. The small OLED shows how long it has held it. |
-| **Hold to take it over** | Another team can take the zone the same way. |
+| **ZONE · NEUTRAL** · **Hold to capture** | A zone nobody holds (Domination, Hold-All, Last Stand, Master and Satellites; in Master and Satellites the header says **MASTER** or **SATELLITE** once the controller has told the box which it is). Hold your team's button. A bar fills. |
+| **ZONE HELD** · team | A team holds the zone. The ring takes its colour. Both screens show how long it has held it, counting up (**held 1:23**). In Domination the big screen also shows each team's points at this box, in team colours, in its top right corner. In Master and Satellites the header names the box (**MASTER HELD**, **SATELLITE HELD**), and the master's big screen counts up the held time and shows each team's score the same way. Progressive Domination and VIP Payload's checkpoints count up the held time on the big screen too. |
+| **Hold to take it over** | Another team can take the zone the same way. While a team holds its button, a bar with that team's name fills along the bottom of the big screen, as it does on the OLED. |
 | **READY** · **Hold to arm** | *Bomb / Rush*: the bomb is not armed yet. Attackers hold their button. |
 | **ARMED** · time **until detonation** | The bomb is armed. Defenders hold their button to defuse. |
 | **DEFUSED** / **EXPLODED** | The bomb ended. The winning team is named. After an explosion the game ends. |
@@ -140,13 +140,13 @@ You hold your team's button on the box. The box shows what is happening.
 
 Other modes have their own screens: *Kill Confirmed* (**press your button, then scan the tags**), *Respawn and Lives* (**Scan your tag to come back in**), *Medic Kit* (**Scan your tag**, **then hold the button**) and *Hacking Terminal* (a puzzle on the keypad). The [modes page](https://atalaia-project.link/en/modes/) shows them.
 
-**The logo.** The box shows the Atalaia tower, on its boot screen and on the **READY** screen, and on the *Bomb / Rush* screen while the bomb is not armed. The field's own logo (the console's *Settings*) shows in the app, on the scoreboard and on the poster, not on the box: a box used to fetch it over the field Wi-Fi, which it no longer does. A builder can build a box with another splash: [firmware guide, section 4](firmware.md#4-the-options-a-builder-sets).
+**The logo.** The box shows the Atalaia tower, on its boot screen (the small screen and the big one, with the firmware version beside it) and on the **READY** screen, and on the *Bomb / Rush* screen while the bomb is not armed. The field's own logo (the console's *Settings*) shows in the app, on the scoreboard and on the poster, not on the box: a box used to fetch it over the field Wi-Fi, which it no longer does. A builder can build a box with another splash: [firmware guide, section 4](firmware.md#4-the-options-a-builder-sets).
 
-On the small OLED you see the mode on top, one big value (the phase, the timer or the team) and a hint under it. While a team holds its button, the OLED shows a bar that fills.
+On the small OLED you see the mode on top, one big value (the phase, the timer or the team) and a hint under it. On a held zone (Domination, Progressive Domination, Master and Satellites, VIP Payload's checkpoints) the hint is how long the team has held it (**held for 1:23**). While a team holds its button, the OLED shows a bar that fills.
 
 In a game with a time limit that you started on the box, the big screen has a thin bar along its bottom edge that shows how much of the game is left (it turns red in the last minute), and the OLED shows the time left, as minutes and seconds, at the right of its top line. A game with **No limit** has neither. A game that the field controller runs ends when the game master ends it, so it has no bar.
 
-*Medic Kit*, *Hacking Terminal* and *VIP / Payload* do not follow the box language. Each takes its screen language from its own **Language** setting in the game, and that is Portuguese by default. Ask the organisers to set it.
+*Medic Kit* and *Hacking Terminal* do not follow the box language. Each takes its screen language from its own **Language** setting in the game; left empty, it is the game's language. *VIP / Payload* follows the box language, like the other modes (its old **Language** setting is no longer used).
 
 ## 7. What the lights and screens tell you
 
@@ -216,7 +216,7 @@ An Android phone can be a box too. In the app choose **Game prop**, then **Join 
 | The screen is in the wrong language | The organisers set the **Box language** before creating the game. |
 | The box shows English only | An older firmware. The organisers can update it. |
 | **PIN locked · try again in N min** | Wait. The count survives a restart. Do not keep guessing. |
-| The box rebooted in a game | It comes back in the same game. The organisers see **node.rebooted** in their log. |
+| The box rebooted in a game | It comes back in the same game. The organisers see **node.rebooted** in their log, with the reason the box gives (power, brownout, software, panic, watchdog); the console's feed says **A box crashed and restarted** for a program crash or a watchdog reset. A flaky keypad or screen wire no longer reboots a box: the failing part is set aside for a while and the game goes on (a keypad then reads as no key). |
 | The small screen is dark | Ask the builder. The big screen can still work. |
 
 For building and bench faults see [the build manual's troubleshooting table](../../../hardware/field-box/BUILD.md#13-troubleshooting).

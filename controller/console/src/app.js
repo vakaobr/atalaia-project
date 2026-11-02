@@ -7,7 +7,7 @@
 
 import { html, render, Component, t, loadLanguage, LANGS, api, ApiError, Stream,
          savedToken, saveToken, takeHashToken, serves, AREAS, clock, OFFLINE_MS, fetchBranding,
-         brandingUrl, inWebView } from './ui.js';
+         brandingUrl, inWebView, httpsAddress } from './ui.js';
 import { GameControl, ControllerPanel } from './components/game-control.js';
 import { ScorePanel } from './components/score-panel.js';
 import { LiveFeed } from './components/live-feed.js';
@@ -19,6 +19,8 @@ import { PresetBuilder } from './components/preset-builder.js';
 import { ScenarioBuilder } from './components/scenario-builder.js';
 import { RadioSettings } from './components/radio-settings.js';
 import { BoxLanguageSettings } from './components/box-language-settings.js';
+import { ClockBanner, ClockSettings } from './components/clock-settings.js';
+import { MapFetchingSettings } from './components/map-fetching-settings.js';
 import { FirmwarePanel } from './components/firmware-panel.js';
 import { PodConfigPanel } from './components/pod-config-panel.js';
 import { FetchedModes } from './components/fetched-modes.js';
@@ -28,6 +30,7 @@ import { BrandingSettings, TeamPresets, FieldBrand, accentRef } from './componen
 import { discover } from './components/box-invites.js';
 import { RemoteGmLog } from './components/remote-gm-log.js';
 import { ScoreboardShare } from './components/scoreboard-share.js';
+import { AccessTokens } from './components/access-tokens.js';
 import { PosterPrompt, PosterPromptSetting, posterPromptWanted } from './components/poster-prompt.js';
 
 const TABS = ['game', 'checkin', 'field', 'nodes', 'join', 'adopt', 'presets', 'scenarios', 'feed', 'controller', 'settings'];
@@ -106,12 +109,18 @@ class App extends Component {
     // ---- login ----------------------------------------------------------------
 
     async login(token) {
+        const secure = await httpsAddress();
+        if (secure) {
+            this.setState({ role: null, loginError: t('login.use_https', { url: secure }) });
+            this.loadBranding();
+            return;
+        }
         try {
             const who = await api(token, 'GET', '/whoami');
             saveToken(token);
             this.token = token; // used at once below: setState is applied later
             this.features = Array.isArray(who.features) ? who.features : null;
-            this.setState({ token, role: who.role, loginError: '', features: this.features });
+            this.setState({ token, role: who.role, loginError: '', features: this.features, accessTokens: who.access_tokens === true });
             this.startStream();
             this.loadCatalogue();
             this.checkPosterChanged(who.role);
@@ -144,7 +153,7 @@ class App extends Component {
         this.token = '';
         this.features = null;
         saveToken('');
-        this.setState({ token: '', role: null, features: null, connected: null, loginError: reason || '',
+        this.setState({ token: '', role: null, features: null, accessTokens: false, connected: null, loginError: reason || '',
                         game: null, status: null, nodes: {}, feed: [], alerts: [], radio: null, posterPrompt: null });
     }
 
@@ -564,6 +573,7 @@ class App extends Component {
                 <button type="button" class="link" data-testid="logout" onClick=${() => this.logout()}>${t('login.leave')}</button>
             </div>
             ${connected === false && html`<div class="banner" role="status" data-testid="reconnecting">${t('app.reconnecting')}</div>`}
+            <${ClockBanner} app=${this} />
         </header>`;
     }
 
@@ -593,10 +603,10 @@ class App extends Component {
         case 'controller':
             return html`<${ControllerPanel} app=${this} />${this.state.role === 'gm' && html`<${RemoteGmLog} app=${this} />`}`;
         case 'settings':
-            return html`${this.serves('radio') && html`<${RadioSettings} app=${this} />`}<${BoxLanguageSettings} app=${this} />${
+            return html`${this.serves('radio') && html`<${RadioSettings} app=${this} />`}<${ClockSettings} app=${this} /><${BoxLanguageSettings} app=${this} /><${MapFetchingSettings} app=${this} />${
                 this.state.role === 'gm' && this.serves('checkin') && html`<${PosterPromptSetting} />`}${
                 this.serves('branding') && html`<${BrandingSettings} app=${this} />`}${
-                this.serves('presets') && html`<${TeamPresets} app=${this} />`}`;
+                this.serves('presets') && html`<${TeamPresets} app=${this} />`}<${AccessTokens} app=${this} />`;
         default:
             return null;
         }

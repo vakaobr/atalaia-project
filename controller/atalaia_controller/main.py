@@ -5,7 +5,9 @@
     run       start the controller: radio modem, MQTT bridge, REST/WebSocket API, GM console
               (HTTP on [api] port, HTTPS with the field CA on [api] tls_port), and with
               [atak] enabled the CoT feed for ATAK
-    tokens    print the GM and read tokens (generated on first start if not configured)
+    tokens    print the GM and read tokens (generated on first start if not configured);
+              --create LABEL --scope read|gm|marshals [--ttl 8h] [--game N] makes a short-lived access
+              token (shown once), --list shows them, --revoke ID ends one
     join-key  print the field join key that authenticates join cards (protocol/join.md):
               boxes get it when they are adopted (protocol/adoption.md), a standby controller
               in [join] key; --fingerprint prints only its fingerprint, --rotate makes a new one
@@ -24,6 +26,7 @@ import logging
 import os
 import secrets
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -31,6 +34,7 @@ from typing import Any, Callable, Optional
 from atalaia_sim.core import Core, LibraryNotFound, find_library
 
 from . import tls as tlsmod
+from .access_tokens import AccessTokens, TokenError
 from .addresses import FieldAddresses, saved_poster_urls, warn_dropped
 from .adoption import PREVIOUS_SETTING, Adoption
 from .api import Auth, create_app
@@ -39,6 +43,7 @@ from .checkin import Checkin
 from .config import Config, ConfigError, load_config
 from .engine import Controller
 from .firmware_updates import FirmwareUpdates, firmware_dir
+from .guard import WS_MAX_MESSAGE
 from .mqtt import MqttBridge, maybe_bridge
 from .pod_config import PodConfig
 from .positions import Positions
@@ -160,6 +165,11 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
     plan = addrs.plan(saved_poster_urls(store), cfg.checkin_urls)
     warn_dropped(plan.dropped)
     tls = ensure_tls(cfg, plan.san)
+    if tls and cfg.mqtt_tls_export_dir:
+        try:
+            tlsmod.export_for_broker(tls, cfg.mqtt_tls_export_dir)
+        except OSError as exc:
+            log.warning("[mqtt] tls_export_dir %s: Mosquitto's TLS copy not written: %s", cfg.mqtt_tls_export_dir, exc)
     controller.ca_sha256 = tls.ca_sha256 if tls else None
     controller.link_urls = plan.default if tls else []
     if tls and addrs.container and not cfg.tls_names:
@@ -171,7 +181,9 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
     FirmwareUpdates(controller, firmware_dir(cfg.db_path, cfg.firmware_dir), cfg.firmware_release_keys,
                     cfg.firmware_update_timeout_s, variants=cfg.firmware_variants)
     PodConfig(controller)
-    SignedModes(controller, cfg.modes_keys, cfg.modes_revoked, cfg.modes_index)
+    SignedModes(controller, cfg.modes_keys, cfg.modes_revoked, cfg.modes_index,
+                min_versions={k.strip(): v.strip() for k, _, v in (e.partition("=") for e in cfg.modes_min_versions)},
+                revocation_max_age_days=cfg.modes_revocation_max_age_days)
     ModeFetch(controller, cfg.modes_box_keys, cfg.modes_fetch_timeout_s)
     Adoption(controller)
     mqtt = maybe_bridge(cfg, controller)
@@ -224,7 +236,8 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
             modem.stop()
 
     app = create_app(controller, hub, Auth(gm, read), on_start=on_start, on_stop=on_stop,
-                     ca_pem=tls.ca_pem if tls else None)
+                     ca_pem=tls.ca_pem if tls else None, https_port=cfg.tls_port if tls and not cfg.http_tokens else 0,
+                     trusted_proxy=cfg.trusted_proxy)
     return Bundle(cfg, store, controller, modem, mqtt, hub, app, tls, sync, atak, remote)
 
 
@@ -234,10 +247,10 @@ def serve(bundle: Bundle, log_level: str = "info") -> None:
 
     cfg = bundle.cfg
     servers = [uvicorn.Server(uvicorn.Config(bundle.app, host=cfg.host, port=cfg.api_port,
-                                             log_level=log_level, lifespan="on"))]
+                                             log_level=log_level, lifespan="on", ws_max_size=WS_MAX_MESSAGE))]
     if bundle.tls is not None:
         servers.append(uvicorn.Server(uvicorn.Config(
-            bundle.app, host=cfg.host, port=cfg.tls_port, log_level=log_level, lifespan="off",
+            bundle.app, host=cfg.host, port=cfg.tls_port, log_level=log_level, lifespan="off", ws_max_size=WS_MAX_MESSAGE,
             ssl_certfile=str(bundle.tls.server_cert), ssl_keyfile=str(bundle.tls.server_key))))
         log.info("HTTPS on port %d with the field CA %s", cfg.tls_port, bundle.tls.ca_sha256.hex())
 
@@ -308,6 +321,49 @@ def join_key_command(cfg: Config, store: Store, action: str) -> int:
     return 0
 
 
+def parse_ttl(text: str) -> int:
+    """``90``, ``90s``, ``30m``, ``8h`` or ``2d`` in seconds."""
+    units = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+    body, unit = (text[:-1], text[-1]) if text and text[-1] in units else (text, "s")
+    if not body.isdigit():
+        raise ValueError(f"--ttl {text!r}: a number and s, m, h or d (30m, 8h, 2d)")
+    return int(body) * units[unit]
+
+
+def _when(t: Optional[float]) -> str:
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(t)) if t else "-"
+
+
+def access_token_command(store: Store, args: argparse.Namespace) -> int:
+    """``tokens --create / --list / --revoke``: the access tokens (access_tokens.py), straight in the store,
+    so it works with the controller stopped or running. Expiry uses this machine's clock, the controller's own."""
+    tokens = AccessTokens(store, time.time)
+    try:
+        if args.create is not None:
+            body: dict = {"label": args.create, "scope": args.scope, "ttl_s": parse_ttl(args.ttl)}
+            if args.game is not None:
+                body["game_id"] = args.game
+            made = tokens.create(body, by="CLI")
+            print(f"token:   {made['token']}\nid:      {made['id']}\nscope:   {made['scope']}"
+                  + (f" (game {made['game_id']})" if made["game_id"] else "")
+                  + f"\nexpires: {_when(made['expires_at'])}\n"
+                  "Shown once: it is not stored, only its hash. Revoke with: tokens --revoke " + made["id"])
+        elif args.revoke:
+            made = tokens.revoke(args.revoke, by="CLI")
+            print(f"{made['id']} ({made['label']}): {made['status']}")
+        else:
+            rows = tokens.list()
+            for r in rows:
+                print(f"{r['id']}  {r['status']:8}  {r['scope']:8}  game {r['game_id'] or '-':>3}  "
+                      f"expires {_when(r['expires_at'])}  last used {_when(r['last_used_at'])}  {r['label']}")
+            if not rows:
+                print("no access tokens")
+    except (TokenError, ValueError) as exc:
+        print(f"atalaia_controller: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m atalaia_controller", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -322,6 +378,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     group.add_argument("--rotate", action="store_true",
                        help="join-key: make a new field join key (after a field card is lost); every box "
                             "and standby controller must then be given the new one")
+    parser.add_argument("--create", metavar="LABEL", help="tokens: make an access token with this label")
+    parser.add_argument("--list", action="store_true", help="tokens: list the access tokens")
+    parser.add_argument("--revoke", metavar="ID", help="tokens: revoke the access token with this id")
+    parser.add_argument("--scope", default="read", choices=("read", "gm", "marshals"),
+                        help="tokens --create: what the token may do (default read)")
+    parser.add_argument("--ttl", default="8h", help="tokens --create: how long it lasts, 30m, 8h, 2d (at most 7d; default 8h)")
+    parser.add_argument("--game", type=int, help="tokens --create: limit the token to this game (scopes read and gm)")
     parser.add_argument("--config", help="TOML settings file (see controller/controller.example.toml)")
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
@@ -333,6 +396,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 2
     if args.command == "tokens":
         store = Store(cfg.db_path)
+        if args.create is not None or args.list or args.revoke:
+            return access_token_command(store, args)
         gm, read = ensure_tokens(cfg, store)
         print(f"GM token:   {gm}\nread token: {read}")
         return 0

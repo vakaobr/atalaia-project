@@ -11,6 +11,7 @@
 
 #include "check.h"
 #include "screen_renderer.h"
+#include "screen_template.h"
 
 /* ---- individual template tests ---- */
 
@@ -183,8 +184,57 @@ static void test_timer_bar(void)
     CHECK(screen_timer_bar_left() == -1);
 }
 
+/* Under Domination the box keeps each team's last points at this zone (TZ-3). */
+static void test_overlay_totals(void)
+{
+    long pts = -1;
+    screen_renderer_reset();
+    screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.domination {\"capture_hold_ms\":3000}");
+    CHECK(screen_render("neutral", "{}"));
+    CHECK(!screen_overlay_total("red", &pts));
+    CHECK(screen_render("captured", "{\"team\":\"blue\",\"points\":7,\"since\":20}"));
+    CHECK(screen_render("captured", "{\"team\":\"red\",\"points\":12,\"since\":95}"));
+    CHECK(screen_render("captured", "{\"team\":\"red\",\"points\":13,\"since\":95}"));
+    CHECK(screen_overlay_total("blue", &pts) && pts == 7); /* kept: it scores no more */
+    CHECK(screen_overlay_total("RED", &pts) && pts == 13);
+    CHECK(screen_render("final_score", "{\"owner\":\"blue\",\"points\":9}"));
+    CHECK(screen_overlay_total("blue", &pts) && pts == 9);
+    CHECK(screen_render("ready", "{}")); /* between games: a clean start */
+    CHECK(!screen_overlay_total("red", &pts));
+
+    /* Another mode's "points" are not a team's total. */
+    screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.progressive_domination {}");
+    CHECK(screen_render("captured", "{\"team\":\"red\",\"points\":2,\"since\":5}"));
+    CHECK(!screen_overlay_total("red", &pts));
+    screen_renderer_reset();
+
+    /* Master and Satellites: the master's status carries the holder's team total (TFT-2); a
+     * satellite's captured screen and a status without a total add none. */
+    screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.master_satellites {\"capture_hold_ms\":3000}");
+    CHECK(screen_render("captured", "{\"team\":\"blue\",\"since\":5,\"points\":9}"));
+    CHECK(!screen_overlay_total("blue", &pts));
+    CHECK(screen_render("master_status", "{\"team\":\"blue\",\"since\":5,\"held\":1,\"of\":2}"));
+    CHECK(!screen_overlay_total("blue", &pts));
+    CHECK(screen_render("master_status",
+                        "{\"team\":\"blue\",\"since\":5,\"held\":1,\"of\":2,\"total\":7}"));
+    CHECK(screen_render("master_status",
+                        "{\"team\":\"red\",\"since\":50,\"held\":0,\"of\":2,\"total\":12}"));
+    CHECK(screen_overlay_total("blue", &pts) && pts == 7);
+    CHECK(screen_overlay_total("red", &pts) && pts == 12);
+    CHECK(screen_render("neutral", "{\"role\":\"master\"}")); /* kept while the master is free */
+    CHECK(screen_overlay_total("red", &pts) && pts == 12);
+    screen_renderer_reset();
+
+    /* VIP Payload's boxes do not score: no totals. */
+    screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.vip_payload {}");
+    CHECK(screen_render("checkpoint_held", "{\"team\":\"red\",\"since\":5,\"points\":3}"));
+    CHECK(!screen_overlay_total("red", &pts));
+    screen_renderer_reset();
+}
+
 void run_screen_renderer_tests(void)
 {
+    test_overlay_totals();
     test_timer_bar();
     test_render_standby();
     test_render_countdown();

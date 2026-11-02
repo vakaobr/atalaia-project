@@ -54,6 +54,7 @@ typedef struct {
 #define CHECKIN  "org.atalaia.player_checkin {\"points\":1}"
 #define HACK     "org.atalaia.hacking_terminal {\"puzzle\":\"code\",\"digits\":4}"
 #define MASTER   "org.atalaia.master_satellites {\"capture_hold_ms\":3000}"
+#define VIP      "org.atalaia.vip_payload {\"capture_hold_ms\":3000}"
 #define CODES    "org.atalaia.codes {\"codes\":\"\"}"
 
 /* The splashes are drawn by oled_view_splash(), not by a screen update; data is the firmware's
@@ -232,7 +233,8 @@ static const oled_case_t cases[] = {
     {"respawn_pt", RESPAWN, "respawn", "{\"team\":\"blue\",\"lives\":17}"},
     {"checkin_pt", CHECKIN, "checkin", "{\"total\":5,\"team\":\"red\"}"},
     {"hack_solved_pt", HACK, "hack_solved", "{\"team\":\"red\"}"},
-    {"master_status_pt", MASTER, "master_status", "{\"team\":\"red\",\"held\":2,\"of\":3}"},
+    {"master_status_pt", MASTER, "master_status",
+     "{\"team\":\"red\",\"held\":2,\"of\":3,\"since\":95}"},
     {"defused_de", BOMB, "defused", "{\"team\":\"blue\"}"},
     {"exploded_de", BOMB, "exploded", "{\"team\":\"red\"}"},
     {"code_entry_de", BOMB, "code_entry", "{\"title\":\"ARM\",\"digits\":2}"},
@@ -242,7 +244,8 @@ static const oled_case_t cases[] = {
     {"respawn_de", RESPAWN, "respawn", "{\"team\":\"blue\",\"lives\":17}"},
     {"checkin_de", CHECKIN, "checkin", "{\"total\":5,\"team\":\"red\"}"},
     {"hack_solved_de", HACK, "hack_solved", "{\"team\":\"red\"}"},
-    {"master_status_de", MASTER, "master_status", "{\"team\":\"red\",\"held\":2,\"of\":3}"},
+    {"master_status_de", MASTER, "master_status",
+     "{\"team\":\"red\",\"held\":2,\"of\":3,\"since\":95}"},
     {"defused_zh-tw", BOMB, "defused", "{\"team\":\"blue\"}"},
     {"exploded_zh-tw", BOMB, "exploded", "{\"team\":\"red\"}"},
     {"code_entry_zh-tw", BOMB, "code_entry", "{\"title\":\"ARM\",\"digits\":2}"},
@@ -253,7 +256,8 @@ static const oled_case_t cases[] = {
     {"respawn_zh-tw", RESPAWN, "respawn", "{\"team\":\"blue\",\"lives\":17}"},
     {"checkin_zh-tw", CHECKIN, "checkin", "{\"total\":5,\"team\":\"red\"}"},
     {"hack_solved_zh-tw", HACK, "hack_solved", "{\"team\":\"red\"}"},
-    {"master_status_zh-tw", MASTER, "master_status", "{\"team\":\"red\",\"held\":2,\"of\":3}"},
+    {"master_status_zh-tw", MASTER, "master_status",
+     "{\"team\":\"red\",\"held\":2,\"of\":3,\"since\":95}"},
     {"prog_inactive_pt", PROG, "inactive", "{\"done\":1,\"of\":4}"},
     {"prog_completed_pt", PROG, "completed", "{\"team\":\"blue\",\"step\":1,\"of\":4,\"done\":1}"},
     {"prog_inactive_de", PROG, "inactive", "{\"done\":1,\"of\":4}"},
@@ -261,6 +265,22 @@ static const oled_case_t cases[] = {
     {"prog_inactive_zh-tw", PROG, "inactive", "{\"done\":1,\"of\":4}"},
     {"prog_completed_zh-tw", PROG, "completed",
      "{\"team\":\"blue\",\"step\":1,\"of\":4,\"done\":1}"},
+    /* The held time on every held zone's OLED (decision TFT-8): Progressive Domination's captured
+     * screen (it had it already), the Master's status and VIP Payload's held checkpoint, in each
+     * language; the footer is the same words as Domination's. */
+    {"prog_captured_pt", PROG, "captured",
+     "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"held_min\":1,\"points\":6}"},
+    {"prog_captured_de", PROG, "captured",
+     "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"held_min\":1,\"points\":6}"},
+    {"prog_captured_zh-tw", PROG, "captured",
+     "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"held_min\":1,\"points\":6}"},
+    {"master_status", MASTER, "master_status",
+     "{\"team\":\"red\",\"held\":2,\"of\":3,\"since\":95}"},
+    {"vip_checkpoint_held", VIP, "checkpoint_held", "{\"team\":\"red\",\"since\":95}"},
+    {"vip_checkpoint_held_pt", VIP, "checkpoint_held", "{\"team\":\"red\",\"since\":95}"},
+    {"vip_checkpoint_held_de", VIP, "checkpoint_held", "{\"team\":\"red\",\"since\":95}"},
+    {"vip_checkpoint_held_zh-tw", VIP, "checkpoint_held", "{\"team\":\"red\",\"since\":95}"},
+    {"vip_checkpoint_free_pt", VIP, "checkpoint_free", "{}"},
     {"wifi_setup", NULL, "wifi_setup", "{\"ssid\":\"atalaia-7c4f\"}"},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))

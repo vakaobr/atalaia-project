@@ -100,9 +100,9 @@ String deriveBoxBeaconUuid(List<int> joinKey) {
   final u = Uint8List.fromList(mac.sublist(0, 16));
   u[6] = (u[6] & 0x0f) | 0x80; // version 8: custom
   u[8] = (u[8] & 0x3f) | 0x80; // variant of RFC 4122
-  final h = [
-    for (final b in u) b.toRadixString(16).padLeft(2, '0'),
-  ].join().toUpperCase();
+  final h = [for (final b in u) b.toRadixString(16).padLeft(2, '0')]
+      .join()
+      .toUpperCase();
   return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-'
       '${h.substring(16, 20)}-${h.substring(20)}';
 }

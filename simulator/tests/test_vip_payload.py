@@ -116,5 +116,62 @@ class VipPayloadSimTests(unittest.TestCase):
         self.assertLessEqual(len(params_json(params).encode()), PARAMS_MAX)
 
 
+class ScreenLanguageTests(unittest.TestCase):
+    """The screens follow the box's language, data `lang`, like the other modes' (decision TFT-9),
+    whatever the old `lang` parameter says."""
+
+    @staticmethod
+    def _texts(name):
+        import yaml
+
+        doc = yaml.safe_load((MODES / "vip_payload" / "assets" / "screens" / f"{name}.yaml")
+                             .read_text(encoding="utf-8"))
+        found = []
+
+        def walk(node):
+            if isinstance(node, dict):
+                if isinstance(node.get("text"), str) and "lang" in node["text"]:
+                    found.append(node["text"])
+                for v in node.values():
+                    walk(v)
+            elif isinstance(node, list):
+                for v in node:
+                    walk(v)
+
+        walk(doc)
+        return found
+
+    @unittest.skipIf(CORE is None, "needs the shared core library")
+    def test_every_text_follows_the_box_language_and_ignores_the_parameter(self):
+        data = {"team": "red", "since": 95, "age": 130, "live": 1, "metres": 40}
+        params = {"capture_hold_ms": 3000, "lang": "en"}  # a game saved with an old lang
+        seen = {}
+        for name in ("checkpoint_free", "checkpoint_held", "payload"):
+            texts = self._texts(name)
+            self.assertTrue(texts, name)
+            for text in texts:
+                self.assertNotIn("params.lang", text)
+                for lang in ("pt", "en", "de", "zh-tw"):
+                    with self.subTest(name, text=text[:40], lang=lang):
+                        got = CORE.screen_text(text, dict(data, lang=lang), params)
+                        self.assertTrue(got.strip(), "an empty text: literals over the scratch?")
+                        seen.setdefault((name, text), set()).add(got)
+        # The words differ by language (a word like "PAYLOAD" is shared by en and de only).
+        for (name, text), outs in seen.items():
+            self.assertGreaterEqual(len(outs), 2, (name, text))
+
+    @unittest.skipIf(CORE is None, "needs the shared core library")
+    def test_the_held_checkpoint_reads_in_each_language(self):
+        (live,) = [t for t in self._texts("checkpoint_held") if "age|clock" in t]
+        want = {"pt": "capturado há 2:10", "en": "held 2:10", "de": "gehalten seit 2:10",
+                "zh-tw": "已佔領 2:10"}
+        for lang, text in want.items():
+            with self.subTest(lang):
+                self.assertEqual(CORE.screen_text(live, {"lang": lang, "age": 130, "live": 1},
+                                                  {"lang": "pt"}), text)
+        # No language given (a box that has none): English.
+        self.assertEqual(CORE.screen_text(live, {"age": 130, "live": 1}, {"lang": "pt"}), "held 2:10")
+
+
 if __name__ == "__main__":
     unittest.main()

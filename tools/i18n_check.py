@@ -45,6 +45,10 @@ import yaml
 
 REPO = Path(__file__).resolve().parents[1]
 BASE = "en"
+# A count of exactly 1 takes the text "<key>_one" (the app's Strings.t, the console's t(), decision
+# PLU-2); a language with no plural has none of these and is not missing them.
+SINGULAR = "_one"
+NO_PLURAL = {"zh-tw"}
 
 # Placeholders per kind of file.
 BRACES = re.compile(r"\{\w+\}")  # {team}
@@ -304,7 +308,9 @@ def check_domain(d: Domain, languages: dict[str, dict], strict: set[str], report
             theirs = sorted(d.placeholders.findall(base[key]))
             if mine != theirs:
                 report.errors.append(f"{where}: {key} has the placeholders {mine}, English {theirs}")
-        missing = sorted(base.keys() - table.keys())
+        missing = sorted(
+            k for k in base.keys() - table.keys() if not (lang in NO_PLURAL and k.endswith(SINGULAR))
+        )
         if not missing or d.own_completeness:
             continue
         report.missing[(d.name, lang)] = missing

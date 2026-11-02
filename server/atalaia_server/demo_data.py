@@ -577,7 +577,7 @@ async def make_account(db: AsyncSession, keys: Keys, notice_version: str, userna
                 gdpr_consent_at=now)
     db.add(user)
     await db.flush()
-    personal_data.give_consent(db, user.id, personal_data.ACCOUNT, notice_version, now)
+    personal_data.record_notice(db, user.id, notice_version, personal_data.NOTICE_SIGNUP, now)
     if role is not None:
         db.add(UserFieldRole(user_id=user.id, field_id=demo_id("field"), role_id=ROLE_NAMES[role]))
     return user.id

@@ -16,7 +16,9 @@ that connection's role may see it:
 A mode can grant a team a temporary view of another team (a UAV sweep): the
 event ``visibility.granted`` (its envelope team sees ``see_team`` for
 ``duration_s``), ended by ``visibility.expired``, which the controller emits
-when the time is up. Positions are deleted when the game ends, and are never
+when the time is up. Reports are taken only from a player who chose to share
+(``share_position`` at check-in, off by default, changeable during the game: protocol/checkin.md) and are
+dropped when they stop sharing. Positions are deleted when the game ends, and are never
 sent on the radio or MQTT. A VIP's GPS reports also go to the game's field.lua
 as the input position.fix (decision P4R6, VIP / Payload), and to nothing else.
 
@@ -38,9 +40,9 @@ from __future__ import annotations
 import math
 import re
 import threading
-import time
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
+from . import wallclock
 from . import beacons as beaconsmod
 from . import box_beacons as boxbeacons
 from .engine import Conflict, ControllerError
@@ -105,11 +107,14 @@ def check_report(r: Any) -> dict[str, Any]:
 
 
 class Positions:
-    def __init__(self, controller: "Controller", wall: Callable[[], float] = time.time) -> None:
+    def __init__(self, controller: "Controller", wall: Callable[[], float] = wallclock.now,
+                 mono: Optional[Callable[[], float]] = None) -> None:
         self.ctrl = controller
         self._wall = wall
+        # A grant's time runs on the controller's monotonic clock: a wall clock that jumps must not end or extend it.
+        self._mono = mono or (lambda: controller.now_ms() / 1000.0)
         self._lock = threading.Lock()
-        # (game, team that sees, team seen) -> expiry (wall seconds)
+        # (game, team that sees, team seen) -> expiry (monotonic seconds)
         self.grants: dict[tuple[int, str, str], float] = {}
         controller.positions = self
 
@@ -147,9 +152,17 @@ class Positions:
             mine = self._team_name(pos["game_id"], viewer.team)
             theirs = self._team_name(pos["game_id"], pos["team"])
             exp = self.grants.get((pos["game_id"], mine or "", theirs or ""))
-            if exp is not None and exp > self._wall():
+            if exp is not None and exp > self._mono():
                 return True
         return False
+
+    def _share_ok(self, row: Optional[dict[str, Any]]) -> bool:
+        """The player's yes to sharing, under the notice in force (a bare controller in a test has no check-in
+        service: the stored flag alone)."""
+        svc = self.ctrl.checkin
+        if svc is None:
+            return bool(row and row.get("position_share"))
+        return svc.share_in_force(row)
 
     def visible(self, viewer: "Viewer", game_id: Optional[int] = None) -> list[dict[str, Any]]:
         if game_id is None:
@@ -157,7 +170,9 @@ class Positions:
                 self.ctrl.game["id"] if self.ctrl.game else None)
         if game_id is None:
             return []
-        return [p for p in self.ctrl.store.player_positions(game_id).values() if self.can_see(viewer, p)]
+        rows = {r["player_id"]: r for r in self.ctrl.store.checkins(game_id)}
+        return [p for p in self.ctrl.store.player_positions(game_id).values()
+                if self.can_see(viewer, p) and (self.ctrl.checkin is None or self._share_ok(rows.get(p["player_id"])))]
 
     # --- reports -------------------------------------------------------------------
 
@@ -168,6 +183,11 @@ class Positions:
         if not isinstance(items, list) or not 1 <= len(items) <= REPORTS_MAX:
             raise ControllerError(f"reports: 1 to {REPORTS_MAX} position reports")
         checked = [check_report(r) for r in items]
+        row = self.ctrl.store.checkin(viewer.game_id, viewer.player_id)
+        if not self._share_ok(row):
+            # Sharing is the player's own choice at check-in (an unticked box), changeable any time; declining
+            # never blocks the check-in or the game (GDPR Art. 7(4)).
+            raise Conflict("position_sharing_off: this player did not choose to share their position")
         for r, raw in zip(checked, items):
             if raw.get("player_id") not in (None, viewer.player_id):
                 raise ControllerError("player_id: only your own position")
@@ -233,12 +253,12 @@ class Positions:
                 or not isinstance(dur, (int, float)) or not 0 < dur <= GRANT_MAX_S:
             return
         with self._lock:
-            self.grants[(game_id, team, see)] = self._wall() + float(dur)
+            self.grants[(game_id, team, see)] = self._mono() + float(dur)
         self.ctrl._emit({"type": "positions", "game": game_id, "_positions_refresh": True})
 
     def tick(self) -> None:
         """Ends grants whose time is up, with visibility.expired from the controller."""
-        now = self._wall()
+        now = self._mono()
         with self._lock:
             done = [k for k, exp in self.grants.items() if exp <= now]
             for k in done:

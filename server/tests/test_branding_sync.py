@@ -134,9 +134,9 @@ class FieldBrandingTests(AppTestCase):
 
     async def test_the_retention_days_are_a_field_setting_that_travels_to_the_controllers(self) -> None:
         """RET-1, RET-2: ``chrono_retention_days`` (the registry's ``default_retention_days``) and
-        ``game_retention_days`` are the admin's, 365 by default, in the field and in ``settings`` of the answer."""
+        ``game_retention_days`` are the admin's, 365 (chrono) and 90 (game data, 2026-10-30) by default, in the field and in ``settings`` of the answer."""
         st = (await self.sync_field(settings=True))["settings"]
-        self.assertEqual((st["chrono_retention_days"], st["game_retention_days"]), (365, 365))
+        self.assertEqual((st["chrono_retention_days"], st["game_retention_days"]), (365, 90))
         stream = await self.listen()
         r = await self.client.patch(self.url(), json={"chrono_retention_days": 180, "game_retention_days": 3653},
                                     headers=self.admin)

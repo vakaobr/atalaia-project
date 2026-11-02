@@ -61,8 +61,7 @@ const Map<String, String> deStrings = {
       'Der Beitrittsschlüssel hat 64 Hex-Ziffern (0-9, a-f).',
   'settings.join_key_clear': 'Löschen',
   'settings.pin': 'Admin-PIN',
-  'settings.pin_none':
-      'Keine PIN: Alle können ein Spiel auf diesem Prop pausieren oder beenden.',
+  'settings.pin_none': 'Keine PIN: Alle können ein Spiel auf diesem Prop pausieren oder beenden.',
   'settings.pin_set':
       'Gesetzt: wird beim Starten, Pausieren, Beenden und Verlassen abgefragt.',
   'settings.pin_hint': '4 bis 8 Ziffern.',
@@ -158,8 +157,7 @@ const Map<String, String> deStrings = {
   'prop.pod_opened':
       'Jemand hat während des Spiels den I/O-Pod geöffnet. Sag der '
       'Spielleitung Bescheid.',
-  'prop.pod_reconnecting':
-      'Die Verbindung zum I/O-Pod ist abgebrochen. Verbinde neu (Versuch {n}) …',
+  'prop.pod_reconnecting': 'Die Verbindung zum I/O-Pod ist abgebrochen. Verbinde neu (Versuch {n}) …',
   'prop.pod_refused':
       'Ein anderer Pod hat geantwortet, der I/O-Pod ist daher nicht mehr verbunden. '
       'Verbinde einen Pod erneut.',
@@ -239,6 +237,7 @@ const Map<String, String> deStrings = {
   'pod.find': 'Pods suchen',
   'pod.found_none': 'Kein Pod gefunden.',
   'pod.linked': 'Pod über {kind} verbunden: Firmware {fw}, {n} Funktionen.',
+  'pod.linked_one': 'Pod über {kind} verbunden: Firmware {fw}, {n} Funktion.',
   'pod.open_failed': 'Die Verbindung zum Pod ließ sich nicht öffnen.',
   'pod.no_ident': 'Der Pod hat nicht geantwortet.',
   'pod.reconnecting':
@@ -297,8 +296,7 @@ const Map<String, String> deStrings = {
   'player.bad_link': 'Adresse oder Zugangscode fehlt.',
   'player.link_unreachable':
       'Der Controller antwortet nicht. Bist du im WLAN des Felds?',
-  'player.link_mismatch':
-      'Der antwortende Controller ist nicht der, für den dieser Code gemacht wurde. Mach nicht weiter und sag der Orga Bescheid.',
+  'player.link_mismatch': 'Der antwortende Controller ist nicht der, für den dieser Code gemacht wurde. Mach nicht weiter und sag der Orga Bescheid.',
   'player.link_not_controller':
       'Unter dieser Adresse antwortet kein Feld-Controller.',
   'player.connecting': 'Verbindung zum Feld-Controller…',
@@ -311,6 +309,7 @@ const Map<String, String> deStrings = {
   'player.pick_team': 'Tippe auf dein Team, um es hervorzuheben.',
   'player.eliminated': 'ausgeschieden',
   'player.lives_left': '{n} Leben',
+  'player.lives_left_one': '{n} Leben',
   'player.objectives': 'Ziele',
   'player.node': 'Box {n}',
   'player.held_by': 'Gehalten von Team {team}',
@@ -359,6 +358,7 @@ const Map<String, String> deStrings = {
   'event.score.delta': 'Punkte für Team {team}: {amount}',
   'event.code.used': 'Team {team} hat einen Code benutzt',
   'event.player.respawn': '{player} ist wieder drin ({lives} Leben)',
+  'event.player.respawn_one': '{player} ist wieder drin ({lives} Leben)',
   'event.player.checkin': '{player} hat eingecheckt',
   'event.kill.confirmed': 'Kill bestätigt von Team {team} ({player})',
   'event.kill.denied': 'Team {team} hat den Tag von {player} zurückgeholt',
@@ -380,8 +380,7 @@ const Map<String, String> deStrings = {
   'event.vip.extracted': 'Team {team} hat die Extraktionszone erreicht',
   'event.money.collected': '{player} hat {amount} Geld eingesammelt',
   'event.money.deposited': '{player} hat {amount} für Team {team} eingezahlt',
-  'event.progressive.activated':
-      'Box {zone} ist jetzt aktiv (Nr. {step}): nur sie kann eingenommen werden',
+  'event.progressive.activated': 'Box {zone} ist jetzt aktiv (Nr. {step}): nur sie kann eingenommen werden',
   'event.progressive.completed':
       'Team {team} hat Box {zone} abgeschlossen (Nr. {step})',
   'event.scenario.started': 'Das Szenario hat begonnen',
@@ -438,25 +437,20 @@ const Map<String, String> deStrings = {
   'marshal.readings':
       '{n} Messwerte auf diesem Handy. Sie werden 365 Tage aufbewahrt und dann '
       'gelöscht.',
+  'marshal.readings_one': '{n} Messwert auf diesem Handy. Er wird 365 Tage aufbewahrt und dann gelöscht.',
   'marshal.erase': 'Messwerte einer Person löschen',
   'marshal.erase_do': 'Löschen',
   'marshal.checking': 'Frage den Feld-Controller …',
   'marshal.you_are': 'Du bist Marshal {id} ({name})',
-  'marshal.id_from_gm':
-      'ID und Name stammen aus der Marshal-Liste der Spielleitung; der Feld-Controller hat sie bestätigt.',
-  'marshal.not_listed':
-      'Der Feld-Controller hat dich nicht auf seiner Marshal-Liste. Bitte die Spielleitung, dich als Marshal einzutragen.',
-  'marshal.revoked':
-      'Die Spielleitung hat dich von der Marshal-Liste genommen; dieses Handy ist hier kein Marshal mehr. Die {n} noch nicht gesendeten Serien bleiben auf diesem Handy und können gesendet werden, wenn die Spielleitung dich wieder einträgt.',
-  'marshal.offline_never':
-      'Der Feld-Controller ist nicht erreichbar, und dieses Handy wurde hier noch nicht als Marshal bestätigt. Verbinde dich einmal mit dem Netz des Felds und frag erneut.',
-  'marshal.offline_expired':
-      'Der Feld-Controller ist nicht erreichbar, und seine Bestätigung vom {at} ist abgelaufen. Verbinde dich mit dem Netz des Felds und frag erneut.',
-  'marshal.offline_ok':
-      'Offline: Der Feld-Controller hat dich am {at} als Marshal {id} bestätigt. Das gilt bis {until}; danach verbinde dich mit dem Netz des Felds, um erneut zu bestätigen.',
+  'marshal.id_from_gm': 'ID und Name stammen aus der Marshal-Liste der Spielleitung; der Feld-Controller hat sie bestätigt.',
+  'marshal.not_listed': 'Der Feld-Controller hat dich nicht auf seiner Marshal-Liste. Bitte die Spielleitung, dich als Marshal einzutragen.',
+  'marshal.revoked': 'Die Spielleitung hat dich von der Marshal-Liste genommen; dieses Handy ist hier kein Marshal mehr. Die {n} noch nicht gesendeten Serien bleiben auf diesem Handy und können gesendet werden, wenn die Spielleitung dich wieder einträgt.',
+  'marshal.revoked_one': 'Die Spielleitung hat dich von der Marshal-Liste genommen; dieses Handy ist hier kein Marshal mehr. Die {n} noch nicht gesendete Serie bleibt auf diesem Handy und kann gesendet werden, wenn die Spielleitung dich wieder einträgt.',
+  'marshal.offline_never': 'Der Feld-Controller ist nicht erreichbar, und dieses Handy wurde hier noch nicht als Marshal bestätigt. Verbinde dich einmal mit dem Netz des Felds und frag erneut.',
+  'marshal.offline_expired': 'Der Feld-Controller ist nicht erreichbar, und seine Bestätigung vom {at} ist abgelaufen. Verbinde dich mit dem Netz des Felds und frag erneut.',
+  'marshal.offline_ok': 'Offline: Der Feld-Controller hat dich am {at} als Marshal {id} bestätigt. Das gilt bis {until}; danach verbinde dich mit dem Netz des Felds, um erneut zu bestätigen.',
   'marshal.retry': 'Erneut fragen',
-  'marshal.expired_now':
-      'Die Bestätigung des Feld-Controllers ist abgelaufen: Frag erneut, bevor du aufzeichnest.',
+  'marshal.expired_now': 'Die Bestätigung des Feld-Controllers ist abgelaufen: Frag erneut, bevor du aufzeichnest.',
 
   // Chrono
   'chrono.title': 'Chrono',
@@ -505,6 +499,7 @@ const Map<String, String> deStrings = {
   'replica.add': 'Replik registrieren',
   'replica.none': 'Noch keine Repliken registriert.',
   'replica.count': '{n} Repliken registriert',
+  'replica.count_one': '{n} Replik registriert',
   'replica.owner': 'ID der spielenden Person',
   'replica.type': 'Typ',
   'replica.class': 'Klasse',
@@ -564,15 +559,13 @@ const Map<String, String> deStrings = {
 
   // Field check-in, replicas to chrono, positions (plan phase E)
   'checkin.title': 'Am Feld einchecken',
-  'checkin.intro':
-      'Scanne das Check-in-Plakat des Felds mit der Kamera (oder füge seinen Text ein). Das Handy erreicht den Controller des Felds über das WLAN des Felds; Internet ist nicht nötig.',
+  'checkin.intro': 'Scanne das Check-in-Plakat des Felds mit der Kamera (oder füge seinen Text ein). Das Handy erreicht den Controller des Felds über das WLAN des Felds; Internet ist nicht nötig.',
   'checkin.scan': 'Plakat scannen',
   'checkin.scan_hint': 'Richte die Kamera auf den QR-Code des Check-in-Plakats',
   'checkin.by_text': 'Oder füge den Text des Plakats ein',
   'checkin.text_hint': 'atalaia:checkin:…',
   'checkin.use_text': 'Diesen Text verwenden',
-  'checkin.bad_poster':
-      'Dieses Check-in-Plakat ist nicht lesbar. Frag die Orga nach einem anderen.',
+  'checkin.bad_poster': 'Dieses Check-in-Plakat ist nicht lesbar. Frag die Orga nach einem anderen.',
   'checkin.not_poster': 'Das ist kein Check-in-Plakat von Atalaia.',
   // Why the field controller did not answer (check-R5)
   'diag.title': 'Details',
@@ -585,22 +578,19 @@ const Map<String, String> deStrings = {
   'diag.line': '{kind} · {url} · {time}',
   'checkin.unreachable':
       'Der Controller des Felds antwortet nicht. Bist du im WLAN des Felds?',
-  'checkin.join_wifi':
-      'Der Controller des Felds antwortet nicht: Verbinde dich mit dem WLAN „{ssid}" und versuch es nochmal.',
-  'checkin.mismatch':
-      'Der antwortende Controller ist nicht der des Plakats (Plakat {poster}, Controller {got}). Mach nicht weiter und sag der Orga Bescheid.',
+  'checkin.join_wifi': 'Der Controller des Felds antwortet nicht: Verbinde dich mit dem WLAN „{ssid}" und versuch es nochmal.',
+  'checkin.mismatch': 'Der antwortende Controller ist nicht der des Plakats (Plakat {poster}, Controller {got}). Mach nicht weiter und sag der Orga Bescheid.',
   'checkin.not_controller':
       'Unter dieser Adresse antwortet kein Feld-Controller.',
-  'checkin.changed':
-      'Diesem Feld wurde mit einem anderen Zertifikat vertraut ({old}); das Plakat zeigt {new}. Wenn die Orga bestätigt, dass der Controller gewechselt hat, vergiss das Feld und scanne das Plakat erneut.',
+  'checkin.changed': 'Diesem Feld wurde mit einem anderen Zertifikat vertraut ({old}); das Plakat zeigt {new}. Wenn die Orga bestätigt, dass der Controller gewechselt hat, vergiss das Feld und scanne das Plakat erneut.',
   'checkin.forget_field': 'Dieses Feld vergessen',
   'checkin.error': 'Der Controller hat abgelehnt: {error}',
-  'checkin.offline':
-      'Keine Verbindung zum Controller des Felds: Versuch es im Netz des Felds nochmal.',
+  'checkin.offline': 'Keine Verbindung zum Controller des Felds: Versuch es im Netz des Felds nochmal.',
   'checkin.expired': 'Dieser Check-in gilt nicht mehr: Checke erneut ein.',
   'checkin.connecting': 'Verbindung zum Controller des Felds…',
   'checkin.notice_title': 'Deine Daten bei {field}',
   'checkin.notice_ok': 'Gelesen, weiter',
+  'checkin.notice_changed': 'Der Datenschutzhinweis hat sich geändert. Lies ihn und bestätige erneut. Das Teilen deiner Position bleibt aus, bis du es neu ankreuzt.',
   'checkin.trusted': 'Zertifikat des Felds {ca}',
   'checkin.no_games': 'An diesem Feld ist kein Spiel für den Check-in offen.',
   'checkin.game': 'Spiel',
@@ -635,8 +625,7 @@ const Map<String, String> deStrings = {
   'checkin.declare': 'Repliken wählen',
   'checkin.follow': 'Spiel verfolgen',
   'checkin.leave': 'Spiel verlassen',
-  'checkin.leave_body':
-      'Dein Name und deine Verbandsnummer werden aus diesem Spiel gelöscht. Bereits gechronte Repliken bleiben gespeichert.',
+  'checkin.leave_body': 'Dein Name und deine Verbandsnummer werden aus diesem Spiel gelöscht. Bereits gechronte Repliken bleiben gespeichert.',
   'checkin.left': 'Du hast das Spiel verlassen; deine Daten wurden gelöscht.',
   'chrono_state.pending': 'nicht gechront',
   'chrono_state.passed': 'bestanden',
@@ -644,8 +633,7 @@ const Map<String, String> deStrings = {
   'chrono_state.withdrawn': 'zurückgezogen',
   'chrono_state.refused_today': 'heute abgelehnt',
   'declare.title': 'Repliken für dieses Spiel',
-  'declare.intro':
-      'Wähle die Repliken, die du in diesem Spiel nutzt (bis zu {max}). Bring sie zu den Marshals zum Chronen.',
+  'declare.intro': 'Wähle die Repliken, die du in diesem Spiel nutzt (bis zu {max}). Bring sie zu den Marshals zum Chronen.',
   'declare.none': 'Noch keine Repliken: Füge deine hinzu.',
   'declare.add': 'Replik hinzufügen',
   'declare.type': 'Typ',
@@ -653,34 +641,32 @@ const Map<String, String> deStrings = {
   'declare.make': 'Hersteller und Modell (optional)',
   'declare.save': 'Speichern',
   'declare.saved': 'Gespeichert: Orga und Marshals sehen sie jetzt.',
-  'declare.locked':
-      'Eine gechronte Replik bleibt angemeldet: Bitte einen Marshal, sie zu ändern.',
+  'declare.locked': 'Eine gechronte Replik bleibt angemeldet: Bitte einen Marshal, sie zu ändern.',
   'queue.title': 'Repliken zum Chronen',
-  'queue.hint':
-      'Die Liste des Felds: wer Repliken angemeldet hat, die noch nicht gechront wurden.',
-  'queue.check_in_first':
-      'Checke zuerst mit dem Plakat am Feld ein; danach gibt dir die Orga die Marshal-Rolle.',
+  'queue.hint': 'Die Liste des Felds: wer Repliken angemeldet hat, die noch nicht gechront wurden.',
+  'queue.check_in_first': 'Checke zuerst mit dem Plakat am Feld ein; danach gibt dir die Orga die Marshal-Rolle.',
   'queue.not_marshal': 'Diese Liste ist nur für Marshals und die Orga.',
   'queue.counts':
       'Zu chronen: {pending} · bestanden: {passed} · abgelehnt: {refused}',
   'queue.scan': 'Etikett einer Replik scannen',
   'queue.scan_hint': 'Richte die Kamera auf das QR-Etikett der Replik',
-  'queue.not_found':
-      'Diese Replik ist in diesem Spiel nicht angemeldet: Wähle die Anmeldung der spielenden Person.',
+  'queue.not_found': 'Diese Replik ist in diesem Spiel nicht angemeldet: Wähle die Anmeldung der spielenden Person.',
   'queue.refresh': 'Aktualisieren',
   'queue.empty': 'Noch niemand hat Repliken angemeldet.',
   'queue.manual': 'Von Hand einchecken',
   'queue.manual_do': 'Einchecken',
   'queue.manual_done': 'Eingecheckt: {id}',
   'queue.send_pending': '{n} noch nicht gesendete Serien senden',
+  'queue.send_pending_one': '{n} noch nicht gesendete Serie senden',
   'queue.send_failed':
       '{n} Serien wurden nicht angenommen; sie bleiben auf diesem Handy.',
-  'queue.held':
-      '{n} Serien wurden nicht angenommen, weil der Controller dich nicht auf seiner Marshal-Liste hat; sie bleiben auf diesem Handy.',
+  'queue.send_failed_one':
+      '{n} Serie wurde nicht angenommen; sie bleibt auf diesem Handy.',
+  'queue.held': '{n} Serien wurden nicht angenommen, weil der Controller dich nicht auf seiner Marshal-Liste hat; sie bleiben auf diesem Handy.',
+  'queue.held_one': '{n} Serie wurde nicht angenommen, weil der Controller dich nicht auf seiner Marshal-Liste hat; sie bleibt auf diesem Handy.',
   'queue.waiting_confirmation': 'wartet auf Bestätigung',
   'queue.sticker_title': 'NFC-Aufkleber verwenden?',
-  'queue.sticker_body':
-      'Den NFC-Aufkleber der Replik ans Telefon halten, um sie damit zu registrieren, oder das gedruckte QR-Etikett verwenden.',
+  'queue.sticker_body': 'Den NFC-Aufkleber der Replik ans Telefon halten, um sie damit zu registrieren, oder das gedruckte QR-Etikett verwenden.',
   'queue.sticker_qr': 'QR-Etikett verwenden',
   'queue.sticker_taken':
       'Dieser Aufkleber ist schon für eine andere Replik registriert.',
@@ -690,39 +676,32 @@ const Map<String, String> deStrings = {
   'label.share': 'Etikett teilen / drucken',
   'label.share_all': 'Alle Etiketten teilen / drucken',
   'label.share_title': 'Replik-Etiketten',
-  'label.hint':
-      'Klebe dieses Etikett auf die Replik. Der Marshal scannt es, um die Replik in der Chrono-Liste zu finden. Es enthält nur diesen Code, nichts über dich. Gedruckt wird es mit 30 × 30 mm; mehrere Etiketten passen auf ein A4-Blatt.',
-  'label.share_unavailable':
-      'Dieses Telefon kann keine Datei an das Teilen-Menü übergeben. Nutze stattdessen „Etikett zeigen“.',
+  'label.hint': 'Klebe dieses Etikett auf die Replik. Der Marshal scannt es, um die Replik in der Chrono-Liste zu finden. Es enthält nur diesen Code, nichts über dich. Gedruckt wird es mit 30 × 30 mm; mehrere Etiketten passen auf ein A4-Blatt.',
+  'label.share_unavailable': 'Dieses Telefon kann keine Datei an das Teilen-Menü übergeben. Nutze stattdessen „Etikett zeigen“.',
   'label.share_failed': 'Das Teilen-Menü hat sich nicht geöffnet.',
-  'label.none_yet':
-      'Das Etikett erscheint hier, sobald du diese Replik für ein Spiel angemeldet hast.',
+  'label.none_yet': 'Das Etikett erscheint hier, sobald du diese Replik für ein Spiel angemeldet hast.',
   'chrono.send': 'An den Controller senden',
   'chrono.sent_pass': 'Gesendet: bestanden.',
   'chrono.sent_fail': 'Gesendet: abgelehnt.',
   'chrono.sent_warn': 'Gesendet: Warnung.',
   'chrono.sent_unjudged': 'Gesendet: keine Klasse zum Vergleich.',
   'chrono.sent_null': 'Gesendet.',
-  'chrono.send_failed':
-      'Nicht gesendet: {error}. Bleibt auf diesem Handy und wird später gesendet.',
+  'chrono.send_failed': 'Nicht gesendet: {error}. Bleibt auf diesem Handy und wird später gesendet.',
   'player.checkin': 'Am Feld einchecken',
   'player.watch': 'Ein Spiel ohne Check-in verfolgen',
   'player.continue': 'Weiter: {game}',
   'player.me': 'Du: {role}, {team}',
   'player.no_team': 'noch kein Team',
   'player.positions': 'Sichtbare Positionen: {n}',
-  'player.share': 'Meine Position teilen',
-  'player.share_hint':
-      'Nur während des Spiels; der Controller entscheidet, wer sie sieht. Die Orga und die Marshals sehen sie auf ihren ATAK-Geräten.',
-  'player.share_on': 'Wird geteilt: {n} Position(en) gesendet',
-  'player.share_stopped':
-      'Teilen beendet: Das Spiel ist vorbei oder der Check-in hat sich geändert.',
+  'player.share': 'Meine Position während dieses Spiels mit dem Spiel teilen',
+  'player.share_hint': 'Nur während des Spiels; der Controller entscheidet, wer sie sieht. Die Orga und die Marshals sehen sie auf ihren ATAK-Geräten.',
+  'player.share_on': 'Wird geteilt: {n} Positionen gesendet',
+  'player.share_on_one': 'Wird geteilt: {n} Position gesendet',
+  'player.share_stopped': 'Teilen beendet: Das Spiel ist vorbei oder der Check-in hat sich geändert.',
   'player.no_location': 'Dieses Handy hat keinen Standort.',
   'player.location_denied': 'Keine Berechtigung für den Standort.',
-  'player.location_denied_ios':
-      'Keine Berechtigung für den Standort. Erlaube ihn unter Einstellungen > Atalaia > Standort (Beim Verwenden der App) und prüfe, ob die Ortungsdienste an sind.',
-  'player.share_ios_note':
-      'Auf dem iPhone wird deine Position nur geteilt, solange Atalaia auf dem Bildschirm offen ist: Sie pausiert, wenn du die App wechselst oder das Handy sperrst, und läuft weiter, wenn du zurückkommst.',
+  'player.location_denied_ios': 'Keine Berechtigung für den Standort. Erlaube ihn unter Einstellungen > Atalaia > Standort (Beim Verwenden der App) und prüfe, ob die Ortungsdienste an sind.',
+  'player.share_ios_note': 'Auf dem iPhone wird deine Position nur geteilt, solange Atalaia auf dem Bildschirm offen ist: Sie pausiert, wenn du die App wechselst oder das Handy sperrst, und läuft weiter, wenn du zurückkommst.',
   'player.sharing_title': 'Atalaia: Deine Position wird geteilt',
   'player.sharing_text': 'Während des Spiels',
   // The out-of-bounds warning (decisions MF-31 to MF-40)
@@ -745,30 +724,25 @@ const Map<String, String> deStrings = {
   'prop.gm_message': 'Spielleitung: {text}',
   // Beacons im Gebäude (Entscheidungen BLE-1 bis BLE-9)
   'player.beacons_why_title': 'Positionen im Gebäude',
-  'player.beacons_why':
-      'Dieses Feld hat Bluetooth-Beacons im Gebäude. Um zu sagen, in welchem Raum du bist, kann Atalaia sie hören, während du deine Position teilst: nur die Beacons des Felds, und es sendet nur, welches am stärksten ist. Android fragt dafür nach den Berechtigungen für Bluetooth und Standort. Ohne sie bleibt deine Position nur GPS.',
+  'player.beacons_why': 'Dieses Feld hat Bluetooth-Beacons im Gebäude. Um zu sagen, in welchem Raum du bist, kann Atalaia sie hören, während du deine Position teilst: nur die Beacons des Felds, und es sendet nur, welches am stärksten ist. Android fragt dafür nach den Berechtigungen für Bluetooth und Standort. Ohne sie bleibt deine Position nur GPS.',
   'player.beacons_allow': 'Weiter',
   'player.beacons_skip': 'Jetzt nicht',
   'player.beacons_on':
       'Hört auf die Beacons des Felds: im Gebäude ist deine Position der Raum.',
   'player.beacons_skipped':
       'Positionen im Gebäude sind aus. Deine GPS-Position wird weiter geteilt.',
-  'player.beacons_denied':
-      'Positionen im Gebäude sind aus: keine Berechtigung für Bluetooth. Deine GPS-Position wird weiter geteilt.',
-  'player.beacons_off':
-      'Positionen im Gebäude sind aus: Bluetooth ist ausgeschaltet. Schalte es ein und teile erneut.',
-  'player.beacons_unavailable':
-      'Dieses Handy kann die Beacons des Felds nicht hören. Deine GPS-Position wird weiter geteilt.',
-  'player.beacons_why_ios':
-      'Dieses Feld hat Bluetooth-Beacons im Gebäude. Um zu sagen, in welchem Raum du bist, kann Atalaia sie hören, während du deine Position teilst: nur die Beacons des Felds, und es sendet nur, welches am stärksten ist. Das iPhone fragt dafür nach der Standortberechtigung (Bluetooth nutzen die Beacons, es wird nicht abgefragt). Ohne sie bleibt deine Position nur GPS.',
-  'player.beacons_on_ios':
-      'Hört auf die Beacons des Felds, nur solange Atalaia auf dem Bildschirm offen ist: im Gebäude ist deine Position der Raum. Bei gesperrtem Telefon oder mit einer anderen App im Vordergrund geht deine Position zurück auf GPS und behält das letzte Stockwerk.',
+  'player.beacons_denied': 'Positionen im Gebäude sind aus: keine Berechtigung für Bluetooth. Deine GPS-Position wird weiter geteilt.',
+  'player.beacons_off': 'Positionen im Gebäude sind aus: Bluetooth ist ausgeschaltet. Schalte es ein und teile erneut.',
+  'player.beacons_unavailable': 'Dieses Handy kann die Beacons des Felds nicht hören. Deine GPS-Position wird weiter geteilt.',
+  'player.beacons_why_ios': 'Dieses Feld hat Bluetooth-Beacons im Gebäude. Um zu sagen, in welchem Raum du bist, kann Atalaia sie hören, während du deine Position teilst: nur die Beacons des Felds, und es sendet nur, welches am stärksten ist. Das iPhone fragt dafür nach der Standortberechtigung (Bluetooth nutzen die Beacons, es wird nicht abgefragt). Ohne sie bleibt deine Position nur GPS.',
+  'player.beacons_on_ios': 'Hört auf die Beacons des Felds, nur solange Atalaia auf dem Bildschirm offen ist: im Gebäude ist deine Position der Raum. Bei gesperrtem Telefon oder mit einer anderen App im Vordergrund geht deine Position zurück auf GPS und behält das letzte Stockwerk.',
   'player.my_room': 'Deine Position: {room}',
   'player.map_title': 'Feldplan',
   'player.map_semantics': 'Plan des Felds, {level}: {n} Positionen',
+  'player.map_semantics_one': 'Plan des Felds, {level}: {n} Position',
   'player.map_off_plan': '{n} Positionen nicht auf diesem Plan',
-  'player.map_level_unknown':
-      'Leere Punkte: Spielende, die noch nicht gesagt haben, auf welchem Stockwerk sie sind.',
+  'player.map_off_plan_one': '{n} Position nicht auf diesem Plan',
+  'player.map_level_unknown': 'Leere Punkte: Spielende, die noch nicht gesagt haben, auf welchem Stockwerk sie sind.',
   'player.map_level_unknown_short': 'Stockwerk unbekannt',
   'player.map_cell': 'Dein Feld: {cell}',
   'player.map_you': 'Du',
@@ -777,8 +751,7 @@ const Map<String, String> deStrings = {
   'player.level_n': 'Ebene {n}',
   'player.level_title': 'Auf welchem Stockwerk bist du?',
   'player.level_unknown': 'Weiß nicht',
-  'player.level_hint':
-      'Dein Team sieht dich auf diesem Stockwerk. Das Handy kann Stockwerke nicht selbst unterscheiden.',
+  'player.level_hint': 'Dein Team sieht dich auf diesem Stockwerk. Das Handy kann Stockwerke nicht selbst unterscheiden.',
   'player.level_beacon': 'Dein Stockwerk kommt vom Beacon im Raum: {level}.',
   'player.feature.safe_zone': 'Sicherheitszone',
   'player.feature.respawn': 'Respawn',
@@ -788,8 +761,7 @@ const Map<String, String> deStrings = {
   'player.feature.objective': 'Ziel',
   'player.feature.other': 'Sonstiges',
   'player.feature.boundary': 'Feldgrenze',
-  'player.share_hint_squads':
-      'Nur während des Spiels; der Controller entscheidet, wer sie sieht: dein Squad, wenn das Spiel es erlaubt, und die Orga und die Marshals auf ihren ATAK-Geräten.',
+  'player.share_hint_squads': 'Nur während des Spiels; der Controller entscheidet, wer sie sieht: dein Squad, wenn das Spiel es erlaubt, und die Orga und die Marshals auf ihren ATAK-Geräten.',
   'checkin.team_squad': '{team} › Squad {squad}',
   'branding.logo': 'Logo von {name}',
   // Online registration on the field's site server (decision S16-13)
@@ -831,6 +803,7 @@ const Map<String, String> deStrings = {
   'site.cancelled_reason': 'Dieses Spiel wurde abgesagt: {reason}',
   'site.open_until': 'Anmeldung offen bis {when}',
   'site.left': '{n} Plätze',
+  'site.left_one': '{n} Platz',
   'site.opens': 'Anmeldung öffnet {when}',
   'site.full': 'Ausgebucht',
   'site.closed': 'Anmeldung geschlossen',
@@ -845,13 +818,13 @@ const Map<String, String> deStrings = {
   'site.replicas': 'Repliken, die du nutzt (bis zu {n})',
   'site.class_not_here': '{class}: Diese Klasse gibt es auf diesem Feld nicht',
   'site.too_many': 'Dieses Feld erlaubt bis zu {n} Repliken pro Person.',
+  'site.too_many_one': 'Dieses Feld erlaubt bis zu {n} Replik pro Person.',
   'site.register': 'Anmelden',
   'site.save': 'Änderungen speichern',
   'site.changed': 'Anmeldung geändert.',
   'site.cancel_reg': 'Anmeldung stornieren',
   'site.cancel_title': 'Anmeldung stornieren?',
-  'site.cancel_text':
-      'Du gibst deinen Platz in {game} auf, und das Check-in-Ticket gilt nicht mehr.',
+  'site.cancel_text': 'Du gibst deinen Platz in {game} auf, und das Check-in-Ticket gilt nicht mehr.',
   'site.cancel_yes': 'Anmeldung stornieren',
   'site.data_note':
       'Das Feld erhält den Namen, den du für das Spiel wählst, deinen '
@@ -869,8 +842,7 @@ const Map<String, String> deStrings = {
       'Tickets:',
   'site.copy': 'Text kopieren',
   'site.copied': 'Kopiert.',
-  'site.ticket_secret':
-      'Wer dieses Ticket hat, kann an deiner Stelle einchecken: Teile es nicht.',
+  'site.ticket_secret': 'Wer dieses Ticket hat, kann an deiner Stelle einchecken: Teile es nicht.',
   'site.my_tickets': 'Meine Tickets',
   'site.no_tickets': 'Noch keine Tickets auf diesem Handy.',
   'site.claim': 'ID dieses Handys verwenden',
@@ -1002,7 +974,7 @@ const Map<String, String> deStrings = {
   'ctl.open': 'Im WLAN des Felds erreichbar',
   'ctl.open_on':
       'Handys, Computer und Spielprops verbinden sich über HTTPS (Port 8443, '
-      'mit der CA des Felds) und MQTT (Port 1883).',
+      'mit der CA des Felds) und MQTT über TLS (Port 8883, dieselbe CA).',
   'ctl.open_off':
       'Nur dieses Handy erreicht den Controller: Im Netz lauscht nichts.',
   'ctl.addresses': 'Die Konsole, auf Computern im Netz des Felds:',
@@ -1094,6 +1066,8 @@ const Map<String, String> deStrings = {
       'Keine: Dieser Controller nimmt kein Firmware-Release für die Boxen an.',
   'ctl.fw_keys_set':
       '{n} Schlüssel: Releases, die sie signieren, werden angenommen.',
+  'ctl.fw_keys_set_one':
+      '{n} Schlüssel: Releases, die er signiert, werden angenommen.',
   'ctl.fw_keys_hint':
       'Die öffentlichen Hälften der Release-Schlüssel (Base64, je 44 '
       'Zeichen), einer pro Zeile, wie in [firmware] release_keys des Pi. '
@@ -1126,9 +1100,8 @@ const Map<String, String> deStrings = {
   'ctl_modes.title': 'Moduspakete',
   'ctl_modes.tile': 'Moduspakete (Feld-Controller)',
   'ctl_modes.tile_hint':
-      '{keys} vertrauenswürdige Schlüssel, {box} Box-Schlüssel',
-  'ctl_modes.intro':
-      'Die Schlüssel, denen der Feld-Controller dieses Handys bei signierten Moduspaketen vertraut, die Schlüssel in der Firmware der Boxen (der Controller bietet den Boxen nur Pakete an, die sie annehmen), widerrufene Schlüssel und der Index des Registers: der Abschnitt [modes] eines Pi. Sie gelten ab dem nächsten Start des Controllers.',
+      'Vertrauenswürdige Schlüssel: {keys}, Box-Schlüssel: {box}',
+  'ctl_modes.intro': 'Die Schlüssel, denen der Feld-Controller dieses Handys bei signierten Moduspaketen vertraut, die Schlüssel in der Firmware der Boxen (der Controller bietet den Boxen nur Pakete an, die sie annehmen), widerrufene Schlüssel und der Index des Registers: der Abschnitt [modes] eines Pi. Sie gelten ab dem nächsten Start des Controllers.',
   'ctl_modes.keys':
       'Vertrauenswürdige Modusschlüssel (einer pro Zeile, Base64)',
   'ctl_modes.box_keys': 'Modusschlüssel der Boxen (einer pro Zeile, Base64)',
@@ -1140,6 +1113,10 @@ const Map<String, String> deStrings = {
       'Zeile {line}: kein Modusschlüssel (Base64 von 32 Bytes).',
   'ctl_modes.bad_id': 'Zeile {line}: keine Schlüssel-ID (16 Hexziffern).',
   'ctl_modes.bad_index': 'Der Index ist eine https://-Adresse oder eine Datei.',
+  'ctl_modes.min_versions': 'Mindestversion pro Modus (eine pro Zeile, ID=Version, zum Beispiel org.example.mode=1.2.0; optional)',
+  'ctl_modes.max_age': 'Tage, die die letzte Widerrufsliste noch gilt, wenn der Index nicht erreichbar ist (0 bis 3650; Standard 30)',
+  'ctl_modes.bad_floor': 'Zeile {line}: keine Mindestversion (ID=Version, zum Beispiel org.example.mode=1.2.0).',
+  'ctl_modes.bad_age': 'Die Tage sind eine Zahl von 0 bis 3650.',
   'ctl_modes.saved': 'Gespeichert: gilt ab dem nächsten Start des Controllers.',
   // The phone controller's slice S7 settings (PE24-118 onward).
   'ctl_site.tile': 'Site-Server, Ausfallübernahme und ATAK (Feld-Controller)',
@@ -1148,26 +1125,22 @@ const Map<String, String> deStrings = {
   'ctl_site.on': 'an',
   'ctl_site.off': 'aus',
   'ctl_site.title': 'Site-Server, Ausfallübernahme und ATAK',
-  'ctl_site.intro':
-      'Der Feld-Controller dieses Handys so, wie ihn die controller.toml eines Pi festlegt: seine Ausfallübernahme, der Site-Server des Felds (Spiele, Protokolle und Punkte gehen dorthin, sobald Internet da ist; Anmeldelisten, Branding und die Szenariobibliothek kommen von dort) und der ATAK-Feed. Gilt ab dem nächsten Start des Controllers.',
+  'ctl_site.intro': 'Der Feld-Controller dieses Handys so, wie ihn die controller.toml eines Pi festlegt: seine Ausfallübernahme, der Site-Server des Felds (Spiele, Protokolle und Punkte gehen dorthin, sobald Internet da ist; Anmeldelisten, Branding und die Szenariobibliothek kommen von dort) und der ATAK-Feed. Gilt ab dem nächsten Start des Controllers.',
   'ctl_site.failover': 'Ausfallübernahme',
   'ctl_site.failover_auto': 'Automatische Ausfallübernahme',
   'ctl_site.manual': 'Manuell',
   'ctl_site.auto': 'Automatisch',
-  'ctl_site.failover_hint':
-      'Manuell: Die Spielleitung befördert einen Bereitschafts-Controller. Automatisch: Ein Bereitschafts-Controller übernimmt nach drei verpassten Signalen (30 s). Ein Handy im Akkubetrieb gibt einem Pi am Netz den Vortritt, wenn beide kandidieren.',
+  'ctl_site.failover_hint': 'Manuell: Die Spielleitung befördert einen Bereitschafts-Controller. Automatisch: Ein Bereitschafts-Controller übernimmt nach drei verpassten Signalen (30 s). Ein Handy im Akkubetrieb gibt einem Pi am Netz den Vortritt, wenn beide kandidieren.',
   'ctl_site.sync': 'Site-Server',
   'ctl_site.sync_hint': 'Offline zuerst: Ein Spiel wartet nie auf das Netz.',
   'ctl_site.url': 'Adresse (https://…)',
   'ctl_site.key': 'API-Schlüssel des Felds (vom Site-Server)',
   'ctl_site.key_set':
       'API-Schlüssel {fp}… (einen neuen eingeben, um ihn zu ersetzen)',
-  'ctl_site.branding':
-      'Branding, gespeicherte Teams und Check-in-Einstellungen des Felds vom Site-Server',
+  'ctl_site.branding': 'Branding, gespeicherte Teams und Check-in-Einstellungen des Felds vom Site-Server',
   'ctl_site.library': 'Szenarien und Spielvorlagen des Felds vom Site-Server',
   'ctl_site.remote_gm': 'Remote-Spielleitung',
-  'ctl_site.remote_gm_hint':
-      'Die Spielleitung des Felds auf dem Site-Server darf das laufende Spiel starten, pausieren und beenden. Standardmäßig aus.',
+  'ctl_site.remote_gm_hint': 'Die Spielleitung des Felds auf dem Site-Server darf das laufende Spiel starten, pausieren und beenden. Standardmäßig aus.',
   'ctl_site.atak': 'ATAK-Feed (Cursor on Target)',
   'ctl_site.atak_hint':
       'Die Boxen und Zonen auf ATAK-Karten, über das WLAN des Felds.',
@@ -1175,6 +1148,16 @@ const Map<String, String> deStrings = {
   'ctl_site.staff': 'ATAK-Geräte der Orga (Host:Port, durch Kommas getrennt)',
   'ctl_site.players':
       'Spielerpositionen an die Geräte der Orga (nie per Multicast)',
+  'ctl_site.staff_tls':
+      'TLS zu den Orga-Geräten (SSL-Eingang von ATAK, Port 8089)',
+  'ctl_site.staff_tls_hint': 'Die Spielerpositionen laufen dann verschlüsselt durchs Netz. Das Zertifikat der Orga-Geräte wird nur gegen die CA unten geprüft, nie gegen die des Systems.',
+  'ctl_site.staff_tls_ca':
+      'CA-Zertifikat, das die Orga-Geräte vorzeigen (PEM-Text)',
+  'ctl_site.staff_tls_cert':
+      'Client-Zertifikat dieses Controllers (PEM-Text; optional)',
+  'ctl_site.staff_tls_key':
+      'Dazu der private Schlüssel (PEM-Text; zusammen mit dem Zertifikat)',
+  'ctl_site.staff_tls_name': 'Name in den Zertifikaten der Geräte (nur wenn die Endpunkte Adressen sind; optional)',
   'ctl_site.remote': 'Remote-ATAK über den Site-Server',
   'ctl_site.remote_players': 'Auch Spielerpositionen über den Site-Server',
   'ctl_site.bad_sync': 'Site-Server: {why}',
@@ -1189,8 +1172,7 @@ const Map<String, String> deStrings = {
   'apd.expires': 'Gültig bis (JJJJ-MM-TT)',
   'apd.expires_required': 'Gültig bis, JJJJ-MM-TT (erforderlich)',
   'apd.date_format': '2027-01-31',
-  'apd.hint':
-      'Die App prüft sie nicht: Ein Marshal vergleicht sie mit deinem Ausweis.',
+  'apd.hint': 'Die App prüft sie nicht. Am Eingang vergleicht ein Marshal deine Eingabe mit deinem Ausweis, denn das Feld muss ihn prüfen. Sobald der Ausweis bestätigt ist, wird die Nummer im Controller des Feldes gelöscht.',
   'apd.need_number': 'Dieses Feld verlangt deine APD-Mitgliedsnummer.',
   'apd.need_expiry':
       'Dieses Feld verlangt das Ablaufdatum deiner Mitgliedschaft.',
@@ -1202,33 +1184,34 @@ const Map<String, String> deStrings = {
   'apd.status.expired': 'Mitgliedschaft abgelaufen',
   'apd.status.not_accepted': 'APD hier nicht akzeptiert',
   'apd.status.missing': 'Mitgliedschaft fehlt',
-  'apd.hint_marshal': 'Ein Marshal sieht sich deinen Mitgliedsausweis an.',
+  'apd.hint_marshal': 'Ein Marshal gleicht deinen Mitgliedsausweis mit deiner Eingabe ab; du wirst zugelassen, sobald er ihn bestätigt.',
   'queue.confirm': 'Zulassen',
+  'queue.confirm_no_card': 'Ohne Ausweis zulassen',
+  'queue.card_seen': 'Ausweis gesehen, stimmt',
+  'apd.verdict_on': '{verdict} am {date}',
+  'apd.card_by': 'Ausweis geprüft von {who}',
+  'checkin.share_position':
+      'Meine Position während dieses Spiels mit dem Spiel teilen',
+  'checkin.share_position_hint': 'Freiwillig und aus, solange du nicht ankreuzt. Dein Squad oder dein Team (soweit der Spielmodus es erlaubt), die Marshals und die Spielleitung sehen deine Position auf der Karte; die Remote-Spielleitung nur, wenn das Feld es einschaltet. Wenn du nicht ankreuzt, ändert sich sonst nichts. Du kannst das Teilen jederzeit während des Spiels beenden.',
+  'checkin.card_why': 'Warum der Ausweis geprüft wird: Das Feld muss deinen Mitgliedsausweis am Eingang mit den hier eingegebenen Daten abgleichen (in Portugal eine gesetzliche Pflicht der Felder, sonst das berechtigte Interesse des Feldes). Danach bleiben nur der Verband, das Ablaufdatum, das Ergebnis und die prüfende Person gespeichert; die Nummer wird gelöscht.',
   'site.err.membership_missing':
       'Dieses Feld braucht für die Anmeldung deine APD-Mitgliedsnummer.',
   'site.err.apd_not_accepted': 'Dieses Feld akzeptiert diese APD nicht.',
   'site.err.membership_expired':
       'Die Mitgliedschaft ist am Tag dieses Spiels abgelaufen.',
   // The remote GM may see shared positions (PKD-5)
-  'player.share_remote_gm':
-      'Hat das Feld eine Remote-Spielleitung, die im Site-Server angemeldet ist, sieht die Remote-Spielleitung deine Position ebenfalls, solange du sie teilst. Der Site-Server speichert sie nicht.',
+  'player.share_remote_gm': 'Hat das Feld eine Remote-Spielleitung, die im Site-Server angemeldet ist, sieht die Remote-Spielleitung deine Position ebenfalls, solange du sie teilst. Der Site-Server speichert sie nicht.',
   // The account's login methods and the login without a password (PKA-1);
   // the texts are the site server's own (staff_i18n.py) where the same.
-  'acct.passkey_cancelled':
-      'Der Passkey wurde nicht verwendet (Anfrage abgebrochen oder abgelaufen).',
+  'acct.passkey_cancelled': 'Der Passkey wurde nicht verwendet (Anfrage abgebrochen oder abgelaufen).',
   'acct.passkey_failed': 'Die Anmeldung mit dem Passkey hat nicht geklappt.',
   'acct.passkey_none': 'Dieses Konto hat keine Passkeys.',
-  'acct.oidc.state_invalid':
-      'Diese Anmeldeanfrage ist abgelaufen oder wurde nicht von dieser App gestellt. Versuch es noch einmal.',
+  'acct.oidc.state_invalid': 'Diese Anmeldeanfrage ist abgelaufen oder wurde nicht von dieser App gestellt. Versuch es noch einmal.',
   'acct.oidc.denied': 'Die Anmeldung wurde beim Anbieter abgelehnt.',
-  'acct.oidc.consent_required':
-      'Um ein neues Konto anzulegen, setze das Häkchen im Feld unter den Anbieter-Schaltflächen und wähle den Anbieter dann noch einmal.',
   'acct.oidc.too_many_attempts':
       'Zu viele neue Konten von dieser Adresse. Versuch es später noch einmal.',
-  'acct.oidc.quota_exceeded':
-      'Dieses Spielfeld hat seine Höchstzahl an Konten erreicht. Wende dich an das Team des Spielfelds.',
-  'acct.oidc.id_token_invalid':
-      'Die Antwort des Anbieters wurde nicht akzeptiert. Versuch es noch einmal.',
+  'acct.oidc.quota_exceeded': 'Dieses Spielfeld hat seine Höchstzahl an Konten erreicht. Wende dich an das Team des Spielfelds.',
+  'acct.oidc.id_token_invalid': 'Die Antwort des Anbieters wurde nicht akzeptiert. Versuch es noch einmal.',
   'acct.oidc.token_exchange_failed':
       'Der Anbieter hat die Anfrage abgelehnt. Versuch es noch einmal.',
   'acct.oidc.provider_unreachable':
@@ -1236,21 +1219,18 @@ const Map<String, String> deStrings = {
   'acct.oidc.try_again': 'Versuch es noch einmal.',
   'acct.oidc.other': 'Die Anmeldung beim Anbieter hat nicht geklappt.',
   'acct.title': 'Anmeldemöglichkeiten',
-  'acct.intro':
-      'Die Möglichkeiten, sich bei diesem Konto anzumelden: Passwort, Google, Microsoft oder Apple, Passkeys und der TOTP-Code. Jede Änderung steht im Audit-Protokoll des Servers.',
+  'acct.intro': 'Die Möglichkeiten, sich bei diesem Konto anzumelden: Passwort, Google, Microsoft oder Apple, Passkeys und der TOTP-Code. Jede Änderung steht im Audit-Protokoll des Servers.',
   'acct.confirm_title': 'Bestätige, dass du es bist',
   'acct.confirm_password': 'Aktuelles Passwort',
-  'acct.confirm_password_hint':
-      'Die Änderungen unten verlangen das aktuelle Passwort. Gib es hier ein, bevor du sie machst.',
-  'acct.confirm_recent':
-      'Dieses Konto hat kein Passwort: Die Änderungen verlangen eine Bestätigung aus den letzten 10 Minuten (auch eine Anmeldung zählt). Bestätige auf einem der Wege unten und wiederhole dann die Aktion.',
+  'acct.confirm_password_hint': 'Die Änderungen unten verlangen das aktuelle Passwort. Gib es hier ein, bevor du sie machst.',
+  'acct.confirm_recent': 'Dieses Konto hat kein Passwort: Die Änderungen verlangen eine Bestätigung aus den letzten 10 Minuten (auch eine Anmeldung zählt). Bestätige auf einem der Wege unten und wiederhole dann die Aktion.',
+  'acct.stepup_needed': 'Dieses Konto hat einen zweiten Faktor (TOTP oder Passkey) oder eine Team-Rolle: Wer die Anmeldung ändern will (Passkeys, TOTP, Passwort, verknüpfte Konten, Konten zusammenführen), muss zuerst den TOTP-Code oder den Passkey angeben. Eine Anmeldung mit Google, Microsoft oder Apple reicht nicht.',
   'acct.confirm_with': 'Mit {provider} bestätigen',
   'acct.confirmed': 'Bestätigt. Wiederhole die Aktion.',
   'acct.reauthed': 'Beim Anbieter bestätigt. Wiederhole die Aktion.',
   'acct.providers_title': 'Google, Microsoft und Apple',
   'acct.providers_none': 'Mit diesem Konto ist kein Login verknüpft.',
-  'acct.providers_off':
-      'Dieser Server bietet keine Anmeldung mit Google, Microsoft oder Apple an.',
+  'acct.providers_off': 'Dieser Server bietet keine Anmeldung mit Google, Microsoft oder Apple an.',
   'acct.provider_linked_at': 'verknüpft am {when}',
   'acct.provider_last_login': 'zuletzt angemeldet {when}',
   'acct.link': '{provider} verknüpfen',
@@ -1259,14 +1239,12 @@ const Map<String, String> deStrings = {
   'acct.linked': 'Login mit dem Konto verknüpft.',
   'acct.unlinked': 'Verknüpfung gelöst.',
   'acct.passkeys_title': 'Passkeys',
-  'acct.passkeys_intro':
-      'Ein Passkey meldet ohne Passwort und ohne Code an und zählt als zweiter Faktor für die Rollen Admin, GM und Marshal.',
+  'acct.passkeys_intro': 'Ein Passkey meldet ohne Passwort und ohne Code an und zählt als zweiter Faktor für die Rollen Admin, GM und Marshal.',
   'acct.passkeys_none': 'Keine Passkeys.',
   'acct.passkey_name': 'Name des neuen Passkeys',
   'acct.passkey_add': 'Passkey hinzufügen',
   'acct.passkey_added': 'Passkey hinzugefügt.',
-  'acct.passkey_unsupported':
-      'Dieses Telefon unterstützt keine Passkeys (es braucht Android 14 oder neuer).',
+  'acct.passkey_unsupported': 'Dieses Telefon unterstützt keine Passkeys (es braucht Android 14 oder neuer).',
   'acct.passkey_synced': 'synchronisiert',
   'acct.passkey_device': 'nur dieses Gerät',
   'acct.passkey_created': 'erstellt {when}',
@@ -1281,8 +1259,7 @@ const Map<String, String> deStrings = {
   'acct.pw_title': 'Passwort',
   'acct.pw_state_set': 'Dieses Konto hat ein Passwort.',
   'acct.pw_state_none': 'Dieses Konto hat kein Passwort.',
-  'acct.pw_off':
-      'Die Anmeldung mit Passwort ist auf diesem Server abgeschaltet: Ein Passwort kann nicht gesetzt oder geändert werden.',
+  'acct.pw_off': 'Die Anmeldung mit Passwort ist auf diesem Server abgeschaltet: Ein Passwort kann nicht gesetzt oder geändert werden.',
   'acct.pw_new': 'Neues Passwort',
   'acct.pw_set_button': 'Passwort setzen',
   'acct.pw_change_button': 'Passwort ändern',
@@ -1295,33 +1272,25 @@ const Map<String, String> deStrings = {
   'acct.totp_on': 'TOTP ist für dieses Konto aktiv.',
   'acct.totp_off': 'TOTP ist für dieses Konto nicht aktiv.',
   'acct.totp_enable': 'TOTP aktivieren',
-  'acct.totp_enrol_intro':
-      'Füge dieses Geheimnis deiner Authenticator-App hinzu ({digits} Ziffern, alle {s} s ein neuer Code) und gib unten den Code ein, den die App zeigt.',
+  'acct.totp_enrol_intro': 'Füge dieses Geheimnis deiner Authenticator-App hinzu ({digits} Ziffern, alle {s} s ein neuer Code) und gib unten den Code ein, den die App zeigt.',
   'acct.totp_secret': 'Geheimnis',
   'acct.totp_uri': 'otpauth-Adresse (für Apps, die eine annehmen)',
   'acct.totp_confirm': 'Mit diesem Code aktivieren',
   'acct.totp_enabled': 'TOTP aktiviert.',
-  'acct.totp_disable_intro':
-      'Zum Abschalten: der aktuelle Code der App, dazu das Passwort oben, wenn das Konto eines hat.',
+  'acct.totp_disable_intro': 'Zum Abschalten: der aktuelle Code der App, dazu das Passwort oben, wenn das Konto eines hat.',
   'acct.totp_disable': 'TOTP abschalten',
   'acct.totp_disabled': 'TOTP abgeschaltet.',
   'acct.oidc.already_linked': 'Dieses Konto hat diesen Login schon verknüpft.',
   'acct.oidc.identity_taken':
       'Dieser Login ist schon mit einem anderen Konto verknüpft.',
-  'acct.oidc.provider_already_linked':
-      'Dieses Konto hat schon einen Login von diesem Anbieter. Löse zuerst die bestehende Verknüpfung.',
-  'acct.oidc.identity_mismatch':
-      'Das ist nicht der mit diesem Konto verknüpfte Login. Nimm dasselbe Anbieterkonto.',
-  'acct.e.last_login_method':
-      'Das ist die letzte Möglichkeit, sich bei diesem Konto anzumelden: Füge zuerst eine andere hinzu.',
-  'acct.e.second_factor_required_by_role':
-      'Eine Rolle dieses Kontos braucht einen zweiten Faktor (TOTP oder Passkey): Behalte mindestens einen.',
-  'acct.e.totp_required_by_role':
-      'Eine Rolle dieses Kontos braucht einen zweiten Faktor: Füge einen Passkey hinzu, bevor du TOTP abschaltest.',
-  'acct.e.password_login_disabled':
-      'Die Anmeldung mit Passwort ist auf diesem Server abgeschaltet, ein Passwort kann nicht gesetzt oder geändert werden.',
-  'acct.e.confirmation_required':
-      'Bestätige zuerst, dass du es bist (siehe Bestätigung oben), und wiederhole dann die Aktion.',
+  'acct.oidc.provider_already_linked': 'Dieses Konto hat schon einen Login von diesem Anbieter. Löse zuerst die bestehende Verknüpfung.',
+  'acct.oidc.identity_mismatch': 'Das ist nicht der mit diesem Konto verknüpfte Login. Nimm dasselbe Anbieterkonto.',
+  'acct.e.last_login_method': 'Das ist die letzte Möglichkeit, sich bei diesem Konto anzumelden: Füge zuerst eine andere hinzu.',
+  'acct.e.second_factor_required_by_role': 'Eine Rolle dieses Kontos braucht einen zweiten Faktor (TOTP oder Passkey): Behalte mindestens einen.',
+  'acct.e.totp_required_by_role': 'Eine Rolle dieses Kontos braucht einen zweiten Faktor: Füge einen Passkey hinzu, bevor du TOTP abschaltest.',
+  'acct.e.password_login_disabled': 'Die Anmeldung mit Passwort ist auf diesem Server abgeschaltet, ein Passwort kann nicht gesetzt oder geändert werden.',
+  'acct.e.confirmation_required': 'Bestätige zuerst, dass du es bist (siehe Bestätigung oben), und wiederhole dann die Aktion.',
+  'acct.e.mfa_required': 'Diese Aktion verlangt einen zweiten Faktor (TOTP oder Passkey): Bestätige im Bestätigungsfeld oben mit dem Code oder dem Passkey und wiederhole sie dann.',
   'acct.e.invalid_password': 'Falsches Passwort.',
   'acct.e.invalid_code': 'Falscher Code.',
   'acct.e.no_password': 'Dieses Konto hat kein Passwort.',
@@ -1351,8 +1320,7 @@ const Map<String, String> deStrings = {
   'acct.browser_unavailable':
       'Der Browser des Telefons konnte nicht geöffnet werden.',
   'acct.oidc.cancelled': 'Die Anmeldung wurde abgebrochen.',
-  'acct.oidc.browser_unavailable':
-      'Der Browser des Telefons konnte nicht geöffnet werden, oder dieser Server nimmt keine Anmeldung über die App an.',
+  'acct.oidc.browser_unavailable': 'Der Browser des Telefons konnte nicht geöffnet werden, oder dieser Server nimmt keine Anmeldung über die App an.',
   'acct.waiting': 'Warten auf {provider} im Browser …',
   'acct.waiting_cancel': 'Abbrechen',
   'acct.open': 'Anmeldemöglichkeiten des Kontos',
@@ -1372,8 +1340,6 @@ const Map<String, String> deStrings = {
   'site.login_or': 'oder',
   'site.login_with': 'Mit {provider} anmelden',
   'site.login_passkey': 'Mit einem Passkey anmelden',
-  'site.login_consent':
-      'Bei der ersten Anmeldung stimme ich zu, dass ein neues Konto angelegt wird (gespeichert wird nur die Kennung des Anbieters; siehe die Datenschutzerklärung des Spielfelds).',
   'site.login_waiting': 'Warten auf die Anmeldung im Browser …',
   'site.login_waiting_cancel': 'Abbrechen',
   'site.account': 'Anmeldemöglichkeiten des Kontos',
@@ -1381,42 +1347,29 @@ const Map<String, String> deStrings = {
   'propmodes.keys': 'Modus-Schlüssel für geladene Modi',
   'propmodes.keys_none':
       'Keine: Dieses Prop führt nur die in der App eingebauten Modi aus.',
-  'propmodes.keys_set':
-      '{n} Schlüssel: Ein Modus, den sie signieren, darf vom Controller geladen werden.',
-  'propmodes.keys_hint':
-      'Die öffentlichen Hälften (Base64, je 44 Zeichen) der Modus-Schlüssel, denen dieses Prop vertraut, einer pro Zeile, höchstens 4: wie die in die Firmware einer Feldbox eingebauten Modus-Schlüssel. Ein Spiel, dessen Modus die App nicht hat, wird nur dann vom Controller geladen, wenn ein Schlüssel dieser Liste ihn signiert hat. Füge keinen Schlüssel hinzu, den du nicht vom Projekt oder von deinem Verein bekommen hast.',
+  'propmodes.keys_set': '{n} Schlüssel: Ein Modus, den sie signieren, darf vom Controller geladen werden.',
+  'propmodes.keys_set_one': '{n} Schlüssel: Ein Modus, den er signiert, darf vom Controller geladen werden.',
+  'propmodes.keys_hint': 'Die öffentlichen Hälften (Base64, je 44 Zeichen) der Modus-Schlüssel, denen dieses Prop vertraut, einer pro Zeile, höchstens 4: wie die in die Firmware einer Feldbox eingebauten Modus-Schlüssel. Ein Spiel, dessen Modus die App nicht hat, wird nur dann vom Controller geladen, wenn ein Schlüssel dieser Liste ihn signiert hat. Füge keinen Schlüssel hinzu, den du nicht vom Projekt oder von deinem Verein bekommen hast.',
   'propmodes.keys_bad':
       'Jeder Schlüssel hat 44 Base64-Zeichen (32 Bytes); höchstens 4.',
-  'propmodes.fetching':
-      'Der Modus des Spiels wird vom Controller geladen und seine Signatur geprüft …',
-  'propmodes.err.no_key':
-      'Dieses Gerät vertraut keinem Modus-Schlüssel und nimmt deshalb keinen Modus vom Controller an. Füge in den Einstellungen den Schlüssel des Projekts oder deines Vereins hinzu.',
-  'propmodes.err.unreachable':
-      'Der Controller war mit dem Zertifikat des Feldes nicht erreichbar. Verbinde dich mit dem WLAN des Feldes und versuche es erneut.',
-  'propmodes.err.not_offered':
-      'Der Controller bietet {mode} nicht an, oder das Spiel hat schon begonnen. Bitte die Orga, ihn signiert zu senden oder eingebaute Modi zu nehmen.',
-  'propmodes.err.download':
-      'Der Download von {mode} ist abgebrochen oder hatte nicht die angekündigte Größe. Versuche es erneut.',
-  'propmodes.err.bad_release':
-      'Abgelehnt: Die signierte Freigabe von {mode} hat nicht die erlaubte Form. Sie wurde nicht ausgeführt.',
-  'propmodes.err.bad_signature':
-      'Abgelehnt: {mode} ist nicht signiert oder nicht von einem Schlüssel, dem dieses Gerät vertraut. Er wurde nicht ausgeführt.',
+  'propmodes.fetching': 'Der Modus des Spiels wird vom Controller geladen und seine Signatur geprüft …',
+  'propmodes.err.no_key': 'Dieses Gerät vertraut keinem Modus-Schlüssel und nimmt deshalb keinen Modus vom Controller an. Füge in den Einstellungen den Schlüssel des Projekts oder deines Vereins hinzu.',
+  'propmodes.err.unreachable': 'Der Controller war mit dem Zertifikat des Feldes nicht erreichbar. Verbinde dich mit dem WLAN des Feldes und versuche es erneut.',
+  'propmodes.err.not_offered': 'Der Controller bietet {mode} nicht an, oder das Spiel hat schon begonnen. Bitte die Orga, ihn signiert zu senden oder eingebaute Modi zu nehmen.',
+  'propmodes.err.download': 'Der Download von {mode} ist abgebrochen oder hatte nicht die angekündigte Größe. Versuche es erneut.',
+  'propmodes.err.bad_release': 'Abgelehnt: Die signierte Freigabe von {mode} hat nicht die erlaubte Form. Sie wurde nicht ausgeführt.',
+  'propmodes.err.bad_signature': 'Abgelehnt: {mode} ist nicht signiert oder nicht von einem Schlüssel, dem dieses Gerät vertraut. Er wurde nicht ausgeführt.',
   'propmodes.err.kind':
       'Abgelehnt: {mode} ist keine Art von Paket, die ein Prop ausführt.',
   'propmodes.err.tier':
       'Abgelehnt: {mode} braucht ein leistungsfähigeres Gerät als dieses.',
-  'propmodes.err.builtin':
-      'Abgelehnt: {mode} hat die Kennung eines in die App eingebauten Modus; diese werden nie ersetzt.',
+  'propmodes.err.builtin': 'Abgelehnt: {mode} hat die Kennung eines in die App eingebauten Modus; diese werden nie ersetzt.',
   'propmodes.err.too_big':
       'Abgelehnt: {mode} ist für ein Prop zu groß (höchstens 256 KiB).',
-  'propmodes.err.bad_hash':
-      'Abgelehnt: {mode} ist nicht die signierte Datei. Sie wurde nicht ausgeführt.',
-  'propmodes.err.bad_archive':
-      'Abgelehnt: Das Paket von {mode} ist beschädigt oder hat nicht die erlaubte Form. Es wurde nicht ausgeführt.',
-  'propmodes.err.load':
-      'Abgelehnt: {mode} lässt sich in der Sandbox nicht laden. Er wurde nicht ausgeführt.',
-  'propmodes.err.no_space':
-      'Kein Platz für {mode}: Das Handy behält höchstens 8 geladene Modi, insgesamt 512 KiB.',
+  'propmodes.err.bad_hash': 'Abgelehnt: {mode} ist nicht die signierte Datei. Sie wurde nicht ausgeführt.',
+  'propmodes.err.bad_archive': 'Abgelehnt: Das Paket von {mode} ist beschädigt oder hat nicht die erlaubte Form. Es wurde nicht ausgeführt.',
+  'propmodes.err.load': 'Abgelehnt: {mode} lässt sich in der Sandbox nicht laden. Er wurde nicht ausgeführt.',
+  'propmodes.err.no_space': 'Kein Platz für {mode}: Das Handy behält höchstens 8 geladene Modi, insgesamt 512 KiB.',
   'propmodes.err.other': 'Der Modus konnte nicht geladen werden ({mode}).',
   // The membership texts of a field outside Portugal (decision MEM-4)
   'apd.section_m': 'Verbandsmitgliedschaft',
@@ -1431,8 +1384,7 @@ const Map<String, String> deStrings = {
   // The registration import on the phone controller's own screen (decision PIM-1);
   // the file and row texts are the console's (checkin_import in its i18n).
   'ctl.import': 'Anmeldeliste',
-  'ctl.import_hint':
-      'Für ein Feld ohne Feldserver: Eine Anmeldeliste (CSV oder JSON) einer anderen Plattform als erwartete Spielende dieses Spiels importieren. Erst prüfen; bis zum Importieren ändert sich nichts.',
+  'ctl.import_hint': 'Für ein Feld ohne Feldserver: Eine Anmeldeliste (CSV oder JSON) einer anderen Plattform als erwartete Spielende dieses Spiels importieren. Erst prüfen; bis zum Importieren ändert sich nichts.',
   'ctl.import_open': 'Anmeldeliste importieren',
   'ctl.import_none':
       'Starte ein Spiel, um eine Anmeldeliste darin zu importieren.',
@@ -1440,30 +1392,27 @@ const Map<String, String> deStrings = {
   'ctl_import.pick_again': 'Andere Datei wählen',
   'ctl_import.picked': 'Datei: {name}',
   'ctl_import.no_file': 'Noch keine Datei gewählt.',
-  'ctl_import.no_picker':
-      'Dieses Telefon kann hier keine Dateiauswahl öffnen. Importiere die Liste stattdessen in der GM-Konsole in einem Browser.',
+  'ctl_import.no_picker': 'Dieses Telefon kann hier keine Dateiauswahl öffnen. Importiere die Liste stattdessen in der GM-Konsole in einem Browser.',
   'ctl_import.offline': 'Der Controller hat nicht geantwortet. Läuft er?',
   'ctl_import.failed': 'Der Controller hat die Liste abgelehnt: {detail}',
   'ctl_import.rows_more': '{n} weitere Zeilen werden nicht angezeigt.',
+  'ctl_import.rows_more_one': '{n} weitere Zeile wird nicht angezeigt.',
   'ctl_import.title': 'Anmeldeliste importieren',
-  'ctl_import.intro':
-      'Für ein Feld ohne Feldserver: Eine Anmeldeliste einer anderen Plattform (CSV oder JSON, im Importformat des Feldservers) wird zu den erwarteten Spielenden dieses Spiels, und ein Marshal hakt jede Person bei der Ankunft ab. Gelesen werden nur display_name, external_ref, team_preference, federation_number und replicas; jede andere Spalte (eine E-Mail, eine Telefonnummer) wird nur genannt, nie gelesen.',
+  'ctl_import.intro': 'Für ein Feld ohne Feldserver: Eine Anmeldeliste einer anderen Plattform (CSV oder JSON, im Importformat des Feldservers) wird zu den erwarteten Spielenden dieses Spiels, und ein Marshal hakt jede Person bei der Ankunft ab. Gelesen werden nur display_name, external_ref, team_preference, federation_number und replicas; jede andere Spalte (eine E-Mail, eine Telefonnummer) wird nur genannt, nie gelesen.',
   'ctl_import.source': 'Quelle',
-  'ctl_import.source_hint':
-      'Der Name der anderen Plattform (a-z, 0-9, Punkt, Bindestrich, Unterstrich). Dieselbe Quelle und dasselbe external_ref aktualisieren dieselbe Person.',
-  'ctl_import.basis':
-      'Das Feld ist für die Liste verantwortlich: Es hat eine eigene Rechtsgrundlage, die Daten dieser Spielenden zu speichern.',
+  'ctl_import.source_hint': 'Der Name der anderen Plattform (a-z, 0-9, Punkt, Bindestrich, Unterstrich). Dieselbe Quelle und dasselbe external_ref aktualisieren dieselbe Person.',
+  'ctl_import.basis': 'Das Feld ist für die Liste verantwortlich: Es hat eine eigene Rechtsgrundlage, die Daten dieser Spielenden zu speichern.',
   'ctl_import.check': 'Datei prüfen',
   'ctl_import.run': 'Importieren',
   'ctl_import.order': 'Erst prüfen: Bis zum Importieren ändert sich nichts.',
   'ctl_import.checked': 'Geprüft, noch nichts importiert.',
   'ctl_import.imported': 'Importiert.',
-  'ctl_import.counts':
-      '{rows} Zeilen: {created} neu, {updated} geändert, {unchanged} unverändert, {skipped} übersprungen, {refused} abgelehnt.',
+  'ctl_import.counts': '{rows} Zeilen: {created} neu, {updated} geändert, {unchanged} unverändert, {skipped} übersprungen, {refused} abgelehnt.',
+  'ctl_import.counts_one': '{rows} Zeile: neu {created}, geändert {updated}, unverändert {unchanged}, übersprungen {skipped}, abgelehnt {refused}.',
   'ctl_import.ignored': 'Nicht gelesene Spalten: {names}',
   'ctl_import.more': 'und {n} weitere',
-  'ctl_import.missing':
-      '{n} importierte Spielende, die noch nicht angekommen sind, fehlen in dieser Datei (sie bleiben).',
+  'ctl_import.missing': '{n} importierte Spielende, die noch nicht angekommen sind, fehlen in dieser Datei (sie bleiben).',
+  'ctl_import.missing_one': '{n} importierte Person, die noch nicht angekommen ist, fehlt in dieser Datei (sie bleibt).',
   'ctl_import.row': 'Zeile',
   'ctl_import.result': 'Ergebnis',
   'ctl_import.line': 'Zeile {n}',
@@ -1484,8 +1433,7 @@ const Map<String, String> deStrings = {
   'ctl_import.codes.too_large': 'die Datei ist größer als 1 MiB',
   'ctl_import.codes.too_many_rows': 'mehr als 5.000 Zeilen',
   'ctl_import.codes.format_invalid': 'keine CSV- oder JSON-Datei',
-  'ctl_import.codes.source_invalid':
-      'die Quelle ist ungültig (a-z, 0-9, Punkt, Bindestrich, Unterstrich; nicht "site")',
+  'ctl_import.codes.source_invalid': 'die Quelle ist ungültig (a-z, 0-9, Punkt, Bindestrich, Unterstrich; nicht "site")',
   'ctl_import.codes.basis_not_confirmed':
       'bestätigen, dass das Feld eine eigene Grundlage für die Liste hat',
   'ctl_import.codes.game_ended': 'das Spiel ist beendet',
@@ -1520,61 +1468,70 @@ const Map<String, String> deStrings = {
       'Vibriert bei Spielereignissen, auch wenn die App geschlossen ist',
   'player.saved': 'Gemerkte Felder',
   'player.saved_forget': 'Dieses Feld vergessen',
+  'acct.oidc.notice_required': 'Um ein neues Konto anzulegen, setze zuerst das Häkchen, dass du den Datenschutzhinweis gelesen hast (Feld unter den Anbieter-Schaltflächen), und wähle den Anbieter dann noch einmal.',
+  'acct.oidc.age_confirmation_required': 'Für ein Konto musst du mindestens 16 Jahre alt sein. Jüngere Spielende checken am Spielfeld ohne Konto ein, nach den Regeln des Spielfelds für Eltern oder Erziehungsberechtigte. Wenn du 16 oder älter bist, setze das Häkchen für das Alter (unter den Anbieter-Schaltflächen) und wähle den Anbieter noch einmal.',
+  'site.err.age_confirmation_required': 'Für ein Konto musst du mindestens 16 Jahre alt sein. Jüngere Spielende checken am Spielfeld ohne Konto ein, nach den Regeln des Spielfelds für Eltern oder Erziehungsberechtigte.',
+  'site.err.notice_required': 'Öffne und lies den Datenschutzhinweis und setze dann das Häkchen, dass du ihn gelesen hast.',
+  'site.err.username_invalid': 'Der Benutzername braucht 3 bis 64 Buchstaben, Ziffern, Punkte, Bindestriche oder Unterstriche und beginnt mit einem Buchstaben oder einer Ziffer.',
+  'site.err.username_reserved':
+      'Dieser Benutzername ist reserviert: Wähle einen anderen.',
+  'site.err.email_invalid': 'Diese E-Mail-Adresse ist ungültig.',
+  'site.err.username_or_email_taken':
+      'Dieser Benutzername oder diese E-Mail-Adresse ist schon vergeben.',
+  'site.err.quota_exceeded': 'Dieses Spielfeld hat sein Limit an Konten erreicht. Sprich mit der Orga des Spielfelds.',
+  'site.signup_open': 'Konto anlegen',
+  'site.signup_title': 'Konto bei {host} anlegen',
+  'site.signup_intro': 'Mit einem Konto meldest du dich zu Spielen an und siehst deinen Verlauf. Öffne zuerst den Datenschutzhinweis und lies ihn, dann bestätige unten. Jünger als 16? Du brauchst kein Konto: Check in am Spielfeld.',
+  'site.signup_email': 'E-Mail (optional)',
+  'site.signup_create': 'Konto anlegen',
+  'site.signup_no_notice': 'Dieser Server hat seinen Datenschutzhinweis noch nicht veröffentlicht, deshalb kann hier noch kein Konto angelegt werden. Frag die Orga des Spielfelds.',
+  'site.new_account_hint': 'Neu hier? Um ein Konto anzulegen, lies den Hinweis und setze beide Häkchen.',
+  'site.login_notice': 'Ich habe den Datenschutzhinweis gelesen.',
+  'site.login_notice_first': 'Öffne zuerst oben den Datenschutzhinweis.',
+  'site.login_age': 'Ich bin 16 Jahre alt oder älter. Jüngere Spielende checken am Spielfeld ohne Konto ein, nach den Regeln des Spielfelds für Eltern oder Erziehungsberechtigte.',
   'privacy.title': 'Datenschutzhinweis',
   'privacy.read': 'Datenschutzhinweis lesen',
   'privacy.version': 'Version {version}',
   'privacy.lang_fallback':
       'Diesen Hinweis gibt es nicht auf {requested}: angezeigt auf {shown}.',
-  'privacy.none':
-      'Der Server hat den Text des Datenschutzhinweises noch nicht veröffentlicht. Frag die Orga des Spielfelds.',
-  'privacy.intro_outdated':
-      'Der Datenschutzhinweis hat sich seit der letzten Zustimmung dieses Kontos geändert (Version {old}, jetzt {version}). Lies den Hinweis und bestätige erneut.',
-  'privacy.intro_missing':
-      'Für dieses Konto ist keine Zustimmung zum Datenschutzhinweis gespeichert (Version {version}). Lies den Hinweis und bestätige.',
+  'privacy.none': 'Der Server hat den Text des Datenschutzhinweises noch nicht veröffentlicht. Frag die Orga des Spielfelds.',
+  'privacy.intro_outdated': 'Der Datenschutzhinweis hat sich seit der Version geändert, die diesem Konto zuletzt gezeigt wurde (Version {old}, jetzt {version}). Lies den Hinweis und bestätige, dass du ihn gesehen hast. Das Konto funktioniert weiter wie bisher.',
+  'privacy.intro_missing': 'Es ist nicht vermerkt, dass dieses Konto den Datenschutzhinweis (Version {version}) gesehen hat. Lies den Hinweis und bestätige, dass du ihn gesehen hast.',
   'privacy.read_and_confirm': 'Lesen und bestätigen',
-  'privacy.accept': 'Ich habe den Datenschutzhinweis gelesen und stimme zu.',
+  'privacy.accept': 'Ich habe den Datenschutzhinweis gelesen.',
   'privacy.confirm': 'Bestätigen',
   'privacy.tick_first':
-      'Setze zuerst das Häkchen, dass du den Hinweis gelesen hast und zustimmst.',
-  'privacy.done': 'Zustimmung gespeichert.',
-  'privacy.changed':
-      'Der Hinweis hat sich inzwischen geändert. Lies die neue Version und bestätige erneut.',
-  'site.err.notice_version_changed':
-      'Der Datenschutzhinweis hat sich inzwischen geändert. Öffne ihn, lies die neue Version und versuche es erneut.',
-  'acct.oidc.notice_version_changed':
-      'Der Datenschutzhinweis hat sich inzwischen geändert. Öffne ihn, lies die neue Version und versuche es erneut.',
+      'Setze zuerst das Häkchen, dass du den Hinweis gelesen hast.',
+  'privacy.done': 'Vermerkt: Der Hinweis wurde gesehen.',
+  'privacy.changed': 'Der Hinweis hat sich inzwischen geändert. Lies die neue Version und bestätige erneut.',
+  'site.err.notice_version_changed': 'Der Datenschutzhinweis hat sich inzwischen geändert. Öffne ihn, lies die neue Version und versuche es erneut.',
+  'acct.oidc.notice_version_changed': 'Der Datenschutzhinweis hat sich inzwischen geändert. Öffne ihn, lies die neue Version und versuche es erneut.',
+  'site.err.privacy_notice_unpublished': 'Dieser Server hat seine Datenschutzerklärung noch nicht veröffentlicht und legt deshalb keine neuen Konten an. Bestehende Konten melden sich wie gewohnt an. Sag es den Betreibenden des Servers.',
+  'acct.oidc.privacy_notice_unpublished': 'Dieser Server hat seine Datenschutzerklärung noch nicht veröffentlicht und legt deshalb keine neuen Konten an. Bestehende Konten melden sich wie gewohnt an. Sag es den Betreibenden des Servers.',
   'hub.title': 'Chrono-Freigabe',
   'hub.open': 'Chrono-Freigabe zwischen Spielfeldern',
-  'hub.intro':
-      'Wenn du auf mehreren Spielfeldern dieses Servers spielst, kannst du deine Konten verknüpfen, damit jedes Feld die Chrono-Prüfungen sieht, die du auf einem anderen bestanden hast (nur lesend). Jedes Feld braucht weiterhin deine Zustimmung.',
+  'hub.intro': 'Wenn du auf mehreren Spielfeldern dieses Servers spielst, kannst du deine Konten verknüpfen, damit jedes Feld die Chrono-Prüfungen sieht, die du auf einem anderen bestanden hast (nur lesend). Jedes Feld braucht weiterhin deine Zustimmung.',
   'hub.not_hosted':
       'Dieser Server hat nur ein Spielfeld: Es gibt nichts zu verknüpfen.',
   'hub.linked': 'Konto verknüpft seit {when}.',
-  'hub.unlinked':
-      'Dieses Konto ist noch nicht mit deinen Konten auf anderen Feldern verknüpft.',
+  'hub.unlinked': 'Dieses Konto ist noch nicht mit deinen Konten auf anderen Feldern verknüpft.',
   'hub.sharing_on':
       'Freigabe aktiv: Die anderen Felder sehen deine Chrono-Prüfungen.',
-  'hub.sharing_off':
-      'Noch keine Freigabe: Deine Zustimmung auf diesem Feld fehlt, oder das Feld hat die Freigabe ausgeschaltet.',
-  'hub.consent_hint':
-      'Die Freigabe braucht deine Zustimmung auf jedem Feld und den Schalter des Feldes selbst.',
+  'hub.sharing_off': 'Noch keine Freigabe: Deine Zustimmung auf diesem Feld fehlt, oder das Feld hat die Freigabe ausgeschaltet.',
+  'hub.consent_hint': 'Die Freigabe braucht deine Zustimmung auf jedem Feld und den Schalter des Feldes selbst.',
   'hub.make_title': 'Code erzeugen',
-  'hub.make_text':
-      'Erzeuge einen Code und gib ihn in deinem Konto auf dem anderen Feld ein.',
+  'hub.make_text': 'Erzeuge einen Code und gib ihn in deinem Konto auf dem anderen Feld ein.',
   'hub.make': 'Code erzeugen',
-  'hub.code_note':
-      'Gilt {minutes} Minuten und kann einmal benutzt werden. Er wird nicht noch einmal angezeigt.',
+  'hub.code_note': 'Gilt {minutes} Minuten und kann einmal benutzt werden. Er wird nicht noch einmal angezeigt.',
   'hub.copy': 'Kopieren',
   'hub.enter_title': 'Code eines anderen Feldes eingeben',
-  'hub.enter_text':
-      'Erzeuge einen Code in deinem Konto auf dem anderen Feld und gib ihn hier ein.',
+  'hub.enter_text': 'Erzeuge einen Code in deinem Konto auf dem anderen Feld und gib ihn hier ein.',
   'hub.enter_label': 'Code vom anderen Feld',
   'hub.link': 'Verknüpfen',
   'hub.code_needed': 'Gib den Code ein.',
   'hub.linked_ok': 'Konten verknüpft.',
   'hub.unlink_title': 'Verknüpfung lösen',
-  'hub.unlink_text':
-      'Beim Lösen sind die Chrono-Daten dieses Feldes für die anderen Felder nicht mehr sichtbar.',
+  'hub.unlink_text': 'Beim Lösen sind die Chrono-Daten dieses Feldes für die anderen Felder nicht mehr sichtbar.',
   'hub.unlink': 'Verknüpfung lösen',
   'hub.unlink_confirm': 'Verknüpfung der Konten lösen?',
   'hub.unlink_body':
@@ -1583,8 +1540,7 @@ const Map<String, String> deStrings = {
   'hub.unlinked_ok': 'Verknüpfung gelöst.',
   'hub.e.invalid_code':
       'Der Code ist ungültig, abgelaufen oder wurde schon benutzt.',
-  'hub.e.already_linked':
-      'Dieses Konto ist schon mit einer anderen Person verknüpft. Löse die Verknüpfung zuerst.',
+  'hub.e.already_linked': 'Dieses Konto ist schon mit einer anderen Person verknüpft. Löse die Verknüpfung zuerst.',
   'hub.e.person_already_linked_here':
       'Diese Person hat auf diesem Feld schon ein verknüpftes Konto.',
   'hub.e.not_linked': 'Dieses Konto ist nicht verknüpft.',

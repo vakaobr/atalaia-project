@@ -72,7 +72,7 @@ export class RegistrationImport extends Component {
         const shown = r.results.filter((x) => x.result !== 'unchanged').slice(0, 200);
         return html`<div data-testid="import-result" role="status">
             <p><strong>${r.dry_run ? t('checkin_import.checked') : t('checkin_import.imported')}</strong>
-                ${' '}${t('checkin_import.counts', { rows: r.rows, created: c.created, updated: c.updated,
+                ${' '}${t('checkin_import.counts', { n: r.rows, rows: r.rows, created: c.created, updated: c.updated,
         unchanged: c.unchanged, skipped: c.skipped, refused: c.refused })}</p>
             ${r.not_imported_columns.length > 0 && html`<p class="small muted" data-testid="import-ignored">${
                 t('checkin_import.ignored', { names: r.not_imported_columns.join(', ') })}${

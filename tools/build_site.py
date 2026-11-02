@@ -249,6 +249,11 @@ def rel(path: Path) -> str:
     return path.relative_to(REPO).as_posix() if path.is_relative_to(REPO) else path.as_posix()
 
 
+# The header's menus and the pages they hold (the header partial lists the same links).
+NAV_GROUPS = {"learn": ("modes", "radio", "architecture", "glossary"), "build": ("build", "roadmap"),
+              "community": ()}
+
+
 def folder(page: Page, lang: Language) -> str:
     """The page's folder relative to the site root: "", "en/", "glossario/", "en/glossary/"."""
     return lang.path + page.folders[lang.code]
@@ -457,6 +462,9 @@ def page_values(page: Page, lang: Language, texts: dict[str, str], file_name: st
     for target in PAGES:
         values[f"page.to.{target.name}"] = relative(here, folder(target, lang))
         values[f"page.nav.{target.name}"] = ' aria-current="page"' if target is page else ""
+    for group, members in NAV_GROUPS.items():
+        # The menu that holds this page is marked, so its button shows the active section.
+        values[f"page.group.{group}"] = ' data-current="true"' if page.name in members else ""
     if page.name == "architecture":
         for template in arch_templates():
             width, height = arch_size(arch_path(template, lang))

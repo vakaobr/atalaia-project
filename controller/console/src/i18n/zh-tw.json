@@ -14,6 +14,7 @@
     "token": "存取代碼（GM 或唯讀）",
     "enter": "進入",
     "bad": "存取代碼錯誤。",
+    "use_https": "存取代碼不會以一般 HTTP 傳送。請改用 {url} 開啟控制台（瀏覽器會詢問一次是否信任場地憑證）。",
     "expired": "這組存取代碼已失效，請重新輸入。",
     "hint": "控制器用這個指令顯示代碼：python3 -m atalaia_controller tokens",
     "readonly": "唯讀",
@@ -230,9 +231,19 @@
       "node_online": "一個盒子已上線",
       "node_offline": "一個盒子已離線",
       "node_rebooted": "一個盒子重新啟動（{reason}）",
+      "node_rebooted_crash": "一個盒子當機並重新啟動（{reason}）",
       "node_setup_applied": "{zone}已確認情境設定",
       "battery_low": "一個盒子電量偏低",
       "nobody": "不明"
+    },
+    "reboot_reasons": {
+      "power": "斷電或開機",
+      "brownout": "電壓驟降",
+      "software": "軟體重新啟動（更新或指令）",
+      "panic": "程式嚴重錯誤",
+      "watchdog": "看門狗逾時（程式卡住）",
+      "deepsleep": "從深度睡眠喚醒",
+      "unknown": "原因不明"
     },
     "puzzles": {
       "code": "密碼",
@@ -438,10 +449,19 @@
     "box_room_label": "{name} 的房間（留空：箱子的名稱）",
     "box_room_save": "儲存房間"
   },
+  "map_fetching": {
+    "title": "地圖擷取",
+    "intro": "「從地圖載入場地」頁面會向 OpenStreetMap、Overpass、Nominatim 與開放的航空影像服務索取地圖與場地範圍，並把開啟頁面之裝置的 IP 位址與所要求的範圍傳給它們。如果場地不希望如此，請關閉：頁面就不會開啟，也不會有任何資料離開控制器。仍可上傳圖片來載入場地。",
+    "label": "允許控制台從網路擷取地圖",
+    "saved": "已儲存。",
+    "read_only": "只有 GM 能更改。"
+  },
   "fieldmap": {
     "open": "從地圖載入場地",
     "title": "從地圖載入場地",
     "back": "回到控制台",
+    "off": "這個場地已關閉地圖擷取，因此本頁不會連到 OpenStreetMap、Overpass、Nominatim 或任何航空影像服務。要從地圖載入場地，請由 GM 在「設定」的「地圖擷取」中開啟。你也可以在「場地」分頁上傳場地的圖片。",
+    "off_note": "這個場地已關閉地圖擷取（設定）。",
     "login": "請先用 GM 代碼登入控制台，再從「場地」分頁開啟這個頁面。",
     "intro": "在地圖上找到場地並標出外框的各個角：這個瀏覽器會用開放地圖繪製場地圖片。圖片、它在地圖上的位置（ATAK）和場地邊界接著會儲存在場地控制器上，控制器不需要網路。",
     "sources": "只在你設定遊戲時：這個瀏覽器會從 OpenStreetMap（© OpenStreetMap contributors）下載一次地圖和該區域資料，有開放空照影像的國家或地區也會下載當地的影像（葡萄牙本土是 DGT 正射影像，西班牙是 IGN 的 PNOA，法國是 IGN 的正射影像，荷蘭是 PDOK 的影像，另有比利時、盧森堡、瑞士、德國十一個邦、波蘭與捷克公家服務的影像，各自附上來源標示）。如果 OpenStreetMap 的資料服務忙碌，同樣的查詢（只有場地的區域）會送到另一個提供相同資料的公共伺服器（overpass.private.coffee）。不會下載其他東西，控制台其餘部分沒有網路也能運作。",
@@ -826,8 +846,18 @@
       "remove_confirm": "要把 {id}（{name}）從裁判名單移除嗎？他們的 App 會立刻不再是裁判，尚未送出的測速值會被拒絕，直到你再把他們加入。",
       "removed": "{id} 已從裁判名單移除。"
     },
-    "card_seen": "已看過證件",
+    "card_seen": "已看會員卡，相符",
     "not_checked": "未檢查",
+    "confirm_no_card": "沒有會員卡也放行",
+    "waits_card": "等待查驗會員卡",
+    "card_by": "會員卡由 {who} 於 {when} 查驗",
+    "verdict_on": "{date}：{verdict}",
+    "number_erased": "查驗會員卡後編號已刪除",
+    "apd_override_no_card": "未查驗會員卡即放行",
+    "position_shared": "分享位置",
+    "share_position": "在這場遊戲期間與遊戲分享我的位置",
+    "share_position_hint": "獨立選項，玩家同意才勾選。其小隊或隊伍（依模式允許）、裁判和 GM 看得到；遠端 GM 只有場地開啟時才看得到。拒絕不影響其他任何事。玩家隨時可以停止。",
+    "card_why": "場地必須將實體會員卡與事先填寫的資料對照（葡萄牙的場地依 GDPR 第 6 條第 1 項 (c)，其他地區依 (f)）。",
     "remove": "移除",
     "manual": "手動報到",
     "manual_hint": "給沒有 App 的玩家：控制器會產生他們的 ID，可寫入玩家標籤。",
@@ -872,7 +902,7 @@
     "valid_for": "測速有效期間",
     "valid_for_day": "整天",
     "valid_for_game": "只限這場遊戲",
-    "federation_note": "協會會員編號不會自動驗證：「必填」只是讓表單不填就無法送出。看過證件後請勾選「已看過證件」。",
+    "federation_note": "編號不會自動驗證。場地的 APD 規則在報到時查驗時，玩家會維持待確認，直到你把實體會員卡與其填寫的內容對照並勾選「已看會員卡，相符」；之後編號會被刪除，保留結果、日期與你的 ID。",
     "apd_title": "APD 會員資格",
     "apd_checkin": "報到時檢查玩家的 APD 會員資格",
     "apd_expiry": "要求並檢查到期日",
@@ -1387,6 +1417,23 @@
     "pending_note": "有 {n} 把登記的槍還沒測速。",
     "back": "返回"
   },
+  "clock": {
+    "wrong": "控制器的時鐘不正確。",
+    "reason_before_release": "目前顯示 {now}，早於此軟體發行的時間（{floor}）。Raspberry Pi 4 沒有自己的時鐘，斷電後會以舊的時間開機。",
+    "reason_behind_records": "目前顯示 {now}，早於已儲存的資料（{floor}）。",
+    "hint_gm": "時間戳記與憑證都依賴它，時間正確之前不會刪除任何資料。若此裝置的時間正確，可由此裝置設定：",
+    "hint_read": "請遊戲主持人在主控台設定。",
+    "set": "以此裝置的時間設定控制器時鐘",
+    "set_done": "控制器時鐘現在是 {time}。",
+    "wrong_short": "（不正確）",
+    "title": "控制器時鐘",
+    "intro": "在野外，控制器沒有網際網路。Raspberry Pi 4 沒有自己的時鐘，斷電後會使用上次關機的時間（或 1970 年）；Pi 5 要有電池才能保持時間。遊戲與計時器不依賴它；時間戳記、玩家代碼、憑證與舊資料的刪除則依賴它。",
+    "controller_time": "控制器時間",
+    "device_time": "此裝置時間",
+    "jump": "時鐘在 {time} 跳了 {seconds} 秒。計時器不受影響。",
+    "forward_only": "只會往前調，不會早於控制器已有的最新資料；時間看起來正確時，一次最多 14 天。",
+    "read_only": "只有遊戲主持人可以設定。"
+  },
   "box_language": {
     "title": "盒子語言",
     "intro": "盒子畫面的語言：就緒、等待開始、中立據點、已啟動、遊戲結束。遊戲會保留建立時的語言，每份加入資料（卡片、QR Code、文字、無線電邀請）都帶有它。舊版韌體的盒子仍顯示英文。",
@@ -1583,6 +1630,66 @@
       "unavailable": "已拒絕：無法使用",
       "failed": "失敗"
     }
+  },
+  "access_tokens": {
+    "title": "臨時存取碼",
+    "intro": "為裁判的手機、來訪的 GM、自動化測試或觀眾螢幕各給一組專屬代碼，不必使用 GM 代碼或唯讀代碼。每組代碼都有名稱、說明可執行的操作，會在你選定的時間後自動失效（最長 7 天），也可隨時立即撤銷。在此建立的代碼無法再建立其他代碼。",
+    "label": "名稱",
+    "label_hint": "裁判小安，週六",
+    "scope": "可執行",
+    "scopes": {
+      "read": "唯讀",
+      "marshals": "唯讀並管理裁判",
+      "gm": "完整 GM"
+    },
+    "scope_help": {
+      "read": "與唯讀代碼相同：可追蹤比賽，不能更改任何內容。",
+      "marshals": "唯讀，另可新增、修改與移除裁判，其他一律不行。",
+      "gm": "GM 代碼能做的一切，但不能建立存取碼。"
+    },
+    "lifetime": "有效時間",
+    "lifetimes": {
+      "1h": "1 小時",
+      "4h": "4 小時",
+      "8h": "8 小時（一個比賽日）",
+      "1d": "1 天",
+      "3d": "3 天",
+      "7d": "7 天（上限）"
+    },
+    "game": "比賽",
+    "all_games": "任何比賽",
+    "game_help": "將代碼可更改的內容限制在單一比賽。比賽清單與即時動態仍會顯示所有比賽。",
+    "create": "建立存取碼",
+    "made": "已建立存取碼「{label}」。",
+    "once": "請立即複製：它只會顯示這一次，之後無法再查看，只能撤銷。",
+    "summary": "{scope}，有效至 {until}。",
+    "summary_game": "僅限比賽 {game}。",
+    "address": "控制器位址",
+    "qr_label": "以新存取碼登入手機的 QR 碼",
+    "qr_help": "用手機相機掃描，即可開啟已登入的 GM 控制台（唯讀代碼則開啟記分板）。只給要使用的人看：持有者在代碼到期或被撤銷前都能用它操作。",
+    "no_link": "此控制器尚無可放入 QR 碼的位址：請見報到海報上的位址。請手動輸入代碼。",
+    "done": "完成",
+    "empty": "沒有存取碼。",
+    "list": "存取碼",
+    "expires": "到期",
+    "last_used": "上次使用",
+    "status": "狀態",
+    "statuses": {
+      "active": "有效",
+      "expired": "已過期",
+      "revoked": "已撤銷"
+    },
+    "revoke": "撤銷",
+    "confirm_revoke": "要撤銷「{label}」嗎？它會立即失效。",
+    "activity": "最近活動",
+    "audit": {
+      "created": "已建立",
+      "used": "已使用",
+      "refused": "已拒絕",
+      "revoked": "已撤銷",
+      "expired": "已過期"
+    },
+    "failed": "無法載入清單。"
   },
   "scoreboard_share": {
     "title": "與玩家分享記分板",

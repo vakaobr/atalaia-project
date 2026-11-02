@@ -645,7 +645,11 @@ menu "Atalaia Field Box Configuration"
                 Wokwi emulator; a join still needs a payload signed with this
                 box's field join key, and a tag one signed with the game key.
                 "@joinkey" follows the adoption rules (protocol/adoption.md):
-                it never replaces another field's key.
+                it never replaces another field's key. Decision SR-40: "@joinkey"
+                and "@update" need the admin PIN as their last word
+                ("@joinkey <64 hex> <PIN>", "@update <version> <id> <PIN>") unless
+                ATALAIA_SERIAL_KEYS is on (the bench and Wokwi builds, whose scripts
+                type them without one).
 
         config ATALAIA_SERIAL_ADOPT
             bool "Accept @adopt-info and @adopt lines on the serial console (USB adoption)"
@@ -868,6 +872,16 @@ menu "Atalaia Field Box Configuration"
 
     # ---- Boot splash (decision LOGO-6) ----------------------------------------
     menu "Boot splash"
+        config ATALAIA_TFT_SPLASH_MS
+            int "Boot splash time on the TFT (ms, 0 = none)"
+            default 2500
+            range 0 10000
+            help
+                The logo and the firmware version on the big screen from the moment
+                it is up. It stays at least this long and, when the first game
+                screen is not ready by then, until it is. Never delays the radio or
+                the game. Without a TFT nothing is drawn.
+
         config ATALAIA_SPLASH_LOGO
             string "Boot splash image (plain-text PGM, 30 x 60)"
             default "assets/splash.pgm"

@@ -61,6 +61,12 @@
 		defer
 	}
 
+	# The server caps request bodies itself (atalaia_server/body_limit.py: 1 MiB, 4 MiB on the image uploads); this
+	# is the first line of defence, above the largest upload, so a huge body never reaches the one worker (SRV-2).
+	request_body {
+		max_size 5MB
+	}
+
 	# The Host header goes on unchanged: the server picks the field from it
 	# (an unknown field: 404 unknown_field, a suspended one: 403).
 	reverse_proxy server:8000 {

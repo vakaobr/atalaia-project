@@ -152,17 +152,16 @@ void main() {
           pod: client,
           join: join,
           epochs: epochs,
-          encodeEvent:
-              ({
-                required node,
-                required seq,
-                required tMs,
-                required type,
-                required team,
-                required squad,
-                required prio,
-                required dataJson,
-              }) => null,
+          encodeEvent: ({
+            required node,
+            required seq,
+            required tMs,
+            required type,
+            required team,
+            required squad,
+            required prio,
+            required dataJson,
+          }) => null,
           tick: const Duration(milliseconds: 20),
         );
       },

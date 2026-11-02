@@ -49,6 +49,15 @@ def declaration(replica_id: Optional[str] = None, rclass: str = "rifle", rtype: 
     return d
 
 
+def https_app(app):
+    """The app as if reached over TLS: this Starlette's TestClient gives websockets the scheme ws whatever the URL."""
+    async def shim(scope, receive, send):
+        if scope["type"] == "websocket":
+            scope = {**scope, "scheme": "wss"}
+        await app(scope, receive, send)
+    return shim
+
+
 class Marshal:
     """A marshal's Ed25519 key and signed readings (protocol/chrono-record.md)."""
 
@@ -110,7 +119,12 @@ class P3Case(unittest.TestCase):
         self.svc._wall = lambda: self.now
         self.svc._tz = datetime.timezone.utc
         self.ctrl.positions._wall = lambda: self.now
-        self.client = TestClient(self.bundle.app)
+        self.ctrl.positions._mono = lambda: self.now  # grants run on monotonic time: the test moves both
+        # The clock guard (wallclock.py) judges the test's time, which moves by days, not the machine's.
+        guard = self.ctrl.clock_guard
+        guard._wall = guard._mono = lambda: self.now
+        guard.release_date = guard._records = 0.0  # (the test writes records of times it has not reached)
+        self.client = TestClient(https_app(self.bundle.app), base_url="https://testserver")  # the tokens go over HTTPS (guard.py)
 
     def close_bundle(self) -> None:
         self.client.close()
@@ -146,7 +160,9 @@ class P3Case(unittest.TestCase):
                  expect: int = 201, **extra: Any) -> dict[str, Any]:
         pid, secret = ident or new_identity()
         body = {"game_id": game_id, "player_id": pid, "player_secret": secret, "display_name": name,
-                "notice_version": 1, **extra}
+                "notice_version": 2, "share_position": True, **extra}
+        if body["share_position"] is None:  # a client that says nothing (an older app)
+            del body["share_position"]
         r = self.client.post("/api/v1/checkin", json=body, headers={"X-Forwarded-For": "ignored"})
         self.assertEqual(r.status_code, expect, r.text)
         out = r.json()

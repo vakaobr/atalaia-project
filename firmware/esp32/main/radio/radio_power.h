@@ -31,6 +31,13 @@
 #define ATALAIA_EU868_G_ERP_LIMIT_DBM  14 /* 25 mW, 1% DC  */
 #define ATALAIA_EU868_G2_ERP_LIMIT_DBM 27 /* 500 mW, 10% DC */
 
+/* x100 / 100 rounded toward minus infinity: the conducted power may never be rounded up, and C's
+ * division rounds a negative quotient toward zero (-7.85 dBm would become -7, over the limit). */
+static inline int atalaia_floor_div100(int x100)
+{
+    return x100 >= 0 ? x100 / 100 : -((-x100 + 99) / 100);
+}
+
 /*
  * Compute the SX1262 conducted TX power for an EU868 sub-band.
  *
@@ -48,7 +55,7 @@ static inline int8_t atalaia_eu868_tx_power_dbm(int erp_limit_dbm, int fem_gain_
      * Conducted = EIRP - FEM - antenna. */
     int eirp_x100 = erp_limit_dbm * 100 + 215;
     int conducted_x100 = eirp_x100 - fem_gain_db * 100 - antenna_gain_dbi * 100;
-    int conducted = conducted_x100 / 100; /* truncation = round-down */
+    int conducted = atalaia_floor_div100(conducted_x100); /* round down, also below zero */
     if (conducted < -9) conducted = -9;
     if (conducted > 22) conducted = 22;
     return (int8_t)conducted;
@@ -86,7 +93,7 @@ static inline bool atalaia_tx_power_for(const atalaia_band_info_t *band, int fem
     }
     default: return false;
     }
-    int conducted = x100 / 100; /* truncation toward zero, as the Python side */
+    int conducted = atalaia_floor_div100(x100); /* round down, as the Python side */
     if (conducted < -9) return false;
     if (conducted > 22) conducted = 22;
     *dbm = (int8_t)conducted;

@@ -63,6 +63,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
   FieldInfo? _info;
   int? _gameId;
   String? _team;
+  bool _share = false; // the position-sharing box, unticked (decision LEG-12)
   final _picked = <String>{};
 
   /// The tickets of online registrations the phone keeps (lib/site/), and
@@ -199,7 +200,12 @@ class _CheckinScreenState extends State<CheckinScreen> {
     final f = _field!;
     final v = _info!.noticeVersion;
     await app.update((x) => x.noticeSeen = {...x.noticeSeen, f.fieldId: v});
-    if (mounted) setState(() => _step = _Step.form);
+    if (mounted) {
+      setState(() {
+        _step = _Step.form;
+        _error = null;
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -292,6 +298,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
         apdId: withApd ? _apd.apd : null,
         membershipExpires: withApd ? _apd.expiresOrNull : null,
         teamPreference: _team,
+        sharePosition: _share,
         replicas: decls.isEmpty ? null : decls,
         registrationId: kept?.registrationId,
         registrationTicket: kept?.ticket,
@@ -313,6 +320,34 @@ class _CheckinScreenState extends State<CheckinScreen> {
       );
     } on CheckinException catch (e) {
       if (!mounted) return;
+      if (e.noticeChanged) {
+        // The field's notice moved on since the player read it (NV-2): not a
+        // raw error. Fetch the new text, show it, and ask again; the position
+        // box goes back to unticked.
+        try {
+          final fresh = await _client!.info();
+          if (!mounted) return;
+          final seen = AppScope.read(context).settings.noticeSeen;
+          if (seen[field.fieldId] == fresh.noticeVersion) {
+            // Seen already, yet refused: forget it so the text shows again.
+            await app.update(
+              (x) => x.noticeSeen = {...x.noticeSeen}..remove(field.fieldId),
+            );
+          }
+          if (!mounted) return;
+          setState(() {
+            _info = fresh;
+            _share = false;
+            _step = _Step.notice;
+            _error = 'checkin.notice_changed';
+            _errorArgs = const {};
+          });
+          return;
+        } on CheckinException catch (_) {
+          if (!mounted) return;
+          // Could not fetch it: the generic error below.
+        }
+      }
       setState(() {
         _step = _Step.form;
         _error = e.offline ? 'checkin.unreachable' : 'checkin.error';
@@ -510,6 +545,25 @@ class _CheckinScreenState extends State<CheckinScreen> {
             onChanged: (v) => setState(() => _team = v),
           ),
         ],
+        if (info.apdRule.checkin)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              s.t('checkin.card_why'),
+              key: const Key('checkin-card-why'),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        // A separate, unticked choice: declining blocks nothing (Art. 7(4)).
+        CheckboxListTile(
+          key: const Key('checkin-share-position'),
+          value: _share,
+          onChanged: (v) => setState(() => _share = v == true),
+          title: Text(s.t('checkin.share_position')),
+          subtitle: Text(s.t('checkin.share_position_hint')),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+        ),
         if (_tickets.isNotEmpty) ...[
           const SizedBox(height: 16),
           DropdownButtonFormField<KeptTicket?>(
@@ -810,7 +864,7 @@ class _CheckinStatusScreenState extends State<CheckinStatusScreen> {
                       overridden: me['apd_override'] == true,
                       country: apdCountryOf(me),
                     ),
-                    if (me['apd_status'] != 'valid')
+                    if (me['apd_status'] != 'valid' || c.status == 'pending')
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.only(left: 8),

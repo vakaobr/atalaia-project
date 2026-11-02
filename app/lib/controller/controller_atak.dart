@@ -24,7 +24,15 @@
 /// - player positions never go to multicast. With [AtakConfig.players] they
 ///   go only to the staff ATAK devices of [AtakConfig.staffEndpoints] (TCP,
 ///   "host:port", default port 4242): GPS reports only, by pseudonymous
-///   player id, never by name (decision M9-6);
+///   player id, never by name (decision M9-6). With [AtakConfig.staffTls]
+///   (the Pi's `[atak] staff_tls`, security review FLD-5, phone parity FU30-10)
+///   the connection is TLS 1.2 or later, only the pinned
+///   [AtakConfig.staffTlsCa] trusted (default port 8089, ATAK's SSL input),
+///   with the controller's client certificate when there is one; the
+///   certificate's names are checked against the endpoint's host, or against
+///   [AtakConfig.staffTlsName] when the endpoints are addresses the devices'
+///   certificates were not made for (the Pi does not check names at all:
+///   Dart's TLS always does);
 /// - map features: only those for everyone to multicast; the staff devices
 ///   get them all; the remote relay gets the points and circles for
 ///   everyone, a circle as a spot marker with its radius as `ce`, never a
@@ -88,6 +96,9 @@ import 'controller_sync_format.dart'
 
 const atakDefaultMulticast = '239.2.3.1:6969';
 const atakDefaultStaffPort = 4242;
+
+/// ATAK's SSL input (TAK's streaming port): the default of a TLS endpoint.
+const atakDefaultStaffTlsPort = 8089;
 const atakStaffEndpointsMax = 8;
 const cotXmlDecl = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n";
 const cotDatagramMax = 1400;
@@ -805,11 +816,18 @@ class AtakConfig {
     this.players = false,
     this.remote = false,
     this.remotePlayers = false,
+    this.staffTls = false,
+    this.staffTlsCa = '',
+    this.staffTlsCert = '',
+    this.staffTlsKey = '',
+    this.staffTlsName = '',
   });
 
   /// From the section's keys as the Pi names them: enabled, multicast,
   /// interval_s, staff_endpoints (a list or a comma list), players, remote,
-  /// remote_players; a key left out keeps its default.
+  /// remote_players, staff_tls and, as PEM text (a phone has no file to
+  /// point at), staff_tls_ca, staff_tls_cert and staff_tls_key, and
+  /// staff_tls_name; a key left out keeps its default.
   factory AtakConfig.fromSection(Map<String, Object?> s) {
     const d = AtakConfig();
     bool flag(String k, bool def) {
@@ -833,6 +851,13 @@ class AtakConfig {
     } else {
       throw AtakConfigError('atak.staff_endpoints: "host:port" texts');
     }
+    String text(String k) {
+      final v = s[k];
+      if (v == null) return '';
+      if (v is String) return v;
+      throw AtakConfigError('atak.$k: text');
+    }
+
     final multicast = s['multicast'] ?? d.multicast;
     final interval = s['interval_s'] ?? d.intervalS;
     if (multicast is! String) {
@@ -849,6 +874,11 @@ class AtakConfig {
       players: flag('players', d.players),
       remote: flag('remote', d.remote),
       remotePlayers: flag('remote_players', d.remotePlayers),
+      staffTls: flag('staff_tls', d.staffTls),
+      staffTlsCa: text('staff_tls_ca'),
+      staffTlsCert: text('staff_tls_cert'),
+      staffTlsKey: text('staff_tls_key'),
+      staffTlsName: text('staff_tls_name').trim(),
     );
   }
 
@@ -861,6 +891,22 @@ class AtakConfig {
   final bool players;
   final bool remote;
   final bool remotePlayers;
+
+  /// TLS to the staff devices (`[atak] staff_tls`); needs [staffTlsCa].
+  final bool staffTls;
+
+  /// PEM text: the CA (or certificate) the staff devices' TLS input
+  /// presents; nothing else is trusted.
+  final String staffTlsCa;
+
+  /// PEM text: this controller's client certificate and key, when the
+  /// devices ask for one (both or neither).
+  final String staffTlsCert;
+  final String staffTlsKey;
+
+  /// The name the devices' certificates are made for, when the endpoints are
+  /// addresses (empty: each endpoint's own host).
+  final String staffTlsName;
 
   /// atak.py `check_config` and config.py `_check_atak`; [syncEnabled]:
   /// whether the controller's sync (whose stream the relay rides) is on.
@@ -892,6 +938,28 @@ class AtakConfig {
     for (final ep in staffEndpoints) {
       parseEndpoint(ep, atakDefaultStaffPort);
     }
+    if (staffTls) {
+      if (staffTlsCa.trim().isEmpty) {
+        throw AtakConfigError(
+          'atak.staff_tls needs atak.staff_tls_ca (the CA the devices\' TLS '
+          'input presents; TLS is never used without checking it)',
+        );
+      }
+      atakStaffTlsContext(this); // the PEM is read now: bad text stops here
+    } else if (staffTlsCa.trim().isNotEmpty ||
+        staffTlsCert.trim().isNotEmpty ||
+        staffTlsKey.trim().isNotEmpty ||
+        staffTlsName.isNotEmpty) {
+      throw AtakConfigError(
+        'atak.staff_tls_ca, staff_tls_cert, staff_tls_key and staff_tls_name '
+        'need atak.staff_tls = true',
+      );
+    }
+    if (staffTlsCert.trim().isEmpty != staffTlsKey.trim().isEmpty) {
+      throw AtakConfigError(
+        'atak.staff_tls_cert and atak.staff_tls_key go together',
+      );
+    }
     if (!(intervalS >= 1.0 && intervalS <= 3600.0)) {
       throw AtakConfigError('atak.interval_s must be 1-3600 seconds');
     }
@@ -903,6 +971,26 @@ class AtakConfig {
     if (remotePlayers && !remote) {
       throw AtakConfigError('atak.remote_players needs atak.remote');
     }
+  }
+}
+
+/// TLS to the staff ATAK devices (FLD-5, as atak.py `staff_tls_context`): TLS
+/// 1.2 or later, only the configured CA trusted (never the system's roots),
+/// the controller's client certificate when there is one. Throws
+/// [AtakConfigError] for PEM that cannot be read.
+SecurityContext atakStaffTlsContext(AtakConfig c) {
+  try {
+    final ctx = SecurityContext(withTrustedRoots: false)
+      ..minimumTlsProtocolVersion = TlsProtocolVersion.tls1_2
+      ..setTrustedCertificatesBytes(utf8.encode(c.staffTlsCa));
+    if (c.staffTlsCert.trim().isNotEmpty) {
+      ctx
+        ..useCertificateChainBytes(utf8.encode(c.staffTlsCert))
+        ..usePrivateKeyBytes(utf8.encode(c.staffTlsKey));
+    }
+    return ctx;
+  } on Object catch (e) {
+    throw AtakConfigError('atak.staff_tls_*: $e');
   }
 }
 
@@ -1002,18 +1090,40 @@ class UdpCotSender implements AtakUdpSender {
 /// Staff ATAK devices: one connection per endpoint and cycle, the events
 /// one after another (atak.py `TcpSender`).
 class TcpCotSender implements AtakTcpSender {
-  TcpCotSender(List<String> endpoints, {this.timeout = atakTcpTimeout})
-    : endpoints = [
-        for (final e in endpoints) parseEndpoint(e, atakDefaultStaffPort),
-      ];
+  /// With [context] ([atakStaffTlsContext]) every connection is TLS, to port
+  /// 8089 when an endpoint names none; [serverName] is what the devices'
+  /// certificates are checked against (default: the endpoint's host).
+  TcpCotSender(
+    List<String> endpoints, {
+    this.timeout = atakTcpTimeout,
+    this.context,
+    this.serverName,
+  }) : endpoints = [
+         for (final e in endpoints)
+           parseEndpoint(
+             e,
+             context == null ? atakDefaultStaffPort : atakDefaultStaffTlsPort,
+           ),
+       ];
 
   final List<(String, int)> endpoints;
   final Duration timeout;
+  final SecurityContext? context;
+  final String? serverName;
 
   Future<String?> _one(String host, int port, Uint8List payload) async {
     Socket? s;
     try {
       s = await Socket.connect(host, port, timeout: timeout);
+      final ctx = context;
+      if (ctx != null) {
+        // The handshake checks the chain against the pinned CA alone.
+        s = await SecureSocket.secure(
+          s,
+          host: serverName ?? host,
+          context: ctx,
+        ).timeout(timeout);
+      }
       s.add(payload);
       await s.flush().timeout(timeout);
       await s.close().timeout(timeout);
@@ -1062,8 +1172,25 @@ class AtakEmitter {
        tcp =
            tcp ??
            (config.staffEndpoints.isNotEmpty
-               ? TcpCotSender(config.staffEndpoints)
+               ? TcpCotSender(
+                   config.staffEndpoints,
+                   context: config.staffTls
+                       ? atakStaffTlsContext(config)
+                       : null,
+                   serverName: config.staffTlsName.isEmpty
+                       ? null
+                       : config.staffTlsName,
+                 )
                : null) {
+    if (config.players &&
+        config.staffEndpoints.isNotEmpty &&
+        !config.staffTls) {
+      log?.call(
+        '[atak] players = true without staff_tls: every player\'s position '
+        'crosses the network to ${config.staffEndpoints} in the clear; use '
+        'staff_tls, or a wired or VPN link',
+      );
+    }
     engine.addListener(onControllerMessage);
     _listening = true;
   }
@@ -1834,6 +1961,7 @@ class AtakEmitter {
     'multicast': config.multicast.isEmpty ? null : config.multicast,
     'staff_endpoints': config.staffEndpoints.length,
     'players': config.players,
+    'staff_tls': config.staffTls,
     'interval_s': config.intervalS,
     'markers': _markers.length,
     'remote': _remoteOn,

@@ -27,9 +27,8 @@ const _csv =
 void main() {
   late ControllerApi api;
   late int gameId;
-  final limits = File(
-    'lib/chrono/limit_templates/portugal.yaml',
-  ).readAsStringSync();
+  final limits = File('lib/chrono/limit_templates/portugal.yaml')
+      .readAsStringSync();
 
   setUp(() {
     final engine = ControllerEngine(

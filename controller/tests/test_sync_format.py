@@ -29,7 +29,7 @@ VECTORS = json.loads((REPO / "protocol" / "vectors" / "sync.json").read_text(enc
 class VectorTests(unittest.TestCase):
     def test_counts(self) -> None:
         self.assertEqual((len(VECTORS["valid"]), len(VECTORS["invalid"]), len(VECTORS["merge"])), (15, 76, 3))
-        self.assertEqual((len(VECTORS["answers"]["valid"]), len(VECTORS["answers"]["invalid"])), (23, 82))
+        self.assertEqual((len(VECTORS["answers"]["valid"]), len(VECTORS["answers"]["invalid"])), (24, 86))
         self.assertEqual({v["kind"] for v in VECTORS["answers"]["valid"]}, set(fmt.ANSWERS))
         self.assertEqual({v["kind"] for v in VECTORS["valid"]}, set(fmt.CHECKS))
         self.assertEqual({v["kind"] for v in VECTORS["invalid"]}, set(fmt.CHECKS))

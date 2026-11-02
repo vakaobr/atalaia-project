@@ -9,7 +9,7 @@ For the person who builds a box or a prop and has to put the software on it. You
 
 > **Not field-ready yet.** The firmware releases on GitHub are marked pre-release for that reason. Atalaia is pre-alpha. Real Heltec V4.3 boards have been flashed and used on a bench with the field controller: boot, radio, buttons, the board's own OLED, adoption by USB cable and by code, and an update over the air. Nothing else in this guide has run on a real board. Steps that depend on hardware that was not tried say **Not yet tested on a real board**.
 
-The hardware is in the build manuals: [Field Box](../../../hardware/field-box/BUILD.md), [Satellite](../../../hardware/satellite/BUILD.md), [I/O pod](../../../hardware/io-pod/BUILD.md). The controller is in the [controller setup guide](controller-setup.md).
+The hardware is in the build manuals: [Field Box](../../../hardware/field-box/BUILD.md), [Satellite](../../../hardware/satellite/BUILD.md), [I/O pod](../../../hardware/io-pod/BUILD.md). The controller is in the [controller setup guide](controller-setup.md), and its radio modem board in [Set up the radio modem](modem.md).
 
 ## Contents
 
@@ -43,7 +43,7 @@ Two ways. Download a release if you only want to put the project's firmware on a
 
 ### 2.1 Download a release (the easy way)
 
-The project publishes firmware on GitHub: [the Releases page](https://github.com/vakaobr/atalaia-project/releases). The first one is **v0.4.0**, marked **pre-release**: pre-alpha and **not field-tested**. Read its notes first.
+The project publishes firmware on GitHub: [the Releases page](https://github.com/vakaobr/atalaia-project/releases). Take the newest one (v0.5.0 on 2026-11-01; the first was v0.4.0). Each is marked **pre-release**: pre-alpha and **not field-tested**. Read its notes first.
 
 Pick the files for your board:
 
@@ -150,7 +150,7 @@ PY -m esptool --chip esp32s3 -p COM5 -b 921600 write_flash "@flash_args"
 
 Keep the quotes: PowerShell reads a bare `@` differently. `flash_args` is a file the build made. It lists the files and where they go. If the connection fails, use download mode, or try `-b 460800` or `-b 115200`.
 
-For the modem and the pod, go to `build-modem` or `build-pod` instead.
+For the modem and the pod, go to `build-modem` or `build-pod` instead. The modem has its own page, with these commands for each system: [Set up the radio modem](modem.md).
 
 **USB flash required once, from v0.5.** A box flashed with v0.4.0 or earlier has the old partition table (2 MB program slots). From v0.5 the program slots are 4 MB, and an update over the air cannot change the partition table, so flash such a box over USB once, with the command above and **without** `erase_flash`: the settings, the keys and the adoption stay where they are (the table's first four partitions did not move). What is lost is the storage partition, which moved: the box formats it on the first start and fetches the game modes and the field's logo again at the next join. A box still on the old table refuses to run the new firmware: its screen says *Flash over USB* and the log says `WRONG PARTITION TABLE`. A box that was offered the new image over the air by an older firmware goes back to its old one by itself. After the one USB flash, updates over the air work as before. The USB radio modem and the I/O pod share the table: one already flashed with v0.4.0 or earlier only logs `WRONG PARTITION TABLE` and keeps working, but flash it over USB once as well (without `erase_flash`) so it has the new layout.
 
@@ -186,6 +186,7 @@ Most options are build options. Give them to `docker_fw.py`:
 | --- | --- | --- |
 | Radio region | `--region=eu868` or `--region=as923-tw` (Taiwan, 920-925 MHz) | EU868 |
 | Listen before talk | `--lbt=on` or `--lbt=off` | on |
+| Antenna gain | `--antenna-dbi=10` (the fitted antenna's rated gain, 0 to 20 dBi): the firmware lowers the transmit power by it, so a higher-gain antenna stays within the legal radiated power | 2 dBi |
 | Mode keys | `--mode-keys=<key>[,<key>...]` (up to 4, hex or base64) | The project's two keys |
 | Release keys | `--release-keys=<key>[,<key>...]` (up to 4) | None: every update is refused |
 | Version | `--fw-version=0.4.1` | From the code |
@@ -208,14 +209,14 @@ Example for a Taiwanese field: `python tools/docker_fw.py build --region=as923-t
 
 Never lower `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` or the antenna gain below the real values. That would break the legal power limit.
 
-If you change `--region`, `--lbt`, a key option, or update the repository, the build may make the settings file again from the defaults and your edits are lost. Do the edit again. Keep a note of your edits.
+If you change `--region`, `--lbt`, `--antenna-dbi`, a key option, or update the repository, the build may make the settings file again from the defaults and your edits are lost. Do the edit again. Keep a note of your edits.
 
 **Settings you do not set at build time.**
 
 - **The admin PIN** has no default. You choose it on the setup page ([section 5](#5-first-boot-and-setup)). Easy PINs such as 1234 are refused.
 - **The field Wi-Fi** name and password are set on the setup page too.
 - **The field join key** is given to the box when it is adopted ([section 6](#6-adoption)).
-- **Your own splash logo.** The image on the box's boot screen and on its *ready* screens is a build asset, `firmware/esp32/assets/splash.pgm` (the Atalaia tower). To build a box with another one, make a **plain-text PGM** (the first line `P2`, then `30 60`, then the maximum value, then 1,800 numbers, one per pixel, row by row; `assets/splash.pgm` is an example you can open in a text editor, and GIMP and ImageMagick write the format: `convert logo.png -resize 30x60! -depth 8 -compress none logo.pgm`) **of exactly 30 x 60 pixels**. A pixel is lit from half the maximum value up and dark below: the image is one colour, drawn white on the small OLED and in the accent colour, scaled up to 96 pixels tall, on the big screen; make it tall and narrow, like the tower. Then either replace `assets/splash.pgm`, or point the build at your file (`CONFIG_ATALAIA_SPLASH_LOGO` in menuconfig, *Boot splash*, a path relative to `firmware/esp32/` or absolute; for `docker_fw.py` put a line `CONFIG_ATALAIA_SPLASH_LOGO="assets/mine.pgm"` in `firmware/esp32/sdkconfig.defaults`, and keep the file inside the repository so the build container sees it). The build turns the file into a C array and stops with a message if the file is not a 30 x 60 plain-text PGM. Only the Field Box and the modem have a splash. **The project's release images always carry the Atalaia tower**; a box with your image is your own build and gets no release update that you did not build yourself ([section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)).
+- **Your own splash logo.** The image on the box's boot screens (the OLED's and the big screen's) and on its *ready* screens is a build asset, `firmware/esp32/assets/splash.pgm` (the Atalaia tower). To build a box with another one, make a **plain-text PGM** (the first line `P2`, then `30 60`, then the maximum value, then 1,800 numbers, one per pixel, row by row; `assets/splash.pgm` is an example you can open in a text editor, and GIMP and ImageMagick write the format: `convert logo.png -resize 30x60! -depth 8 -compress none logo.pgm`) **of exactly 30 x 60 pixels**. A pixel is lit from half the maximum value up and dark below: the image is one colour, drawn white on the small OLED and in the accent colour, scaled up to 96 pixels tall, on the big screen; make it tall and narrow, like the tower. Then either replace `assets/splash.pgm`, or point the build at your file (`CONFIG_ATALAIA_SPLASH_LOGO` in menuconfig, *Boot splash*, a path relative to `firmware/esp32/` or absolute; for `docker_fw.py` put a line `CONFIG_ATALAIA_SPLASH_LOGO="assets/mine.pgm"` in `firmware/esp32/sdkconfig.defaults`, and keep the file inside the repository so the build container sees it). The build turns the file into a C array and stops with a message if the file is not a 30 x 60 plain-text PGM. Only the Field Box and the modem have a splash. **The project's release images always carry the Atalaia tower**; a box with your image is your own build and gets no release update that you did not build yourself ([section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)).
 - **The box's Bluetooth beacon.** A Field Box joined to a game advertises an iBeacon so that a phone that hears it is placed where the box is (the beacon's UUID comes from the join key, its major is 45253 and its minor is the box's node id). Nothing to set on the box: the GM turns it off for the whole field at the console (**Field**, **Indoor beacons**, **Field Boxes as beacons**), and the next game's join tells the boxes. It uses the Bluetooth stack in the image (about 160 KB more flash and 25 KB more RAM than a build without it) and is off between games. The Wokwi variant and the modem have no beacon.
 
 ## 5. First boot and setup
@@ -304,20 +305,16 @@ If the radio does not work, check the board revision first ([section 4](#4-the-o
 
 ## 9. The modem board
 
-The controller's radio is a second Heltec V4 plugged into its USB port. It runs the modem image.
+The controller's radio is a second Heltec V4 plugged into its USB port. It runs the modem image. **The whole path, with the flash commands for Windows, Linux and macOS, the port, the controller's `[modem]` setting, the checks and a troubleshooting table, is in [Set up the radio modem](modem.md).** What a builder needs to know about the image itself:
 
-1. Fit the **LoRa antenna**. The modem has no Wi-Fi, so it needs no 2.4 GHz antenna.
-2. Build it for the same board revision and the same region as the boxes: `python tools/docker_fw.py modem` (with `--region=as923-tw` for Taiwan). For a V4.2, edit `firmware/esp32/build-modem/sdkconfig` as in [section 4](#4-the-options-a-builder-sets).
-3. Flash from `firmware/esp32/build-modem` as in [section 3](#3-flash-it). If the board is already plugged into a running controller, stop the controller first: it holds the port.
-4. Plug it into the controller. Its small screen shows the tower and **MODEM MODE**, then the status:
-   - **LINK**: `waiting` (the controller has not talked to it yet: it is not running, or the modem is on another port), `OK`, or `DOWN` (it talked, then stopped for 12 seconds).
-   - The game number, the channel, the packets sent and received with their failures, and the airtime left.
-   - **RADIO FAULT** if the radio chip did not start.
+- **Download it** (`atalaia-modem-<version>-usb.zip`, section 2.1) or **build it** with `python tools/docker_fw.py modem` into `firmware/esp32/build-modem/`. The released one is V4.3, EU868, English until the controller connects. Build the modem for the same board revision and the same region as the boxes (`--region=as923-tw` for Taiwan; for a V4.2, edit `build-modem/sdkconfig` as in [section 4](#4-the-options-a-builder-sets)).
+- **Flash it** like any board ([section 3](#3-flash-it)), from the unzipped folder or from `firmware/esp32/build-modem`. If the board is plugged into a running controller, stop the controller first: it holds the port. The modem has no over-the-air update.
+- **Fit the LoRa antenna before power.** The modem has no Wi-Fi, so it needs no 2.4 GHz antenna.
+- **Its small screen** shows the tower and **MODEM MODE** for about two seconds, then the status: **LINK** `waiting` (the controller has not talked to it: it is not running, or the modem is on another port), `OK`, or `DOWN` (it talked, then stopped for 12 seconds); the game number, the channel, the packets sent and received with their failures, and the airtime left; **RADIO FAULT** if the radio chip did not start.
+- **The screen's language** is the boxes' (English, Portuguese, German or Traditional Chinese). The controller tells the modem which one every time it connects: the **box language** setting in the GM console, or with `auto` the language of the console that created the game. Before that, and on the first splash, the modem uses its build's language, `en` by default. To make it another one, set `CONFIG_ATALAIA_MODEM_LANG="pt"` (or `de`, `zh-tw`) in `firmware/esp32/build-modem/sdkconfig` and build again, as in [section 4](#4-the-options-a-builder-sets). In Portuguese the words are `aguarda`, `OK`, `PERDIDO` and `FALHA NO LORA` (the small font has no accents); in German `wartet`, `OK`, `GETRENNT` and `FUNKFEHLER`; in Chinese the link is in the top bar (`等待`, `正常`, `離線`) and a radio fault is `無線電錯誤`. An older modem image, built before this, stays in English.
+- **Its port** goes into the controller's `[modem] port` setting: [Set up the radio modem, section 7](modem.md#7-put-the-port-in-the-controllers-settings-and-restart-it).
 
-   The screen is in the language of your boxes (English, Portuguese, German or Traditional Chinese). The controller tells the modem which one every time it connects: the **box language** setting in the GM console, or with `auto` the language of the console that created the game. Before the controller has talked to it, and on the first splash, the modem uses its build's language, `en` by default. To make it another one, set `CONFIG_ATALAIA_MODEM_LANG="pt"` (or `de`, `zh-tw`) in `firmware/esp32/build-modem/sdkconfig` and build again, as in [section 4](#4-the-options-a-builder-sets). In Portuguese the words are `aguarda`, `OK`, `PERDIDO` and `FALHA NO LORA` (the small font has no accents); in German `wartet`, `OK`, `GETRENNT` and `FUNKFEHLER`; in Chinese the link is in the top bar (`等待`, `正常`, `離線`) and a radio fault is `無線電錯誤`. An older modem image, built before this, stays in English.
-5. Put its port into the controller's `[modem] port` setting. On Linux it is usually `/dev/ttyACM0`. The [controller setup guide](controller-setup.md) shows how.
-
-The modem is the only image whose USB port carries data frames, so its log is on UART0, not on USB. A modem like this has run with the controller and real boxes on a bench (2026-10-21). Not yet tested on a Raspberry Pi.
+The modem is the only image whose USB port carries data frames, so its log is on UART0 (GPIO 43 and 44), not on USB: do not open its USB port with a serial monitor, and expect no log from [section 3.4](#34-restart-and-watch). A modem like this has run with the controller and real boxes on a bench (2026-10-21). Not yet tested on a Raspberry Pi.
 
 ## 10. The I/O pod variants
 

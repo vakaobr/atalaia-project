@@ -141,7 +141,8 @@ badge). The steps, as they were:
 1. Create `atalaia-modes` (public) and copy the contents of
    `registry/template/` into it, `.github/` included.
 2. Set `ATALAIA_REF` in `.github/workflows/registry.yml` to a release tag or
-   commit of this repository; replace the owner in `.github/CODEOWNERS` if it
+   commit of this repository (one that has `tools/ci-sim-requirements.txt`: the
+   workflow installs its tools from those hashed files); replace the owner in `.github/CODEOWNERS` if it
    is not `@vakaobr`.
 3. `reuse download --all`, so `LICENSES/` holds the texts REUSE needs.
 4. Make the project's registry key offline ([`keys.md`](keys.md)) and add its

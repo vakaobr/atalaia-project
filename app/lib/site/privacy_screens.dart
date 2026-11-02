@@ -1,16 +1,17 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/// The field's privacy notice in the app, and the "consent again" prompt
+/// The field's privacy notice in the app, and the "notice shown again" prompt
 /// (lib/site/privacy_notice.dart; the staff pages' twin, the site server's
-/// CONS-* decisions).
+/// CONS-* and LEG-* decisions).
 ///
 /// [PrivacyNoticeScreen] reads the notice the operator published, in the app's
 /// language (or the one the server fell back to, and says so). With a
-/// [ConsentState] that asks for consent it also offers the tick and the button
-/// that record it: the version sent is the one on the screen, so a notice that
-/// changed in between is read again and never agreed to unseen. [ConsentBanner]
-/// is the prompt at the top of a signed-in field.
+/// [NoticeState] that shows it again it also offers the tick and the button
+/// that record that it was seen: the version sent is the one on the screen, so
+/// a notice that changed in between is read again and never recorded unseen.
+/// The account rests on the contract, so this is information, not consent.
+/// [NoticeBanner] is the prompt at the top of a signed-in field.
 library;
 
 import 'dart:async';
@@ -23,12 +24,12 @@ import 'account_screen.dart' show accountError;
 import 'privacy_notice.dart';
 import 'site_client.dart';
 
-/// The prompt that asks an account to consent again (outdated or missing),
-/// with the way to read the notice and agree.
-class ConsentBanner extends StatelessWidget {
-  const ConsentBanner({required this.state, required this.onOpen, super.key});
+/// The prompt that shows an account the notice again (outdated or missing),
+/// with the way to read it and confirm.
+class NoticeBanner extends StatelessWidget {
+  const NoticeBanner({required this.state, required this.onOpen, super.key});
 
-  final ConsentState state;
+  final NoticeState state;
   final VoidCallback onOpen;
 
   @override
@@ -43,9 +44,9 @@ class ConsentBanner extends StatelessWidget {
     return Notice(
       text,
       kind: NoticeKind.warning,
-      key: const Key('consent-banner'),
+      key: const Key('notice-banner'),
       action: TextButton(
-        key: const Key('consent-open'),
+        key: const Key('notice-open'),
         onPressed: onOpen,
         child: Text(s.t('privacy.read_and_confirm')),
       ),
@@ -56,22 +57,22 @@ class ConsentBanner extends StatelessWidget {
 class PrivacyNoticeScreen extends StatefulWidget {
   const PrivacyNoticeScreen({
     required this.session,
-    this.consent,
+    this.again,
     this.onShown,
-    this.onAgreed,
+    this.onAcknowledged,
     super.key,
   });
 
   final SiteSession session;
 
-  /// Asks for consent: shows the tick and the button (null: only reads).
-  final ConsentState? consent;
+  /// Shows the notice again: the tick and the button (null: only reads).
+  final NoticeState? again;
 
   /// Told the version of the notice the person has in front of them.
   final void Function(String version)? onShown;
 
-  /// Told when the consent is recorded.
-  final void Function(ConsentState state)? onAgreed;
+  /// Told when it is recorded that the notice was seen.
+  final void Function(NoticeState state)? onAcknowledged;
 
   @override
   State<PrivacyNoticeScreen> createState() => _PrivacyNoticeScreenState();
@@ -113,7 +114,7 @@ class _PrivacyNoticeScreenState extends State<PrivacyNoticeScreen> {
     }
   }
 
-  Future<void> _agree() async {
+  Future<void> _confirm() async {
     final s = context.s;
     final n = _notice;
     if (n == null || _busy) return;
@@ -127,17 +128,17 @@ class _PrivacyNoticeScreenState extends State<PrivacyNoticeScreen> {
       _info = null;
     });
     try {
-      final state = await _api.renew(n.version);
+      final state = await _api.acknowledge(n.version);
       if (!mounted) return;
       setState(() {
         _done = true;
         _info = s.t('privacy.done');
       });
-      widget.onAgreed?.call(state);
+      widget.onAcknowledged?.call(state);
     } on SiteException catch (e) {
       if (!mounted) return;
       if (e.code == 'notice_version_changed') {
-        // Read the new one before agreeing to it.
+        // Read the new one before confirming it.
         setState(() {
           _ticked = false;
           _loaded = false;
@@ -157,7 +158,7 @@ class _PrivacyNoticeScreenState extends State<PrivacyNoticeScreen> {
   Widget build(BuildContext context) {
     final s = context.s;
     final n = _notice;
-    final asks = widget.consent != null && !_done;
+    final asks = widget.again != null && !_done;
     return Scaffold(
       appBar: AppBar(title: Text(s.t('privacy.title'))),
       body: !_loaded
@@ -236,7 +237,7 @@ class _PrivacyNoticeScreenState extends State<PrivacyNoticeScreen> {
                           const SizedBox(height: 8),
                           FilledButton(
                             key: const Key('privacy-agree'),
-                            onPressed: _busy ? null : _agree,
+                            onPressed: _busy ? null : _confirm,
                             child: Text(s.t('privacy.confirm')),
                           ),
                         ],

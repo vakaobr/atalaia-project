@@ -33,6 +33,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
+
 import '../platform/services.dart';
 import 'site_client.dart';
 
@@ -120,7 +122,8 @@ final class LoginMethods {
       ],
       totpEnabled = j['totp_enabled'] == true,
       available = OidcOffer.list(j['available_providers']),
-      mfa = j['mfa'] == true;
+      mfa = j['mfa'] == true,
+      stepUpNeeded = j['step_up_needed'] == true;
 
   final bool passwordSet;
   final bool passwordLoginEnabled;
@@ -131,6 +134,11 @@ final class LoginMethods {
   /// The providers this server has configured.
   final List<OidcOffer> available;
   final bool mfa;
+
+  /// The account has a second factor or a staff role and this session has not
+  /// passed one: changing its passkeys, TOTP, password, linked logins or
+  /// merging needs a TOTP code or a passkey first (the server's SR-1).
+  final bool stepUpNeeded;
 }
 
 /// TOTP enrolment's answer: the secret and its `otpauth` address, shown as
@@ -150,7 +158,12 @@ final class TotpEnrolment {
 
 /// The answer of `POST /auth/oidc/{provider}/start`.
 final class OidcStart {
-  const OidcStart(this.browserUrl);
+  const OidcStart(this.browserUrl, {this.bound = false});
+
+  /// Whether the server took the app's verifier hash (APP-4): then the
+  /// ticket is only good with the verifier, which the app presents at
+  /// `/auth/oidc/complete`. An older server does not take it (false).
+  final bool bound;
 
   /// The address to open in the browser (null: the server did not give one,
   /// which an older server does not).
@@ -179,7 +192,7 @@ final class OidcReturn {
   /// `linked` or `reauth` for a finished link or confirmation.
   final String? ok;
 
-  /// The server's error code (`denied`, `consent_required`, ...).
+  /// The server's error code (`denied`, `notice_required`, ...).
   final String? error;
 
   static final _nonce = RegExp(r'^[A-Za-z0-9_-]{16,64}$');
@@ -257,7 +270,7 @@ class PendingReturn {
 }
 
 /// A social login that did not finish: the server's error code
-/// (`consent_required`, `denied`, `state_invalid`, ...), or `cancelled`,
+/// (`notice_required`, `age_confirmation_required`, `denied`, ...), or `cancelled`,
 /// `timeout` or `browser_unavailable` from the phone.
 class OidcFailure implements Exception {
   OidcFailure(this.code);
@@ -266,6 +279,21 @@ class OidcFailure implements Exception {
   @override
   String toString() => 'OidcFailure($code)';
 }
+
+/// A PKCE-style secret for one social login (APP-4): 32 random bytes,
+/// base64url without padding (43 characters).
+String newVerifier([Random? random]) {
+  final r = random ?? Random.secure();
+  return base64Url
+      .encode(List<int>.generate(32, (_) => r.nextInt(256)))
+      .replaceAll('=', '');
+}
+
+/// `BASE64URL(SHA-256(verifier))` without padding (RFC 7636 S256): what the
+/// app sends at the start, the verifier itself going only to `complete`.
+String verifierChallenge(String verifier) => base64Url
+    .encode(sha256.convert(ascii.encode(verifier)).bytes)
+    .replaceAll('=', '');
 
 String newNonce([Random? random]) {
   final r = random ?? Random.secure();
@@ -306,27 +334,36 @@ class SiteAuth {
 
   /// Asks the site to begin a social login, with the app's own return link.
   /// [purpose] is `login`, `link` or `reauth` (the last two need a session);
-  /// [consent] is the box the server asks for the first sign-in of a new
-  /// account; [password] confirms a `link` for an account that has one.
+  /// [noticeSeen] and [ageConfirmed] are the two boxes the server asks for the
+  /// first sign-in of a new account (LEG-*: the account rests on the contract,
+  /// so they are not consents: the person was shown the notice and is 16 or
+  /// older); they are sent only when ticked, so a login to an existing account
+  /// sends neither and works against an older server too. [password] confirms
+  /// a `link` for an account that has one.
   /// [noticeVersion] is the version of the privacy notice the person was
-  /// shown when they ticked [consent] (sent with the consent only). A server
+  /// shown when they ticked [noticeSeen] (sent with it only). A server
   /// before CONS-7 refuses the unknown field with a 422 that names it
   /// (`extra_forbidden` at `body.notice_version`); only that answer, which the
   /// app also meets from older self-hosted servers, is asked again without the
   /// field (decision APF-10). Every other 422 is the caller's to see. A server
   /// that takes the field refuses a notice that changed since with 409
-  /// `notice_version_changed`.
+  /// `notice_version_changed`. [appChallenge] is the hash of the app's
+  /// verifier (APP-4), dropped the same way for a server that does not know
+  /// it ([OidcStart.bound] then says false).
   Future<OidcStart> oidcStart(
     String provider, {
     required String purpose,
     required String nonce,
-    bool consent = false,
+    bool noticeSeen = false,
+    bool ageConfirmed = false,
     String password = '',
     String? noticeVersion,
+    String? appChallenge,
   }) async {
     final body = {
       'purpose': purpose,
-      'consent': consent,
+      if (noticeSeen) 'notice_seen': true,
+      if (ageConfirmed) 'age_confirmed': true,
       'return_to': '${session.site}/app/oidc?s=$nonce',
       if (password.isNotEmpty) 'password': password,
     };
@@ -334,19 +371,30 @@ class SiteAuth {
     Future<SiteResponse> ask(Map<String, Object?> b) => purpose == 'login'
         ? _http.send('POST', path, body: b)
         : session.callRaw('POST', path, body: b);
-    final withVersion = consent && noticeVersion != null && noticeVersion != '';
-    var r = await ask({
-      ...body,
-      if (withVersion) 'notice_version': noticeVersion,
-    });
-    if (withVersion && r.refusesUnknownField('notice_version')) {
-      r = await ask(body);
+    final optional = <String, String>{
+      if (noticeSeen && noticeVersion != null && noticeVersion != '')
+        'notice_version': noticeVersion,
+      'app_challenge': ?appChallenge,
+    };
+    // Each field a server older than it refuses by name is dropped and the
+    // request asked again, once (a 422 names every one at the same time).
+    var r = await ask({...body, ...optional});
+    final refused = [
+      for (final f in optional.keys)
+        if (r.refusesUnknownField(f)) f,
+    ];
+    if (refused.isNotEmpty) {
+      refused.forEach(optional.remove);
+      r = await ask({...body, ...optional});
     }
     final json = await _ok(r);
     final url = Uri.tryParse('${json['browser_url'] ?? ''}');
     final ok = url != null && url.scheme == 'https' && url.host.isNotEmpty;
     // Only the site's own address: nothing else is a place for the browser.
-    return OidcStart(ok && url.host == session.site.host ? url : null);
+    return OidcStart(
+      ok && url.host == session.site.host ? url : null,
+      bound: optional.containsKey('app_challenge'),
+    );
   }
 
   /// Runs a whole social login in the system browser: asks the site, opens
@@ -358,7 +406,8 @@ class SiteAuth {
   Future<String?> oidc(
     String provider, {
     String purpose = 'login',
-    bool consent = false,
+    bool noticeSeen = false,
+    bool ageConfirmed = false,
     String password = '',
     String? noticeVersion,
     void Function(PendingReturn waiting)? onOpened,
@@ -366,13 +415,16 @@ class SiteAuth {
     final b = browser, rs = returns;
     if (b == null || rs == null) throw OidcFailure('browser_unavailable');
     final nonce = newNonce();
+    final verifier = newVerifier();
     final start = await oidcStart(
       provider,
       purpose: purpose,
       nonce: nonce,
-      consent: consent,
+      noticeSeen: noticeSeen,
+      ageConfirmed: ageConfirmed,
       password: password,
       noticeVersion: noticeVersion,
+      appChallenge: verifierChallenge(verifier),
     );
     final url = start.browserUrl;
     if (url == null) throw OidcFailure('browser_unavailable');
@@ -391,7 +443,7 @@ class SiteAuth {
     final done = await _http.send(
       'POST',
       '/auth/oidc/complete',
-      body: {'ticket': ticket},
+      body: {'ticket': ticket, if (start.bound) 'verifier': verifier},
     );
     if (!done.ok) throw SiteException(done.status, done.detail);
     return session.adopt(done);

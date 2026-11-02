@@ -250,6 +250,27 @@ bool atalaia_radio_epoch_key_retired(const atalaia_radio_nvs_ops_t *nvs,
     return store_find(&st, tag) < 0 && store_retired(&st, tag);
 }
 
+/* The epoch floor (EP-2): 0 when none is kept; false on a read error. */
+static bool floor_read(const atalaia_radio_nvs_ops_t *nvs, uint16_t *floor)
+{
+    *floor = 0;
+    if (nvs->read_floor == NULL) return true;
+    int rc = nvs->read_floor(nvs->ctx, floor);
+    if (rc == -1) *floor = 0;
+    return rc == 0 || rc == -1;
+}
+
+/* Raises the floor to at least epoch, before an epoch that high is used. False if it could not be
+ * written. */
+static bool floor_raise(const atalaia_radio_nvs_ops_t *nvs, uint16_t epoch)
+{
+    if (nvs->write_floor == NULL) return true;
+    uint16_t cur = 0;
+    if (!floor_read(nvs, &cur)) return false;
+    if (epoch <= cur) return true;
+    return nvs->write_floor(nvs->ctx, epoch) == 0;
+}
+
 /* Stores epoch as this key's (seq wrap). The store is read again, so it never goes back. */
 static bool store_epoch(atalaia_radio_proto_t *rp, uint16_t epoch, bool resuming)
 {
@@ -258,8 +279,27 @@ static bool store_epoch(atalaia_radio_proto_t *rp, uint16_t epoch, bool resuming
     int at = store_find(&st, rp->epoch_tag);
     if (at >= 0 && st.epoch[at] >= epoch) return false; /* never store a lower or equal epoch */
     if (at < 0 && store_retired(&st, rp->epoch_tag)) return false;
+    (void)floor_raise(rp->nvs,
+                      epoch); /* the floor is protection only: the store is the record here */
     store_put(&st, rp->epoch_tag, epoch);
     return save_store(rp, &st);
+}
+
+bool atalaia_radio_epoch_lost_bounds(uint16_t floor, uint16_t *lo, uint16_t *hi)
+{
+    if (floor == 0) {
+        *lo = ATALAIA_EPOCH_LOST_MIN;
+        *hi = ATALAIA_EPOCH_LOST_MAX;
+        return true;
+    }
+    uint32_t low = floor + 1u > ATALAIA_EPOCH_LOST_MIN ? floor + 1u : ATALAIA_EPOCH_LOST_MIN;
+    if (low > ATALAIA_EPOCH_LOST_MAX) return false;
+    uint32_t start = floor + 1u + ATALAIA_EPOCH_LOST_MARGIN;
+    if (start < ATALAIA_EPOCH_LOST_MIN) start = ATALAIA_EPOCH_LOST_MIN;
+    if (start > ATALAIA_EPOCH_LOST_MAX) start = low; /* the margin gives way, never the floor */
+    *lo = (uint16_t)start;
+    *hi = (uint16_t)(start + (ATALAIA_EPOCH_LOST_MAX - start + 2u) / 2u - 1u);
+    return true;
 }
 
 bool atalaia_radio_proto_boot_epoch(atalaia_radio_proto_t *rp, bool resuming)
@@ -285,6 +325,40 @@ bool atalaia_radio_proto_boot_epoch(atalaia_radio_proto_t *rp, bool resuming)
         return false;
     }
     uint16_t new_epoch = at >= 0 ? (uint16_t)(st.epoch[at] + 1) : 1;
+    rp->epoch_lost = false;
+    if (at < 0 && resuming) {
+        /* A stored game with no record of its key: the store was lost (FLD-10, SR-27). */
+        uint8_t r[2];
+        if (rp->nvs->random_bytes == NULL || rp->nvs->random_bytes(rp->nvs->ctx, r, 2) != 0) {
+            rp->tx_blocked = true;
+            return false;
+        }
+        /* Above every epoch this box ever used with any key (EP-2): the floor kept apart from the
+         * blob, and the blob's own records (an older store may have no floor). */
+        uint16_t floor = 0;
+        if (!floor_read(rp->nvs, &floor)) {
+            rp->tx_blocked = true;
+            return false;
+        }
+        for (int i = 0; i < st.count; i++) {
+            if (st.epoch[i] > floor) floor = st.epoch[i];
+        }
+        uint16_t lo, hi;
+        if (!atalaia_radio_epoch_lost_bounds(floor, &lo, &hi)) {
+            rp->tx_blocked = true; /* no epoch is left above what this box used: join it again */
+            return false;
+        }
+        new_epoch = (uint16_t)(lo + ((uint32_t)(r[0] << 8 | r[1]) % ((uint32_t)hi - lo + 1u)));
+        /* The floor is written before the epoch is used, and a draw that cannot be recorded is not
+         * used: a second loss would otherwise draw below it. */
+        if (!floor_raise(rp->nvs, new_epoch)) {
+            rp->tx_blocked = true;
+            return false;
+        }
+        rp->epoch_lost = true;
+    } else {
+        (void)floor_raise(rp->nvs, new_epoch); /* protection only: the blob has this epoch too */
+    }
 
     /* Persist BEFORE first TX. */
     store_put(&st, rp->epoch_tag, new_epoch);
@@ -312,17 +386,29 @@ void atalaia_radio_proto_set_epoch(atalaia_radio_proto_t *rp, uint16_t epoch)
     rp->seq = 0;
 }
 
-void atalaia_radio_proto_set_source_epoch(atalaia_radio_proto_t *rp, uint16_t source,
+bool atalaia_radio_proto_set_source_epoch(atalaia_radio_proto_t *rp, uint16_t source,
                                           uint16_t epoch)
 {
     int idx = find_source(rp, source);
+    if (idx >= 0 && rp->source_epochs[idx].valid) {
+        /* Never backwards (SR-111): what a controller names is trusted, but an epoch at or below
+         * the one heard would make this receiver refuse a source it hears (a stale or replayed
+         * announcement). An equal one only settles the source. */
+        if (epoch < rp->source_epochs[idx].epoch) return false;
+        if (epoch == rp->source_epochs[idx].epoch) {
+            rp->source_epochs[idx].provisional = false;
+            return false;
+        }
+    }
     if (idx < 0) {
         idx = alloc_source_slot(rp);
+        atalaia_replay_init(&rp->source_epochs[idx].replay);
     }
     rp->source_epochs[idx].source = source;
     rp->source_epochs[idx].epoch = epoch;
     rp->source_epochs[idx].valid = true;
     rp->source_epochs[idx].provisional = false; /* told by the controller: trusted */
+    return true;
 }
 
 bool atalaia_radio_proto_send_payload(atalaia_radio_proto_t *rp, uint8_t msg_type, uint8_t prio,
@@ -430,6 +516,9 @@ static bool wide_allowed(atalaia_radio_proto_t *rp, uint16_t source, uint32_t no
             if (now - rp->wide_recent[i].ms > now - rp->wide_recent[slot].ms) slot = i;
         }
     }
+    if (!rp->wide_recent[slot].valid || rp->wide_recent[slot].source != source) {
+        rp->wide_recent[slot].deep_next = 0;
+    }
     rp->wide_recent[slot].source = source;
     rp->wide_recent[slot].ms = now;
     rp->wide_recent[slot].valid = true;
@@ -439,11 +528,37 @@ static bool wide_allowed(atalaia_radio_proto_t *rp, uint16_t source, uint32_t no
     return true;
 }
 
+/* One slice of the deep search for source (SR-110): the epochs from its cursor on,
+ * ATALAIA_DEEP_SLICE of them, the cursor then at the next. It wraps to `lo` past 65535, so a source
+ * whose epoch is out of reach is looked for again from the start. wide_allowed has just made the
+ * source's entry. */
+static bool deep_search(atalaia_radio_proto_t *rp, const radio_rx_msg_t *rx, uint16_t source,
+                        uint32_t lo, atalaia_header_t *out_hdr, uint8_t *out_payload,
+                        size_t *out_payload_len, uint16_t *found)
+{
+    if (lo > 65535u) return false;
+    int at = -1;
+    for (int i = 0; i < ATALAIA_WIDE_SOURCES; i++) {
+        if (rp->wide_recent[i].valid && rp->wide_recent[i].source == source) at = i;
+    }
+    if (at < 0) return false;
+    uint32_t from = rp->wide_recent[at].deep_next;
+    if (from < lo || from > 65535u) from = lo;
+    uint32_t to = from + ATALAIA_DEEP_SLICE - 1u;
+    if (to > 65535u) to = 65535u;
+    rp->wide_recent[at].deep_next = to + 1u;
+    rp->deep_searches++;
+    if (!try_epochs(rp, rx, from, to, out_hdr, out_payload, out_payload_len, found)) return false;
+    rp->deep_found++;
+    return true;
+}
+
 bool atalaia_radio_proto_on_recv_window(atalaia_radio_proto_t *rp, const radio_rx_msg_t *rx_msg,
                                         uint16_t window, atalaia_header_t *out_hdr,
                                         uint8_t *out_payload, size_t *out_payload_len,
                                         uint16_t *out_epoch)
 {
+    rp->last_replay = ATALAIA_REPLAY_FRESH; /* set only by a packet that authenticates */
     if (!rp->has_key) return false;
     if (rx_msg->len < ATALAIA_RF_HEADER_SIZE + ATALAIA_RF_MIC_SIZE) {
         return false;
@@ -482,12 +597,30 @@ bool atalaia_radio_proto_on_recv_window(atalaia_radio_proto_t *rp, const radio_r
         ok = try_epochs(rp, rx_msg, (uint32_t)first + window + 1u,
                         (uint32_t)first + ATALAIA_RESTART_EPOCH_WINDOW, out_hdr, out_payload,
                         out_payload_len, &epoch);
+        if (!ok && (hdr.type == ATALAIA_MSG_HELLO || hdr.type == ATALAIA_MSG_TIME)) {
+            ok =
+                deep_search(rp, rx_msg, source, (uint32_t)first + ATALAIA_RESTART_EPOCH_WINDOW + 1u,
+                            out_hdr, out_payload, out_payload_len, &epoch);
+        }
         if (!ok) return false;
         if (idx >= 0) provisional = rp->source_epochs[idx].provisional;
     }
-    /* Authenticated: remember (or adopt) this epoch for the source. */
+    /* Authenticated: remember (or adopt) this epoch for the source, and ask its replay window
+     * (Amendment 23): a counter already seen, or 64 or more below the highest, is refused. A
+     * refused packet leaves the table as it was (it may be a recording of a lower epoch). */
     if (idx < 0) {
         idx = alloc_source_slot(rp);
+        atalaia_replay_init(&rp->source_epochs[idx].replay);
+    }
+    rp->last_replay =
+        atalaia_replay_accept(&rp->source_epochs[idx].replay, atalaia_replay_ctr(epoch, hdr.seq));
+    if (rp->last_replay != ATALAIA_REPLAY_FRESH) {
+        if (rp->last_replay == ATALAIA_REPLAY_DUPLICATE) {
+            rp->replay_duplicates++;
+        } else {
+            rp->replay_too_old++;
+        }
+        return false;
     }
     rp->source_epochs[idx].source = source;
     rp->source_epochs[idx].epoch = epoch;

@@ -241,6 +241,16 @@ static void test_parts(void)
     CHECK(!r.used);
     atalaia_ff_msg_t announce = {.kind = ATALAIA_FF_ANNOUNCE};
     CHECK(atalaia_ff_reasm_add(&r, &announce, out, sizeof(out)) == 0);
+
+    /* A hand-built part longer than a slot (decision SR-139): refused before anything is copied,
+     * whatever the wire decoder would have allowed (ASan sees an overflow or an over-read). */
+    atalaia_ff_reasm_reset(&r);
+    for (unsigned len = ATALAIA_FF_CHUNK_MAX + 1; len <= 255; len += 101) {
+        atalaia_ff_msg_t big = a;
+        big.chunk_len = (uint8_t)len;
+        CHECK(atalaia_ff_reasm_add(&r, &big, out, sizeof(out)) == 0);
+        CHECK(!r.used && r.have == 0);
+    }
 }
 
 /* The nonce rule (decision RJ-15): no random number in it. */

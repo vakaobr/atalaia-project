@@ -13,7 +13,8 @@
 #
 #   sh preview.sh init            first time: preview.env with new secrets (nothing is started)
 #   sh preview.sh up              build and start (published on 127.0.0.1:8000 only)
-#   sh preview.sh down            stop everything (the data stays)
+#   sh preview.sh notice          install the privacy notice files of ATALAIA_PRIVACY_NOTICE_VERSION (up and update do it)
+#   sh preview.sh down           stop everything (the data stays)
 #   sh preview.sh status | logs [SERVICE] | check
 #   sh preview.sh admin           make the administrator (once): login in admin-login.txt
 #   sh preview.sh reviewer NAME   a test account with the GM role on the demo field: reviewers/NAME.txt
@@ -53,6 +54,30 @@ dc() {
         -f "$server/docker-compose.yml" -f "$server/docker-compose.preview.yml" "$@"
 }
 
+# The preview's privacy notice (LIVE-2, FU30-1): the files of ATALAIA_PRIVACY_NOTICE_VERSION in preview.env, from
+# server/preview/privacy-notice/ into the folder the server container reads (server/privacy-notice/). An update
+# replaces src/, so the notice is installed again by every up and update; it refuses when that version's files
+# (Portuguese and English) are missing, so the preview never goes up silently without its notice.
+install_notice() {
+    version=$(sed -n 's/^ATALAIA_PRIVACY_NOTICE_VERSION=//p' "$env_file" | tail -n 1 | tr -d "\"'")
+    if [ -z "$version" ]; then
+        echo "preview.sh: ATALAIA_PRIVACY_NOTICE_VERSION is empty in $env_file: no notice is installed (new accounts are refused)" >&2
+        return 0
+    fi
+    from=$server/preview/privacy-notice
+    to=$server/privacy-notice
+    for lang in pt en; do
+        [ -f "$from/privacy-notice-$lang-$version.md" ] ||
+            fail "the privacy notice for ATALAIA_PRIVACY_NOTICE_VERSION=$version is missing:" \
+                "$from/privacy-notice-$lang-$version.md (add the files, or set the version of an existing notice in $env_file)"
+    done
+    mkdir -p "$to"
+    for f in "$from"/privacy-notice-*-"$version".md; do
+        cp "$f" "$to/"
+    done
+    echo "preview.sh: privacy notice $version installed in $to"
+}
+
 cmd=${1:-}
 [ $# -gt 0 ] && shift
 case "$cmd" in
@@ -80,8 +105,13 @@ case "$cmd" in
         chmod 600 "$env_file"
         echo "preview.sh: $env_file ready (mode 600). Next: 'sh preview.sh up', then 'sh preview.sh admin'."
         ;;
+    notice)
+        need_env
+        install_notice
+        ;;
     up)
         need_env
+        install_notice
         dc up -d --build --wait server postgres demo-refresh demo-field
         echo "preview.sh: up on 127.0.0.1:$(sed -n 's/^ATALAIA_PREVIEW_PORT=//p' "$env_file" | tail -n 1) only;" \
             "the tunnel (Windows service) serves it at https://$domain"
@@ -214,7 +244,7 @@ case "$cmd" in
         fi
         ;;
     *)
-        sed -n '5,31p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '5,32p' "$0" | sed 's/^# \{0,1\}//'
         [ -z "$cmd" ] || exit 2
         ;;
 esac

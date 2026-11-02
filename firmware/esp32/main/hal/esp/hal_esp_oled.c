@@ -18,7 +18,6 @@
 #include <string.h>
 
 #include "driver/gpio.h"
-#include "driver/i2c.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -44,9 +43,9 @@ static bool ready;
 
 static int send(const uint8_t *buf, size_t len)
 {
-    esp_err_t err = i2c_master_write_to_device(HAL_ESP_I2C_PORT, CONFIG_ATALAIA_OLED_ADDR, buf, len,
-                                               pdMS_TO_TICKS(100));
-    return err == ESP_OK ? 0 : -1;
+    /* A page is 129 bytes: about 13 ms at 100 kHz. A failing panel is skipped by the bus layer
+     * (hal_esp_i2c.h) so a frame costs nothing while it is down. */
+    return hal_esp_i2c_write(CONFIG_ATALAIA_OLED_ADDR, buf, len, 50) == HAL_ESP_I2C_OK ? 0 : -1;
 }
 
 static int commands(const uint8_t *cmds, size_t n)

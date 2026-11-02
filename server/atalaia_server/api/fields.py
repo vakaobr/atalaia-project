@@ -4,7 +4,9 @@
 
     POST   /api/v1/fields                                   server administrator: a new field
     GET    /api/v1/fields                                   the fields the caller has a role on (all, for a server administrator)
-    PATCH  /api/v1/fields/{field_id}                        the field's admin: {chrono_sharing_enabled} (plan phase 14),
+    PATCH  /api/v1/fields/{field_id}                        the field's admin: {chrono_sharing_enabled} (plan phase 14;
+                                                            switching it on needs {sharing_terms_accepted: <version>},
+                                                            the sharing terms, LEG-41),
                                                             {public_page, description, address_text,
                                                             federation_label} (plan phase 15), {limit_template,
                                                             max_replicas} (plan phase 16: registration's replicas)
@@ -46,7 +48,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from atalaia_controller import apd as apd_core, sync_format
 
-from .. import hub_share, sync
+from .. import chrono_registry, hub_share, sharing_terms, sync
 from ..services import branding, registration, scheduling
 from ..audit import record
 from ..auth import Principal, current_principal, require_field_role, server_admin
@@ -76,6 +78,9 @@ class FieldPatch(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     chrono_sharing_enabled: Optional[bool] = None
+    # The version of the sharing terms (docs/templates/sharing-terms.md) the administrator accepts for the field (LEG-41);
+    # switching sharing on needs the current one accepted, in this request or an earlier one.
+    sharing_terms_accepted: Optional[str] = PydanticField(default=None, max_length=64)
     public_page: Optional[bool] = None
     description: Optional[str] = None
     address_text: Optional[str] = None
@@ -87,6 +92,8 @@ class FieldPatch(BaseModel):
     # Days the field's controllers keep chrono records (also this server's registry) and an ended game's data (RET-1/2).
     chrono_retention_days: Optional[int] = None
     game_retention_days: Optional[int] = None
+    # PRIV-2: how long a "ban" outcome lasts (days; null puts the default back: 12 months, within the chrono retention).
+    chrono_ban_days: Optional[int] = None
 
 
 class SyncKeyIn(BaseModel):
@@ -108,11 +115,12 @@ def _days_ok(days: Any) -> bool:
 
 def field_json(f: Field, roles: Any = None) -> dict[str, Any]:
     body = {"id": str(f.id), "name": f.name, "slug": f.slug, "field_type": f.field_type, "timezone": f.timezone,
-            "chrono_sharing_enabled": f.chrono_sharing_enabled, "public_page": f.public_page,
+            "chrono_sharing_enabled": f.chrono_sharing_enabled, "sharing_terms": sharing_terms.view(f),
+            "sharing_live": sharing_terms.is_live(f), "public_page": f.public_page,
             "description": f.description, "address_text": f.address_text, "federation_label": f.federation_label,
             "limit_template": f.limit_template, "max_replicas": f.max_replicas, "apd": registration.field_rule(f),
             "country": f.country, "chrono_retention_days": f.default_retention_days,
-            "game_retention_days": f.game_retention_days}
+            "game_retention_days": f.game_retention_days, "chrono_ban_days": f.chrono_ban_days}
     if roles is not None:
         body["my_roles"] = sorted(roles)
     return body
@@ -177,6 +185,16 @@ async def update_field(field_id: uuid.UUID, body: FieldPatch, request: Request,
     require_field_role(principal, field_id, "admin")
     field = await _field(db, field_id)
     changed: dict[str, Any] = {}
+    if body.sharing_terms_accepted is not None:
+        if body.sharing_terms_accepted != sharing_terms.current():
+            raise HTTPException(409, "sharing_terms_version")  # the page was loaded before the terms changed
+        if field.sharing_terms_version != body.sharing_terms_accepted:
+            field.sharing_terms_version = body.sharing_terms_accepted
+            field.sharing_terms_accepted_at = datetime.now(timezone.utc)
+            field.sharing_terms_accepted_by = principal.user.id
+            changed["sharing_terms_accepted"] = body.sharing_terms_accepted
+    if body.chrono_sharing_enabled is True and field.sharing_terms_version != sharing_terms.current():
+        raise HTTPException(409, "sharing_terms_required")  # no acceptance, no sharing (LEG-41)
     for name in ("chrono_sharing_enabled", "public_page"):
         value = getattr(body, name)
         if value is not None and value != getattr(field, name):
@@ -232,9 +250,16 @@ async def update_field(field_id: uuid.UUID, body: FieldPatch, request: Request,
             raise HTTPException(400, "game_retention_days_invalid")
         if body.game_retention_days != field.game_retention_days:
             field.game_retention_days = changed["game_retention_days"] = body.game_retention_days
+    if "chrono_ban_days" in body.model_fields_set:  # null: the field's chrono retention (the most a ban can last)
+        days = body.chrono_ban_days
+        if days is not None and (isinstance(days, bool) or not 1 <= days <= field.default_retention_days):
+            raise HTTPException(400, "chrono_ban_days_invalid")
+        if days != field.chrono_ban_days:
+            field.chrono_ban_days = days
+            changed["chrono_ban_days"] = days
     if "address_text" in changed:
         await scheduling.bump_for_field_address(db, field.id, datetime.now(timezone.utc))
-    if "chrono_sharing_enabled" in changed:
+    if changed.keys() & {"chrono_sharing_enabled", "sharing_terms_accepted"}:
         await hub_share.sync_all(db)  # a hosted hub's shared view follows the field's switch (SVX-2)
     if changed:
         record(db, "field_update", request, user_id=principal.user.id, resource="field", resource_id=field.id,
@@ -276,10 +301,10 @@ async def grant_role(field_id: uuid.UUID, body: GrantIn, request: Request,
     _may_manage(principal, field_id, body.role)
     await _field(db, field_id)
     target = await db.scalar(select(User).where(User.username == body.username.strip().lower()))
+    if body.role in PRIVILEGED_ROLES and (target is None or not await has_second_factor(db, target)):
+        raise HTTPException(409, "totp_required")  # one answer for "no such account" and "no second factor" (SRV-4)
     if target is None:
         raise HTTPException(404, "user_not_found")
-    if body.role in PRIVILEGED_ROLES and not await has_second_factor(db, target):
-        raise HTTPException(409, "totp_required")
     inserted = await db.scalar(
         insert(UserFieldRole).values(user_id=target.id, field_id=field_id,
                                      role_id=ROLE_NAMES[body.role], granted_by=principal.user.id)

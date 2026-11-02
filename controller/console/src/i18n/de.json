@@ -14,6 +14,7 @@
     "token": "Zugangscode (GM oder nur lesen)",
     "enter": "Anmelden",
     "bad": "Falscher Zugangscode.",
+    "use_https": "Der Code wird nicht über einfaches HTTP gesendet. Öffne die Konsole unter {url} (der Browser fragt einmal, ob er dem Feldzertifikat vertrauen soll).",
     "expired": "Der Zugangscode wird nicht mehr angenommen. Bitte gib ihn erneut ein.",
     "hint": "Der Controller zeigt die Codes mit: python3 -m atalaia_controller tokens",
     "readonly": "Nur lesen",
@@ -51,6 +52,7 @@
     "role": "Dieser Controller ist jetzt {role} (Amtszeit {term}).",
     "node_offline": "Box {node} ist seit über 90 s nicht mehr zu hören.",
     "count": "{n} Warnungen",
+    "count_one": "{n} Warnung",
     "start_forced": "Spiel ohne Box gestartet für: {roles}"
   },
   "game": {
@@ -102,10 +104,12 @@
       "paused": "pausiert",
       "ended": "beendet"
     },
-    "confirm_start_pending": "{n} angemeldete Replik(en) noch nicht gechront. Trotzdem starten?",
+    "confirm_start_pending": "{n} angemeldete Repliken noch nicht gechront. Trotzdem starten?",
+    "confirm_start_pending_one": "{n} angemeldete Replik noch nicht gechront. Trotzdem starten?",
     "squads": "Squads pro Team",
     "squads_hint": "0 = keine Squads (kleine Spiele: nur Teams). Bei Milsim oder großen Spielen teilt sich jedes Team in Squads.",
     "squads_each": "{n} Squads pro Team",
+    "squads_each_one": "{n} Squad pro Team",
     "disclosure": "An wen die Ziele eines Squads gehen",
     "disclosure_scenario": "Wie das Szenario sagt ({value})",
     "disclosure_members": "Alle im Squad",
@@ -175,6 +179,7 @@
     "filter": "Ereignisse filtern",
     "critical_only": "Nur kritische",
     "count": "{n} Ereignisse",
+    "count_one": "{n} Ereignis",
     "empty": "Noch keine Ereignisse.",
     "events": {
       "medic_heal": "{player} wurde geheilt (Heilungen im Kit übrig: {remaining}; Heilungen in diesem Spiel: {used})",
@@ -186,6 +191,7 @@
       "vip_extracted_vip": "{team} hat seinen VIP extrahiert ({player})",
       "money_collected": "{player} ({team}) hat {amount} Geld eingesammelt",
       "money_deposited": "{player} ({team}) hat {amount} eingezahlt: {amount} Punkte",
+      "money_deposited_one": "{player} ({team}) hat {amount} eingezahlt: {amount} Punkt",
       "progressive_activated": "Box {zone} ist jetzt aktiv (Nr. {step}): nur sie kann eingenommen werden",
       "progressive_completed": "{team} hat Box {zone} abgeschlossen (Nr. {step}): sie ist gesperrt",
       "scenario_started": "Das Szenario {scenario} hat begonnen",
@@ -211,6 +217,7 @@
       "score_delta": "Punkte für Team {team}: {amount}",
       "code_used": "Team {team} hat einen Code benutzt",
       "player_respawn": "{player} ist wieder drin ({lives} Leben)",
+      "player_respawn_one": "{player} ist wieder drin ({lives} Leben)",
       "player_checkin": "{player} hat eingecheckt",
       "kill_confirmed": "Kill bestätigt von Team {team} ({player})",
       "kill_denied": "Team {team} hat den Tag von {player} zurückgeholt",
@@ -230,9 +237,19 @@
       "node_online": "Eine Box ist online",
       "node_offline": "Eine Box ist offline",
       "node_rebooted": "Eine Box wurde neu gestartet ({reason})",
+      "node_rebooted_crash": "Eine Box ist abgestürzt und neu gestartet ({reason})",
       "node_setup_applied": "{zone} hat die Szenario-Einstellung bestätigt",
       "battery_low": "Der Akku einer Box ist schwach",
       "nobody": "Unbekannt"
+    },
+    "reboot_reasons": {
+      "power": "Stromausfall oder Einschalten",
+      "brownout": "Spannungseinbruch",
+      "software": "Neustart per Software (Update oder Befehl)",
+      "panic": "Absturz des Programms",
+      "watchdog": "Watchdog: das Programm hing",
+      "deepsleep": "Aufwachen aus dem Tiefschlaf",
+      "unknown": "Grund unbekannt"
     },
     "puzzles": {
       "code": "Code",
@@ -438,10 +455,19 @@
     "box_room_label": "Raum von {name} (leer: der Name der Box)",
     "box_room_save": "Raum speichern"
   },
+  "map_fetching": {
+    "title": "Kartenabruf",
+    "intro": "Die Seite „Spielfeld aus einer Karte laden“ fragt OpenStreetMap, Overpass, Nominatim und die offenen Luftbilddienste nach der Karte und dem Gebiet des Spielfelds und sendet ihnen die IP-Adresse des Geräts, das die Seite öffnet, und das angefragte Gebiet. Schalte ihn aus, wenn das Spielfeld das nicht will: Die Seite bleibt dann geschlossen, und nichts verlässt den Controller. Das Spielfeld lässt sich weiterhin über ein hochgeladenes Bild laden.",
+    "label": "Die Konsole darf Karten aus dem Internet abrufen",
+    "saved": "Gespeichert.",
+    "read_only": "Nur die Spielleitung ändert das."
+  },
   "fieldmap": {
     "open": "Feld aus einer Karte laden",
     "title": "Feld aus einer Karte laden",
     "back": "Zurück zur Konsole",
+    "off": "Der Kartenabruf ist für dieses Spielfeld ausgeschaltet, deshalb erreicht diese Seite weder OpenStreetMap noch Overpass, Nominatim oder einen Luftbilddienst. Um das Spielfeld aus einer Karte zu laden, schaltet die Spielleitung ihn unter Einstellungen, „Kartenabruf“, ein. Du kannst auch im Reiter Spielfeld ein Bild des Spielfelds hochladen.",
+    "off_note": "Der Kartenabruf ist für dieses Spielfeld ausgeschaltet (Einstellungen).",
     "login": "Melde dich zuerst mit dem GM-Code an der Konsole an und öffne diese Seite dann aus dem Tab Feld.",
     "intro": "Such das Feld auf der Karte und markiere die Ecken seines Umrisses: Dieser Browser zeichnet das Feldbild aus offenen Karten. Das Bild, seine Lage auf der Karte (ATAK) und die Feldgrenze werden dann auf dem Feld-Controller gespeichert, der dafür kein Internet braucht.",
     "sources": "Nur während du das Spiel einrichtest: Dieser Browser lädt die Karte und das Gebiet einmal von OpenStreetMap (© OpenStreetMap-Mitwirkende) und, wo es sie gibt, die offenen Luftbilder des Landes oder der Region (das DGT-Orthofoto auf dem portugiesischen Festland, das PNOA des IGN in Spanien, die Orthofotos des IGN in Frankreich und die von PDOK in den Niederlanden sowie die der öffentlichen Dienste Belgiens, Luxemburgs, der Schweiz, von elf deutschen Ländern, Polens und Tschechiens, jeweils mit ihrem Nachweis). Ist der Datendienst von OpenStreetMap ausgelastet, geht dieselbe Anfrage (nur das Gebiet des Feldes) an einen anderen öffentlichen Server mit denselben Daten (overpass.private.coffee). Sonst wird nichts heruntergeladen, und der Rest der Konsole funktioniert weiter ohne Internet.",
@@ -573,7 +599,8 @@
     "scenario_name": "Szenario-Box",
     "scenario_none": "— keine (Rolle wählen) —",
     "scenario_box": "Box {node}",
-    "scenario_hint": "Das Szenario findet seine Boxen über diese Namen: {done} von {n} haben eine Box."
+    "scenario_hint": "Das Szenario findet seine Boxen über diese Namen: {done} von {n} haben eine Box.",
+    "scenario_hint_one": "Das Szenario findet seine Box über diesen Namen: {done} von {n} hat eine Box."
   },
   "presets": {
     "title": "Vorlagen",
@@ -711,9 +738,11 @@
     "checked": "Geprüft, noch nichts importiert.",
     "imported": "Importiert.",
     "counts": "{rows} Zeilen: {created} neu, {updated} geändert, {unchanged} unverändert, {skipped} übersprungen, {refused} abgelehnt.",
+    "counts_one": "{rows} Zeile: neu {created}, geändert {updated}, unverändert {unchanged}, übersprungen {skipped}, abgelehnt {refused}.",
     "ignored": "Nicht gelesene Spalten: {names}",
     "more": "und {n} weitere",
     "missing": "{n} importierte Spielende, die noch nicht angekommen sind, fehlen in dieser Datei (sie bleiben).",
+    "missing_one": "{n} importierte Person, die noch nicht angekommen ist, fehlt in dieser Datei (sie bleibt).",
     "row": "Zeile",
     "result": "Ergebnis",
     "line": "Zeile {n}",
@@ -826,8 +855,18 @@
       "remove_confirm": "{id} ({name}) von der Marshal-Liste nehmen? Die App ist sofort kein Marshal mehr, und noch nicht gesendete Messwerte werden abgelehnt, bis du die Person wieder einträgst.",
       "removed": "{id} von der Marshal-Liste genommen."
     },
-    "card_seen": "Ausweis gesehen",
+    "card_seen": "Ausweis gesehen, stimmt",
     "not_checked": "nicht geprüft",
+    "confirm_no_card": "Ohne Ausweis zulassen",
+    "waits_card": "wartet auf die Ausweisprüfung",
+    "card_by": "Ausweis geprüft von {who}, {when}",
+    "verdict_on": "{verdict} am {date}",
+    "number_erased": "Nummer nach der Ausweisprüfung gelöscht",
+    "apd_override_no_card": "ohne Ausweis zugelassen",
+    "position_shared": "teilt Position",
+    "share_position": "Meine Position während dieses Spiels mit dem Spiel teilen",
+    "share_position_hint": "Getrennt und nicht angekreuzt, solange die Person nicht zustimmt. Ihr Squad oder Team (soweit der Modus es erlaubt), die Marshals und die Spielleitung sehen sie; die Remote-Spielleitung nur, wenn das Feld es einschaltet. Ein Nein ändert sonst nichts. Die Person kann jederzeit aufhören.",
+    "card_why": "Das Feld muss den Ausweis mit den vorab eingegebenen Daten abgleichen (Art. 6 Abs. 1 Buchst. c DSGVO bei Feldern in Portugal, sonst Buchst. f).",
     "remove": "Entfernen",
     "manual": "Von Hand einchecken",
     "manual_hint": "Für Spielende ohne App: Der Controller erstellt ihre ID, die auf einen Spielenden-Tag geschrieben werden kann.",
@@ -872,7 +911,7 @@
     "valid_for": "Ein Chrono gilt für",
     "valid_for_day": "den ganzen Tag",
     "valid_for_game": "nur dieses Spiel",
-    "federation_note": "Die Verbandsnummer wird nie automatisch geprüft: „Pflicht“ verhindert nur, dass das Formular ohne sie abgeschickt wird. Hake „Ausweis gesehen“ an, sobald du den Ausweis gesehen hast.",
+    "federation_note": "Die Nummer wird nie automatisch geprüft. Wo die APD-Regel des Feldes beim Check-in prüft, bleibt die Person offen, bis du den Ausweis mit der Eingabe vergleichst und „Ausweis gesehen, stimmt“ ankreuzt; danach wird die Nummer gelöscht, Ergebnis, Datum und deine ID bleiben.",
     "apd_title": "APD-Mitgliedschaft",
     "apd_checkin": "APD-Mitgliedschaft beim Check-in prüfen",
     "apd_expiry": "Ablaufdatum verlangen und prüfen",
@@ -932,6 +971,7 @@
     "schedule_create": "Spiel erstellen",
     "schedule_made": "erstellt: Spiel {ids}",
     "schedule_registered": "{n} angemeldet",
+    "schedule_registered_one": "{n} angemeldet",
     "problems": {
       "https_off": "HTTPS ist auf dem Controller aus ([api] tls_port = 0): Das Plakat braucht das Zertifikat des Felds.",
       "no_address": "Das Plakat hat keine https-Adresse für den Controller: Trag die Adressen unten ein, [checkin] urls oder [api] tls_names.",
@@ -960,6 +1000,7 @@
     "intro": "Druck diese Seite: ein Etikett von 30 × 30 mm pro Replik zum Ausschneiden und Aufkleben. Der Code enthält nur das Etikett der Replik (ATL- und acht Zeichen), nichts über die spielende Person. Die App des Marshals scannt ihn in der Chrono-Liste.",
     "print": "Drucken",
     "count": "{n} Etiketten",
+    "count_one": "{n} Etikett",
     "qr_label": "QR-Etikett {code}"
   },
   "branding": {
@@ -1026,6 +1067,7 @@
     "ok_no_core": "Keine Probleme im Manifest (der Core ist auf diesem Controller nicht geladen).",
     "ok_warnings": "Keine Fehler, aber Warnungen:",
     "has_errors": "{n} Fehler: Behebe sie vor der Installation.",
+    "has_errors_one": "{n} Fehler: Behebe ihn vor der Installation.",
     "whole": "(Manifest)",
     "levels": {
       "error": "Fehler",
@@ -1238,7 +1280,8 @@
     "scan": "Nach Boxen suchen",
     "scanning": "Suche …",
     "none": "Keine Box gefunden. Prüfe das Kabel (ein Datenkabel, nicht nur Strom) und ob die Box eingeschaltet ist.",
-    "silent": "{n} Anschluss/Anschlüsse haben nicht geantwortet",
+    "silent": "{n} Anschlüsse haben nicht geantwortet",
+    "silent_one": "{n} Anschluss hat nicht geantwortet",
     "busy": "einem Spiel beigetreten: Beende es zuerst",
     "locked": "zu viele falsche PINs: Warte {min} min (ein Neustart verkürzt das nicht)",
     "adopt": "Aufnehmen",
@@ -1320,6 +1363,7 @@
     "body": "Die Spielenden checken ein, indem sie das Plakat des Feldes scannen. Hängt es noch nicht, druck es aus, bevor sie zu „{game}“ kommen. Es ist für alle Spiele gleich.",
     "countdown": "Schließt in {n} s",
     "announce": "Diese Meldung schließt sich in {n} Sekunden von selbst.",
+    "announce_one": "Diese Meldung schließt sich in {n} Sekunde von selbst.",
     "never": "Nicht mehr anzeigen",
     "open": "Plakatseite öffnen",
     "close": "Schließen",
@@ -1329,7 +1373,8 @@
     "resume": "Countdown fortsetzen",
     "paused": "Angehalten: bleibt offen, bis du es schließt",
     "announce_paused": "Countdown angehalten.",
-    "announce_resumed": "Countdown fortgesetzt: noch {n} Sekunden."
+    "announce_resumed": "Countdown fortgesetzt: noch {n} Sekunden.",
+    "announce_resumed_one": "Countdown fortgesetzt: noch {n} Sekunde."
   },
   "invites": {
     "open": "Boxen einladen",
@@ -1384,8 +1429,26 @@
     "start_question": "Zuerst die übrigen Einstellungen des Spiels prüfen?",
     "review": "Einstellungen prüfen",
     "start_now": "Jetzt starten",
-    "pending_note": "{n} angemeldete Replik(en) noch nicht gechront.",
+    "pending_note": "{n} angemeldete Repliken noch nicht gechront.",
+    "pending_note_one": "{n} angemeldete Replik noch nicht gechront.",
     "back": "Zurück"
+  },
+  "clock": {
+    "wrong": "Die Uhr des Controllers geht falsch.",
+    "reason_before_release": "Sie zeigt {now}, also vor der Veröffentlichung dieser Software ({floor}). Ein Raspberry Pi 4 hat keine eigene Uhr und startet nach einem Stromausfall mit einer alten Zeit.",
+    "reason_behind_records": "Sie zeigt {now}, früher als Daten, die der Controller schon hat ({floor}).",
+    "hint_gm": "Zeitstempel und Zertifikate hängen davon ab, und bis sie stimmt, wird nichts gelöscht. Wenn die Zeit dieses Geräts stimmt, kann sie von hier gesetzt werden:",
+    "hint_read": "Die Spielleitung soll sie in der Konsole setzen.",
+    "set": "Uhr des Controllers von diesem Gerät setzen",
+    "set_done": "Die Uhr des Controllers zeigt jetzt {time}.",
+    "wrong_short": "(falsch)",
+    "title": "Uhr des Controllers",
+    "intro": "Im Feld hat der Controller kein Internet. Ein Raspberry Pi 4 hat keine eigene Uhr und startet nach einem Stromausfall mit der Zeit des letzten Herunterfahrens (oder 1970); ein Pi 5 behält die Zeit nur mit seiner Batterie. Spiele und Timer hängen nicht davon ab; Zeitstempel, Spielercodes, Zertifikate und das Löschen alter Daten schon.",
+    "controller_time": "Zeit des Controllers",
+    "device_time": "Zeit dieses Geräts",
+    "jump": "Die Uhr ist um {seconds} s gesprungen, um {time}. Timer sind nicht betroffen.",
+    "forward_only": "Sie geht nur vorwärts, nie vor die neuesten Daten des Controllers und, wenn sie schon plausibel ist, nie mehr als 14 Tage auf einmal.",
+    "read_only": "Nur die Spielleitung setzt sie."
   },
   "box_language": {
     "title": "Sprache der Boxen",
@@ -1583,6 +1646,66 @@
       "unavailable": "abgelehnt: nicht verfügbar",
       "failed": "fehlgeschlagen"
     }
+  },
+  "access_tokens": {
+    "title": "Zugangscodes auf Zeit",
+    "intro": "Gib dem Handy einer Schiedsperson, einem Gast-GM, einem automatischen Test oder einem Zuschauerbildschirm einen eigenen Code statt des GM- oder Nur-Lese-Codes. Jeder Code hat eine Bezeichnung, legt fest, was er darf, läuft nach der gewählten Zeit (höchstens 7 Tage) von selbst ab und lässt sich sofort widerrufen. Ein hier erzeugter Code kann keine weiteren Codes erzeugen.",
+    "label": "Bezeichnung",
+    "label_hint": "Schiedsrichterin Ana, Samstag",
+    "scope": "Darf",
+    "scopes": {
+      "read": "Nur lesen",
+      "marshals": "Lesen und Marshals verwalten",
+      "gm": "Voller GM"
+    },
+    "scope_help": {
+      "read": "Wie der Nur-Lese-Code: das Spiel verfolgen, nichts ändern.",
+      "marshals": "Nur lesen, dazu Marshals hinzufügen, ändern und entfernen. Sonst nichts.",
+      "gm": "Alles, was der GM-Code kann, außer Zugangscodes zu erzeugen."
+    },
+    "lifetime": "Gültig für",
+    "lifetimes": {
+      "1h": "1 Stunde",
+      "4h": "4 Stunden",
+      "8h": "8 Stunden (ein Spieltag)",
+      "1d": "1 Tag",
+      "3d": "3 Tage",
+      "7d": "7 Tage (das Maximum)"
+    },
+    "game": "Spiel",
+    "all_games": "Jedes Spiel",
+    "game_help": "Beschränkt auf ein Spiel, was der Code ändern darf. Spielelisten und der Live-Feed zeigen weiterhin alle Spiele.",
+    "create": "Zugangscode erzeugen",
+    "made": "Zugangscode „{label}“ erzeugt.",
+    "once": "Jetzt kopieren: Er wird nur dieses eine Mal angezeigt und lässt sich nicht erneut abrufen, nur widerrufen.",
+    "summary": "{scope}, gültig bis {until}.",
+    "summary_game": "Nur Spiel {game}.",
+    "address": "Adresse des Controllers",
+    "qr_label": "QR-Code, der ein Handy mit dem neuen Zugangscode anmeldet",
+    "qr_help": "Mit der Handykamera scannen, um die Konsole (bei einem Nur-Lese-Code die Anzeigetafel) bereits angemeldet zu öffnen. Nur der Person zeigen, die ihn nutzt: Wer ihn hat, kann damit handeln, bis er abläuft oder widerrufen wird.",
+    "no_link": "Dieser Controller hat noch keine Adresse für einen QR-Code: siehe die Adressen auf dem Check-in-Plakat. Den Code von Hand eintippen.",
+    "done": "Fertig",
+    "empty": "Keine Zugangscodes.",
+    "list": "Zugangscodes",
+    "expires": "Läuft ab",
+    "last_used": "Zuletzt benutzt",
+    "status": "Zustand",
+    "statuses": {
+      "active": "Aktiv",
+      "expired": "Abgelaufen",
+      "revoked": "Widerrufen"
+    },
+    "revoke": "Widerrufen",
+    "confirm_revoke": "„{label}“ widerrufen? Er funktioniert sofort nicht mehr.",
+    "activity": "Letzte Aktivität",
+    "audit": {
+      "created": "erzeugt",
+      "used": "benutzt",
+      "refused": "abgelehnt",
+      "revoked": "widerrufen",
+      "expired": "abgelaufen"
+    },
+    "failed": "Die Liste konnte nicht geladen werden."
   },
   "scoreboard_share": {
     "title": "Anzeigetafel mit Spielenden teilen",

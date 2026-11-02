@@ -52,9 +52,9 @@ void main() {
   testWidgets('the settings show the version of the core it can load', (
     tester,
   ) async {
-    final number = RegExp(
-      r'project\(atalaia_core VERSION (\S+)',
-    ).firstMatch(File('../core/CMakeLists.txt').readAsStringSync())!.group(1);
+    final number = RegExp(r'project\(atalaia_core VERSION (\S+)')
+        .firstMatch(File('../core/CMakeLists.txt').readAsStringSync())!
+        .group(1);
     // A development core adds version.h's pre-release ("0.3.0-dev", FV-1).
     final pre = RegExp(r'#define ATALAIA_VERSION_PRERELEASE "([^"]*)"')
         .firstMatch(

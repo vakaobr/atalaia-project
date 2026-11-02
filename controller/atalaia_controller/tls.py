@@ -34,11 +34,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional
 
+from . import wallclock
+
 log = logging.getLogger("atalaia.tls")
 
 CA_DAYS = 3653
 SERVER_DAYS = 365
 RENEW_DAYS = 30
+# A controller in a field has no internet and often no real-time clock (a Pi 4: wallclock.py), so the clock
+# it issues with can be days behind or at 1970 while the phones' clocks are right. Certificates are issued
+# for a window that holds every real date from this build's release on, whatever the clock says: valid from
+# the day before the release, until a year or ten after the later of the clock and the release.
+BACKDATE = datetime.timedelta(days=1)
 
 
 @dataclass
@@ -55,6 +62,20 @@ class FieldTls:
         from cryptography import x509  # noqa: PLC0415
 
         return x509.load_pem_x509_certificate(self.ca_pem).public_bytes(_der())
+
+
+def export_for_broker(tls: FieldTls, dest: str | Path) -> Path:
+    """Mosquitto's copy of the CA certificate and the server's certificate and key, for its TLS listener
+    (controller/deploy/mosquitto-tls.conf, FLD-5). The CA's key never leaves ``tls_dir``. ``dest`` is a folder
+    the service owns whose group is the broker's (setgid, mode 2750): the key is written 0640, so the broker
+    reads it by that group and nobody else does. Written again at every start, so a renewed certificate
+    reaches the broker on its next reload."""
+    d = Path(dest)
+    d.mkdir(parents=True, exist_ok=True)
+    _write(d / "ca.pem", tls.ca_pem, False)
+    _write(d / "server.pem", tls.server_cert.read_bytes(), False)
+    _write(d / "server.key", tls.server_key.read_bytes(), True, mode=0o640)
+    return d
 
 
 def _der():
@@ -147,10 +168,10 @@ def link_names(configured: Iterable[str], found: Iterable[str], container: Optio
     return out
 
 
-def _write(path: Path, data: bytes, private: bool) -> None:
+def _write(path: Path, data: bytes, private: bool, mode: int = 0o600) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-    fd = os.open(tmp, flags, 0o600 if private else 0o644)
+    fd = os.open(tmp, flags, mode if private else 0o644)
     try:
         os.write(fd, data)
         os.fsync(fd)
@@ -158,7 +179,7 @@ def _write(path: Path, data: bytes, private: bool) -> None:
         os.close(fd)
     if private:
         try:
-            os.chmod(tmp, 0o600)
+            os.chmod(tmp, mode)
         except OSError:
             pass
     os.replace(tmp, path)
@@ -190,7 +211,13 @@ def ensure(tls_dir: str | Path, names: list[str], field_name: str = "Atalaia",
         os.chmod(d, 0o700)
     except OSError:
         pass
-    now = now or datetime.datetime.now(datetime.timezone.utc)
+    now = now or datetime.datetime.fromtimestamp(wallclock.now(), datetime.timezone.utc)
+    release = datetime.datetime.fromtimestamp(wallclock.RELEASE_DATE, datetime.timezone.utc)
+    valid_from = min(now, release) - BACKDATE  # never later than a phone's right clock
+    base = max(now, release)                   # a clock before the release is wrong: count from the release
+    if now < release:
+        log.warning("the clock (%s) is earlier than this release: certificates are issued as of %s",
+                    now.strftime("%Y-%m-%d"), release.strftime("%Y-%m-%d"))
     ca_key_path, ca_path = d / "ca.key", d / "ca.pem"
     key_path, cert_path = d / "server.key", d / "server.pem"
     pem = serialization.Encoding.PEM
@@ -200,14 +227,21 @@ def ensure(tls_dir: str | Path, names: list[str], field_name: str = "Atalaia",
     if ca_key_path.exists() and ca_path.exists():
         ca_key = serialization.load_pem_private_key(ca_key_path.read_bytes(), None)
         ca_cert = x509.load_pem_x509_certificate(ca_path.read_bytes())
-    else:
+        if _not_after(ca_cert) < release:
+            # Made with a clock at 1970: it expired before any phone's today. Nothing can make it valid again,
+            # so a new one (the poster and QR codes show the new fingerprint; phones pin it again).
+            log.warning("the field CA expired %s (it was made with a wrong clock): making a new one",
+                        _not_after(ca_cert).strftime("%Y-%m-%d"))
+            ca_key_path.unlink(missing_ok=True)
+            ca_path.unlink(missing_ok=True)
+    if not (ca_key_path.exists() and ca_path.exists()):
         ca_key = ec.generate_private_key(ec.SECP256R1())
         subject = x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Atalaia field"),
                              x509.NameAttribute(NameOID.COMMON_NAME, f"{field_name[:40]} field CA")])
         ca_cert = (x509.CertificateBuilder().subject_name(subject).issuer_name(subject)
                    .public_key(ca_key.public_key()).serial_number(x509.random_serial_number())
-                   .not_valid_before(now - datetime.timedelta(hours=1))
-                   .not_valid_after(now + datetime.timedelta(days=CA_DAYS))
+                   .not_valid_before(valid_from)
+                   .not_valid_after(base + datetime.timedelta(days=CA_DAYS))
                    .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
                    .add_extension(x509.KeyUsage(digital_signature=False, content_commitment=False,
                                                 key_encipherment=False, data_encipherment=False,
@@ -227,7 +261,7 @@ def ensure(tls_dir: str | Path, names: list[str], field_name: str = "Atalaia",
         try:
             cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
             have = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
-            left = _not_after(cert) - now
+            left = _not_after(cert) - base
             renew = (have != _san(names) or left < datetime.timedelta(days=RENEW_DAYS)
                      or cert.issuer != ca_cert.subject)
         except (ValueError, x509.ExtensionNotFound):
@@ -238,8 +272,8 @@ def ensure(tls_dir: str | Path, names: list[str], field_name: str = "Atalaia",
                 .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, names[0] if names else "atalaia")]))
                 .issuer_name(ca_cert.subject).public_key(key.public_key())
                 .serial_number(x509.random_serial_number())
-                .not_valid_before(now - datetime.timedelta(hours=1))
-                .not_valid_after(now + datetime.timedelta(days=SERVER_DAYS))
+                .not_valid_before(valid_from)
+                .not_valid_after(base + datetime.timedelta(days=SERVER_DAYS))
                 .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
                 .add_extension(_san(names), critical=False)
                 .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]), critical=False)

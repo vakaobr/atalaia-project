@@ -106,17 +106,17 @@ class AccountPageTests(AppTestCase):
                 with self.subTest(lang=lang, code=code):
                     self.assertIn(f"acct_e_{code}", strings)
             for code in ("already_linked", "identity_taken", "provider_already_linked", "identity_mismatch",
-                         "denied", "state_invalid", "other", "name_unusable", "consent_required"):
+                         "denied", "state_invalid", "other", "name_unusable", "notice_required", "age_confirmation_required"):
                 self.assertIn(f"oidc_err_{code}", strings, (lang, code))
 
     async def test_every_text_of_the_page_is_in_the_four_languages(self) -> None:
         template = (staff_pages.TEMPLATE_DIR / "account.html").read_text(encoding="utf-8")
-        used = set(re.findall(r"\$([a-z][a-z0-9_]*)", template))
+        used = set(re.findall(r"\$([a-z][a-z0-9_]*)", template)) - {"hub_share_href"}  # an address, not a text
         used |= set(re.findall(r"\bt\('([a-z0-9_]+)'", SCRIPT))
         self.assertGreater(len(used), 40)
         for lang, strings in STRINGS.items():
             self.assertEqual([k for k in sorted(used) if k not in strings], [], lang)
-        for key in sorted(k for k in STRINGS["en"] if k.startswith(("acct_", "nav_account"))):
+        for key in sorted(k for k in STRINGS["en"] if k.startswith(("acct_", "nav_account")) and not k.endswith("_one")):  # (no zh-tw singulars)
             texts = {lang: STRINGS[lang][key] for lang in STRINGS}
             self.assertGreater(len(set(texts.values())), 1, key)  # not one text copied into every language
 

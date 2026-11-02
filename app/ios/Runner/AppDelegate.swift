@@ -5,11 +5,15 @@
 // The "device" channel is answered here: the private folder for the settings
 // (filesDir), the maker, the screen kept on, a buzz, and the location
 // permission (requestPermission, handed to LocationPlugin, which also answers
-// BLUETOOTH_SCAN: beacon ranging needs it). Four features
+// BLUETOOTH_SCAN: beacon ranging needs it). Seven features
 // have a Swift file each, registered below (decisions iOS-13 to iOS-15):
 // the QR scanner (QrScanPlugin.swift), `atalaia://` links (LinkPlugin.swift),
 // the position for a player who shares it (LocationPlugin.swift) and the
-// indoor beacons (BeaconScanPlugin.swift, decisions IOSB-1 to IOSB-8). Every
+// indoor beacons (BeaconScanPlugin.swift, decisions IOSB-1 to IOSB-8), and
+// the site login: the browser session for a social login (BrowserPlugin.swift)
+// and passkeys (PasskeyPlugin.swift), decisions IOSL-1 to IOSL-9; and the
+// vault for the secrets at rest, a key in the Keychain
+// (KeychainVaultPlugin.swift, decisions IOSK-1 to IOSK-6). Every
 // other method, and every other channel (NFC, kiosk, foreground service, the
 // field's Wi-Fi, the I/O pod), is left out on purpose: Flutter then raises
 // MissingPluginException, which the Dart side reads as "not available"
@@ -37,6 +41,9 @@ import UIKit
       QrScanPlugin.register(messenger: registrar.messenger())
       LocationPlugin.register(messenger: registrar.messenger())
       BeaconScanPlugin.register(messenger: registrar.messenger())
+      BrowserPlugin.register(messenger: registrar.messenger())
+      PasskeyPlugin.register(messenger: registrar.messenger())
+      KeychainVaultPlugin.register(messenger: registrar.messenger())
     }
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AtalaiaLinks") {
       LinkPlugin.register(registrar: registrar)
@@ -98,9 +105,10 @@ import UIKit
     }
   }
 
-  /// The app's private folder for the settings (the field join key, the
-  /// marshal's key): Application Support, which the app owns, kept out of
-  /// iCloud and iTunes backups as Android's allowBackup="false" does (PD6).
+  /// The app's private folder for the settings: Application Support, which
+  /// the app owns, kept out of iCloud and iTunes backups as Android's
+  /// allowBackup="false" does (PD6). The secrets in it are sealed with the
+  /// Keychain's key (secrets.enc, KeychainVaultPlugin.swift), not in its JSON.
   private static func privateFolder() -> String? {
     guard
       var url = FileManager.default.urls(

@@ -156,8 +156,7 @@ const Map<String, String> ptStrings = {
       'Alguém abriu o módulo de E/S durante o jogo. Avisa a organização.',
   'prop.pod_reconnecting':
       'A ligação ao módulo de E/S perdeu-se. A religar (tentativa {n})…',
-  'prop.pod_refused':
-      'Respondeu outro módulo, por isso o módulo de E/S deixou de estar ligado. Liga um módulo outra vez.',
+  'prop.pod_refused': 'Respondeu outro módulo, por isso o módulo de E/S deixou de estar ligado. Liga um módulo outra vez.',
   'prop.pod_unlink': 'Desligar o módulo de E/S',
   'prop.hold': 'Manter premido\n{team}',
   'prop.nfc_hint': 'Encosta a etiqueta às costas do telemóvel.',
@@ -232,12 +231,12 @@ const Map<String, String> ptStrings = {
   'pod.find': 'Procurar módulos',
   'pod.found_none': 'Nenhum módulo encontrado.',
   'pod.linked': 'Módulo ligado por {kind}: firmware {fw}, {n} capacidades.',
+  'pod.linked_one': 'Módulo ligado por {kind}: firmware {fw}, {n} capacidade.',
   'pod.open_failed': 'Não foi possível abrir a ligação ao módulo.',
   'pod.no_ident': 'O módulo não respondeu.',
   'pod.reconnecting':
       'A ligação ao módulo perdeu-se. A religar (tentativa {n})…',
-  'pod.refused':
-      'Respondeu outro módulo, por isso a ligação não foi retomada. Liga um módulo outra vez.',
+  'pod.refused': 'Respondeu outro módulo, por isso a ligação não foi retomada. Liga um módulo outra vez.',
   'pod.unlink': 'Desligar o módulo',
 
   // Capacidades
@@ -288,8 +287,7 @@ const Map<String, String> ptStrings = {
   'player.bad_link': 'Falta o endereço ou o código de acesso.',
   'player.link_unreachable':
       'O controlador não responde. Estás ligado à rede Wi-Fi do campo?',
-  'player.link_mismatch':
-      'O controlador que responde não é aquele para o qual este código foi feito. Não continues e avisa a organização.',
+  'player.link_mismatch': 'O controlador que responde não é aquele para o qual este código foi feito. Não continues e avisa a organização.',
   'player.link_not_controller':
       'Quem responde neste endereço não é um controlador de campo.',
   'player.connecting': 'A ligar ao controlador de campo…',
@@ -302,6 +300,7 @@ const Map<String, String> ptStrings = {
   'player.pick_team': 'Toca na tua equipa para a destacar.',
   'player.eliminated': 'eliminada',
   'player.lives_left': '{n} vidas',
+  'player.lives_left_one': '{n} vida',
   'player.objectives': 'Objetivos',
   'player.node': 'Caixa {n}',
   'player.held_by': 'Da equipa {team}',
@@ -348,6 +347,7 @@ const Map<String, String> ptStrings = {
   'event.score.delta': 'Pontos para a equipa {team}: {amount}',
   'event.code.used': 'A equipa {team} usou um código',
   'event.player.respawn': '{player} voltou ao jogo ({lives} vidas)',
+  'event.player.respawn_one': '{player} voltou ao jogo ({lives} vida)',
   'event.player.checkin': '{player} registou presença',
   'event.kill.confirmed': 'Baixa confirmada pela equipa {team} ({player})',
   'event.kill.denied': 'A equipa {team} recuperou a etiqueta de {player}',
@@ -367,8 +367,7 @@ const Map<String, String> ptStrings = {
   'event.vip.extracted': 'A equipa {team} chegou à zona de extração',
   'event.money.collected': '{player} recolheu {amount} de dinheiro',
   'event.money.deposited': '{player} depositou {amount} para a equipa {team}',
-  'event.progressive.activated':
-      'A caixa {zone} está ativa (n.º {step}): é a única que pode ser capturada',
+  'event.progressive.activated': 'A caixa {zone} está ativa (n.º {step}): é a única que pode ser capturada',
   'event.progressive.completed':
       'A equipa {team} completou a caixa {zone} (n.º {step})',
   'event.scenario.started': 'O cenário começou',
@@ -425,25 +424,21 @@ const Map<String, String> ptStrings = {
   'marshal.readings':
       '{n} medições neste telemóvel. Guardam-se 365 dias e depois são '
       'apagadas.',
+  'marshal.readings_one':
+      '{n} medição neste telemóvel. Guarda-se 365 dias e depois é apagada.',
   'marshal.erase': 'Apagar as medições de alguém',
   'marshal.erase_do': 'Apagar',
   'marshal.checking': 'A perguntar ao controlador do campo…',
   'marshal.you_are': 'O teu identificador de marshal é {id} ({name})',
-  'marshal.id_from_gm':
-      'O identificador e o nome vêm da lista de marshals da organização; o controlador do campo confirmou-os.',
-  'marshal.not_listed':
-      'O controlador do campo não te tem na lista de marshals. Pede à organização para te acrescentar como marshal.',
-  'marshal.revoked':
-      'A organização retirou-te da lista de marshals, por isso este telemóvel já não é de marshal neste campo. As {n} série(s) por enviar ficam neste telemóvel e podem ser enviadas se a organização te voltar a acrescentar.',
-  'marshal.offline_never':
-      'Sem ligação ao controlador do campo, e este telemóvel ainda não foi confirmado como marshal aqui. Liga-te uma vez à rede do campo e pergunta outra vez.',
-  'marshal.offline_expired':
-      'Sem ligação ao controlador do campo, e a confirmação de {at} caducou. Liga-te à rede do campo e pergunta outra vez.',
-  'marshal.offline_ok':
-      'Sem ligação: o controlador do campo confirmou-te como marshal {id} em {at}. Vale até {until}; depois disso, liga-te à rede do campo para confirmar outra vez.',
+  'marshal.id_from_gm': 'O identificador e o nome vêm da lista de marshals da organização; o controlador do campo confirmou-os.',
+  'marshal.not_listed': 'O controlador do campo não te tem na lista de marshals. Pede à organização para te acrescentar como marshal.',
+  'marshal.revoked': 'A organização retirou-te da lista de marshals, por isso este telemóvel já não é de marshal neste campo. As {n} séries por enviar ficam neste telemóvel e podem ser enviadas se a organização te voltar a acrescentar.',
+  'marshal.revoked_one': 'A organização retirou-te da lista de marshals, por isso este telemóvel já não é de marshal neste campo. A {n} série por enviar fica neste telemóvel e pode ser enviada se a organização te voltar a acrescentar.',
+  'marshal.offline_never': 'Sem ligação ao controlador do campo, e este telemóvel ainda não foi confirmado como marshal aqui. Liga-te uma vez à rede do campo e pergunta outra vez.',
+  'marshal.offline_expired': 'Sem ligação ao controlador do campo, e a confirmação de {at} caducou. Liga-te à rede do campo e pergunta outra vez.',
+  'marshal.offline_ok': 'Sem ligação: o controlador do campo confirmou-te como marshal {id} em {at}. Vale até {until}; depois disso, liga-te à rede do campo para confirmar outra vez.',
   'marshal.retry': 'Perguntar outra vez',
-  'marshal.expired_now':
-      'A confirmação do controlador do campo caducou: pergunta outra vez antes de registar.',
+  'marshal.expired_now': 'A confirmação do controlador do campo caducou: pergunta outra vez antes de registar.',
 
   // Cronógrafo
   'chrono.title': 'Cronógrafo',
@@ -494,6 +489,7 @@ const Map<String, String> ptStrings = {
   'replica.add': 'Registar réplica',
   'replica.none': 'Ainda não há réplicas registadas.',
   'replica.count': '{n} réplicas registadas',
+  'replica.count_one': '{n} réplica registada',
   'replica.owner': 'Identificador de quem joga',
   'replica.type': 'Tipo',
   'replica.class': 'Classe',
@@ -552,8 +548,7 @@ const Map<String, String> ptStrings = {
 
   // Check-in no campo, réplicas por cronografar, posições (fase E)
   'checkin.title': 'Check-in no campo',
-  'checkin.intro':
-      'Lê o cartaz de check-in do campo com a câmara (ou cola o texto dele). O telemóvel liga-se ao controlador do campo pela rede Wi-Fi do campo; não precisa de internet.',
+  'checkin.intro': 'Lê o cartaz de check-in do campo com a câmara (ou cola o texto dele). O telemóvel liga-se ao controlador do campo pela rede Wi-Fi do campo; não precisa de internet.',
   'checkin.scan': 'Ler o cartaz',
   'checkin.scan_hint': 'Aponta para o código QR do cartaz de check-in',
   'checkin.by_text': 'Ou cola o texto do cartaz',
@@ -571,24 +566,20 @@ const Map<String, String> ptStrings = {
   'diag.http': 'HTTP {status}',
   'diag.other': 'erro de ligação',
   'diag.line': '{kind} · {url} · {time}',
-  'checkin.unreachable':
-      'O controlador do campo não responde. Estás ligado à rede Wi-Fi do campo?',
-  'checkin.join_wifi':
-      'O controlador do campo não responde: liga-te à rede Wi-Fi «{ssid}» e tenta outra vez.',
-  'checkin.mismatch':
-      'O controlador que responde não é o do cartaz (cartaz {poster}, controlador {got}). Não continues e avisa a organização.',
+  'checkin.unreachable': 'O controlador do campo não responde. Estás ligado à rede Wi-Fi do campo?',
+  'checkin.join_wifi': 'O controlador do campo não responde: liga-te à rede Wi-Fi «{ssid}» e tenta outra vez.',
+  'checkin.mismatch': 'O controlador que responde não é o do cartaz (cartaz {poster}, controlador {got}). Não continues e avisa a organização.',
   'checkin.not_controller':
       'Quem responde neste endereço não é um controlador de campo.',
-  'checkin.changed':
-      'Este campo já foi confiado com outro certificado ({old}); o cartaz mostra {new}. Se a organização confirmar que o controlador mudou, esquece o campo e lê o cartaz outra vez.',
+  'checkin.changed': 'Este campo já foi confiado com outro certificado ({old}); o cartaz mostra {new}. Se a organização confirmar que o controlador mudou, esquece o campo e lê o cartaz outra vez.',
   'checkin.forget_field': 'Esquecer este campo',
   'checkin.error': 'O controlador recusou: {error}',
-  'checkin.offline':
-      'Sem ligação ao controlador do campo: tenta outra vez quando estiveres na rede do campo.',
+  'checkin.offline': 'Sem ligação ao controlador do campo: tenta outra vez quando estiveres na rede do campo.',
   'checkin.expired': 'Este check-in já não é válido: faz o check-in outra vez.',
   'checkin.connecting': 'A ligar ao controlador do campo…',
   'checkin.notice_title': 'Os teus dados em {field}',
   'checkin.notice_ok': 'Li e quero continuar',
+  'checkin.notice_changed': 'O aviso de privacidade mudou. Lê-o e confirma outra vez. A partilha da tua posição fica desligada até a marcares de novo.',
   'checkin.trusted': 'Certificado do campo {ca}',
   'checkin.no_games': 'Não há nenhum jogo aberto para check-in neste campo.',
   'checkin.game': 'Jogo',
@@ -623,8 +614,7 @@ const Map<String, String> ptStrings = {
   'checkin.declare': 'Escolher as réplicas',
   'checkin.follow': 'Seguir o jogo',
   'checkin.leave': 'Sair do jogo',
-  'checkin.leave_body':
-      'O teu nome e o número de federado são apagados deste jogo. As réplicas já cronografadas ficam registadas.',
+  'checkin.leave_body': 'O teu nome e o número de federado são apagados deste jogo. As réplicas já cronografadas ficam registadas.',
   'checkin.left': 'Saíste do jogo; os teus dados foram apagados.',
   'chrono_state.pending': 'por cronografar',
   'chrono_state.passed': 'aprovada',
@@ -632,8 +622,7 @@ const Map<String, String> ptStrings = {
   'chrono_state.withdrawn': 'retirada',
   'chrono_state.refused_today': 'recusada hoje',
   'declare.title': 'As réplicas deste jogo',
-  'declare.intro':
-      'Escolhe as réplicas que vais usar neste jogo (até {max}). Leva-as aos marshals para a cronografagem.',
+  'declare.intro': 'Escolhe as réplicas que vais usar neste jogo (até {max}). Leva-as aos marshals para a cronografagem.',
   'declare.none': 'Ainda não tens réplicas: junta as tuas.',
   'declare.add': 'Juntar uma réplica',
   'declare.type': 'Tipo',
@@ -641,33 +630,30 @@ const Map<String, String> ptStrings = {
   'declare.make': 'Marca e modelo (opcional)',
   'declare.save': 'Guardar',
   'declare.saved': 'Guardado: a organização e os marshals já as veem.',
-  'declare.locked':
-      'Uma réplica já cronografada fica declarada: fala com um marshal para a mudar.',
+  'declare.locked': 'Uma réplica já cronografada fica declarada: fala com um marshal para a mudar.',
   'queue.title': 'Réplicas por cronografar',
-  'queue.hint':
-      'A lista do campo: quem declarou réplicas que ainda não passaram no cronógrafo.',
-  'queue.check_in_first':
-      'Primeiro faz o check-in no campo com o cartaz; depois a organização dá-te o papel de marshal.',
+  'queue.hint': 'A lista do campo: quem declarou réplicas que ainda não passaram no cronógrafo.',
+  'queue.check_in_first': 'Primeiro faz o check-in no campo com o cartaz; depois a organização dá-te o papel de marshal.',
   'queue.not_marshal': 'Esta lista é só para marshals e para a organização.',
   'queue.counts':
       'Por cronografar: {pending} · aprovadas: {passed} · recusadas: {refused}',
   'queue.scan': 'Ler a etiqueta de uma réplica',
   'queue.scan_hint': 'Aponta para a etiqueta QR da réplica',
-  'queue.not_found':
-      'Esta réplica não está declarada neste jogo: escolhe a declaração do jogador ou da jogadora.',
+  'queue.not_found': 'Esta réplica não está declarada neste jogo: escolhe a declaração do jogador ou da jogadora.',
   'queue.refresh': 'Atualizar',
   'queue.empty': 'Ninguém declarou réplicas ainda.',
   'queue.manual': 'Check-in à mão',
   'queue.manual_do': 'Fazer o check-in',
   'queue.manual_done': 'Check-in feito: {id}',
-  'queue.send_pending': 'Enviar {n} série(s) por enviar',
-  'queue.send_failed': '{n} série(s) não foram aceites; ficam neste telemóvel.',
-  'queue.held':
-      '{n} série(s) não foram aceites porque o controlador não te tem na lista de marshals; ficam neste telemóvel.',
+  'queue.send_pending': 'Enviar {n} séries por enviar',
+  'queue.send_pending_one': 'Enviar {n} série por enviar',
+  'queue.send_failed': '{n} séries não foram aceites; ficam neste telemóvel.',
+  'queue.send_failed_one': '{n} série não foi aceite; fica neste telemóvel.',
+  'queue.held': '{n} séries não foram aceites porque o controlador não te tem na lista de marshals; ficam neste telemóvel.',
+  'queue.held_one': '{n} série não foi aceite porque o controlador não te tem na lista de marshals; fica neste telemóvel.',
   'queue.waiting_confirmation': 'à espera de confirmação',
   'queue.sticker_title': 'Usar um autocolante NFC?',
-  'queue.sticker_body':
-      'Encostar o autocolante NFC da réplica ao telemóvel para a registar por ele, ou usar a etiqueta QR impressa.',
+  'queue.sticker_body': 'Encostar o autocolante NFC da réplica ao telemóvel para a registar por ele, ou usar a etiqueta QR impressa.',
   'queue.sticker_qr': 'Usar a etiqueta QR',
   'queue.sticker_taken': 'Este autocolante já está registado noutra réplica.',
   'queue.unregistered': 'ainda sem registo',
@@ -676,10 +662,8 @@ const Map<String, String> ptStrings = {
   'label.share': 'Partilhar / imprimir etiqueta',
   'label.share_all': 'Partilhar / imprimir todas as etiquetas',
   'label.share_title': 'Etiquetas de réplicas',
-  'label.hint':
-      'Cola esta etiqueta na réplica. O marshal lê-a para encontrar a réplica na lista do cronógrafo. Só tem este código, nada sobre ti. Imprime-se a 30 × 30 mm; várias etiquetas cabem numa folha A4.',
-  'label.share_unavailable':
-      'Este telemóvel não consegue passar um ficheiro à partilha. Usa antes Mostrar etiqueta.',
+  'label.hint': 'Cola esta etiqueta na réplica. O marshal lê-a para encontrar a réplica na lista do cronógrafo. Só tem este código, nada sobre ti. Imprime-se a 30 × 30 mm; várias etiquetas cabem numa folha A4.',
+  'label.share_unavailable': 'Este telemóvel não consegue passar um ficheiro à partilha. Usa antes Mostrar etiqueta.',
   'label.share_failed': 'A partilha não abriu.',
   'label.none_yet':
       'A etiqueta aparece aqui depois de declarares esta réplica num jogo.',
@@ -697,18 +681,16 @@ const Map<String, String> ptStrings = {
   'player.me': 'Tu: {role}, {team}',
   'player.no_team': 'ainda sem equipa',
   'player.positions': 'Posições que vês: {n}',
-  'player.share': 'Partilhar a minha posição',
-  'player.share_hint':
-      'Só durante o jogo; o controlador decide quem a vê. A organização e os marshals veem-na nos seus dispositivos ATAK.',
-  'player.share_on': 'A partilhar: {n} posição(ões) enviada(s)',
+  'player.share': 'Partilhar a minha posição com o jogo durante este jogo',
+  'player.share_hint': 'Só durante o jogo; o controlador decide quem a vê. A organização e os marshals veem-na nos seus dispositivos ATAK.',
+  'player.share_on': 'A partilhar: {n} posições enviadas',
+  'player.share_on_one': 'A partilhar: {n} posição enviada',
   'player.share_stopped':
       'A partilha parou: o jogo terminou ou o check-in mudou.',
   'player.no_location': 'Este telemóvel não tem localização.',
   'player.location_denied': 'Sem autorização para a localização.',
-  'player.location_denied_ios':
-      'Sem autorização para a localização. Permite-a em Definições > Atalaia > Localização (Ao Usar a Aplicação) e confirma que os Serviços de Localização estão ligados.',
-  'player.share_ios_note':
-      'No iPhone a posição só é partilhada enquanto o Atalaia está aberto no ecrã: pára se mudares de aplicação ou bloqueares o telemóvel, e continua quando voltas.',
+  'player.location_denied_ios': 'Sem autorização para a localização. Permite-a em Definições > Atalaia > Localização (Ao Usar a Aplicação) e confirma que os Serviços de Localização estão ligados.',
+  'player.share_ios_note': 'No iPhone a posição só é partilhada enquanto o Atalaia está aberto no ecrã: pára se mudares de aplicação ou bloqueares o telemóvel, e continua quando voltas.',
   'player.sharing_title': 'Atalaia: a partilhar a posição',
   'player.sharing_text': 'Durante o jogo',
   // O aviso de fora do campo (decisões MF-31 a MF-40)
@@ -728,28 +710,23 @@ const Map<String, String> ptStrings = {
   'prop.gm_message': 'Organização: {text}',
   // Balizas interiores (decisões BLE-1 a BLE-9)
   'player.beacons_why_title': 'Posições no interior',
-  'player.beacons_why':
-      'Este campo tem balizas Bluetooth no interior. Para saber em que divisão estás, o Atalaia pode ouvi-las enquanto partilhas a posição: só as balizas do campo, e envia apenas qual é a mais forte. O Android pede as autorizações de Bluetooth e de localização para isso. Sem elas a tua posição fica só por GPS.',
+  'player.beacons_why': 'Este campo tem balizas Bluetooth no interior. Para saber em que divisão estás, o Atalaia pode ouvi-las enquanto partilhas a posição: só as balizas do campo, e envia apenas qual é a mais forte. O Android pede as autorizações de Bluetooth e de localização para isso. Sem elas a tua posição fica só por GPS.',
   'player.beacons_allow': 'Continuar',
   'player.beacons_skip': 'Agora não',
   'player.beacons_on':
       'A ouvir as balizas do campo: no interior a tua posição é a divisão.',
-  'player.beacons_skipped':
-      'As posições no interior estão desligadas. A posição por GPS continua a ser partilhada.',
-  'player.beacons_denied':
-      'As posições no interior estão desligadas: sem autorização para o Bluetooth. A posição por GPS continua a ser partilhada.',
-  'player.beacons_off':
-      'As posições no interior estão desligadas: o Bluetooth está desligado. Liga-o e partilha outra vez.',
-  'player.beacons_unavailable':
-      'Este telemóvel não consegue ouvir as balizas do campo. A posição por GPS continua a ser partilhada.',
-  'player.beacons_why_ios':
-      'Este campo tem balizas Bluetooth no interior. Para saber em que divisão estás, o Atalaia pode ouvi-las enquanto partilhas a posição: só as balizas do campo, e envia apenas qual é a mais forte. O iPhone pede a autorização de localização para isso (o Bluetooth é usado pelas balizas, não é pedido). Sem ela a tua posição fica só por GPS.',
-  'player.beacons_on_ios':
-      'A ouvir as balizas do campo, só enquanto o Atalaia está aberto no ecrã: no interior a tua posição é a divisão. Com o telemóvel bloqueado ou outra aplicação à frente, a posição volta ao GPS e mantém o último piso.',
+  'player.beacons_skipped': 'As posições no interior estão desligadas. A posição por GPS continua a ser partilhada.',
+  'player.beacons_denied': 'As posições no interior estão desligadas: sem autorização para o Bluetooth. A posição por GPS continua a ser partilhada.',
+  'player.beacons_off': 'As posições no interior estão desligadas: o Bluetooth está desligado. Liga-o e partilha outra vez.',
+  'player.beacons_unavailable': 'Este telemóvel não consegue ouvir as balizas do campo. A posição por GPS continua a ser partilhada.',
+  'player.beacons_why_ios': 'Este campo tem balizas Bluetooth no interior. Para saber em que divisão estás, o Atalaia pode ouvi-las enquanto partilhas a posição: só as balizas do campo, e envia apenas qual é a mais forte. O iPhone pede a autorização de localização para isso (o Bluetooth é usado pelas balizas, não é pedido). Sem ela a tua posição fica só por GPS.',
+  'player.beacons_on_ios': 'A ouvir as balizas do campo, só enquanto o Atalaia está aberto no ecrã: no interior a tua posição é a divisão. Com o telemóvel bloqueado ou outra aplicação à frente, a posição volta ao GPS e mantém o último piso.',
   'player.my_room': 'A tua posição: {room}',
   'player.map_title': 'Mapa do campo',
   'player.map_semantics': 'Mapa do campo, {level}: {n} posições',
+  'player.map_semantics_one': 'Mapa do campo, {level}: {n} posição',
   'player.map_off_plan': '{n} posições fora desta planta',
+  'player.map_off_plan_one': '{n} posição fora desta planta',
   'player.map_level_unknown':
       'Pontos vazios: quem ainda não disse em que piso está.',
   'player.map_level_unknown_short': 'piso desconhecido',
@@ -760,8 +737,7 @@ const Map<String, String> ptStrings = {
   'player.level_n': 'Piso {n}',
   'player.level_title': 'Em que piso estás?',
   'player.level_unknown': 'Não sei',
-  'player.level_hint':
-      'A tua equipa vê-te nesse piso. O telemóvel não distingue os pisos sozinho.',
+  'player.level_hint': 'A tua equipa vê-te nesse piso. O telemóvel não distingue os pisos sozinho.',
   'player.level_beacon': 'O teu piso vem da baliza da sala: {level}.',
   'player.feature.safe_zone': 'Zona segura',
   'player.feature.respawn': 'Respawn',
@@ -771,8 +747,7 @@ const Map<String, String> ptStrings = {
   'player.feature.objective': 'Objetivo',
   'player.feature.other': 'Outro',
   'player.feature.boundary': 'Limite do campo',
-  'player.share_hint_squads':
-      'Só durante o jogo; o controlador decide quem a vê: o teu squad, se o jogo o permitir, e a organização e os marshals nos seus dispositivos ATAK.',
+  'player.share_hint_squads': 'Só durante o jogo; o controlador decide quem a vê: o teu squad, se o jogo o permitir, e a organização e os marshals nos seus dispositivos ATAK.',
   'checkin.team_squad': '{team} › squad {squad}',
   'branding.logo': 'Logótipo de {name}',
   // Inscrições online no servidor do campo (decisão S16-13)
@@ -784,8 +759,7 @@ const Map<String, String> ptStrings = {
       'endereço da página do campo ou do jogo.',
   'site.address': 'Endereço da página do campo ou do jogo',
   'site.open': 'Abrir',
-  'site.bad_address':
-      'Isto não é o endereço de uma página de campo ou de jogo (https://…/f/…).',
+  'site.bad_address': 'Isto não é o endereço de uma página de campo ou de jogo (https://…/f/…).',
   'site.confirm_text':
       'Vais entrar com a tua conta em {host}. Só continues se for o site do '
       'campo onde vais jogar: quem fez a ligação pode ter escrito outro site.',
@@ -811,6 +785,7 @@ const Map<String, String> ptStrings = {
   'site.cancelled_reason': 'Este jogo foi cancelado: {reason}',
   'site.open_until': 'Inscrições abertas até {when}',
   'site.left': '{n} lugares',
+  'site.left_one': '{n} lugar',
   'site.opens': 'As inscrições abrem a {when}',
   'site.full': 'Esgotado',
   'site.closed': 'Inscrições fechadas',
@@ -825,6 +800,7 @@ const Map<String, String> ptStrings = {
   'site.replicas': 'Réplicas que vais usar (até {n})',
   'site.class_not_here': '{class}: este campo não tem esta classe',
   'site.too_many': 'Este campo aceita até {n} réplicas por pessoa.',
+  'site.too_many_one': 'Este campo aceita até {n} réplica por pessoa.',
   'site.register': 'Fazer a inscrição',
   'site.save': 'Guardar as alterações',
   'site.changed': 'Inscrição alterada.',
@@ -975,7 +951,7 @@ const Map<String, String> ptStrings = {
   'ctl.open': 'Aberto na rede Wi-Fi do campo',
   'ctl.open_on':
       'Telemóveis, computadores e dispositivos de jogo ligam-se por HTTPS '
-      '(porta 8443, com a CA do campo) e por MQTT (porta 1883).',
+      '(porta 8443, com a CA do campo) e por MQTT sobre TLS (porta 8883, a mesma CA).',
   'ctl.open_off':
       'Só este telemóvel chega ao controlador: nada fica à escuta na rede.',
   'ctl.addresses': 'A consola, nos computadores da rede do campo:',
@@ -1063,7 +1039,8 @@ const Map<String, String> ptStrings = {
   'ctl.fw_keys_none':
       'Nenhuma: este controlador não aceita versões de firmware para as '
       'caixas.',
-  'ctl.fw_keys_set': '{n} chave(s): aceita as versões que assinam.',
+  'ctl.fw_keys_set': '{n} chaves: aceita as versões que assinam.',
+  'ctl.fw_keys_set_one': '{n} chave: aceita as versões que assina.',
   'ctl.fw_keys_hint':
       'As metades públicas das chaves de versão (base64, 44 caracteres '
       'cada), uma por linha, como em [firmware] release_keys do Pi. As '
@@ -1095,9 +1072,9 @@ const Map<String, String> ptStrings = {
   // The phone controller's [modes] settings (slice S7b of PE24).
   'ctl_modes.title': 'Pacotes de modos',
   'ctl_modes.tile': 'Pacotes de modos (controlador de campo)',
-  'ctl_modes.tile_hint': '{keys} chaves de confiança, {box} chaves das caixas',
-  'ctl_modes.intro':
-      'As chaves em que o controlador de campo deste telemóvel confia para pacotes de modos assinados, as chaves gravadas no firmware das caixas (o controlador só lhes oferece pacotes que aceitam), as chaves revogadas e o índice do registo: a secção [modes] de um Pi. Aplicam-se quando o controlador voltar a arrancar.',
+  'ctl_modes.tile_hint':
+      'Chaves de confiança: {keys}, chaves das caixas: {box}',
+  'ctl_modes.intro': 'As chaves em que o controlador de campo deste telemóvel confia para pacotes de modos assinados, as chaves gravadas no firmware das caixas (o controlador só lhes oferece pacotes que aceitam), as chaves revogadas e o índice do registo: a secção [modes] de um Pi. Aplicam-se quando o controlador voltar a arrancar.',
   'ctl_modes.keys': 'Chaves de modos de confiança (uma por linha, base64)',
   'ctl_modes.box_keys': 'Chaves de modos das caixas (uma por linha, base64)',
   'ctl_modes.revoked':
@@ -1109,6 +1086,10 @@ const Map<String, String> ptStrings = {
   'ctl_modes.bad_id':
       'Linha {line}: não é um id de chave (16 dígitos hexadecimais).',
   'ctl_modes.bad_index': 'O índice é um endereço https:// ou um ficheiro.',
+  'ctl_modes.min_versions': 'Versão mínima por modo (uma por linha, id=versão, por exemplo org.exemplo.modo=1.2.0; opcional)',
+  'ctl_modes.max_age': 'Dias em que a última lista de revogações ainda vale quando o índice não responde (0 a 3650; 30 por omissão)',
+  'ctl_modes.bad_floor': 'Linha {line}: não é uma versão mínima (id=versão, por exemplo org.exemplo.modo=1.2.0).',
+  'ctl_modes.bad_age': 'Os dias são um número de 0 a 3650.',
   'ctl_modes.saved':
       'Guardado: aplica-se quando o controlador voltar a arrancar.',
   // The phone controller's slice S7 settings (PE24-118 onward).
@@ -1119,34 +1100,36 @@ const Map<String, String> ptStrings = {
   'ctl_site.on': 'ligado',
   'ctl_site.off': 'desligado',
   'ctl_site.title': 'Servidor do site, substituição e ATAK',
-  'ctl_site.intro':
-      'O controlador de campo deste telemóvel como o controller.toml de um Pi o define: a substituição, o servidor do site do campo (os jogos, os registos e as pontuações vão para lá quando há internet; listas de inscritos, imagem do campo e biblioteca de cenários vêm de lá) e o feed para o ATAK. Aplica-se quando o controlador voltar a arrancar.',
+  'ctl_site.intro': 'O controlador de campo deste telemóvel como o controller.toml de um Pi o define: a substituição, o servidor do site do campo (os jogos, os registos e as pontuações vão para lá quando há internet; listas de inscritos, imagem do campo e biblioteca de cenários vêm de lá) e o feed para o ATAK. Aplica-se quando o controlador voltar a arrancar.',
   'ctl_site.failover': 'Substituição',
   'ctl_site.failover_auto': 'Substituição automática',
   'ctl_site.manual': 'Manual',
   'ctl_site.auto': 'Automático',
-  'ctl_site.failover_hint':
-      'Manual: o GM promove um controlador de reserva. Automático: um controlador de reserva assume depois de três sinais em falta (30 s). Um telemóvel a bateria cede a um Pi ligado à corrente quando ambos se candidatam.',
+  'ctl_site.failover_hint': 'Manual: o GM promove um controlador de reserva. Automático: um controlador de reserva assume depois de três sinais em falta (30 s). Um telemóvel a bateria cede a um Pi ligado à corrente quando ambos se candidatam.',
   'ctl_site.sync': 'Servidor do site',
   'ctl_site.sync_hint': 'Primeiro offline: um jogo nunca espera pela rede.',
   'ctl_site.url': 'Endereço (https://…)',
   'ctl_site.key': 'Chave de API do campo (do servidor do site)',
   'ctl_site.key_set': 'Chave de API {fp}… (escreve outra para a substituir)',
-  'ctl_site.branding':
-      'Imagem do campo, equipas guardadas e definições do check-in do servidor do site',
+  'ctl_site.branding': 'Imagem do campo, equipas guardadas e definições do check-in do servidor do site',
   'ctl_site.library':
       'Cenários e predefinições de jogo do campo do servidor do site',
   'ctl_site.remote_gm': 'GM remoto',
-  'ctl_site.remote_gm_hint':
-      'Os GM do campo no servidor do site podem iniciar, pausar e terminar o jogo em curso. Desligado por omissão.',
+  'ctl_site.remote_gm_hint': 'Os GM do campo no servidor do site podem iniciar, pausar e terminar o jogo em curso. Desligado por omissão.',
   'ctl_site.atak': 'Feed ATAK (Cursor on Target)',
   'ctl_site.atak_hint':
       'As caixas e as zonas nos mapas do ATAK, pelo Wi-Fi do campo.',
   'ctl_site.multicast': 'Endereço multicast (239.2.3.1:6969)',
-  'ctl_site.staff':
-      'Dispositivos ATAK da organização (anfitrião:porta, separados por vírgulas)',
-  'ctl_site.players':
-      'Posições dos jogadores para os dispositivos da organização (nunca para multicast)',
+  'ctl_site.staff': 'Dispositivos ATAK da organização (anfitrião:porta, separados por vírgulas)',
+  'ctl_site.players': 'Posições dos jogadores para os dispositivos da organização (nunca para multicast)',
+  'ctl_site.staff_tls': 'TLS para os dispositivos da organização (entrada SSL do ATAK, porta 8089)',
+  'ctl_site.staff_tls_hint': 'As posições dos jogadores passam então cifradas pela rede. O certificado dos dispositivos da organização é verificado só com a AC abaixo, nunca com a do sistema.',
+  'ctl_site.staff_tls_ca': 'Certificado da AC que os dispositivos da organização apresentam (texto PEM)',
+  'ctl_site.staff_tls_cert':
+      'Certificado de cliente deste controlador (texto PEM; opcional)',
+  'ctl_site.staff_tls_key':
+      'A sua chave privada (texto PEM; junto com o certificado)',
+  'ctl_site.staff_tls_name': 'Nome nos certificados dos dispositivos (só quando os endereços são IP; opcional)',
   'ctl_site.remote': 'ATAK remoto através do servidor do site',
   'ctl_site.remote_players':
       'Também as posições dos jogadores através do servidor do site',
@@ -1162,7 +1145,7 @@ const Map<String, String> ptStrings = {
   'apd.expires': 'Válido até (AAAA-MM-DD)',
   'apd.expires_required': 'Válido até, AAAA-MM-DD (obrigatório)',
   'apd.date_format': '2027-01-31',
-  'apd.hint': 'A app não o verifica: o marshal compara-o com o cartão.',
+  'apd.hint': 'A app não o verifica. À entrada, um marshal compara o que escreveste com o teu cartão físico, porque o campo tem de o verificar. Depois de o cartão ser confirmado, o número é apagado do controlador do campo.',
   'apd.need_number': 'Este campo pede o número de associado da APD.',
   'apd.need_expiry': 'Este campo pede a data de validade da filiação.',
   'apd.bad_date': 'Escreve-se a data como AAAA-MM-DD, por exemplo 2027-01-31.',
@@ -1172,31 +1155,34 @@ const Map<String, String> ptStrings = {
   'apd.status.expired': 'Filiação caducada',
   'apd.status.not_accepted': 'APD não aceite aqui',
   'apd.status.missing': 'Filiação em falta',
-  'apd.hint_marshal': 'O marshal vai ver o cartão de associado.',
+  'apd.hint_marshal': 'Um marshal vai conferir o cartão de associado com o que escreveste, e és admitido quando o confirmar.',
   'queue.confirm': 'Admitir',
+  'queue.confirm_no_card': 'Admitir sem o cartão',
+  'queue.card_seen': 'Cartão visto, confere',
+  'apd.verdict_on': '{verdict} em {date}',
+  'apd.card_by': 'cartão verificado por {who}',
+  'checkin.share_position':
+      'Partilhar a minha posição com o jogo durante este jogo',
+  'checkin.share_position_hint': 'Opcional, e desligado se não marcares. A tua equipa ou squad (conforme o modo de jogo permitir), os marshals e a organização veem a tua posição no mapa; o GM remoto só a vê se o campo o ativar. Se não marcares, nada mais muda. Podes deixar de partilhar a qualquer momento durante o jogo.',
+  'checkin.card_why': 'Porque se verifica o cartão: o campo tem de conferir o teu cartão de associado à entrada com os dados que escreveste aqui (uma obrigação legal nos campos em Portugal, o interesse legítimo do campo nos outros). Depois só ficam a associação, a data de validade, o resultado e quem verificou; o número é apagado.',
   'site.err.membership_missing':
       'Este campo exige o número de associado da APD para a inscrição.',
   'site.err.apd_not_accepted': 'Este campo não aceita essa APD.',
   'site.err.membership_expired':
       'A filiação já terá caducado no dia deste jogo.',
   // The remote GM may see shared positions (PKD-5)
-  'player.share_remote_gm':
-      'Se o campo tiver um GM remoto com sessão iniciada no servidor do site, o GM remoto também vê a tua posição enquanto a partilhares. O servidor do site não a guarda.',
+  'player.share_remote_gm': 'Se o campo tiver um GM remoto com sessão iniciada no servidor do site, o GM remoto também vê a tua posição enquanto a partilhares. O servidor do site não a guarda.',
   // The account's login methods and the login without a password (PKA-1);
   // the texts are the site server's own (staff_i18n.py) where the same.
   'acct.passkey_cancelled':
       'A chave de acesso não foi usada (pedido cancelado ou expirado).',
   'acct.passkey_failed': 'Não foi possível entrar com a chave de acesso.',
   'acct.passkey_none': 'Esta conta não tem chaves de acesso.',
-  'acct.oidc.state_invalid':
-      'Este pedido de entrada expirou ou não foi feito por esta app. Tentar de novo.',
+  'acct.oidc.state_invalid': 'Este pedido de entrada expirou ou não foi feito por esta app. Tentar de novo.',
   'acct.oidc.denied': 'A entrada foi recusada no fornecedor.',
-  'acct.oidc.consent_required':
-      'Para criar uma conta nova, marcar a caixa de autorização que está abaixo dos botões dos fornecedores e escolher o fornecedor de novo.',
   'acct.oidc.too_many_attempts':
       'Demasiadas contas novas a partir deste endereço. Tentar mais tarde.',
-  'acct.oidc.quota_exceeded':
-      'Este campo chegou ao limite de contas. Falar com a organização do campo.',
+  'acct.oidc.quota_exceeded': 'Este campo chegou ao limite de contas. Falar com a organização do campo.',
   'acct.oidc.id_token_invalid':
       'A resposta do fornecedor não foi aceite. Tentar de novo.',
   'acct.oidc.token_exchange_failed':
@@ -1206,14 +1192,12 @@ const Map<String, String> ptStrings = {
   'acct.oidc.try_again': 'Tentar de novo.',
   'acct.oidc.other': 'Não foi possível entrar com o fornecedor.',
   'acct.title': 'Formas de entrar',
-  'acct.intro':
-      'As formas de entrar nesta conta: palavra-passe, Google, Microsoft ou Apple, chaves de acesso e o código TOTP. Cada alteração fica no registo de auditoria do servidor.',
+  'acct.intro': 'As formas de entrar nesta conta: palavra-passe, Google, Microsoft ou Apple, chaves de acesso e o código TOTP. Cada alteração fica no registo de auditoria do servidor.',
   'acct.confirm_title': 'Confirmar que é esta conta',
   'acct.confirm_password': 'Palavra-passe atual',
-  'acct.confirm_password_hint':
-      'As alterações abaixo pedem a palavra-passe atual. Escrevê-la aqui antes de as fazer.',
-  'acct.confirm_recent':
-      'Esta conta não tem palavra-passe: as alterações pedem uma confirmação feita nos últimos 10 minutos (entrar também conta). Confirmar com uma das formas abaixo e repetir a ação.',
+  'acct.confirm_password_hint': 'As alterações abaixo pedem a palavra-passe atual. Escrevê-la aqui antes de as fazer.',
+  'acct.confirm_recent': 'Esta conta não tem palavra-passe: as alterações pedem uma confirmação feita nos últimos 10 minutos (entrar também conta). Confirmar com uma das formas abaixo e repetir a ação.',
+  'acct.stepup_needed': 'Esta conta tem um segundo fator (TOTP ou chave de acesso) ou uma função de equipa: mudar a forma de entrar (chaves de acesso, TOTP, palavra-passe, contas ligadas, junção de contas) pede primeiro o código TOTP ou a chave de acesso. Um início de sessão com Google, Microsoft ou Apple não basta.',
   'acct.confirm_with': 'Confirmar com {provider}',
   'acct.confirmed': 'Confirmado. Repetir a ação.',
   'acct.reauthed': 'Confirmado com o fornecedor. Repetir a ação.',
@@ -1229,14 +1213,12 @@ const Map<String, String> ptStrings = {
   'acct.linked': 'Login ligado à conta.',
   'acct.unlinked': 'Login desligado.',
   'acct.passkeys_title': 'Chaves de acesso',
-  'acct.passkeys_intro':
-      'Uma chave de acesso entra sem palavra-passe nem código e conta como segundo fator para as funções de administração, GM e marshal.',
+  'acct.passkeys_intro': 'Uma chave de acesso entra sem palavra-passe nem código e conta como segundo fator para as funções de administração, GM e marshal.',
   'acct.passkeys_none': 'Sem chaves de acesso.',
   'acct.passkey_name': 'Nome da nova chave de acesso',
   'acct.passkey_add': 'Adicionar chave de acesso',
   'acct.passkey_added': 'Chave de acesso adicionada.',
-  'acct.passkey_unsupported':
-      'Este telemóvel não suporta chaves de acesso (precisa do Android 14 ou mais recente).',
+  'acct.passkey_unsupported': 'Este telemóvel não suporta chaves de acesso (precisa do Android 14 ou mais recente).',
   'acct.passkey_synced': 'sincronizada',
   'acct.passkey_device': 'só neste dispositivo',
   'acct.passkey_created': 'criada {when}',
@@ -1251,8 +1233,7 @@ const Map<String, String> ptStrings = {
   'acct.pw_title': 'Palavra-passe',
   'acct.pw_state_set': 'Esta conta tem palavra-passe.',
   'acct.pw_state_none': 'Esta conta não tem palavra-passe.',
-  'acct.pw_off':
-      'Neste servidor a entrada com palavra-passe está desligada: não se pode definir nem mudar uma.',
+  'acct.pw_off': 'Neste servidor a entrada com palavra-passe está desligada: não se pode definir nem mudar uma.',
   'acct.pw_new': 'Nova palavra-passe',
   'acct.pw_set_button': 'Definir palavra-passe',
   'acct.pw_change_button': 'Mudar palavra-passe',
@@ -1265,32 +1246,24 @@ const Map<String, String> ptStrings = {
   'acct.totp_on': 'O TOTP está ativo nesta conta.',
   'acct.totp_off': 'O TOTP não está ativo nesta conta.',
   'acct.totp_enable': 'Ativar TOTP',
-  'acct.totp_enrol_intro':
-      'Juntar este segredo à app de autenticação ({digits} algarismos, um código novo a cada {s} s) e escrever abaixo o código que a app mostra.',
+  'acct.totp_enrol_intro': 'Juntar este segredo à app de autenticação ({digits} algarismos, um código novo a cada {s} s) e escrever abaixo o código que a app mostra.',
   'acct.totp_secret': 'Segredo',
   'acct.totp_uri': 'Endereço otpauth (para apps que o aceitam)',
   'acct.totp_confirm': 'Ativar com este código',
   'acct.totp_enabled': 'TOTP ativado.',
-  'acct.totp_disable_intro':
-      'Para desativar: o código atual da app, mais a palavra-passe acima se a conta a tiver.',
+  'acct.totp_disable_intro': 'Para desativar: o código atual da app, mais a palavra-passe acima se a conta a tiver.',
   'acct.totp_disable': 'Desativar TOTP',
   'acct.totp_disabled': 'TOTP desativado.',
   'acct.oidc.already_linked': 'Esta conta já tem esse login ligado.',
   'acct.oidc.identity_taken': 'Esse login já está ligado a outra conta.',
-  'acct.oidc.provider_already_linked':
-      'Esta conta já tem um login deste fornecedor. Desligar primeiro o que existe.',
-  'acct.oidc.identity_mismatch':
-      'Esse não é o login ligado a esta conta. Usar a mesma conta do fornecedor.',
-  'acct.e.last_login_method':
-      'Essa é a última forma de entrar nesta conta: acrescentar primeiro outra.',
-  'acct.e.second_factor_required_by_role':
-      'Uma função desta conta precisa de segundo fator (TOTP ou chave de acesso): ficar com pelo menos um.',
-  'acct.e.totp_required_by_role':
-      'Uma função desta conta precisa de segundo fator: adicionar primeiro uma chave de acesso.',
-  'acct.e.password_login_disabled':
-      'Neste servidor a entrada com palavra-passe está desligada: não se pode definir nem mudar uma.',
-  'acct.e.confirmation_required':
-      'Confirmar primeiro que é esta conta (ver a confirmação acima) e repetir a ação.',
+  'acct.oidc.provider_already_linked': 'Esta conta já tem um login deste fornecedor. Desligar primeiro o que existe.',
+  'acct.oidc.identity_mismatch': 'Esse não é o login ligado a esta conta. Usar a mesma conta do fornecedor.',
+  'acct.e.last_login_method': 'Essa é a última forma de entrar nesta conta: acrescentar primeiro outra.',
+  'acct.e.second_factor_required_by_role': 'Uma função desta conta precisa de segundo fator (TOTP ou chave de acesso): ficar com pelo menos um.',
+  'acct.e.totp_required_by_role': 'Uma função desta conta precisa de segundo fator: adicionar primeiro uma chave de acesso.',
+  'acct.e.password_login_disabled': 'Neste servidor a entrada com palavra-passe está desligada: não se pode definir nem mudar uma.',
+  'acct.e.confirmation_required': 'Confirmar primeiro que é esta conta (ver a confirmação acima) e repetir a ação.',
+  'acct.e.mfa_required': 'Esta ação pede um segundo fator (TOTP ou chave de acesso): confirmar com o código ou a chave de acesso no painel de confirmação acima e repetir.',
   'acct.e.invalid_password': 'Palavra-passe errada.',
   'acct.e.invalid_code': 'Código errado.',
   'acct.e.no_password': 'Esta conta não tem palavra-passe.',
@@ -1318,8 +1291,7 @@ const Map<String, String> ptStrings = {
   'acct.browser_unavailable':
       'Não foi possível abrir o navegador do telemóvel.',
   'acct.oidc.cancelled': 'A entrada foi cancelada.',
-  'acct.oidc.browser_unavailable':
-      'Não foi possível abrir o navegador do telemóvel, ou este servidor não aceita a entrada pela app.',
+  'acct.oidc.browser_unavailable': 'Não foi possível abrir o navegador do telemóvel, ou este servidor não aceita a entrada pela app.',
   'acct.waiting': 'À espera de {provider} no navegador…',
   'acct.waiting_cancel': 'Cancelar',
   'acct.open': 'Formas de entrar na conta',
@@ -1340,8 +1312,6 @@ const Map<String, String> ptStrings = {
   'site.login_or': 'ou',
   'site.login_with': 'Entrar com {provider}',
   'site.login_passkey': 'Entrar com uma chave de acesso',
-  'site.login_consent':
-      'Se esta for a primeira entrada, autorizo criar uma conta nova (só se guarda o identificador que o fornecedor dá; ver o aviso de privacidade do campo).',
   'site.login_waiting': 'À espera da entrada no navegador…',
   'site.login_waiting_cancel': 'Cancelar',
   'site.account': 'Formas de entrar na conta',
@@ -1350,41 +1320,31 @@ const Map<String, String> ptStrings = {
   'propmodes.keys_none':
       'Nenhuma: este dispositivo só corre os modos incluídos na aplicação.',
   'propmodes.keys_set':
-      '{n} chave(s): pode obter do controlador um modo que elas assinem.',
-  'propmodes.keys_hint':
-      'As metades públicas (base64, 44 caracteres cada) das chaves de modo em que este dispositivo confia, uma por linha, no máximo 4: como as chaves de modo incluídas no firmware de uma caixa. Um jogo cujo modo a aplicação não tem só é obtido do controlador se uma chave desta lista o assinou. Não acrescentes uma chave que não te foi dada pelo projeto ou pelo teu clube.',
+      '{n} chaves: pode obter do controlador um modo que elas assinem.',
+  'propmodes.keys_set_one':
+      '{n} chave: pode obter do controlador um modo que ela assine.',
+  'propmodes.keys_hint': 'As metades públicas (base64, 44 caracteres cada) das chaves de modo em que este dispositivo confia, uma por linha, no máximo 4: como as chaves de modo incluídas no firmware de uma caixa. Um jogo cujo modo a aplicação não tem só é obtido do controlador se uma chave desta lista o assinou. Não acrescentes uma chave que não te foi dada pelo projeto ou pelo teu clube.',
   'propmodes.keys_bad':
       'Cada chave tem 44 caracteres base64 (32 bytes); no máximo 4.',
   'propmodes.fetching':
       'A obter o modo do jogo do controlador e a verificar a assinatura…',
-  'propmodes.err.no_key':
-      'Este dispositivo não confia em nenhuma chave de modo, por isso não aceita modos do controlador. Acrescenta a chave do projeto ou do teu clube nas Definições.',
-  'propmodes.err.unreachable':
-      'Não foi possível chegar ao controlador com o certificado do campo. Liga-te ao Wi-Fi do campo e tenta outra vez.',
-  'propmodes.err.not_offered':
-      'O controlador não oferece {mode}, ou o jogo já começou. Pede à organização que o envie assinado, ou que use modos incluídos.',
-  'propmodes.err.download':
-      'A transferência de {mode} falhou ou não tinha o tamanho anunciado. Tenta outra vez.',
-  'propmodes.err.bad_release':
-      'Recusado: a versão assinada de {mode} não está na forma aceite. Não foi executado.',
-  'propmodes.err.bad_signature':
-      'Recusado: {mode} não está assinado, ou não o está por uma chave em que este dispositivo confia. Não foi executado.',
+  'propmodes.err.no_key': 'Este dispositivo não confia em nenhuma chave de modo, por isso não aceita modos do controlador. Acrescenta a chave do projeto ou do teu clube nas Definições.',
+  'propmodes.err.unreachable': 'Não foi possível chegar ao controlador com o certificado do campo. Liga-te ao Wi-Fi do campo e tenta outra vez.',
+  'propmodes.err.not_offered': 'O controlador não oferece {mode}, ou o jogo já começou. Pede à organização que o envie assinado, ou que use modos incluídos.',
+  'propmodes.err.download': 'A transferência de {mode} falhou ou não tinha o tamanho anunciado. Tenta outra vez.',
+  'propmodes.err.bad_release': 'Recusado: a versão assinada de {mode} não está na forma aceite. Não foi executado.',
+  'propmodes.err.bad_signature': 'Recusado: {mode} não está assinado, ou não o está por uma chave em que este dispositivo confia. Não foi executado.',
   'propmodes.err.kind':
       'Recusado: {mode} não é um tipo de pacote que um dispositivo execute.',
   'propmodes.err.tier':
       'Recusado: {mode} precisa de um dispositivo mais potente do que este.',
-  'propmodes.err.builtin':
-      'Recusado: {mode} tem o identificador de um modo incluído na aplicação; esses nunca são substituídos.',
-  'propmodes.err.too_big':
-      'Recusado: {mode} é grande demais para um dispositivo (256 KiB no máximo).',
+  'propmodes.err.builtin': 'Recusado: {mode} tem o identificador de um modo incluído na aplicação; esses nunca são substituídos.',
+  'propmodes.err.too_big': 'Recusado: {mode} é grande demais para um dispositivo (256 KiB no máximo).',
   'propmodes.err.bad_hash':
       'Recusado: {mode} não é o ficheiro que foi assinado. Não foi executado.',
-  'propmodes.err.bad_archive':
-      'Recusado: o pacote de {mode} está danificado ou não está na forma aceite. Não foi executado.',
-  'propmodes.err.load':
-      'Recusado: {mode} não carrega no isolamento de execução. Não foi executado.',
-  'propmodes.err.no_space':
-      'Sem espaço para {mode}: o telemóvel guarda no máximo 8 modos obtidos, 512 KiB no total.',
+  'propmodes.err.bad_archive': 'Recusado: o pacote de {mode} está danificado ou não está na forma aceite. Não foi executado.',
+  'propmodes.err.load': 'Recusado: {mode} não carrega no isolamento de execução. Não foi executado.',
+  'propmodes.err.no_space': 'Sem espaço para {mode}: o telemóvel guarda no máximo 8 modos obtidos, 512 KiB no total.',
   'propmodes.err.other': 'Não foi possível obter o modo ({mode}).',
   // The membership texts of a field outside Portugal (decision MEM-4)
   'apd.section_m': 'Filiação numa associação',
@@ -1399,8 +1359,7 @@ const Map<String, String> ptStrings = {
   // The registration import on the phone controller's own screen (decision PIM-1);
   // the file and row texts are the console's (checkin_import in its i18n).
   'ctl.import': 'Lista de inscrições',
-  'ctl.import_hint':
-      'Para um campo sem servidor do campo: importe uma lista de inscrições (CSV ou JSON) de outra plataforma como as pessoas esperadas deste jogo. Verifique primeiro; nada muda até se importar.',
+  'ctl.import_hint': 'Para um campo sem servidor do campo: importe uma lista de inscrições (CSV ou JSON) de outra plataforma como as pessoas esperadas deste jogo. Verifique primeiro; nada muda até se importar.',
   'ctl.import_open': 'Importar uma lista de inscrições',
   'ctl.import_none':
       'Inicie um jogo para importar uma lista de inscrições para ele.',
@@ -1408,30 +1367,27 @@ const Map<String, String> ptStrings = {
   'ctl_import.pick_again': 'Escolher outro ficheiro',
   'ctl_import.picked': 'Ficheiro: {name}',
   'ctl_import.no_file': 'Ainda nenhum ficheiro escolhido.',
-  'ctl_import.no_picker':
-      'Este telemóvel não consegue abrir aqui um seletor de ficheiros. Importe a lista na consola do GM, num navegador.',
+  'ctl_import.no_picker': 'Este telemóvel não consegue abrir aqui um seletor de ficheiros. Importe a lista na consola do GM, num navegador.',
   'ctl_import.offline': 'O controlador não respondeu. Está a funcionar?',
   'ctl_import.failed': 'O controlador recusou a lista: {detail}',
   'ctl_import.rows_more': 'Mais {n} linhas não são mostradas.',
+  'ctl_import.rows_more_one': 'Mais {n} linha não é mostrada.',
   'ctl_import.title': 'Importar uma lista de inscrições',
-  'ctl_import.intro':
-      'Para um campo sem servidor do campo: uma lista de inscrições de outra plataforma (CSV ou JSON, no formato de importação do servidor do campo) passa a ser as pessoas esperadas deste jogo, e um marshal assinala cada pessoa à chegada. Só se leem display_name, external_ref, team_preference, federation_number e replicas; qualquer outra coluna (um email, um telefone) é apenas nomeada, nunca lida.',
+  'ctl_import.intro': 'Para um campo sem servidor do campo: uma lista de inscrições de outra plataforma (CSV ou JSON, no formato de importação do servidor do campo) passa a ser as pessoas esperadas deste jogo, e um marshal assinala cada pessoa à chegada. Só se leem display_name, external_ref, team_preference, federation_number e replicas; qualquer outra coluna (um email, um telefone) é apenas nomeada, nunca lida.',
   'ctl_import.source': 'Origem',
-  'ctl_import.source_hint':
-      'O nome da outra plataforma (a-z, 0-9, ponto, hífen, sublinhado). A mesma origem e o mesmo external_ref atualizam o mesmo jogador.',
-  'ctl_import.basis':
-      'O campo é responsável pela lista: tem base legal própria para guardar os dados destas pessoas.',
+  'ctl_import.source_hint': 'O nome da outra plataforma (a-z, 0-9, ponto, hífen, sublinhado). A mesma origem e o mesmo external_ref atualizam o mesmo jogador.',
+  'ctl_import.basis': 'O campo é responsável pela lista: tem base legal própria para guardar os dados destas pessoas.',
   'ctl_import.check': 'Verificar o ficheiro',
   'ctl_import.run': 'Importar',
   'ctl_import.order': 'Verifica-se primeiro: nada muda até se importar.',
   'ctl_import.checked': 'Verificado, ainda nada importado.',
   'ctl_import.imported': 'Importado.',
-  'ctl_import.counts':
-      '{rows} linhas: {created} novas, {updated} alteradas, {unchanged} iguais, {skipped} ignoradas, {refused} recusadas.',
+  'ctl_import.counts': '{rows} linhas: {created} novas, {updated} alteradas, {unchanged} iguais, {skipped} ignoradas, {refused} recusadas.',
+  'ctl_import.counts_one': '{rows} linha: novas {created}, alteradas {updated}, iguais {unchanged}, ignoradas {skipped}, recusadas {refused}.',
   'ctl_import.ignored': 'Colunas não lidas: {names}',
   'ctl_import.more': 'e mais {n}',
-  'ctl_import.missing':
-      '{n} pessoas importadas que ainda não chegaram não estão neste ficheiro (ficam).',
+  'ctl_import.missing': '{n} pessoas importadas que ainda não chegaram não estão neste ficheiro (ficam).',
+  'ctl_import.missing_one': '{n} pessoa importada que ainda não chegou não está neste ficheiro (fica).',
   'ctl_import.row': 'Linha',
   'ctl_import.result': 'Resultado',
   'ctl_import.line': 'linha {n}',
@@ -1487,50 +1443,66 @@ const Map<String, String> ptStrings = {
   'player.buzz_text': 'A vibrar nos eventos do jogo com a aplicação fechada',
   'player.saved': 'Campos guardados',
   'player.saved_forget': 'Esquecer este campo',
-  // O aviso de privacidade do servidor do campo e o consentimento de novo
+  // O aviso de privacidade do servidor do campo e mostrá-lo de novo, a criação de conta (LEG-*)
   // (CONS-*), a versão do aviso na criação de conta com login social, e a
   // ligação da cronografagem entre os campos de um hub alojado (SVX-2).
+  'acct.oidc.notice_required': 'Para criar uma conta nova, marcar primeiro que se leu o aviso de privacidade (caixa abaixo dos botões dos fornecedores) e escolher o fornecedor de novo.',
+  'acct.oidc.age_confirmation_required': 'Para criar uma conta é preciso ter 16 anos ou mais. Quem é mais novo faz o check-in no campo sem conta, com as regras do campo para os pais ou responsáveis. Se tens 16 anos ou mais, marca a caixa da idade (abaixo dos botões dos fornecedores) e escolhe o fornecedor de novo.',
+  'site.err.age_confirmation_required': 'Para criar uma conta é preciso ter 16 anos ou mais. Quem é mais novo faz o check-in no campo sem conta, com as regras do campo para os pais ou responsáveis.',
+  'site.err.notice_required':
+      'Abre e lê o aviso de privacidade, depois marca que o leste.',
+  'site.err.username_invalid': 'O nome de utilizador precisa de 3 a 64 letras, algarismos, pontos, hífenes ou sublinhados, e começa por uma letra ou um algarismo.',
+  'site.err.username_reserved':
+      'Esse nome de utilizador está reservado: escolhe outro.',
+  'site.err.email_invalid': 'Esse endereço de email não é válido.',
+  'site.err.username_or_email_taken':
+      'Esse nome de utilizador ou endereço de email já está em uso.',
+  'site.err.quota_exceeded':
+      'Este campo atingiu o limite de contas. Fala com a organização do campo.',
+  'site.signup_open': 'Criar uma conta',
+  'site.signup_title': 'Criar uma conta em {host}',
+  'site.signup_intro': 'Uma conta serve para te inscreveres em jogos e veres o teu histórico. Abre e lê primeiro o aviso de privacidade, depois confirma abaixo. Tens menos de 16 anos? Não precisas de conta: faz o check-in no campo.',
+  'site.signup_email': 'Email (opcional)',
+  'site.signup_create': 'Criar conta',
+  'site.signup_no_notice': 'Este servidor ainda não publicou o aviso de privacidade, por isso ainda não se pode criar uma conta aqui. Pergunta à organização do campo.',
+  'site.new_account_hint': 'É a tua primeira vez? Para criar uma conta, lê o aviso e marca as duas caixas.',
+  'site.login_notice': 'Li o aviso de privacidade.',
+  'site.login_notice_first': 'Abre primeiro o aviso de privacidade, acima.',
+  'site.login_age': 'Tenho 16 anos ou mais. Quem é mais novo faz o check-in no campo sem conta, com as regras do campo para os pais ou responsáveis.',
   'privacy.title': 'Aviso de privacidade',
   'privacy.read': 'Ler o aviso de privacidade',
   'privacy.version': 'Versão {version}',
   'privacy.lang_fallback':
       'Este aviso não existe em {requested}: mostra-se em {shown}.',
-  'privacy.none':
-      'O servidor ainda não publicou o texto do aviso de privacidade. Pergunta à organização do campo.',
-  'privacy.intro_outdated':
-      'O aviso de privacidade mudou desde o último consentimento desta conta (versão {old}, agora {version}). Lê o aviso e confirma de novo.',
-  'privacy.intro_missing':
-      'Esta conta não tem consentimento registado para o aviso de privacidade (versão {version}). Lê o aviso e confirma.',
+  'privacy.none': 'O servidor ainda não publicou o texto do aviso de privacidade. Pergunta à organização do campo.',
+  'privacy.intro_outdated': 'O aviso de privacidade mudou desde a versão mostrada pela última vez a esta conta (versão {old}, agora {version}). Lê o aviso e confirma que o viste. A conta continua a funcionar como está.',
+  'privacy.intro_missing': 'Não há registo de que esta conta tenha visto o aviso de privacidade (versão {version}). Lê o aviso e confirma que o viste.',
   'privacy.read_and_confirm': 'Ler e confirmar',
-  'privacy.accept': 'Li o aviso de privacidade e estou de acordo.',
+  'privacy.accept': 'Li o aviso de privacidade.',
   'privacy.confirm': 'Confirmar',
-  'privacy.tick_first': 'Marca primeiro que leste o aviso e estás de acordo.',
-  'privacy.done': 'Consentimento registado.',
+  'privacy.tick_first': 'Marca primeiro que leste o aviso.',
+  'privacy.done': 'Registado: o aviso foi visto.',
   'privacy.changed':
       'O aviso mudou entretanto. Lê a nova versão e confirma de novo.',
-  'site.err.notice_version_changed':
-      'O aviso de privacidade mudou entretanto. Abre-o, lê a nova versão e tenta de novo.',
-  'acct.oidc.notice_version_changed':
-      'O aviso de privacidade mudou entretanto. Abre-o, lê a nova versão e tenta de novo.',
+  'site.err.notice_version_changed': 'O aviso de privacidade mudou entretanto. Abre-o, lê a nova versão e tenta de novo.',
+  'acct.oidc.notice_version_changed': 'O aviso de privacidade mudou entretanto. Abre-o, lê a nova versão e tenta de novo.',
+  'site.err.privacy_notice_unpublished': 'Este servidor ainda não publicou o seu aviso de privacidade, por isso não cria contas novas. Quem já tem conta entra como sempre. Avisar quem gere o servidor.',
+  'acct.oidc.privacy_notice_unpublished': 'Este servidor ainda não publicou o seu aviso de privacidade, por isso não cria contas novas. Quem já tem conta entra como sempre. Avisar quem gere o servidor.',
   'hub.title': 'Cronografagem entre campos',
   'hub.open': 'Partilha da cronografagem entre campos',
-  'hub.intro':
-      'Se jogas em vários campos deste servidor, podes ligar as tuas contas para que cada campo veja as cronografagens que passaste noutro (só de leitura). Cada campo continua a precisar do teu consentimento.',
+  'hub.intro': 'Se jogas em vários campos deste servidor, podes ligar as tuas contas para que cada campo veja as cronografagens que passaste noutro (só de leitura). Cada campo continua a precisar do teu consentimento.',
   'hub.not_hosted': 'Este servidor tem um só campo: não há nada para ligar.',
   'hub.linked': 'Conta ligada desde {when}.',
   'hub.unlinked':
       'Esta conta ainda não está ligada às tuas contas de outros campos.',
   'hub.sharing_on':
       'A partilhar: os outros campos veem as tuas cronografagens.',
-  'hub.sharing_off':
-      'Ainda não está a partilhar: falta o teu consentimento neste campo, ou o campo tem a partilha desligada.',
-  'hub.consent_hint':
-      'A partilha precisa do teu consentimento em cada campo e do interruptor do próprio campo.',
+  'hub.sharing_off': 'Ainda não está a partilhar: falta o teu consentimento neste campo, ou o campo tem a partilha desligada.',
+  'hub.consent_hint': 'A partilha precisa do teu consentimento em cada campo e do interruptor do próprio campo.',
   'hub.make_title': 'Gerar um código',
   'hub.make_text': 'Gera um código e escreve-o na tua conta do outro campo.',
   'hub.make': 'Gerar código',
-  'hub.code_note':
-      'Vale {minutes} minutos e só pode ser usado uma vez. Não volta a ser mostrado.',
+  'hub.code_note': 'Vale {minutes} minutos e só pode ser usado uma vez. Não volta a ser mostrado.',
   'hub.copy': 'Copiar',
   'hub.enter_title': 'Escrever o código de outro campo',
   'hub.enter_text':

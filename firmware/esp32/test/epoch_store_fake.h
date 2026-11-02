@@ -24,7 +24,44 @@ typedef struct {
     bool read_fails; /* read_epochs returns -2 */
     bool write_fail; /* write_epochs fails and changes nothing */
     int writes;      /* write_epochs calls */
+    uint32_t rnd;    /* what random_bytes hands out next (a fixed value in a test) */
+    bool no_random;  /* random_bytes fails */
+    uint16_t floor;  /* the epoch floor entry (EP-2), apart from the blob */
+    bool have_floor;
+    bool floor_fails;      /* read_floor returns -2 */
+    bool floor_write_fail; /* write_floor fails and changes nothing */
+    int floor_writes;
 } epoch_fake_t;
+
+static inline int epoch_fake_read_floor(void *ctx, uint16_t *floor)
+{
+    epoch_fake_t *f = (epoch_fake_t *)ctx;
+    if (f->floor_fails) return -2;
+    if (!f->have_floor) return -1;
+    *floor = f->floor;
+    return 0;
+}
+
+static inline int epoch_fake_write_floor(void *ctx, uint16_t floor)
+{
+    epoch_fake_t *f = (epoch_fake_t *)ctx;
+    f->floor_writes++;
+    if (f->floor_write_fail) return -1;
+    f->floor = floor;
+    f->have_floor = true;
+    return 0;
+}
+
+static inline int epoch_fake_random(void *ctx, uint8_t *buf, size_t n)
+{
+    epoch_fake_t *f = (epoch_fake_t *)ctx;
+    if (f->no_random) return -1;
+    for (size_t i = 0; i < n; i++) {
+        f->rnd = f->rnd * 1664525u + 1013904223u;
+        buf[i] = (uint8_t)(f->rnd >> 24);
+    }
+    return 0;
+}
 
 static inline int epoch_fake_read_legacy(void *ctx, uint16_t *e)
 {
@@ -76,6 +113,9 @@ static inline int epoch_fake_of(const epoch_fake_t *f, const uint8_t key[16])
                                .read_key = (rk),                                                   \
                                .write_key = (wk),                                                  \
                                .erase_key = (ek),                                                  \
+                               .random_bytes = epoch_fake_random,                                  \
+                               .read_floor = epoch_fake_read_floor,                                \
+                               .write_floor = epoch_fake_write_floor,                              \
                                .ctx = (f)})
 
 #endif /* ATALAIA_EPOCH_STORE_FAKE_H */

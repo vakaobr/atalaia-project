@@ -320,7 +320,8 @@ class ControllerFirmware {
         if (_active.contains(e.value['state'])) e.key,
     ]..sort();
     if (nodes.isEmpty) return null;
-    return 'firmware updates are on their way to box(es) ${nodes.join(', ')}: '
+    return 'firmware updates are on their way to '
+        "${nodes.length == 1 ? 'box' : 'boxes'} ${nodes.join(', ')}: "
         'wait for them, or cancel them (DELETE /api/v1/firmware/updates) '
         'before the game starts';
   }

@@ -32,6 +32,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../controller/controller_link.dart';
+import '../controller/peer_epoch.dart' show cmdPeerEpoch;
 import '../pod/pod_client.dart';
 import '../pod/pod_codec.dart';
 import '../protocol/join_payload.dart';
@@ -162,8 +163,59 @@ class PodRadioLink extends ChangeNotifier implements ControllerLink {
   Map<String, Object?>? _state;
   var _stateSentMs = -1;
 
+  /// Other nodes' epochs the controller named (CMD peer, RFC 0001 Amendment 24), the highest per node: the
+  /// pod's receiver follows a source only a few epochs above the last it heard, and a controller that heard a
+  /// box far above says so over Wi-Fi too, where the radio's own CMD is not what this link takes (decisions
+  /// EP-1, SR-110). Sent to the pod once its radio is configured, and again after each new configuration.
+  final _peers = <int, int>{};
+
+  /// What was named so far (node -> epoch), for the screen and the tests.
+  Map<int, int> get peerEpochs => Map.unmodifiable(_peers);
+
   @override
   Stream<LinkMessage> get messages => _messages.stream;
+
+  /// Tells the pod's receiver that node [src] is at [epoch] (SET_PEER_EPOCH). It only ever goes up (SR-111):
+  /// an epoch at or below what was named is ignored, and a node id or epoch outside the wire's range or this
+  /// phone's own id is refused. False when nothing was taken.
+  bool setPeerEpoch(int src, int epoch) {
+    if (src < 1 ||
+        src > 0xfffe ||
+        src == join.nodeId ||
+        epoch < 1 ||
+        epoch > 0xffff) {
+      return false;
+    }
+    if (epoch <= (_peers[src] ?? 0)) return false;
+    _peers[src] = epoch;
+    if (linked) _sendPeers({src: epoch});
+    return true;
+  }
+
+  /// A CMD peer's params, from the radio or from the Wi-Fi link: {"src", "epoch"}; anything else is ignored.
+  bool applyPeerEpoch(Map<String, Object?>? params) {
+    final src = params?['src'], epoch = params?['epoch'];
+    return src is int && epoch is int && setPeerEpoch(src, epoch);
+  }
+
+  void _sendPeers(Map<int, int> epochs) {
+    if (epochs.isEmpty || pod.broken) return;
+    final pairs = epochs.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    for (var i = 0; i < pairs.length; i += 60) {
+      unawaited(
+        pod.sendRadio(FrameType.radioCmd, [
+          RadioOp.setPeerEpoch,
+          for (final e in pairs.skip(i).take(60)) ...[
+            e.key >> 8 & 0xff,
+            e.key & 0xff,
+            e.value >> 8 & 0xff,
+            e.value & 0xff,
+          ],
+        ]),
+      );
+    }
+  }
 
   /// The pod's radio is configured for the game: packets can go out.
   @override
@@ -251,6 +303,9 @@ class PodRadioLink extends ChangeNotifier implements ControllerLink {
             status['cmd'] == 2) {
           state = RadioLinkState.linked;
           _configureAtMs = -1;
+          _sendPeers(
+            _peers,
+          ); // a new configuration forgets what the pod was told
           for (final o in _outbox) {
             // A new epoch: everything waiting goes again, in new packets.
             o.dueMs = 0;
@@ -302,6 +357,12 @@ class PodRadioLink extends ChangeNotifier implements ControllerLink {
         if (!c.isFor(join.nodeId)) return;
         // From the controller this node follows (or anyone before its first TIME).
         if (_heardTime && h.source != _leader) return;
+        if (c.cmd == cmdPeerEpoch) {
+          // The pod hands the radio's CMD peer to its phone, as a box's own code takes it (field_link.c); the
+          // Wi-Fi link carries the same message (PropLink), and both go through here (decision EP-1).
+          applyPeerEpoch(c.params);
+          return;
+        }
         _messages.add(LinkCommand(c.name, c.params ?? const {}));
       case RfType.ack:
         final a = RfAck.decode(plain);

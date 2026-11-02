@@ -68,9 +68,9 @@ void main() {
   );
 
   test('the gm_only table is the event schema\'s', () {
-    final doc =
-        loadYaml(File('../protocol/schema/events.yaml').readAsStringSync())
-            as YamlMap;
+    final doc = loadYaml(
+      File('../protocol/schema/events.yaml').readAsStringSync(),
+    ) as YamlMap;
     final fromSchema = <String, Set<String>>{};
     (doc['events'] as YamlMap).forEach((name, spec) {
       final gmOnly = spec is YamlMap ? spec['gm_only'] : null;

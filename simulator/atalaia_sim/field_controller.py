@@ -46,8 +46,11 @@ from .packet import (
     time_encode,
     vf_ack,
 )
+from .peer_epoch import PeerEpochs
 from .protocol import MESSAGE_TYPES
 from .radio_model import RadioModel
+from .replay import FRESH, ReplayWindow
+from .replay import counter as replay_counter
 
 # Game states (TIME key 2).
 GAME_WAITING = 0
@@ -87,6 +90,9 @@ CMD_UPDATE = 9
 # The I/O pod's settings (RFC 0001 Amendment 17, protocol/pod-config.md): params {"v", "rev", ...};
 # the controller sends it to the node id of the phone a pod serves, and the pod's radio takes it.
 CMD_POD = 10
+# A node's epoch, for the receivers (RFC 0001 Amendment 24, decision SR-110): params {"src", "epoch"}.
+# Internal: the controller sends it itself, so it has no name in CMD_OPCODES (the GM's list).
+CMD_PEER_EPOCH = 11
 CMD_OPCODES = {
     "start": CMD_START,
     "pause": CMD_PAUSE,
@@ -109,8 +115,9 @@ BROADCAST = 0xFFFF
 # CMD params travel as a CBOR map with text keys; a box's C decoder turns
 # them into JSON in a 128-byte buffer, so their JSON form must fit 127 bytes.
 CMD_PARAMS_MAX = 127
-# Flood copies of a packet are dropped for this long (ADR-P2-6: 60 s on the controller).
-PACKET_DEDUPE_MS = 60_000
+# Flood copies and replays are refused by the per-source replay window (replay.py, RFC 0001
+# Amendment 23): a packet already seen, or 64 or more counters below the source's highest, however
+# long ago (this was a 60 s table; a recording played back after a minute got through).
 
 # Node health (decisions FU1-1 to FU1-3).
 HEALTH_EVENTS = ("node.online", "node.offline", "battery.low")
@@ -335,13 +342,21 @@ class FieldController:
         self.on_drift: Optional[Callable[[dict[str, Any]], None]] = None
 
         self.acks = AckTracker()
-        self._packets_seen: dict[tuple[int, int, int], int] = {}
+        self._replay: dict[int, ReplayWindow] = {}  # source -> its replay window
+        self._peer_epochs = PeerEpochs()  # the epochs this controller named to the receivers (SR-110)
+        self.replays_refused = 0  # authenticated packets the windows refused (copies and replays)
+        self.controllers_heard: set[int] = set()  # other controllers' node ids heard on the air (EP-3)
         self._events_seen: set[tuple[int, int, int, str]] = set()
-        self._last_prune = 0
 
         # Hooks for the host (all optional).
         self.on_event: Optional[Callable[[dict[str, Any]], None]] = None
         self.on_node: Optional[Callable[[FieldNode, str], None]] = None
+        # A box heard at an epoch the receivers may not follow (SR-110): (node, epoch), for the host to
+        # tell its modem (SET_PEER_EPOCH); the controller has sent the CMD to the boxes itself.
+        self.on_peer_epoch: Optional[Callable[[int, int], None]] = None
+        # Another controller was heard on the air (its TIME or CLAIM authenticated): its node id has used
+        # epochs under this key and must not be given to a new device (EP-3). Called once per controller id.
+        self.on_controller_heard: Optional[Callable[[int], None]] = None
         self.on_scores: Optional[Callable[[dict[str, int]], None]] = None
         self.on_role: Optional[Callable[[str, int], None]] = None
 
@@ -483,7 +498,7 @@ class FieldController:
         if isinstance(cmd, str) and cmd not in CMD_OPCODES:
             raise ValueError(f"unknown command {cmd!r}")
         opcode = CMD_OPCODES[cmd] if isinstance(cmd, str) else int(cmd)
-        if not 0 <= opcode <= CMD_POD:
+        if not 0 <= opcode <= CMD_POD:  # CMD_PEER_EPOCH is the controller's own
             raise ValueError(f"unknown command opcode {opcode}")
         return self._send_cmd(opcode, params, dest, now_ms=now_ms)
 
@@ -506,6 +521,14 @@ class FieldController:
         if dest is not None and dest != BROADCAST:
             msg["dest"] = dest
         return self._send("CMD", cmd_encode(msg), PRIO_CRITICAL, now_ms)
+
+    def _announce_peer_epoch(self, node_id: int, epoch: int, now_ms: int) -> None:
+        """A box was heard at an epoch the receivers may not follow (peer_epoch.py, SR-110): the host
+        tells its modem, and the leader tells every box (CMD peer, flooded; it only moves a table up)."""
+        if self.on_peer_epoch is not None:
+            self.on_peer_epoch(node_id, epoch)
+        if self.election.is_leader:
+            self._send_cmd(CMD_PEER_EPOCH, {"src": node_id, "epoch": epoch}, now_ms=now_ms)
 
     def _send_ack(self, node_id: int, epoch: int, now_ms: int) -> None:
         self._send("ACK", ack_encode(self.acks.ack_payload(node_id, epoch)), PRIO_NORMAL, now_ms)
@@ -540,11 +563,16 @@ class FieldController:
         """Process one decrypted packet. meta may carry epoch, rssi and snr (from the modem)."""
         meta = meta or {}
         epoch = int(meta.get("epoch", 0))
-        key = (header.source, epoch, header.seq)
-        if key in self._packets_seen:
-            return  # a flood copy of a packet already handled
-        self._packets_seen[key] = self._now
+        window = self._replay.setdefault(header.source, ReplayWindow())
+        if window.accept(replay_counter(epoch, header.seq)) != FRESH:
+            self.replays_refused += 1
+            return  # a flood copy of a packet already handled, or a recording played back
         msg_type = header.type
+        if msg_type in (MESSAGE_TYPES["TIME"], MESSAGE_TYPES["CLAIM"]) and header.source != self.node_id \
+                and header.source not in self.controllers_heard:
+            self.controllers_heard.add(header.source)
+            if self.on_controller_heard is not None:
+                self.on_controller_heard(header.source)
 
         if msg_type == MESSAGE_TYPES["TIME"]:
             self._on_time(source_node, payload)
@@ -555,6 +583,7 @@ class FieldController:
 
         self.acks.record(source_node, epoch, header.seq)
         node = self._node(source_node)
+        prior_epoch = node.epoch
         node.last_seen_ms = self._now
         node.last_seen_game_ms = self.game_time_ms
         node.heard = True
@@ -574,6 +603,9 @@ class FieldController:
 
         if vf_ack(header.version_flags) and self.election.is_leader:
             self._send_ack(source_node, epoch, self._now)
+        kind = "HELLO" if msg_type == MESSAGE_TYPES["HELLO"] else ""
+        if self._peer_epochs.heard(source_node, prior_epoch, epoch, kind, self._now):
+            self._announce_peer_epoch(source_node, epoch, self._now)
         self._check_health(node, self._now)
 
     def _on_state(self, node: FieldNode, payload: bytes) -> None:
@@ -750,13 +782,11 @@ class FieldController:
                 self.send_time_beacon(now_ms=now_ms)
         else:
             self._repeats = []
+        if self.election.is_leader:
+            for node_id, epoch in self._peer_epochs.due(now_ms):  # the repeats of an announcement
+                self._send_cmd(CMD_PEER_EPOCH, {"src": node_id, "epoch": epoch}, now_ms=now_ms)
         for node in list(self.nodes.values()):
             self._check_health(node, now_ms)
-
-        if now_ms - self._last_prune >= 10_000:
-            self._last_prune = now_ms
-            cutoff = now_ms - PACKET_DEDUPE_MS
-            self._packets_seen = {k: t for k, t in self._packets_seen.items() if t >= cutoff}
         return deliveries
 
     # --- score merging --------------------------------------------------------

@@ -138,9 +138,10 @@ class TemplateScreen extends StatelessWidget {
                 fontSize: _defaultFont,
                 height: 1.2,
                 fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily,
-                fontFamilyFallback: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.fontFamilyFallback,
+                fontFamilyFallback: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.fontFamilyFallback,
               ),
               child: Semantics(
                 container: true,

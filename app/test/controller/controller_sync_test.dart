@@ -311,9 +311,8 @@ class FakeSite {
 
 void main() {
   late AtalaiaCore core;
-  final limits = File(
-    'lib/chrono/limit_templates/portugal.yaml',
-  ).readAsStringSync();
+  final limits = File('lib/chrono/limit_templates/portugal.yaml')
+      .readAsStringSync();
   final fixtures =
       (loadVectors('controller_api.json')['fixtures']! as Map)['values']!
           as Map;
@@ -671,6 +670,17 @@ void main() {
         SyncConfig(url: site.url, apiKey: 'x').problem(),
         contains('api_key'),
       );
+      // One CA certificate only (APP-1): a bundle trusts more than anyone hashed.
+      const one =
+          '-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n';
+      expect(
+        SyncConfig(url: site.url, apiKey: key, caPem: one).problem(),
+        isNull,
+      );
+      expect(
+        SyncConfig(url: site.url, apiKey: key, caPem: one + one).problem(),
+        contains('ca_pem'),
+      );
     });
 
     test('the game never waits for the network', () async {
@@ -868,6 +878,50 @@ void main() {
       expect(engine.store.eventLog(gid), isEmpty);
       expect(engine.store.scores(gid), isEmpty);
       expect(c.syncState(gid, seed)['final'], isFalse); // its bookkeeping went
+    });
+
+    test('a purged game leaves its team results for 365 days, with no player '
+        'id (SR-88)', () {
+      final gid = play();
+      engine.store.saveScores(gid, {'red': 9, 'blue': 4});
+      final tie = play();
+      engine.store.saveScores(tie, {'red': 3, 'blue': 3});
+      expect(checkin.gameResults()['results'], isEmpty);
+      wall += 95 * 86400;
+      final out = checkin.purge(force: true)!;
+      expect((out['games'], out['game_results_expired']), (2, 0));
+      expect(engine.store.game(gid), isNull);
+      final results = (checkin.gameResults()['results']! as List)
+          .cast<Map<String, Object?>>();
+      expect(results, hasLength(2));
+      final won = results.firstWhere((r) => r['winner'] != null);
+      expect(won['team_totals'], {'red': 9, 'blue': 4});
+      expect(won['winner'], 'red');
+      expect(results.where((r) => r['winner'] == null), hasLength(1)); // a tie
+      for (final r in results) {
+        expect(r.keys.toSet(), {
+          'name',
+          'mode_id',
+          'teams',
+          'team_totals',
+          'winner',
+          'state',
+          'duration_ms',
+          'started_at',
+          'ended_at',
+        });
+      }
+      wall += 271 * 86400; // 366 days after the games ended
+      expect(checkin.purge(force: true)!['game_results_expired'], 2);
+      expect(checkin.gameResults()['results'], isEmpty);
+    });
+
+    test('a game past a year when it goes leaves no result', () {
+      play();
+      checkin.setSettings({'game_retention_days': 730});
+      wall += 731 * 86400;
+      expect(checkin.purge(force: true)!['games'], 1);
+      expect(checkin.gameResults()['results'], isEmpty);
     });
 
     test('the field\'s own days, and no sync: age alone decides', () {
@@ -1096,6 +1150,38 @@ void main() {
         expect(c.sharedChronoSupported, isTrue); // no pull was tried
       });
 
+      test(
+        'an erased account or a withdrawn consent (copies_revoked) takes the '
+        'copies away even after the start (PRIV-5)',
+        () async {
+          final first = await record();
+          site.gets['/api/v1/sync/chrono'] = answer([
+            (falcao, [first]),
+          ]);
+          expect(await c.runOnce(), isTrue, reason: c.lastError);
+          expect(await shown(), [first['_id']]);
+          engine.startGame(gid, force: true);
+          expect(await c.runOnce(), isTrue, reason: c.lastError);
+          expect(await shown(), [
+            first['_id'],
+          ]); // kept: nothing changes after the start
+          site.gets['/api/v1/sync/schedule'] = {
+            ...scheduled(),
+            'copies_revoked': [
+              {'player_id': falcao, 'reason': 'erasure', 'at': t0.toInt()},
+            ],
+          };
+          expect(await c.runOnce(), isTrue, reason: c.lastError);
+          expect(await shown(), isEmpty);
+          expect(
+            await c.runOnce(),
+            isTrue,
+            reason: c.lastError,
+          ); // every cycle: nothing more
+          expect(await shown(), isEmpty);
+        },
+      );
+
       test('an older site server has the roster but not the records', () async {
         site.gets.remove('/api/v1/sync/chrono');
         site.gets['/api/v1/sync/roster'] = roster();
@@ -1216,7 +1302,7 @@ void main() {
               .encode(List.filled(32, 1))
               .replaceAll('=', ''),
           'display_name': 'Falcão',
-          'notice_version': 1,
+          'notice_version': 2,
           'registration_id': '7a000000-0000-4000-8000-000000000001',
           'ticket': base64Url.encode(List.filled(32, 9)).replaceAll('=', ''),
         }),
@@ -1394,11 +1480,11 @@ void main() {
         return a;
       }
 
-      site.gets['/api/v1/sync/field'] = days(chrono: 180, game: 90);
+      site.gets['/api/v1/sync/field'] = days(chrono: 180, game: 120);
       final c = client(branding: 'site');
       expect(await c.runOnce(), isTrue, reason: c.lastError);
       expect(checkin.retentionDays('chrono_retention_days'), 180);
-      expect(checkin.retentionDays('game_retention_days'), 90);
+      expect(checkin.retentionDays('game_retention_days'), 120);
       final locked = api.handle(
         'PUT',
         Uri.parse('/api/v1/checkin/settings'),
@@ -1410,7 +1496,7 @@ void main() {
       // A site server that does not send them leaves the last ones.
       site.gets['/api/v1/sync/field'] = days();
       expect(await c.runOnce(), isTrue, reason: c.lastError);
-      expect(checkin.retentionDays('game_retention_days'), 90);
+      expect(checkin.retentionDays('game_retention_days'), 120);
     });
 
     test('not pulled with local branding', () async {
@@ -1856,7 +1942,7 @@ void main() {
             .encode(List.filled(32, 1))
             .replaceAll('=', ''),
         'display_name': 'Falcão Secreto',
-        'notice_version': 1,
+        'notice_version': 2,
       }),
     );
     expect(r.status, 201);

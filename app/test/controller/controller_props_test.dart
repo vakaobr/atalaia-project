@@ -17,6 +17,7 @@ import 'package:atalaia_app/controller/controller_engine.dart';
 import 'package:atalaia_app/controller/prop_link.dart';
 import 'package:atalaia_app/ffi/bindings.dart';
 import 'package:atalaia_app/protocol/join_payload.dart';
+import 'package:atalaia_app/radio/rf_codec.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/core_libs.dart';
@@ -149,6 +150,33 @@ void main() {
     expect(api.props.linked, [7]);
     await link.close();
     expect(await waitFor(() => api.props.linked.isEmpty), isTrue);
+  });
+
+  test('a peer epoch announcement reaches the Wi-Fi props (EP-1)', () async {
+    // CMD opcode 11 (RFC 0001 Amendment 24) goes to a prop as it goes on the
+    // radio, named `peer` as on the Pi, to every prop (no dest); the prop's
+    // pod radio takes it from there (pod_radio_link_test.dart).
+    final link = prop(joined(7));
+    final heard = <LinkMessage>[];
+    link.messages.listen(heard.add);
+    link.start();
+    expect(await waitFor(() => link.linked), isTrue);
+    final sent = api.props.forward(
+      RfType.cmd,
+      const RfCmd(cmd: 11, params: {'src': 4, 'epoch': 41000}).encode(),
+    );
+    expect(sent, isTrue);
+    expect(
+      await waitFor(
+        () => heard.whereType<LinkCommand>().any((c) => c.cmd == 'peer'),
+      ),
+      isTrue,
+    );
+    final peer = heard.whereType<LinkCommand>().singleWhere(
+      (c) => c.cmd == 'peer',
+    );
+    expect(peer.params, {'src': 4, 'epoch': 41000});
+    await link.close();
   });
 
   test('a prop with the wrong key is refused', () async {

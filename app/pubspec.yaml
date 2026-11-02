@@ -3,7 +3,7 @@
 #
 # The Atalaia app (README.md). Dependencies are pinned to exact versions and
 # pubspec.lock is committed; tools/docker_app.py and CI run
-# `flutter pub get --enforce-lockfile` in ghcr.io/cirruslabs/flutter:3.44.0.
+# `flutter pub get --enforce-lockfile` in atalaia-flutter:3.47.9.
 # To change a dependency: edit the pin here, then `python tools/docker_app.py lock`.
 name: atalaia_app
 description: >-
@@ -15,8 +15,8 @@ publish_to: none
 version: 0.5.0
 
 environment:
-  sdk: ^3.12.0
-  flutter: ">=3.44.0"
+  sdk: ^3.13.0
+  flutter: ">=3.47.0"
 
 dependencies:
   flutter:
@@ -25,7 +25,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   # HMAC-SHA256 for player tags, player tokens and join payloads (Dart team, pure Dart).
-  crypto: 3.0.7
+  crypto: 3.0.8
   # Ed25519 for chrono records; the pure-Dart implementation (DartEd25519) is used.
   cryptography: 2.9.0
   # calloc, malloc and UTF-8 strings for the dart:ffi bridge to the core (Dart team).
@@ -36,7 +36,7 @@ dependencies:
   pointycastle: 4.0.0
   # QR code matrices for the qr_code template widget (kevmoo.com, pure Dart);
   # the app draws the modules itself (lib/ui/qr_painter.dart).
-  qr: 4.0.0
+  qr: 4.0.1
   # The GM role shows the field controller's GM console (flutter.dev; the
   # system WebView on Android, WKWebView on iOS).
   webview_flutter: 4.14.1

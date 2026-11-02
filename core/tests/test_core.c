@@ -150,6 +150,7 @@ int main(void)
     run_flood_tests();
     run_lbt_tests();
     run_ack_tests();
+    run_replay_tests();
     run_duty_cycle_tests();
     run_msg_codec_tests();
     run_crypto_mbedtls_tests();
@@ -161,6 +162,7 @@ int main(void)
     run_screen_template_tests();
     run_proxy_tests();
     run_geo_tests();
+    run_rand_tests();
 
     if (check_failures == 0) {
         printf("core: all tests passed\n");

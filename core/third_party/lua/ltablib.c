@@ -21,6 +21,32 @@
 
 
 /*
+** ATALAIA PATCH (LIVE2-S2, review 2026-10-30): the loops below run inside a C function, where the
+** VM's instruction hook never fires, so a script could spend seconds in one call (table.move over
+** a billion elements, insert/remove at the front of a big table in a loop, sort of a big table)
+** while the sandbox's instruction budget was charged a few instructions. meter_work() charges the
+** work to the installed count hook (the sandbox's instruction budget, or the scenario compiler's)
+** in units of one element move, and the hook raises its error when the budget is spent. The
+** remainder below one hook step is kept in the thread's extra space, so many small calls add up.
+*/
+#define METER_STEPS	1000
+
+static void meter_work (lua_State *L, lua_Unsigned work) {
+  lua_Hook hook = lua_gethook(L);
+  if (hook != NULL && work > 0) {
+    size_t *left = (size_t *)lua_getextraspace(L);
+    lua_Unsigned total;
+    if (work > ((lua_Unsigned)1 << 40))  /* more than any budget: cap the loop below */
+      work = (lua_Unsigned)1 << 40;
+    total = *left + work;
+    *left = (size_t)(total % METER_STEPS);
+    for (total /= METER_STEPS; total > 0; total--)
+      hook(L, NULL);  /* the hooks here ignore the debug record */
+  }
+}
+
+
+/*
 ** Operations that an object must define to mimic a table
 ** (some functions only need some of them)
 */
@@ -73,6 +99,7 @@ static int tinsert (lua_State *L) {
       /* check whether 'pos' is in [1, e] */
       luaL_argcheck(L, (lua_Unsigned)pos - 1u < (lua_Unsigned)e, 2,
                        "position out of bounds");
+      meter_work(L, (lua_Unsigned)(e - pos) * 2);  /* ATALAIA PATCH */
       for (i = e; i > pos; i--) {  /* move up elements */
         lua_geti(L, 1, i - 1);
         lua_seti(L, 1, i);  /* t[i] = t[i - 1] */
@@ -96,6 +123,8 @@ static int tremove (lua_State *L) {
     luaL_argcheck(L, (lua_Unsigned)pos - 1u <= (lua_Unsigned)size, 2,
                      "position out of bounds");
   lua_geti(L, 1, pos);  /* result = t[pos] */
+  if (pos < size)  /* ATALAIA PATCH */
+    meter_work(L, (lua_Unsigned)(size - pos) * 2);
   for ( ; pos < size; pos++) {
     lua_geti(L, 1, pos + 1);
     lua_seti(L, 1, pos);  /* t[pos] = t[pos + 1] */
@@ -126,6 +155,7 @@ static int tmove (lua_State *L) {
     n = e - f + 1;  /* number of elements to move */
     luaL_argcheck(L, t <= LUA_MAXINTEGER - n + 1, 4,
                   "destination wrap around");
+    meter_work(L, (lua_Unsigned)n * 2);  /* ATALAIA PATCH */
     if (t > e || t <= f || (tt != 1 && !lua_compare(L, 1, tt, LUA_OPEQ))) {
       for (i = 0; i < n; i++) {
         lua_geti(L, 1, f + i);
@@ -161,6 +191,8 @@ static int tconcat (lua_State *L) {
   lua_Integer i = luaL_optinteger(L, 3, 1);
   last = luaL_optinteger(L, 4, last);
   luaL_buffinit(L, &b);
+  if (i < last)  /* ATALAIA PATCH */
+    meter_work(L, (lua_Unsigned)last - (lua_Unsigned)i);
   for (; i < last; i++) {
     addfield(L, &b, i);
     luaL_addlstring(&b, sep, lsep);
@@ -200,6 +232,7 @@ static int tunpack (lua_State *L) {
   if (l_unlikely(n >= (unsigned int)INT_MAX  ||
                  !lua_checkstack(L, (int)(++n))))
     return luaL_error(L, "too many results to unpack");
+  meter_work(L, n);  /* ATALAIA PATCH */
   for (; i < e; i++) {  /* push arg[i..e - 1] (to avoid overflows) */
     lua_geti(L, 1, i);
   }
@@ -223,6 +256,15 @@ static int tunpack (lua_State *L) {
 /* type for array indices */
 typedef unsigned int IdxT;
 
+
+/*
+** ATALAIA PATCH (LIVE2 low note): the pivot's "randomness" came from clock() and time(), so the
+** same script sorted differently on two runs of a game and a replay could diverge (the pivot
+** only moves when a partition is badly unbalanced, but then the order of the comparator's calls
+** changes). A fixed value keeps a sort a pure function of its input; the work of a bad input is
+** charged to the instruction budget in partition() instead.
+*/
+#define l_randomizePivot()	0x9e3779b9u
 
 /*
 ** Produce a "random" 'unsigned int' to randomize pivot choice. This
@@ -298,6 +340,7 @@ static int sort_comp (lua_State *L, int a, int b) {
 static IdxT partition (lua_State *L, IdxT lo, IdxT up) {
   IdxT i = lo;  /* will be incremented before first use */
   IdxT j = up - 1;  /* will be decremented before first use */
+  meter_work(L, (lua_Unsigned)(up - lo) * 2);  /* ATALAIA PATCH */
   /* loop invariant: a[lo .. i] <= P <= a[j .. up] */
   for (;;) {
     /* next loop: repeat ++i while a[i] < P */

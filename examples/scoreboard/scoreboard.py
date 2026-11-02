@@ -130,7 +130,9 @@ def run_curses(inbox: "queue.Queue[tuple[str, Any, dict]]") -> int:
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--host", default="localhost", help="the controller's MQTT broker (default localhost)")
-    ap.add_argument("--port", type=int, default=1883)
+    ap.add_argument("--port", type=int, default=1883, help="1883 on the controller itself; 8883 (TLS) from the field")
+    ap.add_argument("--cafile", default="", help="the field CA's ca.pem: connect over TLS, trusting that CA alone "
+                                                 "(the field's network is 8883, FLD-5)")
     ap.add_argument("--username", default="")
     ap.add_argument("--password", default="")
     ap.add_argument("--game", default="+", help="only this game id (default: every game)")
@@ -143,6 +145,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     client = make_client(f"atalaia-scoreboard-{int(time.time() * 1000) % 100000}")
     if args.username:
         client.username_pw_set(args.username, args.password or None)
+    if args.cafile:
+        import ssl  # noqa: PLC0415
+
+        client.tls_set(ca_certs=args.cafile, tls_version=ssl.PROTOCOL_TLS_CLIENT)
+        client.tls_insecure_set(True)  # the certificate is checked against the field CA alone, not against a name
 
     def on_connect(client: Any, userdata: Any, flags: Any, reason: Any, *rest: Any) -> None:
         failed = getattr(reason, "is_failure", reason != 0)

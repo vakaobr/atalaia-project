@@ -25,7 +25,6 @@
 #include "../hal_nfc.h"
 #include "hal_esp_i2c.h"
 
-#include "driver/i2c.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -35,7 +34,6 @@
 static const char *TAG = "hal_nfc";
 
 /* The PN532 sits on the shared board bus (hal_esp_i2c.c). */
-#define NFC_I2C_PORT HAL_ESP_I2C_PORT
 
 #define PN532_I2C_ADDR                0x24
 #define PN532_READY_BIT               0x01
@@ -72,16 +70,17 @@ static esp_err_t pn532_write_command(const uint8_t *cmd, size_t len)
     }
     frame[6 + len] = (uint8_t)(~dcs + 1);
     frame[7 + len] = 0x00;
-    return i2c_master_write_to_device(NFC_I2C_PORT, PN532_I2C_ADDR, frame, 8 + len,
-                                      pdMS_TO_TICKS(PN532_TIMEOUT_MS));
+    return hal_esp_i2c_write(PN532_I2C_ADDR, frame, 8 + len, PN532_TIMEOUT_MS) == HAL_ESP_I2C_OK
+               ? ESP_OK
+               : ESP_FAIL;
 }
 
 static bool pn532_wait_ready(int timeout_ms)
 {
     for (int waited = 0; waited <= timeout_ms; waited += 5) {
         uint8_t status = 0;
-        if (i2c_master_read_from_device(NFC_I2C_PORT, PN532_I2C_ADDR, &status, 1,
-                                        pdMS_TO_TICKS(20)) == ESP_OK &&
+        /* Quiet: the PN532 NACKs while it is busy, which says nothing about the bus. */
+        if (hal_esp_i2c_read_quiet(PN532_I2C_ADDR, &status, 1, 20) == HAL_ESP_I2C_OK &&
             (status & PN532_READY_BIT)) {
             return true;
         }
@@ -100,8 +99,8 @@ static int pn532_transceive(const uint8_t *cmd, size_t len, uint8_t *resp, size_
     if (!pn532_wait_ready(PN532_TIMEOUT_MS)) return -1;
     static const uint8_t ack[] = {0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00};
     uint8_t frame[64];
-    if (i2c_master_read_from_device(NFC_I2C_PORT, PN532_I2C_ADDR, frame, 1 + sizeof(ack),
-                                    pdMS_TO_TICKS(PN532_TIMEOUT_MS)) != ESP_OK ||
+    if (hal_esp_i2c_read(PN532_I2C_ADDR, frame, 1 + sizeof(ack), PN532_TIMEOUT_MS) !=
+            HAL_ESP_I2C_OK ||
         memcmp(frame + 1, ack, sizeof(ack)) != 0) {
         return -1;
     }
@@ -109,8 +108,7 @@ static int pn532_transceive(const uint8_t *cmd, size_t len, uint8_t *resp, size_
     /* [RDY] [00] [00 FF] [LEN] [LCS] [D5] [CMD+1 data...] [DCS] [00] */
     size_t want = cap + 9;
     if (want > sizeof(frame)) want = sizeof(frame);
-    if (i2c_master_read_from_device(NFC_I2C_PORT, PN532_I2C_ADDR, frame, want,
-                                    pdMS_TO_TICKS(PN532_TIMEOUT_MS)) != ESP_OK) {
+    if (hal_esp_i2c_read(PN532_I2C_ADDR, frame, want, PN532_TIMEOUT_MS) != HAL_ESP_I2C_OK) {
         return -1;
     }
     if (frame[2] != 0x00 || frame[3] != 0xFF || (uint8_t)(frame[4] + frame[5]) != 0 ||

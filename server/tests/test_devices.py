@@ -46,7 +46,7 @@ class DeviceCase(AppTestCase):
 
     def settings(self) -> Settings:
         base = super().settings()
-        return Settings(database_url=base.database_url, secret_key=base.secret_key, metrics_token=base.metrics_token,
+        return Settings(allow_signup_without_notice=True, database_url=base.database_url, secret_key=base.secret_key, metrics_token=base.metrics_token,
                         db_timeout_s=base.db_timeout_s, purge_hour=None, firmware_keys=self.keys)
 
     async def asyncSetUp(self) -> None:

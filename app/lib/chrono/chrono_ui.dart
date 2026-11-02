@@ -299,9 +299,8 @@ class _ChronoScreenState extends State<ChronoScreen> {
                     setState(() => _template = t);
                     if (t != null) {
                       unawaited(
-                        AppScope.read(
-                          context,
-                        ).update((x) => x.limitTemplate = t.id),
+                        AppScope.read(context)
+                            .update((x) => x.limitTemplate = t.id),
                       );
                     }
                   },

@@ -2,24 +2,36 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # A team holds a satellite (or a box with no controller). Data: team, since
-# (game time of the capture, in seconds). Boxes do not score: the master does;
-# lang (pt, en, de or zh-tw) from the box.
+# (game time of the capture, in seconds), role (master or satellite, from the
+# controller; the header says zone until it is told). Boxes do not score: the master
+# does; lang (pt, en, de or zh-tw) from the box. The Field Box also adds age (the
+# seconds since "since" by the game's clock) and live (1), updated every second, so
+# its screen counts up "held for 1:23"; without them (a phone) it says "since <time>".
 template: captured
 layout:
   - type: row
     style: { width: fill, height: 44, background: team }
     children:
       - type: label
+        text: "{lang == 'pt' && 'SATÉLITE OCUPADO' || lang == 'de' && 'SATELLIT BESETZT' || lang == 'zh-tw' && '衛星已佔領' || 'SATELLITE HELD'}"
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{role == 'satellite'}" }
+      - type: label
+        text: "{lang == 'pt' && 'MESTRE OCUPADA' || lang == 'de' && 'MASTER BESETZT' || lang == 'zh-tw' && '主站已佔領' || 'MASTER HELD'}"
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{role == 'master'}" }
+      - type: label
         text: "{lang == 'pt' && 'ZONA OCUPADA' || lang == 'de' && 'ZONE BESETZT' || lang == 'zh-tw' && '據點已佔領' || 'ZONE HELD'}"
-        style: { font_size: 20, width: fill, align: center, color: contrast }
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{role != 'satellite' && role != 'master'}" }
   - type: spacer
     height: fill
   - type: label
     text: "{team|upper}"
     style: { font_size: 48, color: team }
   - type: label
+    text: "{lang == 'pt' && (role == 'satellite' && 'ocupado há' || 'ocupada há') || lang == 'de' && 'gehalten seit' || lang == 'zh-tw' && '已佔領' || 'held'} {age|clock}"
+    style: { font_size: 20, color: muted, visible: "{live}" }
+  - type: label
     text: "{lang == 'pt' && 'desde' || lang == 'de' && 'seit' || lang == 'zh-tw' && '佔領於' || 'held since'} {since|clock}"
-    style: { font_size: 20, color: muted }
+    style: { font_size: 20, color: muted, visible: "{!live}" }
   - type: spacer
     height: fill
   - type: label

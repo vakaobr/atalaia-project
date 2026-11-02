@@ -111,7 +111,7 @@ local function use(c)
   )
   if code.kind == "points" then
     score.add(team, code.amount, "code")
-    prompt("+" .. code.amount .. " points for " .. string.upper(team), false, 3)
+    prompt("Points for " .. string.upper(team) .. ": +" .. code.amount, false, 3)
   elseif code.kind == "hint" then
     prompt("Hint: the game master is told", false, 3)
   else

@@ -813,9 +813,8 @@ checkFromMap(Object? body, Map<String, Object?> meta, int level) {
     throw ControllerError('image: over $fieldImageMax bytes');
   }
   if (data.length < magic.length ||
-      [
-        for (var i = 0; i < magic.length; i++) data[i] == magic[i],
-      ].contains(false)) {
+      [for (var i = 0; i < magic.length; i++) data[i] == magic[i]]
+          .contains(false)) {
     throw ControllerError('image: not a $ctype image');
   }
   final b = body['bounds'];

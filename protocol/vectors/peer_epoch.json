@@ -1,0 +1,61 @@
+{
+  "description": "When a controller names a box's epoch to the other receivers (RFC 0001 Amendment 24, decision SR-110). A box whose epoch store was lost sends at a random epoch in 4096..61439 (Amendment 23, SR-27); one that rebooted sends a little above where it was. A receiver follows a source only within a window of epochs above the last it heard, so the controller, which hears the box, names the epoch to its modem (SET_PEER_EPOCH) and to every box (CMD opcode 11, params {src, epoch}, see cmd.json). 'rule': a packet of `type` heard at epoch `heard` from a source last known at `prior` (0: never heard) is announced when heard is above prior and either more than `window` above it or, for a source already heard (prior above 0), a HELLO (the box says it has restarted); never when it is not above prior. 'sequences': a PeerEpochs tracker starting empty, in order; a 'heard' step is [source, prior, heard, type, now_ms] and gives whether it is announced now (a source is announced again only at an epoch above the last it announced, so a box repeating its HELLO is announced once); a 'due' step is [now_ms] and gives the [source, epoch] announcements to repeat then (each at the repeat_after_ms offsets from the announcement, one per source per step, however late the step). The Python port (simulator/atalaia_sim/peer_epoch.py) and the Dart port (app/lib/controller/peer_epoch.dart) must give exactly these answers.",
+  "window": 16,
+  "repeat_after_ms": [4000, 10000],
+  "rule": [
+    {"name": "a_new_box_at_epoch_1", "prior": 0, "heard": 1, "type": "EVENT", "announce": false},
+    {"name": "a_new_box_says_hello_at_epoch_1", "prior": 0, "heard": 1, "type": "HELLO", "announce": false},
+    {"name": "a_new_box_says_hello_inside_the_window", "prior": 0, "heard": 16, "type": "HELLO", "announce": false},
+    {"name": "a_new_box_says_hello_past_the_window", "prior": 0, "heard": 17, "type": "HELLO", "announce": true},
+    {"name": "a_new_box_that_has_rebooted_a_few_times", "prior": 0, "heard": 12, "type": "EVENT", "announce": false},
+    {"name": "a_known_box_one_epoch_up_in_an_event", "prior": 5, "heard": 6, "type": "EVENT", "announce": false},
+    {"name": "exactly_the_window_above", "prior": 5, "heard": 21, "type": "STATE", "announce": false},
+    {"name": "one_past_the_window", "prior": 5, "heard": 22, "type": "STATE", "announce": true},
+    {"name": "a_restarted_box_says_hello_one_epoch_up", "prior": 5, "heard": 6, "type": "HELLO", "announce": true},
+    {"name": "a_hello_at_the_same_epoch", "prior": 5, "heard": 5, "type": "HELLO", "announce": false},
+    {"name": "a_hello_at_a_lower_epoch_never", "prior": 5, "heard": 4, "type": "HELLO", "announce": false},
+    {"name": "a_far_lower_epoch_never", "prior": 41000, "heard": 3, "type": "HELLO", "announce": false},
+    {"name": "a_lost_store_box_never_heard_before", "prior": 0, "heard": 41000, "type": "HELLO", "announce": true},
+    {"name": "a_lost_store_box_heard_in_an_event", "prior": 7, "heard": 9000, "type": "EVENT", "announce": true},
+    {"name": "a_prop_on_wifi_has_no_epoch", "prior": 0, "heard": 0, "type": "HELLO", "announce": false}
+  ],
+  "sequences": [
+    {
+      "name": "announced_once_then_repeated_twice",
+      "steps": [
+        {"heard": [5, 7, 41000, "HELLO", 1000], "announce": true},
+        {"heard": [5, 41000, 41000, "HELLO", 1500], "announce": false},
+        {"due": [2000], "sends": []},
+        {"due": [5000], "sends": [[5, 41000]]},
+        {"due": [5001], "sends": []},
+        {"due": [11000], "sends": [[5, 41000]]},
+        {"due": [30000], "sends": []}
+      ]
+    },
+    {
+      "name": "a_retry_of_the_same_hello_before_the_modem_is_told_is_announced_once",
+      "steps": [
+        {"heard": [5, 7, 41000, "HELLO", 1000], "announce": true},
+        {"heard": [5, 7, 41000, "HELLO", 4000], "announce": false}
+      ]
+    },
+    {
+      "name": "a_second_restart_is_announced_again_at_the_higher_epoch_only",
+      "steps": [
+        {"heard": [5, 7, 41000, "HELLO", 1000], "announce": true},
+        {"heard": [5, 41000, 41001, "HELLO", 2000], "announce": true},
+        {"heard": [5, 41001, 41000, "HELLO", 3000], "announce": false},
+        {"due": [6000], "sends": [[5, 41001]]}
+      ]
+    },
+    {
+      "name": "two_boxes_are_independent_and_a_late_tick_sends_one_each",
+      "steps": [
+        {"heard": [5, 7, 9000, "HELLO", 0], "announce": true},
+        {"heard": [6, 3, 5000, "STATE", 100], "announce": true},
+        {"due": [60000], "sends": [[5, 9000], [6, 5000]]},
+        {"due": [60001], "sends": []}
+      ]
+    }
+  ]
+}

@@ -78,23 +78,37 @@ final class DataFieldDef extends Struct {
 }
 
 /// void (*event)(void *user, const atalaia_event_t *ev, const char *data_json)
-typedef EventCallbackNative =
-    Void Function(Pointer<Void>, Pointer<AtalaiaEvent>, Pointer<Utf8>);
+typedef EventCallbackNative = Void Function(
+  Pointer<Void>,
+  Pointer<AtalaiaEvent>,
+  Pointer<Utf8>,
+);
 
 /// void (*command)(void *user, const char *target, const char *method, const char *args_json)
-typedef CommandCallbackNative =
-    Void Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>);
+typedef CommandCallbackNative = Void Function(
+  Pointer<Void>,
+  Pointer<Utf8>,
+  Pointer<Utf8>,
+  Pointer<Utf8>,
+);
 
 /// void (*log)(void *user, const char *message)
 typedef LogCallbackNative = Void Function(Pointer<Void>, Pointer<Utf8>);
 
 /// void (*field_state)(void *user, const char *key, const char *value_json)
-typedef FieldStateCallbackNative =
-    Void Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>);
+typedef FieldStateCallbackNative = Void Function(
+  Pointer<Void>,
+  Pointer<Utf8>,
+  Pointer<Utf8>,
+);
 
 /// void *(*atalaia_alloc_fn)(void *ud, void *ptr, size_t old_size, size_t new_size)
-typedef AllocNative =
-    Pointer<Void> Function(Pointer<Void>, Pointer<Void>, Size, Size);
+typedef AllocNative = Pointer<Void> Function(
+  Pointer<Void>,
+  Pointer<Void>,
+  Size,
+  Size,
+);
 
 /// atalaia_node_callbacks_t (atalaia/node.h).
 final class NodeCallbacks extends Struct {
@@ -112,8 +126,12 @@ typedef FieldNodesNative = Pointer<Utf8> Function(Pointer<Void>, Pointer<Utf8>);
 typedef FieldOwnerNative = Pointer<Utf8> Function(Pointer<Void>, Uint16);
 
 /// bool (*send)(void *user, uint16_t node_id, const char *cmd, const char *params_json)
-typedef FieldSendNative =
-    Bool Function(Pointer<Void>, Uint16, Pointer<Utf8>, Pointer<Utf8>);
+typedef FieldSendNative = Bool Function(
+  Pointer<Void>,
+  Uint16,
+  Pointer<Utf8>,
+  Pointer<Utf8>,
+);
 
 /// atalaia_field_ops_t (atalaia/field_ops.h).
 final class FieldOpsStruct extends Struct {
@@ -136,6 +154,11 @@ final class NodeConfig extends Struct {
   external Pointer<NativeFunction<AllocNative>> alloc;
   external Pointer<Void> allocUd;
   external Pointer<FieldOpsStruct> fieldOps;
+
+  /// The game key's 16 bytes: rand() is seeded from it with the game seed and
+  /// the node id. All zero seeds from the game seed and node id alone.
+  @Array(16)
+  external Array<Uint8> randKey;
 }
 
 /// atalaia_score_t (atalaia/score.h): index 0 (no team) is unused.

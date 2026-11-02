@@ -93,6 +93,22 @@ class PropLinkTests(P3Case):
         finally:
             ws.__exit__(None, None, None)
 
+    def test_a_peer_epoch_announcement_reaches_the_prop(self):
+        """EP-1 (RFC 0001 Amendment 24): CMD opcode 11 goes to a Wi-Fi prop as it goes on the radio, named
+        `peer` with its params, to every prop (no dest): a prop with a pod radio tells its pod."""
+        ws = self.connect()
+        try:
+            ws.receive_json()
+            with self.ctrl._lock:
+                self.ctrl.fc._announce_peer_epoch(4, 41000, 1000)  # a box heard at a far higher epoch
+            m = ws.receive_json()
+            self.assertEqual((m["type"], m["cmd"], m["opcode"], m["params"], m["dest"]),
+                             ("cmd", "peer", 11, {"src": 4, "epoch": 41000}, None))
+            ws.send_json({"type": "ping"})
+            self.assertEqual(ws.receive_json(), {"type": "pong"})
+        finally:
+            ws.__exit__(None, None, None)
+
     def test_a_command_to_another_node_does_not_reach_this_prop(self):
         ws = self.connect()
         try:
