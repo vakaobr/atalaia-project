@@ -62,6 +62,15 @@ class Splash(unittest.TestCase):
         self.write_c(bytes(data))
         self.assertIn("another splash", tool.splash_problem(self.build, self.repo))
 
+    def test_an_io_pod_build_has_no_splash(self) -> None:
+        self.sdkconfig.write_text("CONFIG_ATALAIA_POD_MODE=y\n", encoding="utf-8")
+        self.c.unlink()
+        self.assertIsNone(tool.splash_problem(self.build, self.repo))
+
+    def test_an_io_pod_build_with_a_splash_is_refused(self) -> None:
+        self.sdkconfig.write_text("CONFIG_ATALAIA_POD_MODE=y\n", encoding="utf-8")
+        self.assertIn("should embed none", tool.splash_problem(self.build, self.repo))
+
     def test_missing_pieces_refused(self) -> None:
         self.c.unlink()
         self.assertIn("splash_logo.c", tool.splash_problem(self.build, self.repo))
