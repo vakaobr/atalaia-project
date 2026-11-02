@@ -3,6 +3,10 @@
 #
 # Generated from requirements.in with uv pip compile --universal --generate-hashes
 # --exclude-newer 2026-10-16 (see requirements.in); do not edit by hand.
+# A single package bumped since then (its release at least two weeks old) is
+# added with --upgrade-package NAME --exclude-newer-package NAME=<its release
+# day, or a time just after its upload when a newer release came out the same
+# day>; the commit that bumps it gives the full command.
 # On a Raspberry Pi or Ubuntu the distribution packages are enough and are what CI tests:
 #   sudo apt install python3-fastapi python3-uvicorn python3-websockets \
 #        python3-paho-mqtt python3-serial python3-yaml python3-cryptography mosquitto
@@ -28,7 +32,7 @@ certifi==2026.7.22 \
     # via
     #   httpcore
     #   httpx
-cffi==2.1.1 \
+cffi==2.1.1 ; platform_python_implementation != 'PyPy' \
     --hash=sha256:046bfc24911b37851ee1b51aab8bffe713d89c68c6a057b09484ce9fd5f69b4e \
     --hash=sha256:06c72bb76605a4b0cd0aad6930b69d4baf7dd5d806cfc409b824191099700e66 \
     --hash=sha256:0beceaabe56af686895136a2de78db54ecd8e4046b236b8fd6d6cb61389e9bf2 \
@@ -227,7 +231,7 @@ paho-mqtt==2.1.0 \
     --hash=sha256:12d6e7511d4137555a3f6ea167ae846af2c7357b10bc6fa4f7c3968fc1723834 \
     --hash=sha256:6db9ba9b34ed5bc6b6e3812718c7e06e2fd7444540df2455d2c51bd58808feee
     # via -r requirements.in
-pycparser==3.11 \
+pycparser==3.11 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy' \
     --hash=sha256:51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80 \
     --hash=sha256:d875f09c3507d00e1aba0eecc6dcadc1352f30fff09dc6bff2f1c2935e97c2bc
     # via cffi
@@ -466,6 +470,7 @@ typing-extensions==4.16.0 \
     #   opentelemetry-api
     #   pydantic
     #   pydantic-core
+    #   starlette
     #   typing-inspection
 typing-inspection==0.4.4 \
     --hash=sha256:547274fa6b0a561ccf549cc9524b999a578e737d015d8709d021f9d0d13bea47 \

@@ -14,7 +14,7 @@
 # then put the SPDX header and the install notes back at the top of
 # requirements.txt, and check that it still installs for the Pi (the commands
 # are in controller/README.md, "Installing with pip").
-fastapi>=0.148.0
+fastapi>=0.115
 uvicorn>=0.30
 websockets>=13
 paho-mqtt>=1.6,<3
