@@ -8,6 +8,7 @@ modem binary or mosquitto is an error, never a skip.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import shutil
@@ -502,6 +503,36 @@ class Mosquitto:
         except subprocess.TimeoutExpired:
             self.proc.kill()
         shutil.rmtree(self.dir, ignore_errors=True)
+
+
+class Listener:
+    """A paho subscriber to a private Mosquitto, recording (topic, JSON payload, retain flag)."""
+
+    def __init__(self, port: int, topic: str = "field/v1/#") -> None:
+        self.messages: list[tuple[str, dict, bool]] = []
+        self.lock = threading.Lock()
+        from atalaia_controller.mqtt import _client  # paho only for the MQTT tests
+
+        self.client = _client(f"test-{id(self)}")
+        self.client.on_message = self._on_message
+        self.ready = threading.Event()
+        self.client.on_subscribe = lambda *a: self.ready.set()
+        self.client.connect("127.0.0.1", port)
+        self.client.subscribe(topic, qos=1)
+        self.client.loop_start()
+        assert self.ready.wait(5)
+
+    def _on_message(self, client, userdata, msg) -> None:
+        with self.lock:
+            self.messages.append((msg.topic, json.loads(msg.payload), bool(msg.retain)))
+
+    def topic(self, name: str) -> list[dict]:
+        with self.lock:
+            return [m for t, m, _ in self.messages if t == name]
+
+    def close(self) -> None:
+        self.client.loop_stop()
+        self.client.disconnect()
 
 
 class FakeSerial:
