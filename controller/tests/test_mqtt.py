@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import tempfile
 import threading
+import types
 import unittest
 
 import paho.mqtt.client as paho
@@ -115,13 +116,19 @@ class MqttTests(unittest.TestCase):
         pub.connect("127.0.0.1", self.broker.port)
         pub.loop_start()
         try:
+            # wait_connected means the bridge's SUBSCRIBE is queued, not that the broker has it. A retained
+            # command for another game (refused, nothing on air) reaches the bridge exactly once, live or
+            # retained, as soon as its subscription holds.
+            pub.publish(f"field/v1/{self.gid + 1}/cmd/4", "{}", qos=1, retain=True)
+            self.assertTrue(wait_for(lambda: self.bridge.commands >= 1, 5))
+            heard = self.bridge.commands
             self.modem.sent.clear()
             pub.publish(f"field/v1/{self.gid}/cmd/4", json.dumps({"cmd": "message", "params": {"text": "hi"}}), qos=1)
             pub.publish(f"field/v1/{self.gid}/cmd/all", json.dumps({"cmd": "reset"}), qos=1)
             pub.publish(f"field/v1/{self.gid}/cmd/4", "not json", qos=1)
             pub.publish(f"field/v1/{self.gid}/cmd/4", json.dumps({"cmd": "end"}), qos=1)
             pub.publish(f"field/v1/{self.gid + 1}/cmd/4", json.dumps({"cmd": "reset"}), qos=1)
-            self.assertTrue(wait_for(lambda: self.bridge.commands >= 5, 5))
+            self.assertTrue(wait_for(lambda: self.bridge.commands >= heard + 5, 5))
             cmds = [cmd_decode(p) for _, p in self.modem.of("CMD")]
             self.assertEqual(cmds, [{"cmd": 5, "params": {"text": "hi"}, "dest": 4}, {"cmd": 6}])
         finally:
@@ -135,13 +142,60 @@ class MqttTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: not self.bridge.connected.is_set(), 5))
         self.broker = Mosquitto(port)
         self.assertTrue(self.bridge.wait_connected(20))  # paho reconnects by itself
-        sub = Listener(self.broker.port, f"field/v1/{self.gid}/score")
+        topic = f"field/v1/{self.gid}/score"
+        # wait_connected means the republish is queued, not that the broker has it: a subscriber faster than
+        # the bridge gets the score as a live message (retain flag 0, MQTT 3.1.1 section 3.3.1.3). Seeing it
+        # at all proves the broker has it; a scoreboard that subscribes after that gets it retained.
+        first = Listener(port, topic)
+        try:
+            self.assertTrue(wait_for(lambda: first.messages, 5))
+            self.assertEqual(first.messages[-1][1]["teams"], {"red": 4, "blue": 0})
+        finally:
+            first.close()
+        sub = Listener(port, topic)
         try:
             self.assertTrue(wait_for(lambda: sub.messages, 5))
             self.assertEqual(sub.messages[-1][1]["teams"], {"red": 4, "blue": 0})
             self.assertTrue(sub.messages[-1][2])
         finally:
             sub.close()
+
+
+class RepublishOrderTests(unittest.TestCase):
+    """The reconnect republish against a score published at the same moment (no broker: publishes recorded)."""
+
+    def test_a_score_published_during_the_reconnect_republish_is_not_overwritten(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = config(tmp, mqtt_enabled=True)
+        bridge = MqttBridge(cfg, types.SimpleNamespace(add_listener=lambda fn: None))  # type: ignore[arg-type]
+        sent: list[tuple[str, dict]] = []
+        hooks: list = []
+
+        class Client:
+            def publish(self, topic, payload, qos=0, retain=False):
+                if hooks:
+                    hooks.pop()()  # a new score arrives while this republish is on its way
+                sent.append((topic, json.loads(payload)))
+                return types.SimpleNamespace(rc=0)
+
+            def subscribe(self, *args, **kwargs):
+                pass
+
+        bridge.client = Client()  # type: ignore[assignment]
+        topic = "field/v1/1/score"
+        bridge._publish(topic, {"teams": {"red": 1}}, retain=True)
+        racer = threading.Thread(target=bridge._publish, args=(topic, {"teams": {"red": 2}}, True))
+
+        def race() -> None:
+            racer.start()
+            racer.join(0.2)  # before the fix it ran to the end here, ahead of the republish of red 1
+
+        hooks.append(race)
+        bridge._on_connect(bridge.client, None, {}, 0)
+        racer.join(5)
+        self.assertEqual(sent[-1], (topic, {"teams": {"red": 2}}))  # the broker keeps the newest score
+        self.assertEqual(bridge._retained[topic], b'{"teams":{"red":2}}')
+
 
 if __name__ == "__main__":
     unittest.main()
