@@ -12,6 +12,41 @@ CONTRIBUTING.md, "Pull request titles and commit messages"); optional hand-writt
 `## [Unreleased]` and move into the next release's section as "Details". The sections up to 0.5.0
 were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.0](https://github.com/vakaobr/atalaia-project/compare/v0.5.0...v0.6.0) (2026-11-02)
+
+
+### Features
+
+* **app:** say plainly what position sharing shares; offer indoor beacons as optional ([#23](https://github.com/vakaobr/atalaia-project/issues/23)) ([a7329a4](https://github.com/vakaobr/atalaia-project/commit/a7329a419ba8c1ff22f7f20162b7265a77c1892a))
+* **preview:** run on the Mac mini; preview.sh restore keeps Caddy off and fixes the demo key ([#10](https://github.com/vakaobr/atalaia-project/issues/10)) ([270cfdd](https://github.com/vakaobr/atalaia-project/commit/270cfddf1231f2247b6799d93c4b235c42ee1e24))
+
+
+### Bug Fixes
+
+* **app:** find the NDK's host tools on macOS as well as Linux ([#9](https://github.com/vakaobr/atalaia-project/issues/9)) ([74cce59](https://github.com/vakaobr/atalaia-project/commit/74cce59a0ed2256db9ff70746d80da92fa0de8ba))
+* **app:** same beacon scan error codes on iOS and Android; check.sh can stage per run ([#24](https://github.com/vakaobr/atalaia-project/issues/24)) ([af9cc0b](https://github.com/vakaobr/atalaia-project/commit/af9cc0b3656e89bbd2c382ecdde24275f704879a))
+* **console:** keep a block edit made just before leaving the block view or pressing Install ([#14](https://github.com/vakaobr/atalaia-project/issues/14)) ([ce3f3cf](https://github.com/vakaobr/atalaia-project/commit/ce3f3cfabcfea625ca1b3b15eebc911c9c6d42f0))
+* **controller:** republish retained MQTT topics in order after a reconnect; make the broker-restart test deterministic ([#11](https://github.com/vakaobr/atalaia-project/issues/11)) ([d9117e3](https://github.com/vakaobr/atalaia-project/commit/d9117e3079388c00e4284edafa0660d8d590f405))
+
+
+### Documentation
+
+* accounts rest on the contract, minimum age 16, sign-up in the app (LEG-20 to LEG-39) ([61a8db9](https://github.com/vakaobr/atalaia-project/commit/61a8db970e1290131b6b23fca22b8c4132b26441))
+* **app:** privacy notice §9's iOS Keychain wording is confirmed ([#21](https://github.com/vakaobr/atalaia-project/issues/21)) ([2707b3d](https://github.com/vakaobr/atalaia-project/commit/2707b3d785f945c3a356199f41b71f422c66b385))
+* decision rows for the last waves, over-the-air on real boards, clock and access tokens on the roadmap ([#22](https://github.com/vakaobr/atalaia-project/issues/22)) ([43f03b9](https://github.com/vakaobr/atalaia-project/commit/43f03b90dabcae228b98b547d0ee07797fdca93f))
+* **modem:** flashing on macOS, and the modem with a controller in Docker on a Mac ([#20](https://github.com/vakaobr/atalaia-project/issues/20)) ([66085b6](https://github.com/vakaobr/atalaia-project/commit/66085b697d71deaa9c48a9e640faa975dab8afd3))
+* one end-to-end guide to set up the radio modem, and fix the old modem instructions ([be62b0b](https://github.com/vakaobr/atalaia-project/commit/be62b0b4534291270fd29015dd4d506ad63a255e))
+* phase state files stop pointing at work that is already done (SD) ([13e3fce](https://github.com/vakaobr/atalaia-project/commit/13e3fce7a3095151fee588028d6e38dd3a64759b))
+* privacy notice states the approved legal positions; DPIA template ([737126e](https://github.com/vakaobr/atalaia-project/commit/737126e613f9fa3e3ef2e8c6537d62b5a5318374))
+* README, STATUS files, SECURITY.md, manuals and the project page after 30 October's last merges ([a4ce0af](https://github.com/vakaobr/atalaia-project/commit/a4ce0af92ce72837672d27bc0b38da39d340a730))
+* site login on iOS and the epoch follow-up in the README, status files, SECURITY.md and project page; IOSL-1..9 and EP-1..12 rows ([89bb037](https://github.com/vakaobr/atalaia-project/commit/89bb037ab84a1e646b76342c3ad2d51b883056af))
+* the iOS app is built and compiled in CI; only site login on iOS is missing ([5b4e954](https://github.com/vakaobr/atalaia-project/commit/5b4e954d3ff15e69c66170b257cc8560873946f5))
+
+
+### Continuous Integration
+
+* release with release-please and check pull request titles as Conventional Commits ([#12](https://github.com/vakaobr/atalaia-project/issues/12)) ([31f216c](https://github.com/vakaobr/atalaia-project/commit/31f216c85d2132c0e0be827d2e7f19e1736bcc7a))
+
 ## [Unreleased]
 
 - **`app/tool/check.sh` can work in a folder of its own** (`ATALAIA_APP_WORK`, default `/tmp/atalaia-app` as before): two app checks run natively on the same Mac staged into the same folder and overwrote each other's sources mid-run (2026-11-02); the merge queue's native app job now gives every run its own folder.
