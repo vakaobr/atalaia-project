@@ -499,7 +499,10 @@ then downloads over the Wi-Fi from the controller, checks, installs and reboots.
 Heltec V4.3 on 2026-10-22 (decisions OT-1 to OT-6), sent by the controller over LoRa from a
 controller in Docker: steps 1-7 pass (download, check and install in about 11 s on a home
 network, confirmed after the self-test, the controller's record `done`); step 8 passes too
-(OT-6). If it fails, the log names why: `Wi-Fi starting: DMA-capable RAM ...`,
+(OT-6). Done again on 2026-11-02 from the console of the Mac bench, with the long-lived bench release key
+(`24a03cb8dc937d01`, RELEASE_SIGNING.md "Bench keys"): board 3 went from 0.6.0-dev.157 to
+0.6.1-bench.1 (variant `box-bench`) in about 22 s from the command to `done` after the self-test.
+A first try failed `no_wifi`: the box had no field Wi-Fi stored. If it fails, the log names why: `Wi-Fi starting: DMA-capable RAM ...`,
 `Wi-Fi driver did not start: ...`, `the controller's certificate: ...`. The board needs its **2.4 GHz Wi-Fi antenna**, and the
 PC and the board the same 2.4 GHz network (the "field Wi-Fi" here is your own). In WSL:
 `python3`, in the repository; on Windows `cmd`: the flasher of `hardware/field-box/BUILD.md`

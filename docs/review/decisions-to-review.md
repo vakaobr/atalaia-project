@@ -3540,7 +3540,7 @@ Commit `b208bd9c`. Three agents had found the old test skipping silently in the 
 
 ## A lost epoch record no longer exhausts the range (EPW-1 to EPW-4, 2026-11-01)
 
-Commits `4279cbdb`, `b6da4231` and `76ce606f` (controllers). What looked like a flaky test was a product bug. EPW-2 is the maintainer's call. The Field Box side (EPW-2b to EPW-4b) is still in the merge queue and is not listed yet.
+Commits `4279cbdb`, `b6da4231` and `76ce606f` (controllers). What looked like a flaky test was a product bug. EPW-2 is the maintainer's call. The Field Box side (EPW-2b to EPW-4b) is in the next section.
 
 | # | Question | Answer chosen | Why | Status |
 | --- | --- | --- | --- | --- |
@@ -3548,3 +3548,143 @@ Commits `4279cbdb`, `b6da4231` and `76ce606f` (controllers). What looked like a 
 | EPW-2 | Refuse to resume on suspected stale floor? | No (margin instead) | Refusal removes residual risk but makes the game unrecoverable | open: the maintainer's call (raised 2026-11-01) |
 | EPW-3 | Receiver report / key rotation? | Not done | Wire change / GM re-join of every box | built (2026-11-01); open for the maintainer's review |
 | EPW-4 | Field Box draw? | Follow-up (same range-exhaustion shape; floor never stale) | Needs docker_fw | built (2026-11-01); open for the maintainer's review |
+
+## The Field Box's lost epoch draw (EPW-2b to EPW-4b, 2026-11-01)
+
+Commit `8a4fb20d` (firmware). The Field Box side of EPW-1 to EPW-4: a box that lost its epoch record draws as the controllers do (design D).
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| EPW-2b | The 8192 suspect margin on the box too? | No: a margin of 1024 and the lower half of the room only | The box's floor is its own NVS entry, never restored from a backup | built (2026-11-01); open for the maintainer's review |
+| EPW-3b | The pod and the modem? | No change | They draw no epoch (the modem gets it with CONFIGURE) | built (2026-11-01); open for the maintainer's review |
+| EPW-4b | Firmware and shared vectors? | protogen generates `tx_epoch_vectors.h`; `check.sh --check` catches a stale one | Follows the other vector headers | built (2026-11-01); open for the maintainer's review |
+
+## iOS: the app's secrets sealed with a key in the Keychain (IOSK-1 to IOSK-6, 2026-11-01)
+
+Commits `89eb6ca4` and `146cf9d5` (app, the Mac session; a privacy-review finding). Before this, on iOS every vaulted secret was in plain text in `settings.json` (the channel answered only on Android). The Keychain vault test passed on an iPhone 15 Pro Max.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| IOSK-1 | Keychain items, or a Keychain key sealing the file? | A Keychain-held AES-256 key sealing `secrets.enc`, Android's format | One Dart path and the existing migration | built (2026-11-01); open for the maintainer's review |
+| IOSK-2 | Accessibility? | AfterFirstUnlockThisDeviceOnly | No backup or sync; a save while the phone locks must not fail | built (2026-11-01); open for the maintainer's review |
+| IOSK-3 | Face ID on the key? | No | Android's needs none; a prompt would block joining | built (2026-11-01); open for the maintainer's review |
+| IOSK-4 | Migration? | The existing plain-text-to-sealed path, read back to verify | Already tested | built (2026-11-01); open for the maintainer's review |
+| IOSK-5 | Delete a leftover key on reinstall? | No; documented, in the privacy notice too (its [MAINTAINER] marker kept) | Deleting could destroy a live key before the first unlock | built (2026-11-01); open: the privacy notice's wording waits for the maintainer |
+| IOSK-6 | Errors? | Missing key, wrong size or a failed GCM open: `key_lost`; any other status: unavailable | Same as Android | built (2026-11-01); open for the maintainer's review |
+
+## The iPhone checklist checks in over HTTPS (MACT-1 to MACT-3, 2026-11-01)
+
+Commit `15034ba4` (app tests, the Mac session). The iPhone checklist passed 11 of 11 against the bench (iPhone 15 Pro Max, iOS 27.2; the camera scan and the location prompt are a person's checks). Two stale test bugs: item 9 checked in over plain HTTP, and a pin stored with a `ca_sha256` of 32 zero bytes was dropped by `PinnedField.fromJson` (it now holds the real CA's DER hash).
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| MACT-1 | Fix item 9 by allowing HTTP in the app, or by changing the test? | The test: the CA from `/api/v1/controller/ca`, then HTTPS | A TLS-only field client is a security property (check-R1, APP-1) | built (2026-11-01); open for the maintainer's review |
+| MACT-2 | The default HTTPS address? | The same host, port 8443, `ATALAIA_TEST_CONTROLLER_HTTPS` to override | The default `tls_port` | built (2026-11-01); open for the maintainer's review |
+| MACT-3 | Guaranteed cleanup? | A sweep by name (`itest-ios`) of marshals and check-ins in setUpAll and tearDownAll, plus a teardown per test | A killed app runs no teardown | built (2026-11-01); open for the maintainer's review |
+
+## VIP Payload follows the box's language; the OLED shows the held time for the master and VIP checkpoints (TFT-8 to TFT-10, 2026-11-01)
+
+Commit `e7fcfbf4` (firmware).
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| TFT-8 | The held time on the OLED for the Master's status and a VIP checkpoint? | Yes, Domination's layout (the team big, a "held for" footer) when `since` exists; Progressive Domination already had it (now pinned with images) | One layout for every held zone | built (2026-11-01); open for the maintainer's review |
+| TFT-9 | VIP's `params.lang`? | The templates read the box's language; `lang` stays declared but unused (its labels say so), default en | P5H-23 was for the Medic Kit; saved games must still load | built (2026-11-01); open for the maintainer's review |
+| TFT-10 | The literal budget? | Fine (about 140 bytes at most) | Under the 230-byte warning (TPL-5) | built (2026-11-01); open for the maintainer's review |
+
+## Short-lived scoped access tokens on the field controller (AT-1 to AT-10, 2026-11-01)
+
+Commit `fe6e2c75` (controller, console). The maintainer approved the feature on 2026-11-01. Store schema 19 to 20. The bench's long-lived tokens were rotated afterwards (MAC-3).
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| AT-1 | Scopes? | `read`, `gm`, `marshals` | The marshal routes are one self-contained group (what the iOS test needs) | built (2026-11-01); open for the maintainer's review |
+| AT-2 | One game? | An optional `game_id` on `read` and `gm`; routes naming another game refused, routes with no game reads only | Central and cheap | built (2026-11-01); open for the maintainer's review |
+| AT-3 | Enforcement? | One global FastAPI `gate` dependency (HTTP and WebSocket); a test built from the router covers every route | New routes are covered by themselves | built (2026-11-01); open for the maintainer's review |
+| AT-4 | Who manages tokens? | The main GM token only | A token never makes tokens | built (2026-11-01); open for the maintainer's review |
+| AT-5 | Format and storage? | `atk_<id8>.<256-bit secret>`, SHA-256 stored, constant-time compare | A high-entropy secret | built (2026-11-01); open for the maintainer's review |
+| AT-6 | Lifetime? | 8 h by default, 60 s to 7 days, at most 50 active, purged 1 h after expiry | Bounds the damage | built (2026-11-01); open for the maintainer's review |
+| AT-7 | The clock? | `Controller._wall` in `AccessTokens.live()` only; a token made more than 60 s in the future is refused (fails closed) | One place for the clock branch | built (2026-11-01); open for the maintainer's review |
+| AT-8 | Failed-auth limit and audit? | 60 a minute per address for access tokens, then 429; audited 365 days, rate-limited | The GM and read tokens unchanged | built (2026-11-01); open for the maintainer's review |
+| AT-9 | The phone controller? | Not given the feature; the console's panel hidden by the `whoami` flag | `FEATURES` is locked to the Dart list | built (2026-11-01); open for the maintainer's review |
+| AT-10 | Streams and plain HTTP? | A stream is re-checked every 5 s; `gm` and `marshals` refused over plain HTTP from another machine | Revoking ends live access | built (2026-11-01); open for the maintainer's review |
+
+## Flutter 3.47.9 and the app's dependencies (FLU-1 to FLU-6, 2026-11-01)
+
+Commits `afdc94c4` (a first pin at 3.44.9, superseded), `dbdef889`, `bcafded9`, `f85f8435`, `950e8d98`, `5cc9613e` and `63b9739c` (app; the Mac session tested it on iOS). Xcode 27's `lipo` broke the iOS simulator build of 3.44.0.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| FLU-1 | Which Flutter? | 3.47.9 (Dart 3.13.7), up from 3.44.0 | Tested on iOS; the maintainer wants the dependencies current; fixes the Xcode 27 `lipo` failure | built (2026-11-01); open for the maintainer's review |
+| FLU-2 | A pin without a cirruslabs tag? | A Dockerfile on the cirruslabs 3.44.0 image (by digest) plus the official 3.47.9 archive (by SHA-256): `atalaia-flutter:3.47.9` | Hash pinning kept | built (2026-11-01); open for the maintainer's review |
+| FLU-3 | The Mac session's commits? | All four cherry-picked (crypto 3.0.8; the SDK and dependency bump, webview_flutter_wkwebview 3.27.2 and qr 4.0.1 among them; two analyzer fixes; Dart 3.13's format) | Format and code generation produced no further change | built (2026-11-01); open for the maintainer's review |
+| FLU-4 | Goldens? | 24 regenerated, 0.03 to 0.7 % outline anti-aliasing only | The 3.47 renderer's sub-pixel change | built (2026-11-01); open for the maintainer's review |
+| FLU-5 | pubspec constraints? | sdk ^3.13.0, flutter >=3.47.0 | qr 4.0.1 and webview 3.27 need them | built (2026-11-01); open for the maintainer's review |
+| FLU-6 | The CI iOS job? | flutter-version 3.47.9; Xcode is macos-latest's default | Works on Xcode 27 | built (2026-11-01); open for the maintainer's review |
+
+## The field controller with a wrong wall clock (CLK-1 to CLK-9, 2026-11-01)
+
+Commit `48dffa45` (controller, console, manuals). A Raspberry Pi 4 has no real-time clock: offline after a power cycle it comes up at the last saved time or at 1970. Manuals (en, pt): controller setup, "The clock" and "Using a travel router". Not tried on a real Pi.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| CLK-1 | Durations? | Monotonic time for every duration and timeout; the wall clock only for timestamps and expiry | A jumping clock must not change a game or a transfer | built (2026-11-01); open for the maintainer's review |
+| CLK-2 | An implausible clock? | Below the newest of the release date, the stored high-water mark and the newest store record, by more than 60 s | Catches 1970 and days behind | built (2026-11-01); open for the maintainer's review |
+| CLK-3 | Set from the GM's browser, or adopted by itself? | Explicitly, by the GM: `PUT /api/v1/clock`, forward only, bounded (14 days ahead of a plausible clock, 5 years above the floor) | Adopting a time by itself means any request moves it | built (2026-11-01); open for the maintainer's review |
+| CLK-4 | An offset or the system clock? | An offset in the process; `timedatectl` documented | The service cannot set the system clock | built (2026-11-01); open for the maintainer's review |
+| CLK-5 | Backwards? | Never, and never below the floor | It would revive expired tokens and certificates | built (2026-11-01); open for the maintainer's review |
+| CLK-6 | Certificates? | notBefore the day before the release date; a CA that expired before the release is replaced at start (its fingerprint changes: players scan again) | A CA made at 1970 expired in 1980, and phones refused it | built (2026-11-01); open for the maintainer's review |
+| CLK-7 | The retention purge? | Held while the clock is implausible and for 1 h after a forward jump of a day or more | A jump of years would delete everything | built (2026-11-01); open for the maintainer's review |
+| CLK-8 | A pod's settings revision? | The highest revision sent is kept in the store | Pods ignored every push made at 1970 | built (2026-11-01); open for the maintainer's review |
+| CLK-9 | The phone controller (Dart)? | Unchanged | A phone's clock is the network's; its certificate's notBefore could be backdated later | built (2026-11-01); open for the maintainer's review |
+
+## Releases by release-please; Dependabot; the retained MQTT score after a reconnect (RP, DEP, MQF, 2026-11-02)
+
+Pull requests #12 (`31f216c8`), #4 (`6c7fb8f1`), #5, #6, #7 and #11 (`d9117e30`). From 2026-11-02 every change reaches `main` as a squash-merged pull request whose title is a Conventional Commit (CONTRIBUTING.md). Only the RP rows below were recorded; the others of RP-1 to RP-12 are in the pull request.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| RP-1 | The firmware build for a release made with the workflow token? | `release-please.yml` drafts the release, then `gh workflow run release.yml --ref vX.Y.Z` | `workflow_dispatch` is the one event that token can start; `release.yml` unchanged; no new secret | built (2026-11-02); open for the maintainer's review |
+| RP-3 | Release type and bumps? | simple, tags `vX.Y.Z`, bump-minor-pre-major, prerelease | FV-1; still 0.x pre-releases | built (2026-11-02); open for the maintainer's review |
+| RP-6 | `version.h`, CMake and `-dev`? | `prepare_release.py release-pr` on the release branch, and an `open-dev` pull request after the release | The markers cannot empty the pre-release; keeps FV-1 | built (2026-11-02); open for the maintainer's review |
+| RP-7 | The CHANGELOG? | release-please owns the version sections; the hand-written `## [Unreleased]` folds in as `### Details` | Nothing is lost; the history is untouched | built (2026-11-02); open for the maintainer's review |
+| RP-8 | The old workflows? | `prepare-release.yml` and `tag-release.yml` removed; a tag pushed by hand still works | One way to release (supersedes PREP-1 to PREP-8) | built (2026-11-02); open for the maintainer's review |
+| RP-10 | The pull request title check? | amannn/action-semantic-pull-request v6.1.1, on `pull_request`, read-only, the repository's scopes | Safe for forks | built (2026-11-02); open for the maintainer's review |
+| RP-12 | The first release? | A `Release-As: 0.6.0` footer | The older commits are not Conventional Commits | built (2026-11-02); open for the maintainer's review |
+| DEP-1 | Dependabot's pip requirements as it left them? | Rebuilt with the documented uv command, `--upgrade-package X --exclude-newer-package X=<day>` | Dependabot resolved for Python 3.13 and later; #5 conflicted with #7 | built (2026-11-02); open for the maintainer's review |
+| DEP-4 | upload-artifact v7 and download-artifact v8 separately? | No: both in #4; #3 closed as superseded | download v8 unzips only `application/zip`, and upload 4.6.2 marks "zip" | built (2026-11-02); open for the maintainer's review |
+| MQF-1 | The broker-restart test's flake? | The test waits until a subscriber sees the score, then checks the retained one with a second subscriber | `wait_connected` only means queued in paho | built (2026-11-02); open for the maintainer's review |
+| MQF-2 | A change in the product? | Storing and sending a retained topic, and the republish after a reconnect, under one lock | An older republished score could overwrite a newer one (RepublishOrderTests) | built (2026-11-02); open for the maintainer's review |
+
+Open: `controller/tests/test_scoreboard_example.py::test_prints_the_retained_score` relies on a weak signal (`bridge.published > 0`), the same family as MQF-1; not yet hardened.
+
+## A block edit made just before leaving the block view is kept (CKF-1 to CKF-5, 2026-11-02)
+
+Pull request #14 (`ce3f3cfa`, console). Found by the merge queue, where `test_keyboard_reaches_and_changes_the_blocks` failed now and then. These rows were written from the commit and its CHANGELOG entry (the agent's own rows were not kept); CKF-2 and CKF-3 are the ones the code names. Reproduced with frames slowed by 150 ms under CPU load: 5 failures in 30 before, none in 66 after.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| CKF-1 | A flaky test, or a product bug? | Both: a real lost update, and the test's timing | The lost update reproduced on its own with a new test | built (2026-11-02); open for the maintainer's review |
+| CKF-2 | How is the edit kept? | A new `flush()` in the block view hands any pending YAML to the builder when the view goes away and before Install; a commented text that did not change is left as it is | Blockly fires a change a frame later and the view rebuilt the YAML one turn after that, so leaving or installing in between dropped the edit | built (2026-11-02); open for the maintainer's review |
+| CKF-3 | The keyboard test's timing? | Two frames after every key, then waiting (up to 20 s) for the focus, the blocks and the name in the YAML | Blockly moves the focus a frame late and can take it from a field focused in between | built (2026-11-02); open for the maintainer's review |
+| CKF-4 | How does the test wait? | Polling with `page.evaluate`, not `page.wait_for_function` | The console's CSP refuses the string `wait_for_function` compiles | built (2026-11-02); open for the maintainer's review |
+| CKF-5 | Install with an error in the blocks? | Nothing is installed | The old text must not go out in its place | built (2026-11-02); open for the maintainer's review |
+
+## The Mac bench: the queue's app job, a bench release key, the bench tokens (MAC-1 to MAC-3, 2026-11-02)
+
+The coordinator moved from WSL on the Windows PC to the Mac mini. With the bench key, board 3 went from 0.6.0-dev.157 to 0.6.1-bench.1 over the air from the console, in about 22 s from the command to the box confirmed after its self-test (BRING_UP step 10c; the first run over the air was on 2026-10-22, OT-1 to OT-6).
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| MAC-1 | The merge queue's app job on the Mac? | Native macOS (`app_native.sh`), goldens left out; CI keeps the goldens | Flutter has no linux-arm64 image, and gcc crashes under Rosetta's amd64 | built (2026-11-02); open for the maintainer's review |
+| MAC-2 | A key for the bench's builds over the air? | A bench release key, id `24a03cb8dc937d01` (private half in a mode-600 file off the repository), built into bench images beside the two project keys; the bench controller trusts all three and accepts the `box` and `box-bench` variants | Bench builds can go over the air; the maintainer: "do as you see fit" | maintainer: accepted as recommended |
+| MAC-3 | The bench's long-lived GM and read tokens? | Rotated on 2026-11-02; the token files are mode 600 | They had been copied between machines (AT follow-up) | maintainer: accepted as recommended |
+
+## The docs pass of 2 November (DOCS-10 to DOCS-13, 2026-11-02)
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| DOCS-10 | Where do the controller's clock and access tokens go on the roadmap? | Two bullets in phase 2's done list, one in its next list; one line in the README's phase 2 row and one status bullet | Phase 2 holds the field controller | built (2026-11-02); open for the maintainer's review |
+| DOCS-11 | "The update over the air has not run on a real board"? | Replaced wherever it was still said (`protocol/firmware-update.md`, the firmware and controller READMEs, the phase 4 status note) with the bench runs of 2026-10-22 and 2026-11-02; "not yet on a field" kept | Stale since 2026-10-22 | built (2026-11-02); open for the maintainer's review |
+| DOCS-12 | The bench key in the docs? | Its id and that it exists (RELEASE_SIGNING.md "Bench keys", BRING_UP step 10c); no path | Public key id only | built (2026-11-02); open for the maintainer's review |
+| DOCS-13 | Rows the coordination log did not hold (CLKRB, MACB, SBF)? | Not added | Nothing to copy; left for the coordinator | built (2026-11-02); open for the maintainer's review |

@@ -853,7 +853,10 @@ roadmap:
       - "O código de acesso do fluxo em direto deixou de estar no endereço web: a consola envia-o num cabeçalho e a app num cabeçalho Authorization, e os registos dos controladores e do servidor do site apagam valores de códigos nos endereços (o endereço antigo ainda funciona durante uma transição). Um campo cujos registos foram partilhados deve mudar os códigos do GM e de leitura."
       - "Os resultados das equipas, sem ids de jogadores, também ficam 365 dias nos dois controladores (o histórico de jogos 90 dias), e o GM pode lê-los, só de leitura. Testado num computador."
       - "Um guia único para montar o modem de rádio, das peças até uma caixa entrar num jogo: versão pronta ou compilação, gravação em Windows, Linux e macOS, a porta, as verificações e uma tabela de problemas (<a href=\"https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/pt/modem.md\">Montar o modem de rádio</a>). Experimentado na bancada com o controlador em Docker no WSL2; não num Raspberry Pi nem em macOS, e não num campo."
-      - "Um controlador que perdeu o registo de épocas sorteia a nova época na metade inferior do espaço acima do seu piso, com uma margem (maior se faltar o ficheiro de épocas), pelo que perdas repetidas, catorze ou mais seguidas, não esgotam o intervalo. Começou como um teste instável e era um erro do produto. Testes no computador; falta o sorteio da própria Field Box."
+      - "Um controlador que perdeu o registo de épocas sorteia a nova época na metade inferior do espaço acima do seu piso, com uma margem (maior se faltar o ficheiro de épocas), pelo que perdas repetidas, catorze ou mais seguidas, não esgotam o intervalo. Começou como um teste instável e era um erro do produto. Testes no computador; a Field Box sorteia agora da mesma maneira."
+      - "O controlador de campo aguenta um relógio errado (um Raspberry Pi 4 não tem relógio próprio e pode arrancar em 1970): os tempos de jogo e os prazos deixam de depender dele, a consola avisa o GM, que acerta a hora na consola (só para a frente), os certificados continuam válidos para telemóveis com a hora certa e a limpeza de dados espera. Testes no computador, ainda não num Pi real."
+      - "Tokens de acesso de curta duração: o GM pode dar ao telemóvel de quem arbitra, a um teste automático ou a um ecrã para o público um token que só lê, só conduz o jogo ou só gere os marshals, para um jogo ou para todos, por 8 horas por omissão (no máximo 7 dias), e revogá-lo de imediato. Testes no computador."
+      - "Atualizações pelo ar para as compilações da bancada: uma chave de versões da bancada, aceite na bancada ao lado das chaves do projeto, assina as compilações diárias; a 2 de novembro de 2026 uma caixa passou de uma compilação para a seguinte a partir da consola em cerca de 22 segundos, confirmada depois do autoteste."
     next:
       - As placas de rádio e 5 caixas montadas para o teste no campo.
       - Um teste no campo com 20 caixas, com e sem escuta antes de falar.
@@ -861,6 +864,7 @@ roadmap:
       - "Verificar em duas placas que uma mudança de canal mantém uma caixa parada e que um início lhe chega em cerca de um segundo (o guia está escrito)."
       - "Experimentar a janela de repetição e os controladores endurecidos em placas reais e num Pi real (um comando gravado e repetido na bancada)."
       - "Apagar o registo de épocas de uma caixa em duas placas de bancada para ver que volta a ser encontrada, duas vezes seguidas e com um antigo líder a voltar a entrar (o guia está escrito)."
+      - "Acertar o relógio e usar tokens de acesso num Raspberry Pi real, num campo sem internet."
     gate: >-
       Prova: 5 caixas num espaço de <a href="{{ page.to.glossary }}#glossario-cqb">CQB</a> e num campo
       exterior, sem uma única captura perdida. <strong>Em aberto.</strong>
