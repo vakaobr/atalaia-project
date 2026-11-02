@@ -232,7 +232,7 @@ Exactly as the Field Box:
 2. **Antennas before any power**, both labelled: LoRa (868 MHz, 2 dBi or less,
    or set the firmware's antenna gain) and the 2.4 GHz FPC antenna (Bluetooth).
 3. **Power path** ([manual, section 7](../field-box/BUILD.md#7-power-and-battery-safety)
-   and [diagram 2/2](../field-box/wiring/field-box-power.svg)): cell(s), fuse,
+   and [diagram 2/2](../field-box/wiring/field-box-power.svg)): cells, fuse,
    Schottky diode, main switch, BAT+ splice; the boost converter set to
    5.0-5.2 V on its own first; then the 5 V loads (ring, amplifier, button LEDs,
    level shifter); the gauge's battery-sense input on BAT+; the board's battery

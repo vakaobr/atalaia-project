@@ -24,7 +24,7 @@ layout:
     text: "{lang == 'pt' && 'Último acerto' || lang == 'de' && 'Letzter Treffer' || lang == 'zh-tw' && '上次命中' || 'Last hit'}{lang == 'zh-tw' && '：' || ': '}{team|upper}"
     style: { font_size: 20, color: team, visible: "{team}" }
   - type: label
-    text: "{hits} {lang == 'pt' && 'acertos que contam' || lang == 'de' && 'Treffer mit Punkten' || lang == 'zh-tw' && '次有效命中' || 'scoring hits'}"
+    text: "{hits} {lang == 'pt' && hits == 1 && 'acerto que conta' || lang == 'pt' && 'acertos que contam' || lang == 'de' && 'Treffer mit Punkten' || lang == 'zh-tw' && '次有效命中' || hits == 1 && 'scoring hit' || 'scoring hits'}"
     style: { font_size: 14, color: muted, visible: "{hits > 0}" }
   - type: spacer
     height: fill

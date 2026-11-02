@@ -59,8 +59,10 @@ from atalaia_sim.mode import COMMAND_NAME, SEPARATOR, ModeError, hold_scoring
 from atalaia_sim.packet import Header, vf_make
 from atalaia_sim.protocol import MESSAGE_TYPES
 
+from . import wallclock
 from . import channels, radio_modem, radio_region, visibility
 from . import scenario_service as scenarios
+from .access_tokens import AccessTokens
 from .pairing import Pairing
 from .reinvite import Reinvite
 from .config import Config
@@ -262,7 +264,7 @@ class FieldScript:
 
     def __init__(self, core: Core, engine: "Controller", source: str, chunk: str,
                  teams: list[str], params: dict[str, Any], seed: int,
-                 score_key: str = "field-1") -> None:
+                 score_key: str = "field-1", game_key: Optional[bytes] = None) -> None:
         self.engine = engine
         self.teams = list(teams)
         self.score_key = score_key
@@ -270,7 +272,8 @@ class FieldScript:
         self.pending_end: Optional[dict[str, Any]] = None
         ops = FieldOps(nodes=self._nodes, owner=self._owner, send=self._send, on_state=self._on_state)
         self.node = Node(core, engine.node_id, seed, teams, params, source, chunk,
-                         on_event=self._on_event, on_log=self._on_log, field_ops=ops)
+                         on_event=self._on_event, on_log=self._on_log, field_ops=ops,
+                         game_key=game_key)
         if not self.node.loaded:
             raise ModeError(f"field.lua does not load: {self.node.last_error}")
 
@@ -341,7 +344,7 @@ class FieldScript:
 class Controller:
     def __init__(self, cfg: Config, store: Store, *, modem: Optional[radio_modem.RadioModem] = None,
                  core: Optional[Core] = None, clock: Callable[[], float] = time.monotonic,
-                 join_key: bytes = b"") -> None:
+                 wall: Callable[[], float] = wallclock.now, join_key: bytes = b"") -> None:
         self.cfg = cfg
         # The field join key authenticates join payloads (protocol/join.md); never on the API.
         self.join_key = join_key
@@ -350,7 +353,10 @@ class Controller:
         self.core = core
         self.modes = ModeRegistry(store, cfg.modes_dirs, core)
         self._clock = clock
+        self._wall = wall  # the wall clock of a game's created_at, started_at and ended_at (a contract case moves it)
         self._t0 = clock()
+        self.access_tokens = AccessTokens(store, wall)  # short-lived scoped API tokens (access_tokens.py)
+        self.clock_guard = wallclock.ClockGuard(store, wall=wall, mono=clock)  # a wrong wall clock (wallclock.py)
         self._lock = threading.RLock()
         self._listeners: list[Callable[[dict[str, Any]], None]] = []
         self._thread: Optional[threading.Thread] = None
@@ -460,6 +466,7 @@ class Controller:
 
     def start(self) -> None:
         self._stop.clear()
+        self.clock_guard.start()
         self._thread = threading.Thread(target=self._run, name="controller-tick", daemon=True)
         self._thread.start()
 
@@ -516,6 +523,9 @@ class Controller:
             fc.register_node(int(node_id), f"node-{node_id}", role)
         fc.on_event = self._on_event
         fc.on_node = self._on_node
+        fc.on_peer_epoch = self._on_peer_epoch
+        fc.controllers_heard = self._controllers_heard(game["id"])
+        fc.on_controller_heard = self._on_controller_heard
         fc.on_scores = self._on_scores
         fc.on_role = self._on_role
         # The mode's optional scoring contract: a projected score between STATEs (decision BSC-2).
@@ -650,7 +660,10 @@ class Controller:
 
     def public_game(self, game: dict[str, Any]) -> dict[str, Any]:
         out = dict(game)
-        live = self.game is not None and self.game["id"] == game["id"]
+        # One look at the live game and its engine: another thread (the game's end) can clear either
+        # between two reads, and a GET must never fail because of that.
+        cur, fc = self.game, self.fc
+        live = cur is not None and cur["id"] == game["id"]
         out["live"] = live
         meta = self.scenario_meta(game.get("mode_id"))
         if meta is not None:
@@ -659,12 +672,12 @@ class Controller:
                                               scenarios.reveal(self, game, meta))
             names = self.scenario_names if live else scenarios.node_names(self, game["id"])
             out["scenario_nodes"] = {str(k): v for k, v in sorted(names.items())}
-        if live and self.fc is not None:
-            out["game_time_ms"] = self.fc.game_time_ms
-            out["term"] = self.fc.term
+        if live and fc is not None:
+            out["game_time_ms"] = fc.game_time_ms
+            out["term"] = fc.term
         if live and self.key_lost:
             out["key_lost"] = True
-        if live and game.get("state") == "ready" and self.fc is not None and not game.get("joined"):
+        if live and game.get("state") == "ready" and fc is not None and not game.get("joined"):
             try:
                 out["start_check"] = self.start_check()
             except Conflict:
@@ -680,6 +693,7 @@ class Controller:
         pkg = self.modes.get(game.get("mode_id")) if isinstance(game.get("mode_id"), str) else None
         out = {**game, "params": visibility.public_params(pkg.mode if pkg else None, game.get("params"))}
         out.pop("scenario_nodes", None)
+        out.pop("game_seed", None)  # the game's id towards the site server, for staff only (LIVE2-2)
         meta = self.scenario_meta(game.get("mode_id"))
         if meta is not None:
             out["scenario"] = meta.player_view(viewer, game, scenarios.revealed(self, game["id"]),
@@ -826,7 +840,7 @@ class Controller:
                 "preset_id": preset["id"] if preset else None, "teams": teams, "params": params,
                 "assignments": clean, "duration_ms": duration,
                 "game_seed": random.SystemRandom().randrange(1, 0xFFFFFFFF),
-                "state": "ready", "term": 1, "created_at": time.time(),
+                "state": "ready", "term": 1, "created_at": self._wall(),
                 "node_id": self.cfg.node_id, "channel_hz": self.field_channel,
                 "max_hops": self.cfg.max_hops, "joined": False, "squads": squads,
                 "team_info": team_info,
@@ -981,6 +995,25 @@ class Controller:
             self._tell_modem_language()
         return self.box_language()
 
+    # --- the console's map fetching (LEG-50) ---------------------------------------
+
+    def map_fetching_on(self) -> bool:
+        """Whether the console's *Load the field from a map* page may reach OpenStreetMap, Overpass, Nominatim and the
+        aerial imagery services: the field setting, on by default. Off, the page is served without those origins
+        (api.py) and says so."""
+        with self._lock:
+            return self.store.get_setting("map_fetching") != "off"
+
+    def map_fetching(self) -> dict[str, Any]:
+        return {"map_fetching": self.map_fetching_on()}
+
+    def set_map_fetching(self, value: Any) -> dict[str, Any]:
+        if not isinstance(value, bool):
+            raise ControllerError("map_fetching: true or false")
+        with self._lock:
+            self.store.set_setting("map_fetching", "on" if value else "off")
+        return self.map_fetching()
+
     def _tell_modem_language(self, lang: Optional[str] = None) -> None:
         """The language of the modem board's own OLED (decision MOD-2): the field's box-language
         setting; with "auto" the language the live game's boxes got (the console's that created
@@ -1059,7 +1092,7 @@ class Controller:
     def _next_move_rev(self) -> int:
         """A revision above every earlier one, and at least the wall clock in seconds, so a restored
         backup (an older counter) still gives boxes a number above what they hold."""
-        return min(0xFFFFFFFF, max(self.move_rev() + 1, int(time.time())))
+        return min(0xFFFFFFFF, max(self.move_rev() + 1, int(wallclock.now())))
 
     def set_field_channel(self, channel_hz: Any, source: Any = "manual") -> dict[str, Any]:
         """The GM's choice for the field (accepting the default counts): stored, sent to the modem. A
@@ -1080,7 +1113,7 @@ class Controller:
             self.store.set_setting("radio.channel_hz", str(hz))
             self.store.set_setting("radio.channel_source", source)
             self.store.set_setting("radio.channel_confirmed", "1")
-            self.store.set_setting("radio.channel_set_at", str(time.time()))
+            self.store.set_setting("radio.channel_set_at", str(wallclock.now()))
             moved = False
             if hz != old:
                 history = [old] + [h for h in self.channel_history() if h not in (old, hz)]
@@ -1115,7 +1148,7 @@ class Controller:
                 self.store.set_setting("radio.channel_hz", str(region.default_channel_hz))
                 self.store.set_setting("radio.channel_source", "default")
                 self.store.set_setting("radio.channel_confirmed", "0")
-                self.store.set_setting("radio.channel_set_at", str(time.time()))
+                self.store.set_setting("radio.channel_set_at", str(wallclock.now()))
                 self.store.set_setting("radio.last_scan", "")
                 self.store.set_setting("radio.channel_history", "[]")  # another region's channels
                 self._last_scan = None
@@ -1204,6 +1237,7 @@ class Controller:
         used = {self.node_id, self.cfg.node_id, 0xFFFF}
         used.update(int(n) for n in self.game["assignments"])
         used.update(self._issued_ids())  # a standby controller's id too (BN-18)
+        used.update(self._controller_ids_on_air())  # a controller that has led or claimed (EP-3)
         if self.fc is not None:
             used.update(self.fc.nodes)
         if self.game.get("controller_id") is not None:
@@ -1278,6 +1312,14 @@ class Controller:
             assigned = self.game["assignments"].get(str(node_id))
             if kind == "controller" and (assigned is not None or node_id in fc.nodes):
                 raise Conflict(f"node id {node_id} is a box in this game")
+            if kind == "controller" and node_id in self._controller_ids_on_air():
+                # EP-3: a controller that led or claimed in this game has used epochs under this key as this
+                # id; a device that lost its stores (database and epoch file) and is joined again under it
+                # would repeat its nonces and be deaf to every receiver that heard the old epochs. A
+                # controller joined again gets a new id (leave the node id out).
+                raise Conflict(f"node id {node_id} belongs to a controller that has been on the air in this "
+                               "game: a controller joined again gets a new node id (Join), as a replacement "
+                               "box does")
             issued = self._issued_ids()
             known = fc.nodes.get(node_id)
             if not same_device and (node_id in issued or (known is not None and known.heard)):
@@ -1412,7 +1454,7 @@ class Controller:
                 "id": j["game_id"], "name": f"Game {j['game_id']} (standby)", "mode_id": pkg.id,
                 "preset_id": None, "teams": j["teams"], "params": params, "assignments": {},
                 "duration_ms": 0, "game_seed": j["game_seed"], "state": "ready", "term": 0,
-                "created_at": time.time(), "node_id": j["node_id"], "channel_hz": j["channel_hz"],
+                "created_at": self._wall(), "node_id": j["node_id"], "channel_hz": j["channel_hz"],
                 "max_hops": j["max_hops"], "joined": True, "controller_id": j["controller_id"],
             }
             key = j["game_key"]
@@ -1532,11 +1574,13 @@ class Controller:
                     have = joined[role]
                     if prefix == "min_" and have < value:
                         warnings.append({"code": "min", "param": name, "role": role, "value": value, "have": have,
-                                         "text": f"{have} {role} node(s) joined; {name} is {value}"})
+                                         "text": f"{have} {role} {'node' if have == 1 else 'nodes'} joined; "
+                                                 f"{name} is {value}"})
                     elif prefix == "last_" and 0 < have <= value:
                         warnings.append({"code": "last", "param": name, "role": role, "value": value,
                                          "have": have,
-                                         "text": f"only {have} {role} node(s) joined and {name} is {value}: "
+                                         "text": f"only {have} {role} {'node' if have == 1 else 'nodes'} joined and "
+                                                 f"{name} is {value}: "
                                                  "the countdown can run from the start"})
             return {"needed": needed, "joined": dict(sorted(joined.items())), "missing": missing,
                     "warnings": warnings, "ok": not missing}
@@ -1569,7 +1613,7 @@ class Controller:
                 self._start_field()
             except ModeError as exc:
                 raise ControllerError(str(exc)) from None
-            out = self._set_state(game_id, "running", started_at=time.time())
+            out = self._set_state(game_id, "running", started_at=self._wall())
             self._after_field()
             self._save_game_time(force=True)
             return out
@@ -1635,7 +1679,7 @@ class Controller:
                 self.positions.end_game(game_id)  # ADR-P3-6: positions last as long as the game
             tag = epoch_tag(self._key) if self._key else self.store.get_setting(f"key_tag:{game_id}")
             key_lost = self.key_lost
-            out = self._set_state(game_id, "ended", ended_at=time.time())
+            out = self._set_state(game_id, "ended", ended_at=self._wall())
             self._deactivate()
             if self.reinvite is not None:
                 self.reinvite.forget_game(game_id)  # no invite into a game that is over
@@ -1672,7 +1716,7 @@ class Controller:
         self.store.update_game(game_id, game_key=None)
         self.store.delete_setting(f"key_tag:{game_id}")
         log.info("standby: left game %d (%s)", game_id, reason)
-        out = self._set_state(game_id, "ended", ended_at=time.time())
+        out = self._set_state(game_id, "ended", ended_at=self._wall())
         self._deactivate()
         return self.public_game(self.store.game(game_id) or out)
 
@@ -1848,6 +1892,7 @@ class Controller:
                 "role": fc.election.role if fc else None,
                 "term": fc.term if fc else None,
                 "live_game": self.game["id"] if self.game else None,
+                "clock": self.clock_guard.status(),
                 "key_lost": self.key_lost,
                 "radio": self.radio_state,
                 "modem": {
@@ -1880,6 +1925,8 @@ class Controller:
     # --- the tick -------------------------------------------------------------
 
     def tick(self) -> None:
+        self.access_tokens.purge()  # expired and revoked tokens, at most every 10 minutes
+        self.clock_guard.tick()
         if self.checkin is not None:
             self.checkin.purge()  # retention (ADR-P3-13), at most every 10 minutes
         if self.branding is not None:
@@ -1952,7 +1999,7 @@ class Controller:
             return
         times: dict[str, float] = {}
         if state == "running" and not self.game.get("started_at"):
-            times["started_at"] = time.time()
+            times["started_at"] = self._wall()
             self.game["started_at"] = times["started_at"]
         self._set_state(self.game["id"], state, **times)
 
@@ -1972,6 +2019,37 @@ class Controller:
                 return
             self.fc.on_packet(rx.header.source, rx.header, rx.payload,
                               {"epoch": rx.epoch, "rssi": rx.rssi, "snr": rx.snr})
+
+    def _on_peer_epoch(self, node_id: int, epoch: int) -> None:
+        """A box was heard at an epoch the receivers may not follow (a restart, or a lost epoch store:
+        RFC 0001 Amendment 24, decision SR-110): the modem is told too (SET_PEER_EPOCH; it only
+        ever goes up). The field controller has sent the boxes their CMD."""
+        log.info("node %d is at epoch %d; the receivers are told", node_id, epoch)
+        if self.modem is not None:
+            self.modem.set_peer_epochs({node_id: epoch})
+
+    def _controllers_heard(self, game_id: int) -> set[int]:
+        saved = self.store.get_setting(f"controllers_heard:{game_id}")
+        return set(json.loads(saved)) if saved else set()
+
+    def _on_controller_heard(self, node_id: int) -> None:
+        """Another controller's TIME or CLAIM was heard: its node id has used epochs under this key, kept so
+        that no new device is given the id (EP-3; issue_join)."""
+        if self.game is None or self.fc is None:
+            return
+        heard = self._controllers_heard(self.game["id"]) | {node_id}
+        self.store.set_setting(f"controllers_heard:{self.game['id']}", json.dumps(sorted(heard)))
+
+    def _controller_ids_on_air(self) -> set[int]:
+        """The node ids of controllers that have transmitted in the live game: the one that issued the join
+        (a promoted standby's game names it) and every controller heard (TIME or CLAIM)."""
+        assert self.game is not None
+        ids = self._controllers_heard(self.game["id"])
+        if self.fc is not None:
+            ids |= self.fc.controllers_heard
+        if self.game.get("controller_id") is not None:
+            ids.add(int(self.game["controller_id"]))
+        return ids
 
     def _on_tx_ack(self, seq: int, status: str) -> None:
         self.tx_status[status] += 1
@@ -2147,7 +2225,7 @@ class Controller:
             params = {**params, "scenario_reveal": scenarios.reveal(self, self.game, meta)}
         self.field = FieldScript(self.core, self, pkg.field_script, f"{pkg.id}/field.lua",
                                  self.game["teams"], params, self.game["game_seed"],
-                                 score_key=f"field-{run}")
+                                 score_key=f"field-{run}", game_key=self._key or None)
         if self.fc.game_time_ms > 0:
             self.field.advance(self.fc.game_time_ms)  # a restart or a takeover joins mid-game
         self.field.input("game.start")

@@ -264,8 +264,9 @@ class ChannelFilePicker implements FilePicker {
   }
 }
 
-/// The AndroidKeyStore's AES-GCM key (KeystorePlugin.kt). A missing plugin
-/// (iOS, the web, a widget test) is "not available", never a crash.
+/// The AES-GCM key of the AndroidKeyStore (KeystorePlugin.kt) or of the iOS
+/// Keychain (KeychainVaultPlugin.swift). A missing plugin (the web, a widget
+/// test) is "not available", never a crash.
 class ChannelSecretVault implements SecretVault {
   static const _ch = MethodChannel('$_prefix/keystore');
 

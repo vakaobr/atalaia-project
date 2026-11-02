@@ -10,6 +10,11 @@
 //     --dart-define=ATALAIA_TEST_READ_TOKEN=<read token> \
 //     --dart-define=ATALAIA_TEST_GM_TOKEN=<GM token>
 //
+// The check-in (items 8 and 9) fetches the field's CA from the controller's
+// plain HTTP address and then uses its HTTPS address, by default the same
+// host on port 8443 (ATALAIA_TEST_CONTROLLER_HTTPS=https://host:port to
+// change it); ATALAIA_TEST_GAME=<id> picks the game to check in to.
+//
 // The three defines are optional: a test that needs one is skipped, with
 // its reason, when it is missing. Everything else needs nothing from the
 // network but the phone's own loopback address.
@@ -42,9 +47,11 @@ import 'package:atalaia_app/platform/platform_check.dart';
 import 'package:atalaia_app/player/field_buzz.dart';
 import 'package:atalaia_app/player/field_feed.dart';
 import 'package:atalaia_app/player/player_screens.dart';
+import 'package:atalaia_app/security/pem.dart';
 import 'package:atalaia_app/storage/app_store.dart';
 import 'package:atalaia_app/ui/settings_screen.dart';
 import 'package:atalaia_app/version.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -62,6 +69,13 @@ const _gmToken = String.fromEnvironment('ATALAIA_TEST_GM_TOKEN');
 /// The game to check in to, when the controller has several open (default:
 /// the first one the controller lists).
 const _gameId = String.fromEnvironment('ATALAIA_TEST_GAME');
+
+/// The controller's HTTPS address for the check-in (the app reaches a field
+/// only over TLS with the field's own CA, check-R1). Default: the host of
+/// [_controller] on the controller's default TLS port, 8443.
+const _controllerHttps = String.fromEnvironment(
+  'ATALAIA_TEST_CONTROLLER_HTTPS',
+);
 
 const _noController = 'ATALAIA_TEST_CONTROLLER is not given';
 const _noRead =
@@ -244,6 +258,73 @@ Future<(int, Object?)> _api(
   }
 }
 
+/// The name the test's player and marshal carry at the controller.
+const _testName = 'itest-ios';
+
+/// Removes what an earlier or this run may have left at the controller: every
+/// marshal named [_testName], and every check-in of that name in a game that
+/// has not ended (the GM token removes it, as the console does). Run before
+/// and after the tests, so a run whose app was killed (no teardown at all)
+/// is cleaned by the next one. Best effort, never fails a test; needs the
+/// controller and the GM token.
+Future<void> _sweepLeftovers() async {
+  if (_controller.isEmpty || _gmToken.isEmpty) return;
+  final http = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+  try {
+    List<Object?> listOf(Object? body, String key) => body is List
+        ? body
+        : (body is Map && body[key] is List ? body[key] as List : const []);
+    final (_, marshals) = await _api(
+      http,
+      'GET',
+      '/api/v1/marshals',
+      token: _gmToken,
+    );
+    for (final m in listOf(marshals, 'marshals')) {
+      if (m is Map && m['name'] == _testName && m['marshal_id'] != null) {
+        await _api(
+          http,
+          'DELETE',
+          '/api/v1/marshals/${m['marshal_id']}',
+          token: _gmToken,
+        );
+      }
+    }
+    final (_, games) = await _api(
+      http,
+      'GET',
+      '/api/v1/games',
+      token: _gmToken,
+    );
+    for (final g in listOf(games, 'games')) {
+      if (g is! Map || g['state'] == 'ended' || g['id'] == null) continue;
+      final (_, list) = await _api(
+        http,
+        'GET',
+        '/api/v1/games/${g['id']}/checkins',
+        token: _gmToken,
+      );
+      for (final c in listOf(list, 'checkins')) {
+        if (c is Map &&
+            c['display_name'] == _testName &&
+            c['status'] != 'removed' &&
+            c['player_id'] != null) {
+          await _api(
+            http,
+            'DELETE',
+            '/api/v1/games/${g['id']}/checkins/${c['player_id']}',
+            token: _gmToken,
+          );
+        }
+      }
+    }
+  } on Object catch (e) {
+    debugPrint('sweep of $_testName at the controller: $e');
+  } finally {
+    http.close(force: true);
+  }
+}
+
 /// A test player checked in at the controller, with what the app keeps of a
 /// check-in. [leave] takes it out again.
 class _TestPlayer {
@@ -278,17 +359,57 @@ class _TestPlayer {
   }
 }
 
+/// The controller's HTTPS address: [_controllerHttps], or [_controller]'s
+/// host on port 8443.
+String _httpsUrl() {
+  if (_controllerHttps.isNotEmpty) {
+    return _controllerHttps.replaceAll(RegExp(r'/+$'), '');
+  }
+  final u = Uri.parse(_controller);
+  return Uri(scheme: 'https', host: u.host, port: 8443).toString();
+}
+
+/// The field's CA as the app gets it on a first scan (protocol/checkin.md):
+/// `GET /api/v1/controller/ca` on the plain HTTP port, no token.
+Future<String> _controllerCaPem() async {
+  final http = HttpClient();
+  try {
+    final req = await http.getUrl(
+      Uri.parse('$_controller/api/v1/controller/ca'),
+    );
+    final res = await req.close().timeout(const Duration(seconds: 15));
+    final pem = await utf8.decodeStream(res);
+    if (res.statusCode != 200 || !pem.contains('BEGIN CERTIFICATE')) {
+      throw StateError(
+        'no CA at $_controller/api/v1/controller/ca '
+        '(${res.statusCode})',
+      );
+    }
+    return pem;
+  } finally {
+    http.close(force: true);
+  }
+}
+
 /// Checks a new test player in at the controller through the app's own
-/// client (the controller's field is trusted by address, not by a CA: the
-/// address is plain http, so no certificate is involved). Null, with the
-/// reason, when the controller has no game open for check-in.
+/// client, as a phone does after scanning the poster: the field's CA from
+/// the plain HTTP port, then every request over HTTPS trusting that CA only
+/// (the client always speaks TLS, so a plain http address cannot be used
+/// here). Null, with the reason, when the controller has no game open for
+/// check-in.
 Future<(_TestPlayer?, String?)> _checkIn() async {
+  final caPem = await _controllerCaPem();
+  // The pin's hash must be the CA's: a stored field whose hash does not match
+  // is dropped when the app reads it back (PinnedField.fromJson, APP-1).
+  final caSha256 = Uint8List.fromList(
+    sha256.convert(pemCertificates(caPem)!.first).bytes,
+  );
   final probe = PinnedField(
     fieldId: 'probe',
     fieldName: 'probe',
-    caPem: _testCaPem(),
-    caSha256: Uint8List(32),
-    urls: [_controller.replaceAll(RegExp(r'/+$'), '')],
+    caPem: caPem,
+    caSha256: caSha256,
+    urls: [_httpsUrl()],
   );
   final client = CheckinClient(IoFieldHttp(probe));
   final info = await client.info();
@@ -303,8 +424,8 @@ Future<(_TestPlayer?, String?)> _checkIn() async {
   final field = PinnedField(
     fieldId: info.fieldId,
     fieldName: info.fieldName,
-    caPem: _testCaPem(),
-    caSha256: Uint8List(32),
+    caPem: caPem,
+    caSha256: caSha256,
     urls: probe.urls,
   );
   final id = FieldIdentity(info.fieldId, newPlayerId(), newPlayerSecret());
@@ -313,7 +434,7 @@ Future<(_TestPlayer?, String?)> _checkIn() async {
     gameId: game['game_id']! as int,
     playerId: id.playerId,
     secret: id.secret,
-    displayName: 'itest-ios',
+    displayName: _testName,
     noticeVersion: info.noticeVersion,
   );
   final c = FieldCheckin(
@@ -347,6 +468,10 @@ void itest(
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  // Nothing of the test stays at the controller, whatever happened before.
+  setUpAll(_sweepLeftovers);
+  tearDownAll(_sweepLeftovers);
 
   // --- 1: the start language, and the four languages ------------------------
 
@@ -507,9 +632,8 @@ void main() {
     await tester.pumpAndSettle();
     await tapVisible(tester, find.byKey(const Key('vibrate-on-events')));
     await tester.pumpAndSettle();
-    await AppScope.read(
-      tester.element(find.byType(SettingsScreen)),
-    ).update((x) => x.joinKeyHex = key);
+    await AppScope.read(tester.element(find.byType(SettingsScreen)))
+        .update((x) => x.joinKeyHex = key);
     await tester.pumpAndSettle();
     final file = File('${dir.path}/settings.json');
     expect(file.existsSync(), isTrue, reason: 'settings.json in the folder');
@@ -768,38 +892,36 @@ void main() {
 
   // --- 9: marshal validation ---------------------------------------------------
 
-  itest(
-    '9. a player who is not on the GM\'s marshal list is refused',
-    (tester) async {
-      if (_skipped(_needs(_controller.isNotEmpty, _noController))) {
-        return;
-      }
-      final (player, why) = await _checkIn();
-      if (player == null) {
-        markTestSkipped(why!);
-        return;
-      }
-      addTearDown(player.leave);
-      final settings = AppSettings();
-      await tester.pumpWidget(
-        deviceApp(settings: settings, store: await player.store(settings)),
-      );
-      await waitFor(tester, find.byKey(const Key('role-marshal')));
-      await tapVisible(tester, find.byKey(const Key('role-marshal')));
-      final pt = _s(AppLanguage.pt);
-      await waitFor(tester, find.text(pt.t('marshal.not_listed')));
-      expect(find.byKey(const Key('marshal-status')), findsOneWidget);
-      expect(
-        find.byKey(const Key('marshal-chrono')),
-        findsNothing,
-        reason: 'the tools stay closed',
-      );
-      expect(settings.marshalValidation, isNull);
-      expect(settings.marshalId, isEmpty);
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-    timeout: const Timeout(Duration(minutes: 2)),
-  );
+  itest('9. a player who is not on the GM\'s marshal list is refused', (
+    tester,
+  ) async {
+    if (_skipped(_needs(_controller.isNotEmpty, _noController))) {
+      return;
+    }
+    final (player, why) = await _checkIn();
+    if (player == null) {
+      markTestSkipped(why!);
+      return;
+    }
+    addTearDown(player.leave);
+    final settings = AppSettings();
+    await tester.pumpWidget(
+      deviceApp(settings: settings, store: await player.store(settings)),
+    );
+    await waitFor(tester, find.byKey(const Key('role-marshal')));
+    await tapVisible(tester, find.byKey(const Key('role-marshal')));
+    final pt = _s(AppLanguage.pt);
+    await waitFor(tester, find.text(pt.t('marshal.not_listed')));
+    expect(find.byKey(const Key('marshal-status')), findsOneWidget);
+    expect(
+      find.byKey(const Key('marshal-chrono')),
+      findsNothing,
+      reason: 'the tools stay closed',
+    );
+    expect(settings.marshalValidation, isNull);
+    expect(settings.marshalId, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, timeout: const Timeout(Duration(minutes: 2)));
 
   itest(
     '9. a player the GM lists is accepted, and refused again once removed',
@@ -835,7 +957,7 @@ void main() {
         'POST',
         '/api/v1/marshals',
         token: _gmToken,
-        body: {'player_id': player.playerId, 'name': 'itest-ios'},
+        body: {'player_id': player.playerId, 'name': _testName},
       );
       expect(status, anyOf(200, 201), reason: 'GM token refused? $body');
       marshalId = (body! as Map)['marshal_id'] as String;
@@ -895,23 +1017,21 @@ void main() {
     timeout: const Timeout(Duration(minutes: 2)),
   );
 
-  itest(
-    '10. the controller\'s own console loads in the web view',
-    (tester) async {
-      if (_skipped(
-        _androidHasIt ??
-            _needsDevice ??
-            _needs(_controller.isNotEmpty, _noController),
-      )) {
-        return;
-      }
-      await _openConsole(tester, _controller);
-      // The console's page is titled "Atalaia", and asks for a code itself.
-      await _expectTitle(tester, 'Atalaia');
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-    timeout: const Timeout(Duration(minutes: 2)),
-  );
+  itest('10. the controller\'s own console loads in the web view', (
+    tester,
+  ) async {
+    if (_skipped(
+      _androidHasIt ??
+          _needsDevice ??
+          _needs(_controller.isNotEmpty, _noController),
+    )) {
+      return;
+    }
+    await _openConsole(tester, _controller);
+    // The console's page is titled "Atalaia", and asks for a code itself.
+    await _expectTitle(tester, 'Atalaia');
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, timeout: const Timeout(Duration(minutes: 2)));
 
   // --- 11: the haptics ----------------------------------------------------------
 

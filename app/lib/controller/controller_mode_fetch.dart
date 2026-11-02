@@ -179,8 +179,7 @@ class ControllerModeFetch {
     final o = offer(nodeModeId, tier);
     if (o['ok'] == true) return null;
     return switch (o['why']) {
-      'no_box_keys' =>
-        'no box mode keys are set ([modes] box_keys): the boxes would take nothing',
+      'no_box_keys' => 'no box mode keys are set ([modes] box_keys): the boxes would take nothing',
       'no_https' =>
         'this controller does not serve HTTPS: boxes fetch modes only over '
             'HTTPS pinned to the field CA',
@@ -352,7 +351,8 @@ class ControllerModeFetch {
           e.key,
     ]..sort();
     if (nodes.isEmpty) return null;
-    return "boxes are fetching this game's modes: node(s) ${nodes.join(', ')}; "
+    return "boxes are fetching this game's modes: "
+        "${nodes.length == 1 ? 'node' : 'nodes'} ${nodes.join(', ')}; "
         'wait for them, or stop waiting (DELETE /api/v1/mode-fetch) before '
         'the game starts';
   }

@@ -30,9 +30,9 @@ void main() {
 
   test('the version is the one core/CMakeLists.txt and version.h declare', () {
     final cmake = File('../core/CMakeLists.txt').readAsStringSync();
-    final number = RegExp(
-      r'project\(atalaia_core VERSION (\S+)',
-    ).firstMatch(cmake)!.group(1);
+    final number = RegExp(r'project\(atalaia_core VERSION (\S+)')
+        .firstMatch(cmake)!
+        .group(1);
     // A development core adds version.h's pre-release ("0.3.0-dev", FV-1).
     final pre = RegExp(r'#define ATALAIA_VERSION_PRERELEASE "([^"]*)"')
         .firstMatch(
@@ -43,13 +43,9 @@ void main() {
   });
 
   group('event vectors (protocol/vectors/events.yaml) through the C codec', () {
-    final doc =
-        plain(
-              loadYaml(
-                File('../protocol/vectors/events.yaml').readAsStringSync(),
-              ),
-            )
-            as Map<String, Object?>;
+    final doc = plain(
+      loadYaml(File('../protocol/vectors/events.yaml').readAsStringSync()),
+    ) as Map<String, Object?>;
     final schema = EventSchema.load();
     for (final c in (doc['valid']! as List).cast<Map<String, Object?>>()) {
       test(c['name']! as String, () {
@@ -126,9 +122,8 @@ void main() {
   });
 
   test('screen templates: the core parses, refuses and fills in', () {
-    final countdown = File(
-      '../modes/bomb/assets/screens/countdown.yaml',
-    ).readAsStringSync();
+    final countdown = File('../modes/bomb/assets/screens/countdown.yaml')
+        .readAsStringSync();
     expect(core.checkScreen(countdown), isNull);
     expect(core.checkScreen('template: x\nwidgets: 3\n'), isNotNull);
     expect(
@@ -193,13 +188,59 @@ void main() {
     },
   );
 
+  group(
+    'rand() seeded from the game key (protocol/vectors/rand.json, LIVE2-2)',
+    () {
+      List<int> values(List<int>? key, int seed, int nodeId) {
+        final logs = <String>[];
+        final node = CoreNode.create(
+          core,
+          NodeSpec(
+            source: "on('go', function() for i = 1, 4 do log(rand(1, 1000000)) end end)",
+            chunkName: '@rand.lua',
+            nodeId: nodeId,
+            gameSeed: seed,
+            gameKey: key,
+            instrLimit: 200000,
+          ),
+          handlers: NodeHandlers(onLog: logs.add),
+        );
+        node.input('go');
+        node.close();
+        return logs.map(int.parse).toList();
+      }
+
+      final doc = loadVectors('rand.json');
+      for (final c in cases(doc, 'cases')) {
+        test(c['name'] as String, () {
+          expect(
+            values(
+              hexDecode(c['game_key'] as String),
+              c['game_seed'] as int,
+              c['node_id'] as int,
+            ),
+            (c['lua_rand_1_1000000'] as List).cast<int>(),
+          );
+        });
+      }
+
+      test('no key is the old sequence, and another key another game', () {
+        final c = cases(doc, 'cases').first;
+        final key = hexDecode(c['game_key'] as String);
+        final seed = c['game_seed'] as int;
+        final node = c['node_id'] as int;
+        expect(values(null, seed, node), values(null, seed, node));
+        expect(values(null, seed, node), isNot(values(key, seed, node)));
+      });
+    },
+  );
+
   test('the sandbox has no io, os or package', () {
     final logs = <String>[];
     final node = CoreNode.create(
       core,
       const NodeSpec(
-        source:
-            'log(tostring(io) .. " " .. tostring(os) .. " " .. tostring(package))',
+        source: 'log(tostring(io) .. " " .. tostring(os) .. " " .. tostring(package))',
         chunkName: '@sandbox.lua',
       ),
       handlers: NodeHandlers(onLog: logs.add),

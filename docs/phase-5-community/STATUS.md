@@ -8,7 +8,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 **Current phase:** Implementation (plan phases 1-13 built in software 2026-10-22: the visual mode editor complete, its link to the simulator, signed mode packages, the sandbox-escape battery, signed packages in the controller, scenario blocks in the GM console, missing modes sent to boxes (controller and box), the registry repository's template and the community processes, German, Traditional Chinese (Taiwan), the build guides for the other node types)
 **Phase status:** Software done (every software plan phase built; the gate waits for hardware and real deployments)
 **Risk level:** Medium
-**Last updated:** 2026-10-22 (plan phase 11 built, P5K-1 to P5K-12; plan phase 12 built; the editor makes the package itself, P5I-1 to P5I-6; plan phases 8 and 9 built; plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
+**Last updated:** 2026-10-22 (plan phase 11 built, P5K-1 to P5K-12; plan phase 12 built; the editor makes the package itself, P5I-1 to P5I-6; plan phases 8 and 9 built; plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8 and built as 13a and 13b; refreshed after phases 2-4 software; first written 2026-10-18)
 **Next step:** the review of the German and the Traditional Chinese by native-speaking players (P5H-5, P5K-11), and the maintainer's P5K-3, P5K-4, P5K-5, P5K-7 and P5K-12 (box flash and fonts, OLED readability, typed Chinese names, the app's font, the radio band on the Chinese page); P5I-1 and P5I-3 (the editor's package: made in the page, signed offline) for the maintainer; creating the registry repository waits for the maintainer; plan phase 13's test on real boxes is HW3; every software plan phase is built; the build guides wait for their first builds and photos (HW2) and the maintainer's P5J decisions
 
 Phase 5 is the community layer: visual mode editor (Blockly), mode
@@ -80,7 +80,7 @@ section 16).
   keeps them on LittleFS (limits, the Reduced tier, rollback, removal), only
   between games. K10 amended for that path (ADR.md, "Note 2026-10-22: P5R-8").
   Design choices P5B-8 to P5B-17 (open; P5B-9, which keys a box trusts, is for
-  the maintainer). Not built.
+  the maintainer). Built since as 13a and 13b (below); on real boxes: HW3.
 - [x] **Plan phase 13a, missing modes from the GM console: the controller,
   console and protocol (2026-10-22), in software:** join keys 16
   (`fetch_modes`) and 17 (`forget_modes`) in the Python codec and the shared
@@ -227,7 +227,7 @@ section 16).
 | 4 | Mode packages and signing | Software | **Built 2026-10-22** |
 | 5 | Sandbox-escape battery | Software | **Built 2026-10-22** |
 | 6 | Signed packages in the controller | Software | **Built 2026-10-22** |
-| 13 | Missing modes from the GM console (P5R-8; built after 6) | Software (box side host-tested); real boxes: HW3 | Planned 2026-10-22 |
+| 13 | Missing modes from the GM console (P5R-8; built after 6) | Software (box side host-tested); real boxes: HW3 | **Built in software 2026-10-22** (13a the controller, 13b the box; real boxes: HW3) |
 | 7 | Scenario blocks in the console | Software | **Built 2026-10-22** |
 | 8 | Registry repository template | Software; publishing needs the maintainer | **Built 2026-10-22**; the repository `atalaia-modes` was created 2026-10-26 (with its public page); the project's registry key is still the maintainer's |
 | 9 | Community processes | Software | **Built 2026-10-22** |
@@ -332,8 +332,8 @@ section 16).
 3. Left from plan phases 3-6, small (the editor making the package itself is
    built, P5I-1 to P5I-6, signing staying offline):
    `protocol/vectors/controller_api.json`
-   has no contract cases for the new `/api/v1/mode-packages` endpoints yet
-   (the Android controller role does not serve them); P5C-15 (the two sandbox
+   has contract cases for the mode-package endpoints (`/api/v1/mode-packages`,
+   `/api/v1/mode-fetch`, `/api/v1/mode-packages/report`); P5C-15 (the two sandbox
    fixes) and P5C-18 (packages stay installed when their key is revoked) were
    accepted by the maintainer; the other decisions of P5C-1 to P5C-21 are open
    for the maintainer's review.
@@ -369,3 +369,13 @@ Update (2026-10-28, decision SCL-1, software and browser tests): the "not done" 
 ## The box's boot splash is a build asset (2026-10-29, decisions LOGO-5 to LOGO-7)
 
 The Field Box shows only the Atalaia tower (no field logo is fetched). A builder who wants another splash replaces `firmware/esp32/assets/splash.pgm` or points `CONFIG_ATALAIA_SPLASH_LOGO` at their own file (steps in the firmware guide, section 4, English and Portuguese); the project's release images always carry the tower and the release build checks it. Built and host-tested, not flashed on a board.
+
+## CI and release hardening from the security review (2026-10-30, SR-60 to SR-69, SR-90 to SR-94)
+
+Every action pinned by commit SHA (version in a comment), the ESP-IDF image by digest (also in `tools/docker_fw.py` and the registry template), every `pip install` in CI from a requirements file compiled with hashes and installed with `--require-hashes --no-deps --only-binary :all:` (`reuse` from its source archive), `controller/requirements.txt` a hash-pinned lock, Dependabot weekly for actions, pip and pub, `persist-credentials: false` on checkouts, `permissions: contents: read` on `ci.yml`, and the release workflow's signing job in the environment `release`, failing unless the tag's commit is on `origin/main`. The CBOR decoders' limits are tested on hostile input. The maintainer still has to create the protected `release` environment, move the two signing secrets into it, add a `v*` tag ruleset and review the "create and approve pull requests" setting (steps in `firmware/esp32/docs/RELEASE_SIGNING.md`); the workflows were not run on a hosted runner here.
+
+## The project page, 2026-10-31 to 2026-11-01 (FB-1 to FB-8, FBM-1 to FBM-4, MSC-1 to MSC-5, MSF-1 to MSF-3, TI-1 to TI-6)
+
+- **Real Field Box footage.** The build page and the main page show the first bench build (2026-10-31 photo) and an 11 s muted clip from 2026-11-01 with the new TFT screens (hold bar, live held time, corner points), plus a second photo of the "PRONTA" screen with the tower. The modes page has a 17.8 s clip of a Master and Satellites test game on four boxes; its caption says the run found three screen problems, that they are fixed in the firmware, and that the clip still shows the old screens. In pt, en, de and zh-tw; the clips honour reduced motion (a pause button).
+- **Roadmap texts** (phases 1 and 2, in the four languages) now list the big screen's hold bar, held time and corner points, the screens of the three other modes, the boot splash, the I2C fix (host tests; bench test still to do), the screen-text size check, the singular counts, the radio modem guide and the controllers' lost-epoch draw, each with what has and has not been tried.
+- **The site browser test cannot skip silently any more (TI-1 to TI-6).** `python3 tools/docker_site_browser.py` runs `tools/site_browser_test.py` in an image with Playwright 1.49.0 pinned by hash; a missing Playwright is a failure, and only `ATALAIA_SKIP_SITE_BROWSER=1` skips. The old route had printed "OK (skipped=1)".

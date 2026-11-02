@@ -238,6 +238,16 @@ static const uint8_t pl_cmd_3[] = {
     0x33, 0x2e, 0x30, 0x03, 0x07,
 };
 #define pl_cmd_3_len sizeof(pl_cmd_3)
+static const uint8_t pl_cmd_4[] = {
+    0xa2, 0x01, 0x0b, 0x02, 0xa2, 0x63, 0x73, 0x72, 0x63, 0x05, 0x65, 0x65,
+    0x70, 0x6f, 0x63, 0x68, 0x19, 0x23, 0x28,
+};
+#define pl_cmd_4_len sizeof(pl_cmd_4)
+static const uint8_t pl_cmd_5[] = {
+    0xa3, 0x01, 0x0b, 0x02, 0xa2, 0x63, 0x73, 0x72, 0x63, 0x19, 0x04, 0xd2,
+    0x65, 0x65, 0x70, 0x6f, 0x63, 0x68, 0x19, 0xa0, 0x28, 0x03, 0x07,
+};
+#define pl_cmd_5_len sizeof(pl_cmd_5)
 static const uint8_t pl_cmd_bad_0[] = {
     0xa2, 0x02, 0xa0, 0x03, 0x05,
 };
@@ -248,6 +258,8 @@ static const payload_vector_t cmd_vectors[] = {
     {"cmd_targeted", "{\"cmd\":3,\"params\":{\"timeout\":30},\"dest\":42}", pl_cmd_1, pl_cmd_1_len},
     {"cmd_mode_refill", "{\"cmd\":8,\"params\":{\"name\":\"refill\"},\"dest\":7}", pl_cmd_2, pl_cmd_2_len},
     {"cmd_update", "{\"cmd\":9,\"params\":{\"id\":\"0123456789abcdef\",\"version\":\"0.3.0\"},\"dest\":7}", pl_cmd_3, pl_cmd_3_len},
+    {"cmd_peer_epoch", "{\"cmd\":11,\"params\":{\"src\":5,\"epoch\":9000}}", pl_cmd_4, pl_cmd_4_len},
+    {"cmd_peer_epoch_to_one_box", "{\"cmd\":11,\"params\":{\"src\":1234,\"epoch\":41000},\"dest\":7}", pl_cmd_5, pl_cmd_5_len},
 };
 #define CMD_VECTOR_COUNT (sizeof(cmd_vectors) / sizeof(cmd_vectors[0]))
 

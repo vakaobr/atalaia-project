@@ -344,7 +344,7 @@ function reason(row) {
 
 function showImport(answer) {
     const c = answer.counts || {};
-    const lines = [t('io_counts', { rows: answer.rows, created: c.created || 0, updated: c.updated || 0,
+    const lines = [t('io_counts', { n: answer.rows, rows: answer.rows, created: c.created || 0, updated: c.updated || 0,
         unchanged: c.unchanged || 0, skipped: c.skipped || 0, refused: c.refused || 0 })];
     if (answer.missing && answer.missing.count) lines.push(t('io_missing', { n: answer.missing.count }));
     const ignored = answer.not_imported_columns || [];

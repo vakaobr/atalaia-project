@@ -92,8 +92,9 @@ Future<void> back(WidgetTester tester) async {
 }
 
 Future<void> login(WidgetTester tester, FakeSite site) async {
-  await tester.enterText(find.byKey(const Key('site-user')), site.username);
-  await tester.enterText(find.byKey(const Key('site-password')), site.password);
+  // The login step is taller than the screen now (the sign-up boxes): scroll to the fields.
+  await enter(tester, 'site-user', site.username);
+  await enter(tester, 'site-password', site.password);
   await tapKey(tester, 'site-login');
 }
 
@@ -451,6 +452,9 @@ void main() {
     await tester.tap(find.text('Domingo de manhã · Campo Norte').last);
     await tester.pumpAndSettle();
     await tapKey(tester, 'checkin-submit');
+    // The error is at the top of a form that is now longer than the screen.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 3000));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('checkin-error')), findsOneWidget);
     expect(field.rows, isEmpty);
   });

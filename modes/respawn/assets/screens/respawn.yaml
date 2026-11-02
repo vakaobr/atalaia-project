@@ -18,18 +18,18 @@ layout:
     text: "{lives}"
     style: { font_size: 48, color: "{lives == 0 && 'danger' || 'white'}" }
   - type: label
-    text: "{lang == 'pt' && 'vidas restantes' || lang == 'de' && 'Leben übrig' || lang == 'zh-tw' && '剩餘命數' || 'lives left'}"
+    text: "{lang == 'pt' && lives == 1 && 'vida restante' || lang == 'pt' && 'vidas restantes' || lang == 'de' && 'Leben übrig' || lang == 'zh-tw' && '剩餘命數' || lives == 1 && 'life left' || 'lives left'}"
     style: { font_size: 20, color: muted, visible: "{!team && !player}" }
   # The team's and the player's lives: Portuguese, German and English put the name last, Chinese
   # first (a label of its own: a string of a chain holds no value to fill in).
   - type: label
-    text: "{lang == 'pt' && 'vidas de ' || lang == 'de' && 'Leben für ' || 'lives left for '}{team|upper}"
+    text: "{lang == 'pt' && lives == 1 && 'vida de ' || lang == 'pt' && 'vidas de ' || lang == 'de' && 'Leben für ' || lives == 1 && 'life left for ' || 'lives left for '}{team|upper}"
     style: { font_size: 20, color: team, visible: "{team && !params.per_player && lang != 'zh-tw'}" }
   - type: label
     text: "{team|upper} 隊剩餘命數"
     style: { font_size: 20, color: team, visible: "{team && !params.per_player && lang == 'zh-tw'}" }
   - type: label
-    text: "{lang == 'pt' && 'vidas de ' || lang == 'de' && 'Leben für ' || 'lives left for '}{player}"
+    text: "{lang == 'pt' && lives == 1 && 'vida de ' || lang == 'pt' && 'vidas de ' || lang == 'de' && 'Leben für ' || lives == 1 && 'life left for ' || 'lives left for '}{player}"
     style: { font_size: 20, color: muted, visible: "{player && params.per_player && lang != 'zh-tw'}" }
   - type: label
     text: "{player} 的剩餘命數"

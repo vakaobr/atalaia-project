@@ -82,7 +82,8 @@ class I18nCheckTests(unittest.TestCase):
         self.assertEqual(app.tables["de"]["settings.lang_de"], "Deutsch")
         # strings_zh_tw.dart's zhTwStrings is the language zh-tw (P5K-2).
         self.assertEqual(app.where["zh-tw"], "app/lib/l10n/strings_zh_tw.dart")
-        self.assertEqual(app.tables["en"].keys(), app.tables["zh-tw"].keys())
+        # Chinese has no plural, so none of the singular forms (`<key>_one`, decision PLU-2).
+        self.assertEqual({k for k in app.tables["en"] if not k.endswith("_one")}, set(app.tables["zh-tw"]))
         self.assertEqual(app.tables["en"].keys(), app.tables["pt"].keys())
 
     def test_a_missing_german_key_is_a_warning(self):

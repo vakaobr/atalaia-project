@@ -19,8 +19,11 @@ site name atalaia.test, ports on 127.0.0.1 only:
     old ones; a damaged backup is refused by restore.sh with nothing changed;
  4. everything is deleted (`down --volumes`), a fresh stack starts with an
     empty database, restore.sh restores the backup into a fresh database, and
-    every table's contents match what they were; the probe checks that the
-    restored data and API key work through Caddy.
+    every table's contents match what they were (but for the account the
+    erasure ledger lists, PRIV-4: it was in the backup, the ledger says it was
+    erased, and restore.sh applies the ledger again, so it comes back
+    anonymised and nothing else changes); the probe checks that the restored
+    data and API key work through Caddy.
 The stack runs with the remote ATAK relay on (Phase 4 follow-up FU5): the
 operator issues a data package with `python -m atalaia_server atak issue` in
 the server's container, the relay's port answers TLS where the stack publishes
@@ -35,6 +38,7 @@ Everything it made is removed at the end, whatever the result.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import secrets
@@ -308,6 +312,16 @@ class Deployment:
     def fingerprint(self) -> str:
         return self.sql(FINGERPRINT_SQL)
 
+    def ledger_seed(self) -> None:
+        """PRIV-4: two accounts in the database; the erasure ledger (in its volume, copied beside the backup by
+        backup.sh) says one of them was erased, as if after the backup was made."""
+        ids = self.sql("INSERT INTO users (username) VALUES ('erased-later'), ('stays') RETURNING id, username")
+        rows = dict(line.split("|")[::-1] for line in ids.splitlines())
+        self.erased_id = rows["erased-later"]
+        entry = {"v": 1, "kind": "account", "tenant": None, "at": "2026-10-30T00:00:00Z",
+                 "hash": hashlib.sha256(f"atalaia-erasure/1:account:{self.erased_id}".encode()).hexdigest()}
+        self.dc("run", "--rm", "-T", "ledger-tool", "import", input=(json.dumps(entry) + "\n").encode(), quiet=True)
+
     def restore(self, backup: Path, expected: str) -> None:
         say("4. a fresh stack, then restore.sh")
         self.dc("down", "--volumes", "--remove-orphans")
@@ -315,7 +329,14 @@ class Deployment:
         expect(self.sql("SELECT count(*) FROM fields") == "0", "the fresh database is empty")
         self.run(["sh", str(SERVER / "restore.sh"), str(backup), "--yes"])
         got = self.fingerprint()
-        expect(got == expected, f"every table matches after the restore ({len(expected.splitlines())} tables)")
+        kept = lambda text: [line for line in text.splitlines() if line.split()[0] not in ("users", "audit_log")]  # noqa: E731
+        expect(kept(got) == kept(expected), f"every table matches after the restore ({len(expected.splitlines())} tables)")
+        names = self.sql("SELECT username FROM users WHERE username IN ('erased-later', 'stays') OR username LIKE 'deleted-%' "
+                         "ORDER BY 1").splitlines()
+        expect(names[0].startswith("deleted-") and "stays" in names and "erased-later" not in names,
+               "the account the erasure ledger lists is erased again after the restore, the other stays")
+        expect(self.sql("SELECT count(*) FROM audit_log WHERE action = 'gdpr_erasure'") == "1",
+               "the replay is in the audit log")
         expect(self.sql("SELECT count(*) FROM game_events") == "2", "the synced events are back")
 
     def down(self) -> None:
@@ -344,6 +365,7 @@ def run(suffix: str, server_image: str, test_image: str) -> int:
         expect(bool(address) and address != caddy,
                f"the audit log has the client's address ({address}), not Caddy's ({caddy})")
         d.one_worker()
+        d.ledger_seed()
         expected = d.fingerprint()
         expect(len(expected.splitlines()) >= 30, "every table fingerprinted")
         backup = d.backup()

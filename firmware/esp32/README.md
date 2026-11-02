@@ -23,7 +23,7 @@ The firmware is structured as a shell around the shared C core (`core/`):
 
 ```
 app_main
-  +-- game_task (core 1, priority 5, 100 Hz, 12 KB stack)
+  +-- game_task (core 1, priority 5, 100 Hz, 24 KB stack)
   |     +-- radio RX -> box_game (field games: join, CMD, TIME, ACK)
   |     +-- poll buttons/keypad/serial console
   |     +-- NFC: join cards when idle, player tags during a game (nfc.tag)
@@ -180,7 +180,7 @@ a `@mode <mode id> <params>` message in the screen queue, so a name resolves
 to the running mode's template (main mode first, then its modifiers). Bomb
 and Domination use templates; when a mode has no template of a name, the C
 screens below are drawn. Templates come from the image only: there is no
-upload path yet, so LittleFS is not read for them (decision K10).
+upload path yet, so LittleFS is not read for them (decision K10). An expression whose `'text'` literals need more than 256 bytes is refused when the template is parsed, built in or fetched (decision TPL-1; `modes/README.md`, "Authoring limits"); one that fails to render anyway shows `?` and the box logs `screen expression {...}` once at warning level.
 
 The C screen templates (`main/screen_renderer.c`, ADR-P1-2) are C functions
 that build LVGL 9.2 widget trees for the 320x240 TFT: `standby`,
@@ -207,6 +207,30 @@ commit them with the change. Rendered images land in
 `firmware/esp32/build-test/screens/` (or `<build>/screens/` with `ctest`),
 next to a `.diff.png` for each mismatch.
 
+### The I2C bus must never take the box down
+
+The OLED, the PCF8574 keypad, the PN532 and the MAX17048 share one bus (GPIO 17/18). Bench,
+2026-10-31: a keypad with bad solder joints rebooted a box six times in three minutes with
+"Interrupt wdt timeout on CPU0" in `i2c_isr_handler_default`. Cause: ESP-IDF v5.3's legacy I2C
+driver (`driver/i2c.h`) only handles an interrupt while a transaction it started is running; any
+other interrupt (a start/stop, timeout or arbitration loss that noise raises after a transaction
+timed out and the driver reset the controller) is neither handled nor cleared, the level-triggered
+interrupt fires again at once, and the CPU never leaves the handler until the interrupt watchdog
+resets it. The fix (decision I2C-1) is in two layers, both in `main/hal/esp/hal_esp_i2c.c`:
+
+- **The driver.** Every part now goes through `i2c_master` (`driver/i2c_master.h`), whose handler
+  clears what it reads first thing, with a timeout on every transaction, a controller reset and
+  bus clear after each failed one, and a glitch filter (7 cycles) on SDA/SCL.
+- **The health layer** (`main/i2c_health.c`, pure logic, host-tested). Each device has a record:
+  3 failures in a row suspend it (every call then answers "suspended" at once, nothing on the
+  bus), a trial is allowed after 0.5 s, doubling to 30 s while it keeps failing, and one success
+  brings it back. A run of 3 failures on the bus (any device) also resets the bus, at most once a
+  second. All of it is logged once per change under the tag `hal_i2c`: `device 0x20 suspended
+  after 3 failures`, `still failing`, `answers again`. The keypad then reads as "no key", the OLED
+  frame is skipped, NFC polls find nothing and the battery level reads unknown, while the game
+  runs on the buttons. `hal_esp_i2c_stats()` has the counters (ok, errors, skipped, suspensions,
+  recoveries, bus resets).
+
 ### The on-board OLED
 
 The Heltec V4's own 0.96" OLED (SSD1306, 128x64, I2C 0x3C on the shared bus,
@@ -230,6 +254,30 @@ template keeps it, filled by the share of the game left and red in the last
 minute. The LVGL task calls it each pass from the runner's timer; no timer (no
 limit, no game, a field game, game over) hides it. Reference images:
 `test/screens/timer_bar_*.png`.
+
+The TFT also shows what the box itself knows (decisions TZ-1 to TZ-5, in `screen_renderer.c`, on
+LVGL's top layer like the timer bar; the shell sets the readers with `screen_set_overlay_readers()`
+and the LVGL task calls `screen_overlay_tick()` each pass):
+- a zone's screen with no bar of its own (neutral and captured, Master and Satellites' `master_status`,
+  VIP Payload's `checkpoint_free` and `checkpoint_held`: `oled_text_for()` marks them `zone`, so the
+  OLED draws the bar there too, decision TFT-3) shows the capture's hold bar and the holding team's name
+  in a strip over the footer, from the OLED's own logic (`oled_text_for()` and `oled_text_hold()`,
+  BN-26) and the mode's `capture_hold_ms`. On the OLED a held `master_status` or `checkpoint_held` that
+  carries `since` reads as Domination's captured screen (the team big, `held for 1:23` below from the
+  game clock, decision TFT-8); Progressive Domination's captured already did; Bomb's arm and defuse bars are the mode's own data and
+  already drew in its templates;
+- a template's data with `since` gets `age`, `live` and, when the data has no `held` of its own, `held`
+  added (game seconds since the capture, by the game clock the OLED reads), redrawn once a second through
+  `screen_template_update()`, so only the changed label is touched. Domination's captured screen says
+  `held 1:23`; without `live` (a phone) it keeps `held since <time>`. Master and Satellites' `held` is its
+  satellites, so its screens, Progressive Domination's captured and VIP Payload's `checkpoint_held` read
+  `age` (decision TFT-4);
+- under Domination, each team's points at this box in team-coloured chips in the top right: the last
+  `points` the captured and final screens carried for that team (its own zone's total, re-sent every
+  tick), kept when another team takes the zone and cleared at a new `@mode` or between games. Under
+  Master and Satellites the chips are the `total` of the master's status (the team's score), shown on the
+  master; the satellites show none. Progressive Domination and VIP Payload have none (decision TFT-2).
+Reference images: `test/screens/yaml_domination_*_live*.png`, `*_holding*.png`, and the same for `yaml_master_satellites_*`, `yaml_progressive_domination_captured_*` and `yaml_vip_checkpoint_*`.
 
 It is a second LVGL display, rendered in RGB565 and packed to one bit per
 pixel on flush (`oled_pack`); only the 128-byte pages that changed go over
@@ -257,12 +305,15 @@ hardware arrives.
 ## USB radio modem variant
 
 The same project builds the field controller's radio: a Heltec V4.3
-plugged into the Raspberry Pi over USB (ADR-P2-4). `sdkconfig.modem`
+plugged into the Raspberry Pi over USB (ADR-P2-4). The builder's and the
+organiser's path (flash commands per system, the port, the controller's
+`[modem] port`, checks, troubleshooting) is the manual
+[Set up the radio modem](../../docs/manuals/en/modem.md). `sdkconfig.modem`
 sets `CONFIG_ATALAIA_MODEM_MODE`, which builds `main/modem/` instead of
 the Field Box shell: the radio HAL and radio task, plus a serial task
 that moves the frames of [protocol/usb-modem.md](../../protocol/usb-modem.md)
 between the USB-Serial-JTAG port and the radio. The modem encrypts and
-decrypts with AES-CCM (mbedtls, hardware AES), dedupes flood copies,
+decrypts with AES-CCM (mbedtls, hardware AES), drops flood copies and replays with a per-source replay window,
 enforces the duty cycle of the channel's sub-band, measures the noise on
 a channel when asked (MEASURE, only while no game is configured), carries
 field frames as they are, with or without a game (FIELD_TX, FIELD_RX,
@@ -406,7 +457,7 @@ The radio is the USB modem's own code (`main/modem/modem.c`, frames
 shifted by 3): the phone sends plaintext packets with RADIO_TX, the pod
 encrypts them with the game key, keeps the duty cycle and the TX power of
 the channel's EU868 sub-band (`radio/radio_limits.c`), refuses a channel
-that does not fit in one sub-band, dedupes and decrypts what it hears
+that does not fit in one sub-band, decrypts what it hears and drops copies and replays
 (RADIO_RX), and measures noise when asked (MEASURE, answered by RADIO_NOISE
 `0x0B`, decision PF2). Field and pair frames, sealed by the phone, go and
 come as they are (RADIO_FIELD_TX, RX and ACK, `0x0C`-`0x0E`, with or without
@@ -478,7 +529,7 @@ Radio-specific Kconfig options (under "Atalaia Field Box Configuration > Radio")
 - `ATALAIA_RADIO_FEM_EN_PIN` (2, chip enable), `ATALAIA_RADIO_VFEM_CTL_PIN` (7, the FEM's LDO, driven high), `ATALAIA_RADIO_FEM_CTX_PIN` (5, V4.3, low = LNA), `ATALAIA_RADIO_FEM_PA_PIN` (46, V4.2, high = PA) -- driven only after the SX1262 answers (`main/hal/board_fem.c`)
 - `ATALAIA_VEXT_CTL_PIN` -- Vext, active low, driven low at boot (under "Board power")
 - `ATALAIA_RADIO_FEM_GAIN_DB` -- FEM gain for TX power calculation (default 14)
-- `ATALAIA_RADIO_ANTENNA_GAIN_DBI` -- antenna gain in dBi (default 2)
+- `ATALAIA_RADIO_ANTENNA_GAIN_DBI` -- antenna gain in dBi (default 2); `python3 tools/docker_fw.py build|bench|modem|pod|wokwi --antenna-dbi=N` sets it for that build folder
 - `ATALAIA_RADIO_REGION` -- the radio region the image is built for: EU868 (default) or AS923-TW (Taiwan, 920-925 MHz, SF9 at 500 kHz, 0.5 W at the antenna port; RFC 0001 Amendment 12). The firmware knows only that region: a join, a CONFIGURE or a MEASURE on another region's channel is refused. `python3 tools/docker_fw.py build|bench|modem|pod --region=as923-tw` builds a Taiwanese image (fit a 915-925 MHz antenna; not certified, decisions RF-AS923-3 and RF-AS923-13)
 - `ATALAIA_LBT` -- listen before talk (default on; RFC 0001 Amendment 14): a CAD and the receiver's state before every transmission, in the Field Box, the modem and the pod. `python3 tools/docker_fw.py build|bench|modem|pod|wokwi --lbt=off` builds the same firmware without it, for the field test that compares the two (`docs/runbooks/radio-field-test.md`)
 - `ATALAIA_RADIO_DISABLE` -- skip radio init (kept for debugging; the Wokwi build runs with the radio enabled)
@@ -486,7 +537,7 @@ Radio-specific Kconfig options (under "Atalaia Field Box Configuration > Radio")
 Field game options (under "Field network games"):
 - `ATALAIA_STATE_INTERVAL_S` -- seconds between STATE packets in a joined game (default 15)
 - `ATALAIA_BATTERY_LOW_PCT` -- send `battery.low` below this battery level (default 20; 0 = never; only with a MAX17048 gauge)
-- `ATALAIA_SERIAL_JOIN` -- accept `@join`, `@joinkey`, `@tag`, `@wifi`, `@update`, `@modes`, `@forgetmodes` and `@lobby` lines on the serial console (default on)
+- `ATALAIA_SERIAL_JOIN` -- accept `@join`, `@joinkey`, `@tag`, `@wifi`, `@update`, `@modes`, `@forgetmodes` and `@lobby` lines on the serial console (default on). `@joinkey` and `@update` take the admin PIN as their last word unless `ATALAIA_SERIAL_KEYS` is on (the bench and Wokwi builds)
 - `ATALAIA_SERIAL_ADOPT` -- accept `@adopt-info` and `@adopt` on the serial console: USB adoption by the field controller (default on; protocol/adoption.md)
 - `ATALAIA_CONSOLE_USB_INPUT` -- read the console input from the USB-C port (USB-Serial-JTAG, the Heltec V4's only USB) as well as UART0 (default on; off in the Wokwi build)
 - `ATALAIA_LED_BRIGHTNESS_PCT` -- LED ring brightness at boot (default 40%; under "LEDs")
@@ -628,7 +679,8 @@ step 10c).
   a join round trip, a Lua node) and only then confirms itself; otherwise, or if it crashes
   first, the previous image boots again.
 - **Starting one:** the controller's CMD update (opcode 9) from the GM console, or
-  `@update <version> <release id>` on the serial console (the same checks). Signing releases:
+  `@update <version> <release id> <admin PIN>` on the serial console (the same checks; the PIN
+  is left out on a bench build, decision SR-40). Signing releases:
   [docs/RELEASE_SIGNING.md](docs/RELEASE_SIGNING.md) and `tools/firmware_release.py`.
 
 ## Mode packages fetched for a game
@@ -677,6 +729,12 @@ beacon's controller failed half-way and the box reset.
 | At a join, with the beacon in the image: DMA-capable free (bench) | 11,547 (largest 6,400) | about 150,000 (estimate: 194 KB less the 27 KB the stacks and the rest take, measured at the same point on the bench, less the non-DMA part) |
 | At a join, no Bluetooth in the image (bench, the hotfix) | 36,023 (largest 20,480) | not built |
 
+The game task's stack is 24 KB since decision SR-132 (it was 12 KB), and the mode-fetch task's 20 KB (was 12 KB): Lua's nesting is capped at 20 C levels (`core/third_party/README.md`), and the worst chain takes about 0.8 KB a level. Task stacks come out of the heap at run time, not the static RAM `check_fw_ram.py` measures, so that number does not change; the runtime free heap at a join is 12 KB lower (20 KB lower while a mode is fetched). To check on the bench: run a script that nests `gsub` callbacks to the limit and read the game task's `uxTaskGetStackHighWaterMark`.
+
+The replay windows (decision SR-24) cost about 0.5 KB net in the box's static RAM (64 sources of 32 bytes in the
+per-source epoch table; the link's 64-entry duplicate table is gone): `check_fw_ram.py` measured 193,497 bytes left
+for the heap (194,049 before), well inside the 120 KiB margin it keeps.
+
 What moved, and why it is safe:
 - **LVGL's 48 KB widget heap** (`LV_MEM_SIZE`) to PSRAM (`LV_ATTRIBUTE_LARGE_RAM_ARRAY` in
   `lvgl_conf/lv_conf.h`); the draw buffers stay in internal DMA RAM.
@@ -709,6 +767,18 @@ The rules the code keeps:
   buffer to internal RAM fails, and the runtime's needs (about 27 + 47 KB, or 27 + 25 KB) stay covered
   with margin. Put a new big static buffer in PSRAM (`ATALAIA_PSRAM_BSS`) or raise the threshold with a
   reason; never lower it.
+
+## The TFT's boot splash (decisions TS-1 to TS-5)
+
+As soon as the display is up, the big screen shows the `splash` screen (`screen_renderer.c`): the OLED's
+tower scaled to 96 pixels in the accent colour on the left, "ATALAIA" and the version on the right, in
+the OLED splash's two lines (`oled_version_lines()`: `v0.6.0-dev.124` and the commit `1f31026`). It stays
+`ATALAIA_TFT_SPLASH_MS` (Kconfig *Boot splash*, default 2500, 0 = none) from the moment it is drawn, and
+longer when the first game screen is not ready by then: the display task keeps the screens that arrive
+meanwhile (`tft_splash.c`, the latest alone, the mode's `@mode` message goes through) and draws it when
+the time is over. Nothing sleeps: radio and game start as before. No panel (the driver failed): nothing is
+drawn. The same asset (`assets/splash.pgm`) as the OLED, so "Your own splash logo" below changes both.
+Host tests: `test_tft_splash.c` (timing), `splash` and `splash_release` in `test/screens/`.
 
 ## Your own splash logo (decisions LOGO-5, LOGO-6)
 
@@ -919,7 +989,8 @@ controller's game.
   an 8-byte check; the console's *Adopt* tab makes it) tapped between games,
   or the **USB cable** from the field controller, which sends `@adopt-info`
   (one `ATALAIA-ADOPT {json}` line: name, MAC, state) and `@adopt <64 hex>
-  [<admin PIN>|-] [<field name>]`; `@joinkey <64 hex>` and the setup
+  [<admin PIN>|-] [<field name>]`; `@joinkey <64 hex> <admin PIN>` (a release build wants the PIN last; a bench
+  build does not) and the setup
   portal's field follow the same rules. An unadopted box (none stored; a
   development key does not count) takes the first field; an adopted box takes
   the same field again and another field's key only with its admin PIN (on
@@ -930,7 +1001,8 @@ controller's game.
   the field's name and its key's fingerprint (`XXXX-XXXX`), or asks for the
   PIN. The key stays in the "radio" NVS namespace, the name in `field_name`;
   production boxes need NVS and flash encryption and secure boot (the
-  protocol document, section 2). Host tests: `test/test_adoption.c` against
+  protocol document, section 2), which no released image has yet (SECURITY.md;
+  the plan is [docs/RELEASE_HARDENING.md](docs/RELEASE_HARDENING.md)). Host tests: `test/test_adoption.c` against
   `protocol/vectors/field_card.json`. In software; the field card not yet
   read by a real PN532, the cable not yet used from a real controller.
 - **Pairing by code** -- `main/box_pair.c`, `main/cpace.c` (protocol/adoption.md
@@ -976,6 +1048,20 @@ controller's game.
   this box relayed in the last 30 s; every other frame is relayed with probability
   min(1, 3 / boxes heard in 10 minutes) after 20-600 ms; 8 relay slots. A frame
   over the duty-cycle budget is dropped, not queued (RFC 0001 section 8).
+  **Replays** (RFC 0001 Amendment 23, decisions SR-20 to SR-29, the security review's FLD-1): every
+  authenticated packet goes through its source's replay window (`core/src/replay.c`: the highest
+  `epoch << 16 | seq` and a 64-bit bitmap, kept in the per-source epoch table, 64 sources), so a copy or
+  a recording is dropped before anything acts on it, however long after (the 30 s table let a recorded
+  CMD PAUSE or END through); a game-state CMD (start, pause, resume, end) and a TIME must also be newer
+  than the last of theirs the box applied. The counts are `rx_duplicates`, `rx_replays`, `cmds_stale` and
+  `times_stale` in `field_link_stats_t`. The window is in RAM: a box that just rebooted takes the first
+  packet of each source as new. A box that resumes its game with no epoch record for its key (its store
+  was lost) takes a random epoch in 4096 to 61439 instead of 1, so no earlier nonce repeats (FLD-10). Every
+  receiver finds such a node by the **deep search** of its HELLO or TIME (RFC 0001 Amendment 24, decision SR-110:
+  `ATALAIA_DEEP_SLICE` epochs of the range per search of the wide-search budget, so a minute or two), and a
+  controller that hears it names its epoch in **CMD peer** (opcode 11, params `{"src", "epoch"}`; `FIELD_CMD_PEER_EPOCH`,
+  `peer_epochs` in `field_link_stats_t`) and to the modem (SET_PEER_EPOCH). A source's epoch in the table only
+  ever goes up (`atalaia_radio_proto_set_source_epoch` returns false and changes nothing for a lower one). A second loss of the store cannot draw lower (RFC 0001 Amendment 25, decision EP-2): the box keeps the highest epoch it ever used with any key in its own NVS entry `epfloor` (`read_floor` / `write_floor` of the NVS ops), written before an epoch above it is used, and a lost store's epoch is drawn by `atalaia_radio_epoch_lost_bounds` (decision EPW-1, the design of the Pi and the phone, shared vectors `protocol/vectors/tx_epoch.json`): with no floor uniformly in `[4096, 61439]`, with a floor uniformly in the lower half of the room above `max(4096, floor + 1 + 1024)` (the margin gives way near the top), so each loss takes at most half of what is left and many losses fit; the box has no "epoch file missing" wider margin, its floor is its own NVS entry and is never restored from a backup (EPW-2). With no room above the floor, or a floor it cannot read or a draw it cannot record, the box does not transmit (`tx_blocked`).
 - **Listen before talk** -- (RFC 0001 Amendment 14, decisions SL-25 to SL-31; Kconfig
   `ATALAIA_LBT`, on by default, in every image that transmits: the Field Box, the USB modem
   and the I/O pod) before each transmission the radio task asks the radio whether the
@@ -1007,7 +1093,13 @@ controller's game.
   the bench board has no gauge fitted.
 - **After a reboot** -- the stored join brings the box back: a new epoch
   (that game's last + 1), HELLO, the saved game state, `node.rebooted`, and
-  the unacknowledged events from the flash log.
+  the unacknowledged events from the flash log. `node.rebooted`'s `reason` is
+  why the chip came up (`esp_reset_reason()`, mapped in `main/reset_reason.c`,
+  decision I2C-5): `power`, `brownout`, `software` (an update or a reboot
+  command), `panic`, `watchdog`, `deepsleep` or `unknown`. A panic or a
+  watchdog reset is a crash: the console says "A box crashed and restarted"
+  and the boot log says so too. It is sent when a game was being played
+  (that is when the box reports a reboot at all).
 - **The radio report** -- (decision SL-18) while a game is on the box, once a minute and once
   more when it ends, one JSON line on the serial port (USB-C, 115200 baud) under the log tag
   `radio_stats`: `I (123456) radio_stats: {"t_s":120,"game":4243,"node":7,"sent":9,"retries":31,

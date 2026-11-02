@@ -47,7 +47,7 @@ Mais abaixo, **Quem és** tem **Identificador do cronógrafo** (um nome para o t
 
 ## 2b. O veredicto da filiação em APD à receção
 
-Quando o campo verifica a filiação em APD, o cartão de quem joga na lista mostra a APD, o número e a validade com um selo: **Filiação válida**, **Filiação caducada**, **APD não aceite aqui** ou **Filiação em falta**. A app não verifica nada: compara o número e a data com o cartão da pessoa. Quem não tem selo válido fica **à espera**; **Admitir** admite-a na mesma. Nunca ficas bloqueado e o controlador regista-o sem o número (o cartão passa a dizer **admitido por um marshal**). A lista mostra quem declarou réplicas e também quem está **à espera de confirmação** sem réplicas, para veres a filiação e admitires a pessoa a partir do telemóvel; depois de admitida e sem réplicas, deixa de estar na lista. A consola do GM lista toda a gente.
+Quando o campo verifica a filiação em APD, o cartão de quem joga na lista mostra a APD, o número e a validade com um selo: **Filiação válida**, **Filiação caducada**, **APD não aceite aqui** ou **Filiação em falta**. A app não verifica nada: compara o número e a data com o cartão da pessoa. **O campo tem de conferir o cartão físico com o que a pessoa escreveu de antemão** (uma obrigação legal nos campos em Portugal, art. 6.º, n.º 1, al. c), do RGPD; o interesse legítimo do campo nos outros, al. f)). Por isso, quando a regra verifica no check-in, **toda a gente fica à espera**, mesmo com selo válido e confirmação automática, até veres o cartão e tocares em **Cartão visto, confere**. Isso admite a pessoa e regista **o teu identificador e a hora**; o controlador **apaga então o número de associado** e guarda só a APD, a validade, o veredicto desse dia (*Filiação válida em 2027-01-15*) e quem verificou, durante o prazo normal de retenção do check-in. Se o cartão não confere, corrige primeiro a APD, o número ou a validade na linha da pessoa, na consola, ou não toques. **Admitir sem o cartão** (aparece em vez de **Admitir** quando a regra verifica no check-in) admite a pessoa na mesma: nunca ficas bloqueado. O controlador regista-o com o motivo (*sem cartão*, ou o veredicto) e nunca o número, guarda o número, e o cartão passa a dizer **admitido sem o cartão**. A lista mostra quem declarou réplicas e também quem está **à espera de confirmação** sem réplicas, para veres a filiação e admitires a pessoa a partir do telemóvel; depois de admitida e sem réplicas, deixa de estar na lista. A consola do GM lista toda a gente.
 
 **Fora de Portugal** os mesmos ecrãs falam de **filiação numa associação**: o país do campo (definido pelo GM) decide as palavras, por isso o selo diz **Associação não aceite aqui** e o cartão mostra a associação em vez de uma APD. O que verificas é o mesmo: o número e a data contra o cartão da pessoa.
 
@@ -58,8 +58,8 @@ Quando o campo verifica a filiação em APD, o cartão de quem joga na lista mos
 3. Cada cartão é uma pessoa, com a equipa e as réplicas declaradas. Um símbolo junto de cada réplica diz **por cronografar**, **aprovada** ou **recusada**. Quem ainda não foi confirmado mostra **à espera de confirmação**. Uma réplica sem registo mostra **ainda sem registo**.
 4. Para encontrar uma réplica pela etiqueta, toca no ícone de **ler** e aponta a câmara à etiqueta QR dela.
 5. Toca numa réplica para a cronografar ([secção 4](#4-cronografa-uma-réplica)).
-6. Se cronografares várias réplicas sem ligação, toca em **Enviar** *n* **série(s) por enviar** quando voltares ao Wi-Fi do campo. Uma série que o controlador não aceita fica no teu telemóvel.
-7. Alguém sem a app: toca em **Check-in à mão**, escreve o nome e toca em **Fazer o check-in**. Quando o campo pede filiação, o formulário tem também a **APD** (ou associação), o **número de associado** e a **validade** (AAAA-MM-DD): escreve o que diz o cartão da pessoa. Nada é verificado e nunca és impedido por causa do veredicto; um veredicto que não seja válido fica registado sem o número. O controlador dá-lhe um identificador.
+6. Se cronografares várias réplicas sem ligação, toca em **Enviar** *n* **séries por enviar** (**Enviar 1 série por enviar**, se for só uma) quando voltares ao Wi-Fi do campo. Uma série que o controlador não aceita fica no teu telemóvel.
+7. Alguém sem a app: toca em **Check-in à mão**, escreve o nome e toca em **Fazer o check-in**. Quando o campo pede filiação, o formulário tem também a **APD** (ou associação), o **número de associado** e a **validade** (AAAA-MM-DD): escreve o que diz o cartão da pessoa e marca **Cartão visto, confere** enquanto tens o cartão na mão (o número é então apagado, como acima; desmarcado, é um check-in sem o cartão). O formulário tem ainda uma caixa separada, **Partilhar a minha posição com o jogo durante este jogo**: marca-a só se a pessoa concordar; desmarcada não muda o check-in. Nada é verificado e nunca és impedido por causa do veredicto; uma exceção fica registada sem o número. O controlador dá-lhe um identificador.
 
 A organização também vê esta lista na consola dela. A lista precisa de a organização confirmar que és marshal.
 
@@ -128,7 +128,11 @@ O **controlador do campo assina cada etiqueta** com a chave do jogo e o teu tele
 4. Toca em **Escrever a etiqueta**. A app pede a etiqueta ao controlador. Quando disser **Encosta a etiqueta às costas do telemóvel…**, mantém-na quieta até ficar escrita. Aparece depois em **Escritas agora**.
 5. Repete para cada pessoa.
 
-Uma etiqueta só funciona no jogo para que foi gravada. Cada jogo novo precisa de etiquetas novas. A organização também pode gravar etiquetas a partir da consola ou do ecrã de um controlador no telemóvel (vê o [manual da organização](game-master.md#etiquetas-de-quem-joga)).
+Uma etiqueta só funciona no jogo para que foi gravada. Cada jogo novo precisa de etiquetas novas.
+
+**Uma etiqueta pode ser copiada.** A assinatura não cobre o chip, por isso quem consiga ler uma etiqueta com um telemóvel pode gravar os mesmos bytes noutra, e uma caixa toma a cópia por quem joga. Funciona até o jogo acabar (a chave do jogo é nova em cada jogo). Trata a etiqueta como um crachá: não lhe dês valor fora do jogo, entrega as etiquetas no briefing e mantém-nas à vista até lá. Bloquear uma etiqueta só para leitura (uma app NFC consegue; não se desfaz, por isso só nas etiquetas que não vais gravar outra vez) impede que alguém a escreva por cima, mas **não impede a cópia**. As etiquetas NTAG 424 DNA impediriam; a app ainda não as suporta. Pormenores: [SECURITY.md](../../../SECURITY.md#player-tags-can-be-copied).
+
+A organização também pode gravar etiquetas a partir da consola ou do ecrã de um controlador no telemóvel (vê o [manual da organização](game-master.md#etiquetas-de-quem-joga)).
 
 ## 8. Limites sem ligação
 
@@ -151,8 +155,8 @@ Conta voltar ao Wi-Fi do campo de duas em duas horas.
 | **Pede à organização para te acrescentar como marshal** | A organização tem de te acrescentar em **Check-in › Marshals**. Depois toca em **Perguntar outra vez**. |
 | **A organização retirou-te da lista de marshals** | A organização retirou-te. As séries por enviar ficam no telemóvel. Pede-lhe que te volte a acrescentar. |
 | **Registar o disparo** está cinzento | Precisas de uma réplica, de um limite para a classe dela e de uma velocidade. Escolhe primeiro uma réplica. |
-| **Não foi enviado … Fica neste telemóvel para enviar depois.** | Não foi possível chegar ao controlador. Liga-te ao Wi-Fi do campo e toca em **Enviar** *n* **série(s) por enviar** na lista. |
-| **n série(s) não foram aceites porque o controlador não te tem na lista de marshals** | Pede à organização que te volte a acrescentar. As séries esperam no teu telemóvel. |
+| **Não foi enviado … Fica neste telemóvel para enviar depois.** | Não foi possível chegar ao controlador. Liga-te ao Wi-Fi do campo e toca em **Enviar** *n* **séries por enviar** (ou **Enviar 1 série por enviar**) na lista. |
+| **n séries não foram aceites porque o controlador não te tem na lista de marshals** (**1 série não foi aceite …**, se for só uma) | Pede à organização que te volte a acrescentar. As séries esperam no teu telemóvel. |
 | **Esta réplica não está declarada neste jogo** | Escolhe a declaração da pessoa na lista. Ela tem de declarar primeiro a réplica. |
 | A etiqueta NFC não grava | **Esta etiqueta está bloqueada**, **é pequena demais** ou **não aceita dados NDEF**: usa uma etiqueta NTAG nova. Mantém a etiqueta quieta. Num iPhone não podes gravar etiquetas. |
 | **Não é possível falar com o controlador do campo: liga-te ao Wi-Fi do campo e tenta outra vez.** | As etiquetas de quem joga precisam do controlador para cada etiqueta. Liga-te ao Wi-Fi do campo e tenta outra vez. |

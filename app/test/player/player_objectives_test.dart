@@ -101,4 +101,52 @@ void main() {
     );
     expect(eventText(s, hidden), 'A equipa vermelha falhou um objetivo');
   });
+
+  testWidgets('housekeeping events stay out of the list, game events stay', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final feed = scenarioFeed();
+    addTearDown(feed.dispose);
+    Map<String, Object?> msg(Map<String, Object?> e) => {
+      'type': 'event',
+      'event': e,
+    };
+    feed
+      ..onMessage(
+        msg({
+          'node': 3,
+          't': 700000,
+          'type': 'node.setup_applied',
+          'data': {'kind': 'scenario'},
+        }),
+      )
+      ..onMessage(
+        msg({
+          'node': 3,
+          't': 710000,
+          'type': 'zone.captured',
+          'team': 'red',
+          'data': {'zone': 'Bridge'},
+        }),
+      );
+    final h = harness(
+      language: AppLanguage.en,
+      settings: AppSettings()..myTeam = 'red',
+    );
+    await tester.pumpWidget(
+      h.app(
+        home: PlayerScreen(link: feed.link, feed: feed),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // The feed keeps both; the list draws only what a player cares about.
+    expect(feed.events.map((e) => e.type), contains('node.setup_applied'));
+    expect(find.text('node.setup_applied'), findsNothing);
+    expect(find.text('red captured Bridge'), findsOneWidget);
+    expect(isPlayerFeedEvent('node.setup_applied'), isFalse);
+    expect(isPlayerFeedEvent('zone.captured'), isTrue);
+  });
 }

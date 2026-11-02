@@ -209,6 +209,7 @@ class _FieldScript implements FieldOperations {
     Map<String, Object?> game,
     this.scoreKey, {
     String? scenarioReveal,
+    List<int>? gameKey,
   }) : teams = (game['teams']! as List).cast<String>() {
     node = CoreNode.create(
       core,
@@ -217,6 +218,7 @@ class _FieldScript implements FieldOperations {
         chunkName: chunk,
         nodeId: engine.nodeId,
         gameSeed: game['game_seed']! as int,
+        gameKey: gameKey,
         teams: teams,
         params: {
           ...(game['params']! as Map).cast<String, Object?>(),
@@ -615,12 +617,16 @@ class ControllerEngine {
   ]) {
     final mode = _mode(game['mode_id']);
     final params = game['params'];
-    final out = <String, Object?>{
-      ...game,
-      'params': mode == null || params is! Map
-          ? <String, Object?>{}
-          : mode.publicParams(params.cast<String, Object?>()),
-    }..remove('scenario_nodes');
+    final out =
+        <String, Object?>{
+            ...game,
+            'params': mode == null || params is! Map
+                ? <String, Object?>{}
+                : mode.publicParams(params.cast<String, Object?>()),
+          }
+          ..remove('scenario_nodes')
+          // The game's id towards the site server: for staff only (LIVE2-2).
+          ..remove('game_seed');
     final meta = scenarioMeta(game['mode_id']);
     final svc = scenarios;
     if (meta != null && svc != null) {
@@ -857,7 +863,12 @@ class ControllerEngine {
   /// Puts a game on the radio (engine.py `_activate`): [lead] false for a
   /// game joined as a standby controller, which follows the TIME beacons
   /// until it is promoted (ADR-P2-8; PE24 slice S7).
-  void _activate(Map<String, Object?> game, Uint8List key, {bool lead = true}) {
+  void _activate(
+    Map<String, Object?> game,
+    Uint8List key, {
+    bool lead = true,
+    bool resuming = false,
+  }) {
     final gameNode = (game['node_id'] as int?) ?? config.nodeId;
     final election = Election(
       gameNode,
@@ -888,6 +899,7 @@ class ControllerEngine {
             wifi: _toWifi,
             paceMs: config.controllerPaceMs,
             nowMs: nowMs,
+            resuming: resuming,
           );
     // The key's tag (not secret) outlives the key, so a GAME_OVER can still
     // name this game after a restart without the key (decision OT-13; sent
@@ -913,6 +925,8 @@ class ControllerEngine {
     });
     fc
       ..onEvent = _onEvent
+      ..onPeerEpoch = _onPeerEpoch
+      ..onControllerHeard = _onControllerHeard
       ..onNode = _onNode
       ..onScores = _onScores
       ..onRole = _onRole
@@ -997,8 +1011,7 @@ class ControllerEngine {
     _field = null;
     _fieldScores = {};
     _boxEnd = null;
-    _radio
-        ?.flush(); // frames still waiting for their gap go now: the key goes next
+    _radio?.flush(); // frames still waiting for their gap go now: the key goes next
     modem?.clear(); // the modem forgets the key
     _radio = null;
     _fc = null;
@@ -1031,7 +1044,7 @@ class ControllerEngine {
     }
     // A joined standby restarts as a follower; the GM promotes it again if
     // needed.
-    _activate(game, key, lead: game['joined'] != true);
+    _activate(game, key, lead: game['joined'] != true, resuming: true);
     final fc = _fc!;
     fc.restoreAdjustments(_adjustments(id));
     for (final node in store.nodes(id)) {
@@ -1266,7 +1279,9 @@ class ControllerEngine {
             'role': role,
             'value': value,
             'have': have,
-            'text': '$have $role node(s) joined; $name is $value',
+            'text':
+                '$have $role ${have == 1 ? 'node' : 'nodes'} joined; '
+                '$name is $value',
           });
         } else if (prefix == 'last_' && have > 0 && have <= value) {
           warnings.add({
@@ -1276,7 +1291,8 @@ class ControllerEngine {
             'value': value,
             'have': have,
             'text':
-                'only $have $role node(s) joined and $name is $value: '
+                'only $have $role ${have == 1 ? 'node' : 'nodes'} joined and '
+                '$name is $value: '
                 'the countdown can run from the start',
           });
         }
@@ -1680,6 +1696,25 @@ class ControllerEngine {
     return boxLanguage();
   }
 
+  // --- the console's map fetching (LEG-50) ----------------------------------
+
+  /// Whether the console's *Load the field from a map* page may reach
+  /// OpenStreetMap, Overpass, Nominatim and the aerial imagery services: the
+  /// field setting, on by default (the Pi's `map_fetching_on`). Off, the page
+  /// is served without those origins and says so.
+  bool mapFetchingOn() => store.getSetting('map_fetching') != 'off';
+
+  /// GET /api/v1/settings/map-fetching.
+  Map<String, Object?> mapFetching() => {'map_fetching': mapFetchingOn()};
+
+  Map<String, Object?> setMapFetching(Object? value) {
+    if (value is! bool) {
+      throw ControllerError('map_fetching: true or false');
+    }
+    store.setSetting('map_fetching', value ? 'on' : 'off');
+    return mapFetching();
+  }
+
   /// The language of the USB modem's own OLED (decision MOD-2; the Pi's
   /// `_tell_modem_language`): the field's setting, with "auto" the live
   /// game's boxes' language, and nothing while no game says one.
@@ -1731,6 +1766,33 @@ class ControllerEngine {
         : {for (final n in jsonDecode(saved) as List) n as int};
   }
 
+  Set<int> _controllersHeard(int gameId) {
+    final saved = store.getSetting('controllers_heard:$gameId');
+    return saved == null
+        ? {}
+        : {for (final n in jsonDecode(saved) as List) n as int};
+  }
+
+  /// Another controller's TIME or CLAIM was heard: its node id has used
+  /// epochs under this key, kept so that no new device is given the id
+  /// (decision EP-3).
+  void _onControllerHeard(int node) {
+    final g = _game;
+    if (g == null) return;
+    final id = g['id']! as int;
+    final heard = (_controllersHeard(id)..add(node)).toList()..sort();
+    store.setSetting('controllers_heard:$id', jsonEncode(heard));
+  }
+
+  /// The node ids of controllers that have transmitted in the live game: the
+  /// one that issued the join (a promoted standby's game names it) and every
+  /// controller heard (TIME or CLAIM).
+  Set<int> _controllerIdsOnAir(FieldController fc) => {
+    ..._controllersHeard(_game!['id']! as int),
+    ...fc.controllersHeard,
+    if (_game!['controller_id'] is int) _game!['controller_id']! as int,
+  };
+
   Set<int> _usedIds(FieldController fc) {
     final g = _game!;
     return {
@@ -1739,6 +1801,7 @@ class ControllerEngine {
       broadcastNode,
       for (final n in (g['assignments']! as Map).keys) int.parse('$n'),
       ..._issuedIds(),
+      ..._controllerIdsOnAir(fc),
       ...fc.nodes.keys,
       if (g['controller_id'] is int) g['controller_id']! as int,
     };
@@ -1826,9 +1889,8 @@ class ControllerEngine {
     final int node;
     if (nodeIdValue == null) {
       final used = _usedIds(fc);
-      node = [
-        for (var i = 1; i < 0xffff; i++) i,
-      ].firstWhere((i) => !used.contains(i));
+      node = [for (var i = 1; i < 0xffff; i++) i]
+          .firstWhere((i) => !used.contains(i));
     } else {
       node = _int(nodeIdValue, 'node_id');
     }
@@ -1842,6 +1904,17 @@ class ControllerEngine {
     if (kind == 'controller' &&
         (assigned != null || fc.nodes.containsKey(node))) {
       throw ControllerError.conflict('node id $node is a box in this game');
+    }
+    if (kind == 'controller' && _controllerIdsOnAir(fc).contains(node)) {
+      // EP-3: a controller that led or claimed in this game has used epochs
+      // under this key as this id; a device that lost its stores and is
+      // joined again under it would repeat its nonces and be deaf to every
+      // receiver that heard the old epochs. It gets a new id.
+      throw ControllerError.conflict(
+        'node id $node belongs to a controller that has been on the air in '
+        'this game: a controller joined again gets a new node id (Join), as '
+        'a replacement box does',
+      );
     }
     final issued = _issuedIds();
     final known = fc.nodes[node];
@@ -2335,6 +2408,14 @@ class ControllerEngine {
     }
   }
 
+  /// A box was heard at an epoch the receivers may not follow (a restart, or
+  /// a lost epoch store: RFC 0001 Amendment 24, decision SR-110): the modem is
+  /// told too (SET_PEER_EPOCH; it only ever goes up). The field controller has
+  /// sent the boxes their CMD (engine.py `_on_peer_epoch`).
+  void _onPeerEpoch(int node, int epoch) {
+    modem?.setPeerEpochs({node: epoch});
+  }
+
   void _onModemState(String state) {
     final m = modem;
     if (m == null) return;
@@ -2622,6 +2703,7 @@ class ControllerEngine {
       '${mode.id}/field.lua',
       game,
       'field-$run',
+      gameKey: _key,
       scenarioReveal: scenarioMeta(game['mode_id']) == null
           ? null
           : scenarios?.reveal(game, scenarioMeta(game['mode_id'])),

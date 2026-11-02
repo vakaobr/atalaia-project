@@ -23,7 +23,7 @@ EVIL = '<img src=x onerror="window.pwned=1">'
 class PreviewBrowserTests(BrowserCase):
     def settings(self) -> Settings:
         s = super().settings()
-        return Settings(database_url=s.database_url, secret_key=s.secret_key, metrics_token=s.metrics_token,
+        return Settings(allow_signup_without_notice=True, database_url=s.database_url, secret_key=s.secret_key, metrics_token=s.metrics_token,
                         db_timeout_s=2.0, purge_hour=None, preview=True)
 
     async def test_the_visitor_and_the_administrator(self) -> None:

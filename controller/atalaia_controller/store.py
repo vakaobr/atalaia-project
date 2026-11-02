@@ -84,6 +84,16 @@ request (the GM's erasure, a player's own chrono erasure), with what was erased 
 shared copies, ``identity`` the field identity, check-ins and declarations) and when, until the site server has
 acknowledged it (``POST /api/v1/sync/erasures``) or the chrono retention has passed. A schema 16 file gets the
 empty table.
+
+Schema 19 (maintainer decision 2026-10-30, SR-88) adds ``game_results``: a game's team results, written by
+``purge_games`` as the game is deleted at its retention (90 days by default) and deleted 365 days after the game
+ended (``purge_game_results``). The game's name, mode, teams, the teams' final totals, the winner, how it
+ended and when it ran: **no player id, no member list, no squad** (a squad of fewer than three would identify
+its members). Read-only in the API (``GET /api/v1/game-results``). A schema 18 file gets the empty table.
+
+Schema 20 (maintainer decision 2026-11-01) adds ``access_tokens`` (the short-lived, scoped, revocable tokens the GM
+makes, access_tokens.py: only the SHA-256 of the secret is stored, never the token) and ``token_audit`` (who made,
+used, was refused and revoked which token; no secrets). A schema 19 file gets the empty tables.
 """
 
 from __future__ import annotations
@@ -91,18 +101,59 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
+import secrets
 import sqlite3
 import threading
-import time
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-SCHEMA_VERSION = 17
+from . import wallclock
+
+log = logging.getLogger(__name__)
+
+SCHEMA_VERSION = 20
+TOKEN_AUDIT_DAYS = 365  # the access tokens' audit log (access_tokens.py)
+GAME_RESULTS_DAYS = 365  # team results (no player ids) outlive the game's own data by this long, from its end
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes, per level's plan
 FIELD_LEVELS_MAX = 10  # levels of a multi-story field (decision ML-1)
 EPOCH_KEYS = 8  # game keys whose TX epoch is kept (as the box's epoch store, radio_protocol.h)
+# A game resumed with no record of its key's epoch (the record was lost or pushed out) goes on at a random
+# epoch in this range, never at 1: the controller's epochs 1.. may all have been used with this key (RFC 0001
+# Amendment 23, decision SR-29; as a box does, ATALAIA_EPOCH_LOST_MIN/MAX in radio_protocol.h, SR-27).
+EPOCH_LOST_MIN = 4096
+EPOCH_LOST_MAX = 61439
+# Where a lost record's epoch is drawn (decision EPW-1, RFC 0001 Amendment 25 follow-up, which has the analysis
+# and the numbers). The floor is written before an epoch is used, so with a floor that survived nothing above it
+# was ever used. A STALE floor (a database restored from an old backup, its epoch file lost) has the epochs used
+# since right above it, contiguous: floor+1 .. floor+k, one per boot, join or seq wrap. So:
+#  - no record at all (floor 0, Amendment 23's case, earlier epochs can be anywhere): uniform over the whole
+#    range [EPOCH_LOST_MIN, EPOCH_LOST_MAX], as before;
+#  - a floor: uniform in the LOWER HALF of what is left above floor + margin: [floor + 1 + margin, +half of the
+#    room). The margin skips the first forgotten epochs (EPOCH_LOST_MARGIN, 1024: months of a stale backup); the
+#    half-room rule makes each loss take at most half of what is left, so the range cannot be used up by two or
+#    three unlucky draws (about 16 losses fit in the worst case);
+#  - the epoch file is missing although the database says one was written (EPOCH_LOST_MARGIN_SUSPECT, 8192): the
+#    database may be an old backup, so the margin is eight times larger (years of use).
+EPOCH_LOST_MARGIN = 1024
+EPOCH_LOST_MARGIN_SUSPECT = 8192
+
+
+def epoch_lost_bounds(floor: int, suspect: bool = False) -> Optional[tuple[int, int]]:
+    """The inclusive range a lost record's epoch is drawn in, above `floor` (the highest epoch the controller
+    ever used with any key; 0 = no record); None when no epoch is left above it. `suspect`: the epoch file
+    is missing although the database says one was written (the database may be an old backup)."""
+    if floor <= 0:
+        return EPOCH_LOST_MIN, EPOCH_LOST_MAX
+    low = max(EPOCH_LOST_MIN, floor + 1)
+    if low > EPOCH_LOST_MAX:
+        return None
+    start = max(EPOCH_LOST_MIN, floor + 1 + (EPOCH_LOST_MARGIN_SUSPECT if suspect else EPOCH_LOST_MARGIN))
+    if start > EPOCH_LOST_MAX:
+        start = low  # no room for the margin: the margin gives way, never the floor
+    return start, start + (EPOCH_LOST_MAX - start + 2) // 2 - 1
 
 
 def epoch_tag(key: bytes) -> str:
@@ -377,12 +428,48 @@ CREATE TABLE IF NOT EXISTS erasures (
     identity  INTEGER NOT NULL DEFAULT 0,              -- 1: the field identity, check-ins and declarations
     erased_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS game_results (
+    game_id     INTEGER NOT NULL,                      -- schema 19: a purged game's team results, no player ids
+    game_seed   INTEGER NOT NULL,
+    name        TEXT NOT NULL,
+    mode_id     TEXT NOT NULL,
+    teams_json  TEXT NOT NULL,
+    totals_json TEXT NOT NULL,                         -- {team: final total}
+    winner      TEXT,                                  -- NULL: a tie or no points
+    state       TEXT NOT NULL,
+    duration_ms INTEGER NOT NULL,
+    started_at  REAL,
+    ended_at    REAL NOT NULL,
+    PRIMARY KEY (game_id, game_seed)
+);
+CREATE INDEX IF NOT EXISTS idx_game_results_ended ON game_results (ended_at);
 CREATE TABLE IF NOT EXISTS player_positions (
     game_id     INTEGER NOT NULL,
     player_id   TEXT NOT NULL,
     report_json TEXT NOT NULL,
     received_at REAL NOT NULL,
     PRIMARY KEY (game_id, player_id)
+);
+CREATE TABLE IF NOT EXISTS access_tokens (
+    id           TEXT PRIMARY KEY,                     -- schema 20: public part of the token (8 hex digits)
+    label        TEXT NOT NULL,
+    scope        TEXT NOT NULL,                        -- read, gm or marshals
+    game_id      INTEGER,                              -- limited to this game, or NULL
+    secret_hash  TEXT NOT NULL,                        -- SHA-256 of the secret part, hex
+    created_at   REAL NOT NULL,
+    expires_at   REAL NOT NULL,
+    last_used_at REAL,
+    last_used_from TEXT,
+    revoked_at   REAL
+);
+CREATE TABLE IF NOT EXISTS token_audit (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    at          REAL NOT NULL,
+    kind        TEXT NOT NULL,                         -- created, used, refused, revoked, expired
+    token_id    TEXT,
+    label       TEXT,
+    scope       TEXT,
+    detail      TEXT
 );
 """
 
@@ -417,6 +504,18 @@ CHECKIN_COLUMNS_V15 = (
     ("apd_override", "INTEGER NOT NULL DEFAULT 0"),  # 1: staff let the check-in through with a verdict other than valid
 )
 
+# Columns added to checkins in schema 18 (the card check, protocol/apd.md "The card check"; position sharing,
+# protocol/checkin.md "Sharing the position"): what the check-in keeps once the number is erased.
+CHECKIN_COLUMNS_V18 = (
+    ("apd_verdict", "TEXT"),                      # the verdict stored when the card was checked (valid, expired, ...)
+    ("apd_verdict_on", "TEXT"),                   # the local date it was valid or not on (YYYY-MM-DD)
+    ("card_checked_by", "TEXT"),                  # the staff id that ticked "card seen, matches" ("gm" for the GM token)
+    ("card_checked_at", "REAL"),                  # and when
+    ("position_share", "INTEGER NOT NULL DEFAULT 0"),  # 1: the player opted in to share their position
+    ("position_share_at", "REAL"),                # when they chose (on or off)
+    ("position_share_notice", "INTEGER"),         # the privacy notice version they chose under
+)
+
 # Column added to chrono_readings in schema 16 (PKD-3): the class limit (J) the series was judged against, sent to the
 # site server so it can work out how far over a violation went.
 CHRONO_COLUMNS_V16 = (("limit_j", "REAL"),)
@@ -424,7 +523,7 @@ CHRONO_COLUMNS_V16 = (("limit_j", "REAL"),)
 LIVE_STATES = ("ready", "running", "paused")
 # Settings keys kept per game as ``prefix:game_id`` (they go with the game, purge_games).
 GAME_SETTING_PREFIXES = ("checkin.open", "key_tag", "game_time", "field_scores", "field_run", "box_lang",
-                         "issued_nodes", "box_beacons_off", "box_beacon_rooms", "box_places_mirrored")
+                         "issued_nodes", "controllers_heard", "box_beacons_off", "box_beacon_rooms", "box_places_mirrored")
 
 
 def _private(path: str) -> None:
@@ -454,6 +553,7 @@ class Store:
 
     def __init__(self, path: str) -> None:
         self.path = path
+        self.epoch_lost = False  # the last next_tx_epoch took a random epoch (SR-29)
         if path != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
             # Created private before SQLite opens it: its WAL and shm files take its mode.
@@ -476,6 +576,10 @@ class Store:
                     self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
             have = {r["name"] for r in self._db.execute("PRAGMA table_info(checkins)").fetchall()}
             for name, decl in CHECKIN_COLUMNS_V15:
+                if name not in have:
+                    self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
+            have = {r["name"] for r in self._db.execute("PRAGMA table_info(checkins)").fetchall()}
+            for name, decl in CHECKIN_COLUMNS_V18:
                 if name not in have:
                     self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
             have = {r["name"] for r in self._db.execute("PRAGMA table_info(chrono_readings)").fetchall()}
@@ -536,10 +640,23 @@ class Store:
         self._exec("INSERT INTO settings (key, value) VALUES (?, ?) "
                    "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
 
+    def newest_wall_time(self) -> float:
+        """The newest wall-clock timestamp the store holds (0.0 when empty): the controller's clock cannot
+        honestly be earlier (wallclock.py)."""
+        best = 0.0
+        for sql in ("SELECT MAX(received_at) AS t FROM events", "SELECT MAX(created_at) AS t FROM games",
+                    "SELECT MAX(started_at) AS t FROM games", "SELECT MAX(ended_at) AS t FROM games",
+                    "SELECT MAX(received_at) AS t FROM remote_commands"):
+            row = self._exec(sql).fetchone()
+            if row is not None and row["t"] is not None:
+                best = max(best, float(row["t"]))
+        return best
+
     def delete_setting(self, key: str) -> None:
         self._exec("DELETE FROM settings WHERE key = ?", (key,))
 
-    def next_tx_epoch(self, key: bytes, resuming: bool = False) -> int:
+    def next_tx_epoch(self, key: bytes, resuming: bool = False,
+                      randbelow: Optional[Callable[[int], int]] = None) -> int:
         """The controller's epoch for this run in the game with this key, written before any TX
         (ADR-P2-2; per game key since RFC 0001's amendment of 2026-10-22).
 
@@ -548,21 +665,113 @@ class Store:
         + 1; a new key starts at 1, so a box new to the game (epochs 0..16) hears it. The one
         tx_epoch of earlier versions is used only while tx_epochs does not exist, and only by a
         game the controller resumes (resuming: its game); a new game starts at 1. One row write:
-        a crash leaves the old list or the new one."""
+        a crash leaves the old list or the new one.
+
+        A game resumed with no record for its key (the list lost, or the key pushed out of it by
+        newer ones) may have used any epoch from 1 with this key: starting at 1 again would repeat
+        nonces, so it starts at a random epoch in [EPOCH_LOST_MIN, EPOCH_LOST_MAX] (RFC 0001
+        Amendment 23, decision SR-29), as a box does after a lost epoch store (SR-27); boxes find
+        it by their deep search of its TIME beacons (decision SR-110). The list is also kept in a
+        file beside the database, written whole before the epoch is used: a database restored from
+        a backup older than the last run, or deleted, has the file's epochs to go on above (the
+        higher of the two counts), so neither case repeats a nonce or starts below what the boxes
+        already heard.
+
+        The draw is in epoch_lost_bounds(floor), a window above the floor (see EPOCH_LOST_MARGIN), not the
+        whole range, so every loss leaves room for the next ones and a stale floor is not landed on.
+        randbelow(n) (default secrets.randbelow) is for the tests."""
         tag = epoch_tag(key)
         with self._lock:
             saved = self.get_setting("tx_epochs")
             table: list[list[Any]] = json.loads(saved) if saved else []
+            side, side_floor = self._read_epoch_file()
+            table = [[t, max(int(e), side.get(t, 0))] for t, e in table] + \
+                [[t, e] for t, e in side.items() if all(t != r[0] for r in table)]
+            # The highest epoch this controller has ever used with any key, kept apart from the list (the
+            # list forgets keys: only 8 are kept): a lost record's random epoch goes above it (EP-2).
+            floor = max([int(self.get_setting("tx_epoch_floor") or 0), side_floor] + [int(e) for _, e in table])
             current = next((int(e) for t, e in table if t == tag), None)
-            if saved is None and resuming and self.get_setting("tx_epoch"):
+            epoch_path = self._epoch_file()
+            suspect = (epoch_path is not None and not os.path.exists(epoch_path)
+                       and self.get_setting("epoch_file_seen") == "1")
+            if saved is None and current is None and resuming and self.get_setting("tx_epoch"):
                 current = int(self.get_setting("tx_epoch") or "0")
             if current is not None and current >= 0xFFFF:
                 raise RuntimeError("the controller's nonce epochs for this game are exhausted; "
                                    "start a new game")
-            epoch = 1 if current is None else current + 1
+            if suspect:
+                log.warning("the epoch file %s is missing although it was written before: the database may be "
+                            "an old backup; a lost record's epoch is drawn far above the floor %d", epoch_path, floor)
+            if current is None and resuming:
+                bounds = epoch_lost_bounds(floor, suspect)
+                if bounds is None:
+                    raise RuntimeError("the controller has used epochs up to %d; none is left above them for "
+                                       "a game it has lost the record of: start a new game" % floor)
+                low, high = bounds
+                epoch = low + (randbelow or secrets.randbelow)(high - low + 1)
+                self.epoch_lost = True
+                log.warning("game with key tag %s resumed with no record of its epoch: the controller "
+                            "goes on at the random epoch %d (above %d, the highest it ever used); boxes find "
+                            "it within a minute or two", tag, epoch, floor)
+            else:
+                epoch = 1 if current is None else current + 1
+                self.epoch_lost = False
+            floor = max(floor, epoch)
             table = [[tag, epoch]] + [r for r in table if r[0] != tag]
-            self.set_setting("tx_epochs", json.dumps(table[:EPOCH_KEYS]))
+            table = table[:EPOCH_KEYS]
+            # The file first: if the database write is lost the epoch is still on disk, and the other
+            # way round it would be used with nothing remembering it.
+            if self._write_epoch_file(table, floor):
+                self.set_setting("epoch_file_seen", "1")  # a missing file is then a loss, not a first run
+            self.set_setting("tx_epoch_floor", str(floor))
+            self.set_setting("tx_epochs", json.dumps(table))
             return epoch
+
+    def _epoch_file(self) -> Optional[str]:
+        return None if self.path == ":memory:" else self.path + ".epochs"
+
+    def _read_epoch_file(self) -> tuple[dict[str, int], int]:
+        """The copy of tx_epochs beside the database: (tag -> epoch, floor); empty when there is none or it
+        cannot be read (the database's list is then what there is). The file is a list of [tag, epoch]
+        (the first version) or {"keys": [[tag, epoch], ...], "floor": n}."""
+        path = self._epoch_file()
+        if path is None:
+            return {}, 0
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                doc = json.load(f)
+            rows, floor = (doc.get("keys", []), int(doc.get("floor", 0))) if isinstance(doc, dict) else (doc, 0)
+            keys = {str(t): int(e) for t, e in rows if isinstance(t, str) and 0 <= int(e) <= 0xFFFF}
+            return keys, floor if 0 <= floor <= 0xFFFF else 0
+        except FileNotFoundError:
+            return {}, 0
+        except (OSError, ValueError, TypeError, AttributeError):
+            log.warning("the epoch file %s cannot be read; the database's list is used", path)
+            return {}, 0
+
+    def _write_epoch_file(self, table: list[list[Any]], floor: int = 0) -> bool:
+        """Replaces the epoch file whole (a temporary file, synced, then renamed): a power cut leaves the
+        old list or the new one. A failure is logged, not raised: the database still has the list."""
+        path = self._epoch_file()
+        if path is None:
+            return False
+        tmp = path + ".tmp"
+        try:
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump({"keys": table, "floor": floor}, f)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, path)
+            dir_fd = os.open(os.path.dirname(os.path.abspath(path)), os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError as exc:
+            log.warning("the epoch file %s was not written: %s", path, exc)
+            return False
+        return True
 
     # --- modes --------------------------------------------------------------
 
@@ -574,7 +783,7 @@ class Store:
                    "ON CONFLICT(id) DO UPDATE SET version = excluded.version, "
                    "files_json = excluded.files_json, installed_at = excluded.installed_at, "
                    "signed_json = excluded.signed_json, package = excluded.package",
-                   (mode_id, version, json.dumps(files), time.time(),
+                   (mode_id, version, json.dumps(files), wallclock.now(),
                     json.dumps(signed) if signed is not None else None,
                     package if signed is not None else None))
 
@@ -596,7 +805,7 @@ class Store:
     # --- presets ------------------------------------------------------------
 
     def save_preset(self, name: str, mode_id: str, params: dict[str, Any]) -> dict[str, Any]:
-        now = time.time()
+        now = wallclock.now()
         with self._lock:
             self._exec("INSERT INTO presets (name, mode_id, params_json, created_at, updated_at) "
                        "VALUES (?, ?, ?, ?, ?) ON CONFLICT(name) DO UPDATE SET "
@@ -692,7 +901,7 @@ class Store:
                    "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(game_id, node_id) DO UPDATE SET "
                    "name = excluded.name, role = excluded.role, info_json = excluded.info_json, "
                    "last_seen = excluded.last_seen",
-                   (game_id, node_id, name, role, json.dumps(info), time.time()))
+                   (game_id, node_id, name, role, json.dumps(info), wallclock.now()))
 
     def nodes(self, game_id: int) -> list[dict[str, Any]]:
         rows = self._exec("SELECT * FROM nodes WHERE game_id = ? ORDER BY node_id", (game_id,)).fetchall()
@@ -709,7 +918,7 @@ class Store:
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (game_id, ev["node"], ev["seq"], ev["t"], ev["type"], ev.get("team"), ev.get("squad"),
              ev.get("prio", "normal"), json.dumps(ev.get("data") or {}), ev.get("epoch"),
-             ev.get("pkt_seq"), time.time()))
+             ev.get("pkt_seq"), wallclock.now()))
         return cur.rowcount == 1
 
     def events(self, game_id: int, since_ms: Optional[int] = None,
@@ -803,13 +1012,52 @@ class Store:
 
     # --- the remote GM's log (schema 8, plan phase 19) ----------------------------------
 
+    # --- access tokens (access_tokens.py) --------------------------------------------
+
+    def add_access_token(self, row: dict[str, Any]) -> None:
+        self._exec("INSERT INTO access_tokens (id, label, scope, game_id, secret_hash, created_at, expires_at) "
+                   "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                   (row["id"], row["label"], row["scope"], row["game_id"], row["secret_hash"],
+                    row["created_at"], row["expires_at"]))
+
+    def access_token(self, token_id: str) -> Optional[dict[str, Any]]:
+        row = self._exec("SELECT * FROM access_tokens WHERE id = ?", (token_id,)).fetchone()
+        return dict(row) if row is not None else None
+
+    def access_tokens(self) -> list[dict[str, Any]]:
+        rows = self._exec("SELECT * FROM access_tokens ORDER BY created_at, id").fetchall()
+        return [dict(r) for r in rows]
+
+    def revoke_access_token(self, token_id: str, now: float) -> bool:
+        return self._exec("UPDATE access_tokens SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
+                          (now, token_id)).rowcount == 1
+
+    def touch_access_token(self, token_id: str, now: float, source: str) -> None:
+        self._exec("UPDATE access_tokens SET last_used_at = ?, last_used_from = ? WHERE id = ?",
+                   (now, source, token_id))
+
+    def purge_access_tokens(self, expired_before: float) -> int:
+        """Drops the tokens that expired (or were revoked and expired) before ``expired_before``, and old audit rows."""
+        with self._lock:
+            self._exec("DELETE FROM token_audit WHERE at < ?", (expired_before - TOKEN_AUDIT_DAYS * 86400,))
+            return self._exec("DELETE FROM access_tokens WHERE expires_at < ?", (expired_before,)).rowcount
+
+    def add_token_audit(self, at: float, kind: str, token_id: Optional[str], label: Optional[str],
+                        scope: Optional[str], detail: str = "") -> None:
+        self._exec("INSERT INTO token_audit (at, kind, token_id, label, scope, detail) VALUES (?, ?, ?, ?, ?, ?)",
+                   (at, kind, token_id, label, scope, detail))
+
+    def token_audit(self, limit: int = 200) -> list[dict[str, Any]]:
+        rows = self._exec("SELECT * FROM token_audit ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
+
     def remote_command(self, command_id: str) -> Optional[dict[str, Any]]:
         row = self._exec("SELECT * FROM remote_commands WHERE command_id = ?", (command_id,)).fetchone()
         return self._remote_row(row) if row is not None else None
 
     def add_remote_command(self, entry: dict[str, Any]) -> dict[str, Any]:
         """Logs one remote command and what came of it; drops entries older than REMOTE_LOG_DAYS."""
-        now = time.time()
+        now = wallclock.now()
         with self._lock:
             self._exec("DELETE FROM remote_commands WHERE received_at < ?", (now - REMOTE_LOG_DAYS * 86400,))
             cur = self._exec(
@@ -897,7 +1145,7 @@ class Store:
         self._exec("INSERT INTO field_levels (level, content_type, data, updated_at) VALUES (?, ?, ?, ?) "
                    "ON CONFLICT(level) DO UPDATE SET content_type = excluded.content_type, "
                    "data = excluded.data, updated_at = excluded.updated_at",
-                   (level, content_type, data, time.time()))
+                   (level, content_type, data, wallclock.now()))
 
     def field_image(self, level: int = 0) -> Optional[tuple[str, bytes, float]]:
         row = self._exec("SELECT content_type, data, updated_at FROM field_levels WHERE level = ?",
@@ -951,7 +1199,7 @@ class Store:
 
     def add_map_feature(self, level: int, data: dict[str, Any]) -> int:
         """A new feature (``data`` without its level); returns its id."""
-        now = time.time()
+        now = wallclock.now()
         with self._lock:
             self._exec("INSERT INTO map_features (level, data_json, created_at, updated_at) VALUES (?, ?, ?, ?)",
                        (level, json.dumps(data, separators=(",", ":"), ensure_ascii=False), now, now))
@@ -959,7 +1207,7 @@ class Store:
 
     def put_map_feature(self, feature_id: int, level: int, data: dict[str, Any]) -> bool:
         return self._exec("UPDATE map_features SET level = ?, data_json = ?, updated_at = ? WHERE id = ?",
-                          (level, json.dumps(data, separators=(",", ":"), ensure_ascii=False), time.time(),
+                          (level, json.dumps(data, separators=(",", ":"), ensure_ascii=False), wallclock.now(),
                            feature_id)).rowcount == 1
 
     def delete_map_feature(self, feature_id: int) -> bool:
@@ -976,7 +1224,7 @@ class Store:
             raise ValueError(f"the field image is over {FIELD_IMAGE_MAX} bytes")
         if not 0 <= level < FIELD_LEVELS_MAX:
             raise ValueError(f"level: 0 to {FIELD_LEVELS_MAX - 1}")
-        now = time.time()
+        now = wallclock.now()
         text = json.dumps(boundary, separators=(",", ":"), ensure_ascii=False)
         with self._lock:
             self._db.execute("BEGIN IMMEDIATE")
@@ -1035,7 +1283,7 @@ class Store:
 
     def add_beacon(self, major: int, minor: int, level: int, data: dict[str, Any]) -> bool:
         """A new beacon (``data``: uuid, room, zone, x, y); False when major and minor are taken."""
-        now = time.time()
+        now = wallclock.now()
         return self._exec("INSERT OR IGNORE INTO beacons (major, minor, level, data_json, created_at, updated_at) "
                           "VALUES (?, ?, ?, ?, ?, ?)",
                           (major, minor, level, json.dumps(data, separators=(",", ":"), ensure_ascii=False),
@@ -1043,7 +1291,7 @@ class Store:
 
     def put_beacon(self, major: int, minor: int, level: int, data: dict[str, Any]) -> bool:
         return self._exec("UPDATE beacons SET level = ?, data_json = ?, updated_at = ? WHERE major = ? AND minor = ?",
-                          (level, json.dumps(data, separators=(",", ":"), ensure_ascii=False), time.time(),
+                          (level, json.dumps(data, separators=(",", ":"), ensure_ascii=False), wallclock.now(),
                            major, minor)).rowcount == 1
 
     def delete_beacon(self, major: int, minor: int) -> bool:
@@ -1058,7 +1306,7 @@ class Store:
                 data = json.loads(r["data_json"])
                 data["x"] = data["y"] = None
                 self._exec("UPDATE beacons SET level = 0, data_json = ?, updated_at = ? WHERE major = ? AND minor = ?",
-                           (json.dumps(data, separators=(",", ":"), ensure_ascii=False), time.time(),
+                           (json.dumps(data, separators=(",", ":"), ensure_ascii=False), wallclock.now(),
                             r["major"], r["minor"]))
                 moved += 1
             return moved
@@ -1070,7 +1318,7 @@ class Store:
         """Stores a checked image once; False if the same bytes were already stored."""
         cur = self._exec("INSERT OR IGNORE INTO images (id, kind, content_type, width, height, data, created_at) "
                          "VALUES (?, ?, ?, ?, ?, ?, ?)", (image_id, kind, content_type, width, height, data,
-                                                         time.time()))
+                                                         wallclock.now()))
         return cur.rowcount == 1
 
     def image(self, image_id: str, with_data: bool = True) -> Optional[dict[str, Any]]:
@@ -1125,7 +1373,7 @@ class Store:
     def save_team_preset(self, name: str, colour: Optional[str], crest_id: Optional[str],
                          preset_id: Optional[int] = None) -> dict[str, Any]:
         """A new team preset, or (with preset_id) a change to one; a name is unique (ValueError)."""
-        now = time.time()
+        now = wallclock.now()
         with self._lock:
             try:
                 if preset_id is None:
@@ -1155,7 +1403,7 @@ class Store:
                 return None
             key = os.urandom(32)
             self._exec("INSERT INTO token_keys (game_id, key, created_at) VALUES (?, ?, ?)",
-                       (game_id, key, time.time()))
+                       (game_id, key, wallclock.now()))
             return key
 
     def field_player(self, player_id: str) -> Optional[dict[str, Any]]:
@@ -1177,7 +1425,8 @@ class Store:
     CHECKIN_FIELDS = ("status", "display_name", "federation_number", "federation_seen", "team_preference",
                       "team", "squad", "role", "manual", "notice_version", "updated_at", "checked_in_at",
                       "erased_at", "registration_id", "ticket_sha256", "from_roster", "apd_id", "membership_expires",
-                      "apd_override")
+                      "apd_override", "apd_verdict", "apd_verdict_on", "card_checked_by", "card_checked_at",
+                      "position_share", "position_share_at", "position_share_notice")
 
     @staticmethod
     def _checkin(row: sqlite3.Row) -> dict[str, Any]:
@@ -1186,6 +1435,7 @@ class Store:
         out["manual"] = bool(out["manual"])
         out["from_roster"] = bool(out.get("from_roster"))
         out["apd_override"] = bool(out.get("apd_override"))
+        out["position_share"] = bool(out.get("position_share"))
         return out
 
     def checkin_by_registration(self, game_id: int, registration_id: str) -> Optional[dict[str, Any]]:
@@ -1517,7 +1767,8 @@ class Store:
             for gid in games:
                 erased += self._exec(
                     "UPDATE checkins SET display_name = NULL, federation_number = NULL, "
-                    "apd_id = NULL, membership_expires = NULL, team_preference = NULL, erased_at = ? WHERE game_id = ? AND erased_at IS NULL",
+                    "apd_id = NULL, membership_expires = NULL, apd_verdict = NULL, apd_verdict_on = NULL, "
+                    "card_checked_by = NULL, card_checked_at = NULL, team_preference = NULL, erased_at = ? WHERE game_id = ? AND erased_at IS NULL",
                     (now, gid)).rowcount
                 declarations += self._exec("DELETE FROM declarations WHERE game_id = ?", (gid,)).rowcount
             idle = [r["player_id"] for r in self._exec(
@@ -1555,13 +1806,47 @@ class Store:
         """Records older than the chrono retention go: the site server's copies are past it too."""
         return self._exec("DELETE FROM erasures WHERE erased_at < ?", (erased_before,)).rowcount
 
-    def purge_games(self, ended_before: float, confirmed_only: Optional[Callable[[dict[str, Any]], bool]] = None
-                    ) -> dict[str, Any]:
+    @staticmethod
+    def winner_of(totals: dict[str, int]) -> Optional[str]:
+        """The team with the most points; None on a tie or with no points at all (the site server's rule)."""
+        if not totals:
+            return None
+        best = max(totals.values())
+        leaders = [t for t, v in totals.items() if v == best]
+        return leaders[0] if len(leaders) == 1 and best > 0 else None
+
+    def game_results(self, limit: int = 100) -> list[dict[str, Any]]:
+        """The kept team results, newest first: name, mode, teams, totals, winner, state, dates. No player ids."""
+        rows = self._exec("SELECT * FROM game_results ORDER BY ended_at DESC, game_id DESC LIMIT ?",
+                          (max(1, int(limit)),)).fetchall()
+        return [{"name": r["name"], "mode_id": r["mode_id"],
+                 "teams": json.loads(r["teams_json"]), "team_totals": json.loads(r["totals_json"]),
+                 "winner": r["winner"], "state": r["state"], "duration_ms": r["duration_ms"],
+                 "started_at": r["started_at"], "ended_at": r["ended_at"]} for r in rows]
+
+    def purge_game_results(self, ended_before: float) -> int:
+        """Results older than their 365 days (``GAME_RESULTS_DAYS``) go."""
+        return self._exec("DELETE FROM game_results WHERE ended_at < ?", (ended_before,)).rowcount
+
+    def _keep_result(self, game: dict[str, Any]) -> None:
+        """Writes an ended game's team results just before the game is deleted (SR-88): the totals as the controller
+        holds them, nothing about a player or a squad. A game already written is left."""
+        have = self.scores(game["id"])
+        totals = {t: int(have.get(t, 0)) for t in game["teams"]}
+        self._exec("INSERT OR IGNORE INTO game_results (game_id, game_seed, name, mode_id, teams_json, totals_json, "
+                   "winner, state, duration_ms, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                   (game["id"], game["game_seed"], game["name"], game["mode_id"], json.dumps(game["teams"]),
+                    json.dumps(totals), self.winner_of(totals), game["state"], int(game["duration_ms"] or 0),
+                    game["started_at"], game["ended_at"] or game["created_at"]))
+
+    def purge_games(self, ended_before: float, confirmed_only: Optional[Callable[[dict[str, Any]], bool]] = None,
+                    keep_results_after: Optional[float] = None) -> dict[str, Any]:
         """Retention of a game's data (decision RET-1): every ended game that ended before ``ended_before`` goes
         with its events, scores, nodes, positions, check-ins, declarations, token key, plan positions, schedule
         link, sync bookkeeping and per-game settings. ``confirmed_only``: a game it answers False for is kept
         (the site server has not confirmed it, RET-3) and counted in ``kept``. The chrono readings, which have
-        their own retention, stay."""
+        their own retention, stay. ``keep_results_after``: a game that ended after it first leaves its team results
+        (``game_results``, SR-88; no player ids)."""
         done = {"games": 0, "events": 0, "kept": 0, "ids": []}
         with self._lock:
             rows = self._exec("SELECT * FROM games WHERE state = 'ended' AND COALESCE(ended_at, created_at) < ? "
@@ -1572,6 +1857,8 @@ class Store:
                     done["kept"] += 1
                     continue
                 gid, seed = game["id"], game["game_seed"]
+                if keep_results_after is not None and (game["ended_at"] or game["created_at"]) > keep_results_after:
+                    self._keep_result(game)
                 done["events"] += self._exec("DELETE FROM events WHERE game_id = ?", (gid,)).rowcount
                 for table in ("scores", "nodes", "positions", "declarations", "checkins", "player_positions",
                               "token_keys"):
@@ -1596,6 +1883,10 @@ class Store:
         rows = self._exec("SELECT player_id, report_json FROM player_positions WHERE game_id = ? "
                           "ORDER BY player_id", (game_id,)).fetchall()
         return {r["player_id"]: json.loads(r["report_json"]) for r in rows}
+
+    def delete_player_position(self, game_id: int, player_id: str) -> int:
+        return self._exec("DELETE FROM player_positions WHERE game_id = ? AND player_id = ?",
+                          (game_id, player_id)).rowcount
 
     def delete_player_positions(self, game_id: int) -> int:
         return self._exec("DELETE FROM player_positions WHERE game_id = ?", (game_id,)).rowcount

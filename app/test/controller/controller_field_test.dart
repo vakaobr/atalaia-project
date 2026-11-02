@@ -544,4 +544,34 @@ void main() {
     );
     expect(e.field!.image(0).$2.length, fieldImageMax);
   });
+
+  test(
+    'a JSON body is capped at 64 KiB, an upload route at its own limit (FLD-9)',
+    () async {
+      final e = ControllerEngine();
+      final api = ControllerApi(e, gmToken: 'gm', readToken: 'rd');
+      final server = await api.serve();
+      addTearDown(() => server.close(force: true));
+      final client = HttpClient();
+      addTearDown(client.close);
+      Future<int> post(String path, int size) async {
+        final r = await client.post('127.0.0.1', server.port, path);
+        r.headers
+          ..set('Authorization', 'Bearer gm')
+          ..set('Content-Type', 'application/json');
+        r.contentLength = size;
+        r.add(Uint8List(size));
+        final res = await r.close();
+        await res.drain<void>();
+        return res.statusCode;
+      }
+
+      expect(await post('/api/v1/checkin', (64 << 10) + 1), 413);
+      expect(await post('/api/v1/games', (64 << 10) + 1), 413);
+      expect(await post('/api/v1/checkin', 100), isNot(413));
+      // A mode may be bigger than a JSON command: past 64 KiB is read, then refused as a bad body.
+      expect(await post('/api/v1/modes', 200 << 10), isNot(413));
+      expect(await post('/api/v1/modes', (2 << 20) + 1), 413);
+    },
+  );
 }

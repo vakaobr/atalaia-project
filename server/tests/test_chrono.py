@@ -17,14 +17,16 @@ import base64
 import datetime
 import io
 import json
+import os
 import time
 import uuid
 import zipfile
 from pathlib import Path
 from typing import Any, Optional
+from unittest import mock
 
 from atalaia_controller import chrono, sync_format
-from atalaia_server import personal_data
+from atalaia_server import personal_data, sharing_terms
 from atalaia_server.models import Field, FieldPlayerId, GameRegistration, ScheduledGame
 
 from .test_sync import CONTROLLER, GAME, SyncTestCase
@@ -448,6 +450,7 @@ class SharingTests(ChronoCase):
         async with self.app.state.sessionmaker() as db:
             field = await db.get(Field, field_id)
             field.chrono_sharing_enabled = on
+            field.sharing_terms_version = sharing_terms.current()  # the terms are accepted (LEG-41); see TermsTests
             await db.commit()
 
     async def consent(self, field_id: uuid.UUID, give: bool = True) -> int:
@@ -562,10 +565,54 @@ class SharingTests(ChronoCase):
         r = await self.client.patch(url, json={"chrono_sharing_enabled": True}, headers=self.gm)
         self.assertEqual(r.status_code, 403)
         r = await self.client.patch(url, json={"chrono_sharing_enabled": True}, headers=self._admin)
+        self.assertEqual((r.status_code, r.json()["detail"]), (409, "sharing_terms_required"))  # LEG-41
+        r = await self.client.patch(url, json={"chrono_sharing_enabled": True,
+                                               "sharing_terms_accepted": sharing_terms.current()}, headers=self._admin)
         self.assertEqual((r.status_code, r.json()["chrono_sharing_enabled"]), (200, True))
         r = await self.client.patch(url, json={"name": "x"}, headers=self._admin)
         self.assertEqual(r.status_code, 422)
         self.assertIn("field_update", [r[0] for r in await self.fetch("SELECT action FROM audit_log")])
+
+    async def test_the_terms_are_accepted_and_asked_again_when_they_change(self) -> None:
+        """LEG-41: the acceptance (version, time, account) is recorded; a new version suspends sharing until accepted."""
+        url = f"/api/v1/fields/{self.field_id}"
+        version = sharing_terms.current()
+        r = await self.client.patch(url, json={"sharing_terms_accepted": "1999-01-01"}, headers=self._admin)
+        self.assertEqual((r.status_code, r.json()["detail"]), (409, "sharing_terms_version"))
+        r = await self.client.get("/api/v1/fields", headers=self._admin)
+        [mine] = [f for f in r.json() if f["id"] == str(self.field_id)]
+        self.assertEqual((mine["sharing_terms"]["accepted_version"], mine["sharing_live"]), (None, False))
+        r = await self.client.patch(url, json={"chrono_sharing_enabled": True, "sharing_terms_accepted": version},
+                                    headers=self._admin)
+        self.assertEqual(r.status_code, 200, r.text)
+        terms = r.json()["sharing_terms"]
+        self.assertEqual((terms["accepted_version"], terms["current"], r.json()["sharing_live"]), (version, True, True))
+        self.assertIsNotNone(terms["accepted_at"])
+        self.assertIsNotNone(terms["accepted_by"])  # the administrator's account
+        first = terms["accepted_at"]
+        # Accepting the same version again changes nothing (the first date stays).
+        r = await self.client.patch(url, json={"sharing_terms_accepted": version}, headers=self._admin)
+        self.assertEqual(r.json()["sharing_terms"]["accepted_at"], first)
+        audit = await self.fetch("SELECT details FROM audit_log WHERE action = 'field_update'")
+        self.assertIn(version, json.dumps([tuple(a) for a in audit], default=str))
+        # The terms change: the field is asked again and its sharing is suspended, the switch still on.
+        await self.share(self.other_field)
+        await self.consent(self.other_field)
+        await self.consent(self.field_id)
+        self.assertEqual(len(await self.shared()), 1)
+        with mock.patch.dict(os.environ, {"ATALAIA_SHARING_TERMS_VERSION": "2027-01-01"}):
+            self.assertEqual(await self.shared(), [])
+            r = await self.client.get("/api/v1/fields", headers=self._admin)
+            [mine] = [f for f in r.json() if f["id"] == str(self.field_id)]
+            self.assertEqual((mine["chrono_sharing_enabled"], mine["sharing_live"], mine["sharing_terms"]["current"]),
+                             (True, False, False))
+            r = await self.client.patch(url, json={"chrono_sharing_enabled": True}, headers=self._admin)
+            self.assertEqual(r.status_code, 409)
+            r = await self.client.patch(url, json={"chrono_sharing_enabled": True, "sharing_terms_accepted": "2027-01-01"},
+                                        headers=self._admin)
+            self.assertEqual((r.status_code, r.json()["sharing_live"]), (200, True))
+            # Both fields must be live: the other one has not accepted the new version, so still nothing.
+            self.assertEqual(await self.shared(), [])
 
 
 class PersonalDataTests(ChronoCase):

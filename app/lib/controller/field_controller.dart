@@ -27,6 +27,8 @@ import 'dart:typed_data';
 
 import '../core/node_types.dart';
 import 'controller_failover.dart';
+import 'peer_epoch.dart';
+import '../radio/replay.dart';
 import '../radio/rf_codec.dart';
 
 /// TIME key 2.
@@ -61,8 +63,10 @@ const broadcastNode = 0xffff;
 /// A box's C decoder turns CMD params into JSON in a 128-byte buffer.
 const cmdParamsMax = 127;
 
-/// Flood copies of a packet are dropped for this long (ADR-P2-6).
-const packetDedupeMs = 60000;
+// Flood copies and replays are refused by the per-source replay window
+// (lib/radio/replay.dart, RFC 0001 Amendment 23): a packet already seen, or 64
+// or more counters below the source's highest, however long ago (this was a
+// 60 s table; a recording played back after a minute got through).
 
 /// TIME every 30 s (spec section 11; 10 s with automatic failover:
 /// [beaconIntervalFor]).
@@ -301,9 +305,28 @@ class FieldController {
   final _lost = <String, Map<String, int>>{};
   final _adjust = <String, int>{};
   final acks = AckTracker();
-  final _packetsSeen = <(int, int, int), int>{};
+  final _replay = <int, ReplayWindow>{}; // source -> its replay window
+
+  /// Authenticated packets the windows refused (flood copies and replays).
+  int replaysRefused = 0;
   final _eventsSeen = <(int, int, int, String)>{};
-  int _lastPrune = 0;
+
+  /// The epochs this controller named to the receivers (peer_epoch.dart, RFC
+  /// 0001 Amendment 24, decision SR-110).
+  final _peerEpochs = PeerEpochs();
+
+  /// A box was heard at an epoch the receivers may not follow: (node, epoch),
+  /// for the host to tell its modem (SET_PEER_EPOCH); the controller has sent
+  /// the boxes their CMD itself.
+  void Function(int node, int epoch)? onPeerEpoch;
+
+  /// The node ids of other controllers heard on the air (their TIME or CLAIM
+  /// authenticated): they have used epochs under this key, so no new device
+  /// is given the id (decision EP-3; the engine's `issueJoin`).
+  final controllersHeard = <int>{};
+
+  /// Called once for each controller id added to [controllersHeard].
+  void Function(int node)? onControllerHeard;
 
   void Function(Map<String, Object?> record)? onEvent;
   void Function(FieldNode node, String kind)? onNode;
@@ -477,6 +500,16 @@ class FieldController {
     );
   }
 
+  /// A box was heard at an epoch the receivers may not follow (peer_epoch.dart,
+  /// SR-110): the host tells its modem, and the leader tells every box (CMD
+  /// peer, flooded; it only moves a table up).
+  void _announcePeerEpoch(int nodeId, int epoch) {
+    onPeerEpoch?.call(nodeId, epoch);
+    if (election.isLeader) {
+      _sendCmd(cmdPeerEpoch, {'src': nodeId, 'epoch': epoch});
+    }
+  }
+
   /// CMD update (opcode 9, RFC 0001 Amendment 6) to [dest]: the GM's alone
   /// (controller_firmware.dart), never a mode's field.lua, so not in
   /// [cmdOpcodes].
@@ -503,9 +536,17 @@ class FieldController {
     int? rssi,
     int? snr,
   }) {
-    final key = (header.source, epoch, header.seq);
-    if (_packetsSeen.containsKey(key)) return; // a flood copy
-    _packetsSeen[key] = _now;
+    final window = _replay.putIfAbsent(header.source, ReplayWindow.new);
+    if (window.accept(ReplayWindow.counter(epoch, header.seq)) !=
+        ReplayVerdict.fresh) {
+      replaysRefused++;
+      return; // a flood copy, or a recording played back
+    }
+    if ((header.type == RfType.time || header.type == RfType.claim) &&
+        header.source != nodeId &&
+        controllersHeard.add(header.source)) {
+      onControllerHeard?.call(header.source);
+    }
     if (header.type == RfType.time) {
       _onTime(header.source, payload);
       return;
@@ -515,7 +556,9 @@ class FieldController {
       return;
     }
     acks.record(header.source, epoch, header.seq);
-    final node = _node(header.source)
+    final node = _node(header.source);
+    final priorEpoch = node.epoch;
+    node
       ..lastSeenMs = _now
       ..lastSeenGameMs = gameTimeMs
       ..heard = true
@@ -533,6 +576,15 @@ class FieldController {
     }
     if (header.ackRequested && election.isLeader) {
       _send(RfType.ack, acks.ack(header.source, epoch).encode(), RfPrio.normal);
+    }
+    if (_peerEpochs.heard(
+      header.source,
+      priorEpoch,
+      epoch,
+      header.type == RfType.hello,
+      _now,
+    )) {
+      _announcePeerEpoch(header.source, epoch);
     }
     _checkHealth(node, _now);
   }
@@ -743,12 +795,13 @@ class FieldController {
     } else {
       _repeats = [];
     }
+    if (election.isLeader) {
+      for (final (node, epoch) in _peerEpochs.due(nowMs)) {
+        _sendCmd(cmdPeerEpoch, {'src': node, 'epoch': epoch});
+      }
+    }
     for (final node in nodes.values.toList()) {
       _checkHealth(node, nowMs);
-    }
-    if (nowMs - _lastPrune >= 10000) {
-      _lastPrune = nowMs;
-      _packetsSeen.removeWhere((_, t) => t < nowMs - packetDedupeMs);
     }
   }
 

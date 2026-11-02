@@ -231,3 +231,52 @@ bool admin_pin_setup_command(admin_pin_t *a, const char *cmd, char *reply, size_
     memset(typed, 0, sizeof(typed));
     return true;
 }
+
+bool admin_pin_gate_serial(admin_pin_t *a, bool open, char *cmd, int args, char *reply, size_t cap)
+{
+    /* Word starts: the command name, its args, then at most the PIN and one more (too many). */
+    const char *w[8];
+    int words = 0;
+    char *p = cmd;
+    while (words < 8) {
+        while (*p == ' ') p++;
+        if (*p == '\0') break;
+        w[words++] = p;
+        p += strcspn(p, " ");
+    }
+    int plain = 1 + args;
+    if (words < plain || words > plain + 1) {
+        snprintf(reply, cap, "refused: wrong number of words (%d after the name%s)", args,
+                 open ? "" : ", then the admin PIN");
+        return false;
+    }
+    if (words == plain) {
+        if (open) return true;
+        snprintf(reply, cap,
+                 "refused: the admin PIN goes last on this line (one is set at the "
+                 "Wi-Fi setup, or \"@admin-pin <new PIN>\")");
+        return false;
+    }
+    char typed[ADMIN_PIN_MAX + 2];
+    size_t tn = strcspn(w[plain], " ");
+    if (tn > ADMIN_PIN_MAX + 1) tn = ADMIN_PIN_MAX + 1; /* longer is wrong anyway */
+    memcpy(typed, w[plain], tn);
+    typed[tn] = '\0';
+    char *cut = cmd + (w[plain] - cmd);
+    while (cut > cmd && cut[-1] == ' ') cut--;
+    bool ok = true;
+    if (!open) {
+        admin_pin_result_t r = admin_pin_check(a, typed);
+        if (r == ADMIN_PIN_LOCKED) {
+            snprintf(reply, cap, "refused: admin PIN locked, try again in %lu min",
+                     (unsigned long)admin_pin_wait_min(a));
+            ok = false;
+        } else if (r != ADMIN_PIN_OK) {
+            snprintf(reply, cap, "refused: admin PIN (%s)", admin_pin_result_name(r));
+            ok = false;
+        }
+    }
+    memset(typed, 0, sizeof(typed));
+    if (ok) *cut = '\0';
+    return ok;
+}

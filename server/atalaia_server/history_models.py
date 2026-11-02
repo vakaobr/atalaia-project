@@ -34,7 +34,8 @@ from .models import Base
 
 DEFAULT_DELAY_S = 60          # spectators see a live game a minute late unless the field says otherwise
 MAX_DELAY_S = 3600
-DEFAULT_RETENTION_DAYS = 730  # ADR-P4-8: game history, 24 months
+DEFAULT_RETENTION_DAYS = 90   # game history: 90 days (maintainer decision 2026-10-30; ADR-P4-8 had 24 months)
+MAX_RETENTION_DAYS = 730      # the most a field may choose (24 months)
 MIN_RETENTION_DAYS = 30
 
 
@@ -51,7 +52,7 @@ class FieldHistorySettings(Base):
     __tablename__ = "field_history_settings"
     __table_args__ = (
         CheckConstraint(f"spectator_delay_s BETWEEN 0 AND {MAX_DELAY_S}", name="delay"),
-        CheckConstraint(f"retention_days BETWEEN {MIN_RETENTION_DAYS} AND {DEFAULT_RETENTION_DAYS}",
+        CheckConstraint(f"retention_days BETWEEN {MIN_RETENTION_DAYS} AND {MAX_RETENTION_DAYS}",
                         name="retention"),
     )
 
@@ -127,5 +128,5 @@ class FieldPreset(Base):
                                                  onupdate=func.now())
 
 
-__all__ = ["DEFAULT_DELAY_S", "DEFAULT_RETENTION_DAYS", "MAX_DELAY_S", "MIN_RETENTION_DAYS", "FieldHistorySettings",
+__all__ = ["DEFAULT_DELAY_S", "DEFAULT_RETENTION_DAYS", "MAX_DELAY_S", "MAX_RETENTION_DAYS", "MIN_RETENTION_DAYS", "FieldHistorySettings",
            "FieldPreset", "FieldScenario", "FieldScenarioRevision", "GameScoreSample"]

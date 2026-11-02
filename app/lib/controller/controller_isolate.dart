@@ -86,8 +86,10 @@ abstract interface class ControllerRun {
 
 /// Starts a controller; [pod] is the UI isolate's link to an I/O pod (opened
 /// already) when [ControllerBoot.pod] says one is linked.
-typedef ControllerLauncher =
-    Future<ControllerRun> Function(ControllerBoot boot, {PodTransport? pod});
+typedef ControllerLauncher = Future<ControllerRun> Function(
+  ControllerBoot boot, {
+  PodTransport? pod,
+});
 
 class ControllerStartException implements Exception {
   ControllerStartException(this.message);

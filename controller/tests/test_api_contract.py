@@ -89,6 +89,7 @@ from atalaia_controller import prop_link
 from atalaia_controller.mqtt import MqttBridge
 from atalaia_controller.prop_link import PropLinks
 from atalaia_controller.store import Store
+from atalaia_controller.stream_auth import SUBPROTOCOL, encode_subprotocol
 from atalaia_controller.ws import Hub
 from atalaia_sim import codec, cpace, packet
 from atalaia_sim import field_frame as ff
@@ -258,7 +259,8 @@ class ContractCase(unittest.TestCase):
         MQTT bridge; the clock, the radio and the recorded MQTT messages go on across restarts."""
         now = env.now
         env.store = Store(env.cfg.db_path)
-        env.ctrl = Controller(env.cfg, env.store, modem=env.modem, core=CORE, clock=lambda: now[0],
+        wall = lambda: VECTORS["wall_start"] + now[0]  # noqa: E731
+        env.ctrl = Controller(env.cfg, env.store, modem=env.modem, core=CORE, clock=lambda: now[0], wall=wall,
                               join_key=bytes.fromhex(env.case.get("join_key", "")))
         # The controller then the store, on a restart or at the end of the case.
         env.stops = contextlib.ExitStack()
@@ -270,16 +272,17 @@ class ContractCase(unittest.TestCase):
             env.hub.max_queue = env.case["stream_max_queue"]
         MqttBridge(env.cfg, env.ctrl).client = env.mqtt  # type: ignore[assignment]
         PropLinks(env.ctrl)  # WS /api/v1/prop
-        wall = lambda: VECTORS["wall_start"] + now[0]  # noqa: E731
         svc = Checkin(env.ctrl)  # no field CA: HTTPS off, as on the phone until its slice S6
         svc._wall = wall
         svc._tz = datetime.timezone.utc
-        Positions(env.ctrl, wall=wall)
+        Positions(env.ctrl, wall=wall, mono=wall)
         # Slice S7c: adoption (no USB, as on a phone) and firmware updates, as main.build sets them up.
         Adoption(env.ctrl, lister=lambda: [])
         FirmwareUpdates(env.ctrl, Path(env.tmp) / "firmware", env.cfg.firmware_release_keys, clock=wall)
         # Slice S7b: signed mode packages and the modes sent to boxes, as main.build sets them up.
-        SignedModes(env.ctrl, env.case.get("mode_keys", []), env.case.get("mode_revoked", []), "")
+        SignedModes(env.ctrl, env.case.get("mode_keys", []), env.case.get("mode_revoked", []), "",
+                    min_versions={k.strip(): v.strip() for k, _, v in
+                                  (e.partition("=") for e in env.case.get("mode_min_versions", []))})
         ModeFetch(env.ctrl, env.case.get("box_keys", []), clock=wall)
         if env.case.get("https"):
             env.ctrl.ca_sha256 = bytes(range(32))
@@ -656,18 +659,22 @@ class ContractCase(unittest.TestCase):
         secret = "not-a-token" if token == "bad" else VECTORS["tokens"].get(token)
         if "bearer" in step:
             secret = substitute(step["bearer"], env.saved)
-        path, headers = "/api/v1/stream", {}
+        path, headers, protocols = "/api/v1/stream", {}, None
         if secret is not None and step.get("via", "query") == "header":
             headers["Authorization"] = f"Bearer {secret}"
+        elif secret is not None and step.get("via") == "subprotocol":
+            protocols = [SUBPROTOCOL, encode_subprotocol(secret)]  # stream_auth.py (LIVE2-1)
         elif secret is not None:
             path += f"?token={secret}"
         if "close" in step:
             with self.assertRaises(WebSocketDisconnect) as ctx:
-                with env.client.websocket_connect(path, headers=headers) as ws:
+                with env.client.websocket_connect(path, headers=headers, subprotocols=protocols) as ws:
                     ws.receive_json()
             self.assertEqual(ctx.exception.code, step["close"])
             return
-        ws = env.stack.enter_context(env.client.websocket_connect(path, headers=headers))
+        ws = env.stack.enter_context(env.client.websocket_connect(path, headers=headers, subprotocols=protocols))
+        if "answers" in step:  # the subprotocol the server picks: never the one that carries the token
+            self.assertEqual(ws.accepted_subprotocol, step["answers"])
         env.sockets[step["ws_connect"]] = ws
         self.check(step["hello"], ws.receive_json(), f"stream {step['ws_connect']}: hello", env)
 

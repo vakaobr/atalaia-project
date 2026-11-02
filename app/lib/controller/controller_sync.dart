@@ -55,6 +55,7 @@ import 'package:crypto/crypto.dart';
 
 import '../chrono/reading.dart' show newUuid;
 import '../modes/mode_catalog.dart' show ModeException;
+import '../security/pem.dart';
 import 'controller_branding.dart';
 import 'controller_engine.dart';
 import 'controller_images.dart';
@@ -176,6 +177,10 @@ class SyncConfig {
     if (!apiKeyOk(apiKey)) {
       return "api_key: the field's key from the site server (43 characters)";
     }
+    final ca = caPem;
+    if (ca != null && ca.trim().isNotEmpty && singleCertificate(ca) == null) {
+      return 'ca_pem: exactly one certificate (the site server\'s CA)';
+    }
     if (branding != 'local' && branding != 'site') {
       return "branding: 'local' or 'site'";
     }
@@ -255,8 +260,14 @@ class HttpSyncTransport implements SyncTransport {
 
   static SecurityContext? _context(String? pem) {
     if (pem == null || pem.trim().isEmpty) return null;
-    return SecurityContext(withTrustedRoots: false)
-      ..setTrustedCertificatesBytes(utf8.encode(pem));
+    // One certificate only (APP-1); anything else trusts nothing, so every
+    // request fails instead of going to a server the operator never named.
+    final der = singleCertificate(pem);
+    final context = SecurityContext(withTrustedRoots: false);
+    if (der != null) {
+      context.setTrustedCertificatesBytes(utf8.encode(derToPem(der)));
+    }
+    return context;
   }
 
   final String base;
@@ -1027,7 +1038,7 @@ class ControllerSync {
   Future<void> _gameDay() async {
     gameDayError = null;
     final sched = await _get(
-      '/api/v1/sync/schedule?days=$_scheduleDays',
+      '/api/v1/sync/schedule?days=$_scheduleDays&revocations=1',
       'schedule',
     );
     if (sched == null) return;
@@ -1037,9 +1048,24 @@ class ControllerSync {
       now,
     );
     schedulePulledAt = now;
+    _dropRevokedCopies(sched['copies_revoked']);
     await _pullRosters();
     await _answerClaims();
     await _pushCheckins();
+  }
+
+  /// PRIV-5: the site server says which of this field's players erased their
+  /// account or withdrew a chrono-sharing consent: the copies of other fields'
+  /// records pulled for them are dropped now, before this cycle's pull
+  /// (Art. 17(2)). Idempotent: the record comes every cycle until the field's
+  /// retention period ends, and does nothing once the copies are gone.
+  void _dropRevokedCopies(Object? revoked) {
+    final checkin = engine.checkin;
+    if (checkin == null || revoked is! List || revoked.isEmpty) return;
+    checkin.revokeShared([
+      for (final r in revoked)
+        (r! as Map<String, Object?>)['player_id']! as String,
+    ]);
   }
 
   List<(Map<String, Object?>, Map<String, Object?>)> _linked() {

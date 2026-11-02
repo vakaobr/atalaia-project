@@ -35,6 +35,8 @@ typedef struct {
     /* Identity in a joined game (1 and 42 for a stand-alone game). */
     uint16_t node_id;
     uint32_t game_seed;
+    /* The joined game's key: rand() is seeded from it too (all zero in a stand-alone game). */
+    uint8_t rand_key[16];
     /* Every event the node emits also goes here (the radio link); may be NULL. */
     void (*event_hook)(void *ctx, const atalaia_event_t *ev, const char *data_json);
     void *event_ctx;

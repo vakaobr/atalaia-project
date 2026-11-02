@@ -164,12 +164,14 @@ REVOKE ALL ON public.atalaia_quota_hits FROM PUBLIC;
 # its own rows only (one row-level policy: ``tenant`` is the schema of the field whose database role runs the
 # transaction, ``atalaia_caller_tenant()``, which reads the ``role`` setting that only SET ROLE changes, and not the
 # ``atalaia.tenant`` setting any statement could rewrite, S2113-3; ENABLEd, not
-# FORCEd, so their owner, which the functions run as, sees every row) and two SECURITY DEFINER functions, the
+# FORCEd, so their owner, which the functions run as, sees every row) and three SECURITY DEFINER functions, the
 # only way across: ``atalaia_share_read`` (the other fields' records of the persons the caller is linked to, when
-# both are active members and consented) and ``atalaia_share_redeem`` (a link code, once). They read hub tables
+# both are active members and consented) ``atalaia_share_redeem`` (a link code, once) and ``atalaia_share_peers`` (the names of the other fields the
+# caller's person is linked at, HLC-2). They read hub tables
 # only, never a tenant's schema. Idempotent: run by ``init`` and by ``migrate``.
 SHARE_TABLES = ("atalaia_share_members", "atalaia_share_records", "atalaia_share_codes")
-SHARE_FUNCTIONS = ("public.atalaia_share_read(uuid[], integer)", "public.atalaia_share_redeem(bytea)")
+SHARE_FUNCTIONS = ("public.atalaia_share_read(uuid[], integer)", "public.atalaia_share_redeem(bytea)",
+                   "public.atalaia_share_peers(uuid)")
 CALLER_FUNCTION = "public.atalaia_caller_tenant()"
 TENANT_FUNCTIONS = SHARE_FUNCTIONS + (CALLER_FUNCTION,)
 SHARE_POLICY = "(tenant = atalaia_caller_tenant())"
@@ -247,6 +249,18 @@ BEGIN
     DELETE FROM public.atalaia_share_codes WHERE code_hash = p_hash AND tenant <> me RETURNING person_id INTO pid;
     RETURN pid;
 END
+$fn$;
+-- HLC-2: the other fields the caller's person is linked at (name, whether sharing is on there, since when), only
+-- when the caller is itself a member for that person; nothing of what those fields hold.
+CREATE OR REPLACE FUNCTION public.atalaia_share_peers(p_person uuid)
+RETURNS TABLE (field_name text, active boolean, updated_at timestamptz)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $fn$
+    SELECT src.field_name, src.active, src.updated_at
+    FROM public.atalaia_share_members me
+    JOIN public.atalaia_share_members src ON src.person_id = me.person_id AND src.tenant <> me.tenant
+    JOIN public.atalaia_tenants t ON t.schema_name = src.tenant
+    WHERE me.tenant = public.atalaia_caller_tenant() AND me.person_id = p_person AND t.status = 'active'
+    ORDER BY src.updated_at, src.field_name
 $fn$;
 """
 

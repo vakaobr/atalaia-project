@@ -14,6 +14,7 @@
     "token": "Código de acesso (da organização ou só de leitura)",
     "enter": "Entrar",
     "bad": "Código de acesso errado.",
+    "use_https": "O código não é enviado por HTTP simples. Abre a consola em {url} (o navegador pede uma vez para confiar no certificado do campo).",
     "expired": "O código de acesso deixou de ser aceite. Volta a entrar.",
     "hint": "O controlador mostra os códigos com: python3 -m atalaia_controller tokens",
     "readonly": "Só leitura",
@@ -51,6 +52,7 @@
     "role": "O controlador agora é {role} (mandato {term}).",
     "node_offline": "A caixa {node} não dá notícias há mais de 90 s.",
     "count": "{n} alertas",
+    "count_one": "{n} alerta",
     "start_forced": "Jogo começado sem caixa para: {roles}"
   },
   "game": {
@@ -102,10 +104,12 @@
       "paused": "em pausa",
       "ended": "terminado"
     },
-    "confirm_start_pending": "Há {n} réplica(s) declarada(s) por cronografar. Começar mesmo assim?",
+    "confirm_start_pending": "Há {n} réplicas declaradas por cronografar. Começar mesmo assim?",
+    "confirm_start_pending_one": "Há {n} réplica declarada por cronografar. Começar mesmo assim?",
     "squads": "Squads por equipa",
     "squads_hint": "0 = sem squads (jogos pequenos: só equipas). Num milsim ou num jogo grande, cada equipa divide-se em squads.",
     "squads_each": "{n} squads por equipa",
+    "squads_each_one": "{n} squad por equipa",
     "disclosure": "A quem vão os objetivos de um squad",
     "disclosure_scenario": "Como diz o cenário ({value})",
     "disclosure_members": "Todos os elementos do squad",
@@ -175,6 +179,7 @@
     "filter": "Filtrar acontecimentos",
     "critical_only": "Só críticos",
     "count": "{n} acontecimentos",
+    "count_one": "{n} acontecimento",
     "empty": "Ainda não há acontecimentos.",
     "events": {
       "medic_heal": "{player} recebeu tratamento (ligaduras no kit: {remaining}; tratamentos neste jogo: {used})",
@@ -186,6 +191,7 @@
       "vip_extracted_vip": "A equipa {team} extraiu o seu VIP ({player})",
       "money_collected": "{player} ({team}) recolheu {amount} de dinheiro",
       "money_deposited": "{player} ({team}) depositou {amount}: {amount} pontos",
+      "money_deposited_one": "{player} ({team}) depositou {amount}: {amount} ponto",
       "progressive_activated": "A caixa {zone} está ativa (n.º {step}): é a única que pode ser capturada",
       "progressive_completed": "{team} completou a caixa {zone} (n.º {step}): ficou bloqueada",
       "scenario_started": "O cenário {scenario} começou",
@@ -211,6 +217,7 @@
       "score_delta": "Pontos para a equipa {team}: {amount}",
       "code_used": "A equipa {team} usou um código",
       "player_respawn": "{player} voltou ao jogo ({lives} vidas)",
+      "player_respawn_one": "{player} voltou ao jogo ({lives} vida)",
       "player_checkin": "{player} registou presença",
       "kill_confirmed": "Baixa confirmada pela equipa {team} ({player})",
       "kill_denied": "A equipa {team} recuperou a etiqueta de {player}",
@@ -230,9 +237,19 @@
       "node_online": "Uma caixa ligou-se",
       "node_offline": "Uma caixa deixou de dar notícias",
       "node_rebooted": "Uma caixa reiniciou ({reason})",
+      "node_rebooted_crash": "Uma caixa falhou e reiniciou ({reason})",
       "node_setup_applied": "{zone} confirmou a configuração do cenário",
       "battery_low": "Uma caixa tem a bateria fraca",
       "nobody": "Alguém por identificar"
+    },
+    "reboot_reasons": {
+      "power": "corte ou arranque de energia",
+      "brownout": "quebra de tensão",
+      "software": "reinício por software (atualização ou comando)",
+      "panic": "erro fatal do programa",
+      "watchdog": "watchdog: o programa bloqueou",
+      "deepsleep": "saída do sono profundo",
+      "unknown": "motivo desconhecido"
     },
     "puzzles": {
       "code": "código",
@@ -438,10 +455,19 @@
     "box_room_label": "Divisão de {name} (vazio: o nome da caixa)",
     "box_room_save": "Guardar a divisão"
   },
+  "map_fetching": {
+    "title": "Obtenção de mapas",
+    "intro": "A página «Carregar o campo de um mapa» pede ao OpenStreetMap, ao Overpass, ao Nominatim e aos serviços de imagem aérea abertos o mapa e a área do campo, e envia-lhes o endereço IP do dispositivo de quem abre a página e a área pedida. Desliga-a se o campo não quiser isso: a página fica fechada e nada sai do controlador. O campo continua a poder ser carregado com uma imagem.",
+    "label": "Deixar a consola obter mapas na internet",
+    "saved": "Guardado.",
+    "read_only": "Só a organização altera isto."
+  },
   "fieldmap": {
     "open": "Carregar o campo de um mapa",
     "title": "Carregar o campo de um mapa",
     "back": "Voltar à consola",
+    "off": "A obtenção de mapas está desligada neste campo, por isso esta página não contacta o OpenStreetMap, o Overpass, o Nominatim nem serviços de imagem aérea. Para carregar o campo de um mapa, a organização liga-a em Definições, «Obtenção de mapas». Também podes carregar uma imagem do campo no separador Campo.",
+    "off_note": "A obtenção de mapas está desligada neste campo (Definições).",
     "login": "Entra primeiro na consola com o código de acesso da organização e abre esta página a partir do separador Campo.",
     "intro": "Encontra o campo no mapa e marca os cantos do seu limite: este navegador desenha a imagem do campo a partir de mapas abertos. A imagem, a sua posição no mapa (ATAK) e o limite do campo ficam depois guardados no controlador de campo, que não precisa de internet para isto.",
     "sources": "Só enquanto preparas o jogo: este navegador obtém o mapa e a área uma vez, do OpenStreetMap (© OpenStreetMap contributors) e, onde houver, da fotografia aérea aberta do país ou da região (o ortofotomapa da DGT em Portugal continental, o PNOA do IGN em Espanha, as ortofotos do IGN em França e as do PDOK nos Países Baixos, e as dos serviços públicos da Bélgica, do Luxemburgo, da Suíça, de onze estados alemães, da Polónia e da Chéquia, cada uma com o seu crédito). Se o serviço de dados do OpenStreetMap estiver ocupado, a mesma pergunta (só a área do campo) vai a outro servidor público com os mesmos dados (overpass.private.coffee). Nada mais é descarregado, e o resto da consola continua a funcionar sem internet.",
@@ -573,7 +599,8 @@
     "scenario_name": "Caixa do cenário",
     "scenario_none": "— nenhuma (escolher a função) —",
     "scenario_box": "caixa {node}",
-    "scenario_hint": "O cenário encontra as suas caixas por estes nomes: {done} de {n} já têm caixa."
+    "scenario_hint": "O cenário encontra as suas caixas por estes nomes: {done} de {n} já têm caixa.",
+    "scenario_hint_one": "O cenário encontra a sua caixa por este nome: {done} de {n} já tem caixa."
   },
   "presets": {
     "title": "Predefinições",
@@ -711,9 +738,11 @@
     "checked": "Verificado, ainda nada importado.",
     "imported": "Importado.",
     "counts": "{rows} linhas: {created} novas, {updated} alteradas, {unchanged} iguais, {skipped} ignoradas, {refused} recusadas.",
+    "counts_one": "{rows} linha: novas {created}, alteradas {updated}, iguais {unchanged}, ignoradas {skipped}, recusadas {refused}.",
     "ignored": "Colunas não lidas: {names}",
     "more": "e mais {n}",
     "missing": "{n} pessoas importadas que ainda não chegaram não estão neste ficheiro (ficam).",
+    "missing_one": "{n} pessoa importada que ainda não chegou não está neste ficheiro (fica).",
     "row": "Linha",
     "result": "Resultado",
     "line": "linha {n}",
@@ -826,8 +855,18 @@
       "remove_confirm": "Retirar {id} ({name}) da lista de marshals? A app deixa de ser de marshal logo, e as medições por enviar são recusadas até voltares a acrescentar.",
       "removed": "{id} saiu da lista de marshals."
     },
-    "card_seen": "cartão visto",
+    "card_seen": "cartão visto, confere",
     "not_checked": "não verificado",
+    "confirm_no_card": "Admitir sem o cartão",
+    "waits_card": "à espera da verificação do cartão",
+    "card_by": "cartão verificado por {who}, {when}",
+    "verdict_on": "{verdict} em {date}",
+    "number_erased": "número apagado após a verificação do cartão",
+    "apd_override_no_card": "admitido sem o cartão",
+    "position_shared": "partilha a posição",
+    "share_position": "Partilhar a minha posição com o jogo durante este jogo",
+    "share_position_hint": "Opção separada e desmarcada, salvo se a pessoa concordar. A equipa ou o squad (conforme o modo permitir), os marshals e o GM veem-na; o GM remoto só se o campo o ativar. Dizer que não não muda mais nada. Pode deixar de partilhar a qualquer momento.",
+    "card_why": "O campo tem de conferir o cartão físico com os dados escritos de antemão (art. 6.º, n.º 1, al. c), do RGPD nos campos em Portugal; al. f) nos restantes).",
     "remove": "Retirar",
     "manual": "Check-in à mão",
     "manual_hint": "Para quem não tem a app: o controlador cria o identificador, que se pode gravar numa etiqueta de jogador.",
@@ -872,7 +911,7 @@
     "valid_for": "Uma cronografagem vale",
     "valid_for_day": "o dia todo",
     "valid_for_game": "só este jogo",
-    "federation_note": "O número de federado nunca é verificado automaticamente: «obrigatório» só impede o envio sem ele. Marca «cartão visto» depois de ver o cartão.",
+    "federation_note": "O número nunca é verificado automaticamente. Onde a regra da APD do campo verifica no check-in, quem joga fica pendente até comparares o cartão físico com o que escreveu e marcares «cartão visto, confere»; o número é então apagado e ficam o resultado, a data e o teu identificador.",
     "apd_title": "Filiação numa APD",
     "apd_checkin": "Verificar a filiação na APD no check-in",
     "apd_expiry": "Pedir a data de validade e verificá-la",
@@ -932,6 +971,7 @@
     "schedule_create": "Criar o jogo",
     "schedule_made": "já criado: jogo {ids}",
     "schedule_registered": "{n} inscrições",
+    "schedule_registered_one": "{n} inscrição",
     "problems": {
       "https_off": "O HTTPS está desligado no controlador ([api] tls_port = 0): o cartaz precisa do certificado do campo.",
       "no_address": "O cartaz não tem nenhum endereço https do controlador: indica os endereços abaixo, [checkin] urls ou [api] tls_names.",
@@ -960,6 +1000,7 @@
     "intro": "Imprime esta página: uma etiqueta de 30 × 30 mm por réplica, para recortar e colar. O código leva só a etiqueta da réplica (ATL- e oito caracteres), nada sobre quem joga. A app do marshal lê-o na lista do cronógrafo.",
     "print": "Imprimir",
     "count": "{n} etiquetas",
+    "count_one": "{n} etiqueta",
     "qr_label": "Etiqueta QR {code}"
   },
   "branding": {
@@ -1025,7 +1066,8 @@
     "ok": "Sem problemas: o field.lua gerado carrega no núcleo.",
     "ok_no_core": "Sem problemas no manifesto (o núcleo não está carregado neste controlador).",
     "ok_warnings": "Sem erros, com avisos:",
-    "has_errors": "{n} erro(s): corrige antes de instalar.",
+    "has_errors": "{n} erros: corrige-os antes de instalar.",
+    "has_errors_one": "{n} erro: corrige-o antes de instalar.",
     "whole": "(manifesto)",
     "levels": {
       "error": "Erro",
@@ -1238,7 +1280,8 @@
     "scan": "Procurar caixas",
     "scanning": "A procurar…",
     "none": "Nenhuma caixa encontrada. Verifica o cabo (de dados, não só de carga) e se a caixa está ligada.",
-    "silent": "{n} porta(s) não responderam",
+    "silent": "{n} portas não responderam",
+    "silent_one": "{n} porta não respondeu",
     "busy": "tem um jogo: termina-o primeiro",
     "locked": "demasiados PIN errados: espera {min} min (reiniciar não encurta a espera)",
     "adopt": "Adotar",
@@ -1320,6 +1363,7 @@
     "body": "Quem joga faz o check-in lendo o cartaz do campo. Se ainda não está afixado, imprime-o antes de as pessoas chegarem para «{game}». É o mesmo para todos os jogos.",
     "countdown": "Fecha em {n} s",
     "announce": "Esta mensagem fecha-se sozinha em {n} segundos.",
+    "announce_one": "Esta mensagem fecha-se sozinha em {n} segundo.",
     "never": "Não mostrar outra vez",
     "open": "Abrir a página do cartaz",
     "close": "Fechar",
@@ -1329,7 +1373,8 @@
     "resume": "Retomar a contagem",
     "paused": "Em pausa: fica aberta até a fechares",
     "announce_paused": "Contagem em pausa.",
-    "announce_resumed": "Contagem retomada: faltam {n} segundos."
+    "announce_resumed": "Contagem retomada: faltam {n} segundos.",
+    "announce_resumed_one": "Contagem retomada: falta {n} segundo."
   },
   "invites": {
     "open": "Convidar caixas",
@@ -1384,8 +1429,26 @@
     "start_question": "Rever primeiro as outras definições do jogo?",
     "review": "Rever definições",
     "start_now": "Começar agora",
-    "pending_note": "Há {n} réplica(s) declarada(s) por cronografar.",
+    "pending_note": "Há {n} réplicas declaradas por cronografar.",
+    "pending_note_one": "Há {n} réplica declarada por cronografar.",
     "back": "Voltar"
+  },
+  "clock": {
+    "wrong": "O relógio do controlador está errado.",
+    "reason_before_release": "Indica {now}, antes de esta versão do programa existir ({floor}). Um Raspberry Pi 4 não tem relógio próprio e, depois de um corte de energia, arranca com uma hora antiga.",
+    "reason_behind_records": "Indica {now}, antes de dados que já guardou ({floor}).",
+    "hint_gm": "As datas, os códigos e os certificados dependem dele, e nada é apagado enquanto não estiver certo. Se a hora deste dispositivo estiver certa, acerta-se a partir dele:",
+    "hint_read": "Peça-se à organização do jogo que o acerte a partir da consola.",
+    "set": "Acertar o relógio do controlador por este dispositivo",
+    "set_done": "O relógio do controlador é agora {time}.",
+    "wrong_short": "(errado)",
+    "title": "Relógio do controlador",
+    "intro": "Em campo, o controlador não tem internet. Um Raspberry Pi 4 não tem relógio próprio e, depois de um corte de energia, arranca com a hora do último desligar (ou 1970); um Pi 5 só mantém a hora com a sua bateria. Os jogos e os temporizadores não dependem dele; as datas, os códigos de quem joga, os certificados e o apagar de dados antigos dependem.",
+    "controller_time": "Hora do controlador",
+    "device_time": "Hora deste dispositivo",
+    "jump": "O relógio saltou {seconds} s às {time}. Os temporizadores não são afetados.",
+    "forward_only": "Só avança: nunca para antes dos dados mais recentes que o controlador guarda, e nunca mais de 14 dias de cada vez quando já parece certo.",
+    "read_only": "Só a organização do jogo o acerta."
   },
   "box_language": {
     "title": "Língua das caixas",
@@ -1583,6 +1646,66 @@
       "unavailable": "recusado: indisponível",
       "failed": "falhou"
     }
+  },
+  "access_tokens": {
+    "title": "Códigos de acesso temporários",
+    "intro": "Dá ao telemóvel de um árbitro, a um GM visitante, a um teste automático ou a um ecrã de espetadores um código próprio, em vez do código do GM ou do código só de leitura. Cada código tem um nome, diz o que pode fazer, deixa de funcionar sozinho passado o tempo escolhido (7 dias, no máximo) e pode ser revogado de imediato. Um código feito aqui não pode fazer outros códigos.",
+    "label": "Nome",
+    "label_hint": "Árbitro Ana, sábado",
+    "scope": "Pode fazer",
+    "scopes": {
+      "read": "Só ler",
+      "marshals": "Ler e gerir marshals",
+      "gm": "GM completo"
+    },
+    "scope_help": {
+      "read": "Como o código só de leitura: acompanhar o jogo, sem mudar nada.",
+      "marshals": "Só de leitura, mais juntar, mudar e retirar marshals. Mais nada.",
+      "gm": "Tudo o que o código do GM faz, exceto fazer códigos de acesso."
+    },
+    "lifetime": "Válido durante",
+    "lifetimes": {
+      "1h": "1 hora",
+      "4h": "4 horas",
+      "8h": "8 horas (um dia de jogo)",
+      "1d": "1 dia",
+      "3d": "3 dias",
+      "7d": "7 dias (o máximo)"
+    },
+    "game": "Jogo",
+    "all_games": "Qualquer jogo",
+    "game_help": "Limita a um só jogo o que o código pode mudar. As listas de jogos e o feed em direto continuam a mostrar todos os jogos.",
+    "create": "Fazer código de acesso",
+    "made": "Código de acesso “{label}” feito.",
+    "once": "Copia-o agora: só aparece esta vez e não se pode voltar a consultar, só revogar.",
+    "summary": "{scope}, válido até {until}.",
+    "summary_game": "Só o jogo {game}.",
+    "address": "Endereço do controlador",
+    "qr_label": "Código QR que inicia sessão num telemóvel com o novo código de acesso",
+    "qr_help": "Lê-o com a câmara do telemóvel para abrir a consola (o marcador, no caso de um código só de leitura) com a sessão já iniciada. Mostra-o só a quem for usá-lo: quem o tiver pode agir com ele até expirar ou ser revogado.",
+    "no_link": "Este controlador ainda não tem nenhum endereço para pôr num código QR: vê os endereços do cartaz de check-in. Escreve o código à mão.",
+    "done": "Concluído",
+    "empty": "Não há códigos de acesso.",
+    "list": "Códigos de acesso",
+    "expires": "Termina",
+    "last_used": "Última utilização",
+    "status": "Estado",
+    "statuses": {
+      "active": "Ativo",
+      "expired": "Expirado",
+      "revoked": "Revogado"
+    },
+    "revoke": "Revogar",
+    "confirm_revoke": "Revogar “{label}”? Deixa de funcionar de imediato.",
+    "activity": "Atividade recente",
+    "audit": {
+      "created": "feito",
+      "used": "utilizado",
+      "refused": "recusado",
+      "revoked": "revogado",
+      "expired": "expirado"
+    },
+    "failed": "Não foi possível carregar a lista."
   },
   "scoreboard_share": {
     "title": "Partilhar o marcador com quem joga",

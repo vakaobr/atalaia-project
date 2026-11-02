@@ -6,6 +6,13 @@
 #   sudo systemctl enable --now atalaia-controller
 # Assumes the repository at /opt/atalaia and the core library built into
 # /opt/atalaia/build (cmake -S core -B build -DATALAIA_SHARED=ON).
+#
+# Hardened (security review SC-7). The only thing the service writes is its state folder: the database,
+# the field CA and server certificate (tls/), the firmware images (firmware/) and Mosquitto's copy of the
+# certificate (mqtt-tls/), all under /var/lib/atalaia. If [controller] db_path points elsewhere, put that
+# folder in ReadWritePaths. Files the service only reads (the settings in /etc/atalaia, the ATAK TLS files,
+# the repository in /opt/atalaia) must not be under /home: ProtectHome hides it. `systemd-analyze security
+# atalaia-controller` shows the result.
 
 [Unit]
 Description=Atalaia field controller
@@ -17,9 +24,40 @@ User=atalaia
 Group=dialout
 WorkingDirectory=/opt/atalaia/controller
 Environment=ATALAIA_CORE_LIB=/opt/atalaia/build/libatalaia_core.so
+# /opt/atalaia is read-only to the service: no __pycache__ is written there.
+Environment=PYTHONDONTWRITEBYTECODE=1
 ExecStart=/usr/bin/python3 -m atalaia_controller run --config /etc/atalaia/controller.toml
 Restart=always
 RestartSec=2
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/atalaia
+ProtectHome=yes
+PrivateTmp=yes
+# Sockets: the API and the console (TCP), MQTT and the site server (TCP), ATAK (UDP and TCP), the radio
+# modem's "socket://" bridge (TCP); AF_NETLINK for the resolver and the address lookups; AF_UNIX for logging.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+# The radio modem and the Field Boxes' USB cables (adoption) are serial ports: /dev/ttyACM* (the ESP32-S3
+# boards' own USB) and /dev/ttyUSB* (USB-serial bridges). The user's group, dialout, owns them, so the
+# access still works; DevicePolicy=closed keeps every other device (disks, cameras, ...) out of reach.
+DevicePolicy=closed
+DeviceAllow=char-ttyACM rw
+DeviceAllow=char-ttyUSB rw
+# Ports above 1023 only (8080, 8443): no capability is needed.
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+LockPersonality=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+# Not MemoryDenyWriteExecute: Python's ctypes (the core library) needs executable memory for its callbacks.
 
 [Install]
 WantedBy=multi-user.target

@@ -157,7 +157,8 @@ class RadioModem:
 
     def set_peer_epochs(self, epochs: dict[int, int]) -> None:
         """Tells the modem each box's last known epoch (also resent after a reconnect)."""
-        self._peers.update(epochs)
+        for node, epoch in epochs.items():  # never backwards (SR-111): what is resent is the highest
+            self._peers[node] = max(epoch, self._peers.get(node, 0))
         pairs = sorted(epochs.items())
         for i in range(0, len(pairs), 60):  # 60 pairs = 241 bytes, under the 256-byte limit
             self._write(mf.CMD, mf.peer_epoch_payload(pairs[i:i + 60]))

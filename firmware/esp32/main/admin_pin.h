@@ -115,4 +115,17 @@ bool admin_pin_command(admin_pin_t *a, const char *cmd, char *reply, size_t cap)
  */
 bool admin_pin_setup_command(admin_pin_t *a, const char *cmd, char *reply, size_t cap, bool *go);
 
+/*
+ * The PIN gate of the serial commands that change what the box trusts or runs ("@joinkey <hex>",
+ * "@update <version> <id>"; decision SR-40). cmd is the line without the '@', edited in place;
+ * args is how many words follow the command name. A release build (open false) needs the admin
+ * PIN as one more word after them: it is checked as any other (counted, with its waits) and
+ * cut off, so the caller goes on with the ungated line, and returns true. Without the PIN, with
+ * a wrong one, while locked or while no PIN is set it returns false and *reply holds one line.
+ * A bench build (open true: CONFIG_ATALAIA_SERIAL_KEYS, whose console the bench scripts drive)
+ * takes the line as it is, and cuts an extra PIN word off without checking it. Words beyond that
+ * are refused in both.
+ */
+bool admin_pin_gate_serial(admin_pin_t *a, bool open, char *cmd, int args, char *reply, size_t cap);
+
 #endif /* ATALAIA_ADMIN_PIN_H */

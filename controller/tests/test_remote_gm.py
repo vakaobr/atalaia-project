@@ -659,7 +659,7 @@ class SettingsTests(unittest.TestCase):
                 bundle = build(cfg, core=CORE, load_core_lib=False)
                 try:
                     self.assertEqual(bundle.remote is not None, on or library)
-                    client = TestClient(bundle.app)  # no lifespan: nothing connects to the site server
+                    client = TestClient(bundle.app, base_url="https://testserver")  # no lifespan: nothing connects to the site server
                     self.assertEqual(client.get("/api/v1/remote-gm", headers=READ).status_code, 403)
                     body = client.get("/api/v1/remote-gm", headers=GM).json()
                     self.assertEqual((body["enabled"], body["log"]), (on, []))

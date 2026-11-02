@@ -64,7 +64,7 @@ def ask(ws: WebSocket, msg: dict) -> dict:
 
 def https_checks(client: httpx.Client) -> None:
     r = client.get(f"https://{HOST}/api/v1/health")
-    check(r.status_code == 200 and r.json().get("status") == "healthy",
+    check(r.status_code == 200 and r.json().get("status") == "ok",
           f"GET /api/v1/health over HTTPS: {r.status_code}")
     check(r.http_version in ("HTTP/1.1", "HTTP/2"), f"answered over {r.http_version}")
     h = r.headers

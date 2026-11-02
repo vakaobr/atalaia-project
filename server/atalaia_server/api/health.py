@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """``GET /api/v1/health`` (public) and ``GET /api/v1/metrics`` (administrators), ADR-P4-10.
 
-Health answers 200 ``{"status": "healthy", "database": "connected", ...}``
-when PostgreSQL answers, and 503 with ``"unhealthy"`` and
-``"unreachable"`` when it does not, so an uptime monitor or the container's
-health check sees an outage. Metrics need ``Authorization: Bearer`` with a
+Health answers 200 ``{"status": "ok"}`` when PostgreSQL answers and 503
+``{"status": "unhealthy"}`` when it does not, so an uptime monitor or the
+container's health check sees an outage; nothing else is public (LIVE-3: the
+version and the uptime help an attacker pick an exploit; they and the database
+state are in the metrics). Metrics need ``Authorization: Bearer`` with a
 server administrator's access token from a login that passed TOTP (plan
 phase 11, decision S10-2), or with ATALAIA_METRICS_TOKEN when one is set,
 for a monitoring system that cannot log in (decision S11-9): 401 without
@@ -41,12 +42,7 @@ def _uptime(request: Request) -> int:
 async def health(request: Request) -> JSONResponse:
     settings = request.app.state.settings
     up = await ping(request.app.state.engine, settings.db_timeout_s)
-    body = {
-        "status": "healthy" if up else "unhealthy",
-        "database": "connected" if up else "unreachable",
-        "version": __version__,
-        "uptime_s": _uptime(request),
-    }
+    body = {"status": "ok" if up else "unhealthy"}
     return JSONResponse(body, status_code=200 if up else 503, headers={"Cache-Control": "no-store"})
 
 

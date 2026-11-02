@@ -247,7 +247,8 @@ the pod are not updated that way). Check what you downloaded against `SHA256SUMS
 
 Guides: [Firmware guide]({base}/blob/{args.tag}/docs/manuals/en/firmware.md) (download, flash, build it yourself) ·
 [Release signing]({base}/blob/{args.tag}/firmware/esp32/docs/RELEASE_SIGNING.md) ·
-[Controller setup]({base}/blob/{args.tag}/docs/manuals/en/controller-setup.md)
+[Controller setup]({base}/blob/{args.tag}/docs/manuals/en/controller-setup.md) ·
+[Set up the radio modem]({base}/blob/{args.tag}/docs/manuals/en/modem.md)
 
 ## What is in this release
 

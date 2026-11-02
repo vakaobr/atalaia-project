@@ -34,7 +34,7 @@ class OidcTestCase(unittest.IsolatedAsyncioTestCase):
         key_file = Path(self.dir.name) / "AuthKey.p8"
         key_file.write_bytes(apple_key_pem())
         self.now = time.time()
-        self.settings = Settings(database_url=DB, secret_key="s" * 43, oidc=(
+        self.settings = Settings(allow_signup_without_notice=True, database_url=DB, secret_key="s" * 43, oidc=(
             OidcClient("google", "google-id", client_secret="google-secret"),
             OidcClient("microsoft", "ms-id", client_secret="ms-secret", tenant="common"),
             OidcClient("apple", "apple.services.id", team_id="TEAM123456", key_id="KEY1234567",
@@ -106,7 +106,7 @@ class ValidationTests(OidcTestCase):
                                 ("organizations", "tenant-1", True), ("organizations", oidc.MSA_TENANT, False),
                                 (TENANT_A, TENANT_A, True), (TENANT_A, "tenant-2", False)):
             with self.subTest(tenant=tenant, tid=tid):
-                service = oidc.OidcService(Settings(database_url=DB, secret_key="s" * 43, oidc=(
+                service = oidc.OidcService(Settings(allow_signup_without_notice=True, database_url=DB, secret_key="s" * 43, oidc=(
                     OidcClient("microsoft", "ms-id", client_secret="x", tenant=tenant),)), http=self.idp)
                 claims = self.idp.claims("microsoft", "ms-id", "s", NONCE, tid=tid,
                                          iss=f"https://login.microsoftonline.com/{tid}/v2.0")
@@ -246,7 +246,7 @@ class ConfigTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "k.p8"
             path.write_text("not a key")
-            settings = Settings(database_url=DB, secret_key="s" * 43, oidc=(
+            settings = Settings(allow_signup_without_notice=True, database_url=DB, secret_key="s" * 43, oidc=(
                 OidcClient("apple", "a", team_id="t", key_id="k", key_file=str(path)),))
             with self.assertRaisesRegex(ConfigError, "PEM private key"):
                 oidc.OidcService(settings)

@@ -160,7 +160,7 @@ class HubCase(unittest.IsolatedAsyncioTestCase):
         super().tearDownClass()
 
     def settings(self, url: Optional[str] = None) -> Settings:
-        return Settings(database_url=url or self.hub.app_url, secret_key=SECRET_KEY, metrics_token=METRICS_TOKEN,
+        return Settings(allow_signup_without_notice=True, database_url=url or self.hub.app_url, secret_key=SECRET_KEY, metrics_token=METRICS_TOKEN,
                         db_timeout_s=2.0, purge_hour=None, hosted=True, hosted_domain=DOMAIN,
                         db_pool_size=self.pool_size, db_max_overflow=0)
 
@@ -268,7 +268,7 @@ class RoutingTests(HubCase):
         self.assertEqual(r.status_code, 401)  # found (case and port do not matter), then asks for a login
         # The health check needs no field: the container calls 127.0.0.1.
         r = await self.client("", "127.0.0.1:8000").get("/api/v1/health")
-        self.assertEqual((r.status_code, r.json()["database"]), (200, "connected"))
+        self.assertEqual((r.status_code, r.json()), (200, {"status": "ok"}))
 
     async def test_slugs_and_hosts(self) -> None:
         self.assertEqual(tenancy.schema_for("campo-a"), "field_campo_a")
@@ -298,7 +298,7 @@ class RoutingTests(HubCase):
         self.assertEqual((await self.login(self.b, "ana", password="another password 4 B!")).status_code, 200)
         # Registration in one field makes no account in the other.
         r = await self.b.post("/api/v1/auth/register", json={"username": "rui", "password": PASSWORD,
-                                                             "consent": True})
+                                                             "notice_seen": True, "age_confirmed": True})
         self.assertEqual(r.status_code, 201, r.text)
         self.assertEqual(len(await self.sql(self.ta, "SELECT 1 FROM users WHERE username = 'rui'")), 0)
         self.assertEqual(len(await self.sql(self.tb, "SELECT 1 FROM users WHERE username = 'rui'")), 1)
@@ -546,6 +546,25 @@ class SurfaceTests(HubCase):
                          1)
         self.assertEqual(len(await self.sql(self.tb, "SELECT 1 FROM users WHERE username = 'chefe-a'")), 0)
 
+    async def test_set_password_is_scoped_to_the_field(self) -> None:
+        """SP-1: ``set-password`` needs ``--field`` in hosted mode and touches only that field's account."""
+        await self.user(self.ta, "sp-marta")
+        await self.user(self.tb, "sp-marta")
+        new = "a long new passphrase 42"
+        with self.assertRaises(cli.CommandError):
+            await cli.set_password(self.settings(), "sp-marta", new, "x", True, input, io.StringIO())
+        with self.assertRaises(cli.CommandError):
+            await cli.set_password(self.settings(), "sp-marta", new, "x", True, input, io.StringIO(), field="campo-z")
+        user_id = await cli.set_password(self.settings(), "sp-marta", new, "no password", True, input, io.StringIO(),
+                                         field="campo-a", actor="system:operator")
+        row_a = (await self.sql(self.ta, "SELECT id, password_hash FROM users WHERE username = 'sp-marta'"))[0]
+        row_b = (await self.sql(self.tb, "SELECT password_hash FROM users WHERE username = 'sp-marta'"))[0]
+        self.assertEqual(row_a["id"], user_id)
+        self.assertTrue(await passwords.verify_password(row_a["password_hash"], new))
+        self.assertTrue(await passwords.verify_password(row_b["password_hash"], PASSWORD))
+        self.assertEqual(len(await self.sql(self.ta, "SELECT 1 FROM audit_log WHERE action = 'password_set'")), 1)
+        self.assertEqual(len(await self.sql(self.tb, "SELECT 1 FROM audit_log WHERE action = 'password_set'")), 0)
+
 
 # Row-level security and the fields' database roles, directly as the server's login role ---------------------
 
@@ -707,6 +726,7 @@ class RowSecurityTests(HubCase):
             "set role": "SET ROLE {owner}",
             "sharing tables": "SELECT * FROM public.atalaia_share_members",
             "sharing function": "SELECT * FROM public.atalaia_share_read(ARRAY[gen_random_uuid()], 5)",
+            "peers function": "SELECT * FROM public.atalaia_share_peers(gen_random_uuid())",
             "grant to itself": "GRANT SELECT ON {s}.users TO CURRENT_USER",
         }
         try:
@@ -818,7 +838,7 @@ class StartTests(HubCase):
         database = TempDatabase()
         await asyncio.to_thread(database.create)
         try:
-            app = create_app(Settings(database_url=database.url, secret_key=SECRET_KEY, purge_hour=None))
+            app = create_app(Settings(allow_signup_without_notice=True, database_url=database.url, secret_key=SECRET_KEY, purge_hour=None))
             async with app.router.lifespan_context(app):
                 async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
                                              base_url=f"https://campo-a.{DOMAIN}") as client:
@@ -885,7 +905,7 @@ class OperatorTests(HubCase):
                                                          "WHERE username = 'alfa-player'")
             self.assertEqual([tuple(r) for r in rows], [("alfa-player", False)])
             self.assertEqual(await asyncio.to_thread(target.fetch, "SELECT 1 FROM sessions"), [])
-            app = create_app(Settings(database_url=target.url, secret_key="another server's own secret key 0123456",
+            app = create_app(Settings(allow_signup_without_notice=True, database_url=target.url, secret_key="another server's own secret key 0123456",
                                       purge_hour=None))
             async with app.router.lifespan_context(app):
                 async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
@@ -1088,6 +1108,8 @@ class HubCheckTests(HubCase):
             ("ALTER FUNCTION public.atalaia_share_redeem(bytea) RESET search_path", "no fixed search_path"),
             (f"REVOKE EXECUTE ON FUNCTION public.atalaia_share_redeem(bytea) FROM {ra}", "cannot run"),
             (f"REVOKE EXECUTE ON FUNCTION public.atalaia_caller_tenant() FROM {rb}", "cannot run"),
+            (f"REVOKE EXECUTE ON FUNCTION public.atalaia_share_peers(uuid) FROM {ra}", "cannot run"),
+            ("GRANT EXECUTE ON FUNCTION public.atalaia_share_peers(uuid) TO PUBLIC", "can be run by anyone"),
             (f"GRANT EXECUTE ON FUNCTION public.atalaia_share_redeem(bytea) TO {app}", f"{app} can run"),
         ]
         for statement, problem in breaks:

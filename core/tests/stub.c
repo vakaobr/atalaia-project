@@ -345,6 +345,7 @@ const char *atalaia_stub_layout(void)
     u = append(buf, u, "," LAYOUT_FIELD(atalaia_node_config_t, alloc));
     u = append(buf, u, "," LAYOUT_FIELD(atalaia_node_config_t, alloc_ud));
     u = append(buf, u, "," LAYOUT_FIELD(atalaia_node_config_t, field_ops));
+    u = append(buf, u, "," LAYOUT_FIELD(atalaia_node_config_t, rand_key));
     u = append(buf, u, "}},");
     u = append(buf, u, LAYOUT_HEAD(atalaia_score_t));
     u = append(buf, u, LAYOUT_FIELD(atalaia_score_t, gained));

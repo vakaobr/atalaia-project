@@ -9,7 +9,7 @@ steps:
   - keys: "11#"
   - expect: { type: code.used, team: red, data: { code: "1", kind: points, amount: 50 } }
   - expect_score: { team: red, points: 50 }
-  - expect_screen: { template: code_entry, data: { message: +50 points for RED, error: false } }
+  - expect_screen: { template: code_entry, data: { message: "Points for RED: +50", error: false } }
   - keys: "4711#"
   - expect_screen: { template: code_entry, data: { message: Code already used, error: true } }
   - expect_no: code.used

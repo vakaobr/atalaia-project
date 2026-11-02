@@ -8,9 +8,12 @@
 /// Android it is an AES-256-GCM key made inside the AndroidKeyStore
 /// (non-exportable; no user-authentication requirement, so the foreground
 /// service and a boot-time start still work), reached through the
-/// `org.atalaia.app/keystore` channel (KeystorePlugin.kt). Where the plugin
-/// does not exist (iOS, tests), [available] is false and the store keeps its
-/// earlier behaviour.
+/// `org.atalaia.app/keystore` channel (KeystorePlugin.kt). On iOS the same
+/// channel and sealed format are answered by KeychainVaultPlugin.swift: an
+/// AES-256 key in the Keychain, readable after the first unlock, on this
+/// device only (decisions IOSK-1 to IOSK-6). Where the plugin does not exist
+/// (the host, tests), [available] is false and the store keeps its earlier
+/// behaviour.
 library;
 
 import 'dart:typed_data';

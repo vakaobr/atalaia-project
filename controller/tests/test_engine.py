@@ -453,10 +453,10 @@ class FieldScriptTests(EngineCase):
         self.modem.sent.clear()
         self.rx(4, 0, "STATE", state(1, {}), epoch=1)
         self.rx(5, 0, "STATE", state(2, {}), epoch=1)
-        self.rx(4, 1, "EVENT", ev(4, 1, 100, "zone.captured", team=1))
+        self.rx(4, 1, "EVENT", ev(4, 1, 100, "zone.captured", team=1), epoch=1)
         self.assertEqual(self.modem.of("CMD"), [])  # owners differ
         self.rx(5, 1, "STATE", state(1, {}), epoch=1)
-        self.rx(5, 2, "EVENT", ev(5, 1, 200, "zone.captured", team=1))
+        self.rx(5, 2, "EVENT", ev(5, 1, 200, "zone.captured", team=1), epoch=1)
         log = self.ctrl.log(gid)
         allheld = [e for e in log if e["type"] == "x.atalaia.allheld"]
         self.assertEqual(len(allheld), 1)

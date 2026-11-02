@@ -495,7 +495,7 @@ The explosion is its own timer rather than a countdown in the display tick, so i
 
 - No `io`, `os`, `require` of arbitrary files, or network access.
 - Per-script memory cap (256 KB on Full-tier ESP32 nodes, about 64 KB on Reduced tier) and an instruction-count watchdog; a runaway script is stopped and the node falls back to a safe "paused" screen.
-- Randomness only through `rand`, seeded per game, so a game log can be replayed exactly.
+- Randomness only through `rand`, seeded per game from the game's secret key, the game seed and the node id (`atalaia/rand/v1`, HMAC-SHA256: the seed and node ids are public, so the key must be in it), so a game can be replayed exactly by whoever holds the key and predicted by nobody else.
 
 ### Simulator and tests
 

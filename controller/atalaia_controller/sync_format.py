@@ -543,6 +543,8 @@ def check_chrono(body: Any) -> dict[str, Any]:
 
 MAX_SCHEDULE = 200          # scheduled games in one schedule answer
 MAX_ROSTER = 5000           # registrations in one roster answer or check-ins body (the controller's max_players)
+MAX_REVOKED = 1000          # players in a schedule answer's ``copies_revoked`` (PRIV-5; the newest within the retention)
+REVOKE_REASONS = ("erasure", "withdrawn")
 MAX_SHARED = 100            # other fields' records of one player in a shared-chrono answer (the newest)
 MAX_CLAIMS = 500           # player id claims per answer or body
 MAX_DECLARATIONS = 20       # a registration's pre-declared replicas (the controller's max_replicas bound)
@@ -582,7 +584,7 @@ def _answer_envelope(body: Any, required: tuple[str, ...], optional: tuple[str, 
 
 def check_schedule(body: Any) -> dict[str, Any]:
     """GET /api/v1/sync/schedule's answer: the field's published scheduled games of the coming days."""
-    body = _answer_envelope(body, ("games",))
+    body = _answer_envelope(body, ("games",), ("copies_revoked",))
     seen: set[str] = set()
     for i, g in enumerate(_list(body["games"], "games", MAX_SCHEDULE)):
         path = f"games[{i}]"
@@ -612,6 +614,21 @@ def check_schedule(body: Any) -> dict[str, Any]:
         _text(g.setdefault("mode_id", None), f"{path}.mode_id", 128, null=True, pattern=MODE_ID)
         _int(g.setdefault("max_players", None), f"{path}.max_players", 1, 10000, null=True)
         _text(g.setdefault("location", None), f"{path}.location", 512, null=True)
+    # PRIV-5: the field's players whose pulled copies of other fields' chrono records are to be dropped (the person
+    # erased their account, or withdrew a field's chrono-sharing consent). A server that has none leaves the key out.
+    revoked = _list(body.setdefault("copies_revoked", []), "copies_revoked", MAX_REVOKED)
+    seen_pairs: set[tuple[str, str]] = set()
+    for i, r in enumerate(revoked):
+        path = f"copies_revoked[{i}]"
+        r = _obj(r, path)
+        _keys(r, path, ("player_id", "reason", "at"))
+        _text(r["player_id"], f"{path}.player_id", 64, pattern=PLAYER_ID)
+        if r["reason"] not in REVOKE_REASONS:
+            _fail("bad_value", f"{path}.reason")
+        _num(r["at"], f"{path}.at", 0, TIME_MAX)
+        if (r["player_id"], r["reason"]) in seen_pairs:
+            _fail("duplicate_player", f"{path}.player_id")
+        seen_pairs.add((r["player_id"], r["reason"]))
     return body
 
 

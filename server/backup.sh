@@ -80,7 +80,7 @@ echo "$$" > "$lock/pid"
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 out="$backup_dir/atalaia-$stamp.backup"
 tmp="$out.partial"
-trap 'rm -rf "$lock" "$tmp"' EXIT
+trap 'rm -rf "$lock" "$tmp" "$backup_dir/erasures-ledger.jsonl.partial"' EXIT
 trap 'exit 130' INT TERM
 [ ! -e "$out" ] || fail "$out exists already"
 
@@ -104,6 +104,20 @@ if [ "$hosted" = on ]; then
     echo "backup.sh: $out ($size bytes, encrypted; the hosted hub: every field, the registry, the hub's audit log)"
 else
     echo "backup.sh: $out ($size bytes, encrypted)"
+fi
+
+# The erasure ledger (PRIV-4): the file the server appends to when an account or a player's records are erased, in a
+# volume outside the database. Copied next to the backups (hashes only, no personal data; mode 0600) so that a lost
+# machine does not lose it; restore.sh merges it back and applies it again. Never pruned: it is needed as long as any
+# older backup exists (it grows by about 150 bytes per erasure).
+ledger="$backup_dir/erasures-ledger.jsonl"
+if dc run --rm -T ledger-tool export > "$ledger.partial"; then
+    chmod 600 "$ledger.partial"
+    mv "$ledger.partial" "$ledger"
+    echo "backup.sh: $ledger ($(wc -l < "$ledger" | tr -d ' ') erasures)"
+else
+    rm -f "$ledger.partial"
+    fail "the backup is complete but the erasure ledger could not be copied next to it ($ledger)"
 fi
 
 for old in "$backup_dir"/atalaia-*.backup; do

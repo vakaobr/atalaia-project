@@ -238,7 +238,7 @@ class _ControllerImportScreenState extends State<ControllerImportScreen> {
       children: [
         Notice(
           '${s.t(dry ? 'ctl_import.checked' : 'ctl_import.imported')} '
-          '${s.t('ctl_import.counts', {'rows': r['rows'], 'created': c['created'], 'updated': c['updated'], 'unchanged': c['unchanged'], 'skipped': c['skipped'], 'refused': c['refused']})}',
+          '${s.t('ctl_import.counts', {'n': r['rows'], 'rows': r['rows'], 'created': c['created'], 'updated': c['updated'], 'unchanged': c['unchanged'], 'skipped': c['skipped'], 'refused': c['refused']})}',
           kind: NoticeKind.ok,
         ),
         if (ignored.isNotEmpty)

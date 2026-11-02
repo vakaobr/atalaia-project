@@ -185,6 +185,8 @@ async def _games(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dict
     if meta["scheduled_game_id"] is not None:
         answer["scheduled"] = await registration.link_game(db, caller.field_id, meta["scheduled_game_id"], row[0],
                                                           row[1])
+    if row[1] == "ended":
+        await registration.erase_numbers(db, row[0])  # the game is over: no copy of a number stays (LEG-5)
     return answer
 
 
@@ -200,6 +202,7 @@ async def _events(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dic
     inserted = len((await db.execute(stmt)).all())
     if any(e["type"] == "game.end" for e in body["events"]) and game.state != "ended":
         await db.execute(update(Game).where(Game.id == game.id).values(state="ended", updated_at=func.now()))
+        await registration.erase_numbers(db, game.id)
     return {"acked_id": body["events"][-1]["id"], "inserted": inserted, "duplicates": len(rows) - inserted}
 
 

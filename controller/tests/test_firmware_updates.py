@@ -344,6 +344,7 @@ class UpdateTests(FirmwareCase):
         r = self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM, json={"force": True})
         self.assertEqual(r.status_code, 409)
         self.assertIn("firmware", r.json()["detail"])
+        self.assertIn("on their way to box 4:", r.json()["detail"])  # one box: "box 4", not "box(es) 4"
         # The box reports, signed with the game key; then its HELLO shows the new version.
         self.assertEqual(self.report(game, 4, self.rel["id"], "installed", "0.3.0").json(), {"accepted": True})
         self.assertEqual(self.fw.updates()[0]["state"], "installed")

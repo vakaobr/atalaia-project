@@ -41,6 +41,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from . import firmware_release as fr
+from . import wallclock
 from .engine import Conflict, Controller, ControllerError, NotFound, Unavailable
 
 log = logging.getLogger("atalaia.firmware")
@@ -62,7 +63,7 @@ class FirmwareUpdates:
     """The releases the GM uploaded, and the updates sent to the live game's boxes."""
 
     def __init__(self, controller: Controller, directory: Path, keys: list[str], timeout_s: float = 600.0,
-                 clock: Callable[[], float] = time.time, variants: Optional[list[str]] = None) -> None:
+                 clock: Callable[[], float] = time.monotonic, variants: Optional[list[str]] = None) -> None:
         self.controller = controller
         self.variants = tuple(variants or VARIANTS)
         self.dir = Path(directory)
@@ -150,7 +151,7 @@ class FirmwareUpdates:
                 raise Conflict(f"at most {MAX_RELEASES} releases are kept: delete one first")
             entry = {"platform": platform, "version": version, "size": len(image), "sha256": sha,
                      "signature": signature, "variant": info.variant, "board": info.board, "layout": info.layout,
-                     "uploaded_at": round(self.clock(), 3)}
+                     "uploaded_at": round(wallclock.now(), 3)}
             _write(self.dir / f"{sha}.bin", image)
             _write(self.dir / f"{sha}.json", json.dumps(entry, sort_keys=True).encode("utf-8"))
             log.warning("firmware release %s %s (%s, %s) uploaded, signed by key %s", platform, version, sha[:16],
@@ -201,7 +202,8 @@ class FirmwareUpdates:
             nodes = sorted(n for n, a in self.attempts.items() if a["state"] in ACTIVE)
         if not nodes:
             return None
-        return (f"firmware updates are on their way to box(es) {', '.join(map(str, nodes))}: wait for them, "
+        return (f"firmware updates are on their way to {'box' if len(nodes) == 1 else 'boxes'} "
+                f"{', '.join(map(str, nodes))}: wait for them, "
                 "or cancel them (DELETE /api/v1/firmware/updates) before the game starts")
 
     def cancel(self) -> list[int]:

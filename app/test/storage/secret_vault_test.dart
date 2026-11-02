@@ -343,7 +343,7 @@ void main() {
     });
   });
 
-  group('no Keystore (iOS, tests)', () {
+  group('no vault (the host, tests)', () {
     test('without a vault: plaintext, as before', () async {
       final s = FileAppStore(dir.path);
       await s.saveSettings(withSecrets());

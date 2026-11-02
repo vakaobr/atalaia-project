@@ -138,7 +138,10 @@ firmware no longer reads a button there.
    ```
    The log goes to UART0 and to this USB port; what you type on the USB
    port (`@join`, `@joinkey`, `@adopt-info`) reaches the box
-   (`CONFIG_ATALAIA_CONSOLE_USB_INPUT`).
+   (`CONFIG_ATALAIA_CONSOLE_USB_INPUT`). The `@joinkey` and `@update` lines in this guide are
+   typed as written on a **bench build** (`CONFIG_ATALAIA_SERIAL_KEYS`, `sdkconfig.bench`). A
+   release build wants the admin PIN as their last word (`@joinkey <64 hex> <PIN>`,
+   `@update <version> <id> <PIN>`), and refuses both while no PIN is set (decision SR-40).
 3. Verify: boot log shows the firmware version with its commit (`Atalaia firmware
    v0.3.0-dev.412+g8560d54 (core v0.3.0-dev)`, the commit you built; `.dirty` if the tree
    had changes; what `python3 tools/docker_fw.py version` printed), PSRAM detection (2 MB on
@@ -153,7 +156,11 @@ firmware no longer reads a button there.
    the tower splash with the version for 2 s, then the PIN screen (or the
    setup screen), upright with the USB port on the left
    (`CONFIG_ATALAIA_OLED_FLIP` turns it round). Two `slow redraw` warnings
-   around then are the OLED's full frames on the 100 kHz bus.
+   around then are the OLED's full frames on the 100 kHz bus. The TFT shows
+   its own boot splash as soon as it is up (the tower on the left; ATALAIA, the
+   version and the commit on the right) for about 2.5 s
+   (`CONFIG_ATALAIA_TFT_SPLASH_MS`), then the first screen; it must be upright
+   in landscape, 320 x 240.
 
 ## Step 2: Vext and External Peripherals
 
@@ -394,8 +401,9 @@ and two boards at least 1 m apart, both antennas fitted.
 4. Pause, resume and end from the console: the box follows. After the end
    the log shows `left game <id>; the game key is erased`.
 5. Battery pull during a game: the box comes back in the same game (`field:
-   ... resumed game`), with `node.rebooted` in the console's feed and no
-   capture lost.
+   ... resumed game`), with `node.rebooted` (reason `power`) in the console's feed
+   and no capture lost. A panic or watchdog restart shows as "A box crashed and
+   restarted" instead; `docs/runbooks/i2c-fault-bench.md` makes one on purpose.
 6. Range: walk the box away until the console marks it offline; with a
    third box joined half-way, the far box's captures reach the console
    again through the middle box's relay.

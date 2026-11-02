@@ -48,9 +48,8 @@ void main() {
   late ControllerApi api;
   late int gameId;
   final calls = <Map<String, Object?>>[];
-  final limits = File(
-    'lib/chrono/limit_templates/portugal.yaml',
-  ).readAsStringSync();
+  final limits = File('lib/chrono/limit_templates/portugal.yaml')
+      .readAsStringSync();
 
   setUp(() {
     engine = ControllerEngine(
@@ -183,6 +182,7 @@ void main() {
       expect(
         find.textContaining(
           s.t('ctl_import.counts', {
+            'n': 3,
             'rows': 3,
             'created': 1,
             'updated': 0,
@@ -382,11 +382,9 @@ void main() {
       ])
         code:
             (jsonDecode(
-                      File(
-                        '../controller/console/src/i18n/$code.json',
-                      ).readAsStringSync(),
-                    )
-                    as Map<String, dynamic>)['checkin_import']
+                  File('../controller/console/src/i18n/$code.json')
+                      .readAsStringSync(),
+                ) as Map<String, dynamic>)['checkin_import']
                 as Map<String, dynamic>,
     };
     final tables = {
@@ -411,6 +409,8 @@ void main() {
       (k) => k.startsWith('ctl_import.') || k.startsWith('ctl.import'),
     )) {
       for (final lang in tables.keys) {
+        // Chinese has no plural, so no singular form (`<key>_one`).
+        if (k.endsWith('_one') && lang == 'zh-tw') continue;
         expect(tables[lang]!.containsKey(k), isTrue, reason: '$lang $k');
       }
     }

@@ -9,10 +9,11 @@
  * header bar (mode or menu), one big value (countdown, phase, choice) and
  * a footer (team, hint or message), with a progress bar beside it while
  * a team holds its button (data "progress", or Bomb's "defuse"). The
- * captured screen also shows the team's points in the header and, from the
+ * captured screen (and a held Master status or VIP checkpoint with "since") also shows the
+ * team's points in the header and, from the
  * game's clock, how long it has held the zone in the footer. On a zone's
- * screens (neutral, captured) the box draws that bar itself from its own
- * buttons when the mode sends none (decision BN-26).
+ * screens (neutral, captured, the Master's status, VIP Payload's checkpoints) the box draws that
+ * bar itself from its own buttons when the mode sends none (decision BN-26).
  *
  * oled_text_for() is the mapping, plain C for the host tests; the LVGL part
  * (ATALAIA_SCREEN_LVGL) draws it on a second LVGL display, packed to one

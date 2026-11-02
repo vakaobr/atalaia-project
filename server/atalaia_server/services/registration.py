@@ -55,7 +55,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import hub_share, quotas
+from .. import chrono_registry, hub_share, quotas
 from ..models import (Field, FieldApiKey, FieldPlayerId, Game, GameRegistration, PlayerIdClaim,
                       RegistrationReplica, Replica, ScheduledGame, User)
 from . import scheduling
@@ -687,9 +687,12 @@ def _ts(value: datetime) -> float:
     return value.timestamp()
 
 
-async def schedule(db: AsyncSession, field_id: uuid.UUID, now: datetime, days: int) -> dict[str, Any]:
+async def schedule(db: AsyncSession, field_id: uuid.UUID, now: datetime, days: int,
+                   revocations: bool = False) -> dict[str, Any]:
     """GET /api/v1/sync/schedule: the field's published (and running) games that have not ended and start
-    within ``days``."""
+    within ``days``. With ``revocations`` (``?revocations=1``: a controller of PRIV-5 onwards; an older one checks the
+    answer strictly and would refuse the key) also ``copies_revoked``, when there are any: the players whose pulled
+    copies of other fields' chrono records the controller drops."""
     rows = list(await db.scalars(select(ScheduledGame).where(
         ScheduledGame.field_id == field_id, ScheduledGame.status.in_(("published", "in_progress")),
         ScheduledGame.ends_at > now, ScheduledGame.starts_at < now + timedelta(days=days))
@@ -710,7 +713,12 @@ async def schedule(db: AsyncSession, field_id: uuid.UUID, now: datetime, days: i
         if place:
             entry["location"] = place
         games.append(entry)
-    return {"sync_version": sync_format.SYNC_VERSION, "games": games}
+    answer: dict[str, Any] = {"sync_version": sync_format.SYNC_VERSION, "games": games}
+    if revocations:
+        revoked = await chrono_registry.copies_revoked(db, field_id, now)
+        if revoked:
+            answer["copies_revoked"] = revoked
+    return answer
 
 
 async def roster(db: AsyncSession, field_id: uuid.UUID, game_id: uuid.UUID) -> Optional[dict[str, Any]]:
@@ -810,6 +818,17 @@ async def link_game(db: AsyncSession, field_id: uuid.UUID, scheduled_id: Optiona
     return True
 
 
+async def erase_numbers(db: AsyncSession, game_id: uuid.UUID) -> int:
+    """The membership number of every registration of the scheduled game that was made into this game, when the
+    game ends (protocol/apd.md, "The card check"): the card was compared at the field, so the number is not
+    kept for the 30 days the APD and expiry stay. Returns how many were cleared."""
+    sched = select(ScheduledGame.id).where(ScheduledGame.controller_game == game_id).scalar_subquery()
+    result = await db.execute(update(GameRegistration).where(
+        GameRegistration.scheduled_game.in_(sched), GameRegistration.federation_number.is_not(None))
+        .values(federation_number=None).execution_options(synchronize_session=False))
+    return result.rowcount or 0
+
+
 async def apply_checkins(db: AsyncSession, field_id: uuid.UUID, game: Game, body: dict[str, Any],
                          now: datetime) -> dict[str, Any]:
     """POST /api/v1/sync/checkins: each registration's outcome and its declarations' final states. A
@@ -837,6 +856,7 @@ async def apply_checkins(db: AsyncSession, field_id: uuid.UUID, game: Game, body
             continue
         reg.status, reg.outcome_at, reg.updated_at = item["outcome"], now, now
         reg.outcome_by = None  # the controller's word replaces a mark staff made
+        reg.federation_number = None  # the card was checked at the field: the number has done its job (LEG-5)
         applied += 1
         for d in item["declarations"]:
             result = await db.execute(update(RegistrationReplica).where(

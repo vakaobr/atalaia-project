@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The privacy notice the operator publishes (decisions CONS-1 to CONS-6): the mechanism, never the text.
 
-The notice is the operator's (legal) text. The server only serves it and asks for consent again when its version
-changes. ``ATALAIA_PRIVACY_NOTICE_DIR`` names a folder with one Markdown file per language and version, called
+The notice is the operator's (legal) text. The server only serves it and, when its version
+changes, shows it again to each account (information, not consent: the account rests on the contract). ``ATALAIA_PRIVACY_NOTICE_DIR`` names a folder with one Markdown file per language and version, called
 ``privacy-notice-<lang>-<version>.md`` (``<lang>`` is ``pt``, ``en``, ``de`` or ``zh-tw``; ``<version>`` is the
 ``ATALAIA_PRIVACY_NOTICE_VERSION`` the file is for), for example ``privacy-notice-en-campo-tejo-2026-11.md``: the
 templates in ``docs/templates/`` filled in by the field. Only the files of the current version are served, so a new
@@ -20,7 +20,10 @@ import html
 import logging
 import re
 from pathlib import Path
-from typing import NamedTuple, Optional
+from typing import TYPE_CHECKING, NamedTuple, Optional
+
+if TYPE_CHECKING:
+    from .config import Settings
 
 LANGUAGES = ("pt", "en", "de", "zh-tw")
 MAX_BYTES = 512 * 1024
@@ -44,6 +47,13 @@ def available(directory: Optional[str], version: str) -> tuple[str, ...]:
         return ()
     base = Path(directory)
     return tuple(lang for lang in LANGUAGES if (base / filename(lang, version)).is_file())
+
+
+def signup_blocked(settings: "Settings") -> bool:
+    """New accounts are refused (LIVE-2): no notice is published for the current version, and the operator has not
+    said (``ATALAIA_ALLOW_SIGNUP_WITHOUT_NOTICE``) that this is a development or test server. A consent is to a text."""
+    return not settings.allow_signup_without_notice and not available(settings.privacy_notice_dir,
+                                                                      settings.privacy_notice_version)
 
 
 def load(directory: Optional[str], version: str, wanted: str, fallback: str = "pt") -> Optional[Notice]:

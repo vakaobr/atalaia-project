@@ -78,9 +78,8 @@ void main() {
   });
 
   group('the phone controller', () {
-    final limits = File(
-      'lib/chrono/limit_templates/portugal.yaml',
-    ).readAsStringSync();
+    final limits = File('lib/chrono/limit_templates/portugal.yaml')
+        .readAsStringSync();
     late ControllerEngine engine;
     late ControllerCheckin svc;
     late List<String> warnings;

@@ -92,11 +92,18 @@ class ProjectionTests(unittest.TestCase):
         self.drifts: list[dict] = []
         self.fc.on_drift = self.drifts.append
         self.fc.start_game(now_ms=0)
+        self._packet_seq: dict[int, int] = {}
+
+    def next_seq(self, node):
+        """A box's packets carry a rising header seq (the controller's replay window refuses the rest);
+        the seq the tests name below is only for reading."""
+        self._packet_seq[node] = self._packet_seq.get(node, -1) + 1
+        return self._packet_seq[node]
 
     def state(self, node, seq, owner, counters, game_ms, **extra):
         payload = state_encode({"owner_team": owner, "phase": 1, "game_time_ms": game_ms,
                                 "counters": counters, "epoch": 0, **extra})
-        self.fc.on_packet(node, header(node, seq), payload, {"epoch": 0})
+        self.fc.on_packet(node, header(node, self.next_seq(node)), payload, {"epoch": 0})
 
     def test_ticks_since_the_report_are_added_and_the_next_state_replaces_them(self):
         self.state(4, 0, 1, {}, 0)
@@ -129,7 +136,7 @@ class ProjectionTests(unittest.TestCase):
         data = {"previous_team": previous} if previous else {}
         payload = codec.encode_event({"node": node, "seq": seq, "t": t, "type": type_, "team": team,
                                       "data": data})
-        hdr = Header(version_flags=vf_make(1, 1, False, True), game_id=1, source=node, seq=100 + seq,
+        hdr = Header(version_flags=vf_make(1, 1, False, True), game_id=1, source=node, seq=self.next_seq(node),
                      hop_limit=2, type=MESSAGE_TYPES["EVENT"])
         self.fc.on_packet(node, hdr, payload, {"epoch": 0})
 

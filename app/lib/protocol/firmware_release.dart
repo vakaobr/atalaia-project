@@ -326,9 +326,8 @@ parseReport(List<int> body) {
     out['version']!,
   );
   if (canonical.length != body.length ||
-      !Iterable<int>.generate(
-        body.length,
-      ).every((i) => canonical[i] == body[i])) {
+      !Iterable<int>.generate(body.length)
+          .every((i) => canonical[i] == body[i])) {
     throw ReleaseException('bad_report', 'not in its canonical form');
   }
   return (
