@@ -91,8 +91,10 @@ jobs:
     # controller/requirements.txt with pip (FastAPI, Starlette and pydantic 2 as pinned there),
     # where the job above has Ubuntu's packages (FastAPI 0.101, pydantic 1.10). The same tests,
     # so both stacks stay green; a DeprecationWarning is an error here, since the older stack
-    # cannot show them (decisions PLK-1 to PLK-5).
+    # cannot show them (decisions PLK-1 to PLK-6).
     runs-on: ubuntu-24.04
+    # A stream test that waits for good ends here, not after GitHub's six hours (PLK-6).
+    timeout-minutes: 30
     permissions:
       contents: read
     env:
