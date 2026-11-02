@@ -112,7 +112,10 @@ android_tools() {
 check_android_lib() {
     lib="$1"
     abi="$2"
-    tools="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+    # The NDK's host tools: linux-x86_64 in the Flutter image and on CI, darwin-x86_64 on a Mac (the NDK
+    # ships one folder for this host; the Mac mini runs the app job natively since 2026-11-02).
+    tools=$(ls -d "$NDK"/toolchains/llvm/prebuilt/*/bin 2>/dev/null | head -n 1)
+    [ -x "$tools/llvm-readelf" ] || { echo "check.sh: no llvm-readelf in $NDK/toolchains/llvm/prebuilt/*/bin" >&2; exit 1; }
     case "$abi" in
         arm64-v8a) machine=AArch64 ;;
         armeabi-v7a) machine=ARM ;;
