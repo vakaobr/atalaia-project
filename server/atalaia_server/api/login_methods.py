@@ -3,11 +3,11 @@
 """Ways to log in besides a password: social login, passkeys, and the staff second factor (decisions LG-*).
 
     GET    /api/v1/auth/methods                        what this server offers (the login pages' buttons)
-    POST   /api/v1/auth/oidc/{provider}/start          {purpose, consent?, notice_version?, return_to?, password?}: the provider's URL
+    POST   /api/v1/auth/oidc/{provider}/start          {purpose, notice_seen?, age_confirmed?, notice_version?, return_to?, password?, app_challenge?}: the provider's URL
     GET    /api/v1/auth/oidc/{provider}/browser        the app's browser starts here (PKA-1): sets the binding cookie
     GET    /api/v1/auth/oidc/{provider}/callback       where the provider sends the browser back (a field's own address)
     GET    /api/v1/auth/oidc/callback                  hosted hub only, ATALAIA_OIDC_RELAY=on: the hub's one address, see oidc_relay.py
-    POST   /api/v1/auth/oidc/complete                  {ticket}: a finished social login becomes a session
+    POST   /api/v1/auth/oidc/complete                  {ticket, verifier?}: a finished social login becomes a session
     POST   /api/v1/auth/passkey/login/options          a passkey login needs no username
     POST   /api/v1/auth/passkey/login                  {challenge_token, credential}: a session with both factors
     POST   /api/v1/auth/stepup/totp                    Bearer, {code}: this session now counts as having a second factor
@@ -36,6 +36,15 @@ a server or a referrer); the page sends it to ``/auth/oidc/complete``, a same-si
 and sets the refresh cookie as every other login does, with the access token in the answer and no token ever in
 a URL or a cookie the API reads.
 
+The app's ticket is bound to the app instance that began the login (APP-4, PKCE style, RFC 7636 S256): the app
+makes a random verifier, sends its hash as ``app_challenge`` at ``/start`` (only with the app's return path), the
+row keeps it, the ticket carries it (``acr``), and ``/auth/oidc/complete`` wants the ``verifier`` that hashes to it
+(a wrong or missing one is a 401 that does not spend the ticket). Whoever lifts the ticket from the return link
+does not have the verifier. The staff pages need none (the binding cookie covers them). An app from before APP-4
+sends no challenge and still works unless ``ATALAIA_OIDC_APP_REQUIRE_CHALLENGE=on``, which refuses it with 426
+``app_challenge_required``; a new app asking an older server is told 422 ``extra_forbidden`` on ``body.app_challenge``
+and asks again without it (as for ``notice_version``).
+
 A social login never sets ``sessions.mfa``: the roles that need a second factor count only after a TOTP or
 passkey step-up (``/auth/stepup/*``). A passkey login sets it: it is something you have and something you are
 or know in one gesture (user verification is required).
@@ -43,6 +52,12 @@ or know in one gesture (user verification is required).
 Accounts with no password (made by a social login, or after removing the password) confirm a sensitive change
 with a proof from the last ten minutes: the session's ``confirmed_at``, set by every login and by a step-up
 (TOTP, passkey) or a social re-login (``purpose: reauth``) (``api/auth._check_password``).
+
+That recent proof is not enough once an account has a second factor or a staff role (SRV-1, SR-1): adding, renaming
+or removing a passkey, TOTP, the password, a linked login and a merge then need a session with ``mfa`` (403
+``mfa_required``), so a social login alone cannot give a staff account a passkey of its own and then log in with it
+(a passkey login sets ``mfa``). ``api/auth.step_up_needed`` draws the line; ``GET /me/login-methods`` says whether
+this session is short of it.
 """
 
 from __future__ import annotations
@@ -64,16 +79,16 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import passkeys, personal_data, quotas, tenancy
+from .. import passkeys, personal_data, privacy_notice, quotas, tenancy
 from ..audit import record
 from ..auth import Principal, bearer, current_principal, principal_from_token
 from ..db import get_session
 from ..models import PRIVILEGED_ROLES, ROLE_NAMES, AuditLog, OidcLogin, Passkey, User, UserFieldRole, UserIdentity, UserSession
-from ..oidc import (MAX_STATE, NAME_PROVIDERS, PROVIDER_LABELS, OidcError, make_relay_state, new_verifier, read_relay_state,
-                    pkce_challenge, username_from_name)
+from ..oidc import (MAX_STATE, NAME_PROVIDERS, PROVIDER_LABELS, OidcError, identity_issuer, make_relay_state, new_verifier,
+                    pkce_challenge, read_relay_state, username_from_name)
 from ..tokens import (TokenError, WebauthnChallenge, make_merge_ticket, make_oidc_ticket, make_webauthn_challenge, read_oidc_ticket,
                       read_webauthn_challenge)
-from .auth import (NO_STORE, Strict, username_problem, _check_code, _check_password, _ip_key, _now, _secret, _start_session, _too_many,
+from .auth import (NO_STORE, Strict, username_problem, _check_code, _check_password, _ip_key, require_step_up, step_up_needed, _now, _secret, _start_session, _too_many,
                    _user_for_update, passkey_count)
 
 router = APIRouter(prefix="/api/v1", tags=["login methods"])
@@ -83,6 +98,7 @@ BINDING_PATH = "/api/v1/auth/oidc"
 STATE_TTL_S = 600
 DEFAULT_RETURN = "/staff/login"
 RETURN_TO = re.compile(r"/staff/[A-Za-z0-9/_.?=&%-]{0,380}")
+APP_SECRET_RE = r"^[A-Za-z0-9_-]{43}$"   # 32 bytes, base64url without padding: a verifier or its SHA-256
 APP_RETURN = "/app/oidc"      # the app's own path on this host: an Android App Link or an iOS Universal Link
 APP_RETURN_TO = re.compile(r"/app/oidc(?:\?[A-Za-z0-9_.=&%-]{0,380})?")
 
@@ -92,14 +108,21 @@ APP_RETURN_TO = re.compile(r"/app/oidc(?:\?[A-Za-z0-9_.=&%-]{0,380})?")
 
 class StartIn(Strict):
     purpose: Literal["login", "link", "reauth", "name"] = "login"
-    consent: bool = False
+    # A new account made at the first sign-in rests on the contract (LEG-*): the person says they were shown the
+    # privacy notice and are 16 or older. Neither is read for a login that already has an account.
+    notice_seen: bool = False
+    age_confirmed: bool = False
     notice_version: Optional[str] = Field(default=None, max_length=64)  # the privacy notice the person was shown
     return_to: str = Field(default=DEFAULT_RETURN, max_length=400)
     password: str = Field(default="", max_length=4096)
+    # The app's PKCE-style binding (APP-4): base64url(SHA-256(verifier)) of a secret the app keeps; the ticket this
+    # login ends in is only good with that verifier at /auth/oidc/complete. Only for the app's return (/app/oidc).
+    app_challenge: Optional[str] = Field(default=None, pattern=APP_SECRET_RE)
 
 
 class TicketIn(Strict):
     ticket: str = Field(max_length=2048)
+    verifier: Optional[str] = Field(default=None, pattern=APP_SECRET_RE)
 
 
 class ConfirmIn(Strict):
@@ -285,6 +308,7 @@ async def my_methods(request: Request, principal: Principal = Depends(current_pr
         "available_providers": [{"provider": p, "label": PROVIDER_LABELS[p]}
                                 for p in request.app.state.oidc.providers()],
         "mfa": principal.mfa,
+        "step_up_needed": await step_up_needed(db, user) and not principal.mfa,
     }, headers=NO_STORE)
 
 
@@ -300,7 +324,7 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
     account's confirmation as every sensitive change does."""
     _provider(request, provider)
     current = request.app.state.settings.privacy_notice_version
-    if body.consent and body.notice_version is not None and body.notice_version != current:
+    if body.notice_seen and body.notice_version is not None and body.notice_version != current:
         return JSONResponse({"detail": "notice_version_changed", "current_version": current}, status_code=409,
                             headers=NO_STORE)
     user_id: Optional[uuid.UUID] = None
@@ -314,6 +338,12 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
             await _check_password(db, request, user, body.password, "identity_link")
         if body.purpose == "name":
             await _check_name_round(db, request, principal, provider, body.return_to)
+    return_to = safe_return_to(body.return_to, site_origin(request))
+    for_app = APP_RETURN_TO.fullmatch(return_to) is not None
+    if body.app_challenge is not None and not for_app:
+        raise HTTPException(422, "app_challenge_not_for_browser")  # the staff pages hold the cookie instead
+    if for_app and body.app_challenge is None and request.app.state.settings.oidc_app_require_challenge:
+        raise HTTPException(426, "app_challenge_required")  # an app from before APP-4: update it
     now = _now()
     await db.execute(delete(OidcLogin).where(OidcLogin.expires_at < now))  # the ones never finished
     state, binding = new_state(request, provider), secrets.token_urlsafe(32)
@@ -321,13 +351,14 @@ async def oidc_start(provider: str, body: StartIn, request: Request,
     redirect_uri = callback_url(request, provider)
     db.add(OidcLogin(state_hash=_hash(state), binding_hash=_hash(binding), provider=provider, purpose=body.purpose,
                      user_id=user_id, session_id=session_id, nonce=nonce, code_verifier=verifier,
-                     redirect_uri=redirect_uri, return_to=safe_return_to(body.return_to, site_origin(request)),
-                     consent=body.consent, notice_version=body.notice_version if body.consent else None,
+                     redirect_uri=redirect_uri, return_to=return_to, app_challenge=body.app_challenge,
+                     notice_seen=body.notice_seen, age_confirmed=body.age_confirmed,
+                     notice_version=body.notice_version if body.notice_seen else None,
                      expires_at=now + timedelta(seconds=STATE_TTL_S)))
     await db.commit()
     url = request.app.state.oidc.authorization_url(provider, redirect_uri, state, nonce,
                                                    pkce_challenge(verifier), profile=body.purpose == "name")
-    if APP_RETURN_TO.fullmatch(safe_return_to(body.return_to, site_origin(request))):
+    if for_app:
         # The app calls this itself, so the binding cookie would land in the app, not in the browser that goes
         # to the provider: the app opens this address in the browser, which sets the cookie there (PKA-1).
         query = urlencode({"x": binding, "s": state})
@@ -448,21 +479,37 @@ async def oidc_callback(provider: str, request: Request, code: Optional[str] = N
     try:
         token = await oidc.exchange(provider, code, row.redirect_uri, row.code_verifier)
         claims = await oidc.validate_claims(provider, token, row.nonce)
-        subject = claims["sub"]
-    except OidcError as e:
-        record(db, "oidc_failed", request, user_id=row.user_id, details={"provider": provider, "reason": e.code})
+        issuer, tenant = identity_issuer(provider, claims)
+        who = (claims["sub"], issuer, tenant)
+    except (OidcError, KeyError) as e:
+        code = e.code if isinstance(e, OidcError) else "id_token_invalid"
+        record(db, "oidc_failed", request, user_id=row.user_id, details={"provider": provider, "reason": code})
         await db.commit()
-        return _back(row.return_to, error=e.code)
+        return _back(row.return_to, error=code)
     if row.purpose == "name":
-        return await _oidc_name(db, request, row, provider, subject, claims)
+        return await _oidc_name(db, request, row, provider, who, claims)
     handler = {"login": _oidc_login, "link": _oidc_link, "reauth": _oidc_reauth}[row.purpose]
-    return await handler(db, request, row, provider, subject)
+    return await handler(db, request, row, provider, who)
+
+
+async def _find_identity(db: AsyncSession, provider: str, who: tuple[str, str, Optional[str]],
+                         lock: bool = False) -> Optional[UserIdentity]:
+    """The social login with this provider, issuer and subject (SRV-8). A Microsoft row made before the issuer was
+    stored has an empty one: it matches once by provider and subject and takes the issuer and tenant now."""
+    subject, issuer, tenant = who
+    query = select(UserIdentity).where(UserIdentity.provider == provider, UserIdentity.subject == subject,
+                                       UserIdentity.issuer.in_((issuer, ""))).order_by(UserIdentity.issuer.desc())
+    found = await db.scalar(query.with_for_update() if lock else query)
+    if found is not None and found.issuer == "":
+        found.issuer, found.tenant = issuer, tenant
+        await db.flush()
+    return found
 
 
 async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provider: str,
-                      subject: str) -> RedirectResponse:
-    identity = await db.scalar(select(UserIdentity).where(UserIdentity.provider == provider,
-                                                          UserIdentity.subject == subject).with_for_update())
+                      who: tuple[str, str, Optional[str]]) -> RedirectResponse:
+    subject, issuer, tenant = who
+    identity = await _find_identity(db, provider, who, lock=True)
     now = _now()
     if identity is not None:
         user = await db.get(User, identity.user_id)
@@ -470,11 +517,17 @@ async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provid
             return _back(row.return_to, error="state_invalid")
         identity.last_login_at = now
         await db.commit()
-        return _back(row.return_to, ticket=make_oidc_ticket(request.app.state.keys, user.id, provider))
-    # An unknown subject makes an account, under the same rules as registering: consent given, the per-address
-    # registration limit. Never matched to an existing account by email (the server never asks for one).
-    if not row.consent:
-        return _back(row.return_to, error="consent_required")
+        return _back(row.return_to, ticket=make_oidc_ticket(request.app.state.keys, user.id, provider,
+                                                          app_challenge=row.app_challenge))
+    # An unknown subject makes an account, under the same rules as registering: a published notice (LIVE-2), 16 or
+    # older confirmed, the notice shown, the per-address registration limit. Never matched to an existing account
+    # by email (the server never asks for one).
+    if privacy_notice.signup_blocked(request.app.state.settings):
+        return _back(row.return_to, error="privacy_notice_unpublished")
+    if not row.age_confirmed:
+        return _back(row.return_to, error="age_confirmation_required")
+    if not row.notice_seen:
+        return _back(row.return_to, error="notice_required")
     current = request.app.state.settings.privacy_notice_version
     if row.notice_version is not None and row.notice_version != current:  # the notice changed during the round trip
         return _back(row.return_to, error="notice_version_changed")
@@ -490,25 +543,28 @@ async def _oidc_login(db: AsyncSession, request: Request, row: OidcLogin, provid
     db.add(user)
     try:
         await db.flush()
-        db.add(UserIdentity(user_id=user.id, provider=provider, subject=subject, last_login_at=now))
+        db.add(UserIdentity(user_id=user.id, provider=provider, subject=subject, issuer=issuer, tenant=tenant,
+                            last_login_at=now))
         await db.flush()
     except IntegrityError:  # the same subject finished twice at once: the other one won
         await db.rollback()
         return _back(row.return_to, error="try_again")
-    personal_data.give_consent(db, user.id, personal_data.ACCOUNT, row.notice_version or current, now)
+    personal_data.record_notice(db, user.id, row.notice_version or current, personal_data.NOTICE_SIGNUP, now,
+                                age_confirmed=True)
     record(db, "register", request, user_id=user.id, resource="user", resource_id=user.id,
            details={"method": "oidc", "provider": provider})
     await db.commit()
-    return _back(row.return_to, ticket=make_oidc_ticket(request.app.state.keys, user.id, provider, new_account=True))
+    return _back(row.return_to, ticket=make_oidc_ticket(request.app.state.keys, user.id, provider, new_account=True,
+                                                          app_challenge=row.app_challenge))
 
 
 async def _oidc_link(db: AsyncSession, request: Request, row: OidcLogin, provider: str,
-                     subject: str) -> RedirectResponse:
+                     who: tuple[str, str, Optional[str]]) -> RedirectResponse:
+    subject, issuer, tenant = who
     user = await db.scalar(select(User).where(User.id == row.user_id).with_for_update()) if row.user_id else None
     if user is None:
         return _back(row.return_to, error="state_invalid")
-    existing = await db.scalar(select(UserIdentity).where(UserIdentity.provider == provider,
-                                                          UserIdentity.subject == subject))
+    existing = await _find_identity(db, provider, who)
     if existing is not None and existing.user_id == user.id:
         return _back(row.return_to, error="already_linked")
     if await db.scalar(select(UserIdentity.id).where(UserIdentity.user_id == user.id,
@@ -524,7 +580,7 @@ async def _oidc_link(db: AsyncSession, request: Request, row: OidcLogin, provide
                details={"provider": provider})
         await db.commit()
         return _back(row.return_to, ok="merge", fragment={"merge": ticket})
-    db.add(UserIdentity(user_id=user.id, provider=provider, subject=subject))
+    db.add(UserIdentity(user_id=user.id, provider=provider, subject=subject, issuer=issuer, tenant=tenant))
     try:
         await db.flush()
     except IntegrityError:
@@ -537,11 +593,9 @@ async def _oidc_link(db: AsyncSession, request: Request, row: OidcLogin, provide
 
 
 async def _oidc_reauth(db: AsyncSession, request: Request, row: OidcLogin, provider: str,
-                       subject: str) -> RedirectResponse:
-    mine = await db.scalar(select(UserIdentity.id).where(UserIdentity.provider == provider,
-                                                         UserIdentity.subject == subject,
-                                                         UserIdentity.user_id == row.user_id))
-    if mine is None or row.session_id is None:
+                       who: tuple[str, str, Optional[str]]) -> RedirectResponse:
+    mine = await _find_identity(db, provider, who)
+    if mine is None or mine.user_id != row.user_id or row.session_id is None:
         return _back(row.return_to, error="identity_mismatch")
     await db.execute(update(UserSession).where(UserSession.id == row.session_id, UserSession.revoked_at.is_(None))
                      .values(confirmed_at=_now()))
@@ -551,15 +605,13 @@ async def _oidc_reauth(db: AsyncSession, request: Request, row: OidcLogin, provi
     return _back(row.return_to, ok="reauth")
 
 
-async def _oidc_name(db: AsyncSession, request: Request, row: OidcLogin, provider: str, subject: str,
-                     claims: dict[str, Any]) -> RedirectResponse:
+async def _oidc_name(db: AsyncSession, request: Request, row: OidcLogin, provider: str,
+                     who: tuple[str, str, Optional[str]], claims: dict[str, Any]) -> RedirectResponse:
     """The "use my name" round (LG-10): proves it is the account's own login (as a reauth does) and hands the browser
     a username proposed from the name claim, in the address fragment. The name is read here and kept nowhere: not in
     the users row, not in the audit entry, not in the log."""
-    mine = await db.scalar(select(UserIdentity.id).where(UserIdentity.provider == provider,
-                                                         UserIdentity.subject == subject,
-                                                         UserIdentity.user_id == row.user_id))
-    if mine is None or row.session_id is None:
+    mine = await _find_identity(db, provider, who)
+    if mine is None or mine.user_id != row.user_id or row.session_id is None:
         return _back(row.return_to, error="identity_mismatch")
     suggestion = username_from_name(claims)
     if suggestion is None or username_problem(suggestion):
@@ -577,9 +629,14 @@ async def _oidc_name(db: AsyncSession, request: Request, row: OidcLogin, provide
 async def oidc_complete(body: TicketIn, request: Request, db: AsyncSession = Depends(get_session)) -> JSONResponse:
     """A finished social login becomes a session (``mfa`` false: see the module's text)."""
     try:
-        user_id, provider, jti, expires_at, new_account = read_oidc_ticket(request.app.state.keys, body.ticket)
+        user_id, provider, jti, expires_at, new_account, challenge = read_oidc_ticket(request.app.state.keys, body.ticket)
     except TokenError:
         raise HTTPException(401, "invalid_ticket") from None
+    # A ticket made for the app is good only for the app that began the login (APP-4): whoever lifted it from the
+    # return link does not have the verifier. Checked before the ticket is spent, so a wrong guess burns nothing.
+    if challenge is not None and (body.verifier is None or not hmac.compare_digest(
+            challenge, pkce_challenge(body.verifier))):
+        raise HTTPException(401, "invalid_ticket")
     used = request.app.state.used_challenges
     if used.spent(jti) or not used.spend(jti, expires_at):
         raise HTTPException(401, "invalid_ticket")
@@ -667,6 +724,7 @@ async def passkey_register(body: AddPasskeyIn, request: Request, principal: Prin
     if challenge.user_id != principal.user.id:
         raise HTTPException(400, "invalid_challenge")
     user = await _user_for_update(db, principal)
+    await require_step_up(db, request, user)  # the options step asked already; a second check costs nothing (SR-1)
     try:
         verified = passkeys.verify_registration(body.credential, challenge.challenge, site_origin(request),
                                                 request.app.state.settings.app_origins)
@@ -705,6 +763,7 @@ async def passkey_rename(passkey_id: uuid.UUID, body: NameIn, request: Request,
     name = body.name.strip()
     if not name or not name.isprintable():
         raise HTTPException(400, "name_invalid")
+    await require_step_up(db, request, principal.user)
     key = await db.scalar(select(Passkey).where(Passkey.id == passkey_id, Passkey.user_id == principal.user.id))
     if key is None:
         raise HTTPException(404, "passkey_not_found")

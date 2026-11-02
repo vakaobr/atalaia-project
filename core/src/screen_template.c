@@ -559,10 +559,20 @@ typedef struct {
     size_t len;
     size_t i;
     const atalaia_tpl_scope_t *scope; /* NULL: syntax check only */
-    char scratch[256];                /* decoded strings */
+    /* 'text' literals: copied once, whatever the data. Every literal of the expression takes its
+     * length + 1 here, evaluated or not (no short-circuit), so the size is a property of the
+     * expression and the check at load time (scope NULL) is exact (decision TPL-1). */
+    char lits[ATALAIA_TPL_LITERALS_MAX];
+    size_t lits_used;
+    size_t lits_need; /* what all the literals would take, counted past the limit */
+    bool lits_over;
+    /* Strings read from the data: cut to the room left, "?" when none is left. */
+    char scratch[ATALAIA_TPL_DATA_MAX];
     size_t used;
+    bool data_full; /* a data string was cut short or replaced by "?" */
     bool error;
     const char *why;
+    char why_buf[64];
 } ev_t;
 
 static void skip_ws(ev_t *e)
@@ -692,7 +702,13 @@ static const char *jfind(const char *obj, const char *k, size_t k_len)
 static val_t jstring(ev_t *e, const char *p)
 {
     size_t room = sizeof(e->scratch) - e->used;
-    if (room < 2) return nil();
+    if (room < 2) {
+        /* Never a silent blank: a visible mark and a log line (decision TPL-1). */
+        static const char mark[] = "?";
+        e->data_full = true;
+        val_t v = {V_STR, 0, mark, 1};
+        return v;
+    }
     char *out = e->scratch + e->used;
     size_t o = 0;
     p++;
@@ -720,7 +736,10 @@ static val_t jstring(ev_t *e, const char *p)
             default: tmp[0] = x; break; /* \" \\ \/ */
             }
         }
-        if (o + n + 1 > room) break;
+        if (o + n + 1 > room) {
+            e->data_full = true;
+            break;
+        }
         memcpy(out + o, tmp, n);
         o += n;
     }
@@ -819,15 +838,17 @@ static val_t atom(ev_t *e, int depth)
         }
         size_t n = e->i - a;
         e->i++;
-        size_t room = sizeof(e->scratch) - e->used;
-        if (n + 1 > room) {
-            ev_fail(e, "text too long");
+        e->lits_need += n + 1;
+        if (e->lits_need > sizeof(e->lits)) {
+            /* Parsing goes on so that lits_need ends up the whole size; evaluate() words it. */
+            e->lits_over = true;
+            ev_fail(e, e->why_buf);
             return nil();
         }
-        char *out = e->scratch + e->used;
+        char *out = e->lits + e->lits_used;
         memcpy(out, e->s + a, n);
         out[n] = '\0';
-        e->used += n + 1;
+        e->lits_used += n + 1;
         val_t v = {V_STR, 0, out, n};
         return v;
     }
@@ -965,6 +986,11 @@ static val_t evaluate(ev_t *e, const char *s, size_t len, const atalaia_tpl_scop
     val_t v = ev_or(e, 0);
     skip_ws(e);
     if (e->i != e->len) ev_fail(e, "unexpected text after the expression");
+    if (e->lits_over && e->why == e->why_buf) {
+        snprintf(e->why_buf, sizeof(e->why_buf),
+                 "its 'texts' need %u bytes of %u (each is its length + 1)", (unsigned)e->lits_need,
+                 (unsigned)ATALAIA_TPL_LITERALS_MAX);
+    }
     return e->error ? nil() : v;
 }
 
@@ -974,6 +1000,46 @@ bool atalaia_tpl_expr_ok(const char *expr, size_t len, char *err, size_t err_cap
     evaluate(&e, expr, len, NULL);
     if (e.error && err && err_cap) snprintf(err, err_cap, "%s", e.why);
     return !e.error;
+}
+
+size_t atalaia_tpl_expr_literal_bytes(const char *expr, size_t len)
+{
+    ev_t e;
+    evaluate(&e, expr, len, NULL);
+    return e.lits_need;
+}
+
+/* ---- what a render does when an expression fails (decision TPL-1) -------------
+ * A check at load time refuses every expression that can fail, so this is for the
+ * rest (a template that skipped the check, a data string longer than the room). It
+ * shows "?" in the text and logs once per expression, never a silent blank. */
+
+static atalaia_tpl_log_fn log_fn;
+static uint32_t logged[8]; /* hashes of the expressions already logged (a ring) */
+static unsigned logged_next;
+
+void atalaia_tpl_set_log(atalaia_tpl_log_fn fn)
+{
+    log_fn = fn;
+    memset(logged, 0, sizeof(logged));
+    logged_next = 0;
+}
+
+static void report(const ev_t *e, const char *expr, size_t len)
+{
+    if (!e->error && !e->data_full) return;
+    uint32_t h = 2166136261u;
+    for (size_t i = 0; i < len; i++) h = (h ^ (uint8_t)expr[i]) * 16777619u;
+    h |= 1; /* never 0, the empty slot */
+    for (size_t i = 0; i < sizeof(logged) / sizeof(logged[0]); i++) {
+        if (logged[i] == h) return;
+    }
+    logged[logged_next++ % (sizeof(logged) / sizeof(logged[0]))] = h;
+    if (!log_fn) return;
+    char msg[128];
+    snprintf(msg, sizeof(msg), "screen expression {%.*s}: %s", (int)(len > 48 ? 48 : len), expr,
+             e->error ? e->why : "a data text did not fit the scratch, shown cut or as ?");
+    log_fn(msg);
 }
 
 /* ---- text with {expressions} -------------------------------------------- */
@@ -1106,7 +1172,12 @@ size_t atalaia_tpl_text(const char *text, const atalaia_tpl_scope_t *scope, char
         size_t elen = split_filter(text + i + 1, close - i - 1, &filter);
         ev_t e;
         val_t v = evaluate(&e, text + i + 1, elen, scope);
-        put_value(&b, v, filter);
+        report(&e, text + i + 1, elen);
+        if (e.error) {
+            sput(&b, "?", 1); /* never a silent blank */
+        } else {
+            put_value(&b, v, filter);
+        }
         i = close;
     }
     return b.len;
@@ -1132,7 +1203,9 @@ bool atalaia_tpl_truthy(const char *value, const atalaia_tpl_scope_t *scope)
     size_t a, len;
     if (!whole_expr(value, &a, &len)) return true;
     ev_t e;
-    return truth(evaluate(&e, value + a, len, scope));
+    bool t = truth(evaluate(&e, value + a, len, scope));
+    report(&e, value + a, len);
+    return t;
 }
 
 double atalaia_tpl_fraction(const char *value, const atalaia_tpl_scope_t *scope)
@@ -1143,6 +1216,7 @@ double atalaia_tpl_fraction(const char *value, const atalaia_tpl_scope_t *scope)
     if (whole_expr(value, &a, &len)) {
         ev_t e;
         d = as_num(evaluate(&e, value + a, len, scope));
+        report(&e, value + a, len);
     } else {
         d = strtod(value, NULL);
     }
@@ -1202,6 +1276,8 @@ bool atalaia_tpl_color(const char *name, uint32_t *rgb)
 
 /* ---- checks on template values ---------------------------------------------- */
 
+#define TPL_ECHO_MAX 40 /* bytes of an expression an error message repeats */
+
 /* Every {expression} in a text: balanced, parseable, known filter. */
 static bool check_text(conv_t *c, int line, const char *text, bool filters)
 {
@@ -1223,7 +1299,15 @@ static bool check_text(conv_t *c, int line, const char *text, bool filters)
         if (filter != F_NONE && !filters) return fail(c->p, line, "filters are only for text");
         char why[64];
         if (!atalaia_tpl_expr_ok(text + i + 1, elen, why, sizeof(why))) {
-            return fail(c->p, line, "{%.*s}: %s", (int)elen, text + i + 1, why);
+            /* The echo is cut (at a character) so the reason always fits the error buffer. */
+            size_t shown = elen;
+            bool cut = elen > TPL_ECHO_MAX;
+            if (cut) {
+                shown = TPL_ECHO_MAX;
+                while (shown > 0 && ((uint8_t)text[i + 1 + shown] & 0xC0) == 0x80) shown--;
+            }
+            return fail(c->p, line, "{%.*s%s}: %s", (int)shown, text + i + 1, cut ? "..." : "",
+                        why);
         }
         i = close;
     }

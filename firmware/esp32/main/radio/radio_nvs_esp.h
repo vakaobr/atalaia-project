@@ -25,6 +25,16 @@
 const atalaia_radio_nvs_ops_t *atalaia_radio_nvs_esp_init(void);
 
 /*
+ * Bench only (the "@epochwipe" shell command of a bench build,
+ * docs/runbooks/epoch-recovery-bench.md): removes the epoch store (the blob and the single u16 of
+ * the firmware before it) so that the box, restarted, finds a stored game with no record of its key
+ * and takes a lost-store epoch (RFC 0001 Amendment 23 item 5). With floor_too the epoch floor entry
+ * goes as well (Amendment 25), which is the case the amendment leaves: both lost. The game key and
+ * the stored game stay. True if it was done.
+ */
+bool atalaia_radio_nvs_esp_wipe_epochs(bool floor_too);
+
+/*
  * The join payload ("join" blob) and the field join key ("join_key") in the
  * same namespace (box_game.h). Call after atalaia_radio_nvs_esp_init().
  */

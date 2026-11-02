@@ -75,14 +75,14 @@ static const timer_bar_case_t timer_bars[] = {
 #define HACK_EN  "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"en\"}"
 #define HACK_DE  "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"de\"}"
 #define HACK_ZH  "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"zh-tw\"}"
-#define VIP      "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"pt\"}"
-#define VIP_EN   "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"en\"}"
-#define VIP_DE   "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"de\"}"
-#define VIP_ZH   "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"zh-tw\"}"
-#define OBJ      "org.atalaia.objectives {}"
-#define MONEY    "org.atalaia.money_factory {\"capacity\":50,\"capture_hold_ms\":3000}"
-#define PROG     "org.atalaia.progressive_domination {\"capture_hold_ms\":3000,\"complete_min\":10}"
-#define SAB      "org.atalaia.sabotage {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
+/* VIP / Payload's screens follow the box's language (the case's suffix), whatever its old `lang`
+ * parameter says (decision TFT-9): VIP_OLD_LANG is a game saved with lang "en". */
+#define VIP          "org.atalaia.vip_payload {\"capture_hold_ms\":3000}"
+#define VIP_OLD_LANG "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"en\"}"
+#define OBJ          "org.atalaia.objectives {}"
+#define MONEY        "org.atalaia.money_factory {\"capacity\":50,\"capture_hold_ms\":3000}"
+#define PROG         "org.atalaia.progressive_domination {\"capture_hold_ms\":3000,\"complete_min\":10}"
+#define SAB          "org.atalaia.sabotage {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
 
 /* Data as the modes (modes/bomb, modes/domination, modes/codes) and the shell send it. */
 static const screen_case_t cases[] = {
@@ -128,6 +128,9 @@ static const screen_case_t cases[] = {
     {"ready", "ready", "{}", NULL},
     {"standby_waiting", "standby", "{}", NULL},
     {"ready_picker", "ready", "{\"picker\":true}", NULL},
+    /* The TFT boot splash (TS-1): a development build's version and a release's. */
+    {"splash", "splash", "{\"version\":\"0.6.0-dev.124+g1f31026\"}", NULL},
+    {"splash_release", "splash", "{\"version\":\"0.6.0\"}", NULL},
     /* A zone nobody holds and a zone a team holds, for the modes without their own (BN-11). */
     {"neutral", "neutral", "{\"hold_s\":3}", NULL},
     {"captured", "captured", "{\"team\":\"red\",\"since\":95}", NULL},
@@ -357,13 +360,13 @@ static const screen_case_t cases[] = {
     {"yaml_hack_solved_en", "hack_solved", "{\"capture\":false}", HACK_EN},
     /* VIP / Payload: a checkpoint (the box's role), and the payload's screen (an Android prop's,
      * drawn here too: the box carries every template). */
-    {"yaml_vip_checkpoint_free", "checkpoint_free", "{}", VIP},
-    {"yaml_vip_checkpoint_held_en", "checkpoint_held", "{\"team\":\"blue\",\"since\":95}", VIP_EN},
-    {"yaml_vip_payload_moving", "payload", "{\"team\":\"red\",\"state\":\"moving\",\"metres\":75}",
-     VIP},
+    {"yaml_vip_checkpoint_free_pt", "checkpoint_free", "{}", VIP},
+    {"yaml_vip_checkpoint_held_en", "checkpoint_held", "{\"team\":\"blue\",\"since\":95}", VIP},
+    {"yaml_vip_payload_moving_pt", "payload",
+     "{\"team\":\"red\",\"state\":\"moving\",\"metres\":75}", VIP},
     {"yaml_vip_payload_weak_en", "payload", "{\"team\":\"red\",\"state\":\"weak\",\"metres\":40}",
-     VIP_EN},
-    {"yaml_vip_payload_extracted", "payload",
+     VIP},
+    {"yaml_vip_payload_extracted_pt", "payload",
      "{\"team\":\"red\",\"state\":\"extracted\",\"metres\":0}", VIP},
     /* Objectives: what a scenario's setup makes of a node (no parameters: the language and the
      * objective's name come in the setup, as data). */
@@ -420,6 +423,20 @@ static const screen_case_t cases[] = {
     {"yaml_domination_captured_de", "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}",
      DOM},
     {"yaml_domination_final_score_de", "final_score", "{\"owner\":\"blue\",\"points\":40}", DOM},
+    /* One point and one life take the singular ("1 ponto", "1 point", "1 Punkt", "vida de"). */
+    {"yaml_domination_captured_one_pt", "captured", "{\"team\":\"red\",\"points\":1,\"since\":95}",
+     DOM},
+    {"yaml_domination_final_score_one_pt", "final_score", "{\"owner\":\"blue\",\"points\":1}", DOM},
+    {"yaml_domination_captured_one", "captured", "{\"team\":\"red\",\"points\":1,\"since\":95}",
+     DOM},
+    {"yaml_domination_final_score_one", "final_score", "{\"owner\":\"blue\",\"points\":1}", DOM},
+    {"yaml_domination_captured_one_de", "captured", "{\"team\":\"red\",\"points\":1,\"since\":95}",
+     DOM},
+    {"yaml_domination_final_score_one_de", "final_score", "{\"owner\":\"blue\",\"points\":1}", DOM},
+    {"yaml_respawn_one_life_pt", "respawn", "{\"team\":\"blue\",\"lives\":1,\"error\":false}",
+     RESPAWN},
+    {"yaml_respawn_one_life", "respawn", "{\"team\":\"blue\",\"lives\":1,\"error\":false}",
+     RESPAWN},
     {"yaml_bomb_standby_arming_de", "standby", "{\"arm\":\"red\",\"progress\":0.6}", BOMB},
     {"yaml_bomb_countdown_defusing_de", "countdown", "{\"left\":231,\"defuse\":0.4}", BOMB},
     {"yaml_master_satellites_status_de", "master_status",
@@ -438,7 +455,7 @@ static const screen_case_t cases[] = {
      "{\"wires\":\"1 2 3 4\",\"cut\":0,\"of\":4,\"locked\":20}", HACK_DE},
     {"yaml_medic_idle_de", "medic_idle", "{\"remaining\":4}", MEDIC_DE},
     {"yaml_vip_payload_weak_de", "payload", "{\"team\":\"red\",\"state\":\"weak\",\"metres\":40}",
-     VIP_DE},
+     VIP},
     {"yaml_obj_capture_de", "obj_capture",
      "{\"label\":\"Brücke\",\"only\":\"red\",\"hold_ms\":3000}", OBJ},
     {"yaml_money_neutral_taking_de", "neutral", "{\"stock\":5,\"taker\":\"blue\",\"progress\":0.4}",
@@ -464,7 +481,7 @@ static const screen_case_t cases[] = {
      HACK_ZH},
     {"yaml_medic_healed_zh-tw", "medic_healed",
      "{\"player\":\"b1\",\"team\":\"blue\",\"remaining\":3,\"used\":1,\"max\":2}", MEDIC_ZH},
-    {"yaml_vip_checkpoint_free_zh-tw", "checkpoint_free", "{}", VIP_ZH},
+    {"yaml_vip_checkpoint_free_zh-tw", "checkpoint_free", "{}", VIP},
     {"yaml_obj_tags_zh-tw", "obj_tags",
      "{\"team\":\"blue\",\"have\":1,\"count\":2,\"note\":\"wrong_team\"}", OBJ},
     {"yaml_obj_bomb_armed_zh-tw", "obj_bomb",
@@ -606,6 +623,68 @@ static const screen_case_t cases[] = {
     {"timer_bar_neutral", "neutral", "{\"hold_s\":3}", NULL},
     {"timer_bar_yaml_domination", "neutral", "{\"hold_s\":3}", DOM},
     {"timer_bar_last_minute", "countdown", "{\"left\":47}", NULL},
+    /* What the box adds on the TFT (TZ-1 to TZ-5): the game's clock at 3:45 (a zone taken at 1:35
+     * has been held 2:10), the teams' totals at this box in the corner (blue held first, with 7;
+     * red holds now, with 12), and the capture's hold bar while a team holds its button. */
+    {"yaml_domination_captured_live", "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}",
+     DOM},
+    {"yaml_domination_captured_live_pt", "captured",
+     "{\"team\":\"red\",\"points\":12,\"since\":95}", DOM},
+    {"yaml_domination_neutral_holding", "neutral", "{}", DOM},
+    {"yaml_domination_captured_holding_de", "captured",
+     "{\"team\":\"red\",\"points\":12,\"since\":95}", DOM},
+    /* The other modes' zones (TFT-1 to TFT-4). Master and Satellites: a box the controller has told
+     * what it is says so when free and when held ("MESTRE OCUPADA" feminine, "SATÉLITE OCUPADO"
+     * masculine in pt); the master counts up the held time, shows the teams' totals in the corner
+     * (blue held first, with 7; red holds now, with 12) and the bar of a team taking it over. */
+    {"yaml_master_satellites_neutral_master", "neutral", "{\"role\":\"master\"}", MASTER},
+    {"yaml_master_satellites_neutral_master_pt", "neutral", "{\"role\":\"master\"}", MASTER},
+    {"yaml_master_satellites_neutral_satellite_pt", "neutral", "{\"role\":\"satellite\"}", MASTER},
+    {"yaml_master_satellites_neutral_satellite_de", "neutral", "{\"role\":\"satellite\"}", MASTER},
+    {"yaml_master_satellites_neutral_master_zh-tw", "neutral", "{\"role\":\"master\"}", MASTER},
+    {"yaml_master_satellites_neutral_pt", "neutral", "{}", MASTER},
+    {"yaml_master_satellites_captured_satellite_pt", "captured",
+     "{\"team\":\"blue\",\"since\":95,\"role\":\"satellite\"}", MASTER},
+    {"yaml_master_satellites_captured_satellite_zh-tw", "captured",
+     "{\"team\":\"blue\",\"since\":95,\"role\":\"satellite\"}", MASTER},
+    {"yaml_master_satellites_captured_live_satellite_pt", "captured",
+     "{\"team\":\"blue\",\"since\":95,\"role\":\"satellite\"}", MASTER},
+    {"yaml_master_satellites_captured_live_satellite_de", "captured",
+     "{\"team\":\"blue\",\"since\":95,\"role\":\"satellite\"}", MASTER},
+    {"yaml_master_satellites_status_live", "master_status",
+     "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4,\"total\":12}", MASTER},
+    {"yaml_master_satellites_status_live_pt", "master_status",
+     "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4,\"total\":12}", MASTER},
+    {"yaml_master_satellites_status_live_zh-tw", "master_status",
+     "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4,\"total\":12}", MASTER},
+    {"yaml_master_satellites_status_holding_pt", "master_status",
+     "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4,\"total\":12}", MASTER},
+    {"yaml_master_satellites_neutral_holding", "neutral", "{\"role\":\"satellite\"}", MASTER},
+    /* Progressive Domination: the held time counts up; no corner totals (its points are one box's).
+     */
+    {"yaml_progressive_domination_captured_live", "captured",
+     "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"held_min\":2,\"need_min\":10,"
+     "\"points\":4,\"share\":0.2}",
+     PROG},
+    {"yaml_progressive_domination_captured_live_pt", "captured",
+     "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"held_min\":2,\"need_min\":10,"
+     "\"points\":4,\"share\":0.2}",
+     PROG},
+    {"yaml_progressive_domination_captured_holding_de", "captured",
+     "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"held_min\":2,\"need_min\":10,"
+     "\"points\":4,\"share\":0.2}",
+     PROG},
+    /* VIP Payload: a checkpoint counts up its held time and shows the bar of a team taking it. */
+    {"yaml_vip_checkpoint_held_live_en", "checkpoint_held", "{\"team\":\"blue\",\"since\":95}",
+     VIP},
+    {"yaml_vip_checkpoint_held_live_pt", "checkpoint_held", "{\"team\":\"blue\",\"since\":95}",
+     VIP},
+    {"yaml_vip_checkpoint_held_holding_de", "checkpoint_held", "{\"team\":\"red\",\"since\":95}",
+     VIP},
+    /* A game saved with the old lang "en" on a Portuguese box: the box's language wins. */
+    {"yaml_vip_checkpoint_held_old_lang_pt", "checkpoint_held", "{\"team\":\"blue\",\"since\":95}",
+     VIP_OLD_LANG},
+    {"yaml_vip_checkpoint_free_holding_en", "checkpoint_free", "{}", VIP},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 
@@ -692,10 +771,54 @@ static void check_glyphs(const char *name)
     if (font_check_labels(lv_screen_active(), msg, sizeof(msg)) > 0) fail(name, msg);
 }
 
+/* The box's own readers, as the shell sets them: the game's clock and the buttons held. */
+static uint32_t test_game_ms(void)
+{
+    return 225000;
+}
+
+static int test_holds_ms; /* ms the blue button has been held; 0 none */
+
+static int test_holds(oled_hold_t *holds, int max)
+{
+    if (!test_holds_ms || max < 1) return 0;
+    snprintf(holds[0].team, sizeof(holds[0].team), "blue");
+    holds[0].ms = (uint32_t)test_holds_ms;
+    return 1;
+}
+
 static void render(const screen_case_t *c)
 {
     box_lang_set_code(language(c->name));
     if (c->mode) screen_render(SCREEN_MODE_MESSAGE, c->mode);
+    test_holds_ms = 0;
+    bool master = c->mode && strstr(c->mode, "master_satellites");
+    if (strstr(c->name, "_live")) {
+        screen_set_overlay_readers(test_game_ms, test_holds);
+        /* Blue held the zone before, with 7 points. */
+        if (master)
+            screen_render("master_status",
+                          "{\"team\":\"blue\",\"since\":20,\"held\":0,\"of\":3,\"points\":2,"
+                          "\"total\":7}");
+        else
+            screen_render("captured", "{\"team\":\"blue\",\"points\":7,\"since\":20}");
+    }
+    if (strstr(c->name, "_holding")) {
+        screen_set_overlay_readers(test_game_ms, test_holds);
+        test_holds_ms = 1500;
+        if (master)
+            screen_render("master_status",
+                          "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4,"
+                          "\"total\":12}");
+        else
+            screen_render("captured", "{\"team\":\"red\",\"points\":12,\"since\":95}");
+        screen_render("neutral", "{}");
+        if (strstr(c->name, "captured") || strstr(c->name, "status") ||
+            strstr(c->name, "checkpoint_held")) {
+            screen_render(c->template_name, c->data);
+            test_holds_ms = 2250;
+        }
+    }
     if (!screen_render(c->template_name, c->data)) fail(c->name, "template not recognised");
     if (c->mode && !screen_template_widget_count()) fail(c->name, "not drawn from its template");
     for (size_t i = 0; i < sizeof(timer_bars) / sizeof(timer_bars[0]); i++) {
@@ -704,6 +827,7 @@ static void render(const screen_case_t *c)
         if (screen_timer_bar_left() != timer_bars[i].left)
             fail(c->name, "the timer bar is not shown");
     }
+    screen_overlay_tick();
     test_display_render();
     test_display_rgb888(rendered);
 }

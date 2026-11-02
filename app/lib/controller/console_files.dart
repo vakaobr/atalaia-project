@@ -74,8 +74,14 @@ const fieldMapSecurityHeaders = {
 
 /// The headers of a /console answer for [path]: the field-map page's own, the
 /// strict ones for every other page and file.
-Map<String, String> consoleHeadersFor(String path) =>
-    path == fieldMapPage ? fieldMapSecurityHeaders : consoleSecurityHeaders;
+///
+/// With the field's map fetching turned off (LEG-50, [mapFetching] false) the
+/// field-map page gets the strict headers too: the browser reaches no map
+/// service from it, whatever its script does.
+Map<String, String> consoleHeadersFor(String path, {bool mapFetching = true}) =>
+    path == fieldMapPage && mapFetching
+    ? fieldMapSecurityHeaders
+    : consoleSecurityHeaders;
 
 const _types = {
   'html': 'text/html; charset=utf-8',

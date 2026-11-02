@@ -66,6 +66,7 @@ import time
 from typing import Any, Callable, Optional
 from urllib.parse import urlsplit, urlunsplit
 
+from . import wallclock
 from . import __version__
 from .engine import Conflict, ControllerError, NotFound, StartBlocked, Unavailable
 from .sync_format import (MAX_COT_EVENTS, MAX_LIVE_EVENTS, MISSING_MAX, NODE_INFO, ROLE_MAX, STALE_S, SYNC_VERSION, SyncFormatError,
@@ -106,7 +107,7 @@ class RemoteGm:
     """The stream's thread: ``start``/``stop``; ``handle_command`` and ``live`` are what it sends and does."""
 
     def __init__(self, cfg: Any, store: Any, controller: Any, *, api_key: str, controller_id: Callable[[], str],
-                 connect: Optional[Callable[[], Any]] = None, wall: Callable[[], float] = time.time) -> None:
+                 connect: Optional[Callable[[], Any]] = None, wall: Callable[[], float] = wallclock.now) -> None:
         self.cfg = cfg
         self.store = store
         self.controller = controller

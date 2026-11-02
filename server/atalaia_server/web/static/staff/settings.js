@@ -41,6 +41,23 @@ async function save(body, done) {
     }
 }
 
+// The sharing terms (LEG-41): the version asked for, who accepted which version and when, and the box to tick.
+function fillTerms() {
+    const terms = field.sharing_terms || {};
+    const version = terms.version || '';
+    $('f-terms-doc').textContent = t('fs_terms_doc', { version });
+    $('f-terms-label').textContent = t('fs_terms_accept', { version });
+    $('f-terms').checked = Boolean(terms.current);  // already accepted at this version: ticked, nothing to repeat
+    let state;
+    if (!terms.accepted_version) state = t('fs_terms_none');
+    else if (terms.current) {
+        state = t('fs_terms_ok', { version, date: (terms.accepted_at || '').slice(0, 10), who: terms.accepted_by || '-' });
+    } else state = t('fs_terms_stale', { accepted: terms.accepted_version, version });
+    $('f-terms-state').textContent = state;
+    $('f-chrono-state').textContent = field.chrono_sharing_enabled
+        ? t(field.sharing_live ? 'fs_chrono_live' : 'fs_chrono_suspended') : '';
+}
+
 function fillForms() {
     $('f-public').checked = Boolean(field.public_page);
     $('f-description').value = field.description || '';
@@ -53,6 +70,7 @@ function fillForms() {
     select.value = field.limit_template || '';
     $('f-replicas').value = field.max_replicas === null || field.max_replicas === undefined ? '' : field.max_replicas;
     $('f-chrono').checked = Boolean(field.chrono_sharing_enabled);
+    fillTerms();
     $('f-country').value = field.country || '';
     $('f-chrono-days').value = field.chrono_retention_days ?? '';
     $('f-game-days').value = field.game_retention_days ?? '';
@@ -169,8 +187,11 @@ function wire() {
     });
     $('chrono-form').addEventListener('submit', async (event) => {
         event.preventDefault();
-        await save({ chrono_sharing_enabled: $('f-chrono').checked }, 'saved');
-        fillForms();
+        // Switching sharing on needs the box ticked: the acceptance (version, date, account) is recorded by the
+        // server; it is also sent while sharing is on and the terms changed, to accept the new version.
+        const accept = $('f-terms').checked ? { sharing_terms_accepted: (field.sharing_terms || {}).version } : {};
+        // A refusal leaves the boxes as they are, so the person can tick the terms and press save again.
+        if (await save({ chrono_sharing_enabled: $('f-chrono').checked, ...accept }, 'saved')) fillForms();
     });
     $('country-form').addEventListener('submit', async (event) => {
         event.preventDefault();

@@ -20,7 +20,8 @@ import unittest
 from pathlib import Path
 
 import support  # noqa: F401
-from atalaia_controller.store import EPOCH_KEYS, SCHEMA_VERSION, Store, epoch_tag
+from atalaia_controller.store import (EPOCH_KEYS, EPOCH_LOST_MARGIN, EPOCH_LOST_MARGIN_SUSPECT, EPOCH_LOST_MAX,
+                                      EPOCH_LOST_MIN, SCHEMA_VERSION, Store, epoch_lost_bounds, epoch_tag)
 
 
 def event(**kw):
@@ -138,6 +139,234 @@ class StoreTests(unittest.TestCase):
             self.assertEqual(other.next_tx_epoch(key, resuming=True), 2)  # the list exists now
         finally:
             other.close()
+
+    def test_tx_epoch_shared_vectors(self):
+        """protocol/vectors/tx_epoch.json, shared with the phone controller's nextTxEpoch."""
+        path = Path(__file__).resolve().parents[2] / "protocol" / "vectors" / "tx_epoch.json"
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        lo, hi = doc["lost_range"]
+        for case in doc["cases"]:
+            with self.subTest(case["name"]):
+                store = Store(":memory:")
+                try:
+                    if case["table"]:
+                        rows = [[epoch_tag(bytes.fromhex(r["key"])), r["epoch"]] for r in case["table"]]
+                        store.set_setting("tx_epochs", json.dumps(rows))
+                    key = bytes.fromhex(case["key"])
+                    if case.get("floor"):
+                        store.set_setting("tx_epoch_floor", str(case["floor"]))
+                    if case.get("error"):
+                        with self.assertRaises(RuntimeError):
+                            store.next_tx_epoch(key, case["resuming"])
+                    elif case.get("lost_range"):
+                        for _ in range(20):
+                            # The same state each time: the draw is random, and the floor moves with it.
+                            again = Store(":memory:")
+                            try:
+                                if case["table"]:
+                                    again.set_setting("tx_epochs", json.dumps(rows))
+                                if case.get("floor"):
+                                    again.set_setting("tx_epoch_floor", str(case["floor"]))
+                                with self.assertLogs("atalaia_controller.store", "WARNING"):
+                                    got = again.next_tx_epoch(key, case["resuming"])
+                                self.assertTrue(case["lost_lo"] <= got <= case["lost_hi"], got)
+                                self.assertTrue(again.epoch_lost)
+                            finally:
+                                again.close()
+                    else:
+                        self.assertEqual(store.next_tx_epoch(key, case["resuming"]), case["epoch"])
+                        self.assertFalse(store.epoch_lost)
+                finally:
+                    store.close()
+
+    def test_a_resumed_game_with_a_lost_record_does_not_repeat_nonces(self):
+        """SR-29: the list gone (or the key pushed out of it) and the game resumed from its stored key:
+        epoch 1.. may all have been used with it, so the controller takes a random high epoch, never 1."""
+        key = bytes(range(16))
+        self.assertEqual(self.store.next_tx_epoch(key), 1)
+        self.store.delete_setting("tx_epochs")
+        os.remove(self.path + ".epochs")  # and the copy beside the database
+        with self.assertLogs("atalaia_controller.store", "WARNING"):
+            got = self.store.next_tx_epoch(key, resuming=True)
+        self.assertTrue(4096 <= got <= 61439 and self.store.epoch_lost)
+        self.assertEqual(self.store.next_tx_epoch(key, resuming=True), got + 1)
+        self.assertFalse(self.store.epoch_lost)
+
+    def test_a_database_restored_from_an_older_backup_goes_on_above_the_file(self):
+        """SR-29: the database is an older copy (epoch 2 where the controller had reached 6), or was
+        deleted; the epoch file beside it still has 6 (and the list of keys)."""
+        key = bytes(range(16))
+        for _ in range(6):
+            self.store.next_tx_epoch(key)
+        self.store.set_setting("tx_epochs", json.dumps([[epoch_tag(key), 2]]))  # the older copy
+        self.assertEqual(self.store.next_tx_epoch(key, resuming=True), 7)
+        self.store.close()
+        os.remove(self.path)  # the database lost, the file kept
+        for suffix in ("-wal", "-shm"):
+            if os.path.exists(self.path + suffix):
+                os.remove(self.path + suffix)
+        self.store = Store(self.path)
+        self.assertEqual(self.store.next_tx_epoch(key, resuming=True), 8)
+        self.assertEqual(self.store.next_tx_epoch(bytes(16)), 1)  # another game is still new
+        self.assertFalse(self.store.epoch_lost)
+
+    def test_an_unreadable_epoch_file_is_ignored_and_rewritten(self):
+        key = bytes(range(16))
+        self.assertEqual(self.store.next_tx_epoch(key), 1)
+        with open(self.path + ".epochs", "w") as f:
+            f.write("not json")
+        self.assertEqual(self.store.next_tx_epoch(key, resuming=True), 2)
+        with open(self.path + ".epochs") as f:
+            self.assertEqual(json.load(f)["keys"][0], [epoch_tag(key), 2])
+        self.assertEqual(stat.S_IMODE(os.stat(self.path + ".epochs").st_mode), 0o600)
+
+    def test_a_second_store_loss_cannot_draw_below_the_first(self):
+        """EP-2: a lost record's epoch is above the highest the controller ever used, so a receiver that
+        followed the first draw (it never goes back) still hears the second, and no nonce of the first
+        life repeats. The floor is its own record: the list losing the key, in both places, does not take it."""
+        key = bytes(range(16))
+        self.store.next_tx_epoch(key)
+        for _ in range(5):  # several losses: each draw is above the last epoch used
+            self.store.set_setting("tx_epochs", "[]")
+            with open(self.path + ".epochs", "w") as f:
+                f.write("[]")  # the file's list lost too (the floor is in the database)
+            floor = int(self.store.get_setting("tx_epoch_floor"))
+            with self.assertLogs("atalaia_controller.store", "WARNING"):
+                got = self.store.next_tx_epoch(key, resuming=True)
+            self.assertGreater(got, floor)
+            self.assertTrue(self.store.epoch_lost)
+            self.store.next_tx_epoch(key, resuming=True)  # a restart or two in between
+            self.store.next_tx_epoch(key, resuming=True)
+
+    def test_the_lost_draw_stays_in_its_range_at_the_bounds(self):
+        """EP-2 / EPW-1: the draw is inside epoch_lost_bounds whatever the random value (lowest and highest
+        answers injected), above the floor, and above the margin for forgotten epochs while it fits."""
+        key = bytes(range(16))
+        self.assertEqual(epoch_lost_bounds(0), (EPOCH_LOST_MIN, EPOCH_LOST_MAX))  # no record: the whole range
+        self.assertIsNone(epoch_lost_bounds(EPOCH_LOST_MAX))
+        for floor in (1, 3, 4094, 4095, 4096, 32767, 50000, 60000, 60414, 60415, 60416, 61000, EPOCH_LOST_MAX - 1):
+            lo, hi = epoch_lost_bounds(floor)
+            self.assertGreater(lo, floor)
+            self.assertLessEqual(hi, EPOCH_LOST_MAX)
+            self.assertGreaterEqual(hi, lo)
+            if floor + 1 + EPOCH_LOST_MARGIN <= EPOCH_LOST_MAX:
+                self.assertGreaterEqual(lo, floor + 1 + EPOCH_LOST_MARGIN)  # a stale floor's forgotten epochs are skipped
+            self.assertLessEqual(hi - lo + 1, (EPOCH_LOST_MAX - lo + 2) // 2)  # at most half of what is left
+            for pick, want in ((lambda n: 0, lo), (lambda n: n - 1, hi)):
+                with self.subTest(floor=floor, want=want):
+                    store = Store(":memory:")
+                    try:
+                        store.set_setting("tx_epoch_floor", str(floor))
+                        with self.assertLogs("atalaia_controller.store", "WARNING"):
+                            self.assertEqual(store.next_tx_epoch(key, True, randbelow=pick), want)
+                    finally:
+                        store.close()
+
+    def test_at_least_15_store_losses_fit_even_at_the_top_of_every_draw(self):
+        """The product bug behind the 2-in-200 flake: a uniform draw over what was left halved the room each
+        loss. Each loss now takes at most half of what is left above the margin: from a small floor 15 losses
+        fit in the worst case (the highest draw every time), each above the last."""
+        key = bytes(range(16))
+        store = Store(":memory:")
+        try:
+            store.set_setting("tx_epoch_floor", "5")
+            last, losses = 5, 0
+            while True:
+                store.set_setting("tx_epochs", "[]")
+                try:
+                    with self.assertLogs("atalaia_controller.store", "WARNING"):
+                        got = store.next_tx_epoch(key, True, randbelow=lambda n: n - 1)
+                except RuntimeError:
+                    break
+                self.assertGreater(got, last)
+                last, losses = got, losses + 1
+            self.assertGreaterEqual(losses, 15)
+        finally:
+            store.close()
+
+    def test_a_stale_floor_cannot_be_landed_on_within_the_margin(self):
+        """EPW-1: a database restored from an old backup (and its epoch file lost) has a floor below the
+        epochs used since (contiguous from floor + 1); up to EPOCH_LOST_MARGIN of them are never drawn,
+        whatever the random value."""
+        key = bytes(range(16))
+        for floor in (10, 5000, 30000):
+            for forgotten in (1, 100, EPOCH_LOST_MARGIN):
+                for pick in (lambda n: 0, lambda n: n - 1, lambda n: n // 2):
+                    store = Store(":memory:")
+                    try:
+                        store.set_setting("tx_epoch_floor", str(floor))
+                        with self.assertLogs("atalaia_controller.store", "WARNING"):
+                            got = store.next_tx_epoch(key, True, randbelow=pick)
+                        self.assertGreater(got, floor + forgotten, (floor, forgotten))
+                    finally:
+                        store.close()
+
+    def test_collision_odds_with_forgotten_epochs_beat_the_uniform_draw(self):
+        """The numbers in RFC 0001 Amendment 25's note (floor 20000, k epochs forgotten above it, contiguous):
+        the chance a draw lands on or below one. The old uniform draw is the bar for k up to 1460."""
+        def odds(bounds, floor, k):
+            lo, hi = bounds
+            return max(0, min(hi, floor + k) - lo + 1) / (hi - lo + 1)
+        floor = 20000
+        for k in (120, 1460):
+            uniform = odds((floor + 1, EPOCH_LOST_MAX), floor, k)
+            self.assertLessEqual(odds(epoch_lost_bounds(floor), floor, k), uniform)
+        self.assertEqual(odds(epoch_lost_bounds(floor), floor, 120), 0)
+        self.assertEqual(odds(epoch_lost_bounds(floor, True), floor, 1460), 0)
+        self.assertEqual(odds(epoch_lost_bounds(floor, True), floor, EPOCH_LOST_MARGIN_SUSPECT), 0)
+
+    def test_a_missing_epoch_file_that_was_written_before_draws_far_above_the_floor(self):
+        """EPW-1: the database may be an old backup when its epoch file is gone; the margin is then 8192."""
+        key = bytes(range(16))
+        self.store.next_tx_epoch(key)  # writes the file and records that it did
+        self.assertEqual(self.store.get_setting("epoch_file_seen"), "1")
+        os.remove(self.path + ".epochs")
+        self.store.set_setting("tx_epochs", "[]")
+        self.store.set_setting("tx_epoch_floor", "20000")
+        with self.assertLogs("atalaia_controller.store", "WARNING") as cm:
+            got = self.store.next_tx_epoch(key, True, randbelow=lambda n: 0)
+        self.assertEqual(got, 20000 + 1 + EPOCH_LOST_MARGIN_SUSPECT)
+        self.assertTrue(any("old backup" in m for m in cm.output))
+        self.assertTrue(os.path.exists(self.path + ".epochs"))  # written again: the next loss is an ordinary one
+
+    def test_a_first_run_without_an_epoch_file_is_not_suspect(self):
+        key = bytes(range(16))
+        self.store.set_setting("tx_epoch_floor", "20000")
+        with self.assertLogs("atalaia_controller.store", "WARNING"):
+            got = self.store.next_tx_epoch(key, True, randbelow=lambda n: 0)
+        self.assertEqual(got, 20000 + 1 + EPOCH_LOST_MARGIN)
+
+    def test_the_floor_survives_in_the_file_when_the_database_is_lost(self):
+        """EP-2 and EP-3: the database deleted, the file kept: a lost record's epoch is above the file's floor."""
+        key = bytes(range(16))
+        with self.assertLogs("atalaia_controller.store", "WARNING"):
+            first = self.store.next_tx_epoch(key, resuming=True)
+        self.store.close()
+        os.remove(self.path)
+        for suffix in ("-wal", "-shm"):
+            if os.path.exists(self.path + suffix):
+                os.remove(self.path + suffix)
+        self.store = Store(self.path)
+        other = bytes(16)
+        with self.assertLogs("atalaia_controller.store", "WARNING"):
+            got = self.store.next_tx_epoch(other, resuming=True)  # another key, no record anywhere
+        self.assertGreater(got, first)
+
+    def test_a_lost_record_with_no_epoch_left_above_the_floor_is_refused(self):
+        key = bytes(range(16))
+        self.store.set_setting("tx_epoch_floor", "61439")
+        with self.assertRaises(RuntimeError):
+            self.store.next_tx_epoch(key, resuming=True)
+        self.assertEqual(self.store.next_tx_epoch(key), 1)  # a new game is not affected
+
+    def test_an_epoch_file_of_the_first_version_is_still_read(self):
+        key = bytes(range(16))
+        self.store.next_tx_epoch(key)
+        self.store.delete_setting("tx_epochs")
+        self.store.delete_setting("tx_epoch_floor")
+        with open(self.path + ".epochs", "w") as f:
+            json.dump([[epoch_tag(key), 5]], f)  # a list, as before the floor
+        self.assertEqual(self.store.next_tx_epoch(key, resuming=True), 6)
 
     def test_epoch_tag_vectors(self):
         """protocol/vectors/epoch_tag.json, shared with the firmware's test_radio_protocol.c."""

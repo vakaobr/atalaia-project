@@ -16,6 +16,7 @@
 local fs = state.field { master = nil, held = 0 }
 local tick
 local told -- the last status sent to the master box
+local roled = {} -- when each box was last told what it is (master or satellite): node id -> game s
 
 local function master_id()
   local m = field.nodes("master")[1]
@@ -46,7 +47,23 @@ local function free_satellites()
   end
 end
 
+-- Tell each box what it is, at the start, every 30 s again (a radio command can be lost) and after
+-- it rebooted: a script does not know its role, and a free box shows "master" or "satellite"
+-- instead of a plain zone. The box redraws only when the answer changes.
+local function tell_roles()
+  local now = game.time()
+  for _, role in ipairs({ "master", "satellite" }) do
+    for _, n in ipairs(field.nodes(role)) do
+      if roled[n.id] == nil or now - roled[n.id] >= 30 then
+        roled[n.id] = now
+        field.send(n.id, "mode", { name = "role", role = role })
+      end
+    end
+  end
+end
+
 local function check()
+  tell_roles()
   local id = master_id()
   local owner = id and field.owner(id)
   if owner ~= fs.master then
@@ -73,18 +90,25 @@ local function check()
     fs.held = held -- state.field changes reach the console, so write only changes
   end
   if owner ~= nil then
-    local status = owner .. " " .. held .. " " .. of .. " " .. points(held)
+    local total = score.get(owner)
+    local status = owner .. " " .. held .. " " .. of .. " " .. points(held) .. " " .. total
     if status ~= told then
       told = status
-      field.send(
-        id,
-        "mode",
-        { name = "status", team = owner, held = held, of = of, points = points(held) }
-      )
+      field.send(id, "mode", {
+        name = "status",
+        team = owner,
+        held = held,
+        of = of,
+        points = points(held),
+        total = total,
+      })
     end
   end
 end
 
+on("node.rebooted", function(e)
+  roled[e.node] = nil
+end)
 on("zone.captured", check)
 on("zone.neutralized", check)
 every(1, check)

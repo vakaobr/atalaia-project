@@ -17,9 +17,9 @@ made from the schedule is an ordinary game, and the GM can change everything abo
 
 from __future__ import annotations
 
-import time
 from typing import TYPE_CHECKING, Any
 
+from . import wallclock
 from .engine import Conflict, ControllerError, NotFound
 
 if TYPE_CHECKING:
@@ -73,7 +73,7 @@ def create_game(ctrl: "Controller", scheduled_game_id: str, spec: dict[str, Any]
     if "duration_ms" not in body:
         body["duration_ms"] = int(max(0, min(scheduled["ends_at"] - scheduled["starts_at"], 0xFFFFFFFF // 1000)) * 1000)
     game = ctrl.create_game(body)
-    ctrl.store.link_schedule(game["id"], int(game["game_seed"]), scheduled_game_id, time.time())
+    ctrl.store.link_schedule(game["id"], int(game["game_seed"]), scheduled_game_id, wallclock.now())
     sync = getattr(ctrl, "sync", None)
     if sync is not None:
         sync.kick()  # the roster comes at once

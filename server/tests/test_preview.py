@@ -38,7 +38,7 @@ class PreviewCase(AppTestCase):
 
     def settings(self) -> Settings:
         s = super().settings()
-        return Settings(database_url=s.database_url, secret_key=s.secret_key, metrics_token=s.metrics_token,
+        return Settings(allow_signup_without_notice=True, database_url=s.database_url, secret_key=s.secret_key, metrics_token=s.metrics_token,
                         db_timeout_s=2.0, purge_hour=None, preview=self.preview)
 
     def at(self, seconds: float) -> None:
@@ -103,7 +103,7 @@ class BannerTests(PreviewCase):
 
     async def test_the_preview_cannot_be_hosted(self) -> None:
         with self.assertRaises(ConfigError):
-            Settings(database_url=self.database_url, secret_key=SECRET_KEY, hosted=True, hosted_domain="hub.example.pt",
+            Settings(allow_signup_without_notice=True, database_url=self.database_url, secret_key=SECRET_KEY, hosted=True, hosted_domain="hub.example.pt",
                      preview=True)
         env = {"ATALAIA_DATABASE_URL": self.database_url, "ATALAIA_SECRET_KEY": SECRET_KEY}
         self.assertFalse(Settings.from_env(env).preview)
@@ -459,7 +459,7 @@ class DemoLiveTests(PreviewCase):
 
     def settings(self) -> Settings:
         s = super().settings()
-        return Settings(database_url=s.database_url, secret_key=s.secret_key, metrics_token=s.metrics_token,
+        return Settings(allow_signup_without_notice=True, database_url=s.database_url, secret_key=s.secret_key, metrics_token=s.metrics_token,
                         db_timeout_s=2.0, purge_hour=None, preview=True, preview_demo_url=self.DEMO_URL + "/")
 
     async def live(self, key_file: Optional[Path] = None, **kw: Any) -> dict[str, Any]:
@@ -639,7 +639,7 @@ class LanguageCase(AppTestCase):
 
     def settings(self) -> Settings:
         s = super().settings()
-        return Settings(database_url=s.database_url, secret_key=s.secret_key, metrics_token=s.metrics_token,
+        return Settings(allow_signup_without_notice=True, database_url=s.database_url, secret_key=s.secret_key, metrics_token=s.metrics_token,
                         db_timeout_s=2.0, purge_hour=None, preview=True, lang_from_browser=self.from_browser,
                         default_lang=self.default_lang)
 
@@ -660,7 +660,7 @@ class LanguageFromBrowserOnTests(LanguageCase):
 
     async def test_the_settings(self) -> None:
         with self.assertRaises(ConfigError):
-            Settings(database_url=self.database_url, secret_key=SECRET_KEY, default_lang="fr")
+            Settings(allow_signup_without_notice=True, database_url=self.database_url, secret_key=SECRET_KEY, default_lang="fr")
         env = {"ATALAIA_DATABASE_URL": self.database_url, "ATALAIA_SECRET_KEY": SECRET_KEY}
         self.assertTrue(Settings.from_env(env).lang_from_browser)
         self.assertEqual(Settings.from_env(env).default_lang, "pt")

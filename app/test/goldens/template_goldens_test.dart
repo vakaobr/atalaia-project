@@ -179,24 +179,29 @@ const cases = [
   ),
   // VIP / Payload: a checkpoint free and held, the payload on its way and
   // extracted (the payload is a phone: the app draws its accents).
-  ('vip_payload_checkpoint_free', 'vip_payload', 'checkpoint_free', '{}'),
+  (
+    'vip_payload_checkpoint_free',
+    'vip_payload',
+    'checkpoint_free',
+    '{"lang":"pt"}',
+  ),
   (
     'vip_payload_checkpoint_held',
     'vip_payload',
     'checkpoint_held',
-    '{"team":"blue","since":95}',
+    '{"team":"blue","since":95,"lang":"pt"}',
   ),
   (
     'vip_payload_moving',
     'vip_payload',
     'payload',
-    '{"team":"red","state":"moving","metres":75}',
+    '{"team":"red","state":"moving","metres":75,"lang":"pt"}',
   ),
   (
     'vip_payload_extracted',
     'vip_payload',
     'payload',
-    '{"team":"red","state":"extracted","metres":0}',
+    '{"team":"red","state":"extracted","metres":0,"lang":"pt"}',
   ),
   // Objectives: a node waiting for its scenario, a red-only capture, a code
   // accepted, tags counted, an armed bomb site (the setup gives the texts).

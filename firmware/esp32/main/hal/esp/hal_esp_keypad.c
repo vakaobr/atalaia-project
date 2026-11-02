@@ -12,8 +12,9 @@
  * PCF8574A (sold under the same name) at 0x38-0x3F. The other parts on the
  * bus are never probed: the NFC reader (0x24) and the board's OLED (0x3C).
  *
- * Uses the legacy driver/i2c.h API so NFC, battery and keypad can
- * share the same I2C port without conflicts.
+ * Goes through hal_esp_i2c.h like every other part on the bus, so NFC, battery, OLED and keypad
+ * share one port, and a keypad that starts failing (a bad joint) is skipped and tried again
+ * later instead of being hammered: scan() then returns HAL_KEY_NONE at once.
  */
 
 #include "sdkconfig.h"
@@ -25,9 +26,7 @@
 #include "hal_esp_i2c.h"
 
 #include "driver/gpio.h"
-#include "driver/i2c.h"
 #include "esp_log.h"
-#include "freertos/FreeRTOS.h"
 
 static const char *TAG = "hal_kp";
 
@@ -39,7 +38,8 @@ static const char *TAG = "hal_kp";
 #ifndef CONFIG_ATALAIA_KP_INT_PIN
 #define CONFIG_ATALAIA_KP_INT_PIN -1
 #endif
-#define CONFIG_ATALAIA_KP_I2C_PORT HAL_ESP_I2C_PORT
+/* One byte at 100 kHz takes about 0.2 ms: 20 ms is a stuck bus. */
+#define KP_TIMEOUT_MS 20
 
 #define NUM_ROWS 4
 #define NUM_COLS 3
@@ -124,18 +124,14 @@ static int esp_keypad_init(void)
 
     /* Set all pins high (idle / pull-up state). */
     uint8_t all_high = 0xFF;
-    esp_err_t err = i2c_master_write_to_device(CONFIG_ATALAIA_KP_I2C_PORT, kp_addr, &all_high, 1,
-                                               pdMS_TO_TICKS(100));
-    present = err == ESP_OK;
+    present = hal_esp_i2c_write(kp_addr, &all_high, 1, 100) == HAL_ESP_I2C_OK;
     if (!present) {
-        ESP_LOGW(TAG, "PCF8574 keypad at 0x%02X did not take a write (%s): keypad disabled",
-                 kp_addr, esp_err_to_name(err));
+        ESP_LOGW(TAG, "PCF8574 keypad at 0x%02X did not take a write: keypad disabled", kp_addr);
         return -1;
     }
     ESP_LOGI(TAG, "PCF8574 keypad at 0x%02X%s", kp_addr, kp_addr >= 0x38 ? " (PCF8574A)" : "");
     uint8_t in = 0xFF;
-    if (i2c_master_read_from_device(CONFIG_ATALAIA_KP_I2C_PORT, kp_addr, &in, 1,
-                                    pdMS_TO_TICKS(100)) == ESP_OK) {
+    if (hal_esp_i2c_read(kp_addr, &in, 1, 100) == HAL_ESP_I2C_OK) {
         p7_pressed = (in & 0x80) ? 0 : 1;
     } else {
         p7_pressed = 0;
@@ -153,23 +149,24 @@ static char esp_keypad_scan(void)
          * Byte layout: P7 P6 P5 P4 P3 P2 P1 P0
          */
         uint8_t out = (uint8_t)(0xFF & ~(1u << r));
-        esp_err_t err = i2c_master_write_to_device(CONFIG_ATALAIA_KP_I2C_PORT, kp_addr, &out, 1,
-                                                   pdMS_TO_TICKS(10));
-        if (err != ESP_OK) continue;
+        /* A failed or skipped transaction ends the scan: the rest would fail the same way
+         * (and a suspended keypad costs nothing: the bus layer answers at once). */
+        if (hal_esp_i2c_write(kp_addr, &out, 1, KP_TIMEOUT_MS) != HAL_ESP_I2C_OK) {
+            return HAL_KEY_NONE;
+        }
 
         /* Read back the port to see which columns were pulled low. */
         uint8_t in = 0xFF;
-        err = i2c_master_read_from_device(CONFIG_ATALAIA_KP_I2C_PORT, kp_addr, &in, 1,
-                                          pdMS_TO_TICKS(10));
-        if (err != ESP_OK) continue;
+        if (hal_esp_i2c_read(kp_addr, &in, 1, KP_TIMEOUT_MS) != HAL_ESP_I2C_OK) {
+            return HAL_KEY_NONE;
+        }
         p7_pressed = (in & 0x80) ? 0 : 1; /* P7: a team button to GND */
 
         for (int c = 0; c < NUM_COLS; c++) {
             if (!(in & (1u << (c + 4)))) {
                 /* Key found -- restore idle state before returning. */
                 uint8_t idle = 0xFF;
-                i2c_master_write_to_device(CONFIG_ATALAIA_KP_I2C_PORT, kp_addr, &idle, 1,
-                                           pdMS_TO_TICKS(10));
+                hal_esp_i2c_write(kp_addr, &idle, 1, KP_TIMEOUT_MS);
                 return keymap[r][c];
             }
         }
@@ -177,7 +174,7 @@ static char esp_keypad_scan(void)
 
     /* No key pressed -- restore idle state. */
     uint8_t idle = 0xFF;
-    i2c_master_write_to_device(CONFIG_ATALAIA_KP_I2C_PORT, kp_addr, &idle, 1, pdMS_TO_TICKS(10));
+    hal_esp_i2c_write(kp_addr, &idle, 1, KP_TIMEOUT_MS);
     return HAL_KEY_NONE;
 }
 

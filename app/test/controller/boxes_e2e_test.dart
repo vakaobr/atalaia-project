@@ -343,109 +343,97 @@ void main() {
     );
   });
 
-  test(
-    'an unadopted box paired by the code it shows',
-    () async {
-      final e = await phone();
-      final b = await box(
-        'porta-norte',
-        key: const [],
-        args: ['--pair', '--announce-ms', '400'],
-      );
-      expect(await waitFor(() => b.logged('pairing: code')), isTrue);
-      String? offered() {
-        for (final o in e.pairing!.status()['offers']! as List) {
-          if ((o as Map)['name'] == 'porta-norte') {
-            return o['pair_id'] as String;
-          }
+  test('an unadopted box paired by the code it shows', () async {
+    final e = await phone();
+    final b = await box(
+      'porta-norte',
+      key: const [],
+      args: ['--pair', '--announce-ms', '400'],
+    );
+    expect(await waitFor(() => b.logged('pairing: code')), isTrue);
+    String? offered() {
+      for (final o in e.pairing!.status()['offers']! as List) {
+        if ((o as Map)['name'] == 'porta-norte') {
+          return o['pair_id'] as String;
         }
-        return null;
       }
+      return null;
+    }
 
-      expect(await waitFor(() => offered() != null), isTrue);
-      final pairId = offered()!;
-      String code([int index = -1]) {
-        final codes = [
-          for (final l in b.lines)
-            if (RegExp(r'code (\d{3}) (\d{3})').firstMatch(l) case final m?)
-              '${m[1]}${m[2]}',
-        ];
-        return codes[index < 0 ? codes.length + index : index];
-      }
+    expect(await waitFor(() => offered() != null), isTrue);
+    final pairId = offered()!;
+    String code([int index = -1]) {
+      final codes = [
+        for (final l in b.lines)
+          if (RegExp(r'code (\d{3}) (\d{3})').firstMatch(l) case final m?)
+            '${m[1]}${m[2]}',
+      ];
+      return codes[index < 0 ? codes.length + index : index];
+    }
 
-      Map<String, Object?> run() =>
-          (e.pairing!.status()['run']! as Map).cast<String, Object?>();
-      // A wrong code: the run fails and the box shows a new one.
-      final first = code();
-      final wrong = ((int.parse(first) + 1) % 1000000).toString().padLeft(
-        6,
-        '0',
-      );
-      e.pairing!.pair(pairId, wrong);
-      expect(
-        await waitFor(
-          () => run()['state'] == 'failed',
-          timeout: const Duration(seconds: 15),
+    Map<String, Object?> run() =>
+        (e.pairing!.status()['run']! as Map).cast<String, Object?>();
+    // A wrong code: the run fails and the box shows a new one.
+    final first = code();
+    final wrong = ((int.parse(first) + 1) % 1000000).toString().padLeft(6, '0');
+    e.pairing!.pair(pairId, wrong);
+    expect(
+      await waitFor(
+        () => run()['state'] == 'failed',
+        timeout: const Duration(seconds: 15),
+      ),
+      isTrue,
+    );
+    expect(run()['detail'], 'wrong_code');
+    // The box does not hear of a wrong code: the phone fails at the REPLY,
+    // and the box burns its code when its own run runs out (BOX_PAIR_RUN_MS,
+    // 10 s from the START, decision AD-25). So the end state comes a fixed
+    // 10 s after the run began, plus however long a loaded machine keeps
+    // the host box's loop from its tick: the deadline is that run and a
+    // generous slack, never a bare 12 s.
+    expect(
+      await waitFor(
+        () => b.logged('pairing: new code'),
+        timeout: boxPairRun + loadSlack,
+      ),
+      isTrue,
+      reason: 'the box burns the code ${b.lines.reversed.take(6)}',
+    );
+    // The right code: adopted with this field's key.
+    e.pairing!.pair(pairId, code());
+    expect(
+      await waitFor(
+        () => run()['state'] == 'done',
+        timeout: const Duration(seconds: 15),
+      ),
+      isTrue,
+      reason: '${run()} ${b.lines.reversed.take(8)}',
+    );
+    expect(run()['result'], 'adopted');
+    expect(File('${tmp.path}/porta-norte/join_key').readAsBytesSync(), joinKey);
+    expect(
+      b.logged('adoption (radio): adopted, field ${fieldFingerprint(joinKey)}'),
+      isTrue,
+    );
+    final log = e.adoption!.info()['log']! as List;
+    expect(
+      [for (final x in log.take(2)) (x as Map)['result']],
+      ['adopted', 'wrong_code'],
+    );
+    // Its field frames start under the new key: a free box.
+    expect(
+      await waitFor(
+        () => (e.boxes!.boxes()['boxes']! as List).any(
+          (x) => (x as Map)['name'] == 'porta-norte',
         ),
-        isTrue,
-      );
-      expect(run()['detail'], 'wrong_code');
-      // The box does not hear of a wrong code: the phone fails at the REPLY,
-      // and the box burns its code when its own run runs out (BOX_PAIR_RUN_MS,
-      // 10 s from the START, decision AD-25). So the end state comes a fixed
-      // 10 s after the run began, plus however long a loaded machine keeps
-      // the host box's loop from its tick: the deadline is that run and a
-      // generous slack, never a bare 12 s.
-      expect(
-        await waitFor(
-          () => b.logged('pairing: new code'),
-          timeout: boxPairRun + loadSlack,
-        ),
-        isTrue,
-        reason: 'the box burns the code ${b.lines.reversed.take(6)}',
-      );
-      // The right code: adopted with this field's key.
-      e.pairing!.pair(pairId, code());
-      expect(
-        await waitFor(
-          () => run()['state'] == 'done',
-          timeout: const Duration(seconds: 15),
-        ),
-        isTrue,
-        reason: '${run()} ${b.lines.reversed.take(8)}',
-      );
-      expect(run()['result'], 'adopted');
-      expect(
-        File('${tmp.path}/porta-norte/join_key').readAsBytesSync(),
-        joinKey,
-      );
-      expect(
-        b.logged(
-          'adoption (radio): adopted, field ${fieldFingerprint(joinKey)}',
-        ),
-        isTrue,
-      );
-      final log = e.adoption!.info()['log']! as List;
-      expect(
-        [for (final x in log.take(2)) (x as Map)['result']],
-        ['adopted', 'wrong_code'],
-      );
-      // Its field frames start under the new key: a free box.
-      expect(
-        await waitFor(
-          () => (e.boxes!.boxes()['boxes']! as List).any(
-            (x) => (x as Map)['name'] == 'porta-norte',
-          ),
-          timeout: const Duration(seconds: 25),
-        ),
-        isTrue,
-        // The test's own limit is the default 30 s; the box's code burn alone
-        // is 10 s, and a wrong run, a right run and the first announce
-        // follow: a loaded machine needs the room (see loadSlack).
-      );
-    },
-    timeout: const Timeout(Duration(minutes: 3)),
-  );
+        timeout: const Duration(seconds: 25),
+      ),
+      isTrue,
+      // The test's own limit is the default 30 s; the box's code burn alone
+      // is 10 s, and a wrong run, a right run and the first announce
+      // follow: a loaded machine needs the room (see loadSlack).
+    );
+  }, timeout: const Timeout(Duration(minutes: 3)));
 
   // The offer is CMD update (opcode 9), an ordinary sealed packet: the USB
   // modem and the I/O pod carry it alike (decision PE24-130).
@@ -511,39 +499,36 @@ void main() {
     });
   }
 
-  test(
-    'an I/O pod relays field and pair frames (PE24-100): the controller uses it as its radio',
-    () async {
-      final pod = await HostPod.start(airPeer: hub.port);
-      addTearDown(pod.stop);
-      hub.members.add(pod.airPort);
-      final podLink = await SocketPodTransport.usb(pod);
-      expect(await probeRadioLink(podLink), 'pod');
-      final client = PodClient(podLink);
-      addTearDown(client.close);
-      final ControllerModem m = PodModem(
-        client,
-        pingInterval: const Duration(milliseconds: 200),
-      );
-      final e = ControllerEngine(
-        store: FileControllerStore(Directory('${tmp.path}/pod-controller')),
-        core: core,
-        modem: m,
-      )..joinKey = joinKey;
-      ControllerAdoption(e);
-      ControllerBoxes(e);
-      ControllerPairing(e);
-      await (m as PodModem).start();
-      expect(await waitFor(() => m.isUp), isTrue);
-      // Since PE24-100 the pod's IDENT says field_frames and pair_frames and
-      // it relays them as the USB modem does.
-      expect(m.hasFieldFrames, isTrue);
-      expect(m.hasPairFrames, isTrue);
-      expect(e.boxes!.boxes()['field_frames'], isTrue);
-      e.pairing!.listen();
-      final gid = game(e);
-      expect(e.endGame(gid)['game_over_frame'], 'sent');
-      e.close();
-    },
-  );
+  test('an I/O pod relays field and pair frames (PE24-100): the controller uses it as its radio', () async {
+    final pod = await HostPod.start(airPeer: hub.port);
+    addTearDown(pod.stop);
+    hub.members.add(pod.airPort);
+    final podLink = await SocketPodTransport.usb(pod);
+    expect(await probeRadioLink(podLink), 'pod');
+    final client = PodClient(podLink);
+    addTearDown(client.close);
+    final ControllerModem m = PodModem(
+      client,
+      pingInterval: const Duration(milliseconds: 200),
+    );
+    final e = ControllerEngine(
+      store: FileControllerStore(Directory('${tmp.path}/pod-controller')),
+      core: core,
+      modem: m,
+    )..joinKey = joinKey;
+    ControllerAdoption(e);
+    ControllerBoxes(e);
+    ControllerPairing(e);
+    await (m as PodModem).start();
+    expect(await waitFor(() => m.isUp), isTrue);
+    // Since PE24-100 the pod's IDENT says field_frames and pair_frames and
+    // it relays them as the USB modem does.
+    expect(m.hasFieldFrames, isTrue);
+    expect(m.hasPairFrames, isTrue);
+    expect(e.boxes!.boxes()['field_frames'], isTrue);
+    e.pairing!.listen();
+    final gid = game(e);
+    expect(e.endGame(gid)['game_over_frame'], 'sent');
+    e.close();
+  });
 }

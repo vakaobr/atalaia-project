@@ -201,6 +201,30 @@ void main() {
     expect(fc.totalScores, {'red': 10, 'blue': 5 + 4 - 2 - 1});
   });
 
+  test('a packet played back long after is refused by the replay window '
+      '(FLD-1)', () {
+    fc.onPacket(header(4, 5, RfType.state), state(1, {1: 10}), epoch: 1);
+    expect(fc.replaysRefused, 0);
+    fc.onPacket(header(4, 5, RfType.state), state(1, {1: 10}), epoch: 1);
+    expect(fc.replaysRefused, 1); // a relayed copy
+    for (var seq = 6; seq < 80; seq++) {
+      fc.onPacket(header(4, seq, RfType.state), state(1, {1: 10}), epoch: 1);
+    }
+    fc.tick(10 * 60000); // far past the old 60 s table
+    fc.onPacket(header(4, 5, RfType.state), state(1, {1: 10}), epoch: 1);
+    fc.onPacket(header(4, 70, RfType.state), state(1, {1: 10}), epoch: 1);
+    expect(fc.replaysRefused, 3);
+    // A rebooted box (new epoch, seq from 0) is not a replay.
+    fc.onPacket(header(4, 0, RfType.state), state(1, {1: 10}), epoch: 2);
+    expect(fc.replaysRefused, 3);
+    // Each source has its own window.
+    for (var node = 20; node < 60; node++) {
+      fc.onPacket(header(node, 9, RfType.state), state(1, {}), epoch: 1);
+      fc.onPacket(header(node, 9, RfType.state), state(1, {}), epoch: 1);
+    }
+    expect(fc.replaysRefused, 3 + 40);
+  });
+
   test('projected score: ticks since the last STATE, replaced by the next '
       '(BSC-2)', () {
     fc.scoringHold = (10000, 2);
@@ -275,15 +299,18 @@ void main() {
         ..startGame(nowMs: 0);
     });
 
+    // The box's packets carry a rising header seq (the replay window refuses
+    // the rest); the seq the tests name is only for reading.
+    var pktSeq = 0;
     void st(int seq, int owner, Map<int, int> counters, int gameMs) =>
         pc.onPacket(
-          header(4, seq, RfType.state),
+          header(4, pktSeq++, RfType.state),
           state(owner, counters, gameTimeMs: gameMs),
           epoch: 1,
         );
     void captured(int seq, int team, int tSec, {bool neutral = false}) =>
         pc.onPacket(
-          header(4, 100 + seq, RfType.event),
+          header(4, pktSeq++, RfType.event),
           Uint8List.fromList([4, seq, tSec, team, neutral ? 1 : 0]),
           epoch: 1,
         );

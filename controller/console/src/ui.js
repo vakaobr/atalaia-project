@@ -117,6 +117,13 @@ export function eventWords(e) {
         const r = t(`firmware.reasons.${reason}`);
         if (!r.startsWith('firmware.')) reason = r;
     }
+    // A box that restarted: why, in words; a panic or a watchdog reset is a crash, said as one
+    // (the firmware reads esp_reset_reason(): firmware/esp32/main/reset_reason.h).
+    if (e.type === 'node.rebooted') {
+        const r = t(`feed.reboot_reasons.${reason}`);
+        if (!r.startsWith('feed.')) reason = r;
+        if (d.reason === 'panic' || d.reason === 'watchdog') key += '_crash';
+    }
     // A scenario's objectives: which one is the staff's (decision M6-5); a reveal without a
     // team is for every team.
     if (String(e.type || '').startsWith('scenario.objective.')) {
@@ -124,7 +131,9 @@ export function eventWords(e) {
         else team = team || t('feed.events.nobody');
         if (!d.objective) key += '_hidden';
     }
-    const s = t(key, { team, player: d.player || '', remaining: d.remaining,
+    // The count a feed text puts a noun after: the lives of a respawn, the points of a deposit.
+    const n = e.type === 'player.respawn' ? d.lives_left : d.amount;
+    const s = t(key, { n, team, player: d.player || '', remaining: d.remaining,
                        used: d.player_heals_used, amount: d.amount, puzzle, code: d.code || '',
                        objective: d.objective || '', scenario: d.scenario || '', reason,
                        zone: d.zone || (e.node === undefined ? '' : `${t('nodes.node')} ${e.node}`), step: d.step,
@@ -141,11 +150,20 @@ export function posterProblem(p) {
     return s === key ? (p.problem || '') : s;
 }
 
-/** t('game.start') or t('feed.count', {n: 3}): the text in the current language. */
+/** t('game.start') or t('feed.count', {n: 3}): the text in the current language; with n: 1 the
+ * singular form `<key>_one` when the language has it. */
 export function t(key, vars) {
-    let s = key.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), dict);
-    if (typeof s !== 'string') {
-        s = key.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), fallback);
+    const find = (table, k) => k.split('.').reduce((o, p) => (o && o[p] !== undefined ? o[p] : undefined), table);
+    let s;
+    // A count of exactly 1 takes the singular form "<key>_one" of the current language when it has
+    // one (1 event, not 1 events); Chinese has no plural and no such keys.
+    if (vars && Number(vars.n) === 1) {
+        s = find(dict, `${key}_one`);
+        if (typeof s !== 'string') s = undefined;
+    }
+    if (s === undefined) {
+        s = find(dict, key);
+        if (typeof s !== 'string') s = find(fallback, key);
     }
     if (typeof s !== 'string') return key;
     if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : m));
@@ -228,6 +246,25 @@ export class ApiError extends Error {
 }
 
 /** Calls the controller's REST API v1 with the token. Returns the JSON answer. */
+/**
+ * Where the console must go to send a token: the HTTPS address of this page's host, or null when the page is
+ * already on HTTPS or on the controller's own loopback address, or this controller has no HTTPS (FLD-4: the
+ * controller refuses the GM token over plain HTTP from another machine, so it is not even sent).
+ */
+export async function httpsAddress() {
+    const { protocol, hostname } = window.location;
+    if (protocol !== 'http:' || ['localhost', '127.0.0.1', '[::1]'].includes(hostname)) return null;
+    try {
+        const r = await fetch('/api/v1/controller/https', { cache: 'no-store' });
+        if (!r.ok) return null;
+        const { port } = await r.json();
+        if (!port) return null;
+        return `https://${hostname}${port === 443 ? '' : `:${port}`}/console/`;
+    } catch (e) {
+        return null;
+    }
+}
+
 export async function api(token, method, path, body, raw) {
     const headers = { Authorization: `Bearer ${token}` };
     let payload;
@@ -307,8 +344,13 @@ export class Stream {
     connect() {
         if (this.stopped) return;
         const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-        const url = `${proto}://${location.host}/api/v1/stream?token=${encodeURIComponent(this.token)}`;
-        const ws = new WebSocket(url);
+        // The token goes in the Sec-WebSocket-Protocol header, never in the address, which access logs
+        // keep (LIVE2-1): "atalaia.v1" is what the server answers, the second is the token, base64url.
+        const bytes = new TextEncoder().encode(this.token);
+        let bin = '';
+        for (const b of bytes) bin += String.fromCharCode(b);
+        const carrier = 'atalaia.token.' + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        const ws = new WebSocket(`${proto}://${location.host}/api/v1/stream`, ['atalaia.v1', carrier]);
         this.ws = ws;
         this.lastRx = Date.now();
         clearInterval(this.beat);

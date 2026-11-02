@@ -2,16 +2,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # A team holds the master. Data: team, since (game time of the capture, in
-# seconds), held and of (the satellites the team holds, of all of them) and
-# points (the master's points per tick with that bonus), from the controller;
-# lang (pt, en, de or zh-tw) from the box.
+# seconds), held and of (the satellites the team holds, of all of them), points
+# (the master's points per tick with that bonus) and total (the team's score), from
+# the controller; lang (pt, en, de or zh-tw) from the box. The Field Box also adds age
+# (the seconds since "since" by the game's clock) and live (1), updated every second,
+# so its screen counts up "held for 1:23" (a phone says "since <time>"), and draws each
+# team's total in the corner and the hold bar of a team taking the master over.
 template: master_status
 layout:
   - type: row
     style: { width: fill, height: 44, background: team }
     children:
       - type: label
-        text: "{lang == 'pt' && 'MASTER OCUPADO' || lang == 'de' && 'MASTER BESETZT' || lang == 'zh-tw' && '主站已佔領' || 'MASTER HELD'}"
+        text: "{lang == 'pt' && 'MESTRE OCUPADA' || lang == 'de' && 'MASTER BESETZT' || lang == 'zh-tw' && '主站已佔領' || 'MASTER HELD'}"
         style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
@@ -19,14 +22,17 @@ layout:
     text: "{team|upper}"
     style: { font_size: 48, color: team }
   - type: label
-    text: "{held} {lang == 'pt' && 'de' || lang == 'de' && 'von' || lang == 'zh-tw' && '/' || 'of'} {of} {lang == 'pt' && 'satélites' || lang == 'de' && 'Satelliten' || lang == 'zh-tw' && '個衛星' || 'satellites'}"
+    text: "{held} {lang == 'pt' && 'de' || lang == 'de' && 'von' || lang == 'zh-tw' && '/' || 'of'} {of} {lang == 'pt' && of == 1 && 'satélite' || lang == 'pt' && 'satélites' || lang == 'de' && of == 1 && 'Satellit' || lang == 'de' && 'Satelliten' || lang == 'zh-tw' && '個衛星' || of == 1 && 'satellite' || 'satellites'}"
     style: { font_size: 20 }
   - type: label
-    text: "{points} {lang == 'pt' && 'pontos a cada' || lang == 'de' && 'Punkte alle' || lang == 'zh-tw' && '分，每' || 'points every'} {params.tick_s} s"
+    text: "{points} {lang == 'pt' && points == 1 && 'ponto a cada' || lang == 'pt' && 'pontos a cada' || lang == 'de' && points == 1 && 'Punkt alle' || lang == 'de' && 'Punkte alle' || lang == 'zh-tw' && '分，每' || points == 1 && 'point every' || 'points every'} {params.tick_s} s"
     style: { font_size: 20, color: "{points > 0 && 'white' || 'danger'}" }
   - type: label
+    text: "{lang == 'pt' && 'ocupada há' || lang == 'de' && 'gehalten seit' || lang == 'zh-tw' && '已佔領' || 'held'} {age|clock}"
+    style: { font_size: 14, color: muted, visible: "{live}" }
+  - type: label
     text: "{lang == 'pt' && 'desde' || lang == 'de' && 'seit' || lang == 'zh-tw' && '佔領於' || 'held since'} {since|clock}"
-    style: { font_size: 14, color: muted }
+    style: { font_size: 14, color: muted, visible: "{!live}" }
   - type: spacer
     height: fill
   - type: label

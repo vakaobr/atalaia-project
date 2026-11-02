@@ -17,7 +17,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/strings.dart';
 import '../player/field_feed.dart' show FeedEvent;
-import '../player/player_screens.dart' show eventText;
+import '../player/player_screens.dart' show eventText, isPlayerFeedEvent;
 import '../ui/widgets.dart';
 import 'site_api.dart';
 import 'site_client.dart';
@@ -151,6 +151,12 @@ class GameHistoryDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.s;
     final g = game;
+    // The player's own history leaves out the same housekeeping events as the
+    // live list (decision PF-1).
+    final shown = [
+      for (final e in g.events)
+        if (isPlayerFeedEvent(e.type)) e,
+    ];
     final winner = g.winner;
     final when = g.startedAt ?? g.endedAt;
     final teams = [
@@ -204,13 +210,13 @@ class GameHistoryDetailScreen extends StatelessWidget {
               ),
           ],
           SectionTitle(s.t('history.events')),
-          if (g.events.isEmpty)
+          if (shown.isEmpty)
             Notice(
               s.t('history.no_events'),
               key: const Key('history-no-events'),
             )
           else
-            for (final e in g.events)
+            for (final e in shown)
               ListTile(
                 dense: true,
                 leading: Text(

@@ -166,6 +166,8 @@ class _Cfg:
         self.atak_multicast = multicast
         self.atak_staff_endpoints = staff
         self.atak_interval_s = interval
+        self.atak_staff_tls = False  # the TLS options are the Pi alone (no shared vector, FLD-5)
+        self.atak_staff_tls_ca = self.atak_staff_tls_cert = self.atak_staff_tls_key = ""
 
 
 def config_cases() -> list[dict[str, Any]]:

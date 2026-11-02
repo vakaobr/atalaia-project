@@ -90,7 +90,7 @@ Until step 5 the running image and the boot choice are never touched: an update 
 
 **After the reboot** the new image is `ESP_OTA_IMG_PENDING_VERIFY`. Once its radio and its storage have come up it runs its self-test (`fw_update_self_test`: SHA-256 and Ed25519 known answers, its release keys present, a join payload round trip, a Lua node running a script) and only then calls `esp_ota_mark_app_valid_cancel_rollback()`. If a check fails it calls `esp_ota_mark_app_invalid_rollback_and_reboot()`; if it crashes or reboots before, the bootloader (`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`) boots the previous image. Either way the old image comes back, and its HELLO tells the controller.
 
-Production option, not enabled (decision FU3-8): ESP-IDF's secure version in eFuse (`CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK`), with secure boot and flash encryption, would add a hardware floor under the box's own version check.
+Production option, not enabled (decision FU3-8): ESP-IDF's secure version in eFuse (`CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK`), with secure boot and flash encryption, would add a hardware floor under the box's own version check; the plan, with what it means for USB flashing, the bench and OTA, is [firmware/esp32/docs/RELEASE_HARDENING.md](../firmware/esp32/docs/RELEASE_HARDENING.md). The console's `@update` is PIN-gated in a release build (decision SR-40).
 
 ## The report
 

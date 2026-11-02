@@ -39,8 +39,13 @@ Future<void> tapKey(WidgetTester tester, String key) async {
       scrollable: find.byType(Scrollable).first,
     );
   }
-  await tester.ensureVisible(f);
-  await tester.pumpAndSettle();
+  // A long form lays out more of the list as it scrolls: bring the widget
+  // into view again until it can be hit.
+  final built = find.byKey(Key(key), skipOffstage: false);
+  for (var i = 0; i < 4 && f.hitTestable().evaluate().isEmpty; i++) {
+    await tester.ensureVisible(built);
+    await tester.pumpAndSettle();
+  }
   await tester.tap(f);
   await tester.pumpAndSettle();
 }
@@ -122,6 +127,28 @@ void main() {
     expect(find.byKey(const Key('player-continue')), findsOneWidget);
   });
 
+  for (final tick in [false, true]) {
+    testWidgets('the position box is its own and unticked: '
+        '${tick ? 'ticked' : 'left alone'} (LEG-12)', (tester) async {
+      final field = FakeField();
+      await start(tester, language: AppLanguage.en, field: field);
+      await tapKey(tester, 'checkin-scan');
+      await tapKey(tester, 'checkin-notice-ok');
+      expect(
+        find.text('Share my position with the game during this game'),
+        findsOneWidget,
+      );
+      final box = find.byKey(const Key('checkin-share-position'));
+      expect(tester.widget<CheckboxListTile>(box).value, false);
+      await tester.enterText(find.byKey(const Key('checkin-name')), 'Hawk');
+      if (tick) await tapKey(tester, 'checkin-share-position');
+      await tapKey(tester, 'checkin-submit');
+      // Declining blocks nothing: the check-in is made either way.
+      expect(field.rows, hasLength(1));
+      expect(field.rows.values.single['position_share'], tick);
+    });
+  }
+
   testWidgets('in English, with a federation number the field requires', (
     tester,
   ) async {
@@ -133,6 +160,9 @@ void main() {
     expect(find.text('Federation number (FPA)'), findsOneWidget);
     await tester.enterText(find.byKey(const Key('checkin-name')), 'Hawk');
     await tapKey(tester, 'checkin-submit');
+    // The error is at the top of a form that is longer than the screen.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 3000));
+    await tester.pumpAndSettle();
     expect(
       find.text('This field asks for your federation number (FPA).'),
       findsOneWidget,
@@ -262,6 +292,35 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('checkin-notice')), findsOneWidget);
+  });
+
+  testWidgets('a notice that changed while the form was open is read again, '
+      'not shown as an error, and the position box is unticked (NV-2)', (
+    tester,
+  ) async {
+    final field = FakeField();
+    await start(tester, language: AppLanguage.en, field: field);
+    await tapKey(tester, 'checkin-scan');
+    await tapKey(tester, 'checkin-notice-ok');
+    await tester.enterText(find.byKey(const Key('checkin-name')), 'Falcão');
+    await tapKey(tester, 'checkin-share-position');
+    field.notice = 2; // the field published a new notice meanwhile
+    await tapKey(tester, 'checkin-submit');
+    expect(find.byKey(const Key('checkin-notice')), findsOneWidget);
+    expect(
+      find.textContaining('The privacy notice changed. Read it and confirm'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('refused'), findsNothing);
+    expect(field.rows, isEmpty);
+    await tapKey(tester, 'checkin-notice-ok');
+    final box = tester.widget<CheckboxListTile>(
+      find.byKey(const Key('checkin-share-position')),
+    );
+    expect(box.value, false, reason: 'asked again, never ticked for them');
+    await tester.enterText(find.byKey(const Key('checkin-name')), 'Falcão');
+    await tapKey(tester, 'checkin-submit');
+    expect(field.rows.values.single['position_share'], false);
   });
 
   testWidgets(

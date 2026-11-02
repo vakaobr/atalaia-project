@@ -11,8 +11,11 @@
 //     native -> Dart "link" (String)      : a link that arrives while the
 //         app runs.
 //
-// Only `atalaia:` links of at most 4096 characters are passed on; Dart
-// (lib/site/site_link.dart) checks everything else. The scheme is declared
+// Only `atalaia:` links of at most 4096 characters, and the https
+// `/app/oidc` address a social login returns to (what BrowserPlugin.swift's
+// browser session ends on; Android's LinkPlugin.kt passes the same two kinds,
+// decisions PKA-1 and IOSL-1), are passed on; Dart (lib/site/site_link.dart,
+// lib/site/site_auth.dart) checks everything else, the host included. The scheme is declared
 // in Info.plist (CFBundleURLTypes). The app uses UIScene, so the URLs reach
 // the plugin as Flutter's scene life-cycle events (FlutterSceneLifeCycle
 // Delegate, registered with the plugin registrar; SceneDelegate.swift stays
@@ -43,9 +46,15 @@ final class LinkPlugin: NSObject {
     registrar.addSceneDelegate(plugin)
   }
 
-  /// What the app passes on: an `atalaia:` link of at most 4096 characters.
+  /// What the app passes on: an `atalaia:` link, or the https `/app/oidc`
+  /// address a social login returns to, of at most 4096 characters.
   nonisolated static func accept(_ text: String) -> String? {
-    text.hasPrefix("atalaia:") && text.count <= 4096 ? text : nil
+    guard text.count <= 4096 else { return nil }
+    if text.hasPrefix("atalaia:") { return text }
+    if let url = URL(string: text), url.scheme == "https", url.path == BrowserPlugin.returnPath {
+      return text
+    }
+    return nil
   }
 
   /// A URL that opened the app; false when it is not one of ours.

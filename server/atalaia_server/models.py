@@ -88,10 +88,19 @@ class Field(Base):
     field_type: Mapped[str] = mapped_column(String(32), nullable=False, server_default="outdoor")
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, server_default="Europe/Lisbon")
     # How long the field's controllers keep chrono records (and this server its registry, migration 0022, decision
-    # RET-2) and an ended game's events, scores and nodes (decision RET-1): 30-3653 days, 365 by default.
+    # RET-2) and an ended game's events, scores and nodes (decision RET-1): 30-3653 days; chrono 365 by default, game data 90
+    # (maintainer decision 2026-10-30).
     default_retention_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default="365")
-    game_retention_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default="365")
+    game_retention_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default="90")
+    # PRIV-2 (migration 0030): how long a "ban" outcome of a chrono violation lasts (days; null: 12 months, never more
+    # than the field's chrono retention).
+    chrono_ban_days: Mapped[Optional[int]] = mapped_column(Integer)
     chrono_sharing_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # The field's acceptance of the sharing terms (migration 0030, decision LEG-41): the version it accepted, when, and
+    # the account that accepted for it. Sharing is live only while the version is the server's current one.
+    sharing_terms_version: Mapped[Optional[str]] = mapped_column(String(64))
+    sharing_terms_accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    sharing_terms_accepted_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     public_scoreboard: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     # The public field page and its feeds (ADR-P4-11, ADR-P4-12; plan phase 15): off by default.
     public_page: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
@@ -117,7 +126,9 @@ class Field(Base):
     __table_args__ = (CheckConstraint("accent IS NULL OR accent ~ '^#[0-9a-f]{6}$'", name="accent"),
                       CheckConstraint("country IS NULL OR country ~ '^[A-Z]{2}$'", name="country"),
                       CheckConstraint("default_retention_days BETWEEN 30 AND 3653", name="default_retention_days"),
-                      CheckConstraint("game_retention_days BETWEEN 30 AND 3653", name="game_retention_days"))
+                      CheckConstraint("game_retention_days BETWEEN 30 AND 3653", name="game_retention_days"),
+                      CheckConstraint("chrono_ban_days IS NULL OR chrono_ban_days BETWEEN 1 AND 3653",
+                                      name="chrono_ban_days"))
 
 
 # Roles that need TOTP (ADR-P4-2): granting one to an account without TOTP fails, and they
@@ -148,6 +159,9 @@ class User(Base):
     server_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     gdpr_consent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # PRIV-7 (migration 0030): when the retention purge warned that the account, inactive for the configured time,
+    # will be anonymised; the account page shows it. Cleared by the purge when the account is active again.
+    inactivity_warned_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
 
@@ -198,16 +212,20 @@ class UserSession(Base):
 
 class UserIdentity(Base):
     """A social login linked to an account (OpenID Connect, LG-1): the provider and the subject the provider
-    gave, nothing of the profile. One per provider per account; a subject belongs to one account."""
+    gave, nothing of the profile. One per provider per account; a subject belongs to one account. A subject is only
+    unique within its issuer (Microsoft's issuer names the tenant), so the issuer is part of the key and ``tenant``
+    keeps Microsoft's ``tid`` (SRV-8); an empty ``issuer`` is a Microsoft row made before it was stored."""
 
     __tablename__ = "user_identities"
-    __table_args__ = (UniqueConstraint("provider", "subject"), UniqueConstraint("user_id", "provider"),
+    __table_args__ = (UniqueConstraint("provider", "issuer", "subject"), UniqueConstraint("user_id", "provider"),
                       CheckConstraint("provider IN ('google', 'microsoft', 'apple')", name="provider"))
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     provider: Mapped[str] = mapped_column(String(16), nullable=False)
     subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    issuer: Mapped[str] = mapped_column(String(255), nullable=False, server_default="")
+    tenant: Mapped[Optional[str]] = mapped_column(String(64))
     created_at: Mapped[datetime] = _created()
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
@@ -251,8 +269,12 @@ class OidcLogin(Base):
     code_verifier: Mapped[str] = mapped_column(String(128), nullable=False)
     redirect_uri: Mapped[str] = mapped_column(String(512), nullable=False)
     return_to: Mapped[str] = mapped_column(String(512), nullable=False)
-    consent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # What the person ticked before the round trip, for an unknown subject that makes an account (LEG-*): that they
+    # read the privacy notice (``notice_seen``, with the version shown) and that they are 16 or older.
+    notice_seen: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    age_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     notice_version: Mapped[Optional[str]] = mapped_column(String(64))  # the notice the person saw (CONS-7)
+    app_challenge: Mapped[Optional[str]] = mapped_column(String(64))  # SHA-256 of the app's verifier (APP-4)
     created_at: Mapped[datetime] = _created()
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
@@ -295,10 +317,11 @@ class AuditLog(Base):
 class Consent(Base):
     """A consent given (ADR-P4-8, plan phase 12): its purpose, the version of the privacy notice
     the person was shown, when, and when it was withdrawn. At most one live consent per purpose.
-    ``users.gdpr_consent_at`` keeps the account consent's time, as ADR-P4-1 has it; this table is
-    the record that shows what was consented to (GDPR Art. 7(1)). Purposes: ``account``, and
-    ``chrono_sharing`` (plan phase 14) with the field whose chrono records the person lets other
-    sharing fields see (``field_id``; one live consent per field)."""
+    This table is the record that shows what was consented to (GDPR Art. 7(1)). Since 0029 it holds
+    only real consents, each withdrawable on its own: ``chrono_sharing`` (plan phase 14) with the
+    field whose chrono records the person lets other sharing fields see (``field_id``; one live
+    consent per field). The account is not one: it rests on the contract (Art. 6(1)(b)) and what
+    it keeps is a ``NoticeRecord`` (LEG-*)."""
 
     __tablename__ = "consents"
     __table_args__ = (
@@ -316,6 +339,32 @@ class Consent(Base):
     notice_version: Mapped[str] = mapped_column(String(64), nullable=False)
     given_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     withdrawn_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+NOTICE_KINDS = ("signup", "shown_again", "migrated")
+
+
+class NoticeRecord(Base):
+    """Which version of the privacy notice an account was shown, and when (LEG-*; GDPR Art. 5(2) and 13).
+    The account rests on the contract (Art. 6(1)(b)), so this is a record of information given, not a consent:
+    nothing here can be withdrawn and nothing depends on it. One row is added each time: ``signup`` (the notice
+    shown when the account was made, with ``age_confirmed``: the person confirmed being 16 or older; there is no
+    date of birth), ``shown_again`` (a newer version shown to the account later and acknowledged) and ``migrated``
+    (a row 0029 made from an old ``account`` consent: same version and time, no age confirmation, since accounts
+    of that time were never asked). The newest row says which version the account has seen."""
+
+    __tablename__ = "notice_records"
+    __table_args__ = (
+        Index("idx_notice_records_user", "user_id", "recorded_at"),
+        CheckConstraint("kind IN ('signup', 'shown_again', 'migrated')", name="kind"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    notice_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    age_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 # --- the controller sync (plan phase 13, migration 0004_sync) -----------------------------
@@ -387,6 +436,34 @@ class Game(Base):
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
+
+
+class GameResult(Base):
+    """A game's team results, kept after the game's per-player history went (maintainer decision 2026-10-30; migration
+    0030): written by the retention purge from the game's totals just before the game is deleted at its history
+    retention (90 days by default), deleted 365 days after the game ended. **No player ids and no member lists**: only the
+    game's name, mode, teams, the teams' final totals, when it ran and how it ended. A squad is not recorded at all (a
+    squad of fewer than 3 players would identify its members, and the server holds no squad results to fold in): the
+    results are per team."""
+
+    __tablename__ = "game_results"
+    __table_args__ = (UniqueConstraint("field_id", "game_id", "game_seed"),
+                      Index("idx_game_results_field_ended", "field_id", "ended_at"))
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    game_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    game_seed: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    mode_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    teams: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    team_totals: Mapped[dict[str, int]] = mapped_column(JSONB, nullable=False)
+    winner: Mapped[Optional[str]] = mapped_column(String(32))
+    state: Mapped[str] = mapped_column(String(16), nullable=False)
+    duration_ms: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = _created()
 
 
 class GameEvent(Base):
@@ -652,6 +729,28 @@ class ChronoViolation(Base):
     outcome: Mapped[Optional[str]] = mapped_column(String(16))
     resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # PRIV-2 (migration 0030): when a "ban" outcome ends: the field's ban length from the day it was recorded, never
+    # past what the field keeps chrono records for (the violation goes with its reading). Null for any other outcome.
+    ban_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _created()
+
+
+class ChronoCopyRevocation(Base):
+    """PRIV-5 (migration 0030): a player of this field whose chrono copies, pulled from other fields (decision
+    S14-5), this field's controllers must drop: the person erased their account (``erasure``) or withdrew the
+    chrono-sharing consent of a field (``withdrawn``). The site server's schedule answer carries the rows of the
+    field's retention period (``copies_revoked``); no account, no name, only the field's own pseudonymous id."""
+
+    __tablename__ = "chrono_copy_revocations"
+    __table_args__ = (
+        UniqueConstraint("field_id", "player_id", "reason"),
+        CheckConstraint("reason IN ('erasure', 'withdrawn')", name="reason"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    player_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    reason: Mapped[str] = mapped_column(String(16), nullable=False)
     created_at: Mapped[datetime] = _created()
 
 

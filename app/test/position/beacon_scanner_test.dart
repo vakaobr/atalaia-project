@@ -185,10 +185,8 @@ void main() {
 
     test('the registry as the controller lists it, the UUID in any case', () {
       expect(
-        RegisteredBeacon.fromApi({
-          'id': '12:34',
-          'uuid': uuid.toLowerCase(),
-        })!.uuid,
+        RegisteredBeacon.fromApi({'id': '12:34', 'uuid': uuid.toLowerCase()})!
+            .uuid,
         uuid,
       );
       for (final bad in <Object?>[
@@ -1147,8 +1145,9 @@ void main() {
           findsNothing, // the note is the Text itself
         );
         expect(
-          (tester.widget(find.byKey(const Key('player-beacons-note'))) as Text)
-              .data,
+          (tester.widget(
+            find.byKey(const Key('player-beacons-note')),
+          ) as Text).data,
           contains('keeps the last floor'),
         );
         debugDefaultTargetPlatformOverride = null;

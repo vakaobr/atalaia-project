@@ -79,13 +79,14 @@ header:
   registry: Registry
   glossary: Glossar
   architecture: "Zusammenspiel"
+  group_learn: Lernen
+  group_community: Community
+  build_guides: Bauanleitungen
   language: Sprache
 
 hero:
   status: >-
-    Pre-Alpha · Software der Phasen 1 und 2 fertig, echte Boards spielen auf dem Labortisch ganze
-    Spiele mit dem Feld-Controller, Phase 3 in Software fertig, Phasen 4 und 5 in Software
-    gebaut · noch nicht feldtauglich
+    Pre-Alpha · Software der Phasen 1 und 2 fertig; echte Boards spielen auf dem Labortisch ganze Spiele mit dem Feld-Controller, mit Tastenfeld; Phase 3 in Software fertig, die iOS-App auf einem iPhone geprüft; der Site-Server aus Phase 4 läuft auf einem Testserver; Phase 5 in Software gebaut · noch nicht feldtauglich
   title: Die offene Plattform für <span class="nowrap">Force-on-Force</span>
   lead: >-
     Atalaia ist eine offene Plattform für die elektronischen Props von Airsoft, Paintball und
@@ -379,9 +380,24 @@ modes:
     text: >-
       Teams nehmen eine Master-Box und ihre Satelliten ein. Nur der Master punktet, und jeder
       Satellit, den dasselbe Team hält, erhöht seine Punkte; wechselt der Master den Besitz, werden
-      alle Satelliten wieder frei. In Software geschrieben und getestet, noch nicht auf echten Boxen
-      gespielt.
+      alle Satelliten wieder frei. In Software geschrieben und getestet, und inzwischen auf echten Boxen
+      probegespielt (siehe das Video unten).
     meta: Mehrere Boxen · braucht den Feld-Controller
+    real_alt: >-
+      Stummes Video eines Testspiels von Master und Satelliten auf dem Prüftisch, drei kurze Ausschnitte
+      aneinandergefügt. Zuerst wird der Master, die Box mit dem großen Bildschirm, von „LIVRE“ (frei) von Rot
+      eingenommen; der Bildschirm zeigt „MASTER OCUPADO“, „RED“, „0 de 3 satélites“. Dann zeigt eine
+      Satelliten-Box, dass Rot sie hält. Zuletzt zeigt der Master für Rot „1 de 3 satélites, 3 pontos a cada
+      10 s“ und geht dann an Blau, wieder bei „0 de 3 satélites“. Die Bildschirme sind auf Portugiesisch.
+    real_caption: >-
+      Testlauf auf dem Prüftisch, 1. November 2026 (drei Ausschnitte desselben Spiels, aneinandergefügt): vier
+      Boxen, und die mit dem großen Bildschirm ist der Master. Rot nimmt den Master und einen Satelliten ein,
+      die Punkte des Masters steigen, danach nimmt Blau den Master ein. Der Lauf hat uns drei Dinge auf dem
+      großen Bildschirm gezeigt: Der portugiesische Bildschirm sagte „MASTER“ statt „MESTRE“, der Master
+      zeigte vor der ersten Einnahme „ZONA“, und er zeigte den Zeitpunkt der Einnahme („desde“) statt der
+      Zeit, die er schon gehalten wird. Alle drei sind nach diesem Lauf in der Firmware behoben (der Clip
+      zeigt noch die alten Bildschirme; eine neue Aufnahme folgt). Ohne Ton; die Bildschirme sind auf
+      Portugiesisch.
   target_windows:
     title: Zielfenster
     text: >-
@@ -475,9 +491,10 @@ gifs:
     caption: "Sabotage: Bombenrunden mit Punktestand, eine Explosion für die Angreifenden, eine Entschärfung für die Verteidigenden, bis die Zeit um ist."
   master_satellites:
     alt: >-
-      Animation von Master und Satelliten: Eine Satelliten-Box wird von neutral zu rot, wenn Rot
-      den Knopf hält; danach zeigt die Master-Box, wie viele Satelliten Rot hält (1, 2, dann 3
-      von 3) und die Punkte pro Takt, und zum Schluss den Bildschirm für das Spielende.
+      Animation von Master und Satelliten: Die Master-Box mit der Überschrift MASTER wird von
+      neutral zu rot, wenn Rot den Knopf hält, und zeigt „MASTER BESETZT“ mit der Haltezeit; danach
+      zeigt sie, wie viele Satelliten Rot hält (1, 2, dann 3 von 3), die Punkte pro Takt und die
+      Gesamtpunkte von Rot in der Ecke, und zum Schluss den Bildschirm für das Spielende.
     caption: >-
       Master und Satelliten: Satelliten werden wie Domination-Zonen eingenommen; die Master-Box
       zählt, wie viele ein Team hält, und zahlt für jeden mehr Punkte.
@@ -570,13 +587,34 @@ gifs:
 screens:
   title: So sieht es aus
   intro: >-
-    Acht Aufnahmen der echten Firmware der Field Box (ESP32, LVGL 9.2, 320&nbsp;×&nbsp;240&nbsp;TFT),
-    die im Emulator <a href="https://wokwi.com">Wokwi</a> läuft. Die Oberfläche der Box ist hier auf
-    Englisch. Die Firmware läuft inzwischen auf einem echten Heltec V4.3; diese Bilder stammen aus dem
-    Emulator. Tippe oder klicke auf ein Bild, um es größer zu sehen.
+    Drei Modi, wie die Box sie zeigt: Animationen, die der Code der Field-Box-Firmware selbst
+    zeichnet, nicht nachgebaut. Die Schaltfläche unter jedem Bild pausiert es. Weiter unten die
+    Screenshots der App.
+  real:
+    title: Die echte Box auf dem Labortisch
+    intro: >-
+      Die Modi oben sind Animationen, die der Code der Firmware zeichnet. Hier spielt der Aufbau der
+      Field Box auf dem Labortisch (ein Board an losen Kabeln, ohne Gehäuse) wirklich Domination.
+    alt: >-
+      Stummes Video in Endlosschleife des Field-Box-Aufbaus beim Spielen von Domination: Das Display zeigt
+      die Zone des roten Teams mit 3 Punkten; unten füllt sich ein blauer Balken, und die Zone geht an das blaue
+      Team. Danach zählt die Haltezeit hoch (ab 0:01), und oben rechts erscheinen die Punkte jedes Teams.
+    caption: >-
+      Die Field Box auf dem Labortisch (1. November 2026) mit dem neuen TFT-Display: Der Haltebalken füllt sich,
+      das blaue Team erobert die Zone, die Haltezeit zählt hoch, und die Punkte jedes Teams erscheinen in der
+      Ecke. Noch ohne Gehäuse, mit losen Kabeln.
+    more: Den Aufbau und das Foto ansehen →
+  gifs_more: Alle Modi ansehen →
+  box_title: Die Bildschirme der Box, Schritt für Schritt
+  box_intro: >-
+    Acht Aufnahmen der echten Firmware der Field Box (ESP32, LVGL 9.2,
+    320&nbsp;×&nbsp;240&nbsp;TFT), die im Emulator <a href="https://wokwi.com">Wokwi</a> läuft, von
+    der PIN der Spielleitung bis zum Entschärfen der Bombe. Die Oberfläche der Box ist hier auf
+    Englisch. Die Firmware läuft inzwischen auf einem echten Heltec V4.3; diese Bilder stammen aus
+    dem Emulator. Tippe oder klicke auf ein Bild, um es größer zu sehen.
   note: >-
     Das <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">Bauhandbuch</a>
-    (auf Englisch) enthält den vollständigen Schaltplan und die Anleitung zum ersten Flashen für den
+    (auf Englisch und Portugiesisch) enthält den vollständigen Schaltplan und die Anleitung zum ersten Flashen für den
     Heltec WiFi LoRa 32&nbsp;V4.
   pin_entry:
     alt: >-
@@ -691,7 +729,7 @@ try:
   then: >-
     Dann öffne <code>http://localhost:8000</code>. Du brauchst Python 3.10+ mit PyYAML. Die
     <a href="https://github.com/vakaobr/atalaia-project/blob/main/simulator/README.md">Anleitung zum
-    Simulator</a> (auf Englisch) hat alle Optionen.
+    Simulator</a> (auf Englisch und Portugiesisch) hat alle Optionen.
   board:
     title: Auf einem Board
     text: >-
@@ -713,7 +751,7 @@ try:
       Bau die Debug-APK der App mit Docker und installiere sie auf einem Handy mit Android 8.0 oder
       neuer oder im Android-Emulator, wie die
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">Anleitung
-      zur App</a> (auf Englisch) erklärt. Sie lief auf Emulatoren, noch nicht auf einem echten Handy.
+      zur App</a> (auf Englisch und Portugiesisch) erklärt. Sie lief auf Emulatoren, noch nicht auf einem echten Handy.
   manuals:
     title: Spielen und ausrichten
     text: >-
@@ -754,7 +792,8 @@ roadmap:
     title: Eine Box
     short: >-
       Firmware der Field Box und ein Bauhandbuch; auf dem Labortisch spielt ein echtes Board ganze
-      Spiele. Es wartet auf die erste gebaute Box.
+      Spiele, inzwischen mit Display, Tastenfeld und Tastern an losen Kabeln (Foto und Clip auf der
+      Bauseite). Es fehlt noch eine zusammengebaute Box.
     done:
       - ESP32-Firmware der Field Box mit Presets auf dem Gerät, lauffähig in einem Emulator.
       - Der kleine Bildschirm der Box zeigt Haltebalken, Punkte und Haltezeit, in vier Sprachen.
@@ -769,12 +808,21 @@ roadmap:
       - "Eine größere Partitionstabelle: die beiden Firmware-Slots der Box sind je 4 MB groß (das Image füllte 93 % von 2 MB), Einstellungen und Schlüssel bleiben, wo sie waren. Nur in Host-Tests und Builds, auf keinem Board geflasht. Eine Box mit der alten Tabelle braucht einmal ein Flashen per USB; danach gehen Over-the-Air-Updates wie bisher."
       - "Die Field Box als iBeacon: Vom Beitritt bis zum Spielende sendet eine Box ein Bluetooth-Beacon (alle 500 ms, nie während ihr WLAN in Gebrauch ist), sodass ein Handy in ihrer Nähe Spielende auf einer Etage oder in einem Raum verorten kann. Die Kennung des Feldes wird aus seinem Beitrittsschlüssel abgeleitet, und die Spielleitung kann die Boxen als Beacons abschalten, je Feld oder je Box. Der interne Speicher der Box wurde überarbeitet, nachdem er auf dem Labortisch beim Beitritt zu einem Spiel ausging (das WLAN scheiterte, dann folgte ein Watchdog-Reset): Auf dem Labortisch gemessen sind beim Start 241 KB frei und im Spiel mit eingeschaltetem Beacon mindestens 102 KB, und die CI lässt den Build scheitern, wenn das Budget zu stark schrumpft. Noch nicht geprüft, ob ein Handy das Beacon einer echten Box hört."
       - "Nach der Ablehnung oder dem Scheitern eines Updates oder eines Modus-Abrufs kehrt der Bildschirm der Box nach 8 Sekunden zum Bildschirm des Zustands zurück (auf dem Labortisch blieb eine Ablehnung stehen, bis jemand hinsah). Nur Host-Tests."
+      - "Die Befehle der seriellen Konsole, die einer Box den Beitrittsschlüssel geben oder ein Update starten (@joinkey, @update), verlangen in einem Release-Build die Admin-PIN und lehnen ab, solange keine gesetzt ist; ein Bench-Build lässt sie für die Bench-Skripte offen. Nur Host-Tests, nicht auf einem echten Board."
+      - "Der erste Labortisch-Aufbau der Field Box (31. Oktober 2026): ein Heltec-V4-Board mit dem 2,8-Zoll-TFT, dem OLED, einem 4×3-Tastenfeld und Team-Tastern, an losen Kabeln und ohne Gehäuse, spielt Domination mit dem Controller vom Labortisch. Es gibt ein <a href=\"{{ page.to.build }}#field-box-first-build\">Foto und einen Clip</a>."
+      - "Der große Bildschirm entspricht jetzt dem kleinen: Haltebalken, die ab der Eroberung hochzählende Haltezeit und die Punkte jedes Teams in einer Ecke, in Domination, Master und Satelliten (Titel MASTER / SATELLIT; der Master zeigt die Team-Summe), Progressive Domination und VIP / Payload. Auf dem Labortisch bei Domination gesehen (Clip auf der Bauseite); die anderen drei Modi nur in Referenzbildern der Firmware und in Tests."
+      - "Der große Bildschirm zeigt beim Start einen Startbildschirm mit dem Turm und der Firmware-Version wie der kleine, statt bis zum ersten Spielbildschirm leer zu bleiben. Host-Tests und ein Referenzbild, bisher nicht auf mehr als dem ersten Labortisch-Board geprüft."
+      - "Ein wackeliger I2C-Bus startet eine Box nicht mehr neu: Tastenfeld, kleiner Bildschirm, NFC-Leser und Akku-Messchip nutzen den neueren ESP-IDF-Treiber mit Zeitlimits, Bus-Reset und einem Backoff, der ein ausfallendes Teil beiseitelegt; ein defektes Tastenfeld liest sich als keine Taste, und das Spiel läuft weiter. Ein Neustart meldet jetzt seinen wirklichen Grund (Spannung, Unterspannung, Software, Absturz, Watchdog) statt immer \"Spannung\", und die Spielleitungs-Konsole sagt \"Eine Box ist abgestürzt und neu gestartet\". Auf dem Labortisch gefunden: Ein Tastenfeld mit schlechten Lötstellen startete ein Board in drei Minuten sechsmal neu. Nur Host-Tests; der Labortisch-Test der Korrektur steht aus."
+      - "Ein Bildschirmtext, der nicht passt, wird beim Prüfen eines Modus abgelehnt, und ein Text, der sich nicht zeichnen lässt, zeigt \"?\" statt leer zu bleiben (ein langer Text in vier Sprachen wurde auf einer Box bisher kommentarlos leer). Tests auf einem Computer."
+      - "Eine Anzahl von eins steht im Singular (\"1 Punkt\", nicht \"1 Punkte\") auf den Bildschirmen der Box, in der App, in der Spielleitungs-Konsole und auf den Personalseiten. Tests in Software."
     next:
       - Eine gebaute Box, die ein zweistündiges Club-Spiel ohne Neustart durchhält.
       - "Die Zeitleiste an einem echten Display sehen."
       - "Das erneute Senden des Setups und Feld wechseln auf einem echten Board ausprobieren."
       - "Das Beacon einer Field Box mit einem echten Handy hören und das WLAN beim Spielbeitritt mit dem neuen Speicherbudget starten."
       - "Die neue Partitionstabelle auf einem echten Board flashen (einmal per USB, ohne Löschen, bei einer Box mit der alten)."
+      - "Ein gehärtetes Release-Image (Flash-Verschlüsselung, Secure Boot): nur als Plan aufgeschrieben, nichts gebaut und auf keinem Board ausprobiert."
+      - "Die I2C-Fehlerbehandlung auf einem Board mit schlecht angeschlossenem Tastenfeld ausprobieren, dazu den Startbildschirm und die neuen Bildschirme auf mehr als dem ersten Labortisch-Board."
     gate: >-
       Gate: Eine Box läuft ein zweistündiges Club-Spiel ohne Neustart. <strong>Offen</strong>, bis
       eine gebaute Box das schafft.
@@ -815,11 +863,24 @@ roadmap:
       - "Die GM-Konsole sagt, was ein Kanalwechsel mit den freien Boxen macht (wie viele der drei MOVE gesendet sind, dann dass der Controller umgezogen ist), und die Einstellungen haben eine Schaltfläche Boxen suchen, die das Ergebnis eines Absuchens zeigt. Ein Absuchen ist je Stunde begrenzt in Teilbändern unter 10 % Tastverhältnis (5 % des Budgets des Teilbands), und die Konsole sagt es, wenn sie ablehnt und wann das nächste möglich ist. In Software, in beiden Controllern."
       - "Der projizierte Punktestand folgt einer Eroberung: Zwischen zwei STATE-Nachrichten einer Box zählt der Controller weiter für das Team, das ein Eroberungsereignis nannte, bis zum nächsten STATE der Box. Auf dem Labortisch scheiterte die Projektion, wenn gleich nach einer Eroberung ein STATE verloren ging; mit dieser Änderung bestand dieselbe Einstellung auf dem Labortisch, und eine Box-Strafe wurde dort ebenfalls geprüft."
       - "Das Spielende einer Box beendet das Spiel: In einem Modus ohne Feldlogik auf dem Controller (das Zeitlimit von Sabotage, Bombe) beendet das erste game.end einer Box des Spiels es, mit dem Sieger der Box oder als Unentschieden. In Bombe / Rush beendet eine Explosion jetzt das Spiel, und das Team, das die Bombe scharf gemacht hat, gewinnt; eine Entschärfung nicht. Auf dem Labortisch mit Sabotage gefunden, und die Explosion der Bombe wurde dort ebenfalls geprüft."
+      - "Ein aufgezeichneter Funkbefehl lässt sich nicht mehr später wieder einspielen: jeder Empfänger (die Box, das USB-Modem und beide Controller) führt ein Replay-Fenster pro Sender, und eine Box lehnt Start, Pause, Fortsetzen, Ende oder TIME ab, wenn sie älter sind als der zuletzt angewendete. Eine Box, die ihren Epochenspeicher verloren hat, würfelt eine neue Epoche aus, statt Nonces wiederzuverwenden. Auf der Funkstrecke ändert sich nichts: ältere Boxen funktionieren weiter, bleiben aber bis zum Update angreifbar. Im Simulator und auf einem Computer getestet, mit gemeinsamen Vektoren in C, Python und Dart; auf echten Boards wurde noch kein Funk-Replay ausprobiert."
+      - "Ein zweiter Verlust des Epochenspeichers kann keine niedrigere Epoche mehr ziehen: Eine Box, der Pi und der Handy-Controller merken sich die höchste Epoche, die sie je benutzt haben, getrennt vom Eintrag pro Schlüssel, und die Ziehung beginnt darüber; ein Controller, der in einem Spiel schon gesendet hat, wird nie wieder unter seiner alten Node-ID eingeladen (er bekommt eine neue); und ein WLAN-Prop bekommt jetzt die CMD-Nachricht, die die Epoche eines Controllers nennt, und reicht sie an seinen Pod weiter (in beiden Controllern). RFC 0001, Änderung 25. Im Simulator und auf einem Computer getestet; nicht auf echten Boards ausprobiert."
+      - "Die Härtung der Feld-Controller aus dem Sicherheits-Review: Größenlimits für Anfragen, GM- und Spieler-Token über reines HTTP abgelehnt, wenn HTTPS an ist (die Konsole öffnet sich unter https://&lt;Controller&gt;:8443/console/), das MQTT des Feldes über TLS (Port 8883; das einfache 1883 nur auf dem Loopback des Pi), TLS für den Personal-ATAK-Feed, HSTS, eine gehärtete Dienst-Unit auf dem Pi und ein Widerruf signierter Modi, der geschlossen ausfällt (eine fehlende oder unlesbare Liste installiert nichts; ein Controller ohne Netz nutzt die letzte Liste 30 Tage lang). Auf einem Computer getestet, nicht auf einem echten Pi oder Handy auf einem Feld."
+      - "Eine Box, die ihren Epochenspeicher verloren hat und deshalb mit einer zufälligen hohen Epoche zurückkam, wird wiedergefunden: Ein Empfänger, der ein HELLO oder TIME nicht öffnen kann, durchsucht den Rest des Epochenbereichs (ein Abschnitt pro Suche, im bestehenden Budget), und ein Controller, der so eine Box hört, nennt den anderen ihre Epoche in einer neuen CMD-Nachricht, die eine Epoche nur erhöhen kann. Ein fortgesetztes Spiel ohne Eintrag startet ebenfalls mit einer zufälligen Controller-Epoche, damit sich keine Nonce wiederholt. Ältere Boxen ignorieren die neue Nachricht. Im Simulator und auf einem Computer getestet; nicht auf echten Boards ausprobiert."
+      - "Das <code>rand()</code> eines Modus wird aus dem Schlüssel des Spiels sowie aus Spiel-Seed und Node-ID gesetzt; was die API Spielenden zeigt, verrät es also nicht mehr (die Codes des Hacking-Terminals, die Teams der Zielfenster), und der Spiel-Seed wird Spielenden und der Anzeigetafel nicht mehr gezeigt. Dasselbe Spiel läuft identisch ab, aber ein vor dieser Änderung aufgezeichnetes Spiel ergibt andere Zufallswerte: Boxen nicht mitten im Spiel aktualisieren. Gemeinsame Testvektoren in C, Python und Dart; nicht auf Boards ausprobiert."
+      - "Die Lua-Sandbox hat die Lücken geschlossen, die eine Prüfung mit einem Speicherprüfer fand: Die Tabellenfunktionen, Coroutinen und lange Ketten von Callbacks werden gemessen, die C-Stacktiefe ist für den ESP32 begrenzt, und eine Node-ID oder ein Timer außerhalb des Bereichs läuft nicht mehr über. Die Stack-Werte sind berechnet, noch nicht auf einem Board gemessen."
+      - "Der Antennengewinn ist eine Build-Option (<code>--antenna-dbi</code>, 0 bis 20 dBi, standardmäßig 2): Eine Box mit stärkerer Antenne senkt ihre leitungsgebundene Leistung um diesen Gewinn, abgerundet, damit die abgestrahlte Leistung im Limit des Teilbands bleibt. Nur Host-Tests."
+      - "Der Zugangscode des Live-Streams steht nicht mehr in der Webadresse: Die Konsole schickt ihn in einem Header, die App in einem Authorization-Header, und die Logs der Controller und des Site-Servers schwärzen Code-Werte in Adressen (die alte Adresse funktioniert noch für eine Übergangszeit). Ein Feld, dessen Logs weitergegeben wurden, sollte seine GM- und Lese-Codes ändern."
+      - "Team-Ergebnisse ohne Spieler-IDs werden auch auf beiden Controllern 365 Tage aufbewahrt (der Spielverlauf 90 Tage); die Spielleitung kann sie nur lesen. Auf einem Computer getestet."
+      - "Eine einzige Anleitung zum Einrichten des Funkmodems, von den Teilen bis zu einer Box, die einem Spiel beitritt: fertige Version oder selbst bauen, Flashen unter Windows, Linux und macOS, der Port, die Prüfungen und eine Fehlertabelle (<a href=\"https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/modem.md\">Set up the radio modem</a>, Englisch). Auf dem Labortisch ausprobiert, mit dem Controller in Docker unter WSL2; nicht auf einem Raspberry Pi oder macOS und nicht auf einem Feld."
+      - "Ein Controller, der seinen Epochen-Speicher verloren hat, zieht die neue Epoche aus der unteren Hälfte des Platzes über seiner Untergrenze, mit einem Abstand (einem größeren, wenn seine Epochen-Datei fehlt); so können wiederholte Verluste, vierzehn und mehr hintereinander, den Bereich nicht aufbrauchen. Es begann als wackeliger Test und war ein Produktfehler. Tests auf einem Computer; die Ziehung der Field Box selbst folgt noch."
     next:
       - Die Funk-Boards und 5 gebaute Boxen für den Feldtest.
       - Ein Feldtest mit 20 Boxen, mit und ohne Hören vor dem Senden.
       - "Ob das Takten des Controllers an geht, entschieden nach dem Feldtest mit 20 Boxen."
       - "Auf zwei Boards prüfen, dass ein Kanalwechsel eine untätige Box behält und ein Start sie in etwa einer Sekunde erreicht (das Runbook ist geschrieben)."
+      - "Das Replay-Fenster und die gehärteten Controller auf echten Boards und einem echten Pi ausprobieren (ein aufgezeichneter Befehl, auf dem Prüfstand wieder eingespielt)."
+      - "Den Epochenspeicher einer Box auf zwei Labor-Boards löschen und prüfen, dass sie wiedergefunden wird, zweimal hintereinander und mit einem wieder aufgenommenen früheren Leiter-Controller (das Runbook ist geschrieben)."
     gate: >-
       Gate: 5 Boxen auf einem <a href="{{ page.to.glossary }}#glossar-cqb">CQB</a>-Gelände und einem
       Outdoor-Feld, keine verlorene Einnahme. <strong>Offen.</strong>
@@ -877,14 +938,18 @@ roadmap:
         - "Die App folgt einem Spiel über den QR-Code der Anzeigetafel, auch wenn der Handy-Controller HTTPS mit seiner eigenen Feld-CA anbietet. In Software, nicht an einem echten Handy ausprobiert."
         - "Spielende sagen, auf welcher Ebene sie sind, und sehen den Feldplan mit den Positionen, die sie sehen dürfen."
         - "Spielverlauf in der App: die Spiele, an denen jemand teilgenommen hat, das neueste zuerst."
-        - "Anmeldung mit Google, Microsoft, Apple oder einem Passkey in der App, mit einem Kontobildschirm. Nur Android; die Anmeldung der App ist auf einem echten Handy nicht ausprobiert (die Seite des Site-Servers wurde mit Google und Microsoft ausprobiert, siehe Phase 4)."
+        - "Anmeldung mit Google, Microsoft, Apple oder einem Passkey in der App, mit einem Kontobildschirm. Android und, in Swift, auch iOS (der Browser der Social-Anmeldung als ASWebAuthenticationSession, Passkeys über Apples Plattform-Zugangsdaten; Passkeys unter iOS sind beim Bauen optional zuzuschalten und brauchen das kostenpflichtige Apple-Programm). Der iOS-Teil wird in der CI kompiliert und ist auf einem iPhone nicht ausgeführt worden; die Anmeldung der App ist auf einem echten Handy nicht ausprobiert (die Seite des Site-Servers wurde mit Google und Microsoft ausprobiert, siehe Phase 4)."
         - "Der Feldplan des Spielers kann das Raster des Feldes und die eigene Zelle des Spielers zeigen."
         - "Schiedsrichter können beim Registrieren einen NFC-Sticker an eine Replik binden."
         - "Das Handy eines Marshals behält den Beitrittsschlüssel des Feldes nicht mehr: nur ein Prop (seine Beitrittskarte) und der Handy-Controller tun das, und ein Update löscht ihn vom Handy eines Marshals."
         - "Scoreboard-Links, die die eigene CA des Feldes festlegen, werden pro Feld gemerkt und vergessen, wenn sich die CA ändert."
         - "Solange ein laufendes Spiel in der Spielendenansicht offen ist, hält ein Android-Vordergrunddienst mit einer Benachrichtigung die App am Laufen, damit das Vibrieren auch bei geschlossener App oder ausgeschaltetem Bildschirm kommt. Nicht auf iOS. Nicht auf einem echten Handy probiert."
         - "Die Field Boxen zählen als Beacons: Eine platzierte Box registriert sich als Beacon neben denen der Spielleitung, und ein Handy, das schon teilt, übernimmt Änderungen am Verzeichnis während des Spiels. In Software, nicht mit einem Handy und einer echten Box ausprobiert."
-        - "Die Datenschutzerklärung und die Einwilligung in der App: eine Aufforderung Lesen und bestätigen, wenn die Einwilligung des Kontos veraltet ist, die Erklärung in der Sprache der App, nichts wird blockiert. Eine Registrierung per Social Login trägt die Version der Erklärung, die die Person sah, und funktioniert weiter mit einem älteren selbst betriebenen Server. Der Chrono-Link zwischen den Feldern eines gehosteten Hubs (ein Einmalcode) erscheint nur im gehosteten Modus. In Software."
+        - "Die Datenschutzerklärung in der App: eine Aufforderung Lesen und bestätigen, wenn dem Konto zuletzt eine andere Version gezeigt wurde, die Erklärung in der Sprache der App, nichts wird blockiert. Die App kann ein Konto anlegen (mit Passwort oder per Social Login), nachdem sie den Hinweis gezeigt hat, mit dem Feld „Ich bin 16 oder älter“; Jüngere checken am Spielfeld ohne Konto ein. Eine Registrierung per Social Login trägt die Version der Erklärung, die die Person sah, und eine Anmeldung funktioniert weiter mit einem älteren selbst betriebenen Server. Der Chrono-Link zwischen den Feldern eines gehosteten Hubs (ein Einmalcode) erscheint nur im gehosteten Modus. In Software."
+        - "Die Kartenprüfung beim Check-in: Prüft das Feld die Mitgliedschaft, bleibt ein Check-in offen, bis eine Marshal-Person oder die GM mit der echten Karte in der Hand „Karte gesehen, stimmt“ ankreuzt; die Mitgliedsnummer wird dann auf dem Controller gelöscht (Ergebnis und Ablaufdatum bleiben), und ohne Karte lässt sich jemand trotzdem durchwinken, mit Begründung im Protokoll und nie mit der Nummer. In der Konsole, in der Marshal-Warteschlange der App und in beiden Controllern. Nur Software."
+        - "Das Teilen der Position ist beim Check-in eine eigene, nicht vorangekreuzte Wahl (in der App und beim Handeintrag der Konsole), mit der Angabe, wer sie sieht; Ablehnen verhindert weder den Check-in noch das Spiel, und jede Person kann sie jederzeit ein- oder ausschalten. Ohne sie lehnt der Controller die Positionen ab. Nur Software."
+        - "Das Sicherheits-Review der App: Eine angeheftete Feld-CA ist genau ein Zertifikat, kein App-weites unverschlüsseltes HTTP auf Android (nur Loopback, der Host des Emulators, 192.168.4.1 und atalaia.local), eine Release-APK, die nie aus Versehen mit dem Debug-Schlüssel signiert wird, und ein Ticket der Social-Anmeldung, das an die App-Instanz gebunden ist. Auf einem echten Handy nicht ausprobiert; den Signaturschlüssel für Releases muss der Maintainer noch erzeugen."
+        - "Die Ereignisliste und der Spielverlauf der Spielenden lassen Routine-Ereignisse ohne Text für Spielende weg (eine Box, die ihr Setup bestätigt, Nodes online oder offline, Tag-Scans, Treffer auf Ziele), statt rohe Typnamen zu zeigen."
     g_props:
       title: Android-Props und I/O-Pod
       items:
@@ -927,7 +992,8 @@ roadmap:
           Remote-Spielleitung und der ATAK-Feed."
         - "Die Konsole der Orga passt auf ein Handy: Check-in- und Marshal-Tabellen stapeln sich, ohne seitliches Scrollen."
         - "Der eigene Bildschirm des Handy-Controllers importiert eine Anmeldeliste (eine CSV- oder JSON-Datei, gewählt mit der Dateiauswahl von Android), ganz ohne GM-Konsole."
-        - "Ein Bereitschafts-Controller übernimmt die Beacon-Einstellungen der Boxen (den Feldschalter, die abgeschalteten Boxen, die Räume) und die Plätze der Boxen aus seinem Beitritt, sodass Handys nach einem Failover dasselbe Beacon-Verzeichnis bekommen. In Software, in beiden Controllern."
+        - "Ein Bereitschafts-Controller übernimmt die Beacon-Einstellungen der Boxen (den Feldschalter, die abgeschalteten Boxen, die Räume) und die Plätze der Boxen aus seinem Beitritt, sodass Handys nach einem Failover dasselbe Beacon-Verzeichnis bekommen; eine Konsole, die auf dem Bereitschafts-Controller schon offen ist, verschiebt die Marker der Boxen sofort, ohne Neuladen. In Software, in beiden Controllern; die Verschiebung der Marker ist in einem Headless-Browser getestet."
+        - "Der Handy-Controller zieht mit der Sicherheitsprüfung des Pi-Controllers gleich: Der Widerruf signierter Modi schlägt sicher fehl (mit einer Untergrenze je Modus und einer Altersgrenze für ein Handy ohne Netz, beides im Bildschirm Modus-Pakete), und der ATAK-Feed für die Spielleitung läuft über TLS mit einer festgelegten Zertifizierungsstelle. In Software getestet; nicht auf einem Handy im Feld."
     g_ios:
       title: iOS
       items:
@@ -946,16 +1012,18 @@ roadmap:
       - "Unter iOS braucht NFC ein kostenpflichtiges Apple-Konto; der Prop und das Handy als
         Feld-Controller bleiben nur für Android."
       - "Das Beacon-Plugin auf einem iPhone ausprobieren (auf einem Mac gebaut) und die Beacons mit echten, auch unter Android."
+      - "Die Website-Anmeldung unter iOS (Browser der Social-Anmeldung und Passkeys) auf einem iPhone ausprobieren."
       - "QR-Code der Anzeigetafel, Ebenenwahl, Spielverlauf und die Wiederverbindung zum Pod an einem echten Handy und Pod ausprobieren."
       - "Die Anmeldung der App auf einem echten Handy ausprobieren."
+      - "Die Kartenprüfung, die Positionswahl beim Check-in, die angeheftete CA und die Kontoerstellung der App auf einem Feld und mit echten Handys ausprobieren."
     gate: "Gate: Ein Spiel mischt ESP32- und Android-Props ohne Probleme."
   p4:
     title: Site-Server und erweitertes Spiel
     short: >-
       Site-Server, Spielplanung und Anmeldung, eigene Szenarien, erweiterte Modi, ATAK. Alle
       Software-Schritte sind gebaut; die Anmeldung mit Google und Microsoft wurde auf einem
-      Testserver echt ausprobiert. Es fehlen ein echter Server, eine rechtliche Prüfung und die
-      Tests auf Hardware.
+      Testserver echt ausprobiert. Es fehlen ein echter Server, die Go-live-Bedingungen des
+      Hosted-Modus und die Tests auf Hardware.
     done:
       - "<strong>Erweiterte Modi</strong>: Master und Satelliten, das Hacking-Terminal,
         VIP / Payload und die Logik von Zielfenster."
@@ -1025,6 +1093,7 @@ roadmap:
         - "Das Raster in ATAK und eine druckbare Rasterkarte."
         - "Der Remote-GM sieht die Positionen der Spieler, wenn sie sie teilen."
         - "ATAK-Gerätezertifikate gelten 90 Tage (vorher 7), und die ATAK-Seite für die Mitarbeitenden warnt, wenn eines in 14 Tagen abläuft."
+        - "Das Feld kann das Laden von Karten in der Konsole abschalten (Einstellungen, Kartenabruf): dann erreicht „Feld aus einer Karte laden“ weder OpenStreetMap noch Overpass, Nominatim oder die Luftbilder. Standardmäßig an."
     g_server:
       title: Site-Server, Konten und Daten
       items:
@@ -1043,13 +1112,19 @@ roadmap:
         - "Anmeldung mit Google, Microsoft oder Apple und mit Passkeys. Passwörter sind optional; das Personal braucht weiterhin einen zweiten Faktor. Google und Microsoft wurden auf dem Testserver (tests.atalaia-project.link) mit den echten Anbietern ausprobiert; Apple noch nicht."
         - "Eine Kontoseite für das Personal, auf der jede Person ihre eigenen Anmeldungen verwaltet: Passkeys, verknüpfte Konten, Passwort und Zwei-Faktor-Code."
         - "Änderungen an Szenarien, Presets und Terminen erreichen die Controller sofort."
-        - "Wie lange ein Feld Daten behält, ist eine Einstellung des Feldes: Spieldaten (Ereignisse, Punkte, Protokolle) und Chrono-Einträge haben je eine Aufbewahrungsdauer, standardmäßig 365 Tage, einzustellen am Controller, in der GM-Konsole oder auf der Einstellungsseite des Site-Servers. Die tägliche Bereinigung löscht ein beendetes Spiel dieses Alters, nie bevor der Site-Server alles davon hat. Das ungenutzte Aufbewahrungsfeld pro Konto ist weg."
+        - "Wie lange ein Feld Daten behält, ist eine Einstellung des Feldes: Spielverlauf und Chrono-Einträge haben je eine Aufbewahrungsdauer, einzustellen am Controller, in der GM-Konsole oder auf der Einstellungsseite des Site-Servers: der Spielverlauf standardmäßig 90 Tage (Teamergebnisse ohne Spieler-IDs 365), Chrono-Einträge 365. Die tägliche Bereinigung löscht ein beendetes Spiel dieses Alters, nie bevor der Site-Server alles davon hat. Das ungenutzte Aufbewahrungsfeld pro Konto ist weg."
         - "Die Löschung einer Person an einem Feld-Controller erreicht den Site-Server mit der nächsten Synchronisierung von selbst (nie mit einem Namen) und löscht dort auch die Chrono-Einträge dieser Person."
-        - "Der erste vollständige Entwurf des Datenschutzhinweises, auf Portugiesisch und Englisch, neu geschrieben nach dem, was jeder Teil von Atalaia heute tut. Ein Entwurf, keine Rechtsberatung, noch nicht von einer Juristin oder einem Juristen geprüft."
-        - "Der Site-Server veröffentlicht den Datenschutzhinweis, den der Betrieb ihm gibt, als Seite und über die API in vier Sprachen und bittet Konten um erneute Einwilligung, wenn sich seine Version ändert. Nichts wird gesperrt: Export und Löschung bleiben möglich. Auf einem Computer getestet."
+        - "Vorlagen für den Datenschutzhinweis, den Auftragsverarbeitungsvertrag und die Bedingungen für die Freigabe zwischen Feldern, auf Portugiesisch und Englisch (der Vertrag auch auf pt-PT), dazu eine Vorlage für die Datenschutz-Folgenabschätzung: Sie geben die Positionen wieder, die der Anwalt oder die Anwältin des Maintainers am 30. Oktober 2026 gebilligt hat (Konten auf Vertragsbasis mit Mindestalter 16, die Mitgliedskarte beim Check-in geprüft und die Nummer gelöscht, Verstöße aufgrund berechtigter Interessen, Positionsfreigabe per Einwilligung, kein Datenschutzbeauftragter). Weiterhin Vorlagen, die jedes Feld ausfüllt, keine Rechtsberatung für ein bestimmtes Feld."
+        - "Der Site-Server veröffentlicht den Datenschutzhinweis, den der Betrieb ihm gibt, als Seite und über die API in vier Sprachen und zeigt ihn den Konten erneut, wenn sich seine Version ändert (ein Konto beruht auf dem Vertrag, nicht auf einer Einwilligung). Nichts wird gesperrt: Export und Löschung bleiben möglich. Auf einem Computer getestet."
         - "Ein Social-Login-Konto wählt seinen Benutzernamen auf der Kontoseite gleich nach dem Anlegen (überspringbar; der Name des Anbieters nur, wenn die Person es verlangt). Jedes Konto kann sich mit seiner eigenen Anmeldemethode umbenennen, und zwei Konten einer Person lassen sich zusammenführen, wenn die Person beide nachgewiesen hat (nie in ein Konto mit Personalrolle hinein oder aus ihm heraus). Der Fehler bei fehlender Einwilligung erscheint am Kontrollkästchen. Auf einem Computer getestet; der Schritt Benutzername und das Zusammenführen sind auf dem Testserver noch auszuprobieren."
         - "Eine Registrierung per Social Login hält die Version der Datenschutzerklärung fest, die die Person tatsächlich sah: Der Server lehnt eine veraltete ab und prüft vor dem Anlegen des Kontos noch einmal. Auf einem Computer getestet."
         - "Die tägliche Aufbewahrungsbereinigung löscht auch anonymisierte Konten (was eine Löschung oder ein Zusammenführen hinterlässt), sobald nichts mehr auf sie verweist. Auf einem Computer getestet."
+        - "Wer die Anmeldung eines Kontos ändert, braucht einen zweiten Faktor: Passkeys hinzufügen, umbenennen oder entfernen, Zwei-Faktor-Codes einrichten oder abschalten, das Passwort ändern, eine Social-Anmeldung verknüpfen und ein Zusammenführen bestätigen werden abgelehnt, wenn die Sitzung keinen TOTP- oder Passkey-Schritt durchlaufen hat (eine Social-Anmeldung allein zählt nicht); ein Zusammenführen bringt nie Passkeys in ein Personalkonto. Die Kontoseite des Personals und die App fragen zuerst diesen Schritt ab. Auf einem Computer getestet, nicht bei den echten Anbietern."
+        - "Das eigene Sicherheits-Review des Site-Servers: Anfragekörper begrenzt (413 ab 1 MiB, 4 MiB bei Uploads), dieselbe Antwort auf „kein solches Konto“ und auf eine abgelehnte Rollenvergabe, der Feld-Export mit nur den Audit-Zeilen des Feldes, der Schalter der öffentlichen Seite in der Feldsuche der App beachtet, eine Pflicht-URL, der Aussteller einer Social-Anmeldung zusammen mit ihrem Subjekt gespeichert, HTTP-Anfragen hinter einem Proxy auf HTTPS umgeleitet und ein Health-Check, der nur ok sagt. Zum Teil auf dem Preview-Server gefunden."
+        - "Konten beruhen auf dem Vertrag, nicht auf einer Einwilligung: Bei der Anmeldung wird festgehalten, welche Version des Datenschutzhinweises gezeigt wurde, mit einem Kästchen „Ich bin 16 oder älter“ (auf der Personalseite und in der App); ein Geburtsdatum wird nicht gespeichert; ohne veröffentlichten Hinweis ist die Registrierung geschlossen. Alte Einwilligungen wurden zu Hinweis-Einträgen. Auf einem Computer getestet."
+        - "Der Code des Datenschutz-Reviews: Die Netzwerkadresse eines Audit-Eintrags wird nach 180 Tagen gelöscht (einstellbar); ein Konto, das 24 Monate nicht benutzt wurde, bekommt eine Warnung und wird 30 Tage später anonymisiert; die Löschung einer Person oder eine zurückgezogene Chrono-Einwilligung erreicht die Controller anderer Felder, die ihre Kopien verwerfen; Löschungen bleiben als Hashes in einem Verzeichnis außerhalb der Datenbank und werden nach einer Wiederherstellung erneut angewendet; eine neue Personalseite markiert Wiederholungstäter nur als Hinweis (eine einfache Verwarnung zählt nie), und eine Sperre endet standardmäßig nach 12 Monaten; der Spielverlauf bleibt 90 Tage mit Spieler-IDs erhalten, die Teamergebnisse ohne sie 365. Auf einem Computer getestet."
+        - "Ein Feld nimmt die Bedingungen für die Freigabe zwischen Feldern an (die Administration, auf der Einstellungsseite), bevor es Chrono-Einträge teilt; Version, Datum und Konto werden festgehalten, und ändern sich die Bedingungen, ruht die Freigabe, bis sie angenommen sind. Das Feld ist Verantwortlicher für die Daten seiner Spielenden, der Hub-Betreiber sein Auftragsverarbeiter, und die Felder, die teilen, sind nur für diesen Schritt gemeinsam Verantwortliche. Auf einem Computer getestet."
+        - "Wer den Server betreibt, kann über die Kommandozeile ein Passwort für ein bestehendes Konto setzen (<code>set-password</code>, zweimal ohne Echo abgefragt, nie in der Kommandozeile): der Ausweg für ein Staff-Konto ohne zweiten Faktor, das seine Anmeldemethoden deshalb nicht über die Seite ändern kann."
     g_games:
       title: Spiele, Clubs und Staff-Seiten
       items:
@@ -1144,9 +1219,13 @@ roadmap:
         - "Hosted-Modus: Jedes Feld hat eine eigene Datenbankrolle, so dass eine SQL-Injection nicht mehr auf die Daten eines anderen Feldes umschalten kann, indem sie die Einstellung ändert, die die Zeilensicherheit nutzte. Eine Lücke, die eine zweite SQL-Anweisung braucht, bleibt offen und ist dokumentiert. Gegen PostgreSQL in Docker getestet."
         - "Hosted-Modus: Felder, die Chrono-Einträge teilen, tun das jetzt auch zwischen den Feldern eines Hubs, über eine schreibgeschützte Ansicht, die eine Einwilligung braucht; eine Person verknüpft ihre Konten bei zwei Feldern mit einem Einmalcode, und nichts wird über E-Mail oder Namen zugeordnet. Gegen PostgreSQL in Docker getestet."
         - "Eine schreibgeschützte Live-Demo für den Vorschau-Server: Der echte Feld-Controller mit drei simulierten Field Boxen spielt endlos Spiele, abwechselnd auf einem offenen Feld und in einem erfundenen dreistöckigen Gebäude (ein Plan je Etage, fünfzehn Beacons, zwölf simulierte Spielende: sechs per Beacon verortet, fünf per GPS mit gewählter Etage, eine Person unsicher), und Besuchende sehen die GM-Konsole, die Anzeigetafel und eine Spielendenansicht, ohne etwas ändern zu können und ohne personenbezogene Daten. Seit dem 29. Oktober 2026 online unter demo.atalaia-project.link; ihre Spielendenansicht wird in einem Headless-Browser getestet."
+        - "Hosted-Modus: ein einziger Rückruf der Social-Anmeldung für den ganzen Hub (optional): Der Betreiber trägt pro Anbieter eine Weiterleitungsadresse ein; der Hub signiert den Zustand, prüft das Feld in seinem Register und übergibt an den eigenen Rückruf des Feldes. In Docker getestet, nicht bei den echten Anbietern."
+        - "Eine Go-live-Checkliste für den Betreiber: sechs Bedingungen, bevor irgendein Feld den Hosted-Modus bekommt (ein unterschriebener Auftragsverarbeitungsvertrag pro Feld, die Freigabebedingungen, jeder Unterauftragsverarbeiter im Anhang und in der EU, ein ausgefüllter Datenschutzhinweis, die eigenen Unterlagen des Betreibers, wenn er eine natürliche Person ist, und ein Nachweis auf einem echten Server)."
+        - "Der Preview-Server (tests.atalaia-project.link) läuft seit dem 30. Oktober mit all dem und hat einen eigenen Datenschutzhinweis (Version preview-2026-10-31: Konten auf Vertragsbasis, 16 oder älter, kein Datenschutzbeauftragter)."
+        - "Der Preview-Server installiert seine Datenschutzerklärung bei jedem Start und Update selbst (und hält an, wenn die Dateien einer Version fehlen), die Live-Demo sendet HSTS, und ein Wegwerf-Teststack (ein gehosteter Hub, ein falscher Login-Anbieter und ein Feld-Controller, nur auf 127.0.0.1) lässt einen autorisierten Sicherheitstest gegen den heutigen Code laufen."
     next:
       - Ein echter Server mit Domain.
-      - Eine rechtliche Prüfung der Vorlagen, bevor der Hosted-Modus live geht. Vorher wird er nicht angeboten.
+      - "Die Go-live-Bedingungen des Hosted-Modus (ein unterschriebener Auftragsverarbeitungsvertrag pro Feld, die Freigabebedingungen, ein ausgefüllter Hinweis) und jedes Feld, das seinen eigenen Hinweis und seine Folgenabschätzung ausfüllt. Der Anwalt oder die Anwältin des Maintainers hat die rechtlichen Positionen am 30. Oktober 2026 gebilligt; der Hosted-Modus wird weiterhin nicht angeboten. Nichts von der Sicherheits-, Funk- und Rechtsarbeit vom 30. Oktober wurde auf einem echten Board oder Handy ausprobiert: Es läuft in Software und auf dem Preview-Server."
       - "Die Tests auf Hardware: echte Boards, ein echtes ATAK-Handy, eine echte 4G-Verbindung, ein
         echter Chronograph."
       - Das Ziel-Addon, auf das die Regeln von Zielfenster warten.
@@ -1206,10 +1285,12 @@ roadmap:
       - "Die Szenario-Blöcke der GM-Konsole haben eine Sprachliste mit allen vier Sprachen."
       - "Die Modus-Schlüssel des Projekts: ein offline gehaltener Root-Schlüssel und ein Schlüssel, mit dem die Registry das Verifiziert-Abzeichen signiert. Boxen, App und Controller vertrauen standardmäßig beiden."
       - "Die Firmware-Anleitung und die Bauhandbücher erklären das eine Flashen per USB, das eine Box mit der alten Partitionstabelle braucht, und dass Einstellungen und Schlüssel es überleben."
+      - "Die Härtung von CI und Release aus dem Sicherheits-Review: jede Action per Commit festgeschrieben, das Build-Image per Digest, jede pip-Installation aus einer Datei mit Hashes, der Signatur-Job in einer geschützten Umgebung, die einen Tag außerhalb von main ablehnt, und wöchentliche Abhängigkeits-Updates. Der Maintainer muss die geschützte Umgebung noch anlegen und die Signatur-Secrets dorthin verschieben (die Schritte sind aufgeschrieben)."
+      - "Lua-Zeichenmuster und string.rep werden in der Sandbox gezählt (ein feindliches Muster konnte eine Box bis zum Watchdog hängen lassen), das Überspringen verschachtelter CBOR-Daten ist tiefenbegrenzt, und die CBOR-Decoder haben Tests mit feindlichen Eingaben."
     next:
       - "Die Prüfung des Deutschen und des Chinesischen: Wenn du auf Deutsch oder Chinesisch
         spielst, hilf uns beim Prüfen. Übersetzungen in andere Sprachen beginnen in
-        docs/translations (auf Englisch)."
+        docs/translations (auf Englisch und Portugiesisch)."
       - "Die Hardware: die Träger-Platine (eine fertige Leiterplatte, die den Bau erleichtert) nach
         den ersten gebauten Boxen, Fotos echter Builds, Community-Inhalte von einem Feld."
     gate: Fortlaufend nach dem ersten Release.
@@ -1220,12 +1301,14 @@ build:
     Die Props von Atalaia werden aus handelsüblichen Teilen rund um ein ESP32-Board gebaut, ohne
     eigens gefertigte Leiterplatte. Hier stehen die Pins und Schaltpläne der Field Box sowie die Anleitungen für den Satelliten, den I/O-Pod und
     das Ziel-Addon, gekürzt; die vollständigen Anleitungen mit allen Prüfungen und den Tabellen zur
-    Fehlersuche liegen im Repository (auf Englisch).
-    Um die Firmware auf eine Platine zu bringen, <a href="https://github.com/vakaobr/atalaia-project/releases">lade eine fertige Version herunter</a> oder baue sie selbst: die <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">Firmware-Anleitung</a> (Englisch) erklärt beides. Der Feld-Controller hat eine eigene <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">Einrichtungsanleitung</a> (Englisch).
+    Fehlersuche liegen im Repository (auf Englisch und Portugiesisch).
+    Um die Firmware auf eine Platine zu bringen, <a href="https://github.com/vakaobr/atalaia-project/releases">lade eine fertige Version herunter</a> oder baue sie selbst: die <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">Firmware-Anleitung</a> (Englisch) erklärt beides. Der Feld-Controller hat eine eigene <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">Einrichtungsanleitung</a> (Englisch). Das Modem hat eine eigene <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/modem.md">Modem-Anleitung</a> (Englisch).
   status: >-
-    <strong>Nach diesen Anleitungen wurde noch keine einzige Box gebaut.</strong> Ihre Pins werden
-    automatisch mit der Firmware abgeglichen, aber jeder Schritt am echten Teil (Gehäuse,
-    Stromversorgung, Laufzeit, Funkreichweite) ist ungetestet, und die Fotos kommen mit den ersten
+    <strong>Nach diesen Anleitungen wurde noch keine Box gebaut, und die Field Box hat noch kein
+    Gehäuse.</strong> Es gibt nur einen <a href="#field-box-first-build">Aufbau der Field Box auf dem
+    Labortisch</a> (lose Kabel), der Spiele spielt. Die Pins werden automatisch mit der Firmware
+    abgeglichen, aber jeder Schritt am echten Teil (Gehäuse, Stromversorgung, Laufzeit,
+    Funkreichweite) ist ungetestet, und die Fotos der anderen Boxen kommen mit deren ersten
     Aufbauten. Wenn du eine baust, erzähl uns, was du dabei findest.
   toc: Auf dieser Seite
   parts: Teile
@@ -1309,11 +1392,46 @@ build:
       Das Haupt-Prop, mit Team-Tastern, Tastenfeld, Farbdisplay, LED-Ring, NFC-Leser und
       Lautsprecher. Ihre
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">Bauanleitung</a>
-      (auf Englisch) hat die Teile, die Schaltpläne, Stromversorgung und Akkusicherheit, das erste
+      (auf Englisch und Portugiesisch) hat die Teile, die Schaltpläne, Stromversorgung und Akkusicherheit, das erste
       Flashen und die Fehlersuche; die Anleitungen unten verweisen bei jedem gemeinsamen Schritt
       darauf.
     pins_shared: >-
       GPIO 1, 35 und 44 sind Pins des Boards, die die Field Box absichtlich mitbenutzt, jeder nur für diesen einen Zweck: 1 ist der Akkuspannungs-Eingang des Boards (die Akkuanzeige liest den Akku per I2C), 35 seine weiße LED (sie flackert leicht mit dem Ring) und 44 die Empfangsleitung von UART0 (die USB-Konsole bleibt unberührt).
+    bench:
+      title: Der erste Aufbau auf dem Labortisch
+      intro: >-
+        Die Field Box gibt es jetzt außerhalb des Papiers, aber nur als Aufbau auf dem Labortisch: das
+        erste Board, das ein ganzes Spiel spielt, mit Display, Tastern und Tastenfeld an losen Kabeln
+        und noch ohne Gehäuse. Es ist kein fertiges Produkt und keine nach den Anleitungen gebaute Box.
+      photo_alt: >-
+        Foto des Labortisch-Aufbaus: ein Heltec-V4-Board mit seinem kleinen OLED-Display, über viele
+        bunte Kabel verbunden mit einem 2,8-Zoll-TFT-Display, das «READY» und «Next game» zeigt, einem
+        Folientastenfeld mit 12 Tasten (4 mal 3) und vier Drucktastern mit grünen, blauen und
+        schwarzen Kappen. Alles liegt lose auf einem Schreibtisch, dahinter eine Computertastatur.
+      photo_caption: >-
+        Die erste Field Box auf dem Labortisch, 31. Oktober 2026: ein Heltec-V4-Board, das
+        2,8-Zoll-TFT (ILI9341), das OLED des Boards, ein 4×3-Tastenfeld und Team-Taster an losen
+        Kabeln, ohne Gehäuse. Es ist das erste Board, das ein Spiel spielt, und ein Aufbau auf dem
+        Labortisch, keine fertige Box.
+      video_alt: >-
+        Stummes Video in Endlosschleife desselben Aufbaus beim Spielen von Domination, mit dem neuen
+        TFT-Display. Das Display zeigt eine Zone des roten Teams mit 3 Punkten; unten füllt sich ein blauer Balken,
+        die Zone geht an das blaue Team, und Display und OLED wechseln von Rot zu Blau. Dann zeigt das Display
+        „ocupada há 0:01“ (gehalten seit 0:01), hochzählend, und oben rechts die Punkte jedes Teams.
+      video_caption: >-
+        Derselbe Aufbau beim Spielen von Domination mit dem Controller vom Labortisch (1. November 2026): Der
+        Haltebalken füllt sich, die Zone wechselt vom roten zum blauen Team, die Haltezeit zählt hoch, und die
+        Punkte jedes Teams erscheinen in der Ecke. Elf Sekunden in Schleife, ohne Ton; das Display ist auf
+        Portugiesisch.
+      photo2_alt: >-
+        Foto desselben Labortisch-Aufbaus mit dem neuen TFT-Display: Das Display zeigt „PRONTA“ (bereit), den gelben
+        Turm des Atalaia-Logos und „Próximo jogo“ (nächstes Spiel), darunter „Uma tecla: escolher jogo aqui“ (eine
+        Taste: hier ein Spiel wählen). Links das Heltec-V4-Board mit seinem OLED, das „Próximo jogo“ wiederholt;
+        rechts ein grüner Drucktaster. Überall lose Kabel, auf einem Schreibtisch.
+      photo2_caption: >-
+        Derselbe Aufbau am 1. November 2026 mit dem neuen TFT-Display: der Bildschirm „PRONTA / Próximo jogo“ (bereit /
+        nächstes Spiel) mit dem gelben Atalaia-Turm, wartend auf ein Spiel. Weiterhin ein Aufbau auf dem Labortisch,
+        ohne Gehäuse.
     wiring:
       title: >-
         Schaltpläne
@@ -1421,7 +1539,7 @@ build:
         <strong>Ein eigener Schaltplan</strong>: Vorerst zeigen die Schaltpläne der Field Box jedes
         Kabel, das ein Satellit hat.
     full: >-
-      Die vollständige Anleitung (auf Englisch):
+      Die vollständige Anleitung (auf Englisch und Portugiesisch):
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/satellite/BUILD.md">Bauanleitung
       des Satelliten</a>.
   pod:
@@ -1492,10 +1610,54 @@ build:
         <strong>Einstellungen vom Handy aus</strong>: Tasterfarben, LED-Zahl und der Rest werden
         vorerst beim Bauen der Firmware festgelegt.
     full: >-
-      Die vollständige Anleitung (auf Englisch):
+      Die vollständige Anleitung (auf Englisch und Portugiesisch):
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/io-pod/BUILD.md">Bauanleitung
       des I/O-Pods</a>, und die Prüfungen des Pods mit einem Handy in der
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/firmware/esp32/docs/BRING_UP.md">Inbetriebnahme-Liste</a>.
+  modem:
+    title: Funkmodem
+    what: >-
+      Das Funkgerät des Controllers: ein zweites Heltec WiFi LoRa 32&nbsp;V4, mit dem Modem-Image geflasht
+      und in den USB-Anschluss des Feld-Controllers gesteckt. Ohne es läuft der Controller und die Konsole
+      öffnet sich, aber nichts erreicht die Boxen und von ihnen wird nichts gehört. Es hat kein WLAN und
+      braucht deshalb nur die LoRa-Antenne.
+    tested: >-
+      Ein so geflashtes Modem lief auf einem Prüfstand mit dem Controller und echten Boxen (ein Computer,
+      der Controller in Docker). Auf einem Raspberry Pi ist es noch nicht gelaufen, auch nicht unter macOS
+      und nicht auf einem Spielfeld.
+    steps:
+      antenna: >-
+        Bringe die <strong>LoRa-Antenne an, bevor die Platine irgendeinen Strom hat</strong>, auch zum
+        Flashen, und nimm ein USB-C-<em>Datenkabel</em>. Lege die Funkregion fest: Modem und Boxen müssen
+        sie teilen.
+      image: >-
+        Lade <code>atalaia-modem-&lt;Version&gt;-usb.zip</code> und <code>SHA256SUMS</code> von den
+        <a href="https://github.com/vakaobr/atalaia-project/releases">Releases</a> herunter (V4.3, EU868)
+        oder baue es selbst: <code>python tools/docker_fw.py modem</code> (V4.2, Taiwan, andere Antennen).
+      flash: >-
+        Lösche mit esptool 4.8.1 eine neue Platine und schreibe die Dateien aus <code>flash_args</code>:
+        <code>esptool --chip esp32s3 -p PORT write_flash "@flash_args"</code>, mit dem Port
+        <code>COM5</code> unter Windows, <code>/dev/ttyACM0</code> unter Linux, <code>/dev/cu.usbmodem…</code>
+        unter macOS. Unter Linux trittst du zuerst der Gruppe <code>dialout</code> bei.
+      screen: >-
+        Der Bildschirm der Platine zeigt den Turm und <strong>MODEM MODE</strong>, dann <code>LINK wartet</code>
+        (zuerst auf Englisch: <code>LINK waiting</code>). Das ist ein gesundes Modem, das noch keinen
+        Controller hat. <strong>RADIO FAULT</strong> heißt, dass der Funkchip nicht gestartet ist.
+      port: >-
+        Stecke es in den Controller, finde den Port (<code>ls /dev/ttyACM*</code>), trage ihn in
+        <code>[modem] port</code> von <code>/etc/atalaia/controller.toml</code> ein und starte den Dienst
+        neu (<code>sudo systemctl restart atalaia-controller</code>).
+      check: >-
+        Der Bildschirm zeigt <strong>LINK OK</strong>, die Kopfzeile der Konsole zeigt
+        <strong>Funk: aktiv</strong>, und das Protokoll des Controllers enthält <code>modem link up</code>.
+      join: >-
+        Schalte eine aufgenommene Box ein, lege ein Spiel an und lade die Box ein: sie geht über
+        <em>sende</em>, <em>eingeladen</em> zu <em>beigetreten</em>, und der Bildschirm des Modems zählt Pakete.
+    full: >-
+      Alle Befehle für jedes System, wie man den Port findet, und eine Tabelle zur Fehlersuche (Ladekabel
+      ohne Daten, falscher Port, Port von einem anderen Programm belegt, <code>dialout</code>, andere Region,
+      <code>LINK waiting</code> oder <code>DOWN</code>, <code>RADIO FAULT</code>, falsche Partitionstabelle):
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/modem.md">Set up the radio modem</a> (Englisch).
   target:
     title: Ziel-Addon
     status: >-
@@ -1560,7 +1722,7 @@ build:
         <strong>Die Energiegrenzen des Felds</strong> gelten beim Schießen auf Ziele wie auf Menschen.
     photo: das fertige Ziel, Platte und Sensor, und der Anschluss an einer Box.
     full: >-
-      Was entschieden ist, mit den Dokumenten hinter jeder Entscheidung (auf Englisch):
+      Was entschieden ist, mit den Dokumenten hinter jeder Entscheidung (auf Englisch und Portugiesisch):
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/target-addon/BUILD.md">Anleitung
       zum Ziel-Addon</a>.
 
@@ -1626,7 +1788,7 @@ glossary:
       Lautsprecher und NFC-Leser in einem wetterfesten Gehäuse, für etwa
       <span class="nowrap">70–110&nbsp;€</span> an Teilen; der Satellit ist eine kleinere Box für einen
       Nebenpunkt, für etwa <span class="nowrap">30–40&nbsp;€</span>. Firmware und Bauhandbuch der Field
-      Box sind fertig; ihre ersten Prototypen warten auf ihre Teile (Phase&nbsp;1).
+      Box sind fertig; ein erster Aufbau auf dem Labortisch (lose Kabel, ohne Gehäuse) spielt schon (Phase&nbsp;1).
   milsim:
     id: glossar-milsim
     term: Milsim
@@ -1840,7 +2002,7 @@ involved:
   intro: "Atalaia wird von Spielenden, Feldbetreibenden und Bastelnden gebaut. Du kannst heute schon helfen:"
   review: >-
     die <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/design-spec.md">Design-Spezifikation</a>
-    (auf Englisch) prüfen und <a href="https://github.com/vakaobr/atalaia-project/issues">Issues
+    (auf Englisch und Portugiesisch) prüfen und <a href="https://github.com/vakaobr/atalaia-project/issues">Issues
     eröffnen</a>;
   propose: >-
     Spielmodi mit der
@@ -1850,7 +2012,7 @@ involved:
   code: >-
     Code schreiben: Fang mit
     <a href="https://github.com/vakaobr/atalaia-project/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>
-    (auf Englisch) an.
+    (auf Englisch und Portugiesisch) an.
   rules: >-
     Jeder Commit trägt eine Zeile <code>Signed-off-by</code>, und das Projekt ist strikt Clean-Room,
     von Grund auf neu geschrieben: kein Code, keine Firmware, keine Handbücher, Töne oder Bilder aus
@@ -1884,11 +2046,18 @@ footer:
     Atalaia ist freie Software: GPL-3.0-or-later für Kern, Firmware, App und Modi; AGPL-3.0-or-later
     für den Feld-Controller und den Site-Server; CERN-OHL-S-2.0 für Hardware; CC BY-SA 4.0 für die
     Dokumentation und diese Seite.
+  flags: >-
+    Sprachflaggen: Twemoji Country Flags, Grafiken aus Twemoji (Twitter, Inc und Mitwirkende), CC BY 4.0, auf vier Flaggen verkleinert.
+  flags_licence: CC BY 4.0
   licensing: Lizenzen
   manuals: Handbücher für Spielende, Orga, Marshals und Box-Betreuende (auf Englisch und Portugiesisch)
   independent: >-
     Unabhängig und von der Community getragen; mit keinem kommerziellen Prop-Hersteller verbunden.
     Diese Seite setzt keine Cookies und lädt nichts von anderen Seiten.
+  privacy: Datenschutzerklärung (Entwurf)
+  privacy_note: >-
+    Die Erklärung, die ein Site-Server seinen Spielenden zeigt. Sie ist eine Vorlage für Betreibende: Sie gibt die rechtlichen Positionen wieder, die der Anwalt oder die Anwältin des Maintainers am 30. Oktober 2026 gebilligt hat, aber der Wortlaut selbst ist noch ein Entwurf, noch nicht von einer juristischen Fachperson geprüft, und jedes Feld muss ihn prüfen und als eigenen übernehmen (auf Englisch und Portugiesisch).
+  privacy_href: https://github.com/vakaobr/atalaia-project/tree/main/docs/templates
 
 # The two radio diagrams: site/src/diagrams/*.svg, built into site/img/diagrams/.
 # Plain text, not HTML. Each text has a fixed room in the drawing; if a
@@ -2025,7 +2194,7 @@ diagrams:
 architecture:
   title: "Wie alles zusammenspielt"
   intro: "Welcher Teil von Atalaia mit welchem spricht, über welche Verbindung und was darüber läuft. Unter jedem Diagramm: was fließt und was nicht."
-  status: "Atalaia ist Pre-Alpha. Auf echten Boards am Teststand liefen: Start, Funk, Tasten, Aufnahme und ein Update über die Luft. Alles andere ist nur in Software gebaut und getestet."
+  status: "Atalaia ist Pre-Alpha. Auf echten Boards am Teststand liefen: Start, Funk, Tasten und Tastenfeld, Aufnahme, ein Update über die Luft und ganze Spiele mit dem Feld-Controller. Die iOS-App hat ihre Checkliste auf einem iPhone bestanden. Alles andere ist nur in Software gebaut und getestet."
   reading: "So liest du das erste Diagramm: Eine durchgezogene Linie funktioniert ohne Internet auf dem Feld, eine gestrichelte braucht Internet."
   flows: "Was fließt"
   not: "Was nicht fließt"

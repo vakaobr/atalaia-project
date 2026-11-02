@@ -53,9 +53,15 @@ All three apply to that build folder only, and are reset when left out.
                                                default; the 20-box field test builds the same commit
                                                with both (docs/runbooks/radio-field-test.md).
                                                Applies to that build folder; on when left out.
+    --antenna-dbi=N                            the fitted antenna's gain in dBi, 0 to 20 (Kconfig
+                                               ATALAIA_RADIO_ANTENNA_GAIN_DBI): the firmware takes it
+                                               off the conducted power so the radiated power stays
+                                               within the sub-band's limit. Give the antenna's rated
+                                               gain (a 10 dBi whip: --antenna-dbi=10); 2 when left out.
+                                               Applies to that build folder.
 
 Works from any folder and any shell (cmd, PowerShell, bash). Docker must be
-running. `build`, `wokwi`, `modem`, `pod` and `bench` use the espressif/idf:v5.3.2 image, the same as
+running. `build`, `wokwi`, `modem`, `pod` and `bench` use the espressif/idf:v5.3.2 image (pinned by digest), the same as
 CI's esp32-build job, and write into firmware/esp32/ so that flashing tools
 and the Wokwi extension find the files. `test` runs CI's firmware-test
 commands in the atalaia-dev image (built on first use, like docker_sim.py)
@@ -83,7 +89,8 @@ PROJECT_RELEASE_KEYS_HEX = "e6dccf90dd002529fe837e023f9f658a70917ff7dc69615cec60
 PROJECT_MODE_KEYS_HEX = "23e9b7acefbe4dc54d86f0c7cc8dbca64340f141a84c94a2f38216420baae0ca d27329d0e19ba0625950cb1b73fca4aa4c5014d76623f6b69389d0e98b1d4c86"
 VERSION_H = REPO / "core" / "include" / "atalaia" / "version.h"
 FW_VERSION_LEN = 31  # esp_app_desc_t's version (32 bytes with its NUL)
-IDF_IMAGE = "espressif/idf:v5.3.2"
+# Pinned by digest, the same as the workflows (security review SC-3): move all of them together.
+IDF_IMAGE = "espressif/idf:v5.3.2@sha256:5b8f58d9d9caa45b689a31a0b6a0cc53b84594e0ba5fdd8d28eeef7d6123242a"
 DEV_IMAGE = "atalaia-dev"
 DEV_LABEL = "org.atalaia.dockerfile"
 # ATALAIA_VOLUME_SUFFIX keeps the build cache of two checkouts (e.g. a git worktree) apart.
@@ -300,6 +307,19 @@ def lbt_options(build_dir: str) -> tuple[str, ...]:
     return (f"{build_dir}/sdkconfig.lbt",)
 
 
+def antenna_options(build_dir: str) -> tuple[str, ...]:
+    """The antenna's gain (--antenna-dbi, 2 when not given): a defaults file in the build folder,
+    written in both cases and only when it changes, so that a new gain rebuilds the sdkconfig."""
+    gain = FW_OPTIONS.get("antenna_dbi", "2")
+    antenna_file = FW / build_dir / "sdkconfig.antenna"
+    text = ("# Written by tools/docker_fw.py (--antenna-dbi): the fitted antenna's gain in this build.\n"
+            f"CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI={gain}\n")
+    antenna_file.parent.mkdir(parents=True, exist_ok=True)
+    if not antenna_file.exists() or antenna_file.read_text() != text:
+        antenna_file.write_text(text)
+    return (f"{build_dir}/sdkconfig.antenna",)
+
+
 def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
     """Builds a variant (defaults applied on top of sdkconfig.defaults) into build_dir, with the
     firmware's version (a CMake cache value, set on every build so that it never sticks)."""
@@ -309,9 +329,11 @@ def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
                     f"{FW_VERSION_LEN} characters; give one with --fw-version=")
     print(f"docker_fw: firmware version {version}", flush=True)
     cmake_args = [f"-D ATALAIA_FW_VERSION={version}"]
-    defaults = defaults + field_box_options(build_dir) + region_options(build_dir) + lbt_options(build_dir)
+    defaults = (defaults + field_box_options(build_dir) + region_options(build_dir) + lbt_options(build_dir)
+                + antenna_options(build_dir))
     print(f"docker_fw: radio region {FW_OPTIONS.get('region', 'eu868')}, "
-          f"listen before talk {FW_OPTIONS.get('lbt', 'on')}", flush=True)
+          f"listen before talk {FW_OPTIONS.get('lbt', 'on')}, antenna {FW_OPTIONS.get('antenna_dbi', '2')} dBi",
+          flush=True)
     # The variant's sdkconfig lives in its build folder. Regenerate it when
     # the defaults change, so edits to them always take effect.
     sdkconfig = FW / build_dir / "sdkconfig"
@@ -342,7 +364,7 @@ def modem() -> int:
     code = variant(MODEM_BUILD, MODEM_DEFAULTS)
     if code == 0:
         print(f"\nModem firmware: firmware/esp32/{MODEM_BUILD}/atalaia_esp32.bin "
-              "(flash it to the board plugged into the controller; see controller/README.md)")
+              "(flash it to the board that goes into the controller: docs/manuals/en/modem.md)")
     return code
 
 
@@ -421,8 +443,9 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 1
     command, options = argv[0], argv[1:]
-    box = ["--fw-version=", "--release-keys=", "--mode-keys=", "--region=", "--lbt="]
-    known = {"build": box, "wokwi": box, "modem": ["--region=", "--lbt="], "pod": ["--region=", "--lbt="],
+    box = ["--fw-version=", "--release-keys=", "--mode-keys=", "--region=", "--lbt=", "--antenna-dbi="]
+    radio = ["--region=", "--lbt=", "--antenna-dbi="]
+    known = {"build": box, "wokwi": box, "modem": radio, "pod": radio,
              "bench": box,
              "test": ["--update-screens"], "clean": [], "version": []}
     if command not in known:
@@ -451,6 +474,11 @@ def main(argv: list[str]) -> int:
             if value not in ("on", "off"):
                 return fail("--lbt: on or off")
             FW_OPTIONS["lbt"] = value
+        elif name == "--antenna-dbi=":
+            value = option.split("=", 1)[1]
+            if not value.isdigit() or not 0 <= int(value) <= 20:
+                return fail("--antenna-dbi: a whole number of dBi, 0 to 20")
+            FW_OPTIONS["antenna_dbi"] = str(int(value))
         elif name == "--mode-keys=":
             keys = release_keys_hex(option.split("=", 1)[1])
             if keys is None:

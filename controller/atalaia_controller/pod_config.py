@@ -22,9 +22,9 @@ from __future__ import annotations
 import json
 import logging
 import threading
-import time
 from typing import Any, Callable, Optional
 
+from . import wallclock
 from .engine import Conflict, Controller, ControllerError, NotFound, Unavailable
 
 log = logging.getLogger("atalaia.pod_config")
@@ -119,11 +119,13 @@ class PodSettingsModel:
         out.update({k: self.set[k] for k in ("btn", "bright", "vol", "tamper") if k in self.set})
         return json.dumps(out, separators=(",", ":"))
 
+REV_KEY = "pod_config.rev_max"  # the highest rev sent to any pod (a pod keeps the last it took in flash)
+
 
 class PodConfig:
     """The GM's pushes of settings to the pods of the live game's phones."""
 
-    def __init__(self, controller: Controller, clock: Callable[[], float] = time.time) -> None:
+    def __init__(self, controller: Controller, clock: Callable[[], float] = wallclock.now) -> None:
         self.controller = controller
         self.clock = clock
         self._lock = threading.Lock()
@@ -137,7 +139,15 @@ class PodConfig:
         """Seconds since 1970, and above the last rev sent to the node: a pod keeps the last rev it
         took in its flash, so a controller that restarted (and forgot) must still go above it."""
         last = self.pushes.get(node_id, {}).get("rev", 0)
-        return max(int(self.clock()), last + 1)
+        # A controller whose clock came up wrong (1970, a Pi 4 after a power cycle) must still go above the
+        # revs a pod holds: the highest sent is kept in the store, whatever the clock says.
+        try:
+            kept = int(self.controller.store.get_setting(REV_KEY) or 0)
+        except ValueError:
+            kept = 0
+        rev = max(int(self.clock()), last + 1, kept + 1)
+        self.controller.store.set_setting(REV_KEY, str(rev))
+        return rev
 
     def candidates(self) -> list[dict[str, Any]]:
         """The phones of the live game: the only nodes an I/O pod can serve (their HELLO says

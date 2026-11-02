@@ -329,6 +329,108 @@ static void test_invalid_templates(void)
     refused(big, "larger than");
 }
 
+static char logged_line[160];
+static int logged_count;
+static void on_log(const char *message)
+{
+    snprintf(logged_line, sizeof(logged_line), "%s", message);
+    logged_count++;
+}
+
+/* A 'text' of n letters. */
+static size_t lit(char *out, size_t at, size_t n, char ch)
+{
+    out[at++] = '\'';
+    memset(out + at, ch, n);
+    at += n;
+    out[at++] = '\'';
+    return at;
+}
+
+/* Decision TPL-1: the 'text' literals of an expression have their own 256 bytes, so whether
+ * they fit never depends on the data, the check at load time is exact, and a render that fails
+ * anyway shows "?" and logs once. */
+static void test_literal_budget(void)
+{
+    char why[96];
+    char ex[600];
+    size_t n;
+
+    /* 255 + 1 NUL = 256: fits exactly; one more byte does not. */
+    n = lit(ex, 0, 255, 'a');
+    CHECK(atalaia_tpl_expr_ok(ex, n, why, sizeof(why)));
+    CHECK(atalaia_tpl_expr_literal_bytes(ex, n) == 256);
+    n = lit(ex, 0, 256, 'a');
+    CHECK(!atalaia_tpl_expr_ok(ex, n, why, sizeof(why)));
+    CHECK(strstr(why, "need 257 bytes of 256") != NULL);
+
+    /* All the literals count, in every branch of && and ||; the message has the total. */
+    n = lit(ex, 0, 100, 'a');
+    n += (size_t)snprintf(ex + n, sizeof(ex) - n, " || x && ");
+    n = lit(ex, n, 100, 'b');
+    n += (size_t)snprintf(ex + n, sizeof(ex) - n, " || ");
+    n = lit(ex, n, 100, 'c');
+    CHECK(atalaia_tpl_expr_literal_bytes(ex, n) == 303);
+    CHECK(!atalaia_tpl_expr_ok(ex, n, why, sizeof(why)));
+    CHECK(strstr(why, "need 303 bytes of 256") != NULL);
+
+    /* Through a template the error names the line and the (cut) expression. */
+    static char src[1024];
+    n = (size_t)snprintf(src, sizeof(src),
+                         "template: x\nlayout:\n  - type: label\n    text: \"{lang == ");
+    n = lit(src, n, 140, 'a');
+    n += (size_t)snprintf(src + n, sizeof(src) - n, " || lang == ");
+    n = lit(src, n, 140, 'b');
+    n += (size_t)snprintf(src + n, sizeof(src) - n, "}\"\n");
+    src[n] = '\0';
+    refused(src, "need 282 bytes of 256");
+    refused(src, "line 3");
+    refused(src, "...}");
+
+    /* Strings read from the data do not take the literals' room. */
+    static char data[512];
+    snprintf(data, sizeof(data), "{\"a\":\"%0150d\",\"b\":\"%0150d\"}", 0, 1);
+    n = lit(ex, 0, 250, 'z');
+    char one[ATALAIA_TPL_TEXT_MAX];
+    char textsrc[400];
+    snprintf(textsrc, sizeof(textsrc), "{a == b || a && ");
+    size_t t = strlen(textsrc);
+    memcpy(textsrc + t, ex, n);
+    t += n;
+    textsrc[t++] = '}';
+    textsrc[t] = '\0';
+    atalaia_tpl_scope_t sc = {data, "{}"};
+    atalaia_tpl_text(textsrc, &sc, one, sizeof(one));
+    CHECK(one[0] == 'z' && strlen(one) == 159); /* the 250 z, cut to a widget's text */
+
+    /* A data string longer than the room is cut; when none is left it reads "?" and is logged. */
+    snprintf(data, sizeof(data), "{\"a\":\"%0150d\",\"b\":\"%0150d\",\"c\":\"%0150d\"}", 0, 1, 2);
+    atalaia_tpl_set_log(on_log);
+    logged_count = 0;
+    atalaia_tpl_text("{a}", &sc, one, sizeof(one));
+    CHECK(strlen(one) == 150 && logged_count == 0);
+    atalaia_tpl_scope_t sc3 = {data, "{}"};
+    atalaia_tpl_text("{a && b && c}", &sc3, one, sizeof(one));
+    CHECK(strcmp(one, "?") == 0 && logged_count == 1);
+    CHECK(strstr(logged_line, "{a && b && c}") != NULL);
+    atalaia_tpl_text("{a && b && c}", &sc3, one, sizeof(one));
+    CHECK(logged_count == 1); /* once per expression */
+
+    /* A template that skipped the check: the failing expression shows "?", not nothing. */
+    logged_count = 0;
+    n = lit(ex, 0, 300, 'q');
+    ex[n] = '\0';
+    static char wrapped[700];
+    snprintf(wrapped, sizeof(wrapped), "A {%s} B {1 + 1}", ex);
+    atalaia_tpl_text(wrapped, &sc, one, sizeof(one));
+    CHECK(strcmp(one, "A ? B 2") == 0);
+    CHECK(logged_count == 1 && strstr(logged_line, "need 301 bytes of 256") != NULL);
+    atalaia_tpl_text(wrapped, &sc, one, sizeof(one));
+    CHECK(logged_count == 1);
+    CHECK(!atalaia_tpl_truthy("{'a' + }", &sc));
+    atalaia_tpl_set_log(NULL);
+}
+
 void run_screen_template_tests(void)
 {
     test_adr_example();
@@ -337,4 +439,5 @@ void run_screen_template_tests(void)
     test_colors();
     test_invalid_yaml();
     test_invalid_templates();
+    test_literal_budget();
 }

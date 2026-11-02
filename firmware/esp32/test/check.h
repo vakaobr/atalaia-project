@@ -38,6 +38,8 @@ void run_oled_view_tests(void);
 void run_modem_screen_tests(void);
 void run_builtin_presets_tests(void);
 void run_key_filter_tests(void);
+void run_i2c_health_tests(void);
+void run_reset_reason_tests(void);
 void run_event_log_tests(void);
 void run_time_sync_tests(void);
 void run_radio_stub_tests(void);
@@ -65,6 +67,7 @@ void run_adoption_tests(void);
 void run_admin_pin_tests(void);
 void run_box_pair_tests(void);
 void run_status_hold_tests(void);
+void run_tft_splash_tests(void);
 void run_target_addon_tests(void);
 
 #endif /* ATALAIA_FW_TEST_CHECK_H */

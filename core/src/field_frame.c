@@ -431,7 +431,8 @@ void atalaia_ff_reasm_reset(atalaia_ff_reasm_t *r)
 int atalaia_ff_reasm_add(atalaia_ff_reasm_t *r, const atalaia_ff_msg_t *m, uint8_t *out, size_t cap)
 {
     if (m->kind != ATALAIA_FF_INVITE || m->parts == 0 || m->part >= m->parts ||
-        m->parts > ATALAIA_FF_PARTS_MAX || m->chunk_len == 0) {
+        m->parts > ATALAIA_FF_PARTS_MAX || m->chunk_len == 0 ||
+        m->chunk_len > ATALAIA_FF_CHUNK_MAX) {
         return 0;
     }
     if (!r->used || r->invite_id != m->invite_id || r->parts != m->parts ||

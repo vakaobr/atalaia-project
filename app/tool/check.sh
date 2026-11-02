@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# The app's checks, run inside ghcr.io/cirruslabs/flutter:3.44.0 by
+# The app's checks, run inside atalaia-flutter:3.47.9 by
 # tools/docker_app.py and by CI's flutter-test, core-android-ndk and
 # flutter-build-android jobs:
 #
@@ -14,7 +14,9 @@
 #                                     (core/CMakePresets.json) and check the libraries
 #   sh app/tool/check.sh apk          flutter build apk --debug (Gradle builds the
 #                                     core with the NDK) and check the APK's libraries,
-#                                     and that it carries no Google Play services
+#                                     and that it carries no Google Play services;
+#                                     then a release build with no keystore, which must
+#                                     stop and say so (APP-2)
 #   sh app/tool/check.sh format       format lib/, test/, integration_test/ and tool/ in place
 #   sh app/tool/check.sh lock         resolve pubspec.yaml again and write pubspec.lock
 #   sh app/tool/check.sh gen          write lib/modes/builtin_modes.g.dart from modes/
@@ -110,7 +112,10 @@ android_tools() {
 check_android_lib() {
     lib="$1"
     abi="$2"
-    tools="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+    # The NDK's host tools: linux-x86_64 in the Flutter image and on CI, darwin-x86_64 on a Mac (the NDK
+    # ships one folder for this host; the Mac mini runs the app job natively since 2026-11-02).
+    tools=$(ls -d "$NDK"/toolchains/llvm/prebuilt/*/bin 2>/dev/null | head -n 1)
+    [ -x "$tools/llvm-readelf" ] || { echo "check.sh: no llvm-readelf in $NDK/toolchains/llvm/prebuilt/*/bin" >&2; exit 1; }
     case "$abi" in
         arm64-v8a) machine=AArch64 ;;
         armeabi-v7a) machine=ARM ;;
@@ -205,6 +210,16 @@ case "$MODE" in
         fi
         echo "ok   no Google Play services or ML Kit classes in the APK"
         echo "ok   $apk ($(wc -c < "$apk") bytes)"
+        # A release build must not fall back to the debug key (security review APP-2): with no
+        # release keystore and no explicit opt-in it has to stop and say what to set.
+        if ATALAIA_RELEASE_STORE_FILE= ATALAIA_RELEASE_STORE_PASSWORD= ATALAIA_RELEASE_KEY_ALIAS= \
+                ATALAIA_RELEASE_KEY_PASSWORD= flutter build apk --release > /tmp/apk-release.log 2>&1; then
+            echo "check.sh: a release APK was built with no release keystore (APP-2)" >&2
+            exit 1
+        fi
+        grep -q 'No release keystore' /tmp/apk-release.log \
+            || { tail -30 /tmp/apk-release.log; echo "check.sh: the release build failed, but not for want of a keystore" >&2; exit 1; }
+        echo "ok   a release build with no keystore stops and says so"
         # A writable folder to put the APK in (tools/docker_app.py mounts app/build/).
         if [ -n "${ATALAIA_APK_OUT:-}" ]; then
             cp "$apk" "$ATALAIA_APK_OUT/atalaia-debug.apk"

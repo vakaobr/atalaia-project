@@ -45,6 +45,7 @@
 ///     POST /api/v1/join                      GM: a join payload (slice S4)
 ///     POST /api/v1/nodes/{id}/join           GM: a join payload for that node id
 ///     GET|PUT /api/v1/settings/box-language  the boxes' screen language
+///     GET|PUT /api/v1/settings/map-fetching  may the console fetch maps (LEG-50)
 ///     WS   /api/v1/prop                      Android props on Wi-Fi
 ///                                            (controller_props.dart, slice S4)
 ///
@@ -321,6 +322,17 @@ class ControllerApi {
       _route('POST', r'/api/v1/nodes/([^/]+)/cmd', _gm(_nodeCmd)),
       _route('GET', r'/api/v1/games/([^/]+)/log', _viewer(_log)),
       _route('GET', r'/api/v1/controller', _read(_status)),
+      // SR-88: the team results of purged games, no player ids (the Pi's api.py).
+      _route(
+        'GET',
+        r'/api/v1/game-results',
+        _read(
+          (r, who) => ApiResponse(
+            200,
+            _svc().gameResults(limit: r.queryInt('limit') ?? 100),
+          ),
+        ),
+      ),
       // Slice S6: the field CA (no token), as the Pi's api.py `field_ca`.
       _route('GET', r'/api/v1/controller/ca', _fieldCa),
       // Slice S7: failover (controller_failover.dart), as the Pi's api.py.
@@ -348,6 +360,20 @@ class ControllerApi {
         _gm(
           (r) =>
               ApiResponse(200, engine.setBoxLanguage(r.body['box_language'])),
+        ),
+      ),
+      // LEG-50: the field's choice to turn the console's map fetching off.
+      _route(
+        'GET',
+        r'/api/v1/settings/map-fetching',
+        _read((r, who) => ApiResponse(200, engine.mapFetching())),
+      ),
+      _route(
+        'PUT',
+        r'/api/v1/settings/map-fetching',
+        _gm(
+          (r) =>
+              ApiResponse(200, engine.setMapFetching(r.body['map_fetching'])),
         ),
       ),
       ..._checkinRoutes(),
@@ -644,7 +670,8 @@ class ControllerApi {
     final a = console.answer(path);
     if (a == null) return null;
     final headers = {
-      if (path.startsWith('/console')) ...consoleHeadersFor(path),
+      if (path.startsWith('/console'))
+        ...consoleHeadersFor(path, mapFetching: engine.mapFetchingOn()),
       if (a.location != null) 'Location': a.location!,
     };
     return switch (a.status) {
@@ -677,6 +704,8 @@ class ControllerApi {
     return server;
   }
 
+  static const _tokenPrefix = 'atalaia.token.';
+
   /// Answers one request of a server the caller bound (the phone's shell
   /// binds HTTP on the loopback address and HTTPS for the field's Wi-Fi,
   /// controller_host.dart).
@@ -698,11 +727,14 @@ class ControllerApi {
     final res = req.response;
     try {
       final chunks = BytesBuilder(copy: false);
-      final limit = _bodyLimit(req.uri.path);
+      final limit = _bodyLimit(req.method, req.uri.path);
+      if (req.contentLength > limit) {
+        throw _HttpError(413, 'the request body is over $limit bytes');
+      }
       await for (final c in req) {
         chunks.add(c);
         if (chunks.length > limit) {
-          throw _HttpError(413, 'the request body is too large');
+          throw _HttpError(413, 'the request body is over $limit bytes');
         }
       }
       final bytes = chunks.takeBytes();
@@ -729,18 +761,46 @@ class ControllerApi {
     await res.close();
   }
 
-  /// WS /api/v1/stream: a token in ?token= (browsers cannot set headers on a
-  /// WebSocket) or Authorization; an unknown token is closed with 4401.
+  /// WS /api/v1/stream: a token in Authorization, or in the
+  /// Sec-WebSocket-Protocol header (browsers cannot set headers on a
+  /// WebSocket): `atalaia.v1` plus `atalaia.token.<base64url of the token>`
+  /// (controller/atalaia_controller/stream_auth.py, LIVE2-1), or, deprecated,
+  /// in ?token= (an address access logs keep). An unknown token is closed
+  /// with 4401. The answer names `atalaia.v1`, never the token.
   Future<void> _stream(HttpRequest req) async {
-    var token = req.uri.queryParameters['token'];
     final header = req.headers.value(HttpHeaders.authorizationHeader) ?? '';
-    if ((token == null || token.isEmpty) &&
-        header.toLowerCase().startsWith('bearer ')) {
+    final offered = [
+      for (final v in req.headers['sec-websocket-protocol'] ?? const <String>[])
+        ...v.split(',').map((p) => p.trim()),
+    ];
+    String? token;
+    if (header.toLowerCase().startsWith('bearer ') &&
+        header.substring(7).trim().isNotEmpty) {
       token = header.substring(7).trim();
     }
+    if (token == null) {
+      for (final p in offered) {
+        if (p.startsWith(_tokenPrefix)) {
+          try {
+            final text = p.substring(_tokenPrefix.length);
+            token = utf8.decode(
+              base64Url.decode(text.padRight((text.length + 3) & ~3, '=')),
+            );
+          } on FormatException {
+            token = null;
+          }
+          break;
+        }
+      }
+    }
+    token ??= req.uri.queryParameters['token'];
     final WebSocket socket;
     try {
-      socket = await WebSocketTransformer.upgrade(req);
+      socket = await WebSocketTransformer.upgrade(
+        req,
+        protocolSelector: (offered) =>
+            offered.contains('atalaia.v1') ? 'atalaia.v1' : null,
+      );
     } on WebSocketException {
       return;
     }
@@ -965,6 +1025,14 @@ class ControllerApi {
       'PUT',
       r'/api/v1/checkin/me/replicas',
       _player((r, v) => ApiResponse(200, _svc().putMyReplicas(v, r.body))),
+    ),
+    _route(
+      'PUT',
+      r'/api/v1/checkin/me/position-sharing',
+      _player(
+        (r, v) =>
+            ApiResponse(200, _svc().setPositionSharing(v, r.body), _noStore),
+      ),
     ),
     _route(
       'PUT',

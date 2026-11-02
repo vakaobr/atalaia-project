@@ -24,11 +24,11 @@ from __future__ import annotations
 import json
 import logging
 import threading
-import time
 from typing import Any, Optional
 
 import paho.mqtt.client as paho
 
+from . import wallclock
 from .config import Config
 from .engine import Controller, ControllerError
 from .visibility import public_event
@@ -117,7 +117,7 @@ class MqttBridge:
         elif kind == "score" and not msg.get("tick"):
             # (a tick is a projected total on the stream only: MQTT carries the boxes' reports)
             self._publish(f"{PREFIX}/{game}/score", {"game": game, "teams": msg["teams"],
-                                                    "at": time.time()}, retain=True)
+                                                    "at": wallclock.now()}, retain=True)
         elif kind == "node":
             node = msg["node"]
             base = f"{PREFIX}/{game}/nodes/{node['node_id']}"
@@ -125,7 +125,7 @@ class MqttBridge:
                 "node_id", "name", "role", "owner", "phase", "game_time_ms", "score")}, retain=True)
             # A link event (node.offline) is news about a box that said nothing: its own last-heard time.
             ago = node.get("seen_ms_ago")
-            seen = time.time() - ago / 1000 if isinstance(ago, int) else time.time()
+            seen = wallclock.now() - ago / 1000 if isinstance(ago, int) else wallclock.now()
             self._publish(f"{base}/health", {**{k: node.get(k) for k in (
                 "node_id", "battery_pct", "rssi", "snr", "epoch", "fw_version", "link", "battery_low")},
                 "last_seen": seen}, retain=True)

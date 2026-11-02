@@ -382,6 +382,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// when the game's teams change, and the field's branding when the
   /// stream says it changed.
   void _onFeed() {
+    _autoShare();
     _syncBuzzService();
     // New orders (an objective revealed to this player, or their squad
     // leader's): two short pulses, no sound, as for the field's boundary
@@ -757,13 +758,126 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  Future<void> _share(bool on) async {
+  /// The field's notice changed since the player read it: fetch the new text,
+  /// show it with "read and confirm", remember the version the player
+  /// confirmed and return it; null when they decline or it cannot be read.
+  /// Sharing stays off meanwhile (NV-4).
+  Future<int?> _readNoticeAgain(CheckinClient client, String fieldId) async {
+    final s = context.s;
+    final app = AppScope.read(context);
+    final FieldInfo info;
+    try {
+      info = await client.info();
+    } on CheckinException catch (e) {
+      if (mounted) setState(() => _shareError = e.message);
+      return null;
+    }
+    if (!mounted) return null;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        key: const Key('player-notice-changed'),
+        title: Text(s.t('checkin.notice_title', {'field': info.fieldName})),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(s.t('checkin.notice_changed')),
+              const SizedBox(height: 12),
+              Text(
+                info
+                    .noticeText(s.code)
+                    .replaceAll('**', '')
+                    .replaceAll('*', ''),
+                key: const Key('player-notice-text'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            key: const Key('player-notice-cancel'),
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(s.t('common.cancel')),
+          ),
+          FilledButton(
+            key: const Key('player-notice-ok'),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(s.t('checkin.notice_ok')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return null;
+    await app.update(
+      (x) => x.noticeSeen = {...x.noticeSeen, fieldId: info.noticeVersion},
+    );
+    return info.noticeVersion;
+  }
+
+  /// The player's choice, kept on the check-in with its time and the notice
+  /// version (decision LEG-12). Stopping never fails; a controller from
+  /// before the route (404/405) just goes on as it did.
+  Future<bool> _recordSharing(bool on) async {
+    final field = widget.link.field;
+    if (field == null) return true;
+    final http = _http ??= context.services.fieldHttp(field);
+    final client = CheckinClient(http);
+    final app = AppScope.read(context);
+    try {
+      // The notice this phone showed for the field, so a controller whose
+      // notice moved on asks again instead of recording a yes to text the
+      // player never saw (NV-4).
+      await client.setPositionSharing(
+        feed.link.token,
+        on,
+        noticeVersion: on ? app.settings.noticeSeen[field.fieldId] : null,
+      );
+      return true;
+    } on CheckinException catch (e) {
+      if (on && e.noticeChanged) {
+        final fresh = await _readNoticeAgain(client, field.fieldId);
+        if (fresh == null) return false;
+        try {
+          await client.setPositionSharing(
+            feed.link.token,
+            true,
+            noticeVersion: fresh,
+          );
+          return true;
+        } on CheckinException catch (e2) {
+          if (mounted) setState(() => _shareError = e2.message);
+          return false;
+        }
+      }
+      if (!on || e.status == 404 || e.status == 405) return true;
+      if (mounted) setState(() => _shareError = e.message);
+      return false;
+    }
+  }
+
+  /// The check-in said yes (an unticked box the player ticked): start
+  /// sharing once, as the switch would. Not again after they stop.
+  bool _autoShared = false;
+  void _autoShare() {
+    if (_autoShared ||
+        widget.link.field == null ||
+        feed.me?['position_share'] != true ||
+        (_reporter?.running ?? false)) {
+      return;
+    }
+    _autoShared = true;
+    unawaited(_share(true, record: false));
+  }
+
+  Future<void> _share(bool on, {bool record = true}) async {
     final services = context.services;
     final s = context.s;
     final app = AppScope.read(context);
     final location = services.location;
     final field = widget.link.field;
     if (!on) {
+      await _recordSharing(false);
       _reporter?.stop();
       _beaconsTimer?.cancel();
       _beaconNote = null;
@@ -791,6 +905,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }
       return;
     }
+    if (record && !await _recordSharing(true)) return;
     final http = _http ??= services.fieldHttp(field);
     final client = CheckinClient(http);
     final scanner = await _beaconScanner(services, client);
@@ -975,6 +1090,11 @@ class PlayerView extends StatelessWidget {
     final objectiveNames = {
       for (final o in feed.objectives) o.id: o.name(s.code),
     };
+    // Housekeeping events stay out of the player's list; the feed keeps them.
+    final shown = [
+      for (final e in feed.events)
+        if (isPlayerFeedEvent(e.type)) e,
+    ];
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1123,8 +1243,8 @@ class PlayerView extends StatelessWidget {
               ),
           ],
           SectionTitle(s.t('player.events')),
-          if (feed.events.isEmpty) Text(s.t('player.no_events')),
-          for (final e in feed.events.take(30))
+          if (shown.isEmpty) Text(s.t('player.no_events')),
+          for (final e in shown.take(30))
             ListTile(
               dense: true,
               leading: TeamDot(e.team, size: 12),
@@ -1556,6 +1676,34 @@ class _TeamRow extends StatelessWidget {
 
 /// An event of the game in words (the types of protocol/schema/events.yaml
 /// that players care about; others show their type).
+/// Event types the player's list leaves out: node, pod, script and reader
+/// housekeeping with no meaning for someone in the game (and no `event.<type>`
+/// text, which used to show the raw type name). See `protocol/schema/events.yaml`.
+/// Everything not named here is shown, so a new game event appears by default.
+/// Only the player's list uses this: the feed keeps every event, and the
+/// history and staff views are not filtered.
+const playerHiddenEventTypes = <String>{
+  'battery.low',
+  'chrono.checkin',
+  'chrono.spotcheck',
+  'node.modes_failed',
+  'node.offline',
+  'node.online',
+  'node.rebooted',
+  'node.setup_applied',
+  'node.update_failed',
+  'pod.connected',
+  'pod.disconnected',
+  'script.error',
+  'script.halted',
+  'tag.scanned',
+  'target.hit',
+  'visibility.expired',
+};
+
+/// Whether the player's event list shows an event of [type].
+bool isPlayerFeedEvent(String type) => !playerHiddenEventTypes.contains(type);
+
 String eventText(
   Strings s,
   FeedEvent e, [
@@ -1589,6 +1737,8 @@ String eventText(
     'player': str('player') ?? '',
     'owner': str('owner') ?? '',
     'lives': d['lives_left'] ?? '',
+    // The count a text puts a noun after takes its singular at 1 (`_one`).
+    if (e.type == 'player.respawn') 'n': d['lives_left'],
     'amount': d['amount'] ?? '',
     'winner': name(str('winner') ?? ''),
     'text': str('text') ?? '',

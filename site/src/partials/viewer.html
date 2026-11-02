@@ -1,0 +1,94 @@
+  {# The screenshot viewer. The script below opens a screenshot's link in this
+     dialog: the image as large as the screen allows (at most three times its
+     size, in whole steps when it is small, so its pixels stay sharp), its alt
+     text as the caption, previous and next (also the arrow keys), closed with
+     Esc, the close button or a click outside the image; focus goes back to
+     the screenshot. It is inline, loading nothing.
+     Without it, or in a browser without <dialog>, the links open the images.
+     Keep "{" and "}" in the script apart: two together are a placeholder. #}
+  <dialog class="viewer" id="viewer" aria-label="{{ screens.viewer.label|text }}">
+    <div class="viewer-frame">
+      <div class="viewer-bar">
+        <button type="button" class="viewer-button" data-go="-1" aria-label="{{ screens.viewer.prev|text }}"><span aria-hidden="true">←</span></button>
+        <span class="viewer-count" aria-live="polite"></span>
+        <button type="button" class="viewer-button" data-go="1" aria-label="{{ screens.viewer.next|text }}"><span aria-hidden="true">→</span></button>
+        <button type="button" class="viewer-button viewer-close" aria-label="{{ screens.viewer.close|text }}"><span aria-hidden="true">×</span></button>
+      </div>
+      <img class="viewer-image" alt="">
+      <p class="viewer-caption" aria-hidden="true"></p>
+    </div>
+  </dialog>
+  <script>
+    (function () {
+      "use strict";
+      var dialog = document.getElementById("viewer");
+      if (!dialog || typeof dialog.showModal !== "function") return;
+      var links = Array.prototype.slice.call(document.querySelectorAll("a.zoom"));
+      var frame = dialog.querySelector(".viewer-frame");
+      var bar = dialog.querySelector(".viewer-bar");
+      var image = dialog.querySelector(".viewer-image");
+      var caption = dialog.querySelector(".viewer-caption");
+      var count = dialog.querySelector(".viewer-count");
+      var closeButton = dialog.querySelector(".viewer-close");
+      var current = 0;
+      var opener = null;
+
+      function fit() {
+        var thumb = links[current].querySelector("img");
+        var width = Number(thumb.getAttribute("width"));
+        var height = Number(thumb.getAttribute("height"));
+        var style = getComputedStyle(frame);
+        var roomX = frame.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        var roomY = frame.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
+          - bar.offsetHeight - caption.offsetHeight - 2 * parseFloat(style.rowGap || "0");
+        var scale = Math.max(0.1, Math.min(roomX / width, roomY / height, 3));
+        var sharp = scale >= 2;
+        if (sharp) scale = Math.floor(scale);
+        image.classList.toggle("sharp", sharp);
+        image.style.width = Math.round(width * scale) + "px";
+        image.style.height = Math.round(height * scale) + "px";
+      }
+
+      function show(index) {
+        current = (index + links.length) % links.length;
+        var link = links[current];
+        var thumb = link.querySelector("img");
+        var figure = link.closest("figure");
+        var title = figure && figure.querySelector("figcaption");
+        image.src = link.href;
+        image.alt = thumb.alt;
+        caption.textContent = thumb.alt;
+        count.textContent = (current + 1) + " / " + links.length;
+        dialog.setAttribute("aria-label", title ? title.textContent.trim() : thumb.alt);
+        fit();
+      }
+
+      links.forEach(function (link, index) {
+        link.addEventListener("click", function (event) {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          opener = link;
+          dialog.showModal();
+          show(index);
+          closeButton.focus();
+        });
+      });
+      dialog.querySelectorAll("[data-go]").forEach(function (button) {
+        button.addEventListener("click", function () { show(current + Number(button.getAttribute("data-go"))); });
+      });
+      closeButton.addEventListener("click", function () { dialog.close(); });
+      dialog.addEventListener("click", function (event) {
+        if (event.target === dialog || event.target === frame) dialog.close();
+      });
+      dialog.addEventListener("keydown", function (event) {
+        if (event.key === "ArrowLeft") { show(current - 1); event.preventDefault(); }
+        if (event.key === "ArrowRight") { show(current + 1); event.preventDefault(); }
+      });
+      dialog.addEventListener("close", function () {
+        image.removeAttribute("src");
+        if (opener) opener.focus();
+        opener = null;
+      });
+      window.addEventListener("resize", function () { if (dialog.open) fit(); });
+    })();
+  </script>

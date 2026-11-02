@@ -23,9 +23,9 @@ void main() {
 
   setUpAll(() {
     final stub = AtalaiaCore.open(stubLibraryPath());
-    layout =
-        jsonDecode(stub.bindings.stubLayout().toDartString())
-            as Map<String, dynamic>;
+    layout = jsonDecode(
+      stub.bindings.stubLayout().toDartString(),
+    ) as Map<String, dynamic>;
   });
 
   /// Compares sizeof and every field offset of [cName] with the Dart struct
@@ -98,6 +98,7 @@ void main() {
       'alloc': () => p.ref.alloc = _one.cast(),
       'alloc_ud': () => p.ref.allocUd = _one.cast(),
       'field_ops': () => p.ref.fieldOps = _one.cast(),
+      'rand_key': () => p.ref.randKey[0] = 1,
     });
   });
 

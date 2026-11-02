@@ -16,7 +16,7 @@
 library;
 
 import 'dart:convert';
-import 'dart:math' show max;
+import 'dart:math' show Random, max;
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
@@ -202,12 +202,49 @@ String epochTag(List<int> key) {
 /// Game keys whose TX epoch is kept (as a box's epoch store).
 const epochKeys = 8;
 
+/// A game resumed with no record of its key's epoch takes a random epoch in
+/// this range, never 1 (RFC 0001 Amendment 23, decision SR-29; the box's
+/// ATALAIA_EPOCH_LOST_MIN and _MAX, protocol/vectors/tx_epoch.json).
+const epochLostMin = 4096;
+const epochLostMax = 61439;
+
+/// Where a lost record's epoch is drawn (decision EPW-1; store.py
+/// `epoch_lost_bounds` and RFC 0001 Amendment 25's note have the reasons).
+/// With no record at all (floor 0) it is the whole range. With a floor it is
+/// the lower half of what is left above `floor + 1 + epochLostMargin`: the
+/// margin skips the epochs used since a stale floor, and the half-room rule
+/// leaves room for later losses (about 16 fit in the worst case).
+const epochLostMargin = 1024;
+
+/// The inclusive range a lost record's epoch is drawn in, above [floor] (the
+/// highest epoch ever used with any key, 0 for no record); null when no epoch
+/// is left above it. Shared vectors: protocol/vectors/tx_epoch.json.
+(int, int)? epochLostBounds(int floor) {
+  if (floor <= 0) return (epochLostMin, epochLostMax);
+  final low = max(epochLostMin, floor + 1);
+  if (low > epochLostMax) return null;
+  var start = max(epochLostMin, floor + 1 + epochLostMargin);
+  if (start > epochLostMax) start = low;
+  return (start, start + (epochLostMax - start + 2) ~/ 2 - 1);
+}
+
 /// The controller's epoch for this run in the game with [key], written
 /// before any packet is sent with it (ADR-P2-2; store.py `next_tx_epoch`):
 /// the setting `tx_epochs` keeps `[tag, epoch]` for the last [epochKeys]
 /// keys, most recent first. A key with a record goes on at its epoch + 1; a
-/// new key starts at 1.
-int nextTxEpoch(ControllerStore store, List<int> key) {
+/// new key starts at 1. A game the controller [resuming] after a restart
+/// with no record of its key (the list lost, or the key pushed out of it)
+/// may have used any epoch from 1 with it, so it starts at a random epoch in
+/// [epochLostMin]..[epochLostMax] instead (SR-29), and above the setting
+/// `tx_epoch_floor`, the highest epoch it ever used with any key (EP-2); boxes
+/// find it by their deep search of its TIME beacons (SR-110). [random] is for
+/// the tests.
+int nextTxEpoch(
+  ControllerStore store,
+  List<int> key, {
+  bool resuming = false,
+  Random? random,
+}) {
   final tag = epochTag(key);
   final saved = store.getSetting('tx_epochs');
   final table = <List<Object?>>[
@@ -227,7 +264,28 @@ int nextTxEpoch(ControllerStore store, List<int> key) {
       'start a new game',
     );
   }
-  final epoch = current == null ? 1 : current + 1;
+  final int epoch;
+  // The highest epoch ever used with any key, kept apart from the list (which
+  // forgets keys): a lost record's random epoch goes above it (EP-2).
+  var floor = int.tryParse(store.getSetting('tx_epoch_floor') ?? '') ?? 0;
+  for (final row in table) {
+    floor = max(floor, row[1]! as int);
+  }
+  if (current == null && resuming) {
+    final bounds = epochLostBounds(floor);
+    if (bounds == null) {
+      throw StateError(
+        'the controller has used epochs up to $floor; none is left above '
+        'them for a game it has lost the record of: start a new game',
+      );
+    }
+    epoch =
+        bounds.$1 +
+        (random ?? Random.secure()).nextInt(bounds.$2 - bounds.$1 + 1);
+  } else {
+    epoch = current == null ? 1 : current + 1;
+  }
+  store.setSetting('tx_epoch_floor', '${max(floor, epoch)}');
   final rows = [
     [tag, epoch],
     for (final row in table)
@@ -272,9 +330,10 @@ class RadioTransport implements FieldTransport {
     this.paceMs = 0,
     this.queueMax = paceQueueMax,
     int Function()? nowMs,
+    bool resuming = false,
   }) : _key = key,
        _nowMs = nowMs ?? (() => 0) {
-    epoch = nextTxEpoch(store, key);
+    epoch = nextTxEpoch(store, key, resuming: resuming);
     configureModem();
   }
 

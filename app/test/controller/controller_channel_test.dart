@@ -133,9 +133,8 @@ void main() {
     expect(e.fieldChannel, 869575000);
     final m = RecordingModem()..ident = {'radio': 'none'};
     expect(
-      ControllerChannel(
-        ControllerEngine(modem: m),
-      ).settings()['scan_unavailable'],
+      ControllerChannel(ControllerEngine(modem: m))
+          .settings()['scan_unavailable'],
       'no_radio',
     );
   });
@@ -208,57 +207,57 @@ void main() {
         if (e['kind'] == 'channel') e['channel_hz']! as int,
     ];
 
+    test('MOVE three times on the old channel, then the new one and a DISCOVER', () {
+      final out = ch.setChannel(newHz, 'scan');
+      expect((out['channel']! as Map)['channel_hz'], newHz);
+      expect(out['previous_channels_hz'], [oldHz]);
+      expect(engine.fieldChannel, newHz);
+      // The radio stays on the old channel to say it: nothing tunes to the new
+      // one yet, and the first MOVE is already out.
+      expect(tunes(), [oldHz]);
+      expect(kinds(), ['move']);
+      final move = decodeFieldFrame(key, radio.fields.first);
+      expect(move['channel_hz'], newHz);
+      expect(move['rev'], greaterThan(0));
+      expect(engine.store.getSetting('radio.move_rev'), '${move['rev']}');
+      run(12000);
+      expect(kinds(), ['move', 'move', 'move', 'discover']);
+      expect(tunes().last, newHz);
+      expect(tunes().where((hz) => hz == newHz), hasLength(1));
+    });
+
     test(
-      'MOVE three times on the old channel, then the new one and a DISCOVER',
+      'radio.move says how far the MOVEs are, and the stream hears of it',
       () {
+        expect(ch.settings()['move'], isNull);
+        final heard = <Map<String, Object?>>[];
+        engine.addListener((m) {
+          if (m['type'] == 'radio') heard.add(m);
+        });
         final out = ch.setChannel(newHz, 'scan');
-        expect((out['channel']! as Map)['channel_hz'], newHz);
-        expect(out['previous_channels_hz'], [oldHz]);
-        expect(engine.fieldChannel, newHz);
-        // The radio stays on the old channel to say it: nothing tunes to the new
-        // one yet, and the first MOVE is already out.
-        expect(tunes(), [oldHz]);
-        expect(kinds(), ['move']);
-        final move = decodeFieldFrame(key, radio.fields.first);
-        expect(move['channel_hz'], newHz);
-        expect(move['rev'], greaterThan(0));
-        expect(engine.store.getSetting('radio.move_rev'), '${move['rev']}');
+        final first = out['move']! as Map<String, Object?>;
+        expect(first['state'], 'telling');
+        expect(
+          [first['from_hz'], first['to_hz'], first['sent'], first['repeats']],
+          [oldHz, newHz, 1, 3],
+        );
+        expect(
+          first['rev'],
+          int.parse(engine.store.getSetting('radio.move_rev')!),
+        );
         run(12000);
-        expect(kinds(), ['move', 'move', 'move', 'discover']);
-        expect(tunes().last, newHz);
-        expect(tunes().where((hz) => hz == newHz), hasLength(1));
+        final done = ch.settings()['move']! as Map<String, Object?>;
+        expect([done['state'], done['sent']], ['moved', 3]);
+        // One radio message per step: the change's own (1 said), 2, 3, then moved.
+        final steps = [
+          for (final m in heard)
+            (((m['radio']! as Map)['move']) as Map)['state'] == 'moved'
+                ? 'moved'
+                : '${(((m['radio']! as Map)['move']) as Map)['sent']}',
+        ];
+        expect(steps, ['1', '2', '3', 'moved']);
       },
     );
-
-    test('radio.move says how far the MOVEs are, and the stream hears of it', () {
-      expect(ch.settings()['move'], isNull);
-      final heard = <Map<String, Object?>>[];
-      engine.addListener((m) {
-        if (m['type'] == 'radio') heard.add(m);
-      });
-      final out = ch.setChannel(newHz, 'scan');
-      final first = out['move']! as Map<String, Object?>;
-      expect(first['state'], 'telling');
-      expect(
-        [first['from_hz'], first['to_hz'], first['sent'], first['repeats']],
-        [oldHz, newHz, 1, 3],
-      );
-      expect(
-        first['rev'],
-        int.parse(engine.store.getSetting('radio.move_rev')!),
-      );
-      run(12000);
-      final done = ch.settings()['move']! as Map<String, Object?>;
-      expect([done['state'], done['sent']], ['moved', 3]);
-      // One radio message per step: the change's own (1 said), 2, 3, then moved.
-      final steps = [
-        for (final m in heard)
-          (((m['radio']! as Map)['move']) as Map)['state'] == 'moved'
-              ? 'moved'
-              : '${(((m['radio']! as Map)['move']) as Map)['sent']}',
-      ];
-      expect(steps, ['1', '2', '3', 'moved']);
-    });
 
     test(
       'the revision rises, the same channel says nothing, a region forgets',
@@ -284,9 +283,7 @@ void main() {
 
     test("the GM's discover sweeps the earlier channels, once a minute", () {
       ch.setChannel(newHz, 'scan');
-      run(
-        20000,
-      ); // and the DISCOVER after the MOVEs is no longer within the 10 s minimum
+      run(20000); // and the DISCOVER after the MOVEs is no longer within the 10 s minimum
       radio.fields.clear();
       radio.log.clear();
       final r = engine.boxes!.discover();
@@ -428,43 +425,40 @@ void main() {
       },
     );
 
-    test(
-      'a pod whose IDENT says measure: false: the scan refuses up front (PE24-105)',
-      () async {
-        // An older pod leaves the flag out and is taken to measure (above).
-        expect(modem.ident!.containsKey('measure'), isFalse);
-        link.ident(measure: true);
-        await settle();
-        expect(modem.canMeasure, isTrue);
-        link.ident(measure: false);
-        await settle();
-        expect(modem.isUp, isTrue);
-        expect(modem.hasRadioChip, isTrue);
-        expect(modem.canMeasure, isFalse);
-        final e = ControllerEngine(modem: modem);
-        final ch = ControllerChannel(e);
-        // The Pi's reason for a modem without `measure` (engine.py).
-        expect(ch.settings()['scan_unavailable'], 'old_firmware');
-        expect(
-          () => ch.startScan(null),
-          throwsA(
-            isA<ControllerError>()
-                .having((x) => x.status, 'status', 503)
-                .having(
-                  (x) => x.message,
-                  'message',
-                  scanUnavailableTexts['old_firmware'],
-                ),
-          ),
-        );
-        expect(ch.scan, isNull);
-        await settle();
-        expect([
-          for (final (op, _) in link.commands)
-            if (op == RadioOp.measure) op,
-        ], isEmpty);
-      },
-    );
+    test('a pod whose IDENT says measure: false: the scan refuses up front (PE24-105)', () async {
+      // An older pod leaves the flag out and is taken to measure (above).
+      expect(modem.ident!.containsKey('measure'), isFalse);
+      link.ident(measure: true);
+      await settle();
+      expect(modem.canMeasure, isTrue);
+      link.ident(measure: false);
+      await settle();
+      expect(modem.isUp, isTrue);
+      expect(modem.hasRadioChip, isTrue);
+      expect(modem.canMeasure, isFalse);
+      final e = ControllerEngine(modem: modem);
+      final ch = ControllerChannel(e);
+      // The Pi's reason for a modem without `measure` (engine.py).
+      expect(ch.settings()['scan_unavailable'], 'old_firmware');
+      expect(
+        () => ch.startScan(null),
+        throwsA(
+          isA<ControllerError>()
+              .having((x) => x.status, 'status', 503)
+              .having(
+                (x) => x.message,
+                'message',
+                scanUnavailableTexts['old_firmware'],
+              ),
+        ),
+      );
+      expect(ch.scan, isNull);
+      await settle();
+      expect([
+        for (final (op, _) in link.commands)
+          if (op == RadioOp.measure) op,
+      ], isEmpty);
+    });
 
     test('a pod without a radio chip cannot measure', () async {
       link.ident(radio: false);

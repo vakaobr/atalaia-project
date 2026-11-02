@@ -33,9 +33,8 @@ void main() {
   late ControllerEngine engine;
   late ControllerCheckin svc;
   late ControllerApi api;
-  final limits = File(
-    'lib/chrono/limit_templates/portugal.yaml',
-  ).readAsStringSync();
+  final limits = File('lib/chrono/limit_templates/portugal.yaml')
+      .readAsStringSync();
 
   setUp(() {
     wall = t0;
@@ -107,7 +106,7 @@ void main() {
         'player_id': pid,
         'player_secret': _secret(players),
         'display_name': name,
-        'notice_version': 1,
+        'notice_version': 2,
         'replicas': ?replicas,
       },
     );
@@ -280,7 +279,7 @@ void main() {
         (call('GET', '/api/v1/checkin/settings').body! as Map)
             .cast<String, Object?>();
     expect(settings()['chrono_retention_days'], 365);
-    expect(settings()['game_retention_days'], 365);
+    expect(settings()['game_retention_days'], 90);
     for (final bad in [29, 3654, '90', true, null]) {
       expect(
         call(

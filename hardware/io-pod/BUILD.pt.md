@@ -244,7 +244,7 @@ Exatamente como na Field Box:
    2 dBi ou menos, ou define o ganho de antena no firmware) e a antena FPC de
    2,4 GHz (Bluetooth).
 3. **Caminho da energia** ([manual, secção 7](../field-box/BUILD.pt.md)
-   e [esquema 2/2](../field-box/wiring/field-box-power.svg)): célula(s),
+   e [esquema 2/2](../field-box/wiring/field-box-power.svg)): células,
    fusível, díodo Schottky, interruptor principal, derivação BAT+; o conversor
    elevador regulado sozinho para 5,0-5,2 V primeiro; depois as cargas de 5 V
    (anel, amplificador, LED dos botões, conversor de nível); a entrada de

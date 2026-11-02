@@ -20,9 +20,8 @@ import '../support/core_libs.dart';
 import '../support/pod_host.dart';
 
 final joinKey = Uint8List.fromList(List.generate(32, (i) => i));
-final limits = File(
-  'lib/chrono/limit_templates/portugal.yaml',
-).readAsStringSync();
+final limits = File('lib/chrono/limit_templates/portugal.yaml')
+    .readAsStringSync();
 
 void main() {
   late Directory tmp;
@@ -39,6 +38,7 @@ void main() {
     httpPort: 0,
     httpsPort: 0,
     mqttPort: 0,
+    mqttTlsPort: 0,
     openAddress: '127.0.0.1',
     addresses: const ['127.0.0.1'],
   );

@@ -22,13 +22,13 @@ from fastapi.testclient import TestClient
 
 from support import CORE, MODEM_HOST, AirHub, FakeModem, HostModem, config, node_packet, packet_decrypt, wait_for
 from atalaia_controller.api import Auth, create_app
-from atalaia_controller.engine import Controller
+from atalaia_controller.engine import Conflict, Controller
 from atalaia_controller.main import ensure_join_key, main
 from atalaia_controller.radio_modem import RadioModem
 from atalaia_controller.store import Store
 from atalaia_controller.ws import Hub
 from atalaia_sim import codec, join
-from atalaia_sim.packet import state_encode, time_decode, time_encode
+from atalaia_sim.packet import Header, claim_encode, state_encode, time_decode, time_encode, vf_make
 from atalaia_sim.protocol import MESSAGE_TYPES
 
 GM = {"Authorization": "Bearer gm-secret"}
@@ -105,6 +105,44 @@ class IssueJoinTests(unittest.TestCase):
         j = join.decode(bytes.fromhex(r.json()["payload_hex"]), JOIN_KEY)
         self.assertEqual((j["kind"], j["role"], j["node_id"]), ("controller", "controller", 1))
         self.assertNotIn("1", self.a.ctrl.game["assignments"])  # a standby is not a box
+
+    def hear_controller(self, node_id: int, msg_type: str = "TIME") -> None:
+        """Another controller's authenticated TIME (or CLAIM) reaches this one."""
+        hdr = Header(vf_make(1, 1, False, True), self.game["id"], node_id, 0, 0, MESSAGE_TYPES[msg_type])
+        body = time_encode({"game_time_ms": 0, "game_state": 0, "duration_ms": 0, "wall_s": 1, "term": 1}) \
+            if msg_type == "TIME" else claim_encode({"term": 1, "priority": 0, "node_id": node_id})
+        self.a.ctrl.fc.on_packet(node_id, hdr, body, {"epoch": 9})
+
+    def test_a_controller_that_has_been_on_the_air_is_not_given_its_id_again(self):
+        """EP-3: a former leader that lost its database and its epoch file and is joined again as a standby under
+        its old id would reuse its nonces (epoch 1, a new key record) and be deaf to everyone that heard its
+        old epochs. Its id is never given to a new device; a join without an id gets a new one."""
+        c = self.a.client
+        self.hear_controller(6)
+        self.hear_controller(8, "CLAIM")
+        for node_id in (6, 8):
+            r = c.post(f"/api/v1/nodes/{node_id}/join", headers=GM, json={"kind": "controller"})
+            self.assertEqual(r.status_code, 409, r.text)
+            self.assertIn("new node id", r.json()["detail"] if "detail" in r.json() else r.text)
+            with self.assertRaises(Conflict):  # nor as "the same device invited again"
+                self.a.ctrl.issue_join({"kind": "controller"}, node_id=node_id, same_device=True)
+        ids = {join.decode(bytes.fromhex(c.post("/api/v1/join", headers=GM, json={"kind": "controller"})
+                                         .json()["payload_hex"]), JOIN_KEY)["node_id"] for _ in range(6)}
+        self.assertFalse(ids & {6, 8}, ids)  # a join with no id skips them
+        # A standby that has not been on the air can be invited again by the same id (a refresh).
+        r = c.post("/api/v1/nodes/15/join", headers=GM, json={"kind": "controller"})
+        self.assertEqual(r.status_code, 200, r.text)
+        r = c.post("/api/v1/nodes/15/join", headers=GM, json={"kind": "controller"})
+        self.assertEqual(r.status_code, 409, r.text)  # (the id was issued: the box rule, as before)
+        self.a.ctrl.issue_join({"kind": "controller"}, node_id=15, same_device=True)
+        # The list is kept: a controller restart still knows 6 and 8.
+        self.a.ctrl.stop()
+        again = Controller(self.a.cfg, self.a.store, modem=FakeModem(), core=CORE, join_key=JOIN_KEY)
+        try:
+            with self.assertRaises(Conflict):
+                again.issue_join({"kind": "controller"}, node_id=6, same_device=True)
+        finally:
+            again.stop()
 
     def test_refusals(self):
         c = self.a.client

@@ -12,7 +12,9 @@ pinned Flutter; it was first built on a Mac on 2026-10-26 (Xcode 27.1, macOS
 27.0, Apple silicon: `flutter build ios --release --no-codesign`) and the same
 day installed and opened on an iPhone 15 Pro Max (iOS 27.2 beta, Xcode 27.2,
 free Personal Team), where checks 1 to 4 below passed; CI's `ios-build` job
-compiles it on a Mac runner. If a step differs on your machine, the
+compiles it on a Mac runner. On 2026-11-01 a second Mac (Xcode 27.2, iOS
+27.2 SDK) built it for the simulator and for a device with no warnings from
+the app's own Swift files. If a step differs on your machine, the
 troubleshooting list at the end is where to look first, and please write down
 what you found.
 
@@ -22,7 +24,7 @@ what you found.
   cable (Lightning or USB-C). iOS 15 or later (an iPhone 6s or later); for NFC, an iPhone 7 or later.
 - An Apple ID. A **free** one is enough for these first tests (see
   [Free account or paid](#free-account-or-paid)).
-- Xcode, CocoaPods and Flutter 3.44.0, installed below.
+- Xcode, CocoaPods and Flutter 3.47.9, installed below.
 
 ## 1. Xcode and the command line tools
 
@@ -52,24 +54,24 @@ repository has no `Podfile` and `pod install` is normally not needed. Flutter
 and `flutter doctor` still want CocoaPods installed, and if a later plugin
 brings a Podfile you will need it (step 6).
 
-## 3. Flutter 3.44.0 (the version the project pins)
+## 3. Flutter 3.47.9 (the version the project pins)
 
 With [fvm](https://fvm.app) (several Flutter versions side by side):
 
 ```sh
 brew tap leoafarias/fvm && brew install fvm
-fvm install 3.44.0
+fvm install 3.47.9
 ```
 
 or the exact tag, by hand:
 
 ```sh
-git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git ~/flutter-3.44.0
-export PATH="$HOME/flutter-3.44.0/bin:$PATH"      # also in ~/.zshrc
+git clone --depth 1 --branch 3.47.9 https://github.com/flutter/flutter.git ~/flutter-3.47.9
+export PATH="$HOME/flutter-3.47.9/bin:$PATH"      # also in ~/.zshrc
 ```
 
-Then `flutter --version` must say 3.44.0 (Dart 3.12). With fvm, write
-`fvm flutter` for `flutter` below, or run `fvm use 3.44.0` inside `app/`.
+Then `flutter --version` must say 3.47.9 (Dart 3.13.7). With fvm, write
+`fvm flutter` for `flutter` below, or run `fvm use 3.47.9` inside `app/`.
 Run `flutter doctor -v`: the Xcode, CocoaPods and "Connected device" lines
 must be green once the iPhone is plugged in (Android and Chrome lines may stay
 red; this app needs neither here).
@@ -134,7 +136,7 @@ Always open the `.xcworkspace` after that.
 | Apps and App IDs | few: about 3 apps per phone and 10 new App IDs a week | no practical limit |
 | Everything this guide tests: network, QR scanning, `atalaia://` links, player feed, positions (on the screen), languages, the GM web view | yes | yes |
 | **NFC tag reading** (the capability and its `com.apple.developer.nfc.readersession.formats` entitlement) | **no**: Xcode refuses the capability for a Personal Team and signing fails | yes |
-| Push notifications, iCloud, Associated Domains, background modes needing a capability | no | yes |
+| Push notifications, iCloud, **Associated Domains (passkeys and the social login on iOS)**, background modes needing a capability | no | yes |
 | TestFlight, installing on other people's phones, the App Store | no | yes |
 
 So: **a free account runs everything the app does on iOS today** (it has no
@@ -227,7 +229,9 @@ stops, copy the first error into the session.
   iPhone as the run destination and press Run once.
 - **`flutter build ios --simulator` fails with "Binary ... Flutter.framework/Flutter
   does not contain architectures "arm64 x86_64""** (Xcode 27.2, Flutter
-  3.44.0): Flutter's tooling runs `lipo <binary> -verify_arch arm64 x86_64`,
+  3.44.0 only; fixed from 3.44.9 on, so the pinned 3.47.9 is fine: later versions verify each
+  architecture on its own, so update if `flutter --version` says 3.44.0):
+  Flutter's tooling runs `lipo <binary> -verify_arch arm64 x86_64`,
   which Xcode 27.2's `lipo` refuses ("-verify_arch requires exactly one input
   file") although the framework has both. Not the app's fault; builds for an
   iPhone are not affected. Use `flutter run -d <simulator id>`, which builds
@@ -418,6 +422,9 @@ the controller's console follows.
 
 The other on-device tests run the same way (`flutter test integration_test/<file>
 -d <iPhone or simulator id>`). State on 2026-10-26:
+`integration_test/keystore_test.dart` (the Keychain vault, see "Secrets at
+rest" below) passes in the simulator and on an iPhone 15 Pro Max (iOS 27.2,
+free Personal Team), 5/5 each, 2026-11-01.
 `integration_test/site_registration_test.dart` passes on the iPhone (1/1) and in
 the simulator; `integration_test/check_in_test.dart` failed on the iPhone on its
 fixed 10-year server certificate (see Troubleshooting), now makes a 365-day one at
@@ -456,7 +463,12 @@ installed app and its permissions. If iOS asks again to trust the developer
 later a debug build started without a debugger shows the splash and exits. For
 normal use, reinstall the release build: `flutter build ios --release` then
 `xcrun devicectl device install app --device <udid> build/ios/iphoneos/Runner.app`
-(or `flutter run --release -d <udid>`).
+(or `flutter run --release -d <udid>`). Installing over the test build keeps
+the app's data, permissions and the developer trust; uninstalling first loses
+them. With Xcode 27.2 the build ends with "Build succeeded but the expected
+app at build/ios/iphoneos/Runner.app not found": harmless, Xcode wrote the
+app to `build/ios/Release-iphoneos/Runner.app` instead, so install that one
+(`ls build/ios/` shows which folder this Xcode used; seen on 2026-11-01).
 
 **Location needs a field check-in first.** The position-sharing switch appears
 only after a field check-in (Participante > Check-in with the poster), not after
@@ -485,6 +497,20 @@ the feed, so there is time; after a "Don't Allow" it fails with the feed never
 opening, and Settings > Atalaia > Local Network is where to turn it on). Keep
 the phone unlocked, as for `flutter run`; tests run as a debug build, which is
 fine while Flutter is attached.
+
+The marshal checks (item 9) check a test player in as a phone does after
+scanning the poster: the field's CA from the controller's plain HTTP address
+(`/api/v1/controller/ca`), then the check-in over HTTPS with that CA only, by
+default on the same host's port 8443
+(`--dart-define=ATALAIA_TEST_CONTROLLER_HTTPS=https://host:port` for another). State on 2026-11-01, iPhone 15 Pro Max (iOS 27.2) against a
+bench controller: 11 passed, 2 skipped (item 6's camera and item 8's
+location prompt, both left to a person).
+The test player and its marshal are both named `itest-ios`; before and after
+the run the test removes every marshal and every check-in of that name in a
+game that has not ended (with the GM token), so a run cut short (the app
+closed on the phone, the cable pulled) leaves nothing behind after the next
+one. Do not touch the phone while the test drives the app: closing the app
+stops the run.
 
 | Checklist | Test | What it checks |
 | --- | --- | --- |
@@ -533,6 +559,103 @@ The same *Share my position* switch, on a field whose controller lists beacons
 - Bluetooth off cannot be detected without a Bluetooth permission the app does
   not ask for: the beacons are simply not heard and the position stays GPS.
 
+## Site login on iOS (decisions IOSL-1 to IOSL-9), for the maintainer
+
+The account screen's **social login** (Google, Microsoft, Apple through the site
+server) and **passkeys** have Swift sides now: `ios/Runner/BrowserPlugin.swift`
+(an `ASWebAuthenticationSession`) and `ios/Runner/PasskeyPlugin.swift`
+(`ASAuthorizationPlatformPublicKeyCredentialProvider`), on the same channels and
+with the same answers as Android's Kotlin plugins; nothing in `lib/` changed.
+**The Swift is compiled by CI's `ios-build` (it passed on a draft pull request) but has not been run on an iPhone**: your iPhone is the first
+run. Without the steps below the app still builds and runs; the
+two features then fail ("not available", or a passkey error) and the password
+login stays.
+
+Both need the **paid Apple Developer Program** (Associated Domains is not
+available to a free Personal Team, section "Free account or paid") and a **site
+server with its own domain**. What to do, once:
+
+1. **The Team ID.** developer.apple.com, Account, Membership details: ten
+   letters and digits (`ABCDE12345`). The bundle id is `org.atalaia.app` (or the
+   suffixed one you signed with: the id in the next step must match what you
+   install).
+2. **The site server serves the association file.** The server already does
+   (decision PKA-1): set `ATALAIA_APP_IOS_APP_IDS=ABCDE12345.org.atalaia.app`
+   (`TEAMID.bundle.id`, up to 8 separated by commas) in its environment and
+   restart; unset it is a 404 and the iOS app logs in with the password only.
+   Check: `curl -i https://DOMAIN/.well-known/apple-app-site-association` must
+   answer 200 with `webcredentials` and your id, with no redirect, over a
+   certificate a phone trusts. The server's `/app/*` paths are in `applinks` too
+   (not needed by the app today). Apple's CDN caches the file for the app's
+   first install and for a while after (use `?mode=developer` on the entitlement
+   below to bypass it on a development build).
+3. **The associated domain in the app.** `ios/Runner/Runner.entitlements` holds
+   `webcredentials:$(ATALAIA_SITE_HOST)`, and the Xcode project defines two
+   build settings on the Runner target: `ATALAIA_SITE_HOST` (placeholder
+   `site.example`: **set it to the site server's host name**, no scheme, no
+   port; for a development build you may write `DOMAIN?mode=developer` in the
+   entitlements file instead) and `ATALAIA_ENTITLEMENTS`, empty, so that a free
+   account still signs: **set it to `Runner/Runner.entitlements`**. In Xcode:
+   Runner target, Build Settings, search "ATALAIA" (user-defined). Then
+   Signing & Capabilities shows "Associated Domains" with the host. One
+   build, one site: a club with its own site server builds its own app, as on
+   Android (`-Patalaia.appLinkHost`).
+4. **Signing.** Section 7, with the paid team selected: Xcode then registers the
+   App ID with the Associated Domains capability by itself (automatic signing),
+   or you tick it on developer.apple.com, Identifiers.
+5. **On the phone.** iOS 16 or later for passkeys, with iCloud Keychain (or
+   another passkey provider) on and a screen lock; **iOS 17.4 or later for the
+   social login**: an `ASWebAuthenticationSession` can end on an https address
+   only from 17.4 (before that only on a custom scheme, which the site's
+   redirect is not), so earlier iPhones answer "not available" and keep the
+   password and passkeys. Install a build whose associated domain is on a
+   site the phone can reach.
+
+What to try, on a paid-team build: log in with a social provider (the
+sheet opens, you sign in, the sheet closes and the account screen shows you
+logged in); add a passkey on the account screen (Face ID or Touch ID, then it
+appears in the list); log out and log in with the passkey; use the passkey for
+a confirmation. A passkey made on the site in Safari should be offered in the
+app, and the other way round (same relying party, the host name).
+
+Known limits: closing the browser sheet or the passkey sheet by hand gives the
+app no sign for the social login (its screen waits until you press its cancel or
+ten minutes pass, as with a closed Custom Tab on Android); a passkey that already
+exists for the account is not hidden from the "add" sheet by the app (the
+system replaces a passkey with the same account and site); Android's
+`no_credential` answer has no iOS twin (closing the sheet is `cancelled`).
+
+## Secrets at rest: the Keychain (decisions IOSK-1 to IOSK-6)
+
+The few secrets the app keeps (the field join key, the marshal's private key,
+the read code, the player's secret at each field, the site refresh token, a
+scoreboard link's token) are sealed as on Android: `secrets.enc` in the app's
+private folder holds them encrypted with AES-256-GCM (the same format as
+Android's), and `settings.json` has none of them. The key is one item in the
+app's Keychain (`KeychainVaultPlugin.swift`, channel `org.atalaia.app/keystore`,
+the same as Android's `KeystorePlugin.kt`):
+
+- **Accessibility** `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`:
+  readable once the phone has been unlocked after a restart; never in an
+  iCloud or Finder backup, never synced by iCloud Keychain, never moved to a new
+  phone. No Face ID or passcode prompt (Android's key asks for none either).
+- **Earlier installs** kept the secrets in `settings.json`. The first start of
+  this version seals them, reads the sealed file back, and only then rewrites
+  `settings.json` without them; if the Keychain fails, nothing is lost and the
+  next start tries again (the same code as Android's migration,
+  `lib/storage/app_store.dart`).
+- **A lost key** (a new phone, a damaged file) reads as "no secrets": the app
+  asks to join the field and log in again, as on Android.
+- **After uninstalling**, iOS may keep the Keychain item (iOS keeps an app's
+  Keychain items when it is deleted). It is a random key with no personal data
+  and opens nothing once the folder is gone; a reinstall reuses it for new
+  secrets.
+
+Tested by `integration_test/keystore_test.dart` (the real Keychain: seal and
+open, a tampered or short file, the store's round trip, the migration of a
+plaintext file, data sealed by another key) in the simulator and on an iPhone:
+`flutter test integration_test/keystore_test.dart -d <id>`.
+
 ## What does not work on iOS, and why
 
 - **A prop** (the phone as a game box: the core, the game loop, kiosk, the
@@ -549,6 +672,9 @@ The same *Share my position* switch, on a field whose controller lists beacons
   without Apple's MFi programme); and it starts the field's Wi-Fi (a local-only
   hotspot) from code, which iOS does not allow. An iPhone is a player, a marshal
   or a GM, joining a field controller that runs on a Pi, a PC or an Android phone.
+- **Site login** (social login, passkeys): Swift sides exist and are not run;
+  they need the paid program, the site's domain and iOS 16 / 17.4 (see "Site
+  login on iOS" above).
 - **NFC**: the app's Kotlin plugin has no Swift twin yet, and CoreNFC needs a
   paid account's entitlement (iOS-10); the Dart side answers "not available"
   (`MissingPluginException` is read as unavailable) and falls back to typing.

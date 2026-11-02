@@ -27,6 +27,7 @@ import '../core/node_types.dart';
 import '../radio/rf_codec.dart';
 import 'controller_engine.dart';
 import 'field_controller.dart';
+import 'peer_epoch.dart' show cmdPeerEpoch;
 import 'prop_link.dart' show propLinkProof;
 
 const propNonceSize = 32;
@@ -86,6 +87,8 @@ class PropLinks {
 
   static final _opcodeNames = {
     for (final e in cmdOpcodes.entries) e.value: e.key,
+    // The controller's own CMD peer (Amendment 24) is told to a Wi-Fi prop too, named as on the Pi (EP-1).
+    cmdPeerEpoch: 'peer',
   };
 
   // --- controller -> props -----------------------------------------------

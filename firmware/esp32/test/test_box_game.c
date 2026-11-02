@@ -343,17 +343,21 @@ static size_t encode(const atalaia_join_t *j, const uint8_t *key, uint8_t *buf)
     return n;
 }
 
+/* The controller's seq (node 0, epoch 1), one counter for every helper that sends as it: a
+ * receiver refuses a counter it has seen or one far below the highest (the replay window,
+ * RFC 0001 Amendment 23), as it would a real controller's repeats. */
+static uint16_t controller_seq;
+
 /* A packet from the controller (node 0, epoch 1) to the box. */
 static void from_controller(uint8_t type, const uint8_t *pl, size_t n)
 {
     static atalaia_radio_proto_t ctl;
-    static uint16_t seq;
     static uint8_t out[PKT_CAP];
     static size_t out_len;
     atalaia_radio_proto_init(&ctl, GAME_ID, 0, &atalaia_crypto_test_stub, NULL);
     atalaia_radio_proto_set_key(&ctl, GAME_KEY);
     atalaia_radio_proto_set_epoch(&ctl, 1);
-    ctl.seq = seq++;
+    ctl.seq = controller_seq++;
     atalaia_header_t h = {ATALAIA_VF_MAKE(1, 2, 0, 1), GAME_ID, 0, ctl.seq, 2, type};
     out_len =
         atalaia_packet_encrypt(&h, 1, GAME_KEY, pl, n, out, sizeof(out), &atalaia_crypto_test_stub);
@@ -394,6 +398,30 @@ static bool last_of(uint8_t type, atalaia_header_t *h, uint8_t *pl, size_t *n)
         }
     }
     return false;
+}
+
+/* The data JSON of the last event of this type sent; false when none. */
+static bool last_event_data(const char *type, char *data, size_t cap)
+{
+    bool found = false;
+    for (int i = 0; i < shell.count; i++) {
+        atalaia_header_t h;
+        uint8_t pl[PKT_CAP];
+        size_t n;
+        if (!atalaia_packet_decrypt(shell.pkt[i], shell.len[i], game.link.proto.epoch, GAME_KEY, &h,
+                                    pl, &n, &atalaia_crypto_test_stub) ||
+            h.type != ATALAIA_MSG_EVENT) {
+            continue;
+        }
+        atalaia_event_t ev;
+        char buf[128];
+        if (atalaia_event_decode(pl, n, &ev, buf, sizeof(buf), NULL) &&
+            strcmp(ev.type, type) == 0) {
+            snprintf(data, cap, "%s", buf);
+            found = true;
+        }
+    }
+    return found;
 }
 
 static int events_named(const char *type)
@@ -520,6 +548,8 @@ static void test_join_play_end(void)
     cmd(FIELD_CMD_START);
     CHECK(game.phase == BOX_PLAYING && runner.running);
     CHECK(runner.node_id == NODE && runner.game_seed == 7);
+    CHECK(memcmp(runner.rand_key, GAME_KEY, 16) ==
+          0); /* rand() is seeded from the game key (LIVE2-2) */
     /* While playing, a new card is refused. */
     j.game_id = GAME_ID + 1;
     size_t n2 = encode(&j, JOIN_KEY, buf);
@@ -564,6 +594,7 @@ static void test_join_play_end(void)
     CHECK(game.phase == BOX_IDLE && !game.link.proto.has_key);
     static const uint8_t zero[16];
     CHECK(memcmp(game.link.proto.game_key, zero, 16) == 0);
+    CHECK(memcmp(runner.rand_key, zero, 16) == 0); /* and the runner's copy */
 }
 
 /* The box's iBeacon (decisions BBC-1 to BBC-12): advertised from the join to the end of the game,
@@ -652,6 +683,41 @@ static void test_end_without_acks(void)
     CHECK(game.phase == BOX_IDLE && !game.link.proto.has_key);
 }
 
+/* Each reset cause reaches the controller in its own word; a word that needs escaping, or none,
+ * never breaks the event. */
+static void resume_with_reason(const char *reason, const char *expect)
+{
+    fixture(false);
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    uint32_t now = 10;
+    cmd(FIELD_CMD_START);
+    run_ms(&now, 2500);
+    node_runner_stop(&runner);
+    fixture(true);
+    if (reason != NULL) box_game_set_reset_reason(&game, reason);
+    CHECK(box_game_resume(&game, 5));
+    char data[128];
+    char want[64];
+    snprintf(want, sizeof(want), "\"reason\":\"%s\"", expect);
+    CHECK(last_event_data("node.rebooted", data, sizeof(data)));
+    CHECK(strstr(data, want) != NULL);
+}
+
+static void test_reboot_reason_words(void)
+{
+    resume_with_reason("power", "power");
+    resume_with_reason("watchdog", "watchdog");
+    resume_with_reason("software", "software");
+    resume_with_reason(NULL, "unknown"); /* the shell never said */
+    resume_with_reason("", "unknown");
+    resume_with_reason("a\"b\\c d", "abcd"); /* kept to the characters that need no escape */
+    resume_with_reason("0123456789abcdefghij", "0123456789abcde"); /* 15 at most */
+}
+
 static void test_resume_after_reboot(void)
 {
     fixture(false);
@@ -675,9 +741,17 @@ static void test_resume_after_reboot(void)
     /* Battery pulled: the same flash, a new boot. */
     fixture(true);
     CHECK(game.have_join_key);
+    box_game_set_reset_reason(&game, "panic"); /* what the shell reads from the chip */
     CHECK(box_game_resume(&game, 5));
     CHECK(game.phase == BOX_PLAYING && runner.running);
     CHECK(game.link.proto.epoch == 2 && epoch_fake_of(&flash.epochs, GAME_KEY) == 2);
+    {
+        /* The controller hears a crash as one, not as a power cut. */
+        char data[128];
+        CHECK(last_event_data("node.rebooted", data, sizeof(data)));
+        CHECK(strstr(data, "\"reason\":\"panic\"") != NULL);
+        CHECK(strstr(data, "power") == NULL);
+    }
     CHECK(runner.game_time_ms >= 2000 && runner.game_time_ms <= played);
     CHECK(runner.node_id == NODE);
     CHECK(events_named("node.rebooted") == 1);
@@ -1201,7 +1275,6 @@ static int invite(const uint8_t key[16], const uint8_t token[8], uint16_t gid, u
 /* A CMD from the controller of the game the box is in now (invite() gave it its key). */
 static void cmd_now(uint8_t opcode)
 {
-    static uint16_t seq;
     atalaia_cmd_msg_t c;
     memset(&c, 0, sizeof(c));
     c.cmd = opcode;
@@ -1209,7 +1282,7 @@ static void cmd_now(uint8_t opcode)
     uint8_t pl[64];
     size_t n = atalaia_cmd_encode(&c, pl, sizeof(pl));
     atalaia_header_t h = {
-        ATALAIA_VF_MAKE(1, 2, 0, 1), game.join.game_id, 0, seq++, 2, ATALAIA_MSG_CMD};
+        ATALAIA_VF_MAKE(1, 2, 0, 1), game.join.game_id, 0, controller_seq++, 2, ATALAIA_MSG_CMD};
     uint8_t out[PKT_CAP];
     size_t len = atalaia_packet_encrypt(&h, 1, game.join.game_key, pl, n, out, sizeof(out),
                                         &atalaia_crypto_test_stub);
@@ -2272,6 +2345,7 @@ void run_box_game_tests(void)
     test_radio_report();
     test_end_without_acks();
     test_resume_after_reboot();
+    test_reboot_reason_words();
     test_screens_follow_the_game();
     test_screen_language();
     test_old_card_refused();

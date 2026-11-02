@@ -5,6 +5,7 @@
     python -m atalaia_server create-admin --username NAME [--email EMAIL] [--password-stdin] [--field SLUG]
     python -m atalaia_server create-admin --username NAME --generate FILE
     python -m atalaia_server reset-totp --username NAME --reason TEXT [--yes] [--field SLUG]
+    python -m atalaia_server set-password --username NAME --reason TEXT [--yes] [--password-stdin] [--field SLUG]
     python -m atalaia_server demo load|reset
     python -m atalaia_server demo live [--key-out FILE] [--keep N] [--reset]
     python -m atalaia_server demo reviewer --username NAME --out FILE
@@ -40,10 +41,21 @@ asks for the username to be typed again unless ``--yes`` is given, and refuses a
 TOTP to clear. The server keeps no recovery codes and no remembered devices: the secret is all there is. In hosted
 mode it needs ``--field SLUG``, as ``create-admin`` does.
 
+``set-password`` gives an existing account a password, or replaces it (decision SP-1): the way out for a passwordless
+staff account with no second factor, which cannot change its login methods until it has one (SR-2, ``step_up_needed``).
+The password is never an argument (it would land in the shell history and ``ps``): it is asked for twice without echo,
+or read from the first line of standard input with ``--password-stdin`` (which needs ``--yes``: standard input is
+taken). It must pass the same policy as the API (``passwords.policy_problem``). Like ``reset-totp`` it asks for the
+username to be typed again unless ``--yes``, revokes every session of the account, writes ``password_set`` to the audit
+log (never the password) and takes ``--field SLUG`` in hosted mode. TOTP and passkeys are not touched.
+
 ``purge`` runs the retention purge (ADR-P4-8) once and prints what it
 deleted (``--dry-run``: what it would delete). The server runs it by itself
 every day at ATALAIA_PURGE_HOUR (03:00 UTC by default); the command is for a
 deployment that turns that off and schedules it elsewhere, or for a check.
+
+``erasure-ledger apply`` (PRIV-4) erases again, after a restore from a backup, the accounts and players the erasure ledger
+(``ATALAIA_ERASURE_LEDGER``, ``erasure_ledger.py``) lists: ``restore.sh`` runs it once the restored server is healthy.
 
 ``atak`` is the operator's side of the remote ATAK relay's enrolment (Phase 4
 follow-up FU5; the field's admin and gm use ``/staff/fields/<field>/atak`` or
@@ -78,7 +90,7 @@ from typing import Any, Callable, Optional, TextIO
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from . import atak_pki, demo_data, hosted, passwords, personal_data, tenancy, totp
+from . import atak_pki, demo_data, erasure_ledger, erasure_replay, hosted, passwords, personal_data, tenancy, totp
 from .api.auth import EMAIL, username_problem
 from .audit import record
 from .config import QUOTA_DEFAULTS, ConfigError, Settings, database_url_from_env
@@ -117,6 +129,16 @@ async def create_admin(settings: Settings, username: str, email: Optional[str], 
         await engine.dispose()
 
 
+def _check_password_policy(password: str, username: str) -> None:
+    """Raises ``CommandError`` when the password fails the policy the API applies (``passwords.policy_problem``)."""
+    problem = passwords.policy_problem(password, username)
+    if problem:
+        raise CommandError({"password_too_short": f"the password needs at least {passwords.MIN_LENGTH} characters",
+                            "password_too_long": f"the password may have at most {passwords.MAX_LENGTH} characters",
+                            "password_is_username": "the password may not be the username",
+                            "password_breached": "that password is on the list of breached passwords"}[problem])
+
+
 async def _create_admin(settings: Settings, engine: Any, username: str, email: Optional[str], password: str,
                         read_code: Callable[[str, str], str], out: TextIO, clock: Callable[[], float]) -> uuid.UUID:
     username = username.strip().lower()
@@ -128,12 +150,7 @@ async def _create_admin(settings: Settings, engine: Any, username: str, email: O
                            "starting with a letter or digit")
     if email is not None and not EMAIL.fullmatch(email):
         raise CommandError("that email address is not valid")
-    problem = passwords.policy_problem(password, username)
-    if problem:
-        raise CommandError({"password_too_short": f"the password needs at least {passwords.MIN_LENGTH} characters",
-                            "password_too_long": f"the password may have at most {passwords.MAX_LENGTH} characters",
-                            "password_is_username": "the password may not be the username",
-                            "password_breached": "that password is on the list of breached passwords"}[problem])
+    _check_password_policy(password, username)
     maker = make_sessionmaker(engine, hosted=settings.hosted)
     async with maker() as db:
         if await db.scalar(select(User.id).where(User.username == username)) is not None:
@@ -162,8 +179,8 @@ async def _create_admin(settings: Settings, engine: Any, username: str, email: O
             await db.flush()
         except IntegrityError:
             raise CommandError("that username or email address is already taken") from None
-        personal_data.give_consent(db, user.id, personal_data.ACCOUNT, settings.privacy_notice_version,
-                                   user.gdpr_consent_at)
+        personal_data.record_notice(db, user.id, settings.privacy_notice_version, personal_data.NOTICE_SIGNUP,
+                                    user.gdpr_consent_at)
         record(db, "admin_create", None, user_id=user.id, resource="user", resource_id=user.id,
                details={"via": "cli"})
         await db.commit()
@@ -213,8 +230,57 @@ async def reset_totp(settings: Settings, username: str, reason: str, assume_yes:
                                 "was_enabled": was_enabled, "sessions_revoked": revoked,
                                 "server_admin": user.server_admin})
                 await db.commit()
-                print(f"TOTP cleared for {username!r} ({user.id}); {revoked} session(s) revoked. "
+                print(f"TOTP cleared for {username!r} ({user.id}); {revoked} {'session' if revoked == 1 else 'sessions'} revoked. "
                       f"It enrols a new secret at the next login.", file=out)
+                return user.id
+    except tenancy.TenantError as e:
+        raise CommandError(str(e)) from None
+    finally:
+        await engine.dispose()
+
+
+async def set_password(settings: Settings, username: str, password: str, reason: str, assume_yes: bool,
+                       confirm: Callable[[str], str], out: TextIO, field: Optional[str] = None,
+                       actor: Optional[str] = None) -> uuid.UUID:
+    """Sets an existing account's password, revokes its sessions and audits it (decision SP-1); returns its id.
+    The password is checked against the API's policy before anything is touched. Asks for the username again unless
+    ``assume_yes``. In hosted mode ``field`` is required."""
+    if settings.hosted != (field is not None):
+        raise CommandError("--field SLUG names the field in hosted mode (ATALAIA_HOSTED=on) and only there")
+    username = username.strip().lower()
+    reason = reason.strip()
+    if not reason:
+        raise CommandError("--reason says why (it goes in the audit log)")
+    if not settings.password_login:
+        raise CommandError("password login is off (ATALAIA_PASSWORD_LOGIN=off): a password would not be usable")
+    _check_password_policy(password, username)
+    engine = make_engine(settings)
+    try:
+        tenant = None
+        if field is not None:
+            tenant = await tenancy.lookup(engine, tenancy.check_slug(field))
+            if tenant is None:
+                raise CommandError(f"no field {field!r} on this hub")
+        with tenancy.use(tenant):
+            async with make_sessionmaker(engine, hosted=settings.hosted)() as db:
+                user = await db.scalar(select(User).where(User.username == username).with_for_update())
+                if user is None or user.password_hash == personal_data.ERASED_PASSWORD:
+                    raise CommandError(f"no account named {username!r}")
+                if not assume_yes:
+                    print(f"This sets {username!r}'s password and signs the account out everywhere.", file=out)
+                    if confirm("Type the username to confirm: ").strip().lower() != username:
+                        raise CommandError("not confirmed: nothing was changed")
+                had_password = user.password_hash is not None
+                user.password_hash = await passwords.hash_password(password)
+                revoked = (await db.execute(update(UserSession).where(
+                    UserSession.user_id == user.id, UserSession.revoked_at.is_(None))
+                    .values(revoked_at=func.now(), mfa=False))).rowcount
+                record(db, "password_set", None, user_id=user.id, resource="user", resource_id=user.id,
+                       details={"via": "cli", "actor": actor or hosted.default_actor(), "reason": reason,
+                                "had_password": had_password, "sessions_revoked": revoked,
+                                "server_admin": user.server_admin})
+                await db.commit()
+                print(f"Password set for {username!r} ({user.id}); {revoked} {'session' if revoked == 1 else 'sessions'} revoked.", file=out)
                 return user.id
     except tenancy.TenantError as e:
         raise CommandError(str(e)) from None
@@ -228,9 +294,12 @@ async def run_purge(settings: Settings, dry_run: bool, out: TextIO) -> dict[str,
     try:
         maker = make_sessionmaker(engine, hosted=settings.hosted)
         for tenant in (await tenancy.active_tenants(engine)) if settings.hosted else [None]:
+            gone: list[uuid.UUID] = []
             with tenancy.use(tenant):
                 async with maker() as db:
-                    counts = await personal_data.purge(db, dry_run=dry_run)
+                    counts = await personal_data.purge(db, dry_run=dry_run, policy=settings.retention, anonymised=gone)
+            erasure_ledger.append(settings.erasure_ledger,  # PRIV-4: the accounts anonymised for inactivity
+                                  [erasure_ledger.account_entry(u, tenant.slug if tenant else None) for u in gone])
             verb = "would delete" if dry_run else "deleted"
             where = f" ({tenant.slug})" if tenant is not None else ""
             print(f"Retention purge{where} {verb}: "
@@ -426,6 +495,14 @@ def _parser() -> argparse.ArgumentParser:
     rt.add_argument("--reason", required=True, help="why (goes in the audit log)")
     rt.add_argument("--yes", action="store_true", help="do not ask for the username to be typed again")
     rt.add_argument("--field", help="hosted mode: the field (slug) the account belongs to")
+    sp = sub.add_parser("set-password", allow_abbrev=False,
+                        help="set an existing account's password (asked for, never an argument), sign it out")
+    sp.add_argument("--username", required=True)
+    sp.add_argument("--reason", required=True, help="why (goes in the audit log)")
+    sp.add_argument("--yes", action="store_true", help="do not ask for the username to be typed again")
+    sp.add_argument("--password-stdin", action="store_true",
+                    help="read the password from the first line of standard input (needs --yes)")
+    sp.add_argument("--field", help="hosted mode: the field (slug) the account belongs to")
     demo = sub.add_parser("demo", help="the preview deployment's demo data (decisions PV-*)")
     dsub = demo.add_subparsers(dest="action", required=True)
     dsub.add_parser("load", help="make the demo data or bring it up to date (idempotent)")
@@ -443,6 +520,8 @@ def _parser() -> argparse.ArgumentParser:
     p = fsub.add_parser("list", help="print the feedback, newest first")
     p.add_argument("--status", default="new", choices=("new", "seen", "done", "all"))
     p.add_argument("--json", action="store_true")
+    led = sub.add_parser("erasure-ledger", help="erase again what the erasure ledger lists, after a restore (PRIV-4)")
+    led.add_argument("action", choices=("apply",))
     purge = sub.add_parser("purge", help="delete what is past its retention period (ADR-P4-8), once")
     purge.add_argument("--dry-run", action="store_true", help="count, delete nothing")
     imp = sub.add_parser("import-field", help="load a hosted field's export into this single-field server")
@@ -513,8 +592,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def _say_quota_hits(waiting: int, out: TextIO) -> None:
     if waiting:
-        print(f"{waiting} note(s) of fields refused for a quota are waiting: python -m atalaia_server hosted "
-              "quota-hits", file=out)
+        notes = "note of a field refused for a quota is" if waiting == 1 else "notes of fields refused for a quota are"
+        print(f"{waiting} {notes} waiting: python -m atalaia_server hosted quota-hits", file=out)
 
 
 def _run_domain(args: argparse.Namespace, url: str, actor: Optional[str], out: TextIO) -> None:
@@ -596,7 +675,7 @@ def run_hosted(args: argparse.Namespace, url: str, out: TextIO) -> None:
         if not groups:
             print("No field was refused for a quota since the last look.", file=out)
         for g in groups:
-            print(f"{g['slug']}: refused for {g['quota']} (limit {g['limit']}), {g['count']} note(s), "
+            print(f"{g['slug']}: refused for {g['quota']} (limit {g['limit']}), {g['count']} {'note' if g['count'] == 1 else 'notes'}, "
                   f"{g['first'].isoformat()} to {g['last'].isoformat()}; recorded in the hub's audit log.", file=out)
     elif action == "domain":
         _run_domain(args, url, actor, out)
@@ -634,6 +713,13 @@ def main(argv: Optional[list[str]] = None, stdin: TextIO = sys.stdin, out: TextI
     if args.command == "purge":
         asyncio.run(run_purge(settings, args.dry_run, out))
         return 0
+    if args.command == "erasure-ledger":
+        try:
+            asyncio.run(erasure_replay.apply_ledger(settings, out))
+        except (ValueError, tenancy.TenantError) as e:
+            print(f"atalaia_server: {e}", file=err)
+            return 1
+        return 0
     if args.command == "atak":
         try:
             asyncio.run(run_atak(settings, args, out))
@@ -651,6 +737,23 @@ def main(argv: Optional[list[str]] = None, stdin: TextIO = sys.stdin, out: TextI
     if args.command == "reset-totp":
         try:
             asyncio.run(reset_totp(settings, args.username, args.reason, args.yes, confirm, out, field=args.field))
+        except (CommandError, EOFError) as e:
+            print(f"atalaia_server: {e or 'not confirmed: nothing was changed'}", file=err)
+            return 1
+        return 0
+    if args.command == "set-password":
+        if args.password_stdin and not args.yes:
+            print("atalaia_server: --password-stdin needs --yes (standard input carries the password)", file=err)
+            return 2
+        try:
+            if args.password_stdin:
+                password = stdin.readline().rstrip("\r\n")
+            else:
+                password = ask("New password: ")
+                if ask("New password again: ") != password:
+                    raise CommandError("the passwords differ")
+            asyncio.run(set_password(settings, args.username, password, args.reason, args.yes, confirm, out,
+                                     field=args.field))
         except (CommandError, EOFError) as e:
             print(f"atalaia_server: {e or 'not confirmed: nothing was changed'}", file=err)
             return 1

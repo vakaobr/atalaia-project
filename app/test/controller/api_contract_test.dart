@@ -252,9 +252,8 @@ void main() {
   final tokens = (vectors['tokens'] as Map).cast<String, String>();
   final schema = EventSchema.load();
   final wallStart = vectors['wall_start'] as int;
-  final limits = File(
-    'lib/chrono/limit_templates/portugal.yaml',
-  ).readAsStringSync();
+  final limits = File('lib/chrono/limit_templates/portugal.yaml')
+      .readAsStringSync();
   late AtalaiaCore core;
 
   setUpAll(() => core = AtalaiaCore.open(coreLibraryPath()));
@@ -405,6 +404,9 @@ void main() {
           ModesConfig(
             keys: [...?(c['mode_keys'] as List?)?.cast<String>()],
             revoked: [...?(c['mode_revoked'] as List?)?.cast<String>()],
+            minVersions: [
+              ...?(c['mode_min_versions'] as List?)?.cast<String>(),
+            ],
           ),
           wallSeconds: () => wallStart + now / 1000,
         );
@@ -483,12 +485,30 @@ void main() {
             : (token == 'bad' ? 'not-a-token' : tokens[token]);
         var url = 'ws://127.0.0.1:${server.port}/api/v1/stream';
         final headers = <String, Object>{};
+        List<String>? protocols;
         if (secret != null && step['via'] == 'header') {
           headers['Authorization'] = 'Bearer $secret';
+        } else if (secret != null && step['via'] == 'subprotocol') {
+          protocols = [
+            'atalaia.v1',
+            'atalaia.token.${base64Url.encode(utf8.encode(secret)).replaceAll('=', '')}',
+          ];
         } else if (secret != null) {
           url += '?token=${Uri.encodeQueryComponent(secret)}';
         }
-        final ws = _Stream(await WebSocket.connect(url, headers: headers));
+        final raw = await WebSocket.connect(
+          url,
+          headers: headers,
+          protocols: protocols,
+        );
+        if (step.containsKey('answers')) {
+          expect(
+            raw.protocol,
+            step['answers'],
+            reason: 'the chosen subprotocol',
+          );
+        }
+        final ws = _Stream(raw);
         final name = step['ws_connect'] as String;
         if (step.containsKey('close')) {
           expect(await ws.next(), isNull, reason: 'stream $name');
@@ -940,11 +960,10 @@ void main() {
                 key['sid']! as Uint8List,
                 key['sealed']! as Uint8List,
               );
-              check(
-                spec['opened'] ?? const <String, Object?>{},
-                {'join_key': _hex(join), 'field_name': name},
-                'step $i: the sealed key',
-              );
+              check(spec['opened'] ?? const <String, Object?>{}, {
+                'join_key': _hex(join),
+                'field_name': name,
+              }, 'step $i: the sealed key');
               final result = (spec['result'] as String?) ?? 'adopted';
               final fp = spec['fingerprint'] != null
                   ? _unhex(spec['fingerprint']! as String)

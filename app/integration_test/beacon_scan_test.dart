@@ -38,35 +38,33 @@ void main() {
       }
     }, skip: !onAndroidDevice);
 
-    testWidgets(
-      'without Bluetooth the scan says so instead of failing',
-      (_) async {
-        final service = ChannelBeaconScanService();
-        if (await service.available() &&
-            await service.granted() &&
-            await service.bluetoothOn()) {
-          // A device with Bluetooth on and the permissions granted: listening
-          // for nothing in particular must neither fail nor hear a beacon.
-          final first = await service
-              .windows([
-                'FDA50693-A4E2-4FB1-AFCF-C28847DC5D9F',
-              ], const Duration(seconds: 3))
-              .first
-              .timeout(const Duration(seconds: 10));
-          expect(first.sightings, isEmpty);
-        } else {
-          // The usual emulator: nothing to scan with, and the stream's error
-          // names it.
-          await expectLater(
-            service.windows([
+    testWidgets('without Bluetooth the scan says so instead of failing', (
+      _,
+    ) async {
+      final service = ChannelBeaconScanService();
+      if (await service.available() &&
+          await service.granted() &&
+          await service.bluetoothOn()) {
+        // A device with Bluetooth on and the permissions granted: listening
+        // for nothing in particular must neither fail nor hear a beacon.
+        final first = await service
+            .windows([
               'FDA50693-A4E2-4FB1-AFCF-C28847DC5D9F',
-            ], const Duration(seconds: 3)).first,
-            throwsA(isA<PlatformException>()),
-          );
-        }
-      },
-      skip: !onAndroidDevice,
-    );
+            ], const Duration(seconds: 3))
+            .first
+            .timeout(const Duration(seconds: 10));
+        expect(first.sightings, isEmpty);
+      } else {
+        // The usual emulator: nothing to scan with, and the stream's error
+        // names it.
+        await expectLater(
+          service.windows([
+            'FDA50693-A4E2-4FB1-AFCF-C28847DC5D9F',
+          ], const Duration(seconds: 3)).first,
+          throwsA(isA<PlatformException>()),
+        );
+      }
+    }, skip: !onAndroidDevice);
   });
 
   group('on iOS', () {

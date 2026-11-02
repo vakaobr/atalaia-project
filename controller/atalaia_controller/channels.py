@@ -25,13 +25,13 @@ from __future__ import annotations
 import logging
 import random
 import threading
-import time
 from dataclasses import asdict
 from typing import Any, Callable, Optional
 
 from atalaia_sim import regions
 from atalaia_sim.regions import Region
 
+from . import wallclock
 from . import modem_framing as mf
 
 log = logging.getLogger("atalaia.channels")
@@ -103,7 +103,7 @@ class Scan:
         self.error: Optional[str] = None
         self.results: list[mf.Noise] = []
         self.current: Optional[int] = None
-        self.started_at = time.time()
+        self.started_at = wallclock.now()
         self.finished_at: Optional[float] = None
         self._thread = threading.Thread(target=self._run, name="channel-scan", daemon=True)
 
@@ -142,7 +142,7 @@ class Scan:
         with self._lock:
             self.state = state
             self.current = None
-            self.finished_at = time.time()
+            self.finished_at = wallclock.now()
         self._notify()
 
     def _notify(self) -> None:

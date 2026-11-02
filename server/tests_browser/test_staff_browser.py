@@ -39,7 +39,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import NameOID
 
-from atalaia_server import sync
+from atalaia_server import sharing_terms, sync
 from atalaia_server.config import Settings
 from atalaia_server.ratelimit import RequestLimit
 
@@ -1245,27 +1245,40 @@ class SettingsTests(BrowserCase):
         await page.fill("#f-replicas", "3")
         await page.click("#checkin-form button[type=submit]")
         await expect(page.locator("#status")).to_have_text("Saved. The controllers get the change at once.")
+        # The sharing terms (LEG-41): switching sharing on without accepting them is refused in words.
+        await expect(page.locator("#f-terms-state")).to_contain_text("not been accepted")
         await page.check("#f-chrono")
         await page.click("#chrono-form button[type=submit]")
+        await expect(page.locator("#status")).to_have_text("To switch sharing on, accept the sharing terms first.")
+        await expect(page.locator("#f-chrono-state")).to_have_text("")
+        await page.check("#f-terms")
+        await page.click("#chrono-form button[type=submit]")
         await expect(page.locator("#status")).to_have_text("Saved.")
+        await expect(page.locator("#f-terms-state")).to_contain_text("accepted on")
+        await expect(page.locator("#f-chrono-state")).to_have_text("Sharing is live.")
         row = await self.row()
         self.assertEqual((row[2], row[3], row[4], row[5]), (True, True, "Campo de bosque.\nChegada às 9h.", 3))
-        # The data retention (RET-1, RET-2): 365 days each at first; both are saved and a refusal is in words.
+        accepted = (await self.fetch("SELECT sharing_terms_version, sharing_terms_accepted_at, sharing_terms_accepted_by "
+                                     "FROM fields WHERE id = $1", self.field_id))[0]
+        self.assertEqual(accepted[0], sharing_terms.current())
+        self.assertIsNotNone(accepted[1])
+        self.assertIsNotNone(accepted[2])
+        # The data retention (RET-1, RET-2): 365 days for chrono, 90 for game data at first; both are saved and a refusal is in words.
         await expect(page.locator("#f-chrono-days")).to_have_value("365")
-        await expect(page.locator("#f-game-days")).to_have_value("365")
+        await expect(page.locator("#f-game-days")).to_have_value("90")
         await page.fill("#f-chrono-days", "180")
-        await page.fill("#f-game-days", "90")
+        await page.fill("#f-game-days", "120")
         await page.click("#retention-form button[type=submit]")
         await expect(page.locator("#status")).to_have_text("Saved. The controllers get the change at once.")
         days = (await self.fetch("SELECT default_retention_days, game_retention_days FROM fields WHERE id = $1",
                                  self.field_id))[0]
-        self.assertEqual((days[0], days[1]), (180, 90))
+        self.assertEqual((days[0], days[1]), (180, 120))
         await page.fill("#f-game-days", "7")
         await page.click("#retention-form button[type=submit]")
         await expect(page.locator("#status")).to_have_text(
             "Invalid game data retention (a whole number of days, from 30 to 3653).")
         self.assertEqual((await self.fetch("SELECT game_retention_days FROM fields WHERE id = $1",
-                                           self.field_id))[0][0], 90)
+                                           self.field_id))[0][0], 120)
         # Refusals, each in words: a country that is not two letters, a one-line text with a tab, a rule
         # that accepts only the ticked ones with none ticked, a number the API refuses.
         await page.fill("#f-country", "PORTUGAL")

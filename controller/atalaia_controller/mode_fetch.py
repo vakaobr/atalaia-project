@@ -43,6 +43,7 @@ import time
 from typing import Any, Callable, Optional
 
 from . import firmware_release as fr
+from . import wallclock
 from . import mode_package as mp
 from .engine import Conflict, Controller, ControllerError, NotFound
 
@@ -63,7 +64,7 @@ class ModeFetch:
     """The live game's fetches, the offer of its parts, and what boxes keep."""
 
     def __init__(self, controller: Controller, box_keys: list[str], timeout_s: float = 300.0,
-                 clock: Callable[[], float] = time.time) -> None:
+                 clock: Callable[[], float] = time.monotonic) -> None:
         self.controller = controller
         self.box_keys = list(box_keys)
         self.timeout_s = timeout_s
@@ -253,7 +254,8 @@ class ModeFetch:
             nodes = sorted(n for n, a in self.attempts.items() if a["game"] == live and a["state"] in ACTIVE)
         if not nodes:
             return None
-        return (f"boxes are fetching this game's modes: node(s) {', '.join(map(str, nodes))}; wait for them, or "
+        return (f"boxes are fetching this game's modes: {'node' if len(nodes) == 1 else 'nodes'} "
+                f"{', '.join(map(str, nodes))}; wait for them, or "
                 "stop waiting (DELETE /api/v1/mode-fetch) before the game starts")
 
     def holds(self, node_id: int) -> bool:
@@ -458,7 +460,7 @@ class ModeFetch:
         boxes = self._load("mode_fetch.boxes", {})
         boxes.pop(key, None)
         boxes[key] = {"device_id": device, "node_id": node_id, "game": game_id, "kept": kept,
-                      "reported_at": round(self.clock(), 3)}
+                      "reported_at": round(wallclock.now(), 3)}
         while len(boxes) > BOXES_KEPT:
             boxes.pop(next(iter(boxes)))
         self.controller.store.set_setting("mode_fetch.boxes", json.dumps(boxes))

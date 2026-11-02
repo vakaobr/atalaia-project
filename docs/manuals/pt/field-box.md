@@ -39,7 +39,7 @@ Corre as regras do jogo sozinha e fala com o controlador de campo por rádio. Se
 ## 2. Ligar, desligar e carregar
 
 1. Confirma que as antenas estão montadas.
-2. Liga o **interruptor principal**. O OLED pequeno mostra a torre da Atalaia e a versão do firmware durante 2 segundos. Depois o ecrã grande mostra o primeiro ecrã da caixa ([secção 3](#3-primeira-configuração-caixa-nova) ou [secção 5](#5-põe-a-caixa-num-jogo)).
+2. Liga o **interruptor principal**. O OLED pequeno e o ecrã grande mostram a torre da Atalaia e a versão do firmware: o OLED durante 2 segundos, o ecrã grande durante cerca de 2,5 segundos (mais tempo só se o primeiro ecrã da caixa ainda não estiver pronto). Depois o ecrã grande mostra o primeiro ecrã da caixa ([secção 3](#3-primeira-configuração-caixa-nova) ou [secção 5](#5-põe-a-caixa-num-jogo)).
 3. Para desligar, usa o interruptor principal.
 
 **Carregar.** Liga um carregador USB-C de 5 V à ficha do painel com o **interruptor principal ligado**. Com o interruptor desligado, a bateria fica isolada e não carrega. Carrega num sítio que possas vigiar, não dentro de uma mala de transporte fechada. Carrega só entre cerca de 0 °C e 45 °C. Não carregues uma caixa fria logo à saída de um campo no inverno.
@@ -128,9 +128,9 @@ Manténs premido o botão da tua equipa na caixa. A caixa mostra o que se passa.
 | **PRONTA** · a torre da Atalaia · **Próximo jogo** | Adotada, sem jogo. Pode ser convidada. |
 | **À ESPERA** · **Jogo** *N* · **O jogo ainda não começou** | Juntou-se. Espera pelo **Começar** da organização. |
 | **JOGO EM CURSO** | O jogo começou. Segue-se o ecrã próprio do modo. |
-| **ZONA · LIVRE** · **Mantém premido** | Uma zona que nenhuma equipa tem (Domínio, Domínio Total, Último Elemento, Mestre e Satélites). Mantém premido o botão da tua equipa. Uma barra enche. |
-| **ZONA OCUPADA** · equipa | Uma equipa tem a zona. O anel fica com a cor dela. O OLED pequeno mostra há quanto tempo a tem. |
-| **Mantém o botão premido para a tomar** | Outra equipa pode tomar a zona da mesma maneira. |
+| **ZONA · LIVRE** · **Mantém premido** | Uma zona que nenhuma equipa tem (Domínio, Domínio Total, Último Elemento, Mestre e Satélites; em Mestre e Satélites o cabeçalho diz **MESTRE** ou **SATÉLITE** depois de o controlador dizer à caixa qual é). Mantém premido o botão da tua equipa. Uma barra enche. |
+| **ZONA OCUPADA** · equipa | Uma equipa tem a zona. O anel fica com a cor dela. Os dois ecrãs mostram há quanto tempo a tem, a contar em frente (**ocupada há 1:23**). No Domínio o ecrã grande mostra também os pontos de cada equipa nesta caixa, com as cores das equipas, no canto de cima à direita. Em Mestre e Satélites o cabeçalho diz o que a caixa é (**MESTRE OCUPADA**, **SATÉLITE OCUPADO**), e o ecrã grande da mestre conta o tempo em frente e mostra a pontuação de cada equipa da mesma maneira. No Domínio Progressivo e nos pontos de controlo do VIP e Carga o ecrã grande também conta o tempo em frente. |
+| **Mantém o botão premido para a tomar** | Outra equipa pode tomar a zona da mesma maneira. Enquanto uma equipa mantém o botão premido, uma barra com o nome dela enche ao longo da margem de baixo do ecrã grande, como no OLED. |
 | **PRONTA** · **Mantém premido para armar** | *Bomba / Rush*: a bomba ainda não está armada. Os atacantes mantêm premido o botão. |
 | **ARMADA** · tempo **até à explosão** | A bomba está armada. Os defensores mantêm premido o botão para a desarmar. |
 | **DESARMADA** / **EXPLODIU** | A bomba terminou. A equipa vencedora é nomeada. Depois de uma explosão o jogo termina. |
@@ -140,13 +140,13 @@ Manténs premido o botão da tua equipa na caixa. A caixa mostra o que se passa.
 
 Os outros modos têm ecrãs próprios: *Baixa Confirmada* (**carrega no botão e lê as etiquetas**), *Reentradas e Vidas* (**Lê a tua etiqueta para voltares ao jogo**), *Ligaduras* (**Lê a tua etiqueta** e **mantém premido o botão**) e *Hackeia o terminal* (um enigma no teclado). A [página dos modos](https://atalaia-project.link/modos/) mostra-os.
 
-**O logótipo.** A caixa mostra a torre da Atalaia, no ecrã de arranque e no ecrã **PRONTA**, e no ecrã de *Bomba / Rush* enquanto a bomba não está armada. O logótipo do próprio campo (as *Definições* da consola) aparece na app, no placar e no cartaz, não na caixa: a caixa ia buscá-lo pela Wi-Fi do campo e já não vai. Quem monta a caixa pode compilá-la com outra imagem de arranque: [guia de firmware, secção 4](firmware.md#4-as-opções-de-quem-monta).
+**O logótipo.** A caixa mostra a torre da Atalaia, no ecrã de arranque (o pequeno e o grande, com a versão do firmware ao lado) e no ecrã **PRONTA**, e no ecrã de *Bomba / Rush* enquanto a bomba não está armada. O logótipo do próprio campo (as *Definições* da consola) aparece na app, no placar e no cartaz, não na caixa: a caixa ia buscá-lo pela Wi-Fi do campo e já não vai. Quem monta a caixa pode compilá-la com outra imagem de arranque: [guia de firmware, secção 4](firmware.md#4-as-opções-de-quem-monta).
 
-No OLED pequeno vês o modo em cima, um valor grande (a fase, o tempo ou a equipa) e uma dica por baixo. Enquanto uma equipa mantém premido o botão, o OLED mostra uma barra que enche.
+No OLED pequeno vês o modo em cima, um valor grande (a fase, o tempo ou a equipa) e uma dica por baixo. Numa zona ocupada (Domínio, Domínio Progressivo, Mestre e Satélites, pontos de controlo do VIP e Carga) a dica é há quanto tempo a equipa a tem (**ocupada 1:23**). Enquanto uma equipa mantém premido o botão, o OLED mostra uma barra que enche.
 
 Num jogo com limite de tempo que começou na própria caixa, o ecrã grande tem uma barra fina ao longo da margem de baixo que mostra quanto falta do jogo (fica vermelha no último minuto), e o OLED mostra o tempo que falta, em minutos e segundos, à direita da linha de cima. Um jogo **Sem limite** não tem nenhuma das duas. Um jogo conduzido pelo controlador do campo acaba quando a organização o termina, por isso não tem barra.
 
-As *Ligaduras*, o *Hackeia o terminal* e o *VIP / Carga* não seguem a língua da caixa. Cada um usa a língua do ecrã da sua própria definição **Língua** no jogo, e por omissão é o português. Pede à organização que a defina.
+As *Ligaduras* e o *Hackeia o terminal* não seguem a língua da caixa. Cada um usa a língua do ecrã da sua própria definição **Língua** no jogo; se estiver vazia, é a língua do jogo. O *VIP / Carga* segue a língua da caixa, como os outros modos (a sua antiga definição **Língua** já não é usada).
 
 ## 7. O que te dizem as luzes e os ecrãs
 
@@ -216,7 +216,7 @@ Um telemóvel Android também pode ser uma caixa. Na app escolhe **Dispositivo d
 | O ecrã está na língua errada | A organização define a **Língua das caixas** antes de criar o jogo. |
 | A caixa só mostra inglês | Firmware mais antigo. A organização pode atualizá-lo. |
 | **PIN bloqueado · tente daqui a N min** | Espera. A contagem sobrevive a um reinício. Não continues a adivinhar. |
-| A caixa reiniciou num jogo | Volta no mesmo jogo. A organização vê **node.rebooted** no registo dela. |
+| A caixa reiniciou num jogo | Volta no mesmo jogo. A organização vê **node.rebooted** no registo dela, com o motivo que a caixa indica (alimentação, queda de tensão, software, falha do programa, watchdog); o fluxo da consola diz **Uma caixa falhou e reiniciou** quando foi uma falha do programa ou um reinício do watchdog. Um fio solto no teclado ou no ecrã já não reinicia a caixa: a peça que falha é posta de lado por um tempo e o jogo continua (o teclado conta então como sem tecla). |
 | O ecrã pequeno está apagado | Fala com quem montou a caixa. O ecrã grande pode continuar a funcionar. |
 
 Para avarias de montagem e de bancada, vê [a tabela de resolução de problemas do manual de montagem](../../../hardware/field-box/BUILD.pt.md#13-resolução-de-problemas).

@@ -68,7 +68,7 @@ async function load() {
     const near = certs.filter((c) => c.expiring);
     const warn = $('atak-expiring');
     warn.hidden = near.length === 0;
-    if (near.length) warn.textContent = t('atak_expiring', { n: near.length, days: state.warn_days,
+    if (near.length) warn.textContent = t('atak_expiring', { n: near.length, days: t('days_within', { n: state.warn_days }),
         devices: near.map((c) => `${c.device_name} (${when(c.not_after, ctx.zone)})`).join(', ') });
     fillRows($('atak-certs'), certs.map((c) => [c.device_name, c.holder || t('atak_operator'), yesNo(c.positions),
         when(c.not_after, ctx.zone), c.expiring ? `${stateName(c.state)} - ${t('atak_expiring_short')}` : stateName(c.state), when(c.last_connected_at, ctx.zone),

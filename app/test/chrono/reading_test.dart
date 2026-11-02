@@ -127,11 +127,8 @@ void main() {
     // Whole numbers may arrive as JSON integers.
     final whole = measure(velocityMps: 100).toJson();
     expect(
-      ChronoReading.fromJson({
-        ...whole,
-        'velocity_mps': 100,
-        'energy_j': 1,
-      }).velocityMps,
+      ChronoReading.fromJson({...whole, 'velocity_mps': 100, 'energy_j': 1})
+          .velocityMps,
       100.0,
     );
   });

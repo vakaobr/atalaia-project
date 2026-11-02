@@ -28,8 +28,10 @@ running. Two images are used:
   modem_host and box_host, mbedtls linked in statically), which the pod and
   radio-link tests and the phone controller's end-to-end tests run. Both
   images are Ubuntu 24.04, so they run in the other one.
-- ghcr.io/cirruslabs/flutter:3.44.0, pinned by digest (about 2.3 GB on the
-  first run), runs app/tool/check.sh. It has no CMake: the NDK 28.2.13676358
+- atalaia-flutter:3.47.9 (tools/dev/flutter/Dockerfile, built on first use and
+  whenever that file changes: cirruslabs' 3.44.0 image, pinned by digest, about
+  2.3 GB, with the official 3.47.9 SDK, pinned by SHA-256, swapped in) runs
+  app/tool/check.sh. It has no CMake: the NDK 28.2.13676358
   and CMake 3.22.1 come from the Android SDK manager on first use (about
   1 GB) and Gradle 9.1.0 with its dependencies on the first `apk`.
 
@@ -50,6 +52,7 @@ build the FFI stub and check the simulator's ctypes structs against it.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import subprocess
@@ -60,8 +63,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import docker_sim  # noqa: E402  (the atalaia-dev image)
 
 REPO = Path(__file__).resolve().parents[1]
-IMAGE = ("ghcr.io/cirruslabs/flutter:3.44.0"
-         "@sha256:46691e311715845de03a3ba4753a475476936805b29431b1f00f1816981033f8")
+# The Flutter image: tools/dev/flutter/Dockerfile (cirruslabs' 3.44.0 image, pinned by
+# digest, with the official 3.47.9 SDK, pinned by SHA-256, swapped in).
+IMAGE = "atalaia-flutter:3.47.9"
+FLUTTER_DIR = REPO / "tools" / "dev" / "flutter"
+IMAGE_LABEL = "org.atalaia.flutter-dockerfile"
 SUFFIX = os.environ.get("ATALAIA_VOLUME_SUFFIX", "")
 PUB_VOLUME = "atalaia-app-pub-cache" + SUFFIX
 CORE_VOLUME = "atalaia-app-core" + SUFFIX
@@ -75,6 +81,22 @@ MODES = ("all", "check", "test", "ndk", "apk", "format", "lock", "gen", "goldens
 def fail(message: str) -> int:
     print(f"docker_app: {message}", file=sys.stderr)
     return 1
+
+
+def ensure_flutter_image() -> bool:
+    """Builds the Flutter image if it is missing or its Dockerfile changed. False if the build failed."""
+    dockerfile = (FLUTTER_DIR / "Dockerfile").read_bytes().replace(b"\r\n", b"\n")
+    wanted = hashlib.sha256(dockerfile).hexdigest()[:16]
+    label_format = "{{index .Config.Labels \"%s\"}}" % IMAGE_LABEL
+    built = subprocess.run(["docker", "image", "inspect", "-f", label_format, IMAGE],
+                           capture_output=True, text=True)
+    if built.returncode != 0 or built.stdout.strip() != wanted:
+        print(f"docker_app: building the {IMAGE} image (first run, or its Dockerfile changed)...",
+              flush=True)
+        if subprocess.call(["docker", "build", "--label", f"{IMAGE_LABEL}={wanted}", "-t", IMAGE,
+                            str(FLUTTER_DIR)]) != 0:
+            return False
+    return True
 
 
 def build_core() -> int:
@@ -102,6 +124,8 @@ def build_core() -> int:
 
 def flutter(mode: str, args: list[str]) -> int:
     """app/tool/check.sh <mode> in the Flutter image; returns its exit code."""
+    if not ensure_flutter_image():
+        return fail("building the Flutter image failed")
     writable = mode in ("format", "lock", "gen", "goldens")
     cmd = ["docker", "run", "--rm", "-v", f"{REPO}:/src" + ("" if writable else ":ro"),
            "-v", f"{PUB_VOLUME}:/root/.pub-cache", "-w", "/src"]

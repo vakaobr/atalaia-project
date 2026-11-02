@@ -19,6 +19,14 @@ full-width punctuation after Han and a half-width space between Han and Latin le
 
 from __future__ import annotations
 
+def count_text(strings: dict[str, str], key: str, n: int, **values: object) -> str:
+    """The text ``key`` for a count: ``<key>_one`` when ``n == 1`` and the language has it (Chinese has no
+    plural), else ``key``, with ``{n}`` and the other ``{name}`` values filled in. The page's script does the same
+    in ``static/staff/staff.js`` (decision PLU-2)."""
+    text = strings[f"{key}_one"] if n == 1 and f"{key}_one" in strings else strings[key]
+    return text.format(n=n, **values)
+
+
 STRINGS: dict[str, dict[str, str]] = {
     "pt": {
         # Every page
@@ -88,17 +96,19 @@ STRINGS: dict[str, dict[str, str]] = {
         "login_or": "Ou entrar com",
         "login_with": "Continuar com {provider}",
         "login_passkey": "Entrar com chave de acesso",
-        "login_consent": "Se esta for a primeira entrada, autorizo criar uma conta nova (só se guarda o identificador "
-                         "dado pelo fornecedor; o nome do fornecedor só é lido se o pedires e não fica guardado; ver o "
-                         "aviso de privacidade do campo).",
+        "login_new_intro": "Primeira vez neste campo? Para criar uma conta ao entrar com um fornecedor, confirmar o seguinte. Só se guarda o identificador dado pelo fornecedor; o nome do fornecedor só é lido se o pedires e não fica guardado.",
+        "login_notice_seen": "Li o aviso de privacidade do campo.",
+        "login_notice_read": "Ler o aviso",
+        "login_age": "Tenho 16 anos ou mais. Quem é mais novo faz o check-in no campo sem conta, com as regras do campo para os pais ou responsáveis.",
         "login_social_working": "A abrir a página do fornecedor…",
         "passkey_cancelled": "A chave de acesso não foi usada (pedido cancelado ou expirado).",
         "passkey_failed": "Não foi possível entrar com a chave de acesso.",
         "passkey_none": "Esta conta não tem chaves de acesso.",
         "oidc_err_state_invalid": "Este pedido de entrada expirou ou não veio deste navegador. Tentar de novo.",
         "oidc_err_denied": "A entrada foi recusada no fornecedor.",
-        "oidc_err_consent_required": "Para criar uma conta nova, marcar a caixa de autorização que está logo abaixo (por baixo dos botões dos fornecedores) e escolher o fornecedor de novo.",
-        "oidc_err_notice_version_changed": "O aviso de privacidade mudou entretanto. A caixa foi desmarcada: ler o aviso atual, marcar a caixa de novo e escolher o fornecedor outra vez.",
+        "oidc_err_notice_required": "Para criar uma conta nova, marcar primeiro que se leu o aviso de privacidade (caixa logo abaixo, por baixo dos botões dos fornecedores) e escolher o fornecedor de novo.",
+        "oidc_err_age_confirmation_required": "Para criar uma conta é preciso ter 16 anos ou mais. Quem é mais novo faz o check-in no campo sem conta, com as regras do campo para os pais ou responsáveis. Se tens 16 anos ou mais, marcar a caixa de idade (logo abaixo) e escolher o fornecedor de novo.",
+        "oidc_err_notice_version_changed": "O aviso de privacidade mudou entretanto. A caixa do aviso foi desmarcada: ler o aviso atual, marcá-la de novo e escolher o fornecedor outra vez.",
         "oidc_err_too_many_attempts": "Demasiadas contas novas a partir deste endereço. Tentar mais tarde.",
         "oidc_err_quota_exceeded": "Este campo chegou ao limite de contas. Falar com a organização do campo.",
         "oidc_err_id_token_invalid": "A resposta do fornecedor não foi aceite. Tentar de novo.",
@@ -208,7 +218,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "check_ok": "Sem erros. O núcleo carregou o cenário.",
         "check_ok_no_core": "Sem erros no manifesto, mas o núcleo não está disponível neste servidor: guardar vai "
                             "falhar.",
-        "check_errors": "{n} problema(s) a corrigir.",
+        "check_errors": "{n} problemas a corrigir.",
+        "check_errors_one": "{n} problema a corrigir.",
         "check_saved_revision": "Este cenário já está na biblioteca, na revisão {n}.",
         "problem_level_error": "erro",
         "problem_level_warning": "aviso",
@@ -239,6 +250,9 @@ STRINGS: dict[str, dict[str, str]] = {
                          "em silêncio: sem notícias há mais de {s} s num jogo a decorrer.",
         "devices_days": "Jogos dos últimos",
         "days_n": "{n} dias",
+        "days_n_one": "{n} dia",
+        "days_within": "{n} dias",
+        "days_within_one": "{n} dia",
         "devices_none": "Nenhuma caixa nos jogos deste período.",
         "col_battery": "Bateria",
         "col_link": "Rádio",
@@ -372,10 +386,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "e_until_invalid": "Data inválida.",
         "e_atak_relay_off": "O relay ATAK deste servidor está desligado.",
         "e_positions_not_allowed": "Só uma conta com a função de GM ou marshal neste campo pode ver posições.",
-        "e_holder_has_no_role": "Essa conta não tem nenhuma função neste campo.",
+        "e_holder_has_no_role": "Essa conta não existe ou não tem nenhuma função neste campo.",
         "e_positions_need_gm_or_marshal": "Só quem tem a função de GM ou marshal neste campo pode emitir um "
                                           "certificado que vê posições.",
-        "e_holder_not_found": "Não há nenhuma conta com esse nome.",
         "e_certificate_not_found": "Certificado não encontrado.",
         "e_invalid_request": "Pedido inválido.",
         # The schedule, a game's registrations and its roster (Phase 4 follow-up FU6)
@@ -564,6 +577,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "rep_make": "Marca e modelo (opcional)",
         "rep_registry": "do registo de quem se inscreveu",
         "rep_limit": "No máximo {n} réplicas.",
+        "rep_limit_one": "No máximo {n} réplica.",
         "rep_not_asked": "Este jogo não pede réplicas declaradas.",
         "io_title": "Exportar e importar",
         "io_export_intro": "O ficheiro CSV da lista leva os dados pessoais de quem se inscreveu: guardá-lo só enquanto o jogo precisar e apagá-lo depois. Cada exportação fica no registo de auditoria, sem nomes.",
@@ -580,10 +594,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "io_dry": "Verificação feita: nada foi guardado.",
         "io_done": "Importação feita.",
         "io_counts": "{rows} linhas: {created} novas, {updated} mudadas, {unchanged} iguais, {skipped} saltadas, {refused} recusadas.",
+        "io_counts_one": "{rows} linha: novas {created}, mudadas {updated}, iguais {unchanged}, saltadas {skipped}, recusadas {refused}.",
         "io_missing": "Inscrições desta origem que não vêm no ficheiro (não são retiradas): {n}.",
         "io_ignored": "Colunas não importadas: {names}.",
         "io_issues": "Linhas que pedem atenção",
         "io_more": "E mais {n} linhas.",
+        "io_more_one": "E mais {n} linha.",
         "io_locked": "Só se importa para um jogo publicado que ainda não começou.",
         "io_res_created": "nova",
         "io_res_updated": "mudada",
@@ -648,7 +664,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "fb_status_seen": "vistas",
         "fb_status_done": "tratadas",
         "fb_status_all": "todas",
-        "feedback_counts": "{new} novas, {seen} vistas, {done} tratadas",
+        "feedback_counts": "novas: {new}, vistas: {seen}, tratadas: {done}",
         "feedback_none": "Não há opiniões neste estado.",
         "fb_col_when": "Quando",
         "fb_col_kind": "Assunto",
@@ -677,6 +693,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "acct_confirm_password": "Palavra-passe atual",
         "acct_confirm_password_hint": "As alterações abaixo pedem a palavra-passe atual. Escrevê-la aqui antes de as fazer.",
         "acct_confirm_recent": "Esta conta não tem palavra-passe: as alterações pedem uma confirmação feita nos últimos 10 minutos (entrar também conta). Confirmar com uma das formas abaixo e repetir a ação.",
+        "acct_stepup_needed": "Esta conta tem um segundo fator (TOTP ou chave de acesso) ou uma função de equipa: mudar a forma de entrar (chaves de acesso, TOTP, palavra-passe, contas ligadas, junção de contas) pede primeiro o código TOTP ou a chave de acesso. Um início de sessão com Google, Microsoft ou Apple não basta.",
         "acct_confirm_with": "Confirmar com {provider}",
         "acct_confirmed": "Confirmado. Repetir a ação.",
         "acct_reauthed": "Confirmado com o fornecedor. Repetir a ação.",
@@ -721,8 +738,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "acct_pw_removed": "Palavra-passe removida.",
         "oidc_err_name_unusable": "O nome do fornecedor não dá um nome de utilizador. Escrever um à mão.",
         "acct_e_name_not_offered": "Esta conta só pode usar o nome do fornecedor com que foi criada (Google ou Microsoft).",
+        "acct_e_app_challenge_not_for_browser": "Esta página não precisa de verificador: só a app o usa. Recarregue a página e tente outra vez.",
+        "acct_e_app_challenge_required": "Esta app é demasiado antiga para entrar com Google, Microsoft ou Apple neste campo. Atualize a app.",
         "acct_e_merge_ticket_invalid": "O pedido de junção expirou ou já foi usado. Ligar o login outra vez.",
         "acct_e_merge_staff_account": "Essa outra conta tem uma função de equipa (administração, GM ou marshal) e não pode ser juntada por aqui. Falar com a administração do campo.",
+        "acct_e_merge_passkeys_into_staff": "A outra conta tem chaves de acesso e esta conta tem uma função de equipa: não são trazidas para cá. Remover as chaves de acesso da outra conta e tentar de novo, ou manter as contas separadas.",
+        "acct_e_mfa_required": "Esta ação pede um segundo fator (TOTP ou chave de acesso): confirmar com o código ou a chave de acesso no painel de confirmação acima e repetir.",
         "acct_e_merge_provider_conflict": "As duas contas já têm um login do mesmo fornecedor. Desligar um deles numa das contas e tentar de novo.",
         "acct_e_merge_too_many_passkeys": "As duas contas juntas têm chaves de acesso a mais. Remover algumas e tentar de novo.",
         "acct_e_username_invalid": "Nome de utilizador inválido: 3 a 64 caracteres, letras minúsculas sem acentos, números, ponto, hífen ou sublinhado, a começar por letra ou número.",
@@ -742,7 +763,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "acct_username_saved": "Nome de utilizador guardado.",
         "acct_merge_title": "Juntar contas",
         "acct_merge_text": "Este login de {provider} pertence a outra conta ({name}). Juntar essa conta a esta? Os logins, as chaves de acesso, as funções, as inscrições e o resto passam para esta conta; a outra deixa de existir.",
-        "acct_merge_moves": "Passam para esta conta: logins ({logins}) e {n} chave(s) de acesso.",
+        "acct_merge_moves": "Passam para esta conta: logins ({logins}) e {n} chaves de acesso.",
+        "acct_merge_moves_one": "Passam para esta conta: logins ({logins}) e {n} chave de acesso.",
         "acct_merge_pw_dropped": "A palavra-passe da outra conta é descartada; esta conta mantém a sua.",
         "acct_merge_pw_not_carried": "A outra conta tem palavra-passe, mas não é passada para esta, que fica sem palavra-passe.",
         "acct_merge_go": "Juntar a outra conta a esta",
@@ -857,17 +879,19 @@ STRINGS: dict[str, dict[str, str]] = {
         "login_or": "Or log in with",
         "login_with": "Continue with {provider}",
         "login_passkey": "Log in with a passkey",
-        "login_consent": "If this is a first login, I agree to a new account being made (only the identifier the "
-                         "provider gives is kept; the provider's name is read only if you ask for it and is not kept; "
-                         "see the field's privacy notice).",
+        "login_new_intro": "New here? To make an account when you sign in with a provider for the first time, confirm the following. Only the identifier the provider gives is kept; the provider's name is only read if you ask for it and is not stored.",
+        "login_notice_seen": "I have read the field's privacy notice.",
+        "login_notice_read": "Read the notice",
+        "login_age": "I am 16 or older. Younger players check in at the field without an account, under the field's rules for parents or guardians.",
         "login_social_working": "Opening the provider's page…",
         "passkey_cancelled": "The passkey was not used (the request was cancelled or timed out).",
         "passkey_failed": "Could not log in with the passkey.",
         "passkey_none": "This account has no passkeys.",
         "oidc_err_state_invalid": "This login request expired or did not come from this browser. Try again.",
         "oidc_err_denied": "The login was refused at the provider.",
-        "oidc_err_consent_required": "To make a new account, tick the agreement box just below this message (under the provider buttons), then choose the provider again.",
-        "oidc_err_notice_version_changed": "The privacy notice has changed in the meantime. The box has been unticked: read the current notice, tick the box again, then choose the provider again.",
+        "oidc_err_notice_required": "To make a new account, first tick that you have read the privacy notice (the box just below, under the provider buttons), then choose the provider again.",
+        "oidc_err_age_confirmation_required": "You must be 16 or older to make an account. Younger players check in at the field without an account, under the field's rules for parents or guardians. If you are 16 or older, tick the age box (just below), then choose the provider again.",
+        "oidc_err_notice_version_changed": "The privacy notice has changed in the meantime. The notice box has been unticked: read the current notice, tick it again, then choose the provider again.",
         "oidc_err_too_many_attempts": "Too many new accounts from this address. Try again later.",
         "oidc_err_quota_exceeded": "This field has reached its limit of accounts. Talk to the field's staff.",
         "oidc_err_id_token_invalid": "The provider's answer was not accepted. Try again.",
@@ -975,7 +999,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "check_ok": "No errors. The core loaded the scenario.",
         "check_ok_no_core": "No errors in the manifest, but the core is not available on this server: saving will "
                             "fail.",
-        "check_errors": "{n} problem(s) to fix.",
+        "check_errors": "{n} problems to fix.",
+        "check_errors_one": "{n} problem to fix.",
         "check_saved_revision": "This scenario is already in the library, at revision {n}.",
         "problem_level_error": "error",
         "problem_level_warning": "warning",
@@ -1004,6 +1029,9 @@ STRINGS: dict[str, dict[str, str]] = {
                          "silent: not heard for more than {s} s in a running game.",
         "devices_days": "Games of the last",
         "days_n": "{n} days",
+        "days_n_one": "{n} day",
+        "days_within": "{n} days",
+        "days_within_one": "{n} day",
         "devices_none": "No boxes in this period's games.",
         "col_battery": "Battery",
         "col_link": "Radio",
@@ -1135,10 +1163,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "e_until_invalid": "Invalid date.",
         "e_atak_relay_off": "This server's ATAK relay is off.",
         "e_positions_not_allowed": "Only an account with the GM or marshal role on this field may see positions.",
-        "e_holder_has_no_role": "That account has no role on this field.",
+        "e_holder_has_no_role": "That account does not exist or has no role on this field.",
         "e_positions_need_gm_or_marshal": "Only someone with the GM or marshal role on this field may issue a "
                                           "certificate that sees positions.",
-        "e_holder_not_found": "No account has that name.",
         "e_certificate_not_found": "Certificate not found.",
         "e_invalid_request": "Invalid request.",
         # The schedule, a game's registrations and its roster (Phase 4 follow-up FU6)
@@ -1327,6 +1354,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "rep_make": "Make and model (optional)",
         "rep_registry": "from the registrant's registry",
         "rep_limit": "At most {n} replicas.",
+        "rep_limit_one": "At most {n} replica.",
         "rep_not_asked": "This game does not ask for declared replicas.",
         "io_title": "Export and import",
         "io_export_intro": "The list's CSV file carries the registrants' personal data: keep it only as long as the game needs it and delete it afterwards. Each export is in the audit log, without names.",
@@ -1343,10 +1371,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "io_dry": "Check done: nothing was saved.",
         "io_done": "Import done.",
         "io_counts": "{rows} rows: {created} new, {updated} changed, {unchanged} the same, {skipped} skipped, {refused} refused.",
+        "io_counts_one": "{rows} row: new {created}, changed {updated}, the same {unchanged}, skipped {skipped}, refused {refused}.",
         "io_missing": "Registrations from this source that are not in the file (they are not withdrawn): {n}.",
         "io_ignored": "Columns not imported: {names}.",
         "io_issues": "Rows that need attention",
         "io_more": "And {n} more rows.",
+        "io_more_one": "And {n} more row.",
         "io_locked": "A list is imported only into a published game that has not started.",
         "io_res_created": "new",
         "io_res_updated": "changed",
@@ -1440,6 +1470,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "acct_confirm_password": "Current password",
         "acct_confirm_password_hint": "The changes below ask for the current password. Type it here before making them.",
         "acct_confirm_recent": "This account has no password: the changes ask for a confirmation made in the last 10 minutes (logging in counts too). Confirm with one of the ways below, then repeat the action.",
+        "acct_stepup_needed": "This account has a second factor (TOTP or a passkey) or a staff role: changing how it logs in (passkeys, TOTP, password, linked accounts, merging accounts) asks for the TOTP code or the passkey first. A Google, Microsoft or Apple login is not enough.",
         "acct_confirm_with": "Confirm with {provider}",
         "acct_confirmed": "Confirmed. Repeat the action.",
         "acct_reauthed": "Confirmed with the provider. Repeat the action.",
@@ -1484,8 +1515,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "acct_pw_removed": "Password removed.",
         "oidc_err_name_unusable": "The provider's name does not make a username. Type one yourself.",
         "acct_e_name_not_offered": "This account can only use the name from the provider it was made with (Google or Microsoft).",
+        "acct_e_app_challenge_not_for_browser": "This page needs no verifier: only the app uses one. Reload the page and try again.",
+        "acct_e_app_challenge_required": "This app is too old to sign in with Google, Microsoft or Apple at this field. Update the app.",
         "acct_e_merge_ticket_invalid": "The merge request expired or was already used. Link the login again.",
         "acct_e_merge_staff_account": "That other account has a staff role (admin, GM or marshal) and cannot be merged here. Ask the field's administrator.",
+        "acct_e_merge_passkeys_into_staff": "The other account has passkeys and this account has a staff role: they are not brought across. Remove the other account's passkeys and try again, or keep the accounts apart.",
+        "acct_e_mfa_required": "This action asks for a second factor (TOTP or a passkey): confirm with the code or the passkey in the confirmation panel above, then repeat it.",
         "acct_e_merge_provider_conflict": "Both accounts already have a login from the same provider. Unlink one of them in one account and try again.",
         "acct_e_merge_too_many_passkeys": "The two accounts together hold too many passkeys. Remove some and try again.",
         "acct_e_username_invalid": "Invalid username: 3 to 64 characters, lower-case letters without accents, digits, dot, hyphen or underscore, starting with a letter or digit.",
@@ -1505,7 +1540,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "acct_username_saved": "Username saved.",
         "acct_merge_title": "Merge accounts",
         "acct_merge_text": "This {provider} login belongs to another account ({name}). Merge that account into this one? Its logins, passkeys, roles, registrations and the rest move to this account; the other account stops existing.",
-        "acct_merge_moves": "Moving to this account: logins ({logins}) and {n} passkey(s).",
+        "acct_merge_moves": "Moving to this account: logins ({logins}) and {n} passkeys.",
+        "acct_merge_moves_one": "Moving to this account: logins ({logins}) and {n} passkey.",
         "acct_merge_pw_dropped": "The other account's password is discarded; this account keeps its own.",
         "acct_merge_pw_not_carried": "The other account has a password, but it is not carried over: this account stays without a password.",
         "acct_merge_go": "Merge the other account into this one",
@@ -1620,9 +1656,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "login_or": "Oder anmelden mit",
         "login_with": "Weiter mit {provider}",
         "login_passkey": "Mit Passkey anmelden",
-        "login_consent": "Bei der ersten Anmeldung stimme ich zu, dass ein neues Konto angelegt wird (gespeichert "
-                         "wird nur die Kennung des Anbieters; der Name beim Anbieter wird nur gelesen, wenn du darum "
-                         "bittest, und nicht gespeichert; siehe die Datenschutzerklärung des Feldes).",
+        "login_new_intro": "Neu hier? Um beim ersten Anmelden mit einem Anbieter ein Konto anzulegen, bestätige Folgendes. Gespeichert wird nur die Kennung, die der Anbieter liefert; sein Name wird nur gelesen, wenn du es verlangst, und nicht gespeichert.",
+        "login_notice_seen": "Ich habe den Datenschutzhinweis des Spielfelds gelesen.",
+        "login_notice_read": "Hinweis lesen",
+        "login_age": "Ich bin 16 Jahre alt oder älter. Jüngere Spielende checken am Spielfeld ohne Konto ein, nach den Regeln des Spielfelds für Eltern oder Erziehungsberechtigte.",
         "login_social_working": "Die Seite des Anbieters wird geöffnet …",
         "passkey_cancelled": "Der Passkey wurde nicht verwendet (Anfrage abgebrochen oder abgelaufen).",
         "passkey_failed": "Die Anmeldung mit dem Passkey hat nicht geklappt.",
@@ -1630,8 +1667,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "oidc_err_state_invalid": "Diese Anmeldeanfrage ist abgelaufen oder stammt nicht aus diesem Browser. Versuch "
                                   "es noch einmal.",
         "oidc_err_denied": "Die Anmeldung wurde beim Anbieter abgelehnt.",
-        "oidc_err_consent_required": "Um ein neues Konto anzulegen, setze das Häkchen im Feld direkt darunter (unter den Anbieter-Schaltflächen) und wähle den Anbieter dann noch einmal.",
-        "oidc_err_notice_version_changed": "Der Datenschutzhinweis hat sich inzwischen geändert. Das Häkchen wurde entfernt: Lies den aktuellen Hinweis, setze das Häkchen erneut und wähle den Anbieter noch einmal.",
+        "oidc_err_notice_required": "Um ein neues Konto anzulegen, setze zuerst das Häkchen, dass du den Datenschutzhinweis gelesen hast (Feld direkt darunter, unter den Anbieter-Schaltflächen), und wähle den Anbieter dann noch einmal.",
+        "oidc_err_age_confirmation_required": "Für ein Konto musst du mindestens 16 Jahre alt sein. Jüngere Spielende checken am Spielfeld ohne Konto ein, nach den Regeln des Spielfelds für Eltern oder Erziehungsberechtigte. Wenn du 16 oder älter bist, setze das Häkchen für das Alter (direkt darunter) und wähle den Anbieter noch einmal.",
+        "oidc_err_notice_version_changed": "Der Datenschutzhinweis hat sich inzwischen geändert. Das Häkchen beim Hinweis wurde entfernt: Lies den aktuellen Hinweis, setze das Häkchen erneut und wähle den Anbieter noch einmal.",
         "oidc_err_too_many_attempts": "Zu viele neue Konten von dieser Adresse. Versuch es später noch einmal.",
         "oidc_err_quota_exceeded": "Dieses Spielfeld hat seine Höchstzahl an Konten erreicht. Wende dich an das Team des Spielfelds.",
         "oidc_err_id_token_invalid": "Die Antwort des Anbieters wurde nicht akzeptiert. Versuch es noch einmal.",
@@ -1740,7 +1778,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "check_ok": "Keine Fehler. Der Kern hat das Szenario geladen.",
         "check_ok_no_core": "Keine Fehler im Manifest, aber der Kern ist auf diesem Server nicht verfügbar: Speichern "
                             "wird fehlschlagen.",
-        "check_errors": "{n} Problem(e) zu beheben.",
+        "check_errors": "{n} Probleme zu beheben.",
+        "check_errors_one": "{n} Problem zu beheben.",
         "check_saved_revision": "Dieses Szenario ist schon in der Bibliothek, in Revision {n}.",
         "problem_level_error": "Fehler",
         "problem_level_warning": "Warnung",
@@ -1769,6 +1808,9 @@ STRINGS: dict[str, dict[str, str]] = {
                          "unter {pct} %; still: in einem laufenden Spiel seit mehr als {s} s nichts von ihr gehört.",
         "devices_days": "Spiele der letzten",
         "days_n": "{n} Tage",
+        "days_n_one": "{n} Tag",
+        "days_within": "{n} Tagen",
+        "days_within_one": "{n} Tag",
         "devices_none": "Keine Boxen in den Spielen dieses Zeitraums.",
         "col_battery": "Akku",
         "col_link": "Funk",
@@ -1905,10 +1947,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "e_atak_relay_off": "Das ATAK-Relay dieses Servers ist aus.",
         "e_positions_not_allowed": "Nur ein Konto mit der Rolle GM oder Marshal auf diesem Spielfeld darf Positionen "
                                    "sehen.",
-        "e_holder_has_no_role": "Dieses Konto hat auf diesem Spielfeld keine Rolle.",
+        "e_holder_has_no_role": "Dieses Konto existiert nicht oder hat auf diesem Spielfeld keine Rolle.",
         "e_positions_need_gm_or_marshal": "Nur wer auf diesem Spielfeld die Rolle GM oder Marshal hat, darf ein "
                                           "Zertifikat ausstellen, das Positionen sieht.",
-        "e_holder_not_found": "Kein Konto hat diesen Namen.",
         "e_certificate_not_found": "Zertifikat nicht gefunden.",
         "e_invalid_request": "Ungültige Anfrage.",
         # The schedule, a game's registrations and its roster (Phase 4 follow-up FU6)
@@ -2097,6 +2138,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "rep_make": "Hersteller und Modell (optional)",
         "rep_registry": "aus dem Register der angemeldeten Person",
         "rep_limit": "Höchstens {n} Repliken.",
+        "rep_limit_one": "Höchstens {n} Replik.",
         "rep_not_asked": "Dieses Spiel fragt keine Repliken ab.",
         "io_title": "Exportieren und importieren",
         "io_export_intro": "Die CSV-Datei der Liste enthält personenbezogene Daten der Angemeldeten: Nur so lange aufbewahren, wie das Spiel sie braucht, und danach löschen. Jeder Export steht im Audit-Protokoll, ohne Namen.",
@@ -2113,10 +2155,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "io_dry": "Prüfung fertig: Nichts wurde gespeichert.",
         "io_done": "Import fertig.",
         "io_counts": "{rows} Zeilen: {created} neu, {updated} geändert, {unchanged} gleich, {skipped} übersprungen, {refused} abgelehnt.",
+        "io_counts_one": "{rows} Zeile: neu {created}, geändert {updated}, gleich {unchanged}, übersprungen {skipped}, abgelehnt {refused}.",
         "io_missing": "Anmeldungen dieser Quelle, die nicht in der Datei stehen (sie werden nicht zurückgezogen): {n}.",
         "io_ignored": "Nicht importierte Spalten: {names}.",
         "io_issues": "Zeilen, die Aufmerksamkeit brauchen",
         "io_more": "Und {n} weitere Zeilen.",
+        "io_more_one": "Und {n} weitere Zeile.",
         "io_locked": "Eine Liste lässt sich nur in ein veröffentlichtes Spiel importieren, das noch nicht begonnen hat.",
         "io_res_created": "neu",
         "io_res_updated": "geändert",
@@ -2210,6 +2254,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "acct_confirm_password": "Aktuelles Passwort",
         "acct_confirm_password_hint": "Die Änderungen unten verlangen das aktuelle Passwort. Gib es hier ein, bevor du sie machst.",
         "acct_confirm_recent": "Dieses Konto hat kein Passwort: Die Änderungen verlangen eine Bestätigung aus den letzten 10 Minuten (auch eine Anmeldung zählt). Bestätige auf einem der Wege unten und wiederhole dann die Aktion.",
+        "acct_stepup_needed": "Dieses Konto hat einen zweiten Faktor (TOTP oder Passkey) oder eine Team-Rolle: Wer die Anmeldung ändern will (Passkeys, TOTP, Passwort, verknüpfte Konten, Konten zusammenführen), muss zuerst den TOTP-Code oder den Passkey angeben. Eine Anmeldung mit Google, Microsoft oder Apple reicht nicht.",
         "acct_confirm_with": "Mit {provider} bestätigen",
         "acct_confirmed": "Bestätigt. Wiederhole die Aktion.",
         "acct_reauthed": "Beim Anbieter bestätigt. Wiederhole die Aktion.",
@@ -2254,8 +2299,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "acct_pw_removed": "Passwort entfernt.",
         "oidc_err_name_unusable": "Aus dem Namen des Anbieters lässt sich kein Benutzername machen. Gib selbst einen ein.",
         "acct_e_name_not_offered": "Dieses Konto kann nur den Namen des Anbieters nutzen, mit dem es angelegt wurde (Google oder Microsoft).",
+        "acct_e_app_challenge_not_for_browser": "Diese Seite braucht keinen Verifizierer: nur die App nutzt einen. Seite neu laden und noch einmal versuchen.",
+        "acct_e_app_challenge_required": "Diese App ist zu alt, um sich auf diesem Spielfeld mit Google, Microsoft oder Apple anzumelden. Bitte die App aktualisieren.",
         "acct_e_merge_ticket_invalid": "Die Zusammenführung ist abgelaufen oder schon benutzt. Verknüpfe den Login noch einmal.",
         "acct_e_merge_staff_account": "Das andere Konto hat eine Team-Rolle (Admin, Spielleitung oder Marshal) und lässt sich hier nicht zusammenführen. Wende dich an die Administration des Geländes.",
+        "acct_e_merge_passkeys_into_staff": "Das andere Konto hat Passkeys und dieses Konto hat eine Team-Rolle: Sie werden nicht übernommen. Entferne die Passkeys des anderen Kontos und versuche es erneut, oder lass die Konten getrennt.",
+        "acct_e_mfa_required": "Diese Aktion verlangt einen zweiten Faktor (TOTP oder Passkey): Bestätige im Bestätigungsfeld oben mit dem Code oder dem Passkey und wiederhole sie dann.",
         "acct_e_merge_provider_conflict": "Beide Konten haben schon einen Login desselben Anbieters. Löse einen davon in einem der Konten und versuche es erneut.",
         "acct_e_merge_too_many_passkeys": "Beide Konten zusammen haben zu viele Passkeys. Entferne einige und versuche es erneut.",
         "acct_e_username_invalid": "Ungültiger Benutzername: 3 bis 64 Zeichen, Kleinbuchstaben ohne Akzente, Ziffern, Punkt, Bindestrich oder Unterstrich, am Anfang ein Buchstabe oder eine Ziffer.",
@@ -2275,7 +2324,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "acct_username_saved": "Benutzername gespeichert.",
         "acct_merge_title": "Konten zusammenführen",
         "acct_merge_text": "Dieser {provider}-Login gehört zu einem anderen Konto ({name}). Dieses Konto in das aktuelle zusammenführen? Seine Logins, Passkeys, Rollen, Anmeldungen und alles Übrige wechseln in dieses Konto; das andere Konto gibt es danach nicht mehr.",
-        "acct_merge_moves": "Wechseln in dieses Konto: Logins ({logins}) und {n} Passkey(s).",
+        "acct_merge_moves": "Wechseln in dieses Konto: Logins ({logins}) und {n} Passkeys.",
+        "acct_merge_moves_one": "Wechseln in dieses Konto: Logins ({logins}) und {n} Passkey.",
         "acct_merge_pw_dropped": "Das Passwort des anderen Kontos wird verworfen; dieses Konto behält seins.",
         "acct_merge_pw_not_carried": "Das andere Konto hat ein Passwort, es wird aber nicht übernommen: Dieses Konto bleibt ohne Passwort.",
         "acct_merge_go": "Das andere Konto in dieses zusammenführen",
@@ -2387,15 +2437,19 @@ STRINGS: dict[str, dict[str, str]] = {
         "login_or": "或使用以下方式登入",
         "login_with": "使用 {provider} 繼續",
         "login_passkey": "使用密碼金鑰登入",
-        "login_consent": "如果這是第一次登入，我同意建立新帳號（只會保存提供者給的識別碼；提供者的名稱只有在你要求時才會讀取，而且不會保存；請見場地的隱私權聲明）。",
+        "login_new_intro": "第一次來嗎？第一次用提供者登入並建立帳號時，請先確認下列事項。只會保存提供者給的識別碼；提供者的名稱只有在你要求時才會讀取，而且不會保存。",
+        "login_notice_seen": "我已閱讀場地的隱私權聲明。",
+        "login_notice_read": "閱讀聲明",
+        "login_age": "我已年滿 16 歲。未滿 16 歲的玩家不需要帳號，可在場地報到，並依場地對家長或監護人的規定辦理。",
         "login_social_working": "正在開啟提供者的頁面…",
         "passkey_cancelled": "沒有使用密碼金鑰（請求已取消或逾時）。",
         "passkey_failed": "無法使用密碼金鑰登入。",
         "passkey_none": "這個帳號沒有密碼金鑰。",
         "oidc_err_state_invalid": "這個登入請求已過期，或不是從這個瀏覽器發出的，請再試一次。",
         "oidc_err_denied": "提供者拒絕了這次登入。",
-        "oidc_err_consent_required": "要建立新帳號，請先勾選正下方（提供者按鈕下面）的同意框，然後再選一次提供者。",
-        "oidc_err_notice_version_changed": "隱私權聲明在這段時間內已更新。同意框已取消勾選：請閱讀目前的聲明，再次勾選同意框，然後重新選擇提供者。",
+        "oidc_err_notice_required": "要建立新帳號，請先勾選已閱讀隱私權聲明（正下方、提供者按鈕下面的框），然後再選一次提供者。",
+        "oidc_err_age_confirmation_required": "建立帳號需年滿 16 歲。未滿 16 歲的玩家不需要帳號，可在場地報到，並依場地對家長或監護人的規定辦理。如果你已年滿 16 歲，請勾選正下方的年齡框，然後再選一次提供者。",
+        "oidc_err_notice_version_changed": "隱私權聲明在這段時間內已更新。聲明的勾選框已取消勾選：請閱讀目前的聲明，再次勾選，然後重新選擇提供者。",
         "oidc_err_too_many_attempts": "這個位址建立的新帳號太多，請稍後再試。",
         "oidc_err_quota_exceeded": "這個場地的帳號數量已達上限，請聯絡場地的工作人員。",
         "oidc_err_id_token_invalid": "提供者的回應不被接受，請再試一次。",
@@ -2524,6 +2578,7 @@ STRINGS: dict[str, dict[str, str]] = {
                          "超過 {s} 秒沒有消息。",
         "devices_days": "遊戲範圍",
         "days_n": "最近 {n} 天",
+        "days_within": "{n} 天",
         "devices_none": "這段期間的遊戲中沒有盒子。",
         "col_battery": "電量",
         "col_link": "無線電",
@@ -2651,9 +2706,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "e_until_invalid": "無效的日期。",
         "e_atak_relay_off": "這台伺服器的 ATAK 中繼已關閉。",
         "e_positions_not_allowed": "只有在這個場地擁有 GM 或裁判角色的帳號，才能查看位置。",
-        "e_holder_has_no_role": "那個帳號在這個場地沒有任何角色。",
+        "e_holder_has_no_role": "那個帳號不存在，或在這個場地沒有任何角色。",
         "e_positions_need_gm_or_marshal": "只有在這個場地擁有 GM 或裁判角色的人，才能核發可查看位置的憑證。",
-        "e_holder_not_found": "沒有使用這個名稱的帳號。",
         "e_certificate_not_found": "找不到憑證。",
         "e_invalid_request": "無效的請求。",
         # The schedule, a game's registrations and its roster (Phase 4 follow-up FU6)
@@ -2954,6 +3008,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "acct_confirm_password": "目前的密碼",
         "acct_confirm_password_hint": "下面的變更需要目前的密碼。請先在這裡輸入。",
         "acct_confirm_recent": "這個帳號沒有密碼：變更需要最近 10 分鐘內完成的確認（登入也算）。請用下面其中一種方式確認，再重做一次。",
+        "acct_stepup_needed": "這個帳號有第二重驗證（TOTP 或密碼金鑰）或工作人員角色：要更改登入方式（密碼金鑰、TOTP、密碼、已連結的帳號、合併帳號），必須先輸入 TOTP 驗證碼或使用密碼金鑰。只用 Google、Microsoft 或 Apple 登入是不夠的。",
         "acct_confirm_with": "用 {provider} 確認",
         "acct_confirmed": "已確認。請重做一次。",
         "acct_reauthed": "已透過提供者確認。請重做一次。",
@@ -2998,8 +3053,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "acct_pw_removed": "已移除密碼。",
         "oidc_err_name_unusable": "無法從提供者的名稱產生使用者名稱，請自行輸入。",
         "acct_e_name_not_offered": "這個帳號只能使用建立它時所用提供者（Google 或 Microsoft）的名稱。",
+        "acct_e_app_challenge_not_for_browser": "這個頁面不需要驗證碼：只有應用程式會用到。請重新載入頁面再試一次。",
+        "acct_e_app_challenge_required": "這個應用程式版本太舊，無法在此場地使用 Google、Microsoft 或 Apple 登入。請更新應用程式。",
         "acct_e_merge_ticket_invalid": "合併請求已過期或已使用過，請重新連結該登入。",
         "acct_e_merge_staff_account": "另一個帳號有工作人員角色（管理員、GM 或裁判），無法在此合併。請洽場地的管理員。",
+        "acct_e_merge_passkeys_into_staff": "另一個帳號有密碼金鑰，而這個帳號有工作人員角色：密碼金鑰不會被帶過來。請先移除另一個帳號的密碼金鑰再試，或讓兩個帳號保持分開。",
+        "acct_e_mfa_required": "這個動作需要第二重驗證（TOTP 或密碼金鑰）：請在上方的確認區用驗證碼或密碼金鑰確認，再重做一次。沒有密碼也沒有第二重驗證的工作人員帳號，需要由伺服器管理員處理。",
         "acct_e_merge_provider_conflict": "兩個帳號都已有同一個提供者的登入。請先在其中一個帳號解除連結，再試一次。",
         "acct_e_merge_too_many_passkeys": "兩個帳號合計的通行金鑰太多。請先移除一些，再試一次。",
         "acct_e_username_invalid": "使用者名稱無效：3 到 64 個字元，無重音符號的小寫字母、數字、句點、連字號或底線，且以字母或數字開頭。",
@@ -3073,10 +3132,11 @@ STRINGS: dict[str, dict[str, str]] = {
 # The texts of the pages for roles, sync keys, branding and clubs, platform links, the firmware catalogue and server
 # administration (FU9) are in their own module; every key is new (a clash would silently change another page's text).
 from .staff_i18n_admin import BY_LANGUAGE as _ADMIN  # noqa: E402
+from .staff_i18n_chrono import BY_LANGUAGE as _CHRONO  # noqa: E402  (the chrono violations page, PRIV-2)
 from .staff_i18n_data import BY_LANGUAGE as _DATA  # noqa: E402  (the data export and quota page, PKC-1)
 from .staff_i18n_settings import BY_LANGUAGE as _SETTINGS  # noqa: E402  (the field's settings page, FS-*)
 
-for _more in (_ADMIN, _DATA, _SETTINGS):
+for _more in (_ADMIN, _CHRONO, _DATA, _SETTINGS):
     for _lang, _texts in _more.items():
         _clash = set(STRINGS[_lang]) & set(_texts)
         assert not _clash, sorted(_clash)
@@ -3193,7 +3253,7 @@ for _lang, _texts in _MEMBERSHIP.items():
     assert not _clash, sorted(_clash)
     STRINGS[_lang].update(_texts)
 
-# The "consent again" panel of the privacy notice (CONS-*); every key is new, as above.
+# The "notice shown again" panel of the privacy notice (CONS-*, LEG-*); every key is new, as above.
 from .consent_i18n import STAFF as _CONSENT  # noqa: E402
 
 for _lang, _texts in _CONSENT.items():
@@ -3201,29 +3261,68 @@ for _lang, _texts in _CONSENT.items():
     assert not _clash, sorted(_clash)
     STRINGS[_lang].update(_texts)
 
+# HLC-*: the page for the hub link code (``/staff/account/hub-share``); every key is new.
+from .staff_i18n_hub import STAFF as _HUB  # noqa: E402
+
+for _lang, _texts in _HUB.items():
+    _clash = set(STRINGS[_lang]) & set(_texts)
+    assert not _clash, sorted(_clash)
+    STRINGS[_lang].update(_texts)
+
 # SVX-1: the remote ATAK page says when a certificate is near expiry. Every key is new.
 _ATAK_EXPIRY: dict[str, dict[str, str]] = {
     "pt": {
-        "atak_expiring": "Atenção: {n} certificado(s) expiram em {days} dias ou menos: {devices}. Emitir um novo "
+        "atak_expiring": "Atenção: {n} certificados expiram em {days} ou menos: {devices}. Emitir um novo "
                          "certificado para o dispositivo e revogar o antigo.",
+        "atak_expiring_one": "Atenção: {n} certificado expira em {days} ou menos: {devices}. Emitir um novo "
+                             "certificado para o dispositivo e revogar o antigo.",
         "atak_expiring_short": "expira em breve",
     },
     "en": {
-        "atak_expiring": "Attention: {n} certificate(s) expire within {days} days: {devices}. Issue a new "
+        "atak_expiring": "Attention: {n} certificates expire within {days}: {devices}. Issue a new "
                          "certificate for the device and revoke the old one.",
+        "atak_expiring_one": "Attention: {n} certificate expires within {days}: {devices}. Issue a new "
+                             "certificate for the device and revoke the old one.",
         "atak_expiring_short": "expires soon",
     },
     "de": {
-        "atak_expiring": "Achtung: {n} Zertifikat(e) laufen innerhalb von {days} Tagen ab: {devices}. Stelle für das "
+        "atak_expiring": "Achtung: {n} Zertifikate laufen innerhalb von {days} ab: {devices}. Stelle für das "
                          "Gerät ein neues Zertifikat aus und widerrufe das alte.",
+        "atak_expiring_one": "Achtung: {n} Zertifikat läuft innerhalb von {days} ab: {devices}. Stelle für das "
+                             "Gerät ein neues Zertifikat aus und widerrufe das alte.",
         "atak_expiring_short": "läuft bald ab",
     },
     "zh-tw": {
-        "atak_expiring": "注意：有 {n} 張憑證將在 {days} 天內到期：{devices}。請為該裝置簽發新憑證，並撤銷舊的。",
+        "atak_expiring": "注意：有 {n} 張憑證將在 {days}內到期：{devices}。請為該裝置簽發新憑證，並撤銷舊的。",
         "atak_expiring_short": "即將到期",
     },
 }
 for _lang, _texts in _ATAK_EXPIRY.items():
+    _clash = set(STRINGS[_lang]) & set(_texts)
+    assert not _clash, sorted(_clash)
+    STRINGS[_lang].update(_texts)
+
+
+# LIVE-2: a server with no published privacy notice makes no new accounts; every key is new.
+_NO_NOTICE: dict[str, dict[str, str]] = {
+    "pt": {
+        "acct_inactivity": "Esta conta esteve inativa muito tempo e ia ser anonimizada a {when}. Como voltaste, fica: a marca desaparece na próxima verificação diária.",
+        "oidc_err_privacy_notice_unpublished": "Este servidor ainda não publicou o seu aviso de privacidade, por isso não cria contas novas. Quem já tem conta entra como sempre. Avisar quem gere o servidor.",
+    },
+    "en": {
+        "acct_inactivity": "This account had been inactive for a long time and was due to be anonymised on {when}. Since you are back, it stays: the notice clears at the next daily check.",
+        "oidc_err_privacy_notice_unpublished": "This server has not published its privacy notice yet, so it is not making new accounts. Existing accounts log in as always. Tell whoever runs the server.",
+    },
+    "de": {
+        "acct_inactivity": "Dieses Konto war lange inaktiv und sollte am {when} anonymisiert werden. Da du zurück bist, bleibt es: Der Hinweis verschwindet bei der nächsten täglichen Prüfung.",
+        "oidc_err_privacy_notice_unpublished": "Dieser Server hat seine Datenschutzerklärung noch nicht veröffentlicht und legt deshalb keine neuen Konten an. Bestehende Konten melden sich wie gewohnt an. Sag es den Betreibenden des Servers.",
+    },
+    "zh-tw": {
+        "acct_inactivity": "這個帳號長時間沒有使用，原本會在 {when} 匿名化。你回來了，所以帳號會保留：這則提醒會在下次每日檢查時消失。",
+        "oidc_err_privacy_notice_unpublished": "這台伺服器尚未公布隱私權聲明，因此暫不建立新帳號。已有帳號仍可登入。請通知管理這台伺服器的人。",
+    },
+}
+for _lang, _texts in _NO_NOTICE.items():
     _clash = set(STRINGS[_lang]) & set(_texts)
     assert not _clash, sorted(_clash)
     STRINGS[_lang].update(_texts)

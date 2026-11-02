@@ -65,8 +65,10 @@ P4-6):
 
 | Template | What it is |
 | --- | --- |
-| [`templates/privacy-notice-pt.md`](templates/privacy-notice-pt.md), [`templates/privacy-notice-en.md`](templates/privacy-notice-en.md) | The field's privacy notice (first full draft, not yet reviewed by a lawyer), in Portuguese and English, with a short in-app notice for account creation and a short check-in poster notice (the field controller's own default check-in notice is in `controller/templates/`) |
-| [`templates/dpa-template.md`](templates/dpa-template.md) | A data processing agreement for a hosted site server (GDPR Art. 28) |
+| [`templates/privacy-notice-pt.md`](templates/privacy-notice-pt.md), [`templates/privacy-notice-en.md`](templates/privacy-notice-en.md) | The field's privacy notice (a template with the legal positions approved on 2026-10-30; a few points still open, listed in its Part D), in Portuguese and English, with a short in-app notice for account creation and a short check-in poster notice (the field controller's own default check-in notice is in `controller/templates/`) |
+| [`templates/dpia-template.md`](templates/dpia-template.md), [`templates/dpia-template-pt.md`](templates/dpia-template-pt.md) | A data protection impact assessment (GDPR Art. 35) for the field to adopt: the violations register and bans, cross-field sharing, live positions, with the legitimate interest assessment, in English and Portuguese |
+| [`templates/dpa-template.md`](templates/dpa-template.md), [`templates/dpa-template-pt.md`](templates/dpa-template-pt.md) | A data processing agreement for a hosted site server (GDPR Art. 28), in English and pt-PT: the field is the controller, the hub operator the processor, EU/EEA data centres only |
+| [`templates/sharing-terms.md`](templates/sharing-terms.md), [`templates/sharing-terms-pt.md`](templates/sharing-terms-pt.md) | The Art. 26 terms between the fields that share chrono readings across fields; a field accepts them in the software before it switches sharing on (the version, date and account are recorded) |
 
 ## Decisions to review
 
@@ -101,5 +103,7 @@ Each implementation phase has its own folder with `RESEARCH.md`, `ADR.md`,
 | [`runbooks/radio-field-test.md`](runbooks/radio-field-test.md) | Runbook for the radio field test (decision SL-18): the boxes' once-a-minute `radio_stats` line, `tools/bench_radio_log.py`, the bench with one box, the field with 5 and 10, and what the model predicts |
 | [`runbooks/lbt-bench-gate.md`](runbooks/lbt-bench-gate.md) | Runbook for the listen-before-talk bench gate (decision SL-25): two Heltec V4.3 boards, the bench image, `@lbt tx` and `@lbt probe`, flashing both and putting the modem back, reading `tools/bench_lbt_gate.py`'s PASS or FAIL |
 | [`runbooks/box-beacon-bench.md`](runbooks/box-beacon-bench.md) | Runbook for the Field Box as an iBeacon on the bench (decisions BBC-1 to BBC-12): the Bluetooth stack's memory, nRF Connect and the app against the box, when it advertises, the console's registration, the join's key 19, the hit rate and the LoRa coexistence check |
+| [`runbooks/epoch-recovery-bench.md`](runbooks/epoch-recovery-bench.md) | Runbook for a node that lost its epoch store, on real boards (decisions SR-110 to SR-119, EP-1 to EP-12; RFC 0001 Amendments 24 and 25): the deep search, a second loss drawing above the first, both records lost, the Pi's records, a former leader joined again, a prop's pod told over Wi-Fi; the bench build's `@epochwipe` |
 | [`runbooks/preview-server.md`](runbooks/preview-server.md) | Runbook for the preview server at tests.atalaia-project.link: start, stop, reset, update, backup, logs, rotating secrets, taking it down |
+| [`runbooks/pentest-stack.md`](runbooks/pentest-stack.md) | Runbook for the disposable pentest stack (`tools/pentest_stack.py`): a hosted hub with two fields, a fake social-login provider, throwaway accounts of every role and a linked field controller, all on 127.0.0.1; up, status, reset, destroy |
 | [`../firmware/esp32/docs/WOKWI.md`](../firmware/esp32/docs/WOKWI.md) | Running the Field Box firmware in the Wokwi emulator, without hardware |

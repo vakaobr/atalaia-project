@@ -9,15 +9,23 @@
 -- how many satellites its holder has (the mode command "status"), so the
 -- master shows them; a box that was never told is a satellite, or a box
 -- picked from its own preset list, and shows only who holds it.
+-- The controller also tells each box what it is (the mode command "role": master or
+-- satellite) as soon as the game runs, so even a free box says which it is; a box never told
+-- shows the plain "zone" wording.
 -- Screens (assets/screens/): neutral, captured, master_status; final_score at
 -- the end (the Field Box's built-in screen).
 
 local s = state.node { owner = nil, since = 0 }
-local master = nil -- the last status from the controller: { held, of, points }
+local master = nil -- the last status from the controller: { held, of, points, total }
+local role = nil -- "master" or "satellite", from the controller; nil until told
+local over = false
 
 local function show()
+  if over then
+    return
+  end
   if s.owner == nil then
-    ui.screen("neutral", {})
+    ui.screen("neutral", { role = role })
   elseif master then
     ui.screen("master_status", {
       team = s.owner,
@@ -25,9 +33,10 @@ local function show()
       held = master.held,
       of = master.of,
       points = master.points,
+      total = master.total,
     })
   else
-    ui.screen("captured", { team = s.owner, since = s.since })
+    ui.screen("captured", { team = s.owner, since = s.since, role = role })
   end
 end
 
@@ -40,12 +49,15 @@ local function capture(team, squad)
   if master then
     -- A new holder of the master starts with no satellites (they are freed);
     -- the controller's next status confirms it.
-    master.held, master.points = 0, params.points_per_tick
+    master.held, master.points, master.total = 0, params.points_per_tick, nil
   end
   show()
 end
 
-on("game.start", show)
+on("game.start", function()
+  over = false
+  show()
+end)
 
 on("team_input.hold", function(e)
   if e.team ~= s.owner and e.ms >= params.capture_hold_ms then
@@ -70,8 +82,16 @@ on("cmd.set_owner", function(e)
   end
 end)
 
--- From field.lua, to the master box only: its holder's satellites and points per tick.
+-- From field.lua: "role" (every box: master or satellite) and "status" (the master box only: its
+-- holder's satellites, points per tick and the team's total).
 on("cmd.mode", function(e)
+  if e.name == "role" then
+    if (e.role == "master" or e.role == "satellite") and e.role ~= role then
+      role = e.role
+      show()
+    end
+    return
+  end
   if e.name ~= "status" or e.team ~= s.owner then
     return
   end
@@ -79,10 +99,12 @@ on("cmd.mode", function(e)
     held = math.tointeger(e.held) or 0,
     of = math.tointeger(e.of) or 0,
     points = math.tointeger(e.points) or 0,
+    total = math.tointeger(e.total),
   }
   show()
 end)
 
 on("game.end", function()
+  over = true
   ui.screen("final_score", { owner = s.owner })
 end)

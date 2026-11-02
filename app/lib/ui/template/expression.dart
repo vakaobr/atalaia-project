@@ -21,8 +21,9 @@
 /// Division by zero gives 0. Text filters: |clock, |upper, |int.
 ///
 /// Two limits are kept from the C code because they change results: the
-/// strings one expression reads share 256 bytes, and a text is cut at 159
-/// bytes. Where the C code would cut a multi-byte UTF-8 character in two,
+/// 'text' literals of one expression share 256 bytes (the load-time check
+/// refuses more; decision TPL-1) and the strings it reads from the data share
+/// 160 (cut, or "?" when none is left), and a text is cut at 159 bytes. Where the C code would cut a multi-byte UTF-8 character in two,
 /// this code drops the whole character instead.
 library;
 
@@ -33,7 +34,41 @@ import 'dart:typed_data';
 /// ATALAIA_TPL_TEXT_MAX: a widget's text after interpolation, NUL included.
 const int templateTextMax = 160;
 
-const int _scratchSize = 256;
+/// ATALAIA_TPL_LITERALS_MAX: the bytes all the 'text' literals of one
+/// expression take, each its length + 1, whether or not it is reached.
+const int templateLiteralsMax = 256;
+
+/// ATALAIA_TPL_DATA_MAX: the bytes the strings read from the data share.
+const int templateDataMax = 160;
+
+/// Where a render reports an expression that failed anyway (it shows "?" for
+/// it), once per expression: atalaia_tpl_set_log. Null logs nothing.
+void Function(String message)? templateLogHook;
+
+final List<int> _logged = [];
+
+void _report(_Eval e, String expr) {
+  if (!e.error && !e.dataFull) return;
+  final bytes = utf8.encode(expr);
+  var h = 2166136261;
+  for (final b in bytes) {
+    h = ((h ^ b) * 16777619) & 0xffffffff;
+  }
+  h |= 1;
+  if (_logged.contains(h)) return;
+  if (_logged.length >= 8) _logged.removeAt(0);
+  _logged.add(h);
+  final hook = templateLogHook;
+  if (hook == null) return;
+  final shown = bytes.length > 48 ? _cutUtf8(expr, 48) : expr;
+  hook(
+    'screen expression {$shown}: '
+    '${e.error ? e.why : 'a data text did not fit the scratch, shown cut or as ?'}',
+  );
+}
+
+/// Forgets which expressions were logged (atalaia_tpl_set_log resets it).
+void resetTemplateLog() => _logged.clear();
 
 /// What the expressions read: the screen's data (the second argument of
 /// ui.screen) and the game's parameters.
@@ -104,9 +139,13 @@ class _Eval {
   final Uint8List s;
   final TemplateScope? scope;
   var i = 0;
-  var used = 0; // bytes of the 256-byte scratch the strings took
+  var used = 0; // bytes of the data scratch the strings read took
+  var litsNeed = 0; // what all the literals take, counted past the limit
+  var litsOver = false;
+  var dataFull = false; // a data string was cut short or replaced by "?"
   var error = false;
   String why = '';
+  bool _litWhy = false; // why is the literal overflow, worded at the end
 
   int get len => s.length;
 
@@ -136,23 +175,50 @@ class _Eval {
     error = true;
   }
 
-  /// A decoded string takes its bytes plus one (the C code's NUL) of the
-  /// scratch; [cut] says whether a too-long string is cut (data) or refused.
-  TemplateValue keep(String text, {required bool cut}) {
-    final room = _scratchSize - used;
+  /// A 'text' literal takes its bytes plus one (the C code's NUL) of the
+  /// literals' 256, whether or not && or || reach it. Over the limit the
+  /// expression is an error, and parsing goes on so the total is known.
+  TemplateValue literal(String text) {
+    litsNeed += utf8.encode(text).length + 1;
+    if (litsNeed > templateLiteralsMax) {
+      litsOver = true;
+      if (!error) _litWhy = true;
+      fail('');
+      return TemplateValue.nil;
+    }
+    return TemplateValue.text(text);
+  }
+
+  /// A string read from the data takes its bytes plus one of the data
+  /// scratch; too long it is cut, with none left it reads "?".
+  TemplateValue keep(String text) {
+    final room = templateDataMax - used;
+    if (room < 2) {
+      dataFull = true;
+      return TemplateValue.text('?');
+    }
     final bytes = utf8.encode(text);
     if (bytes.length + 1 > room) {
-      if (!cut) {
-        fail('text too long');
-        return TemplateValue.nil;
-      }
-      if (room < 2) return TemplateValue.nil;
+      dataFull = true;
       text = _cutUtf8(text, room - 1);
       used += utf8.encode(text).length + 1;
       return TemplateValue.text(text);
     }
     used += bytes.length + 1;
     return TemplateValue.text(text);
+  }
+
+  /// Parses the whole expression; words the literal overflow.
+  TemplateValue run() {
+    final v = or(0);
+    skipWs();
+    if (i != len) fail('unexpected text after the expression');
+    if (litsOver && _litWhy) {
+      why =
+          "its 'texts' need $litsNeed bytes of $templateLiteralsMax "
+          '(each is its length + 1)';
+    }
+    return v;
   }
 
   TemplateValue lookup(String name) {
@@ -170,7 +236,7 @@ class _Eval {
       obj = obj[part];
     }
     return switch (obj) {
-      final String text => keep(_jsonText(text), cut: true),
+      final String text => keep(_jsonText(text)),
       true => TemplateValue.yes,
       false => TemplateValue.no,
       final num n => TemplateValue.number(n.toDouble()),
@@ -220,7 +286,7 @@ class _Eval {
       }
       final text = utf8.decode(s.sublist(a, i), allowMalformed: true);
       i++;
-      return keep(text, cut: false);
+      return literal(text);
     }
     if (isKeyChar(c, first: true)) {
       final a = i;
@@ -388,19 +454,31 @@ double _strtodPrefix(String text) {
 /// Returns nil on any error, as the C code does.
 TemplateValue evaluate(String expr, TemplateScope? scope) {
   final e = _Eval(Uint8List.fromList(utf8.encode(expr)), scope);
-  final v = e.or(0);
-  e.skipWs();
-  if (e.i != e.len) e.fail('unexpected text after the expression');
+  final v = e.run();
+  _report(e, expr);
   return e.error ? TemplateValue.nil : v;
 }
 
 /// Why [expr] is not a valid expression, or null (atalaia_tpl_expr_ok).
 String? expressionError(String expr) {
   final e = _Eval(Uint8List.fromList(utf8.encode(expr)), null);
-  e.or(0);
-  e.skipWs();
-  if (e.i != e.len) e.fail('unexpected text after the expression');
+  e.run();
   return e.error ? e.why : null;
+}
+
+/// How an error message repeats an expression: its first 40 bytes (cut at a
+/// character) and "..." when there is more, as the C check does.
+String expressionEcho(String expr) {
+  if (utf8.encode(expr).length <= 40) return expr;
+  return '${_cutUtf8(expr, 40)}...';
+}
+
+/// The bytes the 'text' literals of [expr] take, each its length + 1, all of
+/// them, counted past [templateLiteralsMax] (atalaia_tpl_expr_literal_bytes).
+int expressionLiteralBytes(String expr) {
+  final e = _Eval(Uint8List.fromList(utf8.encode(expr)), null);
+  e.run();
+  return e.litsNeed;
 }
 
 /// The text filters.
@@ -543,7 +621,11 @@ String interpolate(String? text, TemplateScope scope) {
     final inner = Uint8List.sublistView(src, i + 1, close);
     final (elen, filter) = splitFilter(inner);
     final expr = utf8.decode(inner.sublist(0, elen), allowMalformed: true);
-    out.add(utf8.encode(_show(evaluate(expr, scope), filter)));
+    final ev = _Eval(Uint8List.fromList(utf8.encode(expr)), scope);
+    final v = ev.run();
+    _report(ev, expr);
+    // An expression that failed shows "?", never a silent blank.
+    out.add(utf8.encode(ev.error ? '?' : _show(v, filter)));
     i = close;
   }
   final bytes = out.takeBytes();

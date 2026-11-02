@@ -9,8 +9,9 @@ else ``Accept-Language``, else the default), else in another language the versio
 client can tell); ``html`` is the same text rendered by the server (everything escaped), ``url`` the public page. 404
 ``privacy_notice_not_published`` when no file exists for the current version. The app shows it before an account is
 made (``POST /api/v1/auth/register`` takes ``notice_version`` so a notice that changed in between is refused with 409
-``notice_version_changed``), and to an account asked to consent again (``GET /api/v1/me``,
-``POST /api/v1/me/consents/account``).
+``notice_version_changed``), and again to an account that was last shown another version (``GET /api/v1/me``,
+``POST /api/v1/me/notice``). An account rests on the contract, not on consent (LEG-*): the notice is information
+(GDPR Art. 13), and what the server records is which version was shown.
 """
 
 from __future__ import annotations

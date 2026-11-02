@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "esp_log.h"
+#include "esp_random.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "sdkconfig.h"
@@ -58,6 +59,32 @@ static int esp_nvs_write_epochs(void *ctx, const uint8_t *buf, size_t len)
     if (err == ESP_OK) err = nvs_commit(nvs_h);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "nvs write epochs: %s", esp_err_to_name(err));
+        return -1;
+    }
+    return 0;
+}
+
+/* The epoch floor (decision EP-2): the highest epoch ever used with any key, its own u16 entry
+ * beside the blob, so that a loss of the blob alone does not take it. */
+static int esp_nvs_read_floor(void *ctx, uint16_t *floor)
+{
+    (void)ctx;
+    esp_err_t err = nvs_get_u16(nvs_h, "epfloor", floor);
+    if (err == ESP_ERR_NVS_NOT_FOUND) return -1;
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nvs read epfloor: %s", esp_err_to_name(err));
+        return -2;
+    }
+    return 0;
+}
+
+static int esp_nvs_write_floor(void *ctx, uint16_t floor)
+{
+    (void)ctx;
+    esp_err_t err = nvs_set_u16(nvs_h, "epfloor", floor);
+    if (err == ESP_OK) err = nvs_commit(nvs_h);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nvs write epfloor: %s", esp_err_to_name(err));
         return -1;
     }
     return 0;
@@ -109,6 +136,14 @@ static int esp_nvs_erase_key(void *ctx)
     return 0;
 }
 
+/* The hardware random generator (true random with the radio on, which a running box has). */
+static int esp_random_bytes(void *ctx, uint8_t *buf, size_t n)
+{
+    (void)ctx;
+    esp_fill_random(buf, n);
+    return 0;
+}
+
 static const atalaia_radio_nvs_ops_t esp_nvs_ops = {
     .read_legacy_epoch = esp_nvs_read_legacy_epoch,
     .read_epochs = esp_nvs_read_epochs,
@@ -116,6 +151,9 @@ static const atalaia_radio_nvs_ops_t esp_nvs_ops = {
     .read_key = esp_nvs_read_key,
     .write_key = esp_nvs_write_key,
     .erase_key = esp_nvs_erase_key,
+    .random_bytes = esp_random_bytes,
+    .read_floor = esp_nvs_read_floor,
+    .write_floor = esp_nvs_write_floor,
     .ctx = NULL,
 };
 
@@ -292,6 +330,20 @@ bool atalaia_nvs_encrypted(void)
 }
 
 /* ---- Public --------------------------------------------------------------- */
+
+bool atalaia_radio_nvs_esp_wipe_epochs(bool floor_too)
+{
+    const char *keys[] = {"epochs", "epoch", "epfloor"};
+    int n = floor_too ? 3 : 2;
+    for (int i = 0; i < n; i++) {
+        esp_err_t err = nvs_erase_key(nvs_h, keys[i]);
+        if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+            ESP_LOGE(TAG, "nvs erase %s: %s", keys[i], esp_err_to_name(err));
+            return false;
+        }
+    }
+    return nvs_commit(nvs_h) == ESP_OK;
+}
 
 const atalaia_radio_nvs_ops_t *atalaia_radio_nvs_esp_init(void)
 {

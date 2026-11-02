@@ -13,6 +13,16 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// A release signing setting: the environment first, then the Gradle property.
+fun releaseSetting(property: String, env: String): String? =
+    System.getenv("ATALAIA_RELEASE_$env")?.takeIf { it.isNotBlank() }
+        ?: (project.findProperty("atalaia.release.$property") as String?)?.takeIf { it.isNotBlank() }
+
+val releaseSigningFound =
+    listOf("storeFile" to "STORE_FILE", "storePassword" to "STORE_PASSWORD", "keyAlias" to "KEY_ALIAS",
+        "keyPassword" to "KEY_PASSWORD").all { (p, e) -> releaseSetting(p, e) != null }
+val releaseDebugSigned = (project.findProperty("atalaia.release.debugSigned") as String?) == "true"
+
 android {
     namespace = "org.atalaia.app"
     compileSdk = 36
@@ -37,6 +47,14 @@ android {
         // or a wildcard such as *.hub.example.pt. The default matches nothing.
         manifestPlaceholders["appLinkHost"] =
             (project.findProperty("atalaia.appLinkHost") as String?) ?: "app-links.invalid"
+        // The network policy (security review APP-3): cleartext HTTP only to the
+        // few console addresses in res/xml/network_security_config.xml, or, with
+        // -Patalaia.cleartextLan=true, to any address (the _lan file).
+        manifestPlaceholders["networkSecurityConfig"] =
+            if ((project.findProperty("atalaia.cleartextLan") as String?) == "true")
+                "network_security_config_lan"
+            else
+                "network_security_config"
 
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
@@ -56,13 +74,59 @@ android {
         }
     }
 
+    signingConfigs {
+        // The release key (security review APP-2). The key ceremony is the
+        // maintainer's: nothing here makes, stores or defaults a keystore. Read
+        // from the environment (ATALAIA_RELEASE_STORE_FILE, _STORE_PASSWORD,
+        // _KEY_ALIAS, _KEY_PASSWORD) or from Gradle properties
+        // (atalaia.release.storeFile, .storePassword, .keyAlias, .keyPassword,
+        // for example in ~/.gradle/gradle.properties, never in the repository).
+        if (releaseSigningFound) {
+            create("release") {
+                storeFile = file(releaseSetting("storeFile", "STORE_FILE")!!)
+                storePassword = releaseSetting("storePassword", "STORE_PASSWORD")
+                keyAlias = releaseSetting("keyAlias", "KEY_ALIAS")
+                keyPassword = releaseSetting("keyPassword", "KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // No release signing yet (plan phase G): release builds use the debug key.
-            signingConfig = signingConfigs.getByName("debug")
+            // Never the debug key by accident: a debug-signed release has no
+            // identity the site's assetlinks.json or a passkey's origin binding
+            // can rely on (the sha256 of the signing certificate is what they
+            // name). With no release keystore the build stops in
+            // checkReleaseSigning below, unless -Patalaia.release.debugSigned=true
+            // asks for a debug-signed build (CI smoke builds, a trial on a desk).
+            signingConfig =
+                if (releaseSigningFound) signingConfigs.getByName("release")
+                else if (releaseDebugSigned) signingConfigs.getByName("debug")
+                else null
         }
     }
 }
+
+// Stops a release build that has no release keystore (and did not ask for the
+// debug key) with a message that says what to set, rather than building an
+// unsigned or debug-signed APK nobody noticed. Debug builds never need it.
+val checkReleaseSigning by tasks.registering {
+    val found = releaseSigningFound
+    val debugSigned = releaseDebugSigned
+    doFirst {
+        if (!found && !debugSigned) {
+            throw GradleException(
+                "No release keystore: set ATALAIA_RELEASE_STORE_FILE, ATALAIA_RELEASE_STORE_PASSWORD, " +
+                    "ATALAIA_RELEASE_KEY_ALIAS and ATALAIA_RELEASE_KEY_PASSWORD (environment) or " +
+                    "atalaia.release.storeFile, .storePassword, .keyAlias and .keyPassword (Gradle " +
+                    "properties). For a build that is not for distribution, pass " +
+                    "-Patalaia.release.debugSigned=true to sign it with the debug key on purpose. " +
+                    "See app/README.md, \"Signing a release\"."
+            )
+        }
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkReleaseSigning) }
 
 kotlin {
     compilerOptions {

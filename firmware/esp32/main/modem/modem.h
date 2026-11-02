@@ -6,7 +6,7 @@
  * field controller (frames on a serial link) and the LoRa radio.
  *
  *   host --TX frame (header + plaintext)--> encrypt (AES-CCM) --> radio
- *   radio --packet--> dedupe, decrypt (epoch window) --RX frame--> host
+ *   radio --packet--> decrypt (epoch window), replay window --RX frame--> host
  *   host --FIELD_TX (a sealed field frame)--> radio, as it is, with or without a game
  *   radio --field frame (game 0, type 9)--> FIELD_RX --> host, as it is
  *
@@ -31,9 +31,7 @@
 #include "radio/radio_protocol.h"
 #include "radio/radio_region.h"
 
-#define MODEM_DEDUPE_SIZE      64
-#define MODEM_DEDUPE_EXPIRY_MS 30000
-#define MODEM_MAX_HOPS         3 /* ADR-P2-6: the configured maximum never exceeds 3 */
+#define MODEM_MAX_HOPS 3 /* ADR-P2-6: the configured maximum never exceeds 3 */
 
 typedef struct {
     /* Writes bytes to the serial link. Returns 0 on success. */
@@ -67,17 +65,10 @@ typedef struct {
 } modem_io_t;
 
 typedef struct {
-    uint16_t source;
-    uint32_t nonce_ctr; /* (epoch << 16) | seq */
-    uint32_t seen_ms;
-    bool used;
-} modem_dedupe_entry_t;
-
-typedef struct {
     uint32_t rx_ok;        /* packets forwarded to the host */
     uint32_t rx_dropped;   /* not ours, not configured, own echo */
     uint32_t rx_auth_fail; /* MIC failed for every epoch in the window */
-    uint32_t rx_dupes;     /* already forwarded (flood copies) */
+    uint32_t rx_dupes; /* authentic, but already forwarded (flood copies) or too old (replays) */
     uint32_t tx_ok;
     uint32_t tx_fail;
     uint32_t cmds;
@@ -109,7 +100,6 @@ typedef struct {
     uint32_t last_tx_nonce; /* highest (epoch << 16) | seq sent */
     bool measuring;         /* a MEASURE is running */
 
-    modem_dedupe_entry_t dedupe[MODEM_DEDUPE_SIZE];
     modem_counters_t count;
     uint32_t boot_ms;
     char lang[MODEM_LANG_MAX + 1];         /* the controller's SET_LANG ("" until it sends one) */

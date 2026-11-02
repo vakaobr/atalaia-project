@@ -124,7 +124,7 @@ class Field:
         self.bundle = build(c, core=CORE, load_core_lib=False)
         self.adoption = self.bundle.controller.adoption
         self.adoption.lister = lister
-        self.http = TestClient(self.bundle.app)
+        self.http = TestClient(self.bundle.app, base_url="https://testserver")  # tokens go over HTTPS (guard.py)
         self.http.__enter__()
 
     def close(self) -> None:

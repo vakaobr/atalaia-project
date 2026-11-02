@@ -42,8 +42,6 @@
 #include "time_sync.h"
 
 #define FIELD_LINK_OUTBOX      32
-#define FIELD_LINK_DEDUPE      64
-#define FIELD_LINK_DEDUPE_MS   30000
 #define FIELD_LINK_RELAYS      ATALAIA_RELAY_SLOTS /* 8 (was 4 before Amendment 13) */
 #define FIELD_LINK_STATE_MS    15000               /* default STATE interval */
 #define FIELD_LINK_AIRTIME_MS  40                  /* rough TIME airtime at SF7/BW125 */
@@ -62,6 +60,9 @@ enum {
     FIELD_CMD_REBOOT = 7,
     FIELD_CMD_MODE = 8,   /* a command for the mode script: cmd.mode, its params name it */
     FIELD_CMD_UPDATE = 9, /* a firmware update over Wi-Fi: params {"id", "version"} */
+    /* 10 is the I/O pod's settings (Amendment 17), taken by the pod's radio. */
+    FIELD_CMD_PEER_EPOCH =
+        11, /* a node's epoch, for the receivers: params {"src", "epoch"} (Amendment 24) */
 };
 
 /* Game states as TIME carries them. */
@@ -107,13 +108,6 @@ typedef struct {
 } field_link_pending_t;
 
 typedef struct {
-    uint16_t source;
-    uint16_t epoch;
-    uint16_t seq;
-    uint32_t seen_ms;
-} field_link_seen_t;
-
-typedef struct {
     uint8_t len;
     uint8_t pkt[RADIO_MAX_PKT_LEN];
 } field_link_relay_t;
@@ -121,6 +115,9 @@ typedef struct {
 typedef struct {
     uint32_t events_sent, retries, acked, expired;
     uint32_t rx_ok, rx_rejected, rx_duplicates, relayed;
+    uint32_t rx_replays; /* authentic but 64+ counters below the source's highest (SR-20) */
+    uint32_t cmds_stale, times_stale; /* a CMD or TIME older than one already applied (SR-21) */
+    uint32_t peer_epochs; /* nodes whose epoch a controller named, moving the table up (SR-110) */
     uint32_t relay_skipped, relay_cancelled, relay_no_slot; /* Amendment 13's rules at work */
     uint32_t cmds, times, states_sent, hellos_sent, tx_refused;
     /* Listen before talk (RFC 0001 Amendment 14), copied from the radio task's counters when the
@@ -140,8 +137,7 @@ typedef struct {
     field_link_pending_t outbox[FIELD_LINK_OUTBOX];
     bool backlog;          /* the log holds events the outbox had no room for */
     uint16_t next_log_seq; /* 1.. */
-    field_link_seen_t seen[FIELD_LINK_DEDUPE];
-    atalaia_relay_t relay;                        /* the rules and the slots state */
+    atalaia_relay_t relay; /* the rules and the slots state */
     field_link_relay_t relays[FIELD_LINK_RELAYS]; /* the packets, by slot */
     uint32_t rand_fallback;                       /* io.random == NULL */
 
@@ -157,6 +153,13 @@ typedef struct {
     uint8_t game_state; /* FIELD_GAME_*, from TIME and CMD */
     bool have_time;
     uint32_t controller_time_ms; /* game time of the last TIME, plus its airtime */
+    /* Freshness of what changes the game's state (RFC 0001 Amendment 23, SR-21): the nonce
+     * counter of the last game-state CMD applied and of the last TIME applied, per source (a new
+     * leader starts its own). One that is not above is refused: a recording of a CMD or TIME that
+     * this box never heard at the time passes the replay window, but not this. */
+    uint16_t cmd_source, time_source;
+    uint32_t cmd_ctr, time_ctr;
+    bool have_cmd_ctr, have_time_ctr;
     int8_t last_rssi;
     int32_t step_ms;  /* time-sync step still to apply (positive: jump ahead) */
     uint32_t hold_ms; /* local clock ahead by this much: hold game time until caught up */
@@ -203,8 +206,10 @@ void field_link_reset_sync(field_link_t *l);
 /* Number of events still waiting for an ACK (outbox and log backlog). */
 size_t field_link_pending(const field_link_t *l);
 
-/* Sends node.rebooted (critical) from the link itself (event seq 0, game time t_ms). */
-void field_link_send_rebooted(field_link_t *l, uint32_t t_ms);
+/* Sends node.rebooted (critical) from the link itself (event seq 0, game time t_ms). reason is
+ * why the box restarted, a word of reset_reason.h ("power", "panic", "watchdog", ...); NULL or
+ * empty sends "unknown". Only [0-9A-Za-z._+-] is kept, up to 15 characters. */
+void field_link_send_rebooted(field_link_t *l, uint32_t t_ms, const char *reason);
 
 /* Sends battery.low with the level in percent (telemetry: one packet, no ACK; event seq 0,
  * game time t_ms). */

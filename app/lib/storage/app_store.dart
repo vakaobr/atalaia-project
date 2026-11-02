@@ -6,10 +6,10 @@
 /// android:allowBackup is off so it is not copied to the cloud). The field
 /// join key, the marshal's private key, the read code, the controller's site
 /// API key, the player's per-field secrets and the site refresh tokens are not
-/// in their JSON files on Android: they are sealed with a key in the
-/// AndroidKeyStore (`secrets.enc`, secret_vault.dart, decisions PD6, PKA-4). Where
-/// there is no Keystore plugin (iOS) they stay in the file, protected by the
-/// app sandbox.
+/// in their JSON files: they are sealed (`secrets.enc`, secret_vault.dart,
+/// decisions PD6, PKA-4) with a key in the AndroidKeyStore on Android and in
+/// the Keychain on iOS (IOSK-1 to IOSK-6). Where there is no vault (the host,
+/// tests) they stay in the file.
 /// Writes go to a temporary file first, then replace the old one. Binary
 /// files (a field's logo and wallpaper, team crests: lib/branding/) are
 /// kept the same way under `blobs/`.
@@ -377,11 +377,12 @@ void _putSettingsSecrets(
 }
 
 class FileAppStore implements AppStore {
-  /// With a [vault] (Android's Keystore), the secrets in [_secretKeys] are
-  /// kept sealed in `secrets.enc`, never in `settings.json`; a plaintext
-  /// `settings.json` from an earlier version is migrated on the first load.
-  /// Without one, or where it is not available (iOS, tests), they stay in
-  /// `settings.json` as before.
+  /// With a [vault] (Android's Keystore, iOS's Keychain), the secrets in
+  /// [_secretKeys] are kept sealed in `secrets.enc`, never in `settings.json`;
+  /// a plaintext `settings.json` from an earlier version (on iOS, every
+  /// install before the Keychain vault) is migrated on the first load.
+  /// Without one, or where it is not available (the host, tests), they stay
+  /// in `settings.json` as before.
   FileAppStore(this.dir, {this.vault});
 
   final String dir;

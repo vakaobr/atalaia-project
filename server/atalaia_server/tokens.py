@@ -144,22 +144,26 @@ OIDC_TICKET_TTL_S = 60
 
 
 def make_oidc_ticket(keys: Keys, user_id: uuid.UUID, provider: str, now: Optional[float] = None,
-                     new_account: bool = False) -> str:
+                     new_account: bool = False, app_challenge: Optional[str] = None) -> str:
     """What a finished social login hands the browser (LG-1): a signed, one-minute, single-use ticket that
     ``POST /api/v1/auth/oidc/complete`` turns into a session. The session itself is made by that same-site
     call, so the refresh cookie is set by a request the site started, not by a redirect from the provider."""
     claims: dict[str, Any] = {"typ": "oidc", "sub": str(user_id), "prov": provider}
     if new_account:
         claims["new"] = True  # this login made the account: the pages offer the "choose your username" step (LG-10)
+    if app_challenge:
+        claims["acr"] = app_challenge  # the app's verifier hash (APP-4): /auth/oidc/complete wants the verifier
     token, _ = _encode(keys.oidc_ticket, claims, OIDC_TICKET_TTL_S, now)
     return token
 
 
-def read_oidc_ticket(keys: Keys, token: str) -> tuple[uuid.UUID, str, str, int, bool]:
-    """The user, the provider, the ``jti``, the expiry and whether it made the account, of a social login ticket."""
+def read_oidc_ticket(keys: Keys, token: str) -> tuple[uuid.UUID, str, str, int, bool, Optional[str]]:
+    """The user, the provider, the ``jti``, the expiry, whether it made the account and the app's verifier hash
+    (None for a browser's ticket), of a social login ticket."""
     claims = _decode(keys.oidc_ticket, token, "oidc")
     try:
-        return uuid.UUID(claims["sub"]), str(claims["prov"]), claims["jti"], int(claims["exp"]), claims.get("new") is True
+        return (uuid.UUID(claims["sub"]), str(claims["prov"]), claims["jti"], int(claims["exp"]),
+                claims.get("new") is True, str(claims["acr"]) if claims.get("acr") else None)
     except (KeyError, ValueError, TypeError):
         raise TokenError("malformed claims") from None
 
