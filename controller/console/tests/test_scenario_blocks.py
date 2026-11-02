@@ -24,6 +24,7 @@ import base64
 import hashlib
 import json
 import re
+import time
 import unittest
 
 from test_browser import CONTROLLER, GM, READ, REQUIRE, Field
@@ -45,6 +46,10 @@ SRC = CONTROLLER / "console" / "src"
 BUILDER = (SRC / "components" / "scenario-builder.js").read_text(encoding="utf-8")
 EXAMPLE = re.search(r"export const EXAMPLE = `(.*?)`;", BUILDER, re.S).group(1)
 EXAMPLE_ID = "org.club.bridge-and-vault"
+# How long a step may take to show (ms): generous, the merge queue runs this next to a dozen
+# other Docker jobs.
+WAIT_MS = 20_000
+FOCUSED = "() => [document.activeElement.tagName, document.activeElement.getAttribute('aria-label')]"
 
 
 def examples() -> list[tuple[str, str]]:
@@ -171,7 +176,42 @@ class ScenarioBlocksTests(unittest.TestCase):
         expect(editor).to_be_visible()
         editor.fill(value)
         editor.press("Enter")
-        expect(editor).to_have_count(0)
+        expect(editor).to_have_count(0, timeout=WAIT_MS)
+
+    def wait_until(self, page, test: str, arg=None, what: str = "") -> None:
+        """Waits until test (a JavaScript function of arg) is true in the page. Polled with
+        evaluate: page.wait_for_function compiles a string in the page, which the console's
+        Content-Security-Policy (no 'unsafe-eval') refuses."""
+        deadline = time.monotonic() + WAIT_MS / 1000
+        while not page.evaluate(test, arg):
+            if time.monotonic() > deadline:
+                self.fail(f"not within {WAIT_MS} ms: {what or test}; the focus is on "
+                          + repr(page.evaluate(FOCUSED)))
+            page.wait_for_timeout(50)
+
+    def key(self, page, key: str) -> None:
+        """Presses a key, then lets two animation frames pass. Blockly does part of a key's work in
+        the next frame: focusing a block brings it to the front there, and that moves the block's
+        SVG siblings, a field among them, so a field focused before that frame loses the focus to
+        the page (CKF-3). Requested after Blockly's, these frames come after its work."""
+        page.keyboard.press(key)
+        page.evaluate("() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))")
+
+    def wait_focus(self, page, test: str) -> None:
+        """Waits until the focused element passes test (a JavaScript function of it): Blockly
+        moves the focus a frame after the key, later still on a busy machine."""
+        self.wait_until(page, f"() => ({test})(document.activeElement)", what=test)
+
+    def wait_blocks(self, page, n: int) -> None:
+        self.wait_until(page, "(n) => Blockly.getMainWorkspace().getAllBlocks(false).length === n", n,
+                        f"{n} blocks")
+
+    def wait_yaml(self, page, key: str, value: str) -> None:
+        """Waits until the YAML view's text has the top-level key: value, quoted or not (the block
+        view is left)."""
+        page.get_by_test_id("scenario-view-yaml").click()
+        expect(page.get_by_test_id("scenario-text")).to_have_value(
+            re.compile(f'^{re.escape(key)}: "?{re.escape(value)}"?$', re.M), timeout=WAIT_MS)
 
     def blocks_text(self, page) -> str:
         return page.locator(".scn-blocks").text_content().replace(" ", " ")
@@ -270,7 +310,7 @@ class ScenarioBlocksTests(unittest.TestCase):
         expect(page.locator(".scn-blocks .scn-problem")).to_have_count(1)
         expect(install).to_be_disabled()
         problem.get_by_test_id("scenario-show").click()
-        self.assertTrue(page.evaluate("!!document.activeElement.closest('.scn-blocks')"))
+        self.wait_focus(page, "a => !!a.closest('.scn-blocks')")
         self.edit_field(page, "scn_after", "OBJECTIVE", "bridge")
         expect(page.get_by_test_id("scenario-ok")).to_be_visible()
         expect(page.locator(".scn-blocks .scn-problem")).to_have_count(0)
@@ -314,33 +354,72 @@ class ScenarioBlocksTests(unittest.TestCase):
         """Without a mouse: Tab from the view's buttons reaches the categories; the right arrow
         opens one, Enter takes its block and puts it down, Delete removes it; W goes to the blocks,
         the arrows to the scenario block and its name, Enter edits the name, and the YAML follows.
-        The blocks have labels a screen reader reads."""
+        The blocks have labels a screen reader reads.
+
+        Blockly moves the focus, fires its events and draws a frame later than the key press (a
+        requestAnimationFrame), so every key is followed by two frames and a wait for where the
+        focus or the blocks must be before the next key: on a busy machine a frame comes late, and
+        a key pressed before it lands somewhere else or has its focus taken away (CKF-3)."""
         page = self.console(lang="en")
         self.example_as_blocks(page)
         count = "Blockly.getMainWorkspace().getAllBlocks(false).length"
-        focused = "document.activeElement.getAttribute('aria-label') || ''"
         before = page.evaluate(count)
         page.get_by_test_id("scenario-view-blocks").focus()
-        page.keyboard.press("Tab")
-        self.assertEqual(page.evaluate("document.activeElement.getAttribute('role')"), "treeitem")
-        self.assertTrue(page.evaluate("!!document.activeElement.closest('.scn-blocks')"))
-        page.keyboard.press("ArrowRight")  # the first category's blocks: a new objective
-        self.assertTrue(page.evaluate(focused).startswith("objective, objective, name"), page.evaluate(focused))
-        page.keyboard.press("Enter")  # taken
-        page.keyboard.press("Enter")  # put down
-        self.assertEqual(page.evaluate(count), before + 1)
-        page.keyboard.press("Delete")
-        self.assertEqual(page.evaluate(count), before)
-        page.keyboard.press("w")
-        page.keyboard.press("ArrowDown")
-        self.assertIn("scenario, Bridge and vault", page.evaluate(focused))
-        page.keyboard.press("ArrowRight")
-        self.assertEqual(page.evaluate(focused), "Edit text: Bridge and vault")
-        page.keyboard.press("Enter")
+        self.key(page, "Tab")
+        self.wait_focus(page, "a => a.getAttribute('role') === 'treeitem' && !!a.closest('.scn-blocks')")
+        self.key(page, "ArrowRight")  # the first category's blocks: a new objective
+        self.wait_focus(page, "a => (a.getAttribute('aria-label') || '').startsWith('objective, objective, name')")
+        self.key(page, "Enter")  # taken
+        self.wait_blocks(page, before + 1)
+        self.key(page, "Enter")  # put down
+        self.wait_blocks(page, before + 1)
+        self.key(page, "Delete")
+        self.wait_blocks(page, before)
+        # The deleted block's neighbour takes the focus (a frame later): only then W.
+        self.wait_focus(page, "a => !!a.closest('.blocklyBlockCanvas') && !a.closest('.blocklyFlyout')")
+        self.key(page, "w")
+        self.wait_focus(page, "a => a.classList.contains('blocklyWorkspaceSelectionRing')")
+        self.key(page, "ArrowDown")
+        self.wait_focus(page, "a => (a.getAttribute('aria-label') || '').includes('scenario, Bridge and vault')")
+        self.key(page, "ArrowRight")
+        self.wait_focus(page, "a => a.getAttribute('aria-label') === 'Edit text: Bridge and vault'")
+        self.key(page, "Enter")
+        editor = page.locator(".blocklyHtmlInput")
+        expect(editor).to_be_focused(timeout=WAIT_MS)
         page.keyboard.type("Bridge, vault and more")
+        expect(editor).to_have_value("Bridge, vault and more", timeout=WAIT_MS)
         page.keyboard.press("Enter")
-        expect(page.get_by_test_id("scenario-ok")).to_be_visible()
+        expect(editor).to_have_count(0, timeout=WAIT_MS)
+        # The name reaches the editor's text a frame later still; the YAML view shows it.
+        self.wait_yaml(page, "name", "Bridge, vault and more")
         self.assertEqual(load(self.yaml_text(page))["name"], "Bridge, vault and more")
+
+    @unittest.skipIf(CORE is None, "the shared core library is not built")
+    def test_a_change_just_made_survives_leaving_the_view_and_install(self):
+        """CKF-2: Blockly fires a change's events a frame later, so a block changed and the view
+        left (or Install pressed) in the same moment, before that frame, used to lose the change:
+        the YAML kept the old name and Install sent the old text. Both happen here in one
+        JavaScript task, so no frame can come in between."""
+        page = self.console(lang="en")
+        self.example_as_blocks(page)
+        page.evaluate("""() => {
+            const ws = Blockly.getMainWorkspace();
+            ws.getAllBlocks(true).find((b) => b.type === 'scn_scenario').setFieldValue('Left at once', 'NAME');
+            document.querySelector('[data-testid=scenario-view-yaml]').click();
+        }""")
+        self.wait_yaml(page, "name", "Left at once")
+        self.blocks_view(page)
+        expect(page.get_by_test_id("scenario-install")).to_be_enabled(timeout=WAIT_MS)
+        page.evaluate("""() => {
+            const ws = Blockly.getMainWorkspace();
+            ws.getAllBlocks(true).find((b) => b.type === 'scn_points').setFieldValue(70, 'POINTS');
+            document.querySelector('[data-testid=scenario-install]').click();
+        }""")
+        expect(page.get_by_test_id("scenario-installed")).to_be_visible(timeout=WAIT_MS)
+        installed = self.field.http.get(f"/api/v1/scenarios/{EXAMPLE_ID}").json()
+        by_hand = compile_scenario(load(EXAMPLE.replace("points: 50", "points: 70")
+                                        .replace("name: Bridge and vault", "name: Left at once")))
+        self.assertEqual(installed["files"], by_hand.files)
 
     def test_read_token_on_a_phone_in_english(self):
         """A read-only phone: the blocks fit the width (no sideways scroll), the categories are
