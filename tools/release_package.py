@@ -124,10 +124,17 @@ def splash_problem(build: Path, repo: Path = REPO) -> str | None:
     sdkconfig = build / "sdkconfig"
     if not sdkconfig.is_file():
         return f"{sdkconfig} is missing (cannot tell which splash was built)"
-    m = re.search(r'^CONFIG_ATALAIA_SPLASH_LOGO="([^"]*)"', sdkconfig.read_text(encoding="utf-8"), re.M)
+    config = sdkconfig.read_text(encoding="utf-8")
+    generated = sorted(build.rglob("splash_logo.c"))
+    if re.search(r"^CONFIG_ATALAIA_POD_MODE=y$", config, re.M):
+        # The I/O pod has no screen and its build embeds no splash (main/CMakeLists.txt): nothing to check, as
+        # long as there really is none (the v0.6.0 release run stopped here on the io-pod build).
+        if generated:
+            return f"an I/O pod build (CONFIG_ATALAIA_POD_MODE=y) has {len(generated)} splash_logo.c: it should embed none"
+        return None
+    m = re.search(r'^CONFIG_ATALAIA_SPLASH_LOGO="([^"]*)"', config, re.M)
     if m and m.group(1) != SPLASH_DEFAULT:
         return f'CONFIG_ATALAIA_SPLASH_LOGO="{m.group(1)}": a release image keeps the default "{SPLASH_DEFAULT}"'
-    generated = sorted(build.rglob("splash_logo.c"))
     if len(generated) != 1:
         return f"the build folder has {len(generated)} splash_logo.c files, not 1 (is it a build of this firmware?)"
     got = bytes(int(x, 16) for x in re.findall(r"0x([0-9A-Fa-f]{2})", generated[0].read_text(encoding="utf-8").split("= {", 1)[-1]))
