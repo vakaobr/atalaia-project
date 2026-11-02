@@ -546,13 +546,17 @@ The same *Share my position* switch, on a field whose controller lists beacons
 [docs/runbooks/ios-beacons-iphone.md](../../docs/runbooks/ios-beacons-iphone.md).
 
 - **First use**: after the location prompt, the app explains (*Indoor
-  positions*, naming the iPhone) with **Continue** / **Not now**; *Continue*
-  asks nothing new if the location is already allowed (iOS ranges beacons with
-  the same *While Using the App* permission; there is no Bluetooth prompt and
-  no *Always*).
+  positions (optional)*: GPS is shared either way, the beacons only add the
+  floor and the room; naming the iPhone) with **Use the beacons** / **GPS
+  only**; *Use the beacons* asks nothing new if the location is already
+  allowed (iOS ranges beacons with the same *While Using the App* permission;
+  there is no Bluetooth prompt and no *Always*). The line under the switch
+  then says what is shared: *Sharing by GPS and beacons*, or *Sharing by GPS
+  only*.
 - **Where it works**: only with the app on the screen. A locked phone, or
   another app in front, stops the beacons: the position falls back to GPS and
-  keeps the last floor. The note under the switch says so.
+  keeps the last floor. The note under the switch says so, and the line
+  above it says *Sharing by GPS only* while the beacons are paused.
 - **No simulator test**: the iOS Simulator has no Bluetooth and cannot see
   beacons. Test on an iPhone with a beacon (a phone app that transmits an
   iBeacon will do for the first check, with the field's UUID).
