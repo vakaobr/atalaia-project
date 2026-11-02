@@ -11,9 +11,11 @@
 /// while a player chooses to share their position in a running game; nothing
 /// is kept on the phone.
 ///
-/// iOS has no plugin for this (decision BLE-9): `ChannelBeaconScanService`
-/// answers "not available" there, as it does on any phone without the plugin,
-/// and the position reports stay GPS.
+/// iOS ranges the same beacons through CoreLocation (BeaconScanPlugin.swift,
+/// decisions IOSB-1 to IOSB-8), on the same channels and message shapes, only
+/// while the app is on the screen. On a phone without either plugin
+/// `ChannelBeaconScanService` answers "not available" and the position reports
+/// stay GPS.
 library;
 
 import 'dart:async';
@@ -101,6 +103,19 @@ abstract interface class BeaconScanService {
 
   /// One [BeaconWindow] every [window] while listened to, for the beacons
   /// advertising one of [uuids] only.
+  ///
+  /// The stream fails with a [PlatformException] whose `code` is the same on
+  /// Android and iOS for the same cause:
+  ///  - `unavailable`: no Bluetooth LE or no beacon ranging on this phone, or
+  ///    (Android) Bluetooth is off; iOS cannot tell that Bluetooth is off and
+  ///    simply hears nothing (decision IOSB-4);
+  ///  - `permission`: the permission a scan needs is refused (Android: the
+  ///    Bluetooth scan or the location; iOS: the location, also when it is
+  ///    taken away while listening or Location Services are off);
+  ///  - `no_beacons`: none of [uuids] is a valid UUID;
+  ///  - `scan_failed`: the platform's scanner gave up.
+  /// The app stops listening on any of them and stays on GPS; it does not read
+  /// the code.
   Stream<BeaconWindow> windows(List<String> uuids, Duration window);
 }
 

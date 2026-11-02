@@ -28,7 +28,7 @@
     ".": {
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
-        "app/pubspec.yaml",
+        {"type": "generic", "path": "app/pubspec.yaml"},
         "app/lib/version.dart",
         "controller/atalaia_controller/__init__.py",
         "server/atalaia_server/__init__.py"

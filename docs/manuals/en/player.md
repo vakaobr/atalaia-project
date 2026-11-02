@@ -227,7 +227,9 @@ Sharing your position is optional, and it is the box you ticked or left unticked
 3. Allow the location when the phone asks. Choose **While using the app** on an iPhone. On Android 13 or later also allow notifications.
 4. A notification **Atalaia: sharing your position** stays on. Switch **Share my position** off to stop. It also stops when the game ends.
 
-**Indoors, if the field has beacons.** Some fields put small Bluetooth beacons in their buildings. If this one does, the app asks first, with **Indoor positions**: it can listen for the field's own beacons while you share, and it sends only which one is strongest. Tap **Continue** and Android asks for **Bluetooth** (nearby devices) and the **location** (an iPhone asks only for the location). Tap **Not now**, or refuse, and nothing else changes: the app says **Indoor positions are off** and keeps sharing your GPS position. Bluetooth has to be switched on.
+While you share, a line under the switch says what is shared: **Sharing by GPS only**, or **Sharing by GPS and beacons** when the field's beacons are in use (below).
+
+**Indoors, if the field has beacons.** Some fields put small Bluetooth beacons in their buildings. If this one does, the app asks first, with **Indoor positions (optional)**: your GPS position is shared either way; the beacons only add the floor and the room indoors. The app listens only for the field's own beacons while you share, and sends only which one is strongest. Tap **Use the beacons** and Android asks for **Bluetooth** (nearby devices) and the **location** (an iPhone asks only for the location). Tap **GPS only** and nothing else changes: the line under the switch says **Sharing by GPS only**. If you refuse the permission, or Bluetooth is off, a note says why, and the line says **Sharing by GPS only** too. Bluetooth has to be switched on.
 
 - Indoors your position becomes the **room**. Under the switch it says **Your position: Lobby (Ground floor)**. The organisers see the room, not a point on the floor.
 - The app listens only for the field's beacons and keeps nothing it hears. It listens only while you share, and stops when you stop.
@@ -306,7 +308,7 @@ The app can log you in to an account that already exists, or make one with Googl
 | **Offline. Reconnecting…** for a long time | Go back into Wi-Fi range. Keep the field's Wi-Fi on even when it says "no internet". |
 | No buzzes | **Settings** › **Vibrate on game events** must be on. On an iPhone keep the app open on the game page; on Android do not leave the game page (the notification says the app is following the game). Check the phone is not on silent. |
 | **Share my position** says "No permission for the location." | Allow the location for Atalaia in the phone's settings. |
-| **Your position: …** never shows indoors | The field may have no beacons, or you chose **Not now**. Check Bluetooth is on and Atalaia may use it (nearby devices and location), then switch **Share my position** off and on. Walk closer to a beacon. |
+| **Your position: …** never shows indoors | The field may have no beacons, or you chose **GPS only** (the line under the switch says **Sharing by GPS only**). Check Bluetooth is on and Atalaia may use it (nearby devices and location), then switch **Share my position** off and on. Walk closer to a beacon. |
 | My team is not highlighted | You have no team yet, or you are following without a check-in. Tap your team's card. |
 | I cannot capture a box with my phone | That is right. You capture boxes at the box, by holding your team's button. |
 

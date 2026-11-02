@@ -227,7 +227,9 @@ Partilhar a posição é opcional, e é a caixa que marcaste ou deixaste desmarc
 3. Autoriza a localização quando o telemóvel perguntar. No iPhone, escolhe **Ao Usar a Aplicação**. No Android 13 ou mais recente, autoriza também as notificações.
 4. Uma notificação **Atalaia: a partilhar a posição** fica visível. Desliga **Partilhar a minha posição** para parar. Pára também quando o jogo acaba.
 
-**No interior, se o campo tiver balizas.** Alguns campos põem pequenas balizas Bluetooth nos edifícios. Se este tiver, a app pergunta primeiro, com **Posições no interior**: pode ouvir as balizas do campo enquanto partilhas, e envia apenas qual é a mais forte. Toca em **Continuar** e o Android pede **Bluetooth** (dispositivos próximos) e a **localização** (o iPhone pede só a localização). Toca em **Agora não**, ou recusa, e o resto não muda: a app diz que **as posições no interior estão desligadas** e continua a partilhar a posição por GPS. O Bluetooth tem de estar ligado.
+Durante a partilha, uma linha por baixo do interruptor diz o que é partilhado: **A partilhar só por GPS**, ou **A partilhar por GPS e balizas** quando as balizas do campo estão em uso (ver abaixo).
+
+**No interior, se o campo tiver balizas.** Alguns campos põem pequenas balizas Bluetooth nos edifícios. Se este tiver, a app pergunta primeiro, com **Posições no interior (opcional)**: a posição por GPS é partilhada de qualquer forma; as balizas só acrescentam o piso e a divisão no interior. A app ouve só as balizas do campo enquanto a posição é partilhada, e envia apenas qual é a mais forte. Toca em **Usar as balizas** e o Android pede **Bluetooth** (dispositivos próximos) e a **localização** (o iPhone pede só a localização). Toca em **Só GPS** e o resto não muda: a linha por baixo do interruptor diz **A partilhar só por GPS**. Se recusares a autorização, ou o Bluetooth estiver desligado, uma nota diz porquê, e a linha diz também **A partilhar só por GPS**. O Bluetooth tem de estar ligado.
 
 - No interior a tua posição passa a ser a **divisão**. Por baixo do botão diz **A tua posição: Átrio (Rés do chão)**. A organização vê a divisão, não um ponto no chão.
 - A app só ouve as balizas do campo e não guarda nada do que ouve. Só ouve enquanto partilhas, e pára quando paras.
@@ -306,7 +308,7 @@ A app entra numa conta que já existe, ou cria uma com Google, Microsoft ou Appl
 | **Sem ligação. A voltar a ligar…** durante muito tempo | Volta para o alcance do Wi-Fi. Mantém o Wi-Fi do campo ligado mesmo que diga «sem internet». |
 | Não vibra | **Definições** › **Vibrar nos eventos do jogo** tem de estar ligado. No iPhone mantém a app aberta na página do jogo; no Android não saias da página do jogo (a notificação diz que a app está a acompanhar o jogo). Confirma que o telemóvel não está em silêncio. |
 | **Partilhar a minha posição** diz «Sem autorização para a localização.» | Permite a localização à Atalaia nas definições do telemóvel. |
-| **A tua posição: …** nunca aparece no interior | O campo pode não ter balizas, ou escolheste **Agora não**. Confirma que o Bluetooth está ligado e que a Atalaia o pode usar (dispositivos próximos e localização), e desliga e volta a ligar **Partilhar a minha posição**. Chega-te mais perto de uma baliza. |
+| **A tua posição: …** nunca aparece no interior | O campo pode não ter balizas, ou escolheste **Só GPS** (a linha por baixo do interruptor diz **A partilhar só por GPS**). Confirma que o Bluetooth está ligado e que a Atalaia o pode usar (dispositivos próximos e localização), e desliga e volta a ligar **Partilhar a minha posição**. Chega-te mais perto de uma baliza. |
 | A minha equipa não está destacada | Ainda não tens equipa, ou estás a seguir sem check-in. Toca no cartão da tua equipa. |
 | Não consigo capturar uma caixa com o telemóvel | É assim mesmo. Capturas as caixas na caixa, mantendo premido o botão da tua equipa. |
 

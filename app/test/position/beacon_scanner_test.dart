@@ -8,7 +8,9 @@
 // them two windows after the last one); the plugin's channel contract; and
 // the player screen: nothing asked on a field without beacons, the
 // explanation before the permission, a refusal leaving GPS as it was, and
-// the room the controller names. The radio is a fake (no hardware here).
+// the room the controller names; the line under the switch says what is
+// shared ("GPS only" or "GPS and beacons", decisions LSW-1 to LSW-3), in
+// every language, on a narrow phone. The radio is a fake (no hardware here).
 
 import 'dart:async';
 
@@ -28,6 +30,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_harness.dart';
+import '../support/fonts.dart';
 
 const uuid = 'FDA50693-A4E2-4FB1-AFCF-C28847DC5D9F';
 const other = '11111111-2222-3333-4444-555555555555';
@@ -774,8 +777,10 @@ void main() {
       Map<String, Object?>? levels,
       FakeScan? scan,
       Set<String> granted = const {'ACCESS_FINE_LOCATION', 'BLUETOOTH_SCAN'},
+      AppLanguage language = AppLanguage.en,
+      Size size = const Size(400, 1600),
     }) async {
-      tester.view.physicalSize = const Size(400, 1600);
+      tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final f = field();
@@ -785,7 +790,7 @@ void main() {
       final loc = FakeLocation();
       final sc = scan ?? FakeScan();
       final h = harness(
-        language: AppLanguage.en,
+        language: language,
         settings: AppSettings(),
         fieldHttp: (_) => http,
         location: loc,
@@ -807,6 +812,11 @@ void main() {
       }
     }
 
+    // The line under the switch that says what is shared (LSW-2).
+    String? mode(WidgetTester tester) => (tester.widget(
+      find.byKey(const Key('player-share-mode')),
+    ) as Text).data;
+
     testWidgets('a field without beacons: nothing asked, GPS only', (
       tester,
     ) async {
@@ -817,6 +827,7 @@ void main() {
       expect(find.byKey(const Key('player-beacons-note')), findsNothing);
       expect(scan.listens, isEmpty);
       expect(h.device.calls.where((c) => c.contains('BLUETOOTH')), isEmpty);
+      expect(mode(tester), 'Sharing by GPS only');
     });
 
     testWidgets('an older controller (no registry): GPS only', (tester) async {
@@ -839,13 +850,20 @@ void main() {
       await tester.tap(find.byKey(const Key('player-share-position')));
       await pumpAfter(tester);
       expect(find.byKey(const Key('player-beacons-why')), findsOneWidget);
-      expect(find.text('Indoor positions'), findsOneWidget);
+      expect(find.text('Indoor positions (optional)'), findsOneWidget);
+      expect(
+        find.textContaining('Your GPS position is shared either way.'),
+        findsOneWidget,
+      );
+      expect(find.text('GPS only'), findsOneWidget);
+      expect(find.text('Use the beacons'), findsOneWidget);
       expect(scan.listens, isEmpty); // not before the player agrees
       await tester.tap(find.byKey(const Key('player-beacons-allow')));
       await pumpAfter(tester);
       expect(scan.listens.single.$1, [uuid]);
       expect(scan.listens.single.$2, const Duration(seconds: 7));
       expect(find.byKey(const Key('player-beacons-note')), findsOneWidget);
+      expect(mode(tester), 'Sharing by GPS and beacons');
       // Indoors: the beacon is reported, the GPS fix is not; the controller
       // names the room and the screen shows it.
       scan.out.add(window(5000, [heard(1, 2, -65)]));
@@ -874,10 +892,11 @@ void main() {
       });
       await pumpAfter(tester);
       expect(find.text('Your position: Lobby (Ground)'), findsOneWidget);
-      // Sharing off: the scan stops and the notes go.
+      // Sharing off: the scan stops and the notes go, the line too.
       await tester.tap(find.byKey(const Key('player-share-position')));
       await pumpAfter(tester);
       expect(find.byKey(const Key('player-beacons-note')), findsNothing);
+      expect(find.byKey(const Key('player-share-mode')), findsNothing);
       expect(scan.out.hasListener, isFalse);
       // The sharing's service is stopped; the live game's buzz service (APX-3)
       // is started in its place.
@@ -968,9 +987,10 @@ void main() {
       expect(scan.listens.single.$1, [other]);
       expect(find.byKey(const Key('player-beacons-note')), findsOneWidget);
       expect(h.device.calls.where((c) => c.contains('BLUETOOTH')), isNotEmpty);
+      expect(mode(tester), 'Sharing by GPS and beacons');
     });
 
-    testWidgets('a player who said Not now is not asked again by a change', (
+    testWidgets('a player who said GPS only is not asked again by a change', (
       tester,
     ) async {
       final (_, http, _, scan, fd) = await open(
@@ -1032,7 +1052,8 @@ void main() {
       expect(beaconReports.every((r) => !r.containsKey('level')), isTrue);
     });
 
-    testWidgets('"Not now" leaves GPS as it was, and says so', (tester) async {
+    testWidgets('"GPS only" leaves GPS as it was: no note, the line says '
+        'GPS only', (tester) async {
       final (_, _, _, scan, _) = await open(
         tester,
         registry: [
@@ -1045,12 +1066,9 @@ void main() {
       await pumpAfter(tester);
       expect(scan.listens, isEmpty);
       expect(find.byKey(const Key('player-share-position')), findsOneWidget);
-      expect(
-        find.text(
-          'Indoor positions are off. Your GPS position is still shared.',
-        ),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('player-beacons-note')), findsNothing);
+      expect(find.textContaining('still shared'), findsNothing);
+      expect(mode(tester), 'Sharing by GPS only');
     });
 
     testWidgets('no Bluetooth permission: said, and GPS goes on', (
@@ -1072,6 +1090,7 @@ void main() {
         find.textContaining('no permission for Bluetooth'),
         findsOneWidget,
       );
+      expect(mode(tester), 'Sharing by GPS only');
     });
 
     testWidgets('Bluetooth switched off, or no Bluetooth LE: said', (
@@ -1108,6 +1127,73 @@ void main() {
       expect(scan.listens, isEmpty);
       expect(h.device.calls.where((c) => c.contains('BLUETOOTH')), isEmpty);
       expect(find.textContaining('cannot listen'), findsOneWidget);
+      expect(mode(tester), 'Sharing by GPS only');
+    });
+
+    // Every language on a narrow phone with large text (real fonts, as the
+    // check-in form's layout test): the dialog's title and both buttons and
+    // the line under the switch are shown, in that language, and nothing
+    // overflows; "GPS only" and "Use the beacons" each give their line.
+    group('in every language at 320 dp', () {
+      setUpAll(loadAppFonts);
+      for (final lang in AppLanguage.values) {
+        for (final allow in [false, true]) {
+          testWidgets('${lang.name}, ${allow ? 'beacons' : 'GPS only'}', (
+            tester,
+          ) async {
+            tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+            addTearDown(tester.platformDispatcher.clearAllTestValues);
+            final errors = <FlutterErrorDetails>[];
+            final previous = FlutterError.onError;
+            FlutterError.onError = errors.add;
+            final s = Strings(lang);
+            await open(
+              tester,
+              registry: [
+                {'id': '1:1', 'uuid': uuid},
+              ],
+              language: lang,
+              size: const Size(320, 2400),
+            );
+            await tester.tap(find.byKey(const Key('player-share-position')));
+            await pumpAfter(tester);
+            final dialog = find.byKey(const Key('player-beacons-why'));
+            final title = find.descendant(
+              of: dialog,
+              matching: find.text(s.t('player.beacons_why_title')),
+            );
+            final skip = find.descendant(
+              of: find.byKey(const Key('player-beacons-skip')),
+              matching: find.text(s.t('player.beacons_skip')),
+            );
+            final go = find.descendant(
+              of: find.byKey(const Key('player-beacons-allow')),
+              matching: find.text(s.t('player.beacons_allow')),
+            );
+            final shownDialog = [
+              title.evaluate().length,
+              skip.evaluate().length,
+              go.evaluate().length,
+            ];
+            await tester.tap(
+              find.byKey(
+                Key(allow ? 'player-beacons-allow' : 'player-beacons-skip'),
+              ),
+            );
+            await pumpAfter(tester);
+            FlutterError.onError = previous;
+            expect(shownDialog, [1, 1, 1]);
+            expect(
+              mode(tester),
+              s.t(
+                allow ? 'player.share_mode_beacons' : 'player.share_mode_gps',
+              ),
+            );
+            expect(errors.map((e) => e.exceptionAsString()).toList(), isEmpty);
+            await tester.pumpWidget(const SizedBox());
+          });
+        }
+      }
     });
 
     group('on iOS (CoreLocation ranging)', () {

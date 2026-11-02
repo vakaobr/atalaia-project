@@ -125,7 +125,7 @@ Fit the antennas first. **Never power the board without the LoRa antenna.** Plug
 | --- | --- | --- |
 | Windows 10 and 11 | A new `COM` port (Device Manager, *Ports (COM & LPT)*; USB ID 303A:1001) | No driver is needed. On the first board tested, the port appeared only on the PC's own USB-C port, not through a hub |
 | Linux | `/dev/ttyACM0` (or `ttyACM1`...) | Add yourself to the `dialout` group once (`sudo usermod -aG dialout $USER`), then log in again |
-| macOS | `/dev/cu.usbmodem...` (list them with `ls /dev/cu.usbmodem*`) | Not tested by the project on macOS |
+| macOS | `/dev/cu.usbmodem...` (list them with `ls /dev/cu.usbmodem*`) | No driver is needed. Use the `cu.` name, not the `tty.` one. Box and modem images were written this way on a Mac (2026-11-02, Apple silicon, macOS 27); with several boards, see the [modem guide, section 4.2](modem.md#42-find-the-boards-port) to tell them apart |
 
 To list ports with the tool: `PY -m serial.tools.list_ports -v`.
 
@@ -168,7 +168,7 @@ Open the log and press `Ctrl+]` to leave:
 PY -m serial.tools.miniterm COM5 115200
 ```
 
-You should see the firmware's version, the memory, and one line for each part found. A part that is not fitted gives a warning and the box goes on. The log may warn about GPIO 33 to 37: the project's bench notes call that cosmetic.
+You should see the firmware's version, the memory, and one line for each part found. A part that is not fitted gives a warning and the box goes on. The log may warn about GPIO 33 to 37: the project's bench notes call that cosmetic. On macOS, opening the port can restart the board: wait for the boot log to end before you type a console command (a script that sends one right after opening the port must wait too).
 
 **Without Python, in Chrome or Edge.** Make one image file, then flash it at address `0x0` with Espressif's web page. In a bash shell:
 

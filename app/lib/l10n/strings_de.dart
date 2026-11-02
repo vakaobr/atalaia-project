@@ -697,6 +697,8 @@ const Map<String, String> deStrings = {
   'player.share_hint': 'Nur während des Spiels; der Controller entscheidet, wer sie sieht. Die Orga und die Marshals sehen sie auf ihren ATAK-Geräten.',
   'player.share_on': 'Wird geteilt: {n} Positionen gesendet',
   'player.share_on_one': 'Wird geteilt: {n} Position gesendet',
+  'player.share_mode_gps': 'Wird nur per GPS geteilt',
+  'player.share_mode_beacons': 'Wird per GPS und Beacons geteilt',
   'player.share_stopped': 'Teilen beendet: Das Spiel ist vorbei oder der Check-in hat sich geändert.',
   'player.no_location': 'Dieses Handy hat keinen Standort.',
   'player.location_denied': 'Keine Berechtigung für den Standort.',
@@ -723,18 +725,18 @@ const Map<String, String> deStrings = {
   'prop.radio.closed': 'Der Funk des Pods ist aus',
   'prop.gm_message': 'Spielleitung: {text}',
   // Beacons im Gebäude (Entscheidungen BLE-1 bis BLE-9)
-  'player.beacons_why_title': 'Positionen im Gebäude',
-  'player.beacons_why': 'Dieses Feld hat Bluetooth-Beacons im Gebäude. Um zu sagen, in welchem Raum du bist, kann Atalaia sie hören, während du deine Position teilst: nur die Beacons des Felds, und es sendet nur, welches am stärksten ist. Android fragt dafür nach den Berechtigungen für Bluetooth und Standort. Ohne sie bleibt deine Position nur GPS.',
-  'player.beacons_allow': 'Weiter',
-  'player.beacons_skip': 'Jetzt nicht',
+  'player.beacons_why_title': 'Positionen im Gebäude (optional)',
+  'player.beacons_why': 'Deine GPS-Position wird so oder so geteilt. Dieses Feld hat Bluetooth-Beacons im Gebäude: Mit ihnen zeigt deine Position auch das Stockwerk und den Raum. Atalaia hört nur auf die Beacons des Felds, nur solange du deine Position teilst, und sendet nur, welches am stärksten ist. Android fragt dafür nach den Berechtigungen für Bluetooth und Standort.',
+  'player.beacons_allow': 'Beacons nutzen',
+  'player.beacons_skip': 'Nur GPS',
   'player.beacons_on':
       'Hört auf die Beacons des Felds: im Gebäude ist deine Position der Raum.',
-  'player.beacons_skipped':
-      'Positionen im Gebäude sind aus. Deine GPS-Position wird weiter geteilt.',
-  'player.beacons_denied': 'Positionen im Gebäude sind aus: keine Berechtigung für Bluetooth. Deine GPS-Position wird weiter geteilt.',
+  'player.beacons_denied':
+      'Positionen im Gebäude sind aus: keine Berechtigung für Bluetooth.',
   'player.beacons_off': 'Positionen im Gebäude sind aus: Bluetooth ist ausgeschaltet. Schalte es ein und teile erneut.',
-  'player.beacons_unavailable': 'Dieses Handy kann die Beacons des Felds nicht hören. Deine GPS-Position wird weiter geteilt.',
-  'player.beacons_why_ios': 'Dieses Feld hat Bluetooth-Beacons im Gebäude. Um zu sagen, in welchem Raum du bist, kann Atalaia sie hören, während du deine Position teilst: nur die Beacons des Felds, und es sendet nur, welches am stärksten ist. Das iPhone fragt dafür nach der Standortberechtigung (Bluetooth nutzen die Beacons, es wird nicht abgefragt). Ohne sie bleibt deine Position nur GPS.',
+  'player.beacons_unavailable':
+      'Dieses Handy kann die Beacons des Felds nicht hören.',
+  'player.beacons_why_ios': 'Deine GPS-Position wird so oder so geteilt. Dieses Feld hat Bluetooth-Beacons im Gebäude: Mit ihnen zeigt deine Position auch das Stockwerk und den Raum. Atalaia hört nur auf die Beacons des Felds, nur solange du deine Position teilst, und sendet nur, welches am stärksten ist. Das iPhone fragt dafür nach der Standortberechtigung (Bluetooth nutzen die Beacons, es wird nicht abgefragt).',
   'player.beacons_on_ios': 'Hört auf die Beacons des Felds, nur solange Atalaia auf dem Bildschirm offen ist: im Gebäude ist deine Position der Raum. Bei gesperrtem Telefon oder mit einer anderen App im Vordergrund geht deine Position zurück auf GPS und behält das letzte Stockwerk.',
   'player.my_room': 'Deine Position: {room}',
   'player.map_title': 'Feldplan',
