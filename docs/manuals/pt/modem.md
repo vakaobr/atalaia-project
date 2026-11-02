@@ -48,10 +48,10 @@ Há duas maneiras, como para as caixas ([guia do firmware, secção 2](firmware.
    sha256sum -c --ignore-missing SHA256SUMS
    ```
 
-   No macOS: `shasum -a 256 -c SHA256SUMS`. No Windows `cmd`: `certutil -hashfile atalaia-modem-0.5.0-usb.zip SHA256` e compara a linha com a do `SHA256SUMS`.
+   No macOS: `shasum -a 256 -c SHA256SUMS`. No Windows `cmd`: `certutil -hashfile atalaia-modem-0.6.1-usb.zip SHA256` e compara a linha com a do `SHA256SUMS`.
 4. Descompacta-o para uma pasta própria. Tem o carregador de arranque, a tabela de partições, o programa, um ficheiro `flash_args` e um `README.txt` que repete os comandos abaixo.
 
-   Windows `cmd`: `mkdir atalaia-modem` e depois `tar -xf atalaia-modem-0.5.0-usb.zip -C atalaia-modem` (ou clica com o botão direito, *Extrair tudo*). Linux e macOS: `unzip atalaia-modem-0.5.0-usb.zip -d atalaia-modem`.
+   Windows `cmd`: `mkdir atalaia-modem` e depois `tar -xf atalaia-modem-0.6.1-usb.zip -C atalaia-modem` (ou clica com o botão direito, *Extrair tudo*). Linux e macOS: `unzip atalaia-modem-0.6.1-usb.zip -d atalaia-modem`.
 
 **O que é o modem publicado:** a Heltec **V4.3**, a região **EU868** (868 MHz), escuta antes de emitir ligada, uma antena de 2 dBi suposta, as chaves do projeto incluídas, o ecrã em inglês até o controlador lhe dizer a língua das caixas. **Para uma V4.2, para Taiwan (AS923), para uma antena de mais de 2 dBi ou para um ecrã que arranque noutra língua, compila-o tu.**
 

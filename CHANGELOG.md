@@ -14,6 +14,8 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+- **The guides point to v0.6.1, and the release docs say how releases are guarded today** (`docs/manuals/{en,pt}/firmware.md`, `docs/manuals/{en,pt}/modem.md`, `README.md`, `firmware/esp32/docs/RELEASE_SIGNING.md`, `CONTRIBUTING.md`): the download and checksum examples use the v0.6.1 file names, the first release made through release-please with the signed firmware attached (v0.6.0's firmware build failed, #26, so it has no files). The `release` environment has no required reviewers, by the maintainer's choice while the only developer: merging the release pull request is the human gate, and the signing and publishing run by themselves. Required reviewers are to be turned on when other collaborators join; the steps stay in RELEASE_SIGNING.md.
+
 ## [0.6.1](https://github.com/vakaobr/atalaia-project/compare/v0.6.0...v0.6.1) (2026-11-02)
 
 ### Bug Fixes
