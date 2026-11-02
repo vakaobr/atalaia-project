@@ -562,7 +562,7 @@ Android, os segredos** (a chave de adesão ao campo, a chave privada do marshal,
 renovação do servidor) **estão selados com uma chave no Android Keystore** e
 nunca num ficheiro legível. **Num iPhone, os mesmos segredos estão
 selados com uma chave no Porta-chaves do iOS**, guardada só neste telemóvel e
-nunca numa cópia de segurança [RESPONSÁVEL DO PROJETO: confirmar a redação].
+nunca numa cópia de segurança.
 Desinstalar a app apaga tudo (num iPhone, o iOS pode manter essa chave, que
 não contém dados pessoais e não abre nada depois de os dados da app serem
 apagados). A app não tem nenhuma biblioteca de análise,
