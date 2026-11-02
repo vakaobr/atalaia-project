@@ -5,6 +5,7 @@
 # --exclude-newer 2026-10-05 (see requirements.in); do not edit by hand.
 # A single package bumped since then (its release at least two weeks old) is
 # added with --upgrade-package NAME --exclude-newer-package NAME=<its release
+# day, or a time just after its upload when a newer release came out the same
 # day>; the commit that bumps it gives the full command.
 alembic==1.20.0 \
     --hash=sha256:77eb101048d95f982c0353e9233404889dcd7a6fc244c107836c0e2fc9cf7d9d \
@@ -875,7 +876,7 @@ pyyaml==6.0.3 \
     --hash=sha256:fa160448684b4e94d80416c0fa4aac48967a969efe22931448d853ada8baf926 \
     --hash=sha256:fc09d0aa354569bc501d4e787133afc08552722d3ab34836a80547331bb5d4a0
     # via -r requirements.in
-sqlalchemy[asyncio]==2.1.4 \
+sqlalchemy==2.1.4 \
     --hash=sha256:07c60abaffb980b7382f2c75be8a5279c2b5df2626a0f5d751dd942799bf3b5c \
     --hash=sha256:080f8d853aac5bb5620f0ae6f46527397cf18dce0ec2b478b478469ef3cae2c4 \
     --hash=sha256:0970394ec5d9e397aafc5bc5fa2b7f8b58cb191f2703006b19a96ef4bf00b8d9 \
@@ -965,7 +966,9 @@ typing-extensions==4.16.0 \
     #   opentelemetry-api
     #   pydantic
     #   pydantic-core
+    #   pyopenssl
     #   sqlalchemy
+    #   starlette
     #   typing-inspection
 typing-inspection==0.4.4 \
     --hash=sha256:547274fa6b0a561ccf549cc9524b999a578e737d015d8709d021f9d0d13bea47 \
