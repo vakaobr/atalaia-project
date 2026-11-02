@@ -88,7 +88,17 @@ class VersionTests(unittest.TestCase):
             self.assertEqual(len(marked), 1, name)
             self.assertRegex(marked[0], r"^(version:|const appVersion|__version__)", name)
         config = json.loads((REPO / "release-please-config.json").read_text(encoding="utf-8"))
-        self.assertEqual(sorted(config["packages"]["."]["extra-files"]), sorted(MARKED))
+        extra = config["packages"]["."]["extra-files"]
+        paths = [e if isinstance(e, str) else e["path"] for e in extra]
+        self.assertEqual(sorted(paths), sorted(MARKED))
+        # A .yaml/.json/.toml/.xml path given as a plain string gets release-please's structured updater, which
+        # rewrites the whole file (the v0.6.0 release PR stripped app/pubspec.yaml's comments and SPDX header):
+        # such files must be generic extra-files, which change only the marked line.
+        for e in extra:
+            path = e if isinstance(e, str) else e["path"]
+            if path.endswith((".yaml", ".yml", ".json", ".toml", ".xml")):
+                self.assertIsInstance(e, dict, path)
+                self.assertEqual(e.get("type"), "generic", path)
         self.assertEqual(json.loads((REPO / tool.MANIFEST).read_text(encoding="utf-8")).keys(), {"."})
 
 
