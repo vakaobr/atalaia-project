@@ -263,6 +263,11 @@ class FakeStream:
             threading.Thread(target=self._one, args=(conn,), daemon=True).start()
 
     def _one(self, conn: socket.socket) -> None:
+        # Closed however the talk ends (the client gone, a refusal), not left to the garbage collector.
+        with conn:
+            self._talk(conn)
+
+    def _talk(self, conn: socket.socket) -> None:
         raw = b""
         while b"\r\n\r\n" not in raw:
             chunk = conn.recv(4096)
@@ -607,6 +612,27 @@ class WsClientTests(unittest.TestCase):
         b2.sendall(bytes([0xC1, 0x00]))  # RSV1: no extension was negotiated
         with self.assertRaises(ws_client.WsError):
             ws.recv(1)
+
+    def test_close_closes_the_socket_after_the_server_went_away(self) -> None:
+        """PLK-4: a link already down (the server closed it, a send failed) was marked closed and
+        close() then returned early, leaving the socket open; the remote GM reconnects in a loop."""
+        a, b = socket.socketpair()
+        self.addCleanup(a.close)
+        ws = ws_client.WebSocket(a)
+        b.close()
+        with self.assertRaisesRegex(ws_client.WsError, "closed the connection"):
+            ws.recv(1)
+        self.assertTrue(ws.closed)
+        ws.close()
+        self.assertEqual(a.fileno(), -1)
+        ws.close()  # twice is fine
+        c, d = socket.socketpair()
+        self.addCleanup(c.close)
+        self.addCleanup(d.close)
+        ws = ws_client.WebSocket(c)
+        ws.close()
+        self.assertEqual(d.recv(16)[:1], bytes([0x80 | ws_client.OP_CLOSE]))  # the close frame still goes
+        self.assertEqual(c.fileno(), -1)
 
     def test_a_partial_frame_waits(self) -> None:
         a, b = socket.socketpair()

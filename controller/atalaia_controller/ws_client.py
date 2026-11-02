@@ -155,13 +155,15 @@ class WebSocket:
         self._send(OP_TEXT, data)
 
     def close(self, code: int = 1000) -> None:
-        if self.closed:
-            return
-        try:
-            self._sock.sendall(encode_frame(OP_CLOSE, struct.pack("!H", code), os.urandom(4)))
-        except OSError:
-            pass
-        self.closed = True
+        # The socket is closed even when the link is already down (the server went away, a send or a
+        # receive failed): those only set ``closed``, and returning early left the socket open until
+        # the garbage collector found it, one per reconnect (a ResourceWarning in the tests, PLK-4).
+        if not self.closed:
+            try:
+                self._sock.sendall(encode_frame(OP_CLOSE, struct.pack("!H", code), os.urandom(4)))
+            except OSError:
+                pass
+            self.closed = True
         try:
             self._sock.close()
         except OSError:
