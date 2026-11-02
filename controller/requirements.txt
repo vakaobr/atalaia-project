@@ -7,7 +7,7 @@
 # added with --upgrade-package NAME --exclude-newer-package NAME=<its release
 # day, or a time just after its upload when a newer release came out the same
 # day>; the commit that bumps it gives the full command.
-# On a Raspberry Pi or Ubuntu the distribution packages are enough and are what CI tests:
+# On a Raspberry Pi or Ubuntu the distribution packages are enough (CI tests them and this file):
 #   sudo apt install python3-fastapi python3-uvicorn python3-websockets \
 #        python3-paho-mqtt python3-serial python3-yaml python3-cryptography mosquitto
 # With pip, inside a virtual environment (every package pinned with its hashes):
