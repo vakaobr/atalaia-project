@@ -1,14 +1,16 @@
 name: Release
 
-# A pushed tag v* builds the firmware images, signs them with the CI release key and publishes a
-# GitHub pre-release (docs/manuals/en/firmware.md, firmware/esp32/docs/RELEASE_SIGNING.md).
-# What decides is the ref the run is on, not the event: a tag v* (pushed by hand, or named by
-# tag-release.yml's `gh workflow run release.yml --ref vX.Y.Z`, because a tag pushed with the
-# workflow token starts no workflow) is a real release; "Run workflow" (workflow_dispatch) on a
-# branch is a dry run: the same builds and packaging, signed with a throw-away key made on the
-# runner, uploaded as a workflow artifact, no release, no secret used. A tag pushed by hand and
-# the dispatch for it cannot publish twice: a release that already exists fails the run
-# (checked here first, and again before anything is created). Cutting one: CONTRIBUTING.md.
+# A release tag v* builds the firmware images, signs them with the CI release key and publishes a
+# GitHub pre-release with them (docs/manuals/en/firmware.md, firmware/esp32/docs/RELEASE_SIGNING.md).
+# What decides is the ref the run is on, not the event: a tag v* is a real release, whether
+# release-please.yml named it (`gh workflow run release.yml --ref vX.Y.Z` after merging the release
+# pull request, because a tag made with the workflow token starts no workflow; release-please's
+# release is turned back into a draft first) or the maintainer pushed it by hand; "Run workflow"
+# (workflow_dispatch) on a branch is a dry run: the same builds and packaging, signed with a
+# throw-away key made on the runner, uploaded as a workflow artifact, no release, no secret used.
+# Files are only ever added to a draft, which is published once all of them are up: a published
+# release fails the run (checked here first, and again before anything is uploaded), so a tag
+# cannot publish twice. Releasing: CONTRIBUTING.md, "Releases".
 
 on:
   push:
@@ -74,8 +76,9 @@ jobs:
               echo "::error::$GITHUB_REF_NAME is not a release tag (vMAJOR.MINOR.PATCH[-pre-release])"
               exit 1
             fi
+            # This job's token sees published releases only: release-please's draft passes.
             if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-              echo "::error::a release for $GITHUB_REF_NAME already exists; nothing to do (delete it, and the tag if it is wrong, to release again)"
+              echo "::error::a published release for $GITHUB_REF_NAME already exists; nothing to do (delete it, and the tag if it is wrong, to release again)"
               exit 1
             fi
             version="${GITHUB_REF_NAME#v}"
@@ -253,21 +256,30 @@ jobs:
           path: dist/*
           if-no-files-found: error
           retention-days: 7
-      - name: Create the pre-release (a draft until every asset is up)
+      - name: Publish the pre-release (a draft until every asset is up)
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
           set -eu
+          # The notes: the pre-alpha warning and the guides, then the tag's CHANGELOG.md section
+          # (release-please's list from the pull request titles, and its hand-written Details).
           python3 tools/release_package.py notes --version "$FW_VERSION" --tag "$TAG" --out "$RUNNER_TEMP/notes.md"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "::error::a release for $TAG already exists; delete it (and the tag, if it is wrong) first"; exit 1
+          if draft="$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            # release-please's release, made a draft again by release-please.yml (or a run of this
+            # job that failed half-way: --clobber replaces what it uploaded). A published one is live.
+            if [ "$draft" != true ]; then
+              echo "::error::the release $TAG is published already; delete it (and the tag, if it is wrong) first"; exit 1
+            fi
+            gh release edit "$TAG" --prerelease --title "$TAG (pre-alpha)" --notes-file "$RUNNER_TEMP/notes.md"
+            gh release upload "$TAG" dist/* --clobber
+          else
+            # A tag pushed by hand: no release yet. No partial release: a failure deletes the draft.
+            trap 'gh release delete "$TAG" --yes >/dev/null 2>&1 || true' ERR
+            gh release create "$TAG" dist/* --draft --prerelease --verify-tag \
+              --title "$TAG (pre-alpha)" --notes-file "$RUNNER_TEMP/notes.md"
           fi
-          # No partial release: a draft, published only when everything uploaded; a failure deletes it.
-          trap 'gh release delete "$TAG" --yes >/dev/null 2>&1 || true' ERR
-          gh release create "$TAG" dist/* --draft --prerelease --verify-tag \
-            --title "$TAG (pre-alpha)" --notes-file "$RUNNER_TEMP/notes.md"
           gh release edit "$TAG" --draft=false --prerelease
           trap - ERR
           rm -f "$RUNNER_TEMP/notes.md"

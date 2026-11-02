@@ -1,0 +1,75 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A pull request's title becomes the squash-merge commit on main, and release-please
+# (release-please.yml) builds the version bump and the CHANGELOG.md section from those commits: so
+# the title must be a Conventional Commit, `type(scope): summary` (CONTRIBUTING.md, "Pull request
+# titles"). `feat` raises the minor version (while 0.x), `fix` the patch, `type!:` or a
+# "BREAKING CHANGE:" footer marks a breaking change; feat, fix, perf, revert and docs are listed in
+# the CHANGELOG, the other types are not. Dependabot's titles comply (.github/dependabot.yml
+# commit-message prefixes). The check reads the title from the event only: no checkout, no code of
+# the pull request runs, and the token can only read.
+
+name: Pull request title
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  conventional:
+    name: The title is a Conventional Commit
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read # the pull request's current title
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            revert
+            docs
+            refactor
+            test
+            build
+            ci
+            style
+            chore
+          # The repository's areas (the top-level folders and the parts inside them); a mode may be
+          # named as modes/<mode>. The scope is optional: `docs: ...` and `ci: ...` are fine.
+          scopes: |
+            core
+            firmware
+            modem
+            pod
+            controller
+            console
+            server
+            app
+            preview
+            site
+            docs
+            ci
+            modes
+            modes/[a-z0-9_-]+
+            protocol
+            tools
+            hardware
+            simulator
+            registry
+            examples
+            i18n
+            security
+            deps
+            release
+          requireScope: false
