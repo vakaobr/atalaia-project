@@ -17,8 +17,11 @@
 //     {uuids: [String], window_ms: Int}
 //     one map per window: {t: Unix ms, beacons: [{uuid, major, minor, rssi,
 //     count}]}, one entry per beacon heard, rssi the average over the
-//     window. Without the permission the stream fails at once with the error
-//     code "unavailable".
+//     window. Its error codes are Android's, by cause: "unavailable" (the
+//     phone cannot range beacons), "permission" (no location permission, at
+//     the start or taken away while listening; iOS also reports Location
+//     Services switched off as a refusal), "no_beacons" (no valid UUID asked
+//     for) and "scan_failed" (CoreLocation gave up ranging).
 //
 // iOS ranges iBeacons through CoreLocation only (there is no raw scan for
 // another company's advertisement), one constraint per registered UUID, so
@@ -156,7 +159,7 @@ final class BeaconScanPlugin: NSObject {
     let status = manager.authorizationStatus
     if sink != nil, status == .denied || status == .restricted {
       // The person took the permission away while a game was sharing.
-      fail("unavailable", "no location permission")
+      fail("permission", "no location permission")
     }
   }
 
@@ -179,9 +182,13 @@ extension BeaconScanPlugin: @preconcurrency FlutterStreamHandler {
   func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink)
     -> FlutterError?
   {
-    guard granted, CLLocationManager.isRangingAvailable() else {
+    // Android's order: no hardware first (a permission would not help), then the permission.
+    guard CLLocationManager.isRangingAvailable() else {
       return FlutterError(
-        code: "unavailable", message: "no location permission or ranging", details: nil)
+        code: "unavailable", message: "this phone cannot range beacons", details: nil)
+    }
+    guard granted else {
+      return FlutterError(code: "permission", message: "no location permission", details: nil)
     }
     let args = arguments as? [String: Any]
     let uuids = ((args?["uuids"] as? [Any]) ?? []).compactMap {
