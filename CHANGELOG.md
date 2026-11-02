@@ -14,6 +14,7 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+- **The I/O pod's release package no longer fails the boot-splash check** (`tools/release_package.py`): the check (LOGO-7) wanted exactly one `splash_logo.c` in every build, but the I/O pod has no screen and its build embeds none, so the v0.6.0 release run stopped on the io-pod package and published nothing. A build with `CONFIG_ATALAIA_POD_MODE=y` now passes when it embeds no splash, and is refused if it does.
 ## [0.6.0](https://github.com/vakaobr/atalaia-project/compare/v0.5.0...v0.6.0) (2026-11-02)
 
 ### Features
