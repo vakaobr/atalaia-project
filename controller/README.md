@@ -72,7 +72,7 @@ python3 -m atalaia_controller join-key --fingerprint                # its finger
 python3 -m atalaia_controller join-key --rotate                     # a new key, after a field card is lost
 ```
 
-Without the distribution packages (another Linux, a development machine), install the pinned set in a virtual environment instead. `requirements.txt` pins every package with its PyPI hashes (made from `requirements.in`, which says how to refresh it; the cryptography floor is 44.0.1) and works on Python 3.11 and later, x86-64 and aarch64 (a Raspberry Pi 4 or 5 on a 64-bit OS; wheels exist for both, so nothing is compiled; a 32-bit OS has no wheels for some packages: use the apt route):
+Without the distribution packages (another Linux, a development machine), install the pinned set in a virtual environment instead. `requirements.txt` pins every package with its PyPI hashes (made from `requirements.in`, which says how to refresh it; the cryptography floor is 44.0.1) and works on Python 3.11 and later, x86-64 and aarch64 (a Raspberry Pi 4 or 5 on a 64-bit OS; wheels exist for both, so nothing is compiled; a 32-bit OS has no wheels for some packages: use the apt route). CI runs the controller's tests on both: Ubuntu's packages (job `controller`) and this pinned set with pip on Python 3.12 (job `controller-pinned`, where a deprecation warning from FastAPI or pydantic fails the run):
 
 ```sh
 python3 -m venv .venv && . .venv/bin/activate

@@ -3,7 +3,7 @@
 #
 # Generated from requirements.in with uv pip compile --universal --generate-hashes
 # --exclude-newer 2026-10-16 (see requirements.in); do not edit by hand.
-# On a Raspberry Pi or Ubuntu the distribution packages are enough and are what CI tests:
+# On a Raspberry Pi or Ubuntu the distribution packages are enough (CI tests them and this file):
 #   sudo apt install python3-fastapi python3-uvicorn python3-websockets \
 #        python3-paho-mqtt python3-serial python3-yaml python3-cryptography mosquitto
 # With pip, inside a virtual environment (every package pinned with its hashes):
