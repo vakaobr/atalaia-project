@@ -43,7 +43,9 @@ set -eu
 SRC="${ATALAIA_SRC:-/src}"
 MODE="${1:-check}"
 [ $# -gt 0 ] && shift
-W=/tmp/atalaia-app
+# The copy the checks work on. ATALAIA_APP_WORK gives a run its own folder: two runs on one machine (the Mac's
+# native app job, outside a container) would otherwise overwrite each other's sources.
+W="${ATALAIA_APP_WORK:-/tmp/atalaia-app}"
 export FLUTTER_SUPPRESS_ANALYTICS=true
 
 # Pinned Android build tools (the same in android/app/build.gradle.kts).

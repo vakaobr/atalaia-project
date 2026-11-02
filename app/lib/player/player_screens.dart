@@ -671,10 +671,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   /// Asks the field for its beacons and, if it has any and the phone may
   /// listen, the player's leave first (decisions BLE-1 to BLE-9): a field
-  /// without beacons asks for nothing; the explanation comes before the
-  /// system's Bluetooth and location prompts; a refusal, a phone without
-  /// Bluetooth LE, or Bluetooth switched off leaves the GPS position as it
-  /// was, and says so.
+  /// without beacons asks for nothing; the explanation (the beacons are
+  /// optional, GPS is shared either way: LSW-1) comes before the system's
+  /// Bluetooth and location prompts; a refusal, a phone without Bluetooth LE,
+  /// or Bluetooth switched off leaves the GPS position as it was, and the
+  /// line under the switch says "GPS only".
   Future<BeaconScanner?> _beaconScanner(
     AppServices services,
     CheckinClient client,
@@ -735,10 +736,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
         ],
       ),
     );
-    if (go != true) {
-      _beaconNote = 'player.beacons_skipped';
-      return null;
-    }
+    // "GPS only": nothing more to say, the line under the switch says what
+    // is shared (LSW-2).
+    if (go != true) return null;
     if (!await services.device.requestPermission('BLUETOOTH_SCAN') ||
         !await scan.granted()) {
       _beaconNote = 'player.beacons_denied';
@@ -1008,7 +1008,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
         body: BrandBackdrop(
           branding: _brand,
           child: ListenableBuilder(
-            listenable: Listenable.merge([feed, ?_reporter, ?_plan]),
+            listenable: Listenable.merge([
+              feed,
+              ?_reporter,
+              ?_reporter?.beacons,
+              ?_plan,
+            ]),
             builder: (context, _) => Column(
               children: [
                 if (_watch.out && (_reporter?.running ?? false))
@@ -1025,6 +1030,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             stopped: _reporter?.stopReason,
                             error: _shareError,
                             beaconNote: _beaconNote,
+                            byBeacons: _reporter?.beacons?.running ?? false,
                             room: _myRoom,
                             onChanged: _share,
                             squads: ((feed.game?['squads'] as int?) ?? 0) > 0,
@@ -1357,6 +1363,7 @@ class _SharePosition extends StatelessWidget {
     this.squads = false,
     this.bounds = false,
     this.beaconNote,
+    this.byBeacons = false,
     this.room,
     this.levels,
     this.level,
@@ -1380,6 +1387,10 @@ class _SharePosition extends StatelessWidget {
   /// controller shows this player in (BLE-8).
   final String? beaconNote;
   final String? room;
+
+  /// Whether the field's beacons are being listened for: the line under the
+  /// switch says "GPS and beacons", else "GPS only" (decision LSW-2).
+  final bool byBeacons;
 
   /// The field's levels (null or one: no floor to choose), the floor shown as
   /// the player's (null: not known), whether a room beacon gives it, and what
@@ -1408,6 +1419,21 @@ class _SharePosition extends StatelessWidget {
                   ),
           ),
         ),
+        // What is shared, always, while sharing (LSW-2): "GPS only" is what
+        // the switch asked for, the beacons only add the floor and the room.
+        if (running)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: Text(
+              s.t(
+                byBeacons
+                    ? 'player.share_mode_beacons'
+                    : 'player.share_mode_gps',
+              ),
+              key: const Key('player-share-mode'),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(

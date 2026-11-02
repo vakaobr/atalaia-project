@@ -191,8 +191,15 @@ export class ScenarioBuilder extends Component {
 
     async install() {
         const app = this.props.app;
+        let text = this.state.text;
+        // An edit on a block a moment ago may not have reached the text yet (CKF-2).
+        const now = this.state.view === 'blocks' && this.blockView ? this.blockView.flush() : null;
+        if (now) {
+            if (now.problems.some((p) => p.level === 'error')) return;
+            if (now.yaml) text = now.yaml;
+        }
         try {
-            const done = await api(app.token, 'POST', '/scenarios', { manifest: this.state.text });
+            const done = await api(app.token, 'POST', '/scenarios', { manifest: text });
             this.setState({ done });
             this.loadList();
             app.loadCatalogue();

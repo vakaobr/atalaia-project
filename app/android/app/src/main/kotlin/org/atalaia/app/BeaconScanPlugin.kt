@@ -45,7 +45,11 @@ import java.util.UUID
  * The permissions are asked from Dart first (DevicePlugin: BLUETOOTH_SCAN, and
  * with it the location that a scan needs here: the manifest does not declare
  * neverForLocation, which would hide beacons from the scanner). The sightings
- * event is a map {t, beacons: [{uuid, major, minor, rssi, count}]}.
+ * event is a map {t, beacons: [{uuid, major, minor, rssi, count}]}. Its error
+ * codes, the same as the iOS plugin's: "unavailable" (no Bluetooth LE, or
+ * Bluetooth off), "permission" (a permission refused, also when the scan is
+ * refused with a SecurityException), "no_beacons" (no valid UUID asked for)
+ * and "scan_failed" (the scanner gave up).
  */
 @SuppressLint("MissingPermission")
 class BeaconScanPlugin(private val activity: Activity, messenger: BinaryMessenger) :
@@ -94,8 +98,14 @@ class BeaconScanPlugin(private val activity: Activity, messenger: BinaryMessenge
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
         val scanner = adapter?.takeIf { it.isEnabled }?.bluetoothLeScanner
         if (events == null) return
-        if (scanner == null || !granted()) {
-            events.error("unavailable", "Bluetooth is off or the permission is missing", null)
+        // The same codes as the iOS plugin, by cause (see beacon_scan.dart): no Bluetooth LE or Bluetooth off
+        // first (a permission would not help), then a permission refused.
+        if (scanner == null) {
+            events.error("unavailable", "no Bluetooth LE, or Bluetooth is off", null)
+            return
+        }
+        if (!granted()) {
+            events.error("permission", "the Bluetooth scan or location permission is missing", null)
             return
         }
         val args = arguments as? Map<*, *>

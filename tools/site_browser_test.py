@@ -28,7 +28,7 @@ import unittest
 from pathlib import Path
 
 try:
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import TimeoutError as PlaywrightTimeout, sync_playwright
 except ImportError:  # pragma: no cover
     sync_playwright = None
 
@@ -37,6 +37,9 @@ LANGS = [("pt-PT", "Português"), ("en", "English"), ("de", "Deutsch"), ("zh-Han
 FLAGS = ["\U0001F1F5\U0001F1F9", "\U0001F1EC\U0001F1E7", "\U0001F1E9\U0001F1EA", "\U0001F1F9\U0001F1FC"]
 PAGES = sorted(p.relative_to(SITE).as_posix() for p in SITE.rglob("index.html")
                if not {"src", "i18n", "img", "fonts"} & set(p.relative_to(SITE).parts))
+# How long to wait for something the page does after an action (a picture that has to load). Generous:
+# the merge queue runs this next to a dozen other Docker jobs, and an idle machine takes milliseconds.
+WAIT_MS = 30_000
 
 
 class Quiet(http.server.SimpleHTTPRequestHandler):
@@ -99,16 +102,18 @@ class SiteFlags(unittest.TestCase):
                         for fig in figures:
                             fig.scroll_into_view_if_needed()
                             page.wait_for_function("(f) => f.querySelector('img').complete", arg=fig)
-                        src = page.evaluate("document.querySelector('.gif-row img').currentSrc")
-                        self.assertEqual(src.endswith("-still.gif"), reduced == "reduce")
+                        self.wait_for_picture(page, still=reduced == "reduce")
                         button = page.query_selector(".gif-row button.modegif-button")
                         button.focus()
                         self.assertNotEqual(button.evaluate("(b) => getComputedStyle(b).outlineStyle"), "none")
                         before = button.inner_text()
                         page.keyboard.press("Enter")
                         self.assertNotEqual(button.inner_text(), before)
-                        now = page.evaluate("document.querySelector('.gif-row img').currentSrc")
-                        self.assertEqual(now.endswith("-still.gif"), reduced == "no-preference")
+                        # The click sets the img's src at once, but currentSrc (the picture shown) only
+                        # changes once the browser has loaded the other GIF: wait for it, do not read it.
+                        src = page.evaluate("document.querySelector('.gif-row img').getAttribute('src')")
+                        self.assertEqual(src.endswith("-still.gif"), reduced == "no-preference")
+                        self.wait_for_picture(page, still=reduced == "no-preference")
                         page.goto(self.base + modes_dir, wait_until="load")
                         self.assertEqual(len(page.query_selector_all("[aria-labelledby=box-screens] a.zoom")), 8)
                         self.assertGreaterEqual(len(page.query_selector_all("figure.modegif button.modegif-button")), 14)
@@ -117,6 +122,18 @@ class SiteFlags(unittest.TestCase):
                         self.assertTrue(page.evaluate("document.getElementById('viewer').open"))
                         page.keyboard.press("Escape")
                     ctx.close()
+
+    def wait_for_picture(self, page, still):
+        """Waits until the first animation has loaded and shows its still (or its animated) GIF."""
+        try:
+            page.wait_for_function("(still) => { const i = document.querySelector('.gif-row img');"
+                                   "return i.complete && i.naturalWidth > 0"
+                                   " && i.currentSrc.endsWith('-still.gif') === still; }",
+                                   arg=still, timeout=WAIT_MS)
+        except PlaywrightTimeout:
+            shown = page.evaluate("document.querySelector('.gif-row img').currentSrc")
+            self.fail(f"the first animation should show its {'still' if still else 'animated'} GIF within "
+                      f"{WAIT_MS} ms; it shows {shown!r}")
 
     def check_page(self, page, url, width):
         page.goto(url, wait_until="load")

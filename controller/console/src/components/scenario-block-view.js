@@ -53,6 +53,7 @@ export class ScenarioBlocks extends Component {
         this.marked = new Set();
         this.problems = [];
         this.timer = null;
+        this.said = null; // the YAML the blocks said last (sent or not)
     }
 
     componentDidMount() {
@@ -68,6 +69,7 @@ export class ScenarioBlocks extends Component {
     componentWillUnmount() {
         this.stopped = true;
         clearTimeout(this.timer);
+        this.flush(); // a change made just before the GM leaves the view is not lost
         if (this.ws) {
             // Kept for the next view (a language change re-creates the blocks with its texts).
             this.props.store.state = window.Blockly.serialization.workspaces.save(this.ws);
@@ -115,9 +117,26 @@ export class ScenarioBlocks extends Component {
         const { manifest, where, problems } = workspaceToManifest(this.ws);
         this.where = where;
         this.local = problems;
-        if (send && manifest) this.props.onChange(toYaml(manifest), problems);
+        this.said = manifest ? toYaml(manifest) : null;
+        if (send && manifest) this.props.onChange(this.said, problems);
         else this.props.onLocal(problems);
         this.mark();
+    }
+
+    /** Hands the builder a change it has not had yet, now. Blockly fires a change's events a frame
+     * later (requestAnimationFrame) and the regeneration waits one more turn, so a GM who edits a
+     * block and at once leaves the view or presses Install would otherwise lose the change: the
+     * view is gone before the events come (CKF-2). Returns the YAML it handed over (null when
+     * there was nothing new: the text, with its comments, stays) and the blocks' problems. */
+    flush() {
+        if (!this.ws) return null;
+        const { manifest } = workspaceToManifest(this.ws);
+        const changed = (manifest ? toYaml(manifest) : null) !== this.said;
+        if (changed) {
+            clearTimeout(this.timer);
+            this.generate(true);
+        }
+        return { yaml: changed ? this.said : null, problems: this.local };
     }
 
     blockOf(problem) {

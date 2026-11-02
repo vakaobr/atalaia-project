@@ -653,8 +653,9 @@ Images (ESP-IDF v5.3.2, 0 warnings): Field Box 1,952,160 bytes (0x1dc9a0), 2,242
 
 A field controller updates a Field Box's firmware over the field's Wi-Fi, between games
 ([protocol/firmware-update.md](../../protocol/firmware-update.md), decisions FU3-*). In
-software and in host tests; not yet run on a real board ([BRING_UP.md](docs/BRING_UP.md),
-step 10c).
+software and in host tests, and on real boards on the bench since 2026-10-22 ([BRING_UP.md](docs/BRING_UP.md),
+step 10c; on 2026-11-02 a bench build signed with the bench release key went over the air from
+the console in about 22 s); not yet on a field.
 
 - **The box decides.** `main/fw_update.c` (platform-free, run by the host tests with fakes)
   checks the offer (no game played, release keys built in, the join's field CA and addresses,
@@ -1182,8 +1183,6 @@ Still pending:
   the PN532 reading real join cards, NVS encryption on a provisioned box,
   an invite between games over the air (BRING_UP.md, step 3b).
 - Joining over Wi-Fi from the GM console (decision E3).
-- Running a firmware update over the air on a real board (built and host-tested:
-  [Firmware updates](#firmware-updates-over-the-air)).
 - A GNSS driver for the module on the board's connector (its pins and power
   control are in Kconfig; it stays off until a mode needs a position)
 

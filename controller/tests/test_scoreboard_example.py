@@ -19,7 +19,7 @@ import threading
 import unittest
 from pathlib import Path
 
-from support import MOSQUITTO, FakeModem, Mosquitto, config, wait_for
+from support import MOSQUITTO, FakeModem, Listener, Mosquitto, config, wait_for
 from atalaia_controller.engine import Controller
 from atalaia_controller.mqtt import MqttBridge
 from atalaia_controller.store import Store
@@ -79,7 +79,16 @@ class ExampleAgainstBrokerTests(unittest.TestCase):
 
     def test_prints_the_retained_score(self):
         self.ctrl.adjust_score(self.gid, "red", 10, "bonus")
-        self.assertTrue(wait_for(lambda: self.bridge.published > 0, 5))
+        # bridge.published counts every publish queued in paho (the game start's events too), not what
+        # the broker holds. A subscriber seeing red 10 at all (live or retained, MQTT 3.1.1 section
+        # 3.3.1.3) proves the broker holds it; the example, started after that, gets it retained.
+        topic = f"field/v1/{self.gid}/score"
+        first = Listener(self.broker.port, topic)
+        try:
+            self.assertTrue(wait_for(lambda: {"red": 10, "blue": 0} in [m["teams"] for m in first.topic(topic)], 5),
+                            first.messages)
+        finally:
+            first.close()
         out = self.run_example("--once", "--timeout", "10", "--game", str(self.gid))
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertEqual(out.stdout.strip().splitlines()[-1], f"game {self.gid}: red 10 · blue 0")

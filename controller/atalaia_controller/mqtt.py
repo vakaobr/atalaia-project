@@ -85,10 +85,11 @@ class MqttBridge:
             return
         log.info("MQTT connected to %s:%d", self.cfg.mqtt_host, self.cfg.mqtt_port)
         client.subscribe(f"{PREFIX}/+/cmd/+", qos=1)
+        # Under the lock, as in _publish: a score that arrives meanwhile goes out after this
+        # republish, never before it (the broker would keep the older payload).
         with self._lock:
-            retained = list(self._retained.items())
-        for topic, payload in retained:
-            client.publish(topic, payload, qos=1, retain=True)
+            for topic, payload in self._retained.items():
+                client.publish(topic, payload, qos=1, retain=True)
         self.connected.set()
 
     def _on_disconnect(self, client, userdata, *args) -> None:
@@ -100,9 +101,12 @@ class MqttBridge:
     def _publish(self, topic: str, data: Any, retain: bool = False) -> None:
         payload = json.dumps(data, separators=(",", ":")).encode()
         if retain:
+            # Store and send in one step, so a reconnect cannot republish an older payload after this one.
             with self._lock:
                 self._retained[topic] = payload
-        info = self.client.publish(topic, payload, qos=1, retain=retain)
+                info = self.client.publish(topic, payload, qos=1, retain=True)
+        else:
+            info = self.client.publish(topic, payload, qos=1, retain=False)
         if info.rc == 0:
             self.published += 1
 

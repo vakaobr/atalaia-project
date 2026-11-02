@@ -675,6 +675,8 @@ const Map<String, String> enStrings = {
   'player.share_hint': 'Only during the game; the controller decides who sees it. The organisers and the marshals see it on their ATAK devices.',
   'player.share_on': 'Sharing: {n} positions sent',
   'player.share_on_one': 'Sharing: {n} position sent',
+  'player.share_mode_gps': 'Sharing by GPS only',
+  'player.share_mode_beacons': 'Sharing by GPS and beacons',
   'player.share_stopped':
       'Sharing stopped: the game ended or the check-in changed.',
   'player.no_location': 'This phone has no location.',
@@ -700,18 +702,18 @@ const Map<String, String> enStrings = {
   'prop.radio.closed': 'The pod\'s radio is off',
   'prop.gm_message': 'Game master: {text}',
   // Indoor beacons (decisions BLE-1 to BLE-9)
-  'player.beacons_why_title': 'Indoor positions',
-  'player.beacons_why': 'This field has Bluetooth beacons indoors. To tell which room you are in, Atalaia can listen for them while you share your position: only the field\'s own beacons, and it sends only which one is strongest. Android asks for the Bluetooth and location permissions for this. Without them your position stays GPS only.',
-  'player.beacons_allow': 'Continue',
-  'player.beacons_skip': 'Not now',
+  'player.beacons_why_title': 'Indoor positions (optional)',
+  'player.beacons_why': 'Your GPS position is shared either way. This field has Bluetooth beacons indoors: with them, your position also gives the floor and the room. Atalaia listens only for the field\'s own beacons, only while you share your position, and sends only which one is strongest. Android asks for the Bluetooth and location permissions for this.',
+  'player.beacons_allow': 'Use the beacons',
+  'player.beacons_skip': 'GPS only',
   'player.beacons_on':
       'Listening for the field\'s beacons: indoors your position is the room.',
-  'player.beacons_skipped':
-      'Indoor positions are off. Your GPS position is still shared.',
-  'player.beacons_denied': 'Indoor positions are off: no permission for Bluetooth. Your GPS position is still shared.',
+  'player.beacons_denied':
+      'Indoor positions are off: no permission for Bluetooth.',
   'player.beacons_off': 'Indoor positions are off: Bluetooth is switched off. Switch it on and share again.',
-  'player.beacons_unavailable': 'This phone cannot listen for the field\'s beacons. Your GPS position is still shared.',
-  'player.beacons_why_ios': 'This field has Bluetooth beacons indoors. To tell which room you are in, Atalaia can listen for them while you share your position: only the field\'s own beacons, and it sends only which one is strongest. iPhone asks for the location permission for this (Bluetooth is used by the beacons, not asked for). Without it your position stays GPS only.',
+  'player.beacons_unavailable':
+      'This phone cannot listen for the field\'s beacons.',
+  'player.beacons_why_ios': 'Your GPS position is shared either way. This field has Bluetooth beacons indoors: with them, your position also gives the floor and the room. Atalaia listens only for the field\'s own beacons, only while you share your position, and sends only which one is strongest. iPhone asks for the location permission for this (Bluetooth is used by the beacons, not asked for).',
   'player.beacons_on_ios': 'Listening for the field\'s beacons, only while Atalaia is open on the screen: indoors your position is the room. With the phone locked or another app in front, your position goes back to GPS and keeps the last floor.',
   'player.my_room': 'Your position: {room}',
   'player.map_title': 'Field map',
