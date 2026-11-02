@@ -672,7 +672,8 @@ the console in about 22 s); not yet on a field.
   (BRING_UP.md step 10c); its release text and image say the version with its `+g...`.
 - **The ESP32 side** (`main/fw_update_esp.c`): the Wi-Fi station (`wifi_ssid`/`wifi_pass` in
   NVS: the setup portal's "Field Wi-Fi" fields, or `@wifi <ssid> <password>`), `esp_http_client`
-  over HTTPS trusting only the field CA whose SHA-256 is key 13 of the box's join, `esp_ota_*`
+  over HTTPS trusting only the field CA whose SHA-256 is key 13 of the box's join (the check is
+  `main/field_ca_pin.c`, platform-free: the host box runs it too), `esp_ota_*`
   into the inactive slot, on its own task while the game task and the radio carry on.
 - **Rollback.** `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` (`sdkconfig.defaults`, a new bootloader:
   flash it once by USB). After an update the new image runs its self-test once the radio and the
@@ -1175,7 +1176,12 @@ controller's game.
   `test/test_box_game.c` also runs the box between games (announcements, an
   invite in two parts, DISCOVER, the ready screen, every refusal, a replayed
   invite), and the host box (`--announce-ms N` for quick announcements) is
-  invited into a second game by the controller in `test_box_e2e.py`.
+  invited into a second game by the controller in `test_box_e2e.py`. With
+  `--mode-keys HEX --mode-source https` the host box fetches a game's missing
+  mode packages from the real controller over HTTPS, with the firmware's own
+  `mode_fetch.c` and field CA pin (`main/field_ca_pin.c`, which
+  `fw_update_esp.c` attaches too; `test/box_host/box_host_https.c` stands for
+  `esp_http_client`): `controller/tests/test_box_mode_fetch_e2e.py`.
 
 Still pending:
 

@@ -14,6 +14,8 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+- **The host box fetches mode packages from the real controller over HTTPS** (decisions MFH-1 to MFH-7; `firmware/esp32/main/field_ca_pin.c`, `firmware/esp32/main/fw_update_esp.c`, `firmware/esp32/test/box_host/box_host_https.c`, `firmware/esp32/test/box_host/box_host.c`, `controller/tests/test_box_mode_fetch_e2e.py`): the Field Box's check of the controller's certificate against the join's field CA (key 13) moves out of `fw_update_esp.c` into a platform-free file that builds on the firmware's mbedTLS 3.6 and the host's 2.28; the Field Box attaches it as before. `box_host --mode-source https` runs the firmware's own fetch (`mode_fetch.c`) over mbedTLS sockets with that same check, to the join's address (key 14), and posts its reports to the controller; `--mode-source DIR` (files standing for the controller) is unchanged. A new end-to-end test starts the controller as `run` does (the field CA made on its first start, HTTPS on its TLS port, the C host modem), uploads a package signed with a test registry key, and the C host box fetches, verifies, keeps and reports it, then plays the game; it refuses a join pinning another CA (`unreachable`, said over LoRa), a package signed by a key it does not carry (`bad_signature`) and an archive changed after signing (`bad_hash`). The same fetch on a real box is still to do (HW3).
+
 ## [0.6.1](https://github.com/vakaobr/atalaia-project/compare/v0.6.0...v0.6.1) (2026-11-02)
 
 ### Bug Fixes

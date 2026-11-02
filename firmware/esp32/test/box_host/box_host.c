@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * Host box: a Field Box's game logic on Linux, for end-to-end tests with
- * the field controller and the host modem (controller/tests/test_box_e2e.py).
+ * the field controller and the host modem (controller/tests/test_box_e2e.py,
+ * test_box_mode_fetch_e2e.py).
  *
  * It runs the firmware's own box_game.c, radio/field_link.c,
  * radio_protocol.c, node_runner.c, preset_store.c, state_persist.c and
@@ -19,7 +20,7 @@
  *   box_host --state-dir DIR --modes DIR [--air-port N] [--air-peer N]
  *            [--join-key HEX] [--state-ms N] [--name NAME]
  *            [--as-box VERSION] [--release-keys HEX] [--admin-pin PIN] [--mac MAC] [--pair]
- *            [--announce-ms N] [--no-wifi] [--mode-keys HEX] [--mode-source DIR]
+ *            [--announce-ms N] [--no-wifi] [--mode-keys HEX] [--mode-source DIR|https]
  *            [--region eu868|as923-tw] [--no-lbt]
  *
  * Without --join-key (and no key stored in DIR) the box is unadopted
@@ -46,8 +47,13 @@
  * key 16 whose mode the box lacks is taken as fetching (protocol/mode-packages.md, "Fetching
  * missing modes") and the box runs the firmware's own fetch (mode_fetch.c) once the join is in:
  * from --mode-source DIR (DIR/<id>/release and DIR/<id>/package stand for the controller's
- * answers, a missing file for its 404), or, without it, with no Wi-Fi (no_wifi). It prints
- * "REPORT <the report's lines joined by |>" for each report it would post (taken: 200) and
+ * answers, a missing file for its 404), or, without it, with no Wi-Fi (no_wifi). With
+ * --mode-source https it fetches from the real controller as the Field Box does: over HTTPS to
+ * the join's addresses (key 14), trusting only the join's field CA (key 13) with the firmware's
+ * own pin (main/field_ca_pin.c; box_host_https.c stands for esp_http_client), and posts the
+ * reports to it ("LOG https: ..." says why a connection or a certificate was refused). It prints
+ * "REPORT <the report's lines joined by |>" for each report it posts (from files: taken, as a
+ * 200; over HTTPS then "REPORT taken=yes|no", the controller's 200 or not) and
  * "FETCH result=<code> part=<id>", then joins the game, or says why over LoRa
  * (node.modes_failed) and is free again.
  * --no-wifi: an offer that passes them then runs the update (fw_update_run), which stops
@@ -91,6 +97,7 @@
 #include "adoption.h"
 #include "atalaia/version.h"
 #include "box_game.h"
+#include "box_host_https.h"
 #include "box_text.h"
 #include "box_pair.h"
 #include "builtin_presets.h"
@@ -562,7 +569,7 @@ static void shell_update(void *user, const char *params)
 
 static uint8_t mode_keys[FW_KEYS_MAX][32];
 static int mode_key_count;
-static const char *mode_source; /* --mode-source: the controller's answers as files */
+static const char *mode_source; /* --mode-source: the controller's answers as files, or "https" */
 static bool fetch_due;
 static atalaia_join_t fetch_for;
 
@@ -633,20 +640,22 @@ static void mf_close(void *ctx)
     mf_stream = NULL;
 }
 
+/* --mode-source https: the firmware's HTTPS, as box_host_https.c gives it (NULL otherwise). */
+static const fw_io_t *mf_https;
+
 static bool mf_post(void *ctx, const char *base, const char *path, const char *body,
                     const char *mac_hex)
 {
-    (void)ctx;
-    (void)base;
-    (void)path;
-    (void)mac_hex;
     char line[MF_REPORT_MAX];
     snprintf(line, sizeof(line), "%s", body);
     for (char *c = line; *c; c++) {
         if (*c == '\n') *c = c[1] ? '|' : '\0';
     }
     out("REPORT %s", line);
-    return true;
+    if (mf_https == NULL) return true;
+    bool taken = mf_https->post(ctx, base, path, body, mac_hex);
+    out("REPORT taken=%s", taken ? "yes" : "no");
+    return taken;
 }
 
 static bool mf_cancelled(void *ctx)
@@ -655,20 +664,34 @@ static bool mf_cancelled(void *ctx)
     return game.fetch_cancel;
 }
 
+static void https_warn(const char *why)
+{
+    out("LOG https: %s", why);
+}
+
 static void run_fetch(void)
 {
     static uint8_t buf[4096];
     static char scratch[PRESET_SOURCE_MAX];
     fw_io_t io;
     memset(&io, 0, sizeof(io));
-    io.net_up = mf_net_up;
-    io.net_down = host_net_down;
-    io.get_text = mf_get_text;
-    io.open = mf_open;
-    io.read = mf_read;
-    io.close = mf_close;
+    if (mode_source != NULL && strcmp(mode_source, "https") == 0) {
+        /* As mode_fetch_esp.c: the firmware's HTTPS pinned to the join's field CA (key 13), to
+         * the join's addresses (key 14). */
+        mf_https = box_host_https_net(fetch_for.ca_sha256, https_warn);
+        io = *mf_https;
+    } else {
+        mf_https = NULL;
+        io.net_up = mf_net_up;
+        io.net_down = host_net_down;
+        io.get_text = mf_get_text;
+        io.open = mf_open;
+        io.read = mf_read;
+        io.close = mf_close;
+    }
     io.post = mf_post;
     io.cancelled = mf_cancelled;
+    io.ctx = NULL;
     mf_job_t job;
     memset(&job, 0, sizeof(job));
     job.keys = (const uint8_t(*)[32])mode_keys;
