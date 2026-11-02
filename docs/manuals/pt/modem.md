@@ -9,7 +9,7 @@ O **modem de rádio** é o rádio do controlador: uma placa Heltec WiFi LoRa 32 
 
 Esta página é o caminho todo, de uma placa nova até uma caixa a juntar-se a um jogo através do modem. Os outros guias remetem para aqui: o [guia do firmware](firmware.md#9-a-placa-modem), o [guia de montagem do controlador](controller-setup.md#3-preparar-a-placa-modem) e o [Manual da organização](game-master.md#num-raspberry-pi-ou-outro-computador-linux). Em inglês: [Set up the radio modem](../en/modem.md).
 
-> **O que foi testado e o que não foi.** Um modem gravado assim correu com o controlador e caixas reais numa bancada (2026-10-21): o controlador em Docker no Windows (WSL2), o modem numa porta COM do Windows, a que o contentor chegava por uma pequena ponte COM-para-TCP (vê a nota avançada na secção 7). **Ainda não correu num Raspberry Pi**: os nomes de portas do Linux, o grupo `dialout` e os passos de `systemd` abaixo seguem os ficheiros do projeto e o guia do controlador, e nenhum Pi os correu. Não experimentado em macOS. O gravador no navegador não foi experimentado com uma placa real. Não testado num campo.
+> **O que foi testado e o que não foi.** Um modem gravado assim correu com o controlador e caixas reais numa bancada (2026-10-21): o controlador em Docker no Windows (WSL2), o modem numa porta COM do Windows, a que o contentor chegava por uma pequena ponte COM-para-TCP (vê a nota avançada na secção 7). **Ainda não correu num Raspberry Pi**: os nomes de portas do Linux, o grupo `dialout` e os passos de `systemd` abaixo seguem os ficheiros do projeto e o guia do controlador, e nenhum Pi os correu. No macOS (2026-11-02, um Mac mini com Apple silicon, macOS 27) a imagem do modem e imagens de caixa foram gravadas como na secção 4, e o controlador em Docker chegou ao modem por uma ponte no Mac (secção 7) e registou `modem link up`; um controlador a correr diretamente no macOS não foi experimentado. O gravador no navegador não foi experimentado com uma placa real. Não testado num campo.
 
 ## 1. O caminho em resumo
 
@@ -31,7 +31,7 @@ Se algo falhar, vai à tabela da [secção 10](#10-resolução-de-problemas).
 | Uma **Heltec WiFi LoRa 32 V4**, só para o modem | Da mesma revisão (V4.3 ou V4.2) das tuas caixas. A V4.2 tem o chip GC1109 junto ao conector LoRa. Usa uma placa de que não precises como caixa: uma placa que é modem não é caixa |
 | Uma **antena LoRa** para a tua banda | 868 MHz na Europa (2 dBi ou menos), 915-925 MHz em Taiwan. **Monta-a antes de a placa ter qualquer energia**, também para gravar. Alimentar a placa sem ela pode destruir o rádio. O modem não tem Wi-Fi, por isso não precisa de antena de 2,4 GHz |
 | Um cabo USB-C **de dados** | Um cabo só de carga não mostra nenhuma porta. Curto. Para gravar, usa a porta USB do próprio computador, não um hub |
-| Um computador para gravar | Windows 10 ou 11, Linux (serve o próprio Raspberry Pi) ou macOS, com [Python 3](https://www.python.org/downloads/) |
+| Um computador para gravar | Windows 10 ou 11, Linux (serve o próprio Raspberry Pi) ou macOS, com [Python 3](https://www.python.org/downloads/) (serve o `python3` do próprio macOS) |
 | A mesma **região de rádio** das caixas | EU868 (a predefinida) ou AS923-TW. Um modem e uma caixa feitos para regiões diferentes nunca falam. Decide isto antes da secção 3 |
 
 ## 3. Obter a imagem do modem
@@ -100,7 +100,7 @@ python3 -m venv ~/atalaia-flash
 ~/atalaia-flash/bin/python -m pip install esptool==4.8.1
 ```
 
-Num Raspberry Pi OS ou Ubuntu que diga `ensurepip is not available`, corre primeiro `sudo apt install python3-venv`.
+Num Raspberry Pi OS ou Ubuntu que diga `ensurepip is not available`, corre primeiro `sudo apt install python3-venv`. O teste em macOS usou o esptool 4.12.0 com o pyserial 3.5 (`~/atalaia-flash/bin/pip install esptool pyserial`), e também gravou as imagens.
 
 ### 4.2 Encontrar a porta da placa
 
@@ -108,9 +108,9 @@ Num Raspberry Pi OS ou Ubuntu que diga `ensurepip is not available`, corre prime
 | --- | --- | --- |
 | Windows 10 e 11 | Uma **COM** nova, ID USB 303A:1001. Não é preciso nenhum controlador (driver) | Gestor de dispositivos, *Portas (COM e LPT)*; ou `%USERPROFILE%\atalaia-flash\Scripts\python -m serial.tools.list_ports -v` |
 | Linux | `/dev/ttyACM0`, ou `ttyACM1`... | `ls /dev/ttyACM*`, ou `dmesg \| tail` logo depois de ligares |
-| macOS | `/dev/cu.usbmodem...` | `ls /dev/cu.usbmodem*` |
+| macOS | `/dev/cu.usbmodem...` (por exemplo `/dev/cu.usbmodem31101`). Não é preciso nenhum controlador (driver). Usa o nome `cu.`, não o `tty.` | `ls /dev/cu.usbmodem*` |
 
-Se não tiveres a certeza de qual é a placa, desliga-a, lista as portas, volta a ligá-la e lista outra vez: a nova é a placa.
+Se não tiveres a certeza de qual é a placa, desliga-a, lista as portas, volta a ligá-la e lista outra vez: a nova é a placa. No macOS, com várias placas ligadas, `ioreg -p IOUSB -l -w0 | grep -E '"USB Serial Number" = "[0-9A-F]{2}:'` mostra o MAC de cada placa (o seu número de série USB), e `~/atalaia-flash/bin/python -m esptool --chip esp32s3 -p /dev/cu.usbmodem31101 read_mac` mostra o MAC da placa nessa porta (reinicia a placa).
 
 **Só no Linux: o grupo `dialout`.** O teu utilizador precisa dele para abrir a porta. Confirma com `groups`; se faltar `dialout`, corre `sudo usermod -aG dialout $USER` e depois **sai da sessão e entra outra vez**. Sem isso o esptool diz `Permission denied`.
 
@@ -140,12 +140,12 @@ cd atalaia-modem
 ~/atalaia-flash/bin/python -m esptool --chip esp32s3 -p /dev/ttyACM0 -b 921600 write_flash "@flash_args"
 ```
 
-macOS (não experimentado pelo projeto):
+macOS (a escrita foi feita assim num Mac, para o modem e para caixas):
 
 ```
 cd atalaia-modem
-~/atalaia-flash/bin/python -m esptool --chip esp32s3 -p /dev/cu.usbmodem1101 erase_flash
-~/atalaia-flash/bin/python -m esptool --chip esp32s3 -p /dev/cu.usbmodem1101 -b 921600 write_flash "@flash_args"
+~/atalaia-flash/bin/python -m esptool --chip esp32s3 -p /dev/cu.usbmodem31101 erase_flash
+~/atalaia-flash/bin/python -m esptool --chip esp32s3 -p /dev/cu.usbmodem31101 -b 921600 write_flash "@flash_args"
 ```
 
 Para uma compilação, troca `cd atalaia-modem` por `cd firmware/esp32/build-modem` (a partir da pasta do repositório). Salta a linha `erase_flash` quando não apagares.
@@ -223,9 +223,11 @@ Se o controlador ainda não estiver instalado, faz primeiro a [secção 4 do gui
 
    Deve dizer `active (running)`. O ficheiro de `systemd` deixa o serviço abrir `/dev/ttyACM*` e `/dev/ttyUSB*`, e o utilizador `atalaia` está em `dialout` (guia de montagem do controlador, secção 4, passo 3), por isso não é preciso mais nada para a porta.
 
-Noutro computador, `port` é o nome que o sistema lhe dá: `COM5` no Windows.
+Noutro computador, `port` é o nome que o sistema lhe dá: `COM5` no Windows, `/dev/cu.usbmodem31101` no macOS (um controlador a correr diretamente no macOS não foi experimentado).
 
 **Controlador em Docker no Windows ou no macOS (avançado).** O Docker Desktop e o WSL não passam uma porta série USB para um contentor. O caminho suportado é correr o controlador diretamente no sistema. Se tiveres mesmo de usar Docker, liga a porta ao TCP no anfitrião (um pequeno programa que serve a porta COM numa porta TCP local, por exemplo o `tools/tcp_serial_redirect.py` do pyserial, mais um relé se o contentor não alcançar o loopback do anfitrião) e dá ao contentor um URL do pyserial como porta: `port = "socket://host.docker.internal:7601"` (o número é só um exemplo). O controlador abre a porta com o `serial_for_url` do pyserial, por isso os URL `socket://` funcionam, e foi assim que a bancada correu. A ponte é montagem tua, não vem com o projeto, e o ecrã do modem e as verificações da secção 8 valem como antes.
+
+No macOS (tanto com Colima como com Docker Desktop) a bancada fez o mesmo: uma pequena ponte a correr diretamente no Mac com o `~/atalaia-flash/bin/python`, a servir `/dev/cu.usbmodem...` na porta TCP 7600, a definição `port = "socket://host.docker.internal:7600"` e o contentor iniciado com `--add-host host.docker.internal:host-gateway`. O controlador registou `modem link up`. O `tools/serial_bridge.py` do repositório (com `--baud 921600`) faz este trabalho; a bancada correu um programa próprio, por isso esse não foi experimentado com um modem. **Um só programa por porta série, sempre**: uma ponte, e nenhum esptool nem monitor de série na porta enquanto ela corre. Abrir a porta no macOS pode reiniciar a placa, por isso o ecrã inicial do modem pode voltar a aparecer: não faz mal.
 
 ## 8. Confirmar que o controlador e o modem falam
 

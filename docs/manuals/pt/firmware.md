@@ -125,7 +125,7 @@ Monta primeiro as antenas. **Nunca ligues a placa sem a antena LoRa.** Liga a pl
 | --- | --- | --- |
 | Windows 10 e 11 | Uma porta `COM` nova (Gestor de Dispositivos, *Ports (COM & LPT)*; ID USB 303A:1001) | Não é preciso controlador. Na primeira placa testada, a porta só apareceu na própria porta USB-C do PC, não através de um hub |
 | Linux | `/dev/ttyACM0` (ou `ttyACM1`...) | Junta-te uma vez ao grupo `dialout` (`sudo usermod -aG dialout $USER`) e depois volta a iniciar sessão |
-| macOS | `/dev/cu.usbmodem...` (lista-as com `ls /dev/cu.usbmodem*`) | O projeto não testou no macOS |
+| macOS | `/dev/cu.usbmodem...` (lista-as com `ls /dev/cu.usbmodem*`) | Não é preciso controlador. Usa o nome `cu.`, não o `tty.`. Imagens de caixa e do modem foram escritas assim num Mac (2026-11-02, Apple silicon, macOS 27); com várias placas, vê o [guia do modem, secção 4.2](modem.md#42-encontrar-a-porta-da-placa) para as distinguir |
 
 Para listar as portas com a ferramenta: `PY -m serial.tools.list_ports -v`.
 
@@ -168,7 +168,7 @@ Abre o registo e carrega em `Ctrl+]` para sair:
 PY -m serial.tools.miniterm COM5 115200
 ```
 
-Deves ver a versão do firmware, a memória e uma linha por cada peça encontrada. Uma peça que não está montada dá um aviso e a caixa continua. O registo pode avisar sobre os GPIO 33 a 37: as notas de bancada do projeto chamam a isso cosmético.
+Deves ver a versão do firmware, a memória e uma linha por cada peça encontrada. Uma peça que não está montada dá um aviso e a caixa continua. O registo pode avisar sobre os GPIO 33 a 37: as notas de bancada do projeto chamam a isso cosmético. No macOS, abrir a porta pode reiniciar a placa: espera que o registo de arranque acabe antes de escreveres um comando na consola (um programa que envia um logo a seguir a abrir a porta também tem de esperar).
 
 **Sem Python, no Chrome ou no Edge.** Faz um único ficheiro de imagem e grava-o no endereço `0x0` com a página web da Espressif. Numa shell bash:
 
