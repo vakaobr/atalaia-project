@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": false,
+  "prerelease": true,
+  "always-update": true,
+  "pull-request-title-pattern": "chore(release): v${version}",
+  "pull-request-header": "Merging this pull request releases this version: release-please tags the merge commit and makes the GitHub pre-release, then the Field Box, modem and I/O pod images are built, signed with the CI key once the `release` environment is approved, and attached (CONTRIBUTING.md, \"Releases\"). Closing it releases nothing.",
+  "signoff": "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+  "bootstrap-sha": "c21cf05c7938888c474a4f4c24e4e53f0d551ba0",
+  "changelog-sections": [
+    { "type": "feat", "section": "Features" },
+    { "type": "fix", "section": "Bug Fixes" },
+    { "type": "perf", "section": "Performance" },
+    { "type": "revert", "section": "Reverts" },
+    { "type": "docs", "section": "Documentation" },
+    { "type": "refactor", "section": "Code Refactoring", "hidden": true },
+    { "type": "test", "section": "Tests", "hidden": true },
+    { "type": "build", "section": "Build System", "hidden": true },
+    { "type": "ci", "section": "Continuous Integration", "hidden": true },
+    { "type": "style", "section": "Styles", "hidden": true },
+    { "type": "chore", "section": "Miscellaneous Chores", "hidden": true }
+  ],
+  "packages": {
+    ".": {
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "app/pubspec.yaml",
+        "app/lib/version.dart",
+        "controller/atalaia_controller/__init__.py",
+        "server/atalaia_server/__init__.py"
+      ]
+    }
+  }
+}
