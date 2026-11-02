@@ -49,7 +49,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from atalaia_controller import apd as apd_core
 
-from .. import tenancy
+from .. import privacy_notice, tenancy
 from ..db import get_session
 from ..feeds import FeedField, ical, json_feed
 from ..models import Field, ScheduledGame
@@ -158,6 +158,27 @@ def switcher(current: str, path: str) -> str:
     return " ".join(out)
 
 
+# The footer's link to the privacy notice and the phrase of the login consent that becomes one (LIVE-2).
+FOOTER_PRIVACY = {"pt": "Aviso de privacidade", "en": "Privacy notice", "de": "Datenschutzerklärung",
+                  "zh-tw": "隱私權聲明"}
+NOTICE_PHRASE = {"pt": "aviso de privacidade do campo", "en": "the field's privacy notice",
+                 "de": "die Datenschutzerklärung des Feldes", "zh-tw": "場地的隱私權聲明"}
+
+
+def notice_published(request: Request) -> bool:
+    """A privacy notice is published for the current version (what ``GET /privacy`` serves)."""
+    s = request.app.state.settings
+    return bool(privacy_notice.available(s.privacy_notice_dir, s.privacy_notice_version))
+
+
+def privacy_link(request: Request, lang: str, explicit: bool) -> str:
+    """The footer's `` · <a>Privacy notice</a>``, only when a notice is published and this is not that page."""
+    if request.url.path == "/privacy" or not notice_published(request):
+        return ""
+    href = f"/privacy?lang={lang}" if explicit else "/privacy"
+    return f' · <a href="{esc(href)}">{esc(FOOTER_PRIVACY[lang])}</a>'
+
+
 class Page:
     """One rendering: the language and how links keep it."""
 
@@ -177,7 +198,8 @@ class Page:
         tag = i18n.TAGS[self.lang]
         body = TEMPLATES["page"].substitute(
             lang=tag, title=esc(title), head=head, language_label=esc(self.t["language"]),
-            languages=self.languages(), content=content, footer=esc(footer or self.t["footer"]))
+            languages=self.languages(), content=content,
+            footer=esc(footer or self.t["footer"]) + privacy_link(request, self.lang, self.explicit))
         body = preview_texts.inject_banner(request, body, self.lang)  # a preview server's banner (PV-3)
         vary = "Accept-Language" if request.app.state.settings.lang_from_browser else "Cookie"
         response = answer(request, body, HTML_TYPE, modified, CACHE_PAGE, status_code=status_code,

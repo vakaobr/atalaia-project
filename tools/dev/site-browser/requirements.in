@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The project page's browser test (tools/site_browser_test.py) needs only the Playwright client; the
+# Chromium build comes with the base image (mcr.microsoft.com/playwright/python:v1.49.0-noble), whose
+# python3 has no `playwright` module. requirements.txt pins it and its chain with PyPI hashes; the
+# Dockerfile installs it with pip --require-hashes --no-deps --only-binary=:all:. To refresh, from
+# the repository root:
+#   docker run --rm -v "$PWD/tools/dev/site-browser:/w" -w /w python:3.12.14-slim sh -c '
+#     pip install -q uv==0.9.30 &&
+#     uv pip compile --universal --python-version 3.12 --exclude-newer YYYY-MM-DD \
+#       --generate-hashes --no-header requirements.in -o requirements.txt'
+# then put the SPDX header back at the top of the .txt file. Keep the version equal to the base
+# image's tag (and to tools/dev/console/Dockerfile).
+playwright==1.49.0

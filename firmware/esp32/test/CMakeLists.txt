@@ -50,6 +50,7 @@ set(CORE_SOURCES
     ${CORE_DIR}/src/flood.c
     ${CORE_DIR}/src/lbt.c
     ${CORE_DIR}/src/ack.c
+    ${CORE_DIR}/src/replay.c
     ${CORE_DIR}/src/duty_cycle.c
     ${CORE_DIR}/src/msg_codec.c
     ${CORE_DIR}/src/join.c
@@ -160,6 +161,8 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/button_tracker.c
     ${SHELL_DIR}/builtin_presets.c
     ${SHELL_DIR}/key_filter.c
+    ${SHELL_DIR}/i2c_health.c
+    ${SHELL_DIR}/reset_reason.c
     ${SHELL_DIR}/radio/radio_task.c
     ${SHELL_DIR}/radio/radio_lbt.c
     ${SHELL_DIR}/radio/event_log.c
@@ -186,6 +189,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/cpace.c
     ${SHELL_DIR}/box_pair.c
     ${SHELL_DIR}/status_hold.c
+    ${SHELL_DIR}/tft_splash.c
     ${SHELL_DIR}/target_addon.c
     ${SHELL_DIR}/hal/board_fem.c
     ${SHELL_DIR}/modem/modem.c
@@ -223,6 +227,8 @@ set(TEST_SOURCES
     test_modem_screen.c
     test_builtin_presets.c
     test_key_filter.c
+    test_i2c_health.c
+    test_reset_reason.c
     test_display.c
     test_event_log.c
     test_time_sync.c
@@ -251,6 +257,7 @@ set(TEST_SOURCES
     test_admin_pin.c
     test_box_pair.c
     test_status_hold.c
+    test_tft_splash.c
     test_target_addon.c
 )
 

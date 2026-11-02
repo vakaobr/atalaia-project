@@ -186,7 +186,7 @@ class RelayCase(AppTestCase):
     relay_on = True
 
     def settings(self) -> Settings:
-        return Settings(database_url=self.database_url, secret_key=SECRET_KEY, metrics_token=METRICS_TOKEN,
+        return Settings(allow_signup_without_notice=True, database_url=self.database_url, secret_key=SECRET_KEY, metrics_token=METRICS_TOKEN,
                         db_timeout_s=2.0, purge_hour=None, public_url=f"https://{HOST}", atak_relay=self.relay_on,
                         atak_relay_port=0)
 
@@ -358,7 +358,8 @@ class EnrolmentTests(RelayCase):
         self.assertEqual((await self.issue(gm, holder=player_name))["certificate"]["holder"], player_name)
         _, _, stranger = await self.person()
         self.assertEqual((await self.issue(gm, holder=stranger, status=409))["detail"], "holder_has_no_role")
-        self.assertEqual((await self.issue(gm, holder="nobody-at-all", status=404))["detail"], "holder_not_found")
+        # SRV-4: no such account and an account with no role here are told apart by nothing.
+        self.assertEqual(await self.issue(gm, holder="nobody-at-all", status=409), {"detail": "holder_has_no_role"})
         # A server administrator with no role on the field names a holder.
         root, _, _ = await self.person(server_admin=True)
         self.assertEqual((await self.issue(root, status=409))["detail"], "holder_has_no_role")
@@ -463,7 +464,7 @@ class RelayOffTests(RelayCase):
     relay_on = False
 
     async def test_off_by_default_nothing_listens_and_nothing_is_issued(self) -> None:
-        self.assertFalse(Settings(database_url=self.database_url, secret_key=SECRET_KEY).atak_relay)
+        self.assertFalse(Settings(allow_signup_without_notice=True, database_url=self.database_url, secret_key=SECRET_KEY).atak_relay)
         self.assertIsNone(self.relay)
         gm, _, _ = await self.person("gm")
         self.assertEqual((await self.issue(gm, status=409))["detail"], "atak_relay_off")

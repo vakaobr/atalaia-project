@@ -564,7 +564,12 @@ prende cada molho com abraçadeiras para nada puxar uma soldadura.
    ([secção 6](#6-revisão-da-placa-e-antenas)) e o conector USB-C acessível.
 2. Monta a placa de interligação ao lado dela. Liga **3V3**, **GND**,
    **GPIO 17** (SDA) e **GPIO 18** (SCL) da placa aos pinos «in» 3V3, GND, SDA
-   e SCL do hub: quatro fios curtos, com menos de 15 cm.
+   e SCL do hub: quatro fios curtos, com menos de 15 cm. Os GPIO 17 e 18 não
+   estão nas duas filas compridas de pinos: são dois dos quatro furos extra
+   na ponta de cima da placa (a ponta das antenas, oposta ao USB-C),
+   marcados **18 17 16 15** no verso, que normalmente vêm sem pinos: solda
+   aí um conector 2x2 curto ou os fios. Os GPIO 15 e 16 (áudio, secção 9.7)
+   são os outros dois.
 3. **Deixa todos os outros pinos da placa por ligar.** Em particular, nunca
    ligues o GPIO 0, 45 ou 46 (pinos de arranque; o 46 comanda também o módulo
    de entrada da V4.2), o GPIO 5 (o módulo de entrada da V4.3), os GPIO
@@ -888,7 +893,8 @@ saber primeiro:
   pouco ou emite fraco; se o passo de rádio do BRING_UP.md parecer errado,
   verifica isto primeiro.
 - **Região:** a caixa, o modem do controlador e o controlador têm de ser todos
-  compilados para a mesma região de rádio (EU868 por omissão).
+  compilados para a mesma região de rádio (EU868 por omissão). O modem do
+  controlador tem um guia próprio: [Montar o modem de rádio](../../docs/manuals/pt/modem.md).
 - **Nenhum uso em jogo antes da verificação da potência de emissão** do
   BRING_UP.md (passo do rádio): o ganho de 14 dB do módulo de entrada que o
   firmware assume ainda não foi medido.
@@ -919,7 +925,7 @@ seguido pelo git), altera a linha, guarda e corre outra vez
 | Placa montada ao contrário (o OLED pequeno de pernas para o ar) | `CONFIG_ATALAIA_OLED_FLIP=y` |
 | Módulo GNSS ligado no arranque (só teste de bancada: nada o lê ainda) | `CONFIG_ATALAIA_GNSS_POWER_ON=y` |
 
-Taiwan (`--region=as923-tw`), ouvir antes de falar (`--lbt=`), as chaves de
+Taiwan (`--region=as923-tw`), ouvir antes de falar (`--lbt=`), o ganho da antena (`--antenna-dbi=`), as chaves de
 versões e as chaves de modos são opções de compilação, não linhas a editar;
 vê o [guia do firmware](../../docs/manuals/pt/firmware.md#4-as-opções-de-quem-monta).
 Nunca baixes o `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` nem o ganho da antena abaixo

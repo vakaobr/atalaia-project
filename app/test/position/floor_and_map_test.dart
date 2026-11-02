@@ -571,7 +571,7 @@ void main() {
       expect(find.byKey(const Key('map-feature-4')), findsOneWidget); // red HQ
       expect(find.byKey(const Key('map-feature-3')), findsNothing); // level 0
       expect(find.byKey(const Key('map-off-plan')), findsOneWidget);
-      expect(find.text('1 positions not on this plan'), findsOneWidget);
+      expect(find.text('1 position not on this plan'), findsOneWidget);
       final plan = tester.getSize(find.byKey(const Key('map-plan')));
       expect(plan.width, lessThanOrEqualTo(360));
       expect(plan.width / plan.height, closeTo(173 / 222, 0.03));

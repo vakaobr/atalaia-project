@@ -124,9 +124,8 @@ CheckedImage checkImage(
   String? declaredContentType,
   ImageLimits limits,
 ) {
-  final declared = _pyStrip(
-    (declaredContentType ?? '').split(';').first,
-  ).toLowerCase();
+  final declared = _pyStrip((declaredContentType ?? '').split(';').first)
+      .toLowerCase();
   if (data.length > limits.maxBytes) {
     throw ImageError(
       413,

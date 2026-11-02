@@ -353,6 +353,7 @@ class FetchTests(Case):
         r = self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True})
         self.assertEqual(r.status_code, 409)
         self.assertIn("fetching", r.json()["detail"])
+        self.assertIn("modes: node ", r.json()["detail"])  # one box: "node 3", not "node(s) 3"
         self.assertFalse(self.ctrl.start_check()["ok"])
         results = FetchingBox(self, box, [KEY["public_key_b64"]]).run()
         self.assertEqual(results, ["installed"])

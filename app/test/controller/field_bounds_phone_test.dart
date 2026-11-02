@@ -59,9 +59,8 @@ void main() {
       ControllerCheckin(
         engine,
         CheckinConfig(
-          limitsYaml: File(
-            'lib/chrono/limit_templates/portugal.yaml',
-          ).readAsStringSync(),
+          limitsYaml: File('lib/chrono/limit_templates/portugal.yaml')
+              .readAsStringSync(),
           utcDay: true,
         ),
       );
@@ -99,7 +98,7 @@ void main() {
               .encode(List.filled(32, 1))
               .replaceAll('=', ''),
           'display_name': 'r1',
-          'notice_version': 1,
+          'notice_version': 2,
         }),
       );
       expect(checkedIn.status, 201);

@@ -431,7 +431,8 @@ class BrandingCache extends ChangeNotifier {
       final r = await src.get('/api/v1/games/$gameId/teams');
       if (r.status != 200) return TeamBranding.none;
       final j = jsonDecode(utf8.decode(r.bytes)) as Map;
-      return teams(src, {
+      // awaited, so a failure while fetching the crests is caught below
+      return await teams(src, {
         for (final t in (j['teams'] as List?) ?? const [])
           if (t is Map && t['team'] is String)
             t['team']: {

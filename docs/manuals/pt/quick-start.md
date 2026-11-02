@@ -21,7 +21,7 @@ Uma página para o dia do jogo. Em inglês: [Quick start](../en/quick-start.md).
 ## Se diriges o jogo
 
 1. Arranca o controlador de campo (um Raspberry Pi com o modem USB, ou **Controlador de campo** na app, em Android). Obtém o **código da organização**: `python3 -m atalaia_controller tokens`.
-2. Abre `http://` *endereço do controlador* `:8080/console/`. Escreve o código da organização.
+2. Abre `https://` *endereço do controlador* `:8443/console/` (aceita uma vez o certificado do próprio campo). Escreve o código da organização.
 3. Uma vez: **Definições** › escolhe o canal de rádio. **Adotar** as caixas novas. **Check-in** › **Imprimir o cartaz** e afixa-o.
 4. **Jogo** › nome, modo, equipas, duração › **Criar jogo**.
 5. **Convidar caixas**: marca-as, dá-lhes papéis, **Convidar**. Espera por **Tudo pronto para começar**.

@@ -13,7 +13,8 @@
 /// token that the site server sets as the `__Secure-atalaia_refresh`
 /// cookie. The access token stays in memory only; the refresh token is kept
 /// in the app's private storage with the other secrets (decision PD6:
-/// Android's app sandbox, backups off), never logged and never shown. Each
+/// sealed with the Keystore's or the Keychain's key, backups off), never
+/// logged and never shown. Each
 /// refresh (`POST /api/v1/auth/refresh`, the cookie and `X-Atalaia-Refresh:
 /// 1`) spends the old token and sets a new one; the server ends the session
 /// when a spent token comes back (a copy used elsewhere). So refreshes run
@@ -264,6 +265,35 @@ class SiteSession {
       return TotpNeeded('${r.json['totp_session']}', user);
     }
     return LoggedIn(await _start(r, user));
+  }
+
+  /// Makes an account with a password (`POST /auth/register`; no session
+  /// follows: the caller logs in). The account rests on the contract, not on
+  /// consent (LEG-*): the person was shown the privacy notice ([noticeVersion]
+  /// is the version on their screen, so a notice that changed meanwhile is
+  /// refused with 409 `notice_version_changed`) and confirms being 16 or older
+  /// (no date of birth is asked). Throws [SiteException] with the server's
+  /// code (`username_invalid`, `password_breached`, `notice_required`, ...).
+  Future<void> register(
+    String user,
+    String password, {
+    String? email,
+    String? noticeVersion,
+  }) async {
+    final r = await http.send(
+      'POST',
+      '/auth/register',
+      body: {
+        'username': user,
+        'password': password,
+        if (email != null && email.isNotEmpty) 'email': email,
+        'notice_seen': true,
+        'age_confirmed': true,
+        if (noticeVersion != null && noticeVersion.isNotEmpty)
+          'notice_version': noticeVersion,
+      },
+    );
+    if (!r.ok) throw SiteException(r.status, r.detail);
   }
 
   Future<String> loginTotp(TotpNeeded step, String code) async {

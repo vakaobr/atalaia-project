@@ -322,9 +322,21 @@ void main() {
         'inside.',
       ),
     );
-    // Nothing about it went to the controller: positions only.
+    // The switch records the player's choice (decision LEG-12).
     expect(
-      http.calls.where((c) => !c.startsWith('GET /field/')).toSet(),
+      http.calls.where((c) => c.startsWith('PUT /checkin/me/position-sharing')),
+      isNotEmpty,
+    );
+    // Nothing about it went to the controller: positions only (and the
+    // player's own switch, which records the sharing choice).
+    expect(
+      http.calls
+          .where(
+            (c) =>
+                !c.startsWith('GET /field/') &&
+                !c.startsWith('PUT /checkin/me/position-sharing'),
+          )
+          .toSet(),
       everyElement(startsWith('POST /positions')),
     );
 

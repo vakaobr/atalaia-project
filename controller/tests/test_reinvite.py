@@ -153,6 +153,8 @@ class StartGuardTests(Case):
                          (["zone"], {"zone": 1}, [], True))
         self.assertEqual([(w["code"], w["param"], w["value"], w["have"]) for w in check["warnings"]],
                          [("min", "min_zones", 2, 1)])
+        # A count of one takes "node", not "nodes" (decision PLU-2).
+        self.assertEqual(check["warnings"][0]["text"], "1 zone node joined; min_zones is 2")
         self.assertEqual(self.client.get(f"/api/v1/games/{gid}/start-check", headers=GM).json(), check)
 
     def test_force_starts_anyway_and_says_so(self):
@@ -198,6 +200,7 @@ class StartGuardTests(Case):
         self.assertTrue(check["ok"])
         self.assertEqual([(w["code"], w["param"], w["value"], w["have"]) for w in check["warnings"]],
                          [("min", "min_zones", 3, 2)])
+        self.assertEqual(check["warnings"][0]["text"], "2 zone nodes joined; min_zones is 3")
         self.assertEqual(self.ctrl.start_game(gid)["state"], "running")
 
     def test_last_stand_with_too_few_zones_warns(self):
@@ -205,6 +208,8 @@ class StartGuardTests(Case):
         self.heard(1, "zone")
         codes = sorted(w["code"] for w in self.ctrl.start_check()["warnings"])
         self.assertEqual(codes, ["last", "min"])  # last_zones 1, min_zones 2 by default
+        last = [w["text"] for w in self.ctrl.start_check()["warnings"] if w["code"] == "last"]
+        self.assertTrue(last[0].startswith("only 1 zone node joined and last_zones is 1"), last)
         self.heard(2, "zone")
         self.heard(3, "zone")
         self.assertEqual(self.ctrl.start_check()["warnings"], [])

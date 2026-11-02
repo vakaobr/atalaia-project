@@ -22,9 +22,12 @@ const PRIVILEGED = ['admin', 'gm', 'marshal'];
 
 // ---- texts --------------------------------------------------------------------------------
 
-/** The page's text for key, with {name} replaced by vars.name. */
+/** The page's text for key, with {name} replaced by vars.name. With vars.n === 1 the singular text
+ * "<key>_one" when the language has it (1 problem, not 1 problems; Chinese has none; decision PLU-2). */
 export function t(key, vars) {
-    let text = Object.prototype.hasOwnProperty.call(STRINGS, key) ? STRINGS[key] : key;
+    const one = `${key}_one`;
+    const own = (k) => Object.prototype.hasOwnProperty.call(STRINGS, k);
+    let text = vars && Number(vars.n) === 1 && own(one) ? STRINGS[one] : own(key) ? STRINGS[key] : key;
     if (vars) {
         text = text.replace(/\{(\w+)\}/g, (m, name) => (name in vars ? String(vars[name]) : m));
     }
@@ -245,7 +248,7 @@ export function keep(body) {
 export function forget() {
     storageSet(null);
     try {
-        window.sessionStorage.removeItem('atalaia.staff.consent');  // consent.js: asked again at the next login
+        window.sessionStorage.removeItem('atalaia.staff.notice');  // consent.js: shown again at the next login
     } catch (e) {
         /* no storage: nothing to forget */
     }
@@ -457,6 +460,7 @@ const SECTIONS = {
     devices: (r) => r.has('admin') || r.has('gm'),
     remote: (r) => r.has('admin') || r.has('gm'),
     atak: (r) => r.has('admin') || r.has('gm'),
+    chrono: (r) => r.has('admin') || r.has('gm') || r.has('marshal'),
     roles: (r) => r.has('admin') || r.has('gm'),
     synckeys: (r) => r.has('admin'),
     branding: (r) => r.has('admin') || r.has('gm'),
@@ -495,7 +499,7 @@ export async function boot() {
     if (!s.mfa) {  // a social login, or a password with no TOTP step: offer the second factor if a role needs it
         import('./stepup.js').then((m) => m.maybeStepUp()).catch(() => {});
     }
-    import('./consent.js').then((m) => m.maybeAskConsent()).catch(() => {});  // a changed privacy notice (CONS-*)
+    import('./consent.js').then((m) => m.maybeShowNotice()).catch(() => {});  // a changed privacy notice (CONS-*)
     const logout = $('logout');
     logout.hidden = false;
     logout.addEventListener('click', async () => {

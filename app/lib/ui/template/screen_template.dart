@@ -662,7 +662,7 @@ class _Parser {
       }
       final expr = utf8.decode(inner.sublist(0, elen), allowMalformed: true);
       final why = expressionError(expr);
-      if (why != null) return fail(line, '{$expr}: $why');
+      if (why != null) return fail(line, '{${expressionEcho(expr)}}: $why');
       i = close;
     }
     return true;

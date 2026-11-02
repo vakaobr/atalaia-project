@@ -87,7 +87,7 @@ paste it into a chat.
 | Variable | Made by setup.sh | Meaning |
 | --- | --- | --- |
 | `ATALAIA_DOMAIN` | the argument | The site's name; Caddy gets its certificate |
-| `ATALAIA_PUBLIC_URL` | `https://DOMAIN` | The links in the field pages and feeds (see [server/README.md](../README.md)) |
+| `ATALAIA_PUBLIC_URL` | `https://DOMAIN` | The links in the field pages and feeds, the WebAuthn origin and the OpenID redirect address (see [server/README.md](../README.md)). Required: the server refuses to start without it (hosted mode: unset) |
 | `ATALAIA_TLS` | `acme` | `acme`: a public certificate (Let's Encrypt or ZeroSSL), renewed by Caddy. `internal`: Caddy's own certificate authority, for a trial or a field server with no public name (below) |
 | `POSTGRES_PASSWORD` | random | The database's password; the database is never reachable from outside |
 | `ATALAIA_SECRET_KEY` | random | See above |
@@ -103,7 +103,7 @@ paste it into a chat.
 The daily purge at `ATALAIA_PURGE_HOUR` also deletes the empty `deleted-...` rows that erased accounts leave, once no audit entry
 (kept 36 months) and no other row refers to them; a hosted hub does it per field, under the field's role, with nothing to set up.
 The server's other settings (`ATALAIA_PURGE_HOUR`,
-`ATALAIA_PRIVACY_NOTICE_VERSION`, `ATALAIA_EXPORT_MIN_INTERVAL_S`, `ATALAIA_EXPORT_MAX_MB` and, for a hub,
+`ATALAIA_PRIVACY_NOTICE_VERSION`, `ATALAIA_SHARING_TERMS_VERSION`, `ATALAIA_EXPORT_MIN_INTERVAL_S`, `ATALAIA_EXPORT_MAX_MB` and, for a hub,
 the per-field limits `ATALAIA_QUOTA_ACCOUNTS`, `_SCHEDULED_GAMES`, `_REGISTRATIONS`, `_GAMES`, `_ATAK_CERTS`,
 `_STREAMS`, `_STORED_MB` and `ATALAIA_HOSTED_WATCH_S`) can be added to `.env` too; the list, with the defaults, is in
 [server/README.md](../README.md). After a change: `docker compose up -d`
@@ -120,8 +120,8 @@ language and version: `privacy-notice-pt-<version>.md`, `privacy-notice-en-<vers
 is mounted read-only in the server's container (`ATALAIA_PRIVACY_NOTICE_DIR=/privacy-notice`); a file is read at each
 request, so there is nothing to restart, and the files are not in the backups (keep them with `.env`). The server then
 serves it at `https://DOMAIN/privacy` and `GET /api/v1/privacy-notice`. **To change the notice:** add the new files, set
-the new `ATALAIA_PRIVACY_NOTICE_VERSION` in `.env` and run `docker compose up -d`; each account is asked to consent again
-at its next sign-in. Keep the older files: they are the record of what accounts agreed to. A hub (hosted mode) has one
+the new `ATALAIA_PRIVACY_NOTICE_VERSION` in `.env` and run `docker compose up -d`; each account is shown the new notice
+again at its next sign-in (it reads it and confirms; this is information, not consent: accounts rest on the contract). Keep the older files: they are the record of what accounts were shown. A hub (hosted mode) has one
 folder for all its fields.
 
 ## What runs, and what can be reached
@@ -188,7 +188,7 @@ Browsers warn about such a certificate; players' phones would too.
 Accounts always log in with a password, and can also log in with a **passkey** and, when you register a client with the
 provider, with **Google**, **Microsoft** (personal and work or school accounts) and **Apple**
 (server/README.md, "Accounts, sessions and roles"). Passkeys need nothing: the server uses the address it is served
-from (`ATALAIA_PUBLIC_URL`, so set it) as the WebAuthn origin and its host name as the RP ID; that name must not
+from (`ATALAIA_PUBLIC_URL`, which the server requires) as the WebAuthn origin and its host name as the RP ID; that name must not
 change afterwards, or the passkeys stop working. A provider is **off** until you give all of its settings in `.env`
 (`docker compose up -d` afterwards); the server stores only the provider and the opaque subject it gives, never an
 email or a name, so you ask the providers for nothing but sign-in. (One exception, on request only: the Account page's "Use my Google name" / "Use my Microsoft name" button, which an account made by that provider's login can press once to get a username suggested, runs a round with the extra scope `profile`; the name is read for that one answer and kept nowhere. Google's consent screen must therefore list `profile`, below. Apple has no such button.)
@@ -258,8 +258,8 @@ key in Apple's console if the file leaks. The server asks Apple for no `name` or
 *private email relay* and its `form_post` answer are not involved.
 
 A server that has a typo in these settings, or some of a provider's settings and not all, does not start: its log says
-which one. A first login with an unknown provider account makes a **new** account (the consent box beside the
-buttons); the server never links a provider to an existing account by email, which it does not know. An existing
+which one. A first login with an unknown provider account makes a **new** account (the two boxes beside the
+buttons: the notice was read, and 16 or older); the server never links a provider to an existing account by email, which it does not know. An existing
 account (your administrator's, say) links a provider while logged in, with `POST /api/v1/auth/oidc/PROVIDER/start`
 (`{"purpose": "link", "password": "..."}`, Bearer) and registers a passkey with `POST /api/v1/me/passkeys/options` and
 `POST /api/v1/me/passkeys` (server/README.md has the list); the staff page `/staff/account` and the Atalaia app's
@@ -275,7 +275,7 @@ is a 404 and the app logs in with the password only. The app also needs the **ho
 reads App Links from there at install: the project's build is made with `-Patalaia.appLinkHost=DOMAIN` for the
 site it serves (or `*.hub.example.pt` for a hosted hub), so a club with its own site server builds the app with its own
 host, or keeps the password login in the app. For an iOS app, `ATALAIA_APP_IOS_APP_IDS` (`TEAMID.bundle.id`, commas)
-does the same for `/.well-known/apple-app-site-association`; the iOS app does not use it yet. Check with
+does the same for `/.well-known/apple-app-site-association` (the iOS app's passkeys and social login, which also need the host in the app's associated domains: `app/docs/ios-on-a-mac.md`, "Site login on iOS"). Check with
 `curl https://DOMAIN/.well-known/assetlinks.json`.
 
 **Switching passwords off** (`ATALAIA_PASSWORD_LOGIN=off`): password login and password registration answer 403;
@@ -425,12 +425,48 @@ copy of `.env` as `server/.env` (mode 0600), run `sh server/setup.sh
 campo.example.pt` (it keeps your values and starts the stack), then
 `restore.sh` as above. Point the DNS at the new machine.
 
-**Erasures after the backup:** a restore brings back the database as it was
-when the backup was made, so an account erased after that comes back. After
-a restore, repeat the erasures made since the backup's date: the audit log
-lists them as `gdpr_erasure` (an account) and `chrono_player_erasure` (a
-field's chrono data of a player) with their dates; read it before you
-restore (decision S22-7).
+**Erasures after the backup (the erasure ledger, PRIV-4):** a restore brings back the database as it was when the
+backup was made, so an account erased after that would come back. It does not: the server appends every erasure (an
+account, a player's chrono records, also the accounts the inactivity rule anonymised) to a **ledger outside the
+database**, the Docker volume `ledger` (`ATALAIA_ERASURE_LEDGER=/ledger/erasures.jsonl`), as SHA-256 hashes only (no name,
+no e-mail, no id in clear; a hosted hub's entries carry the field's slug). `backup.sh` copies the ledger next to each
+backup as `erasures-ledger.jsonl` (mode 0600; keep it with the backups, off-site too, and never prune it: about 150 bytes
+per erasure, needed as long as any older backup exists). `restore.sh` merges the copy beside the backup file back into the
+volume (a new machine starts with an empty one), and once the server is healthy runs `docker compose exec server python -m
+atalaia_server erasure-ledger apply`, which erases again, in every field of a hub, whatever the restored database still
+holds of it; it prints what it did and the audit log has it (`gdpr_erasure`, reason `restore_replay`). Running it again does
+nothing. A machine lost together with its volumes loses only the erasures made after the last backup's ledger copy:
+that is the window, so back up often. Written after the erasure commits, best effort: a failure to write is logged
+(`atalaia.server.ledger`) and the erasure stands (decision S22-7, amended by SR-70 to SR-89).
+
+**Retention settings (PRIV-6, PRIV-7):** `ATALAIA_AUDIT_IP_DAYS` (180; 90 to 365): how long an audit entry keeps the
+client's address, after which the entry stays without it until its own 36 months. `ATALAIA_INACTIVE_ACCOUNT_MONTHS` (24;
+12 to 120, or `off`): an account unused that long (no login of any kind, no session, no registration for a game to come;
+never a server administrator or an account with a role at a field) is warned, then anonymised after
+`ATALAIA_INACTIVE_GRACE_DAYS` (30; 7 to 180) by the same code as a person's own erasure. The server cannot send e-mail:
+**the warning is shown on the account page and in `GET /api/v1/me` (`inactivity`) when the person comes back**; if your
+privacy notice promises more, tell people yourself or set `off`.
+
+**Game history keeps 90 days by default (maintainer decision 2026-10-30):** the server's synced games and scheduled games
+90 days after they end (a field may set 30-730 on its history page; it was 24 months), and the controllers' ended
+games 90 days too (`game_retention_days`, a field setting of 30-3653; chrono records keep their own 365). A controller
+with a site sync still never deletes a game before the site server has all of it (RET-3). What carries a player id (events, per-player data, a game's history in accounts) goes at that point; the **team results**
+(final totals per team, the winner, when it ran; no player id, no member list, no squads) are written to `game_results`
+by the purge just before and kept 365 days after the game ended (`GET /api/v1/fields/{id}/history/results`). The Pi
+and the phone controller write the same aggregate themselves when their purge drops a game (the team totals, the winner and the dates; no player id, no member list, no squad) and keep it 365 days after the game ended
+(`GET /api/v1/game-results`, GM or read token), so a standalone controller loses no more than the server does (SR-88). Existing fields keep the
+value they have stored (the migration only changes the default): lower it on the history and settings pages. Whether
+team-only results with no player ids may be kept longer is still open with the maintainer.
+
+**A ban's end (PRIV-2):** a "ban" outcome a field's admin or gm records on a chrono violation has an end date (the
+field's `chrono_ban_days`, 12 months by default, never longer than the field's chrono retention), and the "earlier violation"
+mark is an advisory notice. The server tells no one: **whoever records a ban tells the person, and when it ends**, in
+the way the field normally talks to its players (the field's contact on its page; the privacy notice says how to contest).
+
+**Sign-up needs a published privacy notice (LIVE-2):** a server with no notice file for `ATALAIA_PRIVACY_NOTICE_VERSION` in
+`ATALAIA_PRIVACY_NOTICE_DIR` refuses new accounts (`409 privacy_notice_unpublished`, password and social sign-up) and logs a
+warning at start; existing accounts log in as before. `ATALAIA_ALLOW_SIGNUP_WITHOUT_NOTICE=on` lifts it for a development
+server. A hosted hub whose notice version still starts with `template-` logs a warning at start.
 
 **Test your restores.** `python3 tools/docker_server.py deploy` tests the
 scripts on any computer with Docker. A restore of your own backups is
@@ -455,8 +491,60 @@ scripts do).
 A hub that hosts many fields on one server (ADR-P4-4 as built, plan phase 21,
 decisions S21-1 to S21-13; its deployment is a Phase 4 follow-up, decisions
 FU4-1 to FU4-10; the design is in [../README.md](../README.md#hosted-mode)).
-**It does not go live before a lawyer has reviewed the privacy notice and the
-data processing agreement (decision P4-6).**
+**It does not go live before the go-live checklist below is complete
+(decision P4-6).**
+
+### Who is responsible for what
+
+(Decisions LEG-40 to LEG-47; the data processing agreement is
+[`docs/templates/dpa-template.md`](../../docs/templates/dpa-template.md), in pt-PT
+[`dpa-template-pt.md`](../../docs/templates/dpa-template-pt.md).)
+
+- **Each field is the controller** of its own players' data.
+- **The hub operator is a processor** for each field (GDPR Art. 28) under the
+  DPA, and keeps a record of its processing as a processor (Art. 30(2)).
+- **The Atalaia project** (the authors of the software) is neither: it sees no
+  field's data.
+- **For the sharing step only, the fields that share are joint controllers**
+  (Art. 26). Cross-field chrono sharing is off by default. A field switches it
+  on on its settings page, where its administrator must first accept the
+  **sharing terms**
+  ([`sharing-terms.md`](../../docs/templates/sharing-terms.md), pt-PT
+  [`sharing-terms-pt.md`](../../docs/templates/sharing-terms-pt.md)); the server records the
+  version, the date and the account that accepted (`fields.sharing_terms_*`),
+  and without the acceptance the switch is refused (`409 sharing_terms_required`).
+  When the terms' version changes (`ATALAIA_SHARING_TERMS_VERSION`, default the
+  shipped text's) the field is asked again and **its sharing is suspended until
+  it accepts**; the hub's shared copies follow at the next retention purge. The
+  hub operator processes the shared tables as processor of the fields jointly.
+- **Where the data is:** EU/EEA data centres only, for the server, its backups
+  and every sub-processor, as the DPA requires. A tunnel or CDN in front of the
+  hub that is a non-EU company needs its own safeguard in the DPA annex; the
+  easiest is not to use one.
+
+### Go-live checklist
+
+Hosted mode is not offered to any field until **every** item is done. The server
+also warns at start-up while hosted mode is on and the privacy notice is still a
+template (built apart, decision LEG-45); that warning is a reminder, not a
+substitute for the list.
+
+1. The **DPA is reviewed by a lawyer and signed**, one per field, with the
+   [BRACKETS] filled in.
+2. The **sharing terms** exist and are accepted per field in the software (or
+   sharing stays off for that field).
+3. The **hosting provider, the backup storage and every sub-processor** are in
+   the DPA's annex, **each in an EU/EEA data centre** (or with the safeguard
+   the DPA names).
+4. Each field's **privacy notice is filled in** and is no longer a template
+   (`ATALAIA_PRIVACY_NOTICE_VERSION` names the field's own file; the
+   server's start-up warning says when it does not).
+5. If the hub operator is a natural person: its activity registration,
+   insurance, its own privacy notice for the fields' contact people and its
+   record of processing are in place (check each with a lawyer).
+6. The deployment is **proved on a real server**: a real domain and wildcard
+   DNS record, public certificates, a backup restored into a fresh hub, the
+   isolation check (`hosted check`) green.
 
 **Status (2026-10-21):** the procedure below is tested in Docker on one
 computer by `python3 tools/docker_server.py deploy-hosted`, with Caddy's own
@@ -615,7 +703,10 @@ under the DPA):
   (`POST /api/v1/me/hub-share/code` at one field, `.../link` at the other). A hub made by an older release needs
   `hosted migrate` before the new server starts (`hub` does it); `hosted check` says so otherwise. `hosted delete`
   removes the field's published records with it, and a restore of a hub brings the tables back with the rest (the
-  check runs after it).
+  check runs after it). The page for it is `/staff/account/hub-share` (HLC-*), linked from the account page of a hub
+  only; it needs `public.atalaia_share_peers(uuid)` (a third function, to list the other fields a person is linked
+  at), which `hosted migrate` makes, so a hub of an earlier release is migrated before the new server starts;
+  `hosted check` reports it missing otherwise.
 
 ### Updates
 
@@ -742,11 +833,18 @@ the rest of hosted mode, this has not run on a real hub with real DNS; the tests
 
 ## Monitoring
 
-- `GET /api/v1/health` (no authentication; not rate limited): `status`,
-  `database`, `version`, `uptime_s`; 503 when the database is down. Any
-  uptime monitor can watch it.
+- `GET /api/v1/health` (no authentication; not rate limited): `{"status": "ok"}`,
+  or 503 `{"status": "unhealthy"}` when the database is down, and nothing else
+  (LIVE-3). Any uptime monitor can watch it.
 - `GET /api/v1/metrics` with `Authorization: Bearer <ATALAIA_METRICS_TOKEN>`
-  (or a server administrator's session).
+  (or a server administrator's session): the version, the uptime, the database
+  state and the counters that used to be public in the health answer.
+- A request a TLS-ending proxy (Cloudflare Tunnel) says came over plain HTTP
+  (`X-Forwarded-Proto: http`, honoured for the proxies `FORWARDED_ALLOW_IPS`
+  names) is answered `308` to the same address over `https` (LIVE-1);
+  `localhost`, loopback hosts, requests with no such header (the containers, a
+  health check on 127.0.0.1) and `/api/v1/health` are not redirected. In
+  Cloudflare, also turn on *Always Use HTTPS* for the hostname.
 - `docker compose ps` shows each container's health.
 
 ## Removing it

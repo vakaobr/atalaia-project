@@ -134,6 +134,34 @@ void main() {
     expect(find.textContaining('A decorrer'), findsOneWidget);
   });
 
+  testWidgets('the game history hides housekeeping events', (tester) async {
+    final h = harness(language: AppLanguage.en);
+    final g = HistoryGame({
+      'game': 'g',
+      'name': 'Sábado',
+      'teams': ['red', 'blue'],
+      'player_ids': ['p-1'],
+      'totals': {'red': 5, 'blue': 0},
+      'events': [
+        {
+          't': 1000,
+          'type': 'node.setup_applied',
+          'data': {'kind': 'scenario'},
+        },
+        {
+          't': 2000,
+          'type': 'zone.captured',
+          'team': 'red',
+          'data': {'zone': 'Bridge'},
+        },
+      ],
+    });
+    await tester.pumpWidget(h.app(home: GameHistoryDetailScreen(g)));
+    await tester.pumpAndSettle();
+    expect(find.text('node.setup_applied'), findsNothing);
+    expect(find.text('red captured Bridge'), findsOneWidget);
+  });
+
   test('the model: the site server\'s winner rule, and a sparse answer', () {
     final g = HistoryGame({
       'game': 'g',

@@ -51,7 +51,7 @@ PASSWORD = "correct horse battery staple 42"
 # The tables tests write to (not roles, which the migrations seed).
 DATA_TABLES = ("oidc_logins", "passkeys", "user_identities", "preview_feedback", "atak_certs", "atak_cas", "firmware_releases", "club_reports", "club_members", "field_teams", "clubs", "branding_images", "external_game_links", "platform_links", "player_id_claims", "registration_replicas", "game_registrations", "scheduled_games", "audit_log", "consents", "refresh_tokens", "sessions", "user_field_roles",
                "user_game_roles",
-               "chrono_violations", "chrono_rejects", "chrono_readings", "replicas", "marshal_keys",
+               "game_results", "chrono_copy_revocations", "chrono_violations", "chrono_rejects", "chrono_readings", "replicas", "marshal_keys",
                "field_player_ids", "game_nodes", "game_node_scores", "game_events", "games", "controllers",
                "field_api_keys", "hub_share_links", "users", "fields")
 _clock = [time.time()]
@@ -151,7 +151,8 @@ class AppTestCase(DatabaseTestCase):
 
     def settings(self) -> Settings:
         return Settings(database_url=self.database_url, secret_key=SECRET_KEY, metrics_token=self.metrics_token,
-                        db_timeout_s=2.0, purge_hour=self.purge_hour)
+                        db_timeout_s=2.0, purge_hour=self.purge_hour,
+                        allow_signup_without_notice=True)
 
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()

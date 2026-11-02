@@ -15,7 +15,9 @@ import io
 import logging
 import os
 import stat
+import threading
 import unittest
+from unittest import mock
 
 from p3support import GM, READ, T0, Marshal, P3Case, bearer, declaration, new_identity
 from atalaia_controller import player_token
@@ -48,7 +50,7 @@ class CheckinTests(P3Case):
         self.assertEqual(info["field"]["id"], "field")
         self.assertEqual(info["settings"]["confirm"], "auto")
         self.assertIn("rifle", info["limits"]["classes"])
-        self.assertEqual(info["notice"]["version"], 1)
+        self.assertEqual(info["notice"]["version"], 2)
         self.assertIn("30", info["notice"]["pt"])  # the retention in the default notice
         self.assertNotIn("Falc", self.client.get("/api/v1/checkin").text)
         self.client.post(f"/api/v1/games/{g['id']}/checkin/close", headers=GM)
@@ -97,7 +99,7 @@ class CheckinTests(P3Case):
         self.client.post(f"/api/v1/games/{g['id']}/checkin/open", headers=GM)
         self.check_in(g["id"], expect=201)
         self.check_in(g["id"], name="", expect=400)
-        self.check_in(g["id"], notice_version=2, expect=409)
+        self.check_in(g["id"], notice_version=1, expect=409)
         self.check_in(9999 if g["id"] != 9999 else 9998, expect=404)
         r = self.client.post("/api/v1/checkin", json={"game_id": g["id"], "player_id": "x"})
         self.assertEqual(r.status_code, 400)
@@ -248,9 +250,9 @@ class CheckinTests(P3Case):
         self.assertEqual(self.svc.purge(force=True)["identities"], 1)
         self.assertIsNone(self.ctrl.store.field_player(me["player_id"]))
 
-    def test_the_retention_settings_default_to_a_year_and_are_the_gms(self):
+    def test_the_retention_settings_default_to_a_year_and_90_days_and_are_the_gms(self):
         st = self.client.get("/api/v1/checkin/settings", headers=GM).json()
-        self.assertEqual((st["chrono_retention_days"], st["game_retention_days"]), (365, 365))
+        self.assertEqual((st["chrono_retention_days"], st["game_retention_days"]), (365, 90))
         for bad in (29, 3654, "90", True, None):
             r = self.client.put("/api/v1/checkin/settings", json={"game_retention_days": bad}, headers=GM)
             self.assertEqual(r.status_code, 400, bad)
@@ -294,19 +296,65 @@ class CheckinTests(P3Case):
         store.upsert_node(old["id"], 4, "alpha", "zone", {})
         logged = store.count_events(old["id"])
         self.assertGreaterEqual(logged, 1)
-        self.now = T0 + 364 * 86400
-        self.assertEqual(self.svc.purge(force=True)["games"], 0)
-        self.now = T0 + 366 * 86400
+        self.now = T0 + 89 * 86400
+        self.assertEqual(self.svc.purge(force=True)["games"], 0)  # 90 days by default (2026-10-30)
+        self.now = T0 + 91 * 86400
         out = self.svc.purge(force=True)
         self.assertEqual((out["games"], out["game_events"]), (1, logged))
         self.assertIsNone(store.game(old["id"]))
         self.assertEqual((store.count_events(old["id"]), store.scores(old["id"]), store.nodes(old["id"])), (0, {}, []))
         self.assertEqual(store.checkins(old["id"]), [])
         self.assertIsNone(store.token_key(old["id"]))
-        self.assertIsNotNone(store.game(young["id"]))  # not a year yet
+        self.assertIsNotNone(store.game(young["id"]))  # not 90 days yet
         self.assertIsNotNone(store.game(live["id"]))   # never a game that has not ended
+        self.now = T0 + 366 * 86400
         self.client.put("/api/v1/checkin/settings", json={"game_retention_days": 30}, headers=GM)
         self.assertEqual(self.svc.purge(force=True)["games"], 1)  # the field's own days
+
+    def test_a_purged_games_team_results_stay_365_days_without_a_player(self):
+        """SR-88: written as the game goes, no player id, no member list, no squad; gone 365 days after it ended."""
+        store = self.ctrl.store
+        games = []
+        for _ in range(3):
+            g = self.new_game()
+            self.check_in(g["id"], name=NAME)
+            self.client.post(f"/api/v1/games/{g['id']}/end", json={}, headers=GM)
+            games.append(g)
+        won, tied, old = games
+        store.update_game(won["id"], ended_at=T0)
+        store.update_game(tied["id"], ended_at=T0 + 3 * 86400)
+        store.update_game(old["id"], ended_at=T0 - 200 * 86400)
+        store.save_scores(won["id"], {"red": 9, "blue": 4})
+        store.save_scores(tied["id"], {"red": 3, "blue": 3})
+        self.now = T0 + 89 * 86400
+        self.assertEqual(self.svc.purge(force=True)["games"], 1)  # only the old one is past 90 days
+        self.now = T0 + 95 * 86400
+        out = self.svc.purge(force=True)
+        self.assertEqual((out["games"], out["game_results_expired"]), (2, 0))
+        got = store.game_results()  # newest first: tied (T0 + 3 days), won (T0), old
+        self.assertEqual(len(got), 3)
+        self.assertEqual((got[1]["winner"], got[1]["team_totals"]), ("red", {"red": 9, "blue": 4}))
+        self.assertEqual((got[0]["winner"], got[0]["team_totals"]), (None, {"red": 3, "blue": 3}))  # a tie has none
+        self.assertEqual((got[2]["winner"], got[2]["team_totals"]), (None, {"red": 0, "blue": 0}))   # no points
+        for r in got:
+            self.assertEqual(set(r), {"name", "mode_id", "teams", "team_totals", "winner", "state", "duration_ms",
+                                      "started_at", "ended_at"})
+        self.assertEqual(self.client.get("/api/v1/game-results", headers=GM).json()["results"], got)
+        self.now = T0 + 366 * 86400
+        self.assertEqual(self.svc.purge(force=True)["game_results_expired"], 2)  # the ones that ended up to T0
+        self.assertEqual([r["team_totals"] for r in store.game_results()], [{"red": 3, "blue": 3}])
+        self.now = T0 + 376 * 86400
+        self.svc.purge(force=True)
+        self.assertEqual(store.game_results(), [])
+
+    def test_a_game_past_a_year_when_it_goes_leaves_no_result(self):
+        old = self.new_game()
+        self.client.post(f"/api/v1/games/{old['id']}/end", json={}, headers=GM)
+        self.ctrl.store.update_game(old["id"], ended_at=T0)
+        self.client.put("/api/v1/checkin/settings", json={"game_retention_days": 730}, headers=GM)
+        self.now = T0 + 731 * 86400
+        self.assertEqual(self.svc.purge(force=True)["games"], 1)
+        self.assertEqual(self.ctrl.store.game_results(), [])
 
     def test_a_game_the_site_server_has_not_confirmed_is_kept(self):
         """RET-3: with the sync on, the controller's copy is the only one until the site server has all of it."""
@@ -476,6 +524,55 @@ class StreamAndPrivacyTests(P3Case):
             for secret in ("Falc", "Peregrino", FED, "Sem App Nome"):
                 self.assertNotIn(secret, text)
         self.assertIn(me["player_id"], str(published))  # the event, with the id
+
+
+class GameEndsDuringAGetTests(P3Case):
+    """A GET of the live game (the check-in tab's chrono-list, GET /games/{id}) that meets the game's end
+    answers as for an ended game, never 409. The console's Check-in tab reloads the list on every stream
+    message, so a reload in flight when the GM ends the game is normal (found as a flaky console test,
+    test_checkin_tab_follows_the_live_game, 2026-10-26; engine.public_game)."""
+
+    def test_end_between_the_live_check_and_the_start_check(self):
+        g = self.new_game()
+        real = self.ctrl.start_check
+
+        def end_first():
+            self.ctrl.end_game(g["id"])  # the other thread's end, at the worst moment
+            return real()
+
+        with mock.patch.object(self.ctrl, "start_check", side_effect=end_first):
+            r = self.client.get(f"/api/v1/games/{g['id']}/chrono-list", headers=GM)
+            self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(self.ctrl.store.game(g["id"])["state"], "ended")
+        r = self.client.get(f"/api/v1/games/{g['id']}", headers=GM)
+        self.assertEqual((r.status_code, r.json()["live"]), (200, False))
+
+    def test_gets_while_games_end_never_conflict(self):
+        answers: list[tuple[str, int]] = []
+        gid: list[int] = []
+        stop = threading.Event()
+
+        def hammer():
+            while not stop.is_set():
+                if gid:
+                    for path in ("chrono-list", ""):
+                        r = self.client.get(f"/api/v1/games/{gid[-1]}/{path}".rstrip("/"), headers=GM)
+                        answers.append((path, r.status_code))
+
+        threads = [threading.Thread(target=hammer) for _ in range(3)]
+        for t in threads:
+            t.start()
+        try:
+            for _ in range(40):
+                g = self.new_game()
+                gid.append(g["id"])
+                self.assertEqual(self.client.post(f"/api/v1/games/{g['id']}/end", json={}, headers=GM).status_code, 200)
+        finally:
+            stop.set()
+            for t in threads:
+                t.join()
+        self.assertTrue(answers)
+        self.assertEqual({code for _, code in answers}, {200})
 
 
 if __name__ == "__main__":

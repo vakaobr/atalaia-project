@@ -28,6 +28,7 @@
 #include "atalaia/join.h"
 #include "box_pair.h"
 #include "status_hold.h"
+#include "tft_splash.h"
 #include "box_text.h"
 #include "atalaia/packet.h"
 #include "atalaia/version.h"
@@ -49,10 +50,12 @@
 #include "preset_ui.h"
 #include "screen_renderer.h"
 #include "screen_template.h"
+#include "atalaia/screen_template.h"
 #include "state_persist.h"
 #include "radio/event_log.h"
 #include "radio/radio_stats.h"
 #include "radio/radio_task.h"
+#include "reset_reason.h"
 #if CONFIG_ATALAIA_LBT_BENCH
 #include "radio/lbt_bench.h"
 #endif
@@ -109,6 +112,11 @@
 #endif
 
 static const char *TAG = "atalaia";
+
+static void tpl_log(const char *message)
+{
+    ESP_LOGW(TAG, "%s", message);
+}
 
 #define STORAGE_PATH "/littlefs"
 
@@ -301,10 +309,10 @@ static void serial_input_init(void)
     ESP_LOGI(TAG, "USB adoption on: \"@adopt-info\", \"@adopt <hex> [<PIN>|-] [<name>]\"");
 #endif
 #if CONFIG_ATALAIA_SERIAL_JOIN
-    ESP_LOGI(TAG, "serial join on: \"@join atalaia:join:...\", \"@joinkey <hex>\", "
+    ESP_LOGI(TAG, "serial join on: \"@join atalaia:join:...\", \"@joinkey <hex> <admin PIN>\", "
                   "\"@tag <uid> [<tag>]\", \"@wifi <ssid> <password>\", "
                   "\"@setup <PIN>\", "
-                  "\"@update <version> <release id>\", \"@modes\", \"@forgetmodes\" "
+                  "\"@update <version> <release id> <admin PIN>\", \"@modes\", \"@forgetmodes\" "
                   "or \"@lobby\" on the console");
 #endif
 }
@@ -318,6 +326,11 @@ static void serial_input_init(void)
 #define SERIAL_JOIN_ON 1
 #else
 #define SERIAL_JOIN_ON 0
+#endif
+#if CONFIG_ATALAIA_SERIAL_KEYS
+#define SERIAL_KEYS_ON 1
+#else
+#define SERIAL_KEYS_ON 0
 #endif
 
 static void serial_command(const char *cmd)
@@ -363,6 +376,23 @@ static void serial_command(const char *cmd)
         return;
     }
 #endif
+#if CONFIG_ATALAIA_SKIP_SETUP
+    /* A bench build only (serial keys; docs/runbooks/epoch-recovery-bench.md, RFC 0001 Amendments
+     * 24 and 25):
+     * "@epochwipe" removes the box's epoch store and "@epochwipe all" its epoch floor too, so that
+     * the next boot finds a stored game with no record of its key (a lost store). The game key
+     * stays. */
+    if (strcmp(cmd, "epochwipe") == 0 || strcmp(cmd, "epochwipe all") == 0) {
+        bool all = cmd[9] != '\0';
+        if (atalaia_radio_nvs_esp_wipe_epochs(all)) {
+            ESP_LOGW(TAG, "epochwipe: %s removed; restart the box to take a lost-store epoch",
+                     all ? "the epoch store and the epoch floor were" : "the epoch store was");
+        } else {
+            ESP_LOGE(TAG, "epochwipe: failed");
+        }
+        return;
+    }
+#endif
 #if CONFIG_ATALAIA_LBT_BENCH
     /* Decision SL-25's bench test of listen-before-talk: "@lbt tx", "@lbt probe", ... */
     if (strcmp(cmd, "lbt") == 0 || strncmp(cmd, "lbt ", 4) == 0) {
@@ -370,6 +400,20 @@ static void serial_command(const char *cmd)
         return;
     }
 #endif
+    /* "@joinkey <hex>" and "@update <version> <id>" change what the box trusts or runs: a release
+     * build wants the admin PIN as their last word, a bench build (serial keys) does not
+     * (decision SR-40). The line is rewritten without the PIN once it has been checked. */
+    static char gated[200];
+    if (SERIAL_JOIN_ON && (strncmp(cmd, "joinkey ", 8) == 0 || strncmp(cmd, "update ", 7) == 0)) {
+        static char gate_reply[120];
+        snprintf(gated, sizeof(gated), "%s", cmd);
+        if (!admin_pin_gate_serial(&admin_guard, SERIAL_KEYS_ON, gated, cmd[0] == 'j' ? 1 : 2,
+                                   gate_reply, sizeof(gate_reply))) {
+            ESP_LOGW(TAG, "%.6s: %s", cmd, gate_reply);
+            return;
+        }
+        cmd = gated;
+    }
     bool adopt_cmd =
         SERIAL_ADOPT_ON && (strcmp(cmd, "adopt-info") == 0 || strncmp(cmd, "adopt ", 6) == 0);
     bool joinkey_cmd = SERIAL_JOIN_ON && strncmp(cmd, "joinkey ", 8) == 0;
@@ -1145,6 +1189,11 @@ static void task_game(void *arg)
 #define CONFIG_ATALAIA_OLED_SPLASH_MS 0
 #endif
 
+/* The TFT's boot splash needs a panel: the stub HAL has none. */
+#ifndef CONFIG_ATALAIA_TFT_SPLASH_MS
+#define CONFIG_ATALAIA_TFT_SPLASH_MS 2500
+#endif
+
 static uint32_t now_ms(void)
 {
     return (uint32_t)(esp_timer_get_time() / 1000);
@@ -1206,7 +1255,26 @@ static void task_lvgl(void *arg)
 {
     (void)arg;
     ESP_LOGI(TAG, "lvgl task started");
-    display_port_init(hal.display);
+    const bool tft_up = display_port_init(hal.display);
+    tft_splash_t tft_splash;
+    tft_splash_begin(&tft_splash, now_ms(), 0);
+    if (tft_up && CONFIG_ATALAIA_TFT_SPLASH_MS > 0) {
+        /* The logo and the version at once; the screens that follow wait their turn, nothing
+         * blocks (decision TS-2). The version is JSON-safe (a project version has no quote). */
+        char data[SCREEN_DATA_MAX];
+        char ver[48];
+        size_t n = 0;
+        for (const char *c = esp_app_get_description()->version; *c && n < sizeof(ver) - 1; c++) {
+            if (*c != '"' && *c != '\\' && (unsigned char)*c >= 0x20) ver[n++] = *c;
+        }
+        ver[n] = '\0';
+        snprintf(data, sizeof(data), "{\"version\":\"%s\"}", ver);
+        if (screen_render("splash", data)) {
+            display_port_handle();
+            tft_splash_begin(&tft_splash, now_ms(), CONFIG_ATALAIA_TFT_SPLASH_MS);
+        }
+    }
+    screen_set_overlay_readers(game_clock_ms, held_buttons);
     lv_obj_t *oled_scr = display_port_oled_init(hal.oled);
     if (oled_scr) {
         /* The whole version; the splash shows its short form (FV-8). */
@@ -1221,12 +1289,25 @@ static void task_lvgl(void *arg)
         screen_update_t su;
         while (xQueueReceive(screen_queue, &su, 0) == pdTRUE) {
             ESP_LOGI(TAG, "screen %s %s", su.template_name, su.data_json);
+            /* The mode's own message changes no pixel: it goes through at once. */
+            if (strcmp(su.template_name, SCREEN_MODE_MESSAGE) != 0 &&
+                tft_splash_offer(&tft_splash, su.template_name, su.data_json, now_ms())) {
+                if (oled_scr) oled_view_handle(oled_scr, su.template_name, su.data_json, now_ms());
+                continue;
+            }
             if (!screen_render(su.template_name, su.data_json)) {
                 ESP_LOGW(TAG, "unknown screen template '%s'", su.template_name);
             }
             if (oled_scr) oled_view_handle(oled_scr, su.template_name, su.data_json, now_ms());
         }
         if (oled_scr) oled_view_poll(oled_scr, now_ms());
+        screen_update_t first;
+        if (tft_splash_due(&tft_splash, now_ms(), &first)) {
+            if (!screen_render(first.template_name, first.data_json)) {
+                ESP_LOGW(TAG, "unknown screen template '%s'", first.template_name);
+            }
+        }
+        screen_overlay_tick();
         long left_s, total_s;
         game_timer_seconds(&left_s, &total_s);
         screen_timer_bar(left_s, total_s);
@@ -1423,6 +1504,8 @@ void app_main(void)
      * forgotten; their screens come from storage. */
     mode_store_init(STORAGE_PATH);
     screen_template_set_fetched(mode_store_screen);
+    /* An expression that fails at render time shows "?" and is named here once (TPL-1). */
+    atalaia_tpl_set_log(tpl_log);
     state_persist_init(STORAGE_PATH "/state");
     seed_presets();
     load_preset_list();
@@ -1470,6 +1553,15 @@ void app_main(void)
 
         /* A field game stored before a reboot comes first (ADR-P2-12): rejoin it. */
         state_persist_data_t saved;
+        /* Why this boot happened goes to the controller with node.rebooted: a panic or a
+         * watchdog reset is a crash, not a power cut. */
+        reset_cause_t cause = reset_cause_this_boot();
+        if (reset_cause_is_crash(cause)) {
+            ESP_LOGW(TAG, "the last restart was a crash (%s)", reset_cause_name(cause));
+        } else {
+            ESP_LOGI(TAG, "reset reason: %s", reset_cause_name(cause));
+        }
+        box_game_set_reset_reason(&box, reset_cause_name(cause));
         bool resumed = box_game_resume(&box, (uint32_t)(esp_timer_get_time() / 1000));
         if (resumed) ESP_LOGI(TAG, "rejoined field game %u", box.join.game_id);
 
@@ -1502,8 +1594,12 @@ void app_main(void)
     }
 
     /* FreeRTOS tasks per ADR-P1-7. */
-    /* 12 KB: Lua, the join codec and the field link all run on the game task. */
-    xTaskCreatePinnedToCore(task_game, "game", 12288, NULL, 5, NULL, 1);
+    /* 24 KB: Lua, the join codec and the field link all run on the game task. Lua's nesting is
+     * capped at 20 C levels (LUAI_MAXCCALLS, core/third_party/lua/luaconf.h, decision SR-132) and
+     * a level of the worst chain (a gsub callback calling gsub) takes about 0.8 KB on the Xtensa
+     * (-fstack-usage, -O2): 22 levels and the pattern matcher's 32 are about 18 KB, with 6 KB for
+     * what is under them. It was 12 KB when Lua allowed 200 levels (69 to 273 KB). */
+    xTaskCreatePinnedToCore(task_game, "game", 24576, NULL, 5, NULL, 1);
     xTaskCreatePinnedToCore(task_lvgl, "lvgl", 8192, NULL, 4, NULL, 1);
     xTaskCreatePinnedToCore(task_audio, "audio", 4096, NULL, 3, NULL, 0);
     xTaskCreatePinnedToCore(task_wifi, "wifi", 4096, NULL, 2, NULL, 0);

@@ -31,6 +31,12 @@
 # SECURITY and the one policy on every table and every role's privileges as they
 # should be, or the server stays stopped. Starting runs `hosted migrate` (hub)
 # again, and the check runs once more.
+# The erasure ledger (PRIV-4): what was erased after the backup was made is not in it, so a restore would bring it
+# back. The server writes a ledger of hashes outside the database (the Docker volume `ledger`; backup.sh copies it
+# next to the backups as erasures-ledger.jsonl). Before the server starts, the copy beside the backup file is merged
+# into the volume (a new machine has an empty one); once the server is healthy, `erasure-ledger apply` erases again,
+# in every field, what the restored database still holds of it, and the result is printed. Never skipped: a failure
+# stops the script with the server running, and the command can be repeated by hand.
 # Settings: ATALAIA_ENV_FILE (server/.env), COMPOSE_PROJECT_NAME.
 set -eu
 
@@ -132,6 +138,13 @@ if [ "$restored" -ne 1 ] || [ "$opened" != 0 ]; then
         "and the server is stopped: fix the cause and run restore.sh again"
 fi
 
+ledger_copy="$(dirname "$file")/erasures-ledger.jsonl"
+if [ -f "$ledger_copy" ]; then
+    dc run --rm -T ledger-tool import < "$ledger_copy" || fail "the erasure ledger $ledger_copy could not be merged"
+else
+    echo "restore.sh: no $ledger_copy: only the erasure ledger already on this machine is applied"
+fi
+
 if [ "$hosted" = on ]; then
     echo "restore.sh: giving the restored hub's fields their database roles and grants (hosted migrate)"
     ATALAIA_ENV_FILE=$env_file sh "$here/hosted-roles.sh"
@@ -150,4 +163,7 @@ else
     echo "restore.sh: starting the server (it runs the migrations)"
     dc up -d --wait server caddy
 fi
+echo "restore.sh: erasing again what the erasure ledger lists"
+dc exec -T server python -m atalaia_server erasure-ledger apply \
+    || fail "the erasure ledger could not be applied after the restore; run it again: docker compose exec server python -m atalaia_server erasure-ledger apply"
 echo "restore.sh: restored $file"

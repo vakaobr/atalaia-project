@@ -69,7 +69,7 @@ def drop_sql(role: str, schema: str) -> list[str]:
         f"REVOKE ALL ON public.atalaia_share_members, public.atalaia_share_records, public.atalaia_share_codes "
         f"FROM {r}; "
         f"REVOKE ALL ON FUNCTION public.atalaia_share_read(uuid[], integer), public.atalaia_share_redeem(bytea), "
-        f"public.atalaia_caller_tenant() FROM {r}; END IF; "
+        f"public.atalaia_share_peers(uuid), public.atalaia_caller_tenant() FROM {r}; END IF; "
         f"REVOKE ALL ON SCHEMA public FROM {r}; END IF; END $do$",
         f"DROP ROLE IF EXISTS {r}",
     ]

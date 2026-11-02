@@ -61,8 +61,14 @@ class Strings {
 
   /// The text for [key] with its {placeholders} filled from [args]. A
   /// missing key shows itself, so it is easy to spot (and a test fails).
+  /// A count of exactly 1 (`n: 1`) takes the singular form `<key>_one` of
+  /// this language when it has one (1 vida, not 1 vidas); Chinese has no
+  /// plural and no such keys, and a language without the form keeps the
+  /// plural one.
   String t(String key, [Map<String, Object?> args = const {}]) {
-    var s = language.table[key] ?? enStrings[key] ?? key;
+    final n = args['n'];
+    final one = n is num && n == 1 ? language.table['${key}_one'] : null;
+    var s = one ?? language.table[key] ?? enStrings[key] ?? key;
     if (args.isEmpty) return s;
     args.forEach((k, v) => s = s.replaceAll('{$k}', '$v'));
     return s;

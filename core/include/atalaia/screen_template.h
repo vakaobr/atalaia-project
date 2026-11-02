@@ -55,6 +55,11 @@
 #define ATALAIA_TPL_NAME_MAX    31
 #define ATALAIA_TPL_DEPTH_MAX   4   /* rows and columns inside each other */
 #define ATALAIA_TPL_TEXT_MAX    160 /* a widget's text after interpolation, NUL included */
+/* One expression's 'text' literals share this many bytes (each takes its length + 1, whether
+ * or not it is reached). The load-time check refuses an expression over it. Decision TPL-1. */
+#define ATALAIA_TPL_LITERALS_MAX 256
+/* The strings an expression reads from the data share this many (cut, or "?" when none is left). */
+#define ATALAIA_TPL_DATA_MAX 160
 
 /* Widget sizes besides pixels. */
 #define ATALAIA_TPL_AUTO (-1) /* fit the content */
@@ -161,5 +166,19 @@ bool atalaia_tpl_color(const char *name, uint32_t *rgb);
 
 /* Checks one expression (without braces). err gets the reason. */
 bool atalaia_tpl_expr_ok(const char *expr, size_t len, char *err, size_t err_cap);
+
+/*
+ * The bytes the expression's 'text' literals take (each its length + 1, all of them: nothing is
+ * skipped by && or ||), counted past ATALAIA_TPL_LITERALS_MAX. Tools report it and warn near the
+ * limit.
+ */
+size_t atalaia_tpl_expr_literal_bytes(const char *expr, size_t len);
+
+/*
+ * Where a render reports an expression that failed anyway (it shows "?" for it): called once per
+ * expression with a short English line. NULL (the default) logs nothing. Not thread safe.
+ */
+typedef void (*atalaia_tpl_log_fn)(const char *message);
+void atalaia_tpl_set_log(atalaia_tpl_log_fn fn);
 
 #endif /* ATALAIA_SCREEN_TEMPLATE_H */

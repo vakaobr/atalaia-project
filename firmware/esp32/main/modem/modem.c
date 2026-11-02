@@ -161,44 +161,6 @@ static bool apply_channel(modem_t *m, uint32_t hz)
     return true;
 }
 
-/*
- * Flood copies of one packet arrive several times (direct and relayed).
- * Keyed on (source, epoch, seq) so a box that rebooted and restarted its
- * seq at 0 is not mistaken for a duplicate.
- */
-static bool dedupe_seen(modem_t *m, uint16_t source, uint32_t nonce_ctr)
-{
-    uint32_t t = now(m);
-    int free_slot = -1;
-    int oldest = -1;
-    uint32_t oldest_age = 0;
-    for (int i = 0; i < MODEM_DEDUPE_SIZE; i++) {
-        modem_dedupe_entry_t *e = &m->dedupe[i];
-        if (e->used && t - e->seen_ms > MODEM_DEDUPE_EXPIRY_MS) {
-            e->used = false;
-        }
-        if (!e->used) {
-            if (free_slot < 0) free_slot = i;
-            continue;
-        }
-        if (e->source == source && e->nonce_ctr == nonce_ctr) {
-            return true;
-        }
-        uint32_t age = t - e->seen_ms;
-        if (oldest < 0 || age > oldest_age) {
-            oldest = i;
-            oldest_age = age;
-        }
-    }
-    /* Full table: evict the oldest entry (LRU), as core/src/flood.c does. */
-    int slot = free_slot >= 0 ? free_slot : oldest;
-    m->dedupe[slot].source = source;
-    m->dedupe[slot].nonce_ctr = nonce_ctr;
-    m->dedupe[slot].seen_ms = t;
-    m->dedupe[slot].used = true;
-    return false;
-}
-
 /* ---- Commands ------------------------------------------------------------- */
 
 static bool cmd_configure(modem_t *m, const uint8_t *p, size_t len)
@@ -222,10 +184,9 @@ static bool cmd_configure(modem_t *m, const uint8_t *p, size_t len)
     }
     bool same_game = m->configured && m->game_id == game_id && memcmp(m->rx.game_key, key, 16) == 0;
     if (!same_game) {
-        /* A new game: forget every source epoch and every packet seen. */
+        /* A new game: forget every source epoch and every replay window. */
         atalaia_radio_proto_init(&m->rx, game_id, node_id, m->crypto, NULL);
         atalaia_radio_proto_set_key(&m->rx, key);
-        memset(m->dedupe, 0, sizeof(m->dedupe));
         m->tx_used = false;
         m->last_tx_nonce = 0;
     } else {
@@ -354,7 +315,6 @@ static void handle_cmd(modem_t *m, const uint8_t *p, size_t len)
         break;
     case MODEM_CMD_CLEAR:
         memset(&m->rx, 0, sizeof(m->rx));
-        memset(m->dedupe, 0, sizeof(m->dedupe));
         m->configured = false;
         m->game_id = 0;
         m->tx_used = false;
@@ -551,11 +511,13 @@ void modem_on_air_rx(modem_t *m, const uint8_t *pkt, size_t len, int8_t rssi, in
     atalaia_header_t out_hdr;
     if (!atalaia_radio_proto_on_recv_window(&m->rx, &msg, m->epoch_window, &out_hdr, plain,
                                             &plain_len, &epoch)) {
-        m->count.rx_auth_fail++;
-        return;
-    }
-    if (dedupe_seen(m, hdr.source, ((uint32_t)epoch << 16) | hdr.seq)) {
-        m->count.rx_dupes++;
+        /* Authentic but already forwarded (a flood copy) or 64 or more counters below the
+         * source's highest (a replay): RFC 0001 Amendment 23, the replay window. */
+        if (m->rx.last_replay != ATALAIA_REPLAY_FRESH) {
+            m->count.rx_dupes++;
+        } else {
+            m->count.rx_auth_fail++;
+        }
         return;
     }
 

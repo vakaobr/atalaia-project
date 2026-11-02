@@ -38,9 +38,8 @@ void main() {
   late ControllerEngine engine;
   late ControllerCheckin svc;
   late ControllerApi api;
-  final limits = File(
-    'lib/chrono/limit_templates/portugal.yaml',
-  ).readAsStringSync();
+  final limits = File('lib/chrono/limit_templates/portugal.yaml')
+      .readAsStringSync();
 
   setUp(() {
     wall = t0;
@@ -106,7 +105,7 @@ void main() {
         'player_id': pid,
         'player_secret': _secret(n),
         'display_name': 'Falcão',
-        'notice_version': 1,
+        'notice_version': 2,
         ...extra,
       },
     );
@@ -115,9 +114,9 @@ void main() {
   /// The staff row of the player [who] (default: the latest to check in).
   Map<String, Object?> row(int gid, [String? who]) {
     final list = svc.listCheckins(ApiViewer.gm, gid)['checkins']! as List;
-    return (list.firstWhere((r) => (r as Map)['player_id'] == (who ?? pid))
-            as Map)
-        .cast<String, Object?>();
+    return (list.firstWhere(
+      (r) => (r as Map)['player_id'] == (who ?? pid),
+    ) as Map).cast<String, Object?>();
   }
 
   test('the rule is a check-in setting: default, saved, refused when bad', () {
@@ -154,7 +153,7 @@ void main() {
     expect(((svc.info()['settings']! as Map)['apd']! as Map)['checkin'], true);
   });
 
-  test('a membership that passes checks in; one that does not waits', () {
+  test('with a rule that checks, every self check-in waits for the card', () {
     final gid = newGame();
     rule({
       'checkin': true,
@@ -167,7 +166,8 @@ void main() {
       'membership_expires': '2027-06-30',
     });
     expect(r.status, 201, reason: '${r.body}');
-    expect((r.body! as Map)['status'], 'checked_in');
+    // Even a valid verdict with confirm = auto waits for "card seen" (LEG-1).
+    expect((r.body! as Map)['status'], 'pending');
     expect(row(gid)['apd_status'], 'valid');
     for (final (extra, verdict) in [
       (<String, Object?>{}, 'missing'),
@@ -204,7 +204,7 @@ void main() {
         'checkin': true,
         'accepted': ['apd-b'],
       });
-      checkIn(gid, {'apd_id': 'apd-a', 'membership_number': '123'});
+      checkIn(gid, {'apd_id': 'apd-a', 'membership_number': 'MN-70518'});
       expect(row(gid)['status'], 'pending');
       final logged = <String>[];
       svc.audit = logged.add;
@@ -221,7 +221,7 @@ void main() {
       expect(logged, hasLength(1));
       expect(logged.single, contains(pid));
       expect(logged.single, contains('not_accepted'));
-      expect(logged.single, isNot(contains('123')));
+      expect(logged.single, isNot(contains('70518')));
     },
   );
 
@@ -245,6 +245,347 @@ void main() {
     expect(v['apd_override'], true);
     expect(v['membership_number'], '777');
     expect(v['federation_number'], '777');
+  });
+
+  group('the card check (protocol/apd.md, decisions LEG-1 to LEG-11)', () {
+    const number = 'MBR-ZQ9917';
+    late int gid;
+    Map<String, Object?> asMap(ApiResponse r) =>
+        (r.body! as Map).cast<String, Object?>();
+
+    ApiResponse member([String num = number, Map<String, Object?>? extra]) =>
+        checkIn(gid, {
+          'apd_id': 'apd-a',
+          'membership_number': num,
+          'membership_expires': '2100-01-31',
+          ...?extra,
+        });
+
+    ApiResponse patch(String who, Map<String, Object?> body) =>
+        call('PATCH', '/api/v1/games/$gid/checkins/$who', body: body);
+
+    setUp(() {
+      gid = newGame();
+      call(
+        'PUT',
+        '/api/v1/checkin/settings',
+        body: {
+          'confirm': 'auto',
+          'federation': 'optional',
+          'apd': {
+            'checkin': true,
+            'expiry': true,
+            'accepted': ['apd-a'],
+          },
+        },
+      );
+    });
+
+    test('the tick records who and when, stores the verdict, erases the '
+        'number', () {
+      expect(asMap(member())['status'], 'pending');
+      final logged = <String>[];
+      svc.audit = logged.add;
+      final r = patch(pid, {'federation_seen': true});
+      expect(r.status, 200, reason: '${r.body}');
+      final out = asMap(r);
+      expect(out['status'], 'checked_in');
+      expect(out['federation_seen'], true);
+      expect(out['apd_override'], false);
+      expect(out['membership_number'], isNull);
+      expect(out['federation_number'], isNull);
+      expect(out['apd_id'], 'apd-a');
+      expect(out['membership_expires'], '2100-01-31');
+      expect(out['apd_status'], 'valid');
+      expect(out['apd_verdict_on'], '2027-01-15');
+      expect(out['card_checked_by'], 'gm');
+      expect(out['card_checked_at'], t0);
+      expect(logged.any((l) => l.contains('card check')), true);
+      expect(logged.any((l) => l.contains(number)), false);
+      // The stored verdict stands when the rule changes later.
+      rule({
+        'checkin': true,
+        'accepted': ['x'],
+      });
+      expect(row(gid)['apd_status'], 'valid');
+    });
+
+    test('a confirmation without the card is an override that keeps the '
+        'number', () {
+      member();
+      final logged = <String>[];
+      svc.audit = logged.add;
+      final out = asMap(patch(pid, {'status': 'checked_in'}));
+      expect(out['status'], 'checked_in');
+      expect(out['apd_override'], true);
+      expect(out['federation_seen'], false);
+      expect(out['membership_number'], number);
+      expect(out['card_checked_by'], isNull);
+      expect(
+        logged.any((l) => l.contains('apd override') && l.contains('no_card')),
+        true,
+      );
+      expect(logged.any((l) => l.contains(number)), false);
+    });
+
+    test('the app cannot put the number back; un-ticking is refused', () {
+      member();
+      patch(pid, {'federation_seen': true});
+      final who = pid;
+      final again = call(
+        'POST',
+        '/api/v1/checkin',
+        token: null,
+        body: {
+          'game_id': gid,
+          'player_id': who,
+          'player_secret': _secret(n),
+          'display_name': 'Falcão',
+          'notice_version': 2,
+          'apd_id': 'apd-a',
+          'membership_number': number,
+          'membership_expires': '2100-01-31',
+        },
+      );
+      expect(again.status, 200, reason: '${again.body}');
+      expect(row(gid, who)['membership_number'], isNull);
+      expect(row(gid, who)['federation_seen'], true);
+      expect(patch(who, {'federation_seen': false}).status, 409);
+    });
+
+    test('new data replaces the check', () {
+      member();
+      patch(pid, {'federation_seen': true});
+      final out = asMap(
+        patch(pid, {
+          'membership_number': 'OTHER-1',
+          'apd_id': 'apd-a',
+          'membership_expires': '2100-01-31',
+        }),
+      );
+      expect(out['federation_seen'], false);
+      expect(out['card_checked_by'], isNull);
+      expect(out['apd_verdict_on'], isNull);
+      expect(out['membership_number'], 'OTHER-1');
+      final again = asMap(patch(pid, {'federation_seen': true}));
+      expect(again['federation_seen'], true);
+      expect(again['membership_number'], isNull);
+    });
+
+    test('a hand check-in with the card erases; without it overrides', () {
+      final base = {
+        'display_name': 'Ana',
+        'membership_number': number,
+        'apd_id': 'apd-a',
+        'membership_expires': '2100-01-31',
+      };
+      var r = call(
+        'POST',
+        '/api/v1/games/$gid/checkins',
+        body: {...base, 'federation_seen': true},
+      );
+      var out = asMap(r);
+      expect(r.status, 201, reason: '${r.body}');
+      expect(out['status'], 'checked_in');
+      expect(out['membership_number'], isNull);
+      expect(out['card_checked_by'], 'gm');
+      expect(out['apd_override'], false);
+      expect(out['apd_status'], 'valid');
+      r = call('POST', '/api/v1/games/$gid/checkins', body: base);
+      out = asMap(r);
+      expect(out['membership_number'], number);
+      expect(out['apd_override'], true);
+      expect(out['card_checked_by'], isNull);
+      expect(
+        call(
+          'POST',
+          '/api/v1/games/$gid/checkins',
+          body: {...base, 'federation_seen': 'yes'},
+        ).status,
+        400,
+      );
+    });
+
+    test('the CSV carries who and when, and no number after the check', () {
+      member();
+      patch(pid, {'federation_seen': true});
+      final csv = svc.csvExport(gid);
+      final lines = csv.split('\r\n');
+      final cols = lines[0].split(',');
+      final cells = lines[1].split(',');
+      expect(cells[cols.indexOf('card_checked_by')], 'gm');
+      expect(cells[cols.indexOf('card_checked_at')], startsWith('2027-01-15'));
+      expect(cells[cols.indexOf('federation_number')], '');
+      expect(cells[cols.indexOf('apd_status')], 'valid');
+      expect(csv.contains(number), false);
+    });
+
+    test('leaving and the purge forget the card check', () {
+      member();
+      patch(pid, {'federation_seen': true});
+      final who = pid;
+      svc.leave(
+        ApiViewer('player', {
+          'game_id': gid,
+          'player_id': who,
+          'role': 'player',
+        }),
+      );
+      final r = row(gid, who);
+      expect(r['card_checked_by'], isNull);
+      expect(r['card_checked_at'], isNull);
+      expect(r['apd_verdict_on'], isNull);
+      expect(r['federation_number'], isNull);
+    });
+  });
+
+  group('position sharing is its own choice (LEG-12 to LEG-16)', () {
+    late int gid;
+    Map<String, Object?> asMap(ApiResponse r) =>
+        (r.body! as Map).cast<String, Object?>();
+    Map<String, Object?> gps(int t) => {
+      'lat': 38.72,
+      'lon': -9.14,
+      'accuracy_m': 5,
+      'source': 'gps',
+      't': t,
+    };
+
+    ApiResponse position(String token, int t) =>
+        call('POST', '/api/v1/positions', token: token, body: gps(t));
+
+    setUp(() {
+      gid = newGame();
+      call('POST', '/api/v1/games/$gid/start', body: {'force': true});
+    });
+
+    test('off unless ticked; declining blocks nothing', () {
+      final yes = asMap(checkIn(gid, {'share_position': true}));
+      expect(yes['status'], 'checked_in');
+      final no = asMap(checkIn(gid, {'share_position': false}));
+      final silent = asMap(checkIn(gid, {}));
+      expect(no['status'], 'checked_in');
+      expect(silent['status'], 'checked_in');
+      expect(position(no['token']! as String, 1000).status, 409);
+      expect(position(silent['token']! as String, 1000).status, 409);
+      expect(position(yes['token']! as String, 1000).status, 200);
+      expect(row(gid, silent['player_id']! as String)['position_share'], false);
+      expect(
+        row(gid, silent['player_id']! as String)['position_share_notice'],
+        2,
+      );
+      expect(checkIn(gid, {'share_position': 'yes'}).status, 400);
+    });
+
+    test(
+      'the player stops and starts any time; stopping drops the position',
+      () {
+        final me = asMap(checkIn(gid, {'share_position': true}));
+        final tok = me['token']! as String;
+        position(tok, 1000);
+        List<Object?> positions() =>
+            (call('GET', '/api/v1/positions').body! as Map)['positions']!
+                as List<Object?>;
+        expect(positions(), hasLength(1));
+        wall += 60;
+        var r = call(
+          'PUT',
+          '/api/v1/checkin/me/position-sharing',
+          token: tok,
+          body: {'share_position': false},
+        );
+        expect(r.status, 200, reason: '${r.body}');
+        expect(asMap(r)['position_share'], false);
+        expect(asMap(r)['position_share_at'], t0 + 60);
+        expect(asMap(r)['position_share_notice'], 2);
+        expect(positions(), isEmpty);
+        expect(position(tok, 2000).status, 409);
+        expect(
+          call(
+            'PUT',
+            '/api/v1/checkin/me/position-sharing',
+            token: tok,
+            body: {'share_position': 'on'},
+          ).status,
+          400,
+        );
+        r = call(
+          'PUT',
+          '/api/v1/checkin/me/position-sharing',
+          token: tok,
+          body: {'share_position': true},
+        );
+        expect(r.status, 200);
+        expect(position(tok, 3000).status, 200);
+      },
+    );
+
+    test('a notice bump turns an older yes off until asked again (NV-3)', () {
+      final me = asMap(checkIn(gid, {'share_position': true}));
+      final tok = me['token']! as String;
+      expect(position(tok, 1000).status, 200);
+      // The field raises the notice version (a restart with the new config).
+      ControllerCheckin(
+        engine,
+        CheckinConfig(
+          limitsYaml: limits,
+          utcDay: true,
+          apdsJson: _list,
+          country: 'PT',
+          noticeVersion: 3,
+        ),
+      );
+      final r = position(tok, 2000);
+      expect(r.status, 409, reason: '${r.body}');
+      expect('${(r.body! as Map)['detail']}', contains('position_sharing_off'));
+      expect(
+        (call('GET', '/api/v1/positions').body! as Map)['positions'],
+        <Object?>[],
+      );
+      expect(
+        asMap(call('GET', '/api/v1/checkin/me', token: tok))['position_share'],
+        false,
+      );
+      // An old-version check-in is refused with the code the app reads.
+      final stale = checkIn(gid, {'share_position': true});
+      expect(stale.status, 409);
+      expect(
+        '${(stale.body! as Map)['detail']}',
+        startsWith('notice_version_changed'),
+      );
+      // The switch names the notice shown: stale refused, current accepted.
+      ApiResponse put(int v) => call(
+        'PUT',
+        '/api/v1/checkin/me/position-sharing',
+        token: tok,
+        body: {'share_position': true, 'notice_version': v},
+      );
+      expect(put(2).status, 409);
+      expect(put(3).status, 200);
+      expect(position(tok, 3000).status, 200);
+    });
+
+    test('a hand check-in records the choice, and leaving drops it', () {
+      var r = call(
+        'POST',
+        '/api/v1/games/$gid/checkins',
+        body: {'display_name': 'Ana', 'share_position': true},
+      );
+      expect(asMap(r)['position_share'], true);
+      expect(asMap(r)['position_share_notice'], 2);
+      r = call(
+        'POST',
+        '/api/v1/games/$gid/checkins',
+        body: {'display_name': 'Rui'},
+      );
+      expect(asMap(r)['position_share'], false);
+      final me = asMap(checkIn(gid, {'share_position': true}));
+      position(me['token']! as String, 1000);
+      call('DELETE', '/api/v1/checkin/me', token: me['token']! as String);
+      final left =
+          (call('GET', '/api/v1/positions').body! as Map)['positions']! as List;
+      expect(left, isEmpty);
+    });
   });
 
   test('the old federation number is the membership number', () {

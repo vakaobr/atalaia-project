@@ -233,6 +233,12 @@ class AtalaiaBindings {
         bool Function(Pointer<Utf8>, int, Pointer<Utf8>, int)
       >('atalaia_tpl_expr_ok', isLeaf: true);
 
+  late final tplExprLiteralBytes = library
+      .lookupFunction<
+        Size Function(Pointer<Utf8>, Size),
+        int Function(Pointer<Utf8>, int)
+      >('atalaia_tpl_expr_literal_bytes', isLeaf: true);
+
   late final eventEncode = library
       .lookupFunction<
         Size Function(
@@ -487,6 +493,17 @@ class AtalaiaCore {
       calloc
         ..free(e)
         ..free(err);
+    }
+  }
+
+  /// The bytes an expression's 'text' literals take (atalaia_tpl_expr_literal_bytes).
+  int screenExpressionLiteralBytes(String expr) {
+    final bytes = utf8.encode(expr);
+    final e = _nativeBytes(bytes);
+    try {
+      return bindings.tplExprLiteralBytes(e.cast(), bytes.length);
+    } finally {
+      calloc.free(e);
     }
   }
 

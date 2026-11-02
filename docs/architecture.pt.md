@@ -75,7 +75,7 @@ usados ao carregar o mapa do campo`"]
     boxes <-->|"LoRa"| modem
     modem <-->|"USB série"| ctrl
     pod <-->|"LoRa"| modem
-    boxes -->|"Wi-Fi HTTPS fixado: firmware, modos, logótipo"| ctrl
+    boxes -->|"Wi-Fi HTTPS fixado: firmware, modos"| ctrl
     props <-->|"Wi-Fi WebSocket, fixado"| ctrl
     props <-->|"USB-OTG ou BLE"| pod
     gm <-->|"Wi-Fi HTTPS e WebSocket"| ctrl
@@ -93,7 +93,7 @@ usados ao carregar o mapa do campo`"]
 falam por LoRa através do modem: eventos, pontos, o relógio e comandos. O controlador
 serve tudo o resto no Wi-Fi do campo: a consola do GM, a vista em direto para quem
 joga, os props Android e os ficheiros que uma caixa vai buscar (firmware, modos de
-jogo, o logótipo do campo). Um telemóvel que é o controlador de campo substitui o
+jogo). Um telemóvel que é o controlador de campo substitui o
 Raspberry Pi e o modem: usa um modem ou um módulo de E/S ligado a ele, ou não tem
 LoRa nenhum e serve só props Android no Wi-Fi.
 
@@ -200,6 +200,17 @@ deslocados em 3) por USB-OTG ou BLE até um telemóvel
 imagem de firmware nem pacote de modo vai por LoRa. Um pacote de modo ou uma imagem
 é demasiado grande e vai buscar-se por HTTPS; só uma oferta curta (CMD update) ou um
 relatório de falha (`node.modes_failed`, `node.update_failed`) usa o LoRa.
+
+**Repetições.** Cada recetor (a caixa, o modem e os dois controladores) guarda, por
+emissor, o `epoch << 16 | seq` mais alto e um mapa de 64 bits, aplicados só a um pacote
+que autenticou: um contador já visto, ou 64 ou mais abaixo do mais alto, é largado por
+muito tempo que tenha passado desde a gravação. Uma caixa também recusa um início, uma
+pausa, um retomar, um fim ou um TIME mais antigo do que o último do seu tipo que
+aplicou, e uma caixa que perdeu o registo da época sorteia uma nova em vez de repetir
+números únicos. Nada muda no ar, por isso uma caixa que não foi atualizada continua
+exposta. A janela vive na RAM: uma caixa que acabou de reiniciar aceita o primeiro
+pacote de cada emissor. Testado com vetores comuns em C, Python e Dart e em testes no
+computador; nenhum pacote gravado foi repetido em placas reais.
 
 Ainda não testado em hardware real: o pod, a retransmissão entre muitas caixas (o
 teste de campo com 5 e 10 caixas) e as tramas de campo com mais de uma caixa. Já
@@ -314,8 +325,20 @@ do site ou outro campo) possa verificar que não foi alterada. As etiquetas NFC 
 quem joga são assinadas pelo controlador, que tem a chave do jogo; a chave nunca
 sai dele.
 
-**Posições.** Quem joga pode partilhar a sua posição durante um jogo em curso, como
-um ponto GPS ou, em espaços interiores, como o id do iBeacon mais forte que o
+**Check-in.** Quando o campo confere a filiação numa associação (a APD, em Portugal), o
+check-in fica pendente até quem é árbitro ou o GM ter o cartão físico à frente e marcar
+"cartão visto, corresponde"; o controlador guarda então o veredicto e apaga o número de
+filiado (o servidor do site apaga a sua cópia quando chega o resultado do jogo ou o jogo
+termina). É possível passar alguém sem o cartão, com o motivo registado. O código do GM
+e os códigos de quem joga são recusados em HTTP simples quando o HTTPS está ligado, por
+isso a consola do GM abre-se em `https://<controlador>:8443/console/`. A obtenção de
+mapas da consola (*Carregar o campo a partir de um mapa*, que chega ao OpenStreetMap e
+a serviços de imagens aéreas a partir do navegador) pode ser desligada nas Definições.
+
+**Posições.** Quem joga pode partilhar a sua posição durante um jogo em curso, só se
+marcou uma caixa própria, desmarcada de origem, no check-in (recusar não impede o
+check-in nem o jogo; pode ligar-se ou desligar-se a qualquer momento, e sem ela o
+controlador recusa as posições), como um ponto GPS ou, em espaços interiores, como o id do iBeacon mais forte que o
 telemóvel ouve (só escuta os beacons registados). O registo tem as etiquetas da
 organização e, a seu lado, as Field Box do jogo em curso que foram colocadas: uma caixa
 que entrou num jogo emite como iBeacon (um UUID derivado da chave de entrada do campo,
@@ -323,7 +346,8 @@ um major fixo, o id do nó como minor), por isso uma caixa na parede também diz
 telemóvel o seu piso e a sua sala. Um telemóvel que já está a partilhar volta a ler o
 registo quando ele muda. Um controlador de reserva recebe as escolhas das balizas das
 caixas e os lugares das caixas na sua carga de entrada, por isso, depois de uma passagem
-de testemunho, o registo é o mesmo. O controlador guarda o último
+de testemunho, o registo é o mesmo, e uma consola já aberta nele move logo os
+marcadores das caixas. O controlador guarda o último
 ponto de cada pessoa, só para esse jogo. Quem joga vê a sua própria posição (e a do
 seu squad, se o jogo o permitir), a chefia de um squad vê o seu squad, um VIP vê a
 sua equipa, os marshals e o GM veem todas, e o código de leitura nenhuma.
@@ -332,7 +356,8 @@ sua equipa, os marshals e o GM veem todas, e o código de leitura nenhuma.
 quem tem outro papel. O marcador e o MQTT recebem pontos e eventos, não posições. Neste
 diagrama não há internet: tudo funciona com o servidor do site desligado.
 
-Ainda não testado em hardware real: tudo isto com um telemóvel a sério (a lista de
+Ainda não testado em hardware real: a verificação do cartão, a escolha da posição e os
+códigos só em HTTPS com um telemóvel a sério; tudo isto com um telemóvel a sério (a lista de
 verificação do iPhone passou para a app iOS, mas nada foi ainda a um campo), o NFC
 num telemóvel e os beacons BLE: o plugin CoreLocation do iPhone compila no CI e não foi
 corrido num iPhone, e nenhum telemóvel ouviu ainda o beacon de uma Field Box a sério.
@@ -411,7 +436,7 @@ raiz (offline) e CI`"]
     reg["Registo de modos:<br/>pacotes assinados"]
     op["Operador:<br/>descarrega e depois carrega"]
     ctrl["`**Controlador de campo**
-guarda versões, pacotes, logótipo`"]
+guarda versões, pacotes`"]
     box["`**Field Box**
 verifica tudo sozinha`"]
     card["Cartão NFC do campo"]
@@ -423,7 +448,7 @@ verifica tudo sozinha`"]
     op -->|"Wi-Fi HTTPS: carregamento na consola"| ctrl
     reg -.->|"HTTPS: índice e pacotes"| ctrl
     ctrl -->|"LoRa: CMD update ou um convite com modos"| box
-    box -->|"Wi-Fi HTTPS fixado: imagem, pacotes de modos, logótipo, relatório"| ctrl
+    box -->|"Wi-Fi HTTPS fixado: imagem, pacotes de modos, relatório"| ctrl
     ctrl ---|"cabo USB: adotar"| box
     ctrl -->|"escreve"| card
     card -->|"toque NFC: adotar"| box
@@ -444,7 +469,7 @@ do controlador, confiando só na CA do campo cujo hash a sua carga de entrada le
 (por isso não precisa de relógio nem de outro repositório de confiança), e
 comunica o resultado por HTTPS (ou por um evento LoRa, se o HTTPS falhar). Um modo
 que falta a uma caixa vai buscar-se da mesma maneira, depois de um convite que o
-peça. O logótipo do campo vem pelo mesmo Wi-Fi e HTTPS. As atualizações só se fazem
+peça. As atualizações só se fazem
 entre jogos, nunca com um jogo a correr.
 
 **A cadeia de confiança.** É a assinatura, e não o canal, que torna um ficheiro
@@ -469,8 +494,8 @@ seguro:
   rever modos nunca precise da chave que pode substituir o firmware de uma caixa.
   Vê [`community/keys.md`](community/keys.md).
 
-Ainda não testado em hardware real: modos obtidos por uma caixa, o logótipo no ecrã
-de uma caixa e o cartão NFC do campo. A adoção por cabo USB e por código de
+Ainda não testado em hardware real: modos obtidos por uma caixa e o cartão NFC do
+campo. A adoção por cabo USB e por código de
 emparelhamento, e uma atualização por rádio, já correram numa bancada.
 
 ## 7. Início de sessão e contas no servidor do site
@@ -514,7 +539,16 @@ dele.
 **Contas.** Uma conta social nova pode escolher o seu nome de utilizador na página da
 conta, qualquer conta pode mudar o seu nome com o seu próprio método de início de
 sessão, e duas contas da mesma pessoa podem ser fundidas depois de a pessoa provar as
-duas (nunca para dentro ou a partir de uma conta com função de equipa). Um registo por
+duas (nunca para dentro ou a partir de uma conta com função de equipa). As contas assentam no contrato, não no consentimento: um registo guarda que versão do
+aviso de privacidade foi mostrada e que a pessoa tem 16 anos ou mais, e não há registo
+enquanto não houver aviso publicado. Mudar a forma como uma conta inicia sessão (uma
+passkey, o TOTP, a palavra-passe, uma conta social ligada, uma fusão) exige uma sessão
+que passou por um TOTP ou uma passkey: um início de sessão social sozinho é recusado.
+Num centro alojado, um só endereço de retorno serve todos os campos (o centro assina um
+estado que nomeia o campo e passa para o retorno do próprio campo). O registo de
+auditoria esquece os endereços de rede ao fim de 180 dias, uma conta sem uso há 24
+meses é anonimizada e o histórico de jogos guarda-se 90 dias (os resultados das equipas,
+sem identificadores, 365). Um registo por
 conta social guarda a versão do aviso de privacidade que a pessoa viu. A limpeza diária
 da retenção apaga os restos anonimizados de uma conta eliminada ou fundida quando nada
 os referencia. O início de sessão com a Google e a Microsoft foi experimentado com os

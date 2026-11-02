@@ -382,6 +382,60 @@ void main() {
     expect(row['apd_override'], true);
   });
 
+  testWidgets('with a rule that checks the card, the tick lets the player in '
+      'and records who (LEG-1 to LEG-4)', (tester) async {
+    field
+      ..confirm = 'auto'
+      ..verdict = 'valid'
+      ..apd = {
+        'accepted': null,
+        'register': false,
+        'checkin': true,
+        'expiry': false,
+        'custom': <Object?>[],
+      };
+    field.handle('POST', '/checkin', {
+      'game_id': 42,
+      'player_id': 'p-cardcardcard',
+      'player_secret': 'z',
+      'display_name': 'Gaio',
+      'notice_version': 1,
+      'apd_id': 'apd-a',
+      'membership_number': 'A-1',
+      'replicas': [
+        {
+          'declaration_id': '7a1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5c',
+          'type': 'aeg',
+          'class': 'rifle',
+        },
+      ],
+    }, null);
+    // The controller holds a valid check-in pending until the card is seen.
+    field.rows['p-cardcardcard']!['status'] = 'pending';
+    final h = harness(fieldHttp: field.http);
+    final r = await records(h.store, h.settings);
+    await tester.pumpWidget(
+      h.app(
+        home: ChronoQueueScreen(
+          checkin: marshal,
+          field: pinned,
+          records: r,
+          templates: templates,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Admitir sem o cartão'), findsOneWidget);
+    expect(find.text('Cartão visto, confere'), findsOneWidget);
+    await tapKey(tester, 'queue-card-seen-p-cardcardcard');
+    final row = field.rows['p-cardcardcard']!;
+    expect(row['status'], 'checked_in');
+    expect(row['federation_number'], isNull);
+    expect(row['card_checked_by'], 'p-marshalmarsh');
+    expect(find.byKey(const Key('queue-card-p-cardcardcard')), findsOneWidget);
+    expect(find.textContaining('p-marshalmarsh'), findsOneWidget);
+  });
+
   testWidgets('a hand check-in takes the APD, number and expiry', (
     tester,
   ) async {

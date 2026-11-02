@@ -371,7 +371,7 @@ only to a staff TCP receiver and never on UDP, and not at all with
 member on the loopback; the API, the stream and the configuration; the
 socket closed on stop. The console: `test_field_georeference_two_corners`
 (Chromium). Not run: a real ATAK device on the field Wi-Fi (HW3), the
-remote relay through the site server (not built, M9-10). Decisions M9-1
+remote relay through the site server (built later as FU5, see the follow-up "the remote ATAK relay"). Decisions M9-1
 to M9-10 (open).
 
 ## Plan phase 10: site server skeleton (built 2026-10-19, in software)
@@ -469,9 +469,10 @@ current version's files at `/privacy` and `GET /api/v1/privacy-notice`
 consent is for the current version (`consent.status`), `POST
 /api/v1/me/consents/account` consents again, and the staff pages prompt for it
 after login. Re-consent is not enforced (the API does not refuse other calls
-meanwhile). `users.data_retention_days` was dropped (migration 0020). Not done:
-the app's own screens for the notice and for consenting again; the social
-login's sign-up (`oidc/.../start`) does not yet take a `notice_version`.
+meanwhile). `users.data_retention_days` was dropped (migration 0020). Built
+since: the app's own screens for the notice and for consenting again
+(`app/lib/site/privacy_screens.dart`, `privacy_notice.dart`) and the social
+login's sign-up (`oidc/.../start` takes `notice_version`, `api/login_methods.py`).
 
 ## Plan phase 13: controller sync (built 2026-10-20, in software)
 
@@ -636,8 +637,9 @@ a chrono pass, the outcomes); 296 controller tests (18 new:
 `test_sync_schedule.py`, 11; `test_checkin_ticket.py`, 6; the answer vectors);
 the console's browser tests (1 new: a game from the schedule, expected players,
 *Arrived*, a scanned ticket, the counts); the Dart ticket tests against the
-same vectors. Not yet: the app's screens for logging in, registering and
-sending the ticket; a real game day (HW1); `[sync] push_walkins`; the
+same vectors. Built since: the app's screens for logging in and the account
+(`app/lib/site/site_auth.dart`, `account_screen.dart`, `site_screens.dart`).
+Not yet: a real game day (HW1); `[sync] push_walkins`; the
 registration import (17). Decisions S16-1 to S16-14, all open; S16-4 (claims
 confirmed by the controller), S16-6 (the field's limit template set on both
 sides) and S16-9 (no registration form on the public pages) want the
@@ -796,9 +798,10 @@ controller's refusals and timeouts; a revoked key; the live view; the audit log)
 `test_remote_gm_e2e.py` (a GM runs the real controller's game over a real socket
 under uvicorn), the migration's data test, and the controller's
 `test_remote_gm.py` (its checks, its log, the live view, the stream against a
-raw-socket server, RFC 6455's own examples). Not built: the remote ATAK relay that
-M9-10 had deferred here (it needs an authenticated endpoint, S19-10), positions in
-the remote view, a GM page on the site server and the console's screen for the log.
+raw-socket server, RFC 6455's own examples). Built later: the remote ATAK relay that
+M9-10 had deferred here (FU5, `atak_relay.py`), positions in the remote view
+(PKD-5) and a GM page on the site server (FU9, S19-11). Not built: the console's
+screen for the log.
 Not yet: a real deployment, over 4G (HW1). Decisions S19-1 to S19-11, all open.
 
 ## Follow-up: device health events (2026-10-21, in software)
@@ -847,8 +850,8 @@ next revision), the migration's data test, and the controller's
 game after one sync, fetch only on change, a refused manifest, a live game
 keeping its scenario, presets waiting for their mode, off, an older site
 server, a corrupt answer); the shared vectors gain 3 valid and 9 invalid
-answers. Not yet: a real deployment, a console or web page for the history
-and the library. Decisions S20-1 to S20-8, all open.
+answers. Not yet: a real deployment, a console page for the history
+and the library (the staff web pages `history` and `scenarios` exist since FU2). Decisions S20-1 to S20-8, all open.
 
 ## Plan phase 21: hosted multi-tenant mode (built 2026-10-20, in software)
 
@@ -1014,7 +1017,8 @@ Closes S21-13 (the coordinator's review note that the row-level security keys on
 | Phase 2 A-E and mode pack | Done in software | None |
 | Phase 2 F (hardware, field test) | Pending, needs the boards | HW1, HW4 |
 | Phase 3 A-F, the Medic Kit, branding | Done in software | Old plan phase F's dependencies are met; plan phases 4, 5, 8, 16, 18 build on them |
-| Phase 3 PE24 (Android controller shell), iOS | Not built | None for phase 4's software |
+| Phase 3 PE24 (Android controller shell) | Done in software (slices S1-S7) | None for phase 4's software |
+| Phase 3 iOS | Built and compiled in CI, unsigned (`app/ios/`, decisions iOS-1 to iOS-16); its checklist passed on an iPhone on 2026-10-26 (debug build, free Personal Team; `174ffa33`). Site login on iOS (social login with `ASWebAuthenticationSession`, passkeys with `ASAuthorization`) has Swift sides (decisions IOSL-1 to IOSL-9; `BrowserPlugin.swift`, `PasskeyPlugin.swift`), compiled by CI only, not run; it needs the paid program, the site's domain in the entitlements and `ATALAIA_APP_IOS_APP_IDS` on the server | None for phase 4's software |
 | Phase 3 G (field test with phones and pods) | Pending, needs the hardware | HW3, HW4 |
 | Target addon (hardware/target-addon) | Design phase | HW2 |
 | Wokwi CI quota (decision R7) | Used up | Firmware changes verified with host tests and ESP-IDF builds only |
@@ -1089,3 +1093,29 @@ The maintainer's decisions of 2026-10-28 and two gaps a survey found, all about 
 ## Hub-level social login callback built (2026-10-30)
 
 ADR-P4-13 is built behind `ATALAIA_OIDC_RELAY=on` (decisions LG-14 to LG-19): one redirect address per provider for the whole hosted hub, signed state naming the field, registry-derived forwarding target, field-side re-check, Caddy's `relay-on.caddy` for the hub's own name. Off by default. Tests: `server/tests/test_oidc_relay.py`. Not done: a run on a real hub with real provider consoles and DNS (the deployment test `deploy-hosted` passes with the relay off and was not extended to turn it on).
+
+## Accounts rest on the contract; sixteen to make one alone; sign-up in the app (2026-10-30)
+
+The maintainer's lawyer approved the position (decisions LEG-*; ADR-P4-8's amendment of 2026-10-30). The `account` consent became a **notice record** (migration `0029_account_notice_records`: which version of the privacy notice was shown, when, and the 16-or-older confirmation; old `account` consents became `migrated` records with the same version and time, and left `consents`); withdrawing nothing erases anything, and `DELETE /api/v1/me` stays the one erasure. Consent remains only for cross-field chrono sharing, position sharing in a game and "use my Google/Microsoft name". The consent-again flow is now "shown again": `GET /api/v1/me` `notice`, `POST /api/v1/me/notice`, the staff pages' panel and the app's banner ask the person to read the notice and confirm they saw it. **Minimum age 16:** `register` and a social sign-up's start need `notice_seen` and `age_confirmed`; no date of birth; younger players check in at the field without an account. **S17-16 is unblocked:** the app makes accounts (password or social) after showing the notice. Not done: the staff pages have no password sign-up form (social only, as before); the privacy notice templates' wording on the account basis is another agent's (position G).
+
+## The security and privacy review of 30 October (decisions SR-1 to SR-19, SR-70 to SR-89, LEG-*; in software and on the preview server)
+
+- **A second factor to change how an account logs in (SRV-1, SR-1 to SR-9).** A social login alone gave a passwordless staff account a recent login, enough to add a passkey that then logged in with a second factor and brought the staff roles. For an account with a TOTP or a passkey, or a staff role and no password, adding, renaming and removing a passkey, starting and turning off TOTP, setting, changing and removing the password, linking and unlinking a social login and confirming a merge are refused with 403 `mfa_required` unless the session passed a TOTP or passkey step-up (or a passkey login); a merge never carries passkeys into a staff account. `GET /me/login-methods` says `step_up_needed`; the staff account page and the app show the step-up first.
+- **The server's review, part 2 (SRV-2, SRV-4 to SRV-8, LIVE-1, LIVE-3; migration `0027_identity_issuer`).** Bodies capped (413 past 1 MiB, 4 MiB on image uploads and the registration import, and 5 MB in both Caddyfiles); the same answer for "no such account" and a refused role grant; the single-field export holds only the field's audit rows; `fields-by-slug` honours the public-page switch; the server refuses to start without `ATALAIA_PUBLIC_URL` (a preview only warns); a social login's issuer is part of the subject; a request a proxy says came over HTTP is redirected (308) to https; the health check answers only `{"status": "ok"}` (the version and uptime are in the metrics).
+- **The GDPR review, code part (SR-70 to SR-89; migration `0028_privacy_retention`).** Audit entries lose their network address after `ATALAIA_AUDIT_IP_DAYS` (180); an account unused for `ATALAIA_INACTIVE_ACCOUNT_MONTHS` (24) is warned and anonymised 30 days later; a person's erasure or a withdrawn chrono-sharing consent reaches other fields' controllers (`copies_revoked`), which drop their copies; erasures are appended as hashes to a ledger in a Docker volume outside the database, copied beside the backups and applied again by `restore.sh`; a staff page `/staff/fields/<field>/chrono` shows "repeat offender" as an advisory (a plain warning never counts) and a ban ends (`chrono_ban_days`, 12 months by default, never past the chrono retention); no new account while no privacy notice is published (`privacy_notice_unpublished`). **Game history keeps 90 days by default** with a player id, and team results without one (`game_results`, `GET .../history/results`) 365 days, on the server and both controllers.
+- **The sharing terms (LEG-40 to LEG-47; migration `0030_sharing_terms`).** A field's administrator accepts the current terms on the settings page before chrono sharing is switched on (409 `sharing_terms_required` otherwise); the version, date and account are recorded; a new version (`ATALAIA_SHARING_TERMS_VERSION`) suspends sharing until accepted, and a field that shared before this release waits for an acceptance. The field is the controller of its players' data, the hub operator its processor, and the sharing fields joint controllers for that step only.
+- **The templates (LEG-60 onwards).** `docs/templates/`: the privacy notice (en, pt), the DPA (en, new pt-PT), the sharing terms (en, pt) and a DPIA (en, pt) state the positions the lawyer approved on 2026-10-30 (accounts on the contract, 16 or older; the card check; violations on legitimate interests with a 12-month ban; no data protection officer; position sharing by consent; map services and the setting to turn them off). They stay templates each field fills in. The hosted go-live checklist (`server/docs/DEPLOY.md`) lists six conditions before any field is offered hosted mode; none has been done.
+- **The preview's notice.** `tests.atalaia-project.link` has a privacy notice of its own (`server/preview/privacy-notice/`, pt-PT and English; version `preview-2026-10-31` aligns it with the accounts-on-contract positions; `preview-2026-10-30` stays as the record). The preview has run the review's code since 2026-10-30.
+- **Not done:** a real hosted hub with provider consoles and DNS; the signed DPAs; the field-level notices; the erasure of signed chrono readings and the bases for NFC tags, game history and clubs (still open in the notice's part D).
+
+## Follow-ups of the security review: tokens out of logs, `set-password`, the preview and the pentest stack (2026-10-30)
+
+- **No tokens in access logs on the site server (SR-123).** A logging filter blanks token-like query values, `#token=` and `Bearer` values in uvicorn's logs; the site server's stream and staff pages already authenticated by cookie. `game_seed` is returned only to admin, GM and marshal accounts (SR-128).
+- **`set-password` (SP-1).** `python -m atalaia_server set-password --username NAME --reason TEXT [--yes] [--password-stdin] [--field SLUG]` unblocks a passwordless staff account that has no second factor (SR-2): the password is asked for twice without echo, never in argv, checked by the API's policy, every session of the account is revoked and a `password_set` audit row is written. A test closes a WebSocket through the HTTPS redirect with 1008.
+- **The preview installs its privacy notice itself (FU30-1 to FU30-3).** `preview.sh up` and `update` copy the files of the chosen notice version in and stop if the pt or en file is missing; the live demo's proxy sends `Strict-Transport-Security` on answers that came over https (FU30-4; no `includeSubDomains`, no preload).
+- **A disposable stack for an authorised security test (`tools/pentest_stack.py`)**: a hosted hub with two fields, a fake OpenID provider, throwaway accounts and a linked field controller, on 127.0.0.1 only; its field container's health check is the controller's own `/healthz` (PT-H). The runbook is `docs/runbooks/pentest-stack.md`. No outside penetration test has been done.
+- **Phase state lines** that called built work next or not built were corrected (SD-1 to SD-3): site login on iOS was the one item still not built. It is built since 2026-10-30 (IOSL-1 to IOSL-9, `app/ios/Runner/BrowserPlugin.swift` and `PasskeyPlugin.swift`): compiled by CI's `ios-build`, not run on an iPhone; passkeys are opt-in at build time (`ATALAIA_ENTITLEMENTS`, `ATALAIA_SITE_HOST`, the paid Apple program, `ATALAIA_APP_IOS_APP_IDS` on the server).
+
+## The hub link code page (2026-10-31)
+
+`/staff/account/hub-share` (decisions HLC-*): the staff-style page for SVX-2's link code that the app's screen (APF-4) already had. In a hosted hub a signed-in person makes a link code at one field, enters it at another, sees the other fields they are linked at, gives or withdraws this field's `chrono_sharing` consent, and unlinks; every refusal in words in four languages; linked from `/staff/account` only when `GET /me/hub-share` answers. The API grew `field`, `consent` and `others` in the `GET` answer and one more `SECURITY DEFINER` function, `atalaia_share_peers(uuid)` (`hosted migrate` makes it; `hosted check` and `drop_sql` know it). Tests: `tests/test_hub_share_page.py`, `tests/test_hub_share.py`, `tests/test_tenants.py`, `tests_browser/test_hubshare_browser.py` (the hub's four calls faked in the browser, as the browser tests run a single field).

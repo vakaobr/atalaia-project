@@ -276,10 +276,8 @@ class _ReplicaLabelScreenState extends State<ReplicaLabelScreen> {
             widget.code,
             key: const Key('label-code'),
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              letterSpacing: 2,
-            ),
+            style: Theme.of(context).textTheme.headlineMedium
+                ?.copyWith(fontWeight: FontWeight.w700, letterSpacing: 2),
           ),
           if (widget.subtitle != null)
             Text(widget.subtitle!, textAlign: TextAlign.center),

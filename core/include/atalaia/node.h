@@ -78,6 +78,11 @@ typedef struct {
     atalaia_alloc_fn alloc; /* NULL for realloc/free */
     void *alloc_ud;
     const atalaia_field_ops_t *field_ops; /* NULL for regular nodes */
+    /* The game's key (the first 16 bytes of the join's game_key): rand() is seeded from it with
+     * game_seed and node_id, so players, who see the seed and the node ids, cannot predict it.
+     * All zero (a stand-alone game, a test, a load-check) falls back to game_seed and node_id
+     * alone. */
+    uint8_t rand_key[16];
 } atalaia_node_config_t;
 
 /* Returns NULL if memory runs out. */

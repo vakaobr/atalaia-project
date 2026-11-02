@@ -77,13 +77,14 @@ header:
   registry: Registo
   glossary: Glossário
   architecture: "Como se liga"
+  group_learn: Aprender
+  group_community: Comunidade
+  build_guides: Guias de montagem
   language: Idioma
 
 hero:
   status: >-
-    Pré-alfa · software das fases 1 e 2 pronto, placas a sério já jogam jogos inteiros com o
-    controlador de campo na bancada, fase 3 pronta em software, fases 4 e 5 feitas em software
-    · ainda não pronta para o campo
+    Pré-alfa · software das fases 1 e 2 pronto; placas a sério já jogam jogos inteiros com o controlador de campo na bancada, com teclado; fase 3 pronta em software, a app iOS verificada num iPhone; o servidor do site da fase 4 a correr num servidor de testes; fase 5 feita em software · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -367,9 +368,23 @@ modes:
     text: >-
       As equipas capturam uma caixa mestre e os seus satélites. Só a mestre pontua, e cada satélite
       que a mesma equipa tiver aumenta os seus pontos; quando a mestre muda de mãos, todos os
-      satélites voltam a ficar neutros. Escrito e testado em software, ainda não jogado em caixas
-      reais.
+      satélites voltam a ficar neutros. Escrito e testado em software, e já testado a jogar em caixas
+      reais (veja-se o vídeo abaixo).
     meta: Várias caixas · precisa do controlador de campo
+    real_alt: >-
+      Vídeo sem som de um jogo de teste de Mestre e Satélites na bancada, com três pedaços juntos. Primeiro a
+      caixa mestre, a do ecrã grande, passa de «LIVRE» a capturada pela equipa vermelha, e o ecrã diz «MASTER
+      OCUPADO», «RED», «0 de 3 satélites». Depois uma caixa satélite mostra a vermelha a segurá-la. Por fim a
+      mestre mostra «1 de 3 satélites, 3 pontos a cada 10 s» para a vermelha e passa para a azul, de volta a «0
+      de 3 satélites». Os ecrãs estão em português.
+    real_caption: >-
+      Teste na bancada, 1 de novembro de 2026 (três pedaços do mesmo jogo, juntos): quatro caixas, e a do ecrã
+      grande é a mestre. A equipa vermelha captura a mestre e um satélite, os pontos da mestre sobem, e depois a
+      azul captura a mestre. O teste mostrou três coisas no ecrã grande: o ecrã em português dizia «MASTER» em
+      vez de «MESTRE», a mestre mostrava «ZONA» antes da primeira captura e mostrava a hora a que foi
+      capturada («desde») em vez de há quanto tempo está a ser mantida. As três já estão corrigidas no
+      firmware depois deste teste (o vídeo ainda mostra os ecrãs antigos; seguir-se-á uma gravação nova). Sem
+      som; os ecrãs estão em português.
   target_windows:
     title: Janelas de Alvo
     text: >-
@@ -461,9 +476,10 @@ gifs:
     caption: "Sabotagem: rondas de bomba com marcador, uma explosão para os atacantes, um desarme para os defensores, até acabar o tempo."
   master_satellites:
     alt: >-
-      Animação de Mestre e Satélites: uma caixa satélite passa de livre a vermelha quando a
-      equipa vermelha prime o botão; depois a caixa mestre mostra quantos satélites a equipa
-      vermelha tem (1, 2 e 3 de 3) e os pontos por intervalo, e por fim o ecrã de fim de jogo.
+      Animação de Mestre e Satélites: a caixa mestre, com o título MESTRE, passa de livre a
+      vermelha quando a equipa vermelha prime o botão e diz «MESTRE OCUPADA» com há quanto tempo está
+      mantida; depois mostra quantos satélites a equipa vermelha tem (1, 2 e 3 de 3), os pontos por
+      intervalo e o total da vermelha no canto, e por fim o ecrã de fim de jogo.
     caption: >-
       Mestre e Satélites: os satélites capturam-se como as zonas do Domínio; a caixa mestre
       conta quantos uma equipa tem e paga mais pontos por cada um.
@@ -553,10 +569,31 @@ gifs:
 screens:
   title: O que se vê
   intro: >-
-    Oito capturas do firmware real da Field Box (ESP32, LVGL 9.2, ecrã de 320&nbsp;×&nbsp;240)
-    a correr no emulador <a href="https://wokwi.com">Wokwi</a>. A interface da caixa está em inglês.
-    O firmware já corre numa Heltec V4.3 a sério; as capturas são do emulador. Toca ou clica numa
-    captura para a ver em grande.
+    Três modos, tal como a caixa os mostra: animações desenhadas pelo código do próprio firmware da
+    Field Box, não maquetadas. O botão por baixo de cada imagem pausa-a. Mais abaixo, as capturas da
+    aplicação.
+  real:
+    title: A caixa a sério, na bancada
+    intro: >-
+      Os modos acima são animações desenhadas pelo código do firmware. Isto é a montagem de bancada da
+      Field Box (uma placa e fios soltos, sem caixa) a jogar Domínio de verdade.
+    alt: >-
+      Vídeo mudo, em ciclo, da montagem de bancada da Field Box a jogar Domínio: o ecrã mostra a zona
+      ocupada pela equipa vermelha, com 3 pontos; uma barra azul enche-se na parte de baixo e a zona passa
+      para a equipa azul. Aparece então o tempo de ocupação, a contar (de 0:01 em diante), e, no canto de cima à
+      direita, os pontos de cada equipa.
+    caption: >-
+      A Field Box na bancada (1 de novembro de 2026), com o ecrã TFT novo: a barra de retenção enche-se, a
+      equipa azul toma a zona, o tempo de ocupação conta e os pontos de cada equipa aparecem no canto. Sem caixa,
+      ainda com fios soltos.
+    more: Ver a montagem e a fotografia →
+  gifs_more: Ver todos os modos →
+  box_title: Os ecrãs da caixa, passo a passo
+  box_intro: >-
+    Oito capturas do firmware real da Field Box (ESP32, LVGL 9.2, ecrã de 320&nbsp;×&nbsp;240) a
+    correr no emulador <a href="https://wokwi.com">Wokwi</a>: do PIN do mestre de jogo ao desarmar
+    da bomba. A interface da caixa está em inglês. O firmware já corre numa Heltec V4.3 a sério; as
+    capturas são do emulador. Toca ou clica numa captura para a ver em grande.
   note: >-
     O <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.pt.md">manual
     de montagem</a> tem o esquema de ligações completo e o guia da primeira gravação do firmware,
@@ -734,8 +771,9 @@ roadmap:
   p1:
     title: Uma caixa
     short: >-
-      Firmware da Field Box e manual de montagem; na bancada, uma placa a sério joga jogos inteiros.
-      À espera da primeira caixa montada.
+      Firmware da Field Box e manual de montagem; na bancada, uma placa a sério joga jogos inteiros,
+      já com ecrã, teclado e botões montados com fios soltos (fotografia e vídeo na página de
+      montagem). Falta ainda uma caixa montada.
     done:
       - Firmware ESP32 da Field Box, com predefinições na própria caixa, a correr num emulador.
       - O pequeno ecrã da caixa mostra a barra de progresso, os pontos e o tempo de posse, em quatro línguas.
@@ -750,12 +788,21 @@ roadmap:
       - "Uma tabela de partições maior: os dois espaços de firmware da caixa têm 4 MB cada (a imagem ocupava 93 % de 2 MB), e as definições e as chaves ficam onde estavam. Só em testes no computador e compilações, sem ter sido gravada numa placa. Uma caixa com a tabela antiga precisa de uma gravação por USB; depois disso, as atualizações pelo ar funcionam como antes."
       - "A Field Box como iBeacon: da entrada num jogo até ao fim, a caixa emite uma baliza Bluetooth (a cada 500 ms, nunca enquanto usa o Wi-Fi), para que um telemóvel perto dela possa colocar quem joga num piso ou numa sala. O identificador do campo deriva da sua chave de adesão, e a organização pode desligar as caixas como balizas, por campo ou por caixa. A memória interna da caixa foi refeita depois de ter acabado na bancada à entrada num jogo (o Wi-Fi falhou e o cão de guarda reiniciou): medido na bancada, ficam livres 241 KB no arranque e 102 KB no mínimo num jogo com a baliza ligada, e o CI falha a compilação se o orçamento encolher demasiado. Ainda não se verificou que um telemóvel ouve a baliza de uma caixa a sério."
       - "Depois de uma recusa ou falha de uma atualização ou da obtenção de um modo, o ecrã da caixa volta ao ecrã do estado passados 8 segundos (na bancada, uma recusa ficou no ecrã até alguém olhar). Só testes no computador."
+      - "Os comandos da consola série que dão à caixa a chave de entrada ou lançam uma atualização (@joinkey, @update) pedem o PIN de administração numa versão de lançamento, e recusam enquanto não houver PIN; uma versão de bancada mantém-nos abertos para os scripts da bancada. Só em testes no computador, não numa placa real."
+      - "A primeira montagem de bancada da Field Box (31 de outubro de 2026): uma placa Heltec V4 com o ecrã TFT de 2,8\", o OLED, um teclado de 4×3 e botões de equipa, com fios soltos e sem caixa, a jogar Domínio com o controlador da bancada. Há <a href=\"{{ page.to.build }}#field-box-first-build\">fotografia e vídeo</a>."
+      - "O ecrã grande passa a ser como o pequeno: barra de captura, tempo de posse a contar desde a captura e os pontos de cada equipa num canto, em Domínio, Mestre e Satélites (títulos MESTRE / SATÉLITE; o mestre mostra o total da equipa), Domínio Progressivo e VIP / Carga. Visto na bancada em Domínio (vídeo na página de montagem); os outros três modos só em imagens de referência do firmware e em testes."
+      - "O ecrã grande mostra um ecrã de arranque, com a torre e a versão do firmware como o ecrã pequeno, em vez de ficar em branco até ao primeiro ecrã do jogo. Testes no computador e uma imagem de referência; ainda não verificado em mais do que a primeira placa de bancada."
+      - "Um barramento I2C instável deixa de reiniciar a caixa: o teclado, o ecrã pequeno, o leitor NFC e o medidor da bateria usam o driver mais recente do ESP-IDF, com limites de tempo, reposição do barramento e um recuo que põe de lado a peça que falha, pelo que um teclado avariado conta como sem tecla e o jogo continua. Um reinício passa a indicar o motivo real (alimentação, queda de tensão, software, falha, watchdog) em vez de sempre \"alimentação\", e a consola do GM diz \"Uma caixa falhou e reiniciou\". Encontrado na bancada: um teclado com soldaduras más reiniciou uma placa seis vezes em três minutos. Só testes no computador; falta o teste na bancada."
+      - "Um texto de ecrã que não cabe é recusado quando se verifica o modo, e um texto que falha ao desenhar mostra \"?\" em vez de ficar em branco (um texto longo em quatro línguas ficava vazio, sem aviso, numa caixa). Testes no computador."
+      - "Uma contagem de um usa o singular (\"1 ponto\", não \"1 pontos\") nos ecrãs da caixa, na app, na consola do GM e nas páginas da equipa. Testes em software."
     next:
       - Uma caixa montada que aguente um jogo de clube de 2 horas sem reiniciar.
       - "Ver a barra do tempo num painel a sério."
       - "Experimentar o reenvio da configuração e o Mudar de campo numa placa a sério."
       - "Ouvir a baliza de uma Field Box com um telemóvel a sério, e arrancar o Wi-Fi à entrada num jogo com o novo orçamento de memória."
       - "Gravar a nova tabela de partições numa placa a sério (uma gravação por USB, sem apagar, para uma caixa com a antiga)."
+      - "Uma imagem de lançamento endurecida (cifra da memória flash, arranque seguro): está só escrita como plano, nada foi construído nem experimentado numa placa."
+      - "Experimentar o tratamento de falhas do I2C numa placa com o teclado mal ligado, e o ecrã de arranque e os novos ecrãs em mais do que a primeira placa de bancada."
     gate: >-
       Prova: uma caixa aguenta um jogo de clube de 2 horas sem reiniciar. <strong>Em aberto</strong>
       até haver uma caixa montada que o consiga.
@@ -796,11 +843,24 @@ roadmap:
       - "A consola de GM diz o que uma mudança de canal faz às caixas livres (quantos dos três MOVE já foram ditos, e depois que o controlador mudou), e as Definições têm um botão Procurar caixas que mostra o resultado de uma varredura. Uma varredura tem um limite por hora nas sub-bandas com menos de 10 % de ciclo de trabalho (5 % do orçamento da sub-banda), e a consola di-lo quando recusa e quando a seguinte é possível. Em software, nos dois controladores."
       - "A pontuação projetada acompanha uma captura: entre duas mensagens STATE de uma caixa, o controlador continua a contar para a equipa que um evento de captura indicou, até ao STATE seguinte da caixa. Na bancada a projeção falhou quando se perdeu um STATE logo a seguir a uma captura; com esta mudança a mesma configuração passou na bancada, e uma penalização da caixa também foi verificada lá."
       - "O fim de jogo de uma caixa termina o jogo: num modo sem lógica de campo no controlador (o limite de tempo do Sabotagem, a Bomba), o primeiro game.end de uma caixa do jogo termina-o, com o vencedor da caixa ou em empate. Na Bomba / Rush uma explosão termina agora o jogo, ganhando a equipa que armou a bomba; um desarme não. Encontrado na bancada com o Sabotagem, e a explosão da Bomba também foi verificada lá."
+      - "Um comando de rádio gravado já não pode ser repetido mais tarde: cada recetor (a caixa, o modem USB e os dois controladores) guarda uma janela de repetição por emissor, e uma caixa recusa um início, pausa, retoma, fim ou TIME mais antigo do que o último que aplicou. Uma caixa que perdeu o registo da sua época sorteia uma nova em vez de repetir números únicos. O rádio não muda: caixas mais antigas continuam a funcionar, mas ficam expostas até serem atualizadas. Testado no simulador e em testes no computador, com vetores comuns em C, Python e Dart; nenhuma repetição de rádio foi experimentada em placas reais."
+      - "Uma segunda perda do registo de épocas já não pode sortear uma época mais baixa: uma caixa, o Pi e o controlador do telemóvel guardam a época mais alta que alguma vez usaram, à parte do registo por chave, e o sorteio começa acima dela; um controlador que já esteve no ar num jogo nunca é convidado de novo com o seu antigo id de nó (recebe um novo); e um adereço com Wi-Fi passa a receber o CMD que indica a época de um controlador, que entrega à sua placa de E/S (nos dois controladores). RFC 0001, emenda 25. Testado no simulador e num computador; não experimentado em placas reais."
+      - "O endurecimento dos controladores de campo, vindo da revisão de segurança: limites ao tamanho dos pedidos, o código do GM e os códigos dos jogadores recusados em HTTP simples quando o HTTPS está ligado (a consola abre-se em https://controlador:8443/console/), o MQTT do campo com TLS (porta 8883; a 1883 simples só no loopback do Pi), TLS para o feed ATAK do pessoal, HSTS, uma unidade de serviço endurecida no Pi e a revogação dos modos assinados a falhar fechada (uma lista ilegível ou em falta não instala nada; um controlador sem rede usa a última lista durante 30 dias). Testado num computador, não num Pi nem num telemóvel reais num campo."
+      - "Uma caixa que perdeu o registo da sua época, e por isso voltou numa época alta aleatória, volta a ser encontrada: um recetor que não consegue abrir um HELLO ou um TIME procura no resto do intervalo de épocas (uma fatia por pesquisa, dentro do orçamento existente), e um controlador que ouve essa caixa diz a sua época às outras numa nova mensagem CMD, que só pode subir uma época. Um jogo retomado sem registo também começa numa época aleatória do controlador, para que um nonce nunca se repita. As caixas antigas ignoram a mensagem nova. Testado no simulador e num computador; não experimentado em placas reais."
+      - "O <code>rand()</code> de um modo parte da chave do jogo, além da semente do jogo e do id do nó, por isso o que a API mostra a quem joga já não o permite prever (os códigos do Terminal de Hacking, as equipas das Janelas de Alvo), e a semente do jogo deixou de ser mostrada a quem joga e ao marcador. O mesmo jogo repete-se de forma idêntica, mas um jogo gravado antes desta alteração repete-se com outros valores aleatórios: não atualizes as caixas a meio de um jogo. Vetores de teste partilhados em C, Python e Dart; não experimentado em placas."
+      - "A sandbox de Lua fechou as brechas que uma revisão com verificador de memória encontrou: as funções de tabelas, as corrotinas e as cadeias longas de callbacks são medidas, a profundidade da pilha C está limitada para o ESP32, e um id de nó ou um temporizador fora do intervalo já não dá a volta. Os valores da pilha são calculados, ainda não medidos numa placa."
+      - "O ganho da antena é uma opção de compilação (<code>--antenna-dbi</code>, 0 a 20 dBi, 2 por omissão): uma caixa com uma antena mais forte baixa a potência conduzida por esse ganho, arredondada para baixo, para que a potência irradiada fique dentro do limite da sub-banda. Só testes no computador."
+      - "O código de acesso do fluxo em direto deixou de estar no endereço web: a consola envia-o num cabeçalho e a app num cabeçalho Authorization, e os registos dos controladores e do servidor do site apagam valores de códigos nos endereços (o endereço antigo ainda funciona durante uma transição). Um campo cujos registos foram partilhados deve mudar os códigos do GM e de leitura."
+      - "Os resultados das equipas, sem ids de jogadores, também ficam 365 dias nos dois controladores (o histórico de jogos 90 dias), e o GM pode lê-los, só de leitura. Testado num computador."
+      - "Um guia único para montar o modem de rádio, das peças até uma caixa entrar num jogo: versão pronta ou compilação, gravação em Windows, Linux e macOS, a porta, as verificações e uma tabela de problemas (<a href=\"https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/pt/modem.md\">Montar o modem de rádio</a>). Experimentado na bancada com o controlador em Docker no WSL2; não num Raspberry Pi nem em macOS, e não num campo."
+      - "Um controlador que perdeu o registo de épocas sorteia a nova época na metade inferior do espaço acima do seu piso, com uma margem (maior se faltar o ficheiro de épocas), pelo que perdas repetidas, catorze ou mais seguidas, não esgotam o intervalo. Começou como um teste instável e era um erro do produto. Testes no computador; falta o sorteio da própria Field Box."
     next:
       - As placas de rádio e 5 caixas montadas para o teste no campo.
       - Um teste no campo com 20 caixas, com e sem escuta antes de falar.
       - "Ligar ou não o espaçamento do controlador, decidido a partir do teste no campo com 20 caixas."
       - "Verificar em duas placas que uma mudança de canal mantém uma caixa parada e que um início lhe chega em cerca de um segundo (o guia está escrito)."
+      - "Experimentar a janela de repetição e os controladores endurecidos em placas reais e num Pi real (um comando gravado e repetido na bancada)."
+      - "Apagar o registo de épocas de uma caixa em duas placas de bancada para ver que volta a ser encontrada, duas vezes seguidas e com um antigo líder a voltar a entrar (o guia está escrito)."
     gate: >-
       Prova: 5 caixas num espaço de <a href="{{ page.to.glossary }}#glossario-cqb">CQB</a> e num campo
       exterior, sem uma única captura perdida. <strong>Em aberto.</strong>
@@ -856,14 +916,18 @@ roadmap:
         - "A app segue um jogo a partir do código QR do marcador, mesmo quando o controlador no telemóvel serve HTTPS com a sua própria CA do campo. Em software, não experimentado num telemóvel a sério."
         - "Quem joga diz em que piso está e vê a planta do campo com as posições que pode ver."
         - "Histórico de jogos na app: os jogos em que a pessoa participou, do mais recente para o mais antigo."
-        - "Início de sessão com Google, Microsoft, Apple ou uma chave de acesso (passkey) na app, com um ecrã de conta. Só Android; o início de sessão da app não foi experimentado num telemóvel a sério (o lado do servidor do site foi experimentado com a Google e a Microsoft, ver fase 4)."
+        - "Início de sessão com Google, Microsoft, Apple ou uma chave de acesso (passkey) na app, com um ecrã de conta. Android, e no iOS em Swift (o navegador do início de sessão social como ASWebAuthenticationSession, as chaves de acesso pelas credenciais de plataforma da Apple; no iOS as chaves de acesso são opcionais na compilação e exigem o programa pago da Apple). A parte do iOS é compilada no CI e não foi corrida num iPhone; o início de sessão da app não foi experimentado num telemóvel a sério (o lado do servidor do site foi experimentado com a Google e a Microsoft, ver fase 4)."
         - "O plano do campo do jogador pode mostrar a quadrícula do campo e a célula do próprio jogador."
         - "Quem é árbitro pode associar um autocolante NFC a uma réplica ao registá-la."
         - "O telemóvel de um marshal já não guarda a chave de entrada do campo: só uma caixa de jogo (o seu cartão de entrada) e o controlador no telemóvel a guardam, e uma atualização apaga-a do telemóvel de um marshal."
         - "As ligações ao marcador que fixam a CA do próprio campo ficam guardadas por campo e são esquecidas quando a CA muda."
         - "Enquanto um jogo em direto está aberto na vista de quem joga, um serviço Android em primeiro plano, com uma notificação, mantém a app a correr, e os avisos por vibração continuam com a app fechada ou o ecrã apagado. No iOS não. Não experimentado num telemóvel a sério."
         - "As Field Box contam como balizas: uma caixa colocada regista-se como baliza ao lado das da organização, e um telemóvel que já está a partilhar apanha as alterações ao registo durante o jogo. Em software, sem testar com um telemóvel e uma caixa a sério."
-        - "O aviso de privacidade e o consentimento na app: um pedido Ler e confirmar quando o consentimento da conta está desatualizado, o aviso na língua da app, sem bloquear nada. Um registo por conta social leva a versão do aviso que a pessoa viu, e continua a funcionar com um servidor próprio mais antigo. A ligação do cronógrafo entre os campos de um hub alojado (um código de uso único) só aparece no modo alojado. Em software."
+        - "O aviso de privacidade na app: um pedido Ler e confirmar quando foi mostrada à conta outra versão, o aviso na língua da app, sem bloquear nada. A app pode criar uma conta (com palavra-passe ou social) depois de mostrar o aviso, com uma caixa «Tenho 16 anos ou mais»; quem é mais novo faz o check-in no campo sem conta. Um registo por conta social leva a versão do aviso que a pessoa viu, e uma entrada continua a funcionar com um servidor próprio mais antigo. A ligação do cronógrafo entre os campos de um hub alojado (um código de uso único) só aparece no modo alojado. Em software."
+        - "A verificação do cartão no check-in: quando o campo confere a filiação, o check-in fica pendente até quem é árbitro ou o GM marcar \"cartão visto, corresponde\" com o cartão físico à frente; o número de filiado é então apagado do controlador (ficam o veredicto e a validade), e é possível passar sem o cartão, com o motivo registado e nunca o número. Na consola, na fila de árbitros da app e nos dois controladores. Só em software."
+        - "A partilha da posição é uma escolha própria, não marcada de origem, no check-in (na app e no check-in manual da consola), com quem a vê; recusar não impede o check-in nem o jogo, e cada jogador/a pode ligá-la ou desligá-la quando quiser. Sem ela, o controlador recusa as posições. Só em software."
+        - "A revisão de segurança da app: a CA do campo fixada é exatamente um certificado, nada de HTTP simples em todo o Android (só o loopback, o anfitrião do emulador, 192.168.4.1 e atalaia.local), uma APK de lançamento que nunca é assinada com a chave de depuração por engano e um bilhete de início de sessão social ligado à instância da app. Não experimentado num telemóvel real; a chave de assinatura de lançamento ainda tem de ser criada pelo responsável do projeto."
+        - "A lista de eventos e o histórico de jogos de quem joga deixam de fora os eventos de rotina que não têm texto para jogadores (uma caixa a confirmar a configuração, nós a ligar ou desligar, leituras de etiquetas, acertos em alvos), em vez de mostrar nomes de tipo em bruto."
     g_props:
       title: Dispositivos Android e módulo de E/S
       items:
@@ -906,7 +970,8 @@ roadmap:
           de cenários recebidas de lá), o GM remoto e o feed para o ATAK."
         - "A consola da organização cabe num telemóvel: as tabelas de check-in e de marshals empilham-se, sem deslocar a página para o lado."
         - "O próprio ecrã do controlador no telemóvel importa uma lista de inscrições (um ficheiro CSV ou JSON escolhido com o seletor de ficheiros do Android), sem precisar da consola de GM."
-        - "Um controlador de reserva recebe do seu convite de adesão as escolhas das balizas das caixas (o interruptor do campo, as caixas desativadas, as salas) e os lugares das caixas, para que, depois de uma passagem de testemunho, os telemóveis recebam o mesmo registo de balizas. Em software, nos dois controladores."
+        - "Um controlador de reserva recebe do seu convite de adesão as escolhas das balizas das caixas (o interruptor do campo, as caixas desativadas, as salas) e os lugares das caixas, para que, depois de uma passagem de testemunho, os telemóveis recebam o mesmo registo de balizas; uma consola já aberta no controlador de reserva move os marcadores das caixas logo, sem recarregar. Em software, nos dois controladores; o movimento dos marcadores está testado num navegador sem ecrã."
+        - "O controlador no telemóvel acompanha a revisão de segurança do controlador Pi: a revogação de modos assinados falha de forma segura (com um mínimo por modo e um limite de idade para um telemóvel sem rede, ambos no ecrã Pacotes de modos), e a emissão ATAK para o pessoal passa por TLS com uma autoridade de certificação fixada. Testado em software; não num telemóvel num campo."
     g_ios:
       title: iOS
       items:
@@ -924,16 +989,18 @@ roadmap:
       - "No iOS, o NFC pede uma conta Apple paga; o dispositivo Android e o telemóvel como
         controlador do campo ficam só em Android."
       - "Experimentar o plugin de balizas num iPhone (compilado num Mac), e as balizas a sério, também no Android."
+      - "Experimentar o início de sessão do site no iOS (navegador do início de sessão social e chaves de acesso) num iPhone."
       - "Experimentar o código QR do marcador, a escolha do piso, o histórico de jogos e a religação ao módulo de E/S num telemóvel e num módulo a sério."
       - "Experimentar o início de sessão da app num telemóvel a sério."
+      - "Experimentar num campo e em telemóveis reais a verificação do cartão, a escolha da posição no check-in, a CA fixada e a criação de conta na app."
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do site e jogo avançado
     short: >-
       Servidor do site, marcação de jogos e inscrições, cenários personalizados, modos avançados,
       ATAK. Todos os passos de software estão feitos; o início de sessão com a Google e a Microsoft já
-      foi experimentado a sério num servidor de testes. Faltam um servidor a sério, uma revisão
-      jurídica e os testes em hardware.
+      foi experimentado a sério num servidor de testes. Faltam um servidor a sério, as condições de entrada
+      em produção do modo alojado e os testes em hardware.
     done:
       - "<strong>Modos avançados</strong>: Mestre e Satélites, o «Hackeia o terminal», VIP / Carga e
         a lógica das Janelas de Alvo."
@@ -1003,6 +1070,7 @@ roadmap:
         - "A quadrícula no ATAK e um mapa de quadrícula para imprimir."
         - "O GM remoto vê as posições dos jogadores quando estes as partilham."
         - "Os certificados de dispositivo do ATAK duram 90 dias (eram 7), e a página de ATAK do pessoal avisa quando um expira nos próximos 14 dias."
+        - "O campo pode desligar a obtenção de mapas da consola (Definições, Obtenção de mapas): então o \"Carregar o campo a partir de um mapa\" não chega ao OpenStreetMap, ao Overpass, ao Nominatim nem às imagens aéreas. Ligada de origem."
     g_server:
       title: Servidor do site, contas e dados
       items:
@@ -1021,13 +1089,19 @@ roadmap:
         - "Início de sessão com Google, Microsoft ou Apple e com passkeys (chaves de acesso). As palavras-passe são opcionais; a equipa continua a precisar de um segundo fator. A Google e a Microsoft foram experimentadas com os fornecedores a sério no servidor de testes (tests.atalaia-project.link); a Apple ainda não."
         - "Uma página de conta para a equipa, onde cada pessoa gere os seus inícios de sessão: passkeys, contas associadas, palavra-passe e código de dois fatores."
         - "As alterações a cenários, predefinições e calendário chegam logo aos controladores."
-        - "Durante quanto tempo o campo guarda os dados é uma definição do campo: os dados de jogo (eventos, pontuações, registos) e os registos de cronografagem têm cada um o seu prazo, 365 dias por omissão, definido no controlador, na consola de GM ou na página de definições do servidor do site. A limpeza diária apaga um jogo terminado com essa idade, nunca antes de o servidor do site o ter por inteiro. O campo, sem uso, de retenção por conta desapareceu."
+        - "Durante quanto tempo o campo guarda os dados é uma definição do campo: o histórico de jogos e os registos de cronografagem têm cada um o seu prazo, definido no controlador, na consola de GM ou na página de definições do servidor do site: o histórico de jogos 90 dias por omissão (os resultados das equipas, sem identificadores de jogadores, 365), os registos de cronografagem 365. A limpeza diária apaga um jogo terminado com essa idade, nunca antes de o servidor do site o ter por inteiro. O campo, sem uso, de retenção por conta desapareceu."
         - "O apagamento de uma pessoa num controlador de campo chega sozinho ao servidor do site na sincronização seguinte (nunca com o nome), e apaga lá também os registos de cronografagem dessa pessoa."
-        - "O primeiro rascunho completo do aviso de privacidade, em português e inglês, reescrito a partir do que cada parte da Atalaia faz hoje. É um rascunho, não é aconselhamento jurídico e ainda não foi revisto por um/a jurista."
-        - "O servidor do site publica o aviso de privacidade que a operação lhe dá, como página e pela API em quatro línguas, e pede às contas que consintam de novo quando a versão muda. Nada fica bloqueado: a exportação e o apagamento continuam disponíveis. Testado num computador."
+        - "Modelos do aviso de privacidade, do acordo de subcontratação de dados e dos termos de partilha entre campos, em português e inglês (o acordo também em pt-PT), e um modelo de avaliação de impacto sobre a proteção de dados: dizem as posições que a assessoria jurídica do responsável do projeto aprovou a 30 de outubro de 2026 (contas assentes no contrato com idade mínima de 16 anos, o cartão de filiado conferido no check-in com o número apagado, infrações por interesse legítimo, partilha da posição por consentimento, sem encarregado de proteção de dados). Continuam a ser modelos que cada campo preenche, não aconselhamento jurídico para um campo em concreto."
+        - "O servidor do site publica o aviso de privacidade que a operação lhe dá, como página e pela API em quatro línguas, e mostra-o de novo às contas quando a versão muda (a conta assenta no contrato, não no consentimento). Nada fica bloqueado: a exportação e o apagamento continuam disponíveis. Testado num computador."
         - "Uma conta social escolhe o nome de utilizador na página da Conta logo depois de ser criada (pode ser saltado; o nome do próprio fornecedor só se a pessoa o pedir). Qualquer conta pode mudar o seu nome com o seu próprio método de início de sessão, e duas contas da mesma pessoa podem ser fundidas depois de a pessoa provar as duas (nunca para dentro ou a partir de uma conta com função de equipa). O erro de consentimento em falta aparece junto da caixa de seleção. Testado num computador; o passo do nome de utilizador e a fusão ainda faltam experimentar no servidor de testes."
         - "Um registo por conta social guarda a versão do aviso de privacidade que a pessoa realmente viu: o servidor recusa uma versão desatualizada e verifica outra vez antes de criar a conta. Testado num computador."
         - "A limpeza diária da retenção também apaga as contas anonimizadas (o que uma eliminação ou uma fusão deixa) quando nada as referencia. Testado num computador."
+        - "Mudar a forma como uma conta inicia sessão exige um segundo fator: juntar, mudar o nome ou remover uma passkey, ligar ou desligar o código de dois fatores, mudar a palavra-passe, ligar uma conta social e confirmar uma fusão são recusados se a sessão não passou por um TOTP ou uma passkey (um início de sessão social sozinho não conta); uma fusão nunca leva passkeys para uma conta de equipa. A página de conta e a app pedem esse passo primeiro. Testado num computador, não com os fornecedores a sério."
+        - "A revisão de segurança do servidor do site: corpos de pedidos limitados (413 acima de 1 MiB, 4 MiB nos carregamentos), a mesma resposta para \"conta inexistente\" e para uma atribuição recusada, a exportação do campo só com as entradas de auditoria do campo, o interruptor da página pública respeitado na procura de campo da app, um endereço público obrigatório, o emissor de um início de sessão social guardado com o seu identificador, pedidos HTTP simples atrás de um proxy redirecionados para HTTPS e uma verificação de saúde que só diz ok. Em parte encontrado no servidor de pré-visualização."
+        - "As contas assentam no contrato, não no consentimento: a criação de conta regista que versão do aviso de privacidade foi mostrada, com uma caixa \"Tenho 16 anos ou mais\" (na página da equipa e na app); não se guarda data de nascimento; sem aviso publicado, o registo fica fechado. Os consentimentos antigos passaram a registos de aviso. Testado num computador."
+        - "O código da revisão de privacidade: o endereço de rede de uma entrada de auditoria apaga-se ao fim de 180 dias (definível); uma conta sem uso há 24 meses é avisada e anonimizada 30 dias depois; a eliminação de uma pessoa, ou um consentimento de partilha retirado, chega aos controladores de outros campos, que largam as cópias; as eliminações ficam como somas de controlo num registo fora da base de dados e são aplicadas de novo depois de um restauro; uma página nova da equipa marca quem reincide como um aviso (um simples aviso nunca conta) e um \"banimento\" termina ao fim de 12 meses por omissão; o histórico de jogos guarda-se 90 dias com identificadores de jogadores, e os resultados das equipas, sem eles, 365. Testado num computador."
+        - "Um campo aceita os termos de partilha entre campos (a administração, na página de definições) antes de partilhar registos de cronografagem; a versão, a data e a conta ficam registadas, e quando os termos mudam a partilha fica suspensa até serem aceites. O campo é o responsável pelos dados, o operador do centro é o subcontratante, e os campos que partilham são corresponsáveis só nesse passo. Testado num computador."
+        - "Quem opera pode definir uma palavra-passe numa conta existente pela linha de comandos (<code>set-password</code>, pedida duas vezes sem eco, nunca na linha de comandos): a saída para uma conta de pessoal sem segundo fator, que por isso não pode mudar os seus métodos de entrada pelo site."
     g_games:
       title: Jogos, clubes e páginas da organização
       items:
@@ -1118,9 +1192,13 @@ roadmap:
         - "Modo alojado: cada campo tem um papel de base de dados só seu, e por isso uma injeção de SQL já não consegue passar para os dados de outro campo mudando a definição que a segurança ao nível da linha usava. Uma lacuna que exige uma segunda instrução SQL continua aberta e está escrita. Testado contra o PostgreSQL em Docker."
         - "Modo alojado: os campos que partilham registos de cronografagem passam a fazê-lo entre os campos de um centro, por uma vista só de leitura que exige consentimento; uma pessoa liga as suas contas em dois campos com um código de uso único, e nada é associado por e-mail ou nome. Testado contra o PostgreSQL em Docker."
         - "Uma demonstração em direto, só de leitura, para o servidor de pré-visualização: o controlador de campo a sério, com três Field Box simuladas, joga jogos sem parar, alternando um campo aberto e um edifício inventado de três pisos (uma planta por piso, quinze balizas, doze jogadores simulados: seis localizados por baliza, cinco por GPS com o piso escolhido, um indeciso), e quem visita vê a consola de GM, o marcador e a vista de quem joga, sem nada para alterar e sem dados pessoais. No ar desde 29 de outubro de 2026, em demo.atalaia-project.link; a vista de quem joga é testada num navegador sem ecrã."
+        - "Modo alojado: um só retorno de início de sessão social para todo o centro (opcional): quem opera regista um endereço de retorno por fornecedor; o centro assina o estado, confere o campo no seu registo e passa para o retorno do próprio campo. Testado em Docker, não com os fornecedores a sério."
+        - "Uma lista de verificação de entrada em produção para quem opera: seis condições antes de um campo poder usar o modo alojado (um acordo de subcontratação assinado por campo, os termos de partilha, todos os subcontratantes no anexo e na UE, um aviso de privacidade preenchido, os papéis próprios de quem opera se for uma pessoa singular, e uma prova num servidor real)."
+        - "O servidor de pré-visualização (tests.atalaia-project.link) corre tudo isto desde 30 de outubro e tem um aviso de privacidade próprio (versão preview-2026-10-31, contas assentes no contrato, 16 anos, sem encarregado de proteção de dados)."
+        - "O servidor de pré-visualização instala sozinho o seu aviso de privacidade em cada arranque e atualização (e pára se faltarem os ficheiros de uma versão), a demonstração em direto envia HSTS, e uma pilha de teste descartável (um hub alojado, um fornecedor de início de sessão falso e um controlador de campo, só em 127.0.0.1) permite correr um teste de segurança autorizado sobre o código de hoje."
     next:
       - Um servidor a sério com domínio.
-      - A revisão jurídica dos modelos antes de o modo alojado abrir. Não é oferecido antes disso.
+      - "As condições de entrada em produção do modo alojado (um acordo de subcontratação assinado por campo, os termos de partilha, um aviso preenchido) e cada campo a preencher o seu aviso e a sua avaliação de impacto. A assessoria jurídica do responsável do projeto aprovou as posições jurídicas a 30 de outubro de 2026; o modo alojado continua a não ser oferecido. Nada do trabalho de segurança, de rádio e jurídico de 30 de outubro foi experimentado numa placa ou num telemóvel reais: corre em software e no servidor de pré-visualização."
       - "Os testes em hardware: placas reais, um telemóvel com ATAK real, uma ligação 4G real, um
         cronógrafo real."
       - O módulo de alvo, que as regras das Janelas de Alvo esperam.
@@ -1177,6 +1255,8 @@ roadmap:
       - "Os blocos de cenários da consola do GM têm uma lista de línguas com as quatro."
       - "As chaves de modos do projeto: uma chave raiz guardada offline e uma chave com que o registo assina o selo de verificado. As caixas, a app e os controladores confiam nas duas por omissão."
       - "O guia do firmware e os manuais de montagem explicam a única gravação por USB de que uma caixa com a tabela de partições antiga precisa, e que as definições e as chaves sobrevivem a ela."
+      - "O endurecimento do CI e do lançamento, vindo da revisão de segurança: cada ação fixada por commit, a imagem de compilação por digest, cada instalação pip a partir de um ficheiro com somas de controlo, o trabalho de assinatura num ambiente protegido que recusa uma etiqueta fora da main, e atualizações semanais das dependências. O responsável do projeto ainda tem de criar o ambiente protegido e mover para lá os segredos de assinatura (os passos estão escritos)."
+      - "Os padrões de texto do Lua e string.rep passam a ser contados no sandbox (um padrão hostil podia bloquear uma caixa até ao watchdog), saltar dados CBOR aninhados tem limite de profundidade, e os descodificadores de CBOR têm testes com entradas hostis."
     next:
       - "A revisão do alemão e do chinês: se jogas em alemão ou em chinês, ajuda-nos a revê-los. As
         traduções para outras línguas começam em docs/translations (em inglês)."
@@ -1191,12 +1271,13 @@ build:
     de uma placa ESP32, sem placa de circuito feita de propósito. Aqui estão os pinos e os esquemas de ligações da Field Box e os guias da caixa
     satélite, do módulo de E/S e do módulo de alvo, em resumo; os guias completos, com todas as
     verificações e as tabelas de problemas e soluções, estão no repositório (em inglês).
-    Para pôr o firmware numa placa, <a href="https://github.com/vakaobr/atalaia-project/releases">transfere uma versão publicada</a> ou compila-a: o <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/pt/firmware.md">guia do firmware</a> explica as duas formas. O controlador de campo tem o seu <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/pt/controller-setup.md">guia de montagem</a>.
+    Para pôr o firmware numa placa, <a href="https://github.com/vakaobr/atalaia-project/releases">transfere uma versão publicada</a> ou compila-a: o <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/pt/firmware.md">guia do firmware</a> explica as duas formas. O controlador de campo tem o seu <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/pt/controller-setup.md">guia de montagem</a>. O modem de rádio tem o seu <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/pt/modem.md">guia do modem</a>.
   status: >-
-    <strong>Ainda não se montou nenhuma caixa a partir destes guias.</strong> Os pinos são
-    verificados automaticamente contra o firmware, mas todos os passos físicos (caixa, alimentação,
-    autonomia, alcance do rádio) estão por testar, e as fotografias chegam com as primeiras
-    montagens. Se montares uma, conta-nos o que encontraste.
+    <strong>Nenhuma caixa foi montada a partir destes guias, e a Field Box ainda não tem caixa.</strong>
+    Há só uma <a href="#field-box-first-build">montagem de bancada da Field Box</a> (fios soltos), a
+    jogar. Os pinos são verificados automaticamente contra o firmware, mas todos os passos físicos
+    (caixa, alimentação, autonomia, alcance do rádio) estão por testar, e as fotografias das outras
+    caixas chegam com as primeiras montagens. Se montares uma, conta-nos o que encontraste.
   toc: Nesta página
   parts: Peças
   pins: Pinos
@@ -1285,6 +1366,39 @@ build:
       remetem para ele em todos os passos que partilham.
     pins_shared: >-
       Os GPIO 1, 35 e 44 são pinos da placa que a Field Box partilha de propósito, cada um para este único uso: o 1 é a entrada de tensão da bateria da placa (o medidor lê a bateria por I2C), o 35 o seu LED branco (que pisca de leve com o anel) e o 44 a linha de receção da UART0 (a consola USB não é afetada).
+    bench:
+      title: A primeira montagem, na bancada
+      intro: >-
+        A Field Box já existe fora do papel, mas só numa montagem de bancada: a primeira placa a correr
+        um jogo inteiro, com o ecrã, os botões e o teclado ligados por fios soltos e ainda sem caixa.
+        Não é um produto acabado nem uma caixa montada segundo os guias.
+      photo_alt: >-
+        Fotografia da montagem de bancada: uma placa Heltec V4 com o seu pequeno ecrã OLED, ligada por
+        muitos fios coloridos a um ecrã TFT de 2,8 polegadas que mostra «READY» e «Next game», a um
+        teclado de membrana de 12 teclas (4 por 3) e a quatro botões de pressão com tampas verde, azul e
+        pretas. Tudo está solto sobre uma secretária, com um teclado de computador ao fundo.
+      photo_caption: >-
+        A primeira Field Box na bancada, a 31 de outubro de 2026: uma placa Heltec V4, o ecrã TFT de
+        2,8" (ILI9341), o OLED da própria placa, um teclado de 4×3 e botões de equipa, ligados com fios
+        soltos, sem caixa. É a primeira placa a correr um jogo, e uma montagem de bancada, não uma caixa
+        acabada.
+      video_alt: >-
+        Vídeo mudo, em ciclo, da mesma montagem de bancada a jogar Domínio, com o ecrã TFT novo. O ecrã mostra
+        uma zona ocupada pela equipa vermelha, com 3 pontos; uma barra azul enche-se na parte de baixo, a zona passa
+        para a equipa azul e o ecrã e o OLED mudam de vermelho para azul. Depois o ecrã mostra «ocupada há 0:01»,
+        a contar, e, no canto de cima à direita, os pontos de cada equipa.
+      video_caption: >-
+        A mesma montagem a jogar Domínio com o controlador da bancada (1 de novembro de 2026): a barra de retenção
+        enche-se, a zona passa da equipa vermelha para a azul, o tempo de ocupação conta e os pontos de cada equipa
+        aparecem no canto. Onze segundos em ciclo, sem som; o ecrã está em português.
+      photo2_alt: >-
+        Fotografia da mesma montagem de bancada, com o ecrã TFT novo: o ecrã mostra «PRONTA», a torre amarela do
+        logótipo do Atalaia e «Próximo jogo», com «Uma tecla: escolher jogo aqui» por baixo. À esquerda, a placa Heltec
+        V4 com o seu OLED, que repete «Próximo jogo»; à direita, um botão verde. Fios soltos por todo o lado, sobre uma
+        secretária.
+      photo2_caption: >-
+        A mesma montagem a 1 de novembro de 2026, com o ecrã TFT novo: o ecrã «PRONTA / Próximo jogo», com a
+        torre amarela do Atalaia, à espera de um jogo. Continua a ser uma montagem de bancada, sem caixa.
     wiring:
       title: >-
         Esquemas de ligações
@@ -1469,6 +1583,47 @@ build:
       de montagem do módulo de E/S</a>, e as verificações do módulo com um telemóvel na
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/firmware/esp32/docs/BRING_UP.md">lista
       de arranque</a>.
+  modem:
+    title: Modem de rádio
+    what: >-
+      O rádio do controlador: uma segunda Heltec WiFi LoRa 32&nbsp;V4, gravada com a imagem do modem e
+      ligada à porta USB do controlador de campo. Sem ele, o controlador corre e a consola abre, mas nada
+      chega às caixas e nada se ouve delas. Não tem Wi-Fi, por isso só precisa da antena LoRa.
+    tested: >-
+      Um modem gravado assim correu com o controlador e caixas reais numa bancada (um computador, o
+      controlador em Docker). Ainda não correu num Raspberry Pi, nem em macOS, nem num campo.
+    steps:
+      antenna: >-
+        Monta a <strong>antena LoRa antes de a placa ter qualquer energia</strong>, também para gravar, e usa
+        um cabo USB-C <em>de dados</em>. Decide a região de rádio: o modem e as caixas têm de a partilhar.
+      image: >-
+        Transfere <code>atalaia-modem-&lt;versão&gt;-usb.zip</code> e <code>SHA256SUMS</code> das
+        <a href="https://github.com/vakaobr/atalaia-project/releases">versões publicadas</a> (V4.3, EU868),
+        ou compila-o: <code>python tools/docker_fw.py modem</code> (V4.2, Taiwan, outras antenas).
+      flash: >-
+        Com o esptool 4.8.1, apaga uma placa nova e escreve os ficheiros do <code>flash_args</code>:
+        <code>esptool --chip esp32s3 -p PORTA write_flash "@flash_args"</code>, com a porta
+        <code>COM5</code> no Windows, <code>/dev/ttyACM0</code> no Linux, <code>/dev/cu.usbmodem…</code>
+        no macOS. No Linux, entra primeiro no grupo <code>dialout</code>.
+      screen: >-
+        O ecrã da placa mostra a torre e <strong>MODEM MODE</strong>, e depois <code>LINK waiting</code>.
+        É um modem saudável que ainda não tem controlador. <strong>RADIO FAULT</strong> quer dizer que o chip
+        de rádio não arrancou.
+      port: >-
+        Liga-o ao controlador, descobre a porta (<code>ls /dev/ttyACM*</code>), põe-na em
+        <code>[modem] port</code> de <code>/etc/atalaia/controller.toml</code> e reinicia o serviço
+        (<code>sudo systemctl restart atalaia-controller</code>).
+      check: >-
+        O ecrã diz <strong>LINK OK</strong>, o cabeçalho da consola diz <strong>Rádio: ligado</strong>, e o
+        registo do controlador tem <code>modem link up</code>.
+      join: >-
+        Liga uma caixa adotada, cria um jogo e convida a caixa: passa por <em>a enviar</em>, <em>convidada</em>,
+        <em>juntou-se</em>, e o ecrã do modem conta pacotes.
+    full: >-
+      Todos os comandos para cada sistema, como descobrir a porta, e uma tabela de problemas (cabo só de
+      carga, porta errada, porta ocupada por outro programa, <code>dialout</code>, região diferente,
+      <code>LINK waiting</code> ou <code>DOWN</code>, <code>RADIO FAULT</code>, tabela de partições errada):
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/pt/modem.md">Montar o modem de rádio</a>.
   target:
     title: Módulo de alvo
     status: >-
@@ -1606,8 +1761,8 @@ glossary:
       altifalante e leitor NFC numa caixa estanque, por cerca de
       <span class="nowrap">70–110&nbsp;€</span> em peças; o Satélite é uma caixa mais pequena para
       um ponto secundário, por cerca de <span class="nowrap">30–40&nbsp;€</span>. O firmware e o
-      manual de montagem da Field Box já estão prontos; os primeiros protótipos esperam pelas peças
-      (fase&nbsp;1).
+      manual de montagem da Field Box já estão prontos; a primeira montagem de bancada (fios soltos, sem
+      caixa) já joga (fase&nbsp;1).
   milsim:
     id: glossario-milsim
     term: Milsim
@@ -1868,11 +2023,18 @@ footer:
     A Atalaia é software livre: GPL-3.0-or-later para o núcleo, o firmware, a app e os modos;
     AGPL-3.0-or-later para o controlador de campo e o servidor do site; CERN-OHL-S-2.0 para o
     hardware; CC BY-SA 4.0 para a documentação e esta página.
+  flags: >-
+    Bandeiras dos idiomas: Twemoji Country Flags, arte do Twemoji (Twitter, Inc e colaboradores), CC BY 4.0, reduzida a quatro bandeiras.
+  flags_licence: CC BY 4.0
   licensing: Licenças
   manuals: Manuais para quem joga, a organização, os marshals e quem opera as caixas
   independent: >-
     Projeto independente e feito pela comunidade, sem ligação a nenhum fabricante comercial de
     dispositivos de jogo. Esta página não usa cookies nem carrega nada de outros sites.
+  privacy: Aviso de privacidade (rascunho)
+  privacy_note: >-
+    O aviso que um servidor do site mostra a quem joga. É um modelo para operadores: diz as posições jurídicas que a assessoria jurídica do responsável do projeto aprovou a 30 de outubro de 2026, mas o texto em si continua a ser um rascunho, ainda não revisto por um jurista, e cada campo tem de o conferir e adotar como seu.
+  privacy_href: https://github.com/vakaobr/atalaia-project/tree/main/docs/templates
 
 # Os dois diagramas do rádio: site/src/diagrams/*.svg, gerados em site/img/diagrams/.
 # Texto simples, não HTML. Cada texto tem um espaço fixo no desenho; se uma
@@ -2007,7 +2169,7 @@ diagrams:
 architecture:
   title: "Como tudo se liga"
   intro: "Que parte do Atalaia fala com que parte, por que ligação, e o que passa por ela. Debaixo de cada diagrama: o que circula e o que não circula."
-  status: "O Atalaia está em pré-alfa. Em placas reais, numa bancada, já correram: arranque, rádio, botões, adoção e uma atualização por rádio. O resto está feito e testado só em software."
+  status: "O Atalaia está em pré-alfa. Em placas reais, numa bancada, já correram: arranque, rádio, botões e teclado, adoção, uma atualização por rádio e jogos inteiros com o controlador de campo. A app iOS passou a sua lista de verificação num iPhone. O resto está feito e testado só em software."
   reading: "Para ler o primeiro diagrama: uma linha contínua funciona sem internet no campo, uma linha tracejada precisa de internet."
   flows: "O que circula"
   not: "O que não circula"

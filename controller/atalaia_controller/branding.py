@@ -36,9 +36,9 @@ import hashlib
 import json
 import logging
 import re
-import time
 from typing import TYPE_CHECKING, Any, Optional
 
+from . import wallclock
 from . import images
 from .checkin import RateLimit
 from .engine import Conflict, ControllerError, NotFound, display_name
@@ -419,15 +419,18 @@ class Branding:
             return
         if grace:
             img = self.store.image(image_id, with_data=False)
-            if img is not None and img["created_at"] > time.time() - CREST_GRACE_S:
+            if img is not None and img["created_at"] > wallclock.now() - CREST_GRACE_S:
                 return  # a fresh upload may be about to go into a game or a preset
         self.store.delete_image(image_id)
 
     def purge(self, force: bool = False, now: Optional[float] = None) -> int:
         """Deletes images nothing refers to (crests a day after their upload); at most every 10 minutes."""
-        now = time.time() if now is None else now
-        if not force and now - self._last_purge < PURGE_EVERY_S:
+        now = wallclock.now() if now is None else now
+        if not force and 0 <= now - self._last_purge < PURGE_EVERY_S:  # a clock set back lets it run
             return 0
+        guard = getattr(self.ctrl, "clock_guard", None)
+        if guard is not None and not guard.purge_allowed():
+            return 0  # a wrong or just-jumped clock deletes nothing (wallclock.py)
         self._last_purge = now
         used = self.referenced()
         gone = 0

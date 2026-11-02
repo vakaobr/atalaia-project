@@ -24,6 +24,7 @@ if(CONFIG_ATALAIA_MODEM_MODE)
         "hal/esp/hal_esp_radio.c"
         "hal/esp/hal_esp_board.c"
         "hal/esp/hal_esp_i2c.c"
+        "i2c_health.c"
         "hal/esp/hal_esp_oled.c"
         "hal/board_fem.c"
         "radio/radio_task.c"
@@ -54,6 +55,7 @@ elseif(CONFIG_ATALAIA_POD_MODE)
         "key_filter.c"
         "hal/esp/hal_esp_board.c"
         "hal/esp/hal_esp_i2c.c"
+        "i2c_health.c"
         "hal/esp/hal_esp_buttons.c"
         "hal/esp/hal_esp_keypad.c"
         "hal/esp/hal_esp_keypad_gpio.c"
@@ -105,6 +107,7 @@ else()
         "hal/esp/hal_esp.c"
         "hal/esp/hal_esp_board.c"
         "hal/esp/hal_esp_i2c.c"
+        "i2c_health.c"
         "hal/esp/hal_esp_buttons.c"
         "hal/esp/hal_esp_keypad.c"
         "hal/esp/hal_esp_keypad_gpio.c"
@@ -148,6 +151,9 @@ else()
         "cpace.c"
         "box_pair.c"
         "status_hold.c"
+        "tft_splash.c"
+        "reset_reason.c"
+        "reset_reason_esp.c"
         "target_addon.c"
     )
     set(ATALAIA_EMBED EMBED_FILES "wifi_setup.html")
@@ -160,6 +166,7 @@ endif()
 set(ATALAIA_REQUIRES
     atalaia_core
     driver
+    esp_driver_i2c
     esp_app_format
     esp_psram
     esp_timer

@@ -20,11 +20,13 @@
 ///   cases (protocol/vectors/controller_api.json, mqtt_acl);
 /// * at most [maxClients] connections (20), the keep-alive enforced (1.5x),
 ///   packets up to 64 KB;
-/// * the loopback address by default: the field's network only when the
-///   shell opens it there (decision PE24-7, slice S6).
+/// * the loopback address by default; the field's network only over TLS
+///   with the field CA, on [tlsPort] (8883), when the shell opens it there
+///   (decision PE24-7, slice S6; the plain port never leaves the phone:
+///   security review FLD-5, SR-54).
 ///
 /// Not supported (refused or ignored, as the ADR says): QoS 2, wills,
-/// persistent sessions, TLS.
+/// persistent sessions.
 library;
 
 import 'dart:async';
@@ -137,7 +139,18 @@ class MqttBroker {
     this.allowPublish,
     this.users,
     this.acl,
+    this.tls,
+    this.tlsAddress,
+    this.tlsPort = 8883,
   }) : address = address ?? InternetAddress.loopbackIPv4;
+
+  /// With a context, a second listener on [tlsAddress] and [tlsPort] speaks
+  /// MQTT over TLS (the field CA's server certificate, field_tls.dart).
+  final SecurityContext? tls;
+  final InternetAddress? tlsAddress;
+
+  /// 0: any free port ([boundTlsPort] tells which).
+  final int tlsPort;
 
   /// 0: any free port ([boundPort] tells which).
   final int port;
@@ -158,6 +171,7 @@ class MqttBroker {
       acl == null || acl!.mayRead(c.user, topic);
 
   ServerSocket? _server;
+  SecureServerSocket? _secure;
   final _clients = <_Client>{};
   final _retained = <String, (Uint8List, int)>{};
   Timer? _keepAlive;
@@ -167,15 +181,37 @@ class MqttBroker {
   Stream<(String, String, Uint8List)> get received => _received.stream;
 
   int get boundPort => _server?.port ?? port;
+  int? get boundTlsPort => _secure?.port;
   int get clientCount => _clients.where((c) => c.connected).length;
 
   Future<void> start() async {
     _server = await ServerSocket.bind(address, port);
     _server!.listen(_accept);
+    final ctx = tls;
+    if (ctx != null) await _bindTls(ctx, tlsPort);
     _keepAlive = Timer.periodic(
       const Duration(seconds: 1),
       (_) => _checkKeepAlive(),
     );
+  }
+
+  Future<void> _bindTls(SecurityContext ctx, int port) async {
+    _secure = await SecureServerSocket.bind(
+      tlsAddress ?? InternetAddress.loopbackIPv4,
+      port,
+      ctx,
+    );
+    _secure!.listen(_accept, onError: (Object _) {});
+  }
+
+  /// A new server certificate (an address changed, one near its end): the
+  /// TLS listener again on the same port; connected clients stay.
+  Future<void> renewTls(SecurityContext ctx) async {
+    final old = _secure;
+    if (old == null) return;
+    final port = old.port;
+    await old.close();
+    await _bindTls(ctx, port);
   }
 
   Future<void> stop() async {
@@ -185,7 +221,9 @@ class MqttBroker {
     }
     _clients.clear();
     await _server?.close();
+    await _secure?.close();
     _server = null;
+    _secure = null;
     await _received.close();
   }
 

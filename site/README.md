@@ -5,8 +5,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Project page
 
-The project page at <https://atalaia-project.link/>. It is static HTML and CSS: no cookies,
-nothing loaded from other sites, and one small inline script, the main page's screenshot viewer
+nothing loaded from other sites, and two small inline scripts, the header menus' Escape and click-outside (the menus are `<details>` and work without it) and the screenshot viewer (main and modes pages) and the mode animations' pause button (src/partials/modegif.html)
+nothing loaded from other sites, and one small inline script, the screenshot viewer (main and modes pages) and the mode animations' pause button (src/partials/modegif.html)
 (see [Screenshots](#screenshots)), without which every page still works. The
 [Pages workflow](../.github/workflows/pages.yml) publishes this folder on every push to `main`
 that changes it, leaving out `src/`, `i18n/` and this README.
@@ -22,11 +22,11 @@ which keeps English's ASCII folders (Han letters in an address are percent-encod
 
 | Page | Portuguese | English | German | Chinese | Template | What it holds |
 | --- | --- | --- | --- | --- | --- | --- |
-| Main page | `/` | `/en/` | `/de/` | `/zh-tw/` | `src/index.html` | The hero, how a game works, why Atalaia, how it fits together, a short radio section, three game modes, the screenshots, try it, the roadmap in one line per phase, the community hub, getting involved, the name and field safety |
-| Game modes | `/modos/` | `/en/modes/` | `/de/modi/` | `/zh-tw/modes/` | `src/modes.html` | Every mode, the Codes modifier, the Medic Kit and "your mode" |
+| Main page | `/` | `/en/` | `/de/` | `/zh-tw/` | `src/index.html` | The hero, how a game works, why Atalaia, how it fits together, a short radio section, three game modes, "What it looks like" (three mode animations, the real box's clip, then the app's screenshots), try it, the roadmap in one line per phase, the community hub, getting involved, the name and field safety |
+| Game modes | `/modos/` | `/en/modes/` | `/de/modi/` | `/zh-tw/modes/` | `src/modes.html` | Every mode (each with its animation), the Codes modifier, the Medic Kit, "your mode" and the box's step-by-step screenshots |
 | Radio | `/radio/` | `/en/radio/` | `/de/funk/` | `/zh-tw/radio/` | `src/radio.html` | How the radio works: both diagrams with their lead-ins, and the channel |
 | Roadmap | `/roadmap/` | `/en/roadmap/` | `/de/roadmap/` | `/zh-tw/roadmap/` | `src/roadmap.html` | The six phases, each as a one-line summary, bullets of what is done (the long lists fold into a `<details>`), bullets of what is next or waiting, and its gate, with a link to the phase's `STATUS.md`. "Roadmap" stays in English in Portuguese too |
-| Build guides | `/montagem/` | `/en/build-guides/` | `/de/bauen/` | `/zh-tw/build-guides/` | `src/build.html` | Safety rules for every build; the Satellite, the I/O pod and the target addon shortened from `hardware/<node>/BUILD.md` (the full guides, in English), with their pin tables and photo placeholders; a pointer to the Field Box's build manual (phase 5 plan phase 12, decisions P5J-1 to P5J-13) |
+| Build guides | `/montagem/` | `/en/build-guides/` | `/de/bauen/` | `/zh-tw/build-guides/` | `src/build.html` | Safety rules for every build; the Satellite, the I/O pod and the target addon shortened from `hardware/<node>/BUILD.md` (the full guides, in English), with their pin tables and photo placeholders; the Field Box's first bench build, with its photo and clip; a pointer to the Field Box's build manual (phase 5 plan phase 12, decisions P5J-1 to P5J-13) |
 | How it fits together | `/como-se-liga/` | `/en/how-it-fits/` | `/de/zusammenspiel/` | `/zh-tw/how-it-fits/` | `src/architecture.html` | The seven architecture diagrams of `docs/architecture.md` as SVG, each with a short "what flows / what does not" text and a link to the doc (decision SITEARCH-1). Linked from the navigation, the roadmap and the build guides |
 | Glossary | `/glossario/` | `/en/glossary/` | `/de/glossar/` | `/zh-tw/glossary/` | `src/glossary.html` | Every glossary entry; the glossary links of every page lead here |
 
@@ -41,7 +41,7 @@ which keeps English's ASCII folders (Han letters in an address are percent-encod
 | `img/` | The badge and illustrations (see [Images](#images)) |
 | `img/wiring/` | The Field Box's two wiring drawings, copied from `hardware/field-box/wiring/` by `tools/build_site.py` (see [The build guides page](#the-build-guides-page)). Generated |
 | `img/diagrams/` | The two radio diagrams in each language and layout. Generated (see [Diagrams](#diagrams)) |
-| `fonts/` | Barlow and Barlow Condensed (latin subset, WOFF2), self-hosted so the page loads nothing from other sites; SIL OFL 1.1, see [LICENSES/OFL-1.1.txt](../LICENSES/OFL-1.1.txt) |
+| `fonts/` | Barlow and Barlow Condensed (latin subset, WOFF2; SIL OFL 1.1, see [LICENSES/OFL-1.1.txt](../LICENSES/OFL-1.1.txt)) and a four-flag subset of Twemoji Country Flags for the language switcher (CC BY 4.0, credited in the footer), all self-hosted so the page loads nothing from other sites; see [fonts/README.md](fonts/README.md) |
 | `style.css` | The look: slate, sand and signal orange taken from the badge, with the hero's hills and tower drawn in inline SVG (the subpages' heads reuse the hills) |
 | `src/<page>.html` | The template of each page, built in every language |
 | `src/partials/` | The parts every page shares: `head.html` (title, description, canonical and `hreflang` addresses, social preview tags), `header.html` (navigation and language switcher) and `footer.html` |
@@ -96,9 +96,32 @@ the rest of this folder (see [REUSE.toml](../REUSE.toml)); the top-level README 
 Each main page loads only its own hero image (WebP, with JPEG for older browsers, at 960 or 1600
 pixels wide as the screen needs) and lazy-loads everything below it.
 
+### Field Box photo and clip
+
+The first real Field Box, a bench build (loose wires, no enclosure) the maintainer photographed and
+filmed on 2026-10-31 (the first photo) and 2026-11-01 (the second photo and the clip, with the improved TFT screens). Never call it a finished box in the texts (`build.field_box.bench.*`,
+`screens.real.*`, in the four languages). The files are the maintainer's own, under the folder's CC BY-SA 4.0
+licence (`REUSE.toml`), with every piece of metadata (EXIF, GPS, device, the container's tags) stripped
+by ffmpeg `-map_metadata -1` and `bitexact`, and the clip's audio removed:
+
+| Files | What they are | Where they appear |
+| --- | --- | --- |
+| `field-box-bench-960/1600` (`.jpg`, `.webp`) | The first bench photo (2026-10-31), 4:3 (the 2048 × 1536 original resized; 154 + 324 KB JPEG, 124 + 254 KB WebP) | `#field-box-first-build` on the build guides page, a `<picture>` like the hero's |
+| `field-box-ready-960/1600` (`.jpg`, `.webp`) | The second bench photo (2026-11-01, 16:9, the 1600 × 900 original resized; 127 + 251 KB JPEG, 109 + 199 KB WebP): the new TFT screen showing "PRONTA / Próximo jogo" with the yellow Atalaia tower | The same section, under the first photo, a `<picture>` with its own caption |
+| `field-box-demo.mp4`, `.webm`, `field-box-demo-poster.jpg` | An 11 s muted loop (the 2026-11-01 recording's 59.5 s to 70.5 s: the red zone's 3 points, the blue hold bar filling, blue taking the zone, the live held time from 0:01 and the per-team point chips in the top-right corner), 720 × 406, 24 fps, H.264 132 KB, VP9 150 KB, poster 47 KB; the box's screen in the video is in Portuguese. Replaces the 2026-10-31 clip | The same section, and "The real box, on the bench" under the mode animations on the main page |
+
+| `master-satellites-test-run.mp4`, `.webm`, `master-satellites-test-run-poster.jpg` | A 17.8 s muted clip of a Master and Satellites test game on four real boxes (the 2026-11-01 recording: 22.5 to 29.0 s the master, the box with the big screen, is taken by red; 54.0 to 56.8 s a satellite's OLED shows red holding it; 98.0 to 106.5 s the master reads "1 de 3 satélites, 3 pontos a cada 10 s", then passes to blue; three pieces joined with clean cuts, the camera swings left out), 720 × 406, 24 fps, H.264 Main crf 33 219 KB, VP9 crf 46 252 KB, poster 48 KB; the screens are in Portuguese | The "Master and Satellites" card on the modes page, under its animation (`modes.master_satellites.real_*`) |
+
+The clips are `<video muted loop playsinline autoplay preload="metadata">` with the poster, from this
+site's own files (nothing from other sites, no cookie). A small inline script (`src/partials/realvideo.html`,
+included by the main, build and modes pages) pauses it for `prefers-reduced-motion: reduce`, so the poster shows, and adds
+the GIFs' pause / play button under it (a loop longer than five seconds needs one); without JavaScript the
+clip autoplays. To replace it, cut with ffmpeg, keep it muted, small and metadata-free, and look at
+every frame for faces or private information first.
+
 ### Screenshots
 
-`img/screens/` holds the screenshots of "What it looks like", shown at their own size:
+`img/screens/` holds the screenshots shown at their own size: the box's on the modes page ("The box's screens, step by step"), the app's and the Medic Kit's in "What it looks like" on the main page:
 
 | Files | What they are |
 | --- | --- |
@@ -107,8 +130,7 @@ pixels wide as the screen needs) and lazy-loads everything below it.
 | `app-medic-*.png` | The Medic Kit's screens (320 × 240) as the app draws them, from `app/test/goldens/images/templates/medic_*.png`; the kit's screens are Portuguese by default, so every language shows the same copies |
 
 When the app's golden images change (`python tools/docker_app.py goldens`), copy them again.
-Each screenshot is a link to its own image. A small inline script at the end of
-`src/index.html` opens the link in a `<dialog>` on the page instead: the image as large as the
+Each screenshot is a link to its own image. A small inline script (`src/partials/viewer.html`, with the dialog it opens; included by the main and modes pages) opens the link in a `<dialog>` on the page instead: the image as large as the
 screen allows (up to three times its size, in whole steps when small, so its pixels stay sharp),
 its alt text as the caption, previous and next (buttons or the arrow keys), closed with Esc, the
 close button or a click outside the image, with the focus back on the screenshot. Without
@@ -131,8 +153,8 @@ class="modegif">` in the mode's card in `src/modes.html` (copy a neighbour's) an
 `caption` under `gifs.<id>` in the four language files.
 
 A card's picture is a `<picture>` whose `<source>` for `prefers-reduced-motion: reduce` is the still
-frame, with `loading="lazy"` and the alt text and caption of `gifs.<id>`; a small inline script at
-the end of `src/modes.html` adds a pause button under each (play, for someone who asked for less
+frame, with `loading="lazy"` and the alt text and caption of `gifs.<id>`; a small inline script
+(`src/partials/modegif.html`, included by the main and modes pages) adds a pause button under each (play, for someone who asked for less
 motion; clicking it swaps the image for the animated GIF). Every mode has a picture in each of the
 four languages (the box's templates are in all four; the messages a mode's script writes, such as
 "Kill confirmed: b1", stay English); a `languages: [en]` entry in the script would make one `-en`
@@ -169,7 +191,8 @@ It needs Python 3 and PyYAML (the dev container has both: see [tools/README.md](
   that language's file.
 - Links to the repository's documents point at the English documents in every language; the
   Portuguese page says "(em inglês)" next to them, the German one "(auf Englisch)".
-- The language switcher in the header names each language in its own language and leads to the
+- The header menu is three `<details>` menus (Learn: modes, radio, how it fits, glossary; Build: build guides, try it, roadmap; Community: community hub, registry) and GitHub; `name="nav"` closes the others, `data-current` marks the menu that holds the page being read and `aria-current` its link (`NAV_GROUPS` in `tools/build_site.py`).
+- The language switcher is four emoji flags at the top right of every page; each link names its language in its own language (`aria-label`, `title`) and leads to the
   same page in the other languages. Try the site with a local server
   (`python3 -m http.server -d site`).
 
@@ -180,6 +203,25 @@ is not on the page it leads to; if the two languages' versions of a page link to
 external addresses; if a page of the page table is missing in a language, or a template or
 partial is unused; or if the site holds a generated page or diagram that nothing makes any more
 (delete it, or restore its page). `tools/check.sh` runs the same check.
+
+### The browser test
+
+`tools/site_browser_test.py` opens every generated page in all four languages at phone and desktop
+widths, in both colour schemes and with and without reduced motion, in headless Chromium: the flag
+links, the menus by keyboard, the footer, no sideways scroll, the mode animations. Run it with
+
+```sh
+python tools/docker_site_browser.py            # builds tools/dev/site-browser/Dockerfile on first use
+python tools/docker_site_browser.py -k flags   # only the tests whose name matches
+```
+
+The image is Playwright's own (`mcr.microsoft.com/playwright/python:v1.49.0-noble`), whose `python3`
+has no `playwright` module, plus the client pinned with hashes in `tools/dev/site-browser/`
+(`requirements.in` / `requirements.txt`, refresh recipe in the `.in` file). The runner removes its
+container (and, with `ATALAIA_VOLUME_SUFFIX` set, its image) when it is done. Run outside that image
+the test **fails** with "Playwright is not installed"; only `ATALAIA_SKIP_SITE_BROWSER=1` skips it, on
+purpose. Build the pages first (`python3 tools/build_site.py`) when you changed `src/` or `i18n/`: the
+test reads `site/` as it is.
 
 ### Adding a page
 
@@ -203,8 +245,10 @@ every language: each GPIO cell names its Kconfig symbol (`<td data-kconfig="ATAL
 and `tools/check_wiring.py` (in `tools/check.sh`) fails if a number is not that symbol's default
 in `firmware/esp32/main/Kconfig.projbuild`. When a pin default changes, change the number here,
 in `hardware/satellite/BUILD.md` and in `hardware/io-pod/BUILD.md` together. The dashed
-`figure.photo` boxes mark where the first builds' photos go (plan phase HW2); never a mock-up or
-generated picture. Portuguese words: guia de montagem, caixa satélite, módulo de E/S, módulo de
+`figure.photo` boxes mark where the first builds' photos go (plan phase HW2) for the Satellite, the
+I/O pod and the target addon; never a mock-up or generated picture. The Field Box's section no
+longer has one: it opens with its first real photo and clip, the bench build of 2026-10-31
+(`#field-box-first-build`, see [Field Box photo and clip](#field-box-photo-and-clip)). Portuguese words: guia de montagem, caixa satélite, módulo de E/S, módulo de
 alvo; German: Bauanleitung, Satellit, I/O-Pod, Ziel-Addon.
 
 The Field Box's section has a pin table of the same kind and its two WireViz wiring drawings

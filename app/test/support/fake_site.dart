@@ -11,6 +11,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:atalaia_app/site/site_auth.dart';
 import 'package:atalaia_app/site/site_client.dart';
 
 class FakeSite {
@@ -53,6 +54,11 @@ class FakeSite {
   final passkeys = <Map<String, Object?>>[];
   var passwordSet = true;
   var totpEnabled = false;
+
+  /// The account has a second factor or a staff role (the server's SR-1): its
+  /// login methods change only after a TOTP or passkey step-up.
+  var stepUpGuard = false;
+  var _steppedUp = false;
   var totpPending = false;
   var accountPassword = 'correct horse battery';
 
@@ -70,7 +76,13 @@ class FakeSite {
   /// The `return_to` of the last `start`, to see that it is the app's own.
   String? lastReturnTo;
   String? lastStartPurpose;
-  bool? lastStartConsent;
+  bool? lastStartNoticeSeen;
+  bool? lastStartAge;
+
+  /// What the sign-up's `register` last sent, and the accounts it made
+  /// (user name -> password; the login takes them too).
+  Map<String, Object?>? lastRegister;
+  final registered = <String, String>{};
   // (the notice version it carried: lastNoticeVersion, below)
 
   /// Ends every access token (as if they had expired).
@@ -240,31 +252,33 @@ class FakeSite {
     };
   }
 
-  // --- the privacy notice and the account's consent (api/privacy.py, CONS-*) -----
+  // --- the privacy notice and which version the account was shown (api/privacy.py, CONS-*, LEG-*) -----
   /// The notice's current version and its Markdown per language (empty: the
   /// operator has not published one).
   var noticeVersion = '2026-11';
   Map<String, String> noticeTexts = {
-    'pt':
-        '# Aviso de privacidade\n\nTratamos o teu **nome**.\n\n- guardamos o registo\n- apagamos a pedido',
-    'en':
-        '# Privacy notice\n\nWe keep your **name**.\n\n- we keep the registration\n- we erase on request',
+    'pt': '# Aviso de privacidade\n\nTratamos o teu **nome**.\n\n- guardamos o registo\n- apagamos a pedido',
+    'en': '# Privacy notice\n\nWe keep your **name**.\n\n- we keep the registration\n- we erase on request',
     'de': '# Datenschutzhinweis\n\nWir speichern deinen Namen.',
   };
 
-  /// What `GET /me` says about the consent: `current`, `outdated` or `missing`
-  /// (null: an older server whose /me has no `consent`), the version it is
-  /// for, and the languages the app asked the notice in.
-  String? consentStatus = 'current';
-  String? consentVersion = '2026-11';
+  /// What `GET /me` says about the notice: `current`, `outdated` or `missing`
+  /// (null: an older server whose /me has no `notice`), the version the
+  /// account was last shown, and the languages the app asked the notice in.
+  String? noticeStatus = 'current';
+  String? noticeShownVersion = '2026-11';
   final noticeLangsAsked = <String>[];
 
   /// A notice that changes while the person reads: the version the server
-  /// has from the next consent on (the 409 case).
-  String? changeNoticeOnConsent;
+  /// has from the next acknowledgement on (the 409 case).
+  String? changeNoticeOnAck;
 
   /// A server that takes `notice_version` on the social sign-up's start.
   var startTakesNoticeVersion = true;
+  // A server before APP-4 refuses `app_challenge` (422) and its ticket needs no verifier.
+  var startTakesAppChallenge = true;
+  String? lastAppChallenge;
+  String? lastVerifier;
 
   /// A 422 for another reason on the start (a field the body got wrong).
   var startValidationError = false;
@@ -281,7 +295,7 @@ class FakeSite {
   /// The code another field made, which `link` takes (once).
   var otherFieldCode = 'ABCD-EFGH-JKLM';
 
-  SiteResponse? _consentAndHub(
+  SiteResponse? _noticeAndHub(
     String method,
     String path,
     Map<String, Object?> b,
@@ -293,21 +307,21 @@ class FakeSite {
         return SiteResponse(200, {
           'id': 'u1',
           'username': username,
-          if (consentStatus != null)
-            'consent': {
-              'status': consentStatus,
-              'version': consentStatus == 'missing' ? null : consentVersion,
+          if (noticeStatus != null)
+            'notice': {
+              'status': noticeStatus,
+              'version': noticeStatus == 'missing' ? null : noticeShownVersion,
               'current_version': noticeVersion,
-              'given_at': consentStatus == 'missing'
+              'shown_at': noticeStatus == 'missing'
                   ? null
                   : '2026-10-01T10:00:00+00:00',
               'notice_published': noticeTexts.isNotEmpty,
             },
         });
-      case 'POST /me/consents/account':
-        if (changeNoticeOnConsent != null) {
-          noticeVersion = changeNoticeOnConsent!;
-          changeNoticeOnConsent = null;
+      case 'POST /me/notice':
+        if (changeNoticeOnAck != null) {
+          noticeVersion = changeNoticeOnAck!;
+          changeNoticeOnAck = null;
         }
         if (b['notice_version'] != noticeVersion) {
           return SiteResponse(409, {
@@ -315,13 +329,13 @@ class FakeSite {
             'current_version': noticeVersion,
           });
         }
-        consentStatus = 'current';
-        consentVersion = noticeVersion;
+        noticeStatus = 'current';
+        noticeShownVersion = noticeVersion;
         return SiteResponse(200, {
           'status': 'current',
           'version': noticeVersion,
           'current_version': noticeVersion,
-          'given_at': '2026-10-29T10:00:00+00:00',
+          'shown_at': '2026-10-29T10:00:00+00:00',
         });
       case 'GET /me/hub-share':
         if (!hosted) return err(404, 'not_hosted');
@@ -379,9 +393,9 @@ class FakeSite {
 
     const ok = SiteResponse(204, null);
     final id = RegExp(r'^/me/passkeys/([^/]+)$').firstMatch(path)?.group(1);
-    final provider = RegExp(
-      r'^/me/identities/([a-z]+)$',
-    ).firstMatch(path)?.group(1);
+    final provider = RegExp(r'^/me/identities/([a-z]+)$')
+        .firstMatch(path)
+        ?.group(1);
     switch ('$method $path') {
       case 'GET /me/login-methods':
         return SiteResponse(200, {
@@ -391,8 +405,10 @@ class FakeSite {
           'totp_enabled': totpEnabled,
           'available_providers': offers['oidc'],
           'mfa': false,
+          'step_up_needed': stepUpGuard && !_steppedUp,
         });
       case 'POST /me/passkeys/options':
+        if (stepUpGuard && !_steppedUp) return err(403, 'mfa_required');
         return checkConfirm() ??
             const SiteResponse(200, {
               'options': {'challenge': 'chal-new', 'rpId': 'site.test'},
@@ -418,10 +434,12 @@ class FakeSite {
         });
       case 'POST /auth/stepup/passkey':
         confirmed = true;
+        _steppedUp = true;
         return const SiteResponse(200, {'mfa': true});
       case 'POST /auth/stepup/totp':
         if (b['code'] != code) return err(401, 'invalid_code');
         confirmed = true;
+        _steppedUp = true;
         return const SiteResponse(200, {'mfa': true});
       case 'POST /me/password':
         if (passwordSet && b['password'] != accountPassword) {
@@ -562,28 +580,36 @@ class FakeSite {
             ],
           });
         }
-        // A server before the notice version refuses the field (422).
-        if (b.containsKey('notice_version')) {
-          if (!startTakesNoticeVersion) {
-            // What FastAPI says of a field the model forbids (app.py).
-            return SiteResponse(422, {
-              'detail': [
+        // A server before the notice version (or before APP-4) refuses the
+        // field (422), naming every one it does not know, as FastAPI does.
+        final unknown = [
+          if (b.containsKey('notice_version') && !startTakesNoticeVersion)
+            'notice_version',
+          if (b.containsKey('app_challenge') && !startTakesAppChallenge)
+            'app_challenge',
+        ];
+        if (unknown.isNotEmpty) {
+          return SiteResponse(422, {
+            'detail': [
+              for (final f in unknown)
                 {
-                  'loc': ['body', 'notice_version'],
+                  'loc': ['body', f],
                   'msg': 'Extra inputs are not permitted',
                   'type': 'extra_forbidden',
                 },
-              ],
-            });
-          }
-          if (b['notice_version'] != noticeVersion) {
-            return err(409, 'notice_version_changed');
-          }
+            ],
+          });
         }
+        if (b.containsKey('notice_version') &&
+            b['notice_version'] != noticeVersion) {
+          return err(409, 'notice_version_changed');
+        }
+        lastAppChallenge = b['app_challenge'] as String?;
         lastNoticeVersion = b['notice_version'] as String?;
         lastReturnTo = '${b['return_to']}';
         lastStartPurpose = '${b['purpose']}';
-        lastStartConsent = b['consent'] == true;
+        lastStartNoticeSeen = b['notice_seen'] == true;
+        lastStartAge = b['age_confirmed'] == true;
         final p = path.split('/')[3];
         return SiteResponse(200, {
           'authorization_url': 'https://accounts.example/auth?p=$p',
@@ -592,6 +618,13 @@ class FakeSite {
         });
       case 'POST /auth/oidc/complete':
         if (b['ticket'] != goodTicket) return err(401, 'invalid_ticket');
+        lastVerifier = b['verifier'] as String?;
+        final challenge = lastAppChallenge;
+        if (challenge != null &&
+            (lastVerifier == null ||
+                verifierChallenge(lastVerifier!) != challenge)) {
+          return err(401, 'invalid_ticket');
+        }
         return _session();
       case 'POST /auth/passkey/login/options':
         return const SiteResponse(200, {
@@ -606,8 +639,31 @@ class FakeSite {
           return err(401, 'invalid_passkey');
         }
         return _session();
+      case 'POST /auth/register':
+        // api/auth.py (LEG-*): 16 or older and the notice shown, the notice
+        // version checked, the name free.
+        lastRegister = b;
+        if (b['age_confirmed'] != true) {
+          return err(400, 'age_confirmation_required');
+        }
+        if (b['notice_seen'] != true) return err(400, 'notice_required');
+        if (b.containsKey('notice_version') &&
+            b['notice_version'] != noticeVersion) {
+          return SiteResponse(409, {
+            'detail': 'notice_version_changed',
+            'current_version': noticeVersion,
+          });
+        }
+        if (b['username'] == username ||
+            registered.containsKey(b['username'])) {
+          return err(409, 'username_or_email_taken');
+        }
+        registered['${b['username']}'] = '${b['password']}';
+        return SiteResponse(201, {'id': 'u2', 'username': b['username']});
       case 'POST /auth/login':
-        if (b['username'] != username || b['password'] != password) {
+        final isNew = registered[b['username']] == b['password'];
+        if (!isNew &&
+            (b['username'] != username || b['password'] != password)) {
           return err(401, 'invalid_credentials');
         }
         if (totp) {
@@ -646,7 +702,7 @@ class FakeSite {
     }
     final login = _loginMethods(method, path, b, bearer);
     if (login != null) return login;
-    final own = _consentAndHub(method, path, b);
+    final own = _noticeAndHub(method, path, b);
     if (own != null) return own;
     final regPath = RegExp(
       r'^/fields/([0-9a-f-]+)/scheduled-games/([0-9a-f-]+)/registrations$',
@@ -696,9 +752,8 @@ class FakeSite {
       regs[id] = r;
       return SiteResponse(201, _withTicket(r));
     }
-    final mine = RegExp(
-      r'^/me/registrations/([0-9a-f-]+)(/ticket)?$',
-    ).firstMatch(path);
+    final mine = RegExp(r'^/me/registrations/([0-9a-f-]+)(/ticket)?$')
+        .firstMatch(path);
     if (mine != null) {
       final r = regs[mine.group(1)];
       if (r == null) return err(404, 'registration_not_found');

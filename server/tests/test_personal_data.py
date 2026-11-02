@@ -27,10 +27,12 @@ from atalaia_server.ratelimit import Limits
 from .base import PASSWORD, SECRET_KEY, AppTestCase
 
 # Plan phase 14's to 18's counts.
-NO_CHRONO = {"chrono_readings": 0, "chrono_rejects": 0, "replicas": 0, "marshal_keys": 0, "scheduled_games": 0,
+NO_CHRONO = {"chrono_readings": 0, "chrono_rejects": 0, "replicas": 0, "marshal_keys": 0, "copy_revocations": 0,
+             "scheduled_games": 0, "game_results": 0, "game_results_expired": 0,
              "federation_numbers": 0, "player_id_claims": 0, "imported_registrations": 0, "club_invitations": 0,
              "club_reports": 0, "branding_images": 0, "atak_certificates": 0, "feedback_contacts": 0,
-             "preview_feedback": 0, "oidc_logins": 0, "anonymised_users": 0}
+             "preview_feedback": 0, "oidc_logins": 0, "inactive_warned": 0, "inactive_cleared": 0,
+             "inactive_anonymised": 0, "anonymised_users": 0}
 
 NEW_PASSWORD = "a different long passphrase 7"
 
@@ -42,7 +44,7 @@ def bearer(session: dict[str, Any]) -> dict[str, str]:
 class PersonalDataTestCase(AppTestCase):
     async def register(self, username: str, email: str | None = None) -> dict[str, Any]:
         r = await self.client.post("/api/v1/auth/register", json={"username": username, "password": PASSWORD,
-                                                                  "email": email, "consent": True})
+                                                                  "email": email, "notice_seen": True, "age_confirmed": True})
         assert r.status_code == 201, r.text
         return r.json()
 
@@ -81,14 +83,14 @@ class AccessTests(PersonalDataTestCase):
         self.assertEqual(r.headers["cache-control"], "no-store")
         data = r.json()
         self.assertEqual(set(data), {"format", "generated_at", "user", "field_roles", "sessions", "audit_log",
-                                     "audit_log_about_you", "consents", "games", "player_ids", "chrono_records",
+                                     "audit_log_about_you", "consents", "notices", "games", "player_ids", "chrono_records",
                                      "marshal_keys", "scheduled_games", "registrations", "player_id_claims",
                                      "clubs", "club_reports", "game_history", "atak_certificates", "identities",
                                      "passkeys"})
         self.assertEqual(data["format"], "atalaia-personal-data/1")
         self.assertEqual((data["user"]["id"], data["user"]["username"], data["user"]["email"]),
                          (user["id"], "rita", "rita@example.pt"))
-        self.assertIsNotNone(data["user"]["gdpr_consent_at"])
+        self.assertIsNotNone(data["user"]["notice_shown_at"])
         self.assertEqual(data["field_roles"], [{"field_id": data["field_roles"][0]["field_id"], "field": "Campo Tejo",
                                                 "role": "player", "granted_at": data["field_roles"][0]["granted_at"]}])
         sessions = {s["id"]: s for s in data["sessions"]}
@@ -102,8 +104,10 @@ class AccessTests(PersonalDataTestCase):
         self.assertEqual([(a["action"], a["details"]["role"]) for a in data["audit_log_about_you"]],
                          [("role_grant", "player")])
         self.assertEqual(set(data["audit_log_about_you"][0]), {"id", "action", "details", "created_at"})
-        self.assertEqual([(c["purpose"], c["notice_version"], c["withdrawn_at"]) for c in data["consents"]],
-                         [("account", DEFAULT_NOTICE_VERSION, None)])
+        # The account is not a consent (LEG-*): what it keeps is which notice it was shown, and the age confirmation.
+        self.assertEqual(data["consents"], [])
+        self.assertEqual([(n["notice_version"], n["kind"], n["age_confirmed"]) for n in data["notices"]],
+                         [(DEFAULT_NOTICE_VERSION, "signup", True)])
         # Never the credentials, never anyone else.
         row = (await self.fetch("SELECT password_hash FROM users WHERE id = $1", user_id))[0]
         self.assertNotIn(row["password_hash"], r.text)
@@ -131,13 +135,14 @@ class AccessTests(PersonalDataTestCase):
             names = sorted(zf.namelist())
             self.assertEqual(names, sorted(f"export/{n}" for n in (
                 "profile.json", "field_roles.json", "sessions.json", "audit_log.json", "audit_log_about_you.json",
-                "consents.json", "games.json", "player_ids.json", "chrono_records.json", "marshal_keys.json",
+                "consents.json", "notices.json", "games.json", "player_ids.json", "chrono_records.json", "marshal_keys.json",
                 "scheduled_games.json", "registrations.json", "player_id_claims.json", "clubs.json",
                 "club_reports.json", "game_history.json", "atak_certificates.json", "identities.json",
                 "passkeys.json", "README.txt")))
             files = {n: zf.read(n).decode("utf-8") for n in names}
         self.assertEqual(json.loads(files["export/profile.json"]), data["user"])
         self.assertEqual(json.loads(files["export/consents.json"]), data["consents"])
+        self.assertEqual(json.loads(files["export/notices.json"]), data["notices"])
         self.assertEqual([a["action"] for a in json.loads(files["export/audit_log.json"])], ["register", "login"])
         self.assertIn("atalaia-personal-data/1", files["export/README.txt"])
         self.assertIn("joana", files["export/README.txt"])
@@ -201,7 +206,7 @@ class RectificationTests(PersonalDataTestCase):
 
     async def test_registration_refuses_reserved_names(self) -> None:
         r = await self.client.post("/api/v1/auth/register", json={"username": "deleted-cafe", "password": PASSWORD,
-                                                                  "consent": True})
+                                                                  "notice_seen": True, "age_confirmed": True})
         self.assertEqual((r.status_code, r.json()["detail"]), (400, "username_reserved"))
 
 
@@ -272,7 +277,7 @@ class ErasureTests(PersonalDataTestCase):
         self.assertRegex(row["username"], r"^deleted-[0-9a-f]{16}$")
         self.assertEqual((row["email"], row["password_hash"], row["totp_secret_enc"], row["gdpr_consent_at"],
                           row["last_login_at"], row["server_admin"]), (None, "DELETED", None, None, None, False))
-        for table in ("user_field_roles", "sessions", "consents"):
+        for table in ("user_field_roles", "sessions", "consents", "notice_records"):
             with self.subTest(table=table):
                 n = (await self.fetch(f"SELECT count(*) FROM {table} WHERE user_id = $1", user_id))[0][0]
                 self.assertEqual(n, 0)
@@ -350,20 +355,20 @@ class PurgeTests(PersonalDataTestCase):
 
         async with self.app.state.sessionmaker() as db:
             self.assertEqual(await personal_data.purge(db, now, dry_run=True),
-                             {"sessions": 2, "audit_log": 1, "games": 0, **NO_CHRONO})
+                             {"sessions": 2, "audit_log": 1, "audit_addresses": 0, "games": 0, **NO_CHRONO})
         self.assertEqual((await self.fetch("SELECT count(*) FROM sessions"))[0][0], 5)
         async with self.app.state.sessionmaker() as db:
             self.assertEqual(await personal_data.purge(db, now),
-                             {"sessions": 2, "audit_log": 1, "games": 0, **NO_CHRONO})
+                             {"sessions": 2, "audit_log": 1, "audit_addresses": 0, "games": 0, **NO_CHRONO})
         left = {r[0] for r in await self.fetch("SELECT id FROM sessions")}
         self.assertEqual(left, {sessions[n] for n in ("expired_recently", "revoked_recently", "live")})
         self.assertEqual((await self.fetch("SELECT count(*) FROM refresh_tokens"))[0][0], 3)
         self.assertEqual((await self.fetch("SELECT count(*) FROM audit_log WHERE action = 'login'"))[0][0], 1)
         purges = await self.audit("retention_purge")
-        self.assertEqual(json.loads(purges[0]["details"]), {"sessions": 2, "audit_log": 1, "games": 0, **NO_CHRONO})
+        self.assertEqual(json.loads(purges[0]["details"]), {"sessions": 2, "audit_log": 1, "audit_addresses": 0, "games": 0, **NO_CHRONO})
         async with self.app.state.sessionmaker() as db:  # again: nothing left to do
             self.assertEqual(await personal_data.purge(db, now),
-                             {"sessions": 0, "audit_log": 0, "games": 0, **NO_CHRONO})
+                             {"sessions": 0, "audit_log": 0, "audit_addresses": 0, "games": 0, **NO_CHRONO})
 
     async def anonymised(self, tag: str) -> uuid.UUID:
         """An anonymised account as erasure leaves it (and as a merged one is to be left)."""
@@ -462,12 +467,13 @@ class PurgeTests(PersonalDataTestCase):
                 else:
                     os.environ[k] = v
         rest = (", 0 chrono readings rows, 0 chrono rejects rows, 0 replicas rows, 0 marshal keys rows, "
-                "0 scheduled games rows, 0 federation numbers rows, 0 player id claims rows, "
+                "0 copy revocations rows, 0 scheduled games rows, 0 federation numbers rows, 0 player id claims rows, "
                 "0 imported registrations rows, 0 club invitations rows, 0 club reports rows, "
                 "0 branding images rows, 0 atak certificates rows, 0 feedback contacts rows, "
-                "0 preview feedback rows, 0 oidc logins rows, 0 anonymised users rows\n")
-        self.assertEqual(outputs, ["Retention purge would delete: 1 sessions rows, 0 audit log rows, 0 games rows" + rest,
-                                   "Retention purge deleted: 1 sessions rows, 0 audit log rows, 0 games rows" + rest])
+                "0 preview feedback rows, 0 oidc logins rows, 0 inactive warned rows, 0 inactive cleared rows, "
+                "0 inactive anonymised rows, 0 anonymised users rows\n")
+        self.assertEqual(outputs, ["Retention purge would delete: 1 sessions rows, 0 audit log rows, 0 audit addresses rows, 0 games rows, 0 game results rows, 0 game results expired rows" + rest,
+                                   "Retention purge deleted: 1 sessions rows, 0 audit log rows, 0 audit addresses rows, 0 games rows, 0 game results rows, 0 game results expired rows" + rest])
         self.assertEqual((await self.fetch("SELECT count(*) FROM sessions"))[0][0], 0)
 
     async def test_the_daily_task(self) -> None:
@@ -531,12 +537,12 @@ class GameDataTests(PersonalDataTestCase):
         self.assertEqual((await self.fetch("SELECT count(*) FROM user_game_roles"))[0][0], 0)
         self.assertEqual((await self.fetch("SELECT count(*) FROM games"))[0][0], 1)  # the game is the field's
 
-    async def test_games_go_after_24_months(self) -> None:
+    async def test_games_go_after_90_days(self) -> None:
         field_id = await self.field()
         now = datetime.now(timezone.utc)
-        old = await self.game(field_id, now - timedelta(days=731), now - timedelta(days=740))
-        recent = await self.game(field_id, now - timedelta(days=729), now - timedelta(days=740))
-        never_ended = await self.game(field_id, None, now - timedelta(days=731))
+        old = await self.game(field_id, now - timedelta(days=91), now - timedelta(days=100))
+        recent = await self.game(field_id, now - timedelta(days=89), now - timedelta(days=100))
+        never_ended = await self.game(field_id, None, now - timedelta(days=91))
         user_id, _, _ = await self.make_user()
         await self.fetch("INSERT INTO user_game_roles (user_id, game, role_id) VALUES ($1, $2, 1)", user_id, old)
         async with self.app.state.sessionmaker() as db:

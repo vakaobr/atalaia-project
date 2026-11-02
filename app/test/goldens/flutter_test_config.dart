@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Every golden test in this folder runs with real fonts. The images are
-// drawn in ghcr.io/cirruslabs/flutter:3.44.0 (python tools/docker_app.py
+// drawn in atalaia-flutter:3.47.9 (python tools/docker_app.py
 // goldens) and compared in the same image by `check` and CI's flutter-test.
 
 import 'dart:async';

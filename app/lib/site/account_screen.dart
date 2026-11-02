@@ -402,10 +402,16 @@ class _SiteAccountScreenState extends State<SiteAccountScreen> {
           helperText: s.t('acct.confirm_password_hint'),
           helperMaxLines: 3,
         ),
-      )
-    else ...[
-      Text(s.t('acct.confirm_recent')),
+      ),
+    if (m.stepUpNeeded) ...[
+      Text(s.t('acct.stepup_needed'), key: const Key('account-stepup-needed')),
       const SizedBox(height: 8),
+    ],
+    if (!m.passwordSet || m.stepUpNeeded) ...[
+      if (!m.passwordSet) ...[
+        Text(s.t('acct.confirm_recent')),
+        const SizedBox(height: 8),
+      ],
       if (m.totpEnabled) ...[
         TextField(
           key: const Key('account-confirm-code'),
@@ -430,15 +436,17 @@ class _SiteAccountScreenState extends State<SiteAccountScreen> {
               : () => _run(_auth.confirmWithPasskey, 'acct.confirmed'),
           child: Text(s.t('acct.confirm_passkey')),
         ),
-      for (final i in m.identities)
-        if (_offered(m, i.provider))
-          OutlinedButton(
-            key: Key('account-reauth-${i.provider}'),
-            onPressed: _busy
-                ? null
-                : () => _provider(i.provider, 'reauth', 'acct.reauthed'),
-            child: Text(s.t('acct.confirm_with', {'provider': i.label})),
-          ),
+      // A provider login confirms, but is not a second factor.
+      if (!m.stepUpNeeded)
+        for (final i in m.identities)
+          if (_offered(m, i.provider))
+            OutlinedButton(
+              key: Key('account-reauth-${i.provider}'),
+              onPressed: _busy
+                  ? null
+                  : () => _provider(i.provider, 'reauth', 'acct.reauthed'),
+              child: Text(s.t('acct.confirm_with', {'provider': i.label})),
+            ),
     ],
   ];
 

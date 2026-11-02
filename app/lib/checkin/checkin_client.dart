@@ -61,8 +61,11 @@ abstract interface class FieldHttp {
 /// the race's probe (a "does this address answer, and is it the field's
 /// controller"). The same security context as every request, so an address
 /// held by another device fails here exactly as it would later.
-typedef FieldProbe =
-    Future<void> Function(PinnedField field, Uri url, RaceCancel cancel);
+typedef FieldProbe = Future<void> Function(
+  PinnedField field,
+  Uri url,
+  RaceCancel cancel,
+);
 
 Future<void> ioProbe(PinnedField field, Uri url, RaceCancel cancel) async {
   final task = await SecureSocket.startConnect(
@@ -210,6 +213,14 @@ class CheckinException implements Exception {
   final List<Map<String, Object?>> reasons;
 
   bool get offline => status == 0;
+
+  /// The controller's privacy notice is not the version the app showed (409
+  /// `notice_version_changed`; an older controller's text said "privacy
+  /// notice changed"): read the notice again, do not show a raw error.
+  bool get noticeChanged =>
+      status == 409 &&
+      (message.startsWith('notice_version_changed') ||
+          message.contains('privacy notice changed'));
 
   @override
   String toString() => 'CheckinException($status): $message';
@@ -430,6 +441,7 @@ class CheckinClient {
     List<Declaration>? replicas,
     String? registrationId,
     String? registrationTicket,
+    bool? sharePosition,
   }) async => CheckinTicket(
     await _call(
       'POST',
@@ -451,6 +463,8 @@ class CheckinClient {
         'apd_id': ?apdId,
         'membership_expires': ?membershipExpires,
         'team_preference': ?teamPreference,
+        // The player's own, separate choice (an unticked box): decision LEG-12.
+        'share_position': ?sharePosition,
         if (replicas != null)
           'replicas': [for (final d in replicas) d.toRequest()],
       },
@@ -506,11 +520,38 @@ class CheckinClient {
     body: {'player': player, 'team': ?team},
   );
 
+  /// The player turns sharing their position with the game on or off, any
+  /// time (an older controller has no such route: 404 or 405).
+  ///
+  /// [noticeVersion] is the notice the player was shown; a controller whose
+  /// notice moved on refuses with 409 `notice_version_changed` (NV-4).
+  Future<Map<String, Object?>> setPositionSharing(
+    String token,
+    bool on, {
+    int? noticeVersion,
+  }) => _call(
+    'PUT',
+    '/checkin/me/position-sharing',
+    token: token,
+    body: {'share_position': on, 'notice_version': ?noticeVersion},
+  );
+
   Future<Map<String, Object?>> manualCheckin(
     String token,
     int gameId,
     Map<String, Object?> body,
   ) => _call('POST', '/games/$gameId/checkins', token: token, body: body);
+
+  /// The marshal ticks "card seen, matches": the controller records who and
+  /// when, stores the verdict, erases the number and lets the player in
+  /// (protocol/apd.md, "The card check").
+  Future<Map<String, Object?>> cardSeen(String token, int gameId, String pid) =>
+      _call(
+        'PATCH',
+        '/games/$gameId/checkins/$pid',
+        token: token,
+        body: {'federation_seen': true},
+      );
 
   Future<Map<String, Object?>> confirm(String token, int gameId, String pid) =>
       _call(

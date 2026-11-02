@@ -58,6 +58,12 @@ final class CoreNode {
       ..instrLimit = spec.instrLimit
       ..alloc = nullptr
       ..allocUd = nullptr;
+    final gameKey = spec.gameKey;
+    if (gameKey != null) {
+      for (var i = 0; i < 16 && i < gameKey.length; i++) {
+        config.ref.randKey[i] = gameKey[i];
+      }
+    }
     callbacks.fill(config);
     final node = b.nodeCreate(config);
     if (node == nullptr) {

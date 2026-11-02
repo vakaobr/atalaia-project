@@ -7,7 +7,7 @@ It stands in front of the field controller and lets through only what a visitor 
 - **Reading only.** GET and HEAD, nothing else: any other method is refused with 405 before anything is forwarded.
   Nothing a visitor sends can start, pause, end or change a game, make a join card, register a box or a mode.
 - **Only the public read token.** The token every visitor uses is published on the "Try the demo" page; the proxy
-  forwards a request only if it carries exactly that token (header or ``?token=`` on the stream), and always
+  forwards a request only if it carries exactly that token (header, or on the stream the subprotocol or the deprecated ``?token=``), and always
   replaces whatever it was given with it. The controller's GM token is never accepted and never seen here.
 - **Only listed paths.** The console's static files, the scoreboard page and a list of the controller's read
   endpoints (``API_READ``); everything else, join cards, adoption, firmware, check-in lists of other people, the
@@ -24,6 +24,7 @@ list above is what keeps it that way if a later version of the controller grows 
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
 import re
@@ -77,6 +78,15 @@ client = httpx.AsyncClient(base_url=CONTROLLER, timeout=15.0, follow_redirects=F
 streams = 0
 
 
+HSTS = "max-age=31536000"
+
+
+def came_over_https(request: Request) -> bool:
+    """The Cloudflare tunnel ends TLS and tells the proxy so (X-Forwarded-Proto). Only an https request gets
+    Strict-Transport-Security; a browser ignores the header on plain http, so a forged value gains nothing."""
+    return request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower() == "https"
+
+
 def token_ok(request: Request) -> bool:
     """The request carries the public read token (and nothing else is accepted)."""
     header = request.headers.get("authorization", "")
@@ -93,10 +103,15 @@ def clean_headers(upstream: httpx.Response) -> dict[str, str]:
 @app.middleware("http")
 async def read_only(request: Request, call_next):
     if request.method not in ("GET", "HEAD"):
-        return PlainTextResponse("This is a read-only demo: nothing can be changed here.\n", status_code=405,
-                                 headers={"Allow": "GET, HEAD", "X-Robots-Tag": "noindex"})
+        refused = PlainTextResponse("This is a read-only demo: nothing can be changed here.\n", status_code=405,
+                                    headers={"Allow": "GET, HEAD", "X-Robots-Tag": "noindex"})
+        if came_over_https(request):
+            refused.headers["Strict-Transport-Security"] = HSTS
+        return refused
     response = await call_next(request)
     h = response.headers
+    if came_over_https(request):
+        h["Strict-Transport-Security"] = HSTS
     h.setdefault("X-Robots-Tag", "noindex, nofollow, noarchive")
     # The proxy's own pages (the controller's carry their own policy): no script or style but our own files.
     h.setdefault("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; "
@@ -286,22 +301,42 @@ async def get_any(path: str, request: Request) -> Response:
     return PlainTextResponse("not found\n", status_code=404)
 
 
+def carrier(token: str) -> str:
+    """The Sec-WebSocket-Protocol entry that carries a token (controller stream_auth.py, LIVE2-1)."""
+    return "atalaia.token." + base64.urlsafe_b64encode(token.encode()).rstrip(b"=").decode()
+
+
+def visitor_token(ws: WebSocket) -> Optional[str]:
+    """The token of a visitor's stream: the subprotocol the console now sends, or ``?token=`` (what an
+    older console sent; the demo's read token is public anyway)."""
+    for item in ws.scope.get("subprotocols") or []:
+        if item.startswith("atalaia.token."):
+            text = item[len("atalaia.token."):]
+            try:
+                return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4)).decode()
+            except ValueError:
+                return None
+    return ws.query_params.get("token")
+
+
 @app.websocket("/api/v1/stream")
 async def stream(ws: WebSocket) -> None:
     global streams
     import websockets
 
-    if ws.query_params.get("token") != READ_TOKEN:
+    if visitor_token(ws) != READ_TOKEN:
         await ws.close(code=4401)
         return
     if streams >= MAX_STREAMS:
         await ws.close(code=4429)
         return
-    await ws.accept()
+    await ws.accept(subprotocol="atalaia.v1" if "atalaia.v1" in (ws.scope.get("subprotocols") or []) else None)
     streams += 1
     try:
-        url = CONTROLLER.replace("http", "ws", 1) + f"/api/v1/stream?token={READ_TOKEN}"
-        async with websockets.connect(url, open_timeout=10, ping_interval=20) as upstream:
+        # The token goes upstream in the subprotocol, not in the address (LIVE2-1).
+        url = CONTROLLER.replace("http", "ws", 1) + "/api/v1/stream"
+        async with websockets.connect(url, open_timeout=10, ping_interval=20,
+                                      subprotocols=["atalaia.v1", carrier(READ_TOKEN)]) as upstream:
             async def down() -> None:
                 async for message in upstream:
                     if isinstance(message, bytes):

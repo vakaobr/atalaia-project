@@ -21,7 +21,7 @@ layout:
     text: "{owner|upper}"
     style: { font_size: 48, color: "{owner}", visible: "{owner}" }
   - type: label
-    text: "{points} {lang == 'pt' && 'pontos nesta caixa' || lang == 'de' && 'Punkte auf dieser Box' || lang == 'zh-tw' && '分（這個盒子）' || 'points on this box'}"
+    text: "{points} {lang == 'pt' && points == 1 && 'ponto nesta caixa' || lang == 'pt' && 'pontos nesta caixa' || lang == 'de' && points == 1 && 'Punkt auf dieser Box' || lang == 'de' && 'Punkte auf dieser Box' || lang == 'zh-tw' && '分（這個盒子）' || points == 1 && 'point on this box' || 'points on this box'}"
     style: { font_size: 20, visible: "{owner}" }
   - type: label
     text: "{lang == 'pt' && 'Ninguém tomou a colina' || lang == 'de' && 'Kein Team hielt den Hügel' || lang == 'zh-tw' && '沒有隊伍佔領山頭' || 'No team took the hill'}"

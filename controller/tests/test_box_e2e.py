@@ -313,6 +313,11 @@ class FieldTests(unittest.TestCase):
         st = box.status()
         self.assertEqual((st["phase"], st["epoch"], st["node_id"]), (2, 2, nid))
         self.assertTrue(wait_for(lambda: "node.rebooted" in self.log_types(gid, nid), 6))
+        # The box says why it restarted: the host build's battery pull is a power cut (a real box
+        # reads esp_reset_reason: "panic" and "watchdog" are crashes, firmware reset_reason.h).
+        rebooted = [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+                    if e["type"] == "node.rebooted" and e["node"] == nid]
+        self.assertEqual(rebooted[-1]["data"].get("reason"), "power")
         self.assertTrue(wait_for(lambda: self.node(nid).get("epoch") == 2, 5))
         # Scores never go back (counters merge by maximum), and a capture after the reboot,
         # with the box's event seq restarted, is logged too (decision D6).

@@ -176,7 +176,9 @@ class ConsoleBrowserTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.pw = sync_playwright().start()
-        cls.browser = cls.pw.chromium.launch()
+        # atalaia-field.test is a name that is not the controller's own loopback (as the Pi's address is for a
+        # laptop on the field), but reaches this test's controller.
+        cls.browser = cls.pw.chromium.launch(args=["--host-resolver-rules=MAP atalaia-field.test 127.0.0.1"])
 
     @classmethod
     def tearDownClass(cls):
@@ -209,7 +211,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = ctx.new_page()
         page.on("pageerror", lambda e: self.errors.append(f"pageerror: {e}"))
         page.on("console", lambda m: self.errors.append(f"console: {m.text}") if m.type == "error" else None)
-        page.on("response", lambda r: self.errors.append(f"HTTP {r.status} {r.request.method} {r.url}")
+        page.on("response", lambda r: self.errors.append(f"HTTP {r.status} {r.request.method} {r.url}{self.body_of(r)}")
                 if r.status >= 400 else None)
         if setup is not None:
             setup(page)  # routes or listeners before the first request
@@ -223,6 +225,14 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("tab-game")).to_be_visible()
         return page
 
+    @staticmethod
+    def body_of(response) -> str:
+        """The first bytes of a failed answer, for the report (the controller says why it refused)."""
+        try:
+            return " -> " + response.text()[:200]
+        except Exception:  # noqa: BLE001 - the page may have gone before the body arrived
+            return ""
+
     def drop_errors(self, *needles: str) -> None:
         """Forgets the console's reports of failures a test caused on purpose (a busy server, no answer)."""
         self.errors = [e for e in self.errors if not any(n in e for n in needles)]
@@ -232,6 +242,21 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertLessEqual(width[0], width[1], "the page scrolls sideways")
 
     # --- tests ----------------------------------------------------------------
+
+    def test_login_on_plain_http_from_another_machine_sends_no_code_and_says_where_to_go(self):
+        # FLD-4: the GM code is refused over HTTP, so the console does not even send it; it says the https address.
+        ctx = self.browser.new_context()
+        self.contexts.append(ctx)
+        page = ctx.new_page()
+        asked: list[str] = []
+        page.on("request", lambda r: asked.append(r.url))
+        page.goto(f"http://atalaia-field.test:{self.field.port}/console/")
+        page.get_by_test_id("token").fill(GM)
+        page.get_by_test_id("login").click()
+        expect(page.get_by_role("alert")).to_contain_text("https://atalaia-field.test:8443/console/")
+        self.assertFalse([u for u in asked if "/api/v1/whoami" in u], "the code was sent over plain HTTP")
+        self.assertTrue([u for u in asked if u.endswith("/api/v1/controller/https")])
+        # The same page on the controller's own address (what every other test does) logs in as before.
 
     def test_gm_creates_and_runs_a_game_with_live_updates(self):
         page = self.console()
@@ -723,6 +748,7 @@ class ConsoleBrowserTests(unittest.TestCase):
                                                                       "signature", "key_id", "license")},
                                           "url": f"packages/{name}", "verified": verified}]})
         (registry / "index.json").write_text(json.dumps({"schema_version": 1, "modes": entries}))
+        (registry / "revoked.json").write_text(json.dumps({"schema_version": 1, "keys": []}))  # FLD-7: a missing list refuses installs
         self.field.close()
         self.field = Field(cfg={"modes_keys": [KEY["public_key_b64"]], "modes_index": str(registry / "index.json")})
 
@@ -1703,7 +1729,7 @@ class ConsoleBrowserTests(unittest.TestCase):
     # app/lib/controller/controller_api.dart (slice S7a added the radio and the field plan)
     PHONE_FEATURES = ["checkin", "join", "box_language", "positions", "radio", "field"]
     # The console's calls in the areas a phone controller does not serve yet.
-    PHONE_HIDDEN = re.compile(r"/api/v1/(presets|team-presets|crests|field/branding|boxes|adopt|firmware|atak"
+    PHONE_HIDDEN = re.compile(r"/api/v1/(tokens|presets|team-presets|crests|field/branding|boxes|adopt|firmware|atak"
                               r"|scenarios|schedule|mode-packages|mode-fetch|controller/promote|controller/join"
                               r"|games/\d+/(invites|teams))")   # remote-gm is served: S7 slice, the Controller tab's log
 
@@ -1713,6 +1739,7 @@ class ConsoleBrowserTests(unittest.TestCase):
             resp = route.fetch()
             body = resp.json()
             body["features"] = self.PHONE_FEATURES
+            body.pop("access_tokens", None)  # the phone controller has no access tokens
             route.fulfill(response=resp, json=body)
         page.route("**/api/v1/whoami", whoami)
         page.on("request", lambda r: requests.append(r.url))
@@ -1738,6 +1765,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("radio-current")).to_be_visible()  # slice S7a
         expect(page.get_by_test_id("branding-settings")).to_have_count(0)
         expect(page.get_by_test_id("team-presets")).to_have_count(0)
+        expect(page.get_by_test_id("access-tokens")).to_have_count(0)  # no such thing on the phone controller
         page.get_by_test_id("tab-controller").click()
         missing = page.get_by_test_id("controller-missing")
         expect(missing).to_contain_text("Este controlador ainda não serve estas partes da consola")
@@ -2218,6 +2246,30 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("tab-settings").click()
         expect(page.get_by_test_id("radio-region")).to_have_text("台灣（AS923，920–925 MHz）")
         expect(page.get_by_test_id("radio-limits")).to_have_text("10% 的時間 · 天線端 500 mW")
+
+    def test_wrong_controller_clock_is_flagged_and_a_gm_sets_it_from_this_device(self):
+        """A Pi 4 has no real-time clock (wallclock.py): the console says the controller's clock is wrong and the
+        GM sets it, forward only, from the browser's."""
+        from atalaia_controller import wallclock
+
+        guard = self.field.bundle.controller.clock_guard
+        guard._hw = time.time()  # what the controller saw before the "power cut"
+        wallclock._offset = -5 * 86400.0
+        self.addCleanup(wallclock.reset)
+        page = self.console()  # European Portuguese by default
+        banner = page.get_by_test_id("clock-wrong")
+        expect(banner).to_contain_text("O relógio do controlador está errado.")
+        self.assertFalse(self.field.http.get("/api/v1/clock").json()["ok"])
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("clock-settings")).to_contain_text("Relógio do controlador")
+        page.get_by_test_id("clock-set").click()
+        expect(banner).to_be_hidden()
+        self.assertTrue(self.field.http.get("/api/v1/clock").json()["ok"])
+        self.assertLess(abs(wallclock.now() - time.time()), 30)
+        # Backwards is refused, in the API too.
+        self.assertEqual(self.field.http.put("/api/v1/clock", json={"epoch": time.time() - 86400}).status_code, 409)
+        page.get_by_test_id("lang").first.select_option("de")
+        expect(page.get_by_test_id("clock-settings")).to_contain_text("Uhr des Controllers")
 
     def test_box_language_follows_the_console_or_the_setting(self):
         """Join key 15 (RFC 0001 Amendment 10): with "auto" a game takes the language of the console it
@@ -3311,6 +3363,37 @@ class ConsoleBrowserTests(unittest.TestCase):
         viewer.goto(self.field.base + "/console/#field")
         expect(viewer.get_by_test_id("field-from-map")).to_have_count(0)
 
+    def test_map_fetching_turned_off_in_settings_closes_the_map_page(self):
+        """LEG-50: the GM turns map fetching off in Settings (Portuguese, then each language's message); the field-map
+        page then says so, shows no map and asks no map service for anything; the Field tab says it too; turned on
+        again, the map comes back."""
+        page = self.console(service_workers="block")
+        seen = self.map_routes(page)
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("map-fetching-settings")).to_contain_text("Obtenção de mapas")
+        expect(page.get_by_test_id("map-fetching")).to_be_checked()
+        page.get_by_test_id("map-fetching").uncheck()
+        expect(page.get_by_test_id("map-fetching-settings")).to_contain_text("Guardado")
+        self.assertIs(self.field.http.get("/api/v1/settings/map-fetching").json()["map_fetching"], False)
+        page.get_by_test_id("tab-field").click()
+        expect(page.get_by_test_id("field-map-off")).to_contain_text("desligada")
+        for lang, tag, words in (("pt", "pt-PT", "desligada neste campo"), ("en", "en", "turned off for this field"),
+                                 ("de", "de", "ausgeschaltet"), ("zh-tw", "zh-Hant-TW", "已關閉地圖擷取")):
+            page.goto(self.field.base + "/console/")
+            expect(page.get_by_test_id("tab-settings")).to_be_visible()
+            page.get_by_test_id("lang").first.select_option(lang)
+            expect(page.locator("html")).to_have_attribute("lang", tag)  # saved before the page is left
+            page.goto(self.field.base + "/console/field-map.html")
+            expect(page.get_by_test_id("fm-off")).to_contain_text(words)
+            expect(page.get_by_test_id("tm")).to_have_count(0)
+        self.assertEqual(seen["tiles"], 0)
+        for what in ("overpass", "hosts", "wms", "wms_tiles", "search", "other"):
+            self.assertEqual(seen[what], [], what)
+        # On again: the map page is itself again.
+        self.field.http.put("/api/v1/settings/map-fetching", json={"map_fetching": True})
+        page.goto(self.field.base + "/console/field-map.html")
+        expect(page.get_by_test_id("tm")).to_be_visible()
+
     def test_field_map_finds_a_place_by_name(self):
         """MF-44 to MF-46, as the maintainer asked (2026-10-23): a place's name goes to Nominatim (mocked)
         only when the GM presses Search, never per keystroke, at most once a second, the same question once,
@@ -4091,7 +4174,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v15').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v17').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):
@@ -4115,7 +4198,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         secret = b64.urlsafe_b64encode(os.urandom(32)).rstrip(b"=").decode("ascii")
         r = httpx.post(self.field.base + "/api/v1/checkin", json={
             "game_id": game_id, "player_id": pid, "player_secret": secret, "display_name": name,
-            "notice_version": 1, **extra}, timeout=10)
+            "notice_version": 2, **extra}, timeout=10)
         self.assertIn(r.status_code, (200, 201), r.text)
         return r.json()
 
@@ -4228,15 +4311,28 @@ class ConsoleBrowserTests(unittest.TestCase):
             "custom": [{"id": "x-clube", "name": "Clube Teste, APD", "short_name": "Clube", "website": None}]}})
         late = self.check_in(game["id"], "Atrasada", apd_id="x-clube", membership_number="12", membership_expires="2020-01-01")
         good = self.check_in(game["id"], "Pontual", apd_id="x-clube", membership_number="13", membership_expires="2099-01-01")
-        self.assertEqual((late["status"], good["status"]), ("pending", "checked_in"))
+        self.assertEqual((late["status"], good["status"]), ("pending", "pending"))  # the card is not seen yet
         page = self.console()
         page.get_by_test_id("tab-checkin").click()
         row = page.get_by_test_id(f"checkin-row-{late['player_id']}")
         expect(row.get_by_test_id("checkin-apd-status")).to_have_text("caducada")
         expect(row.get_by_test_id("checkin-apd")).to_contain_text("Clube")
         expect(page.get_by_test_id(f"checkin-row-{good['player_id']}").get_by_test_id("checkin-apd-status")).to_have_text("válida")
+        expect(row.get_by_test_id("checkin-confirm")).to_have_text("Admitir sem o cartão")
         row.get_by_test_id("checkin-confirm").click()
-        expect(row.get_by_test_id("checkin-apd-override")).to_be_visible()
+        expect(row.get_by_test_id("checkin-apd-override")).to_have_text("admitido sem o cartão")
+        # "Card seen, matches": it lets the player in, shows who and when, erases the number, keeps the verdict.
+        good_row = page.get_by_test_id(f"checkin-row-{good['player_id']}")
+        expect(good_row.get_by_test_id("checkin-waits-card")).to_be_visible()
+        good_row.get_by_test_id("checkin-card-seen").check()
+        expect(good_row.get_by_test_id("checkin-card-by")).to_be_visible()
+        expect(good_row.get_by_test_id("checkin-number-erased")).to_be_visible()
+        expect(good_row.get_by_test_id("checkin-apd-status")).to_contain_text("válida em ")
+        expect(good_row.get_by_test_id("checkin-card-seen")).to_be_disabled()
+        stored = self.field.http.get(f"/api/v1/games/{game['id']}/checkins").json()["checkins"]
+        mine = next(c for c in stored if c["player_id"] == good["player_id"])
+        self.assertEqual((mine["status"], mine["federation_number"], mine["card_checked_by"], mine["apd_status"]),
+                         ("checked_in", None, "gm", "valid"))
         # The rule's own entry is listed in the settings, ticked; add another and save.
         expect(page.get_by_test_id("checkin-apd-accept-x-clube")).to_be_checked()
         page.get_by_test_id("checkin-apd-custom").locator("summary").click()
@@ -4289,7 +4385,7 @@ class ConsoleBrowserTests(unittest.TestCase):
             "custom": [{"id": "x-club", "name": "Club de Prueba", "short_name": "Club", "website": None}]}})
         late = self.check_in(game["id"], "Atrasada", apd_id="x-club", membership_number="12")
         other = self.check_in(game["id"], "Outra", apd_id="apd-a", membership_number="13")
-        self.assertEqual((late["status"], other["status"]), ("checked_in", "pending"))
+        self.assertEqual((late["status"], other["status"]), ("pending", "pending"))
         page = self.console()
         page.get_by_test_id("tab-checkin").click()
         expect(page.get_by_test_id("checkin-country")).to_have_value("ES")
@@ -4307,18 +4403,18 @@ class ConsoleBrowserTests(unittest.TestCase):
             .to_have_text("APD não aceite")
 
     def test_checkin_settings_set_how_long_chrono_and_game_data_are_kept(self):
-        """Decisions RET-1 and RET-2: the field's chrono and game retention are settings of the check-in tab, 365 days
+        """Decisions RET-1 and RET-2: the field's chrono and game retention are settings of the check-in tab, chrono 365 and game data 90 days
         by default, saved with the others; the page labels them in the console's language."""
         self.field.create_game()
         page = self.console()
         page.get_by_test_id("tab-checkin").click()
-        expect(page.get_by_test_id("checkin-game-retention")).to_have_value("365")
+        expect(page.get_by_test_id("checkin-game-retention")).to_have_value("90")
         expect(page.get_by_test_id("checkin-chrono-retention")).to_have_value("365")
         expect(page.locator("label[for=cs-game-days]")).to_have_text("Dados dos jogos guardados (dias)")
-        page.get_by_test_id("checkin-game-retention").fill("90")
+        page.get_by_test_id("checkin-game-retention").fill("120")
         page.get_by_test_id("checkin-chrono-retention").fill("180")
         page.get_by_test_id("checkin-settings-save").click()
-        self.assertTrue(wait_for(lambda: self.field.http.get("/api/v1/checkin/settings").json()["game_retention_days"] == 90, 5))
+        self.assertTrue(wait_for(lambda: self.field.http.get("/api/v1/checkin/settings").json()["game_retention_days"] == 120, 5))
         self.assertEqual(self.field.http.get("/api/v1/checkin/settings").json()["chrono_retention_days"], 180)
 
     def test_marshal_list_in_the_checkin_tab(self):
@@ -4971,6 +5067,70 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.keyboard.press("Escape")
         expect(dialog).to_be_hidden(timeout=1500)
 
+    # --- access tokens: short-lived, scoped, revocable (access_tokens.py) ---------------------------
+
+    def test_access_tokens_are_made_shown_once_used_and_revoked(self):
+        if not ZBARIMG:
+            self.skipTest("zbarimg is not installed")
+        self.field.create_game()
+        page = self.console()
+        page.get_by_test_id("tab-settings").click()
+        box = page.get_by_test_id("access-tokens")
+        expect(box).to_contain_text("Códigos de acesso temporários")
+        expect(page.get_by_test_id("tokens-empty")).to_be_visible()
+        expect(page.get_by_test_id("token-scope-help")).to_contain_text("Como o código só de leitura")
+        page.get_by_test_id("token-label").fill("Árbitro Ana")
+        page.get_by_test_id("token-scope").select_option("marshals")
+        expect(page.get_by_test_id("token-game")).to_be_disabled()      # a game limit is for read and gm
+        page.get_by_test_id("token-scope").select_option("gm")
+        page.get_by_test_id("token-ttl").select_option("3600")
+        page.get_by_test_id("token-create").click()
+        made = page.get_by_test_id("token-made")
+        expect(made).to_be_visible()
+        token = page.get_by_test_id("token-value").inner_text()
+        self.assertRegex(token, r"^atk_[0-9a-f]{8}\.[A-Za-z0-9_-]{43}$")
+        expect(made).to_contain_text("só aparece esta vez")
+        want = f"http://10.42.0.1:{self.field.port}/console/#token={token}"
+        with tempfile.TemporaryDirectory() as tmp:
+            shot = os.path.join(tmp, "token.png")
+            page.get_by_test_id("token-qr").screenshot(path=shot)
+            out = read_qr(shot)
+        self.assertEqual((out.returncode, out.stdout), (0, want), out.stderr)
+        # The list says what it is, never the code again.
+        row = page.get_by_test_id("token-row")
+        expect(row).to_have_count(1)
+        expect(row).to_contain_text("Árbitro Ana")
+        expect(row).to_have_attribute("data-status", "active")
+        page.get_by_test_id("token-done").click()
+        expect(page.get_by_test_id("token-made")).to_have_count(0)
+        self.assertNotIn(token.split(".")[1], page.content())
+        # The token logs a phone into the console, as a GM, without this panel (it cannot make tokens).
+        phone = self.console(token)
+        phone.get_by_test_id("tab-settings").click()
+        expect(phone.get_by_test_id("box-language-settings")).to_be_visible()
+        expect(phone.get_by_test_id("access-tokens")).to_have_count(0)
+        expect(phone.get_by_test_id("readonly")).to_have_count(0)
+        # Revoking ends it at once: the phone's next call is refused and it is sent back to the login.
+        page.once("dialog", lambda d: d.accept())
+        page.get_by_test_id("token-revoke").click()
+        expect(page.get_by_test_id("token-row")).to_have_attribute("data-status", "revoked")
+        self.assertEqual(httpx.get(self.field.base + "/api/v1/whoami",
+                                   headers={"Authorization": f"Bearer {token}"}).status_code, 401)
+        phone.reload()
+        expect(phone.get_by_test_id("login")).to_be_visible()
+        self.drop_errors("401")
+        # A read scope token is a read-only console, and the read code never gets the panel either.
+        r = self.field.http.post("/api/v1/tokens", json={"label": "Ecrã", "scope": "read", "ttl_s": 3600})
+        self.assertEqual(r.status_code, 201)
+        self.assertTrue(r.json()["links"][0].startswith(f"http://10.42.0.1:{self.field.port}/scoreboard#token=atk_"))
+        reader = self.console(r.json()["token"])
+        expect(reader.get_by_test_id("readonly")).to_be_visible()
+        reader.get_by_test_id("tab-settings").click()
+        expect(reader.get_by_test_id("access-tokens")).to_have_count(0)
+        read = self.console(READ)
+        read.get_by_test_id("tab-settings").click()
+        expect(read.get_by_test_id("access-tokens")).to_have_count(0)
+
     # --- "share with players": the scoreboard's QR code (decision PD13) -------------------
 
     def test_scoreboard_qr_code_is_the_scoreboard_address_the_app_follows(self):
@@ -5060,6 +5220,30 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertEqual(one, ["red captured Alpha", "P1 is back in (2 lives)", "Bomb armed by blue (30 s)",
                                "The game ended: ended by box Gate", "The game ended: ended by box 5",
                                "The game ended"])
+        # A box's restart says why; a panic or a watchdog reset is said as a crash, in every
+        # language, not as a power cut (firmware reset_reason.h; bench 2026-10-31).
+        reboots = page.evaluate("""async () => {
+            const m = await import('/console/ui.js');
+            await m.loadLanguage('en');
+            return ['power', 'panic', 'watchdog', 'software', 'mystery', ''].map((reason) =>
+                m.eventWords({ type: 'node.rebooted', node: 3, data: reason ? { reason } : {} }));
+        }""")
+        self.assertEqual(reboots, ["A box restarted (power cut or power-on)",
+                                   "A box crashed and restarted (program crash)",
+                                   "A box crashed and restarted (watchdog: the program hung)",
+                                   "A box restarted (software restart (update or command))",
+                                   "A box restarted (mystery)", "A box restarted ()"])
+        for lang in ("pt", "de", "zh-tw"):
+            crash, power = page.evaluate("""async (lang) => {
+                const m = await import('/console/ui.js');
+                await m.loadLanguage(lang);
+                return [m.eventWords({ type: 'node.rebooted', node: 3, data: { reason: 'panic' } }),
+                        m.eventWords({ type: 'node.rebooted', node: 3, data: { reason: 'power' } })];
+            }""", lang)
+            self.assertNotEqual(crash, power, lang)
+            for text in (crash, power):
+                self.assertNotIn("feed.", text, lang)
+                self.assertNotIn("{", text, lang)
         # "ended by box <name or node id>" in every language (GE-5).
         for lang in ("pt", "de", "zh-tw"):
             text = page.evaluate("""async (lang) => {
@@ -5069,6 +5253,53 @@ class ConsoleBrowserTests(unittest.TestCase):
             }""", lang)
             self.assertIn("Gate", text, lang)
             self.assertNotIn("feed.events", text)
+
+    def test_a_count_of_one_takes_the_singular(self):
+        """1 event, 1 life, 1 point: a text with a count of exactly 1 uses its `_one` form in
+        Portuguese, English and German (Chinese has no plural); the others keep the plural."""
+        page = self.page()
+        cases = {
+            "en": [("feed.count", 1, "1 event"), ("feed.count", 2, "2 events"),
+                   ("labels.count", 1, "1 label"), ("scenario.has_errors", 1, "1 error: fix it before installing."),
+                   ("scenario.has_errors", 3, "3 errors: fix them before installing."),
+                   ("adopt.silent", 1, "1 port did not answer")],
+            "pt": [("feed.count", 1, "1 acontecimento"), ("feed.count", 2, "2 acontecimentos"),
+                   ("alerts.count", 1, "1 alerta"), ("alerts.count", 0, "0 alertas"),
+                   ("checkin.schedule_registered", 1, "1 inscrição"),
+                   ("poster_prompt.announce_resumed", 1, "Contagem retomada: falta 1 segundo."),
+                   ("poster_prompt.announce_resumed", 5, "Contagem retomada: faltam 5 segundos.")],
+            "de": [("feed.count", 1, "1 Ereignis"), ("feed.count", 2, "2 Ereignisse"),
+                   ("game.squads_each", 1, "1 Squad pro Team"), ("game.squads_each", 2, "2 Squads pro Team"),
+                   ("adopt.silent", 1, "1 Anschluss hat nicht geantwortet")],
+            "zh-tw": [("feed.count", 1, None), ("feed.count", 2, None)],
+        }
+        for lang, items in cases.items():
+            for key, n, want in items:
+                got = page.evaluate("""async ([lang, key, n]) => {
+                    const m = await import('/console/ui.js');
+                    await m.loadLanguage(lang);
+                    return m.t(key, { n });
+                }""", [lang, key, n])
+                if want is None:  # no singular form: the same text, with the number in it
+                    self.assertIn(str(n), got, f"{lang} {key}")
+                    self.assertNotEqual(got, key)
+                else:
+                    self.assertEqual(got, want, f"{lang} {key} {n}")
+        words = page.evaluate("""async () => {
+            const m = await import('/console/ui.js');
+            const out = [];
+            for (const lang of ['en', 'pt', 'de']) {
+                await m.loadLanguage(lang);
+                out.push(m.eventWords({ type: 'player.respawn', node: 3, data: { player: 'P1', lives_left: 1 } }));
+                out.push(m.eventWords({ type: 'money.deposited', team: 'red', node: 3, data: { player: 'P1', amount: 1 } }));
+                out.push(m.eventWords({ type: 'money.deposited', team: 'red', node: 3, data: { player: 'P1', amount: 5 } }));
+            }
+            return out;
+        }""")
+        self.assertEqual(words, [
+            "P1 is back in (1 life)", "P1 (red) banked 1: 1 point", "P1 (red) banked 5: 5 points",
+            "P1 voltou ao jogo (1 vida)", "P1 (red) depositou 1: 1 ponto", "P1 (red) depositou 5: 5 pontos",
+            "P1 ist wieder drin (1 Leben)", "P1 (red) hat 1 eingezahlt: 1 Punkt", "P1 (red) hat 5 eingezahlt: 5 Punkte"])
 
     # --- field and team branding (decisions BR1-BR24) -------------------------------
 

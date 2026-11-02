@@ -153,7 +153,9 @@ async function main() {
     const en = await fetchJson('i18n/en.json');
     const dict = lang === 'en' ? en : await fetchJson(`i18n/${lang}.json`);
     const t = (key) => dict.blocks[key] ?? en.blocks[key] ?? key;
-    const ui = (key) => dict.ui[key] ?? en.ui[key] ?? key;
+    // A count of exactly 1 takes the text "<key>_one" when the language has it (decision PLU-2).
+    const ui = (key, n) => (n === 1 ? dict.ui[`${key}_one`] ?? en.ui[`${key}_one`] : undefined)
+        ?? dict.ui[key] ?? en.ui[key] ?? key;
     // ADR-P5-1, rule 4: no "Describe this function..." placeholder on new functions.
     Blockly.Msg.PROCEDURES_DEFNORETURN_COMMENT = '';
     Blockly.Msg.PROCEDURES_DEFRETURN_COMMENT = '';
@@ -425,7 +427,7 @@ async function main() {
     const testStatus = document.getElementById('test-status');
     const testBoxes = document.getElementById('test-boxes');
     const setStatus = (key, values = {}, bad = false) => {
-        let text = ui(key);
+        let text = ui(key, values.boxes);
         for (const [k, v] of Object.entries(values)) text = text.replace(`{${k}}`, String(v));
         document.getElementById('test-message').textContent = text;
         document.getElementById('test-open').hidden = bad;

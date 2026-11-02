@@ -120,8 +120,8 @@ async def issue(field_id: uuid.UUID, request: Request, principal: Principal = De
         if not isinstance(named, str) or not 1 <= len(named) <= 64:
             raise HTTPException(400, "invalid_request")
         holder = (await db.execute(select(User).where(User.username == named.lower()))).scalar_one_or_none()
-        if holder is None:
-            raise HTTPException(404, "holder_not_found")
+        if holder is None:  # the same answer as for an account with no role here: no username check (SRV-4)
+            raise HTTPException(409, "holder_has_no_role")
     try:
         done = await enrolment.issue(db, request.app.state.atak_box, field, device_name=body.get("device_name"),
                                      days=body.get("days", request.app.state.settings.atak_cert_days), holder=holder,

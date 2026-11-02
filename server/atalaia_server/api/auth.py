@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Accounts and sessions: register, login, the TOTP step, refresh, logout, TOTP enrolment (ADR-P4-2).
 
-    POST /api/v1/auth/register        {username, password, email?, consent}
+    POST /api/v1/auth/register        {username, password, email?, notice_seen, age_confirmed, notice_version?}
     POST /api/v1/auth/login           {username, password}
     POST /api/v1/auth/login/totp      {totp_session, code}
     POST /api/v1/auth/refresh         the refresh cookie + header X-Atalaia-Refresh: 1
@@ -41,7 +41,8 @@ from .. import passwords, personal_data, privacy_notice, quotas, tenancy, totp
 from ..audit import record, request_ip
 from ..auth import Principal, current_principal, load_roles
 from ..db import get_session
-from ..models import PRIVILEGED_ROLES, ROLE_NAMES, Passkey, RefreshToken, User, UserFieldRole, UserSession
+from ..models import (PRIVILEGED_ROLES, ROLE_NAMES, Passkey, RefreshToken, User, UserFieldRole, UserGameRole,
+                      UserSession)
 from ..ratelimit import login_key
 from ..tokens import (ACCESS_TTL_S, REFRESH_TTL_S, SESSION_MAX_S, TokenError, make_access_token,
                       make_totp_step_token, new_refresh_token, read_totp_step_token, refresh_token_hash)
@@ -64,7 +65,11 @@ class RegisterIn(Strict):
     username: str = Field(max_length=64)
     password: str = Field(max_length=4096)
     email: Optional[str] = Field(default=None, max_length=320)
-    consent: bool = False
+    # The account rests on the contract (LEG-*), so these are not consents: the person was shown the privacy notice
+    # (``notice_seen``; the version is recorded) and confirms being 16 or older (``age_confirmed``; no date of
+    # birth is asked). Younger players use the field's check-in without an account.
+    notice_seen: bool = False
+    age_confirmed: bool = False
     # The version of the privacy notice the person was shown (GET /api/v1/privacy-notice); when given and not the
     # current one, 409 notice_version_changed (CONS-4).
     notice_version: Optional[str] = Field(default=None, max_length=64)
@@ -120,6 +125,50 @@ async def passkey_count(db: AsyncSession, user_id: uuid.UUID) -> int:
 async def has_second_factor(db: AsyncSession, user: User) -> bool:
     """TOTP on, or a passkey: what a role that needs a second factor asks of an account (LG-4)."""
     return user.totp_enabled or await passkey_count(db, user.id) > 0
+
+
+async def is_staff(db: AsyncSession, user: User) -> bool:
+    """A server administrator, or ``admin``/``gm``/``marshal`` on a field or a game: a role that needs a second
+    factor (LG-4)."""
+    if user.server_admin:
+        return True
+    privileged = [ROLE_NAMES[r] for r in PRIVILEGED_ROLES]
+    for table in (UserFieldRole, UserGameRole):
+        if await db.scalar(select(func.count()).select_from(table).where(table.user_id == user.id,
+                                                                         table.role_id.in_(privileged))):
+            return True
+    return False
+
+
+async def step_up_needed(db: AsyncSession, user: User) -> bool:
+    """True when changing how this account logs in must come from a session that passed a second factor (SR-1).
+
+    An account with a TOTP or a passkey already has one, so a social login or a bare password session (``mfa``
+    false) must not be able to add, swap or remove the means of getting in. A staff account with no second
+    factor yet and a password is let through (the password is the proof; it is how it gets its first one:
+    SR-2). A passwordless staff account with none cannot: nothing could prove it, an operator sets a password
+    first. An account with no staff role and no second factor (a player adding a first passkey) keeps the
+    confirmation it always had (password, or a recent login)."""
+    if await has_second_factor(db, user):
+        return True
+    return user.password_hash is None and await is_staff(db, user)
+
+
+# The confirmations (the ``where`` of ``_check_password``) that change how the account logs in or who it is
+# merged with: the passkeys, TOTP, the password, the social links and the merge.
+STEP_UP_ACTIONS = frozenset({"passkey_add", "passkey_remove", "totp_enrol", "totp_disable", "password_change",
+                             "password_remove", "identity_link", "identity_unlink", "account_merge"})
+
+
+async def require_step_up(db: AsyncSession, request: Request, user: User) -> None:
+    """403 ``mfa_required`` for an account that ``step_up_needed`` unless this session passed a second factor."""
+    principal = getattr(request.state, "principal", None)
+    if principal is not None and principal.user.id == user.id and principal.mfa:
+        return
+    if await step_up_needed(db, user):
+        record(db, "step_up_refused", request, user_id=user.id, resource="user", resource_id=user.id)
+        await db.commit()
+        raise HTTPException(403, "mfa_required")
 
 
 def _now() -> datetime:
@@ -189,6 +238,8 @@ async def _check_password(db: AsyncSession, request: Request, user: Optional[Use
     Two lockouts count each failure (decisions S11-12, S12-1): one per (address, username),
     ``username`` being what was typed at login (the account's own name elsewhere), and a much
     higher one per address against spraying many usernames from one place."""
+    if user is not None and where in STEP_UP_ACTIONS:
+        await require_step_up(db, request, user)
     if user is not None and user.password_hash is None and where != "login":
         _recently_confirmed(request, user)  # an account with no password: a recent proof instead (LG-6)
         return
@@ -265,13 +316,17 @@ def _secret(request: Request, user: User) -> Optional[str]:
 async def register(body: RegisterIn, request: Request, db: AsyncSession = Depends(get_session)) -> JSONResponse:
     if not request.app.state.settings.password_login:
         raise HTTPException(403, "password_login_disabled")
+    if privacy_notice.signup_blocked(request.app.state.settings):  # LIVE-2: a consent is to a published text
+        raise HTTPException(409, "privacy_notice_unpublished")
     username = body.username.strip().lower()
     email = normalise_email(body.email)
     problem = username_problem(username) or email_problem(email)
     if problem:
         raise HTTPException(400, problem)
-    if not body.consent:
-        raise HTTPException(400, "consent_required")
+    if not body.age_confirmed:
+        raise HTTPException(400, "age_confirmation_required")
+    if not body.notice_seen:
+        raise HTTPException(400, "notice_required")
     current = request.app.state.settings.privacy_notice_version
     if body.notice_version is not None and body.notice_version != current:
         return JSONResponse({"detail": "notice_version_changed", "current_version": current}, status_code=409,
@@ -293,8 +348,8 @@ async def register(body: RegisterIn, request: Request, db: AsyncSession = Depend
     except IntegrityError:
         await db.rollback()
         raise HTTPException(409, "username_or_email_taken") from None
-    personal_data.give_consent(db, user.id, personal_data.ACCOUNT, request.app.state.settings.privacy_notice_version,
-                               user.gdpr_consent_at)
+    personal_data.record_notice(db, user.id, current, personal_data.NOTICE_SIGNUP, user.gdpr_consent_at,
+                                age_confirmed=True)
     record(db, "register", request, user_id=user.id, resource="user", resource_id=user.id)
     await db.commit()
     return JSONResponse(user_json(user, {}), status_code=201, headers=NO_STORE)
@@ -395,15 +450,23 @@ async def logout(request: Request, principal: Principal = Depends(current_princi
 @router.get("/me")
 async def me(request: Request, principal: Principal = Depends(current_principal),
              db: AsyncSession = Depends(get_session)) -> JSONResponse:
-    """The account, its roles and where its consent stands (CONS-2): ``consent.status`` is ``current``, ``outdated``
-    (for another version of the privacy notice: show it and ``POST /api/v1/me/consents/account``) or ``missing``;
-    ``consent.notice_published`` says whether ``GET /api/v1/privacy-notice`` has a text to show."""
+    """The account, its roles and which privacy notice it was last shown (CONS-2, LEG-*): ``notice.status`` is
+    ``current``, ``outdated`` (another version: show it again and ``POST /api/v1/me/notice``) or ``missing``;
+    ``notice.notice_published`` says whether ``GET /api/v1/privacy-notice`` has a text to show. ``inactivity`` is
+    null, or (PRIV-7) when the retention purge warned that the account, inactive for a long time, would be
+    anonymised (``warned_at``) and when it would have been (``anonymise_after``): the client says so, and that the
+    account stays because the person is here (the purge clears the warning at its next run)."""
     settings = request.app.state.settings
-    consent = await personal_data.account_consent(db, principal.user.id, settings.privacy_notice_version)
-    consent["notice_published"] = bool(privacy_notice.available(settings.privacy_notice_dir,
-                                                                settings.privacy_notice_version))
-    return JSONResponse({**user_json(principal.user, principal.roles), "mfa": principal.mfa, "consent": consent},
-                        headers=NO_STORE)
+    notice = await personal_data.notice_state(db, principal.user.id, settings.privacy_notice_version)
+    notice["notice_published"] = bool(privacy_notice.available(settings.privacy_notice_dir,
+                                                               settings.privacy_notice_version))
+    warned = principal.user.inactivity_warned_at
+    inactivity = None
+    if warned is not None and settings.retention.inactive_months is not None:
+        inactivity = {"warned_at": warned.isoformat(),
+                      "anonymise_after": (warned + timedelta(days=settings.retention.inactive_grace_days)).isoformat()}
+    return JSONResponse({**user_json(principal.user, principal.roles), "mfa": principal.mfa, "notice": notice,
+                         "inactivity": inactivity}, headers=NO_STORE)
 
 
 async def _user_for_update(db: AsyncSession, principal: Principal) -> User:

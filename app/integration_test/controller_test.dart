@@ -58,9 +58,9 @@ void main() {
     await tapVisible(tester, find.byKey(const Key('ctl-start')));
     await waitFor(tester, find.byKey(const Key('ctl-stop')));
 
-    final shell = AppScope.of(
-      tester.element(find.byType(ControllerScreen)),
-    ).services.controller;
+    final shell = AppScope.of(tester.element(find.byType(ControllerScreen)))
+        .services
+        .controller;
     final st = shell.status!;
     expect(st.running, isTrue);
     expect(st.hasConsole, isTrue, reason: 'the APK carries the console');

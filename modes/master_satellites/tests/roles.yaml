@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The controller tells each box what it is, so a free box says master or satellite, and the master's status carries the team's total
+nodes: { master: master, alpha: satellite }
+steps:
+  - expect_screen: { node: master, template: neutral }
+  - wait: 1.5                                        # field.lua tells the boxes at its first second
+  - expect_screen: { node: master, template: neutral, data: { role: master } }
+  - expect_screen: { node: alpha, template: neutral, data: { role: satellite } }
+  - hold: { node: alpha, team: red, s: 3 }           # 1.5 -> 4.5 s
+  - expect_screen: { node: alpha, template: captured, data: { team: red, since: 4, role: satellite } }
+  - hold: { node: master, team: red, s: 3 }          # 4.5 -> 7.5 s; the first tick at 17.5 s
+  - expect_screen: { node: master, template: master_status, data: { team: red, since: 7, held: 1, of: 1, points: 3, total: 0 } }
+  - wait: 11
+  - expect_score: { team: red, points: 3 }
+  - expect_screen: { node: master, template: master_status, data: { team: red, held: 1, of: 1, points: 3, total: 3 } }
+  - expect_no: script.error

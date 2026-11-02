@@ -281,6 +281,18 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
     }
   }
 
+  /// "Card seen, matches": the marshal compared the physical card with what
+  /// the player typed. The controller records who and when, keeps the
+  /// verdict, erases the number and lets the player in.
+  Future<void> _cardSeen(String playerId) async {
+    try {
+      await _client.cardSeen(c.token, c.gameId, playerId);
+      await _load();
+    } on CheckinException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    }
+  }
+
   Future<void> _manual() async {
     final s = context.s;
     final body = await showDialog<Map<String, Object?>>(
@@ -470,14 +482,37 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
                   ],
                 ),
               ),
-            if (p['status'] == 'pending')
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton(
-                  key: Key('queue-confirm-${p['player_id']}'),
-                  onPressed: () => _confirm('${p['player_id']}'),
-                  child: Text(s.t('queue.confirm')),
+            if (p['card_checked_at'] != null)
+              Padding(
+                key: Key('queue-card-${p['player_id']}'),
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '${s.t('apd.verdict_on', {'verdict': s.t('apd.status.${p['apd_status']}'), 'date': '${p['apd_verdict_on']}'})}'
+                  ' · ${s.t('apd.card_by', {'who': '${p['card_checked_by']}'})}',
                 ),
+              ),
+            if (p['status'] == 'pending')
+              Wrap(
+                spacing: 8,
+                children: [
+                  if (_info?.apdRule.checkin == true)
+                    FilledButton(
+                      key: Key('queue-card-seen-${p['player_id']}'),
+                      onPressed: () => _cardSeen('${p['player_id']}'),
+                      child: Text(s.t('queue.card_seen')),
+                    ),
+                  OutlinedButton(
+                    key: Key('queue-confirm-${p['player_id']}'),
+                    onPressed: () => _confirm('${p['player_id']}'),
+                    child: Text(
+                      s.t(
+                        _info?.apdRule.checkin == true
+                            ? 'queue.confirm_no_card'
+                            : 'queue.confirm',
+                      ),
+                    ),
+                  ),
+                ],
               ),
             for (final d in decls)
               ListTile(
@@ -612,6 +647,7 @@ class _ManualCheckinDialogState extends State<_ManualCheckinDialog> {
   final _name = TextEditingController();
   final _apd = ApdInput();
   String? _error;
+  bool _cardSeen = false, _share = false;
 
   FieldInfo? get _info => widget.info;
   bool get _withApd =>
@@ -645,7 +681,9 @@ class _ManualCheckinDialogState extends State<_ManualCheckinDialog> {
         if (_apd.numberOrNull != null) 'membership_number': _apd.numberOrNull,
         if (_apd.expiresOrNull != null)
           'membership_expires': _apd.expiresOrNull,
+        if (_info?.apdRule.checkin == true) 'federation_seen': _cardSeen,
       },
+      'share_position': _share,
     });
   }
 
@@ -675,6 +713,24 @@ class _ManualCheckinDialogState extends State<_ManualCheckinDialog> {
                 numberRequired: info.federation == 'required',
                 keyPrefix: 'queue-manual-apd',
               ),
+            if (_withApd && info?.apdRule.checkin == true)
+              CheckboxListTile(
+                key: const Key('queue-manual-card-seen'),
+                value: _cardSeen,
+                onChanged: (v) => setState(() => _cardSeen = v == true),
+                title: Text(s.t('queue.card_seen')),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+              ),
+            CheckboxListTile(
+              key: const Key('queue-manual-share-position'),
+              value: _share,
+              onChanged: (v) => setState(() => _share = v == true),
+              title: Text(s.t('checkin.share_position')),
+              subtitle: Text(s.t('checkin.share_position_hint')),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+            ),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),

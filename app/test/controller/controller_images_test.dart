@@ -378,13 +378,10 @@ void main() {
   });
 
   group('the same results as images.py', () {
-    final doc =
-        jsonDecode(
-              File(
-                'test/controller/fixtures/controller_images.json',
-              ).readAsStringSync(),
-            )
-            as Map<String, dynamic>;
+    final doc = jsonDecode(
+      File('test/controller/fixtures/controller_images.json')
+          .readAsStringSync(),
+    ) as Map<String, dynamic>;
     final cases = (doc['cases'] as List<dynamic>).cast<Map<String, dynamic>>();
     test('there are cases', () => expect(cases.length, greaterThan(100)));
     for (final c in cases) {

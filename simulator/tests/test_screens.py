@@ -12,10 +12,13 @@ from pathlib import Path
 
 from atalaia_sim.core import Core, find_library
 from atalaia_sim.mode import load_mode
-from atalaia_sim.screens import check_screen, check_screens, screen_files
+from atalaia_sim.screens import (LITERALS_MAX, LITERALS_WARN, check_screen, check_screens,
+                                 literal_budget, screen_files, screen_warnings)
 from atalaia_sim.sim import Simulation
 
-MODES = Path(__file__).resolve().parents[2] / "modes"
+ROOT = Path(__file__).resolve().parents[2]
+MODES = ROOT / "modes"
+REGISTRY_EXAMPLES = ROOT / "registry" / "examples"
 TEAMS = ["red", "blue"]
 
 
@@ -38,6 +41,63 @@ class ScreenTemplateTests(unittest.TestCase):
         self.assertEqual(found["kill_confirmed"], ["tags"])
         self.assertEqual(found["respawn"], ["respawn"])
         self.assertEqual(found["player_checkin"], ["checkin"])
+
+    def _template(self, tmp: str, name: str, text: str) -> Path:
+        path = Path(tmp) / f"{name}.yaml"
+        path.write_text(f'template: {path.stem}\nlayout:\n  - type: spacer\n    height: 4\n'
+                        f'  - type: label\n    text: "{text}"\n', encoding="utf-8")
+        return path
+
+    def test_literals_over_the_limit_are_refused_with_a_clear_message(self) -> None:
+        """Decision TPL-1: the evaluator gives one expression's 'text' literals 256 bytes (each
+        its length + 1, every branch of && and || counted) and used to render an empty text over
+        it. The check says which mode, screen and widget, and how many bytes."""
+        def expr(sizes: list[int]) -> str:
+            return "{" + " || ".join(f"lang == 'x' && '{'a' * n}'" for n in sizes) + "}"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            # Each branch: 'x' takes 2 and the long text n + 1, so 3 * (n + 3) bytes: 255 fit.
+            fits = self._template(tmp, "fits", expr([82, 82, 82]))
+            self.assertEqual(check_screen(self.core, fits, "demo"), [])
+            exact = literal_budget(self.core, fits)[0][2]
+            self.assertLessEqual(exact, LITERALS_MAX)
+            over = self._template(tmp, "over", expr([100, 100, 100]))
+            problems = check_screen(self.core, over, "demo")
+            self.assertEqual(len(problems), 1, problems)
+            for word in ("demo / over / layout[1] label text", "309 bytes", f"limit is {LITERALS_MAX}"):
+                self.assertIn(word, problems[0])
+            # Without the Python scan the core refuses it just as well, with its own words.
+            self.assertIn("need 309 bytes of 256", self.core.check_screen(over.read_bytes()))
+            # The exact edge: 256 bytes fit, 257 do not.
+            edge = {n: self._template(tmp, f"edge{n}", "{'" + "a" * (n - 1) + "'}") for n in (256, 257)}
+            self.assertEqual(check_screen(self.core, edge[256], "demo"), [])
+            self.assertEqual(len(check_screen(self.core, edge[257], "demo")), 1)
+
+    def test_near_the_limit_warns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            mode = Path(tmp) / "demo"
+            (mode / "assets" / "screens").mkdir(parents=True)
+            self._template(str(mode / "assets" / "screens"), "near", "{'" + "a" * (LITERALS_WARN) + "'}")
+            self._template(str(mode / "assets" / "screens"), "small", "{'abc'}")
+            warnings = screen_warnings(self.core, mode)
+            self.assertEqual(len(warnings), 1, warnings)
+            self.assertIn("demo / near / layout[1] label text", warnings[0])
+            self.assertIn(f"{LITERALS_WARN + 1} of {LITERALS_MAX}", warnings[0])
+
+    def test_every_builtin_mode_and_registry_example_fits_the_literal_limit(self) -> None:
+        """No shipped template has an expression over the limit (so none can go blank on a box),
+        in the built-in modes or the registry's examples. The report is the biggest of each."""
+        folders = sorted(p.parent for root in (MODES, REGISTRY_EXAMPLES) for p in root.glob("*/mode.yaml"))
+        self.assertGreater(len(folders), 15)
+        screens = 0
+        for mode_dir in folders:
+            for path in screen_files(mode_dir):
+                screens += 1
+                with self.subTest(f"{mode_dir.name}/{path.stem}"):
+                    self.assertEqual(check_screen(self.core, path, mode_dir.name), [])
+                    for where, expr, size in literal_budget(self.core, path):
+                        self.assertLessEqual(size, LITERALS_MAX, (where, expr))
+        self.assertGreater(screens, 30)
 
     def test_broken_templates_are_reported(self) -> None:
         cases = {
