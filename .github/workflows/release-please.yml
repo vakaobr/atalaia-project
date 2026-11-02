@@ -1,0 +1,147 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The one way to release (CONTRIBUTING.md, "Releases"). Every change reaches main as a squash-merged
+# pull request whose title is a Conventional Commit (pr-title.yml checks it). On each push to main,
+# release-please (release-please-config.json, .release-please-manifest.json) keeps one pull request
+# "chore(release): vX.Y.Z" open: the next version from the titles since the last release (feat: a
+# minor, fix: a patch while the project is 0.x), its CHANGELOG.md section written from them, and the
+# version files bumped. Merging that pull request is the go-ahead: release-please tags the merge
+# commit vX.Y.Z and makes the GitHub pre-release, and this workflow then starts release.yml on the tag,
+# which builds, signs (after the `release` environment's approval) and attaches the firmware.
+#
+# Everything uses the workflow token (GITHUB_TOKEN), no other secret. A tag or a release made with it
+# starts no workflow (GitHub's rule against loops), but a `workflow_dispatch` is the exception, so
+# release.yml is started with `gh workflow run release.yml --ref vX.Y.Z`, as tag-release.yml did
+# before: it runs exactly as for a tag pushed by hand. Pull requests opened with that token start no
+# workflow either, so CI does not run on the release pull request by itself: close and reopen it
+# (a person's action) to run CI on it.
+
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release pull request, or the release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the release pull request's branch, the tag, the GitHub release
+      pull-requests: write # the release pull request
+      issues: write # its labels ("autorelease: pending" / "autorelease: tagged")
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+      version: ${{ steps.rp.outputs.version }}
+      prs_created: ${{ steps.rp.outputs.prs_created }}
+      pr: ${{ steps.rp.outputs.pr }} # JSON of the release pull request, when it was opened or updated
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: rp
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  release-pr-files:
+    name: Finish the release pull request (version.h, CMake, CHANGELOG details)
+    needs: release-please
+    # release-please regenerates its branch from main on every push to main (always-update), so this
+    # runs every time it did.
+    if: needs.release-please.outputs.prs_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # one commit on release-please's branch
+    env:
+      PR_BRANCH: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
+    steps:
+      - name: The tool from main (this push), not from the branch it edits
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: main
+      - name: The release pull request's branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
+          path: pr
+      - name: Every version file says the release; Unreleased goes under the release's section
+        run: |
+          set -eu
+          case "$PR_BRANCH" in release-please--*) ;; *) echo "::error::$PR_BRANCH is not release-please's branch"; exit 1 ;; esac
+          # The version is the manifest's on that branch; the tool refuses anything it cannot do
+          # and checks every file afterwards (tools/prepare_release.py check).
+          version="$(python3 main/tools/prepare_release.py --root pr release-pr)"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          git -C pr status --short
+      - name: Commit on the branch (nothing when it is already right)
+        working-directory: pr
+        run: |
+          set -eu
+          if git diff --quiet; then echo "Nothing to change"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -s -a -m "chore(release): version files and CHANGELOG details for v$VERSION" \
+            -m "tools/prepare_release.py release-pr: the core's version (version.h, pre-release emptied; CMake), and the hand-written Unreleased notes under the release's section (release-please.yml)."
+          git push origin "HEAD:refs/heads/$PR_BRANCH"
+
+  firmware:
+    name: Start the firmware release (release.yml) on the tag
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the release goes back to a draft until its files are attached
+      actions: write # gh workflow run release.yml
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.release-please.outputs.tag_name }}
+    steps:
+      - name: Draft until the signed files are attached, then start release.yml on the tag
+        run: |
+          set -eu
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error::$TAG is not a release tag"; exit 1
+          fi
+          # release-please published the release with its notes; release.yml's publish job uploads
+          # the files into the draft and publishes it, as for a tag pushed by hand (no release
+          # without its firmware). The tag stays: a draft does not remove it.
+          gh release edit "$TAG" --draft=true
+          gh workflow run release.yml --ref "$TAG"
+          echo "Started release.yml for $TAG"
+
+  open-dev:
+    name: Open the next development version
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the branch
+      pull-requests: write # the pull request
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.release-please.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Version files say the next version with "dev" (core only, decision FV-1)
+        run: |
+          set -eu
+          next="$(python3 tools/prepare_release.py open-dev --released "$VERSION")"
+          branch="dev/open-$next"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add -A
+          git commit -s -m "chore(core): open $next after the v$VERSION release" \
+            -m "The commit after a release sets the next version with the pre-release dev again (decision FV-1, RELEASE_SIGNING.md), so its builds sort above $VERSION."
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --title "chore(core): open $next after the v$VERSION release" \
+            --body "Sets the core's version (version.h, CMakeLists.txt) to $next, as the commit after every release does. Made by release-please.yml; the release itself is already tagged and its firmware build started."

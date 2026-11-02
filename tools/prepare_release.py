@@ -1,40 +1,39 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Prepares a release the way commit 331dcaad did by hand (.github/workflows/prepare-release.yml).
+"""The version files and the CHANGELOG of a release, for release-please (.github/workflows/release-please.yml).
 
-    python3 tools/prepare_release.py prepare --bump minor            [--date 2026-11-01]
-    python3 tools/prepare_release.py prepare --version 0.5.0 [--prerelease rc.1]
-        the next version (the bump is counted from the newest released CHANGELOG section, or the
-        explicit version, which must be newer than it), then: CHANGELOG.md's "## [Unreleased]" body
-        moves under "## [X.Y.Z] - date" (an empty one is refused) and the version files say X.Y.Z:
-        core/include/atalaia/version.h (pre-release emptied, or the label), core/CMakeLists.txt,
-        app/pubspec.yaml, app/lib/version.dart, controller and server __init__.py (what
-        controller/tests/test_versions.py and app/test/version_test.dart check). Prints the version.
+    python3 tools/prepare_release.py release-pr [--version 0.6.0]
+        run on release-please's release pull request branch (the version defaults to what
+        .release-please-manifest.json says there). release-please writes the CHANGELOG section
+        "## [X.Y.Z](compare link) (date)" from the pull request titles and bumps the files that
+        carry an x-release-please-version marker; this does what a marker cannot: every version
+        file says exactly X.Y.Z (core/include/atalaia/version.h with its pre-release emptied, or
+        the version's own label; core/CMakeLists.txt, numbers only; app/pubspec.yaml, its build
+        number kept; app/lib/version.dart; controller and server __init__.py: what
+        controller/tests/test_versions.py and app/test/version_test.dart check), and the
+        hand-written "## [Unreleased]" body moves under that section as "### Details", with an
+        empty "## [Unreleased]" back on top. Then `check`. Running it twice changes nothing.
     python3 tools/prepare_release.py open-dev --released 0.5.0 [--next 0.6.0]
         the commit after a release (decision FV-1, PREP-3): the core's version (version.h and
         CMake only, as cfcd1382 did) becomes the next version with "dev" again, so builds sort
         above the release. Default: the next minor; after a pre-release, the same X.Y.Z.
     python3 tools/prepare_release.py check --version 0.5.0
-        every version file and the CHANGELOG agree with the version (what a tag may be made from).
-    python3 tools/prepare_release.py notes --version 0.5.0 --out notes.md
-        the CHANGELOG section, cut to a pull request body's size.
+        every version file and the CHANGELOG agree with the version (what a release is made from).
 
-Standard library only; --root runs it on another checkout (the unit tests do).
+Standard library only; --root runs it on another checkout (the unit tests and the workflow do).
 """
 
 from __future__ import annotations
 
 import argparse
-import datetime
+import json
 import re
 import sys
 from pathlib import Path
 from typing import NamedTuple, Optional
 
 REPO = Path(__file__).resolve().parents[1]
-# GitHub refuses a pull request body over 65536 characters; release.yml's own cap is 120000.
-NOTES_MAX = 60000
 
 VERSION_H = "core/include/atalaia/version.h"
 CMAKE = "core/CMakeLists.txt"
@@ -43,6 +42,7 @@ DART = "app/lib/version.dart"
 CONTROLLER = "controller/atalaia_controller/__init__.py"
 SERVER = "server/atalaia_server/__init__.py"
 CHANGELOG = "CHANGELOG.md"
+MANIFEST = ".release-please-manifest.json"
 
 _ID = r"[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*"
 VERSION = re.compile(rf"(\d{{1,4}})\.(\d{{1,4}})\.(\d{{1,4}})(?:-({_ID}))?")
@@ -116,52 +116,30 @@ def released_versions(changelog: str) -> list[Version]:
     return out
 
 
-def last_released(changelog: str) -> Version:
-    found = released_versions(changelog)
-    if not found:
-        raise PrepareError("CHANGELOG.md has no released section to count a bump from; use --version")
-    return max(found, key=Version.order)
+def _section(name: str) -> re.Pattern[str]:
+    """A "## [name]..." section: its heading line, then its body up to the next "## [" or the end."""
+    return re.compile(rf"^## \[{re.escape(name)}\][^\n]*\n(.*?)(?=^## \[|\Z)", re.S | re.M)
 
 
-def next_version(last: Version, bump: Optional[str], version: Optional[str], prerelease: str = "") -> Version:
-    if bool(bump) == bool(version):
-        raise PrepareError("give exactly one of --bump and --version")
-    if version:
-        target = parse_version(version)
-        if prerelease:
-            if target.pre:
-                raise PrepareError("the version already has a pre-release; drop --prerelease")
-            target = parse_version(f"{target}-{prerelease}")
-    else:
-        if bump not in ("patch", "minor", "major"):
-            raise PrepareError("--bump is patch, minor or major")
-        if last.pre and bump == "patch":
-            base = Version(last.major, last.minor, last.patch)  # the release the last pre-release led to
-        elif bump == "patch":
-            base = Version(last.major, last.minor, last.patch + 1)
-        elif bump == "minor":
-            base = Version(last.major, last.minor + 1, 0)
-        else:
-            base = Version(last.major + 1, 0, 0)
-        target = parse_version(f"{base}-{prerelease}" if prerelease else str(base))
-    if target.order() <= last.order():
-        raise PrepareError(f"version {target} is not newer than the last release, {last}")
-    return target
-
-
-def move_unreleased(text: str, version: Version, date: str) -> str:
-    """CHANGELOG: the Unreleased body goes under "## [version] - date"; Unreleased stays, empty."""
-    m = re.search(r"^## \[Unreleased\][^\n]*\n(.*?)(?=^## \[|\Z)", text, re.S | re.M)
-    if not m:
-        raise PrepareError('CHANGELOG.md has no "## [Unreleased]" section')
-    body = m[1].strip()
-    if not body:
-        raise PrepareError("the Unreleased section of CHANGELOG.md is empty: nothing to release")
-    if any(v == version for v in released_versions(text)):
-        raise PrepareError(f"CHANGELOG.md already has a section [{version}]")
-    rest = text[m.end():]
-    new = f"## [Unreleased]\n\n## [{version}] - {date}\n\n{body}\n" + ("\n" + rest if rest else "")
-    return text[:m.start()] + new
+def fold_changelog(text: str, version: Version) -> str:
+    """The hand-written Unreleased body goes to the end of release-please's section for the version,
+    as "### Details" (its own ### headings one level down); an empty "## [Unreleased]" goes back
+    right above that section, where release-please inserts the next one."""
+    unreleased = _section("Unreleased").search(text)
+    body = ""
+    if unreleased:
+        body = unreleased[1].strip()
+        text = text[:unreleased.start()] + text[unreleased.end():]
+    release = _section(str(version)).search(text)
+    if not release:
+        raise PrepareError(f"CHANGELOG.md has no section [{version}] (release-please writes it)")
+    heading = text[release.start():release.start(1)].rstrip("\n")
+    parts = [release[1].strip()]
+    if body:
+        parts.append("### Details\n\n" + re.sub(r"^(#{3,5}) ", r"#\1 ", body, flags=re.M))
+    new = "## [Unreleased]\n\n" + heading + "\n\n" + "\n\n".join(part for part in parts if part) + "\n"
+    rest = text[release.end():]
+    return text[:release.start()] + new + ("\n" + rest if rest else "")
 
 
 def _set_core(root: Path, version: Version, pre: str, files: dict[str, str]) -> None:
@@ -179,18 +157,32 @@ def _write_all(root: Path, files: dict[str, str]) -> None:
         (root / name).write_text(text, encoding="utf-8", newline="")
 
 
-def prepare(root: Path, bump: Optional[str], version: Optional[str], prerelease: str, date: str) -> Version:
-    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
-        raise PrepareError(f"{date!r} is not a date (YYYY-MM-DD)")
-    changelog = _read(root, CHANGELOG)
-    target = next_version(last_released(changelog), bump, version, prerelease)
-    files: dict[str, str] = {CHANGELOG: move_unreleased(changelog, target, date)}
+def set_version_files(root: Path, target: Version, files: dict[str, str]) -> None:
+    """Every version file says the version: the core with its pre-release (or none), CMake numbers only."""
     _set_core(root, target, target.pre, files)
     files[PUBSPEC] = _sub1(r"^(version:\s*)[^\s+]+", rf"\g<1>{target}", _read(root, PUBSPEC), PUBSPEC)
     files[DART] = _sub1(r"^(const appVersion = ')[^']+(';)", rf"\g<1>{target}\g<2>", _read(root, DART), DART)
     for name in (CONTROLLER, SERVER):
         files[name] = _sub1(r'^(__version__ = ")[^"]+(")', rf"\g<1>{target}\g<2>", _read(root, name), name)
+
+
+def manifest_version(root: Path) -> Version:
+    """The version release-please's manifest gives the repository's one package (".")."""
+    try:
+        return parse_version(str(json.loads(_read(root, MANIFEST))["."]))
+    except (ValueError, KeyError, TypeError, PrepareError) as exc:
+        raise PrepareError(f'{MANIFEST}: no version for the package "." ({exc})') from exc
+
+
+def release_pr(root: Path, version: Optional[Version] = None) -> Version:
+    """What release-please's markers cannot do on its release pull request (the module's doc)."""
+    target = version or manifest_version(root)
+    files: dict[str, str] = {CHANGELOG: fold_changelog(_read(root, CHANGELOG), target)}
+    set_version_files(root, target, files)
     _write_all(root, files)
+    bad = check(root, target)
+    if bad:
+        raise PrepareError("; ".join(bad))
     return target
 
 
@@ -238,49 +230,28 @@ def check(root: Path, version: Version) -> list[str]:
     return bad
 
 
-def notes(root: Path, version: Version, limit: int = NOTES_MAX) -> str:
-    m = re.search(rf"^## \[{re.escape(str(version))}\][^\n]*\n(.*?)(?=^## \[|\Z)", _read(root, CHANGELOG), re.S | re.M)
-    if not m or not m[1].strip():
-        raise PrepareError(f"CHANGELOG.md has no section [{version}]")
-    body = m[1].strip() + "\n"
-    if len(body) > limit:  # as release_package.py cuts the release's text: at a line, with a pointer
-        tail = "\n(The rest of the list is in CHANGELOG.md.)\n"
-        body = body[:limit - len(tail)].rsplit("\n", 1)[0] + "\n" + tail
-    return body
-
-
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--root", type=Path, default=REPO, help="the checkout to work on")
     sub = parser.add_subparsers(dest="command", required=True)
-    p = sub.add_parser("prepare", help="move the Unreleased section and bump the version files")
-    p.add_argument("--bump", choices=["patch", "minor", "major"])
-    p.add_argument("--version")
-    p.add_argument("--prerelease", default="", help="a label such as rc.1")
-    p.add_argument("--date", default=datetime.date.today().isoformat())
+    r = sub.add_parser("release-pr", help="on the release pull request: every version file and the CHANGELOG")
+    r.add_argument("--version", help="default: what .release-please-manifest.json says")
     o = sub.add_parser("open-dev", help="after the release: the next version, with dev")
     o.add_argument("--released", required=True)
     o.add_argument("--next")
     c = sub.add_parser("check", help="every version file agrees with the version")
     c.add_argument("--version", required=True)
-    n = sub.add_parser("notes", help="the CHANGELOG section, cut to a pull request body's size")
-    n.add_argument("--version", required=True)
-    n.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        if args.command == "prepare":
-            print(prepare(args.root, args.bump, args.version, args.prerelease.strip(), args.date))
+        if args.command == "release-pr":
+            print(release_pr(args.root, parse_version(args.version) if args.version else None))
         elif args.command == "open-dev":
             print(open_dev(args.root, parse_version(args.released), args.next))
-        elif args.command == "check":
+        else:
             bad = check(args.root, parse_version(args.version))
             for line in bad:
                 print(f"prepare_release: {line}", file=sys.stderr)
             return 1 if bad else 0
-        else:
-            text = notes(args.root, parse_version(args.version))
-            args.out.write_text(text, encoding="utf-8")
-            print(f"{args.out}: {len(text)} characters")
     except PrepareError as exc:
         print(f"prepare_release: {exc}", file=sys.stderr)
         return 1
