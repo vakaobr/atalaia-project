@@ -7,13 +7,13 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 The site server, started as a **preview** (decisions PV-1 to PV-12 in [decisions-to-review.md](../review/decisions-to-review.md); [server/README.md](../../server/README.md), "Preview deployment"), at <https://tests.atalaia-project.link>: invented demo data, a banner, a feedback form. Teams and fields are invited to look at it and say what looks good, what is hard to use and what should change. It is not for real games.
 
-Everything below runs in WSL (Ubuntu) on the maintainer's machine, from `~/atalaia-preview/src/server/preview/preview.sh` (shortened to `preview.sh`; run it as `sh ~/atalaia-preview/src/server/preview/preview.sh COMMAND`). Secrets are never printed by it.
+Everything below runs on the maintainer's **Mac mini** (since 2026-11-02, moved from WSL on the maintainer's Windows PC; see "Moving the preview to another host"), from `~/atalaia-preview/src/server/preview/preview.sh` (shortened to `preview.sh`; run it as `sh ~/atalaia-preview/src/server/preview/preview.sh COMMAND`). Secrets are never printed by it. Windows with WSL (Ubuntu) still works as a host; what differs there is in "On Windows with WSL (the alternative host)".
 
 ## How it is put together
 
 ```
-visitor -> Cloudflare (TLS) -> cloudflared (Windows service) -> http://localhost:8000
-        -> WSL2 localhost forwarding -> 127.0.0.1:8000 (Docker) -> server container (uvicorn, port 8000)
+visitor -> Cloudflare (TLS) -> cloudflared (macOS LaunchDaemon) -> http://localhost:8000
+        -> Colima's port forwarding -> 127.0.0.1:8000 (Docker) -> server container (uvicorn, port 8000)
                                                                   -> postgres container (internal network)
                                               demo-refresh container: `demo load` every hour, `demo live` every ten minutes
 
@@ -21,21 +21,30 @@ visitor -> Cloudflare (TLS) -> cloudflared -> http://localhost:8001 -> 127.0.0.1
           (the live demo, a second hostname: read-only proxy -> field controller + simulated boxes; see "The live demo")
 ```
 
-- Containers (project `atalaia-preview`): `server`, `postgres` (volume `atalaia-preview_pgdata`), `demo-refresh`, and for the live demo `demo-field` (volume `atalaia-preview_demo-data`) and the one-shot `demo-init` (volume `atalaia-preview_demo-secrets`). All restart unless stopped, so they come back when Docker starts. **WSL and Docker must be running for the site to answer**: if Windows restarts and nobody starts WSL, the site is down (Cloudflare shows a 502 or 1033 page).
+- Containers (project `atalaia-preview`): `server`, `postgres` (volume `atalaia-preview_pgdata`), `demo-refresh`, and for the live demo `demo-field` (volume `atalaia-preview_demo-data`) and the one-shot `demo-init` (volume `atalaia-preview_demo-secrets`). All restart unless stopped, so they come back when Docker starts. **Colima (Docker's Linux VM) must be running for the site to answer.** It starts at login (`brew services start colima`, a LaunchAgent of the maintainer's user: `~/Library/LaunchAgents/sh.brew.colima.plist`), not at power-on: after a power cut or a restart the site stays down (Cloudflare shows a 502) until someone logs in, unless automatic login is on for that user (System Settings, Users & Groups). The same holds for a backup scheduled with cron: it needs Docker up. cloudflared, a system LaunchDaemon, runs without a login. Colima's VM has 8 CPUs, 8 GiB and 200 GiB (at least 4, 8 GiB, 100 GiB: `colima list`).
 - Only `127.0.0.1:8000` (the site) and `127.0.0.1:8001` (the live demo's read-only proxy) are published. Nothing listens on `0.0.0.0`; the tunnel is the only way in. Neither the server nor the demo has a way out to the internet.
 - `~/atalaia-preview/` (mode 700, outside the repository): `preview.env` (the settings and secrets, mode 600), `admin-login.txt` and `reviewers/*.txt` (logins, mode 600), `backups/`, `src/` (the code the image is built from). Keep a copy of `preview.env` (above all `ATALAIA_SECRET_KEY` and `ATALAIA_BACKUP_KEY`) somewhere safe away from this machine.
 
-## The tunnel (the maintainer's, on Windows)
+## The tunnel (the maintainer's, on the Mac mini)
 
-The Cloudflare dashboard (Zero Trust, Networks, Tunnels, the tunnel, Public hostnames): **`tests.atalaia-project.link` -> Service type HTTP -> URL `localhost:8000`**, and nothing else. Check it:
+cloudflared runs on the Mac as the system LaunchDaemon `com.cloudflare.cloudflared` (`cloudflared tunnel run --token-file ...`, installed with the dashboard's `sudo cloudflared service install ...` command). It is a **remotely managed** tunnel: there is no local `config.yml`, the routes live in the Cloudflare dashboard (Zero Trust, Networks, Tunnels, the tunnel, Public hostnames): **`tests.atalaia-project.link` -> Service type HTTP -> URL `localhost:8000`** (and the live demo's hostname -> `localhost:8001`), and nothing else. It is the same tunnel the Windows PC used. Check it:
 
-- In PowerShell: `Get-Service cloudflared` (Status Running) or the Services app; `cloudflared.exe tunnel info TUNNEL_NAME` lists its connectors; the dashboard shows the tunnel as Healthy.
-- From WSL: `sh preview.sh check` (health and the front page on `127.0.0.1:8000`, then from Windows with `/mnt/c/Windows/System32/curl.exe http://localhost:8000/api/v1/health`, then the public name).
-- If the public name fails but `check` passes locally and from Windows: the Windows service or the dashboard route. If `localhost:8000` fails from Windows only: WSL's localhost forwarding (`wsl --shutdown`, then start WSL and `preview.sh up`; check `.wslconfig` for `localhostForwarding=false`).
+- `pgrep -lf cloudflared` (the process), the dashboard's tunnel page (Healthy; the Connectors tab lists every machine connected to it), and its metrics on `http://127.0.0.1:20241/metrics` (`cloudflared_tunnel_total_requests` rises as visitors arrive through this machine).
+- `sh preview.sh check` (health and the front page on `127.0.0.1:8000`, the live demo, then the public name).
+- **One tunnel, several connectors:** every machine that runs a connector of the same tunnel gets a share of the visitors, whether or not its own site is up. If the public name gives 502 while `check` passes locally, look at the Connectors tab: another machine (the old host) is still connected; stop its cloudflared. If the public name fails and this Mac is the only connector: the LaunchDaemon (`sudo launchctl print system/com.cloudflare.cloudflared`) or the dashboard route.
 
 Cloudflare settings worth having on the zone: **Always Use HTTPS** (the server speaks HTTP to the tunnel and sends HSTS itself, but the redirect is Cloudflare's); optionally a WAF custom rule that blocks `POST /api/v1/auth/register` on this hostname (PV-6: anyone can otherwise make an account); Cloudflare Access is not used (PV-6).
 
-To take the site off the internet at once: stop the Windows service (`Stop-Service cloudflared`) or delete the public hostname in the dashboard. `preview.sh down` stops the server too.
+To take the site off the internet at once: stop the connector (`sudo launchctl bootout system/com.cloudflare.cloudflared`; `sudo launchctl bootstrap system /Library/LaunchDaemons/com.cloudflare.cloudflared.plist` starts it again) or delete the public hostname in the dashboard. `preview.sh down` stops the server too.
+
+### On Windows with WSL (the alternative host)
+
+The preview ran there until 2026-11-02 and still can: the same commands in WSL (Ubuntu) with Docker, cloudflared as a Windows service, WSL2 forwarding Windows' `localhost:8000` to WSL's `127.0.0.1:8000`. **WSL and Docker must be running for the site to answer**: if Windows restarts and nobody starts WSL, the site is down.
+
+- In PowerShell: `Get-Service cloudflared` (Status Running) or the Services app; `cloudflared.exe tunnel info TUNNEL_NAME` lists its connectors. `Stop-Service cloudflared` takes it off the internet.
+- `sh preview.sh check` in WSL also asks from Windows (`/mnt/c/Windows/System32/curl.exe http://localhost:8000/api/v1/health`); that line appears only under WSL.
+- If the public name fails but `check` passes locally and from Windows: the Windows service or the dashboard route. If `localhost:8000` fails from Windows only: WSL's localhost forwarding (`wsl --shutdown`, then start WSL and `preview.sh up`; check `.wslconfig` for `localhostForwarding=false`).
+- A scheduled backup needs cron running in WSL.
 
 ## First time (already done on 2026-10-26)
 
@@ -123,7 +132,9 @@ It exports the code into `src/` (the old tree stays in `src.old/`), rebuilds the
 
 ## Backup and restore
 
-`preview.sh backup` writes an encrypted dump to `~/atalaia-preview/backups/` (30 days kept; the key is `ATALAIA_BACKUP_KEY`). Schedule it (a `crontab -e` line such as `17 3 * * * sh ~/atalaia-preview/src/server/preview/preview.sh backup`; cron must be running in WSL) or run it before an update. Restore with `server/restore.sh` into a fresh database ([server/docs/DEPLOY.md](../../server/docs/DEPLOY.md), "Restore"): `ATALAIA_ENV_FILE=~/atalaia-preview/preview.env sh ~/atalaia-preview/src/server/restore.sh FILE --yes`.
+`preview.sh backup` writes an encrypted dump to `~/atalaia-preview/backups/` (30 days kept; the key is `ATALAIA_BACKUP_KEY`). Schedule it (a `crontab -e` line such as `17 3 * * * PATH=/opt/homebrew/bin:$PATH sh ~/atalaia-preview/src/server/preview/preview.sh backup`; on the Mac it only works while Colima is up, so after a login, see above; in WSL cron must be running) or run it before an update. `ATALAIA_BACKUP_DIR` in `preview.env` is this host's path (`/Users/USER/atalaia-preview/backups` on the Mac).
+
+Restore with **`preview.sh restore FILE --yes`** (it deletes the current database). It runs `server/restore.sh` ([server/docs/DEPLOY.md](../../server/docs/DEPLOY.md), "Restore") through the preview's Compose files (restore.sh sees `ATALAIA_PREVIEW=on` in `preview.env`), so the server comes back as the preview and Caddy is never started, and it puts the live demo's key right: the key is in the `demo-secrets` volume and only its hash in the database, so after a restore the two no longer match and the demo's sync would be refused (`invalid_api_key` in `preview.sh live logs`) until `demo-refresh`'s next round. `preview.sh restore` stops `demo-field` and `demo-refresh`, restores, runs `demo live` once (it makes a new key when the database does not know the volume's), then starts them again. Do not call `server/restore.sh` by hand for the preview.
 
 The feedback is the part worth keeping: before any destructive step run `preview.sh feedback all > ~/atalaia-preview/feedback-$(date +%F).txt` (mode it 600).
 
@@ -135,7 +146,18 @@ The feedback is the part worth keeping: before any destructive step run `preview
 - **`ATALAIA_METRICS_TOKEN`, `ATALAIA_BACKUP_KEY`:** edit `preview.env` and `preview.sh up` (an old backup needs the old key: keep it with the backup).
 - **`ATALAIA_SECRET_KEY`:** edit `preview.env` and `preview.sh up`. Everybody is logged out and every TOTP secret becomes unreadable, so also delete the accounts and make the administrator and the reviewers again.
 - **`POSTGRES_PASSWORD`:** change it in the database first (`ALTER ROLE atalaia PASSWORD '...'`), then in `preview.env`, then `preview.sh up`.
-- **The tunnel's token** is in the Cloudflare dashboard and the Windows service, not here.
+- **The tunnel's token** is in the Cloudflare dashboard and the host's cloudflared service (on the Mac a root-only token file the LaunchDaemon reads), not here.
+
+## Moving the preview to another host
+
+Done on 2026-11-02 from WSL on Windows to the Mac mini; the same steps work the other way. Nothing secret goes through chat or e-mail: the bundle is copied by hand (AirDrop, a USB stick).
+
+1. **New host:** Docker working (on a Mac: Colima, `brew services start colima`, the VM as above), the repository cloned at `~/code/atalaia-project`, ports 8000 and 8001 free on 127.0.0.1, and cloudflared connected to the same tunnel (`sudo cloudflared service install TOKEN` with the token from the dashboard). Keep its connector stopped, or expect 502s for the visitors it gets, until step 5.
+2. **Old host:** `preview.sh backup`, `preview.sh down` (the volumes stay as a fallback), then a bundle (tar) of `~/atalaia-preview/` without `src/` (`preview.env`, `admin-login.txt`, `reviewers/`, the newest backup and `erasures-ledger.jsonl` beside it) and of the live demo's volumes (`atalaia-preview_ledger`, `_demo-data`, `_demo-secrets`, each with `tar --numeric-owner -p` from the volume's root; the demo runs as uid 10001). Note the bundle's SHA-256.
+3. **New host:** check the SHA-256; `mkdir -m 700 ~/atalaia-preview-in && tar -xpf BUNDLE -C ~/atalaia-preview-in`; move `atalaia-preview/` to `~/atalaia-preview` (mode 700); change `ATALAIA_BACKUP_DIR` in `preview.env` to this host's path (nothing else). Load each volume before the first start: `docker volume create atalaia-preview_NAME`, then `docker run --rm -v atalaia-preview_NAME:/v -v ~/atalaia-preview-in/volumes:/i:ro alpine:3.22 tar -C /v --numeric-owner -xpf /i/NAME.tar`.
+4. `ATALAIA_REPO=~/code/atalaia-project sh ~/code/atalaia-project/server/preview/preview.sh update` (the code into `src/`, builds, starts on an empty database), then `preview.sh restore ~/atalaia-preview/backups/atalaia-...backup --yes` and `preview.sh check` (every local line ok).
+5. Stop the old host's cloudflared (Connectors tab: only the new host left); `preview.sh check` now says `public (...): ok`. Log in at `http://127.0.0.1:8000/staff/login` with `admin-login.txt`: a working TOTP shows `ATALAIA_SECRET_KEY` came over.
+6. Delete the bundle and `~/atalaia-preview-in`; schedule the backup on the new host; on the old one, remove the volumes once the new host has run for a while.
 
 ## Wiping everything
 
@@ -152,6 +174,7 @@ sh ~/atalaia-preview/src/server/preview/preview.sh up && sh ~/atalaia-preview/sr
 
 - `python3 tools/docker_server.py preview-check` (the Compose files' promises, the live demo's included), `python3 tools/docker_server.py preview-demo-unit` and `preview-demo` (above), `python3 tools/docker_server.py test tests.test_preview`, `python3 tools/docker_server.py browser tests_browser.test_preview_browser`.
 - Visitors' language: the preview opens in Portuguese whatever the browser asks for (`ATALAIA_LANG_FROM_BROWSER=off`, PV-9); the language switcher remembers the choice in a `lang` cookie. To let browsers decide, set `ATALAIA_LANG_FROM_BROWSER=on` in `preview.env` and `preview.sh up`.
+- `python3 tools/docker_server.py preview-check` also runs `preview.sh restore` against a stand-in `docker` (no container): restore.sh goes through the preview's file, Caddy is not started, and the live demo's key step comes after the database is replaced.
 - Client addresses in the logs are the visitors' (Cloudflare's `X-Forwarded-For`); an address you see as `172.29.89.1` means a request came from this machine directly.
 
 ## The project page

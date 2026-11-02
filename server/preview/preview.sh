@@ -25,10 +25,14 @@
 #                                 its state, a clean restart, deleting its games on the site server, its log
 #   sh preview.sh feedback [new|seen|done|all]
 #   sh preview.sh backup          an encrypted backup into backups/
+#   sh preview.sh restore FILE --yes   replace the database with a backup (server/restore.sh through the preview's
+#                                 files, so Caddy stays off), then give the live demo a key the restored database knows
 #   sh preview.sh update [REF | --from DIR]   new code (default: main of ATALAIA_REPO), rebuild, restart
 #
-# The Cloudflare Tunnel is not part of this stack: cloudflared runs on the maintainer's Windows host and forwards
-# https://tests.atalaia-project.link to http://localhost:8000 (WSL2 forwards it to 127.0.0.1:8000 here).
+# The Cloudflare Tunnel is not part of this stack: cloudflared runs on the same host, outside Docker, and forwards
+# https://tests.atalaia-project.link to http://localhost:8000. Since 2026-11-02 the host is the maintainer's Mac mini
+# (Docker in Colima, cloudflared a macOS LaunchDaemon with a remotely managed tunnel); WSL on Windows, with
+# cloudflared as a Windows service and WSL2 forwarding localhost:8000 to 127.0.0.1:8000, works the same way.
 # Secrets are never printed. Everything is bound to 127.0.0.1; the tunnel is the only way in.
 set -eu
 
@@ -47,6 +51,12 @@ fail() {
 
 need_env() {
     [ -f "$env_file" ] || fail "$env_file is missing: run 'sh preview.sh init' first"
+}
+
+# A setting of preview.env, or $2 when it is not there (the Compose files have the same defaults).
+setting() {
+    v=$(sed -n "s/^$1=//p" "$env_file" | tail -n 1)
+    echo "${v:-$2}"
 }
 
 dc() {
@@ -113,9 +123,9 @@ case "$cmd" in
         need_env
         install_notice
         dc up -d --build --wait server postgres demo-refresh demo-field
-        echo "preview.sh: up on 127.0.0.1:$(sed -n 's/^ATALAIA_PREVIEW_PORT=//p' "$env_file" | tail -n 1) only;" \
-            "the tunnel (Windows service) serves it at https://$domain"
-        echo "preview.sh: the live demo is on 127.0.0.1:$(sed -n 's/^ATALAIA_DEMO_PORT=//p' "$env_file" | tail -n 1) only" \
+        echo "preview.sh: up on 127.0.0.1:$(setting ATALAIA_PREVIEW_PORT 8000) only;" \
+            "the tunnel (cloudflared on this host) serves it at https://$domain"
+        echo "preview.sh: the live demo is on 127.0.0.1:$(setting ATALAIA_DEMO_PORT 8001) only" \
             "(its tunnel hostname is a step of its own: docs/runbooks/preview-server.md, \"The live demo\")"
         ;;
     down)
@@ -132,24 +142,25 @@ case "$cmd" in
         ;;
     check)
         need_env
-        port=$(sed -n 's/^ATALAIA_PREVIEW_PORT=//p' "$env_file" | tail -n 1)
-        base=http://127.0.0.1:${port:-8000}
+        port=$(setting ATALAIA_PREVIEW_PORT 8000)
+        base=http://127.0.0.1:$port
         curl -fsS "$base/api/v1/health" > /dev/null && echo "health: ok"
         curl -fsS "$base/" | grep -q 'preview-banner' && echo "front page with the banner: ok"
         curl -fsS "$base/f/campo-demo/" | grep -q 'campo-demo\|Campo Demo' && echo "demo field: ok"
         curl -fsS "$base/robots.txt" | grep -q 'Disallow: /' && echo "robots.txt: ok"
+        # Only when the host is WSL: Windows' own curl, through WSL2's localhost forwarding (what cloudflared uses).
         win=/mnt/c/Windows/System32/curl.exe
         if [ -x "$win" ]; then
-            "$win" -fsS "http://localhost:${port:-8000}/api/v1/health" > /dev/null && echo "from Windows (localhost:${port:-8000}): ok"
+            "$win" -fsS "http://localhost:$port/api/v1/health" > /dev/null && echo "from Windows (localhost:$port): ok"
         fi
-        dport=$(sed -n 's/^ATALAIA_DEMO_PORT=//p' "$env_file" | tail -n 1)
-        dbase=http://127.0.0.1:${dport:-8001}
+        dbase=http://127.0.0.1:$(setting ATALAIA_DEMO_PORT 8001)
         curl -fsS "$dbase/demo/health" > /dev/null && echo "live demo (read-only proxy): ok"
         [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$dbase/api/v1/games")" = 405 ] && echo "live demo refuses writes: ok"
         if curl -fsS "https://$domain/api/v1/health" > /dev/null 2>&1; then
             echo "public ($domain): ok"
         else
-            echo "public ($domain): NOT answering (is the Windows cloudflared service running? is WSL up?)"
+            echo "public ($domain): NOT answering (is cloudflared running on this host, and is the tunnel's public" \
+                "hostname pointing at http://localhost:$port? is another connector of the same tunnel still up?)"
         fi
         ;;
     admin)
@@ -193,8 +204,7 @@ case "$cmd" in
         case "${1:-status}" in
             status)
                 dc ps -a demo-field demo-refresh
-                dport=$(sed -n 's/^ATALAIA_DEMO_PORT=//p' "$env_file" | tail -n 1)
-                curl -fsS "http://127.0.0.1:${dport:-8001}/demo/state.json" && echo
+                curl -fsS "http://127.0.0.1:$(setting ATALAIA_DEMO_PORT 8001)/demo/state.json" && echo
                 ;;
             restart)
                 # A clean start of the simulated field: the boxes forget their game, a game left running is ended,
@@ -220,6 +230,25 @@ case "$cmd" in
         need_env
         ATALAIA_ENV_FILE=$env_file sh "$server/backup.sh"
         ;;
+    restore)
+        # A backup into this preview (a move to another host, or a migration gone wrong). restore.sh goes through
+        # docker-compose.preview.yml (ATALAIA_PREVIEW=on in preview.env), so the server comes back as the preview
+        # and Caddy is never started. The live demo's API key lives in a volume and only its hash in the database:
+        # after a restore the two no longer match (the key in the volume was made by this host's demo-refresh, the
+        # hash came with the backup) and the demo's sync is refused until demo-refresh's next ten-minute round. So
+        # demo-refresh and demo-field are stopped first (no round in the middle), `demo live` runs once on the
+        # restored database (it keeps the key when the database knows it, otherwise makes a new one and writes it
+        # to the volume), and only then do the two start again. Nothing secret is printed.
+        need_env
+        [ -n "${1:-}" ] || fail "usage: preview.sh restore BACKUP_FILE --yes   (deletes the current database)"
+        install_notice
+        dc stop demo-field demo-refresh
+        COMPOSE_PROJECT_NAME=$project ATALAIA_ENV_FILE=$env_file sh "$server/restore.sh" "$@"
+        dc run --rm -T --no-deps --entrypoint python demo-refresh \
+            -m atalaia_server demo live --key-out /secrets/sync-key
+        dc up -d --wait server postgres demo-refresh demo-field
+        echo "preview.sh: restored; the live demo's key matches the restored database ('sh preview.sh check' next)"
+        ;;
     update)
         mkdir -p "$home"
         new=$home/src.new
@@ -244,7 +273,7 @@ case "$cmd" in
         fi
         ;;
     *)
-        sed -n '5,32p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '/^# Runs the preview/,/^set -eu$/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'
         [ -z "$cmd" ] || exit 2
         ;;
 esac
