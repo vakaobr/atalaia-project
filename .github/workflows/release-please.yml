@@ -135,7 +135,10 @@ jobs:
         run: |
           set -eu
           next="$(python3 tools/prepare_release.py open-dev --released "$VERSION")"
-          branch="dev/open-$next"
+          # Named after the release too: after a patch release the next version is the same as after the
+          # release before it (0.6.0 and 0.6.1 both open 0.7.0-dev), and a merged branch is not deleted, so
+          # "dev/open-$next" alone was refused on push after v0.6.1.
+          branch="dev/open-$next-after-v$VERSION"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
