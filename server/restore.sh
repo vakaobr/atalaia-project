@@ -37,6 +37,10 @@
 # into the volume (a new machine has an empty one); once the server is healthy, `erasure-ledger apply` erases again,
 # in every field, what the restored database still holds of it, and the result is printed. Never skipped: a failure
 # stops the script with the server running, and the command can be repeated by hand.
+# The preview deployment (decisions PV-*; docs/runbooks/preview-server.md): an env file with ATALAIA_PREVIEW=on is
+# restored through docker-compose.preview.yml as well, so the server comes back as the preview (127.0.0.1 only, the
+# banner) and Caddy, which the preview never runs, is not started. `preview.sh restore FILE --yes` is the way to
+# call it there: it also gives the live demo a key the restored database knows.
 # Settings: ATALAIA_ENV_FILE (server/.env), COMPOSE_PROJECT_NAME.
 set -eu
 
@@ -73,9 +77,15 @@ fi
 [ "$yes" -eq 1 ] || fail "this deletes the current database and replaces it with $file; add --yes to go on"
 
 hosted=$(sed -n 's/^ATALAIA_HOSTED=//p' "$env_file" | tail -n 1)
+preview=$(sed -n 's/^ATALAIA_PREVIEW=//p' "$env_file" | tail -n 1)
+if [ "$hosted" = on ] && [ "$preview" = on ]; then
+    fail "$env_file sets both ATALAIA_HOSTED and ATALAIA_PREVIEW: a preview is never a hosted hub; nothing was changed"
+fi
 dc() {
     if [ "$hosted" = on ]; then
         docker compose --env-file "$env_file" -f "$here/docker-compose.yml" -f "$here/docker-compose.hosted.yml" "$@"
+    elif [ "$preview" = on ]; then
+        docker compose --env-file "$env_file" -f "$here/docker-compose.yml" -f "$here/docker-compose.preview.yml" "$@"
     else
         docker compose --env-file "$env_file" -f "$here/docker-compose.yml" "$@"
     fi
@@ -161,7 +171,11 @@ if [ "$hosted" = on ]; then
     fi
 else
     echo "restore.sh: starting the server (it runs the migrations)"
-    dc up -d --wait server caddy
+    if [ "$preview" = on ]; then
+        dc up -d --wait server   # naming caddy would start it in spite of its profile
+    else
+        dc up -d --wait server caddy
+    fi
 fi
 echo "restore.sh: erasing again what the erasure ledger lists"
 dc exec -T server python -m atalaia_server erasure-ledger apply \

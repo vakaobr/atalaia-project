@@ -2,17 +2,18 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # The preview deployment (decisions PV-*; server/README.md "Preview deployment", docs/runbooks/preview-server.md):
-# docker-compose.yml without Caddy, for a site served through a Cloudflare Tunnel that runs OUTSIDE Docker (on the
-# maintainer's Windows host, as a service). Used through server/preview/preview.sh, which keeps the settings and
-# secrets outside the repository (~/atalaia-preview):
+# docker-compose.yml without Caddy, for a site served through a Cloudflare Tunnel that runs OUTSIDE Docker, on the
+# same host (the maintainer's Mac mini, cloudflared as a LaunchDaemon; or Windows, as a service, with WSL). Used
+# through server/preview/preview.sh, which keeps the settings and secrets outside the repository (~/atalaia-preview):
 #   docker compose --env-file ~/atalaia-preview/preview.env -f docker-compose.yml -f docker-compose.preview.yml ...
 #
 # What changes from the production file:
 # - Caddy is not started (profile "caddy"): Cloudflare terminates TLS; cloudflared forwards plain HTTP to
 #   http://localhost:8000 on the host, which is this server's published port.
 # - The server runs with ATALAIA_PREVIEW=on (banner, noindex, feedback form, landing page) and is published on
-#   127.0.0.1 ONLY (ATALAIA_PREVIEW_PORT, default 8000). Windows reaches it as localhost:8000 through WSL2's
-#   localhost forwarding. The ATAK relay port of the production file is dropped. Nothing listens on 0.0.0.0.
+#   127.0.0.1 ONLY (ATALAIA_PREVIEW_PORT, default 8000). cloudflared reaches it as localhost:8000 (Colima forwards
+#   it on a Mac; on Windows, WSL2's localhost forwarding). The ATAK relay port of the production file is dropped.
+#   Nothing listens on 0.0.0.0.
 # - The client's address: Cloudflare appends the real address to X-Forwarded-For (and sets X-Forwarded-Proto
 #   https). The tunnel's connection reaches the server from the gateway of the "atak" network (the only one that
 #   publishes the port, with a fixed subnet and no outbound NAT), and the server trusts forwarded headers from that
