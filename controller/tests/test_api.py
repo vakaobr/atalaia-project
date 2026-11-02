@@ -11,7 +11,9 @@ as the packets they become.
 
 from __future__ import annotations
 
+import asyncio
 import tempfile
+import threading
 import unittest
 
 from fastapi.testclient import TestClient
@@ -216,6 +218,39 @@ class StreamTests(ApiCase):
                 self.assertEqual(exc.code, 4408)
             self.assertLess(len(got), 50)
         self.assertGreaterEqual(self.hub.dropped_clients, 1)
+
+
+class HubLoopTests(unittest.TestCase):
+    """PLK-6: each client's queue is filled on its own event loop. FastAPI's TestClient runs every
+    WebSocket on a loop of its own; the hub filled them all on the latest subscriber's, and a reader on
+    another loop could then wait for good (test_map_features hung once on the pinned lock)."""
+
+    def test_each_queue_is_filled_on_its_own_loop(self):
+        seen: dict[str, str] = {}
+
+        def route(viewer: str, msg: dict) -> dict:
+            seen[viewer] = threading.current_thread().name  # where the hub routes and queues it
+            return msg
+        hub = Hub(route=route)
+        got: dict[str, object] = {}
+        ready = threading.Barrier(3)
+
+        def client(name: str) -> None:
+            async def main() -> None:
+                queue = hub.subscribe(name)
+                ready.wait()
+                got[name] = await asyncio.wait_for(queue.get(), 5)
+            asyncio.run(main())
+
+        threads = [threading.Thread(target=client, args=(n,), name=f"loop-{n}") for n in ("a", "b")]
+        for t in threads:
+            t.start()
+        ready.wait()
+        hub.publish({"type": "system", "kind": "test"})
+        for t in threads:
+            t.join(10)
+        self.assertEqual(seen, {"a": "loop-a", "b": "loop-b"})
+        self.assertEqual(got, {"a": {"type": "system", "kind": "test"}, "b": {"type": "system", "kind": "test"}})
 
 
 if __name__ == "__main__":

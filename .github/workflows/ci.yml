@@ -85,6 +85,56 @@ jobs:
         working-directory: server
         run: /usr/bin/python3 -m unittest tests.test_config tests.test_ids tests.test_shared_imports tests.test_chrono_verify tests.test_feeds tests.test_backup_crypt -v
 
+  controller-pinned:
+    name: Field controller on the hash-pinned lock (pip, Python 3.12)
+    # The controller's second supported install (controller/README.md, decision D15):
+    # controller/requirements.txt with pip (FastAPI, Starlette and pydantic 2 as pinned there),
+    # where the job above has Ubuntu's packages (FastAPI 0.101, pydantic 1.10). The same tests,
+    # so both stacks stay green; a DeprecationWarning is an error here, since the older stack
+    # cannot show them (decisions PLK-1 to PLK-6).
+    runs-on: ubuntu-24.04
+    # A stream test that waits for good ends here, not after GitHub's six hours (PLK-6).
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      ATALAIA_REQUIRE_ALL: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install system dependencies and the pinned lock
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libmbedtls-dev mosquitto
+          sudo systemctl stop mosquitto || true
+          python -m pip install --require-hashes --no-deps --only-binary ":all:" -r controller/requirements.txt
+          python -m pip list
+      - name: Build the core and the host modem
+        run: |
+          cmake -S core -B build -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON -DBUILD_TESTING=OFF
+          cmake --build build
+          cmake -S firmware/esp32/test/modem_host -B build/modem_host -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/modem_host
+          cmake -S firmware/esp32/test/box_host -B build/box_host -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/box_host
+          cmake -S firmware/esp32/test/pod_host -B build/pod_host -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/pod_host
+      - name: Test the controller
+        env:
+          ATALAIA_CORE_LIB: ${{ github.workspace }}/build/libatalaia_core.so
+          ATALAIA_MODEM_HOST: ${{ github.workspace }}/build/modem_host/modem_host
+          ATALAIA_BOX_HOST: ${{ github.workspace }}/build/box_host/box_host
+          ATALAIA_POD_HOST: ${{ github.workspace }}/build/pod_host/pod_host
+        working-directory: controller
+        # FastAPI's and pydantic 2's deprecations are DeprecationWarnings, errors here. Starlette's own
+        # (StarletteDeprecationWarning, a UserWarning) are printed: today only its test client asking
+        # for httpx2 where the lock has httpx (PLK-3).
+        run: python -W error::DeprecationWarning -m unittest discover -s tests -v
+
   console:
     name: GM console and scoreboard in a browser (Chromium)
     # The image of tools/dev/console/Dockerfile, as `python tools/docker_console.py`
