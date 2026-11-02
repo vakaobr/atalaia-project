@@ -9,7 +9,7 @@ The **radio modem** is the controller's radio: a Heltec WiFi LoRa 32 V4 board, f
 
 This page is the whole path, from a bare board to a box joining a game through the modem. The other guides link here: the [firmware guide](firmware.md#9-the-modem-board), the [controller setup guide](controller-setup.md#3-prepare-the-modem-board) and the [Game master manual](game-master.md#on-a-raspberry-pi-or-another-linux-computer).
 
-> **What was tested, and what was not.** A modem flashed like this ran with the controller and real boxes on a bench (2026-10-21): the controller in Docker on Windows (WSL2), the modem on a Windows COM port, which the container reached through a small COM-to-TCP bridge (see the advanced note in section 7). **Not yet run on a Raspberry Pi**: the Linux port names, the `dialout` group and the `systemd` steps below follow the project's files and the controller guide, and no Pi has run them. Not tried on macOS. The browser flasher is not tried with a real board. Not tested on a field.
+> **What was tested, and what was not.** A modem flashed like this ran with the controller and real boxes on a bench (2026-10-21): the controller in Docker on Windows (WSL2), the modem on a Windows COM port, which the container reached through a small COM-to-TCP bridge (see the advanced note in section 7). **Not yet run on a Raspberry Pi**: the Linux port names, the `dialout` group and the `systemd` steps below follow the project's files and the controller guide, and no Pi has run them. On macOS (2026-11-02, a Mac mini with Apple silicon, macOS 27) the modem image and box images were flashed as in section 4, and the controller in Docker reached the modem through a bridge on the Mac (section 7) and logged `modem link up`; a controller run natively on macOS is not tried. The browser flasher is not tried with a real board. Not tested on a field.
 
 ## 1. The path in short
 
@@ -31,7 +31,7 @@ If something fails, go to the table in [section 10](#10-troubleshooting).
 | A **Heltec WiFi LoRa 32 V4**, for the modem only | The same revision (V4.3 or V4.2) as your boxes. V4.2 has the chip GC1109 next to the LoRa connector. Use a board you do not need as a box: a board that is a modem is not a box |
 | A **LoRa antenna** for your band | 868 MHz for Europe (2 dBi or less), 915-925 MHz for Taiwan. **Fit it before the board has any power**, also for flashing. Powering the board without it can destroy the radio. The modem has no Wi-Fi, so it needs no 2.4 GHz antenna |
 | A USB-C **data** cable | A charge-only cable shows no port. Keep it short. Use the computer's own USB port for flashing, not a hub |
-| A computer to flash with | Windows 10 or 11, Linux (the Raspberry Pi itself will do) or macOS, with [Python 3](https://www.python.org/downloads/) |
+| A computer to flash with | Windows 10 or 11, Linux (the Raspberry Pi itself will do) or macOS, with [Python 3](https://www.python.org/downloads/) (macOS's own `python3` will do) |
 | The same **radio region** as the boxes | EU868 (the default) or AS923-TW. A modem and a box built for different regions never talk. Decide this before section 3 |
 
 ## 3. Get the modem image
@@ -100,7 +100,7 @@ python3 -m venv ~/atalaia-flash
 ~/atalaia-flash/bin/python -m pip install esptool==4.8.1
 ```
 
-On a Raspberry Pi OS or Ubuntu that says `ensurepip is not available`, first run `sudo apt install python3-venv`.
+On a Raspberry Pi OS or Ubuntu that says `ensurepip is not available`, first run `sudo apt install python3-venv`. The macOS test used esptool 4.12.0 with pyserial 3.5 (`~/atalaia-flash/bin/pip install esptool pyserial`), and it wrote the images as well.
 
 ### 4.2 Find the board's port
 
@@ -108,9 +108,9 @@ On a Raspberry Pi OS or Ubuntu that says `ensurepip is not available`, first run
 | --- | --- | --- |
 | Windows 10 and 11 | A new **COM** port, USB ID 303A:1001. No driver is needed | Device Manager, *Ports (COM & LPT)*; or `%USERPROFILE%\atalaia-flash\Scripts\python -m serial.tools.list_ports -v` |
 | Linux | `/dev/ttyACM0`, or `ttyACM1`... | `ls /dev/ttyACM*`, or `dmesg \| tail` right after plugging |
-| macOS | `/dev/cu.usbmodem...` | `ls /dev/cu.usbmodem*` |
+| macOS | `/dev/cu.usbmodem...` (for example `/dev/cu.usbmodem31101`). No driver is needed. Use the `cu.` name, not the `tty.` one | `ls /dev/cu.usbmodem*` |
 
-If you are unsure which port is the board, unplug it, list the ports, plug it back and list again: the new one is the board.
+If you are unsure which port is the board, unplug it, list the ports, plug it back and list again: the new one is the board. On macOS, with several boards plugged in, `ioreg -p IOUSB -l -w0 | grep -E '"USB Serial Number" = "[0-9A-F]{2}:'` shows each board's MAC (its USB serial number), and `~/atalaia-flash/bin/python -m esptool --chip esp32s3 -p /dev/cu.usbmodem31101 read_mac` prints the MAC of the board on that port (it restarts the board).
 
 **Linux only: the `dialout` group.** Your user needs it to open the port. Check with `groups`; if `dialout` is missing, run `sudo usermod -aG dialout $USER`, then **log out and in again**. Without it esptool says `Permission denied`.
 
@@ -140,12 +140,12 @@ cd atalaia-modem
 ~/atalaia-flash/bin/python -m esptool --chip esp32s3 -p /dev/ttyACM0 -b 921600 write_flash "@flash_args"
 ```
 
-macOS (not tried by the project):
+macOS (the write was done this way on a Mac, for the modem and for boxes):
 
 ```
 cd atalaia-modem
-~/atalaia-flash/bin/python -m esptool --chip esp32s3 -p /dev/cu.usbmodem1101 erase_flash
-~/atalaia-flash/bin/python -m esptool --chip esp32s3 -p /dev/cu.usbmodem1101 -b 921600 write_flash "@flash_args"
+~/atalaia-flash/bin/python -m esptool --chip esp32s3 -p /dev/cu.usbmodem31101 erase_flash
+~/atalaia-flash/bin/python -m esptool --chip esp32s3 -p /dev/cu.usbmodem31101 -b 921600 write_flash "@flash_args"
 ```
 
 For a build, replace `cd atalaia-modem` with `cd firmware/esp32/build-modem` (from the repository's folder). Skip the `erase_flash` line when you do not erase.
@@ -221,9 +221,11 @@ If the controller is not installed yet, do [controller setup guide, section 4](c
 
    It should say `active (running)`. The `systemd` file lets the service open `/dev/ttyACM*` and `/dev/ttyUSB*`, and the `atalaia` user is in `dialout` (controller setup guide, section 4, step 3), so no more setup is needed for the port.
 
-On another computer, `port` is what the system calls it: `COM5` on Windows.
+On another computer, `port` is what the system calls it: `COM5` on Windows, `/dev/cu.usbmodem31101` on macOS (a controller run natively on macOS is not tried).
 
-**Controller in Docker on Windows or macOS (advanced).** Docker Desktop and WSL cannot pass a USB serial port into a container. The supported way is to run the controller natively. If you must use Docker, bridge the port to TCP on the host (a small program that serves the COM port on a local TCP port, for example pyserial's `tools/tcp_serial_redirect.py`, plus a relay if the container cannot reach the host's loopback) and give the container a pyserial URL as the port: `port = "socket://host.docker.internal:7601"` (the number is only an example). The controller opens its port with pyserial's `serial_for_url`, so `socket://` URLs work, and this is how the bench ran. The bridge is your own setup, not shipped by the project, and the modem's screen and the checks in section 8 apply as before.
+**Controller in Docker on Windows or macOS (advanced).** Docker Desktop and WSL cannot pass a USB serial port into a container. The supported way is to run the controller natively. If you must use Docker, bridge the port to TCP on the host (a small program that serves the COM port on a local TCP port: the repository's `tools/serial_bridge.py`, plus a relay if the container cannot reach the host's loopback) and give the container a pyserial URL as the port: `port = "socket://host.docker.internal:7601"` (the number is only an example). The controller opens its port with pyserial's `serial_for_url`, so `socket://` URLs work, and this is how the bench ran. The bridge runs outside the controller (start it before the controller, and keep it running), and the modem's screen and the checks in section 8 apply as before.
+
+On macOS (Colima or Docker Desktop alike) the bench did the same: the repository's `tools/serial_bridge.py` run natively on the Mac with `~/atalaia-flash/bin/python` (`python tools/serial_bridge.py /dev/cu.usbmodem... 7600 --baud 921600`), serving `/dev/cu.usbmodem...` on TCP port 7600, the setting `port = "socket://host.docker.internal:7600"`, and the container started with `--add-host host.docker.internal:host-gateway`. The controller logged `modem link up` (2026-11-02). **One program per serial port, ever**: one bridge, and no esptool or serial monitor on the port while it runs. Opening the port on macOS can restart the board, so the modem's splash may show again: that is harmless.
 
 ## 8. Check that the controller and the modem talk
 
