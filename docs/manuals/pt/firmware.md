@@ -43,7 +43,7 @@ Há duas maneiras. Transfere uma versão publicada se só queres pôr na placa o
 
 ### 2.1 Transferir uma versão publicada (o caminho fácil)
 
-O projeto publica o firmware no GitHub: [a página de Releases](https://github.com/vakaobr/atalaia-project/releases). Escolhe a mais recente (a v0.5.0 em 2026-11-01; a primeira foi a v0.4.0). Cada uma está marcada como **pré-lançamento**: pré-alfa e **não testada num campo**. Lê primeiro as notas dela.
+O projeto publica o firmware no GitHub: [a página de Releases](https://github.com/vakaobr/atalaia-project/releases). Escolhe a mais recente (a v0.6.1 em 2026-11-02; a primeira foi a v0.4.0; a v0.6.0 não tem ficheiros, a compilação dela falhou). Cada uma está marcada como **pré-lançamento**: pré-alfa e **não testada num campo**. Lê primeiro as notas dela.
 
 Escolhe os ficheiros da tua placa:
 
@@ -62,13 +62,13 @@ Todos são para a Heltec WiFi LoRa 32 V4.3, região de rádio europeia (EU868), 
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 
-No `cmd` do Windows: `certutil -hashfile atalaia-field-box-0.4.0-usb.zip SHA256` e compara a linha com a que está no `SHA256SUMS`. As somas provam que o ficheiro é o que a página da versão publicada lista. A assinatura prova quem fez uma imagem da Field Box: o `.release.json` é assinado com a chave de versões da CI do projeto, em que todas as caixas confiam por omissão (`firmware/esp32/docs/RELEASE_SIGNING.md`). Uma caixa e um controlador verificam-na por ti antes de instalarem uma atualização.
+No `cmd` do Windows: `certutil -hashfile atalaia-field-box-0.6.1-usb.zip SHA256` e compara a linha com a que está no `SHA256SUMS`. As somas provam que o ficheiro é o que a página da versão publicada lista. A assinatura prova quem fez uma imagem da Field Box: o `.release.json` é assinado com a chave de versões da CI do projeto, em que todas as caixas confiam por omissão (`firmware/esp32/docs/RELEASE_SIGNING.md`). Uma caixa e um controlador verificam-na por ti antes de instalarem uma atualização.
 
 **Grava o zip.** Descompacta-o. Nessa pasta segue a [secção 3](#3-grava-o) a partir da 3.1: os comandos são os mesmos, e o `README.txt` dentro do zip repete-os. A pasta tem o ficheiro `flash_args` que o comando usa, por isso salta a compilação e o passo `cd firmware/esp32/build`.
 
 **Grava o ficheiro «merged» a partir de um browser** (Chrome ou Edge, sem Python): abre o gravador web da Espressif, [https://espressif.github.io/esptool-js/](https://espressif.github.io/esptool-js/), liga a placa (em modo de gravação, se não aparecer, [3.2](#32-encontrar-a-porta-da-placa)), define o endereço de gravação como `0x0`, escolhe o ficheiro `-merged.bin` e programa. O projeto ainda não o experimentou com uma placa real; o ficheiro é o mesmo que o comando esptool produz a partir do zip.
 
-O número da versão publicada é o que a caixa mostra no arranque (`0.4.0`).
+O número da versão publicada é o que a caixa mostra no arranque (`0.6.1`).
 
 ### 2.2 Compilar por ti
 
@@ -87,7 +87,7 @@ python tools/docker_fw.py build
 
 No macOS e no Linux, usa `python3` se o `python` não for encontrado. A primeira compilação transfere as ferramentas de compilação e demora vários minutos (cerca de dez da primeira vez). Acaba com uma linha que nomeia o ficheiro `firmware/esp32/build/atalaia_esp32.bin`. Os outros ficheiros de que precisas estão na mesma pasta. Não precisas de os ler.
 
-Uma compilação feita a partir de um clone mostra uma versão como `0.4.0+12.g1a2b3c4` (ou `0.5.0-dev.12+g1a2b3c4` entre versões publicadas): o número da versão publicada, o número de alterações desde então e o identificador do código. Também aparece no ecrã pequeno da placa, no arranque. Guarda uma nota dela junto da caixa. Para obteres exatamente o firmware de uma versão publicada, faz checkout da etiqueta dela (`git checkout v0.4.0`) e compila aí: um checkout limpo de uma etiqueta diz apenas `0.4.0`.
+Uma compilação feita a partir de um clone mostra uma versão como `0.6.1+12.g1a2b3c4` (ou `0.7.0-dev.12+g1a2b3c4` entre versões publicadas): o número da versão publicada, o número de alterações desde então e o identificador do código. Também aparece no ecrã pequeno da placa, no arranque. Guarda uma nota dela junto da caixa. Para obteres exatamente o firmware de uma versão publicada, faz checkout da etiqueta dela (`git checkout v0.6.1`) e compila aí: um checkout limpo de uma etiqueta diz apenas `0.6.1`.
 
 **Chaves.** Uma compilação feita por ti confia, por omissão, nas duas chaves de versões e nas duas chaves de modos do projeto, tal como os ficheiros publicados, por isso um controlador teu aceita as versões assinadas do projeto. As tuas compilações não são assinadas pelo projeto: assina-as com uma chave tua e dá às caixas a metade pública dela (`--release-keys=`, [secção 7](#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo)).
 

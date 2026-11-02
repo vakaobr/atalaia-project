@@ -43,7 +43,7 @@ Two ways. Download a release if you only want to put the project's firmware on a
 
 ### 2.1 Download a release (the easy way)
 
-The project publishes firmware on GitHub: [the Releases page](https://github.com/vakaobr/atalaia-project/releases). Take the newest one (v0.5.0 on 2026-11-01; the first was v0.4.0). Each is marked **pre-release**: pre-alpha and **not field-tested**. Read its notes first.
+The project publishes firmware on GitHub: [the Releases page](https://github.com/vakaobr/atalaia-project/releases). Take the newest one (v0.6.1 on 2026-11-02; the first was v0.4.0; v0.6.0 has no files, its build failed). Each is marked **pre-release**: pre-alpha and **not field-tested**. Read its notes first.
 
 Pick the files for your board:
 
@@ -62,13 +62,13 @@ All of them are for the Heltec WiFi LoRa 32 V4.3, European radio region (EU868),
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 
-On Windows `cmd`: `certutil -hashfile atalaia-field-box-0.4.0-usb.zip SHA256` and compare the line with the one in `SHA256SUMS`. The sums prove the file is the one the release page lists. The signature proves who made a Field Box image: the `.release.json` is signed with the project's CI release key, which every box trusts by default (`firmware/esp32/docs/RELEASE_SIGNING.md`). A box and a controller check it for you before they install an update.
+On Windows `cmd`: `certutil -hashfile atalaia-field-box-0.6.1-usb.zip SHA256` and compare the line with the one in `SHA256SUMS`. The sums prove the file is the one the release page lists. The signature proves who made a Field Box image: the `.release.json` is signed with the project's CI release key, which every box trusts by default (`firmware/esp32/docs/RELEASE_SIGNING.md`). A box and a controller check it for you before they install an update.
 
 **Flash the zip.** Unzip it. In that folder follow [section 3](#3-flash-it) from 3.1 on: the commands are the same, and the `README.txt` inside the zip repeats them. The folder has the `flash_args` file the command uses, so skip the build and the `cd firmware/esp32/build` step.
 
 **Flash the merged file from a browser** (Chrome or Edge, no Python): open Espressif's web flasher, [https://espressif.github.io/esptool-js/](https://espressif.github.io/esptool-js/), connect the board (download mode if it does not appear, [3.2](#32-find-the-boards-port)), set the flash address to `0x0`, choose the `-merged.bin` file and program. Not tried by the project with a real board yet; the file is the same one the esptool command produces from the zip.
 
-The version on the release is the version the box shows at boot (`0.4.0`).
+The version on the release is the version the box shows at boot (`0.6.1`).
 
 ### 2.2 Build it yourself
 
@@ -87,7 +87,7 @@ python tools/docker_fw.py build
 
 On macOS and Linux, use `python3` if `python` is not found. The first build downloads the build tools and takes several minutes (about ten the first time). It ends with a line that names the file `firmware/esp32/build/atalaia_esp32.bin`. The other files you need are in the same folder. You do not need to read them.
 
-A build from a checkout prints a version such as `0.4.0+12.g1a2b3c4` (or `0.5.0-dev.12+g1a2b3c4` between releases): the release's number, the number of changes since, and the code's identifier. It is also on the board's small screen at boot. Keep a note of it with the box. To get exactly a release's firmware, check out its tag (`git checkout v0.4.0`) and build there: a clean checkout of a tag says plain `0.4.0`.
+A build from a checkout prints a version such as `0.6.1+12.g1a2b3c4` (or `0.7.0-dev.12+g1a2b3c4` between releases): the release's number, the number of changes since, and the code's identifier. It is also on the board's small screen at boot. Keep a note of it with the box. To get exactly a release's firmware, check out its tag (`git checkout v0.6.1`) and build there: a clean checkout of a tag says plain `0.6.1`.
 
 **Keys.** A build you make trusts the project's two release keys and two mode keys by default, the same as the released files, so a controller you run accepts the project's signed releases. Your own builds are not signed by the project: sign them with your own key and give the boxes its public half (`--release-keys=`, [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)).
 
