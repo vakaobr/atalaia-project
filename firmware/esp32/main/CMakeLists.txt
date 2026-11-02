@@ -139,6 +139,7 @@ else()
         "fw_layout.c"
         "fw_layout_esp.c"
         "fw_update_esp.c"
+        "field_ca_pin.c"
         "fw_desc.c"
         "mode_package.c"
         "mode_store.c"

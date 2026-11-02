@@ -6,12 +6,8 @@
  * needs, over ESP-IDF's Wi-Fi station, esp_http_client and esp_ota_*.
  *
  * HTTPS trusts exactly one certificate authority: the field CA whose SHA-256 the
- * signed join payload carries (key 13). The controller sends it after its own
- * certificate (controller/atalaia_controller/tls.py); the verify callback clears
- * "not trusted" on that certificate alone, so the chain must end at it, the
- * controller's certificate must be signed by it and carry the host name of the
- * address (key 14), as mbedTLS checks. The same pattern as ESP-IDF's own
- * certificate bundle (a placeholder CA list and a verify callback).
+ * signed join payload carries (key 13), checked by field_ca_pin.c (shared with
+ * the host box's HTTPS, test/box_host/box_host_https.c).
  */
 #include "fw_update_esp.h"
 
@@ -30,6 +26,7 @@
 #include "esp_ota_ops.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
+#include "field_ca_pin.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
@@ -37,11 +34,7 @@
 #include "fw_layout_esp.h"
 #include "fw_update.h"
 #include "mem_monitor.h"
-#include "mbedtls/md.h"
-#include "mbedtls/pk.h"
-#include "mbedtls/sha256.h"
 #include "mbedtls/ssl.h"
-#include "mbedtls/x509_crt.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "fw_update";
@@ -80,85 +73,18 @@ static size_t release_keys(void)
     return (size_t)s_key_count;
 }
 
-/* ---- the field CA ------------------------------------------------------------------- */
+/* ---- the field CA (field_ca_pin.c) -------------------------------------------------- */
 
-static uint8_t s_pin[32];
-static mbedtls_x509_crt s_placeholder_ca; /* never matches: the callback decides */
-
-static bool is_field_ca(const mbedtls_x509_crt *crt)
+static void pin_warn(const char *why)
 {
-    uint8_t h[32];
-    return mbedtls_sha256(crt->raw.p, crt->raw.len, h, 0) == 0 && memcmp(h, s_pin, 32) == 0;
+    ESP_LOGW(TAG, "%s", why);
 }
 
-/* Whether ca (a certificate the server sent) issued and signed child. */
-static bool signed_by(const mbedtls_x509_crt *child, mbedtls_x509_crt *ca)
-{
-    if (!ca->MBEDTLS_PRIVATE(ca_istrue)) {
-        ESP_LOGW(TAG, "the field CA is not marked as a CA");
-        return false;
-    }
-    if (child->issuer_raw.len != ca->subject_raw.len ||
-        memcmp(child->issuer_raw.p, ca->subject_raw.p, ca->subject_raw.len) != 0) {
-        ESP_LOGW(TAG, "the certificate's issuer is not the field CA's name");
-        return false;
-    }
-    if (!mbedtls_pk_can_do(&ca->pk, child->MBEDTLS_PRIVATE(sig_pk))) {
-        ESP_LOGW(TAG, "the field CA's key cannot check this signature type");
-        return false;
-    }
-    const mbedtls_md_info_t *md = mbedtls_md_info_from_type(child->MBEDTLS_PRIVATE(sig_md));
-    unsigned char hash[MBEDTLS_MD_MAX_SIZE];
-    int ret = md == NULL ? -1 : mbedtls_md(md, child->tbs.p, child->tbs.len, hash);
-    if (ret != 0) {
-        ESP_LOGW(TAG, "hashing the certificate failed (-0x%04x)", (unsigned)-ret);
-        return false;
-    }
-    ret = mbedtls_pk_verify_ext(child->MBEDTLS_PRIVATE(sig_pk), child->MBEDTLS_PRIVATE(sig_opts),
-                                &ca->pk, child->MBEDTLS_PRIVATE(sig_md), hash,
-                                mbedtls_md_get_size(md), child->MBEDTLS_PRIVATE(sig).p,
-                                child->MBEDTLS_PRIVATE(sig).len);
-    if (ret != 0)
-        ESP_LOGW(TAG, "the field CA's signature does not verify (-0x%04x)", (unsigned)-ret);
-    return ret == 0;
-}
-
-/* As ESP-IDF's certificate bundle does: mbedTLS marks "not trusted" on the
- * certificate it could not chain to a trusted CA (on the bench, the
- * controller's own certificate, though the server sent the field CA after
- * it). Clear it only where the field CA of the join, found among the
- * certificates the server sent, is that certificate itself or issued and
- * signed it; every other flag stays. */
-static int pin_verify(void *ctx, mbedtls_x509_crt *crt, int depth, uint32_t *flags)
-{
-    (void)ctx;
-    if (*flags & MBEDTLS_X509_BADCERT_NOT_TRUSTED) {
-        bool anchored = is_field_ca(crt);
-        for (mbedtls_x509_crt *ca = crt->next; !anchored && ca != NULL; ca = ca->next) {
-            anchored = is_field_ca(ca) && signed_by(crt, ca);
-        }
-        if (anchored) {
-            *flags &= ~(uint32_t)MBEDTLS_X509_BADCERT_NOT_TRUSTED;
-        } else {
-            ESP_LOGW(TAG, "certificate at depth %d: not the field CA of the join, nor signed by it",
-                     depth);
-        }
-    }
-    if (depth == 0 && *flags != 0) {
-        /* Say why a handshake is refused (name, usage, signature...). */
-        char why[160];
-        mbedtls_x509_crt_verify_info(why, sizeof(why), "", *flags);
-        ESP_LOGW(TAG, "the controller's certificate: %s", why);
-    }
-    return 0;
-}
+static field_ca_pin_t s_pin = {.warn = pin_warn};
 
 static esp_err_t pin_attach(void *conf)
 {
-    mbedtls_ssl_config *c = (mbedtls_ssl_config *)conf;
-    mbedtls_ssl_conf_authmode(c, MBEDTLS_SSL_VERIFY_REQUIRED);
-    mbedtls_ssl_conf_ca_chain(c, &s_placeholder_ca, NULL);
-    mbedtls_ssl_conf_verify(c, pin_verify, NULL);
+    field_ca_pin_attach((mbedtls_ssl_config *)conf, &s_pin);
     return ESP_OK;
 }
 
@@ -484,7 +410,7 @@ static void update_task(void *arg)
 
 const fw_io_t *fw_update_esp_net(const uint8_t ca_sha256[32])
 {
-    memcpy(s_pin, ca_sha256, sizeof(s_pin));
+    memcpy(s_pin.sha256, ca_sha256, sizeof(s_pin.sha256));
     return &IO;
 }
 
@@ -563,7 +489,7 @@ void fw_update_esp_offer(const char *params_json)
             box_game_update_failed(s_box, s_job.id, fw_result_name(r), s_job.running_version);
         return;
     }
-    memcpy(s_pin, s_join.ca_sha256, sizeof(s_pin));
+    memcpy(s_pin.sha256, s_join.ca_sha256, sizeof(s_pin.sha256));
     s_busy = true;
     /* Core 0, below the game task: the game and the radio keep running meanwhile. */
     if (xTaskCreatePinnedToCore(update_task, "fw_update", 8192, NULL, 2, NULL, 0) != pdPASS) {

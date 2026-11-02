@@ -8,7 +8,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 **Current phase:** Implementation (plan phases 1-13 built in software 2026-10-22: the visual mode editor complete, its link to the simulator, signed mode packages, the sandbox-escape battery, signed packages in the controller, scenario blocks in the GM console, missing modes sent to boxes (controller and box), the registry repository's template and the community processes, German, Traditional Chinese (Taiwan), the build guides for the other node types)
 **Phase status:** Software done (every software plan phase built; the gate waits for hardware and real deployments)
 **Risk level:** Medium
-**Last updated:** 2026-10-22 (plan phase 11 built, P5K-1 to P5K-12; plan phase 12 built; the editor makes the package itself, P5I-1 to P5I-6; plan phases 8 and 9 built; plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8 and built as 13a and 13b; refreshed after phases 2-4 software; first written 2026-10-18)
+**Last updated:** 2026-11-02 (plan phase 13b tested end to end against the real controller over HTTPS, MFH-1 to MFH-7); 2026-10-22 (plan phase 11 built, P5K-1 to P5K-12; plan phase 12 built; the editor makes the package itself, P5I-1 to P5I-6; plan phases 8 and 9 built; plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8 and built as 13a and 13b; refreshed after phases 2-4 software; first written 2026-10-18)
 **Next step:** the review of the German and the Traditional Chinese by native-speaking players (P5H-5, P5K-11), and the maintainer's P5K-3, P5K-4, P5K-5, P5K-7 and P5K-12 (box flash and fonts, OLED readability, typed Chinese names, the app's font, the radio band on the Chinese page); P5I-1 and P5I-3 (the editor's package: made in the page, signed offline) for the maintainer; creating the registry repository waits for the maintainer; plan phase 13's test on real boxes is HW3; every software plan phase is built; the build guides wait for their first builds and photos (HW2) and the maintainer's P5J decisions
 
 Phase 5 is the community layer: visual mode editor (Blockly), mode
@@ -129,6 +129,21 @@ section 16).
   failure without HTTPS goes over LoRa as `node.modes_failed` (id 53) and the
   box is free again; key 17 forgets. The core's join codec reads keys 16 and
   17. Decisions P5E-1 to P5E-14. Binary +16 KB (0.9 %), static RAM +1 KB.
+- [x] **Plan phase 13b end to end against the real controller (2026-11-02),
+  in software:** the field CA pin moved out of `fw_update_esp.c` into the
+  platform-free `main/field_ca_pin.c` (mbedTLS 2.28 or 3.x), which the Field
+  Box's HTTPS and the C host box's (`test/box_host/box_host_https.c`, mbedTLS
+  sockets standing for esp_http_client) both attach. `box_host --mode-source
+  https` runs the firmware's own `mode_fetch.c` over it to the join's address
+  (key 14), trusting only the join's field CA (key 13), and posts the reports
+  to the controller; `--mode-source DIR` is unchanged.
+  `controller/tests/test_box_mode_fetch_e2e.py` starts the controller as `run`
+  builds it (the field CA made on first start, uvicorn on its TLS port, the C
+  host modem), uploads a package signed with the test registry key, and the
+  box fetches, verifies, keeps and reports it, then plays; refused: a join
+  pinning another CA (`unreachable`, said over LoRa), a package signed by a key
+  the box lacks (`bad_signature`), an archive changed after signing
+  (`bad_hash`). Decisions MFH-1 to MFH-7.
 - [x] **Plan phase 8, the registry repository's template (2026-10-22), in
   software:** `registry/template/`, the `atalaia-modes` repository's files
   (an empty index, keys and revocations, sources in `modes/`, REUSE, CODEOWNERS,
@@ -313,12 +328,25 @@ section 16).
 | `docker run --rm -v "$PWD:/src" -w /src -e BUILD=/tmp/c atalaia-dev sh tools/check.sh` | exit 0 (simulator 344, controller 629, server's shared tests 92, registry template 18, OK; `i18n_check`: editor 241/241 in en, pt and de; `build_site --check` OK) |
 | `reuse lint` (a copy without build output) | compliant (1854 files) |
 
+## Verification of the fetch over HTTPS (2026-11-02)
+
+| Command | Result |
+|---------|--------|
+| `docker run --rm -v "$PWD:/src" -w /src atalaia-dev:verify sh -c "BUILD=/tmp/c sh tools/check.sh"` | exit 0, 0 compiler warnings (controller 1143 tests, 1 skipped, OK; the 4 new in `test_box_mode_fetch_e2e.py`) |
+| `test_box_mode_fetch_e2e` alone, 25 times in a row | 25 of 25 OK (about 3.3 s a run) |
+| `python3 tools/docker_fw.py test` | 5 of 5 OK, 0 warnings |
+| `python3 tools/docker_fw.py build` (clean) | exit 0, 0 warnings; 0x20fa10 bytes, 48 % of the slot free |
+
 ## Next steps
 
 1. Plan phase 13 on real boxes (HW3): a Field Box with a mode key built in
-   fetching from the bench controller; and the end-to-end test of the C host
-   box (`box_host --mode-keys --mode-source`) against the real controller
-   over HTTPS, which the host tests only model with files.
+   fetching from the bench controller over the field Wi-Fi, by the controller's
+   IP address (the firmware's mbedTLS 3.6.2 checks the certificate's address
+   names; the host test uses `localhost`, MFH-4). The software half is done
+   (2026-11-02, MFH-1 to MFH-7): the C host box fetches from the real
+   controller over HTTPS (`box_host --mode-keys HEX --mode-source https`),
+   with the firmware's own fetch and field CA pin
+   (`controller/tests/test_box_mode_fetch_e2e.py`).
 2. The review of the German by German-speaking players (P5H-5); mode names and
    screens in German (P5H-7). Plan phase 7 is built;
    its P5F-2 (the CSP's two style hashes instead of `'unsafe-inline'`), P5F-4

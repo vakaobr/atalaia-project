@@ -3,7 +3,9 @@
 #
 # The host box: a Field Box's game and radio logic (main/box_game.c,
 # main/radio/field_link.c and what they use) with the real core and
-# mbedtls AES-CCM, on Linux, for the controller's end-to-end tests.
+# mbedtls AES-CCM, on Linux, for the controller's end-to-end tests; a mode
+# fetch over HTTPS from the real controller with the firmware's field CA pin
+# (main/field_ca_pin.c) and mbedtls TLS (box_host_https.c).
 #   cmake -S firmware/esp32/test/box_host -B build/box_host
 #   cmake --build build/box_host
 cmake_minimum_required(VERSION 3.18)
@@ -17,9 +19,12 @@ get_filename_component(CORE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../../core" ABS
 get_filename_component(MAIN_DIR "${CMAKE_CURRENT_LIST_DIR}/../../main" ABSOLUTE)
 
 find_library(MBEDCRYPTO_LIB mbedcrypto)
+# TLS and X.509 too: the mode fetch over HTTPS from the real controller (box_host_https.c).
+find_library(MBEDTLS_LIB mbedtls)
+find_library(MBEDX509_LIB mbedx509)
 find_path(MBEDTLS_INCLUDE_DIR mbedtls/ccm.h)
-if(NOT MBEDCRYPTO_LIB OR NOT MBEDTLS_INCLUDE_DIR)
-    message(FATAL_ERROR "The host box needs mbedtls for real AES-CCM "
+if(NOT MBEDCRYPTO_LIB OR NOT MBEDTLS_LIB OR NOT MBEDX509_LIB OR NOT MBEDTLS_INCLUDE_DIR)
+    message(FATAL_ERROR "The host box needs mbedtls for real AES-CCM and HTTPS "
         "(Debian/Ubuntu: apt install libmbedtls-dev; the atalaia-dev image has it).")
 endif()
 
@@ -32,6 +37,8 @@ add_subdirectory(${CORE_DIR} core)
 
 add_executable(box_host
     box_host.c
+    box_host_https.c
+    ${MAIN_DIR}/field_ca_pin.c
     ${MAIN_DIR}/box_game.c
     ${MAIN_DIR}/box_lobby.c
     ${MAIN_DIR}/box_text.c
@@ -73,7 +80,8 @@ add_library(box_host_monocypher STATIC ${MONOCYPHER_DIR}/monocypher.c
 target_include_directories(box_host_monocypher PUBLIC ${MONOCYPHER_DIR} ${MONOCYPHER_DIR}/optional)
 target_link_libraries(box_host PRIVATE box_host_monocypher)
 target_include_directories(box_host PRIVATE ${MAIN_DIR} ${MAIN_DIR}/radio ${CORE_DIR}/src)
-target_link_libraries(box_host PRIVATE atalaia_core)
+target_link_libraries(box_host PRIVATE atalaia_core ${MBEDTLS_LIB} ${MBEDX509_LIB} ${MBEDCRYPTO_LIB})
+target_include_directories(box_host PRIVATE ${MBEDTLS_INCLUDE_DIR})
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(box_host PRIVATE -Wall -Wextra -Wpedantic)
     # Not an error on macOS: Apple's Clang is not a compiler CI builds with
