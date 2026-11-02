@@ -15,6 +15,7 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 - **The I/O pod's release package no longer fails the boot-splash check** (`tools/release_package.py`): the check (LOGO-7) wanted exactly one `splash_logo.c` in every build, but the I/O pod has no screen and its build embeds none, so the v0.6.0 release run stopped on the io-pod package and published nothing. A build with `CONFIG_ATALAIA_POD_MODE=y` now passes when it embeds no splash, and is refused if it does.
+- **A noise scan that ends as the field's region changes or the controller stops no longer writes after it** (`controller/atalaia_controller/engine.py`): a scan reads "done" a moment before it reports, and in that moment the region could change (the scan no longer counted as running) and drop it without waiting for its thread. Its late report then saved the old region's result as the last scan, sent an EU868 modem the new region's channel, and after `stop()` wrote to the closed database (`scan listener failed ... Cannot operate on a closed database`). Only the current scan's reports count now (a new scan likewise ignores the one before), and `stop()` waits for a dropped scan's thread too.
 ## [0.6.0](https://github.com/vakaobr/atalaia-project/compare/v0.5.0...v0.6.0) (2026-11-02)
 
 ### Features

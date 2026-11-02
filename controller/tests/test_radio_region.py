@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import threading
 import unittest
 
 from support import BOX_HOST, CORE, MODEM_HOST, AirHub, BoxHost, FakeModem, HostModem, config, wait_for
@@ -139,6 +140,95 @@ class EngineRegionTests(unittest.TestCase):
         with self.assertRaises(Conflict):
             self.ctrl.set_field_region("as923-tw")
         self.assertEqual(self.ctrl.field_region.code, "eu868")
+
+
+    def hold_the_last_report(self):
+        """A scan whose thread stops after it reads "done" and before it reports it: the window in
+        which the region may already change (the scan no longer runs). Returns the scan and the
+        event that lets its report go on."""
+        measuring = threading.Event()
+        self.modem.measure_gate = measuring
+        self.ctrl.start_scan()
+        scan = self.ctrl.scan
+        held, release = threading.Event(), threading.Event()
+        report = scan._on_change
+
+        def hold(state):
+            if state["state"] != "running":
+                held.set()
+                release.wait(20)
+            report(state)
+
+        scan._on_change = hold  # the thread waits in its first measurement, so it sees this
+        measuring.set()
+        self.assertTrue(held.wait(10))
+        self.assertFalse(scan.running)
+        return scan, release
+
+    def test_a_scan_ending_after_a_region_change_is_forgotten(self):
+        scan, release = self.hold_the_last_report()
+        out = self.ctrl.set_field_region("as923-tw")
+        self.assertIsNone(out["scan"])
+        tuned, seen = list(self.modem.channels), len(self.messages)
+        release.set()
+        scan.join(10)
+        self.assertFalse(scan.alive)
+        # The old region's result is not kept, shown, sent or saved, and the EU868 modem is not
+        # sent Taiwan's channel (set_field_region left it alone on purpose).
+        self.assertIsNone(self.ctrl.radio_settings()["scan"])
+        self.assertIsNone(self.ctrl.scan_status())
+        self.assertEqual(self.store.get_setting("radio.last_scan"), "")
+        self.assertEqual(self.modem.channels, tuned)
+        self.assertEqual([m for m in self.messages[seen:] if m["type"] == "radio_scan"], [])
+        # The new region's scan is kept as before.
+        self.assertEqual(self.ctrl.start_scan(9)["region"], "as923-tw")
+        self.assertTrue(wait_for(lambda: self.ctrl.scan_status()["state"] == "done", 5))
+        self.assertTrue(wait_for(lambda: self.store.get_setting("radio.last_scan") != "", 5))
+        self.reopen()
+        self.assertEqual(self.ctrl.radio_settings()["scan"]["region"], "as923-tw")
+
+    def test_stop_waits_for_a_dropped_scan_before_the_store_closes(self):
+        scan, release = self.hold_the_last_report()
+        self.ctrl.set_field_region("as923-tw")
+        closed = threading.Event()
+        alive_at_close = []
+
+        def stop_and_close():
+            self.ctrl.stop()
+            alive_at_close.append(scan.alive)
+            self.store.close()
+            closed.set()
+
+        with self.assertNoLogs("atalaia", "ERROR"):
+            stopper = threading.Thread(target=stop_and_close)
+            stopper.start()
+            closed.wait(0.5)  # a stop() that does not wait for the scan closes the store now
+            release.set()
+            stopper.join(20)
+            scan.join(10)
+        self.assertEqual(alive_at_close, [False])
+        self.assertFalse(scan.alive)
+        self.open()  # for tearDown; the store was saved before it closed
+        self.assertIsNone(self.ctrl.radio_settings()["scan"])
+        self.assertEqual(self.store.get_setting("radio.last_scan"), "")
+
+    def test_a_new_scan_ignores_the_last_report_of_the_one_before(self):
+        old, release = self.hold_the_last_report()
+        measuring = threading.Event()
+        self.modem.measure_gate = measuring
+        self.ctrl.start_scan()
+        self.assertTrue(wait_for(lambda: len(self.modem.measured) > 11, 5))  # the new one measures
+        tuned = list(self.modem.channels)
+        release.set()
+        old.join(10)
+        self.assertFalse(old.alive)
+        # The old scan's end does not retune the modem in the middle of the new one's measurement.
+        self.assertEqual(self.modem.channels, tuned)
+        self.assertEqual(self.store.get_setting("radio.last_scan") or "", "")
+        measuring.set()
+        self.assertTrue(wait_for(lambda: self.ctrl.scan_status()["state"] == "done", 5))
+        self.assertTrue(wait_for(lambda: self.store.get_setting("radio.last_scan"), 5))
+        self.assertEqual(self.ctrl.scan_status()["measured"], 11)
 
     def test_joins_carry_key_18(self):
         self.ctrl.set_field_region("as923-tw")

@@ -120,6 +120,11 @@ class Scan:
     def running(self) -> bool:
         return self.state == "running"
 
+    @property
+    def alive(self) -> bool:
+        """The thread still runs (a scan that reads "done" may still be reporting it)."""
+        return self._thread.is_alive()
+
     def _run(self) -> None:
         try:
             for hz in self.channels:

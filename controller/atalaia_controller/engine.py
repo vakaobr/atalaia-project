@@ -380,6 +380,11 @@ class Controller:
         self.tx_status: Counter[str] = Counter()
         self._last_time_save = 0
         self.scan: Optional[channels.Scan] = None
+        # Scans dropped while their thread may still be reporting (a region change or a new scan
+        # right after one ended): stop() waits for them too. Only the current scan's reports count
+        # (_scan_gen), so a late one neither stores the old region's channels nor retunes.
+        self._old_scans: list[channels.Scan] = []
+        self._scan_gen = 0
         # Phase 3 (plan phase E): field check-in, player positions, Android props on Wi-Fi.
         # Set by checkin.Checkin, positions.Positions and prop_link.PropLinks.
         self.checkin: Any = None
@@ -460,9 +465,24 @@ class Controller:
         return self.modem.state if self.modem is not None else "none"
 
     def stop_scan(self) -> None:
+        """Cancels the scan and waits for its thread and any dropped one's, so none of them
+        reports (into the store) after stop() returns."""
+        with self._lock:
+            scans = [s for s in (self.scan, *self._old_scans) if s is not None]
+        for scan in scans:
+            scan.cancel()
+            scan.join(15)
+        with self._lock:
+            self._scan_gen += 1  # a thread past its join's timeout: its reports are ignored
+            self._old_scans = []
+
+    def _drop_scan(self) -> None:
+        """Forgets the scan (it no longer runs: _channel_lock_reason); its thread may still be in
+        its last report, which is then ignored, and stop() still waits for it. Under self._lock."""
         if self.scan is not None:
-            self.scan.cancel()
-            self.scan.join(15)
+            self._old_scans = [s for s in self._old_scans if s.alive] + [self.scan]
+            self.scan = None
+        self._scan_gen += 1
 
     def start(self) -> None:
         self._stop.clear()
@@ -1152,7 +1172,7 @@ class Controller:
                 self.store.set_setting("radio.last_scan", "")
                 self.store.set_setting("radio.channel_history", "[]")  # another region's channels
                 self._last_scan = None
-                self.scan = None
+                self._drop_scan()
                 if self.modem is not None and self.modem.is_up and region.code == radio_region.modem_region(
                         self.modem.ident):
                     self.modem.set_channel(region.default_channel_hz)
@@ -1184,8 +1204,11 @@ class Controller:
                 total = float(dwell_s)
             assert self.modem is not None
             modem = self.modem
+            self._drop_scan()
+            gen = self._scan_gen
             self.scan = channels.Scan(lambda hz, ms: modem.measure(hz, ms), total,
-                                      self.cfg.quiet_threshold_dbm, self._on_scan,
+                                      self.cfg.quiet_threshold_dbm,
+                                      lambda state: self._on_scan(state, gen),
                                       region=self.field_region)
             self._modem_moved("a channel scan started")
             self.scan.start()
@@ -1203,15 +1226,20 @@ class Controller:
         with self._lock:
             return self.scan.public() if self.scan is not None else self._last_scan
 
-    def _on_scan(self, state: dict[str, Any]) -> None:
-        if state["state"] != "running":
-            self._last_scan = state
-            self.store.set_setting("radio.last_scan", json.dumps(state))
-            # Back on the field's channel, read and sent under the lock like set_field_channel's own
-            # retune: the scan reads "done" before this runs, so a GM's new channel can arrive first,
-            # and an unlocked read of the old one could then be sent after it (the modem left on
-            # the old channel while the setting says the new one).
-            with self._lock:
+    def _on_scan(self, state: dict[str, Any], gen: Optional[int] = None) -> None:
+        """A scan's report; ``gen`` is the _scan_gen it started under (None: the current scan)."""
+        # Under the lock: the scan reads "done" before this runs, so a GM's new channel or region can
+        # arrive first. A region change (or stop()) drops the scan: its result is the old region's
+        # channels and the store may be closed, so a report of a scan no longer current is ignored.
+        # The retune back to the field's channel is read and sent under the lock like
+        # set_field_channel's own (an unlocked read of the old channel could be sent after the new).
+        with self._lock:
+            if gen is not None and gen != self._scan_gen:
+                log.debug("ignoring a report of a dropped channel scan (%s)", state["state"])
+                return
+            if state["state"] != "running":
+                self._last_scan = state
+                self.store.set_setting("radio.last_scan", json.dumps(state))
                 if self.modem is not None and self.modem.is_up:
                     self.modem.set_channel(self.field_channel)
                     self._modem_moved("a channel scan ended")
