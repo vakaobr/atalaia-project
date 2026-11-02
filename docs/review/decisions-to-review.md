@@ -3569,7 +3569,7 @@ Commits `89eb6ca4` and `146cf9d5` (app, the Mac session; a privacy-review findin
 | IOSK-2 | Accessibility? | AfterFirstUnlockThisDeviceOnly | No backup or sync; a save while the phone locks must not fail | built (2026-11-01); open for the maintainer's review |
 | IOSK-3 | Face ID on the key? | No | Android's needs none; a prompt would block joining | built (2026-11-01); open for the maintainer's review |
 | IOSK-4 | Migration? | The existing plain-text-to-sealed path, read back to verify | Already tested | built (2026-11-01); open for the maintainer's review |
-| IOSK-5 | Delete a leftover key on reinstall? | No; documented, in the privacy notice too (its [MAINTAINER] marker kept) | Deleting could destroy a live key before the first unlock | built (2026-11-01); open: the privacy notice's wording waits for the maintainer |
+| IOSK-5 | Delete a leftover key on reinstall? | No; documented, in the privacy notice too | Deleting could destroy a live key before the first unlock | built (2026-11-01); the privacy notice's wording confirmed by the maintainer on 2026-11-02 (marker removed, PR #21) |
 | IOSK-6 | Errors? | Missing key, wrong size or a failed GCM open: `key_lost`; any other status: unavailable | Same as Android | built (2026-11-01); open for the maintainer's review |
 
 ## The iPhone checklist checks in over HTTPS (MACT-1 to MACT-3, 2026-11-01)
@@ -3660,15 +3660,27 @@ Open: `controller/tests/test_scoreboard_example.py::test_prints_the_retained_sco
 
 ## A block edit made just before leaving the block view is kept (CKF-1 to CKF-5, 2026-11-02)
 
-Pull request #14 (`ce3f3cfa`, console). Found by the merge queue, where `test_keyboard_reaches_and_changes_the_blocks` failed now and then. These rows were written from the commit and its CHANGELOG entry (the agent's own rows were not kept); CKF-2 and CKF-3 are the ones the code names. Reproduced with frames slowed by 150 ms under CPU load: 5 failures in 30 before, none in 66 after.
+Pull request #14 (`ce3f3cfa`, console). Found by the merge queue, where `test_keyboard_reaches_and_changes_the_blocks` failed now and then. The rows are the console agent's own.
 
 | # | Question | Answer chosen | Why | Status |
 | --- | --- | --- | --- | --- |
-| CKF-1 | A flaky test, or a product bug? | Both: a real lost update, and the test's timing | The lost update reproduced on its own with a new test | built (2026-11-02); open for the maintainer's review |
-| CKF-2 | How is the edit kept? | A new `flush()` in the block view hands any pending YAML to the builder when the view goes away and before Install; a commented text that did not change is left as it is | Blockly fires a change a frame later and the view rebuilt the YAML one turn after that, so leaving or installing in between dropped the edit | built (2026-11-02); open for the maintainer's review |
-| CKF-3 | The keyboard test's timing? | Two frames after every key, then waiting (up to 20 s) for the focus, the blocks and the name in the YAML | Blockly moves the focus a frame late and can take it from a field focused in between | built (2026-11-02); open for the maintainer's review |
-| CKF-4 | How does the test wait? | Polling with `page.evaluate`, not `page.wait_for_function` | The console's CSP refuses the string `wait_for_function` compiles | built (2026-11-02); open for the maintainer's review |
-| CKF-5 | Install with an error in the blocks? | Nothing is installed | The old text must not go out in its place | built (2026-11-02); open for the maintainer's review |
+| CKF-1 | Fix only the test, or the console too? | Both | One of the two failures was a real lost update: a GM can lose an edit or install the old text | built (2026-11-02); open for the maintainer's review |
+| CKF-2 | How to stop the block edit being lost? | `flush()` on unmount and before Install; it compares the blocks' current YAML with the last one generated | It does not rely on Blockly's internal event queue (`fireNow` is exported only as TEST_ONLY), and an unchanged commented text keeps its comments | built (2026-11-02); open for the maintainer's review |
+| CKF-3 | Patch Blockly's `moveSvgRootToFront` blurring a field focused in between? | No; the test waits two frames after every key | The bundled library stays unmodified; it only bites a key pressed within one frame of the last. Worth reporting upstream | built (2026-11-02); open for the maintainer's review |
+| CKF-4 | Waiting primitive | Poll with `page.evaluate` for up to 20 s instead of `page.wait_for_function` | `wait_for_function` compiles its string in the page, which the console's CSP refuses (`unsafe-eval`) | built (2026-11-02); open for the maintainer's review |
+| CKF-5 | Commit the slow-frame harness? | No; described in the report and the CHANGELOG | It doubles the class's runtime in an already long suite; the new deterministic test covers the lost update | built (2026-11-02); open for the maintainer's review |
+
+## The project page's mode GIF test waits for the picture (SBF-1 to SBF-5, 2026-11-02)
+
+Pull request #13 (`1fbb9156`, tools/site_browser_test.py). Found by the merge queue, where `test_mode_animations_and_box_screens` failed under load (29 of 40 runs).
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| SBF-1 | Fix the test or the site script? | The test only | The script sets `src` synchronously as intended; `currentSrc` changing only after the load is normal browser behaviour | built (2026-11-02); open for the maintainer's review |
+| SBF-2 | How should the test wait? | `page.wait_for_function` on `complete && naturalWidth > 0` and `currentSrc` ending (or not) in `-still.gif`, 30 s, with a clear failure message | It waits for the picture really shown and costs nothing on an idle machine | built (2026-11-02); open for the maintainer's review |
+| SBF-3 | Keep a check right after the press? | Yes: the `src` attribute at once, then wait for `currentSrc` | The test still proves the script swapped the source synchronously | built (2026-11-02); open for the maintainer's review |
+| SBF-4 | Change the other reads made right after an action? | No | Button text, `dialog.open`, `details.open`, focus and `fonts.ready` are set synchronously or already awaited | built (2026-11-02); open for the maintainer's review |
+| SBF-5 | CHANGELOG entry? | None | Only test code changed | built (2026-11-02); open for the maintainer's review |
 
 ## The Mac bench: the queue's app job, a bench release key, the bench tokens (MAC-1 to MAC-3, 2026-11-02)
 
@@ -3687,4 +3699,4 @@ The coordinator moved from WSL on the Windows PC to the Mac mini. With the bench
 | DOCS-10 | Where do the controller's clock and access tokens go on the roadmap? | Two bullets in phase 2's done list, one in its next list; one line in the README's phase 2 row and one status bullet | Phase 2 holds the field controller | built (2026-11-02); open for the maintainer's review |
 | DOCS-11 | "The update over the air has not run on a real board"? | Replaced wherever it was still said (`protocol/firmware-update.md`, the firmware and controller READMEs, the phase 4 status note) with the bench runs of 2026-10-22 and 2026-11-02; "not yet on a field" kept | Stale since 2026-10-22 | built (2026-11-02); open for the maintainer's review |
 | DOCS-12 | The bench key in the docs? | Its id and that it exists (RELEASE_SIGNING.md "Bench keys", BRING_UP step 10c); no path | Public key id only | built (2026-11-02); open for the maintainer's review |
-| DOCS-13 | Rows the coordination log did not hold (CLKRB, MACB, SBF)? | Not added | Nothing to copy; left for the coordinator | built (2026-11-02); open for the maintainer's review |
+| DOCS-13 | Rows the coordination log did not hold (CLKRB, MACB)? | Not added (SBF added by the coordinator from the agent's report) | Nothing to copy | built (2026-11-02); open for the maintainer's review |
