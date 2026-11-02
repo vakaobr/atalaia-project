@@ -79,4 +79,4 @@ Boxes already in the field learn a new key only from a firmware release that car
 
 ## Bench keys
 
-For a test on the desk (`BRING_UP.md`, "Firmware update over the air") make a throw-away key with `keygen --unencrypted` outside the repository, build bench images with `--release-keys=<its hex>`, and delete it afterwards. A bench key must never sign anything meant for a Field Box; bench images (`box-bench`) do not install on Field Boxes anyway.
+For a test on the desk (`BRING_UP.md`, "Firmware update over the air") make a throw-away key with `keygen --unencrypted` outside the repository, build bench images with `--release-keys=<its hex>`, and delete it afterwards. Since 2026-11-02 the maintainer's bench also keeps one long-lived **bench release key** (key id `24a03cb8dc937d01`, its private half in a mode-600 file outside the repository): bench builds carry it beside the two project keys, and the bench controller trusts all three and accepts the `box` and `box-bench` variants, so the bench's daily builds go over the air. A bench key must never sign anything meant for a Field Box; bench images (`box-bench`) do not install on Field Boxes anyway.
