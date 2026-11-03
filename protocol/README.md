@@ -11,6 +11,7 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | --- | --- |
 | [`schema/messages.yaml`](schema/messages.yaml) | Packet header and message types (draft) |
 | [`schema/events.yaml`](schema/events.yaml) | Standard events: ids, priorities, CBOR keys and data fields (draft) |
+| [`schema/capabilities.yaml`](schema/capabilities.yaml) | Standard capability types and their ids, the numbers HELLO lists in its key 6 (draft RFC "The expansion port", decision EXP-20) |
 | [`vectors/events.yaml`](vectors/events.yaml) | Test vectors every event codec must pass |
 | [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, the join payload (`join.json`), field frames (`field_frame.json`: RFC 5869's HKDF-SHA256 vectors, sealed announcements, discoveries and invites, refusals, invite parts; written by `tools/field_frame_vectors.py`), the NFC field card that adopts a box (`field_card.json`), pairing a box by its code (`pairing.json`: CPace's draft vectors and the pair frames), player tags (`tag.json`), chrono records (`chrono_record.json`), player tokens (`player_token.json`), the controller sync's bodies (`sync.json`), the field controller's REST API (`controller_api.json`: contract cases run against the Pi controller and the Android controller, decision PE24-4), the controllers' ACK base and bitmap through a lost packet, the same on the Pi and the phone (`ack_tracker.json`, decision SL-8), the Android prop link's proof (`prop_link.json`), the ATAK emitter's CoT, byte for byte on both controllers (`atak_xml.json`, written by `tools/atak_xml_vectors.py`) and firmware releases (`firmware.json`: RFC 8032's Ed25519 vectors, signed manifests, versions, image descriptors, reports) |
 | [`vectors/capability_proxy.yaml`](vectors/capability_proxy.yaml) | Test vectors for the capability proxy (I/O pod) frames and payloads |
@@ -29,6 +30,7 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`sync.md`](sync.md) | The controller sync: how a field controller pushes its games, event logs, score counters and nodes, and the field's chrono registry (marshals' public keys, replicas, signed readings), to a site server, the merge rules, the API key; vectors in `vectors/sync.json` |
 | [`usb-modem.md`](usb-modem.md) | The serial link between the field controller and its USB radio modem |
 | [`capability-proxy.md`](capability-proxy.md) | The link between an I/O pod and a phone (USB-OTG and BLE), version 1 |
+| [`expansion-port.md`](expansion-port.md) | The expansion port, protocol v1: modules on a box's I2C bus behind the M12 socket (addresses 0x58-0x5F, the IDENT, CHANNEL, STATUS and COMMAND registers, CRC-8, the output lease), the `hit` and `output` capabilities on both output paths (the simple output's no-feedback flag), `node.modules` and its compact text, `node.module_lost`, `output.switched`, and CMD output (opcode 12, RFC 0001 Amendment 26); vectors in `vectors/expansion.json` (written by `tools/expansion_vectors.py`); specified, not built |
 | [`pod-config.md`](pod-config.md) | The I/O pod's settings pushed over the radio by the field controller: CMD pod (opcode 10, RFC 0001 Amendment 17), which settings, the revision, the pod's acknowledgement through its phone (`node.setup_applied`), the threat model; vectors in `vectors/pod_config.json` (written by `tools/pod_config_vectors.py`) |
 | [`box-beacon.md`](box-beacon.md) | The Field Box as an iBeacon: the 30-byte advertisement, the field's UUID derived from the join key, the major and the minor (the node id), when and how often a box advertises, the GM's switch (join key 19, RFC 0001 Amendment 20), how the controller registers each box's beacon from its place; vectors in `vectors/box_beacon.json` |
 | [`json/event.schema.json`](json/event.schema.json) | JSON Schema of an event in the game log and the API (generated) |
@@ -54,7 +56,9 @@ The generator writes these files; none of them should be edited by hand:
 | `firmware/esp32/test/pod_config_vectors.h` | C: the I/O pod's settings over CMD pod (from `vectors/pod_config.json`) |
 | `core/tests/geo_vectors.h` | C: geo test vectors, as exact hexadecimal doubles (from `vectors/geo.json`) |
 | `core/tests/field_frame_vectors.h` | C: HKDF and field frame test vectors (from `vectors/field_frame.json`) |
+| `firmware/esp32/test/expansion_vectors.h` | C: the expansion port's CRC-8 cases and frames (from `vectors/expansion.json`) |
 | `simulator/atalaia_sim/protocol.py` | Python: the same tables |
+| `app/lib/protocol/capability_types.g.dart` | Dart: the capability type ids |
 | `protocol/json/event.schema.json` | Anyone consuming events as JSON |
 
 Ids and keys are never reused once protocol v1 is frozen. Until then they may change.

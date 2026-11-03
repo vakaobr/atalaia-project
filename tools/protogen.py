@@ -26,7 +26,10 @@ Outputs, each marked "do not edit":
     firmware/esp32/test/tx_epoch_vectors.h    the lost-record epoch draw (protocol/vectors/tx_epoch.json)
     firmware/esp32/test/mode_package_vectors.h  signed mode package vectors (the Field Box's package
                                         checks, protocol/vectors/mode_package.json)
+    firmware/esp32/test/expansion_vectors.h  the expansion port's CRC-8 and frames
+                                        (protocol/vectors/expansion.json)
     simulator/atalaia_sim/protocol.py   the same tables for Python
+    app/lib/protocol/capability_types.g.dart  the capability type ids for Dart
     protocol/json/event.schema.json     JSON Schema of an event in the game log
 
 The codecs that use these tables are written by hand: core/src/codec.c and
@@ -96,8 +99,9 @@ def unique_ints(entries: dict[str, int], what: str, lo: int, hi: int) -> None:
 def load_schema() -> dict[str, Any]:
     msgs = load_yaml(SCHEMA / "messages.yaml")
     evs = load_yaml(SCHEMA / "events.yaml")
-    require(msgs.get("version") == evs.get("version"),
-            "messages.yaml and events.yaml must have the same version")
+    caps = load_yaml(SCHEMA / "capabilities.yaml")
+    require(msgs.get("version") == evs.get("version") == caps.get("version"),
+            "messages.yaml, events.yaml and capabilities.yaml must have the same version")
 
     header = []
     offset = 0
@@ -144,6 +148,17 @@ def load_schema() -> dict[str, Any]:
         require(isinstance(gm_only, list) and all(g in data for g in gm_only),
                 f"event {name}: gm_only lists fields of its own data only")
     unique_ints({k: v["id"] for k, v in events.items()}, "event", 1, 255)
+
+    # ---- capability types (HELLO key 6, decision EXP-20) ----
+    cap_types = caps["types"]
+    for name, c in cap_types.items():
+        require(FIELD_NAME.match(name) is not None, f"capability type {name}: names are lower_snake_case")
+        require(isinstance(c.get("reserved", False), bool), f"capability type {name}: reserved is true or false")
+        require(isinstance(c.get("doc"), str) and c["doc"] != "", f"capability type {name}: needs a doc")
+        desc = c.get("descriptor", {})
+        require(isinstance(desc, dict) and all(FIELD_NAME.match(k) and k not in ("id", "type") for k in desc),
+                f"capability type {name}: descriptor keys are lower_snake_case, never id or type")
+    unique_ints({k: v["id"] for k, v in cap_types.items()}, "capability type", 1, 255)
 
     # ---- payload field definitions ----
     msg_names = {m["name"] for m in messages}
@@ -192,6 +207,7 @@ def load_schema() -> dict[str, Any]:
         "envelope": envelope,
         "fields": fields,
         "events": events,
+        "cap_types": cap_types,
     }
 
 
@@ -308,6 +324,26 @@ def gen_c_header(s: dict[str, Any]) -> str:
     rows = [(f"ATALAIA_EV_{c_ident(k)} = {v['id']},", f"/* {k} */") for k, v in s["events"].items()]
     L += aligned(rows)
     L += ["};", "",
+          "/* ---- Capability types ---- */", "",
+          "/* Capability type ids: what HELLO lists in its capabilities (key 6). */",
+          "enum {"]
+    rows = [(f"ATALAIA_CAP_{c_ident(k)} = {v['id']},",
+             f"/* {k}{' (reserved)' if v.get('reserved') else ''} */") for k, v in s["cap_types"].items()]
+    L += aligned(rows)
+    L += ["};", "",
+          "typedef struct {",
+          "    const char *name;",
+          "    uint8_t id;",
+          "    bool reserved; /* its id is fixed, but no node lists it yet */",
+          "} atalaia_capability_type_def_t;",
+          "",
+          "extern const atalaia_capability_type_def_t atalaia_capability_type_defs[];",
+          "extern const size_t atalaia_capability_type_def_count;",
+          "",
+          "/* The capability type with this name or id; NULL for one this core does not know. */",
+          "const atalaia_capability_type_def_t *atalaia_capability_type(const char *name);",
+          "const atalaia_capability_type_def_t *atalaia_capability_type_by_id(unsigned id);",
+          "",
           "typedef enum {",
           "    ATALAIA_FIELD_STRING,",
           "    ATALAIA_FIELD_INTEGER,",
@@ -418,6 +454,32 @@ def gen_c_source(s: dict[str, Any]) -> str:
           "    return NULL;",
           "}",
           "",
+          "const atalaia_capability_type_def_t atalaia_capability_type_defs[] = {"]
+    for name, c in s["cap_types"].items():
+        reserved = "true" if c.get("reserved") else "false"
+        L.append(f"    {{{c_string(name)}, ATALAIA_CAP_{c_ident(name)}, {reserved}}},")
+    L += ["};", "const size_t atalaia_capability_type_def_count =",
+          "    sizeof(atalaia_capability_type_defs) / sizeof(atalaia_capability_type_defs[0]);", "",
+          "const atalaia_capability_type_def_t *atalaia_capability_type(const char *name)",
+          "{",
+          "    for (size_t i = 0; name != NULL && i < atalaia_capability_type_def_count; i++) {",
+          "        if (strcmp(atalaia_capability_type_defs[i].name, name) == 0) {",
+          "            return &atalaia_capability_type_defs[i];",
+          "        }",
+          "    }",
+          "    return NULL;",
+          "}",
+          "",
+          "const atalaia_capability_type_def_t *atalaia_capability_type_by_id(unsigned id)",
+          "{",
+          "    for (size_t i = 0; i < atalaia_capability_type_def_count; i++) {",
+          "        if (atalaia_capability_type_defs[i].id == id) {",
+          "            return &atalaia_capability_type_defs[i];",
+          "        }",
+          "    }",
+          "    return NULL;",
+          "}",
+          "",
           "const char *atalaia_msg_type_name(unsigned type)",
           "{",
           "    switch (type) {"]
@@ -506,6 +568,11 @@ def gen_python(s: dict[str, Any]) -> str:
          "    gm_only: tuple[str, ...] = ()  # data fields only staff may read (decision M5-1)",
          "",
          "",
+         "class CapabilityType(NamedTuple):",
+         "    id: int  # the number in HELLO's capabilities",
+         "    reserved: bool  # its id is fixed, but no node lists it yet",
+         "",
+         "",
          "class PayloadField(NamedTuple):",
          "    key: int",
          "    type: str",
@@ -539,6 +606,11 @@ def gen_python(s: dict[str, Any]) -> str:
     L += [f"    {lit(k)}: EventDef({v['id']}, {lit(v['prio'])}, {tuple(v.get('data', []))!r}"
           + (f", {tuple(v['gm_only'])!r}" if v.get("gm_only") else "") + "),"
           for k, v in s["events"].items()]
+    L += ["}", "",
+          "# Capability type ids: what HELLO lists in its capabilities (key 6, decision EXP-20).",
+          "CAPABILITY_TYPES = {"]
+    L += [f"    {lit(k)}: CapabilityType({v['id']}, {bool(v.get('reserved'))}),"
+          for k, v in s["cap_types"].items()]
     L += ["}", ""]
     if s.get("payloads"):
         L += ["PAYLOAD_FIELDS = {"]
@@ -549,6 +621,43 @@ def gen_python(s: dict[str, Any]) -> str:
                 L.append(f"        {lit(f['name'])}: PayloadField({f['key']}, {lit(f['type'])}, {f['required']}{extra}),")
             L.append("    },")
         L += ["}", ""]
+    return "\n".join(L)
+
+
+# ---- Dart ------------------------------------------------------------------
+
+
+def gen_dart_capabilities(s: dict[str, Any]) -> str:
+    def q(v: str) -> str:
+        require("'" not in v and "\\" not in v and "$" not in v, f"capability type {v}: not a plain Dart string")
+        return f"'{v}'"
+
+    L = [*[f"// {line}" for line in SPDX_LINES],
+         "",
+         f"// {GENERATED}",
+         "",
+         "/// The standard capability types and their ids: what HELLO lists in its",
+         "/// capabilities (key 6; protocol/schema/capabilities.yaml, decision EXP-20).",
+         "library;",
+         "",
+         "/// Capability type ids by type name.",
+         "const capabilityTypeIds = <String, int>{"]
+    L += [f"  {q(k)}: {v['id']}," for k, v in s["cap_types"].items()]
+    L += ["};", "",
+          "/// Types whose id is fixed but which no node lists yet."]
+    reserved = ", ".join(q(k) for k, v in s["cap_types"].items() if v.get("reserved"))
+    line = f"const reservedCapabilityTypes = <String>{{{reserved}}};"
+    require(len(line) <= 80, "reserved capability types: the Dart line is too long for dart format; split it")
+    L += [line, "",
+          "/// The type name of a capability id; null for an id this app does not know",
+          "/// (a newer node's type: ignored, never an error).",
+          "String? capabilityTypeName(int id) {",
+          "  for (final e in capabilityTypeIds.entries) {",
+          "    if (e.value == id) return e.key;",
+          "  }",
+          "  return null;",
+          "}",
+          ""]
     return "\n".join(L)
 
 
@@ -1623,6 +1732,91 @@ def gen_box_beacon_vectors(bv: dict[str, Any]) -> str:
     return "\n".join(L)
 
 
+# ---- expansion port vectors (protocol/vectors/expansion.json) ----
+
+EXPANSION_VECTORS = REPO / "protocol" / "vectors" / "expansion.json"
+
+
+def gen_expansion_vectors(ev: dict[str, Any]) -> str:
+    """firmware/esp32/test/expansion_vectors.h: the expansion port's CRC-8 cases and every frame of
+    protocol/vectors/expansion.json, with whether its CRC holds (decision EXP-9). The box's driver and the
+    module core of later increments check the rest of the file."""
+    L = c_spdx("The expansion port's CRC-8 and frames (protocol/vectors/expansion.json).")
+    L[5] = " * Generated by tools/protogen.py from protocol/vectors/expansion.json. Do not edit."
+
+    def arr(name: str, hexs: str) -> list[str]:
+        data = bytes.fromhex(hexs)
+        if not data:
+            return [f"static const uint8_t {name}[1] = {{0}};"]
+        out = [f"static const uint8_t {name}[] = {{"]
+        for j in range(0, len(data), 12):
+            out.append("    " + ", ".join(f"0x{b:02x}" for b in data[j:j + 12]) + ",")
+        return out + ["};"]
+
+    L += ["#ifndef ATALAIA_EXPANSION_VECTORS_H", "#define ATALAIA_EXPANSION_VECTORS_H", "",
+          "#include <stdbool.h>", "#include <stddef.h>", "#include <stdint.h>", "",
+          f"#define EXP_VECTOR_PROTOCOL_VERSION {int(ev['protocol_version'])}u",
+          f"#define EXP_VECTOR_IDENT_LEN {int(ev['ident']['length'])}u",
+          f"#define EXP_VECTOR_CHANNEL_LEN {int(ev['channel']['length'])}u",
+          f"#define EXP_VECTOR_STATUS_LEN {int(ev['status']['length'])}u", ""]
+    for i, c in enumerate(ev["crc8"]):
+        L += arr(f"exp_crc_{i}", c["data"])
+    L += ["", "typedef struct {", "    const char *name;", "    const uint8_t *data;", "    size_t len;",
+          "    uint8_t crc;", "} exp_crc_vector_t;", "", "static const exp_crc_vector_t exp_crc_vectors[] = {"]
+    for i, c in enumerate(ev["crc8"]):
+        n = len(bytes.fromhex(c["data"]))
+        L.append(f"    {{{c_string(c['name'])}, exp_crc_{i}, {n}, 0x{int(c['crc']):02x}}},")
+    L += ["};", "#define EXP_CRC_VECTOR_COUNT (sizeof(exp_crc_vectors) / sizeof(exp_crc_vectors[0]))", ""]
+
+    # Every frame: reads (IDENT, CHANNEL, STATUS: CRC over the bytes read) and writes (COMMAND and the
+    # timelines' writes: CRC over the address byte, then the bytes), with whether its CRC holds: always for
+    # a good frame, never for one the file refuses for its CRC, either way for the other refusals.
+    def crc8(data: bytes) -> int:
+        crc = 0
+        for b in data:
+            crc ^= b
+            for _ in range(8):
+                crc = ((crc << 1) ^ 0x07) & 0xFF if crc & 0x80 else (crc << 1) & 0xFF
+        return crc
+
+    frames: list[tuple[str, int, str, bool]] = []
+
+    def add(name: str, addr: int, hexs: str, reason: str | None) -> None:
+        data = bytes.fromhex(hexs)
+        covered = (bytes([addr << 1]) if addr >= 0 else b"") + data[:-1]
+        ok = len(data) > 0 and crc8(covered) == data[-1]
+        require(ok if reason is None else (not ok if reason == "crc" else True),
+                f"expansion.json {name}: its CRC does not match what the file says")
+        frames.append((name, addr, hexs, ok))
+
+    for section in ("ident", "channel", "status"):
+        for v in ev[section]["valid"]:
+            add(f"{section} {v['name']}", -1, v["bytes"], None)
+        for v in ev[section]["invalid"]:
+            add(f"{section} {v['name']}", -1, v["bytes"], v["reason"])
+    for v in ev["command"]["valid"]:
+        add(f"command {v['name']}", int(v["address"]), v["bytes"], None)
+    for v in ev["command"]["invalid"]:
+        add(f"command {v['name']}", int(v["address"]), v["bytes"], v["reason"])
+    for t in ev["timelines"]:
+        addr = int(ev["modules"][t["module"]]["address"])
+        for j, step in enumerate(t["steps"]):
+            if "bytes" in step:
+                add(f"timeline {t['name']} step {j}", addr, step["bytes"], None)
+    for i, (_, _, hexs, _) in enumerate(frames):
+        L += arr(f"exp_frame_{i}", hexs)
+    L += ["", "typedef struct {", "    const char *name;",
+          "    int address; /* a write's 7-bit address; -1 for a read */", "    const uint8_t *bytes;",
+          "    size_t len;", "    bool crc_ok; /* its last byte is the CRC-8 of what it covers */",
+          "} exp_frame_vector_t;", "", "static const exp_frame_vector_t exp_frame_vectors[] = {"]
+    for i, (name, addr, hexs, ok) in enumerate(frames):
+        L.append(f"    {{{c_string(name)}, {addr}, exp_frame_{i}, {len(bytes.fromhex(hexs))}, "
+                 f"{'true' if ok else 'false'}}},")
+    L += ["};", "#define EXP_FRAME_VECTOR_COUNT (sizeof(exp_frame_vectors) / sizeof(exp_frame_vectors[0]))", "",
+          "#endif /* ATALAIA_EXPANSION_VECTORS_H */", ""]
+    return "\n".join(L)
+
+
 # ---- tx epoch vectors (protocol/vectors/tx_epoch.json): the lost-record draw ----
 
 TX_EPOCH_VECTORS = REPO / "protocol" / "vectors" / "tx_epoch.json"
@@ -2051,7 +2245,10 @@ def outputs() -> dict[Path, str]:
             gen_tx_epoch_vectors(json.loads(TX_EPOCH_VECTORS.read_text(encoding="utf-8"))),
         REPO / "firmware/esp32/test/mode_package_vectors.h":
             gen_mode_package_vectors(json.loads(MODE_PACKAGE_VECTORS.read_text(encoding="utf-8"))),
+        REPO / "firmware/esp32/test/expansion_vectors.h":
+            gen_expansion_vectors(json.loads(EXPANSION_VECTORS.read_text(encoding="utf-8"))),
         REPO / "simulator/atalaia_sim/protocol.py": gen_python(schema),
+        REPO / "app/lib/protocol/capability_types.g.dart": gen_dart_capabilities(schema),
         REPO / "protocol/json/event.schema.json": gen_json_schema(schema),
     }
 

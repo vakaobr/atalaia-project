@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Standard capability types (design specification, section 7) and their ids:
+# the numbers a node lists in HELLO's key 6 ("capability type ids",
+# protocol/schema/messages.yaml). Shared by the firmware, the core, both
+# controllers and the app (draft RFC "The expansion port", decision EXP-20).
+# Scripts and the capability proxy name a type by its text; only HELLO uses
+# the number. A receiver ignores an id it does not know, so a later node may
+# list a type an older controller has never heard of.
+#
+# After editing, run `python3 tools/protogen.py` and commit the generated
+# files with this one. A new type needs an RFC; ids are never reused, and 0 is
+# never a type.
+version: 1
+
+# id: 1-255. reserved: in the table so that its id is fixed, but no node lists
+# it yet (its events and commands come with the RFC amendment of its first
+# hardware). descriptor: the keys a capability descriptor of this type may
+# carry besides id and type (design specification section 7,
+# protocol/capability-proxy.md), with their meaning.
+types:
+  button:   { id: 1,  doc: "a push button: press, release, hold(ms)", descriptor: { team: "the team this button stands for" } }
+  keypad:   { id: 2,  doc: "a key matrix: key, code(string); clear", descriptor: { keys: "the keys it has, such as 0-9*#" } }
+  display:  { id: 3,  doc: "a screen: text, screen(template, data), brightness", descriptor: { w: "width in pixels", h: "height in pixels", color: "true for a colour screen" } }
+  led:      { id: 4,  doc: "an LED ring or strip: color, fill(team), progress, pattern", descriptor: { count: "LEDs", rgb: "true when each LED takes a colour" } }
+  audio:    { id: 5,  doc: "a speaker or buzzer: tone(freq, ms), play(clip), say(text)", descriptor: { clips: "true when it plays sound files" } }
+  nfc:      { id: 6,  doc: "an NFC reader: tag(uid, data); write(data)" }
+  qr:       { id: 7,  doc: "a camera reading codes: scan(text)" }
+  gps:      { id: 8,  doc: "a position: fix(lat, lon, acc); rate(s)" }
+  imu:      { id: 9,  doc: "motion: moved, tilt(deg), shock(g); sensitivity" }
+  hit:      { id: 10, doc: "a target's hit sensor: hit(strength 0-255); arm, disarm (draft RFC 0000 Amendment 1)", descriptor: { channel: "which hit channel of the node, from 1, when it has more than one (hit, hit.2, ...)" } }
+  output:   { id: 11, doc: "a switched output (siren, strobe, smoke, light): on(max_ms), off, pulse(ms), pattern(on_ms, off_ms, ms) (draft RFC 0000 Amendment 5)", descriptor: { feedback: "false for a simple output, which cannot tell whether anything is plugged in; left out (true) for a channel of an expansion module" } }
+  battery:  { id: 12, doc: "a fuel gauge: level(%), low" }
+  tamper:   { id: 13, doc: "an enclosure switch: opened, closed (draft RFC 0000, decision PF8)" }
+  contact:  { id: 14, reserved: true, doc: "a tripwire, pressure mat or door: closed, opened (reserved for its first module)" }

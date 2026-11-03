@@ -29,6 +29,13 @@ ident:
     fields: {"fw_version": "0.4.0", "capabilities": [{"id": "hit", "type": "hit"}, {"id": "ring", "type": "led", "count": 24, "rgb": true}], "has_radio": false, "protocol_version": 1}
     payload: "a40165302e342e300282a262696463686974647479706563686974a46269646472696e676474797065636c656465636f756e74181863726762f504f40501"
     frame: "a501003ea40165302e342e300282a262696463686974647479706563686974a46269646472696e676474797065636c656465636f756e74181863726762f504f40501ef6c"
+  # Outputs and a second hit sensor (draft RFC 0000 Amendment 5; draft RFC "The expansion port", decisions
+  # EXP-18, EXP-26, EXP-36): a simple output says "feedback": false, a module's output channel leaves it out;
+  # the second hit channel names its channel. Bytes written with the Python reference codec.
+  - name: pod_outputs_and_two_targets
+    fields: {"fw_version": "0.7.0", "capabilities": [{"id": "btn.1", "type": "button"}, {"id": "siren", "type": "output", "feedback": false}, {"id": "hit", "type": "hit"}, {"id": "hit.2", "type": "hit", "channel": 2}, {"id": "strobe", "type": "output"}], "has_radio": true, "protocol_version": 1}
+    payload: "a40165302e372e300285a26269646562746e2e31647479706566627574746f6ea362696465736972656e6474797065666f757470757468666565646261636bf4a262696463686974647479706563686974a3626964656869742e32647479706563686974676368616e6e656c02a2626964667374726f62656474797065666f757470757404f50501"
+    frame: "a5010088a40165302e372e300285a26269646562746e2e31647479706566627574746f6ea362696465736972656e6474797065666f757470757468666565646261636bf4a262696463686974647479706563686974a3626964656869742e32647479706563686974676368616e6e656c02a2626964667374726f62656474797065666f757470757404f5050132a3"
 
 evt:
   - name: button_hold
@@ -51,6 +58,10 @@ evt:
     fields: {"cap_id": "hit", "event": "hit", "data": {"strength": 200}, "seq": 12}
     payload: "a40163686974026368697403a168737472656e67746818c8040c"
     frame: "a502001aa40163686974026368697403a168737472656e67746818c8040c046c"
+  - name: second_target_hit
+    fields: {"cap_id": "hit.2", "event": "hit", "data": {"channel": 2, "strength": 90}, "seq": 13}
+    payload: "a401656869742e32026368697403a2676368616e6e656c0268737472656e677468185a040d"
+    frame: "a5020025a401656869742e32026368697403a2676368616e6e656c0268737472656e677468185a040d8f57"
 
 cmd:
   - name: ring_fill
@@ -69,6 +80,22 @@ cmd:
     fields: {"cap_id": "hit", "method": "arm", "args": {}, "seq": 2}
     payload: "a30163686974026361726d0402"
     frame: "a503000da30163686974026361726d04027156"
+  - name: siren_pulse
+    fields: {"cap_id": "siren", "method": "pulse", "args": {"ms": 10000}, "seq": 3}
+    payload: "a40165736972656e026570756c736503a1626d731927100403"
+    frame: "a5030019a40165736972656e026570756c736503a1626d7319271004030ef8"
+  - name: strobe_pattern
+    fields: {"cap_id": "strobe", "method": "pattern", "args": {"ms": 20000, "off_ms": 500, "on_ms": 500}, "seq": 4}
+    payload: "a401667374726f626502677061747465726e03a3626d73194e20666f66665f6d731901f4656f6e5f6d731901f40404"
+    frame: "a503002fa401667374726f626502677061747465726e03a3626d73194e20666f66665f6d731901f4656f6e5f6d731901f404043ee3"
+  - name: siren_on_for_at_most_30_s
+    fields: {"cap_id": "siren", "method": "on", "args": {"ms": 30000}, "seq": 5}
+    payload: "a40165736972656e02626f6e03a1626d731975300405"
+    frame: "a5030016a40165736972656e02626f6e03a1626d731975300405a094"
+  - name: siren_off
+    fields: {"cap_id": "siren", "method": "off", "args": {}, "seq": 6}
+    payload: "a30165736972656e02636f66660406"
+    frame: "a503000fa30165736972656e02636f66660406a447"
 
 ack:
   - name: seq_7
