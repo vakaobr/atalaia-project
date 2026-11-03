@@ -2779,6 +2779,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.type_outline(page)
         page.get_by_test_id("fm-draw").click()
         expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        self.preview_shown(page)  # before the grid's form is used: its clicks would race the page's scroll
         expect(page.get_by_test_id("fm-grid-toggle")).not_to_be_checked()
         expect(page.get_by_test_id("fm-grid")).to_have_count(0)
         page.get_by_test_id("fm-grid-toggle").check()
@@ -3254,6 +3255,26 @@ class ConsoleBrowserTests(unittest.TestCase):
         for lat, lon in OUTLINE:
             page.get_by_test_id("fm-corner").fill(f"{lat}, {lon}")
             page.get_by_test_id("fm-corner-add").click()
+
+    def preview_shown(self, page) -> None:
+        """MF-59: waits until the page has brought the drawn preview into view (a smooth scroll), then checks
+        its heading is at the top, below the banner, and the image starts inside the window. An action before
+        the scroll is over races it: Playwright's click misses the moving element and Playwright scrolls it to
+        the window's edge itself, which can leave the heading above the window (the console's CSP refuses
+        wait_for_function, hence the polling)."""
+        last = None
+        for _ in range(100):
+            now = page.evaluate("""() => { const i = document.querySelector('[data-testid=fm-image]');
+                const h = document.getElementById('fm-preview-h').getBoundingClientRect();
+                return i && i.complete && i.naturalWidth > 0 ? [Math.round(scrollY), h.top, i.getBoundingClientRect().top,
+                    innerHeight] : null; }""")
+            if now is not None and now == last and 0 <= now[1] <= 200:
+                break
+            last = now
+            page.wait_for_timeout(100)
+        else:
+            self.fail(f"the preview did not come into view: [scrollY, heading top, image top, height] = {last}")
+        self.assertLess(now[2], now[3], "the drawn image starts inside the window")
 
     def check_loaded(self, level: int, wms_url: "str | None", label: str = "") -> dict:
         """The controller's side after *Use as the field*: the plan, the map position from the image's edges
