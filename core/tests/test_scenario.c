@@ -22,6 +22,21 @@
 
 static int failures;
 
+/* Under AddressSanitizer each call into the compiler parses its Lua sources again in an
+ * instrumented Lua, about 0.3 s a call on an arm64 VM: the sweeps below are bounded there (the
+ * plain build, check.sh's, runs them whole). */
+#if defined(__SANITIZE_ADDRESS__)
+#define SANITIZED 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define SANITIZED 1
+#endif
+#endif
+#ifndef SANITIZED
+#define SANITIZED 0
+#endif
+#define ROUNDS (SANITIZED ? 30 : 3000)
+
 #define CHECK(cond)                                                                                \
     do {                                                                                           \
         if (!(cond)) {                                                                             \
@@ -157,7 +172,9 @@ static void test_triggers(void)
  * The sizes of the scenario events (scenario/protocol.lua) are the core's
  * codec's: scenario.started for ids of every length from 100 to 200 bytes is
  * too large exactly when atalaia_event_encode makes it longer than a LoRa
- * payload, and the message gives the codec's size.
+ * payload, and the message gives the codec's size. Under a sanitizer only the
+ * lengths next to where the codec crosses 200 bytes, and the two ends, go
+ * through the compiler.
  */
 static void test_event_sizes_match_the_codec(void)
 {
@@ -175,13 +192,18 @@ static void test_event_sizes_match_the_codec(void)
         snprintf(data, sizeof(data), "{\"scenario\":\"%s\"}", id);
         size_t size = atalaia_event_encode(&ev, data, buf, sizeof(buf), NULL);
         CHECK(size > 0);
+        if (size > 200) {
+            crossed++;
+        }
+        if (SANITIZED && n != 100 && n != 200 && (size < 196 || size > 204)) {
+            continue;
+        }
 
         char *tree = manifest(id);
         char *out = atalaia_scenario_check(tree, strlen(tree), NULL);
         char expected[120];
         snprintf(expected, sizeof(expected), "scenario.started takes %zu bytes", size);
         if (size > 200) {
-            crossed++;
             CHECK(contains(out, "\"code\":\"event_too_large\""));
             CHECK(contains(out, expected));
         } else {
@@ -379,7 +401,7 @@ static void test_mutated_trees(char *tree, int rounds)
 
 int main(int argc, char **argv)
 {
-    int rounds = argc > 1 ? atoi(argv[1]) : 3000;
+    int rounds = argc > 1 ? atoi(argv[1]) : ROUNDS;
     test_check_and_compile();
     test_event_sizes_match_the_codec();
     test_malformed_trees();
