@@ -23,5 +23,7 @@ PyYAML>=6.0.1
 # 44.0.1 and later carry the fixed OpenSSL; the controller uses Ed25519, X.509
 # and AES-CCM (the site server pins the same library).
 cryptography>=44.0.1
-# Tests only: FastAPI's TestClient
-httpx>=0.27
+# Tests only: the HTTP client of FastAPI's TestClient. Starlette 1.x wants httpx2
+# (Pydantic's fork of httpx 0.28) and warns on httpx; Ubuntu's older Starlette
+# takes python3-httpx, and the tests use whichever is installed (PLK-3).
+httpx2>=2.0

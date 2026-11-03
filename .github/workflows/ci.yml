@@ -131,8 +131,8 @@ jobs:
           ATALAIA_POD_HOST: ${{ github.workspace }}/build/pod_host/pod_host
         working-directory: controller
         # FastAPI's and pydantic 2's deprecations are DeprecationWarnings, errors here. Starlette's own
-        # (StarletteDeprecationWarning, a UserWarning) are printed: today only its test client asking
-        # for httpx2 where the lock has httpx (PLK-3).
+        # (StarletteDeprecationWarning, a UserWarning) are printed; its test client's request for httpx2
+        # is gone since the lock has httpx2 instead of httpx (PLK-3).
         run: python -W error::DeprecationWarning -m unittest discover -s tests -v
 
   console:
