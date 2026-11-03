@@ -27,6 +27,9 @@ const STANDARD = [
 const INPUT_CAPS = [['team_input.', 'team_input'], ['keypad.', 'keypad'], ['nfc.', 'nfc'], ['hit.', 'hit'], ['gps.', 'gps']];
 /** Outputs a script uses, and the capability each one may use (roles: optional). */
 const OUTPUT_CAPS = [['atalaia_team_display', 'team_display'], ['atalaia_sound', 'audio'], ['atalaia_screen', 'display']];
+/** An output function a role may name in its `outputs:` (atalaia_sim.mode OUTPUT_FUNCTION, EXP-22). */
+const OUTPUT_FUNCTION = /^(siren|strobe|smoke|light|horn|out\.[1-9])(\.[2-9])?$/;
+const OUTPUTS_MAX = 8;
 /** The inputs a role may require, in the order mode.yaml lists them. */
 export const ROLE_INPUTS = INPUT_CAPS.map(([, cap]) => cap);
 /** The kinds the editor makes (a scenario is made in the GM console, P5R-2). */
@@ -477,6 +480,7 @@ function paramSpec(block) {
     } else if (text('DEFAULT')) {
         spec.default = text('DEFAULT');
     }
+    if (block.getField('OPTIONAL') && block.getFieldValue('OPTIONAL') === 'TRUE') spec.optional = true;
     spec.label = String(block.getFieldValue('LABEL') || '');
     return spec;
 }
@@ -487,9 +491,11 @@ function yamlValue(v) {
 }
 
 /**
- * The mode's roles from the Mode tab: [{ name, inputs, needed }], `inputs` null for "the inputs the
- * box script reacts to" or a list of ROLE_INPUTS. A project saved before plan phase 3 has one
- * `role` (a name) instead.
+ * The mode's roles from the Mode tab: [{ name, inputs, needed, outputs, outputs_needed }], `inputs`
+ * null for "the inputs the box script reacts to" or a list of ROLE_INPUTS; `outputs` the output
+ * functions the role switches (mode.yaml `outputs:`, draft RFC "The expansion port", EXP-22), with
+ * `output` required when `outputs_needed`, else optional. A project saved before plan phase 3 has
+ * one `role` (a name) instead, one saved before outputs none.
  */
 export function modeRoles(info) {
     const roles = Array.isArray(info.roles) ? info.roles : [{ name: info.role || 'zone' }];
@@ -497,6 +503,8 @@ export function modeRoles(info) {
         name: String((r && r.name) || '').trim(),
         inputs: r && Array.isArray(r.inputs) ? ROLE_INPUTS.filter((cap) => r.inputs.includes(cap)) : null,
         needed: !(r && r.needed === false),
+        outputs: r && Array.isArray(r.outputs) ? r.outputs.map((o) => String(o).trim()).filter(Boolean) : [],
+        outputs_needed: Boolean(r && r.outputs_needed),
     }));
 }
 
@@ -584,9 +592,17 @@ export function generateManifest(info, nodeWs, fieldWs, scripts) {
         if (role.inputs && !role.inputs.length && handled.length) {
             problems.push({ key: 'problem_role_no_input', block: null, name: role.name });
         }
+        const outs = role.outputs;
+        if (outs.length && (outs.length > OUTPUTS_MAX || new Set(outs).size !== outs.length
+                || !outs.every((o) => OUTPUT_FUNCTION.test(o)))) {
+            problems.push({ key: 'problem_role_outputs', block: null, name: role.name });
+        }
+        const required = outs.length && role.outputs_needed ? [...requires, 'output'] : requires;
+        const optionalCaps = outs.length && !role.outputs_needed ? [...optional, 'output'] : optional;
         const caps = [];
-        if (requires.length) caps.push(`requires: [${requires.join(', ')}]`);
-        if (optional.length) caps.push(`optional: [${optional.join(', ')}]`);
+        if (required.length) caps.push(`requires: [${required.join(', ')}]`);
+        if (optionalCaps.length) caps.push(`optional: [${optionalCaps.join(', ')}]`);
+        if (outs.length) caps.push(`outputs: [${outs.join(', ')}]`);
         if (!role.needed) caps.push('needed: false');
         roleLines.push(`  ${role.name}: { ${caps.join(', ')} }`.replace('{  }', '{}'));
     }

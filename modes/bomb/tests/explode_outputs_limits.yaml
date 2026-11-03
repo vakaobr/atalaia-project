@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A box's own longest time for an output wins, and a box without a siren plays on without one
+params: { fuse_s: 30, smoke_s: 10, siren_s: 10 }
+outputs: { bomb: { smoke: 4 } }
+steps:
+  - hold: { team: red, s: 5 }
+  - wait: 30
+  - expect: { type: bomb.exploded, at: 35 }
+  - expect: { type: output.switched, at: 35, data: { capability: smoke, ms: 4000 } }
+  - expect_no: { type: output.switched, data: { capability: siren } }
+  - expect_output: { capability: smoke, active: true, left_s: 4 }
+  - expect_status: ended
+  - wait: 4
+  - expect_output: { capability: smoke, active: false }

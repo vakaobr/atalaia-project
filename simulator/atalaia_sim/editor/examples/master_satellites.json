@@ -3,17 +3,21 @@
  "version": 1,
  "mode": {
   "id": "org.atalaia.master_satellites",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "name": "Master and Satellites",
-  "description": "Teams capture a master box and its satellites as in Domination. Only the master scores, and the satellites its holder also holds raise its points; when the master changes hands, every satellite goes back to neutral.",
+  "description": "Teams capture a master box and its satellites as in Domination. Only the master scores, and the satellites its holder also holds raise its points; when the master changes hands, every satellite goes back to neutral. A master box with a siren output can sound it when one team holds every satellite.",
   "name_pt": "Mestre e Satélites",
-  "description_pt": "As equipas capturam uma caixa mestre e os seus satélites como no Domínio. Só a mestre pontua, e os satélites que a mesma equipa tiver aumentam os seus pontos; quando a mestre muda de mãos, todos os satélites voltam a ficar neutros.",
+  "description_pt": "As equipas capturam uma caixa mestre e os seus satélites como no Domínio. Só a mestre pontua, e os satélites que a mesma equipa tiver aumentam os seus pontos; quando a mestre muda de mãos, todos os satélites voltam a ficar neutros. Uma caixa mestre com uma saída de sirene pode tocá-la quando uma equipa tem todos os satélites.",
   "kind": "mode",
   "roles": [
    {
     "name": "master",
     "inputs": null,
-    "needed": true
+    "needed": true,
+    "outputs": [
+     "siren"
+    ],
+    "outputs_needed": false
    },
    {
     "name": "satellite",
@@ -26,9 +30,9 @@
   "author": "The Atalaia contributors",
   "year": "2026",
   "name_de": "Master und Satelliten",
-  "description_de": "Teams nehmen eine Master-Box und ihre Satelliten ein wie bei Domination. Nur der Master punktet, und die Satelliten, die sein Team auch hält, erhöhen seine Punkte; wechselt der Master den Besitz, werden alle Satelliten wieder frei.",
+  "description_de": "Teams nehmen eine Master-Box und ihre Satelliten ein wie bei Domination. Nur der Master punktet, und die Satelliten, die sein Team auch hält, erhöhen seine Punkte; wechselt der Master den Besitz, werden alle Satelliten wieder frei. Eine Master-Box mit einem Sirenenausgang kann ihn ertönen lassen, wenn ein Team alle Satelliten hält.",
   "name_zh_tw": "主站與衛星",
-  "description_zh_tw": "各隊像佔點模式一樣佔領主站盒子與它的衛星。只有主站會得分，佔有主站的隊伍同時佔有的衛星會提高主站的分數；主站易手時，所有衛星都回到中立。"
+  "description_zh_tw": "各隊像佔點模式一樣佔領主站盒子與它的衛星。只有主站會得分，佔有主站的隊伍同時佔有的衛星會提高主站的分數；主站易手時，所有衛星都回到中立。有警報器（siren）輸出的主站盒子可在一隊佔有所有衛星時啟動它。"
  },
  "node": {
   "blocks": {
@@ -1575,6 +1579,24 @@
      }
     },
     {
+     "type": "atalaia_param_declare",
+     "id": "o41",
+     "fields": {
+      "NAME": "siren_all_s",
+      "TYPE": "int",
+      "DEFAULT": "",
+      "MIN": "0",
+      "MAX": "600",
+      "OPTIONAL": "TRUE",
+      "LABEL": "Siren on the master when one team holds every satellite (s; empty or 0: none): the master box's siren output",
+      "LABEL_PT": "Sirene na mestre quando uma equipa tem todos os satélites (s; vazio ou 0: sem sirene): a saída siren da caixa mestre",
+      "LABEL_DE": "Sirene am Master, wenn ein Team alle Satelliten hält (s; leer oder 0: aus): der Ausgang siren der Master-Box",
+      "LABEL_ZH_TW": "一隊佔有所有衛星時主站的警報器（秒；空白或 0：不啟動）：主站盒子的 siren 輸出"
+     },
+     "x": 1000,
+     "y": 900
+    },
+    {
      "type": "procedures_defreturn",
      "id": "m161",
      "x": 20,
@@ -3015,6 +3037,15 @@
         "id": "m277",
         "extraState": {
          "name": "check"
+        },
+        "next": {
+         "block": {
+          "type": "procedures_callnoreturn",
+          "id": "o42",
+          "extraState": {
+           "name": "siren_all"
+          }
+         }
         }
        }
       }
@@ -3035,6 +3066,15 @@
         "id": "m279",
         "extraState": {
          "name": "check"
+        },
+        "next": {
+         "block": {
+          "type": "procedures_callnoreturn",
+          "id": "o43",
+          "extraState": {
+           "name": "siren_all"
+          }
+         }
         }
        }
       }
@@ -3061,8 +3101,425 @@
         "id": "m282",
         "extraState": {
          "name": "check"
+        },
+        "next": {
+         "block": {
+          "type": "procedures_callnoreturn",
+          "id": "o44",
+          "extraState": {
+           "name": "siren_all"
+          }
+         }
         }
        }
+      }
+     }
+    },
+    {
+     "type": "procedures_defnoreturn",
+     "id": "o40",
+     "fields": {
+      "NAME": "siren_all"
+     },
+     "inputs": {
+      "STACK": {
+       "block": {
+        "type": "controls_if",
+        "id": "o39",
+        "inputs": {
+         "IF0": {
+          "block": {
+           "type": "logic_operation",
+           "id": "o38",
+           "fields": {
+            "OP": "AND"
+           },
+           "inputs": {
+            "A": {
+             "block": {
+              "type": "logic_compare",
+              "id": "o34",
+              "fields": {
+               "OP": "NEQ"
+              },
+              "inputs": {
+               "A": {
+                "block": {
+                 "type": "atalaia_param",
+                 "id": "o32",
+                 "fields": {
+                  "NAME": "siren_all_s"
+                 }
+                }
+               },
+               "B": {
+                "block": {
+                 "type": "logic_null",
+                 "id": "o33"
+                }
+               }
+              }
+             }
+            },
+            "B": {
+             "block": {
+              "type": "logic_compare",
+              "id": "o37",
+              "fields": {
+               "OP": "GT"
+              },
+              "inputs": {
+               "A": {
+                "block": {
+                 "type": "atalaia_param",
+                 "id": "o35",
+                 "fields": {
+                  "NAME": "siren_all_s"
+                 }
+                }
+               },
+               "B": {
+                "block": {
+                 "type": "math_number",
+                 "id": "o36",
+                 "fields": {
+                  "NUM": 0
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "DO0": {
+          "block": {
+           "type": "variables_set",
+           "id": "o31",
+           "fields": {
+            "VAR": {
+             "id": "v-all"
+            }
+           },
+           "inputs": {
+            "VALUE": {
+             "block": {
+              "type": "atalaia_field_common_owner",
+              "id": "o26",
+              "inputs": {
+               "NODES": {
+                "block": {
+                 "type": "atalaia_field_ids",
+                 "id": "o25",
+                 "fields": {
+                  "ROLE": "satellite"
+                 }
+                }
+               }
+              }
+             }
+            }
+           },
+           "next": {
+            "block": {
+             "type": "controls_if",
+             "id": "o30",
+             "inputs": {
+              "IF0": {
+               "block": {
+                "type": "logic_compare",
+                "id": "o29",
+                "fields": {
+                 "OP": "NEQ"
+                },
+                "inputs": {
+                 "A": {
+                  "block": {
+                   "type": "variables_get",
+                   "id": "o27",
+                   "fields": {
+                    "VAR": {
+                     "id": "v-all"
+                    }
+                   }
+                  }
+                 },
+                 "B": {
+                  "block": {
+                   "type": "variables_get",
+                   "id": "o28",
+                   "fields": {
+                    "VAR": {
+                     "id": "v-all_held"
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              },
+              "DO0": {
+               "block": {
+                "type": "variables_set",
+                "id": "o24",
+                "fields": {
+                 "VAR": {
+                  "id": "v-all_held"
+                 }
+                },
+                "inputs": {
+                 "VALUE": {
+                  "block": {
+                   "type": "variables_get",
+                   "id": "o11",
+                   "fields": {
+                    "VAR": {
+                     "id": "v-all"
+                    }
+                   }
+                  }
+                 }
+                },
+                "next": {
+                 "block": {
+                  "type": "variables_set",
+                  "id": "o23",
+                  "fields": {
+                   "VAR": {
+                    "id": "v-master"
+                   }
+                  },
+                  "inputs": {
+                   "VALUE": {
+                    "block": {
+                     "type": "lists_getIndex",
+                     "id": "o14",
+                     "fields": {
+                      "MODE": "GET",
+                      "WHERE": "FROM_START"
+                     },
+                     "inputs": {
+                      "VALUE": {
+                       "block": {
+                        "type": "atalaia_field_ids",
+                        "id": "o12",
+                        "fields": {
+                         "ROLE": "master"
+                        }
+                       }
+                      },
+                      "AT": {
+                       "block": {
+                        "type": "math_number",
+                        "id": "o13",
+                        "fields": {
+                         "NUM": 1
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  },
+                  "next": {
+                   "block": {
+                    "type": "controls_if",
+                    "id": "o22",
+                    "inputs": {
+                     "IF0": {
+                      "block": {
+                       "type": "logic_operation",
+                       "id": "o21",
+                       "fields": {
+                        "OP": "AND"
+                       },
+                       "inputs": {
+                        "A": {
+                         "block": {
+                          "type": "logic_compare",
+                          "id": "o17",
+                          "fields": {
+                           "OP": "NEQ"
+                          },
+                          "inputs": {
+                           "A": {
+                            "block": {
+                             "type": "variables_get",
+                             "id": "o15",
+                             "fields": {
+                              "VAR": {
+                               "id": "v-all"
+                              }
+                             }
+                            }
+                           },
+                           "B": {
+                            "block": {
+                             "type": "logic_null",
+                             "id": "o16"
+                            }
+                           }
+                          }
+                         }
+                        },
+                        "B": {
+                         "block": {
+                          "type": "logic_compare",
+                          "id": "o20",
+                          "fields": {
+                           "OP": "NEQ"
+                          },
+                          "inputs": {
+                           "A": {
+                            "block": {
+                             "type": "variables_get",
+                             "id": "o18",
+                             "fields": {
+                              "VAR": {
+                               "id": "v-master"
+                              }
+                             }
+                            }
+                           },
+                           "B": {
+                            "block": {
+                             "type": "logic_null",
+                             "id": "o19"
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     },
+                     "DO0": {
+                      "block": {
+                       "type": "atalaia_field_send",
+                       "id": "o10",
+                       "fields": {
+                        "CMD": "output"
+                       },
+                       "inputs": {
+                        "NODE": {
+                         "block": {
+                          "type": "variables_get",
+                          "id": "o1",
+                          "fields": {
+                           "VAR": {
+                            "id": "v-master"
+                           }
+                          }
+                         }
+                        },
+                        "DATA": {
+                         "block": {
+                          "type": "atalaia_pair",
+                          "id": "o9",
+                          "fields": {
+                           "KEY": "capability"
+                          },
+                          "inputs": {
+                           "VALUE": {
+                            "block": {
+                             "type": "text",
+                             "id": "o2",
+                             "fields": {
+                              "TEXT": "siren"
+                             }
+                            }
+                           }
+                          },
+                          "next": {
+                           "block": {
+                            "type": "atalaia_pair",
+                            "id": "o8",
+                            "fields": {
+                             "KEY": "act"
+                            },
+                            "inputs": {
+                             "VALUE": {
+                              "block": {
+                               "type": "text",
+                               "id": "o3",
+                               "fields": {
+                                "TEXT": "pulse"
+                               }
+                              }
+                             }
+                            },
+                            "next": {
+                             "block": {
+                              "type": "atalaia_pair",
+                              "id": "o7",
+                              "fields": {
+                               "KEY": "ms"
+                              },
+                              "inputs": {
+                               "VALUE": {
+                                "block": {
+                                 "type": "math_arithmetic",
+                                 "id": "o6",
+                                 "fields": {
+                                  "OP": "MULTIPLY"
+                                 },
+                                 "inputs": {
+                                  "A": {
+                                   "block": {
+                                    "type": "atalaia_param",
+                                    "id": "o4",
+                                    "fields": {
+                                     "NAME": "siren_all_s"
+                                    }
+                                   }
+                                  },
+                                  "B": {
+                                   "block": {
+                                    "type": "math_number",
+                                    "id": "o5",
+                                    "fields": {
+                                     "NUM": 1000
+                                    }
+                                   }
+                                  }
+                                 }
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "x": 20,
+     "y": 2200,
+     "icons": {
+      "comment": {
+       "text": "With siren_all_s, the master box's siren sounds for that many seconds when one team comes to hold every satellite (CMD 12 through field.send; a box without a siren ignores it), and again only after that team lost one.",
+       "pinned": false,
+       "height": 80,
+       "width": 360
       }
      }
     }
@@ -3116,6 +3573,18 @@
    {
     "name": "amount",
     "id": "v-amount"
+   },
+   {
+    "name": "all",
+    "id": "v-all"
+   },
+   {
+    "name": "all_held",
+    "id": "v-all_held"
+   },
+   {
+    "name": "master",
+    "id": "v-master"
    }
   ]
  },

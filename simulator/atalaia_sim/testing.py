@@ -16,7 +16,8 @@ are `wait` and `hold`; everything else happens at the current game time.
       - wait: 1
       - expect: { type: bomb.exploded, team: red }
 
-See modes/README.md for every step.
+A box has the outputs its role lists in mode.yaml (`outputs:`), unless the test says which
+(`outputs: { bomb: [smoke] }`, or `{ bomb: [] }` for none). See modes/README.md for every step.
 """
 
 from __future__ import annotations
@@ -232,6 +233,34 @@ class _Runner:
             raise TestFailure(f"expected screen {arg['template']} {arg.get('data', {})} on '{name}', "
                               f"last screen is {template} {data}")
 
+    def do_expect_output(self, arg: Any) -> None:
+        """An output of a box (its function) on or off now: ``{ node, capability, active, left_s, source }``;
+        ``left_s`` (the seconds it stays on) and ``source`` (script, field, gm) are optional. (``active``,
+        not ``on``: YAML 1.1 reads a bare ``on`` as true.)"""
+        if not isinstance(arg, dict) or "capability" not in arg or not isinstance(arg.get("active"), bool):
+            raise TestFailure("expect_output takes { node, capability, active: true or false, left_s, source }")
+        unknown = set(arg) - {"node", "capability", "active", "left_s", "source"}
+        if unknown:
+            raise TestFailure(f"expect_output: unknown key(s) {sorted(unknown)}")
+        name = self._default_node(arg)
+        outputs = self.sim.outputs(name)
+        if not outputs.has(arg["capability"]):
+            raise TestFailure(f"node '{name}' has no output {arg['capability']} "
+                              f"(it has: {', '.join(outputs.channels) or 'none'})")
+        state = next(o for o in outputs.states(self.sim.time_ms) if o["capability"] == arg["capability"])
+        problems = []
+        if state["on"] != arg["active"]:
+            problems.append("on" if state["on"] else "off")
+        if "left_s" in arg and state["left_ms"] != round(float(arg["left_s"]) * 1000):
+            problems.append(f"{state['left_ms'] / 1000:g} s left")
+        if "source" in arg and state["source"] != arg["source"]:
+            problems.append(f"switched by {state['source'] or 'nobody'}")
+        if problems:
+            raise TestFailure(f"expected {arg['capability']} on '{name}' {'on' if arg['active'] else 'off'}"
+                              + (f" with {arg['left_s']:g} s left" if "left_s" in arg else "")
+                              + (f" from {arg['source']}" if "source" in arg else "")
+                              + f", it is {', '.join(problems)}")
+
 
 def _check_problems(sim: Simulation, where: str) -> None:
     """Any event that breaks the protocol schema fails the test."""
@@ -277,7 +306,10 @@ def run_test(core: Core, mode: Mode, path: Path) -> TestResult:
         default_node = next(iter(mode.roles))
         nodes = spec.get("nodes", {default_node: default_node})
         params = mode.resolve_params(spec.get("params") or {}, teams)
-        sim = Simulation(core, mode, nodes, teams, params, seed=spec.get("seed", 1))
+        outputs = spec.get("outputs")
+        if outputs is not None and not isinstance(outputs, dict):
+            raise TestFailure("outputs maps a node name to its outputs: { bomb: [smoke, siren] }")
+        sim = Simulation(core, mode, nodes, teams, params, seed=spec.get("seed", 1), outputs=outputs)
         runner = _Runner(sim)
         if spec.get("autostart", True):
             sim.start()

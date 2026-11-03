@@ -149,7 +149,7 @@ Num jogo com limite de tempo que começou na própria caixa, o ecrã grande tem 
 
 ### Saídas: uma sirene, um estroboscópio, uma máquina de fumo
 
-Uma caixa montada com uma **saída simples** tem uma tomada M8 com a etiqueta **SAÍDA 1** (às vezes também **SAÍDA 2**). Um cabo vai dela a um pequeno *interruptor de relé RC*, que liga uma sirene, um estroboscópio, uma luz ou o comando de uma máquina de fumo com a bateria deles. É o jogo que a liga: por exemplo uma sirene quando uma equipa ocupa todos os satélites, ou fumo quando a bomba explode (quando os modos de jogo a usarem). Ainda não experimentada em hardware.
+Uma caixa montada com uma **saída simples** tem uma tomada M8 com a etiqueta **SAÍDA 1** (às vezes também **SAÍDA 2**). Um cabo vai dela a um pequeno *interruptor de relé RC*, que liga uma sirene, um estroboscópio, uma luz ou o comando de uma máquina de fumo com a bateria deles. É o jogo que a liga: fumo ou uma sirene quando a bomba explode (**Fumo quando explode** e **Sirene quando explode** da *Bomba / Rush*), a sirene da mestre quando uma equipa tem todos os satélites (*Mestre e Satélites*), ou a organização a partir da consola. Dá à saída o uso que o modo pede: **smoke** ou **siren**. Ainda não experimentada em hardware.
 
 **As saídas ficam desligadas até as ativares, na caixa.** É de propósito: uma caixa emprestada por outro campo, ou ligada na zona segura, nunca dispara até que uma pessoa junto dessa caixa o diga.
 

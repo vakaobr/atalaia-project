@@ -1266,6 +1266,40 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("tab-nodes").click()
         expect(page.get_by_test_id(f"node-module-{BOX}-g46")).to_have_text("siren · não verificado")
 
+    def test_a_modes_outputs_in_the_form_and_the_start_check(self):
+        """Draft RFC "The expansion port", increment 4: Bomb's role names the outputs it switches (smoke,
+        siren): the game form says so in four languages, with its new parameters' labels; a joined bomb box
+        with an output but none of those gets the start check's "outputs" note."""
+        page = self.console()
+        page.get_by_test_id("lang").select_option("en")
+        page.get_by_test_id("game-source").select_option("mode:org.atalaia.bomb")
+        uses = page.get_by_test_id("game-mode-outputs")
+        expect(uses).to_contain_text("Bomb / Rush would switch these outputs on a box that has them: smoke, siren.")
+        expect(page.locator('label[for="game-smoke_s"]')).to_contain_text("Smoke when it explodes")
+        for lang, text, label in (("pt", "Bomba / Rush acionaria estas saídas numa caixa que as tenha: smoke, siren.",
+                                   "Fumo quando explode"),
+                                  ("de", "Bombe / Rush würde diese Ausgänge an einer Box schalten", "Rauch bei der Explosion"),
+                                  ("zh-tw", "會在有這些輸出的盒子上啟動它們：smoke, siren", "爆炸時啟動盒子的 smoke 輸出")):
+            page.get_by_test_id("lang").first.select_option(lang)
+            expect(uses).to_contain_text(text)
+            expect(page.locator('label[for="game-siren_s"]')).to_be_visible()
+            expect(page.locator('label[for="game-smoke_s"]')).to_contain_text(label)
+        page.get_by_test_id("game-source").select_option(f"mode:{DOMINATION}")
+        expect(uses).to_have_count(0)  # Domination switches no output
+
+        self.field.create_game(mode_id="org.atalaia.bomb", assignments={str(BOX): "bomb"}, params={"smoke_s": 5})
+        self.field.box_hello(caps=[1, 2, 3, 4, 5, 11])
+        ev = codec.encode_event({"node": BOX, "seq": 1, "t": 0, "type": "node.modules",
+                                 "data": {"modules": "g46:servo:horn"}})
+        self.field.box("EVENT", ev, ack=True)
+        page = self.console()
+        page.get_by_test_id("lang").select_option("en")
+        expect(page.get_by_test_id("start-warnings")).to_contain_text(
+            "box-7 (bomb) has none of the outputs the mode would switch (smoke, siren): it plays without them.")
+        page.get_by_test_id("lang").select_option("pt")
+        expect(page.get_by_test_id("start-warnings")).to_contain_text(
+            "box-7 (bomb) não tem nenhuma das saídas que o modo acionaria (smoke, siren)")
+
     def test_hacking_terminal_game_and_its_event(self):
         """A Hacking Terminal game from the form (its parameters in Portuguese); the terminal's
         join; a solved terminal reads as words in the feed, with the code it revealed for the GM,

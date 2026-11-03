@@ -128,10 +128,12 @@
     "start_warnings": {
       "min": "{have} × {role} juntas; o modo pede {value} ({param}).",
       "optional_caps": "{name} ({role}) não tem {caps}: o modo funciona sem isso.",
+      "outputs": "{name} ({role}) não tem nenhuma das saídas que o modo acionaria ({caps}): joga-se sem elas.",
       "last": "Só {have} × {role} juntas e {param} é {value}: a contagem pode correr logo desde o início."
     },
     "settings": "Definições do jogo",
     "settings_hint": "Definidas ao criar o jogo; para as mudar, termina este jogo e cria outro.",
+    "mode_outputs": "{mode} acionaria estas saídas numa caixa que as tenha: {list}. Uma caixa só aciona as saídas ativadas na própria caixa, com o PIN de administração.",
     "key_lost_notice": "Este controlador reiniciou sem a chave do jogo (persist_game_key estava desligado): o jogo só pode ser terminado. Ao terminá-lo, as caixas são avisadas pelo rádio do campo, com a chave de entrada do campo, e saem do jogo.",
     "confirm_end_key_lost": "Terminar o jogo e avisar as caixas pelo rádio do campo?",
     "over_told": "As caixas do jogo foram avisadas pelo rádio do campo de que o jogo terminou.",

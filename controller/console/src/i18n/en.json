@@ -128,10 +128,12 @@
     "start_warnings": {
       "min": "{have} × {role} joined; the mode asks for {value} ({param}).",
       "optional_caps": "{name} ({role}) has no {caps}: the mode does without it.",
+      "outputs": "{name} ({role}) has none of the outputs the mode would switch ({caps}): it plays without them.",
       "last": "Only {have} × {role} joined and {param} is {value}: the countdown can run from the start."
     },
     "settings": "Game settings",
     "settings_hint": "Set when the game was created; to change them, end this game and create another one.",
+    "mode_outputs": "{mode} would switch these outputs on a box that has them: {list}. A box switches only the outputs enabled at the box, with its admin PIN.",
     "key_lost_notice": "This controller restarted without the game's key (persist_game_key was off): the game can only be ended. Ending it tells its boxes over the field radio, sealed with the field join key, and they leave the game.",
     "confirm_end_key_lost": "End the game and tell its boxes over the field radio?",
     "over_told": "The game's boxes were told over the field radio that it is over.",

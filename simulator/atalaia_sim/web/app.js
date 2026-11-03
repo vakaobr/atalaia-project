@@ -346,6 +346,17 @@ function renderNode(node) {
     );
   }));
 
+  // The box's outputs (a siren, smoke): on with the seconds left, or off (draft RFC "The expansion port").
+  card.querySelector(".switched").replaceChildren(...(node.switched || []).map((o) => {
+    const left = o.left_ms > 0 ? ` · ${Math.ceil(o.left_ms / 1000)} s left` : "";
+    const how = o.pattern ? ` · blinking ${o.pattern[0]}/${o.pattern[1]} ms` : "";
+    const who = o.source ? ` (${o.source})` : "";
+    return el("li", { class: o.on ? "on" : "", title: `at most ${o.max_on_s} s on` },
+      el("span", { class: "lamp", "aria-hidden": "true" }),
+      el("span", { textContent: `${o.capability}: ${o.on ? "on" : o.left_ms > 0 ? "blinking" : "off"}${left}${how}${who}` }),
+    );
+  }));
+
   const audio = card.querySelector(".audio");
   if (node.audio) {
     const key = `${node.audio.t}:${compact(node.audio.args)}`;

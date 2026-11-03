@@ -12,11 +12,15 @@
 -- capture event, so the check also runs every second. A satellite that
 -- rebooted is freed at the next change of the master, as on the field.
 -- With more than one master box, the first one (the lowest node id) counts.
+-- With params.siren_all_s, the master box's siren sounds for that many seconds
+-- when one team comes to hold every satellite (CMD 12 through field.send; a box
+-- without a siren output ignores it), again only after that team lost one.
 
 local fs = state.field { master = nil, held = 0 }
 local tick
 local told -- the last status sent to the master box
 local roled = {} -- when each box was last told what it is (master or satellite): node id -> game s
+local all_held -- the team the siren last sounded for, while it still holds every satellite
 
 local function master_id()
   local m = field.nodes("master")[1]
@@ -58,6 +62,39 @@ local function tell_roles()
         roled[n.id] = now
         field.send(n.id, "mode", { name = "role", role = role })
       end
+    end
+  end
+end
+
+-- The team holding every satellite (at least one), or nil.
+local function holds_all()
+  local sats = field.nodes("satellite")
+  local team = sats[1] and field.owner(sats[1].id)
+  for _, n in ipairs(sats) do
+    if field.owner(n.id) ~= team then
+      return nil
+    end
+  end
+  return team
+end
+
+local function siren_all()
+  if (params.siren_all_s or 0) <= 0 then
+    return
+  end
+  local team = holds_all()
+  if team == all_held then
+    return
+  end
+  local id = master_id()
+  -- A refused send (the controller sends a box at most one start every 2 s) is tried again
+  -- at the next check, a second later.
+  if team == nil or id == nil then
+    all_held = team
+  else
+    local siren = { capability = "siren", act = "pulse", ms = params.siren_all_s * 1000 }
+    if field.send(id, "output", siren) then
+      all_held = team
     end
   end
 end
@@ -104,6 +141,7 @@ local function check()
       })
     end
   end
+  siren_all()
 end
 
 on("node.rebooted", function(e)

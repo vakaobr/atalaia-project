@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A box with no output at all plays the game with smoke and siren set, and the explosion still ends it
+params: { fuse_s: 30, smoke_s: 5, siren_s: 5 }
+outputs: { bomb: [] }
+steps:
+  - hold: { team: red, s: 5 }
+  - wait: 30
+  - expect: { type: bomb.exploded, team: red, at: 35 }
+  - expect: { type: game.end, at: 35, data: { reason: win, winner: red } }
+  - expect_no: output.switched
+  - expect_status: ended
