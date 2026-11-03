@@ -73,6 +73,7 @@ to check, alternatives and what to avoid.
 | Interconnect board | Perfboard about 5 x 7 cm, pin headers, 330 ohm resistor | Carries the 3V3, GND, SDA, SCL and 5 V rails and the level shifter |
 | NFC reader | PN532 breakout (I2C mode) | Addr 0x24; shares the board I2C bus |
 | Audio amp | MAX98357A I2S breakout + 4-8 ohm 3 W speaker | Optional; drop to free 3 GPIOs |
+| Piezo buzzer | Passive piezo element + 220 ohm (or an NPN stage for more volume) | Optional, with or without the amp; firmware option `CONFIG_ATALAIA_BUZZER` on GPIO 45 (decisions BZR-1 to BZR-8). Not yet built on hardware: [BUILD.md section 9.7](BUILD.md#97-audio-optional) |
 | Battery | 1S Li-ion: 2 x protected 18650 in parallel (or a 1S2P pack with BMS), 3.0-4.2 V | **One cell in series only.** The board's battery socket, its charger and the MAX17048 are single-cell parts: a 2S (7.4 V) pack destroys them. The kit's 3000 mAh LiPo is also 1S and can serve a first prototype (BUILD.md, section 7) |
 | Battery gauge | MAX17048 I2C breakout | Addr 0x36; shares the board I2C bus. The firmware reads battery level only from this gauge (not from the board's own ADC divider) |
 | 5 V supply | Boost converter, 3.0-4.2 V in, 5 V at 2.5 A or more out | Feeds the LED ring, the amplifier and the button LEDs |
@@ -101,7 +102,8 @@ flickers faintly with it); GPIO 44, UART0's receive line, is button 3 (the
 box then takes no console input on UART0; the USB console is unaffected).
 The ESP32-S3R2 has 8 GPIOs free of any board part (3, 4, 6, 15, 16, 33, 47,
 48) for 12 signals, hence these and button 4 on the keypad expander
-(decisions PIN-1 to PIN-5 in `docs/review/decisions-to-review.md`).
+(decisions PIN-1 to PIN-5 in `docs/review/decisions-to-review.md`). The optional piezo buzzer
+takes GPIO 45, a strapping pin its circuit keeps low (decision BZR-1).
 
 ### SX1262 Radio Pins (Board-Internal)
 
@@ -144,6 +146,7 @@ The ESP32-S3R2 has 8 GPIOs free of any board part (3, 4, 6, 15, 16, 33, 47,
 | I2S BCLK       | 6    | MAX98357A |
 | I2S LRCLK      | 15   | |
 | I2S DOUT       | 16   | |
+| Piezo buzzer   | 45   | Optional (`ATALAIA_BUZZER_PIN`, only with `CONFIG_ATALAIA_BUZZER=y`). The VDD_SPI strapping pin: the buzzer's circuit keeps it low at reset |
 | GNSS power     | 34   | Board-internal (VGNSS_Ctrl, low = on). The firmware drives it high (module off) at boot |
 | GNSS TX        | 38   | Board-internal: the ESP32's UART TX to the module's RX |
 | GNSS RX        | 39   | Board-internal: the module's TX to the ESP32's UART RX |

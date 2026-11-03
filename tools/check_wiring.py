@@ -18,9 +18,10 @@ with --resolve before drawing. The check fails when:
   bus, I2S audio), or the diagrams wire a GPIO no Kconfig pin claims;
 - a wired GPIO is board-internal (the list in Kconfig.projbuild's header, plus
   the Heltec V4 front-end-module pins below), on the board's GNSS connector
-  (its module keeps those pins: decision PIN-1) or a boot strapping pin; or a
-  board pin the Field Box shares on purpose (GPIO 1, 35, 44: SHARED below) is
-  used for anything else than what it is shared for;
+  (its module keeps those pins: decision PIN-1) or a boot strapping pin (GPIO 45
+  only for the optional piezo buzzer, whose circuit holds it low at reset:
+  STRAP_TOLERANT below); or a board pin the Field Box shares on purpose (GPIO 1,
+  35, 44: SHARED below) is used for anything else than what it is shared for;
 - the keypad is not on the PCF8574 the way hal_esp_keypad.c scans it (rows on
   P0-P3, columns on P4-P6), the team button of ATALAIA_KP_P7_BUTTON is not on
   its P7, the expander address differs from the Kconfig default, or its INT
@@ -63,11 +64,12 @@ GUIDES: dict[Path, tuple[str, ...]] = {
         "ATALAIA_BTN1_PIN", "ATALAIA_BTN2_PIN", "ATALAIA_BTN3_PIN", "ATALAIA_KP_P7_BUTTON",
         "ATALAIA_NFC_SDA_PIN", "ATALAIA_NFC_SCL_PIN", "ATALAIA_LED_PIN", "ATALAIA_DISP_CS_PIN",
         "ATALAIA_DISP_DC_PIN", "ATALAIA_DISP_MOSI_PIN", "ATALAIA_DISP_CLK_PIN",
-        "ATALAIA_AUDIO_BCLK_PIN", "ATALAIA_AUDIO_LRCLK_PIN", "ATALAIA_AUDIO_DOUT_PIN"),
+        "ATALAIA_AUDIO_BCLK_PIN", "ATALAIA_AUDIO_LRCLK_PIN", "ATALAIA_AUDIO_DOUT_PIN",
+        "ATALAIA_BUZZER_PIN"),
     REPO / "hardware" / "satellite" / "BUILD.md": (
         "ATALAIA_BTN1_PIN", "ATALAIA_BTN2_PIN", "ATALAIA_BTN3_PIN", "ATALAIA_LED_PIN",
         "ATALAIA_BATT_SDA_PIN", "ATALAIA_BATT_SCL_PIN", "ATALAIA_AUDIO_BCLK_PIN",
-        "ATALAIA_AUDIO_LRCLK_PIN", "ATALAIA_AUDIO_DOUT_PIN"),
+        "ATALAIA_AUDIO_LRCLK_PIN", "ATALAIA_AUDIO_DOUT_PIN", "ATALAIA_BUZZER_PIN"),
     REPO / "hardware" / "io-pod" / "BUILD.md": (
         "ATALAIA_BTN1_PIN", "ATALAIA_BTN2_PIN", "ATALAIA_BTN3_PIN", "ATALAIA_KP_P7_BUTTON",
         "ATALAIA_LED_PIN", "ATALAIA_NFC_SDA_PIN", "ATALAIA_NFC_SCL_PIN", "ATALAIA_AUDIO_BCLK_PIN",
@@ -145,6 +147,14 @@ README_ROWS = {
 README_P7 = "PCF8574 P7"
 
 STRAPPING_FORBIDDEN = {0, 45, 46}  # GPIO 3 is a strapping pin the pin map uses on purpose
+# Strapping pins one optional part may take, because its circuit keeps the pin's reset level
+# (decision BZR-1): GPIO -> (the Kconfig pins allowed on it, why). GPIO 45 selects the flash
+# voltage at reset (low = 3.3 V, its internal pull-down): a piezo through a series resistor, or a
+# transistor's base with 10 kohm to GND, never pulls it up. The diagrams do not show the buzzer.
+STRAP_TOLERANT: dict[int, tuple[set[str], str]] = {
+    45: ({"ATALAIA_BUZZER_PIN"},
+         "the VDD_SPI strap: only the piezo buzzer, whose circuit holds it low at reset"),
+}
 SHARED_BUS = {17, 18}  # board-internal, but the shared I2C bus is meant to be wired
 
 # Heltec WiFi LoRa 32 V4 pins that the Kconfig header does not list (yet).
@@ -410,6 +420,8 @@ def check_pin(where: str, symbol: str, cell: str, defaults: dict[str, int],
                 f"{defaults[symbol]}"]
     if gpio < 0:
         return [f"{where}: {symbol} is disabled by default (-1): a guide lists wired pins only"]
+    if gpio in STRAP_TOLERANT and symbol in STRAP_TOLERANT[gpio][0]:
+        return []
     if gpio in STRAPPING_FORBIDDEN:
         return [f"{where}: {symbol} = GPIO {gpio}, a boot strapping pin"]
     if gpio in V4_GNSS:
@@ -575,6 +587,20 @@ def check(diagram_paths: list[Path], kconfig_path: Path, readme_path: Path | Non
         if defaults.get(symbol) not in (gpio, -1):
             errors.append(f"Kconfig: {symbol} = {defaults.get(symbol)}, but the Heltec V4 "
                           f"wires that line of its GNSS connector to GPIO {gpio}")
+    # The optional buzzer (not in the diagrams) has a pin of its own: no other part's default.
+    buzzer = defaults.get("ATALAIA_BUZZER_PIN")
+    if buzzer is None:
+        errors.append("Kconfig: ATALAIA_BUZZER_PIN has no numeric default")
+    else:
+        for symbol, gpio in sorted(defaults.items()):
+            if (symbol != "ATALAIA_BUZZER_PIN" and symbol.endswith("_PIN") and gpio == buzzer
+                    and buzzer >= 0):
+                errors.append(f"Kconfig: ATALAIA_BUZZER_PIN = {buzzer}, the default of {symbol} too")
+        if buzzer in internal or buzzer in V4_GNSS or buzzer in V4_RESERVED or buzzer in SHARED:
+            errors.append(f"Kconfig: ATALAIA_BUZZER_PIN = {buzzer}, a pin the board or another "
+                          "part keeps")
+        elif buzzer in STRAPPING_FORBIDDEN and buzzer not in STRAP_TOLERANT:
+            errors.append(f"Kconfig: ATALAIA_BUZZER_PIN = {buzzer}, a boot strapping pin")
     for label in board_labels:
         m = re.fullmatch(r"GPIO(\d+)", label)
         if m and int(m.group(1)) not in wired:

@@ -6,6 +6,7 @@
 
 #include "hal_audio.h"
 #include "hal_battery.h"
+#include "hal_buzzer.h"
 #include "hal_buttons.h"
 #include "hal_display.h"
 #include "hal_keypad.h"
@@ -22,6 +23,7 @@ typedef struct {
     const hal_oled_ops_t *oled; /* on-board status OLED; NULL when the board has none */
     const hal_nfc_ops_t *nfc;
     const hal_audio_ops_t *audio;
+    const hal_buzzer_ops_t *buzzer; /* piezo buzzer (CONFIG_ATALAIA_BUZZER); NULL when none */
     const hal_battery_ops_t *battery;
     const hal_radio_ops_t *radio;
 } hal_t;

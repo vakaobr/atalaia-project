@@ -1308,6 +1308,8 @@ build:
     bclk: BCLK do amplificador (opcional)
     lrclk: LRC do amplificador
     dout: DIN do amplificador
+    buzzer: >-
+      Besouro piezoelétrico passivo, opcional (um pino de arranque: o seu circuito mantém-no em baixo; opção do firmware, ainda não montado em hardware)
     tamper: Interruptor da caixa, para GND
     log: >-
       Saída do registo (UART0 TX): só para o RX de um adaptador USB-série de 3,3&nbsp;V, na bancada
@@ -1459,7 +1461,9 @@ build:
         de 5&nbsp;A, um díodo Schottky, um interruptor principal tapado, um conversor elevador de
         5&nbsp;V para o anel e ligadores de alavanca: a alimentação da Field Box com uma só célula.
       sound: >-
-        Som, se quiseres: o amplificador MAX98357A da Field Box e um altifalante pequeno.
+        Som, se quiseres: um besouro piezoelétrico passivo (o mais barato: toca os sons dos jogos
+        como sequências curtas de tons, com uma opção do firmware; ainda não montado em hardware), o
+        amplificador MAX98357A da Field Box e um altifalante pequeno, ou os dois.
       box: >-
         Uma caixa de plástico IP65 de cor viva, com respiro e bucins, e rótulos «GAME PROP».
     free_pins: >-
@@ -1500,8 +1504,8 @@ build:
     photo: a caixa satélite acabada, por dentro e por fora.
     open:
       buzzer: >-
-        <strong>O besouro piezoelétrico</strong> do desenho original: o firmware só faz som através
-        do amplificador, por isso um besouro precisaria de uma alteração ao firmware.
+        <strong>O besouro piezoelétrico</strong> do desenho original: o firmware já o controla (uma
+        opção de compilação, no GPIO&nbsp;45), mas ainda nenhum foi montado e ouvido numa placa real.
       enclosure: >-
         <strong>A caixa</strong>: ainda não se escolheu nenhuma.
       runtime: >-
