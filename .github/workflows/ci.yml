@@ -649,11 +649,10 @@ jobs:
     # Bomb prop on the real core, a join text, the player view over a
     # WebSocket (app/integration_test/). Flutter 3.47.9 comes from
     # subosito/flutter-action because the emulator and the Flutter tool must
-    # run on the same machine; both actions are pinned by commit. The AVD and
-    # its quick-boot snapshot are cached (key: API level, target, arch): on a
-    # miss a first emulator run makes them and saves the cache, and the tests
-    # then boot from that snapshot without saving over it (-no-snapshot-save),
-    # reactivecircus/android-emulator-runner's documented pattern.
+    # run on the same machine; both actions are pinned by commit. The emulator
+    # boots cold every run (-no-snapshot): a cached quick-boot snapshot (#56)
+    # came up before Android's input service, and every PR run failed at
+    # `adb shell input` ("No service published for: input"), 2026-11-03.
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -680,42 +679,14 @@ jobs:
       - name: Packages from the lockfile
         working-directory: app
         run: flutter pub get --enforce-lockfile
-      - name: The emulator's AVD and snapshot from the cache
-        id: avd-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-${{ runner.os }}-api30-default-x86_64-v1 # as the emulator steps' api-level, target and arch
-      - name: Make the AVD and its snapshot (cache miss)
-        if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
-        with:
-          api-level: 30
-          target: default
-          arch: x86_64
-          force-avd-creation: false
-          disable-animations: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: echo "AVD and snapshot made for the cache."
-      - name: Save the AVD and snapshot to the cache
-        if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-${{ runner.os }}-api30-default-x86_64-v1 # as the emulator steps' api-level, target and arch
       - name: Integration tests on the emulator
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 30
           target: default
           arch: x86_64
-          force-avd-creation: false
           disable-animations: true
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           working-directory: app
           # Android 13+ asks before an app posts notifications (a prop asks when
           # its game starts); grant it once installed, as app/tool/emulator_tests.ps1
