@@ -1079,7 +1079,7 @@
   },
   "scenario": {
     "title": "劇本編輯器",
-    "intro": "劇本是一份 YAML 清單：GM 命名的盒子，以及任務目標（佔領、密碼、標籤、炸彈、護送、防守、存活）。控制器會在你輸入時檢查；安裝後，在「遊戲」分頁用「任務目標」建立一場遊戲。",
+    "intro": "劇本是一份 YAML 清單：GM 命名的盒子，以及任務目標（佔領、密碼、標籤、炸彈、護送、防守、存活），以及切換盒子輸出的觸發器（所有據點被佔領時響起警報器）。控制器會在你輸入時檢查；安裝後，在「遊戲」分頁用「任務目標」建立一場遊戲。",
     "text": "清單（YAML）",
     "example": "範例",
     "check": "檢查",
@@ -1149,6 +1149,7 @@
       "scenario_params": "參數 %1",
       "scenario_nodes": "盒子與玩家 %1",
       "scenario_objectives": "任務目標 %1",
+      "scenario_triggers": "觸發器 %1",
       "scenario_tip": "劇本：它的 ID（你社團的，例如 org.club.foxhound）、版本和名稱；盒子畫面的語言；它的隊伍、參數、盒子和任務目標。",
       "description": "說明 %1",
       "author": "作者 %1",
@@ -1213,7 +1214,25 @@
       "cat_effects": "給予什麼",
       "cat_texts": "文字",
       "cat_teams": "隊伍",
-      "cat_params": "參數"
+      "cat_params": "參數",
+      "when_completed": "當以下全部完成時 %1",
+      "when_any": "當以下任一完成時 %1",
+      "when_failed": "當 %1 失敗時",
+      "when_start": "當遊戲開始時",
+      "when_end": "當遊戲結束時",
+      "when_do": "切換 %1",
+      "when_tip": "觸發器：發生這件事時，切換一個盒子的輸出（警報器、閃光燈、煙霧），每場遊戲一次。盒子必須有這個輸出，且其管理員已在盒子上啟用它。",
+      "when_end_tip": "遊戲結束時的觸發器：結束後，盒子最多讓輸出運作 10 秒（結束號角）。",
+      "which": "任務目標 %1",
+      "output": "%1 盒子 %3 的 %2，持續 %4 秒",
+      "act_pulse": "脈衝開啟",
+      "act_on": "開啟",
+      "output_pattern": "閃爍盒子 %2 的 %1，持續 %3 秒",
+      "output_pattern_steps": "開 %1 秒，關 %2 秒",
+      "output_off": "關閉盒子 %2 的 %1",
+      "output_tip": "輸出的功能，依盒子的名稱：siren、strobe、smoke、light、horn（第二個：siren.2）或 out.1 到 out.9。最多 600 秒。",
+      "output_off_tip": "輸出的功能，或用 * 代表盒子的所有輸出。",
+      "cat_triggers": "觸發器"
     }
   },
   "firmware": {

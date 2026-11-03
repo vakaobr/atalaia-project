@@ -10,7 +10,7 @@ scenarios/, the console's own example and the valid manifests of protocol/vector
 becomes blocks in the page, is saved and loaded again as Blockly does, and the YAML the blocks
 write is read by the controller's own reader: it compiles to exactly the same package (mode.yaml
 and field.lua, byte for byte) and gets the same problems from the validator as the hand-written
-text. Then the view itself: Portuguese and English, a change made on a block reaching the YAML
+text. Then the view itself: Portuguese and English, the Triggers blocks in four languages, a change made on a block reaching the YAML
 and the installed package, the controller's problems on their blocks, the blocks' own problems,
 the keyboard, a phone's width, the read token, what the blocks refuse to show, offline, and
 Blockly's stylesheets being exactly the ones the Content-Security-Policy allows. Every page is
@@ -61,6 +61,31 @@ def examples() -> list[tuple[str, str]]:
     out += [(f"vector: {v['name']}", json.dumps(v["manifest"], ensure_ascii=False)) for v in vectors["valid"]]
     return out
 
+
+# A scenario with a trigger of every kind (draft RFC "The expansion port", EXP-25).
+TRIGGERS = """\
+id: org.club.sirens
+version: 1
+name: Sirens
+nodes:
+  sat_a: { role: objective }
+  sat_b: { role: objective }
+  master: { role: objective }
+objectives:
+  - { id: sat_a, name: A, type: capture_and_hold, target: sat_a }
+  - { id: sat_b, name: B, type: capture_and_hold, target: sat_b }
+triggers:
+  - when: { completed: [sat_a, sat_b] }
+    output: { node: master, capability: siren, act: pulse, seconds: 10 }
+  - when: { any_completed: [sat_a] }
+    output: { node: master, capability: strobe, act: pattern, seconds: 30, on_ms: 500, off_ms: 1500 }
+  - when: { failed: sat_b }
+    output: { node: master, capability: "*", act: "off" }
+  - when: { game: start }
+    output: { node: sat_a, capability: horn, act: "on", seconds: 2 }
+  - when: { game: end }
+    output: { node: master, capability: horn, act: pulse, seconds: 10 }
+"""
 
 # The round trip in the page: manifest -> blocks -> Blockly's saved state -> blocks -> YAML.
 ROUND_TRIP = """async (manifest) => {
@@ -227,7 +252,7 @@ class ScenarioBlocksTests(unittest.TestCase):
         page = self.console()
         self.blocks_view(page)  # loads Blockly and defines the blocks
         cases = examples()
-        self.assertEqual(len(cases), 13)  # with scenario.json's emoji as a surrogate pair (PE24-107)
+        self.assertEqual(len(cases), 14)  # with scenario.json's emoji as a surrogate pair (PE24-107) and triggers
         for name, text in cases:
             with self.subTest(name):
                 original = load(text)
@@ -349,6 +374,76 @@ class ScenarioBlocksTests(unittest.TestCase):
         written = load(self.yaml_text(page))
         self.assertEqual(written["objectives"][0]["effect"], {"points": 60})
         self.assertEqual(compile_scenario(written).files, by_hand.files)
+
+    @unittest.skipIf(CORE is None, "the shared core library is not built")
+    def test_triggers_as_blocks_in_four_languages(self):
+        """Triggers (draft RFC "The expansion port", EXP-25): each condition is a "when" block of
+        the Triggers category holding its output; the blocks speak Portuguese, English, German and
+        Chinese; a changed duration reaches the YAML and the compiled field.lua; a second output in
+        one trigger is one too many; what the blocks cannot hold as it is (a duration left out, an
+        empty list of triggers) stays in the YAML."""
+        page = self.console()
+        editor = page.get_by_test_id("scenario-text")
+        editor.fill(TRIGGERS)
+        expect(page.get_by_test_id("scenario-ok")).to_be_visible()
+        self.blocks_view(page)
+        kinds = "() => Blockly.getMainWorkspace().getAllBlocks(true).map((b) => b.type).filter((t) => /when|output|which/.test(t))"
+        self.assertEqual(page.evaluate(kinds), ["scn_when_completed", "scn_which", "scn_which", "scn_output",
+                                                "scn_when_any", "scn_which", "scn_output_pattern",
+                                                "scn_when_failed", "scn_output_off", "scn_when_start", "scn_output",
+                                                "scn_when_end", "scn_output"])
+        words = {"pt": ("gatilhos", "quando todos estes estiverem cumpridos", "dispara", "faz piscar", "desliga",
+                        "quando o jogo acaba", "Gatilhos"),
+                 "en": ("triggers", "when all of these are completed", "pulse", "blink", "switch off",
+                        "when the game ends", "Triggers"),
+                 "de": ("Auslöser", "wenn alle diese erfüllt sind", "kurz einschalten", "blinken", "ausschalten",
+                        "wenn das Spiel endet", "Auslöser"),
+                 "zh-tw": ("觸發器", "當以下全部完成時", "脈衝開啟", "閃爍", "關閉", "當遊戲結束時", "觸發器")}
+        for lang, expected in words.items():
+            with self.subTest(lang):
+                if lang != "pt":
+                    page.get_by_test_id("lang").first.select_option(lang)
+                    expect(page.locator(".scn-blocks .blocklySvg").first).to_be_visible()
+                    expect(page.locator(".scn-blocks")).to_contain_text(expected[1], timeout=WAIT_MS)
+                text = self.blocks_text(page)
+                for w in expected[:-1]:
+                    self.assertIn(w, text)
+                self.assertIn(expected[-1], page.evaluate(
+                    "() => Blockly.getMainWorkspace().getToolbox().getToolboxItems().map((i) => i.getName())"))
+        page.get_by_test_id("lang").first.select_option("en")
+        expect(page.locator(".scn-blocks")).to_contain_text("when all of these are completed", timeout=WAIT_MS)
+
+        self.edit_field(page, "scn_output", "SECONDS", "20")
+        page.get_by_test_id("scenario-view-yaml").click()
+        expect(editor).to_have_value(re.compile(r"act: pulse, seconds: 20 \}"), timeout=WAIT_MS)
+        written = load(self.yaml_text(page))
+        self.assertEqual(written["triggers"][0]["output"],
+                         {"node": "master", "capability": "siren", "act": "pulse", "seconds": 20})
+        self.assertIn("ms = 20000", compile_scenario(written).files["field.lua"])
+
+        self.blocks_view(page)
+        page.evaluate("""() => {
+            const ws = Blockly.getMainWorkspace();
+            const output = ws.getAllBlocks(true).find((b) => b.type === 'scn_output_off');
+            const extra = ws.newBlock('scn_output_off');
+            extra.initSvg();
+            extra.render();
+            output.nextConnection.connect(extra.previousConnection);
+        }""")
+        twice = page.locator('[data-testid=scenario-block-problems] [data-code="twice"]')
+        expect(twice).to_contain_text("Given twice")
+        expect(page.get_by_test_id("scenario-install")).to_be_disabled()
+        page.evaluate("""() => Blockly.getMainWorkspace().getAllBlocks(true)
+            .filter((b) => b.type === 'scn_output_off')[1].dispose(true)""")
+        expect(twice).to_have_count(0)
+
+        for text, paths in [(TRIGGERS.replace("act: pulse, seconds: 10 }", "act: pulse }", 1), "triggers[0].output.seconds"),
+                            (TRIGGERS.split("triggers:")[0] + "triggers: []\n", "triggers")]:
+            page.get_by_test_id("scenario-view-yaml").click()
+            editor.fill(text)
+            page.get_by_test_id("scenario-view-blocks").click()
+            expect(page.get_by_test_id("scenario-blocks-error")).to_contain_text(f"as they are: {paths}.")
+            expect(editor).to_be_visible()
 
     def test_keyboard_reaches_and_changes_the_blocks(self):
         """Without a mouse: Tab from the view's buttons reaches the categories; the right arrow

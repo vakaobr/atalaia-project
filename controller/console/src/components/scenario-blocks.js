@@ -66,8 +66,14 @@ const NO_LEVEL = 'none';
 
 const COLOURS = {
     scenario: '#2f6b47', text: '#6b6b6b', team: '#a33b3b', param: '#7a5c99', node: '#2e6f8f',
-    objective: '#b5651d', who: '#3d7d7d', how: '#5b6fb3', effect: '#8a7a14',
+    objective: '#b5651d', who: '#3d7d7d', how: '#5b6fb3', effect: '#8a7a14', trigger: '#9b3f6b', output: '#6d4c9a',
 };
+
+// Triggers (draft RFC "The expansion port", EXP-25): a "when" block per condition, holding one output.
+// Block type -> the condition's key in `when` (game: start and game: end are two blocks).
+const WHEN_BLOCKS = { scn_when_completed: 'completed', scn_when_any: 'any_completed', scn_when_failed: 'failed',
+    scn_when_start: 'start', scn_when_end: 'end' };
+const OUTPUT_BLOCKS = ['scn_output', 'scn_output_pattern', 'scn_output_off'];
 
 // The languages a scenario's texts are translated into (manifest `i18n`; English is the text itself, PKB-9, SCL-1):
 // the language code, the suffix of its blocks and fields (scn_name_pt, LABEL_PT; scn_name_zh_tw, LABEL_ZH_TW).
@@ -90,6 +96,9 @@ const PLACES = {
         'scn_defuse', 'scn_fuse', 'scn_circle', 'scn_area', 'scn_max_acc', 'scn_lives', 'scn_points',
         'scn_points_param', 'scn_win', 'scn_reveal'],
     'scn_area.CORNERS': ['scn_corner'],
+    'scn_scenario.TRIGGERS': Object.keys(WHEN_BLOCKS),
+    ...Object.fromEntries(Object.keys(WHEN_BLOCKS).flatMap((type) => [[`${type}.DO`, OUTPUT_BLOCKS],
+        ...(type === 'scn_when_completed' || type === 'scn_when_any' ? [[`${type}.OBJECTIVES`, ['scn_which']]] : [])])),
 };
 
 const text = (name, value = '') => ({ type: 'field_input', name, text: value, spellcheck: false });
@@ -130,6 +139,7 @@ export function blockDefinitions(tr) {
             [tr('scenario_params'), [statement('PARAMS')]],
             [tr('scenario_nodes'), [statement('NODES')]],
             [tr('scenario_objectives'), [statement('OBJECTIVES')]],
+            [tr('scenario_triggers'), [statement('TRIGGERS')]],
         ], { tooltip: tr('scenario_tip') }),
         def('scn_description', C.text, [[tr('description'), [text('TEXT')]]], item),
         def('scn_author', C.text, [[tr('author'), [text('TEXT')]]], item),
@@ -175,6 +185,26 @@ export function blockDefinitions(tr) {
         def('scn_points_param', C.effect, [[tr('points_param'), [text('PARAM', 'points')]]], item),
         def('scn_win', C.effect, [[tr('win'), []]], item),
         def('scn_reveal', C.effect, [[tr('reveal'), [text('OBJECTIVE')]]], item),
+        def('scn_when_completed', C.trigger, [[tr('when_completed'), [statement('OBJECTIVES')]],
+            [tr('when_do'), [statement('DO')]]], { ...item, tooltip: tr('when_tip') }),
+        def('scn_when_any', C.trigger, [[tr('when_any'), [statement('OBJECTIVES')]],
+            [tr('when_do'), [statement('DO')]]], { ...item, tooltip: tr('when_tip') }),
+        def('scn_when_failed', C.trigger, [[tr('when_failed'), [text('OBJECTIVE')]],
+            [tr('when_do'), [statement('DO')]]], { ...item, tooltip: tr('when_tip') }),
+        def('scn_when_start', C.trigger, [[tr('when_start'), []], [tr('when_do'), [statement('DO')]]],
+            { ...item, tooltip: tr('when_tip') }),
+        def('scn_when_end', C.trigger, [[tr('when_end'), []], [tr('when_do'), [statement('DO')]]],
+            { ...item, tooltip: tr('when_end_tip') }),
+        def('scn_which', C.trigger, [[tr('which'), [text('OBJECTIVE')]]], item),
+        def('scn_output', C.output, [[tr('output'), [
+            { type: 'field_dropdown', name: 'ACT', options: [[tr('act_pulse'), 'pulse'], [tr('act_on'), 'on']] },
+            text('CAPABILITY', 'siren'), text('NODE'), num('SECONDS', 10)]]], { ...item, tooltip: tr('output_tip') }),
+        def('scn_output_pattern', C.output, [
+            [tr('output_pattern'), [text('CAPABILITY', 'strobe'), text('NODE'), num('SECONDS', 30)]],
+            [tr('output_pattern_steps'), [num('ON', 0.5, 0.001), num('OFF', 0.5, 0.001)]],
+        ], { ...item, tooltip: tr('output_tip') }),
+        def('scn_output_off', C.output, [[tr('output_off'), [text('CAPABILITY', '*'), text('NODE')]]],
+            { ...item, tooltip: tr('output_off_tip') }),
     ];
 }
 
@@ -202,6 +232,7 @@ export function toolbox(tr) {
             cat('cat_texts', C.text, ['scn_description', ...TEXT_BLOCKS, 'scn_author']),
             cat('cat_teams', C.team, ['scn_team']),
             cat('cat_params', C.param, ['scn_param']),
+            cat('cat_triggers', C.trigger, [...Object.keys(WHEN_BLOCKS), 'scn_which', ...OUTPUT_BLOCKS]),
         ],
     };
 }
@@ -260,7 +291,7 @@ export function manifestToState(m) {
     };
     if (!isObject(m)) return { state: null, lost: [''] };
     only(m, ['id', 'version', 'name', 'description', 'author', 'lang', 'teams', 'squads', 'reveal', 'disclosure', 'params',
-        'i18n', 'nodes', 'objectives'], '');
+        'i18n', 'nodes', 'objectives', 'triggers'], '');
 
     const root = { ID: '', VERSION: '', NAME: '', LANG: 'pt', SQUADS: 0, REVEAL: 'game', DISCLOSURE: 'members' };
     if ('id' in m) root.ID = textOf(m, 'id', '') ?? '';
@@ -400,9 +431,15 @@ export function manifestToState(m) {
     else if (!Array.isArray(m.objectives)) lost.push('objectives');
     else m.objectives.forEach((o, i) => objectives.push(objectiveBlock(o, `objectives[${i}]`, lost, { only, textOf, intOf })));
 
+    const triggers = [];
+    if ('triggers' in m) {
+        if (!Array.isArray(m.triggers) || m.triggers.length === 0) lost.push('triggers'); // the blocks would leave it out
+        else m.triggers.forEach((t, i) => triggers.push(triggerBlock(t, `triggers[${i}]`, lost, { only, textOf, intOf })));
+    }
+
     const scenario = block('scn_scenario', root, {
         INFO: chain(info), TEAMS: chain(teams), PARAMS: chain(params), NODES: chain(nodes),
-        OBJECTIVES: chain(objectives.filter(Boolean)),
+        OBJECTIVES: chain(objectives.filter(Boolean)), TRIGGERS: chain(triggers.filter(Boolean)),
     });
     scenario.x = 16;
     scenario.y = 16;
@@ -561,6 +598,79 @@ function objectiveBlock(o, path, lost, { only, textOf, intOf }) {
     return block('scn_objective', fields, { RULES: chain(rules) });
 }
 
+/** A trigger's block (EXP-25): its "when" block, holding the objectives it waits for and its output. */
+function triggerBlock(t, path, lost, { only, textOf, intOf }) {
+    if (!isObject(t)) {
+        lost.push(path);
+        return null;
+    }
+    only(t, ['when', 'output'], path);
+    const w = t.when;
+    const wp = `${path}.when`;
+    const keys = isObject(w) ? Object.keys(w) : [];
+    if (keys.length !== 1 || !['completed', 'any_completed', 'failed', 'game'].includes(keys[0])) {
+        lost.push(wp);
+        return null;
+    }
+    const key = keys[0];
+    let type;
+    const fields = {};
+    const inputs = {};
+    if (key === 'game') {
+        if (w.game !== 'start' && w.game !== 'end') {
+            lost.push(`${wp}.game`);
+            return null;
+        }
+        type = w.game === 'start' ? 'scn_when_start' : 'scn_when_end';
+    } else if (key === 'failed') {
+        type = 'scn_when_failed';
+        fields.OBJECTIVE = textOf(w, 'failed', wp) ?? '';
+        if (w.failed === '') lost.push(`${wp}.failed`);
+    } else {
+        type = key === 'completed' ? 'scn_when_completed' : 'scn_when_any';
+        const ids = w[key];
+        if (!Array.isArray(ids) || ids.length === 0) lost.push(`${wp}.${key}`);
+        else {
+            const which = [];
+            ids.forEach((id, j) => {
+                if (isText(id) && id !== '') which.push(block('scn_which', { OBJECTIVE: id }));
+                else lost.push(`${wp}.${key}[${j}]`);
+            });
+            inputs.OBJECTIVES = chain(which);
+        }
+    }
+    if ('output' in t) inputs.DO = outputBlock(t.output, `${path}.output`, lost, { only, textOf, intOf });
+    return block(type, fields, inputs);
+}
+
+function outputBlock(o, path, lost, { only, textOf, intOf }) {
+    if (!isObject(o) || !['on', 'pulse', 'pattern', 'off'].includes(o.act)) {
+        lost.push(isObject(o) ? `${path}.act` : path);
+        return undefined;
+    }
+    const fields = {};
+    for (const [key, field] of [['node', 'NODE'], ['capability', 'CAPABILITY']]) {
+        fields[field] = textOf(o, key, path) ?? '';
+        if (o[key] === '') lost.push(`${path}.${key}`); // the blocks would leave it out
+    }
+    // Every number the act takes is needed: a block always writes it.
+    const need = (key) => {
+        if (!(key in o)) lost.push(`${path}.${key}`);
+        return intOf(o, key, path) ?? 0;
+    };
+    if (o.act === 'off') {
+        only(o, ['node', 'capability', 'act'], path);
+        return { block: block('scn_output_off', fields) };
+    }
+    if (o.act === 'pattern') {
+        only(o, ['node', 'capability', 'act', 'seconds', 'on_ms', 'off_ms'], path);
+        return { block: block('scn_output_pattern', { ...fields, SECONDS: need('seconds'), ON: need('on_ms') / MS,
+            OFF: need('off_ms') / MS }) };
+    }
+    only(o, ['node', 'capability', 'act', 'seconds'], path);
+    return { block: block('scn_output', { ...fields, ACT: o.act, SECONDS: need('seconds') }) };
+}
+
 // ---- blocks -> manifest ---------------------------------------------------------------------
 
 /** The blocks one after the other in a statement input (disabled ones left out). */
@@ -682,7 +792,40 @@ export function workspaceToManifest(ws) {
     if (Object.keys(nodes).length) m.nodes = nodes;
     m.objectives = placed(root, 'OBJECTIVES').map((b, i) => objectiveOf(b, `objectives[${i}]`, placed, put, problems));
     where.objectives = root.id;
+    const triggers = placed(root, 'TRIGGERS').map((b, i) => triggerOf(b, `triggers[${i}]`, placed, put, problems));
+    if (triggers.length) m.triggers = put('triggers', triggers, root);
     return { manifest: m, where, problems };
+}
+
+/** A trigger from its "when" block: the condition and the one output inside it. */
+function triggerOf(b, path, placed, put, problems) {
+    const field = (blk, name) => blk.getFieldValue(name);
+    const t = {};
+    put(path, t, b);
+    const key = WHEN_BLOCKS[b.type];
+    if (key === 'start' || key === 'end') t.when = { game: key };
+    else if (key === 'failed') t.when = { failed: field(b, 'OBJECTIVE') };
+    else {
+        const which = placed(b, 'OBJECTIVES');
+        which.forEach((c, j) => put(`${path}.when.${key}[${j}]`, null, c));
+        t.when = { [key]: which.map((c) => field(c, 'OBJECTIVE')) };
+    }
+    put(`${path}.when`, null, b);
+    const outputs = placed(b, 'DO');
+    outputs.slice(1).forEach((c) => problems.push({ blockId: c.id, path: `${path}.output`, code: 'twice', level: 'error' }));
+    const o = outputs[0];
+    if (o) {
+        const out = {};
+        if (field(o, 'NODE') !== '') out.node = field(o, 'NODE');
+        if (field(o, 'CAPABILITY') !== '') out.capability = field(o, 'CAPABILITY');
+        if (o.type === 'scn_output_off') out.act = 'off';
+        else if (o.type === 'scn_output_pattern') {
+            Object.assign(out, { act: 'pattern', seconds: Number(field(o, 'SECONDS')),
+                on_ms: Math.round(Number(field(o, 'ON')) * MS), off_ms: Math.round(Number(field(o, 'OFF')) * MS) });
+        } else Object.assign(out, { act: field(o, 'ACT'), seconds: Number(field(o, 'SECONDS')) });
+        t.output = put(`${path}.output`, out, o);
+    }
+    return t;
 }
 
 function objectiveOf(b, path, placed, put, problems) {
@@ -903,9 +1046,10 @@ function emitMap(obj, indent, lines, first = null) {
 }
 
 const TOP = ['id', 'version', 'name', 'author', 'description', 'lang', 'teams', 'squads', 'reveal', 'disclosure', 'params',
-    'i18n', 'nodes', 'objectives'];
+    'i18n', 'nodes', 'objectives', 'triggers'];
 const OBJECTIVE = ['id', 'name', 'description', 'i18n', 'type', 'target', 'assignee', 'params', 'visibility',
     'depends_on', 'time_window', 'effect'];
+const TRIGGER = ['when', 'output'];
 
 function ordered(obj, keys) {
     const out = {};
@@ -919,21 +1063,22 @@ function ordered(obj, keys) {
 export function toYaml(manifest) {
     const lines = [];
     const top = ordered(manifest, TOP);
-    const head = Object.fromEntries(Object.entries(top).filter(([k]) => k !== 'nodes' && k !== 'objectives'));
+    const head = Object.fromEntries(Object.entries(top).filter(([k]) => !['nodes', 'objectives', 'triggers'].includes(k)));
     emitMap(head, 0, lines);
     if ('nodes' in top) {
         lines.push('');
         emitMap({ nodes: top.nodes }, 0, lines);
     }
-    if ('objectives' in top) {
+    for (const [key, keys] of [['objectives', OBJECTIVE], ['triggers', TRIGGER]]) {
+        if (!(key in top)) continue;
         lines.push('');
-        const list = top.objectives;
-        if (!Array.isArray(list) || list.length === 0) lines.push(`objectives: ${flow(list)}`);
+        const list = top[key];
+        if (!Array.isArray(list) || list.length === 0) lines.push(`${key}: ${flow(list)}`);
         else {
-            lines.push('objectives:');
+            lines.push(`${key}:`);
             list.forEach((o, i) => {
                 if (i > 0) lines.push('');
-                if (isObject(o) && Object.keys(o).length) emitMap(ordered(o, OBJECTIVE), 4, lines, '  - ');
+                if (isObject(o) && Object.keys(o).length) emitMap(ordered(o, keys), 4, lines, '  - ');
                 else lines.push(`  - ${flow(o)}`);
             });
         }

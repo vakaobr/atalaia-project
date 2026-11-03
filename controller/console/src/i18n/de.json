@@ -1090,7 +1090,7 @@
   },
   "scenario": {
     "title": "Szenario-Editor",
-    "intro": "Ein Szenario ist ein YAML-Manifest: die Boxen, die die GM benennt, und die Ziele (einnehmen, Code, Tags, Bombe, Eskorte, verteidigen, überleben). Der Controller prüft es während du tippst; nach der Installation erstellst du im Tab Spiel ein Spiel davon mit Ziele.",
+    "intro": "Ein Szenario ist ein YAML-Manifest: die Boxen, die die GM benennt, und die Ziele (einnehmen, Code, Tags, Bombe, Eskorte, verteidigen, überleben), und Auslöser, die Ausgänge der Boxen schalten (eine Sirene, wenn alle Punkte eingenommen sind). Der Controller prüft es während du tippst; nach der Installation erstellst du im Tab Spiel ein Spiel davon mit Ziele.",
     "text": "Manifest (YAML)",
     "example": "Beispiel",
     "check": "Prüfen",
@@ -1161,6 +1161,7 @@
       "scenario_params": "Parameter %1",
       "scenario_nodes": "Boxen und Personen %1",
       "scenario_objectives": "Ziele %1",
+      "scenario_triggers": "Auslöser %1",
       "scenario_tip": "Das Szenario: seine ID (die deines Clubs, wie org.club.foxhound), Version und Name; die Sprache der Bildschirme der Boxen; seine Teams, Parameter, Boxen und Ziele.",
       "description": "Beschreibung %1",
       "author": "verfasst von %1",
@@ -1225,7 +1226,25 @@
       "cat_effects": "Was es bringt",
       "cat_texts": "Texte",
       "cat_teams": "Teams",
-      "cat_params": "Parameter"
+      "cat_params": "Parameter",
+      "when_completed": "wenn alle diese erfüllt sind %1",
+      "when_any": "wenn eines davon erfüllt ist %1",
+      "when_failed": "wenn %1 scheitert",
+      "when_start": "wenn das Spiel beginnt",
+      "when_end": "wenn das Spiel endet",
+      "when_do": "schaltet %1",
+      "when_tip": "Ein Auslöser: wenn dies geschieht, wird ein Ausgang einer Box (Sirene, Blitzlicht, Rauch) geschaltet, einmal pro Spiel. Die Box muss den Ausgang haben, und ihr Admin muss ihn an der Box freigegeben haben.",
+      "when_end_tip": "Ein Auslöser am Spielende: nach dem Ende lässt eine Box einen Ausgang höchstens 10 s laufen (eine Schlusshupe).",
+      "which": "Ziel %1",
+      "output": "%1: %2 an der Box %3 für %4 s",
+      "act_pulse": "kurz einschalten",
+      "act_on": "einschalten",
+      "output_pattern": "blinken: %1 an der Box %2 für %3 s",
+      "output_pattern_steps": "an %1 s, aus %2 s",
+      "output_off": "ausschalten: %1 an der Box %2",
+      "output_tip": "Die Funktion des Ausgangs, wie die Box ihn nennt: siren, strobe, smoke, light, horn (ein zweiter: siren.2) oder out.1 bis out.9. Höchstens 600 s.",
+      "output_off_tip": "Die Funktion des Ausgangs, oder * für alle Ausgänge der Box.",
+      "cat_triggers": "Auslöser"
     }
   },
   "firmware": {
