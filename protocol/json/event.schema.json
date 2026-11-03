@@ -85,7 +85,10 @@
             "node.modes_failed",
             "progressive.activated",
             "progressive.completed",
-            "node.setup_applied"
+            "node.setup_applied",
+            "node.modules",
+            "node.module_lost",
+            "output.switched"
           ]
         },
         {
@@ -1732,6 +1735,99 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "node.modules"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "modules": {
+                "$ref": "#/$defs/data/modules"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "node.module_lost"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "modules": {
+                "$ref": "#/$defs/data/modules"
+              },
+              "reason": {
+                "$ref": "#/$defs/data/reason"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "output.switched"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "capability": {
+                "$ref": "#/$defs/data/capability"
+              },
+              "ms": {
+                "$ref": "#/$defs/data/ms"
+              },
+              "source": {
+                "$ref": "#/$defs/data/source"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -1899,6 +1995,22 @@
       "by_name": {
         "type": "string",
         "description": "name of that box, when it has one"
+      },
+      "modules": {
+        "type": "string",
+        "description": "a box's expansion modules and simple outputs, as compact text (protocol/expansion-port.md)"
+      },
+      "capability": {
+        "type": "string",
+        "description": "a capability id: an output's function, such as siren, smoke or out.2"
+      },
+      "ms": {
+        "type": "integer",
+        "description": "milliseconds; for output.switched how long the output is on, 0 when it is turned off"
+      },
+      "source": {
+        "type": "string",
+        "description": "who switched an output: script, field, gm or box_admin"
       }
     }
   }

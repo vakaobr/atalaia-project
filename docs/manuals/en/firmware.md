@@ -206,6 +206,7 @@ Example for a Taiwanese field: `python tools/docker_fw.py build --region=as923-t
 | Board's small screen upside down | `CONFIG_ATALAIA_OLED_FLIP=y` |
 | No iBeacon on the Field Box (it is on by default) | `# CONFIG_ATALAIA_BOX_BEACON is not set` |
 | The beacon's interval, power | `CONFIG_ATALAIA_BOX_BEACON_INTERVAL_MS=500` (100 to 10000), `CONFIG_ATALAIA_BOX_BEACON_TX_DBM=0` |
+| A passive piezo buzzer is fitted (on GPIO 45; not yet tried on hardware) | `CONFIG_ATALAIA_BUZZER=y` |
 
 Never lower `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` or the antenna gain below the real values. That would break the legal power limit.
 

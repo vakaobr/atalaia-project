@@ -44,6 +44,8 @@ The controller encodes each with the radio's own codecs (`atalaia_sim.packet`, `
 | `cmd` | `cmd` (`start`, `pause`, `resume`, `end`, `set_owner`, `message`, `reset`, `reboot`, `mode`), `opcode`, `params`, `dest` (absent: every node); a `mode` command (opcode 8, RFC 0001 Amendment 5) reaches the mode script as `cmd.mode` with its params, `name` included |
 | `ack`, `error`, `pong`, `replaced` | as above |
 
+CMD opcode 12 (`output`, RFC 0001 Amendment 26; [expansion-port.md](expansion-port.md) section 8; not sent by any controller yet) is a `cmd` message too: `cmd` `output`, `opcode` 12, `params` `{"capability", "act", "ms", "on_ms", "off_ms", "src"}`, `dest` the prop. The prop's shell handles it, not the mode's script, by switching the output on its I/O pod; a prop without that output ignores it.
+
 The controller's own CMD opcode 11 (`peer`, RFC 0001 Amendments 24 and 25) is a `cmd` message too: `cmd` `peer`, `opcode` 11, `params` `{"src": node id, "epoch": epoch}`, `dest` absent (every prop). It names the epoch a node is at; a prop with an I/O pod tells its pod's receiver (never down, `src` 1 to 65534 and not its own id, `epoch` 1 to 65535); a prop with no pod ignores it, and the mode's script never sees it.
 
 Whatever the controller sends on the radio as TIME or CMD reaches the linked props too; a command for one node reaches only that node's link. Without a radio modem a command reaches the Wi-Fi props and is reported as sent.

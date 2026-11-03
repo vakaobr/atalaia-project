@@ -27,6 +27,7 @@
 #include "pod_task.h"
 #include "radio/radio_task.h"
 #include "sdkconfig.h"
+#include "sound_esp.h"
 
 static const char *TAG = "atalaia-pod";
 
@@ -35,6 +36,9 @@ extern const hal_keypad_ops_t hal_esp_keypad_ops;
 extern const hal_led_ops_t hal_esp_led_ops;
 extern const hal_nfc_ops_t hal_esp_nfc_ops;
 extern const hal_audio_ops_t hal_esp_audio_ops;
+#if CONFIG_ATALAIA_BUZZER
+extern const hal_buzzer_ops_t hal_esp_buzzer_ops;
+#endif
 extern const hal_battery_ops_t hal_esp_battery_ops;
 extern const hal_radio_ops_t hal_esp_radio_ops;
 
@@ -94,9 +98,14 @@ void app_main(void)
     cfg.nfc = hal.nfc->init() == 0;
     if (!cfg.nfc) ESP_LOGW(TAG, "NFC: not available");
     hal.audio = &hal_esp_audio_ops;
-    /* The audio HAL "succeeds" with no pins (audio disabled): not fitted then. */
-    cfg.audio = CONFIG_ATALAIA_AUDIO_BCLK_PIN >= 0 && CONFIG_ATALAIA_AUDIO_LRCLK_PIN >= 0 &&
-                CONFIG_ATALAIA_AUDIO_DOUT_PIN >= 0 && hal.audio->init() == 0;
+    /* The audio HAL "succeeds" with no pins (audio disabled): not fitted then. hal.audio is NULL
+     * without a speaker, and hal.buzzer without a piezo buzzer (sound_esp.c plays on the rest). */
+    if (!(sound_esp_speaker_pins() && hal.audio->init() == 0)) hal.audio = NULL;
+#if CONFIG_ATALAIA_BUZZER
+    hal.buzzer = &hal_esp_buzzer_ops;
+    if (hal.buzzer->init() != 0) hal.buzzer = NULL;
+#endif
+    cfg.audio = hal.audio != NULL || hal.buzzer != NULL;
     if (!cfg.audio) ESP_LOGW(TAG, "audio: not available");
     hal.battery = &hal_esp_battery_ops;
     if (hal.battery->init() != 0) hal.battery = NULL; /* battery level unknown */

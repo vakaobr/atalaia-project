@@ -176,6 +176,7 @@ para uma caixa: 70-110 € a preços de mercado de hobby
 | 28 | Espaçadores e parafusos M3 de nylon, placa de fundo (de plástico ou contraplacado) | 1 jogo | | Mantém a eletrónica afastada do fundo da caixa |
 | 29 | Janela transparente, acrílico ou policarbonato de 2-3 mm | 1 | Maior do que a área ativa do ecrã | Só se a tampa for opaca |
 | 30 | Etiquetas: «GAME PROP» e o nome da caixa | 2+ | Resistentes ao tempo | Obrigatórias, vê a [secção 4](#4-regras-de-segurança) |
+| 31 | Besouro piezoelétrico **passivo**, 12-30 mm, para 3-24 V; uma resistência de 220 ohm; para um mais alto, um transístor NPN (2N2222, BC547 ou S8050), uma resistência de 1 kohm, uma de 10 kohm e outra de 1 kohm | 1 de cada | Um elemento piezo **sem** oscilador próprio | Opcional, com ou sem o amplificador (decisões BZR-1 a BZR-8); precisa de um firmware compilado com `CONFIG_ATALAIA_BUZZER=y`. Não um besouro «ativo» (um só tom, peça o firmware o que pedir), não um transdutor magnético diretamente no pino (indica a resistência de uma bobina, como 16 ohm), não um «módulo de besouro» com pull-up na entrada ([secção 9.7](#97-áudio-opcional)). **Ainda não montado em hardware** |
 
 ## 3. Ferramentas e consumíveis
 
@@ -572,7 +573,8 @@ prende cada molho com abraçadeiras para nada puxar uma soldadura.
    são os outros dois.
 3. **Deixa todos os outros pinos da placa por ligar.** Em particular, nunca
    ligues o GPIO 0, 45 ou 46 (pinos de arranque; o 46 comanda também o módulo
-   de entrada da V4.2), o GPIO 5 (o módulo de entrada da V4.3), os GPIO
+   de entrada da V4.2; o 45 só para o besouro piezoelétrico opcional, secção
+   9.7), o GPIO 5 (o módulo de entrada da V4.3), os GPIO
    internos da placa 2, 7, 8-14, 19-21, 26-32, 36, 37, 43, nem o GPIO 34 e
    38-42 do conector GNSS. Três pinos da placa são usados de propósito, cada
    um só como o diagrama mostra: GPIO 1 (CS do ecrã), GPIO 35 (dados do anel de
@@ -686,6 +688,32 @@ pinos do hub: 3V3, GND, SDA, SCL.
 3. Altifalante a SPK+ e SPK-. **Nenhum fio do altifalante pode tocar no GND**:
    as duas saídas do amplificador são comandadas.
 4. Deixa GAIN e SD por ligar (ganho por omissão, os dois canais misturados).
+5. **Besouro piezoelétrico (opcional, com ou sem o amplificador; ainda não
+   montado em hardware).** Toca os sons dos jogos como sequências curtas de
+   tons; com o amplificador também montado, os tons e as sequências soam nos
+   dois ao mesmo tempo e um som com ficheiro toca só no altifalante (decisão
+   BZR-3). Precisa de um firmware compilado com `CONFIG_ATALAIA_BUZZER=y`
+   ([secção 12](#12-passagem-para-o-bring-up)). Usa um elemento piezo
+   **passivo**. O seu pino, o **GPIO 45**, é um pino de arranque que tem de
+   estar **em baixo** quando a placa arranca: puxado para cima, o chip escolhe
+   flash de 1,8 V e a placa não arranca. Os dois circuitos abaixo mantêm-no em
+   baixo; nunca montes um «módulo de besouro» com uma resistência de pull-up
+   na entrada.
+   - **Direto, baixinho** (dentro de portas): do GPIO 45 a uma resistência de
+     220 ohm, até ao terminal + do piezo; o outro terminal ao GND. O pino dá no
+     máximo 15 mA durante um instante em cada flanco (3,3 V / 220 ohm; os pinos
+     do ESP32-S3 dão 20 mA por omissão) e bem menos de 1 mA em média.
+   - **Com um transístor, mais alto** (ao ar livre): do GPIO 45 a uma
+     resistência de 1 kohm, até à base de um transístor NPN (2N2222, BC547,
+     S8050); uma resistência de 10 kohm da base ao GND (mantém o pino em baixo
+     no arranque); emissor ao GND; o piezo da junção de 5 V ao coletor, com
+     uma resistência de 1 kohm em paralelo com o piezo (descarrega-o entre
+     impulsos). O pino dá cerca de 2,6 mA ((3,3 V - 0,7 V) / 1 kohm); o piezo
+     oscila entre 0 e 5 V. Um transdutor magnético (uma bobina de 16-42 ohm)
+     só funciona neste circuito com um díodo 1N4148 em paralelo (risca para os
+     5 V).
+   Os diagramas de ligações não mostram o besouro. **Verifica:** nenhuma
+   continuidade do GPIO 45 ao 3V3 ou aos 5 V.
 
 ### 9.8 Cabo da bateria da placa
 
@@ -924,6 +952,7 @@ seguido pelo git), altera a linha, guarda e corre outra vez
 | Caixa de duas equipas, libertar os pinos | `CONFIG_ATALAIA_BTN3_PIN=-1` e `CONFIG_ATALAIA_KP_P7_BUTTON=0` (opcional) |
 | Placa montada ao contrário (o OLED pequeno de pernas para o ar) | `CONFIG_ATALAIA_OLED_FLIP=y` |
 | Módulo GNSS ligado no arranque (só teste de bancada: nada o lê ainda) | `CONFIG_ATALAIA_GNSS_POWER_ON=y` |
+| Besouro piezoelétrico montado ([secção 9.7](#97-áudio-opcional)) | `CONFIG_ATALAIA_BUZZER=y` (o seu pino: `CONFIG_ATALAIA_BUZZER_PIN=45`) |
 
 Taiwan (`--region=as923-tw`), ouvir antes de falar (`--lbt=`), o ganho da antena (`--antenna-dbi=`), as chaves de
 versões e as chaves de modos são opções de compilação, não linhas a editar;
@@ -957,6 +986,8 @@ dentro da tampa da caixa.
 | Um botão de equipa «prime-se» sozinho | Fios de botão compridos a captar ruído: junta uma resistência de 10 kohm do fio de sinal do botão ao 3V3 no hub, e afasta os fios do anel de LEDs e dos fios do altifalante |
 | O botão 4 nunca regista | É lido através do expansor do teclado: o registo tem de dizer `PCF8574 keypad at 0x..`; o fio dele vai para o P7, não para um GPIO da placa |
 | Sem som | Interruptor desligado (o amplificador está nos 5 V); BCLK/LRC/DIN trocados; fio do altifalante a tocar no GND |
+| Besouro calado | Firmware compilado sem `CONFIG_ATALAIA_BUZZER=y` (sem a linha `piezo buzzer on GPIO 45` no registo de arranque); um besouro ativo ou um módulo em vez de um piezo passivo; o volume a 0 |
+| A placa deixou de arrancar quando se montou o besouro | Algo puxa o GPIO 45 para cima: o pull-up de um módulo, ou falta a resistência de 10 kohm do circuito com transístor. Tira o besouro e verifica ([secção 9.7](#97-áudio-opcional)) |
 | O telemóvel não vê o Wi-Fi `atalaia-XXXX` | Antena de 2,4 GHz em falta ou no conector errado; telemóvel longe demais; a caixa já está configurada (o Wi-Fi de configuração só abre numa caixa nova ou depois de **Configurar o Wi-Fi**: [guia do firmware](../../docs/manuals/pt/firmware.md#5-primeiro-arranque-e-configuração)) |
 | A página de configuração não abre sozinha | Abre `http://192.168.4.1` no browser do telemóvel; desliga os dados móveis e o DNS privado durante um minuto |
 | O logótipo do campo não aparece no ecrã grande | É obtido pelo Wi-Fi do campo quando se entra num jogo: a caixa precisa do nome e da palavra-passe do Wi-Fi do campo, e o logótipo tem de ser um PNG. Vê o [guia do firmware](../../docs/manuals/pt/firmware.md#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo) |
@@ -1026,6 +1057,7 @@ delas está ligada a um GPIO a não ser através do conversor de nível.
 | Relógio de bits do áudio (BCLK) | 6 | `ATALAIA_AUDIO_BCLK_PIN` | cinzento | BCLK do amplificador | 3,3 V | controlador de áudio (`hal_esp_audio.c`, I2S) |
 | Relógio esquerda/direita do áudio (LRC) | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | rosa | LRC do amplificador | 3,3 V | controlador de áudio |
 | Dados do áudio (DIN) | 16 | `ATALAIA_AUDIO_DOUT_PIN` | castanho | DIN do amplificador | 3,3 V | controlador de áudio |
+| Besouro piezoelétrico (opcional) | 45 | `ATALAIA_BUZZER_PIN` | roxo | 220 ohm até ao piezo, ou 1 kohm até à base do transístor | 3,3 V, em repouso em baixo. Um pino de arranque: o seu circuito tem de o manter em baixo no arranque | controlador do besouro (`hal_esp_buzzer.c`, LEDC), só com `CONFIG_ATALAIA_BUZZER=y` |
 
 **Não são sinais de GPIO** (ligados a barramentos, não a um pino do firmware):
 
@@ -1050,7 +1082,7 @@ PCF8574A, `ATALAIA_KP_I2C_ADDR`), PN532 0x24, MAX17048 0x36, o OLED da placa
 
 | GPIO | O que é |
 | --- | --- |
-| 0, 45, 46 | Pinos de arranque. O GPIO 46 é também a linha do módulo de entrada da V4.2 |
+| 0, 45, 46 | Pinos de arranque. O GPIO 46 é também a linha do módulo de entrada da V4.2. O GPIO 45 só para o besouro piezoelétrico opcional, cujo circuito o mantém em baixo ([secção 9.7](#97-áudio-opcional)) |
 | 2, 7, 8-14 | O rádio e o módulo de entrada dele |
 | 5 | O módulo de entrada da V4.3 (amplificador de receção ligado ou desligado) |
 | 19, 20 | USB |
@@ -1061,7 +1093,8 @@ PCF8574A, `ATALAIA_KP_I2C_ADDR`), PN532 0x24, MAX17048 0x36, o OLED da placa
 | 43 | Transmissão da UART0: o registo. Nunca o ligues a uma peça |
 
 Pinos da placa usados **de propósito**, cada um para uma só coisa: GPIO 1 (CS
-do ecrã), GPIO 35 (dados do anel de LEDs), GPIO 44 (botão 3).
+do ecrã), GPIO 35 (dados do anel de LEDs), GPIO 44 (botão 3), e GPIO 45 (o
+besouro piezoelétrico opcional).
 
 **Onde a referência de pinos e o firmware discordavam.** Em 2026-10-28 esta
 secção foi verificada em relação a `Kconfig.projbuild` e a `hal_esp_*.c`. Os

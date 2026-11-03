@@ -32,6 +32,7 @@
 #include "pod_config.h"
 #include "pod_settings.h"
 #include "radio/radio_task.h"
+#include "sound_esp.h"
 
 #if POD_BLE_ENABLED
 #include "pod_ble_nimble.h"
@@ -82,22 +83,21 @@ typedef struct {
     uint16_t ms;
 } audio_req_t;
 
+/* On the speaker and the piezo buzzer, whichever are fitted (sound.c, decision BZR-3). */
 static void audio_task(void *arg)
 {
     (void)arg;
     audio_req_t r;
+    sound_out_t out = sound_esp_out(hw, hw->audio != NULL);
     for (;;) {
         if (xQueueReceive(audio_q, &r, portMAX_DELAY) != pdTRUE) continue;
         switch (r.op) {
-        case AUDIO_TONE:
-            if (r.hz == 0) {
-                vTaskDelay(pdMS_TO_TICKS(r.ms));
-            } else {
-                hw->audio->tone(r.hz, r.ms);
-            }
+        case AUDIO_TONE: sound_tone(&out, r.hz, r.ms); break;
+        case AUDIO_STOP: sound_stop(&out); break;
+        case AUDIO_VOLUME:
+            if (hw->audio != NULL) hw->audio->set_volume(r.volume);
+            if (hw->buzzer != NULL) hw->buzzer->set_volume(r.volume);
             break;
-        case AUDIO_STOP: hw->audio->stop(); break;
-        case AUDIO_VOLUME: hw->audio->set_volume(r.volume); break;
         default: break;
         }
     }
@@ -355,7 +355,7 @@ void pod_task_start(const hal_t *hal, const pod_caps_config_t *cfg)
     }
 
     pod_audio_t audio = {.tone = audio_tone, .stop = audio_stop, .volume = audio_volume};
-    if (cfg->audio && hal->audio != NULL) {
+    if (cfg->audio && (hal->audio != NULL || hal->buzzer != NULL)) {
         audio_q = xQueueCreate(AUDIO_QUEUE_LEN, sizeof(audio_req_t));
         if (audio_q != NULL)
             xTaskCreatePinnedToCore(audio_task, "audio", 4096, NULL, AUDIO_TASK_PRIO, NULL, 0);

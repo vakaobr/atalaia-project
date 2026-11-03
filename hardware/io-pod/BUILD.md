@@ -70,7 +70,7 @@ What the pod lends, from the pod firmware
 | Team buttons 1-4 | press, hold (every 250 ms), release. Button N is the game's N-th team, as on a Field Box, unless a colour is set in the firmware |
 | Keypad (3x4, through a PCF8574) | each key |
 | LED ring (WS2812B) | fill with a team colour, one colour, off, brightness, a progress bar |
-| Amplifier and speaker (MAX98357A) | tones, and the mode's sounds played as tones; volume |
+| Amplifier and speaker (MAX98357A), and/or a passive piezo buzzer | tones, and the mode's sounds played as tones; volume |
 | NFC reader (PN532) | a player tag's record (join cards are not passed on: a phone joins by QR code or text) |
 | Enclosure switch | opened, closed: the phone reports an opening to the GM console as `node.tamper` |
 | LoRa radio | the field's radio: the phone talks to the field controller through it, encrypted by the pod with the game key |
@@ -127,7 +127,7 @@ where each one's pitfalls are), less the display and its window, plus:
 | 5 | 3x4 membrane keypad and a PCF8574 (or PCF8574A) module | 0-1 | As the Field Box: the PCF8574 powered from 3V3; not an "LCD I2C backpack" |
 | 6 | WS2812B LED ring, 5 V, with the 74AHCT125 level shifter, its socket, 100 nF, 330 ohm and 1000 µF | 0-1 | As the Field Box |
 | 7 | PN532 NFC module (I2C) | 0-1 | As the Field Box |
-| 8 | MAX98357A I2S amplifier and a 4-8 ohm, 3 W speaker | 0-1 | As the Field Box; the pod's only sound |
+| 8 | MAX98357A I2S amplifier and a 4-8 ohm, 3 W speaker; and/or a passive piezo buzzer | 0-1 | As the Field Box. The buzzer needs a pod firmware built with `CONFIG_ATALAIA_BUZZER=y` and is wired to GPIO 45 as the [Field Box manual, section 9.7](../field-box/BUILD.md#97-audio-optional) says (decisions BZR-1 to BZR-8; not yet built on hardware) |
 | 9 | MAX17048 fuel gauge | 1 | Recommended: the phone shows the pod's battery level |
 | 10 | Protected 18650 cells (one, or two in a **parallel** holder) or a 1S pack with BMS | 1S | **One cell in series only** |
 | 11 | 5 V boost converter (5 V, 2.5 A or more out), fuse holder and 5 A fuse, Schottky diode (e.g. 1N5822), covered main switch, lever splices | 1 each | As the Field Box ([manual, section 7](../field-box/BUILD.md#7-power-and-battery-safety)) |

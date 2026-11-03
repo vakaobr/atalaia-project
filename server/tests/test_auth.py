@@ -11,7 +11,7 @@ import unittest
 from http.cookies import SimpleCookie
 from typing import Any
 
-import httpx
+import httpx2
 from argon2 import PasswordHasher, Type
 
 from atalaia_server import tokens, totp
@@ -32,7 +32,7 @@ class Clock:
         return self.t
 
 
-def set_cookie(response: httpx.Response) -> SimpleCookie:
+def set_cookie(response: httpx2.Response) -> SimpleCookie:
     jar = SimpleCookie()
     for value in response.headers.get_list("set-cookie"):
         jar.load(value)
@@ -44,7 +44,7 @@ class AuthTestCase(AppTestCase):
         return await self.fetch("SELECT user_id, action, resource, resource_id, details, host(ip_address) AS ip "
                                 "FROM audit_log WHERE action = $1 ORDER BY id", action)
 
-    async def register(self, username: str, password: str = PASSWORD, **extra: Any) -> httpx.Response:
+    async def register(self, username: str, password: str = PASSWORD, **extra: Any) -> httpx2.Response:
         return await self.client.post("/api/v1/auth/register",
                                       json={"username": username, "password": password, "notice_seen": True, "age_confirmed": True, **extra})
 
@@ -181,7 +181,7 @@ class LoginTests(AuthTestCase):
         # Another player behind the same address (a field's 4G link) still logs in.
         self.assertIn("access_token", await self.login(friend))
         # The same username from another address is not locked out either.
-        other = httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app, client=("198.51.100.4", 4000)),
+        other = httpx2.AsyncClient(transport=httpx2.ASGITransport(app=self.app, client=("198.51.100.4", 4000)),
                                   base_url="https://server.test")
         self.stack.push_async_callback(other.aclose)
         self.assertIn("access_token", await self.login(name, client=other))
@@ -245,7 +245,7 @@ class SessionTests(AuthTestCase):
     def cookie(self) -> str:
         return self.client.cookies.get(COOKIE, path=COOKIE_PATH)
 
-    async def refresh(self, client: httpx.AsyncClient | None = None) -> httpx.Response:
+    async def refresh(self, client: httpx2.AsyncClient | None = None) -> httpx2.Response:
         return await (client or self.client).post("/api/v1/auth/refresh", headers=REFRESH)
 
     async def test_bearer_needed(self) -> None:

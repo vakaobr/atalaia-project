@@ -12,6 +12,7 @@
 #include "atalaia/join.h"
 #include "atalaia/tag.h"
 #include "pod_json.h"
+#include "sound.h"
 
 void pod_caps_init(pod_caps_t *c, const pod_caps_config_t *cfg, const hal_t *hal,
                    const pod_audio_t *audio)
@@ -320,33 +321,13 @@ static bool ring_command(pod_caps_t *c, const char *method, const char *args)
     return false;
 }
 
-typedef struct {
-    uint16_t hz, ms;
-} tone_step_t;
-
-/* The pod has no sound files: the mode's clips are played as tones (PF7). */
-static const struct {
-    const char *clip;
-    tone_step_t steps[6];
-} clips[] = {
-    {"explosion", {{120, 1500}}},
-    {"armed", {{1000, 150}, {0, 100}, {1000, 150}}},
-    {"defused", {{1500, 150}, {2000, 250}}},
-    {"captured", {{1200, 150}, {1600, 200}}},
-    {"alarm", {{2500, 300}, {0, 150}, {2500, 300}, {0, 150}, {2500, 300}}},
-    {"tick", {{3000, 30}}},
-};
-
+/* The pod has no sound files: the mode's clips are played as tones (PF7), the Field Box's
+ * patterns (sound.c; any other clip: a beep). */
 static void play_clip(pod_caps_t *c, const char *clip)
 {
-    for (size_t i = 0; i < sizeof(clips) / sizeof(clips[0]); i++) {
-        if (strcmp(clip, clips[i].clip) != 0) continue;
-        for (size_t s = 0; s < 6 && clips[i].steps[s].ms > 0; s++) {
-            c->audio.tone(c->audio.ctx, clips[i].steps[s].hz, clips[i].steps[s].ms);
-        }
-        return;
-    }
-    c->audio.tone(c->audio.ctx, 2000, 120); /* any other clip: a beep */
+    const sound_pattern_t *p = sound_pattern(clip);
+    size_t n = sound_pattern_len(p);
+    for (size_t s = 0; s < n; s++) c->audio.tone(c->audio.ctx, p->steps[s].hz, p->steps[s].ms);
 }
 
 static bool audio_command(pod_caps_t *c, const char *method, const char *args)
