@@ -10,9 +10,236 @@ on:
 permissions:
   contents: read
 
+# On a pull request each job below runs only when a part of the repository it builds, tests or
+# copies in changed (the `changes` job's filters; CONTRIBUTING.md, "What CI runs"). A job left out
+# shows as skipped, which blocks nothing: the ruleset requires only the pull request title check.
+# Pushes to main, release-please's pull requests (branches release-please--*) and any other event
+# run every job, and so does a pull request when the filter itself fails. The repository-wide
+# checks (protocol and generated files, formatting, REUSE, DCO) have no filter and always run.
+# This file, core/ and protocol/'s folders (the schema and vectors every part reads) are in
+# every filter. Not sure whether a path belongs in a filter? Add it: a needless run costs minutes,
+# a missing path lets a break through to main.
+
 jobs:
+  changes:
+    name: Which parts changed (chooses the jobs to run)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read # the pull request's changed files, through the API (no checkout)
+    outputs:
+      all: ${{ steps.gate.outputs.all }}
+      core: ${{ steps.filter.outputs.core }}
+      controller: ${{ steps.filter.outputs.controller }}
+      console: ${{ steps.filter.outputs.console }}
+      editor: ${{ steps.filter.outputs.editor }}
+      server: ${{ steps.filter.outputs.server }}
+      app: ${{ steps.filter.outputs.app }}
+      ndk: ${{ steps.filter.outputs.ndk }}
+      emulator: ${{ steps.filter.outputs.emulator }}
+      sanitizers: ${{ steps.filter.outputs.sanitizers }}
+      sandbox: ${{ steps.filter.outputs.sandbox }}
+      registry: ${{ steps.filter.outputs.registry }}
+      firmware_test: ${{ steps.filter.outputs.firmware_test }}
+      esp32: ${{ steps.filter.outputs.esp32 }}
+    steps:
+      - name: Everything except on an ordinary pull request
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          case "$EVENT:$HEAD_REF" in
+            pull_request:release-please--*) all=true ;;
+            pull_request:*) all=false ;;
+            *) all=true ;;
+          esac
+          echo "all=$all" >> "$GITHUB_OUTPUT"
+      - name: The changed files against each job's filter
+        id: filter
+        if: steps.scope.outputs.all != 'true'
+        continue-on-error: true # a failed filter runs everything (next step), never nothing
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          # Each filter lists what its job builds, tests or copies in (its scripts and Dockerfiles
+          # included), read from the job's steps and the files its tests open.
+          filters: |
+            shared: &shared
+              - '.github/workflows/ci.yml'
+              - 'core/**'
+              # schema/, vectors/, json/ (and any new folder); not the specs' prose (protocol/*.md)
+              - 'protocol/*/**'
+            core:
+              - *shared
+              - 'simulator/**'
+              - 'modes/**'
+              - 'firmware/**'
+              - 'registry/examples/**'
+              - 'controller/atalaia_controller/**'
+              # test_i18n_check.py copies every language's texts
+              - 'controller/console/src/**'
+              - 'app/lib/l10n/**'
+              - 'server/atalaia_server/web/**'
+              - 'site/i18n/**'
+              - 'docs/translations/**'
+              - 'tools/ci-sim-requirements.txt'
+              - 'tools/docker_sim.py'
+              - 'tools/expansion_vectors.py'
+              - 'tools/gen_box_fonts.py'
+              - 'tools/i18n_check.py'
+              - 'tools/mode_package.py'
+              - 'tools/protogen.py'
+            controller:
+              - *shared
+              - 'controller/**'
+              - 'simulator/**'
+              - 'modes/**'
+              - 'firmware/**'
+              - 'examples/**'
+              - 'registry/apds/**'
+              - 'registry/schema/**'
+              # the site server's plain tests run in this job too
+              - 'server/atalaia_server/**'
+              - 'server/tests/**'
+              - 'server/schemas/**'
+              - 'server/*.yml'
+              - 'app/lib/version.dart'
+              - 'app/pubspec.yaml'
+              - 'app/lib/chrono/limit_templates/**'
+              - 'docs/manuals/en/**'
+              - 'release-please-config.json'
+              - '.release-please-manifest.json'
+              - 'tools/bench_radio_log.py'
+              - 'tools/docker_fw.py'
+              - 'tools/firmware_release.py'
+              - 'tools/gen_box_fonts.py'
+              - 'tools/i18n_check.py'
+              - 'tools/mode_package.py'
+              - 'tools/ortho_coverage.py'
+              - 'tools/prepare_release.py'
+              - 'tools/release_package.py'
+              - 'tools/scenario_compile_vectors.py'
+            console:
+              - *shared
+              - 'controller/**'
+              - 'simulator/**'
+              - 'modes/**'
+              - 'firmware/**'
+              - 'app/lib/chrono/limit_templates/**'
+              - 'tools/dev/console/**'
+              - 'tools/docker_console.py'
+            editor:
+              - *shared
+              - 'simulator/**'
+              - 'modes/**'
+              - 'controller/atalaia_controller/**'
+              - 'tools/dev/console/**'
+              - 'tools/docker_editor.py'
+              - 'tools/mode_package.py'
+            server:
+              - *shared
+              - 'server/**'
+              - 'simulator/atalaia_sim/**'
+              - 'controller/atalaia_controller/**'
+              - 'app/lib/chrono/limit_templates/**'
+              - 'modes/**'
+              - 'registry/apds/**'
+              - 'tools/dev/server-browser/**'
+              - 'tools/docker_server.py'
+              - 'tools/server_deploy.py'
+              - 'tools/server_deploy_hosted.py'
+              - 'tools/breached_hashes.py'
+            app:
+              - *shared
+              - 'app/**'
+              - 'modes/**'
+              # app/tool/check.sh and sync_console.dart copy these in (the console: PE24-61)
+              - 'controller/console/src/**'
+              - 'controller/templates/**'
+              - 'controller/atalaia_controller/api.py'
+              - 'controller/tests/fixtures/**'
+              - 'controller/tests/scenarios/**'
+              - 'registry/apds/**'
+              # the host pod, modem and box the tests drive
+              - 'firmware/**'
+              - 'tools/dev/flutter/**'
+              - 'tools/docker_app.py'
+              - 'tools/atak_xml_vectors.py'
+              - 'tools/i18n_check.py'
+              - 'tools/protogen.py'
+            ndk:
+              - *shared
+              - 'app/tool/check.sh'
+              - 'tools/dev/flutter/**'
+              - 'tools/docker_app.py'
+            emulator:
+              - *shared
+              - 'app/**'
+              - 'modes/**'
+              - 'controller/console/src/**'
+              - 'controller/templates/**'
+            sanitizers:
+              - *shared
+              - 'firmware/**'
+              - 'modes/**'
+            sandbox:
+              - *shared
+              - 'simulator/**'
+              - 'modes/**'
+              - 'tools/ci-sim-requirements.txt'
+            registry:
+              - *shared
+              - 'registry/**'
+              - 'simulator/**'
+              - 'modes/**'
+              - 'controller/atalaia_controller/**'
+              - 'server/atalaia_server/data/**'
+              - 'app/assets/apds.json'
+              - 'LICENSES/**'
+              - 'REUSE.toml'
+              - 'tools/ci-lint-requirements.txt'
+              - 'tools/ci-sim-requirements.txt'
+              - 'tools/mode_package.py'
+              - 'tools/registry_check.py'
+              - 'tools/registry_page.py'
+            firmware_test:
+              - *shared
+              - 'firmware/**'
+              - 'modes/**'
+              - 'site/img/modes/**'
+              - 'tools/bench_radio_log.py'
+              - 'tools/box_beacon_vectors.py'
+              - 'tools/ci-yaml-requirements.txt'
+              - 'tools/docker_fw.py'
+              - 'tools/gen_box_fonts.py'
+              - 'tools/gen_mode_gifs.py'
+              - 'tools/mode_gifs.yaml'
+              - 'tools/mode_package.py'
+              - 'tools/protogen.py'
+            esp32:
+              - *shared
+              - 'firmware/**'
+              - 'modes/**'
+              - 'tools/check_fw_ram.py'
+              - 'tools/docker_fw.py'
+              - 'tools/firmware_release.py'
+              - 'tools/gen_box_fonts.py'
+              - 'tools/oled_logo.py'
+      - name: Everything when the filter could not say
+        id: gate
+        env:
+          SCOPE_ALL: ${{ steps.scope.outputs.all }}
+          FILTER: ${{ steps.filter.outcome }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$SCOPE_ALL" = true ] || [ "$FILTER" = failure ]; then all=true; else all=false; fi
+          echo "all=$all" >> "$GITHUB_OUTPUT"
+          echo "Run every job: $all (event $EVENT, filter: ${FILTER:-not run})"
+
   core:
     name: Core and game modes
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.core == 'true'
     runs-on: ubuntu-latest
     env:
       ATALAIA_REQUIRE_ALL: "1"
@@ -45,6 +272,8 @@ jobs:
 
   controller:
     name: Field controller (REST, MQTT, host modem, host boxes)
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.controller == 'true'
     # Ubuntu's own Python packages, as in tools/dev/Dockerfile and on a Raspberry Pi.
     runs-on: ubuntu-24.04
     env:
@@ -87,6 +316,8 @@ jobs:
 
   controller-pinned:
     name: Field controller on the hash-pinned lock (pip, Python 3.12)
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.controller == 'true'
     # The controller's second supported install (controller/README.md, decision D15):
     # controller/requirements.txt with pip (FastAPI, Starlette and pydantic 2 as pinned there),
     # where the job above has Ubuntu's packages (FastAPI 0.101, pydantic 1.10). The same tests,
@@ -137,6 +368,8 @@ jobs:
 
   console:
     name: GM console and scoreboard in a browser (Chromium)
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.console == 'true'
     # The image of tools/dev/console/Dockerfile, as `python tools/docker_console.py`
     # builds it locally: Playwright with Chromium, the controller's Ubuntu
     # packages, Mosquitto and zbar-tools. The real controller runs with the C
@@ -155,6 +388,8 @@ jobs:
 
   editor:
     name: Mode editor in a browser (Chromium), blocks to modes that pass their tests
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.editor == 'true'
     # The GM console's image (tools/dev/console/Dockerfile), as `python tools/docker_editor.py`
     # uses it locally: the editor served by the simulator's web server, its Lua generator run in
     # Chromium, and the example projects' generated modes run against the hand-written modes'
@@ -173,6 +408,8 @@ jobs:
 
   server:
     name: Site server (FastAPI on PostgreSQL 16, migrations)
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.server == 'true'
     # The image of server/Dockerfile (target test: python:3.12-slim, the
     # hash-pinned requirements, the core built in its own stage) and the same
     # commands `python3 tools/docker_server.py test` and `... migrations` run
@@ -211,6 +448,8 @@ jobs:
 
   server-browser:
     name: Site server staff pages in a browser (Chromium)
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.server == 'true'
     # The image of tools/dev/server-browser/Dockerfile (Playwright's, with the
     # server's hash-pinned packages) next to an ephemeral PostgreSQL 16, as
     # `python3 tools/docker_server.py browser` runs it locally (decision FU2-10):
@@ -226,6 +465,8 @@ jobs:
 
   server-deploy:
     name: Site server deployment (setup.sh, Caddy, backup and restore)
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.server == 'true'
     # The real server/docker-compose.yml (Caddy, the server, PostgreSQL 16) with
     # Caddy's own CA and the site name atalaia.test, as `python3 tools/docker_server.py
     # deploy` runs it locally (plan phase 22): setup.sh, HTTPS and the WebSocket
@@ -243,6 +484,8 @@ jobs:
 
   server-deploy-hosted:
     name: Hosted hub deployment (on-demand TLS, two fields, backup and restore)
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.server == 'true'
     # server/docker-compose.yml with docker-compose.hosted.yml, as `python3
     # tools/docker_server.py deploy-hosted` runs it locally (Phase 4 follow-up):
     # setup.sh --hosted (the two roles, the registry), the operator's commands,
@@ -267,6 +510,8 @@ jobs:
 
   flutter-test:
     name: Player app (Dart, with the core through dart:ffi)
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.app == 'true'
     # The pinned Flutter image that `python tools/docker_app.py` uses (Flutter
     # 3.47.9, Dart 3.13.7: cirruslabs' 3.44.0 image pinned by digest with the
     # official 3.47.9 SDK pinned by SHA-256, tools/dev/flutter/Dockerfile, built
@@ -314,6 +559,8 @@ jobs:
 
   core-android-ndk:
     name: Core cross-compiled for Android (NDK, three ABIs)
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.ndk == 'true'
     # In the same Flutter image: the Android SDK manager installs NDK
     # 28.2.13676358 and CMake 3.22.1 (pinned in app/tool/check.sh), then
     # core/CMakePresets.json builds libatalaia_core.so for arm64-v8a,
@@ -333,6 +580,8 @@ jobs:
 
   flutter-build-android:
     name: Android APK (Gradle builds the core with the NDK)
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.app == 'true'
     # `flutter build apk --debug` in the same Flutter image: Gradle 9.1.0
     # (checksum-pinned), the Android Gradle plugin 9.0.1 and Kotlin 2.3.20, with
     # externalNativeBuild compiling core/ for arm64-v8a, armeabi-v7a and
@@ -389,6 +638,8 @@ jobs:
 
   flutter-integration:
     name: The app on an Android emulator (integration tests)
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.emulator == 'true'
     # The emulator needs hardware acceleration (KVM), which GitHub's Ubuntu
     # runners have and Docker on Windows or macOS does not: these tests run
     # here only. An Android 11 (API 30) x86_64 emulator with the plain AOSP
@@ -398,7 +649,11 @@ jobs:
     # Bomb prop on the real core, a join text, the player view over a
     # WebSocket (app/integration_test/). Flutter 3.47.9 comes from
     # subosito/flutter-action because the emulator and the Flutter tool must
-    # run on the same machine; both actions are pinned by commit.
+    # run on the same machine; both actions are pinned by commit. The AVD and
+    # its quick-boot snapshot are cached (key: API level, target, arch): on a
+    # miss a first emulator run makes them and saves the cache, and the tests
+    # then boot from that snapshot without saving over it (-no-snapshot-save),
+    # reactivecircus/android-emulator-runner's documented pattern.
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -425,14 +680,42 @@ jobs:
       - name: Packages from the lockfile
         working-directory: app
         run: flutter pub get --enforce-lockfile
+      - name: The emulator's AVD and snapshot from the cache
+        id: avd-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-${{ runner.os }}-api30-default-x86_64-v1 # as the emulator steps' api-level, target and arch
+      - name: Make the AVD and its snapshot (cache miss)
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 30
+          target: default
+          arch: x86_64
+          force-avd-creation: false
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: echo "AVD and snapshot made for the cache."
+      - name: Save the AVD and snapshot to the cache
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-${{ runner.os }}-api30-default-x86_64-v1 # as the emulator steps' api-level, target and arch
       - name: Integration tests on the emulator
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 30
           target: default
           arch: x86_64
+          force-avd-creation: false
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           working-directory: app
           # Android 13+ asks before an app posts notifications (a prop asks when
           # its game starts); grant it once installed, as app/tool/emulator_tests.ps1
@@ -506,6 +789,8 @@ jobs:
 
   sanitizers:
     name: Core under AddressSanitizer and UBSan
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.sanitizers == 'true'
     runs-on: ubuntu-latest
     env:
       ATALAIA_REQUIRE_ALL: "1"
@@ -539,6 +824,8 @@ jobs:
     # or run without limits, as box and controller scripts, under ASan and UBSan; then the same
     # through the simulator's ctypes bindings. The registry's CI runs this battery too.
     name: Sandbox-escape battery
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.sandbox == 'true'
     runs-on: ubuntu-latest
     env:
       ATALAIA_REQUIRE_ALL: "1"
@@ -576,6 +863,8 @@ jobs:
     # then lint must refuse tampered and out-of-process registries. Locally in tools/check.sh,
     # where the JSON Schema and REUSE steps are skipped (the dev container lacks those tools).
     name: Mode registry template and its CI on a sample submission
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.registry == 'true'
     runs-on: ubuntu-latest
     env:
       ATALAIA_REQUIRE_ALL: "1"
@@ -641,6 +930,8 @@ jobs:
 
   esp32-build:
     name: ESP32 cross-compilation
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.esp32 == 'true'
     runs-on: ubuntu-latest
     container:
       image: espressif/idf:v5.3.2@sha256:5b8f58d9d9caa45b689a31a0b6a0cc53b84594e0ba5fdd8d28eeef7d6123242a
@@ -677,6 +968,8 @@ jobs:
 
   esp32-modem-build:
     name: ESP32 USB radio modem cross-compilation
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.esp32 == 'true'
     runs-on: ubuntu-latest
     container:
       image: espressif/idf:v5.3.2@sha256:5b8f58d9d9caa45b689a31a0b6a0cc53b84594e0ba5fdd8d28eeef7d6123242a
@@ -708,6 +1001,8 @@ jobs:
 
   esp32-pod-build:
     name: ESP32 I/O pod cross-compilation
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.esp32 == 'true'
     runs-on: ubuntu-latest
     container:
       image: espressif/idf:v5.3.2@sha256:5b8f58d9d9caa45b689a31a0b6a0cc53b84594e0ba5fdd8d28eeef7d6123242a
@@ -743,6 +1038,8 @@ jobs:
 
   firmware-test:
     name: Firmware HAL stub tests
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.firmware_test == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
