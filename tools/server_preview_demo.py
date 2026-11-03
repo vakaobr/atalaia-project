@@ -17,9 +17,11 @@ preview is never touched), with the demo's pace shortened (a game is a minute), 
  5. the site server shows the demo: its landing page links to it, and the live demo field's public page and scoreboard
     show the games the simulated controller synced (also a finished game's scores);
  6. the second scenario, a three-storey building, is played in turn: levels "R/C", "1.º andar" and "2.º andar" with a plan
-    each, boxes on different levels, a beacon registry (a visitor's token reads only each beacon's id and uuid), and
-    players seen on different levels, located by beacon (with their room), by GPS with a floor, and one not sure
-    (no level); the open-field game before it has no levels and no beacons;
+    each, boxes on different levels, a beacon registry of fifteen (a visitor's token reads only each beacon's id and
+    uuid), and players seen on different levels, located by beacon (with their room), by GPS with a floor, and one not
+    sure (no level); the open-field game before it has no levels and no registered beacons. In both the registry also
+    lists the live game's three placed boxes, each a beacon of its own (major 45253, the node id, the field's UUID;
+    controller box_beacons.py), told apart from the scenario's by their major;
  7. it restarts cleanly: after a restart of the demo container a game that was running is ended, boxes rejoin, and a
     new game is played; the old games are not listed any more (a fresh controller database).
 Everything it made is removed at the end, whatever the result.
@@ -104,6 +106,30 @@ def get(url: str, token: Optional[str] = None, method: str = "GET", data: Option
 def jget(url: str, token: Optional[str] = READ_TOKEN) -> Any:
     code, body = get(url, token)
     return json.loads(body) if code == 200 else None
+
+
+BOX_MAJOR = "45253"  # the Field Boxes' own beacons (controller box_beacons.py): major 0xB0C5, minor the node id
+
+
+def beacon_split(registry: Any) -> tuple[list, list]:
+    """GET /api/v1/beacons as (the beacons the GM registered, the live game's boxes as beacons). A visitor reads
+    only each one's id and uuid, so a box is told by its major."""
+    rows = (registry or {}).get("beacons", [])
+    boxes = [b for b in rows if b["id"].split(":")[0] == BOX_MAJOR]
+    return [b for b in rows if b not in boxes], boxes
+
+
+def boxes_are_beacons(base: str, gid: int) -> tuple[bool, list]:
+    """Whether the live game's placed boxes are in the beacon registry, one each (45253:node id), all with the
+    field's one UUID and no other UUID than that (a box is placed as the game is set up: waited for)."""
+    def got():
+        placed = sorted(int(n) for n in (jget(f"{base}/api/v1/games/{gid}/positions") or {}))
+        _, boxes = beacon_split(jget(f"{base}/api/v1/beacons"))
+        ids = sorted(int(b["id"].split(":")[1]) for b in boxes)
+        good = (len(placed) == 3 and ids == placed and len({b["uuid"] for b in boxes}) == 1
+                and all(set(b) == {"id", "uuid"} for b in boxes))
+        return (True, [b["id"] for b in boxes]) if good else None
+    return wait(got, 40) or (False, [b["id"] for b in beacon_split(jget(f"{base}/api/v1/beacons"))[1]])
 
 
 def wait(predicate, seconds: float, step: float = 2.0):
@@ -208,8 +234,10 @@ def main() -> int:
         check.ok(bool(running), "a game is running")
         if running:
             check.ok("edifício" not in running["name"] and (jget(f"{base}/api/v1/field/levels") or {}).get("enabled") is False
-                     and not (jget(f"{base}/api/v1/beacons") or {}).get("beacons"),
-                     "the first game is the open field: no levels, no beacons")
+                     and not beacon_split(jget(f"{base}/api/v1/beacons"))[0],
+                     "the first game is the open field: no levels, no registered beacons")
+            ok, seen = boxes_are_beacons(base, running["id"])
+            check.ok(ok, f"its three placed boxes are beacons of their own, the field's UUID ({seen})")
         if running:
             gid = running["id"]
             nodes = jget(f"{base}/api/v1/nodes") or []
@@ -248,7 +276,11 @@ def main() -> int:
             check.ok(len(set(plans)) == 3, "the three floor plans differ")
             check.ok(get(f"{base}/api/v1/field/levels/3/image", READ_TOKEN)[0] == 404, "there is no fourth level")
             registry = jget(f"{base}/api/v1/beacons") or {}
-            check.ok(len(registry.get("beacons", [])) == 15, "fifteen beacons are registered (five a level)")
+            tags, _ = beacon_split(registry)
+            check.ok(len(tags) == 15 and BOX_MAJOR not in {b["id"].split(":")[0] for b in tags},
+                     f"fifteen beacons are registered (five a level; {len(tags)})")
+            ok, seen = boxes_are_beacons(base, bgid)
+            check.ok(ok, f"and the three boxes are beacons of their own besides them ({seen})")
             check.ok(all(set(b) == {"id", "uuid"} for b in registry.get("beacons", [])),
                      "a visitor's token reads only each beacon's id and uuid")
             boxes = jget(f"{base}/api/v1/games/{bgid}/positions") or {}
@@ -291,7 +323,8 @@ def main() -> int:
             check.ok(bool(site_seen), "the site server's pages show the building game too (the same field, synced)")
             check.ok(wait(lambda: (jget(f"{base}/api/v1/field/levels") or {}).get("enabled") is False, 200),
                      "the next open-field game turns the levels off again")
-            check.ok(not (jget(f"{base}/api/v1/beacons") or {}).get("beacons"), "and takes the beacons down")
+            tags, boxes_now = beacon_split(jget(f"{base}/api/v1/beacons"))
+            check.ok(not tags and len(boxes_now) <= 3, f"and takes the registered beacons down (left: {[b['id'] for b in tags]})")
 
         print("3. nothing can be changed", flush=True)
         games = jget(f"{base}/api/v1/games") or []
