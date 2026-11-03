@@ -21,6 +21,7 @@ A *Field Box* é o dispositivo de jogo principal da Atalaia. Tem:
 - um **leitor NFC** para etiquetas e cartões;
 - um **ecrã OLED** pequeno na placa, uma linha de estado para a organização;
 - um **altifalante** opcional, um **besouro piezoelétrico** opcional, ou os dois (o besouro toca os sons do jogo como sequências curtas de bipes);
+- uma ou duas **saídas** opcionais que ligam uma sirene, um estroboscópio, uma luz ou o comando de uma máquina de fumo ([secção 6](#saídas-uma-sirene-um-estroboscópio-uma-máquina-de-fumo));
 - um rádio *LoRa* e uma **bateria** (uma célula de iões de lítio, recarregada por USB-C).
 
 Corre as regras do jogo sozinha e fala com o controlador de campo por rádio. Se perder o controlador, continua a jogar e a contar pontos.
@@ -146,6 +147,33 @@ No OLED pequeno vês o modo em cima, um valor grande (a fase, o tempo ou a equip
 
 Num jogo com limite de tempo que começou na própria caixa, o ecrã grande tem uma barra fina ao longo da margem de baixo que mostra quanto falta do jogo (fica vermelha no último minuto), e o OLED mostra o tempo que falta, em minutos e segundos, à direita da linha de cima. Um jogo **Sem limite** não tem nenhuma das duas. Um jogo conduzido pelo controlador do campo acaba quando a organização o termina, por isso não tem barra.
 
+### Saídas: uma sirene, um estroboscópio, uma máquina de fumo
+
+Uma caixa montada com uma **saída simples** tem uma tomada M8 com a etiqueta **SAÍDA 1** (às vezes também **SAÍDA 2**). Um cabo vai dela a um pequeno *interruptor de relé RC*, que liga uma sirene, um estroboscópio, uma luz ou o comando de uma máquina de fumo com a bateria deles. É o jogo que a liga: por exemplo uma sirene quando uma equipa ocupa todos os satélites, ou fumo quando a bomba explode (quando os modos de jogo a usarem). Ainda não experimentada em hardware.
+
+**As saídas ficam desligadas até as ativares, na caixa.** É de propósito: uma caixa emprestada por outro campo, ou ligada na zona segura, nunca dispara até que uma pessoa junto dessa caixa o diga.
+
+1. Em **PRONTA**, carrega numa tecla qualquer. **Marca o PIN de administração.**
+2. Vai à última entrada da lista, **Saídas**, e carrega em `#`.
+3. O ecrã mostra **SAÍDA 1 GPIO 46**, o seu uso e se está ativada. Carrega:
+   - em `1` para a ativar ou desativar;
+   - em `2` para mudar o seu uso: **out.1**, **siren** (sirene), **strobe** (estroboscópio), **smoke** (fumo), **light** (luz), **horn** (buzina); os jogos pedem uma saída pelo seu uso;
+   - em `3` para mudar o tempo máximo que pode ficar ligada: 5, 10, 30, 60, 120, 300 ou 600 segundos;
+   - em `5` para a testar: ligada durante 1 segundo;
+   - em `0` para a saída seguinte; em `#` ou `*` para voltar à lista.
+4. Cada mudança fica guardada logo, também depois de reiniciar.
+
+Podes fazer o mesmo pelo cabo USB: `@outputs` lista-as, `@output 1 enable <PIN>`, `@output 1 function siren <PIN>`, `@output 1 max 30 <PIN>`, `@output 1 test <PIN>`.
+
+O que a caixa faz:
+
+- Liga saídas **só durante um jogo** (e o teste de 1 segundo entre jogos). As definições só mudam entre jogos.
+- **Desliga** todas as saídas quando arranca, quando o jogo é **pausado** (continuam desligadas quando o jogo retoma) e quando o jogo **acaba**. Uma buzina de fim de jogo ainda pode tocar até 10 segundos.
+- Uma saída nunca fica ligada mais tempo do que o que definiste. Muda no máximo de meio em meio segundo.
+- Se a caixa deixar de funcionar, ficar sem energia ou reiniciar, o interruptor perde o sinal e desliga-se em cerca de um segundo.
+
+**Segurança.** Só aparelhos de baixa tensão com bateria própria (no máximo 24 V). **Nunca** a rede elétrica. Uma máquina de fumo só pela sua entrada de comando de baixa tensão; nunca pirotecnia. Proteção auditiva perto de sirenes e buzinas. Fumo nunca numa sala fechada sem autorização do recinto. Antes do primeiro jogo, quem monta verifica cada interruptor: tem de desligar quando se tira o cabo ([manual de montagem, secção 9.10](../../../hardware/field-box/BUILD.pt.md#910-saída-simples-opcional)).
+
 As *Ligaduras* e o *Hackeia o terminal* não seguem a língua da caixa. Cada um usa a língua do ecrã da sua própria definição **Língua** no jogo; se estiver vazia, é a língua do jogo. O *VIP / Carga* segue a língua da caixa, como os outros modos (a sua antiga definição **Língua** já não é usada).
 
 ## 7. O que te dizem as luzes e os ecrãs
@@ -218,5 +246,7 @@ Um telemóvel Android também pode ser uma caixa. Na app escolhe **Dispositivo d
 | **PIN bloqueado · tente daqui a N min** | Espera. A contagem sobrevive a um reinício. Não continues a adivinhar. |
 | A caixa reiniciou num jogo | Volta no mesmo jogo. A organização vê **node.rebooted** no registo dela, com o motivo que a caixa indica (alimentação, queda de tensão, software, falha do programa, watchdog); o fluxo da consola diz **Uma caixa falhou e reiniciou** quando foi uma falha do programa ou um reinício do watchdog. Um fio solto no teclado ou no ecrã já não reinicia a caixa: a peça que falha é posta de lado por um tempo e o jogo continua (o teclado conta então como sem tecla). |
 | O ecrã pequeno está apagado | Fala com quem montou a caixa. O ecrã grande pode continuar a funcionar. |
+| A sirene (ou o estroboscópio, o fumo) nunca liga | Ativa a saída na caixa (PIN de administração, **Saídas**) e dá-lhe o uso que o jogo pede. Só funciona durante um jogo, ou com o teste de 1 segundo entre jogos. Verifica a bateria do próprio interruptor. |
+| Um interruptor fica ligado com a caixa desligada | Deixa de usar esse interruptor: tem de desligar quando perde o sinal. Fala com quem montou a caixa. |
 
 Para avarias de montagem e de bancada, vê [a tabela de resolução de problemas do manual de montagem](../../../hardware/field-box/BUILD.pt.md#13-resolução-de-problemas).

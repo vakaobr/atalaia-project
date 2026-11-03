@@ -173,6 +173,9 @@ prices ([hardware overview](../README.md)).
 | 29 | Clear window, 2-3 mm acrylic or polycarbonate | 1 | Bigger than the display's active area | Only if the lid is opaque |
 | 30 | Labels: "GAME PROP" and the box name | 2+ | Weatherproof | Required, see [section 4](#4-safety-rules) |
 | 31 | **Passive** piezo buzzer, 12-30 mm, rated 3-24 V; a 220 ohm resistor; for a louder one an NPN transistor (2N2222, BC547 or S8050), a 1 kohm, a 10 kohm and a second 1 kohm resistor | 1 each | A piezo element **without** its own oscillator | Optional, with or without the amplifier (decisions BZR-1 to BZR-8); needs a firmware built with `CONFIG_ATALAIA_BUZZER=y`. Not an "active" buzzer (one pitch whatever the firmware asks), not a magnetic transducer on the pin directly (it lists a coil resistance, such as 16 ohm), not a "buzzer module" with a pull-up on its input ([section 9.7](#97-audio-optional)). **Not yet built on hardware** |
+| 32 | **RC relay switch** (the kind sold for radio-controlled models: a servo-plug input, a relay, about 5 V supply), one per output | 1-2 | **Opens its relay when the servo signal stops** (the maker says so, or the bench check of [section 9.10](#910-simple-output-optional) shows it); a threshold between 1.0 and 2.0 ms (some learn it at set-up); the relay's contacts rated for the load | Optional: the simple output, for a siren, strobe, light or a smoke machine's remote (draft RFC "The expansion port", decisions EXP-31 to EXP-37); needs a firmware built with `CONFIG_ATALAIA_SIMPLE_OUT=y`. A documented board with a fail-safe on signal loss (Pololu's RC switch with relay, or its MOSFET version for DC loads switched often), or a generic "1-channel RC PWM relay switch" **after** its bench check: their behaviour on signal loss varies between batches, and one that **holds its last state** must never be used. **Not yet built on hardware** |
+| 33 | M8 3-pin socket (A-coded, panel mount, IP67) with a matching 3-core cable up to 2 m; a 10 kohm and a 330 ohm resistor | 1 each per output | M8, **not** M12: the expansion port's M12 cannot take it by mistake | For row 32. The RC switch's own servo plug goes on the far end of the cable |
+| 34 | On the load's side: a fuse for the load's battery and a 5 V regulator for the switch (an RC "BEC" or a small buck module from the load's 6-24 V) | 1 each per output | The switch's supply range (often 4.8-6 V) | For row 32. **Never** from the box: the box gives the signal and GND only |
 
 ## 3. Tools and consumables
 
@@ -507,6 +510,11 @@ continuity checks:
 | 12, 13 | 4A, 4OE | GND rail |
 | 14 | VCC | 5V rail, and a 100 nF ceramic capacitor from pin 14 to pin 7, as close as possible |
 
+Gates 2, 3 and 4 are spare. The optional simple output takes gate 2 (and a
+second one gate 3): its wiring replaces the GND on pin 5 (or pin 9) as
+[section 9.10](#910-simple-output-optional) says; leave them as above
+otherwise.
+
 **Checks before going on** (no power, chip out of its socket): no
 continuity between any two rails; pin 14 to the 5V rail and pin 7 to GND
 beep; pin 2 beeps to the "LED data in" pin; the "LED data out" pin reads
@@ -697,6 +705,78 @@ The keypad expander (PCF8574), NFC reader (PN532) and battery gauge
 - [ ] Every wire labelled at both ends, no bare copper, bundles tied, no
       wire pinched by the lid.
 - [ ] Nothing wired to the board pins listed in [section 9.1](#91-main-board-and-rails).
+- [ ] The simple output, if fitted: its checks in [section 9.10](#910-simple-output-optional).
+
+### 9.10 Simple output (optional)
+
+**Not yet built on hardware.** A siren, a strobe, a light or a smoke machine's
+remote switched by the box (draft RFC "The expansion port", decisions EXP-31 to
+EXP-37; the preferred way for a box to switch something): one GPIO sends an
+RC-servo signal through the spare gate 2 of the 74AHCT125 to an off-the-shelf
+**RC relay switch** (parts rows 32-34). The box sends 50 pulses a second:
+**2.0 ms is on, 1.0 ms is off**. They come in bursts of half a second that only
+the running game renews, so if the box hangs, resets or loses power, the
+pulses stop within 0.5 s and the switch opens its relay on the lost signal.
+That is why only a switch that **opens when the signal stops** may be used.
+The box gives the signal and GND; the switch and the load take their power
+from the load's own battery.
+
+**Loads: low voltage only** (SELV: at most 24 V DC, 2 A recommended), whatever
+the relay's print says. **Never mains.** A smoke machine only through a
+documented low-voltage remote input; never pyrotechnics. Hearing protection
+near sirens and horns; smoke never in a closed room without the venue's
+approval; nothing that looks like an explosive ([section 4](#4-safety-rules)).
+
+1. **Firmware:** a build with `CONFIG_ATALAIA_SIMPLE_OUT=y`
+   (`python tools/docker_fw.py build --simple-out=on`;
+   [section 12](#12-hand-off-to-bring-up)). Its pin follows the board
+   revision ([section 6](#6-board-revision-and-antennas)): **GPIO 46 on a
+   V4.3, GPIO 5 on a V4.2** (each is the other revision's front-end line;
+   never the one your revision uses). The boot log says
+   `output 1 on GPIO 46: out.1, disabled ...`.
+2. **On the interconnect board, gate 2:** take pin 5 (2A) off the GND rail
+   and wire it to the board's GPIO 46 (V4.3) or 5 (V4.2); fit a **10 kohm**
+   resistor from pin 5 to the GND rail (it holds the pin low while the board
+   starts, so the switch sees no signal, and keeps GPIO 46's strap low). Pin 4
+   (2OE) stays on GND. Pin 6 (2Y) through a **330 ohm** resistor to the output
+   socket's signal pin. The signal leaves the box at 5 V, buffered: a fault on
+   the cable reaches the socketed 74AHCT125, not the board.
+3. **The socket:** an **M8 3-pin** socket through the wall, away from the
+   antennas: **pin 1 not connected** (the box gives no power), **pin 3 GND**
+   (to the hub GND rail), **pin 4 signal** (from the 330 ohm). Label it
+   "OUTPUT 1". It is not the expansion port's M12.
+4. **The cable** (up to 2 m, 3 cores, signal and GND twisted, away from the
+   load's own wires): M8 pin 4 to the switch's servo-plug **signal** wire
+   (white, yellow or orange), pin 3 to its **GND** (black or brown). The servo
+   plug's **+** (red) does **not** go to the box.
+5. **The load's side:** the load's battery through a fuse to the relay's COM,
+   its NO to the load, the load back to the battery; and the same battery
+   through a fuse to a 5 V regulator (an RC "BEC" or a buck module) into the
+   switch's + and GND. The switch's GND is joined to the box's through the
+   cable: fine for low-voltage loads on their own battery, and the reason a
+   mains device is never wired to it.
+6. **A second output** (only on a box **without** the piezo buzzer: GPIO 45
+   is the buzzer's or a second output's, never both; the firmware refuses
+   both): gate 3 the same way (pin 9, 3A, from GPIO 45 with 10 kohm to GND;
+   pin 10, 3OE, on GND; pin 8, 3Y, through 330 ohm to a second M8 socket,
+   "OUTPUT 2"); build with `--simple-out=on2` (`CONFIG_ATALAIA_SIMPLE_OUT2=y`).
+7. **Checks** (no power, chip out of its socket): GPIO 46 (or 5) reads
+   10 kohm to GND; M8 pin 4 reads 330 ohm to socket pin 6; nothing on M8 pin
+   1; no continuity from M8 pin 4 to 3V3, 5 V or BAT+. Before its first game,
+   each RC switch gets its bench check
+   ([BRING_UP.md, step 8b](../../firmware/esp32/docs/BRING_UP.md#step-8b-simple-output-rc-relay-switch)):
+   2.0 ms closes it, 1.0 ms opens it, and with the relay closed, pulling the
+   signal plug opens it within a second. A switch that holds its state is not
+   used.
+8. **Enable it at the box:** outputs stay off until the field's admin enables
+   them at the box with the admin PIN, and gives each its function (siren,
+   strobe, smoke, light, horn) and its longest time on
+   ([the Field Box manual](../../docs/manuals/en/field-box.md#outputs-a-siren-a-strobe-a-smoke-machine)).
+
+The box turns every output off at boot, when a game is paused, when the mode's
+script is stopped and when the game ends (an end-of-game horn may still sound
+for up to 10 s), and switches a simple output at most every half second. The
+wiring diagrams do not show it.
 
 ## 10. First power-on
 
@@ -899,8 +979,10 @@ again, then flash. Common changes:
 | Board mounted the other way up (small OLED upside down) | `CONFIG_ATALAIA_OLED_FLIP=y` |
 | GNSS module switched on at boot (bench test only: nothing reads it yet) | `CONFIG_ATALAIA_GNSS_POWER_ON=y` |
 | Piezo buzzer fitted ([section 9.7](#97-audio-optional)) | `CONFIG_ATALAIA_BUZZER=y` (its pin: `CONFIG_ATALAIA_BUZZER_PIN=45`) |
+| Simple output fitted ([section 9.10](#910-simple-output-optional)) | `CONFIG_ATALAIA_SIMPLE_OUT=y` (its pin follows the board revision: 46 on a V4.3, 5 on a V4.2); a second one on GPIO 45, without the buzzer: `CONFIG_ATALAIA_SIMPLE_OUT2=y` |
 
-Taiwan (`--region=as923-tw`), listen before talk (`--lbt=`), the antenna's gain (`--antenna-dbi=`), the release keys
+Taiwan (`--region=as923-tw`), listen before talk (`--lbt=`), the antenna's gain (`--antenna-dbi=`), the buzzer
+(`--buzzer=on`), the simple output (`--simple-out=on`, `on2`), the release keys
 and the mode keys are build options, not lines to edit; see the
 [firmware guide](../../docs/manuals/en/firmware.md#4-the-options-a-builder-sets).
 Never lower `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` or the antenna gain below the
@@ -932,6 +1014,8 @@ made again (see section 11, step 1); keep a note of it inside the box lid.
 | Button 4 never registers | It is read through the keypad expander: the log must say `PCF8574 keypad at 0x..`; its wire goes to P7, not to a board GPIO |
 | No sound | Switch off (amplifier on 5 V); BCLK/LRC/DIN swapped; speaker wire touching GND |
 | Buzzer silent | Firmware built without `CONFIG_ATALAIA_BUZZER=y` (no `piezo buzzer on GPIO 45` line in the boot log); an active buzzer or a module instead of a passive piezo; the volume at 0 |
+| The RC switch never closes | Outputs disabled at the box (enable them: admin PIN, **Outputs**); no game running (outputs switch only in a game, or the admin's 1 s test between games); firmware built without `CONFIG_ATALAIA_SIMPLE_OUT=y` (no `output 1 on GPIO` line at boot); the switch's + not powered from the load's side; its threshold set the other way round (a reverse jumper) |
+| The RC switch stays closed when the box is off | It holds its last state on signal loss: never use it ([section 9.10](#910-simple-output-optional)) |
 | The board stopped booting when the buzzer was fitted | Something pulls GPIO 45 up: a buzzer module's pull-up, or the transistor circuit's 10 kohm missing. Take the buzzer off and check ([section 9.7](#97-audio-optional)) |
 | Phone cannot see the `atalaia-XXXX` Wi-Fi | 2.4 GHz antenna missing or on the wrong connector; phone too far; the box is already set up (the setup Wi-Fi opens only on a new box or after **Wi-Fi setup**: [firmware guide](../../docs/manuals/en/firmware.md#5-first-boot-and-setup)) |
 | The setup page does not open by itself | Open `http://192.168.4.1` in the phone's browser; switch off mobile data and private DNS for a minute |
@@ -1000,6 +1084,8 @@ except through the level shifter.
 | Audio bit clock (BCLK) | 6 | `ATALAIA_AUDIO_BCLK_PIN` | grey | amplifier BCLK | 3.3 V | audio driver (`hal_esp_audio.c`, I2S) |
 | Audio left/right clock (LRC) | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | pink | amplifier LRC | 3.3 V | audio driver |
 | Audio data (DIN) | 16 | `ATALAIA_AUDIO_DOUT_PIN` | brown | amplifier DIN | 3.3 V | audio driver |
+| Simple output 1 (optional) | 46 (V4.3), 5 (V4.2) | `ATALAIA_SIMPLE_OUT_PIN` | yellow | 74AHCT125 pin 5 (2A), 10 kohm to GND; 2Y through 330 ohm to the M8 socket's pin 4 | 3.3 V in, 5 V out of the shifter; servo pulses at 50 Hz, idles low. GPIO 46 is a strapping pin its 10 kohm keeps low | output layer (`outputs.c`, `simple_out_esp.c`, RMT), only with `CONFIG_ATALAIA_SIMPLE_OUT=y` |
+| Simple output 2 (optional, no buzzer) | 45 | `ATALAIA_SIMPLE_OUT2_PIN` | yellow | 74AHCT125 pin 9 (3A), 10 kohm to GND; 3Y through 330 ohm to a second M8 socket | As output 1. The VDD_SPI strap: its 10 kohm keeps it low at reset | only with `CONFIG_ATALAIA_SIMPLE_OUT2=y` (refused with the buzzer) |
 | Piezo buzzer (optional) | 45 | `ATALAIA_BUZZER_PIN` | purple | 220 ohm to the piezo, or 1 kohm to the transistor's base | 3.3 V, idles low. A boot strapping pin: its circuit must keep it low at reset | buzzer driver (`hal_esp_buzzer.c`, LEDC), only with `CONFIG_ATALAIA_BUZZER=y` |
 
 **Not GPIO signals** (wired to rails, not to a pin of the firmware):
@@ -1024,9 +1110,9 @@ except through the level shifter.
 
 | GPIO | What it is |
 | --- | --- |
-| 0, 45, 46 | Boot strapping pins. GPIO 46 is also the V4.2's front-end module line. GPIO 45 only for the optional piezo buzzer, whose circuit keeps it low ([section 9.7](#97-audio-optional)) |
+| 0, 45, 46 | Boot strapping pins. GPIO 46 is also the V4.2's front-end module line. GPIO 45 only for the optional piezo buzzer or a second simple output, GPIO 46 only for the simple output on a V4.3; their circuits keep them low ([sections 9.7](#97-audio-optional) and [9.10](#910-simple-output-optional)) |
 | 2, 7, 8-14 | The radio and its front-end module |
-| 5 | The V4.3's front-end module (receive amplifier on or off) |
+| 5 | The V4.3's front-end module (receive amplifier on or off). On a V4.2 it is free: the simple output's pin there |
 | 19, 20 | USB |
 | 21 | The board's OLED reset |
 | 26-32 | Flash and PSRAM |
@@ -1035,8 +1121,9 @@ except through the level shifter.
 | 43 | UART0 transmit: the log. Never wire it to a part |
 
 Board pins used **on purpose**, each for one thing only: GPIO 1 (display CS),
-GPIO 35 (LED ring data), GPIO 44 (button 3), and GPIO 45 (the optional piezo
-buzzer).
+GPIO 35 (LED ring data), GPIO 44 (button 3), GPIO 45 (the optional piezo
+buzzer, or a second simple output), and GPIO 46 on a V4.3 or 5 on a V4.2 (the
+optional simple output).
 
 **Where the pin reference and the firmware disagreed.** On 2026-10-28 this
 section was checked against `Kconfig.projbuild` and `hal_esp_*.c`. The GPIO

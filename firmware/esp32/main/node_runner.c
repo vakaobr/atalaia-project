@@ -29,12 +29,19 @@ static void on_event(void *user, const atalaia_event_t *ev, const char *data_jso
 #endif
     r->event_count++;
     snprintf(r->last_event_type, sizeof(r->last_event_type), "%s", ev->type);
+    /* A mode ends the game (game.finish, game.win): every output off before its game.end
+     * handlers run, so what they switch on is the end's grace (EXP-29). */
+    if (r->outputs != NULL && strcmp(ev->type, "game.end") == 0) {
+        outputs_game_end(r->outputs, r->outputs->now);
+    }
     if (r->event_hook != NULL) r->event_hook(r->event_ctx, ev, data_json);
 }
 
 static void on_command(void *user, const char *target, const char *method, const char *args_json)
 {
     node_runner_t *r = (node_runner_t *)user;
+    /* An output's capability id first (cap("siren"):pulse(ms)); everything else as before. */
+    if (command_dispatch_output(r->outputs, target, method, args_json)) return;
     command_dispatch(target, method, args_json, r->hal, &r->queues);
 }
 
@@ -164,7 +171,8 @@ bool node_runner_start(node_runner_t *r, const preset_t *preset, const char *con
     /* Initialise the game timer. */
     game_timer_init(&r->timer, preset->duration_s * 1000u);
 
-    /* Start the game. */
+    /* Start the game; the outputs may be switched from game.start on (outputs.h). */
+    if (r->outputs != NULL) outputs_game_start(r->outputs);
     atalaia_node_input(r->node, "game.start", NULL);
     r->running = true;
 
@@ -250,7 +258,8 @@ bool node_runner_resume(node_runner_t *r, const state_persist_data_t *saved, con
     /* Fast-forward the timer's elapsed counter without firing game.end. */
     r->timer.elapsed_ms = saved->timer_elapsed_ms;
 
-    /* Start the game. */
+    /* Start the game; the outputs may be switched from game.start on (outputs.h). */
+    if (r->outputs != NULL) outputs_game_start(r->outputs);
     atalaia_node_input(r->node, "game.start", NULL);
 
     /* Advance game time to where we left off. */
@@ -278,8 +287,9 @@ void node_runner_tick(node_runner_t *r, uint32_t delta_ms)
     /* Advance the core's game time. */
     atalaia_node_advance(r->node, r->game_time_ms);
 
-    /* Tick the game timer (may send game.end). */
-    game_timer_tick(&r->timer, delta_ms, r->node);
+    /* Tick the game timer; when it runs out, game.end (through node_runner_input, so the
+     * outputs go off before the mode's handlers run). */
+    if (game_timer_tick(&r->timer, delta_ms, NULL)) node_runner_input(r, "game.end", NULL);
 
     /* Persist state every second. */
     r->persist_accum_ms += delta_ms;
@@ -292,6 +302,9 @@ void node_runner_tick(node_runner_t *r, uint32_t delta_ms)
 bool node_runner_input(node_runner_t *r, const char *type, const char *data_json)
 {
     if (!r || !r->node || !r->running) return false;
+    if (r->outputs != NULL && type != NULL && strcmp(type, "game.end") == 0) {
+        outputs_game_end(r->outputs, r->outputs->now);
+    }
     return atalaia_node_input(r->node, type, data_json);
 }
 

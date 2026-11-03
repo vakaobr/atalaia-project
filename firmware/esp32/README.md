@@ -574,6 +574,12 @@ Piezo buzzer options (under "Piezo buzzer", the Field Box and the pod; decisions
 `ATALAIA_BUZZER` (default **off**: a passive piezo is fitted) and `ATALAIA_BUZZER_PIN` (default 45).
 See "Sound: the speaker and the piezo buzzer" below.
 
+Simple output options (under "Simple output (RC relay switch)", the Field Box; draft RFC "The expansion port",
+EXP-31 to EXP-37): `ATALAIA_SIMPLE_OUT` (default **off**), `ATALAIA_SIMPLE_OUT_PIN` (46 on a V4.3, 5 on a V4.2,
+following `ATALAIA_BOARD_REV`), `ATALAIA_SIMPLE_OUT2` (a second one, offered only without the buzzer) and
+`ATALAIA_SIMPLE_OUT2_PIN` (45). `python3 tools/docker_fw.py build|bench --simple-out=on|on2|<GPIO>` and
+`--buzzer=on` set them for that build folder. See "Outputs: the simple output" below.
+
 GNSS options (under "GNSS"): `ATALAIA_GNSS_PWR_PIN` (34, VGNSS_Ctrl,
 active low; driven high, module off, at boot), `ATALAIA_GNSS_POWER_ON`
 (default off), `ATALAIA_GNSS_TX_PIN` / `ATALAIA_GNSS_RX_PIN` (38 / 39, the
@@ -605,6 +611,7 @@ are shared on purpose and button 4 is read through the keypad expander.
 | I2C SDA / SCL | 17 / 18 | 17 / 18 | OLED, PCF8574, PN532, MAX17048 |
 | I2S BCLK / LRCLK / DOUT | 6 / 15 / 16 | 6 / 15 / 16 | |
 | Piezo buzzer (optional, `ATALAIA_BUZZER`) | - | 45 | Added 2026-11-03 (BZR-1): the VDD_SPI strap, kept low by the buzzer's circuit |
+| Simple output (optional, `ATALAIA_SIMPLE_OUT`) | - | 46 (V4.3), 5 (V4.2) | Added 2026-11-03 (EXP-34): the board revision's free front-end pin, through the 74AHCT125's gate 2; a second one on 45 only without the buzzer |
 | GNSS power, TX, RX, wake-up, PPS, reset | (display, buttons) | 34, 38, 39, 40, 41, 42 | The module keeps its connector; off at boot |
 
 `sdkconfig.wokwi` keeps the emulator's own display and ring pins (its
@@ -659,6 +666,64 @@ up, and the driver leaves it low when silent. `tools/check_wiring.py` allows GPI
 (+6,480 more: the LEDC driver), 52 % of the 4 MB OTA slot. Static internal RAM left for the heap
 (`check_fw_ram.py`): 192,765 bytes before, 192,757 off, 192,277 on (the 120 KiB floor holds). The
 bench image: 2,138,080 off, 2,144,592 on; the I/O pod: 689,680 off, 696,176 on.
+
+## Outputs: the simple output (draft RFC "The expansion port", increment 2)
+
+A box switches a siren, a strobe, a light or a smoke machine's remote through its **outputs**: the
+`output` capability (protocol/expansion-port.md, sections 6-9), today on the **simple output**, the
+path the maintainer chose as the preferred one (EXP-31): one GPIO sending an RC-servo signal through
+the level shifter's spare gate to an off-the-shelf RC relay switch (hardware/field-box/BUILD.md,
+section 9.10). The I2C output module of a later increment joins the same layer.
+
+**The layer** (`main/outputs.c`, platform-free, host tests in `test/test_outputs.c`) holds each
+channel's settings, its desired state and the rules; only the last step is the path's:
+
+| Rule | What the box does |
+| --- | --- |
+| Settings (EXP-28) | Every output is **disabled until the field's admin enables it at the box**: the picker's last entry, **Outputs**, behind the admin PIN (`main/outputs_admin.c`: `1` on/off, `2` the function, `3` the max on, `5` the 1 s test, `0` the next output, `#` back), or `@outputs` / `@output <n> enable\|disable\|test\|function <name>\|max <s>` on the serial console, with the admin PIN as the last word in a release build. Kept in NVS (`out<n>_en`, `out<n>_fn`, `out<n>_max`). The function is the capability id scripts call: `siren`, `strobe`, `smoke`, `light`, `horn`, else `out.<n>` (a second with the same function is `siren.2`); the max on 1-600 s (default 30). Only between games |
+| Who switches | A mode's script: `cap("siren"):pulse(ms)`, `:on()` / `:on(max_ms)`, `:off()`, `:pattern(on_ms, off_ms, ms)` (the core's `cap()` proxy forwards any method; `command_dispatch_output` takes the box's output ids, anything else goes on as before, and a call to an output the box lacks does nothing). The field: **CMD opcode 12** (RFC 0001 Amendment 26) handled by the firmware in `box_game.c`, whatever the mode; its params are checked against `protocol/vectors/cmd.json`'s `output_params`; an `on` always carries `ms`; `capability: "*"` with `off` turns everything off. The admin's 1 s test |
+| Limits | A call never runs past the channel's max on. A simple output changes state at most every 500 ms (EXP-30, EXP-36): a shorter pulse runs 500 ms, a pattern under 500 ms on or off is refused, an on within 500 ms of the last change is refused; an off never is. A script starts a channel at most twice a second (more are dropped, one `script.error` a game) |
+| Game state (EXP-29) | On only while a game runs. Every output off at boot, when the game pauses (not back on at the resume), when the sandbox halts the script, and when the game ends: before the mode's `game.end` handlers run, so an end-of-game horn they pulse is allowed, for at most **10 s** after the end (the field's CMD 12 too). The admin's test only between games |
+| Events | `output.switched` (`capability`, `ms`, `source`: `script`, `field`, `gm`, `box_admin`) for each start and each off before its time; nothing for what the game state turns off. In a field game it goes to the controller on the radio (`field_link_send_box_event`, normal priority), otherwise to the log |
+| HELLO and `node.modules` | HELLO's capabilities (key 6, `protocol/schema/capabilities.yaml`) list what the box has: button, keypad, display, led, audio, nfc, battery from the parts that started, and `output` (11) while an output is enabled. Once the controller acknowledges the HELLO the box sends `node.modules` with its enabled simple outputs, `g46:servo:siren` (EXP-36: no version, no feedback); a box with none sends nothing |
+
+**The simple output's signal** (`main/simple_out.c`, platform-free, host tests in
+`test/test_simple_out.c`; `main/simple_out_esp.c` on the ESP32): 50 Hz, **2.0 ms on, 1.0 ms off**.
+Each channel has an RMT transmit channel at 1 MHz sending one 20 ms frame repeated by the hardware's
+loop count, so a burst stops by itself; the game task keeps **25 frames (0.5 s)** queued and tops them
+up every **200 ms** (the first burst 25 frames, each renewal the ~10 that bring it back to 0.5 s).
+Whatever stops the game task (a hang the task watchdog only reports, a crash, a reset), the pulses
+stop within 0.5 s and the RC switch opens on the lost signal (EXP-32, EXP-37). A change of width
+flushes the queue (the channel is deleted and made again: the RMT driver cannot drop queued
+transmissions) and starts at once. While a game runs a channel that is off gets 1.0 ms pulses (a live
+"off"); at the end of a signal (boot, pause, halt, end, a test's end) it gets 0.5 s of 1.0 ms and
+then **no pulses, the pin low** (the RMT's idle level and the 10 kohm pull-down). LEDC was refused:
+it keeps pulsing in hardware after a hang. The LED ring has its own RMT channel; the S3 has four.
+
+**Pins** (EXP-34): GPIO 46 on a V4.3, 5 on a V4.2 (each the other revision's front-end line), GPIO
+45 for a second output only without the buzzer. The build refuses at compile time a pin another
+part uses, the other revision's front-end pin and 45 with the buzzer (`#error` in
+`simple_out_esp.c`); `simple_out_pin_problem` checks the same at run time and in the host tests.
+A bench build has `@hang` (the game task stops for good: bench test 12, BRING_UP.md step 8b).
+
+**The host box** (`test/box_host`, `--simple-out siren[@GPIO]`, twice at most) runs the same layer
+and scheduler and prints the pulse train: `PULSE g46 t=<ms> width=<us> frames=<n> until=<ms>[ flush]`
+per burst and `PIN g46 low t=<ms>` when the last one has gone out; `status` adds `outputs`;
+`controller/tests/test_box_e2e.py` checks it against the real controller.
+
+**Not in this increment** (the RFC's later ones): the controllers sending CMD 12, their output API,
+`modules` in the node list and the capability start check, the console's outputs panel (3); modes
+using outputs (4); scenario triggers (5); the I2C port and its modules (6-8, 11); the I/O pod's
+simple outputs (9). **Not yet tried on hardware.**
+
+**Size** (ESP-IDF 5.3.2, 2026-11-03, against the commit before this change): the Field Box image grew from
+2,163,296 to 2,174,736 bytes with the simple output off (+11,440: the output layer, its admin screen and
+console, CMD 12, HELLO's capabilities) and to 2,177,488 with it on (+2,752 more: the RMT driver and the
+burst scheduler); with the buzzer too 2,183,984, with a second output 2,177,536; 53 % of the 4 MB OTA slot.
+Static internal RAM left for the heap (`check_fw_ram.py`): 192,757 bytes before, 192,005 off, 191,821 on,
+191,333 with the buzzer (the 120 KiB floor holds). The bench image: 2,150,000 off, 2,152,752 on, 2,159,280
+with the buzzer. Every build 0 warnings; a bench build with `--simple-out=15` (the amplifier's LRCLK) stops
+at the compile-time check, as it should.
 
 ## Partition Table
 

@@ -2321,8 +2321,160 @@ static void test_fetch_modes(void)
     state_persist_clear();
 }
 
+/* ---- Outputs in a field game (outputs.h; draft RFC "The expansion port", increment 2) ---- */
+
+static outputs_t bg_outs;
+static bool bg_on, bg_live;
+
+static void bg_drive(void *ctx, bool on, bool live, uint32_t now_ms)
+{
+    (void)ctx;
+    (void)now_ms;
+    bg_on = on;
+    bg_live = live;
+}
+
+static void bg_event(void *ctx, const char *type, const char *data_json)
+{
+    (void)ctx;
+    box_game_output_event(&game, type, data_json);
+}
+
+/* A box with one simple output (enabled with function fn, or as a new box has it: NULL), joined. */
+static void join_with_output(const char *fn)
+{
+    fixture(false);
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    outputs_ops_t ops = {.event = bg_event};
+    outputs_init(&bg_outs, &ops);
+    out_settings_t s;
+    outputs_default_settings(0, &s);
+    if (fn != NULL) {
+        s.enabled = true;
+        snprintf(s.function, sizeof(s.function), "%s", fn);
+    }
+    out_backend_t b = {.drive = bg_drive};
+    CHECK(outputs_add_simple(&bg_outs, 46, &b, &s) == 0);
+    box_game_set_outputs(&game, &bg_outs);
+    CHECK(runner.outputs == &bg_outs);
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+}
+
+static bool hello_lists(uint8_t cap)
+{
+    atalaia_header_t h;
+    uint8_t pl[PKT_CAP];
+    size_t n;
+    atalaia_hello_t hello;
+    if (!last_of(ATALAIA_MSG_HELLO, &h, pl, &n) || !atalaia_hello_decode(pl, n, &hello)) {
+        return false;
+    }
+    for (uint8_t i = 0; i < hello.capabilities_count; i++) {
+        if (hello.capabilities[i] == cap) return true;
+    }
+    return false;
+}
+
+static void tick_outputs(uint32_t *now, uint32_t ms)
+{
+    for (uint32_t t = 0; t < ms; t += 10) {
+        *now += 10;
+        box_game_tick(&game, 10, *now);
+        outputs_tick(&bg_outs, box_game_output_state(&game), *now);
+    }
+}
+
+static void test_outputs_in_a_field_game(void)
+{
+    join_with_output("siren");
+    /* HELLO lists `output` (11) while an output is enabled (EXP-20). */
+    CHECK(hello_lists(ATALAIA_CAP_OUTPUT));
+    uint32_t now = 100;
+    tick_outputs(&now, 50);
+    CHECK(events_named("node.modules") == 0); /* not before the HELLO is acknowledged */
+    ack_all();
+    tick_outputs(&now, 20);
+    char data[128];
+    CHECK(last_event_data("node.modules", data, sizeof(data)));
+    CHECK(strcmp(data, "{\"modules\":\"g46:servo:siren\"}") == 0);
+    CHECK(events_named("node.modules") == 1);
+    tick_outputs(&now, 100);
+    CHECK(events_named("node.modules") == 1); /* once */
+
+    /* Joined, not started: no game runs, a CMD 12 is refused. */
+    CHECK(box_game_output_state(&game) == OUT_GAME_NONE);
+    const char *pulse =
+        "{\"act\":\"pulse\",\"capability\":\"siren\",\"ms\":10000,\"src\":\"field\"}";
+    cmd_params(FIELD_CMD_OUTPUT, pulse);
+    tick_outputs(&now, 20);
+    CHECK(!bg_on && !bg_live && events_named("output.switched") == 0);
+
+    cmd(FIELD_CMD_START);
+    CHECK(box_game_output_state(&game) == OUT_GAME_RUNNING);
+    tick_outputs(&now, 20);
+    CHECK(bg_live && !bg_on); /* a live "off" */
+    cmd_params(FIELD_CMD_OUTPUT, pulse);
+    tick_outputs(&now, 20);
+    CHECK(bg_on);
+    CHECK(last_event_data("output.switched", data, sizeof(data)));
+    CHECK(strcmp(data, "{\"capability\":\"siren\",\"ms\":10000,\"source\":\"field\"}") == 0);
+    /* A box without that output ignores the command. */
+    cmd_params(FIELD_CMD_OUTPUT, "{\"act\":\"off\",\"capability\":\"smoke\",\"src\":\"gm\"}");
+    CHECK(bg_outs.ch[0].on);
+
+    /* Pause: off; resume: still off. */
+    cmd(FIELD_CMD_PAUSE);
+    CHECK(box_game_output_state(&game) == OUT_GAME_PAUSED);
+    tick_outputs(&now, 20);
+    CHECK(!bg_on && !bg_live);
+    cmd(FIELD_CMD_RESUME);
+    tick_outputs(&now, 600);
+    CHECK(!bg_on && bg_live);
+
+    /* The GM switches it on and off again. */
+    cmd_params(FIELD_CMD_OUTPUT,
+               "{\"act\":\"on\",\"capability\":\"siren\",\"ms\":5000,\"src\":\"gm\"}");
+    tick_outputs(&now, 600);
+    CHECK(bg_on);
+    cmd_params(FIELD_CMD_OUTPUT, "{\"act\":\"off\",\"capability\":\"*\",\"src\":\"gm\"}");
+    tick_outputs(&now, 10);
+    CHECK(!bg_on);
+    CHECK(last_event_data("output.switched", data, sizeof(data)));
+    CHECK(strcmp(data, "{\"capability\":\"siren\",\"ms\":0,\"source\":\"gm\"}") == 0);
+
+    /* The end: the grace (an end-of-game horn from the field), then nothing. */
+    tick_outputs(&now, 600);
+    cmd(FIELD_CMD_END);
+    CHECK(box_game_output_state(&game) == OUT_GAME_ENDED && bg_outs.grace);
+    tick_outputs(&now, 20);
+    cmd_params(FIELD_CMD_OUTPUT, pulse);
+    tick_outputs(&now, 20);
+    CHECK(bg_on);
+    CHECK(last_event_data("output.switched", data, sizeof(data)));
+    CHECK(strstr(data, "\"ms\":9980,") != NULL); /* cut at the grace's end */
+    tick_outputs(&now, 10000);
+    CHECK(!bg_on && !bg_live && !bg_outs.grace);
+    CHECK(game.phase == BOX_ENDED || game.phase == BOX_IDLE);
+
+    /* A box whose output its admin has not enabled: no `output` in HELLO, no node.modules. */
+    join_with_output(NULL);
+    CHECK(!hello_lists(ATALAIA_CAP_OUTPUT));
+    now = 100;
+    ack_all();
+    tick_outputs(&now, 50);
+    CHECK(events_named("node.modules") == 0);
+    cmd(FIELD_CMD_START);
+    cmd_params(FIELD_CMD_OUTPUT, pulse);
+    tick_outputs(&now, 20);
+    CHECK(!bg_on && !bg_live);
+}
+
 void run_box_game_tests(void)
 {
+    test_outputs_in_a_field_game();
     test_lobby_nonces();
     test_lobby_answers_are_limited();
     test_lobby_refused_invite_keeps_the_ended_game();

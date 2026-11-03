@@ -70,5 +70,7 @@ void run_status_hold_tests(void);
 void run_tft_splash_tests(void);
 void run_target_addon_tests(void);
 void run_sound_tests(void);
+void run_outputs_tests(void);
+void run_simple_out_tests(void);
 
 #endif /* ATALAIA_FW_TEST_CHECK_H */

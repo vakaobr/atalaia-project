@@ -141,6 +141,11 @@ bool screen_json_int(const char *json, const char *key, long *out)
     return true;
 }
 
+bool screen_json_has(const char *json, const char *key)
+{
+    return json_find(json, key) != NULL;
+}
+
 bool screen_json_true(const char *json, const char *key)
 {
     const char *p = json_find(json, key);

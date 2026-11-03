@@ -192,6 +192,9 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/tft_splash.c
     ${SHELL_DIR}/target_addon.c
     ${SHELL_DIR}/sound.c
+    ${SHELL_DIR}/outputs.c
+    ${SHELL_DIR}/outputs_admin.c
+    ${SHELL_DIR}/simple_out.c
     ${SHELL_DIR}/hal/board_fem.c
     ${SHELL_DIR}/modem/modem.c
     ${SHELL_DIR}/modem/modem_framing.c
@@ -261,6 +264,8 @@ set(TEST_SOURCES
     test_tft_splash.c
     test_target_addon.c
     test_sound.c
+    test_outputs.c
+    test_simple_out.c
 )
 
 # ---- Executable --------------------------------------------------------------
@@ -290,6 +295,8 @@ endif()
 # test_wifi_setup.c reads the setup page to check its texts.
 target_compile_definitions(firmware_test PRIVATE "PARTITIONS_CSV=\"${CMAKE_CURRENT_SOURCE_DIR}/../partitions.csv\"")
 target_compile_definitions(firmware_test PRIVATE "WIFI_SETUP_HTML=\"${SHELL_DIR}/wifi_setup.html\"")
+# test_outputs.c runs CMD 12's shared params vectors (protocol/vectors/cmd.json).
+target_compile_definitions(firmware_test PRIVATE "CMD_VECTORS_JSON=\"${CMAKE_CURRENT_SOURCE_DIR}/../../../protocol/vectors/cmd.json\"")
 
 # MODES_DIR is needed by test_game_loop.c to find the real mode scripts.
 if(MODES_DIR)

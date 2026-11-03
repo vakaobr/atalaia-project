@@ -163,6 +163,10 @@ else()
         "target_addon.c"
         "sound.c"
         "sound_esp.c"
+        "outputs.c"
+        "outputs_admin.c"
+        "simple_out.c"
+        "simple_out_esp.c"
     )
     # The optional piezo buzzer (decisions BZR-1 to BZR-8).
     if(CONFIG_ATALAIA_BUZZER)

@@ -21,6 +21,7 @@ The *Field Box* is Atalaia's main game prop. It has:
 - an **NFC reader** for tags and cards;
 - a small **OLED screen** on the board, a status line for staff;
 - an optional **speaker**, an optional **piezo buzzer**, or both (the buzzer beeps the game's sounds as short patterns);
+- one or two optional **outputs** that switch a siren, a strobe, a light or a smoke machine's remote ([section 6](#outputs-a-siren-a-strobe-a-smoke-machine));
 - a *LoRa* radio and a **battery** (one Li-ion cell, recharged by USB-C).
 
 It runs the game's rules by itself, and it talks to the field controller by radio. If it loses the controller, it keeps playing and keeps score.
@@ -146,6 +147,33 @@ On the small OLED you see the mode on top, one big value (the phase, the timer o
 
 In a game with a time limit that you started on the box, the big screen has a thin bar along its bottom edge that shows how much of the game is left (it turns red in the last minute), and the OLED shows the time left, as minutes and seconds, at the right of its top line. A game with **No limit** has neither. A game that the field controller runs ends when the game master ends it, so it has no bar.
 
+### Outputs: a siren, a strobe, a smoke machine
+
+A box built with a **simple output** has an M8 socket labelled **OUTPUT 1** (sometimes also **OUTPUT 2**). A cable goes from it to a small *RC relay switch*, which switches a siren, a strobe, a light or a smoke machine's remote on its own battery. The game switches it: for example a siren when a team holds every satellite, or smoke when the bomb explodes (when the game modes use it). Not yet tried on hardware.
+
+**Outputs are off until you enable them, at the box.** This is on purpose: a box borrowed from another field, or plugged in at the safe zone, can never fire until a person at that box says so.
+
+1. On **READY**, press any key. **Enter the admin PIN.**
+2. Go to the last entry of the list, **Outputs**, and press `#`.
+3. The screen shows **OUTPUT 1 GPIO 46**, its use and whether it is enabled. Press:
+   - `1` to enable or disable it;
+   - `2` to change its use: **out.1**, **siren**, **strobe**, **smoke**, **light**, **horn** (the games ask for an output by its use);
+   - `3` to change the longest time it may stay on: 5, 10, 30, 60, 120, 300 or 600 seconds;
+   - `5` to test it: on for 1 second;
+   - `0` for the next output; `#` or `*` to go back to the list.
+4. Each change is kept at once, also after a restart.
+
+You can do the same on the USB cable: `@outputs` lists them, `@output 1 enable <PIN>`, `@output 1 function siren <PIN>`, `@output 1 max 30 <PIN>`, `@output 1 test <PIN>`.
+
+What the box does:
+
+- It switches outputs **only during a game** (and your 1-second test between games). Settings change only between games.
+- It turns every output **off** when it starts, when the game is **paused** (they stay off when the game goes on), and when the game **ends**. An end-of-game horn may still sound for up to 10 seconds.
+- An output never stays on longer than the time you set. It changes at most every half second.
+- If the box stops working, loses power or restarts, the switch loses its signal and turns off within about a second.
+
+**Safety.** Only low-voltage devices on their own battery (at most 24 V). **Never** mains. A smoke machine only through its low-voltage remote input; never pyrotechnics. Hearing protection near sirens and horns. Smoke never in a closed room without the venue's approval. Before its first game, the builder checks each switch: it must turn off when its cable is pulled ([build manual, section 9.10](../../../hardware/field-box/BUILD.md#910-simple-output-optional)).
+
 *Medic Kit* and *Hacking Terminal* do not follow the box language. Each takes its screen language from its own **Language** setting in the game; left empty, it is the game's language. *VIP / Payload* follows the box language, like the other modes (its old **Language** setting is no longer used).
 
 ## 7. What the lights and screens tell you
@@ -218,5 +246,7 @@ An Android phone can be a box too. In the app choose **Game prop**, then **Join 
 | **PIN locked · try again in N min** | Wait. The count survives a restart. Do not keep guessing. |
 | The box rebooted in a game | It comes back in the same game. The organisers see **node.rebooted** in their log, with the reason the box gives (power, brownout, software, panic, watchdog); the console's feed says **A box crashed and restarted** for a program crash or a watchdog reset. A flaky keypad or screen wire no longer reboots a box: the failing part is set aside for a while and the game goes on (a keypad then reads as no key). |
 | The small screen is dark | Ask the builder. The big screen can still work. |
+| The siren (or strobe, smoke) never comes on | Enable the output at the box (admin PIN, **Outputs**) and give it the use the game asks for. It works only during a game, or with the 1-second test between games. Check the switch's own battery. |
+| A switch stays on when the box is off | Stop using that switch: it must turn off when it loses its signal. Ask the builder. |
 
 For building and bench faults see [the build manual's troubleshooting table](../../../hardware/field-box/BUILD.md#13-troubleshooting).

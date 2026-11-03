@@ -72,6 +72,9 @@ add_executable(box_host
     ${MAIN_DIR}/cpace.c
     ${MAIN_DIR}/box_pair.c
     ${MAIN_DIR}/screen_json.c
+    ${MAIN_DIR}/outputs.c
+    ${MAIN_DIR}/outputs_admin.c
+    ${MAIN_DIR}/simple_out.c
 )
 # Monocypher (components/monocypher): fw_update.c's Ed25519.
 set(MONOCYPHER_DIR ${CMAKE_CURRENT_LIST_DIR}/../../components/monocypher/src)
@@ -80,6 +83,10 @@ add_library(box_host_monocypher STATIC ${MONOCYPHER_DIR}/monocypher.c
 target_include_directories(box_host_monocypher PUBLIC ${MONOCYPHER_DIR} ${MONOCYPHER_DIR}/optional)
 target_link_libraries(box_host PRIVATE box_host_monocypher)
 target_include_directories(box_host PRIVATE ${MAIN_DIR} ${MAIN_DIR}/radio ${CORE_DIR}/src)
+find_library(BOX_HOST_MATH_LIB m)
+if(BOX_HOST_MATH_LIB)
+    target_link_libraries(box_host PRIVATE ${BOX_HOST_MATH_LIB}) # outputs.c: floor()
+endif()
 target_link_libraries(box_host PRIVATE atalaia_core ${MBEDTLS_LIB} ${MBEDX509_LIB} ${MBEDCRYPTO_LIB})
 target_include_directories(box_host PRIVATE ${MBEDTLS_INCLUDE_DIR})
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
