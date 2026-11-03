@@ -62,7 +62,7 @@ All of them are for the Heltec WiFi LoRa 32 V4.3, European radio region (EU868),
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 
-On Windows `cmd`: `certutil -hashfile atalaia-field-box-0.6.1-usb.zip SHA256` and compare the line with the one in `SHA256SUMS`. The sums prove the file is the one the release page lists. The signature proves who made a Field Box image: the `.release.json` is signed with the project's CI release key, which every box trusts by default (`firmware/esp32/docs/RELEASE_SIGNING.md`). A box and a controller check it for you before they install an update.
+On Windows `cmd`: `certutil -hashfile atalaia-field-box-0.6.1-usb.zip SHA256` and compare the line with the one in `SHA256SUMS`. The sums prove the file is the one the release page lists. The signature proves who made a Field Box image: the `.release.json` is signed with one of the project's CI release keys, which every box trusts by default (`firmware/esp32/docs/RELEASE_SIGNING.md`). A box and a controller check it for you before they install an update.
 
 **Flash the zip.** Unzip it. In that folder follow [section 3](#3-flash-it) from 3.1 on: the commands are the same, and the `README.txt` inside the zip repeats them. The folder has the `flash_args` file the command uses, so skip the build and the `cd firmware/esp32/build` step.
 
@@ -89,7 +89,7 @@ On macOS and Linux, use `python3` if `python` is not found. The first build down
 
 A build from a checkout prints a version such as `0.6.1+12.g1a2b3c4` (or `0.7.0-dev.12+g1a2b3c4` between releases): the release's number, the number of changes since, and the code's identifier. It is also on the board's small screen at boot. Keep a note of it with the box. To get exactly a release's firmware, check out its tag (`git checkout v0.6.1`) and build there: a clean checkout of a tag says plain `0.6.1`.
 
-**Keys.** A build you make trusts the project's two release keys and two mode keys by default, the same as the released files, so a controller you run accepts the project's signed releases. Your own builds are not signed by the project: sign them with your own key and give the boxes its public half (`--release-keys=`, [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)).
+**Keys.** A build you make trusts the project's three release keys and two mode keys by default, the same as the released files, so a controller you run accepts the project's signed releases. Your own builds are not signed by the project: sign them with your own key and give the boxes its public half (`--release-keys=`, [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)).
 
 ## 3. Flash it
 
@@ -267,14 +267,14 @@ Two things use the field's Wi-Fi, and only between games: **firmware updates** a
 **The rules for firmware updates.** The box installs an update only if all of these are true:
 
 - No game is being played.
-- The update is signed by a **release key built into the box's own firmware** (`--release-keys`). By default that is the project's two release keys, so the Field Box files from a GitHub release can be installed as updates; a box built with `--release-keys=` your own key trusts only that. The project's keys and what happens if one leaks are in [RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md).
+- The update is signed by a **release key built into the box's own firmware** (`--release-keys`). By default that is the project's three release keys (root, CI, and the next CI key that replaces it), so the Field Box files from a GitHub release can be installed as updates; a box built with `--release-keys=` your own key trusts only that. The project's keys and what happens if one leaks are in [RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md).
 - The version is higher than the one it runs.
 - It is the same variant and board (a V4.2 image never goes on a V4.3).
 - The battery is at 30 % or more, if the box has a gauge.
 
 **The short path.**
 
-**With the project's releases:** flash a box once over USB with a release, then upload a later release's `atalaia-field-box-<version>.bin` and its `.bin.release.json` in the console's **Boxes** tab. The controller's `[firmware] release_keys` already holds the project's keys by default. Press **Update to** (step 5). **With your own key:**
+**With the project's releases:** flash a box once over USB with a release, then upload a later release's `atalaia-field-box-<version>.bin` and its `.bin.release.json` in the console's **Boxes** tab. The controller's `[firmware] release_keys` already holds the project's keys by default. If your `controller.toml` lists them by hand (the example file did), add the next CI key `76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=` to the list: the project's releases move to that key after the first release that carries it ([RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md#rotating-the-ci-key-2026-11)). Press **Update to** (step 5). **With your own key:**
 
 1. Make a key with `tools/firmware_release.py keygen`. Keep the private file safe and out of the repository.
 2. Build the boxes with `--release-keys=<the public key>`. Flash them over USB, once. Updates cannot install a new bootloader.

@@ -127,7 +127,7 @@
                                 # and starts an update per box or for all, never during a game
     release_keys = [...]        # Ed25519 public keys (standard base64, 44 characters each, at most 8;
                                 # from the environment, separated by commas) whose releases the
-                                # controller accepts; default: the project's two release keys
+                                # controller accepts; default: the project's three release keys
                                 # (docs/community/keys.md); empty: no release is accepted. A box checks the
                                 # signature again with the keys built into its own firmware
     dir = ""                    # where the images are kept; empty: "firmware" next to db_path
@@ -199,9 +199,12 @@ from . import REPO_ROOT
 # default of the boxes' CONFIG_ATALAIA_MODE_KEYS, so they are the default of [modes] box_keys too.
 # A field trusts them for its own installs only by listing them in [modes] keys.
 # The project's release keys (docs/community/keys.md): root 424d053af5cdbc35, held offline by the
-# maintainer, and CI 32b3c815ac30ad43, which signs the GitHub releases. They are the default of the
-# boxes' CONFIG_ATALAIA_OTA_RELEASE_KEYS, so the default of [firmware] release_keys too.
-PROJECT_RELEASE_KEYS = ("5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=", "rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=")
+# maintainer, CI 32b3c815ac30ad43, which signs the GitHub releases, and the next CI key
+# a4f6002b0122b131, which takes over from it (firmware/esp32/docs/RELEASE_SIGNING.md, "Rotating the CI
+# key"). They are the default of the boxes' CONFIG_ATALAIA_OTA_RELEASE_KEYS, so the default of
+# [firmware] release_keys too.
+PROJECT_RELEASE_KEYS = ("5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=", "rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=",
+                        "76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=")
 PROJECT_MODE_KEYS = ("I+m3rO++TcVNhvDHzI28pkNA8UGoTJSi84IWQguq4Mo=", "0nMp0OGboGJZUMsbc/ykqkxQFNdmI/a2k4nQ6YsdTIY=")
 
 SECTIONS = {
