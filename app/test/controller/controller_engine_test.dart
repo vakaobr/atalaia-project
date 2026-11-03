@@ -74,10 +74,28 @@ end)
 ''',
 };
 
+/// An output switched after the script's own game.end waits until the boxes
+/// have been told the game ended (engine.py `FieldScript.held_outputs`, as
+/// controller/tests/test_scenario.py's ScenarioTriggerTests): the end's CMD
+/// first, then CMD 12, within the boxes' end grace (EXP-29).
+const _endHornMode = {
+  'mode.yaml':
+      'id: org.test.endhorn\nversion: 0.1.0\nname: End horn\n'
+      'roles:\n  zone: { optional: [output] }\n',
+  'node.lua': 'on("game.start", function() end)\n',
+  'field.lua': '''
+on("zone.captured", function(ev)
+  game.win("red")
+  field.send(ev.node, "output", { capability = "horn", act = "pulse", ms = 5000 })
+end)
+''',
+};
+
 ModeCatalog catalog() => ModeCatalog([
   for (final e in builtinModeFiles.entries) ModeManifest.parse(e.key, e.value),
   ModeManifest.parse('fieldops', _fieldOpsMode),
   ModeManifest.parse('siren', _sirenMode),
+  ModeManifest.parse('endhorn', _endHornMode),
 ]);
 
 void main() {
@@ -265,6 +283,51 @@ void main() {
       {'capability': 'siren', 'act': 'off', 'src': 'field'},
       {'capability': '*', 'act': 'off', 'src': 'field'},
     ]);
+    engine.close();
+  });
+
+  test('an output switched after a win goes after the end\'s CMD', () {
+    final radio = RecordingRadio();
+    final engine = ControllerEngine(
+      core: core,
+      modes: catalog(),
+      transport: radio,
+      clockMs: () => 0,
+    );
+    final game = engine.createGame({
+      'name': 'end horn',
+      'mode_id': 'org.test.endhorn',
+      'assignments': {'4': 'zone'},
+    });
+    final id = game['id']! as int;
+    engine.startGame(id, force: true);
+    radio.sent.clear();
+    final captured = core.encodeEvent(
+      node: 4,
+      seq: 1,
+      tMs: 100,
+      type: 'zone.captured',
+      team: 1,
+      squad: 0,
+      prio: 2,
+      dataJson: null,
+    );
+    engine.onPacket(hdr(id, 4, 1, RfType.event), captured.bytes!, epoch: 1);
+    List<RfCmd> cmds() => [
+      for (final (t, p) in radio.sent)
+        if (t == RfType.cmd) RfCmd.decode(p),
+    ];
+    expect(cmds(), isEmpty); // held until the end
+    engine.tick();
+    expect(engine.getGame(id)['state'], 'ended');
+    expect(cmds().map((c) => c.cmd), [3, 12]);
+    expect(cmds().last.dest, 4);
+    expect(cmds().last.params, {
+      'capability': 'horn',
+      'act': 'pulse',
+      'ms': 5000,
+      'src': 'field',
+    });
     engine.close();
   });
 

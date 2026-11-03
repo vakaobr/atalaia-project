@@ -214,8 +214,10 @@ function Checker:run()
     self:check_objective(i - 1, objectives[i], targeted)
   end
   self:check_cycles(objectives)
+  local switched = {} -- the nodes a trigger switches an output of: used, though no objective targets them
+  self:check_triggers(switched)
   for _, name in ipairs(self.node_names) do
-    if targeted[name] == nil then
+    if targeted[name] == nil and not switched[name] then
       self:warn("nodes." .. name, "unused_node", "no objective targets this node")
     end
   end
@@ -990,6 +992,197 @@ function Checker:check_effect(o, path, oid)
     self:err(where .. ".win", "bad_bool", "true or false")
   end
   self:check_refs(py.get(effect, "reveal"), where .. ".reveal", oid)
+end
+
+-- -- Triggers (draft RFC "The expansion port", EXP-25) --
+
+function Checker:check_triggers(switched)
+  local triggers = py.get(self.m, "triggers")
+  if triggers == nil then
+    return
+  end
+  if not py.is_list(triggers) then
+    self:err("triggers", "bad_triggers", "a list of triggers, each { when, output }")
+    return
+  end
+  if triggers.n > m.TRIGGERS_MAX then
+    self:err("triggers", "too_many", format("at most %d triggers", m.TRIGGERS_MAX))
+  end
+  for i = 1, triggers.n do
+    local t = triggers[i]
+    local path = format("triggers[%d]", i - 1)
+    if not py.is_map(t) then
+      self:err(path, "bad_trigger", "a trigger is a map: { when, output }")
+    else
+      self:unknown_keys(t, { "when", "output" }, path)
+      local moment = self:check_when(py.get(t, "when"), path .. ".when")
+      self:check_output(py.get(t, "output"), path .. ".output", moment, switched)
+    end
+  end
+end
+
+-- What a trigger waits for: its one condition's key (or game's moment, start or end), else nil.
+function Checker:check_when(w, path)
+  local forms = "one of { completed: [ids] } (all of them), { any_completed: [ids] }, "
+    .. "{ failed: id }, { game: start } or { game: end }"
+  if w == nil then
+    self:err(path, "missing", "required: " .. forms)
+    return nil
+  end
+  if not py.is_map(w) or w.n ~= 1 then
+    self:err(path, "bad_when", forms)
+    return nil
+  end
+  local key, value = w.k[1], w.v[1]
+  local where = path .. "." .. str(key)
+  if not in_list(key, m.WHEN_KEYS) then
+    self:err(
+      where,
+      "unknown_key",
+      "unknown key " .. repr(key) .. " (allowed: " .. join(m.WHEN_KEYS) .. ")"
+    )
+    return nil
+  end
+  if key == "game" then
+    if not in_list(value, m.GAME_MOMENTS) then
+      self:err(where, "bad_when", "the game's start or end: " .. join(m.GAME_MOMENTS, " or "))
+      return nil
+    end
+    return value
+  end
+  if key == "failed" then
+    if type(value) ~= "string" or self.ids[value] == nil then
+      self:err(where, "unknown_reference", repr(value) .. " is not an objective id")
+    end
+    return key
+  end
+  if not py.is_list(value) or value.n == 0 then
+    self:err(where, "bad_reference", "a list of objective ids")
+    return key
+  end
+  local seen = {}
+  for j = 1, value.n do
+    local ref = value[j]
+    local at = format("%s[%d]", where, j - 1)
+    if type(ref) ~= "string" or self.ids[ref] == nil then
+      self:err(at, "unknown_reference", repr(ref) .. " is not an objective id")
+    elseif seen[ref] then
+      self:err(at, "bad_reference", repr(ref) .. " is named twice")
+    end
+    if type(ref) == "string" then
+      seen[ref] = true
+    end
+  end
+  return key
+end
+
+-- What a trigger switches: a function of one box, how and for how long. A box switches only the
+-- outputs its admin enabled, and turns them all off when the game pauses or ends (EXP-28, EXP-29).
+function Checker:check_output(o, path, moment, switched)
+  local shape = "{ node, capability, act, seconds }"
+  if o == nil then
+    self:err(path, "missing", "required: " .. shape)
+    return
+  end
+  if not py.is_map(o) then
+    self:err(path, "bad_output", "a map: " .. shape)
+    return
+  end
+  local act = py.get(o, "act")
+  local known = in_list(act, m.ACTS)
+  self:unknown_keys(o, m.OUTPUT_KEYS[known and act or "pattern"], path)
+  local node = py.get(o, "node")
+  if node == nil then
+    self:err(path .. ".node", "missing", "required: a box of the nodes map")
+  else
+    local spec = type(node) == "string" and self.nodes[node] or nil
+    local raw = py.get(self.m, "nodes")
+    if spec == nil then
+      if type(node) ~= "string" or not py.is_map(raw) or not py.has(raw, node) then
+        self:err(path .. ".node", "unknown_node", repr(node) .. " is not in the nodes map")
+      end
+    elseif spec.player then
+      self:err(path .. ".node", "wrong_role", "an output is a box's: " .. node .. " is a player")
+    else
+      switched[node] = true
+    end
+  end
+  local cap = py.get(o, "capability")
+  if cap == nil then
+    self:err(path .. ".capability", "missing", "required: the output's function, like siren")
+  elseif cap == "*" then
+    if known and act ~= "off" then
+      self:err(
+        path .. ".capability",
+        "bad_capability",
+        "* (every output of the box) only with act: off"
+      )
+    end
+  elseif not m.output_function(cap) then
+    self:err(
+      path .. ".capability",
+      "bad_capability",
+      "an output's function: "
+        .. join(m.FUNCTIONS)
+        .. " (a second one of a box: siren.2), or out.1 to out.9; * with act: off"
+    )
+  end
+  if act == nil then
+    self:err(path .. ".act", "missing", "required: " .. join(m.ACTS, ", "))
+  elseif type(act) == "boolean" then
+    -- YAML 1.1 reads a bare on or off as true or false.
+    self:err(
+      path .. ".act",
+      "bad_act",
+      'write it in quotes ("on", "off"): YAML reads on and off as true and false'
+    )
+  elseif not known then
+    self:err(path .. ".act", "bad_act", "one of " .. join(m.ACTS))
+  end
+  if not known or act == "off" then
+    return
+  end
+  local seconds = py.get(o, "seconds")
+  if seconds == nil then
+    self:err(
+      path .. ".seconds",
+      "missing",
+      format(
+        "required: how long, 1 to %d seconds (a box never keeps an output on unbounded)",
+        m.OUTPUT_SECONDS_MAX
+      )
+    )
+  elseif not py.int_in(seconds, 1, m.OUTPUT_SECONDS_MAX) then
+    self:err(
+      path .. ".seconds",
+      "bad_seconds",
+      format("whole seconds, 1 to %d", m.OUTPUT_SECONDS_MAX)
+    )
+  elseif moment == "end" and seconds > m.END_GRACE_S then
+    self:err(
+      path .. ".seconds",
+      "bad_seconds",
+      format("after the game's end a box lets an output run for %d s at most", m.END_GRACE_S)
+    )
+  end
+  if act == "pattern" then
+    for _, key in ipairs({ "on_ms", "off_ms" }) do
+      local v = py.get(o, key)
+      if v == nil then
+        self:err(
+          path .. "." .. key,
+          "missing",
+          "required: a pattern's time on and off, in milliseconds"
+        )
+      elseif not py.int_in(v, m.PATTERN_MS_MIN, m.PATTERN_MS_MAX) then
+        self:err(
+          path .. "." .. key,
+          "bad_pattern",
+          format("milliseconds, %d to %d", m.PATTERN_MS_MIN, m.PATTERN_MS_MAX)
+        )
+      end
+    end
+  end
 end
 
 -- -- The dependency graph --

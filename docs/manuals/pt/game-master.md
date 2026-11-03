@@ -276,6 +276,8 @@ Marca **Códigos** em **Modificadores**. Em **Códigos**, escreve `algarismos:ti
 
 Um *cenário* é um jogo à medida, com objetivos (capturar, código, etiquetas, bomba, escolta, defesa, sobrevivência). Abre **Cenários**, escreve ou cola o manifesto em **YAML** (ou usa **Blocos**), toca em **Verificar** e depois em **Instalar**. Depois, em **Jogo**, escolhe o cenário em **Modo ou predefinição** e marca **Objetivos**. Dá a cada caixa um dos nomes do cenário no separador **Juntar**. O [guia do controlador](../../../controller/README.md#scenarios) (em inglês) explica o formato.
 
+Um cenário também pode acionar as saídas das caixas (uma sirene, um estroboscópio, uma máquina de fumo) com **gatilhos**: quando todos os objetivos de uma lista estão cumpridos, quando o primeiro deles o está, quando um falha, ou quando o jogo começa ou acaba, uma saída de uma caixa indicada liga durante alguns segundos, pisca ou desliga, uma vez por jogo. Em **Blocos** estão na categoria **Gatilhos**: um bloco "quando" com um bloco de saída dentro (a função como a caixa lhe chama, por exemplo `siren`, o nome da caixa no cenário e a duração, no máximo 600 s). A caixa só aciona as saídas ativadas na própria caixa com o PIN de administração (vê [Saídas](#saídas)), desliga-as todas quando o jogo é posto em pausa ou acaba, e depois do fim deixa uma saída ligada no máximo 10 s (uma buzina de fim de jogo). Uma caixa aceita um novo comando de saída no máximo de 2 em 2 s, por isso dois gatilhos na mesma caixa ao mesmo tempo chegam com 2 s de intervalo.
+
 ### Predefinições
 
 Uma *predefinição* é um modo com as suas definições guardadas. Abre **Predefinições**, toca em **Nova predefinição**, escolhe um modo e os parâmetros, dá-lhe um nome e toca em **Guardar**.
