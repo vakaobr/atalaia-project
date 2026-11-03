@@ -537,7 +537,10 @@ slice of PE24.
 
 **Tests.** The C codecs and checks against the shared vectors (a valid
 release, every refusal above, a tampered archive, a revoked or unknown
-key, the reduced tier); `box_host` runs a fetch from a fake controller;
+key, the reduced tier); `box_host` runs a fetch from a fake controller
+(`--mode-source DIR`) and, since 2026-11-02, from the real controller over
+HTTPS with the field CA (`--mode-source https`, the firmware's own fetch
+code and CA check; `controller/tests/test_box_mode_fetch_e2e.py`);
 the controller's tests (offer, report, start guard, the console's
 browser tests); the simulator's join codec with keys 16 and 17. On real
 boxes: HW3.
