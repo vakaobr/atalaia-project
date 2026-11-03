@@ -234,7 +234,7 @@ Five reference builds cover v1, all from off-the-shelf parts with no custom PCB 
 | **Satellite** | Small secondary point, beacon, "power plant" | ESP32-S3 LoRa board, 2 buttons, LED ring, piezo buzzer, 1S 18650 | €30–40 |
 | **Android hybrid prop** | Rich-UI terminal, map, QR, 4G | Repurposed phone or tablet, rugged case, ESP32 I/O pod (LoRa + buttons + LEDs + siren) over USB-OTG or BLE | €0–120 device + €35 pod |
 | **Field controller** | Runs cross-device logic, API, GM web app | Raspberry Pi 4/5 (Zero 2 W for small fields), SX1262 LoRa HAT, optional GPS, optional 4G USB modem, 10–20 Ah power bank | €80–150 |
-| **Target addon** | Hit-scoring target for any box | Steel or polycarbonate plate, piezo sensor, small MCU (RP2040 or ATtiny) for hit detection, WS2812 ring | €20–30 |
+| **Target addon** | Hit-scoring target for any box, on its expansion port | Steel or polycarbonate plate, piezo sensor, small MCU (an RP2040 board is the reference, decision EXP-15) for hit detection, WS2812 ring | €20–30 |
 
 Optional modules for any ESP32 build: GPS (u-blox M10 class), IMU (LSM6DS3 class) for VIP transport, 4G modem (SIM7600 / A7670 class) for stand-alone internet.
 
@@ -263,9 +263,11 @@ Mode manifests declare `min_tier` (`reduced` or `full`). The GM console shows ea
 
 Use the legal LoRa band for the region: EU868 in Portugal and the rest of Europe, US915 in the Americas, AS923 in much of Asia. The firmware ships a region table and refuses to transmit until a region is chosen.
 
-### Addon bus
+### Expansion port and simple output
 
-Addons plug into a waterproof 5-pin M12 connector carrying 3.3 V only: the board's 3.3 V (at most 25 mA for the addon), GND, SDA and SCL of the box's 3.3 V I2C bus; the fifth pin is not connected. There is no 5 V on the port and no interrupt line: the box polls the addon every 20 ms, and an addon that needs more power (its own lights) brings its own cell (corrected 2026-10-23, decisions P5J-15 to P5J-21; `hardware/target-addon/BUILD.md`). Each addon carries its own small MCU that answers an "identify" request with a capability descriptor, so the host needs no driver changes. I2C is reliable to about 1–2 m; longer runs or remote targets use a Satellite or thin node over LoRa or BLE instead.
+Modules plug into the **expansion port**, a waterproof 5-pin M12 connector carrying 3.3 V only: the board's 3.3 V (at most 25 mA for the module's logic), GND, SDA and SCL of the box's 3.3 V I2C bus; the fifth pin is not connected. There is no 5 V on the port and no interrupt line: the box polls an input module every 20 ms, and loads never take power from the box: a module that switches a siren or needs its own lights brings its own supply (corrected 2026-10-23, decisions P5J-15 to P5J-21; `hardware/target-addon/BUILD.md`). A hot-swap I2C buffer and ESD protection on the box's side keep a wet or shorted cable from taking the box's own bus down. Each module carries its own small MCU that answers a fixed register map at an address in 0x58-0x5F (who it is, its channels, and one status read with its oldest input event and its outputs' state), so the host needs no driver per module, and every output a module drives is **leased**: it turns itself off within 1.5 s when the box stops refreshing it ([protocol/expansion-port.md](../protocol/expansion-port.md), the draft RFC "The expansion port"). I2C is reliable to about 1–2 m; longer runs or remote targets use a Satellite or thin node over LoRa or BLE instead.
+
+Outputs have a second, simpler path, and it is the preferred one (decision EXP-31): the **simple output**, one free GPIO sending an RC-servo signal to an off-the-shelf RC relay switch, which opens its relay when the signal stops. It gives one channel per GPIO, needs no processor to flash, and cannot tell whether anything is plugged in. Its signal, pins and wiring are still being decided (the RFC's open questions 17 to 21). Inputs always use the expansion port.
 
 ### Enclosure and power guidance
 
@@ -311,10 +313,15 @@ On boot and on request, each node announces a descriptor:
 | `qr` | `scan(text)` | — | Android camera, Pi camera |
 | `gps` | `fix(lat, lon, acc)` | `rate(s)` | GNSS module, Android location |
 | `imu` | `moved`, `tilt(deg)`, `shock(g)` | `sensitivity` | IMU module, Android sensors |
-| `hit` | `hit(strength)`: scripts get `hit.hit` with `strength` 0-255 | `arm`, `disarm` | Target addon (draft RFC 0000 Amendment 1, decision P4R4) |
-| `output` | — | `on`, `off`, `pulse(ms)` | Siren, smoke relay, strobe |
+| `hit` | `hit(strength)`: scripts get `hit.hit` with `strength` 0-255 (and `channel` on a node with more than one) | `arm`, `disarm` | Target addon (draft RFC 0000 Amendments 1 and 5, decision P4R4) |
+| `output` | — | `on(max_ms)`, `off`, `pulse(ms)`, `pattern(on_ms, off_ms, ms)` | Siren, smoke remote, strobe: a simple output or an expansion module's channel (draft RFC 0000 Amendment 5) |
 | `battery` | `level(%)`, `low` | — | Fuel gauge, Android battery API |
 | `tamper` | `opened`, `closed` | — | Enclosure switch of an I/O pod (draft RFC 0000, decision PF8) |
+| `contact` | `closed`, `opened` | — | Reserved: a tripwire, pressure mat or door on the expansion port, added with its first module |
+
+Each type has a number, the one a node lists in its HELLO (`protocol/schema/capabilities.yaml`, generated into the C, Python and Dart tables): `button` 1, `keypad` 2, `display` 3, `led` 4, `audio` 5, `nfc` 6, `qr` 7, `gps` 8, `imu` 9, `hit` 10, `output` 11, `battery` 12, `tamper` 13, `contact` 14 (reserved). A receiver ignores a number it does not know.
+
+An output's id names its function, so a script says what it wants and the box finds the channel: `cap("siren"):pulse(10000)` is the same call for every output path, and does nothing on a box without a siren. A simple output's descriptor says `"feedback": false`: the controller shows it as "not checked".
 
 New types are added by RFC (section 13), never ad hoc, so scripts stay portable.
 
@@ -1037,7 +1044,7 @@ In Europe, LoRa use falls under ETSI EN 300 220: most EU868 channels allow 25 mW
 - **Prop appearance**: bright colours, "GAME PROP" labels, no pipe-and-wire look. Props resembling explosive devices can trigger police responses in transport or in public.
 - **Transport and storage**: labelled cases; never leave props unattended outside the field.
 - **Batteries**: protected Li-ion cells with a BMS, supervised charging, fire-safe bags for storage.
-- **Outputs**: the relay output is for commercial game smoke, strobes and sirens only, used within local law.
+- **Outputs**: switched outputs are for commercial game smoke, strobes, lights and sirens only, used within local law: safety extra-low voltage loads on their own supply (24 V DC, 2 A per channel at most), never mains, smoke machines only through a documented low-voltage input, never pyrotechnics. Off is the safe state: outputs stay disabled on a box until its admin enables them at the box, turn off when a game pauses or ends and when the box stops (a module's lease, a simple output's signal loss), and only game logic and the GM on the field switch them on; a remote GM may only switch them off, players never (decisions EXP-17, EXP-27 to EXP-29).
 - **Sound levels**: siren and speaker volume capped by default; louder settings require the admin PIN.
 
 ### Liability

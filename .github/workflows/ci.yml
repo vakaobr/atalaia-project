@@ -465,6 +465,8 @@ jobs:
         run: python tools/pod_config_vectors.py --check
       - name: The Field Box's iBeacon vectors are up to date
         run: python tools/box_beacon_vectors.py --check
+      - name: The expansion port's vectors are up to date
+        run: python tools/expansion_vectors.py --check
       - name: The scenario compiler's Unicode table is up to date
         run: python tools/scenario_unicode.py --check
       - name: The registry's JSON Schemas accept their examples and reject the invalid ones

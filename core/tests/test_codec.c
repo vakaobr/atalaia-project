@@ -48,6 +48,22 @@ static void test_tables(void)
         }
     }
 
+    /* Capability type ids (protocol/schema/capabilities.yaml, decision EXP-20). */
+    const atalaia_capability_type_def_t *cap = atalaia_capability_type("output");
+    CHECK(cap != NULL && cap->id == ATALAIA_CAP_OUTPUT && cap->id == 11 && !cap->reserved);
+    CHECK(atalaia_capability_type_by_id(ATALAIA_CAP_HIT) != NULL);
+    CHECK(strcmp(atalaia_capability_type_by_id(10)->name, "hit") == 0);
+    CHECK(atalaia_capability_type("contact") != NULL &&
+          atalaia_capability_type("contact")->reserved);
+    CHECK(atalaia_capability_type("siren") == NULL); /* a capability id, not a type */
+    CHECK(atalaia_capability_type(NULL) == NULL);
+    CHECK(atalaia_capability_type_by_id(0) == NULL);
+    CHECK(atalaia_capability_type_by_id(99) == NULL);
+    for (size_t i = 0; i < atalaia_capability_type_def_count; i++) {
+        const atalaia_capability_type_def_t *c = &atalaia_capability_type_defs[i];
+        CHECK(atalaia_capability_type_by_id(c->id) == c && atalaia_capability_type(c->name) == c);
+    }
+
     CHECK(strcmp(atalaia_msg_type_name(ATALAIA_MSG_EVENT), "EVENT") == 0);
     CHECK(atalaia_msg_type_name(0) == NULL);
     CHECK(ATALAIA_RF_HEADER_BYTES == 9);

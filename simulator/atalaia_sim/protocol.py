@@ -20,6 +20,11 @@ class EventDef(NamedTuple):
     gm_only: tuple[str, ...] = ()  # data fields only staff may read (decision M5-1)
 
 
+class CapabilityType(NamedTuple):
+    id: int  # the number in HELLO's capabilities
+    reserved: bool  # its id is fixed, but no node lists it yet
+
+
 class PayloadField(NamedTuple):
     key: int
     type: str
@@ -119,6 +124,10 @@ DATA_FIELDS = {
     'step': DataField(39, 'integer', False),
     'by_node': DataField(40, 'integer', False),
     'by_name': DataField(41, 'string', False),
+    'modules': DataField(42, 'string', False),
+    'capability': DataField(43, 'string', False),
+    'ms': DataField(44, 'integer', False),
+    'source': DataField(45, 'string', False),
 }
 
 EVENTS = {
@@ -176,6 +185,27 @@ EVENTS = {
     'progressive.activated': EventDef(54, 'critical', ('zone', 'step')),
     'progressive.completed': EventDef(55, 'critical', ('zone', 'step')),
     'node.setup_applied': EventDef(56, 'normal', ('kind',)),
+    'node.modules': EventDef(57, 'normal', ('modules',)),
+    'node.module_lost': EventDef(58, 'critical', ('modules', 'reason')),
+    'output.switched': EventDef(59, 'normal', ('capability', 'ms', 'source')),
+}
+
+# Capability type ids: what HELLO lists in its capabilities (key 6, decision EXP-20).
+CAPABILITY_TYPES = {
+    'button': CapabilityType(1, False),
+    'keypad': CapabilityType(2, False),
+    'display': CapabilityType(3, False),
+    'led': CapabilityType(4, False),
+    'audio': CapabilityType(5, False),
+    'nfc': CapabilityType(6, False),
+    'qr': CapabilityType(7, False),
+    'gps': CapabilityType(8, False),
+    'imu': CapabilityType(9, False),
+    'hit': CapabilityType(10, False),
+    'output': CapabilityType(11, False),
+    'battery': CapabilityType(12, False),
+    'tamper': CapabilityType(13, False),
+    'contact': CapabilityType(14, True),
 }
 
 PAYLOAD_FIELDS = {

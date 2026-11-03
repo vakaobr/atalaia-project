@@ -76,6 +76,10 @@ data_fields:
   step:          { key: 39, type: integer, doc: "a box's place in a sequence of boxes, from 1 (Progressive Domination)" }
   by_node:       { key: 40, type: integer, doc: "node id of the box whose game.end ended the game (the controller's own game.end only)" }
   by_name:       { key: 41, type: string,  doc: "name of that box, when it has one" }
+  modules:       { key: 42, type: string,  doc: "a box's expansion modules and simple outputs, as compact text (protocol/expansion-port.md)" }
+  capability:    { key: 43, type: string,  doc: "a capability id: an output's function, such as siren, smoke or out.2" }
+  ms:            { key: 44, type: integer, doc: "milliseconds; for output.switched how long the output is on, 0 when it is turned off" }
+  source:        { key: 45, type: string,  doc: "who switched an output: script, field, gm or box_admin" }
 
 # id: CBOR value of the type field (1-23 take one byte). prio: the default
 # priority. data: the fields this event may carry besides the common ones.
@@ -155,3 +159,12 @@ events:
   # kind is the setup's kind (capture, code, tags, bomb, off, done, failed). Normal priority: the scenario re-sends its setup
   # until it hears this, and stops after a few tries for a box that never does (an older firmware).
   node.setup_applied:         { id: 56, prio: normal,    data: [kind] }
+  # The expansion port and the simple output (draft RFC "The expansion port", decisions EXP-21, EXP-36;
+  # protocol/expansion-port.md). node.modules: what a box has plugged in, sent after its HELLO is acknowledged,
+  # whenever a module comes or goes and when its admin changes a simple output (modules: the compact text, at
+  # most 100 bytes). node.module_lost: a module the box had during a running game stopped answering (reason
+  # no_answer or bad_ident; never for a simple output, which cannot be checked). output.switched: an output
+  # turned on (ms: for how long), or off before its time (ms 0), and by whom (source).
+  node.modules:               { id: 57, prio: normal,    data: [modules] }
+  node.module_lost:           { id: 58, prio: critical,  data: [modules, reason] }
+  output.switched:            { id: 59, prio: normal,    data: [capability, ms, source] }

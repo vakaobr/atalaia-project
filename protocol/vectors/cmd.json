@@ -51,6 +51,33 @@
         "dest": 7
       },
       "cbor": "a3010b02a2637372631904d26565706f636819a0280307"
+    },
+    {
+      "name": "cmd_output_pulse",
+      "fields": {
+        "cmd": 12,
+        "params": {"capability": "siren", "act": "pulse", "ms": 10000, "src": "field"},
+        "dest": 7
+      },
+      "cbor": "a3010c02a46a6361706162696c69747965736972656e636163746570756c7365626d7319271063737263656669656c640307"
+    },
+    {
+      "name": "cmd_output_pattern",
+      "fields": {
+        "cmd": 12,
+        "params": {"capability": "strobe", "act": "pattern", "ms": 20000, "on_ms": 500, "off_ms": 500, "src": "field"},
+        "dest": 7
+      },
+      "cbor": "a3010c02a66a6361706162696c697479667374726f626563616374677061747465726e626d73194e20656f6e5f6d731901f4666f66665f6d731901f463737263656669656c640307"
+    },
+    {
+      "name": "cmd_output_every_output_off",
+      "fields": {
+        "cmd": 12,
+        "params": {"capability": "*", "act": "off", "src": "gm"},
+        "dest": 7
+      },
+      "cbor": "a3010c02a36a6361706162696c697479612a63616374636f66666373726362676d0307"
     }
   ],
   "invalid": [
@@ -59,5 +86,35 @@
       "cbor": "a202a00305",
       "reason": "missing required field cmd (key 1)"
     }
-  ]
+  ],
+  "output_params": {
+    "description": "CMD opcode 12, output (RFC 0001 Amendment 26; draft RFC 'The expansion port', decision EXP-23): the params a box takes and the ones it refuses, whatever the channel (a channel's own floors and limits come after: protocol/expansion-port.md). Unknown keys are ignored. Checked by simulator/tests/test_expansion.py against the Python reference (simulator/atalaia_sim/expansion.py); the box's handler, both controllers and the app of later increments check them too.",
+    "valid": [
+      {"name": "pulse", "params": {"capability": "siren", "act": "pulse", "ms": 10000, "src": "field"}},
+      {"name": "on_for_at_most_a_minute", "params": {"capability": "smoke", "act": "on", "ms": 60000, "src": "field"}},
+      {"name": "longest", "params": {"capability": "light", "act": "on", "ms": 600000, "src": "field"}},
+      {"name": "off", "params": {"capability": "siren", "act": "off", "src": "gm"}},
+      {"name": "every_output_off", "params": {"capability": "*", "act": "off", "src": "gm"}},
+      {"name": "pattern", "params": {"capability": "strobe", "act": "pattern", "ms": 20000, "on_ms": 500, "off_ms": 500, "src": "field"}},
+      {"name": "pattern_shortest", "params": {"capability": "out.4", "act": "pattern", "ms": 1, "on_ms": 10, "off_ms": 10000, "src": "gm"}},
+      {"name": "second_siren", "params": {"capability": "siren.2", "act": "pulse", "ms": 1, "src": "field"}},
+      {"name": "unknown_key_ignored", "params": {"capability": "siren", "act": "off", "src": "field", "why": "test"}}
+    ],
+    "refused": [
+      {"name": "on_without_ms", "params": {"capability": "siren", "act": "on", "src": "field"}, "reason": "ms is required for on, pulse and pattern"},
+      {"name": "pulse_without_ms", "params": {"capability": "siren", "act": "pulse", "src": "field"}, "reason": "ms is required for on, pulse and pattern"},
+      {"name": "ms_0", "params": {"capability": "siren", "act": "pulse", "ms": 0, "src": "field"}, "reason": "ms is 1 to 600000"},
+      {"name": "ms_too_long", "params": {"capability": "siren", "act": "on", "ms": 600001, "src": "field"}, "reason": "ms is 1 to 600000"},
+      {"name": "ms_not_an_integer", "params": {"capability": "siren", "act": "pulse", "ms": "10000", "src": "field"}, "reason": "ms is an integer"},
+      {"name": "every_output_on", "params": {"capability": "*", "act": "on", "ms": 1000, "src": "field"}, "reason": "* only with off"},
+      {"name": "unknown_act", "params": {"capability": "siren", "act": "toggle", "src": "field"}, "reason": "act is on, off, pulse or pattern"},
+      {"name": "no_capability", "params": {"act": "off", "src": "gm"}, "reason": "capability is required"},
+      {"name": "capability_upper_case", "params": {"capability": "Siren", "act": "off", "src": "gm"}, "reason": "a capability id is 1-23 bytes of a-z 0-9 . _ -"},
+      {"name": "no_src", "params": {"capability": "siren", "act": "off"}, "reason": "src is field or gm"},
+      {"name": "src_from_a_player", "params": {"capability": "siren", "act": "pulse", "ms": 1000, "src": "player"}, "reason": "src is field or gm"},
+      {"name": "pattern_without_off_ms", "params": {"capability": "strobe", "act": "pattern", "ms": 20000, "on_ms": 500, "src": "field"}, "reason": "on_ms and off_ms are required for pattern"},
+      {"name": "pattern_on_ms_9", "params": {"capability": "strobe", "act": "pattern", "ms": 20000, "on_ms": 9, "off_ms": 500, "src": "field"}, "reason": "on_ms and off_ms are 10 to 10000"},
+      {"name": "pattern_off_ms_too_long", "params": {"capability": "strobe", "act": "pattern", "ms": 20000, "on_ms": 500, "off_ms": 10001, "src": "field"}, "reason": "on_ms and off_ms are 10 to 10000"}
+    ]
+  }
 }
