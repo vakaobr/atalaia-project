@@ -148,5 +148,14 @@ void main() {
     expect(find.text('red captured Bridge'), findsOneWidget);
     expect(isPlayerFeedEvent('node.setup_applied'), isFalse);
     expect(isPlayerFeedEvent('zone.captured'), isTrue);
+    // A box's modules and outputs (draft RFC "The expansion port", EXP-21) are
+    // the staff's.
+    for (final type in [
+      'node.modules',
+      'node.module_lost',
+      'output.switched',
+    ]) {
+      expect(isPlayerFeedEvent(type), isFalse, reason: type);
+    }
   });
 }

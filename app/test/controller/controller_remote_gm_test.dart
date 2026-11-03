@@ -324,6 +324,62 @@ void main() {
       expect(r.remoteCommands(), hasLength(5));
     });
 
+    test('every output off, but never one on (EXP-27)', () {
+      final r = remote();
+      final g = game();
+      engine.startGame(g['id']! as int, force: true);
+      final out = r.handleCommand(command(g, 'outputs_off'));
+      expect(out['code'], 'done', reason: '$out');
+      final cmds = [
+        for (final (t, p) in radio.sent)
+          if (t == RfType.cmd) RfCmd.decode(p),
+      ];
+      expect(cmds.last.cmd, 12);
+      expect(cmds.last.params, {'capability': '*', 'act': 'off', 'src': 'gm'});
+      expect(cmds.last.dest, isNull);
+      final sent = radio.sent.length;
+      for (final (what, params) in [
+        ('output', {'node': 4, 'capability': 'siren', 'act': 'on', 'ms': 5000}),
+        ('outputs_off', {'node': 4}),
+      ]) {
+        expect(r.handleCommand(command(g, what, params))['code'], 'invalid');
+      }
+      expect(radio.sent.length, sent);
+    });
+
+    test('a start refused for a box without a capability its role requires '
+        '(EXP-21)', () {
+      final r = remote();
+      final g = game(joined: false);
+      engine.onPacket(
+        RfHeader.v1(
+          gameId: g['id']! as int,
+          source: 4,
+          seq: 0,
+          hopLimit: 2,
+          type: RfType.hello,
+        ),
+        const RfHello(
+          nodeName: 'box-4',
+          platform: 1,
+          fwVersion: '0.7.0',
+          coreVersion: '0.7.0',
+          tier: 0,
+          capabilities: [3, 4],
+          transports: 1,
+          epoch: 1,
+        ).encode(),
+        epoch: 1,
+      );
+      final out = r.handleCommand(command(g, 'start'));
+      expect(out['code'], 'conflict');
+      expect(out['missing'], ['box-4: team_input']);
+      expect(state(g), 'ready');
+      final forced = r.handleCommand(command(g, 'start', {'force': true}));
+      expect(forced['code'], 'done', reason: '$forced');
+      expect(forced['detail'], contains('box-4: team_input'));
+    });
+
     test('another game, a stale or a repeated command', () {
       final r = remote();
       final g = game();

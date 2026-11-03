@@ -1290,7 +1290,17 @@ Json checkField(Object? raw) {
 
 // --- the remote GM on the stream (plan phase 19; P4R12) -------------------
 
-const remoteCommands = ['start', 'pause', 'resume', 'end', 'message', 'mode'];
+/// `outputs_off`: every output of every box of the live game off (draft RFC
+/// "The expansion port", EXP-27: a remote GM may only switch outputs off).
+const remoteCommands = [
+  'start',
+  'pause',
+  'resume',
+  'end',
+  'message',
+  'mode',
+  'outputs_off',
+];
 const _messageMax = 100;
 const _reasonMax = 64;
 const _usernameMax = 64;
@@ -1414,7 +1424,7 @@ Json checkCommandParams(
     case 'start':
       _keys(params, path, const [], ['force']);
       if (params.containsKey('force')) _bool(params['force'], '$path.force');
-    case 'resume':
+    case 'resume' || 'outputs_off':
       _keys(params, path, const []);
     case 'pause' || 'end':
       _keys(params, path, const [], ['reason']);
