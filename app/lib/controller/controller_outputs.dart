@@ -16,7 +16,10 @@
 ///   protocol/schema/capabilities.yaml's `role_names`; any other name that is
 ///   not a type is never checked. Only nodes whose HELLO lists a type this
 ///   controller knows are checked; an enabled simple output counts as present
-///   and is named "not checked".
+///   and is named "not checked". A role's `outputs:` (EXP-22, increment 4)
+///   names the functions its mode switches: a box with outputs (its HELLO
+///   lists `output` and its `node.modules` came) but none of them is the
+///   warning `outputs`.
 /// - **CMD 12** (EXP-23, EXP-27, EXP-30): the params a GM's request or a field
 ///   script's `field.send(node, "output", {...})` become, checked as a box
 ///   checks them (`output_params_problem`), `src` set by the controller, and
@@ -250,6 +253,20 @@ Map<String, List<Map<String, Object?>>> checkNodes(
         'capabilities': lacking,
         'text': '${n['name']} (${n['role']}) has no ${lacking.join(', ')}',
       });
+    }
+    final wanted = _names(spec['outputs']);
+    if (wanted.isNotEmpty && types.contains('output') && n['modules'] != null) {
+      final fitted = outputCaps(n['modules']);
+      if (!wanted.any(fitted.contains)) {
+        warnings.add({
+          'code': 'outputs',
+          ...who,
+          'capabilities': wanted,
+          'text':
+              '${n['name']} (${n['role']}) has none of the outputs the mode '
+              'would switch: ${wanted.join(', ')}',
+        });
+      }
     }
   }
   return {

@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The master's siren sounds when one team holds every satellite, once until that team loses one
+params: { siren_all_s: 10 }
+nodes: { master: master, alpha: satellite, bravo: satellite }
+steps:
+  - hold: { node: alpha, team: red, s: 3 }
+  - expect_output: { node: master, capability: siren, active: false }
+  - hold: { node: bravo, team: red, s: 3 }           # 3 -> 6 s: red holds both
+  - expect: { type: zone.captured, node: bravo, team: red, at: 6 }
+  - expect: { type: output.switched, node: master, at: 6, data: { capability: siren, ms: 10000, source: field } }
+  - expect_output: { node: master, capability: siren, active: true, left_s: 10, source: field }
+  - wait: 5
+  - expect_no: output.switched                       # still red's: not again
+  - wait: 5
+  - expect_output: { node: master, capability: siren, active: false }
+  - hold: { node: alpha, team: blue, s: 3 }          # 16 -> 19 s: blue takes one, nobody holds both
+  - wait: 5
+  - expect_no: output.switched
+  - hold: { node: bravo, team: blue, s: 3 }          # 24 -> 27 s: blue holds both
+  - expect: { type: output.switched, node: master, at: 27, data: { capability: siren, ms: 10000 } }
+  - expect_output: { node: master, capability: siren, active: true }
+  - expect_no: script.error

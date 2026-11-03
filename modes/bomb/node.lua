@@ -99,6 +99,23 @@ end
 
 on("game.start", show_standby)
 
+-- The explosion fires the box's smoke and siren outputs (params.smoke_s and params.siren_s
+-- seconds; 0, or a preset from before they existed: off). The explosion ends the game, and the
+-- box turns every output off when a game ends, before its game.end handlers run: what they
+-- switch on is the end's grace, at most 10 s. A box without such an output ignores the call.
+on("game.end", function()
+  if s.phase ~= "exploded" then
+    return
+  end
+  local smoke, siren = params.smoke_s or 0, params.siren_s or 0
+  if smoke > 0 then
+    cap("smoke"):pulse(smoke * 1000)
+  end
+  if siren > 0 then
+    cap("siren"):pulse(siren * 1000)
+  end
+end)
+
 -- After a power loss a box picked for a game on its own gives the state back
 -- (decision HB-7): an armed bomb goes on with the fuse it had left (or
 -- explodes at once when it ran out meanwhile), and the screen shows the

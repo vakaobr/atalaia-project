@@ -184,12 +184,23 @@ class CreateGame extends Component {
             ${mode && html`<details open=${!preset}>
                 <summary>${t('game.params')}</summary>
                 <p class="muted small">${modeText(mode, 'description')}</p>
+                ${modeOutputs(mode)}
                 <${ParamFields} schema=${schema} labels=${labels} values=${values} teams=${teams} prefix="game"
                     onChange=${(v) => this.setState({ values: v })} />
             </details>`}
             <button type="submit" data-testid="game-create">${t('game.create')}</button>
         </form>`;
     }
+}
+
+/** The outputs a mode's roles say they switch (a role's `outputs:`, draft RFC "The expansion port",
+ * EXP-22): "Bomb / Rush would switch these outputs on a box that has them: smoke, siren". */
+function modeOutputs(mode) {
+    const fns = [...new Set(Object.values(mode.roles || {})
+        .flatMap((r) => (r && Array.isArray(r.outputs) ? r.outputs : [])))];
+    if (!fns.length) return null;
+    return html`<p class="muted small" data-testid="game-mode-outputs">${t('game.mode_outputs',
+        { mode: modeText(mode, 'name'), list: fns.join(', ') })}</p>`;
 }
 
 class Broadcast extends Component {

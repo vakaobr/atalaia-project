@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: With the outputs off (the default), or none fitted, an explosion fires nothing and the game ends as before
+params: { fuse_s: 30 }
+steps:
+  - hold: { team: red, s: 5 }
+  - wait: 30
+  - expect: { type: bomb.exploded, team: red, at: 35 }
+  - expect: { type: game.end, at: 35, data: { reason: win, winner: red } }
+  - expect_no: output.switched
+  - expect_output: { capability: smoke, active: false }
+  - expect_output: { capability: siren, active: false }
+  - expect_status: ended

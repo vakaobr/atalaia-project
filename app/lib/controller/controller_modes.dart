@@ -68,6 +68,16 @@ final _fileName = RegExp(
 final _modeId = RegExp(r'^[a-z0-9][a-z0-9_-]*(\.[a-z0-9][a-z0-9_-]*)+\n?$');
 final _commandName = RegExp(r'^[a-z][a-z0-9_]{0,23}\n?$');
 
+/// The output functions a role may name in its `outputs:` (draft RFC "The
+/// expansion port", EXP-19, EXP-22; atalaia_sim.mode OUTPUT_FUNCTION): the
+/// uses a box's admin gives an output, and a second one with the same use.
+final outputFunction = RegExp(
+  r'^(siren|strobe|smoke|light|horn|out\.[1-9])(\.[2-9])?$',
+);
+
+/// At most this many functions in a role's `outputs:`.
+const outputsMax = 8;
+
 /// A role package inside a composed game: the nodes with one of its roles
 /// run it alone (atalaia_sim.mode `RolePart`).
 final class RolePart {
@@ -358,6 +368,42 @@ void _checkScoring(Map<String, Object?> manifest, String where) {
   return (values[0] * 1000, values[1]);
 }
 
+/// A role's optional `outputs:` (atalaia_sim.mode `check_roles`, EXP-22): the
+/// output functions its script switches, 1-8 different ones of
+/// [outputFunction], with `output` in the role's `requires:` (it cannot play
+/// without one) or `optional:` (it plays without), which the start check
+/// looks at. Other role keys are not checked here.
+void checkRoles(Object? roles, String where) {
+  if (roles is! Map) return;
+  for (final e in roles.entries) {
+    final spec = e.value;
+    if (spec is! Map || !spec.containsKey('outputs')) continue;
+    final outputs = spec['outputs'];
+    if (outputs is! List ||
+        outputs.isEmpty ||
+        outputs.length > outputsMax ||
+        !outputs.every((o) => o is String && outputFunction.hasMatch(o)) ||
+        outputs.toSet().length != outputs.length) {
+      throw ModeException(
+        '$where: role ${e.key}: outputs is a list of 1-$outputsMax different '
+        'output functions: siren, strobe, smoke, light, horn or out.1-out.9 '
+        '(siren.2 for a second)',
+      );
+    }
+    final listed = [
+      for (final key in ['requires', 'optional'])
+        if (spec[key] is List) ...(spec[key] as List),
+    ];
+    if (!listed.contains('output')) {
+      throw ModeException(
+        '$where: role ${e.key} lists outputs, so it needs output in its '
+        'requires: (it cannot play without one) or its optional: (it plays '
+        'without)',
+      );
+    }
+  }
+}
+
 /// The optional parts of a manifest: kind, commands and i18n
 /// (atalaia_sim.mode `check_manifest`).
 void checkManifest(Map<String, Object?> manifest, String where) {
@@ -396,6 +442,7 @@ void checkManifest(Map<String, Object?> manifest, String where) {
     }
   }
   _checkScoring(manifest, where);
+  checkRoles(manifest['roles'], where);
   final commands = manifest['commands'];
   if (commands != null) {
     if (commands is! Map) {

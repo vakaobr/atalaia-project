@@ -437,6 +437,8 @@ class LiveGame:
                     "screen": screen,
                     "audio": audio,
                     "outputs": list(outputs.values()),
+                    # The box's switched outputs (a siren, smoke), as its output layer has them now.
+                    "switched": sim.outputs(name).states(sim.time_ms),
                     "input": vnode.last_input,
                     "inputs": node_inputs(sim.mode, vnode.role),
                     "hold": None if hold is None else {"team": hold.team, "ms": sim.time_ms - hold.start_ms},

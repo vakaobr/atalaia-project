@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The master box's own longest time for its siren wins, and the game's end turns the siren off
+params: { siren_all_s: 120 }
+nodes: { master: master, alpha: satellite }
+outputs: { master: { siren: 20 } }
+steps:
+  - hold: { node: alpha, team: red, s: 3 }
+  - expect: { type: output.switched, node: master, at: 3, data: { capability: siren, ms: 20000, source: field } }
+  - expect_output: { node: master, capability: siren, active: true, left_s: 20 }
+  - wait: 5
+  - end: time
+  - expect_output: { node: master, capability: siren, active: false }

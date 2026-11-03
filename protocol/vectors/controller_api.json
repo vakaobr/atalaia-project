@@ -2553,6 +2553,30 @@
       ]
     },
     {
+      "name": "EXPI4 a role's outputs: in the start check: a box with outputs but none of those Bomb switches is a warning, one with no output at all is optional_caps (draft RFC 'The expansion port', increment 4: EXP-22)",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Smoke", "mode_id": "org.atalaia.bomb", "assignments": {"4": "bomb", "5": "bomb"}, "params": {"smoke_s": 5}}}, "status": 201,
+         "json": {"params": {"smoke_s": 5}}, "save": {"gid": "id"}},
+        {"rx": {"source": 4, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.7.0", "core_version": "0.7.0", "tier": 0, "capabilities": [1, 2, 3, 4, 5, 11], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"rx": {"source": 5, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-5", "platform": 1, "fw_version": "0.7.0", "core_version": "0.7.0", "tier": 0, "capabilities": [1, 2, 3, 4, 5], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200,
+         "json": {"missing": [], "missing_caps": [],
+                  "warnings": [{"code": "optional_caps", "node": 5, "name": "box-5", "role": "bomb", "capabilities": ["output"], "text": "$any"}],
+                  "not_checked": [], "ok": true}},
+        {"rx": {"source": 4, "seq": 1, "epoch": 1, "type": "EVENT", "event": {"node": 4, "seq": 1, "t": 0, "type": "node.modules", "data": {"modules": "g46:servo:horn"}}}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200,
+         "json": {"missing_caps": [],
+                  "warnings": [{"code": "outputs", "node": 4, "name": "box-4", "role": "bomb", "capabilities": ["smoke", "siren"], "text": "$any"},
+                               {"code": "optional_caps", "node": 5, "name": "box-5", "role": "bomb", "capabilities": ["output"], "text": "$any"}],
+                  "not_checked": [{"node": 4, "name": "box-4", "role": "bomb", "capability": "horn", "text": "$any"}], "ok": true}},
+        {"rx": {"source": 4, "seq": 2, "epoch": 1, "type": "EVENT", "event": {"node": 4, "seq": 2, "t": 0, "type": "node.modules", "data": {"modules": "g46:servo:smoke"}}}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200,
+         "json": {"warnings": [{"code": "optional_caps", "node": 5}],
+                  "not_checked": [{"node": 4, "capability": "smoke"}], "ok": true}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 200, "json": {"state": "running"}}
+      ]
+    },
+    {
       "name": "EXP outputs: a box's modules in the node list, the capability start check, the GM's outputs and their limits (draft RFC 'The expansion port', increment 3: EXP-21, EXP-23, EXP-27, EXP-30, EXP-36)",
       "steps": [
         {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sirens", "mode_id": "org.atalaia.domination", "assignments": {"4": "zone", "5": "zone", "6": "zone"}}}, "status": 201,

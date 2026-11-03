@@ -238,8 +238,17 @@ async function main() {
                 renderRoles();
                 changed();
             });
+            // The output functions the role switches (mode.yaml outputs:, e.g. "smoke, siren").
+            const outputs = Object.assign(document.createElement('input'), {
+                className: 'role-outputs', value: (role.outputs || []).join(', '), spellcheck: false,
+                placeholder: 'smoke, siren',
+            });
+            outputs.setAttribute('aria-label', ui('role_outputs'));
+            const outputsLabel = document.createElement('label');
+            outputsLabel.append(document.createTextNode(ui('role_outputs')), outputs);
             row.append(name, check('role-auto', !role.inputs, ui('role_auto')), inputs,
-                check('role-needed', role.needed, ui('role_needed')), remove);
+                check('role-needed', role.needed, ui('role_needed')), outputsLabel,
+                check('role-outputs-needed', Boolean(role.outputs_needed), ui('role_outputs_needed')), remove);
             return row;
         }));
     }
@@ -255,7 +264,11 @@ async function main() {
             const line = files.mode_yaml.split('\n').find((l) => l.startsWith(`  ${name}: {`)) || '';
             inputs = ((/requires: \[([^\]]*)\]/.exec(line) || [])[1] || '').split(', ').filter(Boolean);
         }
-        info.roles[Number(row.dataset.index)] = { name, inputs, needed: row.querySelector('.role-needed').checked };
+        const outputs = row.querySelector('.role-outputs').value.split(',').map((o) => o.trim()).filter(Boolean);
+        info.roles[Number(row.dataset.index)] = {
+            name, inputs, needed: row.querySelector('.role-needed').checked,
+            outputs, outputs_needed: row.querySelector('.role-outputs-needed').checked,
+        };
         if (e.target.classList.contains('role-auto')) renderRoles();
     });
     document.getElementById('role-add').addEventListener('click', () => {

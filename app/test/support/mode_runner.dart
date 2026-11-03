@@ -17,6 +17,8 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:atalaia_app/controller/controller_outputs.dart'
+    show outputParamsProblem;
 import 'package:atalaia_app/core/game_loop_isolate.dart';
 import 'package:atalaia_app/core/node_types.dart';
 import 'package:atalaia_app/ffi/bindings.dart';
@@ -27,6 +29,7 @@ import 'package:atalaia_app/security/nfc_tag_signer.dart';
 import 'package:crypto/crypto.dart';
 import 'package:yaml/yaml.dart';
 
+import 'box_outputs.dart';
 import 'event_schema.dart';
 
 /// How the test's nodes run.
@@ -55,6 +58,10 @@ const fieldCommands = {
   'message': 'gm.message',
   'mode': 'cmd.mode',
 };
+
+/// field.send(node, "output", {...}) is CMD 12, which the box's firmware
+/// handles (sim.py OUTPUT_GAP_MS): at most one start to a node this often.
+const outputGapMs = 2000;
 
 /// A CMD's parameters, as JSON, fit a box's 128-byte buffer
 /// (field_controller.py CMD_PARAMS_MAX).
@@ -625,6 +632,9 @@ class VirtualNode {
   final String role;
   late SimNode runtime;
   final commands = <NodeCommand>[];
+
+  /// Its outputs (a siren, smoke: box_outputs.dart).
+  BoxOutputs outputs = BoxOutputs({});
   final logs = <String>[];
 
   NodeCommand? lastCommand(String target, String method) {
@@ -678,7 +688,11 @@ class Simulation {
   (int, Map<String, Object?>)? _fieldEnd;
   var _ended = false;
   var _started = false; // game.start broadcast, game.end not yet
+  final _outputSent =
+      <String, int>{}; // node -> when the field last started one of its outputs
 
+  /// [outputs]: node name -> the outputs that box has (sim.py); a node not
+  /// named has those its role lists in `outputs:`.
   static Future<Simulation> create(
     AtalaiaCore core,
     EventSchema schema,
@@ -688,6 +702,7 @@ class Simulation {
     Map<String, Object?> params, {
     int seed = 1,
     Via via = Via.direct,
+    Map<String, Object?> outputs = const {},
   }) async {
     final sim = Simulation._(
       core,
@@ -699,6 +714,12 @@ class Simulation {
       via,
     );
     try {
+      final unknown = outputs.keys.toSet().difference(nodeRoles.keys.toSet());
+      if (unknown.isNotEmpty) {
+        throw TestFailure(
+          'outputs for unknown node(s) ${unknown.toList()..sort()}',
+        );
+      }
       var nodeId = 0;
       for (final e in nodeRoles.entries) {
         nodeId++;
@@ -708,6 +729,19 @@ class Simulation {
           );
         }
         final vnode = VirtualNode(e.key, e.value);
+        final spec = mode.roles[e.value];
+        final fitted =
+            outputs[e.key] ??
+            (spec is Map ? spec['outputs'] : null) ??
+            const <Object?>[];
+        try {
+          vnode.outputs = BoxOutputs(
+            fittedOutputs(fitted, "node '${e.key}'"),
+            (t, data) => sim._recordSwitched(vnode, t, data),
+          );
+        } on ArgumentError catch (err) {
+          throw TestFailure('${err.message}');
+        }
         sim.nodes[e.key] = vnode;
         vnode.runtime = await sim._spawn(vnode, nodeId);
         if (!vnode.runtime.loaded) {
@@ -765,7 +799,7 @@ class Simulation {
             spec,
             handlers: NodeHandlers(
               onEvent: (ev) => _record(vnode, ev),
-              onCommand: vnode.commands.add,
+              onCommand: (c) => _command(vnode, c),
               onLog: vnode.logs.add,
             ),
           ),
@@ -782,7 +816,7 @@ class Simulation {
                 case NodeEventOutput(:final event):
                   _record(vnode, event);
                 case NodeCommandOutput(:final command):
-                  vnode.commands.add(command);
+                  _command(vnode, command);
                 case NodeLogOutput(:final line):
                   vnode.logs.add(line);
                 case NodeErrorOutput(:final message):
@@ -806,6 +840,8 @@ class Simulation {
     final vnode = node(name);
     final nodeId = vnode.runtime.nodeId;
     await vnode.runtime.close();
+    // A box boots with every output off; it plays on in the running game.
+    vnode.outputs.boot(timeMs, _started);
     vnode.runtime = await _spawn(vnode, nodeId);
     if (!vnode.runtime.loaded) {
       throw TestFailure(
@@ -842,6 +878,51 @@ class Simulation {
     await _pump();
   }
 
+  /// A script's call on a capability: an output's is the box's output
+  /// layer's, the rest the shell's.
+  void _command(VirtualNode vnode, NodeCommand c) {
+    final args = jsonDecode(c.argsJson);
+    if (!vnode.outputs.scriptCall(
+      c.tMs,
+      c.target,
+      c.method,
+      args is List ? args : const [],
+    )) {
+      vnode.commands.add(c);
+    }
+  }
+
+  /// output.switched from a box's output layer, as it sends it.
+  void _recordSwitched(VirtualNode vnode, int t, Map<String, Object?> data) {
+    final nodeId = nodes.containsKey(vnode.name) ? vnode.runtime.nodeId : 0;
+    final prio = schema.defaultPrio('output.switched');
+    _checkWire(
+      vnode.name,
+      nodeId,
+      0,
+      t,
+      'output.switched',
+      0,
+      0,
+      prio,
+      data,
+      jsonEncode(data),
+    );
+    _log.add(
+      LogEntry(t, vnode.name, nodeId, 0, 'output.switched', null, prio, data),
+    );
+    if (field != null) {
+      _toField.add((t, 'output.switched', {...data, 'node': nodeId}));
+    }
+  }
+
+  /// A node's outputs now (all off once its script was halted).
+  Future<BoxOutputs> outputs(String name) async {
+    final vnode = node(name);
+    if (await vnode.runtime.status() == 'halted') vnode.outputs.halt(timeMs);
+    return vnode.outputs;
+  }
+
   Future<void> close() async {
     for (final v in nodes.values) {
       try {
@@ -859,6 +940,9 @@ class Simulation {
       id >= 1 && id <= teams.length ? teams[id - 1] : null;
 
   void _record(VirtualNode vnode, EmittedEvent ev) {
+    // The box's mode ended the game: every output off before its game.end
+    // handlers run, then the grace (node_runner.c).
+    if (ev.type == 'game.end') vnode.outputs.end(ev.tMs);
     final data = ev.data;
     _checkWire(
       vnode.name,
@@ -1023,6 +1107,7 @@ class Simulation {
     final target = nodes.values
         .where((v) => v.runtime.nodeId == nodeId)
         .firstOrNull;
+    if (target != null && cmd == 'output') return _fieldOutput(target, params);
     if (target == null || !fieldCommands.containsKey(cmd)) return false;
     if (cmd == 'mode' && !commandName.hasMatch('${params['name'] ?? ''}')) {
       return false; // a mode command names itself
@@ -1037,6 +1122,38 @@ class Simulation {
       return false;
     }
     _toNodes.add((target.name, fieldCommands[cmd]!, Map.of(params)));
+    return true;
+  }
+
+  /// field.send(node, "output", {...}): CMD 12 with src field (sim.py
+  /// _field_output), at most one start every 2 s to a node.
+  bool _fieldOutput(VirtualNode target, Map<String, Object?> spec) {
+    final act = spec['act'];
+    final keep = act == 'off'
+        ? const ['capability', 'act']
+        : act == 'pattern'
+        ? const ['capability', 'act', 'ms', 'on_ms', 'off_ms']
+        : const ['capability', 'act', 'ms'];
+    final params = <String, Object?>{
+      for (final k in keep)
+        if (spec.containsKey(k)) k: spec[k],
+      'src': 'field',
+    };
+    if (outputParamsProblem(params) != null) return false;
+    final last = _outputSent[target.name];
+    if (act != 'off' && last != null && timeMs - last < outputGapMs) {
+      return false;
+    }
+    if (act != 'off') _outputSent[target.name] = timeMs;
+    target.outputs.switchOutput(
+      timeMs,
+      params['capability']! as String,
+      act! as String,
+      ms: (params['ms'] as int?) ?? 0,
+      onMs: (params['on_ms'] as int?) ?? 0,
+      offMs: (params['off_ms'] as int?) ?? 0,
+      source: 'field',
+    );
     return true;
   }
 
@@ -1090,7 +1207,20 @@ class Simulation {
       _ended = true;
       _started = false;
     }
+    final at = t ?? timeMs;
     for (final v in nodes.values) {
+      // The box's output layer first: a game.start or game.end handler
+      // switches after it.
+      switch (type) {
+        case 'game.start':
+          v.outputs.gameStart(at);
+        case 'game.pause':
+          v.outputs.pause(at);
+        case 'game.resume':
+          v.outputs.resume();
+        case 'game.end':
+          v.outputs.end(at);
+      }
       await v.runtime.input(type, d);
     }
     if (field != null) {
@@ -1426,8 +1556,55 @@ class _Runner {
             'last screen is $template $data',
           );
         }
+      case 'expect_output':
+        await _expectOutput(arg);
       default:
         throw TestFailure("unknown step '$action'");
+    }
+  }
+
+  /// testing.py do_expect_output: an output of a box on or off now.
+  Future<void> _expectOutput(Object? arg) async {
+    if (arg is! Map<String, Object?> ||
+        !arg.containsKey('capability') ||
+        arg['active'] is! bool) {
+      throw TestFailure(
+        'expect_output takes { node, capability, active: true or false, '
+        'left_s, source }',
+      );
+    }
+    _only('expect_output', arg, {
+      'node',
+      'capability',
+      'active',
+      'left_s',
+      'source',
+    });
+    final name = _node(arg);
+    final capability = arg['capability']! as String;
+    final outputs = await sim.outputs(name);
+    if (!outputs.has(capability)) {
+      final has = outputs.channels.keys.join(', ');
+      throw TestFailure(
+        "node '$name' has no output $capability "
+        '(it has: ${has.isEmpty ? 'none' : has})',
+      );
+    }
+    final st = outputs.state(capability, sim.timeMs);
+    final active = arg['active']! as bool;
+    final problems = <String>[
+      if (st.on != active) st.on ? 'on' : 'off',
+      if (arg.containsKey('left_s') &&
+          st.leftMs != ((arg['left_s']! as num) * 1000).round())
+        '${st.leftMs / 1000} s left',
+      if (arg.containsKey('source') && st.source != arg['source'])
+        'switched by ${st.source ?? 'nobody'}',
+    ];
+    if (problems.isNotEmpty) {
+      throw TestFailure(
+        "expected $capability on '$name' ${active ? 'on' : 'off'}, it is "
+        '${problems.join(', ')}',
+      );
     }
   }
 
@@ -1592,6 +1769,12 @@ Future<TestResult> runTest(
       (spec['params'] as Map<String, Object?>?) ?? {},
       teams,
     );
+    final outputs = spec['outputs'];
+    if (outputs != null && outputs is! Map<String, Object?>) {
+      throw TestFailure(
+        'outputs maps a node name to its outputs: { bomb: [smoke, siren] }',
+      );
+    }
     sim = await Simulation.create(
       core,
       schema,
@@ -1601,6 +1784,7 @@ Future<TestResult> runTest(
       params,
       seed: (spec['seed'] as int?) ?? 1,
       via: via,
+      outputs: (outputs as Map<String, Object?>?) ?? const {},
     );
     final runner = _Runner(sim);
     if (spec['autostart'] != false) {
