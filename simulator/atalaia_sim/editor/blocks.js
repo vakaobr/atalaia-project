@@ -248,6 +248,8 @@ function definitions(t) {
                 { type: 'field_input', name: 'DEFAULT', text: '10', spellcheck: false },
                 { type: 'field_input', name: 'MIN', text: '1', spellcheck: false },
                 { type: 'field_input', name: 'MAX', text: '600', spellcheck: false },
+                // mode.yaml optional: true, so the setting may be left empty (no default).
+                { type: 'field_checkbox', name: 'OPTIONAL', checked: false },
             ],
             message2: t('param_label'), args2: [{ type: 'field_input', name: 'LABEL', text: 'Seconds per tick' }],
             message3: t('param_label_pt'), args3: [{ type: 'field_input', name: 'LABEL_PT', text: '' }],
