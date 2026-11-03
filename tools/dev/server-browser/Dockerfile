@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir --break-system-packages --require-hashes --no-dep
  && pip install --no-cache-dir --break-system-packages --no-deps "playwright==${PLAYWRIGHT_VERSION}" \
       "pyee==${PYEE_VERSION}" \
  && rm /tmp/requirements.txt /tmp/requirements-test.txt \
- && python3 -c "import playwright.async_api, fastapi, sqlalchemy, asyncpg, alembic, httpx, uvicorn" \
+ && python3 -c "import playwright.async_api, fastapi, sqlalchemy, asyncpg, alembic, httpx2, uvicorn" \
  && PLAYWRIGHT_BROWSERS_PATH=/ms-playwright python3 -m playwright install --dry-run chromium
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     PYTHONDONTWRITEBYTECODE=1 \
