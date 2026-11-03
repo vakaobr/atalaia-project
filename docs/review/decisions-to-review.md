@@ -3710,3 +3710,47 @@ The maintainer went through the rows still marked "to review later": P5F-2, P5F-
 | PLK-3 | Starlette 1.x's test client warns that `httpx` is deprecated in favour of `httpx2`: switch? | Yes: move the controller's tests to `httpx2` and re-lock, keeping the distribution-package stack working | The warning becomes an error when Starlette drops httpx; the pinned-lock CI job runs with deprecations as errors | maintainer (2026-11-03): accepted |
 | KRT-0 | The firmware release CI key lives only in repository secrets and cannot be moved: how to put it in the `release` environment? | Rotate over the air: a new CI key (a4f6002b0122b131) in the environment, trusted next to root and the old CI key; one transition release signed with the old key; then sign with the new key and delete the old secrets; a later release drops the old key | Boards only trust keys built into their image; a transition release carries the new key to boards over the air, with no USB flash and no key stored outside the signed image | maintainer (2026-11-03): accepted |
 
+## The expansion port and the simple output (EXP-1 to EXP-38, 2026-11-03)
+
+From the draft RFC `docs/rfcs/0000-expansion-port.md` (PR #36). One port and protocol for a box's inputs (the target addon's hits) and outputs, and a single-GPIO servo "simple output" for relays (sirens, strobes, a smoke machine's low-voltage remote). The maintainer decided EXP-31 (the simple output is the preferred output path; the I2C port for inputs and multi-channel outputs) and approved the RFC's recommended answers to its open questions Q1 to Q21 on 2026-11-03 ("use the proposed defaults, we can revisit later"). Implementation: increment 1 (protocol, vectors, capability ids) PR #41, increment 2 (the simple output) in progress.
+
+| # | Decision | Status |
+| --- | --- | --- |
+| EXP-1 | M12 A-coded 5-pin, P5J-20 pin-out; pin 5 reserved, not connected | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-2 | The port on the Field Box, the Satellite and the I/O pod, optional; no GPIO, no pin change | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-3 | Loads from their own supply, never from the box; 25 mA on pin 1 for module logic only | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-4 | Hot-swap buffer with stuck-bus recovery, TVS, series resistors, PTC, back-feed diode on the box's side | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-5 | I2C behind the buffer; longer distances through a Satellite or a later extender module | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-6 | 100 kHz | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-7 | Addresses 0x58-0x5F; defaults 0x58 (inputs), 0x5C (outputs); jumpers add 0-3; at most 4 modules | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-8 | Polled: input modules every 20 ms, output-only every 250 ms; no interrupt line | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-9 | Expansion protocol v1: `IDENT`, `CHANNEL`, `STATUS`, `COMMAND`, CRC-8 (the write's covering the address) | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-10 | Inputs filtered in the module; events timed by their age on the box's clock | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-11 | Every output leased: 1.5 s, refreshed every 500 ms, at most 5 s | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-12 | Desired state on the box, reconciled with each `STATUS` | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-13 | Hard limits in the module, the box and the call; the lowest wins | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-14 | Errors, gone after 25 failed reads, hot-plug by probing one empty address every 2 s, `ALL_OFF` at discovery and boot | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-15 | RP2040 reference processor, portable protocol core; bare PCF8574/MCP23017 relay boards not supported | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-16 | I2C output module (later, optional since EXP-31): I2C isolator, own supply, RP2040, off-the-shelf opto-isolated relay board | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-17 | SELV loads only; mains out of scope; smoke machines only through documented low-voltage inputs; no pyrotechnics | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-18 | Capability types `hit` (unchanged) and `output` (on, off, pulse, pattern), from either output path; `contact` reserved | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-19 | Output ids name the function (`siren`, `smoke`, ... else `out.N`; a simple output's set by the admin); calls to missing capabilities do nothing | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-20 | A capability type id table for HELLO key 6, filled by the box | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-21 | Events `node.modules`, `node.module_lost`, `output.switched`; modules in the node list; capability start check for nodes that report capabilities | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-22 | A role's optional `outputs:` list of functions | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-23 | CMD opcode 12 `output`, handled by the firmware; remote `on` always with a duration | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-24 | Node scripts: `cap(fn):pulse`, `:on`, `:off`, `:pattern` | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-25 | Scenario `triggers:` with an `output` action, and console blocks | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-26 | The I/O pod gets the port and simple outputs (GPIO 33, 1, 3), lends `hit` and `output` over the proxy and holds the lease or the bursts | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-27 | Who may switch: game logic and the GM on the field; the remote GM off only; never players | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-28 | Outputs disabled on a box until its admin enables them at the box | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-29 | Fail-safe table: off at boot, discovery, pause, end (10 s grace), halt; leases (I2C) and stopped bursts (simple output) end the rest | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-30 | Rate limits: 2 starts/s per channel from scripts, CMD 12 once per 2 s per node (off never held), relays every 100 ms at most, a simple output every 500 ms at most | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-31 | **Decided by the maintainer (2026-11-03):** two output paths; the single-GPIO RC-servo simple output is the preferred one for sirens, strobes and smoke remotes; the I2C output module is the later, optional path for more channels or feedback; inputs stay on the I2C port (a servo signal carries nothing back) | maintainer (2026-11-03): decided |
+| EXP-32 | Simple output signal: 50 Hz, 1.0 ms off, 2.0 ms on; RMT bursts of 25 frames renewed every 200 ms by the game task (not free-running LEDC); 1.0 ms then a low pin at boot, pause, end, halt | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-33 | Simple output wiring: a spare 74AHCT125 gate to 5 V, 10 kohm pull-down at its input, 330 ohm series; M8 3-pin socket (1 NC, 3 GND, 4 signal); the RC switch powered from the load side; up to 2 m | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-34 | Pins: `ATALAIA_SIMPLE_OUT_PIN` 46 (V4.3) or 5 (V4.2) on the Field Box and Satellite, 33 (then 1, 3) on the pod, 15 on board 5; 45 for the buzzer or a second simple output | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-35 | One channel per GPIO, no multiplexing by pulse width; no feedback, no presence check; outputs only | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-36 | One `output` capability over both paths through a shared output layer; a simple output reported with a no-feedback flag (`g46:servo:siren`, `"feedback": false`), "not checked" in the console and start check; patterns at least 500 ms on and off | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-37 | Only RC switches that open on signal loss (documented or bench-checked), threshold between 1.0 and 2.0 ms | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
+| EXP-38 | Increments reordered: protocol first, then the simple output with the shared output layer, controllers, modes, triggers; the port (inputs and the target module) after; the I2C output module last and optional | maintainer (2026-11-03): accepted as recommended (Q1–Q21), may be revisited |
