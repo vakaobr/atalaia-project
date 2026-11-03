@@ -12,6 +12,35 @@ CONTRIBUTING.md, "Pull request titles and commit messages"); optional hand-writt
 `## [Unreleased]` and move into the next release's section as "Details". The sections up to 0.5.0
 were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.0](https://github.com/vakaobr/atalaia-project/compare/v0.6.1...v0.7.0) (2026-11-03)
+
+
+### Features
+
+* **controller:** box modules, the capability start check and the GM's outputs on both controllers and the console ([#47](https://github.com/vakaobr/atalaia-project/issues/47)) ([a652cf2](https://github.com/vakaobr/atalaia-project/commit/a652cf2882f5f3809a882527065aa6639792d1d8))
+* **core:** scenario triggers switch the boxes' outputs; Triggers blocks in the console ([#49](https://github.com/vakaobr/atalaia-project/issues/49)) ([6010dbe](https://github.com/vakaobr/atalaia-project/commit/6010dbed54ff9b090f4812efed1933641a20ce04))
+* **firmware:** an optional passive piezo buzzer; the speaker plays the game's sounds again ([#40](https://github.com/vakaobr/atalaia-project/issues/40)) ([c234ca6](https://github.com/vakaobr/atalaia-project/commit/c234ca6cee1626f31baf61f595d56d30f3ec1252))
+* **firmware:** the simple output and the box's output layer ([#45](https://github.com/vakaobr/atalaia-project/issues/45)) ([39e08d6](https://github.com/vakaobr/atalaia-project/commit/39e08d6fb50faac0fdc878f5aabee4b5724cb2c0))
+* **modes:** Bomb's smoke and siren, the master's siren, and a role's outputs ([#50](https://github.com/vakaobr/atalaia-project/issues/50)) ([a14a5e8](https://github.com/vakaobr/atalaia-project/commit/a14a5e8bc9456daa1b9603ed583b4c7b29c3e623))
+* **protocol:** the expansion port's protocol, vectors and capability type ids ([#41](https://github.com/vakaobr/atalaia-project/issues/41)) ([3f30ef5](https://github.com/vakaobr/atalaia-project/commit/3f30ef5d322ef9689bf267e9d4038267b7004df0))
+* **release:** trust the next CI release key a4f6002b0122b131, sign with it behind a switch ([#38](https://github.com/vakaobr/atalaia-project/issues/38)) ([ee56036](https://github.com/vakaobr/atalaia-project/commit/ee56036df1d9df9a5ff19b27aa95aec447fd187b))
+
+
+### Bug Fixes
+
+* **ci:** link box_host's mbedtls and mbedx509 statically for the app job ([#48](https://github.com/vakaobr/atalaia-project/issues/48)) ([bba5f69](https://github.com/vakaobr/atalaia-project/commit/bba5f699eb573153444ba8c0d61b26dd160393a4))
+* **console:** forget a saved access code the controller now refuses ([#52](https://github.com/vakaobr/atalaia-project/issues/52)) ([1741a21](https://github.com/vakaobr/atalaia-project/commit/1741a21f2046211c61ec40f8ad613a410c73d3f2))
+* **preview:** the live demo starts again and shows the players' positions ([#43](https://github.com/vakaobr/atalaia-project/issues/43)) ([9030fe6](https://github.com/vakaobr/atalaia-project/commit/9030fe6507cbf32a23727373c9a690828739e310))
+
+
+### Documentation
+
+* phase 5 notes the HTTPS host-box fetch and the registry keys as done ([#34](https://github.com/vakaobr/atalaia-project/issues/34)) ([dee8722](https://github.com/vakaobr/atalaia-project/commit/dee8722155aa106a2ea92fae80e887cf2395d9aa))
+* point the guides to v0.6.1 and describe the release gate as configured ([#31](https://github.com/vakaobr/atalaia-project/issues/31)) ([8e3ded9](https://github.com/vakaobr/atalaia-project/commit/8e3ded919d8156c5ca4b7d6fd5164163f7644c7a))
+* RFC draft for the expansion port and the single-GPIO simple output (target addon, relays, sirens) ([#36](https://github.com/vakaobr/atalaia-project/issues/36)) ([c0962a9](https://github.com/vakaobr/atalaia-project/commit/c0962a949d9f62fd8ddd8ecdad65f42d050969cd))
+* the expansion port's decisions EXP-1 to EXP-38 in the decisions log ([#42](https://github.com/vakaobr/atalaia-project/issues/42)) ([c8a3637](https://github.com/vakaobr/atalaia-project/commit/c8a363777bf619c708753aeb514178c63aaeb1e8))
+* the maintainer's review of the open P5F/P5J rows, httpx2 and the release key rotation ([#35](https://github.com/vakaobr/atalaia-project/issues/35)) ([16abd9f](https://github.com/vakaobr/atalaia-project/commit/16abd9f4b4a91165e385c45f0ffcdf4a718648f4))
+
 ## [Unreleased]
 
 - **Scenario triggers switch the boxes' outputs (increment 5 of the draft RFC "The expansion port")** (decisions EXPI5-1 to EXPI5-15, following EXP-25, EXP-29 and EXP-30; `core/scenario/manifest.lua`, `validator.lua`, `luagen.lua`, `runtime.lua`, `controller/atalaia_controller/engine.py`, `app/lib/controller/controller_engine.dart`, `controller/console/src/components/scenario-blocks.js`, the console's four languages, `protocol/vectors/scenario.json`, `protocol/vectors/scenario_compile.json`, `tools/scenario_compile_vectors.py`): a scenario manifest's new optional `triggers:` list switches an output of a box when every objective of a list is completed (`completed`), the first of them is (`any_completed`), one fails (`failed`), or the game starts or ends (`game: start`, `game: end`): `output: { node, capability, act, seconds }` with the act `on`, `pulse`, `pattern` (with `on_ms` and `off_ms`, 500-10000) or `off`, the box one of the scenario's `nodes`, the function `siren`, `strobe`, `smoke`, `light`, `horn` (`siren.2`), `out.1`-`out.9` or `*` with `off`, and 1-600 s (10 s at most for `game: end`, the box's end grace). The validator says what is wrong in the style of the other rules (a bare `on` or `off`, which YAML 1.1 reads as a boolean, asks for quotes); the compiler writes `SCENARIO.triggers` into `field.lua` only when there are triggers; the runtime fires each trigger once a game as CMD 12 with `src: field` (the same path as `field.send(node, "output", ...)` and the controller's one start a box every 2 s), tries again every second for 10 s what that limit holds back, drops what waits on a pause and does not sound the start again after a restart mid-game. Both controllers now hold back the outputs a field script switches after its own `game.end` (an objective that wins the game) until the end's CMD has gone, so they come within the boxes' 10 s grace instead of being switched off by the end. The GM console's scenario blocks gain a **Triggers** category ("when" blocks holding an output block) in pt, en, de and zh-TW, with the YAML round trip (what the blocks cannot hold as it is stays in the YAML view). Tests: the shared vectors (C core, Python and the phone's Dart), a scenario game through the Pi's engine (`controller/tests/test_scenario.py`), the phone's end-of-game hold (`app/test/controller/controller_engine_test.dart`) and the blocks in Chromium. Not tried on hardware.
