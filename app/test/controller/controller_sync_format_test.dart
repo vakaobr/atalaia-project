@@ -40,7 +40,7 @@ void main() {
     final stream = v['stream']! as Map;
     expect(
       (list(stream['valid']).length, list(stream['invalid']).length),
-      (23, 67),
+      (24, 69),
     );
     expect({
       for (final c in list(stream['valid'])) c['kind'],

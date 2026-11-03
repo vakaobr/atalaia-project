@@ -49,7 +49,14 @@ const cmdOpcodes = {
   'reset': 6,
   'reboot': 7,
   'mode': 8,
+  'output': cmdOutput,
 };
+
+/// CMD output's opcode (switch an output, RFC 0001 Amendment 26; draft RFC
+/// "The expansion port", EXP-23): params `capability`, `act`, `ms`, `on_ms`,
+/// `off_ms`, `src`. The engine sets `src` itself and checks the params and its
+/// rate limit first (controller_outputs.dart).
+const cmdOutput = 12;
 
 /// CMD update's opcode (firmware updates, slice S7c).
 const cmdUpdate = 9;

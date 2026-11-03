@@ -76,6 +76,7 @@ import 'controller_field.dart';
 import 'controller_firmware.dart';
 import 'controller_mode_fetch.dart';
 import 'controller_modes.dart';
+import 'controller_outputs.dart';
 import 'controller_pairing.dart';
 import 'controller_pod_config.dart';
 import 'controller_positions.dart';
@@ -276,6 +277,9 @@ class _FieldScript implements FieldOperations {
     if (cmd == 'mode' && !_commandName.hasMatch('${params['name'] ?? ''}')) {
       return false;
     }
+    // CMD 12 (EXP-23): src field, checked and rate limited by the engine
+    // (controller_outputs.dart).
+    if (cmd == 'output') return engine.fieldOutput(nodeId, params);
     if (!cmdOpcodes.containsKey(cmd)) return false; // update: the GM's alone
     try {
       return _fc.sendCmd(cmd, params.isEmpty ? null : params, dest: nodeId) !=
@@ -416,6 +420,10 @@ class ControllerEngine {
   // (GE-1): it ends the game at the next tick, not from inside the radio
   // receive path.
   Map<String, Object?>? _boxEnd;
+  // The live game's boxes' modules, from their last node.modules
+  // (controller_outputs.dart, EXP-21), and the CMD 12 rate limit (EXP-30).
+  final _modules = <int, List<Map<String, Object?>>>{};
+  final _outputRate = OutputRateLimit();
   Uint8List _key = Uint8List(0);
   Map<String, Map<String, int>> _fieldScores = {};
   final _listeners = <void Function(Map<String, Object?>)>[];
@@ -1011,6 +1019,8 @@ class ControllerEngine {
     _field = null;
     _fieldScores = {};
     _boxEnd = null;
+    _modules.clear();
+    _outputRate.clear();
     _radio?.flush(); // frames still waiting for their gap go now: the key goes next
     modem?.clear(); // the modem forgets the key
     _radio = null;
@@ -1073,6 +1083,13 @@ class ControllerEngine {
       known.epoch = (node['epoch'] as int?) ?? 0;
       final battery = node['battery_pct'];
       if (battery is int) known.batteryPct = battery;
+      final mods = node['modules'];
+      if (mods is List) {
+        _modules[nodeId] = [
+          for (final m in mods)
+            if (m is Map) m.cast<String, Object?>(),
+        ];
+      }
     }
     _restoreHealth(fc, id);
     // The controller's own events go on from their stored seq (PE24-42).
@@ -1255,7 +1272,8 @@ class ControllerEngine {
     if (_game == null) throw ControllerError.conflict('no live game');
     final needed = _neededRoles();
     final joined = <String, int>{};
-    for (final (_, role) in _joinedNodes()) {
+    final joinedNodes = _joinedNodes();
+    for (final (_, role) in joinedNodes) {
       joined[role] = (joined[role] ?? 0) + 1;
     }
     final missing = [
@@ -1298,14 +1316,46 @@ class ControllerEngine {
         }
       }
     });
+    final caps = _capabilityCheck(joinedNodes);
+    warnings.addAll(caps['warnings']!);
     final sortedJoined = joined.keys.toList()..sort();
     return {
       'needed': needed,
       'joined': {for (final r in sortedJoined) r: joined[r]},
       'missing': missing,
+      'missing_caps': caps['missing_caps'],
       'warnings': warnings,
-      'ok': missing.isEmpty,
+      'not_checked': caps['not_checked'],
+      'ok': missing.isEmpty && caps['missing_caps']!.isEmpty,
     };
+  }
+
+  /// The start check's capability part for these joined nodes (engine.py
+  /// `_capability_check`, controller_outputs.dart `checkNodes`).
+  Map<String, List<Map<String, Object?>>> _capabilityCheck(
+    List<(int, String)> nodes,
+  ) {
+    final stored = <int, Map<String, Object?>>{
+      for (final n in store.nodes(_game!['id']! as int))
+        n['node_id']! as int: n,
+    };
+    final mode = _mode(_game!['mode_id']);
+    return checkNodes([
+      for (final (id, role) in nodes)
+        () {
+          final row = stored[id] ?? const <String, Object?>{};
+          final live = _fc?.nodes[id];
+          return <String, Object?>{
+            'node': id,
+            'name': live?.name ?? row['name'] ?? '$id',
+            'role': role,
+            'capabilities': live?.hello != null
+                ? live!.hello!.capabilities
+                : row['capabilities'],
+            'modules': _modules[id] ?? row['modules'],
+          };
+        }(),
+    ], (role) => mode?.roles[role]);
   }
 
   Map<String, Object?> startGame(int id, {bool force = false}) {
@@ -1321,20 +1371,29 @@ class ControllerEngine {
     }
     final check = startCheck();
     final missing = (check['missing']! as List).cast<String>();
-    if (missing.isNotEmpty && !force) {
+    final missingCaps = (check['missing_caps']! as List)
+        .cast<Map<String, Object?>>();
+    final lacking = [
+      for (final c in missingCaps)
+        '${c['name']} (${c['role']}) has no ${c['capability']}',
+    ];
+    if (check['ok'] != true && !force) {
       throw ControllerError(
-        'no box or prop has joined for: ${missing.join(', ')}; '
-        'join them, or start anyway (force)',
+        missing.isNotEmpty
+            ? '${['no box or prop has joined for: ${missing.join(', ')}', ...lacking].join('; ')}'
+                  '; join them, or start anyway (force)'
+            : '${lacking.join('; ')}; start anyway (force)',
         status: 409,
         extra: {'start_check': check},
       );
     }
-    if (missing.isNotEmpty) {
+    if (check['ok'] != true) {
       _emit({
         'type': 'system',
         'kind': 'start.forced',
         'game': id,
         'missing': missing,
+        if (missingCaps.isNotEmpty) 'missing_caps': missingCaps,
       });
     }
     final presetId = _game!['preset_id'];
@@ -1555,6 +1614,9 @@ class ControllerEngine {
       'core_version': hello?.coreVersion,
       'tier': hello?.tier,
       'capabilities': hello?.capabilities,
+      // Its modules and simple outputs, from its last node.modules; null
+      // until it says (EXP-21).
+      'modules': _modules[node.nodeId],
       'device_id': device
           ?.map((b) => b.toRadixString(16).padLeft(2, '0'))
           .join(),
@@ -1606,6 +1668,149 @@ class ControllerEngine {
       );
     }
     return {'node': nodeId, 'cmd': cmd, 'opcode': cmdOpcodes[cmd], 'seq': seq};
+  }
+
+  // --- outputs (draft RFC "The expansion port", increment 3) ---------------
+
+  /// The GM switches one output of a box (CMD 12, src gm; EXP-27): on, pulse
+  /// or pattern only while the game runs, with a duration (5 s by default);
+  /// off whenever the game is live. At most one start to a box every 2 s
+  /// (429); off is never held back (EXP-30). engine.py `send_output`.
+  Map<String, Object?> sendOutput(
+    int gameId,
+    Object? nodeIdValue,
+    Object? spec,
+  ) {
+    final fc = _live(gameId);
+    final nodeId = _int(nodeIdValue, 'node id');
+    final node = fc.nodes[nodeId];
+    if (node == null) {
+      throw ControllerError.notFound(
+        'node $nodeId is not a node of game $gameId',
+      );
+    }
+    final (params, problem) = outputParams(spec, 'gm');
+    if (params == null) {
+      throw ControllerError(problem ?? 'not an output request');
+    }
+    final act = params['act']! as String;
+    if (act != 'off') {
+      if (_game!['state'] != 'running') {
+        throw ControllerError.conflict(
+          'game $gameId is ${_game!['state']}: an output turns on only while '
+          'the game runs (off works whenever the game is live)',
+        );
+      }
+      final caps = node.hello?.capabilities;
+      if (typesOf(caps).isNotEmpty && !caps!.contains(outputTypeId)) {
+        throw ControllerError.conflict(
+          '${node.name} has no output enabled (its HELLO lists none)',
+        );
+      }
+      final known = _modules[nodeId];
+      if (known != null && !outputCaps(known).contains(params['capability'])) {
+        final have = outputCaps(known).toList()..sort();
+        throw ControllerError.conflict(
+          '${node.name} has no output ${params['capability']} (it has: '
+          '${have.isEmpty ? 'none' : have.join(', ')})',
+        );
+      }
+    }
+    final wait = _outputRate.waitMs(nodeId, act, nowMs());
+    if (wait > 0) {
+      throw ControllerError(
+        'an output of ${node.name} was switched less than 2 s ago; again in '
+        '${(wait + 999) ~/ 1000} s (off is never held back)',
+        status: 429,
+      );
+    }
+    final seq = _sendOutputCmd(fc, nodeId, params);
+    return {
+      'node': nodeId,
+      'cmd': 'output',
+      'opcode': cmdOutput,
+      'seq': seq,
+      'params': params,
+    };
+  }
+
+  /// Every output of every box of the live game off now (the console's "All
+  /// outputs off", the remote GM's too: EXP-27). One CMD 12 to every node.
+  Map<String, Object?> outputsOff(int gameId) {
+    final fc = _live(gameId);
+    const params = {'capability': '*', 'act': 'off', 'src': 'gm'};
+    final seq = _sendOutputCmd(fc, broadcastNode, params);
+    return {
+      'node': broadcastNode,
+      'cmd': 'output',
+      'opcode': cmdOutput,
+      'seq': seq,
+      'params': params,
+    };
+  }
+
+  int _sendOutputCmd(
+    FieldController fc,
+    int nodeId,
+    Map<String, Object?> params,
+  ) {
+    final int? seq;
+    try {
+      seq = fc.sendCmd('output', params, dest: nodeId);
+    } on FieldControllerException catch (e) {
+      throw ControllerError(e.message);
+    }
+    if (seq == null) {
+      throw ControllerError.unavailable(
+        'the radio is $radioState; output command not sent',
+      );
+    }
+    if (nodeId != broadcastNode) {
+      _outputRate.sent(nodeId, params['act']! as String, nowMs());
+    }
+    return seq;
+  }
+
+  /// field.send(node, "output", {...}) from a field script (EXP-23): src
+  /// field, the params a box takes, one node (or every node, for off), the
+  /// rate limit. False when not sent (engine.py `field_output`).
+  bool fieldOutput(int nodeId, Object? spec) {
+    final fc = _fc;
+    if (fc == null || nodeId < 1 || nodeId > broadcastNode) return false;
+    final (params, _) = outputParams(spec, 'field');
+    if (params == null || (nodeId == broadcastNode && params['act'] != 'off')) {
+      return false;
+    }
+    if (_outputRate.waitMs(nodeId, params['act']! as String, nowMs()) > 0) {
+      return false;
+    }
+    try {
+      _sendOutputCmd(fc, nodeId, params);
+    } on ControllerError {
+      return false;
+    }
+    return true;
+  }
+
+  /// A box's node.modules or node.module_lost: the node list's `modules`,
+  /// stored with the node and told to the consoles (engine.py `_on_modules`).
+  void _onModules(Map<String, Object?> record) {
+    final game = _game;
+    final node = _fc?.nodes[record['node']];
+    if (game == null || node == null) return;
+    final text = (record['data'] as Map?)?['modules'];
+    final List<Map<String, Object?>>? modules;
+    if (record['type'] == 'node.modules') {
+      modules = modulesOf(text);
+    } else {
+      modules = markLost(_modules[node.nodeId], text);
+    }
+    if (modules == null) return;
+    _modules[node.nodeId] = modules;
+    _onNode(node, 'modules');
+    if (game['state'] == 'ready' && game['joined'] != true) {
+      _emit({'type': 'game', 'game': publicGame(game)}); // not_checked changed
+    }
   }
 
   void _checkModeCommand(
@@ -2577,6 +2782,12 @@ class ControllerEngine {
       }
     }
     positions?.onEvent(id, record);
+    if ((record['type'] == 'node.modules' ||
+            record['type'] == 'node.module_lost') &&
+        record['node'] != nodeId &&
+        record['origin'] != 'controller') {
+      _onModules(record);
+    }
     final field = _field;
     if (field != null &&
         record['node'] != nodeId &&
