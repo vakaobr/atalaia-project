@@ -41,7 +41,7 @@ typedef enum {
     ATALAIA_MSG_EVENT = 2,  /* one game or system event */
     ATALAIA_MSG_ACK = 3,    /* confirms receipt of a sequence number */
     ATALAIA_MSG_STATE = 4,  /* periodic snapshot of local state and per-team counters */
-    ATALAIA_MSG_CMD = 5,    /* controller or GM instruction: start, pause, reset, set owner, message, a mode command, a firmware update, an I/O pod's settings */
+    ATALAIA_MSG_CMD = 5,    /* controller or GM instruction: start, pause, reset, set owner, message, a mode command, a firmware update, an I/O pod's settings, an output */
     ATALAIA_MSG_TIME = 6,   /* game-clock beacon; also the controller heartbeat */
     ATALAIA_MSG_CONFIG = 7, /* assigns a preset and role; parameters only */
     ATALAIA_MSG_CLAIM = 8,  /* controller election: candidate claims the role with a term number */
@@ -56,7 +56,7 @@ enum {
     ATALAIA_PL_HELLO_FW_VERSION = 3,   /* firmware version string */
     ATALAIA_PL_HELLO_CORE_VERSION = 4, /* core library version */
     ATALAIA_PL_HELLO_TIER = 5,         /* 0=full, 1=reduced, 2=proxy */
-    ATALAIA_PL_HELLO_CAPABILITIES = 6, /* capability type ids */
+    ATALAIA_PL_HELLO_CAPABILITIES = 6, /* capability type ids (protocol/schema/capabilities.yaml) */
     ATALAIA_PL_HELLO_TRANSPORTS = 7,   /* bitmask: bit 0=lora, 1=wifi, 2=ble */
     ATALAIA_PL_HELLO_BATTERY_PCT = 8,  /* 0-100 */
     ATALAIA_PL_HELLO_EPOCH = 9,        /* current nonce epoch */
@@ -85,7 +85,7 @@ enum {
 
 /* CBOR keys of CMD payload fields. */
 enum {
-    ATALAIA_PL_CMD_CMD = 1,    /* opcode: 0-11 (9: firmware update, RFC 0001 Amendment 6; 10: an I/O pod's settings, Amendment 17; 11: a node's epoch for the receivers, Amendment 24) */
+    ATALAIA_PL_CMD_CMD = 1,    /* opcode: 0-12 (9: firmware update, RFC 0001 Amendment 6; 10: an I/O pod's settings, Amendment 17; 11: a node's epoch for the receivers, Amendment 24; 12: switch an output, Amendment 26) */
     ATALAIA_PL_CMD_PARAMS = 2, /* command-specific parameters */
     ATALAIA_PL_CMD_DEST = 3,   /* destination node; absent = broadcast */
 };
@@ -183,6 +183,10 @@ enum {
     ATALAIA_DATA_STEP = 39,              /* a box's place in a sequence of boxes, from 1 (Progressive Domination) */
     ATALAIA_DATA_BY_NODE = 40,           /* node id of the box whose game.end ended the game (the controller's own game.end only) */
     ATALAIA_DATA_BY_NAME = 41,           /* name of that box, when it has one */
+    ATALAIA_DATA_MODULES = 42,           /* a box's expansion modules and simple outputs, as compact text (protocol/expansion-port.md) */
+    ATALAIA_DATA_CAPABILITY = 43,        /* a capability id: an output's function, such as siren, smoke or out.2 */
+    ATALAIA_DATA_MS = 44,                /* milliseconds; for output.switched how long the output is on, 0 when it is turned off */
+    ATALAIA_DATA_SOURCE = 45,            /* who switched an output: script, field, gm or box_admin */
 };
 
 /* Standard event ids: the CBOR value of the type field. */
@@ -241,7 +245,43 @@ enum {
     ATALAIA_EV_PROGRESSIVE_ACTIVATED = 54,        /* progressive.activated */
     ATALAIA_EV_PROGRESSIVE_COMPLETED = 55,        /* progressive.completed */
     ATALAIA_EV_NODE_SETUP_APPLIED = 56,           /* node.setup_applied */
+    ATALAIA_EV_NODE_MODULES = 57,                 /* node.modules */
+    ATALAIA_EV_NODE_MODULE_LOST = 58,             /* node.module_lost */
+    ATALAIA_EV_OUTPUT_SWITCHED = 59,              /* output.switched */
 };
+
+/* ---- Capability types ---- */
+
+/* Capability type ids: what HELLO lists in its capabilities (key 6). */
+enum {
+    ATALAIA_CAP_BUTTON = 1,   /* button */
+    ATALAIA_CAP_KEYPAD = 2,   /* keypad */
+    ATALAIA_CAP_DISPLAY = 3,  /* display */
+    ATALAIA_CAP_LED = 4,      /* led */
+    ATALAIA_CAP_AUDIO = 5,    /* audio */
+    ATALAIA_CAP_NFC = 6,      /* nfc */
+    ATALAIA_CAP_QR = 7,       /* qr */
+    ATALAIA_CAP_GPS = 8,      /* gps */
+    ATALAIA_CAP_IMU = 9,      /* imu */
+    ATALAIA_CAP_HIT = 10,     /* hit */
+    ATALAIA_CAP_OUTPUT = 11,  /* output */
+    ATALAIA_CAP_BATTERY = 12, /* battery */
+    ATALAIA_CAP_TAMPER = 13,  /* tamper */
+    ATALAIA_CAP_CONTACT = 14, /* contact (reserved) */
+};
+
+typedef struct {
+    const char *name;
+    uint8_t id;
+    bool reserved; /* its id is fixed, but no node lists it yet */
+} atalaia_capability_type_def_t;
+
+extern const atalaia_capability_type_def_t atalaia_capability_type_defs[];
+extern const size_t atalaia_capability_type_def_count;
+
+/* The capability type with this name or id; NULL for one this core does not know. */
+const atalaia_capability_type_def_t *atalaia_capability_type(const char *name);
+const atalaia_capability_type_def_t *atalaia_capability_type_by_id(unsigned id);
 
 typedef enum {
     ATALAIA_FIELD_STRING,

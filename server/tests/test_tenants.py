@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import asyncpg
-import httpx
+import httpx2
 from sqlalchemy import select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError
@@ -175,8 +175,8 @@ class HubCase(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self) -> None:
         await self.stack.aclose()
 
-    def client(self, slug: str, host: Optional[str] = None) -> httpx.AsyncClient:
-        client = httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app),
+    def client(self, slug: str, host: Optional[str] = None) -> httpx2.AsyncClient:
+        client = httpx2.AsyncClient(transport=httpx2.ASGITransport(app=self.app),
                                    base_url=f"https://{host or f'{slug}.{DOMAIN}'}")
         self.stack.push_async_callback(client.aclose)
         return client
@@ -211,8 +211,8 @@ class HubCase(unittest.IsolatedAsyncioTestCase):
                 await db.commit()
                 return user.id, name, secret
 
-    async def login(self, client: httpx.AsyncClient, name: str, secret: Optional[str] = None,
-                    password: str = PASSWORD) -> httpx.Response:
+    async def login(self, client: httpx2.AsyncClient, name: str, secret: Optional[str] = None,
+                    password: str = PASSWORD) -> httpx2.Response:
         r = await client.post("/api/v1/auth/login", json={"username": name, "password": password})
         if r.status_code != 200 or not r.json().get("totp_required"):
             return r
@@ -221,17 +221,17 @@ class HubCase(unittest.IsolatedAsyncioTestCase):
         return await client.post("/api/v1/auth/login/totp", json={"totp_session": r.json()["totp_session"],
                                                                   "code": totp.code_at(secret or "", t)})
 
-    async def auth(self, client: httpx.AsyncClient, name: str, secret: Optional[str] = None) -> dict[str, str]:
+    async def auth(self, client: httpx2.AsyncClient, name: str, secret: Optional[str] = None) -> dict[str, str]:
         r = await self.login(client, name, secret)
         self.assertEqual(r.status_code, 200, r.text)
         return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
-    async def staff(self, tenant: tenancy.Tenant, client: httpx.AsyncClient, *roles: str,
+    async def staff(self, tenant: tenancy.Tenant, client: httpx2.AsyncClient, *roles: str,
                     server_admin: bool = False) -> dict[str, str]:
         _, name, secret = await self.user(tenant, None, *roles, server_admin=server_admin)
         return await self.auth(client, name, secret)
 
-    async def key(self, tenant: tenancy.Tenant, client: httpx.AsyncClient) -> str:
+    async def key(self, tenant: tenancy.Tenant, client: httpx2.AsyncClient) -> str:
         """The field's API key, made through the API once per class (a field has at most two live keys)."""
         keys = type(self).__dict__.get("_keys")
         if keys is None:
@@ -244,7 +244,7 @@ class HubCase(unittest.IsolatedAsyncioTestCase):
             keys[tenant.slug] = r.json()["key"]
         return keys[tenant.slug]
 
-    async def synced_game(self, tenant: tenancy.Tenant, client: httpx.AsyncClient, key: str) -> str:
+    async def synced_game(self, tenant: tenancy.Tenant, client: httpx2.AsyncClient, key: str) -> str:
         bearer = {"Authorization": f"Bearer {key}"}
         r = await client.post("/api/v1/sync/games", json=envelope(meta=META), headers=bearer)
         self.assertEqual(r.status_code, 200, r.text)
@@ -840,7 +840,7 @@ class StartTests(HubCase):
         try:
             app = create_app(Settings(allow_signup_without_notice=True, database_url=database.url, secret_key=SECRET_KEY, purge_hour=None))
             async with app.router.lifespan_context(app):
-                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+                async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app),
                                              base_url=f"https://campo-a.{DOMAIN}") as client:
                     self.assertEqual((await client.get("/api/v1/fields")).status_code, 401)
         finally:
@@ -850,7 +850,7 @@ class StartTests(HubCase):
 # The operator's commands: export, import, suspend, migrate, delete ---------------------------------------
 
 class OperatorTests(HubCase):
-    async def seed(self, tenant: tenancy.Tenant, client: httpx.AsyncClient, marker: str) -> None:
+    async def seed(self, tenant: tenancy.Tenant, client: httpx2.AsyncClient, marker: str) -> None:
         await self.user(tenant, f"{marker}-player", "player")
         await self.synced_game(tenant, client, await self.key(tenant, client))
         _, name, _ = await self.user(tenant, f"{marker}-captain")
@@ -908,7 +908,7 @@ class OperatorTests(HubCase):
             app = create_app(Settings(allow_signup_without_notice=True, database_url=target.url, secret_key="another server's own secret key 0123456",
                                       purge_hour=None))
             async with app.router.lifespan_context(app):
-                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+                async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app),
                                              base_url="https://campo.example.pt") as client:
                     r = await client.post("/api/v1/auth/login", json={"username": "alfa-player",
                                                                       "password": PASSWORD})

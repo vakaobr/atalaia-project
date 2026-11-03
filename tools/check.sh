@@ -28,6 +28,8 @@ python3 tools/mode_package_vectors.py --check
 python3 tools/pod_config_vectors.py --check
 # The Field Box's iBeacon (decisions BBC): the UUID, the advertisement bytes and the interval, from hashlib alone.
 python3 tools/box_beacon_vectors.py --check
+# The expansion port's protocol v1 (draft RFC "The expansion port", EXP-9): CRC-8, frames, lease timelines.
+python3 tools/expansion_vectors.py --check
 # The scenario compiler's Unicode classes (core/scenario/unicode.lua, decision PE24-109).
 python3 tools/scenario_unicode.py --check
 python3 tools/build_site.py --check

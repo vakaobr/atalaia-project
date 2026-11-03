@@ -9,11 +9,8 @@ own, so these are plain synchronous tests on a database of their own.
 from __future__ import annotations
 
 import unittest
-import warnings
 
-with warnings.catch_warnings():  # Starlette 1.x would rather have httpx2; httpx is what the tests pin
-    warnings.simplefilter("ignore")
-    from starlette.testclient import TestClient
+from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from atalaia_server import sync

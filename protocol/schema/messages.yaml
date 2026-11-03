@@ -20,7 +20,7 @@ messages:
   - { id: 2, name: EVENT,  doc: "one game or system event" }
   - { id: 3, name: ACK,    doc: "confirms receipt of a sequence number" }
   - { id: 4, name: STATE,  doc: "periodic snapshot of local state and per-team counters" }
-  - { id: 5, name: CMD,    doc: "controller or GM instruction: start, pause, reset, set owner, message, a mode command, a firmware update, an I/O pod's settings" }
+  - { id: 5, name: CMD,    doc: "controller or GM instruction: start, pause, reset, set owner, message, a mode command, a firmware update, an I/O pod's settings, an output" }
   - { id: 6, name: TIME,   doc: "game-clock beacon; also the controller heartbeat" }
   - { id: 7, name: CONFIG, doc: "assigns a preset and role; parameters only" }
   - { id: 8, name: CLAIM,  doc: "controller election: candidate claims the role with a term number" }
@@ -34,7 +34,7 @@ payloads:
     - { key: 3, name: fw_version, type: text, required: true, doc: "firmware version string" }
     - { key: 4, name: core_version, type: text, required: true, doc: "core library version" }
     - { key: 5, name: tier, type: uint8, required: true, doc: "0=full, 1=reduced, 2=proxy" }
-    - { key: 6, name: capabilities, type: array_uint8, required: true, doc: "capability type ids" }
+    - { key: 6, name: capabilities, type: array_uint8, required: true, doc: "capability type ids (protocol/schema/capabilities.yaml)" }
     - { key: 7, name: transports, type: uint8, required: true, doc: "bitmask: bit 0=lora, 1=wifi, 2=ble" }
     - { key: 8, name: battery_pct, type: uint8, required: false, doc: "0-100" }
     - { key: 9, name: epoch, type: uint16, required: true, doc: "current nonce epoch" }
@@ -54,7 +54,7 @@ payloads:
     - { key: 8, name: epoch, type: uint16, required: true, doc: "current nonce epoch" }
     - { key: 9, name: lost, type: map_u8_u32, required: false, doc: "per-team points lost to penalties on this node; absent = none (RFC 0001 Amendment 18)" }
   CMD:
-    - { key: 1, name: cmd, type: uint8, required: true, doc: "opcode: 0-11 (9: firmware update, RFC 0001 Amendment 6; 10: an I/O pod's settings, Amendment 17; 11: a node's epoch for the receivers, Amendment 24)" }
+    - { key: 1, name: cmd, type: uint8, required: true, doc: "opcode: 0-12 (9: firmware update, RFC 0001 Amendment 6; 10: an I/O pod's settings, Amendment 17; 11: a node's epoch for the receivers, Amendment 24; 12: switch an output, Amendment 26)" }
     - { key: 2, name: params, type: map, required: false, doc: "command-specific parameters" }
     - { key: 3, name: dest, type: uint16, required: false, doc: "destination node; absent = broadcast" }
   TIME:

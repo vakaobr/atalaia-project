@@ -172,6 +172,7 @@ prices ([hardware overview](../README.md)).
 | 28 | M3 nylon standoffs and screws, backplate (plastic or plywood) | 1 set | | Keeps the electronics off the box floor |
 | 29 | Clear window, 2-3 mm acrylic or polycarbonate | 1 | Bigger than the display's active area | Only if the lid is opaque |
 | 30 | Labels: "GAME PROP" and the box name | 2+ | Weatherproof | Required, see [section 4](#4-safety-rules) |
+| 31 | **Passive** piezo buzzer, 12-30 mm, rated 3-24 V; a 220 ohm resistor; for a louder one an NPN transistor (2N2222, BC547 or S8050), a 1 kohm, a 10 kohm and a second 1 kohm resistor | 1 each | A piezo element **without** its own oscillator | Optional, with or without the amplifier (decisions BZR-1 to BZR-8); needs a firmware built with `CONFIG_ATALAIA_BUZZER=y`. Not an "active" buzzer (one pitch whatever the firmware asks), not a magnetic transducer on the pin directly (it lists a coil resistance, such as 16 ohm), not a "buzzer module" with a pull-up on its input ([section 9.7](#97-audio-optional)). **Not yet built on hardware** |
 
 ## 3. Tools and consumables
 
@@ -537,7 +538,7 @@ pulls on a solder joint.
    are the other two.
 3. **Leave every other board pin unconnected.** In particular never wire
    GPIO 0, 45 or 46 (boot straps; 46 also drives the V4.2's front-end
-   module), GPIO 5 (the V4.3's front-end module), the board-internal
+   module; 45 only for the optional piezo buzzer, section 9.7), GPIO 5 (the V4.3's front-end module), the board-internal
    GPIO 2, 7, 8-14, 19-21, 26-32, 36, 37, 43, or the GNSS connector's GPIO 34
    and 38-42. Three board pins are used on purpose, each only as the
    diagram shows: GPIO 1 (display CS), GPIO 35 (LED ring data; the board's
@@ -648,6 +649,30 @@ The keypad expander (PCF8574), NFC reader (PN532) and battery gauge
 3. Speaker to SPK+ and SPK-. **Neither speaker wire may touch GND**: the
    amplifier's outputs are both driven.
 4. Leave GAIN and SD unconnected (default gain, both channels mixed).
+5. **Piezo buzzer (optional, with or without the amplifier; not yet built
+   on hardware).** It beeps the games' sounds as short tone patterns; with
+   the amplifier fitted too, tones and patterns sound on both together and a
+   clip with a sound file plays on the speaker alone (decision BZR-3). It
+   needs a firmware built with `CONFIG_ATALAIA_BUZZER=y`
+   ([section 12](#12-hand-off-to-bring-up)). Use a **passive** piezo
+   element. Its pin, **GPIO 45**, is a boot strapping pin that must be
+   **low** when the board starts: a pull-up there makes the chip choose
+   1.8 V flash and the board does not boot. Both circuits below keep it
+   low; never fit a "buzzer module" with a pull-up resistor on its input.
+   - **Direct, quiet** (indoors): GPIO 45 to a 220 ohm resistor, to the
+     piezo's + lead; the other lead to GND. The pin gives at most 15 mA for
+     an instant at each edge (3.3 V / 220 ohm; the ESP32-S3's pins take
+     20 mA by default) and well under 1 mA on average.
+   - **Through a transistor, louder** (outdoors): GPIO 45 to a 1 kohm
+     resistor, to the base of an NPN transistor (2N2222, BC547, S8050); a
+     10 kohm resistor from the base to GND (it holds the pin low at reset);
+     emitter to GND; the piezo from the 5 V splice to the collector, with a
+     1 kohm resistor across the piezo (it discharges the piezo between
+     pulses). The pin gives about 2.6 mA ((3.3 V - 0.7 V) / 1 kohm), the
+     piezo swings 5 V. A magnetic transducer (a coil of 16-42 ohm) works in
+     this circuit only with a 1N4148 diode across it (band towards 5 V).
+   The wiring diagrams do not show the buzzer. **Check:** no continuity
+   from GPIO 45 to 3V3 or 5 V.
 
 ### 9.8 Board battery lead
 
@@ -873,6 +898,7 @@ again, then flash. Common changes:
 | Two-team box, free the pins | `CONFIG_ATALAIA_BTN3_PIN=-1` and `CONFIG_ATALAIA_KP_P7_BUTTON=0` (optional) |
 | Board mounted the other way up (small OLED upside down) | `CONFIG_ATALAIA_OLED_FLIP=y` |
 | GNSS module switched on at boot (bench test only: nothing reads it yet) | `CONFIG_ATALAIA_GNSS_POWER_ON=y` |
+| Piezo buzzer fitted ([section 9.7](#97-audio-optional)) | `CONFIG_ATALAIA_BUZZER=y` (its pin: `CONFIG_ATALAIA_BUZZER_PIN=45`) |
 
 Taiwan (`--region=as923-tw`), listen before talk (`--lbt=`), the antenna's gain (`--antenna-dbi=`), the release keys
 and the mode keys are build options, not lines to edit; see the
@@ -905,6 +931,8 @@ made again (see section 11, step 1); keep a note of it inside the box lid.
 | A team button "presses" by itself | Long button wires picking up noise: add a 10 kohm resistor from the button's signal wire to 3V3 at the hub, and route the wires away from the LED ring and speaker wires |
 | Button 4 never registers | It is read through the keypad expander: the log must say `PCF8574 keypad at 0x..`; its wire goes to P7, not to a board GPIO |
 | No sound | Switch off (amplifier on 5 V); BCLK/LRC/DIN swapped; speaker wire touching GND |
+| Buzzer silent | Firmware built without `CONFIG_ATALAIA_BUZZER=y` (no `piezo buzzer on GPIO 45` line in the boot log); an active buzzer or a module instead of a passive piezo; the volume at 0 |
+| The board stopped booting when the buzzer was fitted | Something pulls GPIO 45 up: a buzzer module's pull-up, or the transistor circuit's 10 kohm missing. Take the buzzer off and check ([section 9.7](#97-audio-optional)) |
 | Phone cannot see the `atalaia-XXXX` Wi-Fi | 2.4 GHz antenna missing or on the wrong connector; phone too far; the box is already set up (the setup Wi-Fi opens only on a new box or after **Wi-Fi setup**: [firmware guide](../../docs/manuals/en/firmware.md#5-first-boot-and-setup)) |
 | The setup page does not open by itself | Open `http://192.168.4.1` in the phone's browser; switch off mobile data and private DNS for a minute |
 | The field's logo does not show on the big screen | It is fetched over the field Wi-Fi when a game is joined: the box needs the field Wi-Fi name and password, and the logo must be a PNG. See the [firmware guide](../../docs/manuals/en/firmware.md#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi) |
@@ -972,6 +1000,7 @@ except through the level shifter.
 | Audio bit clock (BCLK) | 6 | `ATALAIA_AUDIO_BCLK_PIN` | grey | amplifier BCLK | 3.3 V | audio driver (`hal_esp_audio.c`, I2S) |
 | Audio left/right clock (LRC) | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | pink | amplifier LRC | 3.3 V | audio driver |
 | Audio data (DIN) | 16 | `ATALAIA_AUDIO_DOUT_PIN` | brown | amplifier DIN | 3.3 V | audio driver |
+| Piezo buzzer (optional) | 45 | `ATALAIA_BUZZER_PIN` | purple | 220 ohm to the piezo, or 1 kohm to the transistor's base | 3.3 V, idles low. A boot strapping pin: its circuit must keep it low at reset | buzzer driver (`hal_esp_buzzer.c`, LEDC), only with `CONFIG_ATALAIA_BUZZER=y` |
 
 **Not GPIO signals** (wired to rails, not to a pin of the firmware):
 
@@ -995,7 +1024,7 @@ except through the level shifter.
 
 | GPIO | What it is |
 | --- | --- |
-| 0, 45, 46 | Boot strapping pins. GPIO 46 is also the V4.2's front-end module line |
+| 0, 45, 46 | Boot strapping pins. GPIO 46 is also the V4.2's front-end module line. GPIO 45 only for the optional piezo buzzer, whose circuit keeps it low ([section 9.7](#97-audio-optional)) |
 | 2, 7, 8-14 | The radio and its front-end module |
 | 5 | The V4.3's front-end module (receive amplifier on or off) |
 | 19, 20 | USB |
@@ -1006,7 +1035,8 @@ except through the level shifter.
 | 43 | UART0 transmit: the log. Never wire it to a part |
 
 Board pins used **on purpose**, each for one thing only: GPIO 1 (display CS),
-GPIO 35 (LED ring data), GPIO 44 (button 3).
+GPIO 35 (LED ring data), GPIO 44 (button 3), and GPIO 45 (the optional piezo
+buzzer).
 
 **Where the pin reference and the firmware disagreed.** On 2026-10-28 this
 section was checked against `Kconfig.projbuild` and `hal_esp_*.c`. The GPIO

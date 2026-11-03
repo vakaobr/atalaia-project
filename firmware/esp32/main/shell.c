@@ -60,6 +60,7 @@
 #include "radio/lbt_bench.h"
 #endif
 #include "serial_console.h"
+#include "sound_esp.h"
 #include "wifi_setup.h"
 
 #ifdef ESP_PLATFORM
@@ -142,6 +143,7 @@ static QueueHandle_t screen_queue;
 /* The update tasks' status screens are shown for a while, then the state's screen returns. */
 static status_hold_t status_hold;
 static QueueHandle_t audio_queue;
+static bool speaker_fitted; /* the I2S pins are set and the amplifier's driver started */
 
 /* Default teams until the config store provides configurable team names. */
 static const char *const default_teams[] = {"red", "blue", "green", "yellow"};
@@ -1318,20 +1320,26 @@ static void task_lvgl(void *arg)
 
 /*
  * audio_task -- core 0, priority 3.
- * Dequeues audio_cmd_t messages and plays clips or tones.
+ * Dequeues audio_cmd_t messages and plays clips or tones on the speaker and the piezo buzzer,
+ * whichever are fitted (sound.c, decisions BZR-1 to BZR-8): a clip's file from
+ * STORAGE_PATH/audio/<clip>.wav on the speaker, else the clip's tone pattern on both.
  */
 static void task_audio(void *arg)
 {
     (void)arg;
-    ESP_LOGI(TAG, "audio task started");
+    sound_out_t out = sound_esp_out(&hal, speaker_fitted);
+    ESP_LOGI(TAG, "audio task started (speaker %s, piezo buzzer %s)", speaker_fitted ? "yes" : "no",
+             hal.buzzer != NULL ? "yes" : "no");
 
     for (;;) {
         audio_cmd_t cmd;
         if (xQueueReceive(audio_queue, &cmd, portMAX_DELAY) == pdTRUE) {
-            if (cmd.clip[0] == '\0') {
-                hal.audio->stop();
+            if (cmd.clip[0] != '\0') {
+                sound_play(&out, STORAGE_PATH "/audio", cmd.clip);
+            } else if (cmd.tone_ms > 0) {
+                sound_tone(&out, cmd.tone_hz, cmd.tone_ms);
             } else {
-                hal.audio->play_wav(cmd.clip);
+                sound_stop(&out);
             }
         }
     }
@@ -1380,13 +1388,19 @@ static void hal_start(void)
     if (hal.keypad->init() != 0) ESP_LOGW(TAG, "keypad: not available");
     if (hal.leds->init() != 0) ESP_LOGW(TAG, "LED ring: not available");
     if (hal.nfc->init() != 0) ESP_LOGW(TAG, "NFC: not available");
-    if (hal.audio->init() != 0) ESP_LOGW(TAG, "audio: not available");
+    speaker_fitted = sound_esp_speaker_pins() && hal.audio->init() == 0;
+    if (!speaker_fitted) ESP_LOGW(TAG, "audio: no amplifier");
+    if (hal.buzzer != NULL && hal.buzzer->init() != 0) {
+        ESP_LOGW(TAG, "piezo buzzer: not available");
+        hal.buzzer = NULL;
+    }
     if (hal.battery->init() != 0) ESP_LOGW(TAG, "battery gauge: not available");
     if (hal.radio->init() != 0) {
         ESP_LOGW(TAG, "radio: not available (no SX1262)");
         hal.radio = NULL; /* signal to the rest of the shell */
     }
     hal.audio->set_volume((uint8_t)config_store_get_u32("volume", 80));
+    if (hal.buzzer != NULL) hal.buzzer->set_volume((uint8_t)config_store_get_u32("volume", 80));
 }
 
 /* ---- Field game: radio task first, so a rejoined box can send at once ---- */

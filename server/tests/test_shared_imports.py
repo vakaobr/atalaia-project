@@ -34,7 +34,7 @@ from atalaia_sim.mode import ModeError  # noqa: E402
 
 REQUIRE_ALL = os.environ.get("ATALAIA_REQUIRE_ALL") == "1"
 BLOCKED = ("fastapi", "pydantic", "pydantic_core", "starlette", "sqlalchemy", "alembic", "asyncpg", "uvicorn",
-           "httpx", "anyio")
+           "httpx", "httpx2", "anyio")
 SHARED = ("atalaia_controller.chrono", "atalaia_controller.player_token", "atalaia_controller.images",
           "atalaia_controller.sync_format", "atalaia_controller.sync_client",
           "atalaia_controller.modes", "atalaia_controller.scenarios", "atalaia_controller.visibility",

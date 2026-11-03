@@ -21,7 +21,7 @@ import time
 from typing import Any, Optional
 from urllib.parse import parse_qs, urlsplit
 
-import httpx
+import httpx2
 
 from atalaia_server import hosted, oidc
 from atalaia_server.config import ConfigError, OidcClient, Settings
@@ -52,7 +52,7 @@ class RelayCase(HubCase):
 
     # One login, step by step ---------------------------------------------------------------------
 
-    async def start(self, client: httpx.AsyncClient, provider: str = "google", **body: Any) -> dict[str, str]:
+    async def start(self, client: httpx2.AsyncClient, provider: str = "google", **body: Any) -> dict[str, str]:
         r = await client.post(f"/api/v1/auth/oidc/{provider}/start", json={"purpose": "login", "notice_seen": True, "age_confirmed": True, **body})
         self.assertEqual(r.status_code, 200, r.text)
         return self.idp.authorize(r.json()["authorization_url"])
@@ -61,19 +61,19 @@ class RelayCase(HubCase):
         client_id = {"google": "google-id", "microsoft": "ms-id"}[provider]
         return self.idp.grant(params, self.idp.claims(provider, client_id, subject, params["nonce"]))
 
-    async def at_hub(self, params: dict[str, str], code: str, **extra: str) -> httpx.Response:
+    async def at_hub(self, params: dict[str, str], code: str, **extra: str) -> httpx2.Response:
         """The provider sends the browser to the redirect address it was given (the hub's)."""
         self.assertTrue(params["redirect_uri"].startswith(f"https://{DOMAIN}/"), params["redirect_uri"])
         return await self.hubc.get(urlsplit(params["redirect_uri"]).path,
                                    params={"code": code, "state": params["state"], **extra})
 
     @staticmethod
-    def where(r: httpx.Response) -> tuple[str, str, dict[str, str]]:
+    def where(r: httpx2.Response) -> tuple[str, str, dict[str, str]]:
         assert r.status_code == 303, (r.status_code, r.text)
         loc = urlsplit(r.headers["location"])
         return loc.netloc, loc.path, {k: v[0] for k, v in parse_qs(loc.query).items()}
 
-    async def follow(self, client: httpx.AsyncClient, r: httpx.Response) -> httpx.Response:
+    async def follow(self, client: httpx2.AsyncClient, r: httpx2.Response) -> httpx2.Response:
         _, path, query = self.where(r)
         return await client.get(path, params=query)
 

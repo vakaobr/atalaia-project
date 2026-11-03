@@ -5,11 +5,14 @@
  * Tests for target_addon (the target addon polled over I2C, decisions
  * P5J-18 and P5J-19), against a model of the addon that follows the draft
  * report format: it queues hits while armed and shows the oldest until the
- * box acknowledges it.
+ * box acknowledges it. Its CRC-8 is the expansion port's (protocol/expansion-port.md): every
+ * frame of protocol/vectors/expansion.json is checked with it here until the port's driver
+ * (a later increment of the draft RFC "The expansion port") replaces this stub.
  */
 #include <string.h>
 
 #include "check.h"
+#include "expansion_vectors.h"
 #include "target_addon.h"
 
 #define FAKE_QUEUE 8
@@ -110,6 +113,41 @@ static void test_crc8(void)
     const uint8_t s[] = "123456789";
     CHECK(target_addon_crc8(s, 9) == 0xF4);
     CHECK(target_addon_crc8(s, 0) == 0x00);
+}
+
+static void check_named(bool ok, const char *name)
+{
+    if (!ok) fprintf(stderr, "  expansion vector: %s\n", name);
+    CHECK(ok);
+}
+
+/* The expansion port's CRC-8 (decision EXP-9): the shared cases, and every frame of
+ * protocol/vectors/expansion.json, a write's CRC covering the address byte as sent. */
+static void test_expansion_crc8(void)
+{
+    CHECK(EXP_CRC_VECTOR_COUNT >= 7);
+    for (size_t i = 0; i < EXP_CRC_VECTOR_COUNT; i++) {
+        const exp_crc_vector_t *v = &exp_crc_vectors[i];
+        check_named(target_addon_crc8(v->data, v->len) == v->crc, v->name);
+    }
+    size_t reads = 0, writes = 0;
+    for (size_t i = 0; i < EXP_FRAME_VECTOR_COUNT; i++) {
+        const exp_frame_vector_t *v = &exp_frame_vectors[i];
+        uint8_t covered[32];
+        size_t n = 0;
+        check_named(v->len >= 1 && v->len < sizeof(covered), v->name);
+        if (v->len < 1 || v->len >= sizeof(covered)) continue;
+        if (v->address >= 0) {
+            covered[n++] = (uint8_t)(v->address << 1);
+            writes++;
+        } else {
+            reads++;
+        }
+        memcpy(covered + n, v->bytes, v->len - 1);
+        n += v->len - 1;
+        check_named((target_addon_crc8(covered, n) == v->bytes[v->len - 1]) == v->crc_ok, v->name);
+    }
+    CHECK(reads >= 30 && writes >= 40);
 }
 
 static void test_poll_period(void)
@@ -262,6 +300,7 @@ static void test_overflow_counted(void)
 void run_target_addon_tests(void)
 {
     test_crc8();
+    test_expansion_crc8();
     test_poll_period();
     test_arm_then_hit();
     test_burst_in_one_poll();

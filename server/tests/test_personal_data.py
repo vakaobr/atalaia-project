@@ -15,7 +15,7 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-import httpx
+import httpx2
 
 from atalaia_server import cli, personal_data
 from atalaia_server.api.auth import COOKIE
@@ -154,7 +154,7 @@ class RectificationTests(PersonalDataTestCase):
         self.user = await self.register("rita", "rita@example.pt")
         self.headers = bearer(await self.login("rita"))
 
-    async def patch(self, **body: Any) -> httpx.Response:
+    async def patch(self, **body: Any) -> httpx2.Response:
         return await self.client.patch("/api/v1/me", json={"password": PASSWORD, **body}, headers=self.headers)
 
     async def test_new_username_and_email(self) -> None:
@@ -255,7 +255,7 @@ class PasswordChangeTests(PersonalDataTestCase):
 
 
 class ErasureTests(PersonalDataTestCase):
-    async def erase(self, headers: dict[str, str], **body: Any) -> httpx.Response:
+    async def erase(self, headers: dict[str, str], **body: Any) -> httpx2.Response:
         return await self.client.request("DELETE", "/api/v1/me", json={"password": PASSWORD, **body},
                                          headers=headers)
 

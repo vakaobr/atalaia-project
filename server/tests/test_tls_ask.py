@@ -17,7 +17,7 @@ import unittest
 import uuid
 from typing import Optional
 
-import httpx
+import httpx2
 
 from atalaia_server import hosted, tenancy, tls_ask
 from atalaia_server.config import ConfigError
@@ -82,7 +82,7 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.registry = FakeRegistry()
         self.clock = Clock()
         self.app = tls_ask.AskApp(DOMAIN, self.registry, tls_ask.TokenBucket(5.0, 20, clock=self.clock))
-        self.client = httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app), base_url="http://tls-ask:8001")
+        self.client = httpx2.AsyncClient(transport=httpx2.ASGITransport(app=self.app), base_url="http://tls-ask:8001")
 
     async def asyncTearDown(self) -> None:
         await self.client.aclose()
@@ -148,7 +148,7 @@ class RegistryTests(unittest.IsolatedAsyncioTestCase):
     async def test_the_registry_decides(self) -> None:
         app = tls_ask.create_app({"ATALAIA_DATABASE_URL": self.hub.app_url, "ATALAIA_HOSTED_DOMAIN": "HUB.test"})
         try:
-            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://tls-ask") as c:
+            async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="http://tls-ask") as c:
                 async def ask(name: str) -> int:
                     return (await c.get("/check", params={"domain": name})).status_code
 

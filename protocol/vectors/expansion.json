@@ -1,0 +1,2827 @@
+{
+  "description": "The expansion port's protocol v1 (protocol/expansion-port.md; draft RFC 'The expansion port', decisions EXP-7 to EXP-14, EXP-21, EXP-36): the CRC-8 (polynomial 0x07, initial 0, no reflection; a write's CRC covers the address byte as sent, address << 1), the frames a box reads and writes with their bytes after the address byte, good and refused with the reason, the reference modules they belong to, the lease's timelines, and node.modules' compact text. Made by tools/expansion_vectors.py; checked by simulator/tests/test_expansion.py (the Python reference model) and firmware/esp32/test/test_target_addon.c (the box's CRC-8, every frame).",
+  "protocol_version": 1,
+  "magic": "AX",
+  "addresses": {
+    "first": 88,
+    "last": 95,
+    "input_default": 88,
+    "output_default": 92,
+    "most_modules": 4
+  },
+  "polling": {
+    "input_ms": 20,
+    "output_only_ms": 250,
+    "gone_after_failed_reads": 25,
+    "probe_every_ms": 2000
+  },
+  "lease": {
+    "default_100ms": 15,
+    "least_100ms": 5,
+    "most_100ms": 50,
+    "refresh_ms": 500,
+    "relay_least_change_ms": 100,
+    "relay_least_pattern_10ms": 10,
+    "solid_state_least_pattern_10ms": 1
+  },
+  "crc8": [
+    {
+      "name": "empty",
+      "data": "",
+      "crc": 0
+    },
+    {
+      "name": "check value 123456789",
+      "data": "313233343536373839",
+      "crc": 244
+    },
+    {
+      "name": "one zero byte",
+      "data": "00",
+      "crc": 0
+    },
+    {
+      "name": "one 0xff byte",
+      "data": "ff",
+      "crc": 243
+    },
+    {
+      "name": "the out4 module's IDENT body",
+      "data": "4158010204020002010000a1b2c3d4",
+      "crc": 192
+    },
+    {
+      "name": "a LEASE 15 write to 0x5c, address byte first",
+      "data": "b810040f",
+      "crc": 243
+    },
+    {
+      "name": "the same write to 0x5d",
+      "data": "ba10040f",
+      "crc": 223
+    }
+  ],
+  "modules": {
+    "target": {
+      "address": 88,
+      "ident": {
+        "version": 1,
+        "inputs": true,
+        "outputs": false,
+        "channels": 1,
+        "model": 1,
+        "model_name": "target",
+        "hw": 1,
+        "fw": "1.0.0",
+        "uid": "e6614103"
+      },
+      "channels": [
+        {
+          "index": 0,
+          "kind": "hit",
+          "relay": false,
+          "solid_state": false,
+          "senses_supply": false,
+          "hint": "generic",
+          "max_on_s": 0,
+          "min_off_s": 0
+        }
+      ]
+    },
+    "out4": {
+      "address": 92,
+      "ident": {
+        "version": 1,
+        "inputs": false,
+        "outputs": true,
+        "channels": 4,
+        "model": 2,
+        "model_name": "out4",
+        "hw": 2,
+        "fw": "1.0.0",
+        "uid": "a1b2c3d4"
+      },
+      "channels": [
+        {
+          "index": 0,
+          "kind": "output",
+          "relay": true,
+          "solid_state": false,
+          "senses_supply": false,
+          "hint": "siren",
+          "max_on_s": 60,
+          "min_off_s": 0
+        },
+        {
+          "index": 1,
+          "kind": "output",
+          "relay": true,
+          "solid_state": false,
+          "senses_supply": false,
+          "hint": "strobe",
+          "max_on_s": 120,
+          "min_off_s": 0
+        },
+        {
+          "index": 2,
+          "kind": "output",
+          "relay": true,
+          "solid_state": false,
+          "senses_supply": true,
+          "hint": "smoke",
+          "max_on_s": 30,
+          "min_off_s": 30
+        },
+        {
+          "index": 3,
+          "kind": "output",
+          "relay": false,
+          "solid_state": true,
+          "senses_supply": false,
+          "hint": "generic",
+          "max_on_s": 255,
+          "min_off_s": 0
+        }
+      ]
+    },
+    "m8001": {
+      "address": 93,
+      "ident": {
+        "version": 1,
+        "inputs": true,
+        "outputs": true,
+        "channels": 2,
+        "model": 32769,
+        "model_name": "m8001",
+        "hw": 3,
+        "fw": "0.2.1",
+        "uid": "00000001"
+      },
+      "channels": [
+        {
+          "index": 0,
+          "kind": "hit",
+          "relay": false,
+          "solid_state": false,
+          "senses_supply": false,
+          "hint": "generic",
+          "max_on_s": 0,
+          "min_off_s": 0
+        },
+        {
+          "index": 1,
+          "kind": "output",
+          "relay": false,
+          "solid_state": true,
+          "senses_supply": false,
+          "hint": "light",
+          "max_on_s": 255,
+          "min_off_s": 0
+        }
+      ]
+    }
+  },
+  "ident": {
+    "register": 0,
+    "length": 16,
+    "valid": [
+      {
+        "name": "target_module",
+        "module": "target",
+        "fields": {
+          "version": 1,
+          "inputs": true,
+          "outputs": false,
+          "channels": 1,
+          "model": 1,
+          "model_name": "target",
+          "hw": 1,
+          "fw": "1.0.0",
+          "uid": "e6614103"
+        },
+        "bytes": "4158010101010001010000e661410315"
+      },
+      {
+        "name": "out4_module",
+        "module": "out4",
+        "fields": {
+          "version": 1,
+          "inputs": false,
+          "outputs": true,
+          "channels": 4,
+          "model": 2,
+          "model_name": "out4",
+          "hw": 2,
+          "fw": "1.0.0",
+          "uid": "a1b2c3d4"
+        },
+        "bytes": "4158010204020002010000a1b2c3d4c0"
+      },
+      {
+        "name": "m8001_module",
+        "module": "m8001",
+        "fields": {
+          "version": 1,
+          "inputs": true,
+          "outputs": true,
+          "channels": 2,
+          "model": 32769,
+          "model_name": "m8001",
+          "hw": 3,
+          "fw": "0.2.1",
+          "uid": "00000001"
+        },
+        "bytes": "4158010302018003000201000000018d"
+      }
+    ],
+    "invalid": [
+      {
+        "name": "bad_crc",
+        "bytes": "4158010101010001010000e6614103ea",
+        "reason": "crc"
+      },
+      {
+        "name": "short_read",
+        "bytes": "4158010101010001010000e6614103",
+        "reason": "length"
+      },
+      {
+        "name": "long_read",
+        "bytes": "4158010101010001010000e66141031500",
+        "reason": "length"
+      },
+      {
+        "name": "bad_magic",
+        "bytes": "4159010101010001010000e6614103f0",
+        "reason": "magic"
+      },
+      {
+        "name": "all_ones_bus",
+        "bytes": "ffffffffffffffffffffffffffffffff",
+        "reason": "crc"
+      },
+      {
+        "name": "version_2",
+        "bytes": "4158020101010001010000e6614103ae",
+        "reason": "version"
+      },
+      {
+        "name": "version_0",
+        "bytes": "4158000101010001010000e661410381",
+        "reason": "version"
+      },
+      {
+        "name": "no_class",
+        "bytes": "4158010001010001010000e661410348",
+        "reason": "classes"
+      },
+      {
+        "name": "no_channel",
+        "bytes": "4158010100010001010000e66141030a",
+        "reason": "channels"
+      },
+      {
+        "name": "nine_channels",
+        "bytes": "4158010109010001010000e6614103ed",
+        "reason": "channels"
+      }
+    ]
+  },
+  "channel": {
+    "register": 1,
+    "length": 8,
+    "kinds": {
+      "hit": 1,
+      "contact": 2,
+      "output": 16
+    },
+    "hints": [
+      "generic",
+      "siren",
+      "strobe",
+      "smoke",
+      "light",
+      "horn"
+    ],
+    "valid": [
+      {
+        "name": "target_channel_0",
+        "module": "target",
+        "index": 0,
+        "fields": {
+          "index": 0,
+          "kind": "hit",
+          "relay": false,
+          "solid_state": false,
+          "senses_supply": false,
+          "hint": "generic",
+          "max_on_s": 0,
+          "min_off_s": 0
+        },
+        "bytes": "0001000000000029"
+      },
+      {
+        "name": "out4_channel_0",
+        "module": "out4",
+        "index": 0,
+        "fields": {
+          "index": 0,
+          "kind": "output",
+          "relay": true,
+          "solid_state": false,
+          "senses_supply": false,
+          "hint": "siren",
+          "max_on_s": 60,
+          "min_off_s": 0
+        },
+        "bytes": "001001013c0000f1"
+      },
+      {
+        "name": "out4_channel_1",
+        "module": "out4",
+        "index": 1,
+        "fields": {
+          "index": 1,
+          "kind": "output",
+          "relay": true,
+          "solid_state": false,
+          "senses_supply": false,
+          "hint": "strobe",
+          "max_on_s": 120,
+          "min_off_s": 0
+        },
+        "bytes": "0110010278000039"
+      },
+      {
+        "name": "out4_channel_2",
+        "module": "out4",
+        "index": 2,
+        "fields": {
+          "index": 2,
+          "kind": "output",
+          "relay": true,
+          "solid_state": false,
+          "senses_supply": true,
+          "hint": "smoke",
+          "max_on_s": 30,
+          "min_off_s": 30
+        },
+        "bytes": "021005031e1e00ff"
+      },
+      {
+        "name": "out4_channel_3",
+        "module": "out4",
+        "index": 3,
+        "fields": {
+          "index": 3,
+          "kind": "output",
+          "relay": false,
+          "solid_state": true,
+          "senses_supply": false,
+          "hint": "generic",
+          "max_on_s": 255,
+          "min_off_s": 0
+        },
+        "bytes": "03100200ff000017"
+      },
+      {
+        "name": "m8001_channel_0",
+        "module": "m8001",
+        "index": 0,
+        "fields": {
+          "index": 0,
+          "kind": "hit",
+          "relay": false,
+          "solid_state": false,
+          "senses_supply": false,
+          "hint": "generic",
+          "max_on_s": 0,
+          "min_off_s": 0
+        },
+        "bytes": "0001000000000029"
+      },
+      {
+        "name": "m8001_channel_1",
+        "module": "m8001",
+        "index": 1,
+        "fields": {
+          "index": 1,
+          "kind": "output",
+          "relay": false,
+          "solid_state": true,
+          "senses_supply": false,
+          "hint": "light",
+          "max_on_s": 255,
+          "min_off_s": 0
+        },
+        "bytes": "01100204ff0000f6"
+      }
+    ],
+    "invalid": [
+      {
+        "name": "bad_crc",
+        "index": 0,
+        "bytes": "00010000000000d6",
+        "reason": "crc"
+      },
+      {
+        "name": "short_read",
+        "index": 0,
+        "bytes": "00010000000000",
+        "reason": "length"
+      },
+      {
+        "name": "answer_for_another_channel",
+        "index": 1,
+        "bytes": "0001000000000029",
+        "reason": "index"
+      },
+      {
+        "name": "index_8",
+        "index": 8,
+        "bytes": "08010000000000c3",
+        "reason": "index"
+      },
+      {
+        "name": "unknown_kind",
+        "index": 0,
+        "bytes": "002000000000003b",
+        "reason": "kind"
+      },
+      {
+        "name": "contact_not_in_v1",
+        "index": 0,
+        "bytes": "0002000000000052",
+        "reason": "kind"
+      },
+      {
+        "name": "output_without_max_on",
+        "index": 0,
+        "bytes": "00100101000000ea",
+        "reason": "max_on"
+      }
+    ]
+  },
+  "status": {
+    "register": 2,
+    "length": 9,
+    "flags": [
+      "event",
+      "more",
+      "overflow",
+      "supply_ok",
+      "lease_expired",
+      "fresh",
+      "cmd_error"
+    ],
+    "event_kinds": {
+      "hit": 1,
+      "closed": 2,
+      "opened": 3
+    },
+    "valid": [
+      {
+        "name": "target_idle_armed",
+        "module": "target",
+        "channels": 1,
+        "fields": {
+          "event": null,
+          "more": false,
+          "overflow": false,
+          "supply_ok": false,
+          "lease_expired": false,
+          "fresh": false,
+          "cmd_error": false,
+          "outputs": 0,
+          "armed": 1
+        },
+        "bytes": "000000000000000107"
+      },
+      {
+        "name": "target_hit_with_more",
+        "module": "target",
+        "channels": 1,
+        "fields": {
+          "event": {
+            "seq": 7,
+            "channel": 0,
+            "kind": "hit",
+            "value": 200,
+            "age_ms": 35
+          },
+          "more": true,
+          "overflow": false,
+          "supply_ok": false,
+          "lease_expired": false,
+          "fresh": false,
+          "cmd_error": false,
+          "outputs": 0,
+          "armed": 1
+        },
+        "bytes": "030710c8230000010d",
+        "t_read_ms": 10000,
+        "t_event_ms": 9965
+      },
+      {
+        "name": "target_hit_age_saturated",
+        "module": "target",
+        "channels": 1,
+        "fields": {
+          "event": {
+            "seq": 255,
+            "channel": 0,
+            "kind": "hit",
+            "value": 0,
+            "age_ms": 65535
+          },
+          "more": false,
+          "overflow": true,
+          "supply_ok": false,
+          "lease_expired": false,
+          "fresh": false,
+          "cmd_error": false,
+          "outputs": 0,
+          "armed": 1
+        },
+        "bytes": "05ff1000ffff000178"
+      },
+      {
+        "name": "target_fresh_after_restart",
+        "module": "target",
+        "channels": 1,
+        "fields": {
+          "event": null,
+          "more": false,
+          "overflow": false,
+          "supply_ok": false,
+          "lease_expired": false,
+          "fresh": true,
+          "cmd_error": false,
+          "outputs": 0,
+          "armed": 0
+        },
+        "bytes": "20000000000000006e"
+      },
+      {
+        "name": "out4_two_on_supply_ok",
+        "module": "out4",
+        "channels": 4,
+        "fields": {
+          "event": null,
+          "more": false,
+          "overflow": false,
+          "supply_ok": true,
+          "lease_expired": false,
+          "fresh": false,
+          "cmd_error": false,
+          "outputs": 5,
+          "armed": 0
+        },
+        "bytes": "0800000000000500d9"
+      },
+      {
+        "name": "out4_lease_expired",
+        "module": "out4",
+        "channels": 4,
+        "fields": {
+          "event": null,
+          "more": false,
+          "overflow": false,
+          "supply_ok": true,
+          "lease_expired": true,
+          "fresh": false,
+          "cmd_error": false,
+          "outputs": 0,
+          "armed": 0
+        },
+        "bytes": "1800000000000000af"
+      },
+      {
+        "name": "out4_command_refused",
+        "module": "out4",
+        "channels": 4,
+        "fields": {
+          "event": null,
+          "more": false,
+          "overflow": false,
+          "supply_ok": false,
+          "lease_expired": false,
+          "fresh": false,
+          "cmd_error": true,
+          "outputs": 1,
+          "armed": 0
+        },
+        "bytes": "4000000000000100c9"
+      },
+      {
+        "name": "m8001_hit_on_channel_0_light_on",
+        "module": "m8001",
+        "channels": 2,
+        "fields": {
+          "event": {
+            "seq": 1,
+            "channel": 0,
+            "kind": "hit",
+            "value": 90,
+            "age_ms": 1000
+          },
+          "more": false,
+          "overflow": false,
+          "supply_ok": false,
+          "lease_expired": false,
+          "fresh": false,
+          "cmd_error": false,
+          "outputs": 2,
+          "armed": 1
+        },
+        "bytes": "0101105ae803020131"
+      }
+    ],
+    "invalid": [
+      {
+        "name": "bad_crc",
+        "module": "target",
+        "channels": 1,
+        "bytes": "010710c823000001d4",
+        "reason": "crc"
+      },
+      {
+        "name": "short_read",
+        "module": "target",
+        "channels": 1,
+        "bytes": "010710c823000001",
+        "reason": "length"
+      },
+      {
+        "name": "event_on_a_missing_channel",
+        "module": "target",
+        "channels": 1,
+        "bytes": "010711c82300000102",
+        "reason": "channel"
+      },
+      {
+        "name": "event_kind_0",
+        "module": "target",
+        "channels": 1,
+        "bytes": "010700c823000001b5",
+        "reason": "event_kind"
+      },
+      {
+        "name": "event_kind_4",
+        "module": "target",
+        "channels": 1,
+        "bytes": "010740c823000001c3",
+        "reason": "event_kind"
+      }
+    ]
+  },
+  "command": {
+    "register": 16,
+    "ops": {
+      "ACK": 1,
+      "ARM": 2,
+      "OUTPUT": 3,
+      "LEASE": 4,
+      "ALL_OFF": 5,
+      "CLEAR_FRESH": 6,
+      "LOCATE": 7,
+      "CONFIG": 8
+    },
+    "modes": {
+      "off": 0,
+      "on": 1,
+      "pattern": 2
+    },
+    "parameters": {
+      "threshold": 1,
+      "holdoff_ms": 2,
+      "debounce_ms": 3
+    },
+    "valid": [
+      {
+        "name": "ack_seq_7",
+        "module": "target",
+        "address": 88,
+        "fields": {
+          "op": "ACK",
+          "seq": 7
+        },
+        "bytes": "1001073a"
+      },
+      {
+        "name": "arm_channel_0",
+        "module": "target",
+        "address": 88,
+        "fields": {
+          "op": "ARM",
+          "armed": 1
+        },
+        "bytes": "10020117"
+      },
+      {
+        "name": "disarm_all",
+        "module": "target",
+        "address": 88,
+        "fields": {
+          "op": "ARM",
+          "armed": 0
+        },
+        "bytes": "10020010"
+      },
+      {
+        "name": "siren_on_10_s",
+        "module": "out4",
+        "address": 92,
+        "fields": {
+          "op": "OUTPUT",
+          "channel": 0,
+          "mode": "on",
+          "duration_100ms": 100,
+          "on_10ms": 0,
+          "off_10ms": 0
+        },
+        "bytes": "1003000164000000000064"
+      },
+      {
+        "name": "siren_on_until_off",
+        "module": "out4",
+        "address": 92,
+        "fields": {
+          "op": "OUTPUT",
+          "channel": 0,
+          "mode": "on",
+          "duration_100ms": 0,
+          "on_10ms": 0,
+          "off_10ms": 0
+        },
+        "bytes": "100300010000000000008d"
+      },
+      {
+        "name": "siren_off",
+        "module": "out4",
+        "address": 92,
+        "fields": {
+          "op": "OUTPUT",
+          "channel": 0,
+          "mode": "off",
+          "duration_100ms": 0,
+          "on_10ms": 0,
+          "off_10ms": 0
+        },
+        "bytes": "1003000000000000000052"
+      },
+      {
+        "name": "strobe_pattern_500_500_for_30_s",
+        "module": "out4",
+        "address": 92,
+        "fields": {
+          "op": "OUTPUT",
+          "channel": 1,
+          "mode": "pattern",
+          "duration_100ms": 300,
+          "on_10ms": 50,
+          "off_10ms": 50
+        },
+        "bytes": "100301022c01320032001c"
+      },
+      {
+        "name": "relay_pattern_at_the_100_ms_floor",
+        "module": "out4",
+        "address": 92,
+        "fields": {
+          "op": "OUTPUT",
+          "channel": 1,
+          "mode": "pattern",
+          "duration_100ms": 10,
+          "on_10ms": 10,
+          "off_10ms": 10
+        },
+        "bytes": "100301020a000a000a00fb"
+      },
+      {
+        "name": "solid_state_pattern_50_50",
+        "module": "out4",
+        "address": 92,
+        "fields": {
+          "op": "OUTPUT",
+          "channel": 3,
+          "mode": "pattern",
+          "duration_100ms": 10,
+          "on_10ms": 5,
+          "off_10ms": 5
+        },
+        "bytes": "100303020a0005000500cc"
+      },
+      {
+        "name": "lease_1_5_s",
+        "module": "out4",
+        "address": 92,
+        "fields": {
+          "op": "LEASE",
+          "lease_100ms": 15
+        },
+        "bytes": "10040ff3"
+      },
+      {
+        "name": "lease_shortest",
+        "module": "out4",
+        "address": 92,
+        "fields": {
+          "op": "LEASE",
+          "lease_100ms": 5
+        },
+        "bytes": "100405c5"
+      },
+      {
+        "name": "lease_longest",
+        "module": "out4",
+        "address": 92,
+        "fields": {
+          "op": "LEASE",
+          "lease_100ms": 50
+        },
+        "bytes": "10043240"
+      },
+      {
+        "name": "all_off",
+        "module": "out4",
+        "address": 92,
+        "fields": {
+          "op": "ALL_OFF"
+        },
+        "bytes": "1005f7"
+      },
+      {
+        "name": "clear_fresh",
+        "module": "out4",
+        "address": 92,
+        "fields": {
+          "op": "CLEAR_FRESH"
+        },
+        "bytes": "1006fe"
+      },
+      {
+        "name": "locate_10_s",
+        "module": "out4",
+        "address": 92,
+        "fields": {
+          "op": "LOCATE",
+          "seconds": 10
+        },
+        "bytes": "10070ad7"
+      },
+      {
+        "name": "threshold_40",
+        "module": "target",
+        "address": 88,
+        "fields": {
+          "op": "CONFIG",
+          "channel": 0,
+          "parameter": "threshold",
+          "value": 40
+        },
+        "bytes": "10080001280012"
+      },
+      {
+        "name": "holdoff_150_ms",
+        "module": "target",
+        "address": 88,
+        "fields": {
+          "op": "CONFIG",
+          "channel": 0,
+          "parameter": "holdoff_ms",
+          "value": 150
+        },
+        "bytes": "10080002960036"
+      },
+      {
+        "name": "debounce_20_ms",
+        "module": "target",
+        "address": 88,
+        "fields": {
+          "op": "CONFIG",
+          "channel": 0,
+          "parameter": "debounce_ms",
+          "value": 20
+        },
+        "bytes": "100800031400c1"
+      },
+      {
+        "name": "mixed_module_light_on_5_s",
+        "module": "m8001",
+        "address": 93,
+        "fields": {
+          "op": "OUTPUT",
+          "channel": 1,
+          "mode": "on",
+          "duration_100ms": 50,
+          "on_10ms": 0,
+          "off_10ms": 0
+        },
+        "bytes": "1003010132000000000057"
+      }
+    ],
+    "invalid": [
+      {
+        "name": "bad_crc",
+        "module": "out4",
+        "address": 92,
+        "bytes": "10040f0c",
+        "reason": "crc"
+      },
+      {
+        "name": "meant_for_another_address",
+        "module": "out4",
+        "address": 93,
+        "bytes": "10040ff3",
+        "reason": "crc"
+      },
+      {
+        "name": "crc_without_the_address",
+        "module": "out4",
+        "address": 92,
+        "bytes": "10040fdb",
+        "reason": "crc"
+      },
+      {
+        "name": "unknown_register",
+        "module": "out4",
+        "address": 92,
+        "bytes": "11040f98",
+        "reason": "register"
+      },
+      {
+        "name": "read_only_register",
+        "module": "out4",
+        "address": 92,
+        "bytes": "020091",
+        "reason": "register"
+      },
+      {
+        "name": "no_op",
+        "module": "out4",
+        "address": 92,
+        "bytes": "1097",
+        "reason": "length"
+      },
+      {
+        "name": "op_0",
+        "module": "out4",
+        "address": 92,
+        "bytes": "1000ec",
+        "reason": "op"
+      },
+      {
+        "name": "op_9",
+        "module": "out4",
+        "address": 92,
+        "bytes": "1009d3",
+        "reason": "op"
+      },
+      {
+        "name": "lease_without_its_argument",
+        "module": "out4",
+        "address": 92,
+        "bytes": "1004f0",
+        "reason": "length"
+      },
+      {
+        "name": "all_off_with_an_extra_byte",
+        "module": "out4",
+        "address": 92,
+        "bytes": "100500cb",
+        "reason": "length"
+      },
+      {
+        "name": "output_one_byte_short",
+        "module": "out4",
+        "address": 92,
+        "bytes": "100300016400000000ce",
+        "reason": "length"
+      },
+      {
+        "name": "lease_too_short",
+        "module": "out4",
+        "address": 92,
+        "bytes": "100404c2",
+        "reason": "range"
+      },
+      {
+        "name": "lease_too_long",
+        "module": "out4",
+        "address": 92,
+        "bytes": "10043347",
+        "reason": "range"
+      },
+      {
+        "name": "output_on_channel_4",
+        "module": "out4",
+        "address": 92,
+        "bytes": "100304010a0000000000dc",
+        "reason": "range"
+      },
+      {
+        "name": "output_mode_3",
+        "module": "out4",
+        "address": 92,
+        "bytes": "100300030a000000000029",
+        "reason": "range"
+      },
+      {
+        "name": "output_on_an_input",
+        "module": "target",
+        "address": 88,
+        "bytes": "100300010a000000000068",
+        "reason": "range"
+      },
+      {
+        "name": "relay_pattern_below_100_ms",
+        "module": "out4",
+        "address": 92,
+        "bytes": "100301020a0005000500ea",
+        "reason": "range"
+      },
+      {
+        "name": "pattern_without_on_time",
+        "module": "out4",
+        "address": 92,
+        "bytes": "100303020a000000050082",
+        "reason": "range"
+      },
+      {
+        "name": "pattern_without_off_time",
+        "module": "out4",
+        "address": 92,
+        "bytes": "100303020a00050000008d",
+        "reason": "range"
+      },
+      {
+        "name": "arm_an_output",
+        "module": "out4",
+        "address": 92,
+        "bytes": "100201a7",
+        "reason": "range"
+      },
+      {
+        "name": "arm_a_missing_channel",
+        "module": "target",
+        "address": 88,
+        "bytes": "1002021e",
+        "reason": "range"
+      },
+      {
+        "name": "config_an_output",
+        "module": "out4",
+        "address": 92,
+        "bytes": "100800010100eb",
+        "reason": "range"
+      },
+      {
+        "name": "config_parameter_4",
+        "module": "target",
+        "address": 88,
+        "bytes": "100800040100c1",
+        "reason": "range"
+      }
+    ]
+  },
+  "timelines": [
+    {
+      "name": "lease_runs_out",
+      "module": "out4",
+      "description": "The siren is on until off; the box refreshes the 1.5 s lease at 500 and 1000 ms and then stops (a crash): the module turns it off at 2500 ms and says lease_expired until the box writes again.",
+      "steps": [
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "ALL_OFF"
+          },
+          "bytes": "1005f7",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": [
+              "fresh"
+            ]
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "CLEAR_FRESH"
+          },
+          "bytes": "1006fe",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 0,
+            "mode": "on",
+            "duration_100ms": 0,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "100300010000000000008d",
+          "accepted": true,
+          "expect": {
+            "outputs": 1,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 1000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 2499,
+          "expect": {
+            "outputs": 1,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 2500,
+          "expect": {
+            "outputs": 0,
+            "flags": [
+              "lease_expired"
+            ]
+          }
+        },
+        {
+          "t_ms": 3000,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 0,
+            "mode": "on",
+            "duration_100ms": 0,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "100300010000000000008d",
+          "accepted": true,
+          "expect": {
+            "outputs": 1,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 3100,
+          "write": {
+            "op": "ALL_OFF"
+          },
+          "bytes": "1005f7",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "lost_write_repaired",
+      "module": "out4",
+      "description": "A 5 s strobe is lost on the cable; the next STATUS (250 ms) shows it off and the box sends what is left, rounded up to 100 ms (4.8 s), which ends on the module's own timer at 5050 ms.",
+      "steps": [
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "ALL_OFF"
+          },
+          "bytes": "1005f7",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": [
+              "fresh"
+            ]
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "CLEAR_FRESH"
+          },
+          "bytes": "1006fe",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 1,
+            "mode": "on",
+            "duration_100ms": 50,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "1003010132000000000069",
+          "delivered": false,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 250,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 1,
+            "mode": "on",
+            "duration_100ms": 48,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "100301013000000000003b",
+          "accepted": true,
+          "expect": {
+            "outputs": 2,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 750,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 1250,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 1750,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 2250,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 2750,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 3250,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 3750,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 4250,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 4750,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 5049,
+          "expect": {
+            "outputs": 2,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 5050,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "module_restart",
+      "module": "out4",
+      "description": "A 10 s siren; the module restarts (a brown-out) at 800 ms and comes back off and fresh; the box sees fresh at 1000 ms, clears it and sends the 9 s left.",
+      "steps": [
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "ALL_OFF"
+          },
+          "bytes": "1005f7",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": [
+              "fresh"
+            ]
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "CLEAR_FRESH"
+          },
+          "bytes": "1006fe",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 0,
+            "mode": "on",
+            "duration_100ms": 100,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "1003000164000000000064",
+          "accepted": true,
+          "expect": {
+            "outputs": 1,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 800,
+          "restart": true,
+          "expect": {
+            "outputs": 0,
+            "flags": [
+              "fresh"
+            ]
+          }
+        },
+        {
+          "t_ms": 1000,
+          "write": {
+            "op": "CLEAR_FRESH"
+          },
+          "bytes": "1006fe",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 1000,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 0,
+            "mode": "on",
+            "duration_100ms": 90,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "100300015a000000000078",
+          "accepted": true,
+          "expect": {
+            "outputs": 1,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 1500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 2000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 2500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 3000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 3500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 4000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 4500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 5000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 5500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 6000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 6500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 7000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 7500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 8000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 8500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 9000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 9500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 9999,
+          "expect": {
+            "outputs": 1,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 10000,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "pulse_spanning_missed_polls",
+      "module": "out4",
+      "description": "A 1 s pulse: the polls at 250 and 750 ms are missed and the refresh at 500 ms is lost; the module ends the pulse on its own timer at 1000 ms, with no lease_expired.",
+      "steps": [
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "ALL_OFF"
+          },
+          "bytes": "1005f7",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": [
+              "fresh"
+            ]
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "CLEAR_FRESH"
+          },
+          "bytes": "1006fe",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 0,
+            "mode": "on",
+            "duration_100ms": 10,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "100300010a000000000090",
+          "accepted": true,
+          "expect": {
+            "outputs": 1,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "delivered": false
+        },
+        {
+          "t_ms": 999,
+          "expect": {
+            "outputs": 1,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 1000,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "max_on_and_min_off",
+      "module": "out4",
+      "description": "The smoke channel (max on 30 s, min off 30 s) is turned on until off and kept leased: the module turns it off at 30 s by itself, refuses it until 60 s, then takes a 1 s pulse.",
+      "steps": [
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "ALL_OFF"
+          },
+          "bytes": "1005f7",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": [
+              "fresh"
+            ]
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "CLEAR_FRESH"
+          },
+          "bytes": "1006fe",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 2,
+            "mode": "on",
+            "duration_100ms": 0,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "10030201000000000000ab",
+          "accepted": true,
+          "expect": {
+            "outputs": 4,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 1000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 1500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 2000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 2500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 3000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 3500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 4000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 4500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 5000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 5500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 6000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 6500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 7000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 7500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 8000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 8500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 9000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 9500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 10000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 10500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 11000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 11500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 12000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 12500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 13000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 13500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 14000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 14500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 15000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 15500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 16000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 16500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 17000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 17500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 18000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 18500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 19000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 19500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 20000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 20500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 21000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 21500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 22000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 22500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 23000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 23500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 24000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 24500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 25000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 25500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 26000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 26500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 27000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 27500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 28000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 28500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 29000,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 29500,
+          "write": {
+            "op": "LEASE",
+            "lease_100ms": 15
+          },
+          "bytes": "10040ff3",
+          "accepted": true
+        },
+        {
+          "t_ms": 29999,
+          "expect": {
+            "outputs": 4,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 30000,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 40000,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 2,
+            "mode": "on",
+            "duration_100ms": 0,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "10030201000000000000ab",
+          "accepted": false,
+          "expect": {
+            "outputs": 0,
+            "flags": [
+              "cmd_error"
+            ]
+          }
+        },
+        {
+          "t_ms": 59999,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 2,
+            "mode": "on",
+            "duration_100ms": 0,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "10030201000000000000ab",
+          "accepted": false,
+          "expect": {
+            "outputs": 0,
+            "flags": [
+              "cmd_error"
+            ]
+          }
+        },
+        {
+          "t_ms": 60000,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 2,
+            "mode": "on",
+            "duration_100ms": 10,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "100302010a0000000000b6",
+          "accepted": true,
+          "expect": {
+            "outputs": 4,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 60999,
+          "expect": {
+            "outputs": 4,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 61000,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "relay_pattern_floor",
+      "module": "out4",
+      "description": "A 50 ms pattern is refused on a relay channel and runs on the solid-state one (on first, then off, repeated, for its duration); a relay takes 100 ms.",
+      "steps": [
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "ALL_OFF"
+          },
+          "bytes": "1005f7",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": [
+              "fresh"
+            ]
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "CLEAR_FRESH"
+          },
+          "bytes": "1006fe",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 1,
+            "mode": "pattern",
+            "duration_100ms": 10,
+            "on_10ms": 5,
+            "off_10ms": 5
+          },
+          "bytes": "100301020a0005000500ea",
+          "accepted": false,
+          "expect": {
+            "outputs": 0,
+            "flags": [
+              "cmd_error"
+            ]
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 3,
+            "mode": "pattern",
+            "duration_100ms": 10,
+            "on_10ms": 5,
+            "off_10ms": 5
+          },
+          "bytes": "100303020a0005000500cc",
+          "accepted": true,
+          "expect": {
+            "outputs": 8,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 49,
+          "expect": {
+            "outputs": 8,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 50,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 99,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 100,
+          "expect": {
+            "outputs": 8,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 999,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 1000,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 1000,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 1,
+            "mode": "pattern",
+            "duration_100ms": 10,
+            "on_10ms": 10,
+            "off_10ms": 10
+          },
+          "bytes": "100301020a000a000a00fb",
+          "accepted": true,
+          "expect": {
+            "outputs": 2,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 1099,
+          "expect": {
+            "outputs": 2,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 1100,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 1200,
+          "expect": {
+            "outputs": 2,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 2000,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "relay_switches_at_most_every_100_ms",
+      "module": "out4",
+      "description": "A relay channel turned off at 50 ms refuses to turn on again before 150 ms; off is never refused.",
+      "steps": [
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "ALL_OFF"
+          },
+          "bytes": "1005f7",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": [
+              "fresh"
+            ]
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "CLEAR_FRESH"
+          },
+          "bytes": "1006fe",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 0,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 0,
+            "mode": "on",
+            "duration_100ms": 0,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "100300010000000000008d",
+          "accepted": true,
+          "expect": {
+            "outputs": 1,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 50,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 0,
+            "mode": "off",
+            "duration_100ms": 0,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "1003000000000000000052",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 100,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 0,
+            "mode": "on",
+            "duration_100ms": 0,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "100300010000000000008d",
+          "accepted": false,
+          "expect": {
+            "outputs": 0,
+            "flags": [
+              "cmd_error"
+            ]
+          }
+        },
+        {
+          "t_ms": 150,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 0,
+            "mode": "on",
+            "duration_100ms": 0,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "100300010000000000008d",
+          "accepted": true,
+          "expect": {
+            "outputs": 1,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 160,
+          "write": {
+            "op": "OUTPUT",
+            "channel": 0,
+            "mode": "off",
+            "duration_100ms": 0,
+            "on_10ms": 0,
+            "off_10ms": 0
+          },
+          "bytes": "1003000000000000000052",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        },
+        {
+          "t_ms": 170,
+          "write": {
+            "op": "ALL_OFF"
+          },
+          "bytes": "1005f7",
+          "accepted": true,
+          "expect": {
+            "outputs": 0,
+            "flags": []
+          }
+        }
+      ]
+    }
+  ],
+  "modules_text": {
+    "max_bytes": 100,
+    "valid": [
+      {
+        "name": "none",
+        "text": "",
+        "modules": []
+      },
+      {
+        "name": "rfc_example",
+        "text": "g46:servo:siren;58:target/1.0.0:hit;5c:out4/1.0.0:strobe,smoke,out.3,out.4",
+        "modules": [
+          {
+            "address": "g46",
+            "model": "servo",
+            "fw": null,
+            "caps": [
+              "siren"
+            ],
+            "feedback": false
+          },
+          {
+            "address": "58",
+            "model": "target",
+            "fw": "1.0.0",
+            "caps": [
+              "hit"
+            ],
+            "feedback": true
+          },
+          {
+            "address": "5c",
+            "model": "out4",
+            "fw": "1.0.0",
+            "caps": [
+              "strobe",
+              "smoke",
+              "out.3",
+              "out.4"
+            ],
+            "feedback": true
+          }
+        ]
+      },
+      {
+        "name": "two_targets",
+        "text": "58:target/1.0.0:hit;59:target/1.0.1:hit.2",
+        "modules": [
+          {
+            "address": "58",
+            "model": "target",
+            "fw": "1.0.0",
+            "caps": [
+              "hit"
+            ],
+            "feedback": true
+          },
+          {
+            "address": "59",
+            "model": "target",
+            "fw": "1.0.1",
+            "caps": [
+              "hit.2"
+            ],
+            "feedback": true
+          }
+        ]
+      },
+      {
+        "name": "community_model",
+        "text": "5d:m8001/0.2.1:hit,light",
+        "modules": [
+          {
+            "address": "5d",
+            "model": "m8001",
+            "fw": "0.2.1",
+            "caps": [
+              "hit",
+              "light"
+            ],
+            "feedback": true
+          }
+        ]
+      },
+      {
+        "name": "two_simple_outputs",
+        "text": "g45:servo:out.1;g46:servo:horn",
+        "modules": [
+          {
+            "address": "g45",
+            "model": "servo",
+            "fw": null,
+            "caps": [
+              "out.1"
+            ],
+            "feedback": false
+          },
+          {
+            "address": "g46",
+            "model": "servo",
+            "fw": null,
+            "caps": [
+              "horn"
+            ],
+            "feedback": false
+          }
+        ]
+      }
+    ],
+    "invalid": [
+      {
+        "name": "over_100_bytes",
+        "text": "5c:out4/10.10.10:siren.2,strobe.2;5d:out4/10.10.10:siren.2,strobe.2;5e:out4/10.10.10:siren.2,strobe.2;5f:out4/10.10.10:siren.2,strobe.2;g46:servo:x",
+        "reason": "longer than 100 bytes"
+      },
+      {
+        "name": "address_below_the_range",
+        "text": "57:target/1.0.0:hit",
+        "reason": "addresses are 58-5f"
+      },
+      {
+        "name": "address_upper_case",
+        "text": "5C:out4/1.0.0:siren",
+        "reason": "lower-case hex"
+      },
+      {
+        "name": "module_without_version",
+        "text": "58:target:hit",
+        "reason": "a module has model/version"
+      },
+      {
+        "name": "simple_output_with_version",
+        "text": "g46:servo/1.0.0:siren",
+        "reason": "a simple output has none"
+      },
+      {
+        "name": "simple_output_two_functions",
+        "text": "g46:servo:siren,horn",
+        "reason": "one GPIO, one channel"
+      },
+      {
+        "name": "simple_output_not_servo",
+        "text": "g46:relay:siren",
+        "reason": "the only simple output is servo"
+      },
+      {
+        "name": "gpio_49",
+        "text": "g49:servo:siren",
+        "reason": "GPIOs are 0-48"
+      },
+      {
+        "name": "no_capability",
+        "text": "58:target/1.0.0:",
+        "reason": "at least one capability"
+      },
+      {
+        "name": "same_address_twice",
+        "text": "58:target/1.0.0:hit;58:target/1.0.0:hit.2",
+        "reason": "twice"
+      },
+      {
+        "name": "trailing_separator",
+        "text": "58:target/1.0.0:hit;",
+        "reason": "empty entry"
+      },
+      {
+        "name": "capability_upper_case",
+        "text": "58:target/1.0.0:Hit",
+        "reason": "capability ids are lower-case"
+      }
+    ]
+  }
+}

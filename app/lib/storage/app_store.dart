@@ -24,7 +24,8 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 
 import '../l10n/strings.dart';
-import '../protocol/firmware_release.dart' show projectReleaseKeys;
+import '../protocol/firmware_release.dart'
+    show currentReleaseKeys, projectReleaseKeys;
 import '../security/bytes.dart';
 import 'secret_vault.dart';
 
@@ -287,10 +288,10 @@ final class AppSettings {
       }
       ..sharePosition = j['share_position'] == true
       ..firmwareKeys = j.containsKey('firmware_keys')
-          ? [
+          ? currentReleaseKeys([
               for (final k in (j['firmware_keys'] as List?) ?? const [])
                 if (k is String) k,
-            ]
+            ])
           : [...projectReleaseKeys]
       ..modeKeys = [
         for (final k in (j['mode_keys'] as List?) ?? const [])

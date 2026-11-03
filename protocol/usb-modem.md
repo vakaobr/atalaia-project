@@ -32,7 +32,7 @@ The **epoch** at the end of RX is an addition to ADR-P2-4 (decision D2): it is t
 
 ## TX and TX_ACK
 
-The controller owns its own nonce counter (ADR-P2-2): it chooses `seq` and tells the modem its epoch with CONFIGURE, storing the epoch +1 in SQLite before the first packet of every run and again when `seq` wraps. The epoch is per game key (RFC 0001 Amendment 9, proposed): a new game starts at epoch 1, a restart in the same game goes on above its last one. The modem sets the encrypted bit, clears the reserved bit, clamps `hop_limit` to the configured maximum, encrypts with the game key and the controller's epoch, and queues the packet for the radio. As a safety net it refuses any packet whose `(epoch << 16) | seq` is not above the last one it sent. The TX_ACK comes when the radio has an outcome:
+The controller owns its own nonce counter (ADR-P2-2): it chooses `seq` and tells the modem its epoch with CONFIGURE, storing the epoch +1 in SQLite before the first packet of every run and again when `seq` wraps. The epoch is per game key (RFC 0001 Amendment 9, proposed): a new game starts at epoch 1, a restart in the same game goes on above its last one. The modem sets the encrypted bit, clears the reserved bit, clamps `hop_limit` to the configured maximum, encrypts with the game key and the controller's epoch, and queues the packet for the radio. As a safety net it refuses any packet whose `(epoch << 16) | seq` is not above the last one it sent. The TX_ACK comes when the radio has an outcome: a refusal at once, `ok` (or `duty_cycle`, `timeout`) when the radio is done with the packet, so TX_ACKs need not come in the order of their TX frames and the controller matches each by its `seq`:
 
 | Status | Meaning |
 | --- | --- |

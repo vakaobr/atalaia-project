@@ -1,0 +1,8 @@
+{
+  "id": "box-master:40",
+  "t": 1800000,
+  "node": "box-master",
+  "type": "output.switched",
+  "data": { "capability": "siren", "ms": 10000, "source": "field" },
+  "prio": "normal"
+}

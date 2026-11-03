@@ -56,6 +56,9 @@ static const uint8_t data_node_modes_failed[] = {38, 3};
 static const uint8_t data_progressive_activated[] = {5, 39};
 static const uint8_t data_progressive_completed[] = {5, 39};
 static const uint8_t data_node_setup_applied[] = {11};
+static const uint8_t data_node_modules[] = {42};
+static const uint8_t data_node_module_lost[] = {42, 3};
+static const uint8_t data_output_switched[] = {43, 44, 45};
 
 const atalaia_event_def_t atalaia_event_defs[] = {
     {"game.start", ATALAIA_EV_GAME_START, ATALAIA_PRIO_CRITICAL, data_game_start, 1},
@@ -112,6 +115,9 @@ const atalaia_event_def_t atalaia_event_defs[] = {
     {"progressive.activated", ATALAIA_EV_PROGRESSIVE_ACTIVATED, ATALAIA_PRIO_CRITICAL, data_progressive_activated, 2},
     {"progressive.completed", ATALAIA_EV_PROGRESSIVE_COMPLETED, ATALAIA_PRIO_CRITICAL, data_progressive_completed, 2},
     {"node.setup_applied", ATALAIA_EV_NODE_SETUP_APPLIED, ATALAIA_PRIO_NORMAL, data_node_setup_applied, 1},
+    {"node.modules", ATALAIA_EV_NODE_MODULES, ATALAIA_PRIO_NORMAL, data_node_modules, 1},
+    {"node.module_lost", ATALAIA_EV_NODE_MODULE_LOST, ATALAIA_PRIO_CRITICAL, data_node_module_lost, 2},
+    {"output.switched", ATALAIA_EV_OUTPUT_SWITCHED, ATALAIA_PRIO_NORMAL, data_output_switched, 3},
 };
 const size_t atalaia_event_def_count =
     sizeof(atalaia_event_defs) / sizeof(atalaia_event_defs[0]);
@@ -158,6 +164,10 @@ const atalaia_data_field_def_t atalaia_data_field_defs[] = {
     {"step", ATALAIA_DATA_STEP, ATALAIA_FIELD_INTEGER, false},
     {"by_node", ATALAIA_DATA_BY_NODE, ATALAIA_FIELD_INTEGER, false},
     {"by_name", ATALAIA_DATA_BY_NAME, ATALAIA_FIELD_STRING, false},
+    {"modules", ATALAIA_DATA_MODULES, ATALAIA_FIELD_STRING, false},
+    {"capability", ATALAIA_DATA_CAPABILITY, ATALAIA_FIELD_STRING, false},
+    {"ms", ATALAIA_DATA_MS, ATALAIA_FIELD_INTEGER, false},
+    {"source", ATALAIA_DATA_SOURCE, ATALAIA_FIELD_STRING, false},
 };
 const size_t atalaia_data_field_def_count =
     sizeof(atalaia_data_field_defs) / sizeof(atalaia_data_field_defs[0]);
@@ -198,6 +208,45 @@ const atalaia_data_field_def_t *atalaia_data_field_by_key(unsigned key)
     for (size_t i = 0; i < atalaia_data_field_def_count; i++) {
         if (atalaia_data_field_defs[i].key == key) {
             return &atalaia_data_field_defs[i];
+        }
+    }
+    return NULL;
+}
+
+const atalaia_capability_type_def_t atalaia_capability_type_defs[] = {
+    {"button", ATALAIA_CAP_BUTTON, false},
+    {"keypad", ATALAIA_CAP_KEYPAD, false},
+    {"display", ATALAIA_CAP_DISPLAY, false},
+    {"led", ATALAIA_CAP_LED, false},
+    {"audio", ATALAIA_CAP_AUDIO, false},
+    {"nfc", ATALAIA_CAP_NFC, false},
+    {"qr", ATALAIA_CAP_QR, false},
+    {"gps", ATALAIA_CAP_GPS, false},
+    {"imu", ATALAIA_CAP_IMU, false},
+    {"hit", ATALAIA_CAP_HIT, false},
+    {"output", ATALAIA_CAP_OUTPUT, false},
+    {"battery", ATALAIA_CAP_BATTERY, false},
+    {"tamper", ATALAIA_CAP_TAMPER, false},
+    {"contact", ATALAIA_CAP_CONTACT, true},
+};
+const size_t atalaia_capability_type_def_count =
+    sizeof(atalaia_capability_type_defs) / sizeof(atalaia_capability_type_defs[0]);
+
+const atalaia_capability_type_def_t *atalaia_capability_type(const char *name)
+{
+    for (size_t i = 0; name != NULL && i < atalaia_capability_type_def_count; i++) {
+        if (strcmp(atalaia_capability_type_defs[i].name, name) == 0) {
+            return &atalaia_capability_type_defs[i];
+        }
+    }
+    return NULL;
+}
+
+const atalaia_capability_type_def_t *atalaia_capability_type_by_id(unsigned id)
+{
+    for (size_t i = 0; i < atalaia_capability_type_def_count; i++) {
+        if (atalaia_capability_type_defs[i].id == id) {
+            return &atalaia_capability_type_defs[i];
         }
     }
     return NULL;
