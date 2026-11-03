@@ -339,7 +339,7 @@ section 16).
 
 ## Next steps
 
-For the maintainer first: the expansion port design ([draft RFC](../rfcs/0000-expansion-port.md), decisions EXP-1 to EXP-30): one port and protocol for the target addon and for outputs (relays, sirens, strobes, smoke), with its increments and open questions; implementation starts once it is approved.
+For the maintainer first: the expansion port design ([draft RFC](../rfcs/0000-expansion-port.md), decisions EXP-1 to EXP-38): the I2C port and protocol for the target addon and other inputs, and a single-GPIO RC-servo "simple output" as the preferred way to switch sirens, strobes and smoke remotes (EXP-31, decided by the maintainer), with its increments and open questions; implementation starts once it is approved.
 
 1. Plan phase 13 on real boxes (HW3): a Field Box with a mode key built in
    fetching from the bench controller over the field Wi-Fi, by the controller's
