@@ -111,6 +111,17 @@ badge belongs to one version, so a new version is reviewed again.
 - Add an `SPDX-License-Identifier` header to new source files.
 - Write code, comments, commit messages and docs in English. Translations of user-facing text are welcome: see [docs/translations/](docs/translations/README.md) for where each part's texts are, the glossary and how a translation is reviewed.
 
+### What CI runs
+
+On a pull request, each job of [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs only when a part of the repository it builds, tests or copies in has changed: its first job, **Which parts changed**, matches the pull request's files against one filter per job (dorny/paths-filter), and the others show as skipped when theirs does not match. A skipped job blocks nothing; only the title check is required.
+
+- **Pushes to `main` run everything**, and so do release-please's pull requests (`release-please--*`) and a pull request whose filter step fails.
+- **Always run**: the protocol and generated-files check (it also checks the project page and the wiring diagrams), formatting, REUSE and the DCO sign-off.
+- **In every filter**: `ci.yml` itself, `core/` and the folders of `protocol/` (schema, vectors). A change to one of them runs the whole workflow.
+- **The rest by part**, for example: the GM console (`controller/console/`) runs the controller jobs, the console's browser tests and the app's jobs, the Android emulator included, since the app bundles the console; `modes/` runs nearly everything (the app, the firmware, the simulator, the controller and the server all load the modes); `firmware/` runs the firmware jobs, the controller's and the app's (they drive the host box, pod and modem); `server/` runs the four site server jobs; a change only to docs (`docs/`, except `docs/translations/` and `docs/manuals/en/`, which tests read), `hardware/` or Markdown at the top level runs none of them.
+
+A new test that reads a file from another part of the repository needs that path in its job's filter (the `changes` job in `ci.yml`). When unsure, add it: a needless run costs minutes, a missing path lets a break through to `main`, where everything runs.
+
 ## Pull request titles and commit messages
 
 Every change reaches `main` as a **squash-merged** pull request, and the pull request's **title** becomes that commit's message. release-please reads those commits to choose the next version and to write the release's section of [CHANGELOG.md](CHANGELOG.md), so the title must be a [Conventional Commit](https://www.conventionalcommits.org/): `type(scope): summary`, the summary in the imperative. The check **Pull request title** (`.github/workflows/pr-title.yml`) fails until it is; editing the title re-runs it.
