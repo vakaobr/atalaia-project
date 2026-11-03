@@ -93,6 +93,10 @@ CMD_POD = 10
 # A node's epoch, for the receivers (RFC 0001 Amendment 24, decision SR-110): params {"src", "epoch"}.
 # Internal: the controller sends it itself, so it has no name in CMD_OPCODES (the GM's list).
 CMD_PEER_EPOCH = 11
+# Switch an output (RFC 0001 Amendment 26; draft RFC "The expansion port", EXP-23): params {"capability",
+# "act", "ms", "on_ms", "off_ms", "src"} (protocol/vectors/cmd.json's output_params). The controller sets
+# src itself and checks the params and its rate limit first (controller/atalaia_controller/engine.py).
+CMD_OUTPUT = 12
 CMD_OPCODES = {
     "start": CMD_START,
     "pause": CMD_PAUSE,
@@ -105,6 +109,7 @@ CMD_OPCODES = {
     "mode": CMD_MODE,
     "update": CMD_UPDATE,
     "pod": CMD_POD,
+    "output": CMD_OUTPUT,
 }
 
 PRIO_TELEMETRY = 0
@@ -498,7 +503,7 @@ class FieldController:
         if isinstance(cmd, str) and cmd not in CMD_OPCODES:
             raise ValueError(f"unknown command {cmd!r}")
         opcode = CMD_OPCODES[cmd] if isinstance(cmd, str) else int(cmd)
-        if not 0 <= opcode <= CMD_POD:  # CMD_PEER_EPOCH is the controller's own
+        if opcode not in CMD_OPCODES.values():  # CMD_PEER_EPOCH is the controller's own
             raise ValueError(f"unknown command opcode {opcode}")
         return self._send_cmd(opcode, params, dest, now_ms=now_ms)
 

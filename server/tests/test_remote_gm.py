@@ -356,7 +356,7 @@ class LiveTests(RemoteCase):
         [entry] = r.json()["controllers"]
         self.assertEqual((entry["controller_id"], entry["remote_gm"], entry["live"]["state"]),
                          (CONTROLLER["id"], True, "ready"))
-        self.assertEqual(r.json()["commands"], ["start", "pause", "resume", "end", "message", "mode"])
+        self.assertEqual(r.json()["commands"], ["start", "pause", "resume", "end", "message", "mode", "outputs_off"])
         self.assertIsNotNone(entry["controller"])  # the controllers row the hello made
         rows = await self.fetch("SELECT controller_id, version FROM controllers")
         self.assertEqual((str(rows[0][0]), rows[0][1]), (CONTROLLER["id"], "0.1.0"))

@@ -1,0 +1,107 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""The boxes' modules and outputs on the controller (outputs.py; draft RFC "The expansion port", increment 3).
+
+    cd controller && python -m unittest discover -s tests
+"""
+
+from __future__ import annotations
+
+import unittest
+
+from atalaia_controller import outputs
+from atalaia_sim.protocol import CAPABILITY_ROLE_NAMES, CAPABILITY_TYPES
+
+ZONE = {"requires": ["team_input"], "optional": ["team_display", "audio", "display"]}
+TARGET = {"requires": ["hit", "led"], "optional": ["display", "audio", "smell"]}
+
+
+def node(n: int, role: str, caps, modules=None) -> dict:
+    return {"node": n, "name": f"box-{n}", "role": role, "capabilities": caps, "modules": modules}
+
+
+class RoleNameTests(unittest.TestCase):
+    def test_role_names_are_met_by_their_types(self):
+        """The mapping a mode's requires: names need (protocol/schema/capabilities.yaml role_names): team_input
+        by team buttons, a keypad or an NFC reader; team_display by LEDs or a screen; a type by itself; any
+        other name is never checked."""
+        self.assertEqual(CAPABILITY_ROLE_NAMES, {"team_input": ("button", "keypad", "nfc"),
+                                                 "team_display": ("led", "display")})
+        for types, name, want in (({"button"}, "team_input", True), ({"keypad"}, "team_input", True),
+                                  ({"nfc"}, "team_input", True), ({"display", "led"}, "team_input", False),
+                                  ({"led"}, "team_display", True), ({"display"}, "team_display", True),
+                                  ({"audio"}, "team_display", False), ({"hit"}, "hit", True),
+                                  ({"button"}, "hit", False), ({"button"}, "smell", None), (set(), "gps", False)):
+            with self.subTest(name=name, types=types):
+                self.assertIs(outputs.has(types, name), want)
+
+    def test_hello_ids_to_types(self):
+        ids = {k: v.id for k, v in CAPABILITY_TYPES.items()}
+        self.assertEqual(outputs.types_of([ids["button"], ids["output"], 0, 200, True, "x"]), {"button", "output"})
+        self.assertEqual(outputs.types_of(None), set())
+
+
+class StartCheckTests(unittest.TestCase):
+    def check(self, *nodes):
+        return outputs.check_nodes(nodes, {"zone": ZONE, "target": TARGET}.get)
+
+    def test_a_box_without_what_its_role_requires(self):
+        out = self.check(node(4, "zone", [1, 3, 5]), node(5, "zone", [3, 12]), node(6, "target", [3, 4, 5]))
+        self.assertEqual(out["missing_caps"], [
+            {"node": 5, "name": "box-5", "role": "zone", "capability": "team_input"},
+            {"node": 6, "name": "box-6", "role": "target", "capability": "hit"}])
+        self.assertEqual([(w["node"], w["capabilities"]) for w in out["warnings"]], [(5, ["audio"])])
+        self.assertEqual(out["warnings"][0]["code"], "optional_caps")
+
+    def test_nodes_that_report_nothing_are_not_checked(self):
+        """A box from before the RFC (an empty HELLO list), a phone, ids this controller does not know."""
+        out = self.check(node(4, "zone", []), node(5, "zone", None), node(6, "target", [0, 99]),
+                         node(7, "nosuchrole", [3]))
+        self.assertEqual(out, {"missing_caps": [], "warnings": [], "not_checked": []})
+
+    def test_a_simple_output_counts_and_is_not_checked(self):
+        mods = outputs.modules_of("g46:servo:siren;5c:out4/1.0.0:strobe,smoke")
+        out = self.check(node(4, "zone", [1, 3, 5, 11], mods))
+        self.assertEqual(out["missing_caps"], [])
+        self.assertEqual([(u["node"], u["capability"]) for u in out["not_checked"]], [(4, "siren")])
+        self.assertEqual(out["not_checked"][0]["text"], "siren on box-4: not checked (simple output)")
+
+
+class ModulesTests(unittest.TestCase):
+    def test_modules_and_a_lost_one(self):
+        mods = outputs.modules_of("g46:servo:siren;58:target/1.0.0:hit")
+        self.assertEqual(mods[0], {"address": "g46", "model": "servo", "fw": None, "caps": ["siren"], "feedback": False})
+        self.assertIsNone(outputs.modules_of("nonsense"))
+        self.assertIsNone(outputs.modules_of(5))
+        lost = outputs.mark_lost(mods, "58:target/1.0.0:hit")
+        self.assertEqual([m.get("lost", False) for m in lost], [False, True])
+        self.assertIsNone(outputs.mark_lost(mods, "5c:out4/1.0.0:strobe"))  # not one it had
+        self.assertEqual(outputs.output_caps(lost), {"siren"})
+        self.assertEqual(outputs.simple_outputs(lost), ["siren"])
+
+
+class ParamsTests(unittest.TestCase):
+    def test_the_controller_sets_src_and_the_gms_default(self):
+        self.assertEqual(outputs.output_params({"capability": "siren", "act": "on", "src": "field"}, "gm"),
+                         ({"capability": "siren", "act": "on", "ms": 5000, "src": "gm"}, None))
+        self.assertEqual(outputs.output_params({"capability": "siren", "act": "on"}, "field"),
+                         (None, "ms is required for on, pulse and pattern"))
+        self.assertEqual(outputs.output_params({"capability": "siren", "act": "off", "ms": 3, "on_ms": 9}, "gm"),
+                         ({"capability": "siren", "act": "off", "src": "gm"}, None))
+        self.assertEqual(outputs.output_params({"capability": "s", "act": "pulse", "ms": 9, "on_ms": 5}, "gm")[0],
+                         {"capability": "s", "act": "pulse", "ms": 9, "src": "gm"})
+        self.assertEqual(outputs.output_params(["siren"], "gm")[0], None)
+
+    def test_the_rate_limit(self):
+        rate = outputs.RateLimit()
+        self.assertEqual(rate.wait_ms(4, "on", 0), 0)
+        rate.sent(4, "on", 1000)
+        self.assertEqual(rate.wait_ms(4, "pulse", 2000), 1000)
+        self.assertEqual(rate.wait_ms(4, "off", 2000), 0)
+        self.assertEqual(rate.wait_ms(5, "on", 2000), 0)
+        rate.sent(4, "off", 2500)  # an off never moves the next start
+        self.assertEqual(rate.wait_ms(4, "on", 3000), 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

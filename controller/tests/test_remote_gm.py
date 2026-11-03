@@ -159,6 +159,36 @@ class CommandTests(RemoteCase):
         self.assertEqual({e["result"] for e in self.store.remote_commands()}, {"invalid"})
         self.assertEqual(len(self.store.remote_commands()), 5)
 
+    def test_every_output_off_but_never_one_on(self) -> None:
+        """A remote GM may switch every output of the game off (CMD 12 to every node, src gm), never one on
+        (draft RFC "The expansion port", EXP-27): ``output`` is not a remote command."""
+        game = self.game()
+        self.ctrl.start_game(game["id"], force=True)
+        out = self.remote.handle_command(command(game, "outputs_off"))
+        self.assertEqual(out["code"], "done", out)
+        self.assertEqual(cmd_decode(self.modem.of("CMD")[-1][1]),
+                         {"cmd": 12, "params": {"capability": "*", "act": "off", "src": "gm"}})
+        sent = len(self.modem.of("CMD"))
+        for what, params in (("output", {"node": 4, "capability": "siren", "act": "on", "ms": 5000}),
+                             ("outputs_off", {"node": 4})):
+            with self.subTest(what):
+                self.assertEqual(self.remote.handle_command(command(game, what, params))["code"], "invalid")
+        self.assertEqual(len(self.modem.of("CMD")), sent)
+
+    def test_a_start_refused_for_a_box_without_a_capability_its_role_requires(self) -> None:
+        """The capability start check (EXP-21): the box and what it lacks come back in ``missing``, so the site
+        server's page offers "Start anyway" too."""
+        game = self.game(joined=False)
+        self.modem.rx(4, 0, "HELLO", hello_encode({"node_name": "box-4", "platform": 1, "fw_version": "0.7.0",
+                                                   "core_version": "0.7.0", "tier": 0, "capabilities": [3, 4],
+                                                   "transports": 1, "epoch": 1}), game_id=game["id"], epoch=1)
+        out = self.remote.handle_command(command(game, "start"))
+        self.assertEqual((out["code"], out["missing"]), ("conflict", ["box-4: team_input"]))
+        self.assertEqual(self.state(game), "ready")
+        forced = self.remote.handle_command(command(game, "start", {"force": True}))
+        self.assertEqual(forced["code"], "done", forced)
+        self.assertIn("box-4: team_input", forced["detail"])
+
     def test_another_game_a_stale_or_a_repeated_command(self) -> None:
         game = self.game()
         other = {**game, "game_seed": (game["game_seed"] + 1) % 2**32}

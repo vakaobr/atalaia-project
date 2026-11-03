@@ -986,7 +986,9 @@ def check_field(body: Any) -> dict[str, Any]:
 # the site server sends ``command``, from the short list below and nothing else. Both sides check
 # every message with these functions (``STREAM``), the controller before it acts on a command.
 
-REMOTE_COMMANDS = ("start", "pause", "resume", "end", "message", "mode")
+# ``outputs_off``: every output of every box of the live game off (draft RFC "The expansion port", EXP-27: a
+# remote GM cannot see who stands next to a smoke machine, so it may only switch outputs off, never on).
+REMOTE_COMMANDS = ("start", "pause", "resume", "end", "message", "mode", "outputs_off")
 MESSAGE_MAX = 100           # characters of a GM message (the console's limit; the radio's CMD is 127 bytes)
 REASON_MAX = 64             # characters of a pause or end reason (the controller's API)
 USERNAME_MAX = 64           # the site server's usernames
@@ -1062,7 +1064,7 @@ def check_command_params(command: Any, params: Any, path: str = "params") -> dic
     """A remote command's parameters: an optional ``force`` (boolean, as the console's Start anyway) for start,
     none for resume, an optional reason for pause and end, the
     text of a GM message, the name (and optionally the node: 65535 = every node) of a mode command the
-    game's manifests declare (the controller checks that last part against its game)."""
+    game's manifests declare (the controller checks that last part against its game); none for outputs_off."""
     if command not in REMOTE_COMMANDS:
         _fail("not_allowed", "command")
     params = _obj(params, path)
@@ -1070,7 +1072,7 @@ def check_command_params(command: Any, params: Any, path: str = "params") -> dic
         _keys(params, path, (), ("force",))
         if "force" in params:
             _bool(params["force"], f"{path}.force")
-    elif command == "resume":
+    elif command in ("resume", "outputs_off"):
         _keys(params, path, ())
     elif command in ("pause", "end"):
         _keys(params, path, (), ("reason",))

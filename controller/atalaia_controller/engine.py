@@ -23,7 +23,13 @@ A game starts only once every role it needs has a joined node (a box or a
 linked Android prop): ``start_check`` says which roles are missing, and the
 GM can start anyway with ``force`` (logged, and told to every console).
 Mode minimums (Hold-All's ``min_zones``, Last Stand's ``last_zones``) are
-warnings, never a block (decisions RJ-1 to RJ-3).
+warnings, never a block (decisions RJ-1 to RJ-3). A joined box that reports its
+capabilities and lacks one its role requires blocks the start the same way
+(outputs.py; draft RFC "The expansion port", EXP-21).
+
+The boxes' modules (their ``node.modules``) are in the node list, and the GM
+switches a box's outputs with CMD 12 (``send_output``, ``outputs_off``), as a
+field script does with ``field.send(node, "output", {...})`` (outputs.py).
 """
 
 from __future__ import annotations
@@ -44,6 +50,7 @@ from atalaia_sim import regions
 from atalaia_sim.core import Core, Emitted, FieldOps, Node
 from atalaia_sim.election import LEADER, Election, priority_score
 from atalaia_sim.field_controller import (
+    BROADCAST,
     CMD_OPCODES,
     GAME_ENDED,
     GAME_PAUSED,
@@ -60,7 +67,7 @@ from atalaia_sim.packet import Header, vf_make
 from atalaia_sim.protocol import MESSAGE_TYPES
 
 from . import wallclock
-from . import channels, radio_modem, radio_region, visibility
+from . import channels, outputs, radio_modem, radio_region, visibility
 from . import scenario_service as scenarios
 from .access_tokens import AccessTokens
 from .pairing import Pairing
@@ -99,6 +106,11 @@ class Conflict(ControllerError):
 
 class Unavailable(ControllerError):
     status = 503
+
+
+class TooSoon(ControllerError):
+    """A CMD 12 that starts an output, less than 2 s after the last one to that node (EXP-30)."""
+    status = 429
 
 
 class StartBlocked(Conflict):
@@ -300,6 +312,9 @@ class FieldScript:
             return False  # a mode command names itself (atalaia_sim.mode.COMMAND_NAME)
         if cmd in ("update", "pod"):
             return False  # firmware updates and pod settings are the GM's alone (firmware_updates.py, FU3-4; pod_config.py)
+        if cmd == "output":
+            # CMD 12 (EXP-23): src field, checked and rate limited by the engine (outputs.py).
+            return self.engine.field_output(node_id, params)
         try:
             return self._fc().send_cmd(cmd, params or None, dest=node_id,
                                        now_ms=self.engine.now_ms()) is not None
@@ -374,6 +389,10 @@ class Controller:
         self.scenario_names: dict[int, str] = {}  # the live game's box names for its scenario (Join tab)
         self._devices: dict[int, str] = {}  # the live game's device ids by node id (BN-18)
         self.conflicts: dict[int, list[str]] = {}  # node ids two devices said HELLO on
+        # The live game's boxes' modules, from their last node.modules (outputs.py, EXP-21), and the
+        # CMD 12 rate limit per node (EXP-30).
+        self._modules: dict[int, list[dict[str, Any]]] = {}
+        self._output_rate = outputs.RateLimit()
         self._meta_cache: dict[str, tuple[int, Optional[scenarios.Meta]]] = {}
         self.key_lost = False
         self._key = b""
@@ -611,6 +630,8 @@ class Controller:
                 self._devices[node["node_id"]] = node["device_id"]
             if isinstance(node.get("battery_pct"), int):
                 known.battery_pct = node["battery_pct"]
+            if isinstance(node.get("modules"), list):
+                self._modules[node["node_id"]] = node["modules"]
         self._restore_health(fc, game["id"])
         # The controller's own events go on from their stored seq: from 1 again, an event at the
         # same game time and of the same type as an earlier one (a second GM adjustment before
@@ -665,6 +686,8 @@ class Controller:
             self.field = None
         self._field_scores = {}
         self._box_end = None
+        self._modules = {}
+        self._output_rate.clear()
         if self.transport is not None:
             self.transport.flush()  # frames still waiting for their gap go now: the key goes next
         if self.modem is not None:
@@ -1580,14 +1603,40 @@ class Controller:
         return sorted(r for r, spec in pkg.mode.roles.items()
                       if not (isinstance(spec, dict) and spec.get("needed") is False))
 
+    def _role_spec(self, role: str) -> Any:
+        """A role's manifest entry in the live game's mode (its requires:, optional:), or None."""
+        assert self.game is not None
+        try:
+            pkg = self.modes.get(self.game["mode_id"])
+        except ModeError:
+            return None
+        return pkg.mode.roles.get(role) if pkg is not None else None
+
+    def _capability_check(self, nodes: list[tuple[int, str]]) -> dict[str, list[dict[str, Any]]]:
+        """The start check's capability part for these joined nodes (outputs.check_nodes)."""
+        assert self.game is not None
+        stored = {n["node_id"]: n for n in self.store.nodes(self.game["id"])}
+        info = []
+        for node_id, role in nodes:
+            row = stored.get(node_id, {})
+            live = self.fc.nodes.get(node_id) if self.fc is not None else None
+            caps = live.hello.get("capabilities") if live is not None and live.hello else row.get("capabilities")
+            info.append({"node": node_id, "name": live.name if live is not None else row.get("name", str(node_id)),
+                         "role": role, "capabilities": caps,
+                         "modules": self._modules.get(node_id, row.get("modules"))})
+        return outputs.check_nodes(info, self._role_spec)
+
     def start_check(self) -> dict[str, Any]:
         """What Start would say now: the needed roles, how many nodes of each have joined, the
-        missing ones (Start refuses unless forced) and the mode's minimums not met (warnings)."""
+        missing ones (Start refuses unless forced), the joined nodes that lack a capability their
+        role requires (``missing_caps``: refused too), the mode's minimums not met and optional
+        capabilities lacking (warnings), and the simple outputs no box can check (``not_checked``)."""
         with self._lock:
             if self.game is None:
                 raise Conflict("no live game")
             needed = self._needed_roles()
-            joined: Counter[str] = Counter(role for _, role in self._joined_nodes())
+            nodes = self._joined_nodes()
+            joined: Counter[str] = Counter(role for _, role in nodes)
             missing = [r for r in needed if joined[r] == 0]
             warnings = []
             params = self.game.get("params") or {}
@@ -1610,8 +1659,11 @@ class Controller:
                                          "text": f"only {have} {role} {'node' if have == 1 else 'nodes'} joined and "
                                                  f"{name} is {value}: "
                                                  "the countdown can run from the start"})
+            caps = self._capability_check(nodes)
+            warnings += caps["warnings"]
             return {"needed": needed, "joined": dict(sorted(joined.items())), "missing": missing,
-                    "warnings": warnings, "ok": not missing}
+                    "missing_caps": caps["missing_caps"], "warnings": warnings,
+                    "not_checked": caps["not_checked"], "ok": not missing and not caps["missing_caps"]}
 
     def start_game(self, game_id: int, force: bool = False) -> dict[str, Any]:
         with self._lock:
@@ -1624,15 +1676,17 @@ class Controller:
                 if reason:
                     raise Conflict(reason)
             check = self.start_check()
-            if check["missing"] and not force:
-                raise StartBlocked("no box or prop has joined for: " + ", ".join(check["missing"])
-                                   + "; join them, or start anyway (force)", check)
-            if check["missing"]:
+            lacking = [f"{c['name']} ({c['role']}) has no {c['capability']}" for c in check["missing_caps"]]
+            if not check["ok"] and not force:
+                why = ["no box or prop has joined for: " + ", ".join(check["missing"])] if check["missing"] else []
+                raise StartBlocked("; ".join(why + lacking) + "; join them, or start anyway (force)"
+                                   if check["missing"] else "; ".join(lacking) + "; start anyway (force)", check)
+            if not check["ok"]:
                 # The GM's override, after the console's confirmation: logged and told.
-                log.warning("game %d started anyway (forced) without nodes for: %s", game_id,
-                            ", ".join(check["missing"]))
-                self._emit({"type": "system", "kind": "start.forced", "game": game_id,
-                            "missing": check["missing"]})
+                log.warning("game %d started anyway (forced) without nodes for: %s%s", game_id,
+                            ", ".join(check["missing"]) or "-", "; " + "; ".join(lacking) if lacking else "")
+                self._emit({"type": "system", "kind": "start.forced", "game": game_id, "missing": check["missing"],
+                            **({"missing_caps": check["missing_caps"]} if check["missing_caps"] else {})})
             fc.start_game(duration_ms=self.game["duration_ms"], now_ms=self.now_ms())
             preset = self.store.preset(self.game["preset_id"]) if self.game.get("preset_id") else None
             fc.controller_event("game.start", {"preset": preset["name"] if preset else self.game["mode_id"]},
@@ -1821,6 +1875,8 @@ class Controller:
             "platform": hello.get("platform"), "fw_version": hello.get("fw_version"),
             "core_version": hello.get("core_version"), "tier": hello.get("tier"),
             "capabilities": hello.get("capabilities"),
+            # Its modules and simple outputs, from its last node.modules; null until it says (EXP-21).
+            "modules": self._modules.get(node.node_id),
             # The box's stable device id (HELLO key 10, protocol/field-frames.md), as hex.
             "device_id": device.hex() if isinstance(device, (bytes, bytearray)) and len(device) == 8 else None,
             "score": {t: v.get(f"node-{node.node_id}", 0) for t, v in self.fc._scores.items()},
@@ -1855,6 +1911,106 @@ class Controller:
             if seq is None:
                 raise Unavailable(f"the radio modem is {self.radio_state}; command not sent")
             return {"node": node_id, "cmd": cmd, "opcode": CMD_OPCODES[cmd], "seq": seq}
+
+    # --- outputs (draft RFC "The expansion port", increment 3; outputs.py) -------------------
+
+    def send_output(self, game_id: int, node_id: Any, spec: Any) -> dict[str, Any]:
+        """The GM switches one output of a box (CMD 12, src gm; EXP-27): on, pulse or pattern only
+        while the game runs, with a duration (5 s by default); off whenever the game is live. At
+        most one start to a box every 2 s (TooSoon); off is never held back (EXP-30)."""
+        with self._lock:
+            fc = self._live(game_id)
+            assert self.game is not None
+            node_id = _int(node_id, "node id")
+            node = fc.nodes.get(node_id)
+            if node is None:
+                raise NotFound(f"node {node_id} is not a node of game {game_id}")
+            params, problem = outputs.output_params(spec, "gm")
+            if params is None:
+                raise ControllerError(problem or "not an output request")
+            act = params["act"]
+            if act != "off":
+                if self.game["state"] != "running":
+                    raise Conflict(f"game {game_id} is {self.game['state']}: an output turns on only while "
+                                   "the game runs (off works whenever the game is live)")
+                types = outputs.types_of(node.hello.get("capabilities") if node.hello else None)
+                if types and outputs.OUTPUT_TYPE not in node.hello.get("capabilities", []):
+                    raise Conflict(f"{node.name} has no output enabled (its HELLO lists none)")
+                known = self._modules.get(node_id)
+                if known is not None and params["capability"] not in outputs.output_caps(known):
+                    raise Conflict(f"{node.name} has no output {params['capability']} (it has: "
+                                   f"{', '.join(sorted(outputs.output_caps(known))) or 'none'})")
+            wait = self._output_rate.wait_ms(node_id, act, self.now_ms())
+            if wait:
+                raise TooSoon(f"an output of {node.name} was switched less than 2 s ago; again in "
+                              f"{(wait + 999) // 1000} s (off is never held back)")
+            seq = self._send_output_cmd(fc, node_id, params)
+            log.warning("GM output: %s %s on node %d (%s)", act, params["capability"], node_id,
+                        f"{params['ms']} ms" if "ms" in params else "off")
+            return {"node": node_id, "cmd": "output", "opcode": CMD_OPCODES["output"], "seq": seq, "params": params}
+
+    def outputs_off(self, game_id: int) -> dict[str, Any]:
+        """Every output of every box of the live game off now (the console's "All outputs off"; the
+        remote GM's too: EXP-27). One CMD 12 to every node, never held back."""
+        with self._lock:
+            fc = self._live(game_id)
+            seq = self._send_output_cmd(fc, BROADCAST, {"capability": "*", "act": "off", "src": "gm"})
+            log.warning("GM output: every output of game %d off", game_id)
+            return {"node": BROADCAST, "cmd": "output", "opcode": CMD_OPCODES["output"], "seq": seq,
+                    "params": {"capability": "*", "act": "off", "src": "gm"}}
+
+    def _send_output_cmd(self, fc: FieldController, node_id: int, params: dict[str, Any]) -> int:
+        try:
+            seq = fc.send_cmd("output", params, dest=node_id, now_ms=self.now_ms())
+        except NotController:
+            raise Conflict("this controller is on standby: only the game's controller switches outputs") from None
+        except ValueError as exc:
+            raise ControllerError(str(exc)) from None
+        if seq is None:
+            raise Unavailable(f"the radio modem is {self.radio_state}; output command not sent")
+        if node_id != BROADCAST:
+            self._output_rate.sent(node_id, params["act"], self.now_ms())
+        return seq
+
+    def field_output(self, node_id: Any, spec: Any) -> bool:
+        """field.send(node, "output", {...}) from a field script (EXP-23): src field, the params a box
+        takes, one node (or every node, for off), the rate limit. False when not sent."""
+        fc = self.fc
+        if fc is None or isinstance(node_id, bool) or not isinstance(node_id, int) or not 1 <= node_id <= BROADCAST:
+            return False
+        params, _ = outputs.output_params(spec, "field")
+        if params is None or (node_id == BROADCAST and params["act"] != "off"):
+            return False
+        if self._output_rate.wait_ms(node_id, params["act"], self.now_ms()):
+            log.info("field.lua: an output command to node %d held back (at most one every 2 s)", node_id)
+            return False
+        try:
+            self._send_output_cmd(fc, node_id, params)
+        except ControllerError:
+            return False
+        return True
+
+    def _on_modules(self, record: dict[str, Any]) -> None:
+        """A box's node.modules (its modules and simple outputs) or node.module_lost: the node list's
+        ``modules``, stored with the node and told to the consoles."""
+        assert self.game is not None and self.fc is not None
+        node = self.fc.nodes.get(int(record["node"]))
+        if node is None:
+            return
+        text = (record.get("data") or {}).get("modules")
+        if record["type"] == "node.modules":
+            modules = outputs.modules_of(text)
+            if modules is None:
+                log.warning("node %d: node.modules not in protocol/expansion-port.md's form: %r", node.node_id, text)
+                return
+        else:
+            modules = outputs.mark_lost(self._modules.get(node.node_id), text)
+            if modules is None:
+                return
+        self._modules[node.node_id] = modules
+        self._on_node(node, "modules")
+        if self.game.get("state") == "ready" and not self.game.get("joined"):
+            self._emit({"type": "game", "game": self.public_game(self.game)})  # not_checked changed
 
     def send_update(self, node_id: int, params: dict[str, Any]) -> int:
         """CMD update (RFC 0001 Amendment 6) to one box, only while the live game has not started
@@ -2141,6 +2297,9 @@ class Controller:
                 self._emit({"type": "game", "game": self.public_game(self.game)})
         if self.positions is not None:
             self.positions.on_event(self.game["id"], record)
+        if (record.get("type") in ("node.modules", "node.module_lost") and record["node"] != self.node_id
+                and record.get("origin") != "controller" and self.fc is not None):
+            self._on_modules(record)
         if self.field is not None and record["node"] != self.node_id and record.get("origin") != "controller":
             # A box's events; not the health events the controller logs about a box (FU1-4).
             data = dict(record.get("data") or {})
