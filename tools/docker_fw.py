@@ -32,7 +32,7 @@ a shallow clone, which cannot count, the core's version and the commit: 0.3.0-de
                                                candidate, or a bench test of an update)
     --release-keys=<hex or base64>[,...]       the release public keys a box accepts updates from
                                                (CONFIG_ATALAIA_OTA_RELEASE_KEYS; default: the
-                                               project's two release keys). Public keys only:
+                                               project's three release keys). Public keys only:
                                                tools/firmware_release.py keygen prints them.
     --mode-keys=<hex or base64>[,...]          the mode public keys a box accepts fetched mode
                                                packages from (CONFIG_ATALAIA_MODE_KEYS; default:
@@ -82,8 +82,11 @@ from typing import Optional
 
 REPO = Path(__file__).resolve().parents[1]
 FW = REPO / "firmware" / "esp32"
-# The project's release keys (root 424d053af5cdbc35, CI 32b3c815ac30ad43): the default of --release-keys.
-PROJECT_RELEASE_KEYS_HEX = "e6dccf90dd002529fe837e023f9f658a70917ff7dc69615cec600083bab360d7 ac83bca20314dcb44b2ed9ede91cacf9445d2987e636fe66c6fb91250b17f53c"
+# The project's release keys (root 424d053af5cdbc35, CI 32b3c815ac30ad43, the next CI key a4f6002b0122b131;
+# docs/community/keys.md, firmware/esp32/docs/RELEASE_SIGNING.md): the default of --release-keys.
+PROJECT_RELEASE_KEYS_HEX = ("e6dccf90dd002529fe837e023f9f658a70917ff7dc69615cec600083bab360d7 "
+                            "ac83bca20314dcb44b2ed9ede91cacf9445d2987e636fe66c6fb91250b17f53c "
+                            "efa798e41a0c438447a21857ffc892525214039a39127b5f93b105054c696d26")
 # The project's registry keys (root d9521a79030ce544, CI 7275108d2e3fe583; docs/community/keys.md):
 # the mode keys a build takes when --mode-keys is left out, like the Kconfig default.
 PROJECT_MODE_KEYS_HEX = "23e9b7acefbe4dc54d86f0c7cc8dbca64340f141a84c94a2f38216420baae0ca d27329d0e19ba0625950cb1b73fca4aa4c5014d76623f6b69389d0e98b1d4c86"

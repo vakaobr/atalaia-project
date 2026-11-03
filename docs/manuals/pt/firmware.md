@@ -62,7 +62,7 @@ Todos são para a Heltec WiFi LoRa 32 V4.3, região de rádio europeia (EU868), 
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 
-No `cmd` do Windows: `certutil -hashfile atalaia-field-box-0.6.1-usb.zip SHA256` e compara a linha com a que está no `SHA256SUMS`. As somas provam que o ficheiro é o que a página da versão publicada lista. A assinatura prova quem fez uma imagem da Field Box: o `.release.json` é assinado com a chave de versões da CI do projeto, em que todas as caixas confiam por omissão (`firmware/esp32/docs/RELEASE_SIGNING.md`). Uma caixa e um controlador verificam-na por ti antes de instalarem uma atualização.
+No `cmd` do Windows: `certutil -hashfile atalaia-field-box-0.6.1-usb.zip SHA256` e compara a linha com a que está no `SHA256SUMS`. As somas provam que o ficheiro é o que a página da versão publicada lista. A assinatura prova quem fez uma imagem da Field Box: o `.release.json` é assinado com uma das chaves de versões da CI do projeto, em que todas as caixas confiam por omissão (`firmware/esp32/docs/RELEASE_SIGNING.md`). Uma caixa e um controlador verificam-na por ti antes de instalarem uma atualização.
 
 **Grava o zip.** Descompacta-o. Nessa pasta segue a [secção 3](#3-grava-o) a partir da 3.1: os comandos são os mesmos, e o `README.txt` dentro do zip repete-os. A pasta tem o ficheiro `flash_args` que o comando usa, por isso salta a compilação e o passo `cd firmware/esp32/build`.
 
@@ -89,7 +89,7 @@ No macOS e no Linux, usa `python3` se o `python` não for encontrado. A primeira
 
 Uma compilação feita a partir de um clone mostra uma versão como `0.6.1+12.g1a2b3c4` (ou `0.7.0-dev.12+g1a2b3c4` entre versões publicadas): o número da versão publicada, o número de alterações desde então e o identificador do código. Também aparece no ecrã pequeno da placa, no arranque. Guarda uma nota dela junto da caixa. Para obteres exatamente o firmware de uma versão publicada, faz checkout da etiqueta dela (`git checkout v0.6.1`) e compila aí: um checkout limpo de uma etiqueta diz apenas `0.6.1`.
 
-**Chaves.** Uma compilação feita por ti confia, por omissão, nas duas chaves de versões e nas duas chaves de modos do projeto, tal como os ficheiros publicados, por isso um controlador teu aceita as versões assinadas do projeto. As tuas compilações não são assinadas pelo projeto: assina-as com uma chave tua e dá às caixas a metade pública dela (`--release-keys=`, [secção 7](#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo)).
+**Chaves.** Uma compilação feita por ti confia, por omissão, nas três chaves de versões e nas duas chaves de modos do projeto, tal como os ficheiros publicados, por isso um controlador teu aceita as versões assinadas do projeto. As tuas compilações não são assinadas pelo projeto: assina-as com uma chave tua e dá às caixas a metade pública dela (`--release-keys=`, [secção 7](#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo)).
 
 ## 3. Grava-o
 
@@ -266,14 +266,14 @@ Duas coisas usam o Wi-Fi do campo, e só entre jogos: as **atualizações de fir
 **As regras das atualizações de firmware.** A caixa só instala uma atualização se tudo isto for verdade:
 
 - Nenhum jogo está a decorrer.
-- A atualização está assinada por uma **chave de versões incluída no firmware da própria caixa** (`--release-keys`). Por omissão são as duas chaves de versões do projeto, por isso os ficheiros da Field Box de uma versão publicada no GitHub podem ser instalados como atualizações; uma caixa compilada com `--release-keys=` uma chave tua só confia nessa. As chaves do projeto e o que acontece se uma vazar estão em [RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md).
+- A atualização está assinada por uma **chave de versões incluída no firmware da própria caixa** (`--release-keys`). Por omissão são as três chaves de versões do projeto (a raiz, a da CI e a próxima chave da CI, que a substitui), por isso os ficheiros da Field Box de uma versão publicada no GitHub podem ser instalados como atualizações; uma caixa compilada com `--release-keys=` uma chave tua só confia nessa. As chaves do projeto e o que acontece se uma vazar estão em [RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md).
 - A versão é mais alta do que a que corre.
 - É da mesma variante e da mesma placa (uma imagem V4.2 nunca vai para uma V4.3).
 - A bateria está a 30 % ou mais, se a caixa tiver medidor.
 
 **O caminho curto.**
 
-**Com as versões publicadas do projeto:** grava uma caixa uma vez por USB com uma versão publicada e depois carrega, no separador **Caixas** da consola, o `atalaia-field-box-<version>.bin` de uma versão posterior e o seu `.bin.release.json`. O `[firmware] release_keys` do controlador já tem por omissão as chaves do projeto. Carrega em **Atualizar para** (passo 5). **Com uma chave tua:**
+**Com as versões publicadas do projeto:** grava uma caixa uma vez por USB com uma versão publicada e depois carrega, no separador **Caixas** da consola, o `atalaia-field-box-<version>.bin` de uma versão posterior e o seu `.bin.release.json`. O `[firmware] release_keys` do controlador já tem por omissão as chaves do projeto. Se o teu `controller.toml` as lista à mão (o ficheiro de exemplo listava-as), acrescenta à lista a próxima chave da CI, `76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=`: as versões do projeto passam a ser assinadas com ela depois da primeira versão que a inclui ([RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md#rotating-the-ci-key-2026-11)). Carrega em **Atualizar para** (passo 5). **Com uma chave tua:**
 
 1. Faz uma chave com `tools/firmware_release.py keygen`. Guarda o ficheiro privado em segurança e fora do repositório.
 2. Compila as caixas com `--release-keys=<the public key>`. Grava-as por USB, uma vez. As atualizações não conseguem instalar um bootloader novo.

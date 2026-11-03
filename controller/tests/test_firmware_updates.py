@@ -784,8 +784,9 @@ class ConfigTests(unittest.TestCase):
         from atalaia_controller.config import PROJECT_RELEASE_KEYS, load_config  # noqa: PLC0415
         from atalaia_controller.firmware_release import key_id  # noqa: PLC0415
 
-        # docs/community/keys.md: root 424d053af5cdbc35, CI 32b3c815ac30ad43.
-        self.assertEqual([key_id(k) for k in PROJECT_RELEASE_KEYS], ["424d053af5cdbc35", "32b3c815ac30ad43"])
+        # docs/community/keys.md: root 424d053af5cdbc35, CI 32b3c815ac30ad43, next CI a4f6002b0122b131.
+        self.assertEqual([key_id(k) for k in PROJECT_RELEASE_KEYS],
+                         ["424d053af5cdbc35", "32b3c815ac30ad43", "a4f6002b0122b131"])
         self.assertEqual(load_config(None, {}).firmware_release_keys, list(PROJECT_RELEASE_KEYS))
         self.assertEqual(load_config(None, {"ATALAIA_FIRMWARE_RELEASE_KEYS": SIGNING["public_key_b64"]}
                                      ).firmware_release_keys, [SIGNING["public_key_b64"]])
