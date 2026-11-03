@@ -14,6 +14,7 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+- **The drawn field image comes fully into view** (`controller/console/src/field-map.js`, *Load the field from a map*): MF-59 scrolls the preview to the top of the window once it is drawn, but it scrolled before the image had loaded; with the image still taking no room the page was too short, so the scroll stopped early and left the image below the fold (at 1280 × 900 the heading stayed near the bottom of the window). The page now waits for the image to be decoded before it scrolls and focuses the heading. The browser test that put a grid over the preview also clicked while that scroll was still moving and failed under load (9 of 30 runs); it now waits for the preview to be in place first.
 ## [0.7.0](https://github.com/vakaobr/atalaia-project/compare/v0.6.1...v0.7.0) (2026-11-03)
 
 ### Features

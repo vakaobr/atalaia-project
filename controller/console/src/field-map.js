@@ -487,9 +487,13 @@ class FieldMap extends Component {
     }
 
     /** MF-59: the drawn image is easy to miss below the fold: bring it into view and put the keyboard (and
-     * a screen reader) on its heading, from where *Use as the field* is the next button. */
+     * a screen reader) on its heading, from where *Use as the field* is the next button. Only once the image
+     * has its size: before that it takes no room, the page is too short to scroll its section to the top, and
+     * the scroll stops early with the image still below the fold. */
     showPreview() {
-        this.showHeading('fm-preview-h');
+        const img = document.querySelector('[data-testid="fm-image"]');
+        const sized = img && !img.complete && img.decode ? img.decode().catch(() => {}) : Promise.resolve();
+        sized.then(() => this.showHeading('fm-preview-h'));
     }
 
     /** Scrolls a section (by its heading's id) into view and focuses the heading. */
