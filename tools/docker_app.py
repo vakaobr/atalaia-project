@@ -116,6 +116,9 @@ def build_core() -> int:
               # the program runs in the Flutter image too (which has no mbedtls).
               "&& cmake -S /src/firmware/esp32/test/box_host -B /core-build/box_host "
               "-DCMAKE_BUILD_TYPE=Debug -DMBEDCRYPTO_LIB=$(ls /usr/lib/*/libmbedcrypto.a | head -n 1) "
+              # mbedtls and mbedx509 too, since box_host's HTTPS mode fetch (#32).
+              "-DMBEDTLS_LIB=$(ls /usr/lib/*/libmbedtls.a | head -n 1) "
+              "-DMBEDX509_LIB=$(ls /usr/lib/*/libmbedx509.a | head -n 1) "
               ">> /tmp/build.log 2>&1 && cmake --build /core-build/box_host >> /tmp/build.log 2>&1 "
               "|| { cat /tmp/build.log; exit 1; }")
     return subprocess.call(["docker", "run", "--rm", "-v", f"{REPO}:/src:ro", "-v",
