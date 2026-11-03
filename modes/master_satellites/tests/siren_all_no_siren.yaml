@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A master box without a siren output plays on when siren_all_s is set
+params: { siren_all_s: 10 }
+nodes: { master: master, alpha: satellite }
+outputs: { master: [] }
+steps:
+  - hold: { node: master, team: red, s: 3 }
+  - hold: { node: alpha, team: red, s: 3 }
+  - wait: 10
+  - expect_no: output.switched
+  - expect_score: { team: red, points: 3 }
+  - expect_no: script.error

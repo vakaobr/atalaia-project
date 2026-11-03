@@ -250,13 +250,13 @@ Todos os modos incluídos aparecem em **Modo ou predefinição**. Os nomes em in
 | --- | --- | --- |
 | Domination | Domínio | Uma caixa ou várias. O tempo a premir e os pontos são parâmetros. |
 | Hold-All Domination | Domínio Total | Uma equipa só pontua enquanto tiver todas as caixas. |
-| Bomb / Rush | Bomba / Rush | Rastilho, tempos a premir para armar e desarmar. Uma explosão termina o jogo e vence a equipa que armou a bomba; um desarme não o termina (usa **Terminar**). **Códigos de equipa** opcionais, por exemplo `red=1234,blue=5678`. |
+| Bomb / Rush | Bomba / Rush | Rastilho, tempos a premir para armar e desarmar. Uma explosão termina o jogo e vence a equipa que armou a bomba; um desarme não o termina (usa **Terminar**). **Códigos de equipa** opcionais, por exemplo `red=1234,blue=5678`. **Fumo quando explode** e **Sirene quando explode** opcionais (segundos, até 10; vazio: nenhum) acionam as saídas de fumo e de sirene da caixa ([Saídas](#saídas)). |
 | Sabotage | Sabotagem | Rondas da bomba até acabar o tempo de jogo: uma explosão pontua para os atacantes, um desarme para os defensores, e há uma pausa curta. Vence a equipa com mais pontos. Pausa, tempo de jogo e **Códigos de equipa** opcionais são parâmetros. |
 | Last Stand | Último Elemento | Atacantes, defensores, contagem para a derrota. |
 | Kill Confirmed | Baixa Confirmada | Precisa de etiquetas de quem joga. |
 | Respawn and Lives | Reentradas e Vidas | Precisa de etiquetas, ou de botões de equipa. |
 | Player Check-in | Registo de Presença | Precisa de etiquetas de quem joga. |
-| Master and Satellites | Mestre e Satélites | |
+| Master and Satellites | Mestre e Satélites | **Sirene na mestre quando uma equipa tem todos os satélites** opcional (segundos; vazio: nenhuma) toca a saída de sirene da caixa mestre ([Saídas](#saídas)). |
 | Progressive Domination | Domínio Progressivo | Uma caixa ativa de cada vez. |
 | Hacking Terminal | Hackeia o terminal | Funciona sem o controlador. Enigma: código, fios ou sequência. |
 | VIP / Payload | VIP / Carga | O VIP partilha a posição a partir da app. |
@@ -396,6 +396,8 @@ Um controlador de reserva não pode começar um jogo. Diz **Este controlador nã
 - O **Registo** mostra o que cada saída fez e quem a ligou: **caixa 4: siren ligado durante 5 s (a organização)**. Enquanto está ligada, a saída mostra **ligada**.
 
 As caixas também desligam as saídas sozinhas quando o jogo é posto em pausa ou acaba. Quem está na página **GM remoto** do servidor do site só pode desligar todas as saídas, nunca ligar uma.
+
+**Modos que acionam saídas.** A *Bomba / Rush* aciona o **fumo** (smoke) e a **sirene** (siren) da caixa da bomba quando explode, durante os segundos escritos em **Fumo quando explode** e **Sirene quando explode** (até 10: a explosão termina o jogo, e uma caixa mantém uma saída ligada no máximo 10 segundos depois do fim). O *Mestre e Satélites* toca a **sirene** da caixa mestre quando uma equipa tem todos os satélites, durante os segundos em **Sirene na mestre quando uma equipa tem todos os satélites** (o tempo máximo da própria caixa continua a valer), e volta a tocá-la só depois de essa equipa perder um. Vazios (por omissão), nada é acionado e o jogo é como antes. Ao escolher um destes modos, o formulário diz que saídas usaria (**Bomba / Rush acionaria estas saídas numa caixa que as tenha: smoke, siren**). Para funcionar, a saída tem de estar ativada na própria caixa, com o PIN de administração, e ter esse uso (**smoke**, **siren**; vê o [manual da Field Box](field-box.md#saídas-uma-sirene-um-estroboscópio-uma-máquina-de-fumo)). Uma caixa sem ela joga o jogo da mesma maneira, sem acionar nada; se tiver saídas mas nenhuma destas, a verificação antes de começar diz isso (**box-4 (bomb) não tem nenhuma das saídas que o modo acionaria (smoke, siren): joga-se sem elas.**).
 
 ### O separador Caixas
 

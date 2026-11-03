@@ -125,10 +125,12 @@
     "start_warnings": {
       "min": "已加入 {have} × {role}；模式要求 {value}（{param}）。",
       "optional_caps": "{name}（{role}）沒有 {caps}：模式不需要它也能進行。",
+      "outputs": "{name}（{role}）沒有模式會啟動的任何輸出（{caps}）：沒有它們也能進行。",
       "last": "只加入 {have} × {role}，而 {param} 是 {value}：倒數可能從一開始就啟動。"
     },
     "settings": "遊戲設定",
     "settings_hint": "建立遊戲時設定；若要更改，請結束這場遊戲再建立新的。",
+    "mode_outputs": "{mode} 會在有這些輸出的盒子上啟動它們：{list}。盒子只會啟動在盒子上用管理 PIN 啟用的輸出。",
     "key_lost_notice": "這台控制器重新啟動時沒有這場遊戲的金鑰（persist_game_key 已關閉）：這場遊戲只能結束。結束時會透過場地無線電、以場地加入金鑰加密通知它的盒子，盒子便會離開遊戲。",
     "confirm_end_key_lost": "結束遊戲並透過場地無線電通知它的盒子？",
     "over_told": "已透過場地無線電通知這場遊戲的盒子：遊戲結束。",

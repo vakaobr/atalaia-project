@@ -12,7 +12,9 @@ from typing import Any, Optional
 from typing import TYPE_CHECKING
 
 from . import codec
+from .box_outputs import BoxOutputs, fitted_outputs
 from .core import Command, Core, Emitted, FieldOps, Node
+from .expansion import output_params_problem
 from .field_controller import CMD_PARAMS_MAX
 from .mode import COMMAND_NAME, Mode
 from .protocol import MESSAGE_TYPES, RF_PAYLOAD_MAX
@@ -33,6 +35,10 @@ FIELD_STEP_MS = 100
 # Amendment 5): its params carry the command's name, and the node's script gets
 # them as cmd.mode.
 FIELD_COMMANDS = {"set_owner": "cmd.set_owner", "message": "gm.message", "mode": "cmd.mode"}
+# field.send(node, "output", {...}): CMD opcode 12, which the box's firmware handles, not its script
+# (draft RFC "The expansion port", EXP-23): the box's outputs switch, with src field. The controller
+# sends one that starts an output to a node at most every OUTPUT_GAP_MS; an off always goes.
+OUTPUT_GAP_MS = 2_000
 # Positions never travel as events (decisions P4R6, P4R25): an event whose data holds one of
 # these keys, at any depth, is a problem. The same list as the sync's (protocol/sync.md).
 COORDINATE_KEYS = frozenset({"lat", "lon", "lng", "latitude", "longitude", "alt", "altitude", "position",
@@ -89,6 +95,8 @@ class VirtualNode:
     last_input: Optional[dict[str, Any]] = None
     # The parameters this node runs with: its role's part of the game's (its join's).
     params: dict[str, Any] = field(default_factory=dict)
+    # Its outputs (a siren, smoke: the box's output layer, box_outputs.py).
+    outputs: BoxOutputs = field(default_factory=lambda: BoxOutputs({}))
 
     def last_command(self, target: str, method: str) -> Optional[Command]:
         for cmd in reversed(self.commands):
@@ -111,7 +119,10 @@ class Simulation:
         radio: Optional["RadioModel"] = None,
         game_id: int = 1,
         game_key: Optional[bytes] = None,
+        outputs: Optional[dict[str, Any]] = None,
     ):
+        """``outputs``: node name -> the outputs that box has (a list of functions, or a map of function
+        to its max on in seconds); a node not named has those its role lists in ``outputs:``."""
         self.core = core
         self.mode = mode
         # The game's id and 16-byte key, as a join gives them to a box: player tags
@@ -145,10 +156,15 @@ class Simulation:
         # link to come back, as a box's retries would, and commands to them are lost.
         self._unreachable: set[str] = set()
         self._held: list[tuple[str, int, str, dict[str, Any]]] = []
+        self._output_sent: dict[str, int] = {}  # node name -> when the field last started one of its outputs
 
         self.seed = seed
         self._mem_limit, self._instr_limit = mem_limit, instr_limit
         self._started = False  # game.start broadcast, game.end not yet
+        outputs = outputs or {}
+        unknown = set(outputs) - set(nodes)
+        if unknown:
+            raise SimError(f"outputs for unknown node(s) {sorted(unknown)}")
         for node_id, (name, role) in enumerate(nodes.items(), start=1):
             if role not in mode.roles:
                 raise SimError(f"node '{name}': mode {mode.id} has no role '{role}'")
@@ -156,6 +172,13 @@ class Simulation:
             # gives them (a role package's roles run the package alone, modes/README.md).
             vnode = VirtualNode(name=name, role=role, runtime=None,  # type: ignore[arg-type]
                                 params=mode.params_for(role, params))
+            spec = mode.roles.get(role)
+            fitted = outputs.get(name, (spec.get("outputs") if isinstance(spec, dict) else None) or [])
+            try:
+                vnode.outputs = BoxOutputs(fitted_outputs(fitted, f"node '{name}'"),
+                                           lambda t, data, n=vnode: self._record_switched(n, t, data))
+            except ValueError as exc:
+                raise SimError(str(exc)) from None
             vnode.runtime = self._load_node(vnode, node_id)
             self.nodes[name] = vnode
         if mode.field_script is not None:
@@ -179,7 +202,7 @@ class Simulation:
             mem_limit=self._mem_limit,
             instr_limit=self._instr_limit,
             on_event=lambda ev, n=vnode: self._record(n, ev),
-            on_command=vnode.commands.append,
+            on_command=lambda cmd, n=vnode: self._command(n, cmd),
             on_log=vnode.logs.append,
         )
         if not runtime.loaded:
@@ -196,6 +219,8 @@ class Simulation:
         vnode = self.node(name)
         node_id = vnode.runtime.node_id
         vnode.runtime.close()
+        # A box boots with every output off; it plays on in the running game.
+        vnode.outputs.boot(self.time_ms, self._started)
         vnode.runtime = self._load_node(vnode, node_id)
         if self._started:
             vnode.runtime.input("game.start", {"preset": self.mode.node_mode_id(vnode.role)})
@@ -218,6 +243,32 @@ class Simulation:
             else:
                 self._to_field.append((self.time_ms, "node.rebooted", event))
 
+    def _command(self, vnode: VirtualNode, cmd: Command) -> None:
+        """A script's call on a capability: an output's is the box's output layer's, the rest the shell's."""
+        if not vnode.outputs.script_call(cmd.t_ms, cmd.target, cmd.method, cmd.args):
+            vnode.commands.append(cmd)
+
+    def _record_switched(self, vnode: VirtualNode, t_ms: int, data: dict[str, Any]) -> None:
+        """output.switched from a box's output layer, as it sends it on the field link."""
+        node_id = vnode.runtime.node_id if vnode.runtime is not None else 0
+        prio = codec.default_prio("output.switched")
+        size = self._check_wire(vnode.name, {"node": node_id, "seq": 0, "t": t_ms,
+                                             "type": "output.switched", "prio": prio, "data": data})
+        self._log.append(LogEntry(t_ms, vnode.name, node_id, 0, "output.switched", None, prio, dict(data), size))
+        if self.field is not None:
+            event = {**data, "node": node_id}
+            if vnode.name in self._unreachable:
+                self._held.append((vnode.name, t_ms, "output.switched", event))
+            else:
+                self._to_field.append((t_ms, "output.switched", event))
+
+    def outputs(self, name: str) -> BoxOutputs:
+        """A node's outputs now (all off once its script was halted)."""
+        vnode = self.node(name)
+        if vnode.runtime.status == "halted":
+            vnode.outputs.halt(self.time_ms)
+        return vnode.outputs
+
     def close(self) -> None:
         for vnode in self.nodes.values():
             vnode.runtime.close()
@@ -230,6 +281,10 @@ class Simulation:
         return self.teams[team_id - 1] if 1 <= team_id <= len(self.teams) else None
 
     def _record(self, vnode: VirtualNode, ev: Emitted) -> None:
+        if ev.type == "game.end":
+            # The box's mode ended the game (game.win, game.finish): every output off before its
+            # game.end handlers run, then the grace (node_runner.c).
+            vnode.outputs.end(ev.t_ms)
         size = self._check_wire(vnode.name, {"node": ev.node, "seq": ev.seq, "t": ev.t_ms,
                                              "type": ev.type, "team": ev.team, "squad": ev.squad,
                                              "prio": ev.prio, "data": ev.data})
@@ -275,6 +330,8 @@ class Simulation:
 
     def _field_send(self, node_id: int, cmd: str, params: dict[str, Any]) -> bool:
         target = next((v for v in self.nodes.values() if v.runtime.node_id == node_id), None)
+        if target is not None and cmd == "output":
+            return self._field_output(target, params)
         if target is None or cmd not in FIELD_COMMANDS:
             return False
         if cmd == "mode" and not COMMAND_NAME.match(str((params or {}).get("name", ""))):
@@ -288,6 +345,32 @@ class Simulation:
         self.field_commands.append((self.time_ms, target.name, cmd, dict(params)))
         if target.name not in self._unreachable:
             self._to_nodes.append((target.name, FIELD_COMMANDS[cmd], dict(params)))
+        return True
+
+    def _field_output(self, target: VirtualNode, spec: Any) -> bool:
+        """field.send(node, "output", {...}): CMD 12 with src field, checked as the controller and the box
+        check it (atalaia_controller.outputs.output_params), at most one start every 2 s to a node."""
+        if not isinstance(spec, dict):
+            return False
+        params = {k: spec[k] for k in ("capability", "act", "ms", "on_ms", "off_ms") if k in spec}
+        if params.get("act") == "off":
+            params = {k: v for k, v in params.items() if k in ("capability", "act")}
+        elif params.get("act") != "pattern":
+            params.pop("on_ms", None)
+            params.pop("off_ms", None)
+        params["src"] = "field"
+        if output_params_problem(params) is not None:
+            return False
+        act = params["act"]
+        last = self._output_sent.get(target.name)
+        if act != "off" and last is not None and self.time_ms - last < OUTPUT_GAP_MS:
+            return False
+        if act != "off":
+            self._output_sent[target.name] = self.time_ms
+        self.field_commands.append((self.time_ms, target.name, "output", dict(params)))
+        if target.name not in self._unreachable:
+            target.outputs.switch(self.time_ms, params["capability"], act, params.get("ms", 0),
+                                  params.get("on_ms", 0), params.get("off_ms", 0), source="field")
         return True
 
     def set_reachable(self, node: str, reachable: bool) -> None:
@@ -388,7 +471,17 @@ class Simulation:
         if type_ == "game.end":
             self._ended = True
             self._started = False
+        at = self.time_ms if t_ms is None else t_ms
         for vnode in self.nodes.values():
+            # The box's output layer first: a game.start or game.end handler switches after it.
+            if type_ == "game.start":
+                vnode.outputs.game_start(at)
+            elif type_ == "game.pause":
+                vnode.outputs.pause(at)
+            elif type_ == "game.resume":
+                vnode.outputs.resume(at)
+            elif type_ == "game.end":
+                vnode.outputs.end(at)
             vnode.runtime.input(type_, data or {})
         if self.field is not None:
             reason = (data or {}).get("reason")

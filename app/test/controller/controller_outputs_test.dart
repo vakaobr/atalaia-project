@@ -23,6 +23,19 @@ const target = {
   'optional': ['display', 'audio', 'smell'],
 };
 
+/// Bomb's role since increment 4: optional outputs, and the ones it switches.
+const bomb = {
+  'requires': ['team_input'],
+  'optional': ['keypad', 'audio', 'led', 'display', 'output'],
+  'outputs': ['smoke', 'siren'],
+};
+
+/// A role that cannot play without an output.
+const alarm = {
+  'requires': ['team_input', 'output'],
+  'outputs': ['siren'],
+};
+
 Map<String, Object?> node(
   int n,
   String role,
@@ -38,7 +51,10 @@ Map<String, Object?> node(
 
 Map<String, List<Map<String, Object?>>> check(
   List<Map<String, Object?>> nodes,
-) => checkNodes(nodes, (r) => {'zone': zone, 'target': target}[r]);
+) => checkNodes(
+  nodes,
+  (r) => {'zone': zone, 'target': target, 'bomb': bomb, 'alarm': alarm}[r],
+);
 
 void main() {
   test('role names are met by their types (capabilities.yaml role_names)', () {
@@ -125,6 +141,56 @@ void main() {
         out['not_checked']!.single['text'],
         'siren on box-4: not checked (simple output)',
       );
+    });
+
+    test("a role's outputs (increment 4, outputs.py)", () {
+      final b = capabilityTypeIds['button']!, o = capabilityTypeIds['output']!;
+      String codes(Map<String, List<Map<String, Object?>>> out) =>
+          out['warnings']!
+              .map((w) => '${w['code']}:${w['node']}:${w['capabilities']}')
+              .join(' ');
+      var out = check([
+        node(4, 'bomb', [b]),
+        node(5, 'alarm', [b]),
+      ]);
+      expect(out['missing_caps'], [
+        {'node': 5, 'name': 'box-5', 'role': 'alarm', 'capability': 'output'},
+      ]);
+      expect(
+        codes(out),
+        'optional_caps:4:[keypad, audio, led, display, output]',
+      );
+      final horn = modulesOf('g46:servo:horn');
+      out = check([
+        node(4, 'bomb', [
+          b,
+          capabilityTypeIds['keypad']!,
+          capabilityTypeIds['audio']!,
+          capabilityTypeIds['led']!,
+          capabilityTypeIds['display']!,
+          o,
+        ], horn),
+        node(5, 'alarm', [b, o], horn),
+      ]);
+      expect(out['missing_caps'], isEmpty);
+      expect(codes(out), 'outputs:4:[smoke, siren] outputs:5:[siren]');
+      expect(
+        out['warnings']!.first['text'],
+        'box-4 (bomb) has none of the outputs the mode would switch: smoke, siren',
+      );
+      out = check([
+        node(4, 'bomb', [b, o], modulesOf('g46:servo:smoke')),
+        node(5, 'alarm', [b, o], null),
+      ]);
+      expect(out['warnings']!.map((w) => w['code']), ['optional_caps']);
+      final lost = markLost(
+        modulesOf('5c:out4/1.0.0:siren'),
+        '5c:out4/1.0.0:siren',
+      );
+      out = check([
+        node(5, 'alarm', [b, o], lost),
+      ]);
+      expect(codes(out), 'outputs:5:[siren]');
     });
   });
 

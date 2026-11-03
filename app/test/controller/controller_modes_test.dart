@@ -58,6 +58,127 @@ void main() {
   late AtalaiaCore core;
   setUpAll(() => core = AtalaiaCore.open(coreLibraryPath()));
 
+  test("a role's outputs: (EXP-22, atalaia_sim.mode check_roles)", () {
+    Map<String, Object?> manifest(Map<String, Object?> role) => {
+      'id': 'org.x.y',
+      'version': '1',
+      'roles': {'a': role},
+    };
+    for (final role in <Map<String, Object?>>[
+      {
+        'optional': ['output'],
+        'outputs': ['smoke', 'siren'],
+      },
+      {
+        'requires': ['output'],
+        'outputs': ['siren.2'],
+      },
+      {
+        'optional': ['led', 'output'],
+        'outputs': ['out.3', 'horn', 'light', 'strobe'],
+      },
+      {
+        'optional': ['led'],
+      },
+    ]) {
+      checkManifest(manifest(role), 'm');
+    }
+    for (final (role, message) in <(Map<String, Object?>, String)>[
+      (
+        {
+          'optional': ['output'],
+          'outputs': 'siren',
+        },
+        'outputs is a list',
+      ),
+      (
+        {
+          'optional': ['output'],
+          'outputs': <Object?>[],
+        },
+        'outputs is a list',
+      ),
+      (
+        {
+          'optional': ['output'],
+          'outputs': ['siren', 'siren'],
+        },
+        'different',
+      ),
+      (
+        {
+          'optional': ['output'],
+          'outputs': ['bell'],
+        },
+        'output functions',
+      ),
+      (
+        {
+          'optional': ['output'],
+          'outputs': ['out.0'],
+        },
+        'output functions',
+      ),
+      (
+        {
+          'optional': ['output'],
+          'outputs': ['siren\n'],
+        },
+        'output functions',
+      ),
+      (
+        {
+          'optional': ['output'],
+          'outputs': [3],
+        },
+        'output functions',
+      ),
+      (
+        {
+          'optional': ['output'],
+          'outputs':
+              ['siren', 'smoke', 'strobe', 'light', 'horn'] +
+              ['out.1', 'out.2', 'out.3', 'out.4'],
+        },
+        '1-8',
+      ),
+      (
+        {
+          'optional': ['led'],
+          'outputs': ['siren'],
+        },
+        'needs output',
+      ),
+      (
+        {
+          'outputs': ['siren'],
+        },
+        'needs output',
+      ),
+    ]) {
+      expect(
+        () => checkManifest(manifest(role), 'm'),
+        throwsA(
+          isA<ModeException>().having(
+            (e) => '$e',
+            'message',
+            contains(message),
+          ),
+        ),
+        reason: '$role',
+      );
+    }
+    // The built-in modes that use outputs pass it on the phone too.
+    final bomb = ModeCatalog.builtin().modes.firstWhere(
+      (m) => m.folder == 'bomb',
+    );
+    checkManifest(bomb.manifest, 'bomb');
+    expect(((bomb.manifest['roles']! as Map)['bomb']! as Map)['outputs'], [
+      'smoke',
+      'siren',
+    ]);
+  });
+
   group('the optional scoring block (BSC-2, atalaia_sim.mode)', () {
     Map<String, Object?> manifest(Object? scoring, {String kind = 'mode'}) => {
       'id': 'org.x.y',

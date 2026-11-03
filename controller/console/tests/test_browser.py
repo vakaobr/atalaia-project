@@ -1266,6 +1266,40 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("tab-nodes").click()
         expect(page.get_by_test_id(f"node-module-{BOX}-g46")).to_have_text("siren · não verificado")
 
+    def test_a_modes_outputs_in_the_form_and_the_start_check(self):
+        """Draft RFC "The expansion port", increment 4: Bomb's role names the outputs it switches (smoke,
+        siren): the game form says so in four languages, with its new parameters' labels; a joined bomb box
+        with an output but none of those gets the start check's "outputs" note."""
+        page = self.console()
+        page.get_by_test_id("lang").select_option("en")
+        page.get_by_test_id("game-source").select_option("mode:org.atalaia.bomb")
+        uses = page.get_by_test_id("game-mode-outputs")
+        expect(uses).to_contain_text("Bomb / Rush would switch these outputs on a box that has them: smoke, siren.")
+        expect(page.locator('label[for="game-smoke_s"]')).to_contain_text("Smoke when it explodes")
+        for lang, text, label in (("pt", "Bomba / Rush acionaria estas saídas numa caixa que as tenha: smoke, siren.",
+                                   "Fumo quando explode"),
+                                  ("de", "Bombe / Rush würde diese Ausgänge an einer Box schalten", "Rauch bei der Explosion"),
+                                  ("zh-tw", "會在有這些輸出的盒子上啟動它們：smoke, siren", "爆炸時啟動盒子的 smoke 輸出")):
+            page.get_by_test_id("lang").first.select_option(lang)
+            expect(uses).to_contain_text(text)
+            expect(page.locator('label[for="game-siren_s"]')).to_be_visible()
+            expect(page.locator('label[for="game-smoke_s"]')).to_contain_text(label)
+        page.get_by_test_id("game-source").select_option(f"mode:{DOMINATION}")
+        expect(uses).to_have_count(0)  # Domination switches no output
+
+        self.field.create_game(mode_id="org.atalaia.bomb", assignments={str(BOX): "bomb"}, params={"smoke_s": 5})
+        self.field.box_hello(caps=[1, 2, 3, 4, 5, 11])
+        ev = codec.encode_event({"node": BOX, "seq": 1, "t": 0, "type": "node.modules",
+                                 "data": {"modules": "g46:servo:horn"}})
+        self.field.box("EVENT", ev, ack=True)
+        page = self.console()
+        page.get_by_test_id("lang").select_option("en")
+        expect(page.get_by_test_id("start-warnings")).to_contain_text(
+            "box-7 (bomb) has none of the outputs the mode would switch (smoke, siren): it plays without them.")
+        page.get_by_test_id("lang").select_option("pt")
+        expect(page.get_by_test_id("start-warnings")).to_contain_text(
+            "box-7 (bomb) não tem nenhuma das saídas que o modo acionaria (smoke, siren)")
+
     def test_hacking_terminal_game_and_its_event(self):
         """A Hacking Terminal game from the form (its parameters in Portuguese); the terminal's
         join; a solved terminal reads as words in the feed, with the code it revealed for the GM,
@@ -2779,6 +2813,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.type_outline(page)
         page.get_by_test_id("fm-draw").click()
         expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        self.preview_shown(page)  # before the grid's form is used: its clicks would race the page's scroll
         expect(page.get_by_test_id("fm-grid-toggle")).not_to_be_checked()
         expect(page.get_by_test_id("fm-grid")).to_have_count(0)
         page.get_by_test_id("fm-grid-toggle").check()
@@ -3254,6 +3289,26 @@ class ConsoleBrowserTests(unittest.TestCase):
         for lat, lon in OUTLINE:
             page.get_by_test_id("fm-corner").fill(f"{lat}, {lon}")
             page.get_by_test_id("fm-corner-add").click()
+
+    def preview_shown(self, page) -> None:
+        """MF-59: waits until the page has brought the drawn preview into view (a smooth scroll), then checks
+        its heading is at the top, below the banner, and the image starts inside the window. An action before
+        the scroll is over races it: Playwright's click misses the moving element and Playwright scrolls it to
+        the window's edge itself, which can leave the heading above the window (the console's CSP refuses
+        wait_for_function, hence the polling)."""
+        last = None
+        for _ in range(100):
+            now = page.evaluate("""() => { const i = document.querySelector('[data-testid=fm-image]');
+                const h = document.getElementById('fm-preview-h').getBoundingClientRect();
+                return i && i.complete && i.naturalWidth > 0 ? [Math.round(scrollY), h.top, i.getBoundingClientRect().top,
+                    innerHeight] : null; }""")
+            if now is not None and now == last and 0 <= now[1] <= 200:
+                break
+            last = now
+            page.wait_for_timeout(100)
+        else:
+            self.fail(f"the preview did not come into view: [scrollY, heading top, image top, height] = {last}")
+        self.assertLess(now[2], now[3], "the drawn image starts inside the window")
 
     def check_loaded(self, level: int, wms_url: "str | None", label: str = "") -> dict:
         """The controller's side after *Use as the field*: the plan, the map position from the image's edges

@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The explosion fires the box's smoke and siren for their seconds, in the 10 s after the game's end
+params: { fuse_s: 60, smoke_s: 8, siren_s: 10 }
+steps:
+  - hold: { team: red, s: 5 }
+  - expect_output: { capability: smoke, active: false }
+  - wait: 60
+  - expect: { type: bomb.exploded, team: red, at: 65 }
+  - expect: { type: output.switched, at: 65, data: { capability: smoke, ms: 8000, source: script } }
+  - expect: { type: output.switched, at: 65, data: { capability: siren, ms: 10000, source: script } }
+  - expect_status: ended
+  - expect_output: { capability: smoke, active: true, left_s: 8, source: script }
+  - expect_output: { capability: siren, active: true, left_s: 10 }
+  - wait: 8
+  - expect_output: { capability: smoke, active: false }
+  - expect_output: { capability: siren, active: true, left_s: 2 }
+  - wait: 2
+  - expect_output: { capability: siren, active: false }

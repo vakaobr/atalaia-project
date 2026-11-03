@@ -543,6 +543,32 @@ class EditorTests(unittest.TestCase):
             ("problem_command_twice", "refill"), ("problem_command_unhandled", "open"),
             ("problem_command_unhandled", "refill"), ("problem_role_unknown", "gate")])
 
+    def test_a_roles_outputs_and_an_optional_setting(self):
+        """Increment 4 of the draft RFC "The expansion port": a role's `outputs:` (with `output` optional,
+        or required when the role needs one) and a setting that may be left empty (`optional: true`),
+        as Bomb's smoke_s and Master and Satellites' siren_all_s; bad outputs are a problem."""
+        page = self.open()
+        node = [on("team_input.hold", B("atalaia_log", inputs={"TEXT": ev("team")}), y=0),
+                B("atalaia_param_declare", {"NAME": "smoke_s", "TYPE": "int", "DEFAULT": "", "MIN": "0", "MAX": "10",
+                                            "OPTIONAL": "TRUE", "LABEL": "Smoke"}, x=500)]
+        roles = [{"name": "bomb", "inputs": None, "needed": True, "outputs": ["smoke", "siren"]},
+                 {"name": "alarm", "inputs": None, "needed": True, "outputs": ["siren.2"], "outputs_needed": True},
+                 {"name": "plain", "inputs": None, "needed": True}]
+        out = self.generate(page, project(node=node, roles=roles))
+        self.assertEqual(out["problems"], [])
+        manifest = yaml.safe_load(out["mode_yaml"])
+        self.assertEqual(manifest["roles"], {
+            "bomb": {"requires": ["team_input"], "optional": ["output"], "outputs": ["smoke", "siren"]},
+            "alarm": {"requires": ["team_input", "output"], "outputs": ["siren.2"]},
+            "plain": {"requires": ["team_input"]}})
+        self.assertEqual(manifest["params"]["smoke_s"],
+                         {"type": "int", "min": 0, "max": 10, "optional": True, "label": "Smoke"})
+        for outputs in (["bell"], ["siren", "siren"], ["out.0"], ["siren"] * 9):
+            bad = project(node=node, roles=[{"name": "bomb", "outputs": outputs}])
+            with self.subTest(outputs=outputs):
+                self.assertEqual([(p["key"], p.get("name")) for p in self.generate(page, bad)["problems"]],
+                                 [("problem_role_outputs", "bomb")])
+
     def test_roles_and_kinds(self):
         page = self.open()
         node = [on("team_input.hold", B("atalaia_log", inputs={"TEXT": ev("team")}), y=0),

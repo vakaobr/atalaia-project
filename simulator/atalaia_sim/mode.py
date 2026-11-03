@@ -37,6 +37,11 @@ SEPARATOR = "+"
 # A mode command (CMD opcode 8, RFC 0001 Amendment 5): the GM's or a field script's
 # word for a node's script, which gets it as cmd.mode with the command's name in its data.
 COMMAND_NAME = re.compile(r"^[a-z][a-z0-9_]{0,23}$")
+# The output functions a role may name in its `outputs:` (draft RFC "The expansion port", EXP-19,
+# EXP-22): the uses a box's admin gives an output (firmware/esp32/main/outputs.c,
+# outputs_function_ok), and a second output with the same use (siren.2).
+OUTPUT_FUNCTION = re.compile(r"^(siren|strobe|smoke|light|horn|out\.[1-9])(\.[2-9])?$")
+OUTPUTS_MAX = 8
 
 
 class ModeError(Exception):
@@ -235,6 +240,7 @@ def check_manifest(manifest: dict[str, Any], where: str) -> None:
         if not isinstance(spec.get("gm_only", False), bool):
             raise ModeError(f"{where}: parameter {name!r}: gm_only is true or false")
     check_scoring(manifest, where)
+    check_roles(manifest.get("roles"), where)
     commands = manifest.get("commands")
     if commands is not None:
         if not isinstance(commands, dict):
@@ -269,6 +275,29 @@ def check_manifest(manifest: dict[str, Any], where: str) -> None:
                     raise ModeError(f"{where}: i18n.{lang}.{key} must be text")
             else:
                 raise ModeError(f"{where}: i18n.{lang} has an unknown key {key!r}")
+
+
+def check_roles(roles: Any, where: str) -> None:
+    """A role's optional `outputs:` (draft RFC "The expansion port", EXP-22): the output functions its
+    script switches, 1-8 different ones of OUTPUT_FUNCTION, with `output` in the role's `requires:`
+    (it cannot play without one) or `optional:` (it plays without), since that is what the start check
+    looks at. Other role keys are not checked here."""
+    if not isinstance(roles, dict):
+        return
+    for name, spec in roles.items():
+        if not isinstance(spec, dict) or "outputs" not in spec:
+            continue
+        outputs = spec["outputs"]
+        if (not isinstance(outputs, list) or not 1 <= len(outputs) <= OUTPUTS_MAX
+                or not all(isinstance(o, str) and OUTPUT_FUNCTION.fullmatch(o) for o in outputs)
+                or len(set(outputs)) != len(outputs)):
+            raise ModeError(f"{where}: role {name!r}: outputs is a list of 1-{OUTPUTS_MAX} different output "
+                            "functions: siren, strobe, smoke, light, horn or out.1-out.9 (siren.2 for a second)")
+        listed = [n for key in ("requires", "optional") for n in (spec.get(key) or [])
+                  if isinstance(spec.get(key), list)]
+        if "output" not in listed:
+            raise ModeError(f"{where}: role {name!r} lists outputs, so it needs output in its requires: "
+                            "(it cannot play without one) or its optional: (it plays without)")
 
 
 def load_mode(path: Path) -> Mode:
