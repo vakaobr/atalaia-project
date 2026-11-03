@@ -171,6 +171,7 @@ What the box does:
 - It turns every output **off** when it starts, when the game is **paused** (they stay off when the game goes on), and when the game **ends**. An end-of-game horn may still sound for up to 10 seconds.
 - An output never stays on longer than the time you set. It changes at most every half second.
 - If the box stops working, loses power or restarts, the switch loses its signal and turns off within about a second.
+- The GM sees the box's outputs in the console (a chip under the box, marked **not checked**, and the **Outputs** list on the **Game** tab) and can turn one on for a few seconds during the game, turn it off, or turn every output off at once ([GM manual, Outputs](game-master.md#outputs)).
 
 **Safety.** Only low-voltage devices on their own battery (at most 24 V). **Never** mains. A smoke machine only through its low-voltage remote input; never pyrotechnics. Hearing protection near sirens and horns. Smoke never in a closed room without the venue's approval. Before its first game, the builder checks each switch: it must turn off when its cable is pulled ([build manual, section 9.10](../../../hardware/field-box/BUILD.md#910-simple-output-optional)).
 

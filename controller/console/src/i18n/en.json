@@ -122,8 +122,12 @@
     "missing_short": "No box has joined for: {roles}.",
     "confirm_start_anyway": "Start anyway?",
     "missing_roles": "Start waits for a box (or a linked phone) for: {roles}. Invite boxes, or start anyway.",
+    "missing_caps": "A box lacks what its role needs: {list}. Start anyway only if the game can do without it.",
+    "missing_caps_short": "A box lacks what its role needs: {list}.",
+    "not_checked": "{capability} on {name}: not checked (simple output). Look at it before the game.",
     "start_warnings": {
       "min": "{have} × {role} joined; the mode asks for {value} ({param}).",
+      "optional_caps": "{name} ({role}) has no {caps}: the mode does without it.",
       "last": "Only {have} × {role} joined and {param} is {value}: the countdown can run from the start."
     },
     "settings": "Game settings",
@@ -240,6 +244,10 @@
       "node_rebooted_crash": "A box crashed and restarted ({reason})",
       "node_setup_applied": "{zone} confirmed its scenario setup",
       "battery_low": "A box's battery is low",
+      "node_modules": "{zone} has: {modules}",
+      "node_module_lost": "{zone} lost a module: {modules} ({reason})",
+      "output_switched": "{zone}: {capability} on for {s} s ({source})",
+      "output_switched_off": "{zone}: {capability} off ({source})",
       "nobody": "Nobody known"
     },
     "reboot_reasons": {
@@ -250,6 +258,16 @@
       "watchdog": "watchdog: the program hung",
       "deepsleep": "wake from deep sleep",
       "unknown": "reason unknown"
+    },
+    "module_lost_reasons": {
+      "no_answer": "it stopped answering",
+      "bad_ident": "it answered as another module"
+    },
+    "output_sources": {
+      "script": "the mode",
+      "field": "the field script",
+      "gm": "the game master",
+      "box_admin": "the box's admin"
     },
     "puzzles": {
       "code": "code",
@@ -283,7 +301,22 @@
     },
     "commands": "Commands",
     "command_sent": "sent",
+    "not_checked": "not checked",
+    "module_lost": "lost",
     "conflict": "Two boxes share node {node}: one join was used on two boxes, and they use the same radio nonces. Take one of them out of the game and join it again with a new join (Join)."
+  },
+  "outputs": {
+    "title": "Outputs",
+    "intro": "Sirens, strobes and smoke on the boxes. Each turns on for the seconds given, then off by itself; Off and All outputs off act at once. A box takes a new start at most every 2 s.",
+    "all_off": "All outputs off",
+    "all_off_done": "Every output of the game was told to turn off.",
+    "none": "No box in this game has an output. Outputs are enabled at the box, with the admin PIN.",
+    "not_running": "Outputs turn on only while the game runs; Off works now too.",
+    "seconds": "Seconds",
+    "pulse": "On for {s} s",
+    "confirm_pulse": "Turn {capability} on {name} on for {s} s? Check that nobody is right next to it.",
+    "off": "Off",
+    "on": "on"
   },
   "field": {
     "title": "Field",

@@ -171,6 +171,7 @@ O que a caixa faz:
 - **Desliga** todas as saídas quando arranca, quando o jogo é **pausado** (continuam desligadas quando o jogo retoma) e quando o jogo **acaba**. Uma buzina de fim de jogo ainda pode tocar até 10 segundos.
 - Uma saída nunca fica ligada mais tempo do que o que definiste. Muda no máximo de meio em meio segundo.
 - Se a caixa deixar de funcionar, ficar sem energia ou reiniciar, o interruptor perde o sinal e desliga-se em cerca de um segundo.
+- A organização vê as saídas da caixa na consola (uma etiqueta debaixo da caixa, marcada **não verificado**, e a lista **Saídas** no separador **Jogo**) e pode ligar uma durante uns segundos no jogo, desligá-la ou desligar todas as saídas de uma vez ([manual de GM, Saídas](game-master.md#saídas)).
 
 **Segurança.** Só aparelhos de baixa tensão com bateria própria (no máximo 24 V). **Nunca** a rede elétrica. Uma máquina de fumo só pela sua entrada de comando de baixa tensão; nunca pirotecnia. Proteção auditiva perto de sirenes e buzinas. Fumo nunca numa sala fechada sem autorização do recinto. Antes do primeiro jogo, quem monta verifica cada interruptor: tem de desligar quando se tira o cabo ([manual de montagem, secção 9.10](../../../hardware/field-box/BUILD.pt.md#910-saída-simples-opcional)).
 

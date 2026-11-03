@@ -7,7 +7,7 @@
 // the console at once, and come from the cache when the network fails.
 // API calls and the live stream are never cached.
 
-const CACHE = 'atalaia-console-v17';
+const CACHE = 'atalaia-console-v18';
 const SHELL = [
     './',
     'index.html',
@@ -55,6 +55,7 @@ const SHELL = [
     'components/map-features.js',
     'components/mode-packages.js',
     'components/node-list.js',
+    'components/outputs-panel.js',
     'components/ortho-coverage.js',
     'components/ortho-sources.js',
     'components/place-search.js',

@@ -122,8 +122,12 @@
     "missing_short": "Keine Box beigetreten für: {roles}.",
     "confirm_start_anyway": "Trotzdem starten?",
     "missing_roles": "Der Start wartet auf eine Box (oder ein verbundenes Handy) für: {roles}. Lade Boxen ein oder starte trotzdem.",
+    "missing_caps": "Einer Box fehlt, was ihre Rolle braucht: {list}. Nur trotzdem starten, wenn das Spiel ohne auskommt.",
+    "missing_caps_short": "Einer Box fehlt, was ihre Rolle braucht: {list}.",
+    "not_checked": "{capability} an {name}: nicht geprüft (einfacher Ausgang). Vor dem Spiel ansehen.",
     "start_warnings": {
       "min": "{have} × {role} beigetreten; der Modus verlangt {value} ({param}).",
+      "optional_caps": "{name} ({role}) hat kein {caps}: der Modus kommt ohne aus.",
       "last": "Nur {have} × {role} beigetreten und {param} ist {value}: Der Countdown kann gleich ab Start laufen."
     },
     "settings": "Spieleinstellungen",
@@ -240,6 +244,10 @@
       "node_rebooted_crash": "Eine Box ist abgestürzt und neu gestartet ({reason})",
       "node_setup_applied": "{zone} hat die Szenario-Einstellung bestätigt",
       "battery_low": "Der Akku einer Box ist schwach",
+      "node_modules": "{zone} hat: {modules}",
+      "node_module_lost": "{zone} hat ein Modul verloren: {modules} ({reason})",
+      "output_switched": "{zone}: {capability} an für {s} s ({source})",
+      "output_switched_off": "{zone}: {capability} aus ({source})",
       "nobody": "Unbekannt"
     },
     "reboot_reasons": {
@@ -250,6 +258,16 @@
       "watchdog": "Watchdog: das Programm hing",
       "deepsleep": "Aufwachen aus dem Tiefschlaf",
       "unknown": "Grund unbekannt"
+    },
+    "module_lost_reasons": {
+      "no_answer": "antwortet nicht mehr",
+      "bad_ident": "meldet sich als anderes Modul"
+    },
+    "output_sources": {
+      "script": "der Modus",
+      "field": "das Feldskript",
+      "gm": "die Spielleitung",
+      "box_admin": "der Admin an der Box"
     },
     "puzzles": {
       "code": "Code",
@@ -283,7 +301,22 @@
     },
     "commands": "Befehle",
     "command_sent": "gesendet",
+    "not_checked": "nicht geprüft",
+    "module_lost": "verloren",
     "conflict": "Zwei Boxen teilen sich Node {node}: Ein Beitritt wurde auf zwei Boxen verwendet, und sie nutzen dieselben Funk-Nonces. Nimm eine davon aus dem Spiel und lass sie mit einem neuen Beitritt erneut beitreten (Beitreten)."
+  },
+  "outputs": {
+    "title": "Ausgänge",
+    "intro": "Sirenen, Blitzlichter und Rauch an den Boxen. Jeder Ausgang schaltet für die angegebenen Sekunden ein und danach von selbst aus; Aus und Alle Ausgänge aus wirken sofort. Eine Box nimmt höchstens alle 2 s einen neuen Start an.",
+    "all_off": "Alle Ausgänge aus",
+    "all_off_done": "Alle Ausgänge des Spiels wurden zum Ausschalten aufgefordert.",
+    "none": "Keine Box dieses Spiels hat einen Ausgang. Ausgänge werden an der Box mit der Admin-PIN freigegeben.",
+    "not_running": "Ausgänge schalten nur bei laufendem Spiel ein; Aus geht auch jetzt.",
+    "seconds": "Sekunden",
+    "pulse": "{s} s an",
+    "confirm_pulse": "{capability} an {name} für {s} s einschalten? Prüfen, dass niemand direkt daneben steht.",
+    "off": "Aus",
+    "on": "an"
   },
   "field": {
     "title": "Feld",

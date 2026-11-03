@@ -1856,3 +1856,42 @@ ul.warning {
     cursor: pointer;
     font-weight: 600;
 }
+
+/* A box's modules and outputs (draft RFC "The expansion port", increment 3): a chip each under
+   the box, "not checked" for a simple output the box cannot check, "lost" for a module gone. */
+.chip {
+    display: inline-block;
+    font-size: 0.8rem;
+    padding: 0 0.45rem;
+    margin: 0.1rem 0.2rem 0.1rem 0;
+    border-radius: 1rem;
+    border: 1px solid var(--line);
+    white-space: nowrap;
+}
+
+.chip.warn {
+    border-color: var(--warn);
+}
+
+.chip.ok {
+    border-color: var(--ok);
+}
+
+ul.outputs {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0;
+}
+
+ul.outputs > li {
+    padding: 0.4rem 0;
+    border-top: 1px solid var(--line);
+}
+
+ul.outputs .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    margin-top: 0.3rem;
+}

@@ -150,9 +150,12 @@ class Field:
         self.host.hear(node_packet(key, game["id"], BOX, self.box_seq, 1, msg_type, payload, ack=ack))
         self.box_seq += 1
 
-    def box_hello(self, fw: str = "0.3.0", device: "bytes | None" = None, platform: int = 1) -> None:
+    def box_hello(self, fw: str = "0.3.0", device: "bytes | None" = None, platform: int = 1,
+                  caps: "list[int] | None" = None) -> None:
+        # A Field Box with team buttons, a keypad, a screen, an LED ring and a speaker (capability type ids).
         fields = {"node_name": "box-7", "platform": platform, "fw_version": fw, "core_version": "0.2.0", "tier": 0,
-                  "capabilities": [0, 2], "transports": 1, "battery_pct": 87, "epoch": 1}
+                  "capabilities": [1, 2, 3, 4, 5] if caps is None else caps, "transports": 1, "battery_pct": 87,
+                  "epoch": 1}
         if device is not None:
             fields["device_id"] = device  # HELLO key 10 (protocol/field-frames.md)
         self.box("HELLO", hello_encode(fields))
@@ -1186,6 +1189,82 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(refill).to_have_text("Refill the kit")
         page.get_by_test_id("tab-feed").click()
         expect(heal).to_contain_text("b1 was healed (heals left in the kit: 4; heals in this game: 1)")
+
+    def test_box_outputs_chips_start_check_and_the_outputs_panel(self):
+        """Draft RFC "The expansion port", increment 3: a box whose HELLO lacks what its role requires
+        (team_input) and has a simple output (node.modules "g46:servo:siren"): the start panel names
+        both (the siren "not checked"), Start asks for Start anyway; the Boxes tab shows the module chip;
+        the Outputs panel turns the siren on for the seconds given after a confirmation (CMD 12, src gm),
+        off with one tap, and All outputs off reaches every box; output.switched reads as words in the
+        feed in four languages."""
+        game = self.field.create_game(assignments={str(BOX): "zone"})
+        self.field.box_hello(caps=[3, 11])  # a display and an output: no button, keypad or NFC
+        ev = codec.encode_event({"node": BOX, "seq": 1, "t": 0, "type": "node.modules",
+                                 "data": {"modules": "g46:servo:siren"}})
+        self.field.box("EVENT", ev, ack=True)
+        page = self.console()
+        page.get_by_test_id("lang").select_option("en")
+        expect(page.get_by_test_id("start-missing-caps")).to_contain_text("box-7 (zone): team_input")
+        expect(page.get_by_test_id("start-not-checked")).to_contain_text(
+            "siren on box-7: not checked (simple output)")
+        expect(page.get_by_test_id("outputs-not-running")).to_be_visible()
+        page.get_by_test_id("game-start").click()
+        expect(page.locator(".confirm-q")).to_have_text(
+            "A box lacks what its role needs: box-7 (zone): team_input. Start anyway?")
+        page.get_by_test_id("game-start-yes").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("running")
+        key = self.field.bundle.controller.game_key(game["id"])
+        epoch = self.field.bundle.controller.transport.epoch
+        self.field.host.transmitted_all(0.3)  # CMD start and TIME
+
+        cmds = []
+
+        def heard(want) -> bool:
+            for pkt in self.field.host.transmitted_all(0.2):
+                hdr, plain = packet_decrypt(pkt, epoch, key)
+                if hdr.type == MESSAGE_TYPES["CMD"]:
+                    cmds.append(cmd_decode(plain))
+            return want in cmds
+
+        page.get_by_test_id(f"output-seconds-{BOX}-siren").fill("3")
+        page.get_by_test_id(f"output-pulse-{BOX}-siren").click()
+        expect(page.locator(".confirm-q")).to_have_text(
+            "Turn siren on box-7 on for 3 s? Check that nobody is right next to it.")
+        page.get_by_test_id(f"output-pulse-{BOX}-siren-yes").click()
+        expect(page.get_by_test_id(f"output-{BOX}-siren")).to_contain_text("sent")
+        # A second start within 2 s is held back by the controller: said, never sent.
+        page.get_by_test_id(f"output-pulse-{BOX}-siren").click()
+        page.get_by_test_id(f"output-pulse-{BOX}-siren-yes").click()
+        expect(page.get_by_test_id("toast")).to_contain_text("less than 2 s ago")
+        self.drop_errors("429")
+        pulse = {"cmd": 12, "params": {"capability": "siren", "act": "pulse", "ms": 3000, "src": "gm"}, "dest": BOX}
+        self.assertTrue(wait_for(lambda: heard(pulse), 5), cmds)
+        page.get_by_test_id(f"output-off-{BOX}-siren").click()
+        off = {"cmd": 12, "params": {"capability": "siren", "act": "off", "src": "gm"}, "dest": BOX}
+        self.assertTrue(wait_for(lambda: heard(off), 5), cmds)
+        page.get_by_test_id("outputs-all-off").click()
+        every = {"cmd": 12, "params": {"capability": "*", "act": "off", "src": "gm"}}
+        self.assertTrue(wait_for(lambda: heard(every), 5), cmds)
+        # The box's record of it: on for 3 s, in words, and "on" in the panel meanwhile.
+        ev = codec.encode_event({"node": BOX, "seq": 2, "t": 1000, "type": "output.switched",
+                                 "data": {"capability": "siren", "ms": 3000, "source": "gm"}})
+        self.field.box("EVENT", ev, ack=True)
+
+        page.get_by_test_id("tab-nodes").click()
+        expect(page.get_by_test_id(f"node-module-{BOX}-g46")).to_have_text("siren · not checked")
+        page.get_by_test_id("tab-feed").click()
+        switched = page.locator('[data-testid=feed] [data-type="output.switched"]')
+        modules = page.locator('[data-testid=feed] [data-type="node.modules"]')
+        expect(switched).to_contain_text("box 7: siren on for 3 s (the game master)")
+        expect(modules).to_contain_text("box 7 has: g46:servo:siren")
+        for lang, text in (("pt", "caixa 7: siren ligado durante 3 s (a organização)"),
+                           ("de", "Box 7: siren an für 3 s (die Spielleitung)"),
+                           ("zh-tw", "：siren 開啟 3 秒（主辦）")):
+            page.get_by_test_id("lang").first.select_option(lang)
+            expect(switched).to_contain_text(text)
+        page.get_by_test_id("lang").first.select_option("pt")
+        page.get_by_test_id("tab-nodes").click()
+        expect(page.get_by_test_id(f"node-module-{BOX}-g46")).to_have_text("siren · não verificado")
 
     def test_hacking_terminal_game_and_its_event(self):
         """A Hacking Terminal game from the form (its parameters in Portuguese); the terminal's
@@ -4174,7 +4253,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v17').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v18').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):

@@ -131,6 +131,18 @@ export function eventWords(e) {
         else team = team || t('feed.events.nobody');
         if (!d.objective) key += '_hidden';
     }
+    // A box's modules and outputs (draft RFC "The expansion port", EXP-21): why a module went,
+    // who switched an output (output_sources), and an output turned off before its time.
+    if (e.type === 'node.module_lost') {
+        const r = t(`feed.module_lost_reasons.${reason}`);
+        if (!r.startsWith('feed.')) reason = r;
+    }
+    let source = d.source || '';
+    if (e.type === 'output.switched') {
+        const r = t(`feed.output_sources.${source}`);
+        if (!r.startsWith('feed.')) source = r;
+        if (!d.ms) key += '_off';
+    }
     // The count a feed text puts a noun after: the lives of a respawn, the points of a deposit.
     const n = e.type === 'player.respawn' ? d.lives_left : d.amount;
     const s = t(key, { n, team, player: d.player || '', remaining: d.remaining,
@@ -138,7 +150,9 @@ export function eventWords(e) {
                        objective: d.objective || '', scenario: d.scenario || '', reason,
                        zone: d.zone || (e.node === undefined ? '' : `${t('nodes.node')} ${e.node}`), step: d.step,
                        lives: d.lives_left === undefined ? '' : d.lives_left, fuse: d.fuse_s === undefined ? '' : d.fuse_s,
-                       text: d.text || '', by: d.by_name || (d.by_node === undefined ? '' : d.by_node) });
+                       text: d.text || '', by: d.by_name || (d.by_node === undefined ? '' : d.by_node),
+                       modules: d.modules || '', capability: d.capability || '', source,
+                       s: typeof d.ms === 'number' ? Math.round(d.ms / 100) / 10 : '' });
     return s === key ? '' : s;
 }
 
