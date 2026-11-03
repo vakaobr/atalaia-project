@@ -7,6 +7,7 @@
 // back as this field's card; NFC off or a write that fails says why. In
 // every language, at a phone's width.
 
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:atalaia_app/controller/controller_adoption.dart';
@@ -17,6 +18,7 @@ import 'package:atalaia_app/platform/services.dart';
 import 'package:atalaia_app/protocol/field_card.dart';
 import 'package:atalaia_app/protocol/firmware_release.dart';
 import 'package:atalaia_app/security/ndef.dart';
+import 'package:atalaia_app/storage/app_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -140,9 +142,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    // The default is the project's two release keys (docs/community/keys.md).
+    // The default is the project's three release keys (docs/community/keys.md).
     expect(h.settings.firmwareKeys, projectReleaseKeys);
-    expect(find.text(s.t('ctl.fw_keys_set', {'n': 2})), findsOneWidget);
+    expect(projectReleaseKeys.map(releaseKeyId), [
+      '424d053af5cdbc35',
+      '32b3c815ac30ad43',
+      'a4f6002b0122b131',
+    ]);
+    expect(find.text(s.t('ctl.fw_keys_set', {'n': 3})), findsOneWidget);
     // Not a key: refused, nothing kept.
     await tester.tap(find.byKey(const Key('ctl-fw-keys')));
     await tester.pumpAndSettle();
@@ -172,4 +179,31 @@ void main() {
     ]);
     expect(find.text(s.t('ctl.fw_keys_set', {'n': 2})), findsOneWidget);
   });
+
+  test(
+    'a stored earlier default takes the new release key; an edited list stays',
+    () {
+      List<String> load(List<String> keys) => AppSettings.fromJson(
+        jsonDecode(jsonEncode((AppSettings()..firmwareKeys = keys).toJson()))
+            as Map<String, Object?>,
+      ).firmwareKeys;
+
+      // Saved before the next CI key a4f6002b0122b131 (RELEASE_SIGNING.md,
+      // "Rotating the CI key"): the root and the old CI key, exactly.
+      expect(load(earlierProjectReleaseKeys.single), projectReleaseKeys);
+      expect(load(projectReleaseKeys), projectReleaseKeys);
+      // Changed by someone: kept as it is, even with the project keys in it.
+      const own = '11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=';
+      final withOwn = [...earlierProjectReleaseKeys.single, own];
+      expect(load(withOwn), withOwn);
+      expect(load([earlierProjectReleaseKeys.single.first]), [
+        earlierProjectReleaseKeys.single.first,
+      ]);
+      expect(
+        load(earlierProjectReleaseKeys.single.reversed.toList()),
+        earlierProjectReleaseKeys.single.reversed.toList(),
+      );
+      expect(load(const []), isEmpty);
+    },
+  );
 }
