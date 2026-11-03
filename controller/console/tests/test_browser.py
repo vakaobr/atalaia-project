@@ -4253,7 +4253,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v18').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v19').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):
@@ -5189,14 +5189,21 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(phone.get_by_test_id("box-language-settings")).to_be_visible()
         expect(phone.get_by_test_id("access-tokens")).to_have_count(0)
         expect(phone.get_by_test_id("readonly")).to_have_count(0)
-        # Revoking ends it at once: the phone's next call is refused and it is sent back to the login.
+        # Revoking ends it at once: the phone's open stream is closed (it asks again every STREAM_RECHECK_S, 5 s),
+        # the phone is sent back to the login and forgets the code.
         page.once("dialog", lambda d: d.accept())
         page.get_by_test_id("token-revoke").click()
         expect(page.get_by_test_id("token-row")).to_have_attribute("data-status", "revoked")
         self.assertEqual(httpx.get(self.field.base + "/api/v1/whoami",
                                    headers={"Authorization": f"Bearer {token}"}).status_code, 401)
-        phone.reload()
-        expect(phone.get_by_test_id("login")).to_be_visible()
+        expect(phone.get_by_test_id("login")).to_be_visible(timeout=15000)
+        expect(phone.locator("main.login [role=alert]")).to_contain_text("deixou de ser aceite")
+        self.assertIsNone(phone.evaluate("localStorage.getItem('atalaia.token')"))
+        # The revoked code, opened again, is refused. The login form is on the page before the controller has
+        # answered, so the test waits for the refusal itself before it forgets the 401s it caused on purpose
+        # (otherwise the answer can land after drop_errors: CI run 41657313571).
+        again = self.page(f"/console/#token={token}")
+        expect(again.locator("main.login [role=alert]")).to_contain_text("Código de acesso errado")
         self.drop_errors("401")
         # A read scope token is a read-only console, and the read code never gets the panel either.
         r = self.field.http.post("/api/v1/tokens", json={"label": "Ecrã", "scope": "read", "ttl_s": 3600})
@@ -5209,6 +5216,54 @@ class ConsoleBrowserTests(unittest.TestCase):
         read = self.console(READ)
         read.get_by_test_id("tab-settings").click()
         expect(read.get_by_test_id("access-tokens")).to_have_count(0)
+
+    def test_a_saved_code_the_controller_refuses_is_forgotten(self):
+        # RTK-1/RTK-2: a code kept in this browser and refused when the console starts again (revoked, expired) is
+        # forgotten and "no longer accepted"; a controller that does not answer keeps it; a typed code is "wrong".
+        r = self.field.http.post("/api/v1/tokens", json={"label": "Telemóvel", "scope": "gm", "ttl_s": 3600})
+        self.assertEqual(r.status_code, 201)
+        made = r.json()
+        phone = self.console(made["token"])
+        saved = "localStorage.getItem('atalaia.token')"
+        self.assertEqual(phone.evaluate(saved), made["token"])
+        refused: list[str] = []
+        phone.on("response", lambda resp: refused.append(resp.url)
+                 if resp.status == 401 and resp.url.endswith("/api/v1/whoami") else None)
+        # The controller unreachable on a reload: the console says so and keeps the code.
+        phone.route("**/api/v1/whoami", lambda route: route.abort())
+        phone.reload()
+        expect(phone.locator("main.login [role=alert]")).to_be_visible()
+        expect(phone.locator("main.login [role=alert]")).not_to_contain_text("deixou de ser aceite")
+        self.assertEqual(phone.evaluate(saved), made["token"])
+        phone.unroute("**/api/v1/whoami")
+        self.drop_errors("ERR_FAILED", "Failed to load resource")
+        phone.reload()
+        expect(phone.get_by_test_id("tab-game")).to_be_visible()  # it was kept: the console opens with it
+        # Revoked while the console was closed: the next start forgets it and says it is no longer accepted.
+        phone.close()
+        self.assertEqual(self.field.http.delete(f"/api/v1/tokens/{made['id']}").status_code, 200)
+        phone = self.contexts[-1].new_page()  # the same browser, so the same saved code
+        phone.on("pageerror", lambda e: self.errors.append(f"pageerror: {e}"))
+        phone.on("console", lambda m: self.errors.append(f"console: {m.text}") if m.type == "error" else None)
+        phone.on("response", lambda resp: refused.append(resp.url)
+                 if resp.status == 401 and resp.url.endswith("/api/v1/whoami") else None)
+        phone.goto(self.field.base + "/console/")
+        expect(phone.locator("main.login [role=alert]")).to_contain_text("deixou de ser aceite")
+        self.assertIsNone(phone.evaluate(saved))
+        self.assertEqual(len(refused), 1)
+        # The next start sends it no more: no second refusal, the plain login page.
+        phone.reload()
+        expect(phone.get_by_test_id("login")).to_be_visible()
+        phone.wait_for_load_state("networkidle")
+        self.assertEqual(len(refused), 1)
+        expect(phone.locator("main.login [role=alert]")).to_have_count(0)
+        # A code typed wrong is "wrong", and nothing is kept.
+        phone.get_by_test_id("token").fill("not-the-code")
+        phone.get_by_test_id("login").click()
+        expect(phone.locator("main.login [role=alert]")).to_contain_text("Código de acesso errado")
+        self.assertIsNone(phone.evaluate(saved))
+        self.assertEqual(len(refused), 2)
+        self.drop_errors("401")
 
     # --- "share with players": the scoreboard's QR code (decision PD13) -------------------
 

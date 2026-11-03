@@ -16,7 +16,7 @@ Start the controller (see [controller/README.md](../README.md#running-it)) and o
 - the **GM token** can do everything: create and run games, adjust scores, send messages, make join cards;
 - the **read token** sees everything live but changes nothing (the GM controls are hidden and the API refuses them anyway).
 
-`python3 -m atalaia_controller tokens` prints both. The code is kept in the browser (localStorage) until you sign out.
+`python3 -m atalaia_controller tokens` prints both. The code is kept in the browser (localStorage) until you sign out. When the console opens again with a kept code that the controller now refuses (a 401: revoked or expired), it forgets the code and says it is no longer accepted, as when a live stream is closed for it; a code just typed and refused is "wrong". No answer at all (the controller unreachable) or a 403 keeps the code (decisions RTK-1, RTK-2).
 
 The code can also come in the address's fragment, as for the scoreboard: `https://<controller>:8443/console/#token=<token>` (`&lang=en` for English). The console takes it out of the address at once (it stays in neither the address bar nor the history; a fragment is never sent to the controller, so it is in no server log) and keeps it as a typed code once the controller accepts it. The app opens the console of a phone controller this way (decision PE24-71).
 
