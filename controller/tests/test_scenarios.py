@@ -565,7 +565,7 @@ class SharedLibraryTests(unittest.TestCase):
             "import importlib.abc, sys\n"
             "class Block(importlib.abc.MetaPathFinder):\n"
             "    def find_spec(self, name, path=None, target=None):\n"
-            "        if name.split('.')[0] in ('fastapi', 'pydantic', 'starlette', 'uvicorn', 'httpx', 'paho'):\n"
+            "        if name.split('.')[0] in ('fastapi', 'pydantic', 'starlette', 'uvicorn', 'httpx', 'httpx2', 'paho'):\n"
             "            raise ImportError(name)\n"
             "sys.meta_path.insert(0, Block())\n"
             "import atalaia_controller.scenarios, atalaia_controller.scenarios.cli\n"
