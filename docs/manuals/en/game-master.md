@@ -276,6 +276,8 @@ Tick **Codes** under **Modifiers**. In **Codes**, type `digits:kind[:points][:te
 
 A *scenario* is a custom game with objectives (capture, code, tags, bomb, escort, defend, survive). Open **Scenarios**, write or paste the manifest in **YAML** (or use **Blocks**), tap **Check** and then **Install**. Then in **Game**, pick the scenario under **Mode or preset** and tick **Objectives**. Give each box one of the scenario's names in the **Join** tab. The [controller guide](../../../controller/README.md#scenarios) explains the format.
 
+A scenario can also switch the boxes' outputs (a siren, a strobe, a smoke machine) with **triggers**: when every objective of a list is completed, when the first of them is, when one fails, or when the game starts or ends, an output of a box you name is switched on for some seconds, made to blink, or switched off, once a game. In **Blocks** they are in the **Triggers** category: a "when" block holding one output block (the function as the box names it, such as `siren`, the box's name in the scenario, and how long, at most 600 s). The box switches only the outputs enabled at the box with the admin PIN (see [Outputs](#outputs)), turns them all off when the game is paused or ends, and after the end lets an output run 10 s at most (an end horn). A box takes a new output command every 2 s at most, so two triggers on one box at the same moment come 2 s apart.
+
 ### Presets
 
 A *preset* is a mode with its settings saved. Open **Presets**, tap **New preset**, pick a mode and its parameters, name it and tap **Save**.

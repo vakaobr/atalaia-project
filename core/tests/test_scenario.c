@@ -4,8 +4,8 @@
  *
  * The scenario compiler's C entry points (atalaia/scenario.h, decision
  * PE24-109): a manifest checked and compiled, the size of the scenario
- * events worked out in Lua against the core's own codec, the limits, and
- * malformed, truncated and mutated data trees, every one answered with JSON
+ * events worked out in Lua against the core's own codec, triggers, the limits,
+ * and malformed, truncated and mutated data trees, every one answered with JSON
  * (never a crash: the sanitizer job runs this too). The rules themselves are
  * checked by both controllers' tests against protocol/vectors/scenario.json
  * and scenario_compile.json.
@@ -40,6 +40,37 @@ static const char MANIFEST[] =
     "[{\"str\":\"objectives\"},{\"list\":[{\"map\":[[{\"str\":\"id\"},{\"str\":\"hill\"}],"
     "[{\"str\":\"name\"},{\"str\":\"Hill\"}],[{\"str\":\"type\"},{\"str\":\"capture_and_hold\"}],"
     "[{\"str\":\"target\"},{\"str\":\"a\"}]]}]}]]}";
+
+/* A manifest with two triggers (draft RFC "The expansion port", EXP-25); %s is the first one's
+ * output function. */
+static const char TRIGGERS[] =
+    "{\"map\":[[{\"str\":\"id\"},{\"str\":\"org.club.sirens\"}],"
+    "[{\"str\":\"version\"},{\"str\":\"1\"}],[{\"str\":\"name\"},{\"str\":\"Sirens\"}],"
+    "[{\"str\":\"nodes\"},{\"map\":[[{\"str\":\"a\"},{\"map\":[[{\"str\":\"role\"},"
+    "{\"str\":\"objective\"}]]}],[{\"str\":\"master\"},{\"map\":[[{\"str\":\"role\"},"
+    "{\"str\":\"objective\"}]]}]]}],"
+    "[{\"str\":\"objectives\"},{\"list\":[{\"map\":[[{\"str\":\"id\"},{\"str\":\"hill\"}],"
+    "[{\"str\":\"name\"},{\"str\":\"Hill\"}],[{\"str\":\"type\"},{\"str\":\"capture_and_hold\"}],"
+    "[{\"str\":\"target\"},{\"str\":\"a\"}]]}]}],"
+    "[{\"str\":\"triggers\"},{\"list\":["
+    "{\"map\":[[{\"str\":\"when\"},{\"map\":[[{\"str\":\"completed\"},{\"list\":[{\"str\":\"hill\"}"
+    "]}]]}],"
+    "[{\"str\":\"output\"},{\"map\":[[{\"str\":\"node\"},{\"str\":\"master\"}],"
+    "[{\"str\":\"capability\"},{\"str\":\"%s\"}],[{\"str\":\"act\"},{\"str\":\"pulse\"}],"
+    "[{\"str\":\"seconds\"},{\"int\":\"10\"}]]}]]},"
+    "{\"map\":[[{\"str\":\"when\"},{\"map\":[[{\"str\":\"game\"},{\"str\":\"end\"}]]}],"
+    "[{\"str\":\"output\"},{\"map\":[[{\"str\":\"node\"},{\"str\":\"master\"}],"
+    "[{\"str\":\"capability\"},{\"str\":\"horn\"}],[{\"str\":\"act\"},{\"str\":\"pattern\"}],"
+    "[{\"str\":\"seconds\"},{\"int\":\"10\"}],[{\"str\":\"on_ms\"},{\"int\":\"500\"}],"
+    "[{\"str\":\"off_ms\"},{\"int\":\"500\"}]]}]]}]}]]}";
+
+static char *triggers(const char *capability)
+{
+    size_t n = sizeof(TRIGGERS) + strlen(capability);
+    char *out = malloc(n);
+    snprintf(out, n, TRIGGERS, capability);
+    return out;
+}
 
 static char *manifest(const char *id)
 {
@@ -91,6 +122,35 @@ static void test_check_and_compile(void)
     CHECK(contains(out, "\"ok\":false"));
     atalaia_scenario_free(out);
     atalaia_scenario_free(NULL);
+}
+
+/* Triggers: compiled into SCENARIO.triggers, CMD 12's params in milliseconds; a function no box
+ * has is an error (the vectors hold every rule). */
+static void test_triggers(void)
+{
+    char *tree = triggers("siren");
+    char *out = atalaia_scenario_compile(tree, strlen(tree), NULL);
+    CHECK(contains(out, "\"ok\":true,\"problems\":[]"));
+    CHECK(contains(out, "triggers = {"));
+    CHECK(contains(out, "when = \\\"completed\\\""));
+    CHECK(contains(out, "ms = 10000"));
+    CHECK(contains(out, "on_ms = 500"));
+    atalaia_scenario_free(out);
+    free(tree);
+
+    tree = triggers("fog");
+    out = atalaia_scenario_compile(tree, strlen(tree), NULL);
+    CHECK(contains(out, "\"path\":\"triggers[0].output.capability\",\"code\":\"bad_capability\""));
+    CHECK(!contains(out, "\"files\""));
+    atalaia_scenario_free(out);
+    free(tree);
+
+    /* A manifest without triggers has no triggers table. */
+    tree = manifest("org.club.none");
+    out = atalaia_scenario_compile(tree, strlen(tree), NULL);
+    CHECK(contains(out, "\"ok\":true") && !contains(out, "triggers = {"));
+    atalaia_scenario_free(out);
+    free(tree);
 }
 
 /*
@@ -252,9 +312,8 @@ static uint32_t next(void)
 }
 
 /* Mutated trees: bytes changed, cut, repeated and inserted, from a valid one. */
-static void test_mutated_trees(int rounds)
+static void test_mutated_trees(char *tree, int rounds)
 {
-    char *tree = manifest("org.club.fuzz");
     size_t len = strlen(tree);
     static const char pieces[][24] = {
         "{\"alias\":0}",
@@ -325,11 +384,13 @@ int main(int argc, char **argv)
     test_event_sizes_match_the_codec();
     test_malformed_trees();
     test_limits();
-    test_mutated_trees(rounds);
+    test_triggers();
+    test_mutated_trees(manifest("org.club.fuzz"), rounds);
+    test_mutated_trees(triggers("siren"), rounds);
     if (failures) {
         fprintf(stderr, "%d failure(s)\n", failures);
         return 1;
     }
-    printf("scenario tests passed (%d mutated trees)\n", rounds);
+    printf("scenario tests passed (%d mutated trees of each of two manifests)\n", rounds);
     return 0;
 }

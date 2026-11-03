@@ -9,7 +9,7 @@
 The scenario compiler (core/scenario/, in the C core since decision PE24-109; the Pi reads the
 manifest's text with PyYAML, controller/atalaia_controller/scenarios) compiles a set of manifests: the valid ones of protocol/vectors/scenario.json, the examples in
 controller/tests/scenarios and the cases below, which use every objective type, parameter and
-effect, translations, scenario parameters, YAML 1.1's readings (yes, 0815, 1:30, merge keys),
+effect, triggers, translations, scenario parameters, YAML 1.1's readings (yes, 0815, 1:30, merge keys),
 anchors, and names and descriptions with quotes, Unicode and control characters. For each one
 the file holds the manifest's text, its problems (path, code, level) and, when it compiles, the
 package's field.lua and mode.yaml in full and mode.yaml read back as data. A second list,
@@ -404,6 +404,33 @@ objectives:
   - { id: hill, name: "\\\\ud83d\\U0001F600", type: capture_and_hold, target: a }
 """
 
+# Triggers (draft RFC "The expansion port", EXP-25): every condition and act, "on" and "off" in quotes.
+TRIGGERS = """\
+id: org.club.sirens
+version: 1
+name: Master and satellites
+nodes:
+  sat_a: { role: objective }
+  sat_b: { role: objective }
+  sat_c: { role: objective }
+  master: { role: objective }
+objectives:
+  - { id: sat_a, name: Satellite A, type: capture_and_hold, target: sat_a }
+  - { id: sat_b, name: Satellite B, type: capture_and_hold, target: sat_b }
+  - { id: sat_c, name: Satellite C, type: capture_and_hold, target: sat_c, effect: { win: true } }
+triggers:
+  - when: { completed: [sat_a, sat_b, sat_c] }   # all of them
+    output: { node: master, capability: siren, act: pulse, seconds: 10 }
+  - when: { any_completed: [sat_a, sat_b] }
+    output: { node: master, capability: strobe, act: pattern, seconds: 30, on_ms: 500, off_ms: 1500 }
+  - when: { failed: sat_b }
+    output: { node: master, capability: "*", act: "off" }
+  - when: { game: start }
+    output: { node: master, capability: horn, act: "on", seconds: 2 }
+  - when: { game: end }
+    output: { node: master, capability: horn, act: pulse, seconds: 10 }
+"""
+
 JSON_TEXT = json.dumps({
     "id": "org.club.json", "version": 1.0, "name": "JSON", "lang": "en", "teams": ["red", "blue"],
     "nodes": {"a": {"role": "objective"}, "b": {"role": "bomb_site"}},
@@ -460,6 +487,11 @@ INVALID = [
      "teams: [abcdefghijklmnopqrstuvw, b]\nnodes: { a: { role: bomb_site } }\nobjectives:\n"
      "  - { id: a, name: 'Ç日本語のテキストは長いですね本当に', type: destroy, target: a, assignee: { team: b }, "
      "params: { hold_ms: 600000, defuse_ms: 600000, fuse_s: 3600 } }\n"),
+    ("A trigger's bare on and off, which YAML 1.1 reads as true and false",
+     "id: org.club.bare-off\nversion: 1\nname: Bare off\nnodes: { a: { role: objective } }\nobjectives:\n"
+     "  - { id: hill, name: Hill, type: capture_and_hold, target: a }\ntriggers:\n"
+     "  - { when: { game: start }, output: { node: a, capability: siren, act: on, seconds: 5 } }\n"
+     "  - { when: { failed: hill }, output: { node: a, capability: siren, act: off } }\n"),
     ("Not a manifest: a key twice", "id: a\nname: x\nid: b\n"),
     ("Not a manifest: yes and true are one key", "nodes:\n  yes: { role: objective }\n  true: { role: objective }\n"),
     ("Not a manifest: a merge key overridden",
@@ -581,6 +613,8 @@ def build_vectors() -> dict[str, Any]:
         ("Ids and a code that end with a newline: refused (Python's re $ took them before PE24-106)",
          TRAILING_NEWLINE),
         ("A manifest in JSON", JSON_TEXT),
+        ("Triggers: outputs when objectives are completed or failed, at the start and the end (EXP-25)",
+         TRIGGERS),
         ("Emoji written as surrogate-pair escapes, as JSON with ensure_ascii writes them (PE24-107)",
          SURROGATE_PAIRS),
         ("Surrogate-pair escapes in double-quoted, plain and single-quoted YAML texts", SURROGATE_PAIRS_YAML),
