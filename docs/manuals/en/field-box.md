@@ -149,7 +149,7 @@ In a game with a time limit that you started on the box, the big screen has a th
 
 ### Outputs: a siren, a strobe, a smoke machine
 
-A box built with a **simple output** has an M8 socket labelled **OUTPUT 1** (sometimes also **OUTPUT 2**). A cable goes from it to a small *RC relay switch*, which switches a siren, a strobe, a light or a smoke machine's remote on its own battery. The game switches it: for example a siren when a team holds every satellite, or smoke when the bomb explodes (when the game modes use it). Not yet tried on hardware.
+A box built with a **simple output** has an M8 socket labelled **OUTPUT 1** (sometimes also **OUTPUT 2**). A cable goes from it to a small *RC relay switch*, which switches a siren, a strobe, a light or a smoke machine's remote on its own battery. The game switches it: smoke or a siren when the bomb explodes (*Bomb / Rush*'s **Smoke when it explodes** and **Siren when it explodes**), the master's siren when a team holds every satellite (*Master and Satellites*), or the GM from the console. Give the output the use the mode asks for: **smoke** or **siren**. Not yet tried on hardware.
 
 **Outputs are off until you enable them, at the box.** This is on purpose: a box borrowed from another field, or plugged in at the safe zone, can never fire until a person at that box says so.
 

@@ -10,10 +10,17 @@ from __future__ import annotations
 import unittest
 
 from atalaia_controller import outputs
+from atalaia_controller.modes import parse_package
+from atalaia_sim.mode import ModeError
 from atalaia_sim.protocol import CAPABILITY_ROLE_NAMES, CAPABILITY_TYPES
 
 ZONE = {"requires": ["team_input"], "optional": ["team_display", "audio", "display"]}
 TARGET = {"requires": ["hit", "led"], "optional": ["display", "audio", "smell"]}
+# Bomb's role since increment 4: its outputs are optional, and it names the ones it switches (EXP-22).
+BOMB = {"requires": ["team_input"], "optional": ["keypad", "audio", "led", "display", "output"],
+        "outputs": ["smoke", "siren"]}
+# A role that cannot play without an output.
+ALARM = {"requires": ["team_input", "output"], "outputs": ["siren"]}
 
 
 def node(n: int, role: str, caps, modules=None) -> dict:
@@ -43,7 +50,7 @@ class RoleNameTests(unittest.TestCase):
 
 class StartCheckTests(unittest.TestCase):
     def check(self, *nodes):
-        return outputs.check_nodes(nodes, {"zone": ZONE, "target": TARGET}.get)
+        return outputs.check_nodes(nodes, {"zone": ZONE, "target": TARGET, "bomb": BOMB, "alarm": ALARM}.get)
 
     def test_a_box_without_what_its_role_requires(self):
         out = self.check(node(4, "zone", [1, 3, 5]), node(5, "zone", [3, 12]), node(6, "target", [3, 4, 5]))
@@ -65,6 +72,32 @@ class StartCheckTests(unittest.TestCase):
         self.assertEqual(out["missing_caps"], [])
         self.assertEqual([(u["node"], u["capability"]) for u in out["not_checked"]], [(4, "siren")])
         self.assertEqual(out["not_checked"][0]["text"], "siren on box-4: not checked (simple output)")
+
+
+    def test_a_roles_outputs(self):
+        """Required and optional outputs feed missing_caps and optional_caps; a box with outputs but none of
+        those its role's outputs: names gets the "outputs" warning; one with any of them, none (increment 4)."""
+        ids = {k: v.id for k, v in CAPABILITY_TYPES.items()}
+        b, o = ids["button"], ids["output"]
+        out = self.check(node(4, "bomb", [b]), node(5, "alarm", [b]))
+        self.assertEqual(out["missing_caps"], [{"node": 5, "name": "box-5", "role": "alarm", "capability": "output"}])
+        self.assertEqual([(w["code"], w["node"], w["capabilities"]) for w in out["warnings"]],
+                         [("optional_caps", 4, ["keypad", "audio", "led", "display", "output"])])
+        horn = outputs.modules_of("g46:servo:horn")
+        out = self.check(node(4, "bomb", [b, ids["keypad"], ids["audio"], ids["led"], ids["display"], o], horn),
+                         node(5, "alarm", [b, o], horn))
+        self.assertEqual(out["missing_caps"], [])
+        self.assertEqual([(w["code"], w["node"], w["capabilities"]) for w in out["warnings"]],
+                         [("outputs", 4, ["smoke", "siren"]), ("outputs", 5, ["siren"])])
+        self.assertEqual(out["warnings"][0]["text"],
+                         "box-4 (bomb) has none of the outputs the mode would switch: smoke, siren")
+        self.assertEqual([u["capability"] for u in out["not_checked"]], ["horn", "horn"])
+        smoke = outputs.modules_of("g46:servo:smoke")
+        out = self.check(node(4, "bomb", [b, o], smoke), node(5, "alarm", [b, o], None))  # 5: no node.modules yet
+        self.assertEqual([w["code"] for w in out["warnings"]], ["optional_caps"])
+        lost = outputs.mark_lost(outputs.modules_of("5c:out4/1.0.0:siren"), "5c:out4/1.0.0:siren")
+        out = self.check(node(5, "alarm", [b, o], lost))
+        self.assertEqual([(w["code"], w["node"]) for w in out["warnings"]], [("outputs", 5)])
 
 
 class ModulesTests(unittest.TestCase):
@@ -101,6 +134,23 @@ class ParamsTests(unittest.TestCase):
         self.assertEqual(rate.wait_ms(5, "on", 2000), 0)
         rate.sent(4, "off", 2500)  # an off never moves the next start
         self.assertEqual(rate.wait_ms(4, "on", 3000), 0)
+
+
+
+class UploadTests(unittest.TestCase):
+    def test_an_uploaded_modes_outputs(self):
+        """The Pi takes a role's outputs: (the simulator's check_manifest) and refuses a bad one (increment 4)."""
+        def package(role: str) -> dict:
+            return {"mode.yaml": f"id: org.test.alarm\nversion: 1.0\nroles: {{ alarm: {role} }}\n",
+                    "node.lua": "local x = 1\n"}
+
+        pkg = parse_package(package("{ requires: [team_input], optional: [output], outputs: [siren, strobe] }"))
+        self.assertEqual(pkg.mode.roles["alarm"]["outputs"], ["siren", "strobe"])
+        for role, message in (("{ optional: [output], outputs: [klaxon] }", "output functions"),
+                              ("{ requires: [team_input], outputs: [siren] }", "needs output"),
+                              ("{ optional: [output], outputs: siren }", "outputs is a list")):
+            with self.subTest(role), self.assertRaisesRegex(ModeError, message):
+                parse_package(package(role))
 
 
 if __name__ == "__main__":

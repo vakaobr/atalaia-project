@@ -14,7 +14,11 @@
   ``protocol/schema/capabilities.yaml`` lists under ``role_names``; a name neither a type nor
   there is never checked. Only nodes whose HELLO lists a capability type this controller knows are
   checked (a box from before the RFC, a phone: never). An enabled simple output counts as present,
-  and the check names each one as "not checked", so the GM looks.
+  and the check names each one as "not checked", so the GM looks. A role's ``outputs:`` (EXP-22,
+  increment 4: Bomb's ``[smoke, siren]``) names the functions its mode switches: a box of that role
+  that has outputs (its HELLO lists ``output`` and its ``node.modules`` came) but none of those
+  functions is a warning, ``outputs`` (the mode would switch nothing on it). A box with no output
+  at all is already ``optional_caps`` (or ``missing_caps``) for ``output``.
 - **CMD 12** (EXP-23, EXP-27, EXP-30): the params a GM's request or a field script's
   ``field.send(node, "output", {...})`` become, checked as the box checks them
   (``atalaia_sim.expansion.output_params_problem``), with ``src`` set here (``gm`` or ``field``,
@@ -93,7 +97,9 @@ def check_nodes(nodes: Iterable[dict[str, Any]], role_spec: Any) -> dict[str, li
 
     ``missing_caps``: ``{node, name, role, capability}`` for each required one a node lacks;
     ``warnings``: one ``{code: "optional_caps", node, name, role, capabilities}`` per node lacking
-    optional ones; ``not_checked``: ``{node, name, role, capability}`` for each simple output."""
+    optional ones, and one ``{code: "outputs", node, name, role, capabilities}`` per node with
+    outputs but none of the functions its role's ``outputs:`` names (``capabilities``: those
+    functions); ``not_checked``: ``{node, name, role, capability}`` for each simple output."""
     missing: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
     unchecked: list[dict[str, Any]] = []
@@ -113,6 +119,13 @@ def check_nodes(nodes: Iterable[dict[str, Any]], role_spec: Any) -> dict[str, li
         if lacking:
             warnings.append({"code": "optional_caps", **who, "capabilities": lacking,
                              "text": f"{n['name']} ({n['role']}) has no {', '.join(lacking)}"})
+        wanted = _names(spec.get("outputs"))
+        if wanted and "output" in types and n.get("modules") is not None:
+            fitted = output_caps(n.get("modules"))
+            if not any(fn in fitted for fn in wanted):
+                warnings.append({"code": "outputs", **who, "capabilities": wanted,
+                                 "text": f"{n['name']} ({n['role']}) has none of the outputs the mode "
+                                         f"would switch: {', '.join(wanted)}"})
     return {"missing_caps": missing, "warnings": warnings, "not_checked": unchecked}
 
 

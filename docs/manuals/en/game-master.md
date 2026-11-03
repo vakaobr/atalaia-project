@@ -250,13 +250,13 @@ Every built-in mode is listed in **Mode or preset**. Their English and Portugues
 | --- | --- | --- |
 | Domination | Domínio | One box or many. Hold time and points are parameters. |
 | Hold-All Domination | Domínio Total | A team scores only while it holds every box. |
-| Bomb / Rush | Bomba / Rush | Fuse, arm and defuse hold times. An explosion ends the game and the team that armed the bomb wins; a defuse does not end it (use **End**). Optional **Team codes**, for example `red=1234,blue=5678`. |
+| Bomb / Rush | Bomba / Rush | Fuse, arm and defuse hold times. An explosion ends the game and the team that armed the bomb wins; a defuse does not end it (use **End**). Optional **Team codes**, for example `red=1234,blue=5678`. Optional **Smoke when it explodes** and **Siren when it explodes** (seconds, at most 10; empty: none) fire the box's smoke and siren outputs ([Outputs](#outputs)). |
 | Sabotage | Sabotagem | Bomb rounds until the game time runs out: an explosion scores for the attackers, a defuse for the defenders, then a short pause. The team with more points wins. Pause, game time and optional **Team codes** are parameters. |
 | Last Stand | Último Elemento | Attackers, defenders, countdown to defeat. |
 | Kill Confirmed | Baixa Confirmada | Needs player tags. |
 | Respawn and Lives | Reentradas e Vidas | Needs tags, or team buttons. |
 | Player Check-in | Registo de Presença | Needs player tags. |
-| Master and Satellites | Mestre e Satélites | |
+| Master and Satellites | Mestre e Satélites | Optional **Siren on the master when one team holds every satellite** (seconds; empty: none) sounds the master box's siren output ([Outputs](#outputs)). |
 | Progressive Domination | Domínio Progressivo | One active box at a time. |
 | Hacking Terminal | Hackeia o terminal | Works without the controller. Puzzle: code, wires or sequence. |
 | VIP / Payload | VIP / Carga | The VIP shares a position from the app. |
@@ -394,6 +394,8 @@ A standby controller cannot start a game. It says **This controller is not in ch
 - The **Log** shows what each output did, and who switched it: **box 4: siren on for 5 s (the game master)**. While it is on, the output shows **on**.
 
 The boxes also turn their outputs off on their own when the game is paused or ends. A GM on the site server's **Remote GM** page can only turn every output off, never one on.
+
+**Modes that switch outputs.** *Bomb / Rush* fires the bomb box's **smoke** and **siren** when it explodes, for the seconds you give in **Smoke when it explodes** and **Siren when it explodes** (at most 10: the explosion ends the game, and a box keeps an output on for at most 10 seconds after the end). *Master and Satellites* sounds the master box's **siren** when one team holds every satellite, for the seconds in **Siren on the master when one team holds every satellite** (the box's own longest time still wins), and again only after that team lost one. Left empty (the default), nothing is switched, and the game is as before. When you pick such a mode, the form says which outputs it would use (**Bomb / Rush would switch these outputs on a box that has them: smoke, siren**). For it to work, the box's admin must have enabled the output at the box with the admin PIN and given it that use (**smoke**, **siren**; see the [Field Box manual](field-box.md#outputs-a-siren-a-strobe-a-smoke-machine)). A box without it plays the game the same, with nothing fired; if it has outputs but none of those, the start check says so (**box-4 (bomb) has none of the outputs the mode would switch (smoke, siren): it plays without them.**).
 
 ### The Boxes tab
 

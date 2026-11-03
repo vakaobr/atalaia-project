@@ -128,10 +128,12 @@
     "start_warnings": {
       "min": "{have} × {role} beigetreten; der Modus verlangt {value} ({param}).",
       "optional_caps": "{name} ({role}) hat kein {caps}: der Modus kommt ohne aus.",
+      "outputs": "{name} ({role}) hat keinen der Ausgänge, die der Modus schalten würde ({caps}): es geht ohne sie.",
       "last": "Nur {have} × {role} beigetreten und {param} ist {value}: Der Countdown kann gleich ab Start laufen."
     },
     "settings": "Spieleinstellungen",
     "settings_hint": "Beim Erstellen des Spiels festgelegt; um sie zu ändern, beende dieses Spiel und erstelle ein neues.",
+    "mode_outputs": "{mode} würde diese Ausgänge an einer Box schalten, die sie hat: {list}. Eine Box schaltet nur die Ausgänge, die an der Box mit ihrer Admin-PIN aktiviert wurden.",
     "key_lost_notice": "Dieser Controller wurde ohne den Schlüssel des Spiels neu gestartet (persist_game_key war aus): Das Spiel kann nur noch beendet werden. Beim Beenden erfahren es seine Boxen über den Feldfunk, versiegelt mit dem Beitrittsschlüssel des Felds, und sie verlassen das Spiel.",
     "confirm_end_key_lost": "Das Spiel beenden und es den Boxen über den Feldfunk mitteilen?",
     "over_told": "Den Boxen des Spiels wurde über den Feldfunk mitgeteilt, dass es vorbei ist.",

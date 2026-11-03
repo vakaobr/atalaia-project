@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A defused bomb fires no output, not even when the game ends later
+params: { fuse_s: 60, smoke_s: 10, siren_s: 10 }
+steps:
+  - hold: { team: red, s: 5 }
+  - hold: { team: blue, s: 10 }
+  - expect: { type: bomb.defused, team: blue }
+  - wait: 60
+  - expect_no: bomb.exploded
+  - end: time
+  - expect: { type: game.end, data: { reason: time } }
+  - expect_no: output.switched
+  - expect_output: { capability: smoke, active: false }
+  - expect_output: { capability: siren, active: false }
