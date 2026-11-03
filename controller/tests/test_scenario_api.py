@@ -151,10 +151,11 @@ class EndpointTests(Case):
         r = self.client.post("/api/v1/scenarios/check", headers=GM, json={"manifest": text})
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual((r.json()["ok"], r.json()["name"]), (True, "Ponte \U0001f309"))
-        # The request bodies are made here, not by the test client: httpx 0.28 (the pinned lock) writes
-        # JSON as UTF-8 itself and cannot encode a lone surrogate (PLK-1). A client sends one either as
-        # JSON's own escape ("\\udf09", ensure_ascii) or as the raw bytes ED BC 89, which are not UTF-8
-        # (Python's JSON reader takes them as the surrogate); both reach the check as text.
+        # The request bodies are made here, not by the test client: httpx 0.28 and its fork httpx2 (the
+        # pinned lock) write JSON as UTF-8 themselves and cannot encode a lone surrogate (PLK-1). A
+        # client sends one either as JSON's own escape ("\\udf09", ensure_ascii) or as the raw bytes
+        # ED BC 89, which are not UTF-8 (Python's JSON reader takes them as the surrogate); both reach
+        # the check as text.
         lone = json.dumps(m, ensure_ascii=False).replace("\U0001f309", "\udf09")  # the text itself
         bodies = [json.dumps({"manifest": text.replace("\\ud83c\\udf09", "\\ud83c")}).encode("ascii"),  # an escape
                   json.dumps({"manifest": lone}).encode("ascii"),

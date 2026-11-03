@@ -21,7 +21,10 @@ import threading
 import unittest
 from pathlib import Path
 
-import httpx
+try:  # the client Starlette's TestClient takes: httpx2 on the pinned lock, httpx on Ubuntu's packages (PLK-3)
+    import httpx2 as httpx
+except ModuleNotFoundError:
+    import httpx
 import uvicorn
 import websockets
 

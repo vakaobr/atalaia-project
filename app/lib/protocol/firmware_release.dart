@@ -340,10 +340,37 @@ parseReport(List<int> body) {
 }
 
 /// The project's release keys (docs/community/keys.md): root
-/// 424d053af5cdbc35, held offline, and CI 32b3c815ac30ad43, which signs the
-/// GitHub releases. The default of a phone controller's release keys, as the
-/// Pi's `PROJECT_RELEASE_KEYS` in config.py and the boxes' firmware.
+/// 424d053af5cdbc35, held offline, CI 32b3c815ac30ad43, which signs the
+/// GitHub releases, and the next CI key a4f6002b0122b131, which takes over
+/// from it (firmware/esp32/docs/RELEASE_SIGNING.md, "Rotating the CI key").
+/// The default of a phone controller's release keys, as the Pi's
+/// `PROJECT_RELEASE_KEYS` in config.py and the boxes' firmware.
 const projectReleaseKeys = [
   '5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=',
   'rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=',
+  '76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=',
 ];
+
+/// Earlier defaults of [projectReleaseKeys]. The settings store the list
+/// even when nobody changed it, so a phone that saved one of these exactly
+/// takes the current default instead (a list someone edited is kept): its
+/// controller then accepts the releases the next CI key signs.
+const earlierProjectReleaseKeys = [
+  [
+    '5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=',
+    'rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=',
+  ],
+];
+
+/// [keys] as stored, or the current project default if they are exactly an
+/// earlier one ([earlierProjectReleaseKeys]).
+List<String> currentReleaseKeys(List<String> keys) {
+  for (final earlier in earlierProjectReleaseKeys) {
+    if (keys.length == earlier.length &&
+        Iterable<int>.generate(keys.length)
+            .every((i) => keys[i] == earlier[i])) {
+      return [...projectReleaseKeys];
+    }
+  }
+  return keys;
+}

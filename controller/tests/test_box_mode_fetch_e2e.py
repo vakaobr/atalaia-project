@@ -26,7 +26,10 @@ import tempfile
 import threading
 import unittest
 
-import httpx
+try:  # the client Starlette's TestClient takes: httpx2 on the pinned lock, httpx on Ubuntu's packages (PLK-3)
+    import httpx2 as httpx
+except ModuleNotFoundError:
+    import httpx
 import uvicorn
 
 from support import BOX_HOST, CORE, MODEM_HOST, AirHub, BoxHost, HostModem, config, free_port, wait_for
