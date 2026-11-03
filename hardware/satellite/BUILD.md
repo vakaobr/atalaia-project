@@ -93,6 +93,13 @@ Decided (in the firmware and the design documents):
   `CONFIG_ATALAIA_BUZZER=y` ([section 10](#10-first-power-on-and-first-flash));
   it plays the games' sounds as short beep patterns (decisions BZR-1 to BZR-8).
   **The buzzer has not been built on hardware yet.**
+- **A simple output is optional**: a siren, a strobe, a light or a smoke
+  machine's remote switched by an RC relay switch on the level shifter's
+  spare gate, as on the Field Box (draft RFC "The expansion port", EXP-31 to
+  EXP-37). A Master or a Satellite that sounds a siren needs no other box. It
+  needs a firmware built with `CONFIG_ATALAIA_SIMPLE_OUT=y`; its pin follows
+  the board revision (GPIO 46 on a V4.3, 5 on a V4.2). **Not yet built on
+  hardware.**
 
 Not decided, or not supported yet:
 
@@ -126,6 +133,7 @@ pitfalls. No shop is recommended.
 | 13 | Panel-mount USB-C extension with cap, USB 2.0 data | 1 | Optional: charging and flashing without opening the box |
 | 14 | IP65 junction box, bright colour, **not metal**; cable glands and a pressure-equalising vent | 1 | Big enough for the parts above with the lid closed ([section 6](#6-enclosure)) |
 | 15 | **Passive** piezo buzzer (a piezo element without its own oscillator, 12-30 mm, rated 3-24 V), and a 220 ohm resistor; for a louder buzzer also an NPN transistor (2N2222, BC547 or S8050), a 1 kohm, a 10 kohm and a second 1 kohm resistor | 1 each | Optional, the cheapest sound (decision BZR-6). **Not an active buzzer** (it beeps one pitch whatever the firmware asks) and **not a magnetic transducer** (it lists a coil resistance such as 16 ohm): see [section 9](#9-wiring-step-by-step), step 7. **Not yet built on hardware** |
+| 16 | An RC relay switch that **opens when its signal stops**, an M8 3-pin socket and a 3-core cable (up to 2 m), a 10 kohm and a 330 ohm resistor; on the load's side a fuse and a 5 V regulator | 1 each per output | Optional: the simple output, low-voltage loads only ([Field Box manual, rows 32-34 and section 9.10](../field-box/BUILD.md#910-simple-output-optional)). **Not yet built on hardware** |
 | 16 | MAX98357A I2S amplifier and a 4-8 ohm speaker | 1 | Optional: real sound clips as well as tones |
 | 17 | Labels: "GAME PROP" and the box name | 2+ | Required |
 
@@ -180,6 +188,7 @@ if this table does.
 | I2S BCLK (optional amplifier) | 6 | `ATALAIA_AUDIO_BCLK_PIN` | grey | amplifier BCLK | 3.3 V | |
 | I2S LRCLK | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | pink | amplifier LRC | 3.3 V | |
 | I2S DOUT | 16 | `ATALAIA_AUDIO_DOUT_PIN` | brown | amplifier DIN | 3.3 V | |
+| Simple output (optional) | 46 (V4.3), 5 (V4.2) | `ATALAIA_SIMPLE_OUT_PIN` | yellow | 74AHCT125 pin 5 (2A), 10 kohm to GND; 2Y through 330 ohm to the M8 socket's pin 4 | 3.3 V in, 5 V out of the shifter | Only with `CONFIG_ATALAIA_SIMPLE_OUT=y`; the pin follows the board revision. A second one on GPIO 45, only without the buzzer (`ATALAIA_SIMPLE_OUT2_PIN`) |
 | Piezo buzzer (optional) | 45 | `ATALAIA_BUZZER_PIN` | purple | 220 ohm to the piezo, or 1 kohm to the transistor's base | 3.3 V, idles low | Only with `CONFIG_ATALAIA_BUZZER=y`. A boot strapping pin: nothing may pull it up ([section 9](#9-wiring-step-by-step), step 7) |
 
 Rails, not GPIOs: gauge logic VDD to the hub's 3V3 (violet, 3.3 V); button
@@ -191,8 +200,9 @@ is 0x3C. The full list of pins is in the
 
 Leave every other board pin unconnected. The firmware still drives the Field
 Box's display pins (GPIO 1, 3, 33, 47) as outputs, so nothing else may be wired
-to them; GPIO 0, 45 and 46 are boot straps (45 only for the buzzer's circuit,
-which keeps it low); the board-internal pins are listed
+to them; GPIO 0, 45 and 46 are boot straps (45 only for the buzzer's or a
+second simple output's circuit, 46 only for the simple output on a V4.3, each
+circuit keeping it low); the board-internal pins are listed
 in the [Field Box pin map](../field-box/README.md#pin-assignments-default-kconfig----heltec-v43).
 
 ## 6. Enclosure
@@ -335,7 +345,14 @@ wire; stranded wire only.
      pin.
 
    Check, before any power: no continuity from GPIO 45 to 3V3 or 5 V.
-8. **Board battery lead.** The hub's "5V in" to the 5 V splice. Make the lead
+8. **Simple output (optional; not yet built on hardware).** As the Field Box's
+   [section 9.10](../field-box/BUILD.md#910-simple-output-optional): the
+   74AHCT125's pin 5 (2A) off the GND rail and to GPIO 46 (V4.3) or 5 (V4.2),
+   with 10 kohm from pin 5 to GND; pin 6 (2Y) through 330 ohm to an M8 socket's
+   pin 4, its pin 3 to GND, its pin 1 free; the RC switch powered from the
+   load's battery, never from the box; low-voltage loads only. Check: the GPIO
+   reads 10 kohm to GND, nothing from the socket's pin 4 to 3V3 or 5 V.
+9. **Board battery lead.** The hub's "5V in" to the 5 V splice. Make the lead
    for the board's battery socket from BAT+ and the battery GND splice, then
    **measure its polarity** (cell in, fuse in, switch on, plug not in the
    board) against the + and - marks next to the socket. Switch off, then plug
@@ -378,6 +395,7 @@ free.
    | No keypad expander (and so no button 4) | `CONFIG_ATALAIA_KP_P7_BUTTON=0` |
    | No amplifier | `CONFIG_ATALAIA_AUDIO_BCLK_PIN=-1` (audio off) |
    | Piezo buzzer fitted | `CONFIG_ATALAIA_BUZZER=y` (on GPIO 45, `CONFIG_ATALAIA_BUZZER_PIN`) |
+   | Simple output fitted | `CONFIG_ATALAIA_SIMPLE_OUT=y` (`--simple-out=on`; GPIO 46 on a V4.3, 5 on a V4.2) |
    | Antenna with more than 2 dBi | `CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI=` its gain, rounded up |
 
 5. **Boot log.** In a serial monitor on the USB port: expect one warning per
@@ -387,7 +405,7 @@ free.
 6. **Bring-up.** Do the steps of
    [`BRING_UP.md`](../../firmware/esp32/docs/BRING_UP.md) that apply: 1 (first
    boot), 2 (Vext: the on-board OLED), 4 (buttons), 6 (LEDs), 8 (audio and
-   buzzer, if fitted), 9 (battery), **10 (radio, transmit power: no game before it)**, 10a
+   buzzer, if fitted), 8b (the simple output, if fitted), 9 (battery), **10 (radio, transmit power: no game before it)**, 10a
    (adoption), 10b and 10b2 (joining a controller's game). Skip the eFuse step
    (step 0) on a first box: burning an eFuse cannot be undone.
 

@@ -301,6 +301,17 @@ static void link_on_cmd(void *user, uint8_t cmd, const char *params_json)
          * the script gets its params, name included, as on("cmd.mode", ...). */
         if (g->phase == BOX_PLAYING) node_runner_input(g->runner, "cmd.mode", params);
         break;
+    case FIELD_CMD_OUTPUT:
+        /* Switch an output (RFC 0001 Amendment 26): the firmware's, whatever the mode; the output
+         * layer's rules decide (disabled at the box, no game running, its limits). */
+        if (g->outputs == NULL) {
+            say(g, "output command ignored: this box has no outputs");
+        } else {
+            const char *why = NULL;
+            out_result_t r = outputs_cmd(g->outputs, params ? params : "{}", &why);
+            say(g, "output command: %s", why != NULL ? why : outputs_result_name(r));
+        }
+        break;
     case FIELD_CMD_UPDATE:
         /* A firmware update (RFC 0001 Amendment 6): never while a game is played. */
         if (g->phase == BOX_PLAYING) {
@@ -336,6 +347,12 @@ void box_game_init(box_game_t *g, node_runner_t *runner, preset_t *preset_buf,
     g->nvs = nvs;
     g->log = log;
     g->hello = *hello;
+    g->base_caps_count = 0;
+    for (uint8_t i = 0; i < hello->capabilities_count && i < sizeof(g->base_caps); i++) {
+        if (hello->capabilities[i] != ATALAIA_CAP_OUTPUT) {
+            g->base_caps[g->base_caps_count++] = hello->capabilities[i];
+        }
+    }
     g->preset_index = -1;
     g->region = RADIO_REGION;
     g->battery_low_pct = BOX_BATTERY_LOW_PCT;
@@ -544,6 +561,24 @@ static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uin
     return BOX_JOIN_OK;
 }
 
+/* HELLO's capability type ids: the shell's, and `output` while an output is enabled (EXP-20), in
+ * id order. */
+static void fill_caps(box_game_t *g)
+{
+    uint8_t n = 0;
+    bool output = g->outputs != NULL && outputs_enabled_count(g->outputs) > 0;
+    for (uint8_t i = 0; i < g->base_caps_count && n < sizeof(g->hello.capabilities); i++) {
+        if (output && g->base_caps[i] > ATALAIA_CAP_OUTPUT) {
+            g->hello.capabilities[n++] = ATALAIA_CAP_OUTPUT;
+            output = false;
+        }
+        if (n < sizeof(g->hello.capabilities)) g->hello.capabilities[n++] = g->base_caps[i];
+    }
+    if (output && n < sizeof(g->hello.capabilities))
+        g->hello.capabilities[n++] = ATALAIA_CAP_OUTPUT;
+    g->hello.capabilities_count = n;
+}
+
 /* The game's link, from a verified join: the radio's channel, HELLO, the link's keys. */
 static bool link_up(box_game_t *g, const atalaia_join_t *j, bool fresh)
 {
@@ -559,6 +594,8 @@ static bool link_up(box_game_t *g, const atalaia_join_t *j, bool fresh)
     g->hello.battery_pct = battery >= 0 && battery <= 100 ? (uint8_t)battery : 0xFF;
     g->hello.has_device_id = g->lobby.ready;
     if (g->lobby.ready) memcpy(g->hello.device_id, g->lobby.device_id, ATALAIA_FF_DEVICE_SIZE);
+    fill_caps(g);
+    g->modules_told = false;             /* node.modules once this HELLO is acknowledged */
     g->lobby.channel_hz = j->channel_hz; /* where it listens between games, from now on */
     box_lobby_remember_channel(g);       /* and after a reboot (RFC 0001 Amendment 19) */
     g->lobby.ready_screen_due = false;
@@ -879,6 +916,22 @@ static void follow_link_state(box_game_t *g)
     }
 }
 
+/* node.modules (EXP-21): once the link's HELLO is acknowledged, the box's enabled simple outputs;
+ * nothing when it has none (a box without outputs says nothing new). */
+static void tell_modules(box_game_t *g)
+{
+    if (g->modules_told || g->link.hello_pending) return;
+    if (g->phase != BOX_JOINED && g->phase != BOX_PLAYING) return;
+    g->modules_told = true;
+    if (g->outputs == NULL) return;
+    char text[OUT_MODULES_MAX + 1];
+    if (outputs_modules_text(g->outputs, text, sizeof(text)) == 0) return;
+    char data[OUT_MODULES_MAX + 16];
+    snprintf(data, sizeof(data), "{\"modules\":\"%s\"}", text);
+    field_link_send_box_event(&g->link, "node.modules", data, g->runner->game_time_ms);
+    say(g, "told the controller its modules: %s", text);
+}
+
 void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms)
 {
     g->now_ms = now_ms;
@@ -898,6 +951,7 @@ void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms)
         }
     }
     check_battery(g, now_ms);
+    tell_modules(g);
     if (g->phase == BOX_ENDED &&
         (field_link_pending(&g->link) == 0 || now_ms - g->ended_ms >= BOX_END_LINGER_MS)) {
         leave_game(g);
@@ -981,4 +1035,37 @@ bool box_game_tag_text(box_game_t *g, const char *text)
         if (len == 0 || *p) return false;
     }
     return box_game_tag(g, uid, uid_len, len ? payload : NULL, len);
+}
+
+/* ---- Outputs (outputs.h) ------------------------------------------------------------ */
+
+void box_game_set_outputs(box_game_t *g, outputs_t *o)
+{
+    g->outputs = o;
+    if (g->runner != NULL) g->runner->outputs = o;
+}
+
+out_game_t box_game_output_state(const box_game_t *g)
+{
+    atalaia_node_status_t st = node_runner_status(g->runner);
+    if (g->phase == BOX_PLAYING) {
+        if (st == ATALAIA_NODE_HALTED) return OUT_GAME_HALTED;
+        if (st == ATALAIA_NODE_ENDED)
+            return OUT_GAME_ENDED; /* the mode ended it; CMD end follows */
+        return g->paused ? OUT_GAME_PAUSED : OUT_GAME_RUNNING;
+    }
+    if (g->phase == BOX_ENDED) return OUT_GAME_ENDED;
+    if (g->phase == BOX_IDLE && g->runner != NULL && g->runner->running) {
+        /* A game picked on the box. */
+        if (st == ATALAIA_NODE_RUNNING) return OUT_GAME_RUNNING;
+        if (st == ATALAIA_NODE_ENDED) return OUT_GAME_ENDED;
+        if (st == ATALAIA_NODE_HALTED) return OUT_GAME_HALTED;
+    }
+    return OUT_GAME_NONE;
+}
+
+void box_game_output_event(box_game_t *g, const char *type, const char *data_json)
+{
+    if (g->phase != BOX_JOINED && g->phase != BOX_PLAYING && g->phase != BOX_ENDED) return;
+    field_link_send_box_event(&g->link, type, data_json, g->runner->game_time_ms);
 }

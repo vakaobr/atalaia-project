@@ -237,6 +237,14 @@ typedef struct {
     bool fetch_failed_link;
     /* Why this boot happened (reset_reason.h), sent as node.rebooted's reason on a resume. */
     char reset_reason[16];
+    /* The box's outputs (outputs.h; box_game_set_outputs): CMD 12, HELLO's `output`, node.modules.
+     * NULL: none. */
+    outputs_t *outputs;
+    bool modules_told; /* node.modules went out (or had nothing to say) since this link's HELLO */
+    /* HELLO's capability type ids without `output`, as the shell gave them (box_game_init):
+     * link_up adds `output` while an output is enabled. */
+    uint8_t base_caps[16];
+    uint8_t base_caps_count;
 } box_game_t;
 
 void box_game_init(box_game_t *g, node_runner_t *runner, preset_t *preset_buf,
@@ -310,6 +318,21 @@ void box_game_fetch_done(box_game_t *g, int result, const char *part, bool repor
 
 /* True while the box is fetching mode packages for a join (BOX_FETCHING). */
 bool box_game_fetching(const box_game_t *g);
+
+/* ---- Outputs (outputs.h; draft RFC "The expansion port", increment 2) ------------------ */
+
+/* The box's outputs: the runner's scripts reach them (runner->outputs), CMD 12 switches them, and
+ * each game's HELLO lists `output` while one is enabled; after the HELLO is acknowledged the box
+ * sends node.modules with its enabled simple outputs. NULL: none. */
+void box_game_set_outputs(box_game_t *g, outputs_t *o);
+
+/* The game as the output layer sees it, for outputs_tick: a field game (running, paused, its
+ * mode's script halted, ended) or a game picked on the box; OUT_GAME_NONE otherwise. */
+out_game_t box_game_output_state(const box_game_t *g);
+
+/* outputs_ops_t's event: in a field game (joined, playing, ended) it goes to the controller on
+ * the field link; otherwise only the log has it. */
+void box_game_output_event(box_game_t *g, const char *type, const char *data_json);
 
 /* ---- Between games (box_lobby.c) ----------------------------------------------- */
 

@@ -313,6 +313,18 @@ void field_link_send_update_failed(field_link_t *l, const char *release, const c
     field_link_event(l, &ev, data);
 }
 
+void field_link_send_box_event(field_link_t *l, const char *type, const char *data_json,
+                               uint32_t t_ms)
+{
+    atalaia_event_t ev;
+    uint16_t seq = (uint16_t)(l->proto.seq + 1u); /* the header seq of the next packet */
+    if (!atalaia_event_init(&ev, l->join.node_id, seq, t_ms, type, ATALAIA_TEAM_NONE,
+                            ATALAIA_SQUAD_NONE, ATALAIA_PRIO_NORMAL)) {
+        return;
+    }
+    field_link_event(l, &ev, data_json);
+}
+
 void field_link_send_modes_failed(field_link_t *l, const char *mode, const char *reason,
                                   uint32_t t_ms)
 {

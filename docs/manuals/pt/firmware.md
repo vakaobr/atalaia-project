@@ -190,6 +190,8 @@ A maior parte das opções são opções de compilação. Dá-as ao `docker_fw.p
 | Chaves de modos | `--mode-keys=<key>[,<key>...]` (até 4, em hexadecimal ou base64) | As duas chaves do projeto |
 | Chaves de versões | `--release-keys=<key>[,<key>...]` (até 4) | Nenhuma: toda a atualização é recusada |
 | Versão | `--fw-version=0.4.1` | A do código |
+| Besouro piezoelétrico (no GPIO 45) | `--buzzer=on` | desligado |
+| Saída simples: um interruptor de relé RC para uma sirene, um estroboscópio ou o comando de uma máquina de fumo (GPIO 46 numa V4.3, 5 numa V4.2; ainda não experimentada em hardware) | `--simple-out=on`; `--simple-out=on2` junta uma segunda no GPIO 45 (não com o besouro); um número escolhe outro GPIO livre (uma placa de bancada) | desligada |
 
 Exemplo para um campo em Taiwan: `python tools/docker_fw.py build --region=as923-tw`. Compila o modem e o módulo de E/S com a mesma `--region`. Uma caixa recusa um jogo de outra região. Usa uma antena para a banda: uma antena de 868 MHz está errada a 920 MHz.
 
@@ -206,7 +208,8 @@ Exemplo para um campo em Taiwan: `python tools/docker_fw.py build --region=as923
 | Ecrã pequeno da placa de pernas para o ar | `CONFIG_ATALAIA_OLED_FLIP=y` |
 | Sem iBeacon na Field Box (vem ligado por omissão) | `# CONFIG_ATALAIA_BOX_BEACON is not set` |
 | O intervalo e a potência da baliza | `CONFIG_ATALAIA_BOX_BEACON_INTERVAL_MS=500` (100 a 10000), `CONFIG_ATALAIA_BOX_BEACON_TX_DBM=0` |
-| Há um besouro piezoelétrico passivo montado (no GPIO 45; ainda não experimentado em hardware) | `CONFIG_ATALAIA_BUZZER=y` |
+| Há um besouro piezoelétrico passivo montado (no GPIO 45; ainda não experimentado em hardware; ou `--buzzer=on`) | `CONFIG_ATALAIA_BUZZER=y` |
+| Há uma saída simples montada (ou `--simple-out=on`); as saídas ficam desligadas até serem ativadas na caixa com o PIN de administração | `CONFIG_ATALAIA_SIMPLE_OUT=y` |
 
 Nunca baixes o `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` nem o ganho da antena abaixo dos valores reais. Isso quebraria o limite legal de potência.
 

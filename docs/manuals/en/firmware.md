@@ -190,6 +190,8 @@ Most options are build options. Give them to `docker_fw.py`:
 | Mode keys | `--mode-keys=<key>[,<key>...]` (up to 4, hex or base64) | The project's two keys |
 | Release keys | `--release-keys=<key>[,<key>...]` (up to 4) | None: every update is refused |
 | Version | `--fw-version=0.4.1` | From the code |
+| Piezo buzzer (on GPIO 45) | `--buzzer=on` | off |
+| Simple output: an RC relay switch for a siren, strobe or smoke remote (GPIO 46 on a V4.3, 5 on a V4.2; not yet tried on hardware) | `--simple-out=on`; `--simple-out=on2` adds a second one on GPIO 45 (not with the buzzer); a number picks another free GPIO (a bench board) | off |
 
 Example for a Taiwanese field: `python tools/docker_fw.py build --region=as923-tw`. Build the modem and the pod with the same `--region`. A box refuses a game from another region. Use an antenna for the band: an 868 MHz antenna is wrong at 920 MHz.
 
@@ -206,7 +208,8 @@ Example for a Taiwanese field: `python tools/docker_fw.py build --region=as923-t
 | Board's small screen upside down | `CONFIG_ATALAIA_OLED_FLIP=y` |
 | No iBeacon on the Field Box (it is on by default) | `# CONFIG_ATALAIA_BOX_BEACON is not set` |
 | The beacon's interval, power | `CONFIG_ATALAIA_BOX_BEACON_INTERVAL_MS=500` (100 to 10000), `CONFIG_ATALAIA_BOX_BEACON_TX_DBM=0` |
-| A passive piezo buzzer is fitted (on GPIO 45; not yet tried on hardware) | `CONFIG_ATALAIA_BUZZER=y` |
+| A passive piezo buzzer is fitted (on GPIO 45; not yet tried on hardware; or `--buzzer=on`) | `CONFIG_ATALAIA_BUZZER=y` |
+| A simple output is fitted (or `--simple-out=on`); its outputs stay off until enabled at the box with the admin PIN | `CONFIG_ATALAIA_SIMPLE_OUT=y` |
 
 Never lower `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` or the antenna gain below the real values. That would break the legal power limit.
 

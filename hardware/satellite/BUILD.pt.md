@@ -97,6 +97,13 @@ Decidido (no firmware e nos documentos de conceção):
   ([secção 10](#10-primeiro-arranque-e-primeira-gravação)); toca os sons dos
   jogos como sequências curtas de bipes (decisões BZR-1 a BZR-8). **O besouro
   ainda não foi montado em hardware.**
+- **Uma saída simples é opcional**: uma sirene, um estroboscópio, uma luz ou o
+  comando de uma máquina de fumo ligados por um interruptor de relé RC na
+  porta livre do conversor de nível, como na Field Box (rascunho do RFC «The
+  expansion port», EXP-31 a EXP-37). Um Master ou um Satellite que toca uma
+  sirene não precisa de outra caixa. Precisa de um firmware compilado com
+  `CONFIG_ATALAIA_SIMPLE_OUT=y`; o seu pino segue a revisão da placa (GPIO 46
+  numa V4.3, 5 numa V4.2). **Ainda não montada em hardware.**
 
 Não decidido, ou ainda sem suporte:
 
@@ -130,6 +137,7 @@ Nenhuma loja é recomendada.
 | 13 | Extensão USB-C de painel com tampa, dados USB 2.0 | 1 | Opcional: carregar e gravar sem abrir a caixa |
 | 14 | Caixa de derivação IP65, de cor viva, **não metálica**; bucins e um respiro de equalização de pressão | 1 | Grande o bastante para as peças acima com a tampa fechada ([secção 6](#6-caixa)) |
 | 15 | Besouro piezoelétrico **passivo** (um elemento piezo sem oscilador próprio, 12-30 mm, para 3-24 V) e uma resistência de 220 ohm; para um besouro mais alto, também um transístor NPN (2N2222, BC547 ou S8050), uma resistência de 1 kohm, uma de 10 kohm e outra de 1 kohm | 1 de cada | Opcional, o som mais barato (decisão BZR-6). **Não um besouro ativo** (toca um só tom, peça o firmware o que pedir) e **não um transdutor magnético** (indica a resistência de uma bobina, como 16 ohm): ver a [secção 9](#9-ligações-passo-a-passo), passo 7. **Ainda não montado em hardware** |
+| 16 | Um interruptor de relé RC que **abre quando o sinal para**, uma tomada M8 de 3 pinos e um cabo de 3 condutores (até 2 m), uma resistência de 10 kohm e uma de 330 ohm; do lado da carga, um fusível e um regulador de 5 V | 1 de cada por saída | Opcional: a saída simples, só cargas de baixa tensão ([manual da Field Box, linhas 32-34 e secção 9.10](../field-box/BUILD.pt.md#910-saída-simples-opcional)). **Ainda não montada em hardware** |
 | 16 | Amplificador I2S MAX98357A e um altifalante de 4-8 ohm | 1 | Opcional: sons gravados além dos tons |
 | 17 | Etiquetas: "GAME PROP" e o nome da caixa | 2+ | Obrigatórias |
 
@@ -186,6 +194,7 @@ falha se esta tabela divergir.
 | I2S BCLK (amplificador opcional) | 6 | `ATALAIA_AUDIO_BCLK_PIN` | cinzento | BCLK do amplificador | 3,3 V | |
 | I2S LRCLK | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | rosa | LRC do amplificador | 3,3 V | |
 | I2S DOUT | 16 | `ATALAIA_AUDIO_DOUT_PIN` | castanho | DIN do amplificador | 3,3 V | |
+| Saída simples (opcional) | 46 (V4.3), 5 (V4.2) | `ATALAIA_SIMPLE_OUT_PIN` | amarelo | pino 5 do 74AHCT125 (2A), 10 kohm ao GND; 2Y através de 330 ohm ao pino 4 da tomada M8 | 3,3 V à entrada, 5 V à saída do conversor | Só com `CONFIG_ATALAIA_SIMPLE_OUT=y`; o pino segue a revisão da placa. Uma segunda no GPIO 45, só sem o besouro (`ATALAIA_SIMPLE_OUT2_PIN`) |
 | Besouro piezoelétrico (opcional) | 45 | `ATALAIA_BUZZER_PIN` | roxo | 220 ohm até ao piezo, ou 1 kohm até à base do transístor | 3,3 V, em repouso em baixo | Só com `CONFIG_ATALAIA_BUZZER=y`. Um pino de arranque: nada o pode puxar para cima ([secção 9](#9-ligações-passo-a-passo), passo 7) |
 
 Trilhos, não GPIO: VDD de lógica do medidor ao 3V3 do hub (violeta, 3,3 V); COM
@@ -198,7 +207,8 @@ medidor à derivação BAT+ (vermelho, 3,0-4,2 V). O endereço I2C do medidor é
 Deixa todos os outros pinos da placa sem ligação. O firmware ainda comanda os
 pinos do ecrã da Field Box (GPIO 1, 3, 33, 47) como saídas, por isso nada mais
 pode ser ligado a eles; o GPIO 0, 45 e 46 são pinos de arranque (boot strap; o
-45 só para o circuito do besouro, que o mantém em baixo); os
+45 só para o circuito do besouro ou de uma segunda saída simples, o 46 só para
+a saída simples numa V4.3, cada circuito mantendo-o em baixo); os
 pinos internos da placa estão listados no
 [mapa de pinos da Field Box](../field-box/README.md#pin-assignments-default-kconfig----heltec-v43).
 
@@ -349,7 +359,15 @@ duas pontas de cada fio; só fio multifilar.
 
    Verifica, antes de qualquer energia: nenhuma continuidade do GPIO 45 ao
    3V3 ou aos 5 V.
-8. **Cabo de bateria da placa.** O "5V in" do hub à derivação de 5 V. Faz o cabo
+8. **Saída simples (opcional; ainda não montada em hardware).** Como na
+   [secção 9.10](../field-box/BUILD.pt.md#910-saída-simples-opcional) da Field
+   Box: o pino 5 (2A) do 74AHCT125 fora do barramento GND e ao GPIO 46 (V4.3)
+   ou 5 (V4.2), com 10 kohm do pino 5 ao GND; o pino 6 (2Y) através de 330 ohm
+   ao pino 4 de uma tomada M8, o seu pino 3 ao GND, o pino 1 livre; o
+   interruptor RC alimentado pela bateria da carga, nunca pela caixa; só cargas
+   de baixa tensão. Verifica: o GPIO lê 10 kohm até ao GND, nada do pino 4 da
+   tomada ao 3V3 ou aos 5 V.
+9. **Cabo de bateria da placa.** O "5V in" do hub à derivação de 5 V. Faz o cabo
    para a tomada de bateria da placa a partir de BAT+ e da derivação GND da
    bateria, e depois **mede a sua polaridade** (célula posta, fusível posto,
    interruptor ligado, ficha fora da placa) contra as marcas + e - junto à
@@ -393,6 +411,7 @@ díodo virada para BAT+, a risca do condensador do anel virada para o GND; o
    | Sem expansor do teclado (e portanto sem botão 4) | `CONFIG_ATALAIA_KP_P7_BUTTON=0` |
    | Sem amplificador | `CONFIG_ATALAIA_AUDIO_BCLK_PIN=-1` (áudio desligado) |
    | Besouro piezoelétrico montado | `CONFIG_ATALAIA_BUZZER=y` (no GPIO 45, `CONFIG_ATALAIA_BUZZER_PIN`) |
+   | Saída simples montada | `CONFIG_ATALAIA_SIMPLE_OUT=y` (`--simple-out=on`; GPIO 46 numa V4.3, 5 numa V4.2) |
    | Antena com mais de 2 dBi | `CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI=` o seu ganho, arredondado para cima |
 
 5. **Registo de arranque.** Num monitor série na porta USB: espera um aviso por
@@ -402,7 +421,7 @@ díodo virada para BAT+, a risca do condensador do anel virada para o GND; o
 6. **Bring-up.** Faz os passos de
    [`BRING_UP.md`](../../firmware/esp32/docs/BRING_UP.md) (em inglês) que se
    aplicam: 1 (primeiro arranque), 2 (Vext: o OLED da placa), 4 (botões), 6
-   (LED), 8 (áudio e besouro, se montados), 9 (bateria), **10 (rádio, potência de emissão:
+   (LED), 8 (áudio e besouro, se montados), 8b (a saída simples, se montada), 9 (bateria), **10 (rádio, potência de emissão:
    nenhum jogo antes dela)**, 10a (adoção), 10b e 10b2 (entrar no jogo de um
    controlador). Salta o passo do eFuse (passo 0) numa primeira caixa: queimar
    um eFuse não se desfaz.

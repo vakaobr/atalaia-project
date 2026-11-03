@@ -1035,6 +1035,30 @@ static void build_start_confirm(lv_obj_t *scr)
 
 static void update_start_confirm(const char *data)
 {
+    /* "output": the picker's "Outputs" entry, one simple output's settings at the box
+     * (outputs_admin.h): the same screen, with its own words. */
+    if (screen_json_has(data, "output")) {
+        long n = 1, gpio = -1, max_s = 0;
+        screen_json_int(data, "output", &n);
+        screen_json_int(data, "gpio", &gpio);
+        screen_json_int(data, "max_s", &max_s);
+        char head[48], fn[32], big[64], line[64];
+        snprintf(head, sizeof(head), box_text(TX_OUTPUT_UP), (int)n, (int)gpio);
+        lv_label_set_text(slot[2], head);
+        screen_json_str(data, "fn", fn, sizeof(fn));
+        snprintf(big, sizeof(big), "%s  %s", fn,
+                 box_text(screen_json_true(data, "enabled") ? TX_OUT_ENABLED : TX_OUT_DISABLED));
+        lv_label_set_text(slot[0], big);
+        lv_obj_set_width(slot[1], SCREEN_W - 20);
+        if (screen_json_true(data, "testing")) {
+            lv_label_set_text(slot[1], box_text(TX_OUT_TESTING));
+        } else {
+            snprintf(line, sizeof(line), box_text(TX_OUT_MAX_S), (unsigned long)max_s);
+            lv_label_set_text(slot[1], line);
+        }
+        lv_label_set_text(slot[3], box_text(TX_KEYS_OUTPUT));
+        return;
+    }
     /* "setup": the picker's "Wi-Fi setup" entry asks before the box restarts into the setup
      * portal (preset_ui.h): the same screen, with its own words. */
     if (screen_json_true(data, "setup")) {

@@ -46,6 +46,8 @@
 #include "key_filter.h"
 #include "mem_monitor.h"
 #include "node_runner.h"
+#include "outputs.h"
+#include "outputs_admin.h"
 #include "preset_store.h"
 #include "preset_ui.h"
 #include "screen_renderer.h"
@@ -60,6 +62,7 @@
 #include "radio/lbt_bench.h"
 #endif
 #include "serial_console.h"
+#include "simple_out_esp.h"
 #include "sound_esp.h"
 #include "wifi_setup.h"
 
@@ -160,6 +163,14 @@ static uint8_t nfc_last_uid_len;
 static uint32_t nfc_last_poll_ms;
 /* The admin PIN (admin_pin.h): one check for the picker and adoption, its failure count in NVS. */
 static admin_pin_t admin_guard;
+
+/* The box's outputs (outputs.h): its simple outputs (simple_out_esp.c), CMD 12, the scripts'
+ * cap(fn) calls, the admin's settings (outputs_admin.h). */
+static outputs_t outs;
+static outputs_admin_t outs_admin;
+/* HELLO's capability type ids for the parts hal_start found (protocol/schema/capabilities.yaml). */
+static uint8_t hal_caps[16];
+static uint8_t hal_caps_count;
 /* Adoption (adoption.h): the field card, "@adopt" over the USB cable, "@joinkey". */
 static adoption_t adopt;
 static char adopt_mac[18];
@@ -231,6 +242,16 @@ static void show_picker(void)
     xQueueSend(screen_queue, &su, 0);
 }
 
+/* The outputs screen (the picker's "Outputs" entry), when it is open. */
+static void show_outputs_admin(void)
+{
+    screen_update_t su;
+    if (!outputs_admin_screen(&outs_admin, &su)) return;
+    picker_screen = su;
+    status_hold_state(&status_hold, su.template_name, su.data_json);
+    xQueueSend(screen_queue, &su, 0);
+}
+
 /* The Wi-Fi setup portal opens only on a box that is not configured; bench builds
  * (CONFIG_ATALAIA_SKIP_SETUP) have none. */
 #if CONFIG_ATALAIA_SKIP_SETUP
@@ -270,6 +291,8 @@ static void start_picker(void)
      */
     preset_ui_enable_adopt(&preset_ui,
                            adopt.adopted && hal.radio != NULL && admin_pin_is_set(&admin_guard));
+    /* A box built with a simple output: its settings behind the admin PIN (decision EXP-28). */
+    preset_ui_enable_outputs(&preset_ui, outs.count > 0);
     /* A wait still running, or no PIN set: said at once (decisions AD-28, AD-29). */
     preset_ui.locked_min = admin_pin_wait_min(&admin_guard);
     preset_ui.no_pin = !admin_pin_is_set(&admin_guard);
@@ -400,6 +423,31 @@ static void serial_command(const char *cmd)
     if (strcmp(cmd, "lbt") == 0 || strncmp(cmd, "lbt ", 4) == 0) {
         lbt_bench_command(cmd[3] ? cmd + 4 : "");
         return;
+    }
+#endif
+    /* "@outputs" and "@output <n> ..." (outputs_admin.h): a change wants the admin PIN as its last
+     * word in a release build, as "@joinkey" (decision EXP-28); a bench build takes it without. */
+    if (strcmp(cmd, "outputs") == 0 || outputs_admin_args(cmd) >= 0) {
+        static char out_line[200], out_reply[240];
+        snprintf(out_line, sizeof(out_line), "%s", cmd);
+        int args = outputs_admin_args(out_line);
+        if (args >= 0 && !admin_pin_gate_serial(&admin_guard, SERIAL_KEYS_ON, out_line, args,
+                                                out_reply, sizeof(out_reply))) {
+            ESP_LOGW(TAG, "output: %s", out_reply);
+            return;
+        }
+        bool busy = box_game_active(&box) || runner.running;
+        outputs_admin_command(&outs, out_line, busy, out_reply, sizeof(out_reply));
+        ESP_LOGI(TAG, "%s", out_reply);
+        return;
+    }
+#if CONFIG_ATALAIA_SERIAL_KEYS
+    /* "@hang" (bench builds only; bench test 12 of the simple output): the game task stops for
+     * good, as a hung task would. The simple output's bursts end within 0.5 s and its RC switch
+     * must open; the task watchdog only reports it. Restart the box afterwards. */
+    if (strcmp(cmd, "hang") == 0) {
+        ESP_LOGW(TAG, "hang: the game task stops now (bench test); restart the box afterwards");
+        for (;;) vTaskDelay(portMAX_DELAY);
     }
 #endif
     /* "@joinkey <hex>" and "@update <version> <id>" change what the box trusts or runs: a release
@@ -595,6 +643,21 @@ static void box_log(void *user, const char *line)
 {
     (void)user;
     ESP_LOGI(TAG, "field: %s", line);
+}
+
+/* ---- The outputs' shell ops (outputs.h) ---- */
+
+static void outputs_event(void *ctx, const char *type, const char *data_json)
+{
+    (void)ctx;
+    ESP_LOGI(TAG, "event %s %s", type, data_json);
+    box_game_output_event(&box, type, data_json); /* a field game's controller hears it */
+}
+
+static void outputs_log(void *ctx, const char *line)
+{
+    (void)ctx;
+    ESP_LOGI(TAG, "%s", line);
 }
 
 /* The radio report (radio/radio_stats.h, decision SL-18): one JSON line a minute, read-only. */
@@ -890,6 +953,10 @@ static void box_start(const char *tier)
     hello.tier = strcmp(tier, "full") == 0 ? 0 : 1;
     hello.transports = 1; /* LoRa */
     hello.battery_pct = 0xFF;
+    /* What the box has, as capability type ids (EXP-20); box_game adds `output` while an
+     * output is enabled. */
+    memcpy(hello.capabilities, hal_caps, hal_caps_count);
+    hello.capabilities_count = hal_caps_count;
     box_store_ops_t no_store = {0};
     box_shell_ops_t ops = {.screen = box_screen,
                            .log = box_log,
@@ -907,6 +974,7 @@ static void box_start(const char *tier)
                            .user = NULL};
     box_game_init(&box, &runner, &game_preset, nvs ? atalaia_box_store_esp() : &no_store, &ops,
                   &atalaia_crypto_mbedtls, nvs, &game_log, &hello);
+    box_game_set_outputs(&box, &outs);
     box.state_interval_ms = (uint32_t)CONFIG_ATALAIA_STATE_INTERVAL_S * 1000u;
     box.has_picker = true; /* "ready" says a key brings the game picker */
     /* battery.low below this level, only with a MAX17048 (box_battery() is -1 without one). */
@@ -1097,9 +1165,28 @@ static void task_game(void *arg)
             memset(&picker_screen, 0, sizeof(picker_screen));
             show_picker(); /* adoption left the screen: the picker's step again */
         }
+        if (key != HAL_KEY_NONE && picker_active && outputs_admin_active(&outs_admin)) {
+            /* The outputs screen (the picker's "Outputs" entry): '#' or '*' back to the list. */
+            if (outputs_admin_key(&outs_admin, key)) {
+                show_outputs_admin();
+            } else {
+                preset_ui.state = PRESET_UI_STATE_PRESET_LIST;
+                memset(&picker_screen, 0, sizeof(picker_screen));
+                show_picker();
+            }
+            key = HAL_KEY_NONE;
+        }
         if (key != HAL_KEY_NONE) {
             if (picker_active) {
                 preset_ui_handle_key(&preset_ui, key);
+                if (preset_ui_get_state(&preset_ui) == PRESET_UI_STATE_OUTPUTS_REQUESTED) {
+                    outputs_admin_open(&outs_admin, &outs);
+                    if (outputs_admin_active(&outs_admin)) {
+                        show_outputs_admin();
+                    } else {
+                        preset_ui.state = PRESET_UI_STATE_PRESET_LIST;
+                    }
+                }
                 if (preset_ui_get_state(&preset_ui) == PRESET_UI_STATE_SETUP_REQUESTED) {
                     setup_again("picker"); /* does not return */
                 }
@@ -1167,6 +1254,9 @@ static void task_game(void *arg)
         }
         if (box_was_active && !box_game_active(&box)) after_game = true;
         box_was_active = box_game_active(&box);
+        /* The outputs: the game's state and the clock; each simple output's burst is renewed here,
+         * so if this task stops, the pulses stop within 0.5 s (EXP-32). */
+        outputs_tick(&outs, box_game_output_state(&box), now);
         if (runner.running || runner.queues.screen_count || runner.queues.audio_count) {
             /* Forward screen updates to the LVGL queue. */
             for (int i = 0; i < runner.queues.screen_count; i++) {
@@ -1377,6 +1467,12 @@ static bool mount_storage(void)
     return err == ESP_OK;
 }
 
+/* A part hal_start found, for HELLO (capability type ids, in id order). */
+static void hal_cap(uint8_t id)
+{
+    if (hal_caps_count < sizeof(hal_caps)) hal_caps[hal_caps_count++] = id;
+}
+
 /*
  * Bring up each peripheral. A part that is missing or fails is logged and
  * left out; the box still boots (the Wokwi emulator has no PN532, MAX17048,
@@ -1384,17 +1480,29 @@ static bool mount_storage(void)
  */
 static void hal_start(void)
 {
-    if (hal.buttons->init() != 0) ESP_LOGW(TAG, "team buttons: GPIO setup failed");
-    if (hal.keypad->init() != 0) ESP_LOGW(TAG, "keypad: not available");
-    if (hal.leds->init() != 0) ESP_LOGW(TAG, "LED ring: not available");
-    if (hal.nfc->init() != 0) ESP_LOGW(TAG, "NFC: not available");
+    bool buttons = hal.buttons->init() == 0;
+    if (!buttons) ESP_LOGW(TAG, "team buttons: GPIO setup failed");
+    bool keypad = hal.keypad->init() == 0;
+    if (!keypad) ESP_LOGW(TAG, "keypad: not available");
+    bool leds = hal.leds->init() == 0;
+    if (!leds) ESP_LOGW(TAG, "LED ring: not available");
+    bool nfc = hal.nfc->init() == 0;
+    if (!nfc) ESP_LOGW(TAG, "NFC: not available");
     speaker_fitted = sound_esp_speaker_pins() && hal.audio->init() == 0;
     if (!speaker_fitted) ESP_LOGW(TAG, "audio: no amplifier");
     if (hal.buzzer != NULL && hal.buzzer->init() != 0) {
         ESP_LOGW(TAG, "piezo buzzer: not available");
         hal.buzzer = NULL;
     }
-    if (hal.battery->init() != 0) ESP_LOGW(TAG, "battery gauge: not available");
+    bool gauge = hal.battery->init() == 0;
+    if (!gauge) ESP_LOGW(TAG, "battery gauge: not available");
+    if (buttons) hal_cap(ATALAIA_CAP_BUTTON);
+    if (keypad) hal_cap(ATALAIA_CAP_KEYPAD);
+    if (CONFIG_ATALAIA_DISP_MOSI_PIN >= 0 || hal.oled != NULL) hal_cap(ATALAIA_CAP_DISPLAY);
+    if (leds && CONFIG_ATALAIA_LED_PIN >= 0) hal_cap(ATALAIA_CAP_LED);
+    if (speaker_fitted || hal.buzzer != NULL) hal_cap(ATALAIA_CAP_AUDIO);
+    if (nfc) hal_cap(ATALAIA_CAP_NFC);
+    if (gauge) hal_cap(ATALAIA_CAP_BATTERY);
     if (hal.radio->init() != 0) {
         ESP_LOGW(TAG, "radio: not available (no SX1262)");
         hal.radio = NULL; /* signal to the rest of the shell */
@@ -1498,6 +1606,15 @@ void app_main(void)
         }
     }
     hal_start();
+    /* The outputs next, off before anything else (EXP-29): each simple output sends 0.5 s of
+     * 1.0 ms pulses, then holds its pin low until a game runs. */
+    {
+        outputs_ops_t oops = {
+            .event = outputs_event, .log = outputs_log, .save = simple_out_esp_save, .ctx = NULL};
+        outputs_init(&outs, &oops);
+        simple_out_esp_init(&outs);
+        outputs_tick(&outs, OUT_GAME_NONE, (uint32_t)(esp_timer_get_time() / 1000));
+    }
     key_filter_init(&key_filter);
 #if SERIAL_INPUT
     serial_input_init();

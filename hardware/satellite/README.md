@@ -7,6 +7,8 @@ Box's firmware with fewer parts fitted, and plays the games a field controller i
 
 **To build one, follow the [build guide](BUILD.md).** Sound is optional: the design specification's passive piezo
 buzzer (a firmware option since 2026-11-03, `CONFIG_ATALAIA_BUZZER`, GPIO 45; decisions BZR-1 to BZR-8; not yet built
-on hardware), the Field Box's amplifier, or both.
+on hardware), the Field Box's amplifier, or both. A simple output (an RC relay switch for a siren, strobe or smoke
+remote; `CONFIG_ATALAIA_SIMPLE_OUT`, GPIO 46 on a V4.3 or 5 on a V4.2; draft RFC "The expansion port", EXP-31 to
+EXP-37; not yet built on hardware) is optional too: a Master that sounds a siren needs no other box.
 
 Status: build guide written (2026-10-22); not yet built.

@@ -177,6 +177,9 @@ para uma caixa: 70-110 € a preços de mercado de hobby
 | 29 | Janela transparente, acrílico ou policarbonato de 2-3 mm | 1 | Maior do que a área ativa do ecrã | Só se a tampa for opaca |
 | 30 | Etiquetas: «GAME PROP» e o nome da caixa | 2+ | Resistentes ao tempo | Obrigatórias, vê a [secção 4](#4-regras-de-segurança) |
 | 31 | Besouro piezoelétrico **passivo**, 12-30 mm, para 3-24 V; uma resistência de 220 ohm; para um mais alto, um transístor NPN (2N2222, BC547 ou S8050), uma resistência de 1 kohm, uma de 10 kohm e outra de 1 kohm | 1 de cada | Um elemento piezo **sem** oscilador próprio | Opcional, com ou sem o amplificador (decisões BZR-1 a BZR-8); precisa de um firmware compilado com `CONFIG_ATALAIA_BUZZER=y`. Não um besouro «ativo» (um só tom, peça o firmware o que pedir), não um transdutor magnético diretamente no pino (indica a resistência de uma bobina, como 16 ohm), não um «módulo de besouro» com pull-up na entrada ([secção 9.7](#97-áudio-opcional)). **Ainda não montado em hardware** |
+| 32 | **Interruptor de relé RC** (do tipo vendido para modelos telecomandados: entrada com ficha de servo, um relé, alimentação de cerca de 5 V), um por saída | 1-2 | **Abre o relé quando o sinal de servo para** (o fabricante di-lo, ou a verificação na bancada da [secção 9.10](#910-saída-simples-opcional) mostra-o); um limiar entre 1,0 e 2,0 ms (alguns aprendem-no na configuração); os contactos do relé adequados à carga | Opcional: a saída simples, para uma sirene, um estroboscópio, uma luz ou o comando de uma máquina de fumo (rascunho do RFC «The expansion port», decisões EXP-31 a EXP-37); precisa de um firmware compilado com `CONFIG_ATALAIA_SIMPLE_OUT=y`. Uma placa documentada com segurança na perda de sinal (o interruptor RC com relé da Pololu, ou a versão com MOSFET para cargas DC comutadas muitas vezes), ou um «1-channel RC PWM relay switch» genérico **depois** da verificação na bancada: o comportamento na perda de sinal varia de lote para lote, e um que **mantém o último estado** nunca pode ser usado. **Ainda não montado em hardware** |
+| 33 | Tomada M8 de 3 pinos (codificação A, de painel, IP67) com um cabo de 3 condutores a condizer, até 2 m; uma resistência de 10 kohm e uma de 330 ohm | 1 de cada por saída | M8, **não** M12: a M12 da porta de expansão não a aceita por engano | Para a linha 32. A ficha de servo do próprio interruptor RC fica na outra ponta do cabo |
+| 34 | Do lado da carga: um fusível para a bateria da carga e um regulador de 5 V para o interruptor (um «BEC» de RC ou um pequeno módulo buck a partir dos 6-24 V da carga) | 1 de cada por saída | A gama de alimentação do interruptor (muitas vezes 4,8-6 V) | Para a linha 32. **Nunca** a partir da caixa: a caixa dá só o sinal e o GND |
 
 ## 3. Ferramentas e consumíveis
 
@@ -542,6 +545,11 @@ placa ter passado as verificações de continuidade:
 | 12, 13 | 4A, 4OE | barramento GND |
 | 14 | VCC | barramento 5V, e um condensador cerâmico de 100 nF do pino 14 ao pino 7, o mais perto possível |
 
+As portas 2, 3 e 4 estão livres. A saída simples opcional usa a porta 2 (e
+uma segunda saída a porta 3): as suas ligações substituem o GND do pino 5 (ou
+do pino 9) como diz a [secção 9.10](#910-saída-simples-opcional); de resto,
+deixa-as como acima.
+
 **Verificações antes de continuar** (sem energia, com o chip fora do suporte):
 sem continuidade entre quaisquer dois barramentos; o pino 14 ao barramento 5V
 e o pino 7 ao GND apitam; o pino 2 apita até ao pino «LED data in»; o pino
@@ -740,6 +748,84 @@ pinos do hub: 3V3, GND, SDA, SCL.
 - [ ] Cada fio etiquetado nas duas pontas, sem cobre à vista, molhos presos,
       nenhum fio entalado pela tampa.
 - [ ] Nada ligado aos pinos da placa listados na [secção 9.1](#91-placa-principal-e-barramentos).
+- [ ] A saída simples, se estiver montada: as verificações da [secção 9.10](#910-saída-simples-opcional).
+
+### 9.10 Saída simples (opcional)
+
+**Ainda não montada em hardware.** Uma sirene, um estroboscópio, uma luz ou o
+comando de uma máquina de fumo ligados pela caixa (rascunho do RFC «The
+expansion port», decisões EXP-31 a EXP-37; a forma preferida de uma caixa
+ligar alguma coisa): um GPIO envia um sinal de servo de RC pela porta 2 livre
+do 74AHCT125 até um **interruptor de relé RC** comum (linhas 32-34 das peças).
+A caixa envia 50 impulsos por segundo: **2,0 ms é ligado, 1,0 ms é
+desligado**. Vêm em rajadas de meio segundo que só o jogo em curso renova, por
+isso, se a caixa encravar, reiniciar ou ficar sem energia, os impulsos param
+em 0,5 s e o interruptor abre o relé por ter perdido o sinal. É por isso que
+só pode ser usado um interruptor que **abre quando o sinal para**. A caixa dá
+o sinal e o GND; o interruptor e a carga alimentam-se da bateria da própria
+carga.
+
+**Cargas: só de baixa tensão** (SELV: no máximo 24 V DC, 2 A recomendados),
+diga o relé o que disser. **Nunca a rede elétrica.** Uma máquina de fumo só
+através de uma entrada de comando de baixa tensão documentada; nunca
+pirotecnia. Proteção auditiva perto de sirenes e buzinas; fumo nunca numa sala
+fechada sem autorização do recinto; nada que pareça um explosivo
+([secção 4](#4-regras-de-segurança)).
+
+1. **Firmware:** uma compilação com `CONFIG_ATALAIA_SIMPLE_OUT=y`
+   (`python tools/docker_fw.py build --simple-out=on`;
+   [secção 12](#12-passagem-para-o-bring-up)). O seu pino segue a revisão da
+   placa ([secção 6](#6-revisão-da-placa-e-antenas)): **GPIO 46 numa V4.3,
+   GPIO 5 numa V4.2** (cada um é a linha do módulo de entrada da outra
+   revisão; nunca a que a tua revisão usa). O registo de arranque diz
+   `output 1 on GPIO 46: out.1, disabled ...`.
+2. **Na placa de interligação, porta 2:** tira o pino 5 (2A) do barramento GND
+   e liga-o ao GPIO 46 (V4.3) ou 5 (V4.2) da placa; monta uma resistência de
+   **10 kohm** do pino 5 ao barramento GND (mantém o pino em baixo enquanto a
+   placa arranca, para que o interruptor não veja sinal, e mantém em baixo o
+   pino de arranque 46). O pino 4 (2OE) fica no GND. O pino 6 (2Y), através de
+   uma resistência de **330 ohm**, ao pino de sinal da tomada da saída. O sinal
+   sai da caixa a 5 V, através do conversor: uma avaria no cabo chega ao
+   74AHCT125 do suporte, não à placa.
+3. **A tomada:** uma tomada **M8 de 3 pinos** na parede, longe das antenas:
+   **pino 1 sem ligação** (a caixa não dá energia), **pino 3 GND** (ao
+   barramento GND do hub), **pino 4 sinal** (da resistência de 330 ohm).
+   Etiqueta-a «SAÍDA 1». Não é a M12 da porta de expansão.
+4. **O cabo** (até 2 m, 3 condutores, sinal e GND entrançados, longe dos fios
+   da própria carga): pino 4 da M8 ao fio de **sinal** da ficha de servo do
+   interruptor (branco, amarelo ou laranja), pino 3 ao seu **GND** (preto ou
+   castanho). O **+** da ficha de servo (vermelho) **não** vai à caixa.
+5. **O lado da carga:** a bateria da carga, através de um fusível, ao COM do
+   relé, o NO à carga, a carga de volta à bateria; e a mesma bateria, através
+   de um fusível, a um regulador de 5 V (um «BEC» de RC ou um módulo buck) que
+   alimenta o + e o GND do interruptor. O GND do interruptor fica ligado ao da
+   caixa pelo cabo: aceitável para cargas de baixa tensão com bateria própria,
+   e a razão por que um aparelho da rede elétrica nunca lhe é ligado.
+6. **Uma segunda saída** (só numa caixa **sem** o besouro piezoelétrico: o
+   GPIO 45 é do besouro ou de uma segunda saída, nunca dos dois; o firmware
+   recusa os dois): a porta 3 da mesma forma (pino 9, 3A, a partir do GPIO 45
+   com 10 kohm ao GND; pino 10, 3OE, no GND; pino 8, 3Y, através de 330 ohm a
+   uma segunda tomada M8, «SAÍDA 2»); compila com `--simple-out=on2`
+   (`CONFIG_ATALAIA_SIMPLE_OUT2=y`).
+7. **Verificações** (sem energia, com o chip fora do suporte): o GPIO 46 (ou
+   5) lê 10 kohm até ao GND; o pino 4 da M8 lê 330 ohm até ao pino 6 do
+   suporte; nada no pino 1 da M8; sem continuidade do pino 4 da M8 ao 3V3, aos
+   5 V ou ao BAT+. Antes do primeiro jogo, cada interruptor RC passa pela
+   verificação na bancada
+   ([BRING_UP.md, passo 8b](../../firmware/esp32/docs/BRING_UP.md#step-8b-simple-output-rc-relay-switch)):
+   2,0 ms fecha-o, 1,0 ms abre-o e, com o relé fechado, tirar a ficha do sinal
+   abre-o em menos de um segundo. Um interruptor que mantém o estado não é
+   usado.
+8. **Ativa-a na caixa:** as saídas ficam desligadas até que a pessoa que
+   administra o campo as ative na caixa com o PIN de administração e dê a cada
+   uma a sua função (sirene, estroboscópio, fumo, luz, buzina) e o seu tempo
+   máximo ligada
+   ([manual da Field Box](../../docs/manuals/pt/field-box.md#saídas-uma-sirene-um-estroboscópio-uma-máquina-de-fumo)).
+
+A caixa desliga todas as saídas no arranque, quando um jogo é pausado, quando
+o script do modo é parado e quando o jogo acaba (uma buzina de fim de jogo
+ainda pode soar até 10 s), e muda uma saída simples no máximo de meio em meio
+segundo. Os diagramas de ligações não a mostram.
 
 ## 10. Primeira ligação à energia
 
@@ -953,8 +1039,10 @@ seguido pelo git), altera a linha, guarda e corre outra vez
 | Placa montada ao contrário (o OLED pequeno de pernas para o ar) | `CONFIG_ATALAIA_OLED_FLIP=y` |
 | Módulo GNSS ligado no arranque (só teste de bancada: nada o lê ainda) | `CONFIG_ATALAIA_GNSS_POWER_ON=y` |
 | Besouro piezoelétrico montado ([secção 9.7](#97-áudio-opcional)) | `CONFIG_ATALAIA_BUZZER=y` (o seu pino: `CONFIG_ATALAIA_BUZZER_PIN=45`) |
+| Saída simples montada ([secção 9.10](#910-saída-simples-opcional)) | `CONFIG_ATALAIA_SIMPLE_OUT=y` (o seu pino segue a revisão da placa: 46 numa V4.3, 5 numa V4.2); uma segunda no GPIO 45, sem o besouro: `CONFIG_ATALAIA_SIMPLE_OUT2=y` |
 
-Taiwan (`--region=as923-tw`), ouvir antes de falar (`--lbt=`), o ganho da antena (`--antenna-dbi=`), as chaves de
+Taiwan (`--region=as923-tw`), ouvir antes de falar (`--lbt=`), o ganho da antena (`--antenna-dbi=`), o besouro
+(`--buzzer=on`), a saída simples (`--simple-out=on`, `on2`), as chaves de
 versões e as chaves de modos são opções de compilação, não linhas a editar;
 vê o [guia do firmware](../../docs/manuals/pt/firmware.md#4-as-opções-de-quem-monta).
 Nunca baixes o `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` nem o ganho da antena abaixo
@@ -987,6 +1075,8 @@ dentro da tampa da caixa.
 | O botão 4 nunca regista | É lido através do expansor do teclado: o registo tem de dizer `PCF8574 keypad at 0x..`; o fio dele vai para o P7, não para um GPIO da placa |
 | Sem som | Interruptor desligado (o amplificador está nos 5 V); BCLK/LRC/DIN trocados; fio do altifalante a tocar no GND |
 | Besouro calado | Firmware compilado sem `CONFIG_ATALAIA_BUZZER=y` (sem a linha `piezo buzzer on GPIO 45` no registo de arranque); um besouro ativo ou um módulo em vez de um piezo passivo; o volume a 0 |
+| O interruptor RC nunca fecha | Saídas desativadas na caixa (ativa-as: PIN de administração, **Saídas**); nenhum jogo a decorrer (as saídas só mudam num jogo, ou no teste de 1 s da administração entre jogos); firmware compilado sem `CONFIG_ATALAIA_SIMPLE_OUT=y` (sem a linha `output 1 on GPIO` no arranque); o + do interruptor sem alimentação do lado da carga; o limiar ao contrário (um jumper de inversão) |
+| O interruptor RC fica fechado com a caixa desligada | Mantém o último estado na perda de sinal: nunca o uses ([secção 9.10](#910-saída-simples-opcional)) |
 | A placa deixou de arrancar quando se montou o besouro | Algo puxa o GPIO 45 para cima: o pull-up de um módulo, ou falta a resistência de 10 kohm do circuito com transístor. Tira o besouro e verifica ([secção 9.7](#97-áudio-opcional)) |
 | O telemóvel não vê o Wi-Fi `atalaia-XXXX` | Antena de 2,4 GHz em falta ou no conector errado; telemóvel longe demais; a caixa já está configurada (o Wi-Fi de configuração só abre numa caixa nova ou depois de **Configurar o Wi-Fi**: [guia do firmware](../../docs/manuals/pt/firmware.md#5-primeiro-arranque-e-configuração)) |
 | A página de configuração não abre sozinha | Abre `http://192.168.4.1` no browser do telemóvel; desliga os dados móveis e o DNS privado durante um minuto |
@@ -1057,6 +1147,8 @@ delas está ligada a um GPIO a não ser através do conversor de nível.
 | Relógio de bits do áudio (BCLK) | 6 | `ATALAIA_AUDIO_BCLK_PIN` | cinzento | BCLK do amplificador | 3,3 V | controlador de áudio (`hal_esp_audio.c`, I2S) |
 | Relógio esquerda/direita do áudio (LRC) | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | rosa | LRC do amplificador | 3,3 V | controlador de áudio |
 | Dados do áudio (DIN) | 16 | `ATALAIA_AUDIO_DOUT_PIN` | castanho | DIN do amplificador | 3,3 V | controlador de áudio |
+| Saída simples 1 (opcional) | 46 (V4.3), 5 (V4.2) | `ATALAIA_SIMPLE_OUT_PIN` | amarelo | pino 5 do 74AHCT125 (2A), 10 kohm ao GND; 2Y através de 330 ohm ao pino 4 da tomada M8 | 3,3 V à entrada, 5 V à saída do conversor; impulsos de servo a 50 Hz, em repouso em baixo. O GPIO 46 é um pino de arranque que os 10 kohm mantêm em baixo | camada de saídas (`outputs.c`, `simple_out_esp.c`, RMT), só com `CONFIG_ATALAIA_SIMPLE_OUT=y` |
+| Saída simples 2 (opcional, sem besouro) | 45 | `ATALAIA_SIMPLE_OUT2_PIN` | amarelo | pino 9 do 74AHCT125 (3A), 10 kohm ao GND; 3Y através de 330 ohm a uma segunda tomada M8 | Como a saída 1. O pino de arranque VDD_SPI: os 10 kohm mantêm-no em baixo | só com `CONFIG_ATALAIA_SIMPLE_OUT2=y` (recusada com o besouro) |
 | Besouro piezoelétrico (opcional) | 45 | `ATALAIA_BUZZER_PIN` | roxo | 220 ohm até ao piezo, ou 1 kohm até à base do transístor | 3,3 V, em repouso em baixo. Um pino de arranque: o seu circuito tem de o manter em baixo no arranque | controlador do besouro (`hal_esp_buzzer.c`, LEDC), só com `CONFIG_ATALAIA_BUZZER=y` |
 
 **Não são sinais de GPIO** (ligados a barramentos, não a um pino do firmware):
@@ -1082,9 +1174,9 @@ PCF8574A, `ATALAIA_KP_I2C_ADDR`), PN532 0x24, MAX17048 0x36, o OLED da placa
 
 | GPIO | O que é |
 | --- | --- |
-| 0, 45, 46 | Pinos de arranque. O GPIO 46 é também a linha do módulo de entrada da V4.2. O GPIO 45 só para o besouro piezoelétrico opcional, cujo circuito o mantém em baixo ([secção 9.7](#97-áudio-opcional)) |
+| 0, 45, 46 | Pinos de arranque. O GPIO 46 é também a linha do módulo de entrada da V4.2. O GPIO 45 só para o besouro piezoelétrico opcional ou uma segunda saída simples, o GPIO 46 só para a saída simples numa V4.3; os seus circuitos mantêm-nos em baixo ([secções 9.7](#97-áudio-opcional) e [9.10](#910-saída-simples-opcional)) |
 | 2, 7, 8-14 | O rádio e o módulo de entrada dele |
-| 5 | O módulo de entrada da V4.3 (amplificador de receção ligado ou desligado) |
+| 5 | O módulo de entrada da V4.3 (amplificador de receção ligado ou desligado). Numa V4.2 está livre: é aí o pino da saída simples |
 | 19, 20 | USB |
 | 21 | O reset do OLED da placa |
 | 26-32 | Flash e PSRAM |
@@ -1093,8 +1185,9 @@ PCF8574A, `ATALAIA_KP_I2C_ADDR`), PN532 0x24, MAX17048 0x36, o OLED da placa
 | 43 | Transmissão da UART0: o registo. Nunca o ligues a uma peça |
 
 Pinos da placa usados **de propósito**, cada um para uma só coisa: GPIO 1 (CS
-do ecrã), GPIO 35 (dados do anel de LEDs), GPIO 44 (botão 3), e GPIO 45 (o
-besouro piezoelétrico opcional).
+do ecrã), GPIO 35 (dados do anel de LEDs), GPIO 44 (botão 3), GPIO 45 (o
+besouro piezoelétrico opcional, ou uma segunda saída simples), e GPIO 46 numa
+V4.3 ou 5 numa V4.2 (a saída simples opcional).
 
 **Onde a referência de pinos e o firmware discordavam.** Em 2026-10-28 esta
 secção foi verificada em relação a `Kconfig.projbuild` e a `hal_esp_*.c`. Os

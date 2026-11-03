@@ -15,6 +15,7 @@
 #include "command_dispatch.h"
 #include "game_timer.h"
 #include "hal/hal.h"
+#include "outputs.h"
 #include "preset_store.h"
 #include "state_persist.h"
 
@@ -40,6 +41,9 @@ typedef struct {
     /* Every event the node emits also goes here (the radio link); may be NULL. */
     void (*event_hook)(void *ctx, const atalaia_event_t *ev, const char *data_json);
     void *event_ctx;
+    /* The box's outputs (outputs.h): a script's cap(fn) calls to them, and the game's end before
+     * the mode's game.end handlers run (its grace). NULL: none. */
+    outputs_t *outputs;
     /* Event recording for tests. */
     int event_count;
     char last_event_type[64];

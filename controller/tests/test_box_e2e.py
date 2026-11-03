@@ -332,6 +332,89 @@ class FieldTests(unittest.TestCase):
         self.assertFalse(box.status()["have_key"])
         self.assertFalse(os.path.exists(os.path.join(box.state_dir, "join")))
 
+    def pulses(self, box: BoxHost) -> list[dict]:
+        """The host box's simple-output bursts: "PULSE g46 t=.. width=.. frames=.. until=..[ flush]"."""
+        out = []
+        for line in list(box.lines):
+            if line.startswith("PULSE "):
+                words = line.split()
+                burst = {k: int(v) for k, v in (w.split("=") for w in words[2:] if "=" in w)}
+                burst["gpio"] = int(words[1][1:])
+                burst["flush"] = words[-1] == "flush"
+                out.append(burst)
+        return out
+
+    def test_a_box_with_a_simple_output(self):
+        """The simple output (draft RFC "The expansion port", increment 2): the host box runs the
+        firmware's output layer and burst scheduler, printing the pulse train. Off at boot (0.5 s of
+        1.0 ms, then the pin low), HELLO lists `output`, node.modules reaches the controller once
+        the HELLO is acknowledged, a running game keeps a live "off" renewed every 200 ms with never
+        more than 0.5 s queued (so a killed box's switch loses its signal within 0.5 s), the end
+        lets the signal go, and the admin's test works only between games."""
+        box = self.box("alpha", "--simple-out", "siren")
+        # Boot: one burst of 25 frames of 1.0 ms, then the pin low.
+        self.assertTrue(wait_for(lambda: box.logged("PIN g46 low"), 3), box.lines[-5:])
+        boot = self.pulses(box)
+        self.assertEqual([(b["gpio"], b["width"], b["frames"]) for b in boot], [(46, 1000, 25)])
+
+        gid = self.game()
+        nid = self.join(box)
+        self.assertTrue(wait_for(lambda: self.node(nid).get("fw_version") == "host", 5))
+        self.assertIn(11, self.node(nid)["capabilities"])  # output (protocol/schema/capabilities.yaml)
+        self.assertTrue(wait_for(lambda: "node.modules" in self.log_types(gid, nid), 6), box.lines[-8:])
+        mods = [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+                if e["type"] == "node.modules"]
+        self.assertEqual(mods[0]["data"], {"modules": "g46:servo:siren"})
+        # Joined, not started: no pulses yet.
+        self.assertEqual(len(self.pulses(box)), 1)
+        # Not during a game: the admin's settings and test are refused.
+        box.send("@output 1 test 1234")
+        self.assertTrue(wait_for(lambda: box.logged("output 1: not during a game"), 3))
+
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        self.assertTrue(wait_for(lambda: len(self.pulses(box)) >= 8, 5))
+        live = self.pulses(box)[1:]
+        self.assertTrue(all(b["width"] == 1000 for b in live))  # a live "off"
+        self.assertEqual(live[0]["frames"], 25)
+        for b in live:
+            self.assertLessEqual(b["until"] - b["t"], 500)  # never more than 0.5 s queued
+        st = box.status()
+        self.assertEqual(st["outputs"][0]["id"], "siren")
+        self.assertTrue(st["outputs"][0]["enabled"] and st["outputs"][0]["pulsing"])
+
+        # The end: the signal ends (0.5 s of 1.0 ms at most), the pin goes low.
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 0, 10), box.lines[-8:])
+        self.assertTrue(wait_for(lambda: not box.status()["outputs"][0]["pulsing"], 3))
+        last = self.pulses(box)[-1]
+        self.assertLessEqual(last["until"] - last["t"], 500)
+
+        # Not during the end's 10 s grace (an end-of-game horn may still sound then).
+        box.send("@output 1 test 1234")
+        self.assertTrue(wait_for(lambda: box.logged("output 1: refused (no game running)"), 3))
+        # Between games, after the grace, the admin's 1 s test: 2.0 ms pulses, then the signal ends.
+        time.sleep(10.5)
+        before = len(self.pulses(box))
+        box.send("@output 1 test 1234")
+        self.assertTrue(wait_for(lambda: any(b["width"] == 2000 for b in self.pulses(box)[before:]), 3),
+                        box.lines[-8:])
+        self.assertTrue(wait_for(lambda: self.pulses(box)[-1]["width"] == 1000, 3))
+        # A wrong PIN changes nothing.
+        box.send("@output 1 disable 9999")
+        self.assertTrue(wait_for(lambda: box.logged("LOG refused: admin PIN"), 3), box.lines[-5:])
+        self.assertTrue(box.status()["outputs"][0]["enabled"])
+
+        # A battery pull mid-game: the last burst queued ends at most 0.5 s after it was sent.
+        gid = self.game()
+        self.join(box)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        time.sleep(0.5)
+        box.kill()
+        last = self.pulses(box)[-1]
+        self.assertLessEqual(last["until"] - last["t"], 500)
+
     def play_and_end(self, box: BoxHost, epoch: int) -> None:
         """One game with the box: it joins, each side hears the other (the controller registers the
         HELLO, the box gets its ACK), it starts and ends, and the box is free again."""

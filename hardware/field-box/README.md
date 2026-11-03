@@ -74,6 +74,7 @@ to check, alternatives and what to avoid.
 | NFC reader | PN532 breakout (I2C mode) | Addr 0x24; shares the board I2C bus |
 | Audio amp | MAX98357A I2S breakout + 4-8 ohm 3 W speaker | Optional; drop to free 3 GPIOs |
 | Piezo buzzer | Passive piezo element + 220 ohm (or an NPN stage for more volume) | Optional, with or without the amp; firmware option `CONFIG_ATALAIA_BUZZER` on GPIO 45 (decisions BZR-1 to BZR-8). Not yet built on hardware: [BUILD.md section 9.7](BUILD.md#97-audio-optional) |
+| Simple output | RC relay switch that opens on signal loss, M8 3-pin socket and cable (up to 2 m), 10 kohm and 330 ohm; on the load's side a fuse and a 5 V regulator | Optional, one or two: a siren, strobe, light or smoke remote (low-voltage loads only), firmware option `CONFIG_ATALAIA_SIMPLE_OUT` on GPIO 46 (V4.3) or 5 (V4.2), through the 74AHCT125's spare gate 2 (draft RFC "The expansion port", EXP-31 to EXP-37). Not yet built on hardware: [BUILD.md section 9.10](BUILD.md#910-simple-output-optional) |
 | Battery | 1S Li-ion: 2 x protected 18650 in parallel (or a 1S2P pack with BMS), 3.0-4.2 V | **One cell in series only.** The board's battery socket, its charger and the MAX17048 are single-cell parts: a 2S (7.4 V) pack destroys them. The kit's 3000 mAh LiPo is also 1S and can serve a first prototype (BUILD.md, section 7) |
 | Battery gauge | MAX17048 I2C breakout | Addr 0x36; shares the board I2C bus. The firmware reads battery level only from this gauge (not from the board's own ADC divider) |
 | 5 V supply | Boost converter, 3.0-4.2 V in, 5 V at 2.5 A or more out | Feeds the LED ring, the amplifier and the button LEDs |
@@ -103,7 +104,10 @@ box then takes no console input on UART0; the USB console is unaffected).
 The ESP32-S3R2 has 8 GPIOs free of any board part (3, 4, 6, 15, 16, 33, 47,
 48) for 12 signals, hence these and button 4 on the keypad expander
 (decisions PIN-1 to PIN-5 in `docs/review/decisions-to-review.md`). The optional piezo buzzer
-takes GPIO 45, a strapping pin its circuit keeps low (decision BZR-1).
+takes GPIO 45, a strapping pin its circuit keeps low (decision BZR-1). The optional
+simple output takes the board revision's free front-end pin, GPIO 46 on a V4.3 or 5
+on a V4.2 (and, without the buzzer, a second one GPIO 45), through the level shifter's
+spare gate (EXP-34).
 
 ### SX1262 Radio Pins (Board-Internal)
 
@@ -146,6 +150,7 @@ takes GPIO 45, a strapping pin its circuit keeps low (decision BZR-1).
 | I2S BCLK       | 6    | MAX98357A |
 | I2S LRCLK      | 15   | |
 | I2S DOUT       | 16   | |
+| Simple output  | 46 (V4.3), 5 (V4.2) | Optional (`ATALAIA_SIMPLE_OUT_PIN`, only with `CONFIG_ATALAIA_SIMPLE_OUT=y`): to the 74AHCT125's gate 2 with 10 kohm to GND, then 330 ohm to an M8 socket. A second one on 45 without the buzzer (`ATALAIA_SIMPLE_OUT2_PIN`) |
 | Piezo buzzer   | 45   | Optional (`ATALAIA_BUZZER_PIN`, only with `CONFIG_ATALAIA_BUZZER=y`). The VDD_SPI strapping pin: the buzzer's circuit keeps it low at reset |
 | GNSS power     | 34   | Board-internal (VGNSS_Ctrl, low = on). The firmware drives it high (module off) at boot |
 | GNSS TX        | 38   | Board-internal: the ESP32's UART TX to the module's RX |

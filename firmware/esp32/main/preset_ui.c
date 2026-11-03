@@ -9,10 +9,11 @@
 
 #include "box_text.h"
 
-/* Entries of the list: the games, then "Wi-Fi setup" and "Adopt to another field" when on. */
+/* Entries of the list: the games, then "Wi-Fi setup", "Adopt to another field" and "Outputs"
+ * when on. */
 static int extra_count(const preset_ui_t *ui)
 {
-    return (ui->setup_entry ? 1 : 0) + (ui->adopt_entry ? 1 : 0);
+    return (ui->setup_entry ? 1 : 0) + (ui->adopt_entry ? 1 : 0) + (ui->outputs_entry ? 1 : 0);
 }
 
 static int entry_count(const preset_ui_t *ui)
@@ -33,6 +34,21 @@ static bool adopt_selected(const preset_ui_t *ui)
            ui->selected_preset == ui->preset_count + (ui->setup_entry ? 1 : 0) + 1;
 }
 
+/* Is the selected entry "Outputs"? */
+static bool outputs_selected(const preset_ui_t *ui)
+{
+    return ui->outputs_entry && ui->selected_preset == entry_count(ui);
+}
+
+/* The label of extra entry k (0: the first after the games). */
+static const char *extra_label(const preset_ui_t *ui, int k)
+{
+    if (ui->setup_entry && k-- == 0) return box_text(TX_SETUP_ITEM);
+    if (ui->adopt_entry && k-- == 0) return box_text(TX_ADOPT_ITEM);
+    if (ui->outputs_entry && k == 0) return box_text(TX_OUTPUTS_ITEM);
+    return "";
+}
+
 /* Pages of the preset list (at least one, which may be empty). */
 static int page_count(const preset_ui_t *ui)
 {
@@ -49,6 +65,11 @@ void preset_ui_enable_setup(preset_ui_t *ui, bool on)
 void preset_ui_enable_adopt(preset_ui_t *ui, bool on)
 {
     ui->adopt_entry = on;
+}
+
+void preset_ui_enable_outputs(preset_ui_t *ui, bool on)
+{
+    ui->outputs_entry = on;
 }
 
 void preset_ui_init(preset_ui_t *ui, const char *admin_pin, int preset_count)
@@ -136,9 +157,10 @@ bool preset_ui_handle_key(preset_ui_t *ui, char key)
             return true;
         }
         if (key == '#') {
-            ui->state = setup_selected(ui)   ? PRESET_UI_STATE_SETUP_CONFIRM
-                        : adopt_selected(ui) ? PRESET_UI_STATE_ADOPT_CONFIRM
-                                             : PRESET_UI_STATE_TIMER_ADJUST;
+            ui->state = setup_selected(ui)     ? PRESET_UI_STATE_SETUP_CONFIRM
+                        : adopt_selected(ui)   ? PRESET_UI_STATE_ADOPT_CONFIRM
+                        : outputs_selected(ui) ? PRESET_UI_STATE_OUTPUTS_REQUESTED
+                                               : PRESET_UI_STATE_TIMER_ADJUST;
             return true;
         }
         if (key == '*') {
@@ -209,7 +231,8 @@ bool preset_ui_handle_key(preset_ui_t *ui, char key)
 
     case PRESET_UI_STATE_GAME_STARTED:
     case PRESET_UI_STATE_SETUP_REQUESTED:
-    case PRESET_UI_STATE_ADOPT_REQUESTED: return false;
+    case PRESET_UI_STATE_ADOPT_REQUESTED:
+    case PRESET_UI_STATE_OUTPUTS_REQUESTED: return false;
     }
 
     return false;
@@ -278,11 +301,9 @@ bool preset_ui_screen(const preset_ui_t *ui, const char *const *labels, int labe
         if (n > PRESET_UI_PAGE_SIZE) n = PRESET_UI_PAGE_SIZE;
         for (int i = 0; i < n && pos + 48 < sz; i++) {
             int at = first + i;
-            const char *label =
-                at >= label_count ? (ui->setup_entry && at == label_count ? box_text(TX_SETUP_ITEM)
-                                                                          : box_text(TX_ADOPT_ITEM))
-                : labels && labels[at] ? labels[at]
-                                       : "";
+            const char *label = at >= label_count      ? extra_label(ui, at - label_count)
+                                : labels && labels[at] ? labels[at]
+                                                       : "";
             if (i > 0) data[pos++] = ',';
             data[pos++] = '"';
             pos = json_append_escaped(data, pos, sz - 40, label);
@@ -328,7 +349,8 @@ bool preset_ui_screen(const preset_ui_t *ui, const char *const *labels, int labe
 
     case PRESET_UI_STATE_GAME_STARTED:
     case PRESET_UI_STATE_SETUP_REQUESTED:
-    case PRESET_UI_STATE_ADOPT_REQUESTED: return false;
+    case PRESET_UI_STATE_ADOPT_REQUESTED:
+    case PRESET_UI_STATE_OUTPUTS_REQUESTED: return false;
     }
 
     snprintf(out->template_name, sizeof(out->template_name), "%s", tmpl);

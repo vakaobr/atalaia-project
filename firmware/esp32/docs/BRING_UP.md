@@ -282,6 +282,52 @@ firmware no longer reads a button there.
    that the board still boots from cold with the buzzer fitted (power
    off for 10 s, then on).
 
+## Step 8b: Simple output (RC relay switch)
+
+Only in a build with the simple output (`python tools/docker_fw.py bench --simple-out=on`,
+`CONFIG_ATALAIA_SIMPLE_OUT=y`; draft RFC "The expansion port", decisions EXP-31 to EXP-37; not yet
+tried on hardware). A bare board and one RC relay switch are enough. **Board 5** (the bench board
+whose GPIO 4 is dead and whose 33 and 47 are doubtful; its `b5-bench.patch` turns I2S off): build
+with `--simple-out=15`, GPIO 15 standing in for 46. On the bench the GPIO may drive the switch's
+signal input directly when the switch takes 3.3 V (most do; in a box it goes through the
+74AHCT125's gate 2, Field Box manual section 9.10), with the **10 kohm to GND** at the pin either
+way. The switch's + and GND from a 5 V bench supply, never from the board's 3V3 or 5 V pins; a
+lamp or an LED with its resistor on the relay contacts shows its state. Before power: the GPIO
+reads 10 kohm to GND.
+
+1. **Boot and enable.** The boot log says `output 1 on GPIO 15: out.1, disabled (the admin
+   enables it at the box)`, then `1 simple output(s): RMT bursts of 25 frames, renewed every
+   200 ms`. On a scope or a logic analyser the pin shows **0.5 s of 1.0 ms pulses at 50 Hz, then
+   stays low** (the boot's off). Enable it on the console: `@output 1 enable` (a bench build takes
+   it without the admin PIN; a release build wants it as the last word), `@output 1 function
+   siren`, `@outputs` (expected: `output 1 GPIO 15: siren, enabled, at most 30 s, off`). The
+   same settings are in the picker's last entry, **Outputs** (admin PIN, then `1` on/off, `2`
+   the function, `3` the time, `5` the test).
+2. **Test 11 of the RFC, each RC switch before its first game.** Between games, `@output 1 test`
+   switches it on for 1 s: 2.0 ms pulses close the relay, the 1.0 ms that follow open it, then
+   the pin goes low. If the relay does the opposite, set the switch's reverse jumper (or learn
+   its threshold again with its own button). Then start a game from the picker (any mode, a long
+   timer) and, with the relay closed by the test of step 3 below, pull the signal wire: **the
+   relay must open within a second**. A switch that keeps its relay closed when the signal goes
+   is never used (EXP-37): note its make and batch.
+3. **Switching in a game.** In a game the pin carries 1.0 ms pulses all the time (a live "off").
+   A mode that calls `cap("siren"):pulse(ms)` (none of the built-in modes does yet; a field's CMD
+   12 does once the controllers send it) closes the relay for that long; the log says
+   `output siren: pulse for ... ms (script)`. Pause the game: the relay opens at once and stays
+   open after the resume. End it: it opens, and an end-of-game pulse from the mode still sounds
+   for up to 10 s.
+4. **Test 12, the fail-safe.** With the relay closed (a pulse of 60 s in a game): type `@hang`
+   (bench builds only: the game task stops for good, as a hung task would): **the relay opens
+   within about a second** (0.5 s for the last burst, then the switch's own signal-loss time).
+   Reset the board (its button) with the relay closed: it opens. Pull the board's power with the
+   relay closed: it opens. Then power the board off and on **20 times** with the switch powered
+   and the relay's lamp in view (on video): **the relay never clicks while the board boots**.
+5. **Test 13, the signal at the far end.** In the box (through the 74AHCT125 and the 330 ohm)
+   with 2 m of 3-core cable to the switch, next to a 12 V siren switching on and off: on a scope
+   at the switch's end, clean 5 V pulses, **widths within 50 µs** of 1.0 and 2.0 ms.
+6. **Record** the switch models, their signal-loss times and the scope captures (photos) in
+   `docs/review/decisions-to-review.md` under EXP-37.
+
 ## Step 9: Battery
 
 1. The firmware reads the battery from the MAX17048 gauge (I2C, address

@@ -172,6 +172,19 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
         return true;
     }
     if (strcmp(t, "start_confirm") == 0) {
+        if (screen_json_has(data, "output")) { /* the picker's "Outputs": one output's settings */
+            long n = 1, gpio = -1;
+            char fn[32];
+            screen_json_int(data, "output", &n);
+            screen_json_int(data, "gpio", &gpio);
+            snprintf(out->head, sizeof(out->head), box_text(TXO_OUTPUT), (int)n, (int)gpio);
+            set_text(out->head_right, sizeof(out->head_right),
+                     screen_json_true(data, "enabled") ? TXO_OUT_ON : TXO_OUT_OFF);
+            screen_json_str(data, "fn", fn, sizeof(fn));
+            set(out->big, sizeof(out->big), fn);
+            set_text(out->foot, sizeof(out->foot), TXO_OUT_KEYS);
+            return true;
+        }
         if (screen_json_true(data, "setup")) { /* the picker's "Wi-Fi setup" entry asks first */
             set_text(out->head, sizeof(out->head), TXO_WIFI_SETUP);
             set_text(out->big, sizeof(out->big), TXO_SETUP_Q);
