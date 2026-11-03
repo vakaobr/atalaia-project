@@ -429,6 +429,9 @@ class Director:
         for i, p in enumerate(players):
             body = {"game_id": gid, "player_id": p.pid, "player_secret": p.secret, "display_name": p.name,
                     "notice_version": notice,
+                    # Position sharing is the player's own opt-in at check-in (LEG-1 to LEG-19, `share_position`,
+                    # off by default): the made-up players opt in, or the controller refuses every position they send.
+                    "share_position": True,
                     "replicas": [{"declaration_id": str(uuid.uuid4()), "replica_id": p.replica_id, "type": "aeg",
                                   "class": "rifle"}]}
             out = self.api.call("POST", "/api/v1/checkin", body, token="x")  # the check-in needs no token
