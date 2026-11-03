@@ -159,6 +159,14 @@ def load_schema() -> dict[str, Any]:
         require(isinstance(desc, dict) and all(FIELD_NAME.match(k) and k not in ("id", "type") for k in desc),
                 f"capability type {name}: descriptor keys are lower_snake_case, never id or type")
     unique_ints({k: v["id"] for k, v in cap_types.items()}, "capability type", 1, 255)
+    cap_role_names = caps.get("role_names", {})
+    for name, r in cap_role_names.items():
+        require(FIELD_NAME.match(name) is not None and name not in cap_types,
+                f"capability role name {name}: lower_snake_case, not a type's name")
+        met_by = r.get("met_by")
+        require(isinstance(met_by, list) and met_by and all(t in cap_types for t in met_by),
+                f"capability role name {name}: met_by lists one or more types")
+        require(isinstance(r.get("doc"), str) and r["doc"] != "", f"capability role name {name}: needs a doc")
 
     # ---- payload field definitions ----
     msg_names = {m["name"] for m in messages}
@@ -208,6 +216,7 @@ def load_schema() -> dict[str, Any]:
         "fields": fields,
         "events": events,
         "cap_types": cap_types,
+        "cap_role_names": cap_role_names,
     }
 
 
@@ -611,6 +620,10 @@ def gen_python(s: dict[str, Any]) -> str:
           "CAPABILITY_TYPES = {"]
     L += [f"    {lit(k)}: CapabilityType({v['id']}, {bool(v.get('reserved'))}),"
           for k, v in s["cap_types"].items()]
+    L += ["}", "",
+          "# Role names a mode's requires:/optional: may use besides the types, and the types that meet them.",
+          "CAPABILITY_ROLE_NAMES = {"]
+    L += [f"    {lit(k)}: {tuple(v['met_by'])!r}," for k, v in s["cap_role_names"].items()]
     L += ["}", ""]
     if s.get("payloads"):
         L += ["PAYLOAD_FIELDS = {"]
@@ -649,6 +662,11 @@ def gen_dart_capabilities(s: dict[str, Any]) -> str:
     line = f"const reservedCapabilityTypes = <String>{{{reserved}}};"
     require(len(line) <= 80, "reserved capability types: the Dart line is too long for dart format; split it")
     L += [line, "",
+          "/// Role names a mode's requires: and optional: may use besides the types,",
+          "/// and the types that meet them (a node with any of them has it).",
+          "const capabilityRoleNames = <String, List<String>>{"]
+    L += [f"  {q(k)}: [{', '.join(q(t) for t in v['met_by'])}]," for k, v in s["cap_role_names"].items()]
+    L += ["};", "",
           "/// The type name of a capability id; null for an id this app does not know",
           "/// (a newer node's type: ignored, never an error).",
           "String? capabilityTypeName(int id) {",

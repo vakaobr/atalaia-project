@@ -208,6 +208,12 @@ CAPABILITY_TYPES = {
     'contact': CapabilityType(14, True),
 }
 
+# Role names a mode's requires:/optional: may use besides the types, and the types that meet them.
+CAPABILITY_ROLE_NAMES = {
+    'team_input': ('button', 'keypad', 'nfc'),
+    'team_display': ('led', 'display'),
+}
+
 PAYLOAD_FIELDS = {
     'HELLO': {
         'node_name': PayloadField(1, 'text', True, 24),

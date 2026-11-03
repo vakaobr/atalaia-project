@@ -15,7 +15,8 @@
 ///   when something changed and every 30 s anyway; never a position, a
 ///   token, a key or a check-in; sent only with `remote_gm` on;
 /// - `command` from the site server (start, pause, resume, end, a GM
-///   message, a declared mode command; nothing else), each checked with the
+///   message, a declared mode command, every output off (never one on:
+///   EXP-27); nothing else), each checked with the
 ///   shared format, refused for another game, one sent more than 60 s ago
 ///   by the site server's clock, one already had (by its id) and any while
 ///   `remote_gm` is off, else carried out through the engine as the
@@ -614,6 +615,16 @@ class RemoteGm {
 
   static String _cap(String s) => s.length > 200 ? s.substring(0, 200) : s;
 
+  /// What a refused start lacks, for `command.result`'s `missing`: the roles
+  /// with no joined node, then each joined box without a capability its role
+  /// requires as "`<box>: <capability>`" (EXP-21), each cut to [roleMax]
+  /// characters (remote_gm.py `_missing`).
+  static List<String> _missing(Map<Object?, Object?> check) => [
+    for (final r in (check['missing'] as List? ?? const [])) '$r',
+    for (final c in (check['missing_caps'] as List? ?? const []))
+      if (c is Map) '${c['name']}: ${c['capability']}',
+  ].map((m) => m.length > roleMax ? m.substring(0, roleMax) : m).toList();
+
   /// `(code, detail, missing)`: `missing` names the roles without a joined
   /// node when a start was refused for that (the console's `start_check`).
   (String, String?, List<String>?) _carryOut(Map<String, Object?> cmd) {
@@ -635,7 +646,7 @@ class RemoteGm {
         case 'start':
           final force = params['force'] == true;
           if (force) {
-            forced = (engine.startCheck()['missing']! as List).cast<String>();
+            forced = _missing(engine.startCheck());
           }
           out = engine.startGame(gid, force: force);
         case 'pause':
@@ -649,6 +660,9 @@ class RemoteGm {
             'text': params['text'],
           });
           return ('done', 'sent to every node (seq ${sent['seq']})', null);
+        case 'outputs_off':
+          final sent = engine.outputsOff(gid);
+          return ('done', 'every output off (seq ${sent['seq']})', null);
         default:
           final sent = engine.sendNodeCmd(params['node'], 'mode', {
             'name': params['name'],
@@ -680,10 +694,7 @@ class RemoteGm {
       };
       final check = e.extra['start_check'];
       final missing = code == 'conflict' && check is Map
-          ? [
-              for (final r in (check['missing'] as List? ?? const []))
-                '$r'.length > roleMax ? '$r'.substring(0, roleMax) : '$r',
-            ].take(missingMax).toList()
+          ? _missing(check).take(missingMax).toList()
           : null;
       return (code, _cap(e.message), missing);
     } on Object {

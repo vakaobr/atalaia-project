@@ -364,6 +364,7 @@ With a site server, **From the schedule** lists the games published for the comi
 3. If some declared replicas are not chronographed, it says **n declared replicas not chronographed yet** (**1 declared replica not chronographed yet** for one).
 4. Tap **Start**. It asks **Start the game now?**. Tap **Yes**.
 5. If a role has no box, the button says **Start anyway** and asks **Start anyway?**. Starting anyway is logged and every console is told: **Game started without a box for:** *roles*.
+   A box that has joined but lacks something its role needs (for example a box with no team buttons, keypad or NFC reader as a zone) does the same: the console says **A box lacks what its role needs:** *box (role): what*, and the button says **Start anyway**. Something the role only uses if it is there shows as a note (*box (role) has no audio: the mode does without it*). Boxes with older firmware do not say what they have, so they are never checked. A box's **simple output** (a siren on an RC switch) shows as **siren on box-4: not checked (simple output)**: the box cannot tell what is plugged in, so look at it before the game.
 6. In the **Boxes for this game** dialog, **Start game** asks **Review the game's other settings first?**. **Review settings** closes the dialog and opens **Game settings**. **Start now** starts the game. **Back** goes back.
 
 **Remote start.** If the field uses a site server with the **remote GM** turned on, a GM logged in there can start, pause, resume and end the live game from the site's **Remote GM** page. Choose the controller, tap **Start**. If a role has no box it asks **No box (or linked phone) has joined for: …. Start anyway?**. This is the same check as the console's **Start anyway**. The controller opens the connection. See [section 12](#12-the-site-server-and-hosted-mode-briefly).
@@ -382,9 +383,21 @@ A standby controller cannot start a game. It says **This controller is not in ch
 - **Game settings**: the settings you used, read-only.
 - **Score**: each team's total, with a graph. A box's points arrive with its status, so they can lag by up to about 15 seconds. Next to a total the console may show a smaller *estimated* number: between two reports of a holding box, it adds the points the box has made since, and it follows a capture the box has reported until the box's next status. Only the number without *estimated* is the official score.
 
+### Outputs
+
+**Outputs** on the **Game** tab lists the outputs of the game's boxes: a siren, a strobe or a smoke machine on a box's simple output (marked **not checked**). Outputs are enabled at the box, with the admin PIN (see the Field Box manual); a box with none enabled is not listed.
+
+- Type the **Seconds** (5 by default, up to 600) and tap **On for 5 s**. It asks **Turn siren on box-4 on for 5 s? Check that nobody is right next to it.** Tap **Yes**. The output turns off by itself after that time (or the box's own longest time, whichever is shorter). This works only while the game runs.
+- **Off** turns it off at once, with no question.
+- **All outputs off** turns every output of the game off at once.
+- A box takes a new start at most every 2 seconds (the radio is shared): a second tap sooner says **an output of box-4 was switched less than 2 s ago**. **Off** is never held back.
+- The **Log** shows what each output did, and who switched it: **box 4: siren on for 5 s (the game master)**. While it is on, the output shows **on**.
+
+The boxes also turn their outputs off on their own when the game is paused or ends. A GM on the site server's **Remote GM** page can only turn every output off, never one on.
+
 ### The Boxes tab
 
-Each box shows its **No.**, **Name**, **Role**, **Owner** (team), **Tier**, **Battery** (with **low** below 20%), **Signal**, **Last heard**, **Firmware** and **Epoch**. A box that has not been heard shows **not heard**. You can change a box's owner team with the drop-down. Some modes add buttons, for example a medic kit's refill.
+Each box shows its **No.**, **Name** (with a chip for each module or output the box has, for example **siren · not checked**), **Role**, **Owner** (team), **Tier**, **Battery** (with **low** below 20%), **Signal**, **Last heard**, **Firmware** and **Epoch**. A box that has not been heard shows **not heard**. You can change a box's owner team with the drop-down. Some modes add buttons, for example a medic kit's refill.
 
 ### The Log tab
 

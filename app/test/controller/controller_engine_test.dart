@@ -50,9 +50,34 @@ end)
 ''',
 };
 
+/// field.send(node, "output", {...}) (draft RFC "The expansion port",
+/// EXP-23), as controller/tests/test_engine.py's
+/// test_field_lua_switches_an_output.
+const _sirenMode = {
+  'mode.yaml':
+      'id: org.test.siren\nversion: 0.1.0\nname: Siren\n'
+      'roles:\n  zone: { requires: [team_input], optional: [output] }\n',
+  'node.lua': 'on("game.start", function() end)\n',
+  'field.lua': '''
+on("zone.captured", function(ev)
+  local n = ev.node
+  sent = {
+    field.send(n, "output", { capability = "siren", act = "pulse", ms = 10000, src = "gm" }),
+    field.send(n, "output", { capability = "siren", act = "pulse", ms = 10000 }),
+    field.send(n, "output", { capability = "siren", act = "off" }),
+    field.send(n, "output", { capability = "siren", act = "on" }),
+    field.send(65535, "output", { capability = "*", act = "pulse", ms = 100 }),
+    field.send(65535, "output", { capability = "*", act = "off" }),
+  }
+  emit("x.atalaia.sent", { a = sent[1], b = sent[2], c = sent[3], d = sent[4], e = sent[5], f = sent[6] })
+end)
+''',
+};
+
 ModeCatalog catalog() => ModeCatalog([
   for (final e in builtinModeFiles.entries) ModeManifest.parse(e.key, e.value),
   ModeManifest.parse('fieldops', _fieldOpsMode),
+  ModeManifest.parse('siren', _sirenMode),
 ]);
 
 void main() {
@@ -188,6 +213,58 @@ void main() {
     });
     expect(engine.liveGame, isNull);
     expect(engine.gameKey, isEmpty);
+    engine.close();
+  });
+
+  test('field.lua switches an output: src field, checked, rate limited', () {
+    final radio = RecordingRadio();
+    final engine = ControllerEngine(
+      core: core,
+      modes: catalog(),
+      transport: radio,
+      clockMs: () => 0,
+    );
+    final game = engine.createGame({
+      'name': 'siren',
+      'mode_id': 'org.test.siren',
+      'assignments': {'4': 'zone'},
+    });
+    final id = game['id']! as int;
+    engine.startGame(id, force: true);
+    radio.sent.clear();
+    final captured = core.encodeEvent(
+      node: 4,
+      seq: 1,
+      tMs: 100,
+      type: 'zone.captured',
+      team: 1,
+      squad: 0,
+      prio: 2,
+      dataJson: null,
+    );
+    engine.onPacket(hdr(id, 4, 1, RfType.event), captured.bytes!, epoch: 1);
+    final sent = engine
+        .log(id)
+        .firstWhere((e) => e['type'] == 'x.atalaia.sent');
+    expect(sent['data'], {
+      'a': true,
+      'b': false,
+      'c': true,
+      'd': false,
+      'e': false,
+      'f': true,
+    });
+    final cmds = [
+      for (final (t, p) in radio.sent)
+        if (t == RfType.cmd) RfCmd.decode(p),
+    ];
+    expect(cmds.map((c) => c.cmd), [12, 12, 12]);
+    expect(cmds.map((c) => c.dest), [4, 4, null]);
+    expect(cmds.map((c) => c.params), [
+      {'capability': 'siren', 'act': 'pulse', 'ms': 10000, 'src': 'field'},
+      {'capability': 'siren', 'act': 'off', 'src': 'field'},
+      {'capability': '*', 'act': 'off', 'src': 'field'},
+    ]);
     engine.close();
   });
 

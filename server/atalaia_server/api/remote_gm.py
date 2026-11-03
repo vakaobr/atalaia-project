@@ -15,7 +15,7 @@ Who may: a user with the ``gm`` role on that field, in a session that passed
 the TOTP step (``gm`` counts only then, ADR-P4-2); not the field's admin, not a
 per-game gm and not a server administrator unless they also hold ``gm`` on the
 field. What: only ``sync_format.REMOTE_COMMANDS`` (start, pause, resume, end,
-a GM message, a declared mode command), each checked here with the same
+a GM message, a declared mode command, every output off: never one on), each checked here with the same
 function the controller checks it with again. Where: only to a controller that
 opened its stream with ``[sync] remote_gm = true``; the site server never
 connects to a controller. At most 30 commands a minute per account. Every

@@ -38,6 +38,11 @@ which browsers cannot give headers, takes it in the ``Sec-WebSocket-Protocol`` h
     GET  /api/v1/games/{id}/score          current totals
     POST /api/v1/games/{id}/score          GM adjustment, logged as score.delta
     POST /api/v1/nodes/{id}/cmd            a command to one node (65535: all)
+    POST /api/v1/games/{id}/nodes/{node}/output   GM: switch one output of a box (CMD 12, src gm): {"capability",
+                                           "act": "on"|"off"|"pulse"|"pattern", "ms"?, "on_ms"?, "off_ms"?}; on,
+                                           pulse and pattern only while the game runs (ms 5000 when not given),
+                                           one a box every 2 s (429); draft RFC "The expansion port", EXP-27
+    POST /api/v1/games/{id}/outputs/off    GM: every output of the live game off now (CMD 12 to every node)
     GET  /api/v1/games/{id}/log            the merged event log
     WS   /api/v1/stream                    live events, scores, nodes and alerts
     GET  /api/v1/controller                controller and radio status
@@ -670,6 +675,14 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     def node_cmd(node_id: int, body: Any = Body(None)) -> dict[str, Any]:
         spec = body_map(body)
         return controller.send_node_cmd(node_id, spec.get("cmd"), spec.get("params"))
+
+    @app.post("/api/v1/games/{game_id}/nodes/{node_id}/output", status_code=202, dependencies=[Depends(require_gm)])
+    def node_output(game_id: int, node_id: int, body: Any = Body(None)) -> dict[str, Any]:
+        return controller.send_output(game_id, node_id, body_map(body))
+
+    @app.post("/api/v1/games/{game_id}/outputs/off", status_code=202, dependencies=[Depends(require_gm)])
+    def outputs_off(game_id: int) -> dict[str, Any]:
+        return controller.outputs_off(game_id)
 
     @app.get("/api/v1/games/{game_id}/log")
     def game_log(game_id: int, since_ms: Optional[int] = None,

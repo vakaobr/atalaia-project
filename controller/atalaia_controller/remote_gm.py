@@ -15,8 +15,9 @@ socket carries, as protocol/sync.md describes:
   every 30 s anyway. Never a position, a token, a key or a check-in.
 - ``command`` from the site server, for a user it authenticated with the ``gm``
   role on this field (in a TOTP session). Only ``start``, ``pause``, ``resume``,
-  ``end``, ``message`` (a GM message to every node) and ``mode`` (one of the
-  game's declared mode commands) exist; ``start`` takes an optional ``force``
+  ``end``, ``message`` (a GM message to every node), ``mode`` (one of the
+  game's declared mode commands) and ``outputs_off`` (every output of the game
+  off: a remote GM never switches one on, draft RFC "The expansion port", EXP-27) exist; ``start`` takes an optional ``force``
   (the console's "Start anyway", decision RG-1); the controller checks each with the
   shared ``sync_format.check_command``, refuses one for another game than its
   live one, one sent more than 60 s ago (by the site server's clock), one it
@@ -94,6 +95,15 @@ def _positions_digest(body: dict[str, Any]) -> str:
     """What changed in a ``positions`` body, without the ages (they change every second)."""
     rows = [{k: v for k, v in item.items() if k != "age_s"} for item in body["positions"]]
     return json.dumps([body["game"], rows], sort_keys=True)
+
+
+def _missing(check: dict[str, Any]) -> list[str]:
+    """What a refused start lacks, for ``command.result``'s ``missing``: the roles with no joined node, then
+    each joined box without a capability its role requires, as "<box>: <capability>" (draft RFC "The
+    expansion port", EXP-21), each cut to ROLE_MAX characters."""
+    out = [str(r) for r in check.get("missing", [])]
+    out += [f"{c.get('name')}: {c.get('capability')}" for c in check.get("missing_caps", [])]
+    return [m[:ROLE_MAX] for m in out]
 
 
 def stream_url(sync_url: str) -> str:
@@ -351,7 +361,7 @@ class RemoteGm:
             if what == "start":
                 force = params.get("force") is True
                 if force:
-                    forced = list(ctrl.start_check()["missing"])
+                    forced = _missing(ctrl.start_check())
                 out = ctrl.start_game(gid, force=force)
             elif what == "pause":
                 out = ctrl.pause_game(gid, params.get("reason", ""))
@@ -362,13 +372,16 @@ class RemoteGm:
             elif what == "message":
                 sent = ctrl.send_node_cmd(BROADCAST, "message", {"text": params["text"]})
                 return "done", f"sent to every node (seq {sent['seq']})", None
+            elif what == "outputs_off":
+                sent = ctrl.outputs_off(gid)
+                return "done", f"every output off (seq {sent['seq']})", None
             else:
                 sent = ctrl.send_node_cmd(params["node"], "mode", {"name": params["name"]})
                 return "done", f"sent to node {sent['node']} (seq {sent['seq']})", None
         except NotFound as exc:
             return "not_found", str(exc)[:200], None
         except StartBlocked as exc:
-            missing = [str(r)[:ROLE_MAX] for r in exc.check.get("missing", [])][:MISSING_MAX]
+            missing = _missing(exc.check)[:MISSING_MAX]
             return "conflict", str(exc)[:200], missing or None
         except Conflict as exc:
             return "conflict", str(exc)[:200], None

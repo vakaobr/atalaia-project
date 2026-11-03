@@ -10,7 +10,7 @@ import { GlyphWarning } from './box-glyphs.js';
 import { isTyping } from './poster-prompt.js';
 import { FirstSetupNotice, mhz } from './radio-settings.js';
 import { TeamFields, TeamsEditor, teamInfoBody } from './branding-settings.js';
-import { BoxInvites, StartCheck } from './box-invites.js';
+import { BoxInvites, StartCheck, missingCapsText } from './box-invites.js';
 import {
     ParamFields, ModifierPicker, initialValues, mainModes, partsOf, schemaOf, modeName,
 } from './preset-builder.js';
@@ -319,14 +319,18 @@ export class GameControl extends Component {
     /** Start, or Start anyway when a role has no joined node yet (decision RJ-1). */
     renderStart(game, pending, leading) {
         const missing = (game.start_check && game.start_check.missing) || [];
+        const caps = (game.start_check && game.start_check.missing_caps) || [];
         const roles = missing.join(', ');
         let question = pending ? t('game.confirm_start_pending', { n: pending }) : t('game.confirm_start');
-        if (missing.length) {
-            question = `${t('game.missing_short', { roles })} ${pending ? question : t('game.confirm_start_anyway')}`;
+        const lacks = [missing.length ? t('game.missing_short', { roles }) : '',
+                       caps.length ? t('game.missing_caps_short', { list: missingCapsText(caps) }) : ''].filter(Boolean);
+        if (lacks.length) {
+            question = `${lacks.join(' ')} ${pending ? question : t('game.confirm_start_anyway')}`;
         }
-        return html`<${ConfirmButton} testid="game-start" class=${missing.length ? 'danger' : 'primary'}
-            label=${missing.length ? t('game.start_anyway') : t('game.start')} question=${question}
-            disabled=${!leading} onConfirm=${() => this.lifecycle('start', missing.length ? { force: true } : undefined)} />`;
+        const anyway = lacks.length > 0;
+        return html`<${ConfirmButton} testid="game-start" class=${anyway ? 'danger' : 'primary'}
+            label=${anyway ? t('game.start_anyway') : t('game.start')} question=${question}
+            disabled=${!leading} onConfirm=${() => this.lifecycle('start', anyway ? { force: true } : undefined)} />`;
     }
 
     render(props) {

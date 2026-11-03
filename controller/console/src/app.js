@@ -12,6 +12,7 @@ import { GameControl, ControllerPanel } from './components/game-control.js';
 import { ScorePanel } from './components/score-panel.js';
 import { LiveFeed } from './components/live-feed.js';
 import { NodeList } from './components/node-list.js';
+import { OutputsPanel } from './components/outputs-panel.js';
 import { FieldView } from './components/field-view.js';
 import { JoinPanel } from './components/join-panel.js';
 import { AdoptPanel } from './components/adopt-panel.js';
@@ -580,7 +581,7 @@ class App extends Component {
     renderTab(tab) {
         switch (tab) {
         case 'game':
-            return html`<${GameControl} app=${this} /><${ScorePanel} app=${this} /><${ScoreboardShare} app=${this} />`;
+            return html`<${GameControl} app=${this} /><${OutputsPanel} app=${this} /><${ScorePanel} app=${this} /><${ScoreboardShare} app=${this} />`;
         case 'checkin':
             return html`<${CheckinPanel} app=${this} ref=${(c) => { this.checkinPanel = c; }} />`;
         case 'field':

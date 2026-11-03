@@ -122,8 +122,12 @@
     "missing_short": "Nenhuma caixa se juntou para: {roles}.",
     "confirm_start_anyway": "Começar mesmo assim?",
     "missing_roles": "O início espera por uma caixa (ou um telemóvel ligado) para: {roles}. Convida caixas ou começa mesmo assim.",
+    "missing_caps": "Falta a uma caixa o que o seu papel precisa: {list}. Só se deve começar mesmo assim se o jogo passar sem isso.",
+    "missing_caps_short": "Falta a uma caixa o que o seu papel precisa: {list}.",
+    "not_checked": "{capability} em {name}: não verificado (saída simples). Convém confirmar antes do jogo.",
     "start_warnings": {
       "min": "{have} × {role} juntas; o modo pede {value} ({param}).",
+      "optional_caps": "{name} ({role}) não tem {caps}: o modo funciona sem isso.",
       "last": "Só {have} × {role} juntas e {param} é {value}: a contagem pode correr logo desde o início."
     },
     "settings": "Definições do jogo",
@@ -240,6 +244,10 @@
       "node_rebooted_crash": "Uma caixa falhou e reiniciou ({reason})",
       "node_setup_applied": "{zone} confirmou a configuração do cenário",
       "battery_low": "Uma caixa tem a bateria fraca",
+      "node_modules": "{zone} tem: {modules}",
+      "node_module_lost": "{zone} perdeu um módulo: {modules} ({reason})",
+      "output_switched": "{zone}: {capability} ligado durante {s} s ({source})",
+      "output_switched_off": "{zone}: {capability} desligado ({source})",
       "nobody": "Alguém por identificar"
     },
     "reboot_reasons": {
@@ -250,6 +258,16 @@
       "watchdog": "watchdog: o programa bloqueou",
       "deepsleep": "saída do sono profundo",
       "unknown": "motivo desconhecido"
+    },
+    "module_lost_reasons": {
+      "no_answer": "deixou de responder",
+      "bad_ident": "respondeu como outro módulo"
+    },
+    "output_sources": {
+      "script": "o modo",
+      "field": "o script do campo",
+      "gm": "a organização",
+      "box_admin": "a administração da caixa"
     },
     "puzzles": {
       "code": "código",
@@ -283,7 +301,22 @@
     },
     "commands": "Comandos",
     "command_sent": "enviado",
+    "not_checked": "não verificado",
+    "module_lost": "perdido",
     "conflict": "Duas caixas partilham o n.º {node}: a mesma entrada foi usada em duas caixas, que usam os mesmos nonces do rádio. Tira uma delas do jogo e junta-a de novo com outra entrada (Juntar)."
+  },
+  "outputs": {
+    "title": "Saídas",
+    "intro": "Sirenes, estroboscópios e fumo nas caixas. Cada saída liga durante os segundos indicados e desliga-se sozinha; Desligar e Desligar todas as saídas atuam logo. Uma caixa aceita um novo arranque no máximo de 2 em 2 s.",
+    "all_off": "Desligar todas as saídas",
+    "all_off_done": "Foi pedido a todas as saídas do jogo que se desliguem.",
+    "none": "Nenhuma caixa deste jogo tem saídas. As saídas ativam-se na própria caixa, com o PIN de administração.",
+    "not_running": "As saídas só ligam com o jogo a decorrer; Desligar já funciona agora.",
+    "seconds": "Segundos",
+    "pulse": "Ligar {s} s",
+    "confirm_pulse": "Ligar {capability} em {name} durante {s} s? Confirmar que não está ninguém mesmo ao lado.",
+    "off": "Desligar",
+    "on": "ligada"
   },
   "field": {
     "title": "Campo",

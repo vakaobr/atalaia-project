@@ -268,9 +268,12 @@ export class BoxInvites extends Component {
             line = html`<p class="notice" data-testid="invite-waiting">${t('invites.waiting',
                 { roles: check.missing.join(', '), counts })}</p>`;
         }
-        return html`${line}${check.warnings.length > 0 && html`<ul class="warning small" data-testid="invite-warnings">${
+        const caps = check.missing_caps || [];
+        return html`${line}${caps.length > 0 && html`<p class="warning" data-testid="invite-missing-caps">${t('game.missing_caps',
+            { list: missingCapsText(caps) })}</p>`}${check.warnings.length > 0 && html`<ul class="warning small" data-testid="invite-warnings">${
             check.warnings.map((w) => html`<li>${t(`game.start_warnings.${w.code}`,
-                { role: w.role, have: w.have, value: w.value, param: w.param })}</li>`)}</ul>`}`;
+                { role: w.role, have: w.have, value: w.value, param: w.param, name: w.name,
+                  caps: (w.capabilities || []).join(', ') })}</li>`)}</ul>`}`;
     }
 
     /** While boxes fetch the game's modes, the game waits (the start guard); the GM may stop waiting. */
@@ -289,23 +292,28 @@ export class BoxInvites extends Component {
     renderStart(check) {
         const { state } = this;
         const missing = check.missing || [];
+        // A box without a capability its role requires (EXP-21) also needs Start anyway.
+        const caps = check.missing_caps || [];
+        const anyway = missing.length > 0 || caps.length > 0;
         const pending = this.props.pending || 0;
         if (!state.asking) {
             return html`<div class="actions"><button type="button" ref=${this.startRef} data-testid="invite-start"
-                class=${missing.length ? 'danger' : 'primary'} disabled=${state.starting}
-                onClick=${() => this.setState({ asking: true })}>${missing.length
+                class=${anyway ? 'danger' : 'primary'} disabled=${state.starting}
+                onClick=${() => this.setState({ asking: true })}>${anyway
                     ? t('game.start_anyway') : t('invites.start')}</button></div>`;
         }
         return html`<div class="confirm-box" role="group" aria-labelledby="inv-start-q" data-testid="invite-start-confirm">
             ${missing.length > 0 && html`<p class="warning" data-testid="invite-start-missing">${t('game.missing_short',
                 { roles: missing.join(', ') })}</p>`}
+            ${caps.length > 0 && html`<p class="warning" data-testid="invite-start-missing-caps">${t('game.missing_caps_short',
+                { list: missingCapsText(caps) })}</p>`}
             ${pending > 0 && html`<p class="warning">${t('invites.pending_note', { n: pending })}</p>`}
             <p class="confirm-q" id="inv-start-q">${t('invites.start_question')}</p>
             <div class="actions">
                 <button type="button" ref=${this.choiceRef} class="primary" data-testid="invite-review"
                     onClick=${() => this.review()}>${t('invites.review')}</button>
-                <button type="button" class=${missing.length ? 'danger' : ''} data-testid="invite-start-now"
-                    onClick=${() => this.start(missing.length > 0)}>${missing.length
+                <button type="button" class=${anyway ? 'danger' : ''} data-testid="invite-start-now"
+                    onClick=${() => this.start(anyway)}>${anyway
                         ? t('game.start_anyway') : t('invites.start_now')}</button>
                 <button type="button" data-testid="invite-start-back"
                     onClick=${() => this.setState({ asking: false })}>${t('invites.back')}</button>
@@ -363,14 +371,27 @@ export class BoxInvites extends Component {
     }
 }
 
+/** "box-5 (zone): team_input, ...": the joined boxes that lack a capability their role requires
+ * (draft RFC "The expansion port", EXP-21). */
+export function missingCapsText(caps) {
+    return (caps || []).map((c) => `${c.name} (${c.role}): ${c.capability}`).join('; ');
+}
+
 /** The start guard (decision RJ-1): what Start would say, from the game's start_check. */
 export function StartCheck({ game }) {
     const check = game && game.start_check;
     if (!check) return null;
+    const caps = check.missing_caps || [];
+    const unchecked = check.not_checked || [];
     return html`${check.missing.length > 0 && html`<p class="warning" data-testid="start-missing">${t('game.missing_roles',
         { roles: check.missing.join(', ') })}</p>`}
+        ${caps.length > 0 && html`<p class="warning" data-testid="start-missing-caps">${t('game.missing_caps',
+            { list: missingCapsText(caps) })}</p>`}
         ${check.warnings.length > 0 && html`<ul class="notice small" data-testid="start-warnings">${check.warnings.map((w) => html`<li>${
-            t(`game.start_warnings.${w.code}`, { role: w.role, have: w.have, value: w.value, param: w.param })}</li>`)}</ul>`}`;
+            t(`game.start_warnings.${w.code}`, { role: w.role, have: w.have, value: w.value, param: w.param,
+                                                 name: w.name, caps: (w.capabilities || []).join(', ') })}</li>`)}</ul>`}
+        ${unchecked.length > 0 && html`<ul class="notice small" data-testid="start-not-checked">${unchecked.map((u) => html`<li>${
+            t('game.not_checked', { capability: u.capability, name: u.name })}</li>`)}</ul>`}`;
 }
 
 /** Asks the free boxes to announce themselves; quietly does nothing without a radio. Gives the

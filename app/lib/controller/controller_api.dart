@@ -28,6 +28,8 @@
 ///     GET  /api/v1/games/{id}/score          current totals
 ///     POST /api/v1/games/{id}/score          GM adjustment, logged as score.delta
 ///     POST /api/v1/nodes/{id}/cmd            GM: a command to one node (65535: all)
+///     POST /api/v1/games/{id}/nodes/{node}/output  GM: switch a box's output (CMD 12)
+///     POST /api/v1/games/{id}/outputs/off    GM: every output of the game off
 ///     GET  /api/v1/games/{id}/log            the merged event log (?since_ms=)
 ///     GET  /api/v1/controller                the controller's state
 ///     POST /api/v1/controller/promote        GM: manual failover, stand for election
@@ -320,6 +322,22 @@ class ControllerApi {
       _route('GET', r'/api/v1/games/([^/]+)/score', _viewer(_score)),
       _route('POST', r'/api/v1/games/([^/]+)/score', _gm(_adjust)),
       _route('POST', r'/api/v1/nodes/([^/]+)/cmd', _gm(_nodeCmd)),
+      // A box's outputs (draft RFC "The expansion port", EXP-27): CMD 12.
+      _route(
+        'POST',
+        r'/api/v1/games/([^/]+)/nodes/([^/]+)/output',
+        _gm(
+          (r) => ApiResponse(
+            202,
+            engine.sendOutput(r.pathInt(1), r.pathInt(2), r.body),
+          ),
+        ),
+      ),
+      _route(
+        'POST',
+        r'/api/v1/games/([^/]+)/outputs/off',
+        _gm((r) => ApiResponse(202, engine.outputsOff(r.pathInt(1)))),
+      ),
       _route('GET', r'/api/v1/games/([^/]+)/log', _viewer(_log)),
       _route('GET', r'/api/v1/controller', _read(_status)),
       // SR-88: the team results of purged games, no player ids (the Pi's api.py).
