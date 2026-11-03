@@ -1092,7 +1092,7 @@
   },
   "scenario": {
     "title": "Editor de cenários",
-    "intro": "Um cenário é um manifesto YAML: as caixas a que a organização dá nomes, e os objetivos (capturar, código, etiquetas, bomba, escolta, defender, sobreviver). O controlador verifica-o enquanto escreves; instalado, cria-se um jogo com ele e com os Objetivos no separador Jogo.",
+    "intro": "Um cenário é um manifesto YAML: as caixas a que a organização dá nomes, e os objetivos (capturar, código, etiquetas, bomba, escolta, defender, sobreviver), e gatilhos que acionam as saídas das caixas (uma sirene quando todos os pontos estão tomados). O controlador verifica-o enquanto escreves; instalado, cria-se um jogo com ele e com os Objetivos no separador Jogo.",
     "text": "Manifesto (YAML)",
     "example": "Exemplo",
     "check": "Verificar",
@@ -1163,6 +1163,7 @@
       "scenario_params": "parâmetros %1",
       "scenario_nodes": "caixas e pessoas %1",
       "scenario_objectives": "objetivos %1",
+      "scenario_triggers": "gatilhos %1",
       "scenario_tip": "O cenário: o id (do teu clube, como org.club.foxhound), a versão e o nome; a língua dos ecrãs das caixas; as equipas, os parâmetros, as caixas e os objetivos.",
       "description": "descrição %1",
       "author": "autoria %1",
@@ -1227,7 +1228,25 @@
       "cat_effects": "O que dá",
       "cat_texts": "Textos",
       "cat_teams": "Equipas",
-      "cat_params": "Parâmetros"
+      "cat_params": "Parâmetros",
+      "when_completed": "quando todos estes estiverem cumpridos %1",
+      "when_any": "quando um destes for cumprido %1",
+      "when_failed": "quando %1 falhar",
+      "when_start": "quando o jogo começa",
+      "when_end": "quando o jogo acaba",
+      "when_do": "aciona %1",
+      "when_tip": "Um gatilho: quando isto acontece, é acionada uma saída de uma caixa (sirene, estroboscópio, fumo), uma vez por jogo. A caixa tem de ter essa saída, ativada na própria caixa com o PIN de administração.",
+      "when_end_tip": "Um gatilho no fim do jogo: depois do fim, uma caixa deixa uma saída ligada no máximo 10 s (uma buzina de fim de jogo).",
+      "which": "objetivo %1",
+      "output": "%1 %2 na caixa %3 durante %4 s",
+      "act_pulse": "dispara",
+      "act_on": "liga",
+      "output_pattern": "faz piscar %1 na caixa %2 durante %3 s",
+      "output_pattern_steps": "ligada %1 s, desligada %2 s",
+      "output_off": "desliga %1 na caixa %2",
+      "output_tip": "A função da saída, como a caixa lhe chama: siren, strobe, smoke, light, horn (uma segunda: siren.2) ou out.1 a out.9. No máximo 600 s.",
+      "output_off_tip": "A função da saída, ou * para todas as saídas da caixa.",
+      "cat_triggers": "Gatilhos"
     }
   },
   "firmware": {

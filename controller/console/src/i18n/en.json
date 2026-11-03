@@ -1092,7 +1092,7 @@
   },
   "scenario": {
     "title": "Scenario editor",
-    "intro": "A scenario is a YAML manifest: the boxes the GM names, and the objectives (capture, code, tags, bomb, escort, defend, survive). The controller checks it as you type; once installed, create a game of it with Objectives in the Game tab.",
+    "intro": "A scenario is a YAML manifest: the boxes the GM names, and the objectives (capture, code, tags, bomb, escort, defend, survive), and triggers that switch a box's outputs (a siren when every point is taken). The controller checks it as you type; once installed, create a game of it with Objectives in the Game tab.",
     "text": "Manifest (YAML)",
     "example": "Example",
     "check": "Check",
@@ -1163,6 +1163,7 @@
       "scenario_params": "parameters %1",
       "scenario_nodes": "boxes and players %1",
       "scenario_objectives": "objectives %1",
+      "scenario_triggers": "triggers %1",
       "scenario_tip": "The scenario: its id (your club's, like org.club.foxhound), version and name; the language of the boxes' screens; its teams, parameters, boxes and objectives.",
       "description": "description %1",
       "author": "author %1",
@@ -1227,7 +1228,25 @@
       "cat_effects": "What it gives",
       "cat_texts": "Texts",
       "cat_teams": "Teams",
-      "cat_params": "Parameters"
+      "cat_params": "Parameters",
+      "when_completed": "when all of these are completed %1",
+      "when_any": "when any of these is completed %1",
+      "when_failed": "when %1 fails",
+      "when_start": "when the game starts",
+      "when_end": "when the game ends",
+      "when_do": "switch %1",
+      "when_tip": "A trigger: when this happens, an output of a box (a siren, a strobe, smoke) is switched, once a game. The box must have the output, and its admin must have enabled it at the box.",
+      "when_end_tip": "A trigger at the game's end: after the end a box lets an output run for 10 s at most (an end horn).",
+      "which": "objective %1",
+      "output": "%1 %2 on the box %3 for %4 s",
+      "act_pulse": "pulse",
+      "act_on": "switch on",
+      "output_pattern": "blink %1 on the box %2 for %3 s",
+      "output_pattern_steps": "on %1 s, off %2 s",
+      "output_off": "switch off %1 on the box %2",
+      "output_tip": "The output's function, as the box names it: siren, strobe, smoke, light, horn (a second one: siren.2) or out.1 to out.9. At most 600 s.",
+      "output_off_tip": "The output's function, or * for every output of the box.",
+      "cat_triggers": "Triggers"
     }
   },
   "firmware": {

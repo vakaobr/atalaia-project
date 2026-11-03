@@ -321,6 +321,40 @@ function luagen.objective_data(o, manifest)
   return data
 end
 
+-- One trigger as the runtime reads it (runtime.lua, "Triggers"): when (completed, any_completed,
+-- failed, start or end), the objectives it waits for, and CMD 12's params for the node's name.
+function luagen.trigger_data(t)
+  local when = py.get(t, "when")
+  local key, value = when.k[1], when.v[1]
+  local output = py.get(t, "output")
+  local act = py.get(output, "act")
+  local seconds = py.get(output, "seconds")
+  local objectives
+  if key == "failed" then
+    objectives = py.list({ value }, 1)
+  elseif key ~= "game" then
+    objectives = copy_list(value)
+  end
+  return ordered(
+    "when",
+    key == "game" and value or key,
+    "objectives",
+    objectives,
+    "node",
+    py.get(output, "node"),
+    "capability",
+    py.get(output, "capability"),
+    "act",
+    act,
+    "ms",
+    seconds ~= nil and seconds * 1000 or nil,
+    "on_ms",
+    py.get(output, "on_ms"),
+    "off_ms",
+    py.get(output, "off_ms")
+  )
+end
+
 -- The scenario's field.lua: a header, the data table and the runtime.
 function luagen.field_lua(manifest, runtime)
   local sid = py.get(manifest, "id")
@@ -331,6 +365,16 @@ function luagen.field_lua(manifest, runtime)
   end
   objectives.n = src.n
   local teams = py.getd(manifest, "teams", nil)
+  -- Only when the manifest has triggers: a scenario without them compiles as before.
+  local triggers
+  local raw = py.get(manifest, "triggers")
+  if py.truthy(raw) then
+    triggers = py.list({}, 0)
+    for i = 1, raw.n do
+      triggers[i] = luagen.trigger_data(raw[i])
+    end
+    triggers.n = raw.n
+  end
   local data = ordered(
     "id",
     sid,
@@ -339,7 +383,9 @@ function luagen.field_lua(manifest, runtime)
     "reveal",
     py.get(manifest, "reveal"),
     "objectives",
-    objectives
+    objectives,
+    "triggers",
+    triggers
   )
   local lines = {
     "-- " .. luagen.SPDX_TAG .. " " .. luagen.LICENSE,

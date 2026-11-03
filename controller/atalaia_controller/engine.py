@@ -271,7 +271,11 @@ class FieldScript:
     ``score_key`` (one key per run of the script: a restart or a takeover
     starts a new run, whose points add to the earlier runs'). A game.end it
     emits (game.finish, game.win) ends the game once the script has
-    returned (``pending_end``), never from inside the core's callback.
+    returned (``pending_end``), never from inside the core's callback. The
+    outputs it switches after that (a scenario's game: end trigger, an end
+    horn) wait in ``held_outputs`` until the boxes have been told the game
+    ended: sent before, the end would switch them off at once; after, they
+    run within the box's 10 s end grace (draft RFC "The expansion port", EXP-29).
     """
 
     def __init__(self, core: Core, engine: "Controller", source: str, chunk: str,
@@ -282,6 +286,7 @@ class FieldScript:
         self.score_key = score_key
         self.state: dict[str, Any] = {}
         self.pending_end: Optional[dict[str, Any]] = None
+        self.held_outputs: list[tuple[int, Any]] = []
         ops = FieldOps(nodes=self._nodes, owner=self._owner, send=self._send, on_state=self._on_state)
         self.node = Node(core, engine.node_id, seed, teams, params, source, chunk,
                          on_event=self._on_event, on_log=self._on_log, field_ops=ops,
@@ -314,6 +319,9 @@ class FieldScript:
             return False  # firmware updates and pod settings are the GM's alone (firmware_updates.py, FU3-4; pod_config.py)
         if cmd == "output":
             # CMD 12 (EXP-23): src field, checked and rate limited by the engine (outputs.py).
+            if self.pending_end is not None:
+                self.held_outputs.append((node_id, params))  # sent once the boxes know the game ended
+                return True
             return self.engine.field_output(node_id, params)
         try:
             return self._fc().send_cmd(cmd, params or None, dest=node_id,
@@ -1754,6 +1762,9 @@ class Controller:
                 fc.controller_event("game.end", data, prio="critical")
                 if self.field is not None:
                     self.field.input("game.end", {"reason": reason} if reason else None)
+                    held, self.field.held_outputs = self.field.held_outputs, []
+                    for node_id, params in held:  # in the end's grace (FieldScript)
+                        self.field_output(node_id, params)
                 self.store.save_scores(game_id, fc.total_scores)
                 self._save_game_time(force=True)
             self.store.update_game(game_id, game_key=None)  # the key does not outlive the game

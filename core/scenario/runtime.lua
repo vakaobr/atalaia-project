@@ -30,6 +30,19 @@
 --   max_acc_m     (geo.in_zone), the worst GPS accuracy that counts
 --   minimum_lives survive
 --
+-- SCENARIO.triggers (absent without any; draft RFC "The expansion port", EXP-25), each:
+--   when          completed (every one of objectives), any_completed (the first of them),
+--                 failed (objectives' one), start or end (the game's)
+--   node, capability, act, ms, on_ms, off_ms
+--                 what is switched: CMD 12's params (src field, set by the controller) for the
+--                 node of that name. Each trigger fires once a game. The controller sends one
+--                 output command to a box every 2 s at most: an output held back (or for a box
+--                 not seen yet) is tried again every second for 10 s, the newest for an output
+--                 replacing what waits for it. The box switches only the outputs its admin
+--                 enabled, turns them all off when the game pauses or ends, and after the end
+--                 lets the end's triggers run for 10 s at most (EXP-28, EXP-29); a pause drops
+--                 what waits here, so a resumed game turns nothing back on.
+--
 -- An objective is waiting, then open, then done or failed ("off": its team
 -- is not in this game). It opens when it is revealed (at the start unless
 -- hidden; a hidden one when it could open, or by a reveals), its time window
@@ -170,6 +183,87 @@ local function stop_timer(o)
   end
 end
 
+-- Triggers.
+
+local TRIGGERS = SCENARIO.triggers or {}
+local fired = {} -- trigger index -> true once it fired (once a game)
+local waiting_out = {} -- outputs held back: { node, params, until_s }
+local OUTPUT_RETRY_S = 10
+
+local function box(name)
+  for _, n in ipairs(field.nodes()) do
+    if n.name == name then
+      return n.id
+    end
+  end
+end
+
+local function send_output(w)
+  local id = box(w.node)
+  return id ~= nil and field.send(id, "output", w.params)
+end
+
+local function switch(t)
+  local p =
+    { capability = t.capability, act = t.act, ms = t.ms, on_ms = t.on_ms, off_ms = t.off_ms }
+  for i = #waiting_out, 1, -1 do -- the newest command for an output replaces what waits for it
+    local w = waiting_out[i]
+    if w.node == t.node and (t.capability == "*" or w.params.capability == t.capability) then
+      table.remove(waiting_out, i)
+    end
+  end
+  local w = { node = t.node, params = p, until_s = game.time() + OUTPUT_RETRY_S }
+  if not send_output(w) then
+    waiting_out[#waiting_out + 1] = w
+  end
+end
+
+local function fire(i, t)
+  if not fired[i] then
+    fired[i] = true
+    log("scenario: trigger " .. i .. ": " .. t.act .. " " .. t.capability .. " on " .. t.node)
+    switch(t)
+  end
+end
+
+local function names(t, id)
+  for _, x in ipairs(t.objectives or {}) do
+    if x == id then
+      return true
+    end
+  end
+  return false
+end
+
+-- After an objective is done or failed: the triggers that waited for it.
+local function triggered(o)
+  for i, t in ipairs(TRIGGERS) do
+    if not fired[i] and names(t, o.id) then
+      if t.when == "any_completed" and status[o.id] == "done" then
+        fire(i, t)
+      elseif t.when == "failed" and status[o.id] == "failed" then
+        fire(i, t)
+      elseif t.when == "completed" and status[o.id] == "done" then
+        local all = true
+        for _, x in ipairs(t.objectives) do
+          all = all and status[x] == "done"
+        end
+        if all then
+          fire(i, t)
+        end
+      end
+    end
+  end
+end
+
+local function at_moment(moment)
+  for i, t in ipairs(TRIGGERS) do
+    if t.when == moment then
+      fire(i, t)
+    end
+  end
+end
+
 local refresh -- below: opens an objective when it can
 
 local function reveal(o)
@@ -203,6 +297,7 @@ local function fail(o, team, reason)
   if o.node then
     setup(o)
   end
+  triggered(o)
   for _, d in ipairs(OBJ) do
     if depends_on(d, o.id) then
       fail(d, d.team, "blocked")
@@ -240,6 +335,9 @@ local function finish(o, team)
   if o.win and team then
     game.win(team)
   end
+  -- After the win: the controller holds a field script's outputs back until the boxes have been
+  -- told the game ended, so they come within the end's grace instead of being switched off by it.
+  triggered(o)
 end
 
 local function hold_for(o, team, seconds)
@@ -326,11 +424,34 @@ on("game.start", function()
       end
     end
   end
+  -- A controller that restarts or takes over mid-game runs this again, past the start: the
+  -- start's outputs went then.
+  if game.time() < 1 then
+    at_moment("start")
+  end
+end)
+
+on("game.end", function()
+  waiting_out = {}
+  at_moment("end")
+end)
+
+-- A pause turns every output off (the boxes do it) and a resumed game turns none back on.
+on("game.pause", function()
+  waiting_out = {}
 end)
 
 -- A node that joins later is set up when it first appears, and one that has not said it took its setup is
 -- sent it again (bounded, with a growing wait).
 every(1, function()
+  local now = game.time()
+  local still = {}
+  for _, w in ipairs(waiting_out) do
+    if now < w.until_s and not send_output(w) then
+      still[#still + 1] = w
+    end
+  end
+  waiting_out = still
   for _, o in ipairs(OBJ) do
     if o.node and status[o.id] then
       local s = sent[o.id]
