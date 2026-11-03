@@ -415,6 +415,59 @@ class FieldTests(unittest.TestCase):
         last = self.pulses(box)[-1]
         self.assertLessEqual(last["until"] - last["t"], 500)
 
+    def test_the_gm_switches_a_boxs_simple_output(self):
+        """Draft RFC "The expansion port", increment 3, end to end: the controller keeps the box's
+        node.modules in its node list (the simple output with "feedback": false), the start check names
+        it "not checked", and the GM's output API sends CMD 12 over the C host modem: the host box's
+        firmware turns the siren on (2.0 ms pulses) for the time asked and then off by itself, logs
+        output.switched (source gm) back to the controller, holds a second start for 2 s, and "All
+        outputs off" ends an output at once."""
+        box = self.box("alpha", "--simple-out", "siren")
+        gid = self.game()
+        nid = self.join(box)
+        self.assertTrue(wait_for(lambda: self.node(nid).get("modules") is not None, 6), box.lines[-8:])
+        self.assertEqual(self.node(nid)["modules"],
+                         [{"address": "g46", "model": "servo", "fw": None, "caps": ["siren"], "feedback": False}])
+        check = self.client.get(f"/api/v1/games/{gid}/start-check", headers=READ).json()
+        self.assertEqual([(c["node"], c["capability"]) for c in check["not_checked"]], [(nid, "siren")])
+        self.assertEqual(check["missing_caps"], [])  # the host box has a button and a keypad: team_input
+        # Not before the game runs.
+        r = self.client.post(f"/api/v1/games/{gid}/nodes/{nid}/output", headers=GM,
+                             json={"capability": "siren", "act": "pulse", "ms": 1500})
+        self.assertEqual(r.status_code, 409, r.text)
+
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        before = len(self.pulses(box))
+        r = self.client.post(f"/api/v1/games/{gid}/nodes/{nid}/output", headers=GM,
+                             json={"capability": "siren", "act": "pulse", "ms": 1500})
+        self.assertEqual(r.status_code, 202, r.text)
+        self.assertEqual(r.json()["params"], {"capability": "siren", "act": "pulse", "ms": 1500, "src": "gm"})
+        # A second start within 2 s: held back by the controller, never sent.
+        again = self.client.post(f"/api/v1/games/{gid}/nodes/{nid}/output", headers=GM,
+                                 json={"capability": "siren", "act": "pulse", "ms": 1500})
+        self.assertEqual(again.status_code, 429, again.text)
+        self.assertTrue(wait_for(lambda: any(b["width"] == 2000 for b in self.pulses(box)[before:]), 5),
+                        box.lines[-8:])
+        on_at = next(i for i, b in enumerate(self.pulses(box)) if i >= before and b["width"] == 2000)
+        # Off by itself after its time (1.5 s, and the 500 ms floor of a simple output).
+        self.assertTrue(wait_for(lambda: self.pulses(box)[-1]["width"] == 1000
+                                 and len(self.pulses(box)) > on_at + 1, 5), box.lines[-8:])
+        self.assertTrue(wait_for(lambda: "output.switched" in self.log_types(gid, nid), 6), box.lines[-8:])
+        switched = [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+                    if e["type"] == "output.switched"]
+        self.assertEqual(switched[0]["data"], {"capability": "siren", "ms": 1500, "source": "gm"})
+
+        # On for a minute, then "All outputs off": the 1.0 ms "off" pulses come back at once.
+        time.sleep(2.1)
+        r = self.client.post(f"/api/v1/games/{gid}/nodes/{nid}/output", headers=GM,
+                             json={"capability": "siren", "act": "on", "ms": 60000})
+        self.assertEqual(r.status_code, 202, r.text)
+        self.assertTrue(wait_for(lambda: self.pulses(box)[-1]["width"] == 2000, 5), box.lines[-8:])
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/outputs/off", headers=GM).status_code, 202)
+        self.assertTrue(wait_for(lambda: self.pulses(box)[-1]["width"] == 1000, 5), box.lines[-8:])
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={}).status_code, 200)
+
     def play_and_end(self, box: BoxHost, epoch: int) -> None:
         """One game with the box: it joins, each side hears the other (the controller registers the
         HELLO, the box gets its ACK), it starts and ends, and the box is free again."""

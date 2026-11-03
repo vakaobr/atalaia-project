@@ -16935,6 +16935,24 @@
     }
    },
    {
+    "name": "command_outputs_off",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "outputs_off",
+     "params": {},
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    }
+   },
+   {
     "name": "result_start_needs_roles",
     "kind": "command.result",
     "body": {
@@ -18871,6 +18889,53 @@
     },
     "error": "unknown_field",
     "path": "params.force"
+   },
+   {
+    "name": "command_outputs_off_with_params",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "outputs_off",
+     "params": {
+      "node": 4
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "unknown_field",
+    "path": "params.node"
+   },
+   {
+    "name": "command_output_on",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "output",
+     "params": {
+      "node": 4,
+      "capability": "siren",
+      "act": "on",
+      "ms": 5000
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "not_allowed",
+    "path": "command"
    },
    {
     "name": "result_missing_on_done",

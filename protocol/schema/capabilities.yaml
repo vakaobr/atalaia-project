@@ -34,3 +34,13 @@ types:
   battery:  { id: 12, doc: "a fuel gauge: level(%), low" }
   tamper:   { id: 13, doc: "an enclosure switch: opened, closed (draft RFC 0000, decision PF8)" }
   contact:  { id: 14, reserved: true, doc: "a tripwire, pressure mat or door: closed, opened (reserved for its first module)" }
+
+# Names a mode's role may list in requires: and optional: besides the types
+# (design specification section 7: "team_input" is met by team buttons, a
+# team code on the keypad or a team NFC tag; "team_display" by LEDs or a
+# screen). The controllers' start check (draft RFC "The expansion port",
+# EXP-21) takes a node that lists any of met_by as having it. A name that is
+# neither a type nor here is never checked.
+role_names:
+  team_input:   { met_by: [button, keypad, nfc], doc: "a team claims this node" }
+  team_display: { met_by: [led, display], doc: "shows the owner's colour and the score" }

@@ -466,6 +466,40 @@ class FieldScriptTests(EngineCase):
         self.assertEqual(self.ctrl.field.state, {"captures": 2})
         self.assertIn({"type": "field_state", "key": "captures", "value": 2}, self.messages)
 
+    def test_field_lua_switches_an_output(self):
+        """field.send(node, "output", {...}) (draft RFC "The expansion port", EXP-23): CMD 12 with src field
+        whatever the script says; params a box would refuse are never sent; one start a box every 2 s, off
+        always; on to every node never (off to every node is fine)."""
+        lua = """
+on("zone.captured", function(ev)
+  local n = ev.node
+  sent = {
+    field.send(n, "output", { capability = "siren", act = "pulse", ms = 10000, src = "gm" }),
+    field.send(n, "output", { capability = "siren", act = "pulse", ms = 10000 }),
+    field.send(n, "output", { capability = "siren", act = "off" }),
+    field.send(n, "output", { capability = "siren", act = "on" }),
+    field.send(65535, "output", { capability = "*", act = "pulse", ms = 100 }),
+    field.send(65535, "output", { capability = "*", act = "off" }),
+  }
+  emit("x.atalaia.sent", { a = sent[1], b = sent[2], c = sent[3], d = sent[4], e = sent[5], f = sent[6] })
+end)
+"""
+        files = {"mode.yaml": "id: org.test.siren\nversion: 0.1.0\nname: Siren\n"
+                              "roles:\n  zone: { requires: [team_input], optional: [output] }\n",
+                 "node.lua": 'on("game.start", function() end)\n', "field.lua": lua}
+        self.ctrl.modes.install(files)
+        gid = self.create(mode_id="org.test.siren")["id"]
+        self.ctrl.start_game(gid, force=True)
+        self.modem.sent.clear()
+        self.rx(4, 1, "EVENT", ev(4, 1, 100, "zone.captured", team=1), epoch=1)
+        sent = [e for e in self.ctrl.log(gid) if e["type"] == "x.atalaia.sent"]
+        self.assertEqual(sent[0]["data"], {"a": True, "b": False, "c": True, "d": False, "e": False, "f": True})
+        self.assertEqual([cmd_decode(p) for _, p in self.modem.of("CMD")], [
+            {"cmd": 12, "params": {"capability": "siren", "act": "pulse", "ms": 10000, "src": "field"}, "dest": 4},
+            {"cmd": 12, "params": {"capability": "siren", "act": "off", "src": "field"}, "dest": 4},
+            {"cmd": 12, "params": {"capability": "*", "act": "off", "src": "field"}},
+        ])
+
     def test_bad_uploads_are_refused(self):
         from atalaia_sim.mode import ModeError
         good = {"mode.yaml": "id: org.test.m\nversion: 1\nroles: { zone: {} }\n", "node.lua": "local x = 1\n"}

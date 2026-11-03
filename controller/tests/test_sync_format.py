@@ -65,7 +65,7 @@ class VectorTests(unittest.TestCase):
     def test_stream(self) -> None:
         """The remote GM's messages on the stream (plan phase 19): the controller's and the site server's."""
         stream = VECTORS["stream"]
-        self.assertEqual((len(stream["valid"]), len(stream["invalid"])), (23, 67))
+        self.assertEqual((len(stream["valid"]), len(stream["invalid"])), (24, 69))
         self.assertEqual({v["kind"] for v in stream["valid"]}, set(fmt.STREAM))
         for vector in stream["valid"]:
             with self.subTest(vector=vector["name"]):
@@ -120,7 +120,7 @@ class VectorTests(unittest.TestCase):
         self.assertEqual(fmt.check_command(body)["params"], {"name": "refill", "node": 0xFFFF})
         body = copy.deepcopy(next(v["body"] for v in VECTORS["stream"]["valid"] if v["name"] == "command_end"))
         self.assertEqual(fmt.check_command(body)["params"], {"reason": ""})
-        self.assertEqual(set(fmt.REMOTE_COMMANDS), {"start", "pause", "resume", "end", "message", "mode"})
+        self.assertEqual(set(fmt.REMOTE_COMMANDS), {"start", "pause", "resume", "end", "message", "mode", "outputs_off"})
 
     def test_library_removal(self) -> None:
         """Decision S20-8: what a controller got from the site and the site no longer lists."""

@@ -28,6 +28,13 @@ const capabilityTypeIds = <String, int>{
 /// Types whose id is fixed but which no node lists yet.
 const reservedCapabilityTypes = <String>{'contact'};
 
+/// Role names a mode's requires: and optional: may use besides the types,
+/// and the types that meet them (a node with any of them has it).
+const capabilityRoleNames = <String, List<String>>{
+  'team_input': ['button', 'keypad', 'nfc'],
+  'team_display': ['led', 'display'],
+};
+
 /// The type name of a capability id; null for an id this app does not know
 /// (a newer node's type: ignored, never an error).
 String? capabilityTypeName(int id) {
