@@ -355,7 +355,9 @@ section 16).
    phases 8 and 9 are built: creating `atalaia-modes` from
    `registry/template/` was done on 2026-10-26 (P5-3, P5R-9; steps 1 to 3 and 5
    of `docs/community/registry.md`, "Creating the repository"; step 4, the
-   project's registry key, waits for the maintainer), as do P5G-2,
+   project's registry keys, is done too: root d9521a79030ce544 kept offline by
+   the maintainer and CI 7275108d2e3fe583, both in `atalaia-modes`'s
+   `keys/project/`). Still waiting for the maintainer: P5G-2,
    P5G-3, P5G-8, P5G-9, P5G-12 (accepting the RFC), P5G-13 and P5G-14.
 3. Left from plan phases 3-6, small (the editor making the package itself is
    built, P5I-1 to P5I-6, signing staying offline):
