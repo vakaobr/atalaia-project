@@ -58,7 +58,7 @@ typedef struct {
     bool nfc;                      /* the PN532 answered */
     bool leds;                     /* the ring's data pin is set */
     uint16_t led_count;
-    bool audio;  /* the I2S pins are set */
+    bool audio;  /* a speaker (the I2S pins are set) or a piezo buzzer is fitted */
     bool tamper; /* the enclosure switch's pin is set */
 } pod_caps_config_t;
 

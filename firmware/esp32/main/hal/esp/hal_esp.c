@@ -20,6 +20,9 @@ extern const hal_display_ops_t hal_esp_display_ops;
 extern const hal_oled_ops_t hal_esp_oled_ops;
 extern const hal_nfc_ops_t hal_esp_nfc_ops;
 extern const hal_audio_ops_t hal_esp_audio_ops;
+#if CONFIG_ATALAIA_BUZZER
+extern const hal_buzzer_ops_t hal_esp_buzzer_ops;
+#endif
 extern const hal_battery_ops_t hal_esp_battery_ops;
 extern const hal_radio_ops_t hal_esp_radio_ops;
 
@@ -36,6 +39,11 @@ int hal_esp_init(hal_t *hal)
 #endif
     hal->nfc = &hal_esp_nfc_ops;
     hal->audio = &hal_esp_audio_ops;
+#if CONFIG_ATALAIA_BUZZER
+    hal->buzzer = &hal_esp_buzzer_ops;
+#else
+    hal->buzzer = NULL;
+#endif
     hal->battery = &hal_esp_battery_ops;
     hal->radio = &hal_esp_radio_ops;
     return 0;

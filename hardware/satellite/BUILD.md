@@ -18,7 +18,8 @@ refers to for every step the two builds share.
 > The same firmware has run on bare Heltec V4.3 boards on a bench with two
 > buttons and the board's own OLED (invited into games over the radio,
 > adopted by USB and by code). **Not yet tested on a real board:** the LED
-> ring, the battery gauge, the amplifier, the power path and the enclosure.
+> ring, the battery gauge, the amplifier, the piezo buzzer, the power path and
+> the enclosure.
 > It runs the Field Box's own firmware with fewer parts fitted, so every pin
 > below is a Field Box pin, checked automatically against the firmware's
 > defaults (`python3 tools/check_wiring.py`, see
@@ -61,8 +62,8 @@ section 6); not a quote, and not checked against a real build.
                                                  button LEDs     +--> GPIOs: buttons, LED data
 ```
 
-It has **no colour screen, keypad, NFC reader or speaker** (a speaker can be
-added, [section 3](#3-parts)). So it:
+It has **no colour screen, keypad, NFC reader or speaker** (a piezo buzzer
+or a speaker can be added, [section 3](#3-parts)). So it:
 
 - plays the games a **field controller** runs: it is invited into a game over
   the radio and given its role (`satellite`, `master`, or a zone of any mode
@@ -86,14 +87,15 @@ Decided (in the firmware and the design documents):
 - **The same pins as the Field Box** for the parts it has ([section 5](#5-pins)).
 - **One Li-ion cell (1S)** with the Field Box's protection: fuse, Schottky
   diode, main switch, 5 V boost converter for the LED ring.
+- **Sound is optional**: a passive piezo buzzer (the design specification's
+  part; the cheapest way), the Field Box's MAX98357A amplifier and a small
+  speaker, both, or none. The buzzer needs a firmware built with
+  `CONFIG_ATALAIA_BUZZER=y` ([section 10](#10-first-power-on-and-first-flash));
+  it plays the games' sounds as short beep patterns (decisions BZR-1 to BZR-8).
+  **The buzzer has not been built on hardware yet.**
 
 Not decided, or not supported yet:
 
-- **The piezo buzzer** that the design specification lists for the Satellite
-  is **not supported by the firmware**: the firmware makes sound only through
-  the MAX98357A I2S amplifier. Fit the amplifier and a small speaker if you want
-  sound, or build it silent. A piezo driver would be a firmware change
-  (decision P5J-4, for the maintainer).
 - **The enclosure size and layout**: no Satellite enclosure has been chosen;
   [section 6](#6-enclosure) says what it must do.
 - **Runtime on one cell**: not measured.
@@ -123,8 +125,9 @@ pitfalls. No shop is recommended.
 | 12 | Lever splice connectors, 3- and 4-way | 2 + 1 | Battery, ground and 5 V distribution |
 | 13 | Panel-mount USB-C extension with cap, USB 2.0 data | 1 | Optional: charging and flashing without opening the box |
 | 14 | IP65 junction box, bright colour, **not metal**; cable glands and a pressure-equalising vent | 1 | Big enough for the parts above with the lid closed ([section 6](#6-enclosure)) |
-| 15 | MAX98357A I2S amplifier and a 4-8 ohm speaker | 1 | Optional: the only way to give a Satellite sound |
-| 16 | Labels: "GAME PROP" and the box name | 2+ | Required |
+| 15 | **Passive** piezo buzzer (a piezo element without its own oscillator, 12-30 mm, rated 3-24 V), and a 220 ohm resistor; for a louder buzzer also an NPN transistor (2N2222, BC547 or S8050), a 1 kohm, a 10 kohm and a second 1 kohm resistor | 1 each | Optional, the cheapest sound (decision BZR-6). **Not an active buzzer** (it beeps one pitch whatever the firmware asks) and **not a magnetic transducer** (it lists a coil resistance such as 16 ohm): see [section 9](#9-wiring-step-by-step), step 7. **Not yet built on hardware** |
+| 16 | MAX98357A I2S amplifier and a 4-8 ohm speaker | 1 | Optional: real sound clips as well as tones |
+| 17 | Labels: "GAME PROP" and the box name | 2+ | Required |
 
 ## 4. Tools and safety
 
@@ -177,6 +180,7 @@ if this table does.
 | I2S BCLK (optional amplifier) | 6 | `ATALAIA_AUDIO_BCLK_PIN` | grey | amplifier BCLK | 3.3 V | |
 | I2S LRCLK | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | pink | amplifier LRC | 3.3 V | |
 | I2S DOUT | 16 | `ATALAIA_AUDIO_DOUT_PIN` | brown | amplifier DIN | 3.3 V | |
+| Piezo buzzer (optional) | 45 | `ATALAIA_BUZZER_PIN` | purple | 220 ohm to the piezo, or 1 kohm to the transistor's base | 3.3 V, idles low | Only with `CONFIG_ATALAIA_BUZZER=y`. A boot strapping pin: nothing may pull it up ([section 9](#9-wiring-step-by-step), step 7) |
 
 Rails, not GPIOs: gauge logic VDD to the hub's 3V3 (violet, 3.3 V); button
 COM, gauge GND and ring GND to GND (black); ring 5V, amplifier VIN and
@@ -187,7 +191,8 @@ is 0x3C. The full list of pins is in the
 
 Leave every other board pin unconnected. The firmware still drives the Field
 Box's display pins (GPIO 1, 3, 33, 47) as outputs, so nothing else may be wired
-to them; GPIO 0, 45 and 46 are boot straps; the board-internal pins are listed
+to them; GPIO 0, 45 and 46 are boot straps (45 only for the buzzer's circuit,
+which keeps it low); the board-internal pins are listed
 in the [Field Box pin map](../field-box/README.md#pin-assignments-default-kconfig----heltec-v43).
 
 ## 6. Enclosure
@@ -310,7 +315,27 @@ wire; stranded wire only.
 6. **Amplifier (optional).** BCLK to GPIO 6, LRC to GPIO 15, DIN to GPIO 16;
    VIN and GND to the 5 V splices; the speaker to SPK+ and SPK-, neither
    touching GND.
-7. **Board battery lead.** The hub's "5V in" to the 5 V splice. Make the lead
+7. **Piezo buzzer (optional; not yet built on hardware).** A **passive** piezo
+   element only. GPIO 45 is a boot strapping pin that must be **low** when the
+   board starts (a pull-up makes it choose 1.8 V flash and it does not boot):
+   both circuits below keep it low; never use a "buzzer module" with a
+   pull-up resistor on its input. Either:
+   - **Direct, quiet** (a table, a room): GPIO 45 to a 220 ohm resistor, to
+     the piezo's + lead; its other lead to GND. The pin then gives at most
+     15 mA for an instant at each edge (3.3 V / 220 ohm; the ESP32-S3's pins
+     take 20 mA by default) and well under 1 mA on average;
+   - **Through a transistor, louder** (the field): GPIO 45 to a 1 kohm
+     resistor, to the base of an NPN transistor (2N2222, BC547, S8050); a
+     10 kohm resistor from the base to GND (it holds the pin low at reset);
+     emitter to GND; the piezo from the 5 V rail to the collector, with a
+     1 kohm resistor across the piezo (it discharges the piezo between the
+     pulses). The pin gives about 2.6 mA ((3.3 V - 0.7 V) / 1 kohm); the
+     piezo swings 5 V. A magnetic transducer (a coil, 16-42 ohm) works here
+     only with a 1N4148 diode across it (band to 5 V), never directly on the
+     pin.
+
+   Check, before any power: no continuity from GPIO 45 to 3V3 or 5 V.
+8. **Board battery lead.** The hub's "5V in" to the 5 V splice. Make the lead
    for the board's battery socket from BAT+ and the battery GND splice, then
    **measure its polarity** (cell in, fuse in, switch on, plug not in the
    board) against the + and - marks next to the socket. Switch off, then plug
@@ -352,6 +377,7 @@ free.
    | No third button | `CONFIG_ATALAIA_BTN3_PIN=-1` |
    | No keypad expander (and so no button 4) | `CONFIG_ATALAIA_KP_P7_BUTTON=0` |
    | No amplifier | `CONFIG_ATALAIA_AUDIO_BCLK_PIN=-1` (audio off) |
+   | Piezo buzzer fitted | `CONFIG_ATALAIA_BUZZER=y` (on GPIO 45, `CONFIG_ATALAIA_BUZZER_PIN`) |
    | Antenna with more than 2 dBi | `CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI=` its gain, rounded up |
 
 5. **Boot log.** In a serial monitor on the USB port: expect one warning per
@@ -360,8 +386,8 @@ free.
    normal. Then switch on and unplug USB: it boots from the cell.
 6. **Bring-up.** Do the steps of
    [`BRING_UP.md`](../../firmware/esp32/docs/BRING_UP.md) that apply: 1 (first
-   boot), 2 (Vext: the on-board OLED), 4 (buttons), 6 (LEDs), 8 (audio, if
-   fitted), 9 (battery), **10 (radio, transmit power: no game before it)**, 10a
+   boot), 2 (Vext: the on-board OLED), 4 (buttons), 6 (LEDs), 8 (audio and
+   buzzer, if fitted), 9 (battery), **10 (radio, transmit power: no game before it)**, 10a
    (adoption), 10b and 10b2 (joining a controller's game). Skip the eFuse step
    (step 0) on a first box: burning an eFuse cannot be undone.
 
@@ -405,6 +431,8 @@ power. For a Satellite in particular:
 | No pairing code on the OLED | The box is already adopted, or a game is joined; a box shows its code only when unadopted |
 | LED ring dark | Switch off (no 5 V on USB alone); DIN and DOUT swapped; the 74AHCT125 missing or reversed; its pin 1 not at GND |
 | Battery level unknown, no low-battery warning in the console | No MAX17048 fitted, or its battery-sense wire is missing |
+| Buzzer silent | The firmware was built without `CONFIG_ATALAIA_BUZZER=y` (the boot log then has no `piezo buzzer on GPIO 45` line); an active buzzer or a module instead of a passive piezo; the volume set to 0 |
+| It does not boot since the buzzer was fitted | Something pulls GPIO 45 up: a buzzer module's pull-up, or the transistor's 10 kohm missing. Take the buzzer off and check the circuit |
 | Anything hot, a smell, smoke | Switch off at once, take the fuse out, take the cell out into a fire-safe bag |
 
 If you find a fault that is not here, or a step that is wrong, please open an

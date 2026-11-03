@@ -268,8 +268,19 @@ firmware no longer reads a button there.
 ## Step 8: Audio
 
 1. Start a game that plays sound clips (bomb armed/defused).
-2. Verify: audio plays through the speaker (I2S on GPIO 6/15/16).
+2. Verify: audio plays through the speaker (I2S on GPIO 6/15/16). A clip
+   with no sound file in `/littlefs/audio/<clip>.wav` (every clip today)
+   plays as its tone pattern (`main/sound.c`): Bomb's `armed` is two beeps
+   at 1 kHz, `defused` two rising notes.
 3. Check volume control via serial command.
+4. **Piezo buzzer** (only in a build with `CONFIG_ATALAIA_BUZZER=y`;
+   decisions BZR-1 to BZR-8; not yet tried on hardware). Before power:
+   no continuity from GPIO 45 to 3V3 or 5 V (a pull-up there stops the
+   board booting). The boot log says `piezo buzzer on GPIO 45`. The same
+   game beeps the same patterns on the buzzer; with the amplifier fitted
+   too, both sound together. Note how loud it is at 1 m and 10 m, and
+   that the board still boots from cold with the buzzer fitted (power
+   off for 10 s, then on).
 
 ## Step 9: Battery
 

@@ -283,6 +283,7 @@ void hal_stub_init(hal_t *hal)
     hal->oled = NULL; /* the host tests render the OLED view directly */
     hal->nfc = &stub_nfc_ops;
     hal->audio = &stub_audio_ops;
+    hal->buzzer = NULL; /* no piezo buzzer: sound.c's tests use fakes of their own */
     hal->battery = &stub_battery_ops;
     hal->radio = &hal_stub_radio_ops;
 

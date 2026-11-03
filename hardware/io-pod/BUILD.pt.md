@@ -73,7 +73,7 @@ O que o módulo empresta, segundo o firmware do módulo
 | Botões de equipa 1-4 | carregar, manter (a cada 250 ms), largar. O botão N é a N.ª equipa do jogo, como numa Field Box, a não ser que o firmware defina uma cor |
 | Teclado (3x4, através de um PCF8574) | cada tecla |
 | Anel de luzes (WS2812B) | encher com a cor de uma equipa, uma só cor, apagar, brilho, uma barra de progresso |
-| Amplificador e altifalante (MAX98357A) | tons, e os sons do modo tocados como tons; volume |
+| Amplificador e altifalante (MAX98357A), e/ou um besouro piezoelétrico passivo | tons, e os sons do modo tocados como tons; volume |
 | Leitor NFC (PN532) | o registo da etiqueta de quem joga (os cartões de entrada não são passados: o telemóvel entra por código QR ou por texto) |
 | Interruptor da caixa | aberta, fechada: o telemóvel comunica uma abertura à consola da organização como `node.tamper` |
 | Rádio LoRa | o rádio do campo: o telemóvel fala com o controlador de campo através dele, cifrado pelo módulo com a chave do jogo |
@@ -135,7 +135,7 @@ as armadilhas de cada uma), menos o ecrã e a sua janela, mais:
 | 5 | Teclado de membrana 3x4 e um módulo PCF8574 (ou PCF8574A) | 0-1 | Como na Field Box: o PCF8574 alimentado a 3V3; não uma "placa LCD I2C" |
 | 6 | Anel de LED WS2812B, 5 V, com o conversor de nível 74AHCT125, o seu suporte, 100 nF, 330 ohm e 1000 µF | 0-1 | Como na Field Box |
 | 7 | Módulo NFC PN532 (I2C) | 0-1 | Como na Field Box |
-| 8 | Amplificador I2S MAX98357A e um altifalante de 4-8 ohm, 3 W | 0-1 | Como na Field Box; o único som do módulo |
+| 8 | Amplificador I2S MAX98357A e um altifalante de 4-8 ohm, 3 W; e/ou um besouro piezoelétrico passivo | 0-1 | Como na Field Box. O besouro precisa de um firmware do módulo compilado com `CONFIG_ATALAIA_BUZZER=y` e liga-se ao GPIO 45 como diz o [manual da Field Box, secção 9.7](../field-box/BUILD.pt.md#97-áudio-opcional) (decisões BZR-1 a BZR-8; ainda não montado em hardware) |
 | 9 | Medidor de bateria MAX17048 | 1 | Recomendado: o telemóvel mostra o nível da bateria do módulo |
 | 10 | Células 18650 protegidas (uma, ou duas num suporte em **paralelo**) ou um pack 1S com BMS | 1S | **Uma só célula, em série** |
 | 11 | Conversor elevador (boost) de 5 V (saída de 5 V, 2,5 A ou mais), porta-fusível e fusível de 5 A, díodo Schottky (p. ex. 1N5822), interruptor principal tapado, conectores de alavanca | 1 de cada | Como na Field Box ([manual, secção 7](../field-box/BUILD.pt.md)) |
