@@ -245,6 +245,12 @@ class _FieldScript implements FieldOperations {
   final state = <String, Object?>{};
   Map<String, Object?>? pendingEnd;
 
+  /// The outputs the script switched after its own game.end (a scenario's
+  /// `game: end` trigger): sent once the boxes have been told the game ended,
+  /// so they run within the box's end grace instead of being switched off by
+  /// the end (engine.py `FieldScript.held_outputs`; EXP-29).
+  final heldOutputs = <(int, Map<String, Object?>)>[];
+
   FieldController get _fc => engine._fc!;
 
   @override
@@ -279,7 +285,13 @@ class _FieldScript implements FieldOperations {
     }
     // CMD 12 (EXP-23): src field, checked and rate limited by the engine
     // (controller_outputs.dart).
-    if (cmd == 'output') return engine.fieldOutput(nodeId, params);
+    if (cmd == 'output') {
+      if (pendingEnd != null) {
+        heldOutputs.add((nodeId, params));
+        return true;
+      }
+      return engine.fieldOutput(nodeId, params);
+    }
     if (!cmdOpcodes.containsKey(cmd)) return false; // update: the GM's alone
     try {
       return _fc.sendCmd(cmd, params.isEmpty ? null : params, dest: nodeId) !=
@@ -1480,7 +1492,15 @@ class ControllerEngine {
         if (name.isNotEmpty) data['by_name'] = name;
       }
       fc.controllerEvent('game.end', data, null, 'critical');
-      _field?.input('game.end', reason.isEmpty ? null : {'reason': reason});
+      final field = _field;
+      if (field != null) {
+        field.input('game.end', reason.isEmpty ? null : {'reason': reason});
+        final held = [...field.heldOutputs];
+        field.heldOutputs.clear();
+        for (final (nodeId, params) in held) {
+          fieldOutput(nodeId, params); // in the end's grace (_FieldScript)
+        }
+      }
       store.saveScores(id, fc.totalScores);
       _saveGameTime(force: true);
     }

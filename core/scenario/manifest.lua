@@ -74,6 +74,49 @@ m.RADIUS_WARN_M = 10 -- a phone's GPS is rarely better than this
 m.CMD_PARAMS_MAX = 127 -- a box's CMD buffer (the simulator's field_controller.CMD_PARAMS_MAX)
 m.RF_PAYLOAD_MAX = 200 -- a LoRa payload (protocol.RF_PAYLOAD_MAX)
 
+-- Triggers (draft RFC "The expansion port", EXP-25): when something happens in the game, an output
+-- of a box (its function: a siren, a smoke machine) is switched by the field script, CMD 12.
+m.TRIGGERS_MAX = 32
+-- What a trigger waits for, as the one key of its `when`.
+m.WHEN_KEYS = { "completed", "any_completed", "failed", "game" }
+m.GAME_MOMENTS = { "start", "end" }
+m.ACTS = { "on", "pulse", "pattern", "off" }
+-- The keys of an output, by its act (seconds: how long; a pattern's on_ms and off_ms).
+m.OUTPUT_KEYS = {
+  on = { "node", "capability", "act", "seconds" },
+  pulse = { "node", "capability", "act", "seconds" },
+  pattern = { "node", "capability", "act", "seconds", "on_ms", "off_ms" },
+  off = { "node", "capability", "act" },
+}
+m.OUTPUT_SECONDS_MAX = 600 -- CMD 12's ms is at most 600000 (protocol/expansion-port.md)
+m.END_GRACE_S = 10 -- after the game's end a box lets an output run this long, no longer (EXP-29)
+-- A pattern's steps: no faster than a simple output changes state (500 ms, EXP-36), which a relay
+-- module's channel (100 ms) also takes; at most 10 s.
+m.PATTERN_MS_MIN = 500
+m.PATTERN_MS_MAX = 10000
+-- An output's id is its function (protocol/expansion-port.md, EXP-19): siren, strobe, smoke, light
+-- or horn (a second of one function: siren.2), else out.<n>; the functions a box's admin can give
+-- a channel (firmware/esp32/main/outputs.c, outputs_function_ok).
+m.FUNCTIONS = { "siren", "strobe", "smoke", "light", "horn" }
+function m.output_function(s)
+  if type(s) ~= "string" then
+    return false
+  end
+  if find(s, "^out%.[1-9]$") then
+    return true
+  end
+  local name, n = s:match("^([a-z]+)(.*)$")
+  if name == nil or (n ~= "" and not find(n, "^%.[2-9]$")) then
+    return false
+  end
+  for _, f in ipairs(m.FUNCTIONS) do
+    if f == name then
+      return true
+    end
+  end
+  return false
+end
+
 -- One parameter of an objective type: its kind (int, bool, code, destination),
 -- whether it is required, and an int's range.
 local function param(kind, required, lo, hi)
@@ -147,6 +190,7 @@ m.TOP_KEYS = {
   "i18n",
   "nodes",
   "objectives",
+  "triggers",
 }
 m.OBJECTIVE_KEYS = {
   "id",

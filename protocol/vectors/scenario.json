@@ -454,6 +454,144 @@
     }
    }
   }
+ },
+ {
+  "name": "Triggers (EXP-25): a siren on a box no objective targets when every satellite is completed, a strobe's pattern, outputs off, a horn at the start and the end",
+  "manifest": {
+   "id": "org.club.vectors",
+   "version": "1",
+   "name": "Vectors",
+   "teams": [
+    "red",
+    "blue"
+   ],
+   "nodes": {
+    "sat_a": {
+     "role": "objective"
+    },
+    "sat_b": {
+     "role": "objective"
+    },
+    "sat_c": {
+     "role": "objective"
+    },
+    "master": {
+     "role": "objective"
+    },
+    "vip": {
+     "player": true,
+     "role": "vip"
+    }
+   },
+   "objectives": [
+    {
+     "id": "sat_a",
+     "name": "Satellite A",
+     "type": "capture_and_hold",
+     "target": "sat_a"
+    },
+    {
+     "id": "sat_b",
+     "name": "Satellite B",
+     "type": "capture_and_hold",
+     "target": "sat_b"
+    },
+    {
+     "id": "sat_c",
+     "name": "Satellite C",
+     "type": "capture_and_hold",
+     "target": "sat_c"
+    },
+    {
+     "id": "rescue",
+     "name": "Rescue",
+     "type": "escort",
+     "target": "vip",
+     "params": {
+      "destination": {
+       "lat": 38.7223,
+       "lon": -9.1393,
+       "radius_m": 15
+      }
+     }
+    }
+   ],
+   "triggers": [
+    {
+     "when": {
+      "completed": [
+       "sat_a",
+       "sat_b",
+       "sat_c"
+      ]
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "any_completed": [
+       "sat_a",
+       "sat_b"
+      ]
+     },
+     "output": {
+      "node": "master",
+      "capability": "strobe",
+      "act": "pattern",
+      "seconds": 600,
+      "on_ms": 500,
+      "off_ms": 10000
+     }
+    },
+    {
+     "when": {
+      "failed": "rescue"
+     },
+     "output": {
+      "node": "master",
+      "capability": "*",
+      "act": "off"
+     }
+    },
+    {
+     "when": {
+      "failed": "rescue"
+     },
+     "output": {
+      "node": "sat_a",
+      "capability": "smoke.2",
+      "act": "off"
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "sat_b",
+      "capability": "horn",
+      "act": "on",
+      "seconds": 1
+     }
+    },
+    {
+     "when": {
+      "game": "end"
+     },
+     "output": {
+      "node": "sat_c",
+      "capability": "out.9",
+      "act": "pulse",
+      "seconds": 10
+     }
+    }
+   ]
+  }
  }
  ],
  "invalid": [
@@ -2499,6 +2637,1246 @@
      "code": "bad_unicode"
     }
    ]
-  }
+  },
+ {
+  "name": "Triggers that are not a list",
+  "manifest": {
+   "id": "org.club.vectors",
+   "version": "1",
+   "name": "Vectors",
+   "teams": [
+    "red",
+    "blue"
+   ],
+   "nodes": {
+    "sat_a": {
+     "role": "objective"
+    },
+    "sat_b": {
+     "role": "objective"
+    },
+    "sat_c": {
+     "role": "objective"
+    },
+    "master": {
+     "role": "objective"
+    },
+    "vip": {
+     "player": true,
+     "role": "vip"
+    }
+   },
+   "objectives": [
+    {
+     "id": "sat_a",
+     "name": "Satellite A",
+     "type": "capture_and_hold",
+     "target": "sat_a"
+    },
+    {
+     "id": "sat_b",
+     "name": "Satellite B",
+     "type": "capture_and_hold",
+     "target": "sat_b"
+    },
+    {
+     "id": "sat_c",
+     "name": "Satellite C",
+     "type": "capture_and_hold",
+     "target": "sat_c"
+    },
+    {
+     "id": "rescue",
+     "name": "Rescue",
+     "type": "escort",
+     "target": "vip",
+     "params": {
+      "destination": {
+       "lat": 38.7223,
+       "lon": -9.1393,
+       "radius_m": 15
+      }
+     }
+    }
+   ],
+   "triggers": {
+    "when": {
+     "game": "start"
+    },
+    "output": {
+     "node": "master",
+     "capability": "siren",
+     "act": "pulse",
+     "seconds": 10
+    }
+   }
+  },
+  "errors": [
+   {
+    "path": "triggers",
+    "code": "bad_triggers"
+   }
+  ]
+ },
+ {
+  "name": "Triggers: what they wait for (EXP-25)",
+  "manifest": {
+   "id": "org.club.vectors",
+   "version": "1",
+   "name": "Vectors",
+   "teams": [
+    "red",
+    "blue"
+   ],
+   "nodes": {
+    "sat_a": {
+     "role": "objective"
+    },
+    "sat_b": {
+     "role": "objective"
+    },
+    "sat_c": {
+     "role": "objective"
+    },
+    "master": {
+     "role": "objective"
+    },
+    "vip": {
+     "player": true,
+     "role": "vip"
+    }
+   },
+   "objectives": [
+    {
+     "id": "sat_a",
+     "name": "Satellite A",
+     "type": "capture_and_hold",
+     "target": "sat_a"
+    },
+    {
+     "id": "sat_b",
+     "name": "Satellite B",
+     "type": "capture_and_hold",
+     "target": "sat_b"
+    },
+    {
+     "id": "sat_c",
+     "name": "Satellite C",
+     "type": "capture_and_hold",
+     "target": "sat_c"
+    },
+    {
+     "id": "rescue",
+     "name": "Rescue",
+     "type": "escort",
+     "target": "vip",
+     "params": {
+      "destination": {
+       "lat": 38.7223,
+       "lon": -9.1393,
+       "radius_m": 15
+      }
+     }
+    }
+   ],
+   "triggers": [
+    "siren",
+    {
+     "when": null,
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     },
+     "then": 1
+    },
+    {
+     "when": {},
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "completed": [
+       "sat_a"
+      ],
+      "failed": "sat_b"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "captured": [
+       "sat_a"
+      ]
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "completed": "sat_a"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "any_completed": []
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "completed": [
+       "sat_a",
+       "nope",
+       "sat_a",
+       1
+      ]
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "failed": [
+       "rescue"
+      ]
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "failed": "nope"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "pause"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": true
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": [
+      {
+       "game": "start"
+      }
+     ],
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    }
+   ]
+  },
+  "errors": [
+   {
+    "path": "triggers[0]",
+    "code": "bad_trigger"
+   },
+   {
+    "path": "triggers[1].when",
+    "code": "missing"
+   },
+   {
+    "path": "triggers[2].then",
+    "code": "unknown_key"
+   },
+   {
+    "path": "triggers[2].when",
+    "code": "missing"
+   },
+   {
+    "path": "triggers[3].when",
+    "code": "bad_when"
+   },
+   {
+    "path": "triggers[4].when",
+    "code": "bad_when"
+   },
+   {
+    "path": "triggers[5].when.captured",
+    "code": "unknown_key"
+   },
+   {
+    "path": "triggers[6].when.completed",
+    "code": "bad_reference"
+   },
+   {
+    "path": "triggers[7].when.any_completed",
+    "code": "bad_reference"
+   },
+   {
+    "path": "triggers[8].when.completed[1]",
+    "code": "unknown_reference"
+   },
+   {
+    "path": "triggers[8].when.completed[2]",
+    "code": "bad_reference"
+   },
+   {
+    "path": "triggers[8].when.completed[3]",
+    "code": "unknown_reference"
+   },
+   {
+    "path": "triggers[9].when.failed",
+    "code": "unknown_reference"
+   },
+   {
+    "path": "triggers[10].when.failed",
+    "code": "unknown_reference"
+   },
+   {
+    "path": "triggers[11].when.game",
+    "code": "bad_when"
+   },
+   {
+    "path": "triggers[12].when.game",
+    "code": "bad_when"
+   },
+   {
+    "path": "triggers[13].when",
+    "code": "bad_when"
+   }
+  ]
+ },
+ {
+  "name": "Triggers: what they switch (EXP-23, EXP-25)",
+  "manifest": {
+   "id": "org.club.vectors",
+   "version": "1",
+   "name": "Vectors",
+   "teams": [
+    "red",
+    "blue"
+   ],
+   "nodes": {
+    "sat_a": {
+     "role": "objective"
+    },
+    "sat_b": {
+     "role": "objective"
+    },
+    "sat_c": {
+     "role": "objective"
+    },
+    "master": {
+     "role": "objective"
+    },
+    "vip": {
+     "player": true,
+     "role": "vip"
+    }
+   },
+   "objectives": [
+    {
+     "id": "sat_a",
+     "name": "Satellite A",
+     "type": "capture_and_hold",
+     "target": "sat_a"
+    },
+    {
+     "id": "sat_b",
+     "name": "Satellite B",
+     "type": "capture_and_hold",
+     "target": "sat_b"
+    },
+    {
+     "id": "sat_c",
+     "name": "Satellite C",
+     "type": "capture_and_hold",
+     "target": "sat_c"
+    },
+    {
+     "id": "rescue",
+     "name": "Rescue",
+     "type": "escort",
+     "target": "vip",
+     "params": {
+      "destination": {
+       "lat": 38.7223,
+       "lon": -9.1393,
+       "radius_m": 15
+      }
+     }
+    }
+   ],
+   "triggers": [
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": null
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": "siren"
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "nope",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "vip",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": 1,
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "fog",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "out.0",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren.1",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "Siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "*",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "blink",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": false,
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "on"
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 0
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 601
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 1.5
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": true
+     }
+    },
+    {
+     "when": {
+      "game": "end"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 11
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10,
+      "on_ms": 500
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "off",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pattern",
+      "seconds": 10,
+      "on_ms": 499,
+      "off_ms": 10001
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pattern",
+      "seconds": 10
+     }
+    }
+   ]
+  },
+  "errors": [
+   {
+    "path": "triggers[0].output",
+    "code": "missing"
+   },
+   {
+    "path": "triggers[1].output",
+    "code": "bad_output"
+   },
+   {
+    "path": "triggers[2].output.node",
+    "code": "missing"
+   },
+   {
+    "path": "triggers[3].output.node",
+    "code": "unknown_node"
+   },
+   {
+    "path": "triggers[4].output.node",
+    "code": "wrong_role"
+   },
+   {
+    "path": "triggers[5].output.node",
+    "code": "unknown_node"
+   },
+   {
+    "path": "triggers[6].output.capability",
+    "code": "missing"
+   },
+   {
+    "path": "triggers[7].output.capability",
+    "code": "bad_capability"
+   },
+   {
+    "path": "triggers[8].output.capability",
+    "code": "bad_capability"
+   },
+   {
+    "path": "triggers[9].output.capability",
+    "code": "bad_capability"
+   },
+   {
+    "path": "triggers[10].output.capability",
+    "code": "bad_capability"
+   },
+   {
+    "path": "triggers[11].output.capability",
+    "code": "bad_capability"
+   },
+   {
+    "path": "triggers[12].output.act",
+    "code": "missing"
+   },
+   {
+    "path": "triggers[13].output.act",
+    "code": "bad_act"
+   },
+   {
+    "path": "triggers[14].output.act",
+    "code": "bad_act"
+   },
+   {
+    "path": "triggers[15].output.seconds",
+    "code": "missing"
+   },
+   {
+    "path": "triggers[16].output.seconds",
+    "code": "bad_seconds"
+   },
+   {
+    "path": "triggers[17].output.seconds",
+    "code": "bad_seconds"
+   },
+   {
+    "path": "triggers[18].output.seconds",
+    "code": "bad_seconds"
+   },
+   {
+    "path": "triggers[19].output.seconds",
+    "code": "bad_seconds"
+   },
+   {
+    "path": "triggers[20].output.seconds",
+    "code": "bad_seconds"
+   },
+   {
+    "path": "triggers[21].output.on_ms",
+    "code": "unknown_key"
+   },
+   {
+    "path": "triggers[22].output.seconds",
+    "code": "unknown_key"
+   },
+   {
+    "path": "triggers[23].output.on_ms",
+    "code": "bad_pattern"
+   },
+   {
+    "path": "triggers[23].output.off_ms",
+    "code": "bad_pattern"
+   },
+   {
+    "path": "triggers[24].output.on_ms",
+    "code": "missing"
+   },
+   {
+    "path": "triggers[24].output.off_ms",
+    "code": "missing"
+   }
+  ]
+ },
+ {
+  "name": "Too many triggers",
+  "manifest": {
+   "id": "org.club.vectors",
+   "version": "1",
+   "name": "Vectors",
+   "teams": [
+    "red",
+    "blue"
+   ],
+   "nodes": {
+    "sat_a": {
+     "role": "objective"
+    },
+    "sat_b": {
+     "role": "objective"
+    },
+    "sat_c": {
+     "role": "objective"
+    },
+    "master": {
+     "role": "objective"
+    },
+    "vip": {
+     "player": true,
+     "role": "vip"
+    }
+   },
+   "objectives": [
+    {
+     "id": "sat_a",
+     "name": "Satellite A",
+     "type": "capture_and_hold",
+     "target": "sat_a"
+    },
+    {
+     "id": "sat_b",
+     "name": "Satellite B",
+     "type": "capture_and_hold",
+     "target": "sat_b"
+    },
+    {
+     "id": "sat_c",
+     "name": "Satellite C",
+     "type": "capture_and_hold",
+     "target": "sat_c"
+    },
+    {
+     "id": "rescue",
+     "name": "Rescue",
+     "type": "escort",
+     "target": "vip",
+     "params": {
+      "destination": {
+       "lat": 38.7223,
+       "lon": -9.1393,
+       "radius_m": 15
+      }
+     }
+    }
+   ],
+   "triggers": [
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    },
+    {
+     "when": {
+      "game": "start"
+     },
+     "output": {
+      "node": "master",
+      "capability": "siren",
+      "act": "pulse",
+      "seconds": 10
+     }
+    }
+   ]
+  },
+  "errors": [
+   {
+    "path": "triggers",
+    "code": "too_many"
+   }
+  ]
+ }
  ]
 }
