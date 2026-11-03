@@ -50,6 +50,8 @@ elseif(CONFIG_ATALAIA_POD_MODE)
         "pod/pod_json.c"
         "pod/pod_settings.c"
         "pod/pod_ble.c"
+        "sound.c"
+        "sound_esp.c"
         "modem/modem.c"
         "modem/modem_framing.c"
         "key_filter.c"
@@ -75,6 +77,9 @@ elseif(CONFIG_ATALAIA_POD_MODE)
     )
     if(CONFIG_ATALAIA_POD_BLE)
         list(APPEND ATALAIA_SRCS "pod/pod_ble_nimble.c")
+    endif()
+    if(CONFIG_ATALAIA_BUZZER)
+        list(APPEND ATALAIA_SRCS "hal/esp/hal_esp_buzzer.c")
     endif()
     set(ATALAIA_EMBED)
 else()
@@ -156,7 +161,13 @@ else()
         "reset_reason.c"
         "reset_reason_esp.c"
         "target_addon.c"
+        "sound.c"
+        "sound_esp.c"
     )
+    # The optional piezo buzzer (decisions BZR-1 to BZR-8).
+    if(CONFIG_ATALAIA_BUZZER)
+        list(APPEND ATALAIA_SRCS "hal/esp/hal_esp_buzzer.c")
+    endif()
     set(ATALAIA_EMBED EMBED_FILES "wifi_setup.html")
     # Decision SL-25's bench test of listen-before-talk: the bench variant only.
     if(CONFIG_ATALAIA_LBT_BENCH)

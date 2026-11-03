@@ -15,8 +15,12 @@
 #define CMD_SCREEN_QUEUE_MAX 16
 #define CMD_AUDIO_QUEUE_MAX  16
 
+/* A clip to play (clip set); a tone (clip empty, tone_ms > 0); or stop (clip empty, tone_ms 0).
+ * The audio task plays them through sound.c on the speaker and the piezo buzzer. */
 typedef struct {
     char clip[64];
+    uint16_t tone_hz;
+    uint16_t tone_ms;
 } audio_cmd_t;
 
 typedef struct {
@@ -33,7 +37,8 @@ void command_queues_init(command_queues_t *q);
  * routes to the appropriate subsystem:
  *   "ui"   / "screen" -> screen queue
  *   "audio"/ "play"   -> audio queue
- *   "audio"/ "stop"   -> audio queue (empty clip)
+ *   "audio"/ "tone"   -> audio queue (empty clip, tone_hz/tone_ms from [freq, ms])
+ *   "audio"/ "stop"   -> audio queue (empty clip, tone_ms 0)
  *   "ring" / "fill"   -> hal->leds->fill
  *   "ring" / "progress" -> hal->leds (computed)
  *   "ring" / "set_brightness" -> hal->leds->set_brightness

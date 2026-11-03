@@ -18,8 +18,8 @@ segue e a que recorre em todos os passos que as duas montagens partilham.
 > deste guia. O mesmo firmware já correu em placas Heltec V4.3 nuas, numa
 > bancada, com dois botões e o OLED da própria placa (convidadas para jogos
 > pelo rádio, adotadas por USB e por código). **Ainda não testado numa placa a
-> sério:** o anel de luzes, o medidor de bateria, o amplificador, o caminho da
-> energia e a caixa. Corre o firmware da própria Field Box com menos peças
+> sério:** o anel de luzes, o medidor de bateria, o amplificador, o besouro
+> piezoelétrico, o caminho da energia e a caixa. Corre o firmware da própria Field Box com menos peças
 > montadas, por isso todos os pinos abaixo são pinos da Field Box, verificados
 > automaticamente contra os valores por omissão do firmware
 > (`python3 tools/check_wiring.py`, ver
@@ -64,7 +64,7 @@ orçamento, e não foi confrontado com uma montagem a sério.
 ```
 
 **Não tem ecrã a cores, teclado, leitor NFC nem altifalante** (pode juntar-se um
-altifalante, [secção 3](#3-peças)). Por isso:
+besouro piezoelétrico ou um altifalante, [secção 3](#3-peças)). Por isso:
 
 - joga os jogos que um **controlador de campo** dirige: é convidada para um jogo
   pelo rádio e recebe o seu papel (`satellite`, `master`, ou uma zona de
@@ -90,14 +90,16 @@ Decidido (no firmware e nos documentos de conceção):
 - **Uma célula de iões de lítio (1S)** com a proteção da Field Box: fusível,
   díodo Schottky, interruptor principal, conversor elevador (boost) de 5 V para
   o anel de luzes.
+- **O som é opcional**: um besouro piezoelétrico passivo (a peça da
+  especificação de conceção; a maneira mais barata), o amplificador MAX98357A
+  da Field Box e um altifalante pequeno, os dois, ou nenhum. O besouro precisa
+  de um firmware compilado com `CONFIG_ATALAIA_BUZZER=y`
+  ([secção 10](#10-primeiro-arranque-e-primeira-gravação)); toca os sons dos
+  jogos como sequências curtas de bipes (decisões BZR-1 a BZR-8). **O besouro
+  ainda não foi montado em hardware.**
 
 Não decidido, ou ainda sem suporte:
 
-- **O besouro piezo (buzzer)** que a especificação de conceção lista para o
-  Satélite **não tem suporte do firmware**: o firmware só faz som através do
-  amplificador I2S MAX98357A. Monta o amplificador e um altifalante pequeno se
-  quiseres som, ou constrói-a silenciosa. Um controlador de piezo seria uma
-  alteração do firmware (decisão P5J-4, para quem mantém o projeto).
 - **O tamanho e a disposição da caixa**: nenhuma caixa de Satélite foi
   escolhida; a [secção 6](#6-caixa) diz o que ela tem de fazer.
 - **Autonomia com uma célula**: não medida.
@@ -127,8 +129,9 @@ Nenhuma loja é recomendada.
 | 12 | Conectores de alavanca, de 3 e de 4 vias | 2 + 1 | Distribuição da bateria, da massa e dos 5 V |
 | 13 | Extensão USB-C de painel com tampa, dados USB 2.0 | 1 | Opcional: carregar e gravar sem abrir a caixa |
 | 14 | Caixa de derivação IP65, de cor viva, **não metálica**; bucins e um respiro de equalização de pressão | 1 | Grande o bastante para as peças acima com a tampa fechada ([secção 6](#6-caixa)) |
-| 15 | Amplificador I2S MAX98357A e um altifalante de 4-8 ohm | 1 | Opcional: a única maneira de dar som a um Satélite |
-| 16 | Etiquetas: "GAME PROP" e o nome da caixa | 2+ | Obrigatórias |
+| 15 | Besouro piezoelétrico **passivo** (um elemento piezo sem oscilador próprio, 12-30 mm, para 3-24 V) e uma resistência de 220 ohm; para um besouro mais alto, também um transístor NPN (2N2222, BC547 ou S8050), uma resistência de 1 kohm, uma de 10 kohm e outra de 1 kohm | 1 de cada | Opcional, o som mais barato (decisão BZR-6). **Não um besouro ativo** (toca um só tom, peça o firmware o que pedir) e **não um transdutor magnético** (indica a resistência de uma bobina, como 16 ohm): ver a [secção 9](#9-ligações-passo-a-passo), passo 7. **Ainda não montado em hardware** |
+| 16 | Amplificador I2S MAX98357A e um altifalante de 4-8 ohm | 1 | Opcional: sons gravados além dos tons |
+| 17 | Etiquetas: "GAME PROP" e o nome da caixa | 2+ | Obrigatórias |
 
 ## 4. Ferramentas e segurança
 
@@ -183,6 +186,7 @@ falha se esta tabela divergir.
 | I2S BCLK (amplificador opcional) | 6 | `ATALAIA_AUDIO_BCLK_PIN` | cinzento | BCLK do amplificador | 3,3 V | |
 | I2S LRCLK | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | rosa | LRC do amplificador | 3,3 V | |
 | I2S DOUT | 16 | `ATALAIA_AUDIO_DOUT_PIN` | castanho | DIN do amplificador | 3,3 V | |
+| Besouro piezoelétrico (opcional) | 45 | `ATALAIA_BUZZER_PIN` | roxo | 220 ohm até ao piezo, ou 1 kohm até à base do transístor | 3,3 V, em repouso em baixo | Só com `CONFIG_ATALAIA_BUZZER=y`. Um pino de arranque: nada o pode puxar para cima ([secção 9](#9-ligações-passo-a-passo), passo 7) |
 
 Trilhos, não GPIO: VDD de lógica do medidor ao 3V3 do hub (violeta, 3,3 V); COM
 dos botões, GND do medidor e GND do anel ao GND (preto); 5V do anel, VIN do
@@ -193,7 +197,8 @@ medidor à derivação BAT+ (vermelho, 3,0-4,2 V). O endereço I2C do medidor é
 
 Deixa todos os outros pinos da placa sem ligação. O firmware ainda comanda os
 pinos do ecrã da Field Box (GPIO 1, 3, 33, 47) como saídas, por isso nada mais
-pode ser ligado a eles; o GPIO 0, 45 e 46 são pinos de arranque (boot strap); os
+pode ser ligado a eles; o GPIO 0, 45 e 46 são pinos de arranque (boot strap; o
+45 só para o circuito do besouro, que o mantém em baixo); os
 pinos internos da placa estão listados no
 [mapa de pinos da Field Box](../field-box/README.md#pin-assignments-default-kconfig----heltec-v43).
 
@@ -323,7 +328,28 @@ duas pontas de cada fio; só fio multifilar.
 6. **Amplificador (opcional).** BCLK ao GPIO 6, LRC ao GPIO 15, DIN ao GPIO 16;
    VIN e GND às derivações de 5 V; o altifalante a SPK+ e SPK-, nenhum a tocar
    no GND.
-7. **Cabo de bateria da placa.** O "5V in" do hub à derivação de 5 V. Faz o cabo
+7. **Besouro piezoelétrico (opcional; ainda não montado em hardware).** Só um
+   elemento piezo **passivo**. O GPIO 45 é um pino de arranque que tem de estar
+   **em baixo** quando a placa arranca (puxado para cima, escolhe flash de 1,8 V
+   e não arranca): os dois circuitos abaixo mantêm-no em baixo; nunca uses um
+   "módulo de besouro" com uma resistência de pull-up na entrada. Um de dois:
+   - **Direto, baixinho** (uma mesa, uma sala): do GPIO 45 a uma resistência de
+     220 ohm, até ao terminal + do piezo; o outro terminal ao GND. O pino dá
+     no máximo 15 mA durante um instante em cada flanco (3,3 V / 220 ohm; os
+     pinos do ESP32-S3 dão 20 mA por omissão) e bem menos de 1 mA em média;
+   - **Com um transístor, mais alto** (no campo): do GPIO 45 a uma resistência
+     de 1 kohm, até à base de um transístor NPN (2N2222, BC547, S8050); uma
+     resistência de 10 kohm da base ao GND (mantém o pino em baixo no
+     arranque); emissor ao GND; o piezo do trilho de 5 V ao coletor, com uma
+     resistência de 1 kohm em paralelo com o piezo (descarrega-o entre os
+     impulsos). O pino dá cerca de 2,6 mA ((3,3 V - 0,7 V) / 1 kohm); o piezo
+     oscila entre 0 e 5 V. Um transdutor magnético (uma bobina de 16-42 ohm)
+     só funciona aqui com um díodo 1N4148 em paralelo (risca para os 5 V),
+     nunca diretamente no pino.
+
+   Verifica, antes de qualquer energia: nenhuma continuidade do GPIO 45 ao
+   3V3 ou aos 5 V.
+8. **Cabo de bateria da placa.** O "5V in" do hub à derivação de 5 V. Faz o cabo
    para a tomada de bateria da placa a partir de BAT+ e da derivação GND da
    bateria, e depois **mede a sua polaridade** (célula posta, fusível posto,
    interruptor ligado, ficha fora da placa) contra as marcas + e - junto à
@@ -366,6 +392,7 @@ díodo virada para BAT+, a risca do condensador do anel virada para o GND; o
    | Sem terceiro botão | `CONFIG_ATALAIA_BTN3_PIN=-1` |
    | Sem expansor do teclado (e portanto sem botão 4) | `CONFIG_ATALAIA_KP_P7_BUTTON=0` |
    | Sem amplificador | `CONFIG_ATALAIA_AUDIO_BCLK_PIN=-1` (áudio desligado) |
+   | Besouro piezoelétrico montado | `CONFIG_ATALAIA_BUZZER=y` (no GPIO 45, `CONFIG_ATALAIA_BUZZER_PIN`) |
    | Antena com mais de 2 dBi | `CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI=` o seu ganho, arredondado para cima |
 
 5. **Registo de arranque.** Num monitor série na porta USB: espera um aviso por
@@ -375,7 +402,7 @@ díodo virada para BAT+, a risca do condensador do anel virada para o GND; o
 6. **Bring-up.** Faz os passos de
    [`BRING_UP.md`](../../firmware/esp32/docs/BRING_UP.md) (em inglês) que se
    aplicam: 1 (primeiro arranque), 2 (Vext: o OLED da placa), 4 (botões), 6
-   (LED), 8 (áudio, se montado), 9 (bateria), **10 (rádio, potência de emissão:
+   (LED), 8 (áudio e besouro, se montados), 9 (bateria), **10 (rádio, potência de emissão:
    nenhum jogo antes dela)**, 10a (adoção), 10b e 10b2 (entrar no jogo de um
    controlador). Salta o passo do eFuse (passo 0) numa primeira caixa: queimar
    um eFuse não se desfaz.
@@ -421,6 +448,8 @@ particular:
 | Sem código de emparelhamento no OLED | A caixa já está adotada, ou entrou num jogo; uma caixa só mostra o código quando não está adotada |
 | Anel de luzes apagado | Interruptor desligado (sem 5 V só com USB); DIN e DOUT trocados; o 74AHCT125 em falta ou ao contrário; o seu pino 1 fora do GND |
 | Nível de bateria desconhecido, sem aviso de bateria fraca na consola | Sem MAX17048 montado, ou falta o fio de medição de bateria |
+| Besouro calado | O firmware foi compilado sem `CONFIG_ATALAIA_BUZZER=y` (o registo de arranque não tem a linha `piezo buzzer on GPIO 45`); um besouro ativo ou um módulo em vez de um piezo passivo; o volume a 0 |
+| Deixou de arrancar desde que se montou o besouro | Algo puxa o GPIO 45 para cima: o pull-up de um módulo, ou falta a resistência de 10 kohm do transístor. Tira o besouro e verifica o circuito |
 | Algo quente, um cheiro, fumo | Desliga logo, tira o fusível, tira a célula para um saco à prova de fogo |
 
 Se encontrares uma avaria que não está aqui, ou um passo errado, abre uma

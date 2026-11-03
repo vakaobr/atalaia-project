@@ -18,7 +18,7 @@ from typing import Any, Optional
 from unittest import mock
 from urllib.parse import parse_qs, urlsplit
 
-import httpx
+import httpx2
 
 from atalaia_server import personal_data, quotas
 from atalaia_server.config import OidcClient, Settings
@@ -67,8 +67,8 @@ class LoginTestCase(AppTestCase):
 
     # Social login ---------------------------------------------------------------------------------
 
-    async def begin(self, provider: str = "google", *, client: Optional[httpx.AsyncClient] = None,
-                    headers: Optional[dict[str, str]] = None, **body: Any) -> tuple[dict[str, str], httpx.Response]:
+    async def begin(self, provider: str = "google", *, client: Optional[httpx2.AsyncClient] = None,
+                    headers: Optional[dict[str, str]] = None, **body: Any) -> tuple[dict[str, str], httpx2.Response]:
         client = client or self.client
         r = await client.post(f"/api/v1/auth/oidc/{provider}/start",
                               json={"purpose": "login", "notice_seen": True, "age_confirmed": True, **body}, headers=headers or {})
@@ -76,21 +76,21 @@ class LoginTestCase(AppTestCase):
         return params, r
 
     async def callback(self, provider: str, params: dict[str, str], subject: str, *,
-                       client: Optional[httpx.AsyncClient] = None, state: Optional[str] = None,
-                       claims: Optional[dict[str, Any]] = None) -> httpx.Response:
+                       client: Optional[httpx2.AsyncClient] = None, state: Optional[str] = None,
+                       claims: Optional[dict[str, Any]] = None) -> httpx2.Response:
         code = self.idp.grant(params, self.idp.claims(provider, CLIENT_IDS[provider], subject, params["nonce"],
                                                       **(claims or {})))
         return await (client or self.client).get(f"/api/v1/auth/oidc/{provider}/callback",
                                                   params={"code": code, "state": state or params["state"]})
 
     @staticmethod
-    def landed(r: httpx.Response) -> tuple[str, dict[str, str], str]:
+    def landed(r: httpx2.Response) -> tuple[str, dict[str, str], str]:
         """Where a callback sent the browser: the path, the query and the fragment."""
         assert r.status_code == 303, (r.status_code, r.text)
         location = urlsplit(r.headers["location"])
         return location.path, {k: v[0] for k, v in parse_qs(location.query).items()}, location.fragment
 
-    async def social(self, provider: str, subject: str, *, client: Optional[httpx.AsyncClient] = None,
+    async def social(self, provider: str, subject: str, *, client: Optional[httpx2.AsyncClient] = None,
                      signup: bool = True) -> dict[str, Any]:
         """A whole social login: the session's JSON."""
         client = client or self.client
@@ -111,7 +111,7 @@ class LoginTestCase(AppTestCase):
     # Passkeys -------------------------------------------------------------------------------------
 
     async def add_passkey(self, headers: dict[str, str], authenticator: Optional[SoftAuthenticator] = None,
-                          password: str = PASSWORD, name: Optional[str] = None) -> tuple[SoftAuthenticator, httpx.Response]:
+                          password: str = PASSWORD, name: Optional[str] = None) -> tuple[SoftAuthenticator, httpx2.Response]:
         authenticator = authenticator or SoftAuthenticator()
         r = await self.client.post("/api/v1/me/passkeys/options", json={"password": password}, headers=headers)
         self.assertEqual(r.status_code, 200, r.text)
@@ -132,7 +132,7 @@ class LoginTestCase(AppTestCase):
         self.assertEqual(r.status_code, 200, r.text)
         return r.json()
 
-    async def passkey_login(self, authenticator: SoftAuthenticator, **kw: Any) -> httpx.Response:
+    async def passkey_login(self, authenticator: SoftAuthenticator, **kw: Any) -> httpx2.Response:
         parts = await self.passkey_login_parts()
         return await self.client.post("/api/v1/auth/passkey/login", json={
             "challenge_token": parts["challenge_token"],
@@ -1062,7 +1062,7 @@ class StaffSecondFactorTests(LoginTestCase):
         r = await self.client.post("/api/v1/fields", headers=self.as_admin, json={"name": "Campo", "slug": "campo"})
         self.field = r.json()["id"]
 
-    async def grant(self, name: str, role: str = "gm") -> httpx.Response:
+    async def grant(self, name: str, role: str = "gm") -> httpx2.Response:
         return await self.client.put(f"/api/v1/fields/{self.field}/roles", headers=self.as_admin,
                                      json={"username": name, "role": role})
 

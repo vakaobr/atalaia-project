@@ -12,6 +12,7 @@ as the packets they become.
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import tempfile
 import threading
 import unittest
@@ -251,6 +252,16 @@ class HubLoopTests(unittest.TestCase):
             t.join(10)
         self.assertEqual(seen, {"a": "loop-a", "b": "loop-b"})
         self.assertEqual(got, {"a": {"type": "system", "kind": "test"}, "b": {"type": "system", "kind": "test"}})
+
+
+class TestClientHttpTests(unittest.TestCase):
+    """PLK-3: the test client is built on httpx2 where it is installed (the pinned lock; Starlette 1.x
+    warns when it has only httpx) and on httpx where that is all there is (Ubuntu's packages, whose
+    older Starlette knows no httpx2). The tests' own clients take the same one."""
+
+    def test_built_on_httpx2_where_installed(self):
+        want = "httpx2" if importlib.util.find_spec("httpx2") else "httpx"
+        self.assertIn(want, {cls.__module__.split(".")[0] for cls in TestClient.__mro__})
 
 
 if __name__ == "__main__":

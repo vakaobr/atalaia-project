@@ -25,7 +25,7 @@ from atalaia_controller import channels
 from atalaia_controller.radio_modem import UP, MeasureError, RadioModem
 from atalaia_controller.store import Store
 from atalaia_sim import codec, eu868
-from atalaia_sim.packet import (Header, ack_decode, cmd_decode, hello_encode, state_encode,
+from atalaia_sim.packet import (Header, ack_decode, cmd_decode, header_encode, hello_encode, state_encode,
                                 time_decode, time_encode, vf_ack, vf_enc, vf_make)
 from atalaia_sim.protocol import MESSAGE_TYPES
 
@@ -118,15 +118,39 @@ class ModemHostTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: (self.modem.status or {}).get("rx_auth_fail", 0) >= 2, 3))
         self.assertEqual([r.header.seq for r in self.rx], [0, 2])
 
+    # The TX_ACKs of the nonce guard's three frames, in no particular order. A refusal (nonce_reuse,
+    # invalid) is answered as the modem reads the frame; "ok" when the radio is done with it: on a
+    # real board after its time on air, on the host modem once it has handled everything one read of
+    # the serial socket brought. So when the frames arrive together (a loaded machine: the host modem
+    # was not scheduled between the controller's writes) "ok" comes last (2026-11-02). The controller
+    # matches a TX_ACK by its seq (Controller._on_tx_ack, protocol/usb-modem.md), never by order.
+    NONCE_GUARD_ACKS = [(4, "nonce_reuse"), (4, "ok"), (6, "invalid")]
+
+    def nonce_guard_frames(self) -> list[tuple[Header, bytes]]:
+        hdr = Header(vf_make(1, 1, False, True), GAME, 0, 4, 2, MESSAGE_TYPES["CMD"])
+        wrong_source = Header(vf_make(1, 1, False, True), GAME, 5, 6, 2, MESSAGE_TYPES["CMD"])
+        return [(hdr, b"\xa1\x01\x05"), (hdr, b"\xa1\x01\x05"), (wrong_source, b"\xa1\x01\x05")]  # same seq again
+
     def test_nonce_guard_and_bad_tx(self):
         self.configure(epoch=3)
-        hdr = Header(vf_make(1, 1, False, True), GAME, 0, 4, 2, MESSAGE_TYPES["CMD"])
-        self.assertTrue(self.modem.send_packet(hdr, b"\xa1\x01\x05"))
-        self.assertTrue(self.modem.send_packet(hdr, b"\xa1\x01\x05"))  # same seq again
-        wrong_source = Header(vf_make(1, 1, False, True), GAME, 5, 6, 2, MESSAGE_TYPES["CMD"])
-        self.assertTrue(self.modem.send_packet(wrong_source, b"\xa1\x01\x05"))
+        for header, payload in self.nonce_guard_frames():
+            self.assertTrue(self.modem.send_packet(header, payload))
         self.assertTrue(wait_for(lambda: len(self.acks) == 3))
-        self.assertEqual(self.acks, [(4, "ok"), (4, "nonce_reuse"), (6, "invalid")])
+        self.assertEqual(sorted(self.acks), self.NONCE_GUARD_ACKS)
+        self.assertEqual(len(self.host.transmitted_all()), 1)
+
+    def test_nonce_guard_frames_in_one_read(self):
+        """The same three frames in one write, so the host modem reads them at once: the interleaving a
+        loaded machine gives test_nonce_guard_and_bad_tx now and then, every time. The refusals come
+        before the "ok", and the guard still holds."""
+        self.configure(epoch=3)
+        burst = b"".join(mf.encode_frame(mf.TX, mf.tx_payload(header_encode(header), payload))
+                         for header, payload in self.nonce_guard_frames())
+        self.assertTrue(self.modem.state == UP and self.modem._port is not None)
+        with self.modem._write_lock:
+            self.modem._port.write(burst)
+        self.assertTrue(wait_for(lambda: len(self.acks) == 3))
+        self.assertEqual(self.acks, [(4, "nonce_reuse"), (6, "invalid"), (4, "ok")])
         self.assertEqual(len(self.host.transmitted_all()), 1)
 
     def test_bad_configure_is_an_error(self):

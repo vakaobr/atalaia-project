@@ -58,7 +58,40 @@ static void test_audio_stop_command(void)
     command_dispatch("audio", "stop", "[]", &hal, &q);
 
     CHECK(q.audio_count == 1);
-    CHECK(q.audio[0].clip[0] == '\0'); /* empty clip = stop */
+    CHECK(q.audio[0].clip[0] == '\0'); /* empty clip, no tone = stop */
+    CHECK(q.audio[0].tone_ms == 0);
+}
+
+/* audio.tone(freq, ms) (decision BZR-2): queued for the audio task, capped like the pod's. */
+static void test_audio_tone_command(void)
+{
+    hal_t hal;
+    hal_stub_init(&hal);
+    command_queues_t q;
+    command_queues_init(&q);
+
+    command_dispatch("audio", "tone", "[1000,200]", &hal, &q);
+    CHECK(q.audio_count == 1);
+    CHECK(q.audio[0].clip[0] == '\0' && q.audio[0].tone_hz == 1000 && q.audio[0].tone_ms == 200);
+
+    command_dispatch("audio", "tone", "[30000, 60000]", &hal, &q); /* capped */
+    CHECK(q.audio_count == 2 && q.audio[1].tone_hz == 20000 && q.audio[1].tone_ms == 10000);
+
+    command_dispatch("audio", "tone", "[0,150]", &hal, &q); /* a rest */
+    CHECK(q.audio_count == 3 && q.audio[2].tone_hz == 0 && q.audio[2].tone_ms == 150);
+
+    /* Not a tone: missing or bad arguments, or no length (which would read as a stop). */
+    command_dispatch("audio", "tone", "[1000]", &hal, &q);
+    command_dispatch("audio", "tone", "[]", &hal, &q);
+    command_dispatch("audio", "tone", "[\"x\",1]", &hal, &q);
+    command_dispatch("audio", "tone", "[1000,0]", &hal, &q);
+    command_dispatch("audio", "tone", "[1000,-5]", &hal, &q);
+    command_dispatch("audio", "tone", NULL, &hal, &q);
+    CHECK(q.audio_count == 3);
+
+    /* audio.play() without a clip is not a stop. */
+    command_dispatch("audio", "play", "[]", &hal, &q);
+    CHECK(q.audio_count == 3);
 }
 
 static void test_led_fill_command(void)
@@ -101,6 +134,7 @@ void run_command_dispatch_tests(void)
     test_screen_command();
     test_audio_play_command();
     test_audio_stop_command();
+    test_audio_tone_command();
     test_led_fill_command();
     test_team_display_command();
 }

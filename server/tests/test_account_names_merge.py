@@ -14,7 +14,7 @@ import uuid
 from typing import Any, Optional
 from urllib.parse import parse_qs
 
-import httpx
+import httpx2
 
 from atalaia_server import oidc, personal_data
 from atalaia_server.api import account_merge
@@ -154,7 +154,7 @@ class UsernameStepTests(LoginTestCase):
 class RenameTests(LoginTestCase):
     """Any account renames itself, confirming with its own login method."""
 
-    async def rename(self, headers: dict[str, str], username: str, **body: Any) -> httpx.Response:
+    async def rename(self, headers: dict[str, str], username: str, **body: Any) -> httpx2.Response:
         return await self.client.patch("/api/v1/me", headers=headers, json={"username": username, **body})
 
     async def test_a_passkey_confirms(self) -> None:
@@ -290,10 +290,10 @@ class MergeTests(LoginTestCase):
         self.assertEqual((path, query), ("/staff/login", {"oidc": "merge"}), query)
         return parse_qs(fragment)["merge"][0]
 
-    async def merge(self, headers: dict[str, str], ticket: str, **body: Any) -> httpx.Response:
+    async def merge(self, headers: dict[str, str], ticket: str, **body: Any) -> httpx2.Response:
         return await self.client.post("/api/v1/me/merge", headers=headers, json={"ticket": ticket, **body})
 
-    async def preview(self, headers: dict[str, str], ticket: str) -> httpx.Response:
+    async def preview(self, headers: dict[str, str], ticket: str) -> httpx2.Response:
         return await self.client.post("/api/v1/me/merge/preview", headers=headers, json={"ticket": ticket})
 
     async def seed(self, a: uuid.UUID, b: uuid.UUID) -> dict[str, Any]:

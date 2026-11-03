@@ -191,6 +191,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/status_hold.c
     ${SHELL_DIR}/tft_splash.c
     ${SHELL_DIR}/target_addon.c
+    ${SHELL_DIR}/sound.c
     ${SHELL_DIR}/hal/board_fem.c
     ${SHELL_DIR}/modem/modem.c
     ${SHELL_DIR}/modem/modem_framing.c
@@ -259,6 +260,7 @@ set(TEST_SOURCES
     test_status_hold.c
     test_tft_splash.c
     test_target_addon.c
+    test_sound.c
 )
 
 # ---- Executable --------------------------------------------------------------
@@ -347,7 +349,7 @@ endif()
 
 # ---- The I/O pod's GATT service with the Bluetooth stack stubbed --------------
 add_executable(ble_gatt_stub_test test_ble_gatt_stub.c
-    ${SHELL_DIR}/pod/pod.c ${SHELL_DIR}/pod/pod_ble.c ${SHELL_DIR}/pod/pod_caps.c
+    ${SHELL_DIR}/pod/pod.c ${SHELL_DIR}/pod/pod_ble.c ${SHELL_DIR}/pod/pod_caps.c ${SHELL_DIR}/sound.c
     ${SHELL_DIR}/pod/pod_json.c ${SHELL_DIR}/key_filter.c ${SHELL_DIR}/modem/modem.c
     ${SHELL_DIR}/modem/modem_framing.c ${SHELL_DIR}/radio/radio_protocol.c
     ${SHELL_DIR}/radio/radio_task.c ${SHELL_DIR}/radio/noise_stats.c)

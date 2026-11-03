@@ -30,8 +30,10 @@
 #   GPIO 0  -- boot mode (PRG button on V4.3). Do not use.
 #   GPIO 3  -- JTAG source select, ignored unless an eFuse (not burnt on
 #              the V4) asks for it. Used here for DISP_DC.
-#   GPIO 45 -- VDD_SPI voltage.  NOT used.  An external pull-up here
-#              selects 1.8 V flash and prevents booting.
+#   GPIO 45 -- VDD_SPI voltage.  NOT used, except by the optional piezo
+#              buzzer (ATALAIA_BUZZER_PIN, decision BZR-1), whose circuit
+#              keeps it low.  An external pull-up here selects 1.8 V flash
+#              and prevents booting.
 #   GPIO 46 -- boot log verbosity.  NOT used (and the V4.2's FEM PA line).
 #
 # GNSS connector (SH1.25, 8 pins): the module that comes with the V4 plugs in
@@ -360,6 +362,44 @@ menu "Atalaia Field Box Configuration"
             default 16
             help
                 GPIO 16, freed from keypad. Non-strapping.
+    endmenu
+
+    # ---- Piezo buzzer (optional; decisions BZR-1 to BZR-8) ---------------------
+    menu "Piezo buzzer"
+        depends on ATALAIA_NODE_MODE || ATALAIA_POD_MODE
+
+        config ATALAIA_BUZZER
+            bool "A passive piezo buzzer is fitted"
+            default n
+            help
+                The cheapest sound: a passive piezo element (no oscillator
+                of its own) on ATALAIA_BUZZER_PIN, sounded with square-wave
+                tones from the LEDC PWM peripheral. With or without the
+                MAX98357A amplifier: a tone (audio.tone) sounds on every
+                part fitted, together; a clip (audio.play) plays its sound
+                file on the speaker when there is one
+                (/littlefs/audio/<clip>.wav), otherwise its short tone
+                pattern (main/sound.c) on every part fitted. The volume
+                setting sets the PWM duty (0 = silent). Off by default: a
+                build without it has no buzzer code. Not yet tried on
+                hardware. Wiring: hardware/field-box/BUILD.md, section 9.7.
+
+        config ATALAIA_BUZZER_PIN
+            int "Buzzer GPIO"
+            depends on ATALAIA_BUZZER
+            default 45
+            help
+                GPIO 45 (decision BZR-1): the one header pin that no part of
+                the Field Box, the Satellite or the I/O pod uses (every
+                other free GPIO is taken; GPIO 43 would buzz with the
+                console's log at every boot). It is the VDD_SPI strapping
+                pin, read at reset: it must be low then (an internal
+                pull-down; high selects 1.8 V flash and the board does not
+                boot). The buzzer's circuit keeps it low: a piezo through
+                220 ohm to GND, or an NPN transistor's base through 1 kohm
+                with 10 kohm to GND. Never a buzzer module with a pull-up.
+                The firmware drives it low whenever the buzzer is silent.
+                tools/check_wiring.py allows GPIO 45 for this pin only.
     endmenu
 
     # ---- Battery gauge (MAX17048 over I2C, shared bus with NFC and OLED) ----
@@ -701,7 +741,7 @@ menu "Atalaia Field Box Configuration"
 
         config ATALAIA_OTA_RELEASE_KEYS
             string "Release public keys (64 hex digits each, separated by spaces)"
-            default "e6dccf90dd002529fe837e023f9f658a70917ff7dc69615cec600083bab360d7 ac83bca20314dcb44b2ed9ede91cacf9445d2987e636fe66c6fb91250b17f53c"
+            default "e6dccf90dd002529fe837e023f9f658a70917ff7dc69615cec600083bab360d7 ac83bca20314dcb44b2ed9ede91cacf9445d2987e636fe66c6fb91250b17f53c efa798e41a0c438447a21857ffc892525214039a39127b5f93b105054c696d26"
             help
                 The Ed25519 public keys whose signatures this firmware accepts
                 on a firmware release (up to 4, so a key can be rotated: ship a
@@ -712,8 +752,9 @@ menu "Atalaia Field Box Configuration"
                 Empty: the box refuses every update ("no_key"), and an image
                 without a key never confirms itself after an update, so the
                 bootloader goes back to the previous one.
-                Default: the project's two release keys, root 424d053af5cdbc35
-                and CI 32b3c815ac30ad43 (docs/community/keys.md).
+                Default: the project's three release keys, root 424d053af5cdbc35,
+                CI 32b3c815ac30ad43 and the next CI key a4f6002b0122b131, which
+                replaces it (docs/community/keys.md, RELEASE_SIGNING.md).
 
         config ATALAIA_OTA_VARIANT
             string "Variant name in the image's descriptor (at most 11 characters)"

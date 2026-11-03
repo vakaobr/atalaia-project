@@ -29,6 +29,7 @@ add_executable(pod_host
     pod_host.c
     ${MAIN_DIR}/pod/pod.c
     ${MAIN_DIR}/pod/pod_caps.c
+    ${MAIN_DIR}/sound.c
     ${MAIN_DIR}/pod/pod_json.c
     ${MAIN_DIR}/pod/pod_settings.c
     ${MAIN_DIR}/pod/pod_ble.c
