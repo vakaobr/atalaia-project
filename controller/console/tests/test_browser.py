@@ -5189,14 +5189,21 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(phone.get_by_test_id("box-language-settings")).to_be_visible()
         expect(phone.get_by_test_id("access-tokens")).to_have_count(0)
         expect(phone.get_by_test_id("readonly")).to_have_count(0)
-        # Revoking ends it at once: the phone's next call is refused and it is sent back to the login.
+        # Revoking ends it at once: the phone's open stream is closed (it asks again every STREAM_RECHECK_S, 5 s),
+        # the phone is sent back to the login and forgets the code.
         page.once("dialog", lambda d: d.accept())
         page.get_by_test_id("token-revoke").click()
         expect(page.get_by_test_id("token-row")).to_have_attribute("data-status", "revoked")
         self.assertEqual(httpx.get(self.field.base + "/api/v1/whoami",
                                    headers={"Authorization": f"Bearer {token}"}).status_code, 401)
-        phone.reload()
-        expect(phone.get_by_test_id("login")).to_be_visible()
+        expect(phone.get_by_test_id("login")).to_be_visible(timeout=15000)
+        expect(phone.locator("main.login [role=alert]")).to_contain_text("deixou de ser aceite")
+        self.assertIsNone(phone.evaluate("localStorage.getItem('atalaia.token')"))
+        # The revoked code, opened again, is refused. The login form is on the page before the controller has
+        # answered, so the test waits for the refusal itself before it forgets the 401s it caused on purpose
+        # (otherwise the answer can land after drop_errors: CI run 41657313571).
+        again = self.page(f"/console/#token={token}")
+        expect(again.locator("main.login [role=alert]")).to_contain_text("Código de acesso errado")
         self.drop_errors("401")
         # A read scope token is a read-only console, and the read code never gets the panel either.
         r = self.field.http.post("/api/v1/tokens", json={"label": "Ecrã", "scope": "read", "ttl_s": 3600})
