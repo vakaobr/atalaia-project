@@ -300,8 +300,11 @@ jobs:
           cmake -S firmware/esp32/test/modem_host -B build/modem_host -DCMAKE_BUILD_TYPE=Debug
           cmake --build build/modem_host
           # mbedtls linked statically: the Flutter image has none (tools/docker_app.py does the same).
+          # All three libraries: box_host links mbedtls and mbedx509 too since its HTTPS mode fetch (#32).
           cmake -S firmware/esp32/test/box_host -B build/box_host -DCMAKE_BUILD_TYPE=Debug \
-            -DMBEDCRYPTO_LIB=$(ls /usr/lib/*/libmbedcrypto.a | head -n 1)
+            -DMBEDCRYPTO_LIB=$(ls /usr/lib/*/libmbedcrypto.a | head -n 1) \
+            -DMBEDTLS_LIB=$(ls /usr/lib/*/libmbedtls.a | head -n 1) \
+            -DMBEDX509_LIB=$(ls /usr/lib/*/libmbedx509.a | head -n 1)
           cmake --build build/box_host
       - name: Build the pinned Flutter image (tools/dev/flutter/Dockerfile, SDK checked by SHA-256)
         run: docker build -t atalaia-flutter:3.47.9 tools/dev/flutter
