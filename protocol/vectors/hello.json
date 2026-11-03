@@ -45,6 +45,37 @@
         "device_id": "5a17c0de0b0e1234"
       },
       "cbor": "aa0168626f782d6133663102010365302e342e300465302e322e3005000683000105070108185709030a485a17c0de0b0e1234"
+    },
+    {
+      "name": "hello_box_capability_ids",
+      "description": "A Field Box with a target module and a simple output: button, keypad, display, led, audio, nfc, hit, output, battery (protocol/schema/capabilities.yaml, decision EXP-20)",
+      "fields": {
+        "node_name": "box-a3f1",
+        "platform": 1,
+        "fw_version": "0.7.0",
+        "core_version": "0.7.0",
+        "tier": 0,
+        "capabilities": [1, 2, 3, 4, 5, 6, 10, 11, 12],
+        "transports": 3,
+        "battery_pct": 87,
+        "epoch": 3
+      },
+      "cbor": "a90168626f782d6133663102010365302e372e300465302e372e30050006890102030405060a0b0c07030818570903"
+    },
+    {
+      "name": "hello_unknown_capability_id",
+      "description": "A phone with an I/O pod: button, led, audio, nfc, gps, hit, output, tamper, and 99, an id a receiver does not know and ignores",
+      "fields": {
+        "node_name": "pod-7c21",
+        "platform": 3,
+        "fw_version": "0.7.0",
+        "core_version": "0.7.0",
+        "tier": 0,
+        "capabilities": [1, 4, 5, 6, 8, 10, 11, 13, 99],
+        "transports": 6,
+        "epoch": 1
+      },
+      "cbor": "a80168706f642d3763323102030365302e372e300465302e372e300500068901040506080a0b0d186307060901"
     }
   ],
   "invalid": [

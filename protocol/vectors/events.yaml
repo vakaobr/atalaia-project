@@ -92,6 +92,20 @@ valid:
   - name: "A box confirms a capture setup (id 56; kind, key 11)"
     event: {"node": 3, "seq": 7, "t": 1000, "type": "node.setup_applied", "data": {"kind": "capture"}}
     cbor: "a5 01 03 02 07 03 19 03 e8 04 18 38 08 a1 0b 67 63 61 70 74 75 72 65"
+  # The expansion port and the simple output (draft RFC "The expansion port", decisions EXP-21, EXP-36; ids 57-59,
+  # data keys 42-45). Bytes written with the Python codec (simulator/atalaia_sim/codec.py); the C and Dart codecs check them.
+  - name: "A box says what is plugged in: a simple output and a target module (id 57; modules, key 42)"
+    event: {"node": 3, "seq": 5, "t": 0, "type": "node.modules", "data": {"modules": "g46:servo:siren;58:target/1.0.0:hit"}}
+    cbor: "a5 01 03 02 05 03 00 04 18 39 08 a1 18 2a 78 23 67 34 36 3a 73 65 72 76 6f 3a 73 69 72 65 6e 3b 35 38 3a 74 61 72 67 65 74 2f 31 2e 30 2e 30 3a 68 69 74"
+  - name: "A target module stops answering during a game (id 58, critical by default; modules, reason)"
+    event: {"node": 3, "seq": 9, "t": 754000, "type": "node.module_lost", "data": {"modules": "58:target/1.0.0:hit", "reason": "no_answer"}}
+    cbor: "a5 01 03 02 09 03 1a 00 0b 81 50 04 18 3a 08 a2 18 2a 73 35 38 3a 74 61 72 67 65 74 2f 31 2e 30 2e 30 3a 68 69 74 03 69 6e 6f 5f 61 6e 73 77 65 72"
+  - name: "Bomb's script fires the smoke for 30 s (id 59; capability, ms, source: keys 43-45)"
+    event: {"node": 1, "seq": 40, "t": 1800000, "type": "output.switched", "data": {"capability": "smoke", "ms": 30000, "source": "script"}}
+    cbor: "a5 01 01 02 18 28 03 1a 00 1b 77 40 04 18 3b 08 a3 18 2b 65 73 6d 6f 6b 65 18 2c 19 75 30 18 2d 66 73 63 72 69 70 74"
+  - name: "The GM turns a siren off before its time (id 59, ms 0)"
+    event: {"node": 7, "seq": 12, "t": 1830000, "type": "output.switched", "data": {"capability": "siren", "ms": 0, "source": "gm"}}
+    cbor: "a5 01 07 02 0c 03 1a 00 1b ec 70 04 18 3b 08 a3 18 2b 65 73 69 72 65 6e 18 2c 00 18 2d 62 67 6d"
   # Node health (decisions S19-9, FU1-1 to FU1-6): a box's own battery.low (the link's event
   # seq 0, telemetry by default so no prio key), and the link events the controller logs about a
   # box (the box's node id). Bytes worked out by hand from RFC 8949 (major types 0, 3 and 5).
