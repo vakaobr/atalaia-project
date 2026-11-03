@@ -74,7 +74,8 @@ class App extends Component {
         this.setState({ ready: true, lang: l });
         // The field's branding is public: the login page shows it before any token (decision BR3).
         // With a token, after whoami, and only from a controller that serves it (PE24-70).
-        if (this.state.token) this.login(this.state.token);
+        // A code kept from an earlier visit (not one given in the address) that is now refused is forgotten (RTK-1).
+        if (this.state.token) this.login(this.state.token, !GIVEN.token);
         else this.loadBranding();
         this.ticker = setInterval(() => this.tick(), 1000);
         this.refresher = setInterval(() => this.refresh(), 10000);
@@ -109,7 +110,12 @@ class App extends Component {
 
     // ---- login ----------------------------------------------------------------
 
-    async login(token) {
+    /** Logs in with `token`. `saved`: it is the code this browser kept from an earlier visit, not one just
+     * typed or given in the address: refused now (revoked, expired), it is forgotten, as when a live stream
+     * is closed for it, and the login page says it is no longer accepted rather than wrong (decision RTK-1).
+     * Only a 401 is a refusal: no answer (the controller unreachable) or a 403 (a code that is not accepted
+     * over plain HTTP, FLD-4) keeps it, for the next start (RTK-2). */
+    async login(token, saved = false) {
         const secure = await httpsAddress();
         if (secure) {
             this.setState({ role: null, loginError: t('login.use_https', { url: secure }) });
@@ -127,7 +133,8 @@ class App extends Component {
             this.checkPosterChanged(who.role);
             if (this.serves('branding')) this.loadBranding();
         } catch (e) {
-            this.setState({ role: null, loginError: e.status === 401 ? t('login.bad') : e.message });
+            if (saved && e.status === 401) this.logout(t('login.expired'));
+            else this.setState({ role: null, loginError: e.status === 401 ? t('login.bad') : e.message });
             this.loadBranding(); // for the login page
         }
     }

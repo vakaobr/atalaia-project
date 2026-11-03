@@ -4253,7 +4253,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v18').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v19').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):
@@ -5209,6 +5209,54 @@ class ConsoleBrowserTests(unittest.TestCase):
         read = self.console(READ)
         read.get_by_test_id("tab-settings").click()
         expect(read.get_by_test_id("access-tokens")).to_have_count(0)
+
+    def test_a_saved_code_the_controller_refuses_is_forgotten(self):
+        # RTK-1/RTK-2: a code kept in this browser and refused when the console starts again (revoked, expired) is
+        # forgotten and "no longer accepted"; a controller that does not answer keeps it; a typed code is "wrong".
+        r = self.field.http.post("/api/v1/tokens", json={"label": "Telemóvel", "scope": "gm", "ttl_s": 3600})
+        self.assertEqual(r.status_code, 201)
+        made = r.json()
+        phone = self.console(made["token"])
+        saved = "localStorage.getItem('atalaia.token')"
+        self.assertEqual(phone.evaluate(saved), made["token"])
+        refused: list[str] = []
+        phone.on("response", lambda resp: refused.append(resp.url)
+                 if resp.status == 401 and resp.url.endswith("/api/v1/whoami") else None)
+        # The controller unreachable on a reload: the console says so and keeps the code.
+        phone.route("**/api/v1/whoami", lambda route: route.abort())
+        phone.reload()
+        expect(phone.locator("main.login [role=alert]")).to_be_visible()
+        expect(phone.locator("main.login [role=alert]")).not_to_contain_text("deixou de ser aceite")
+        self.assertEqual(phone.evaluate(saved), made["token"])
+        phone.unroute("**/api/v1/whoami")
+        self.drop_errors("ERR_FAILED", "Failed to load resource")
+        phone.reload()
+        expect(phone.get_by_test_id("tab-game")).to_be_visible()  # it was kept: the console opens with it
+        # Revoked while the console was closed: the next start forgets it and says it is no longer accepted.
+        phone.close()
+        self.assertEqual(self.field.http.delete(f"/api/v1/tokens/{made['id']}").status_code, 200)
+        phone = self.contexts[-1].new_page()  # the same browser, so the same saved code
+        phone.on("pageerror", lambda e: self.errors.append(f"pageerror: {e}"))
+        phone.on("console", lambda m: self.errors.append(f"console: {m.text}") if m.type == "error" else None)
+        phone.on("response", lambda resp: refused.append(resp.url)
+                 if resp.status == 401 and resp.url.endswith("/api/v1/whoami") else None)
+        phone.goto(self.field.base + "/console/")
+        expect(phone.locator("main.login [role=alert]")).to_contain_text("deixou de ser aceite")
+        self.assertIsNone(phone.evaluate(saved))
+        self.assertEqual(len(refused), 1)
+        # The next start sends it no more: no second refusal, the plain login page.
+        phone.reload()
+        expect(phone.get_by_test_id("login")).to_be_visible()
+        phone.wait_for_load_state("networkidle")
+        self.assertEqual(len(refused), 1)
+        expect(phone.locator("main.login [role=alert]")).to_have_count(0)
+        # A code typed wrong is "wrong", and nothing is kept.
+        phone.get_by_test_id("token").fill("not-the-code")
+        phone.get_by_test_id("login").click()
+        expect(phone.locator("main.login [role=alert]")).to_contain_text("Código de acesso errado")
+        self.assertIsNone(phone.evaluate(saved))
+        self.assertEqual(len(refused), 2)
+        self.drop_errors("401")
 
     # --- "share with players": the scoreboard's QR code (decision PD13) -------------------
 
