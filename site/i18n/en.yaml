@@ -1267,6 +1267,8 @@ build:
     bclk: Amplifier BCLK (optional)
     lrclk: Amplifier LRC
     dout: Amplifier DIN
+    buzzer: >-
+      Passive piezo buzzer, optional (a boot strapping pin: its circuit keeps it low; firmware option, not yet built on hardware)
     tamper: Enclosure switch, to GND
     log: >-
       Log output (UART0 TX): only a 3.3&nbsp;V USB-serial adapter's RX, on the bench
@@ -1410,7 +1412,9 @@ build:
         a Schottky diode, a covered main switch, a 5&nbsp;V boost converter for the ring, and lever
         splices: the Field Box's power path with one cell.
       sound: >-
-        Sound is optional: the Field Box's MAX98357A amplifier and a small speaker.
+        Sound is optional: a passive piezo buzzer (the cheapest: it beeps the games' sounds as short
+        tone patterns, with a firmware option; not yet built on hardware), the Field Box's MAX98357A
+        amplifier and a small speaker, or both.
       box: >-
         A plastic IP65 box in a bright colour, with a vent and cable glands, and "GAME PROP" labels.
     free_pins: >-
@@ -1449,8 +1453,8 @@ build:
     photo: the finished Satellite, inside and out.
     open:
       buzzer: >-
-        <strong>The piezo buzzer</strong> of the original design: the firmware makes sound only
-        through the amplifier, so a buzzer would need a firmware change.
+        <strong>The piezo buzzer</strong> of the original design: the firmware drives one (a build
+        option, on GPIO&nbsp;45), but no buzzer has been built and heard on a real board yet.
       enclosure: >-
         <strong>The enclosure</strong>: no box has been chosen yet.
       runtime: >-

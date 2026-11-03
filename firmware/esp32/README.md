@@ -41,7 +41,8 @@ app_main
   |     |   20-200 ms and the loop goes on receiving
   |     +-- RX poll (DIO1 ISR; 10 ms timeout with listen before talk, 50 ms without)
   |     +-- single shared game channel (default 869.525 MHz, g2)
-  +-- audio_task (core 0, priority 3)
+  +-- audio_task (core 0, priority 3): clips and tones on the speaker and the
+  |     optional piezo buzzer (sound.c; see "Sound: the speaker and the piezo buzzer")
   +-- wifi_task  (core 0, priority 2)
   +-- mem_monitor (core 0, priority 1, 10 s)
 ```
@@ -442,7 +443,7 @@ What it lends (only what is fitted is in IDENT; decision PF6):
 | `btn.1`-`btn.4` (button) | `press`, `hold` {"ms"} every 250 ms, `release` {"ms"} | |
 | `keypad` (PCF8574) | `key` {"key"} | `clear` |
 | `ring` (led, WS2812) | | `fill` {"team"} or {"r","g","b"}, `color`, `off`, `set_brightness`, `progress` |
-| `audio` (MAX98357A) | | `tone` {"freq","ms"}, `play` (the mode's clips as tones), `stop`, `set_volume` |
+| `audio` (MAX98357A and/or the piezo buzzer) | | `tone` {"freq","ms"}, `play` (the mode's clips as tones, `sound.c`'s patterns), `stop`, `set_volume` |
 | `nfc` (PN532) | `tag` {"uid", "tag"}: a player tag's record; join cards are not forwarded | |
 | `case` (tamper) | `opened`, `closed` | |
 
@@ -569,6 +570,10 @@ default 47, -1 = none) and `ATALAIA_POD_TAMPER_OPEN_HIGH`,
 `ATALAIA_POD_BLE` (the Bluetooth link, default on) and
 `ATALAIA_POD_BLE_ENCRYPTED` (frames only on an encrypted link, default on).
 
+Piezo buzzer options (under "Piezo buzzer", the Field Box and the pod; decisions BZR-1 to BZR-8):
+`ATALAIA_BUZZER` (default **off**: a passive piezo is fitted) and `ATALAIA_BUZZER_PIN` (default 45).
+See "Sound: the speaker and the piezo buzzer" below.
+
 GNSS options (under "GNSS"): `ATALAIA_GNSS_PWR_PIN` (34, VGNSS_Ctrl,
 active low; driven high, module off, at boot), `ATALAIA_GNSS_POWER_ON`
 (default off), `ATALAIA_GNSS_TX_PIN` / `ATALAIA_GNSS_RX_PIN` (38 / 39, the
@@ -599,12 +604,61 @@ are shared on purpose and button 4 is read through the keypad expander.
 | Display backlight | 47 | -1 (3V3) | Always on |
 | I2C SDA / SCL | 17 / 18 | 17 / 18 | OLED, PCF8574, PN532, MAX17048 |
 | I2S BCLK / LRCLK / DOUT | 6 / 15 / 16 | 6 / 15 / 16 | |
+| Piezo buzzer (optional, `ATALAIA_BUZZER`) | - | 45 | Added 2026-11-03 (BZR-1): the VDD_SPI strap, kept low by the buzzer's circuit |
 | GNSS power, TX, RX, wake-up, PPS, reset | (display, buttons) | 34, 38, 39, 40, 41, 42 | The module keeps its connector; off at boot |
 
 `sdkconfig.wokwi` keeps the emulator's own display and ring pins (its
 `diagram.json`). The full list with the board-internal pins is in the
 `Kconfig.projbuild` header and `hardware/field-box/README.md`;
 `tools/check_wiring.py` checks the wiring diagrams against these defaults.
+
+## Sound: the speaker and the piezo buzzer (decisions BZR-1 to BZR-8)
+
+A box makes sound through the MAX98357A amplifier and a speaker (I2S, `hal_esp_audio.c`), an
+optional **passive piezo buzzer** (`CONFIG_ATALAIA_BUZZER`, LEDC PWM on `ATALAIA_BUZZER_PIN`,
+`hal_esp_buzzer.c`), both, or neither. A mode asks with `audio.play(clip)` and `audio.tone(freq, ms)`
+(the core forwards both to the shell's command callback; `command_dispatch.c` queues them for the
+audio task). `main/sound.c` decides what plays where, platform-free (host tests with fake outputs in
+`test/test_sound.c`); `main/sound_esp.c` connects it to the HAL.
+
+| Request | Speaker only | Buzzer only | Both |
+| --- | --- | --- | --- |
+| `audio.tone(freq, ms)` | the tone | the tone | the tone on both together (the buzzer starts, the speaker plays it and sets the time, the buzzer stops) |
+| `audio.play(clip)`, with `/littlefs/audio/<clip>.wav` on the box | the file | the clip's tone pattern | the file on the speaker, the buzzer silent |
+| `audio.play(clip)`, no file (every clip today) | the clip's tone pattern | the clip's tone pattern | the pattern on both together |
+| `audio.stop()` | flushes the speaker | silences the buzzer | both |
+
+The patterns are by kind of moment, a few short steps each (`sound.c`; a test checks that every clip a
+mode in `modes/` plays has one): the end of something (`explosion` a 1.5 s boom at 120 Hz, `defused`
+two rising notes), warnings (`armed`, `alarm`, `window`: beeps of one pitch), short feedback
+(`tick`, `hit`), something gained (`captured`, `collected`, `deposited`, `healed`: rising notes). An
+unknown clip beeps once (2 kHz, 120 ms). The I/O pod plays the same patterns (they are its PF7
+table, unchanged, with five more). A clip name that is not a plain file name (letters, digits, `_`,
+`-`, at most 32) never reaches the file system. Tones are capped at 20 kHz and 10 s each; the buzzer
+itself plays 100 Hz to 10 kHz. The box's volume setting sets the speaker's level and the buzzer's
+PWM duty (50 % at 100, silent at 0).
+
+Before this change the Field Box handed the clip's bare name to the WAV player, which found no
+file, so a box with a speaker was silent (BZR-5); `audio.tone` was not routed at all on the Field
+Box (BZR-2).
+
+**The pin, GPIO 45** (BZR-1): every other GPIO of the Heltec V4 is used by the board, the GNSS
+connector or a Field Box part (the 8 free ones went to the buttons, the display and the
+amplifier), on every variant (Field Box, Satellite, I/O pod: its enclosure switch takes 47, the
+bench build, the bench patch of board 5, which moves the display to 48/44/6/16; Wokwi has no
+buzzer). GPIO 43 (UART0 TX) was the other candidate, but the ROM, the bootloader and the console
+log on it from every boot, which would crackle in the piezo. GPIO 45 is the VDD_SPI strapping pin:
+low at reset (its internal pull-down) means 3.3 V flash, as on the Heltec V4; the buzzer's circuit
+(a piezo through 220 ohm, or a transistor's base through 1 kohm with 10 kohm to GND) never pulls it
+up, and the driver leaves it low when silent. `tools/check_wiring.py` allows GPIO 45 for
+`ATALAIA_BUZZER_PIN` only. The wiring and the parts: `hardware/field-box/BUILD.md`, section 9.7.
+**Not yet tried on hardware.**
+
+**Size** (ESP-IDF 5.3.2, 2026-11-03, against `c11f68bb`): the Field Box image grew from 2,161,168 to
+2,163,040 bytes with the buzzer off (+1,872: the router and the patterns) and to 2,169,520 with it on
+(+6,480 more: the LEDC driver), 52 % of the 4 MB OTA slot. Static internal RAM left for the heap
+(`check_fw_ram.py`): 192,765 bytes before, 192,757 off, 192,277 on (the 120 KiB floor holds). The
+bench image: 2,138,080 off, 2,144,592 on; the I/O pod: 689,680 off, 696,176 on.
 
 ## Partition Table
 

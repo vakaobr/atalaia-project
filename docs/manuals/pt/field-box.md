@@ -20,7 +20,7 @@ A *Field Box* é o dispositivo de jogo principal da Atalaia. Tem:
 - um anel de **luzes** que mostra a cor da equipa;
 - um **leitor NFC** para etiquetas e cartões;
 - um **ecrã OLED** pequeno na placa, uma linha de estado para a organização;
-- um **altifalante** opcional;
+- um **altifalante** opcional, um **besouro piezoelétrico** opcional, ou os dois (o besouro toca os sons do jogo como sequências curtas de bipes);
 - um rádio *LoRa* e uma **bateria** (uma célula de iões de lítio, recarregada por USB-C).
 
 Corre as regras do jogo sozinha e fala com o controlador de campo por rádio. Se perder o controlador, continua a jogar e a contar pontos.

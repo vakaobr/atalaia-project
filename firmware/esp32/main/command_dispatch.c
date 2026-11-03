@@ -5,7 +5,10 @@
 #include "command_dispatch.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#include "sound.h"
 
 void command_queues_init(command_queues_t *q)
 {
@@ -66,6 +69,26 @@ static void parse_first_string(const char *args, char *out, size_t out_sz)
     out[len] = '\0';
 }
 
+/* [freq, ms] (audio.tone's arguments) as a tone of at most SOUND_TONE_MAX_HZ and
+ * SOUND_TONE_MAX_MS; false when either is missing or not a number. */
+static bool parse_tone_args(const char *args, uint16_t *hz, uint16_t *ms)
+{
+    if (!args || args[0] != '[') return false;
+    char *end;
+    double f = strtod(args + 1, &end);
+    if (end == args + 1) return false;
+    while (*end == ' ') end++;
+    if (*end != ',') return false;
+    const char *second = end + 1;
+    double d = strtod(second, &end);
+    if (end == second) return false;
+    if (!(f >= 0)) f = 0; /* also NaN */
+    if (!(d >= 0)) d = 0;
+    *hz = (uint16_t)(f > SOUND_TONE_MAX_HZ ? SOUND_TONE_MAX_HZ : f);
+    *ms = (uint16_t)(d > SOUND_TONE_MAX_MS ? SOUND_TONE_MAX_MS : d);
+    return true;
+}
+
 /* Parse a color name to RGB. Simple mapping for team colors. */
 static void color_name_to_rgb(const char *name, uint8_t *r, uint8_t *g, uint8_t *b)
 {
@@ -114,13 +137,24 @@ void command_dispatch(const char *target, const char *method, const char *args_j
     if (strcmp(target, "audio") == 0) {
         if (strcmp(method, "play") == 0) {
             if (queues->audio_count < CMD_AUDIO_QUEUE_MAX) {
-                parse_first_string(args_json, queues->audio[queues->audio_count].clip,
-                                   sizeof(queues->audio[0].clip));
+                audio_cmd_t *a = &queues->audio[queues->audio_count];
+                memset(a, 0, sizeof(*a));
+                parse_first_string(args_json, a->clip, sizeof(a->clip));
+                if (a->clip[0] != '\0') queues->audio_count++; /* no clip: not a stop */
+            }
+        } else if (strcmp(method, "tone") == 0) {
+            uint16_t hz, ms;
+            if (queues->audio_count < CMD_AUDIO_QUEUE_MAX && parse_tone_args(args_json, &hz, &ms) &&
+                ms > 0) {
+                audio_cmd_t *a = &queues->audio[queues->audio_count];
+                memset(a, 0, sizeof(*a));
+                a->tone_hz = hz;
+                a->tone_ms = ms;
                 queues->audio_count++;
             }
         } else if (strcmp(method, "stop") == 0) {
             if (queues->audio_count < CMD_AUDIO_QUEUE_MAX) {
-                queues->audio[queues->audio_count].clip[0] = '\0';
+                memset(&queues->audio[queues->audio_count], 0, sizeof(audio_cmd_t));
                 queues->audio_count++;
             }
         }

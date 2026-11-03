@@ -206,6 +206,7 @@ Exemplo para um campo em Taiwan: `python tools/docker_fw.py build --region=as923
 | Ecrã pequeno da placa de pernas para o ar | `CONFIG_ATALAIA_OLED_FLIP=y` |
 | Sem iBeacon na Field Box (vem ligado por omissão) | `# CONFIG_ATALAIA_BOX_BEACON is not set` |
 | O intervalo e a potência da baliza | `CONFIG_ATALAIA_BOX_BEACON_INTERVAL_MS=500` (100 a 10000), `CONFIG_ATALAIA_BOX_BEACON_TX_DBM=0` |
+| Há um besouro piezoelétrico passivo montado (no GPIO 45; ainda não experimentado em hardware) | `CONFIG_ATALAIA_BUZZER=y` |
 
 Nunca baixes o `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` nem o ganho da antena abaixo dos valores reais. Isso quebraria o limite legal de potência.
 

@@ -20,7 +20,7 @@ The *Field Box* is Atalaia's main game prop. It has:
 - a ring of **lights** that shows the team's colour;
 - an **NFC reader** for tags and cards;
 - a small **OLED screen** on the board, a status line for staff;
-- an optional **speaker**;
+- an optional **speaker**, an optional **piezo buzzer**, or both (the buzzer beeps the game's sounds as short patterns);
 - a *LoRa* radio and a **battery** (one Li-ion cell, recharged by USB-C).
 
 It runs the game's rules by itself, and it talks to the field controller by radio. If it loses the controller, it keeps playing and keeps score.

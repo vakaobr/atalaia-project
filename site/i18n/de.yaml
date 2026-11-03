@@ -1340,6 +1340,8 @@ build:
     bclk: BCLK des Verstärkers (optional)
     lrclk: LRC des Verstärkers
     dout: DIN des Verstärkers
+    buzzer: >-
+      Passiver Piezo-Summer, optional (ein Boot-Strapping-Pin: seine Schaltung hält ihn auf Low; Firmware-Option, noch nicht in Hardware gebaut)
     tamper: Gehäuseschalter, nach GND
     log: >-
       Log-Ausgang (UART0 TX): nur an den RX eines USB-Seriell-Adapters mit 3,3&nbsp;V, auf der
@@ -1491,7 +1493,9 @@ build:
         5-A-Sicherung, eine Schottky-Diode, ein abgedeckter Hauptschalter, ein 5-V-Aufwärtswandler für
         den Ring und Hebelklemmen: die Stromversorgung der Field Box mit einer Zelle.
       sound: >-
-        Ton nach Wunsch: der Verstärker MAX98357A der Field Box und ein kleiner Lautsprecher.
+        Ton nach Wunsch: ein passiver Piezo-Summer (am günstigsten: er spielt die Töne der Spiele als
+        kurze Tonfolgen, mit einer Firmware-Option; noch nicht in Hardware gebaut), der Verstärker
+        MAX98357A der Field Box und ein kleiner Lautsprecher, oder beides.
       box: >-
         Ein IP65-Kunststoffgehäuse in einer kräftigen Farbe, mit Druckausgleich und
         Kabelverschraubungen, und „GAME PROP“-Aufkleber.
@@ -1533,8 +1537,9 @@ build:
     photo: der fertige Satellit, innen und außen.
     open:
       buzzer: >-
-        <strong>Der Piezo-Summer</strong> aus dem ursprünglichen Entwurf: Die Firmware gibt Ton nur über
-        den Verstärker aus, ein Summer bräuchte also eine Änderung an der Firmware.
+        <strong>Der Piezo-Summer</strong> aus dem ursprünglichen Entwurf: Die Firmware steuert ihn an
+        (eine Build-Option, an GPIO&nbsp;45), aber noch keiner wurde auf einer echten Platine gebaut
+        und gehört.
       enclosure: >-
         <strong>Das Gehäuse</strong>: Es ist noch keins ausgewählt.
       runtime: >-
