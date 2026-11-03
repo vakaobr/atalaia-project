@@ -119,8 +119,12 @@
     "missing_short": "這些角色還沒有盒子加入：{roles}。",
     "confirm_start_anyway": "仍要開始嗎？",
     "missing_roles": "開始前需要這些角色的盒子（或連結的手機）：{roles}。請邀請盒子，或直接開始。",
+    "missing_caps": "有盒子缺少其角色需要的功能：{list}。只有在遊戲不需要它時才強制開始。",
+    "missing_caps_short": "有盒子缺少其角色需要的功能：{list}。",
+    "not_checked": "{name} 上的 {capability}：未檢查（簡易輸出）。請在遊戲前親自確認。",
     "start_warnings": {
       "min": "已加入 {have} × {role}；模式要求 {value}（{param}）。",
+      "optional_caps": "{name}（{role}）沒有 {caps}：模式不需要它也能進行。",
       "last": "只加入 {have} × {role}，而 {param} 是 {value}：倒數可能從一開始就啟動。"
     },
     "settings": "遊戲設定",
@@ -234,6 +238,10 @@
       "node_rebooted_crash": "一個盒子當機並重新啟動（{reason}）",
       "node_setup_applied": "{zone}已確認情境設定",
       "battery_low": "一個盒子電量偏低",
+      "node_modules": "{zone} 具備：{modules}",
+      "node_module_lost": "{zone} 遺失一個模組：{modules}（{reason}）",
+      "output_switched": "{zone}：{capability} 開啟 {s} 秒（{source}）",
+      "output_switched_off": "{zone}：{capability} 關閉（{source}）",
       "nobody": "不明"
     },
     "reboot_reasons": {
@@ -244,6 +252,16 @@
       "watchdog": "看門狗逾時（程式卡住）",
       "deepsleep": "從深度睡眠喚醒",
       "unknown": "原因不明"
+    },
+    "module_lost_reasons": {
+      "no_answer": "停止回應",
+      "bad_ident": "以另一個模組的身分回應"
+    },
+    "output_sources": {
+      "script": "模式",
+      "field": "場地腳本",
+      "gm": "主辦",
+      "box_admin": "盒子的管理員"
     },
     "puzzles": {
       "code": "密碼",
@@ -277,7 +295,22 @@
     },
     "commands": "指令",
     "command_sent": "已傳送",
+    "not_checked": "未檢查",
+    "module_lost": "已遺失",
     "conflict": "兩個盒子共用節點 {node}：同一組加入資料被用在兩個盒子上，它們使用相同的無線電 nonce。請讓其中一個退出遊戲，再用新的加入資料重新加入（「加入」分頁）。"
+  },
+  "outputs": {
+    "title": "輸出",
+    "intro": "盒子上的警報器、閃光燈與煙霧。每個輸出開啟指定的秒數後會自行關閉；「關閉」與「全部輸出關閉」立即生效。每個盒子最多每 2 秒接受一次新的開啟。",
+    "all_off": "全部輸出關閉",
+    "all_off_done": "已通知本遊戲的所有輸出關閉。",
+    "none": "本遊戲沒有盒子具備輸出。輸出須在盒子上以管理員 PIN 啟用。",
+    "not_running": "輸出只能在遊戲進行中開啟；「關閉」現在即可使用。",
+    "seconds": "秒數",
+    "pulse": "開啟 {s} 秒",
+    "confirm_pulse": "要開啟 {name} 上的 {capability} {s} 秒嗎？請確認旁邊沒有人。",
+    "off": "關閉",
+    "on": "開啟中"
   },
   "field": {
     "title": "場地",

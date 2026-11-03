@@ -6,7 +6,9 @@
 // "offline" after node.offline, battery_low after battery.low; decisions
 // FU1-1 to FU1-5), and (for the GM) a zone owner override and
 // the mode commands of the box's role (mode.yaml "commands", such as a medic
-// kit's refill: CMD opcode 8, RFC 0001 Amendment 5).
+// kit's refill: CMD opcode 8, RFC 0001 Amendment 5). Under each box's name, a chip per module
+// it reported (node.modules: a simple output's function marked "not checked", a module's model,
+// version and functions, "lost" after node.module_lost; draft RFC "The expansion port", EXP-21).
 
 import { html, Component, t, age, teamColour, OFFLINE_MS } from '../ui.js';
 import { commandsFor } from './preset-builder.js';
@@ -28,6 +30,17 @@ export function linkBars(rssi) {
     if (rssi >= -100) return 2;
     if (rssi >= -115) return 1;
     return 0;
+}
+
+/** A box's modules as chips: a simple output "siren · not checked", a module "target 1.0.0: hit". */
+export function ModuleChips({ node }) {
+    const mods = (node && node.modules) || [];
+    if (mods.length === 0) return null;
+    return html`<div class="modules" data-testid=${`node-modules-${node.node_id}`}>${mods.map((m) => html`<span
+        class=${`chip small${m.lost ? ' warn' : ''}`} title=${m.address} data-testid=${`node-module-${node.node_id}-${m.address}`}>${
+        m.feedback === false ? `${(m.caps || []).join(', ')} · ${t('nodes.not_checked')}`
+            : `${m.model}${m.fw ? ` ${m.fw}` : ''}: ${(m.caps || []).join(', ')}`}${
+        m.lost ? html` · <strong class="warn">${t('nodes.module_lost')}</strong>` : ''}</span>`)}</div>`;
 }
 
 export class NodeList extends Component {
@@ -72,7 +85,7 @@ export class NodeList extends Component {
                     const low = batteryLow(n);
                     return html`<tr class=${offline ? 'offline' : ''} data-node=${n.node_id}>
                         <td>${n.node_id}</td>
-                        <td>${n.name}</td>
+                        <td>${n.name}<${ModuleChips} node=${n} /></td>
                         <td>${n.role}</td>
                         <td>${gm ? html`<select aria-label=${t('nodes.set_owner', { node: n.node_id })} value=${n.owner || ''}
                                 onChange=${(e) => this.setOwner(n, e.target.value)}>

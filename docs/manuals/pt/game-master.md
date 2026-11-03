@@ -364,6 +364,7 @@ Com um servidor do site, **Da agenda do site** lista os jogos publicados para os
 3. Se há réplicas declaradas por cronografar, diz **Há n réplicas declaradas por cronografar** (**Há 1 réplica declarada por cronografar**, se for só uma).
 4. Toca em **Começar**. Pergunta **Começar o jogo agora?**. Toca em **Sim**.
 5. Se uma função não tem caixa, o botão diz **Começar mesmo assim** e pergunta **Começar mesmo assim?**. Começar assim fica registado e todas as consolas são avisadas: **Jogo começado sem caixa para:** *funções*.
+   Uma caixa que se juntou mas a que falta algo que o seu papel precisa (por exemplo uma caixa sem botões de equipa, teclado nem leitor NFC como zona) faz o mesmo: a consola diz **Falta a uma caixa o que o seu papel precisa:** *caixa (papel): o quê*, e o botão diz **Começar mesmo assim**. O que o papel só usa se existir aparece como nota (*caixa (papel) não tem audio: o modo funciona sem isso*). As caixas com firmware mais antigo não dizem o que têm, por isso nunca são verificadas. A **saída simples** de uma caixa (uma sirene num interruptor RC) aparece como **siren em box-4: não verificado (saída simples)**: a caixa não sabe o que está ligado, por isso convém confirmar antes do jogo.
 6. Na janela **Caixas para este jogo**, **Começar o jogo** pergunta **Rever primeiro as outras definições do jogo?**. **Rever definições** fecha a janela e abre as **Definições do jogo**. **Começar agora** começa o jogo. **Voltar** volta atrás.
 
 **Início remoto.** Se o campo usa um servidor do site com o **GM remoto** ligado, uma pessoa da organização com sessão iniciada lá pode começar, pôr em pausa, retomar e terminar o jogo em curso a partir da página **GM remoto** do site. Escolhe o controlador e toca em **Começar**. Se uma função não tem caixa, pergunta **Falta uma caixa (ou um telemóvel ligado) para: …. Começar mesmo assim?**. É a mesma verificação do **Começar mesmo assim** da consola. O controlador é que abre a ligação. Vê a [secção 12](#12-o-servidor-do-site-e-o-modo-alojado-em-breve).
@@ -382,9 +383,21 @@ Um controlador de reserva não pode começar um jogo. Diz **Este controlador nã
 - **Definições do jogo**: as definições que usaste, só de leitura.
 - **Pontuação**: o total de cada equipa, com um gráfico. Os pontos de uma caixa chegam com o estado dela, por isso podem atrasar-se até cerca de 15 segundos. Ao lado de um total, a consola pode mostrar um número mais pequeno *estimado*: entre dois relatórios de uma caixa que está a ser mantida, soma os pontos que a caixa fez desde então, e acompanha uma captura que a caixa tenha relatado até ao estado seguinte dela. Só o número sem *estimado* é a pontuação oficial.
 
+### Saídas
+
+**Saídas**, no separador **Jogo**, lista as saídas das caixas do jogo: uma sirene, um estroboscópio ou uma máquina de fumo na saída simples de uma caixa (marcada **não verificado**). As saídas ativam-se na própria caixa, com o PIN de administração (vê o manual da Field Box); uma caixa sem nenhuma ativa não aparece.
+
+- Escreve os **Segundos** (5 por omissão, até 600) e toca em **Ligar 5 s**. Pergunta **Ligar siren em box-4 durante 5 s? Confirmar que não está ninguém mesmo ao lado.** Toca em **Sim**. A saída desliga-se sozinha passado esse tempo (ou o tempo máximo da própria caixa, se for menor). Só funciona com o jogo a decorrer.
+- **Desligar** desliga-a logo, sem perguntar.
+- **Desligar todas as saídas** desliga logo todas as saídas do jogo.
+- Uma caixa aceita um novo arranque no máximo de 2 em 2 segundos (o rádio é partilhado): um segundo toque antes disso diz **an output of box-4 was switched less than 2 s ago**. **Desligar** nunca fica à espera.
+- O **Registo** mostra o que cada saída fez e quem a ligou: **caixa 4: siren ligado durante 5 s (a organização)**. Enquanto está ligada, a saída mostra **ligada**.
+
+As caixas também desligam as saídas sozinhas quando o jogo é posto em pausa ou acaba. Quem está na página **GM remoto** do servidor do site só pode desligar todas as saídas, nunca ligar uma.
+
 ### O separador Caixas
 
-Cada caixa mostra o **N.º**, o **Nome**, o **Papel**, a **Dona** (equipa), o **Nível**, a **Bateria** (com **fraca** abaixo de 20%), o **Sinal**, a **Última notícia**, o **Firmware** e a **Época**. Uma caixa de que não há notícias mostra **sem notícias**. Podes mudar a equipa dona de uma caixa com a lista. Alguns modos juntam botões, por exemplo a recarga de um kit de ligaduras.
+Cada caixa mostra o **N.º**, o **Nome** (com uma etiqueta por cada módulo ou saída que a caixa tem, por exemplo **siren · não verificado**), o **Papel**, a **Dona** (equipa), o **Nível**, a **Bateria** (com **fraca** abaixo de 20%), o **Sinal**, a **Última notícia**, o **Firmware** e a **Época**. Uma caixa de que não há notícias mostra **sem notícias**. Podes mudar a equipa dona de uma caixa com a lista. Alguns modos juntam botões, por exemplo a recarga de um kit de ligaduras.
 
 ### O separador Registo
 
