@@ -200,3 +200,53 @@ void command_dispatch(const char *target, const char *method, const char *args_j
         return;
     }
 }
+
+/* Up to max numbers of a JSON array ("[10000]", "[500,500,20000]"); how many were read. A value
+ * that is not a number ends the list. */
+static int parse_numbers(const char *args, double *out, int max)
+{
+    if (!args || args[0] != '[') return 0;
+    const char *p = args + 1;
+    int n = 0;
+    while (n < max) {
+        while (*p == ' ') p++;
+        char *end;
+        double v = strtod(p, &end);
+        if (end == p) break;
+        out[n++] = v;
+        p = end;
+        while (*p == ' ') p++;
+        if (*p != ',') break;
+        p++;
+    }
+    return n;
+}
+
+/* A script's duration: a whole number of ms, at most OUT_MS_MAX (0 when not given or < 1). */
+static uint32_t script_ms(const double *v, int n, int i)
+{
+    if (i >= n || !(v[i] >= 1)) return 0;
+    return v[i] > OUT_MS_MAX ? OUT_MS_MAX : (uint32_t)v[i];
+}
+
+bool command_dispatch_output(outputs_t *o, const char *target, const char *method,
+                             const char *args_json)
+{
+    if (o == NULL || target == NULL || method == NULL || outputs_find(o, target) < 0) return false;
+    double v[3];
+    int n = parse_numbers(args_json, v, 3);
+    if (strcmp(method, "pulse") == 0) {
+        uint32_t ms = script_ms(v, n, 0);
+        if (ms == 0) return true; /* pulse() without a duration: nothing */
+        outputs_switch(o, target, OUT_ACT_PULSE, ms, 0, 0, OUT_SRC_SCRIPT);
+    } else if (strcmp(method, "on") == 0) {
+        outputs_switch(o, target, OUT_ACT_ON, script_ms(v, n, 0), 0, 0, OUT_SRC_SCRIPT);
+    } else if (strcmp(method, "off") == 0) {
+        outputs_switch(o, target, OUT_ACT_OFF, 0, 0, 0, OUT_SRC_SCRIPT);
+    } else if (strcmp(method, "pattern") == 0) {
+        uint32_t on_ms = script_ms(v, n, 0), off_ms = script_ms(v, n, 1), ms = script_ms(v, n, 2);
+        if (on_ms == 0 || off_ms == 0 || ms == 0) return true;
+        outputs_switch(o, target, OUT_ACT_PATTERN, ms, on_ms, off_ms, OUT_SRC_SCRIPT);
+    }
+    return true;
+}

@@ -19,6 +19,12 @@
  * PRESET_UI_STATE_ADOPT_REQUESTED, which the shell answers by letting the box show a pairing code
  * for another field (adoption_allow_move, box_pair_start). Nothing is forgotten until a field
  * has paired. It sits behind the same admin PIN as every game.
+ *
+ * With the outputs entry on (preset_ui_enable_outputs, a box built with a simple output), the
+ * list ends with "Outputs" (after the two above): '#' on it gives
+ * PRESET_UI_STATE_OUTPUTS_REQUESTED, which the shell answers with the outputs screen
+ * (outputs_admin.h: enable, function, max on, the 1 s test; decision EXP-28), and then sets the
+ * state back to PRESET_UI_STATE_PRESET_LIST. Behind the same admin PIN as every game.
  */
 #ifndef ATALAIA_PRESET_UI_H
 #define ATALAIA_PRESET_UI_H
@@ -39,10 +45,11 @@ typedef enum {
     PRESET_UI_STATE_TIMER_ADJUST,
     PRESET_UI_STATE_CONFIRM,
     PRESET_UI_STATE_GAME_STARTED,
-    PRESET_UI_STATE_SETUP_CONFIRM,   /* "Set up again?" */
-    PRESET_UI_STATE_SETUP_REQUESTED, /* confirmed: the shell restarts the box into the portal */
-    PRESET_UI_STATE_ADOPT_CONFIRM,   /* "Change field?" */
-    PRESET_UI_STATE_ADOPT_REQUESTED, /* confirmed: the shell shows a pairing code */
+    PRESET_UI_STATE_SETUP_CONFIRM,     /* "Set up again?" */
+    PRESET_UI_STATE_SETUP_REQUESTED,   /* confirmed: the shell restarts the box into the portal */
+    PRESET_UI_STATE_ADOPT_CONFIRM,     /* "Change field?" */
+    PRESET_UI_STATE_ADOPT_REQUESTED,   /* confirmed: the shell shows a pairing code */
+    PRESET_UI_STATE_OUTPUTS_REQUESTED, /* "Outputs": the shell shows the outputs screen */
 } preset_ui_state_t;
 
 typedef struct {
@@ -61,6 +68,7 @@ typedef struct {
     bool no_pin;         /* the last '#' met a box with no admin PIN set */
     bool setup_entry;    /* the list ends with "Wi-Fi setup" (entry preset_count + 1) */
     bool adopt_entry;    /* and with "Adopt to another field" after it */
+    bool outputs_entry;  /* and with "Outputs" last */
 } preset_ui_t;
 
 /* Adds (or removes) the list's last entry, "Wi-Fi setup". Off by default. */
@@ -68,6 +76,9 @@ void preset_ui_enable_setup(preset_ui_t *ui, bool on);
 
 /* Adds (or removes) the list's last entry, "Adopt to another field". Off by default. */
 void preset_ui_enable_adopt(preset_ui_t *ui, bool on);
+
+/* Adds (or removes) the list's last entry, "Outputs". Off by default. */
+void preset_ui_enable_outputs(preset_ui_t *ui, bool on);
 
 /* The box's admin PIN check (admin_pin.h), shared with adoption. */
 void preset_ui_set_guard(preset_ui_t *ui, admin_pin_t *guard);
@@ -101,8 +112,9 @@ uint32_t preset_ui_timer_duration(const preset_ui_t *ui);
  * label of list entry i + 1; labels may be NULL when label_count is 0. The
  * list screen holds the current page only, with "page" and "pages" when there
  * is more than one.
- * Returns false in PRESET_UI_STATE_GAME_STARTED, PRESET_UI_STATE_SETUP_REQUESTED and
- * PRESET_UI_STATE_ADOPT_REQUESTED, which have no picker screen. PRESET_UI_STATE_SETUP_CONFIRM is
+ * Returns false in PRESET_UI_STATE_GAME_STARTED, PRESET_UI_STATE_SETUP_REQUESTED,
+ * PRESET_UI_STATE_ADOPT_REQUESTED and PRESET_UI_STATE_OUTPUTS_REQUESTED, which have no picker
+ * screen. PRESET_UI_STATE_SETUP_CONFIRM is
  * the "start_confirm" template with "setup":true, PRESET_UI_STATE_ADOPT_CONFIRM the same with
  * "adopt":true.
  */

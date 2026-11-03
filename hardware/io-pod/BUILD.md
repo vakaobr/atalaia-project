@@ -96,7 +96,14 @@ Not decided, or not supported yet:
 
 - **The siren** in the design specification: the pod's sound is the amplifier
   and speaker. A separate siren, relay or strobe (the specification's `output`
-  capability) is not in the pod firmware (decision P5J-7).
+  capability) is not in the pod firmware yet (decision P5J-7). The draft RFC
+  "The expansion port" plans it as a **simple output** (an RC relay switch on
+  the level shifter's spare gate, wired as the
+  [Field Box's section 9.10](../field-box/BUILD.md#910-simple-output-optional)
+  says) on the pod's free **GPIO 33** (then 1 and 3), with the pod holding the
+  bursts so that a lost phone link turns it off; the Field Box and the Satellite
+  have it since 2026-11-03, the pod firmware gets it in a later increment
+  (EXP-26). Do not wire one to a pod yet.
 - **Power from the phone.** On USB, the phone powers the board; with the pod's
   main switch on, the board's charger may then charge the pod's cell from the
   phone, as a Field Box charges from any USB charger. Whether a pod should do

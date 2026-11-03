@@ -19,9 +19,14 @@ with --resolve before drawing. The check fails when:
 - a wired GPIO is board-internal (the list in Kconfig.projbuild's header, plus
   the Heltec V4 front-end-module pins below), on the board's GNSS connector
   (its module keeps those pins: decision PIN-1) or a boot strapping pin (GPIO 45
-  only for the optional piezo buzzer, whose circuit holds it low at reset:
-  STRAP_TOLERANT below); or a board pin the Field Box shares on purpose (GPIO 1,
-  35, 44: SHARED below) is used for anything else than what it is shared for;
+  only for the optional piezo buzzer or, without it, a second simple output,
+  whose circuits hold it low at reset: STRAP_TOLERANT below); or a board pin the
+  Field Box shares on purpose (GPIO 1, 35, 44: SHARED below) is used for anything
+  else than what it is shared for;
+- the optional simple output (an RC relay switch on a spare gate; draft RFC "The
+  expansion port", EXP-34) is not on the front-end-module pin the board revision
+  leaves free (GPIO 46 on a V4.3, 5 on a V4.2: REVISION_FREE below), or shares a
+  pin with another part on that revision;
 - the keypad is not on the PCF8574 the way hal_esp_keypad.c scans it (rows on
   P0-P3, columns on P4-P6), the team button of ATALAIA_KP_P7_BUTTON is not on
   its P7, the expander address differs from the Kconfig default, or its INT
@@ -152,9 +157,25 @@ STRAPPING_FORBIDDEN = {0, 45, 46}  # GPIO 3 is a strapping pin the pin map uses 
 # voltage at reset (low = 3.3 V, its internal pull-down): a piezo through a series resistor, or a
 # transistor's base with 10 kohm to GND, never pulls it up. The diagrams do not show the buzzer.
 STRAP_TOLERANT: dict[int, tuple[set[str], str]] = {
-    45: ({"ATALAIA_BUZZER_PIN"},
-         "the VDD_SPI strap: only the piezo buzzer, whose circuit holds it low at reset"),
+    45: ({"ATALAIA_BUZZER_PIN", "ATALAIA_SIMPLE_OUT2_PIN"},
+         "the VDD_SPI strap: only the piezo buzzer or a second simple output, whose circuits "
+         "hold it low at reset"),
 }
+# The board revision's free front-end-module pin (decision EXP-34): the V4.3 and the V4.2 swap
+# GPIO 5 and 46, each being the other revision's front-end line, so the build's revision choice
+# (Radio > Board revision) knows which one is free. Kconfig pin -> {revision: the GPIO it may take}.
+# GPIO 46 is a strapping pin read low at reset: the simple output's 10 kohm pull-down keeps it so.
+REVISION_FREE: dict[str, dict[str, int]] = {
+    "ATALAIA_SIMPLE_OUT_PIN": {"ATALAIA_BOARD_HELTEC_V4_3": 46, "ATALAIA_BOARD_HELTEC_V4_2": 5},
+}
+# Each revision's own front-end pins: the other revision's Kconfig pin does not exist in its build.
+REVISION_FEM: dict[str, tuple[int, str]] = {
+    "ATALAIA_BOARD_HELTEC_V4_3": (5, "ATALAIA_RADIO_FEM_PA_PIN"),
+    "ATALAIA_BOARD_HELTEC_V4_2": (46, "ATALAIA_RADIO_FEM_CTX_PIN"),
+}
+DEFAULT_REVISION = "ATALAIA_BOARD_HELTEC_V4_3"
+# Optional parts Kconfig never builds together (`depends on !...`): their pins may share a GPIO.
+EXCLUSIVE = {frozenset({"ATALAIA_BUZZER_PIN", "ATALAIA_SIMPLE_OUT2_PIN"})}
 SHARED_BUS = {17, 18}  # board-internal, but the shared I2C bus is meant to be wired
 
 # Heltec WiFi LoRa 32 V4 pins that the Kconfig header does not list (yet).
@@ -192,11 +213,12 @@ def _truth(expr: str, bools: dict[str, bool]) -> bool:
     return any(all(term(t) for t in part.split("&&")) for part in expr.split("||"))
 
 
-def read_kconfig_defaults(text: str) -> dict[str, int]:
+def read_kconfig_defaults(text: str, choose: frozenset[str] = frozenset()) -> dict[str, int]:
     """Returns the default of every numeric `config` symbol.
 
     Handles conditional defaults (`default 6 if SYM`, the first true one wins)
-    and choices (`default SYM` selects that choice member).
+    and choices (`default SYM` selects that choice member; a member in `choose`
+    is selected instead, as a build that picks it).
     """
     numeric: dict[str, list[tuple[str, str | None]]] = {}
     bool_defaults: dict[str, list[tuple[str, str | None]]] = {}
@@ -247,6 +269,9 @@ def read_kconfig_defaults(text: str) -> dict[str, int]:
     bools: dict[str, bool] = {}
     for members, default in zip(choice_members, choice_default):
         chosen = default or (members[0] if members else None)
+        picked = [m for m in members if m in choose]
+        if picked:
+            chosen = picked[0]
         for member in members:
             bools[member] = member == chosen
     for name, options in bool_defaults.items():
@@ -364,6 +389,44 @@ def connected(links, a: tuple[str, str], b: tuple[str, str]) -> bool:
     return (a, b) in links or (b, a) in links
 
 
+def check_simple_outputs(kconfig_text: str, internal: set[int]) -> list[str]:
+    """The optional simple outputs (not in the diagrams; decision EXP-34), on each board revision:
+    output 1 on the revision's free front-end pin, output 2 on GPIO 45 and only without the buzzer,
+    neither on another part's default pin."""
+    errors: list[str] = []
+    block = re.search(r"config ATALAIA_SIMPLE_OUT2\n(.*?)\n\n", kconfig_text, re.S)
+    if block is None or not re.search(r"depends on [^\n]*!ATALAIA_BUZZER\b", block.group(1)):
+        errors.append("Kconfig: ATALAIA_SIMPLE_OUT2 must depend on !ATALAIA_BUZZER (GPIO 45 is the "
+                      "buzzer's or a second simple output)")
+    for revision, (fem, other_fem_symbol) in REVISION_FEM.items():
+        defaults = read_kconfig_defaults(kconfig_text, frozenset({revision}))
+        name = revision.removeprefix("ATALAIA_BOARD_HELTEC_").replace("_", ".")
+        for symbol, wanted in REVISION_FREE.items():
+            gpio = defaults.get(symbol)
+            if gpio != wanted[revision]:
+                errors.append(f"Kconfig: {symbol} defaults to {gpio} on a {name}, not GPIO "
+                              f"{wanted[revision]}, the pin that revision leaves free")
+            if gpio == fem:
+                errors.append(f"Kconfig: {symbol} = {gpio} on a {name}, its front-end-module line")
+        second = defaults.get("ATALAIA_SIMPLE_OUT2_PIN")
+        if second is None or second not in STRAP_TOLERANT or \
+                "ATALAIA_SIMPLE_OUT2_PIN" not in STRAP_TOLERANT[second][0]:
+            errors.append(f"Kconfig: ATALAIA_SIMPLE_OUT2_PIN defaults to {second}, not GPIO 45")
+        for out in ("ATALAIA_SIMPLE_OUT_PIN", "ATALAIA_SIMPLE_OUT2_PIN"):
+            gpio = defaults.get(out, -1)
+            if gpio < 0:
+                continue
+            if gpio in V4_GNSS or gpio in SHARED or (gpio in internal and gpio not in (5, 46)):
+                errors.append(f"Kconfig: {out} = {gpio}, a pin the board or another part keeps")
+            for symbol, other in sorted(defaults.items()):
+                if (symbol == out or not symbol.endswith("_PIN") or other != gpio
+                        or symbol == other_fem_symbol
+                        or frozenset({symbol, out}) in EXCLUSIVE):
+                    continue
+                errors.append(f"Kconfig: {out} = {gpio} on a {name}, the default of {symbol} too")
+    return errors
+
+
 def check_readme(text: str, defaults: dict[str, int]) -> list[str]:
     """Each row's GPIO cell starts with the Kconfig default (-1: not a GPIO).
 
@@ -422,6 +485,11 @@ def check_pin(where: str, symbol: str, cell: str, defaults: dict[str, int],
         return [f"{where}: {symbol} is disabled by default (-1): a guide lists wired pins only"]
     if gpio in STRAP_TOLERANT and symbol in STRAP_TOLERANT[gpio][0]:
         return []
+    if symbol in REVISION_FREE:
+        # A guide's tables are for the default revision (a V4.3); its cell names both.
+        if gpio == REVISION_FREE[symbol][DEFAULT_REVISION]:
+            return []
+        return [f"{where}: {symbol} = GPIO {gpio}, not the pin the board revision leaves free"]
     if gpio in STRAPPING_FORBIDDEN:
         return [f"{where}: {symbol} = GPIO {gpio}, a boot strapping pin"]
     if gpio in V4_GNSS:
@@ -594,13 +662,14 @@ def check(diagram_paths: list[Path], kconfig_path: Path, readme_path: Path | Non
     else:
         for symbol, gpio in sorted(defaults.items()):
             if (symbol != "ATALAIA_BUZZER_PIN" and symbol.endswith("_PIN") and gpio == buzzer
-                    and buzzer >= 0):
+                    and buzzer >= 0 and frozenset({symbol, "ATALAIA_BUZZER_PIN"}) not in EXCLUSIVE):
                 errors.append(f"Kconfig: ATALAIA_BUZZER_PIN = {buzzer}, the default of {symbol} too")
         if buzzer in internal or buzzer in V4_GNSS or buzzer in V4_RESERVED or buzzer in SHARED:
             errors.append(f"Kconfig: ATALAIA_BUZZER_PIN = {buzzer}, a pin the board or another "
                           "part keeps")
         elif buzzer in STRAPPING_FORBIDDEN and buzzer not in STRAP_TOLERANT:
             errors.append(f"Kconfig: ATALAIA_BUZZER_PIN = {buzzer}, a boot strapping pin")
+    errors += check_simple_outputs(kconfig_text, internal)
     for label in board_labels:
         m = re.fullmatch(r"GPIO(\d+)", label)
         if m and int(m.group(1)) not in wired:

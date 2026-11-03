@@ -101,8 +101,15 @@ Não decidido, ou ainda sem suporte:
 
 - **A sirene** da especificação de conceção: o som do módulo é o amplificador e
   o altifalante. Uma sirene separada, um relé ou um estroboscópio (a
-  capacidade `output` da especificação) não estão no firmware do módulo
-  (decisão P5J-7).
+  capacidade `output` da especificação) ainda não estão no firmware do módulo
+  (decisão P5J-7). O rascunho do RFC «The expansion port» prevê-os como uma
+  **saída simples** (um interruptor de relé RC na porta livre do conversor de
+  nível, ligado como diz a
+  [secção 9.10 da Field Box](../field-box/BUILD.pt.md#910-saída-simples-opcional))
+  no **GPIO 33** livre do módulo (depois o 1 e o 3), com o módulo a manter as
+  rajadas para que uma ligação perdida ao telemóvel a desligue; a Field Box e o
+  Satellite têm-na desde 2026-11-03, o firmware do módulo recebe-a num
+  incremento posterior (EXP-26). Não ligues ainda nenhuma a um módulo.
 - **Energia vinda do telemóvel.** Por USB, o telemóvel alimenta a placa; com o
   interruptor principal do módulo ligado, o carregador da placa pode então
   carregar a célula do módulo a partir do telemóvel, como uma Field Box carrega

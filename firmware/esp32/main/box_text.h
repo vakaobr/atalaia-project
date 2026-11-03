@@ -163,6 +163,14 @@ typedef enum {
     TX_ADOPT_AGAIN_UP,
     TX_ADOPT_WARNING,
     TX_KEYS_ADOPT,
+    /* the picker's "Outputs" entry: the simple outputs' settings at the box (outputs_admin.h) */
+    TX_OUTPUTS_ITEM,
+    TX_OUTPUT_UP, /* %d: the output's number, %d: its GPIO */
+    TX_OUT_ENABLED,
+    TX_OUT_DISABLED,
+    TX_OUT_MAX_S, /* %lu: seconds */
+    TX_OUT_TESTING,
+    TX_KEYS_OUTPUT,
     /* the keypad screen's headers a mode's script sends in English (box_text_title) */
     TX_TITLE_ARM,
     TX_TITLE_DEFUSE,
@@ -196,6 +204,10 @@ typedef enum {
     TXO_KEYS_SETUP,
     TXO_CHANGE_FIELD,
     TXO_CHANGE_FIELD_Q,
+    TXO_OUTPUT,  /* %d: the output's number, %d: its GPIO */
+    TXO_OUT_ON,  /* enabled, in the header's right corner */
+    TXO_OUT_OFF, /* disabled */
+    TXO_OUT_KEYS,
     TXO_POINTS,   /* "%ld": a team's points on this box (the captured screen's header) */
     TXO_HELD_FOR, /* %s: how long the team has held the zone (game time since its capture) */
     /* the built-in modes' names in the OLED's header (box_text_mode_name) */

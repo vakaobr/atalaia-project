@@ -22,6 +22,9 @@ bool screen_json_int(const char *json, const char *key, long *out);
 /* Reads a number value of key, fractions kept. */
 bool screen_json_number(const char *json, const char *key, double *out);
 
+/* True when the object has key, whatever its value. */
+bool screen_json_has(const char *json, const char *key);
+
 /* True when key holds the literal true. */
 bool screen_json_true(const char *json, const char *key);
 

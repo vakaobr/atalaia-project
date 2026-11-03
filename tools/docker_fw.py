@@ -38,7 +38,16 @@ a shallow clone, which cannot count, the core's version and the commit: 0.3.0-de
                                                packages from (CONFIG_ATALAIA_MODE_KEYS; default:
                                                the project's two registry keys). Public keys
                                                only: tools/mode_package.py pubkey prints them.
-All three apply to that build folder only, and are reset when left out.
+    --buzzer=on | --buzzer=off                 the optional piezo buzzer (Kconfig ATALAIA_BUZZER,
+                                               GPIO 45; decisions BZR-1 to BZR-8); off when left out
+    --simple-out=off | on | on2 | <GPIO>       the optional simple output, an RC relay switch on a
+                                               spare 74AHCT125 gate (Kconfig ATALAIA_SIMPLE_OUT;
+                                               draft RFC "The expansion port", EXP-31 to EXP-37):
+                                               on: GPIO 46 on a V4.3 (5 on a V4.2); on2: and a second
+                                               one on GPIO 45 (refused with --buzzer=on); a number:
+                                               that GPIO (board 5 on the bench: --simple-out=15 with
+                                               its patch's I2S off). Off when left out.
+All five apply to that build folder only, and are reset when left out.
 
 `build`, `bench`, `modem`, `pod` and `wokwi` also take:
     --region=eu868 | --region=as923-tw         the radio region the image is built for
@@ -323,6 +332,32 @@ def antenna_options(build_dir: str) -> tuple[str, ...]:
     return (f"{build_dir}/sdkconfig.antenna",)
 
 
+def parts_options(build_dir: str) -> tuple[str, ...]:
+    """The Field Box's optional parts (--buzzer, --simple-out; off when not given): a defaults
+    file in the build folder, written in every case and only when it changes, so that a switch
+    rebuilds the sdkconfig."""
+    if build_dir not in FIELD_BOX_BUILDS:
+        return ()
+    buzzer = FW_OPTIONS.get("buzzer", "off") == "on"
+    simple = FW_OPTIONS.get("simple_out", "off")
+    lines = ["# Written by tools/docker_fw.py (--buzzer, --simple-out): the optional parts of this build.",
+             "CONFIG_ATALAIA_BUZZER=y" if buzzer else "# CONFIG_ATALAIA_BUZZER is not set"]
+    if simple == "off":
+        lines.append("# CONFIG_ATALAIA_SIMPLE_OUT is not set")
+    else:
+        lines.append("CONFIG_ATALAIA_SIMPLE_OUT=y")
+        if simple.isdigit():
+            lines.append(f"CONFIG_ATALAIA_SIMPLE_OUT_PIN={int(simple)}")
+        lines.append("CONFIG_ATALAIA_SIMPLE_OUT2=y" if simple == "on2"
+                     else "# CONFIG_ATALAIA_SIMPLE_OUT2 is not set")
+    text = "\n".join(lines) + "\n"
+    parts_file = FW / build_dir / "sdkconfig.parts"
+    parts_file.parent.mkdir(parents=True, exist_ok=True)
+    if not parts_file.exists() or parts_file.read_text() != text:
+        parts_file.write_text(text)
+    return (f"{build_dir}/sdkconfig.parts",)
+
+
 def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
     """Builds a variant (defaults applied on top of sdkconfig.defaults) into build_dir, with the
     firmware's version (a CMake cache value, set on every build so that it never sticks)."""
@@ -333,9 +368,11 @@ def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
     print(f"docker_fw: firmware version {version}", flush=True)
     cmake_args = [f"-D ATALAIA_FW_VERSION={version}"]
     defaults = (defaults + field_box_options(build_dir) + region_options(build_dir) + lbt_options(build_dir)
-                + antenna_options(build_dir))
+                + antenna_options(build_dir) + parts_options(build_dir))
     print(f"docker_fw: radio region {FW_OPTIONS.get('region', 'eu868')}, "
-          f"listen before talk {FW_OPTIONS.get('lbt', 'on')}, antenna {FW_OPTIONS.get('antenna_dbi', '2')} dBi",
+          f"listen before talk {FW_OPTIONS.get('lbt', 'on')}, antenna {FW_OPTIONS.get('antenna_dbi', '2')} dBi"
+          + (f", buzzer {FW_OPTIONS.get('buzzer', 'off')}, simple output {FW_OPTIONS.get('simple_out', 'off')}"
+             if build_dir in FIELD_BOX_BUILDS else ""),
           flush=True)
     # The variant's sdkconfig lives in its build folder. Regenerate it when
     # the defaults change, so edits to them always take effect.
@@ -446,7 +483,8 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 1
     command, options = argv[0], argv[1:]
-    box = ["--fw-version=", "--release-keys=", "--mode-keys=", "--region=", "--lbt=", "--antenna-dbi="]
+    box = ["--fw-version=", "--release-keys=", "--mode-keys=", "--region=", "--lbt=", "--antenna-dbi=",
+           "--buzzer=", "--simple-out="]
     radio = ["--region=", "--lbt=", "--antenna-dbi="]
     known = {"build": box, "wokwi": box, "modem": radio, "pod": radio,
              "bench": box,
@@ -482,11 +520,23 @@ def main(argv: list[str]) -> int:
             if not value.isdigit() or not 0 <= int(value) <= 20:
                 return fail("--antenna-dbi: a whole number of dBi, 0 to 20")
             FW_OPTIONS["antenna_dbi"] = str(int(value))
+        elif name == "--buzzer=":
+            value = option.split("=", 1)[1]
+            if value not in ("on", "off"):
+                return fail("--buzzer: on or off")
+            FW_OPTIONS["buzzer"] = value
+        elif name == "--simple-out=":
+            value = option.split("=", 1)[1]
+            if value not in ("on", "on2", "off") and not (value.isdigit() and 0 <= int(value) <= 48):
+                return fail("--simple-out: off, on, on2 or a GPIO number (0-48)")
+            FW_OPTIONS["simple_out"] = value
         elif name == "--mode-keys=":
             keys = release_keys_hex(option.split("=", 1)[1])
             if keys is None:
                 return fail("--mode-keys: 1-4 Ed25519 public keys, 64 hex digits or 44 base64 characters each")
             FW_OPTIONS["mode_keys"] = keys
+    if FW_OPTIONS.get("simple_out") == "on2" and FW_OPTIONS.get("buzzer") == "on":
+        return fail("--simple-out=on2 with --buzzer=on: GPIO 45 is the buzzer's or a second simple output")
     if command == "clean":
         return clean()
     if command == "version":

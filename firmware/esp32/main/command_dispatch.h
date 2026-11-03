@@ -9,6 +9,7 @@
 #define ATALAIA_COMMAND_DISPATCH_H
 
 #include "hal/hal.h"
+#include "outputs.h"
 #include "screen_types.h"
 
 /* Maximum number of queued screen updates for test inspection. */
@@ -45,5 +46,15 @@ void command_queues_init(command_queues_t *q);
  */
 void command_dispatch(const char *target, const char *method, const char *args_json, hal_t *hal,
                       command_queues_t *queues);
+
+/*
+ * A script's call to an output (draft RFC "The expansion port", EXP-24): cap("siren"):pulse(ms),
+ * :on() / :on(max_ms), :off(), :pattern(on_ms, off_ms, ms), the target being the output's
+ * capability id. Returns false when target is not an output of o (o NULL: the box has none), so
+ * the call does nothing, as a mode written for a box with a siren expects on one without; true
+ * when it was one (switched, or refused by outputs.h's rules, which log why).
+ */
+bool command_dispatch_output(outputs_t *o, const char *target, const char *method,
+                             const char *args_json);
 
 #endif /* ATALAIA_COMMAND_DISPATCH_H */

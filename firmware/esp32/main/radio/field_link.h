@@ -63,6 +63,8 @@ enum {
     /* 10 is the I/O pod's settings (Amendment 17), taken by the pod's radio. */
     FIELD_CMD_PEER_EPOCH =
         11, /* a node's epoch, for the receivers: params {"src", "epoch"} (Amendment 24) */
+    FIELD_CMD_OUTPUT = 12, /* switch an output: params {"capability", "act", "ms", ...}
+                            * (Amendment 26, protocol/expansion-port.md section 8) */
 };
 
 /* Game states as TIME carries them. */
@@ -222,6 +224,12 @@ void field_link_send_battery_low(field_link_t *l, uint8_t percent, uint32_t t_ms
  * game (game time 0 before the start) are two events, not one taken for a copy of the other. */
 void field_link_send_update_failed(field_link_t *l, const char *release, const char *reason,
                                    const char *fw, uint32_t t_ms);
+
+/* Sends an event of the box's own, not its mode's (node.modules, output.switched, the output
+ * rate limit's script.error): normal priority, retried, its seq the header seq of the first
+ * packet that carries it (as node.update_failed's), game time t_ms. */
+void field_link_send_box_event(field_link_t *l, const char *type, const char *data_json,
+                               uint32_t t_ms);
 
 /* Sends node.modes_failed (critical, retried until acknowledged): a fetch of the game's mode
  * packages that failed and could not be reported over HTTPS (mode_fetch.h, decision P5E-8).

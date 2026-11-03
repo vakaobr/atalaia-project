@@ -66,6 +66,8 @@ int main(void)
     run_tft_splash_tests();
     run_target_addon_tests();
     run_sound_tests();
+    run_outputs_tests();
+    run_simple_out_tests();
 
     if (check_failures == 0) {
         printf("firmware: all %d checks passed\n", check_count);

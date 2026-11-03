@@ -56,6 +56,19 @@
  * 200; over HTTPS then "REPORT taken=yes|no", the controller's 200 or not) and
  * "FETCH result=<code> part=<id>", then joins the game, or says why over LoRa
  * (node.modes_failed) and is free again.
+ * --simple-out FUNCTION[@GPIO] (up to twice; draft RFC "The expansion port", increment 2): a
+ * simple output (an RC relay switch on a GPIO, main/simple_out.c) on GPIO 46 (the second: 45)
+ * unless @GPIO says another, run by the firmware's own output layer (main/outputs.c). FUNCTION
+ * (siren, strobe, smoke, light, horn, out.N) is what its admin set at the box, enabled; "-"
+ * leaves it as a new box has it (disabled, out.N) for "@output" to enable. Settings the box
+ * stored (the file outputs in --state-dir) win over it, as after a reboot. The pulse train is
+ * printed: "PULSE g<gpio> t=<ms> width=<1000|2000> frames=<n> until=<ms>[ flush]" for each burst
+ * the RMT would send (frames of 20 ms; flush: what was queued is dropped), and "PIN g<gpio> low
+ * t=<ms>" once the last burst has gone out, so a test can tell when the switch's signal stops.
+ * HELLO then lists `output` (capability type 11) while one is enabled, a CMD 12 switches it, the
+ * mode's cap(fn) calls reach it, and once the HELLO is acknowledged the box sends node.modules
+ * ("g46:servo:siren").
+ *
  * --no-wifi: an offer that passes them then runs the update (fw_update_run), which stops
  * with no_wifi as on a box whose Wi-Fi did not start, and prints "UPDATE result=<code>";
  * a refusal or that failure reaches the controller over LoRa (node.update_failed), as on
@@ -73,7 +86,13 @@
  *   battery <0-100|-1>          the battery gauge's reading (-1: no gauge); 87 at the start
  *   lbtbusy N                   the next N channel checks answer "busy" (-1: every one, 0: none)
  *   status                      print one STATUS line (JSON): the game, the link, and between
- *                               games the device id and whether the box takes an invite
+ *                               games the device id and whether the box takes an invite, and
+ *                               "outputs": each simple output's id, GPIO, enabled, on, pulsing
+ *   @outputs                    one "LOG outputs: ..." line: the simple outputs' settings
+ *   @output <n> enable|disable|test <PIN>, @output <n> function <name> <PIN>,
+ *   @output <n> max <seconds> <PIN>
+ *                               the admin's settings at the box (main/outputs_admin.c; the PIN
+ *                               is --admin-pin's), between games only
  *   quit
  * stdout: "READY air=<port>", then LOG, SCREEN and STATUS lines (SCREEN: the shell's
  * screens and the mode's, "SCREEN <template> <data JSON>", as the display gets them).
@@ -107,6 +126,9 @@
 #include "radio/radio_lbt.h"
 #include "mode_fetch.h"
 #include "mode_store.h"
+#include "outputs.h"
+#include "outputs_admin.h"
+#include "simple_out.h"
 #include "hal/stub/hal_stub.h"
 #include "serial_console.h"
 #include "state_persist.h"
@@ -493,6 +515,136 @@ static int shell_battery(void *user)
 
 static box_game_t game;
 
+/* ---- Simple outputs (--simple-out): the firmware's output layer, the RMT as log lines ---- */
+
+static outputs_t outs;
+static simple_out_t simple[OUTPUTS_MAX];
+static uint32_t host_now;                /* the loop's clock, for the fake RMT's lines */
+static uint32_t pin_low_at[OUTPUTS_MAX]; /* when the last burst ends; 0: told already */
+
+static bool fake_rmt_send(void *ctx, uint16_t width_us, uint16_t frames, bool flush)
+{
+    simple_out_t *so = (simple_out_t *)ctx;
+    int i = (int)(so - simple);
+    /* What the scheduler will have queued once this is taken (simple_out.c). */
+    uint32_t start = flush || !simple_out_pulsing(so, host_now) ? host_now : so->horizon_ms;
+    uint32_t until = start + (uint32_t)frames * SO_FRAME_MS;
+    out("PULSE g%d t=%lu width=%u frames=%u until=%lu%s", so->gpio, (unsigned long)host_now,
+        (unsigned)width_us, (unsigned)frames, (unsigned long)until, flush ? " flush" : "");
+    pin_low_at[i] = until;
+    return true;
+}
+
+/* "PIN g<gpio> low" once the last queued burst has gone out. */
+static void pins_low(uint32_t now)
+{
+    for (int i = 0; i < outs.count; i++) {
+        if (pin_low_at[i] != 0 && (int32_t)(now - pin_low_at[i]) >= 0 &&
+            !simple_out_pulsing(&simple[i], now)) {
+            out("PIN g%d low t=%lu", simple[i].gpio, (unsigned long)pin_low_at[i]);
+            pin_low_at[i] = 0;
+        }
+    }
+}
+
+static void outputs_event(void *ctx, const char *type, const char *data_json)
+{
+    (void)ctx;
+    out("LOG event %s %s", type, data_json);
+    box_game_output_event(&game, type, data_json);
+}
+
+static void outputs_log(void *ctx, const char *line)
+{
+    (void)ctx;
+    out("LOG %s", line);
+}
+
+/* The settings "NVS": the file outputs, a line "<index> <enabled 0|1> <function> <max s>" each. */
+static bool outputs_save(void *ctx, int index, const out_settings_t *s)
+{
+    (void)ctx;
+    char text[OUTPUTS_MAX * 48] = "";
+    size_t len = 0;
+    for (int i = 0; i < outs.count; i++) {
+        const out_settings_t *x = i == index ? s : &outs.ch[i].set;
+        len += (size_t)snprintf(text + len, sizeof(text) - len, "%d %d %s %lu\n", i,
+                                x->enabled ? 1 : 0, x->function, (unsigned long)x->max_on_s);
+    }
+    return write_file("outputs", (const uint8_t *)text, len) == 0;
+}
+
+static bool outputs_load(int index, out_settings_t *s)
+{
+    char text[OUTPUTS_MAX * 48 + 1];
+    int n = read_file("outputs", (uint8_t *)text, sizeof(text) - 1);
+    if (n <= 0) return false;
+    text[n] = '\0';
+    for (char *line = strtok(text, "\n"); line != NULL; line = strtok(NULL, "\n")) {
+        int i = -1, en = 0;
+        unsigned long max_s = 0;
+        char fn[OUT_ID_MAX + 1];
+        if (sscanf(line, "%d %d %23s %lu", &i, &en, fn, &max_s) == 4 && i == index) {
+            outputs_default_settings(index, s);
+            s->enabled = en != 0;
+            snprintf(s->function, sizeof(s->function), "%s", fn);
+            s->max_on_s = (uint32_t)max_s;
+            return true;
+        }
+    }
+    return false;
+}
+
+/* "--simple-out FUNCTION[@GPIO]": a simple output, its settings from the state dir or from
+ * FUNCTION ("-": a new box's, disabled). False for a bad FUNCTION or GPIO. */
+static bool add_simple_out(const char *arg, uint32_t now)
+{
+    int i = outs.count;
+    if (i >= OUTPUTS_MAX) return false;
+    char fn[OUT_ID_MAX + 1];
+    int gpio = i == 0 ? 46 : 45;
+    const char *at = strchr(arg, '@');
+    size_t n = at ? (size_t)(at - arg) : strlen(arg);
+    if (n == 0 || n > OUT_ID_MAX) return false;
+    memcpy(fn, arg, n);
+    fn[n] = '\0';
+    if (at != NULL) gpio = atoi(at + 1);
+    if (simple_out_pin_problem(gpio, SO_BOARD_V4_3, -1, NULL, 0) != NULL) return false;
+    for (int j = 0; j < i; j++) {
+        if (simple[j].gpio == gpio) return false;
+    }
+    out_settings_t s;
+    if (!outputs_load(i, &s)) {
+        outputs_default_settings(i, &s);
+        if (strcmp(fn, "-") != 0) {
+            if (!outputs_function_ok(fn)) return false;
+            s.enabled = true;
+            snprintf(s.function, sizeof(s.function), "%s", fn);
+        }
+    }
+    simple_out_rmt_t rmt = {.ctx = &simple[i], .send = fake_rmt_send};
+    simple_out_init(&simple[i], gpio, &rmt);
+    out_backend_t be = {.ctx = &simple[i], .drive = simple_out_backend_drive};
+    host_now = now;
+    return outputs_add_simple(&outs, gpio, &be, &s) >= 0;
+}
+
+static void print_outputs(char *buf, size_t cap)
+{
+    size_t len = (size_t)snprintf(buf, cap, "[");
+    for (int i = 0; i < outs.count && len + 2 < cap; i++) {
+        const out_channel_t *c = &outs.ch[i];
+        len += (size_t)snprintf(buf + len, cap - len,
+                                "%s{\"id\":\"%s\",\"gpio\":%d,\"enabled\":%s,\"on\":%s,"
+                                "\"pulsing\":%s,\"bursts\":%lu}",
+                                i ? "," : "", c->id, c->gpio, c->set.enabled ? "true" : "false",
+                                c->level ? "true" : "false",
+                                simple_out_pulsing(&simple[i], host_now) ? "true" : "false",
+                                (unsigned long)simple[i].bursts);
+    }
+    if (len + 2 <= cap) snprintf(buf + len, cap - len, "]");
+}
+
 /* ---- Adoption (adoption.h): the join key and the field's name in "NVS" ------------ */
 
 static adoption_t adopt;
@@ -764,6 +916,8 @@ static event_log_t evlog;
 
 static void print_status(void)
 {
+    char outputs_json[OUTPUTS_MAX * 120 + 4];
+    print_outputs(outputs_json, sizeof(outputs_json));
     char scores[96] = "";
     size_t o = 0;
     if (runner.node != NULL) {
@@ -782,7 +936,7 @@ static void print_status(void)
         "\"times\":%lu,\"states\":%lu,\"rx_ok\":%lu,\"rx_rejected\":%lu,\"relayed\":%lu,"
         "\"have_key\":%s,\"device_id\":\"%s\",\"available\":%s,\"invites_accepted\":%lu,"
         "\"invites_refused\":%lu,\"last_game\":%u,\"lang\":\"%s\","
-        "\"lbt_cads\":%lu,\"lbt_deferrals\":%lu,\"lbt_gave_up\":%lu}",
+        "\"lbt_cads\":%lu,\"lbt_deferrals\":%lu,\"lbt_gave_up\":%lu,\"outputs\":%s}",
         (int)game.phase, game.paused ? "true" : "false", game.join.game_id, game.join.node_id,
         game.link.proto.epoch, (unsigned long)runner.game_time_ms, game.owner_team, scores,
         (unsigned)field_link_pending(&game.link), game.link.leader, (unsigned long)game.link.term,
@@ -793,7 +947,7 @@ static void print_status(void)
         box_lobby_available(&game) ? "true" : "false", (unsigned long)game.lobby.invites_accepted,
         (unsigned long)game.lobby.invites_refused, game.lobby.last_game,
         box_lang_given() ? box_lang_code(box_lang()) : "", (unsigned long)txs.stats.cads,
-        (unsigned long)txs.stats.deferrals, (unsigned long)txs.stats.gave_up);
+        (unsigned long)txs.stats.deferrals, (unsigned long)txs.stats.gave_up, outputs_json);
 }
 
 int main(int argc, char **argv)
@@ -806,6 +960,8 @@ int main(int argc, char **argv)
     const char *mac = "02:00:00:00:00:01";
     bool as_box = false;
     bool pair = false;
+    const char *simple_outs[OUTPUTS_MAX];
+    int simple_out_count = 0;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--pair") == 0) {
             pair = true;
@@ -849,6 +1005,12 @@ int main(int argc, char **argv)
             }
         } else if (strcmp(argv[i], "--mode-source") == 0 && i + 1 < argc) {
             mode_source = argv[++i];
+        } else if (strcmp(argv[i], "--simple-out") == 0 && i + 1 < argc) {
+            if (simple_out_count >= OUTPUTS_MAX) {
+                fprintf(stderr, "box_host: --simple-out at most %d times\n", OUTPUTS_MAX);
+                return 2;
+            }
+            simple_outs[simple_out_count++] = argv[++i];
         } else if (strcmp(argv[i], "--no-wifi") == 0) {
             no_wifi = true;
         } else if (strcmp(argv[i], "--no-lbt") == 0) {
@@ -942,7 +1104,11 @@ int main(int argc, char **argv)
     snprintf(hello.fw_version, sizeof(hello.fw_version), "%s", fw_version);
     snprintf(hello.core_version, sizeof(hello.core_version), "%s", atalaia_version());
     hello.tier = 0;
-    hello.capabilities_count = 0;
+    /* The team buttons and the keypad stand on stdin ("hold", "keys"); box_game adds `output`
+     * (11) while a simple output is enabled. */
+    hello.capabilities[0] = ATALAIA_CAP_BUTTON;
+    hello.capabilities[1] = ATALAIA_CAP_KEYPAD;
+    hello.capabilities_count = 2;
     hello.transports = 1;
     hello.battery_pct = 87;
 
@@ -973,6 +1139,20 @@ int main(int argc, char **argv)
     box_game_init(&game, &runner, &preset, &store, &shell, &atalaia_crypto_mbedtls, &nvs_ops,
                   &evlog, &hello);
     game.region = host_region;
+    {
+        outputs_ops_t oops = {.event = outputs_event, .log = outputs_log, .save = outputs_save};
+        outputs_init(&outs, &oops);
+        for (int i = 0; i < simple_out_count; i++) {
+            if (!add_simple_out(simple_outs[i], mono_ms())) {
+                fprintf(stderr,
+                        "box_host: --simple-out %s: FUNCTION[@GPIO] (siren, strobe, smoke, "
+                        "light, horn, out.N or -; a free GPIO)\n",
+                        simple_outs[i]);
+                return 2;
+            }
+        }
+        box_game_set_outputs(&game, &outs);
+    }
     if (announce_ms > 0) {
         game.lobby.first_min_ms = game.lobby.first_max_ms = (uint32_t)announce_ms;
         game.lobby.interval_fixed_ms = (uint32_t)announce_ms;
@@ -983,6 +1163,8 @@ int main(int argc, char **argv)
     }
     adoption_ops_t aops = {adopt_busy, adopt_store, shell_screen, shell_log, NULL};
     adoption_init(&adopt, &aops, admin_pin);
+    static admin_pin_t guard; /* "@output ..." wants the admin PIN, as a release build does */
+    admin_pin_init(&guard, NULL, admin_pin);
     adoption_identity_t adopt_id = {name, mac, fw_version};
     if (box_game_load_join_key(&game)) {
         char field_name[ADOPTION_NAME_MAX + 1];
@@ -1065,6 +1247,18 @@ int main(int argc, char **argv)
                                 out("LOG %s", reply);
                             }
                         }
+                    } else if (strcmp(command, "outputs") == 0 ||
+                               outputs_admin_args(command) >= 0) {
+                        static char line_out[200], reply_out[240];
+                        snprintf(line_out, sizeof(line_out), "%s", command);
+                        int args = outputs_admin_args(line_out);
+                        if (args < 0 || admin_pin_gate_serial(&guard, false, line_out, args,
+                                                              reply_out, sizeof(reply_out))) {
+                            bool busy = box_game_active(&game) || runner.running;
+                            outputs_admin_command(&outs, line_out, busy, reply_out,
+                                                  sizeof(reply_out));
+                        }
+                        out("LOG %s", reply_out);
                     } else if (strncmp(command, "tag ", 4) == 0) {
                         out("LOG tag %s",
                             box_game_tag_text(&game, command + 4) ? "read" : "not read");
@@ -1133,6 +1327,9 @@ int main(int argc, char **argv)
             run_fetch();
         }
         box_game_tick(&game, delta, now);
+        host_now = now;
+        outputs_tick(&outs, box_game_output_state(&game), now);
+        pins_low(now);
         lbt_pump(now);
         adoption_tick(&adopt, now);
         box_pair_tick(&pairing, now);
