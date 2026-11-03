@@ -7,7 +7,7 @@ server ATALAIA_DATABASE_URL points at), migrates it to head unless the class
 sets ``migrate = False``, and drops it afterwards; each test gets its own
 engine (``self.engine``, no pool, so nothing outlives the test's event loop).
 ``AppTestCase`` adds the application, started through its lifespan, an
-httpx client on its ASGI transport (``self.client``, over https:// so the
+httpx2 client on its ASGI transport (``self.client``, over https:// so the
 Secure refresh cookie is kept), and helpers that make accounts and log in.
 
 TOTP codes in the tests are made for the app's clock (``app.state.clock``),
@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import asyncpg
-import httpx
+import httpx2
 from alembic import command
 from alembic.config import Config
 from sqlalchemy.engine import make_url
@@ -162,7 +162,7 @@ class AppTestCase(DatabaseTestCase):
         self.app = create_app(self.settings())
         await self.stack.enter_async_context(self.app.router.lifespan_context(self.app))
         self.client = await self.stack.enter_async_context(
-            httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app), base_url="https://server.test"))
+            httpx2.AsyncClient(transport=httpx2.ASGITransport(app=self.app), base_url="https://server.test"))
 
     async def asyncTearDown(self) -> None:
         await self.stack.aclose()
@@ -190,7 +190,7 @@ class AppTestCase(DatabaseTestCase):
         return totp.code_at(secret, t)
 
     async def login(self, username: str, password: str = PASSWORD, secret: Optional[str] = None,
-                    client: Optional[httpx.AsyncClient] = None) -> dict[str, Any]:
+                    client: Optional[httpx2.AsyncClient] = None) -> dict[str, Any]:
         """Logs in (with the TOTP step when the account has it); returns the session's JSON."""
         client = client or self.client
         r = await client.post("/api/v1/auth/login", json={"username": username, "password": password})
@@ -209,8 +209,8 @@ class AppTestCase(DatabaseTestCase):
         body = await self.login(username, password, secret)
         return {"Authorization": f"Bearer {body['access_token']}"}
 
-    def other_client(self) -> httpx.AsyncClient:
+    def other_client(self) -> httpx2.AsyncClient:
         """A second client (its own cookies) on the same app; closed with the test."""
-        client = httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app), base_url="https://server.test")
+        client = httpx2.AsyncClient(transport=httpx2.ASGITransport(app=self.app), base_url="https://server.test")
         self.stack.push_async_callback(client.aclose)
         return client

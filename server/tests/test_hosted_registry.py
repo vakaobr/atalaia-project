@@ -23,7 +23,7 @@ import unittest.mock
 from pathlib import Path
 from typing import Any, Optional
 
-import httpx
+import httpx2
 
 from atalaia_server import cli, dnsquery, hosted, quotas, tenancy, tls_ask
 from atalaia_server.app import create_app
@@ -405,7 +405,7 @@ class CustomHostTests(HubCase):
     async def test_the_ask_endpoint_says_yes_only_to_a_verified_name(self) -> None:
         app = tls_ask.create_app({"ATALAIA_DATABASE_URL": self.hub.app_url, "ATALAIA_HOSTED_DOMAIN": DOMAIN})
         try:
-            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://tls-ask") as c:
+            async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="http://tls-ask") as c:
                 app.bucket = tls_ask.TokenBucket(1000.0, 1000)
 
                 async def ask(name: str) -> int:
@@ -482,7 +482,7 @@ class UpgradeTests(HubCase):
         self.assertEqual(again, ["campo-a", "campo-b"])  # idempotent
         app = create_app(self.settings())
         async with app.router.lifespan_context(app):
-            r = await httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+            r = await httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app),
                                         base_url="https://campo-a.hub.test").get("/api/v1/fields")
             self.assertEqual(r.status_code, 401)
 

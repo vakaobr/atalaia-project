@@ -3,7 +3,7 @@
 """The remote GM's view pushed to the browser on PostgreSQL 16 (plan phase 19's S19-11; decision FU9-6).
 
 ``GET /api/v1/fields/{id}/remote-gm/stream`` is driven through the app's own ASGI interface, in the test's event
-loop, so each chunk the server pushes can be read as it comes (httpx's ASGI transport would hold the answer until
+loop, so each chunk the server pushes can be read as it comes (httpx2's ASGI transport would hold the answer until
 the stream ends) while a controller's socket (``test_remote_gm.Stream``) changes the live view. The same page in a
 real browser, over real sockets: ``tests_browser`` (``RemoteGmTests``).
 

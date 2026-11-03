@@ -29,7 +29,7 @@ import ssl
 import sys
 import warnings
 
-import httpx
+import httpx2
 
 from atalaia_controller.ws_client import WebSocket, WsError
 
@@ -62,7 +62,7 @@ def ask(ws: WebSocket, msg: dict) -> dict:
     return json.loads(answer)
 
 
-def https_checks(client: httpx.Client) -> None:
+def https_checks(client: httpx2.Client) -> None:
     r = client.get(f"https://{HOST}/api/v1/health")
     check(r.status_code == 200 and r.json().get("status") == "ok",
           f"GET /api/v1/health over HTTPS: {r.status_code}")
@@ -75,11 +75,11 @@ def https_checks(client: httpx.Client) -> None:
     check(h.get("cross-origin-opener-policy") == "same-origin", "Cross-Origin-Opener-Policy (from Caddy)")
     check("server" not in h and "via" not in h,
           f"no Server or Via header (got {h.get('server')!r}, {h.get('via')!r})")
-    with httpx.Client(verify=ssl.create_default_context(), timeout=10) as public:
+    with httpx2.Client(verify=ssl.create_default_context(), timeout=10) as public:
         try:
             public.get(f"https://{HOST}/api/v1/health")
             check(False, "the system's CAs must not trust Caddy's local test CA")
-        except httpx.ConnectError:
+        except httpx2.ConnectError:
             check(True, "the certificate is Caddy's own CA's, which only the test trusts")
     r = client.get(f"https://{HOST}/staff/login")
     check(r.status_code == 200 and '<script type="module" src="/static/staff/login.js">' in r.text
@@ -88,7 +88,7 @@ def https_checks(client: httpx.Client) -> None:
     r = client.get(f"https://{HOST}/static/staff/staff.js")
     check(r.status_code == 200 and r.headers.get("content-type", "").startswith("text/javascript"),
           f"the staff pages' script through Caddy: {r.status_code}")
-    r = httpx.get(f"http://{HOST}/api/v1/health", timeout=10)
+    r = httpx2.get(f"http://{HOST}/api/v1/health", timeout=10)
     check(r.status_code in (301, 308) and r.headers.get("location") == f"https://{HOST}/api/v1/health",
           f"HTTP redirects to HTTPS: {r.status_code} {r.headers.get('location')}")
 
@@ -105,7 +105,7 @@ def closed_checks() -> None:
 
 
 def before() -> None:
-    with httpx.Client(verify=CA, timeout=10) as client:
+    with httpx2.Client(verify=ssl.create_default_context(cafile=CA), timeout=10) as client:
         https_checks(client)
         r = client.post(f"https://{HOST}/api/v1/auth/login", json={"username": "nobody-here", "password": "wrong"})
         check(r.status_code == 401, f"a wrong login is refused through Caddy: {r.status_code}")
@@ -128,7 +128,7 @@ def before() -> None:
 
 
 def after() -> None:
-    with httpx.Client(verify=CA, timeout=10) as client:
+    with httpx2.Client(verify=ssl.create_default_context(cafile=CA), timeout=10) as client:
         https_checks(client)
     ws = stream(KEY)
     try:

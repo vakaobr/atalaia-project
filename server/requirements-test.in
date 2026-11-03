@@ -4,4 +4,8 @@
 # The tests' extra dependencies, installed only in the image's test target;
 # pinned and hashed into requirements-test.txt as requirements.in explains.
 -c requirements.txt
-httpx
+# The tests' HTTP client (httpx2.AsyncClient on its ASGI transport, the deployment
+# probes) and the one Starlette's TestClient is built on: Starlette 1.x wants httpx2,
+# Pydantic's fork of httpx 0.28, and warns on httpx (PLK-3). The server itself makes
+# its few outgoing requests (OIDC) with urllib and has no HTTP client dependency.
+httpx2

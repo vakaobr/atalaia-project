@@ -34,7 +34,7 @@ import ssl
 import sys
 from dataclasses import dataclass
 
-import httpx
+import httpx2
 
 from atalaia_controller.ws_client import WebSocket, WsError
 
@@ -111,7 +111,7 @@ def stream(field: Field, key: str) -> WebSocket:
                              ca_file=CA)
 
 
-def field_checks(client: httpx.Client, field: Field, other: Field) -> None:
+def field_checks(client: httpx2.Client, field: Field, other: Field) -> None:
     base = f"https://{field.host}"
     r = client.get(f"{base}/api/v1/health")
     check(r.status_code == 200 and "camera=()" in r.headers.get("permissions-policy", "")
@@ -125,7 +125,7 @@ def field_checks(client: httpx.Client, field: Field, other: Field) -> None:
     check(r.status_code == 200, f"{field.host}: its own controller's key works: {r.status_code}")
     r = client.get(f"{base}/api/v1/sync/field", headers={"Authorization": f"Bearer {other.key}"})
     check(r.status_code == 401, f"{field.host}: {other.slug}'s key is unknown there: {r.status_code}")
-    r = httpx.get(f"http://{field.host}/api/v1/health", timeout=10)
+    r = httpx2.get(f"http://{field.host}/api/v1/health", timeout=10)
     check(r.status_code in (301, 308) and r.headers.get("location") == f"https://{field.host}/api/v1/health",
           f"{field.host}: HTTP redirects to HTTPS: {r.status_code}")
     try:
@@ -152,7 +152,7 @@ def run(phase: str) -> None:
     hub = fields()
     if len(hub) < 2:
         check(False, "ATALAIA_PROBE_FIELDS names two fields or more")
-    with httpx.Client(verify=CA, timeout=10) as client:
+    with httpx2.Client(verify=ssl.create_default_context(cafile=CA), timeout=10) as client:
         for i, field in enumerate(hub):
             other = hub[(i + 1) % len(hub)]
             certificate_checks(field)
