@@ -553,6 +553,36 @@ class BuildingTests(unittest.TestCase):
                 self.assertIn("level", body)
                 self.assertEqual(body["level"], p.level if p.mode == "gps" else None)
 
+    def test_the_scenarios_leave_the_boxes_own_beacons_alone(self) -> None:
+        # GET /api/v1/beacons also lists the live game's boxes (kind "box", controller box_beacons.py): a scenario
+        # neither deletes them nor counts them as a difference from its registry.
+        import director
+
+        scenario = director.BuildingScenario()
+        boxes = [{"id": f"45253:{n}", "kind": "box", "uuid": "B0C5B0C5-0000-8000-8000-000000000000", "major": 45253,
+                  "minor": n, "room": "Torre", "zone": "", "level": 0, "x": 0.5, "y": 0.5} for n in (2, 3, 4)]
+        tags = [dict(b, id=f"{b['major']}:{b['minor']}") for b in scenario.beacons]
+
+        class Api:
+            def __init__(self, listed):
+                self.listed, self.calls = listed, []
+
+            def call(self, method, path, body=None, **kw):
+                self.calls.append((method, path))
+                return {"beacons": self.listed} if (method, path) == ("GET", "/api/v1/beacons") else {}
+
+        same = Api(tags + boxes)
+        scenario.setup(same)
+        self.assertFalse([c for c in same.calls if c[1].startswith("/api/v1/beacons") and c[0] != "GET"])
+        fresh = Api(boxes)
+        scenario.setup(fresh)
+        self.assertEqual([c for c in fresh.calls if c[0] == "DELETE"], [])
+        self.assertEqual(len([c for c in fresh.calls if c == ("POST", "/api/v1/beacons")]), 15)
+        both = Api(tags + boxes)
+        director.OpenFieldScenario().setup(both)
+        self.assertEqual(sorted(c[1] for c in both.calls if c[0] == "DELETE"),
+                         sorted(f"/api/v1/beacons/{b['id']}" for b in tags))
+
     def test_the_scenarios_alternate_and_the_callsigns_stay_made_up(self) -> None:
         import director
 

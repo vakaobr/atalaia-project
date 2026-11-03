@@ -152,6 +152,13 @@ class BuildingPlayer(Player):
         self.y += dy / dist * move
 
 
+def registered_tags(api: Api) -> list[dict]:
+    """The beacons the GM registered (the tags), as staff read them. GET /api/v1/beacons also lists the live game's
+    Field Boxes, each its own beacon (``kind: "box"``, controller box_beacons.py): the controller derives those
+    from the boxes and their places, they cannot be deleted or posted, so a scenario leaves them out."""
+    return [b for b in (api.call("GET", "/api/v1/beacons") or {}).get("beacons", []) if b.get("kind") != "box"]
+
+
 class OpenFieldScenario:
     """The first scenario: the open field (a rectangle in the open sea, one plan, GPS positions)."""
 
@@ -161,7 +168,7 @@ class OpenFieldScenario:
 
     def setup(self, api: Api) -> None:
         """One plan and its place on the map; a building's levels and beacons put away first."""
-        for b in (api.call("GET", "/api/v1/beacons") or {}).get("beacons", []):
+        for b in registered_tags(api):
             api.call("DELETE", f"/api/v1/beacons/{b['id']}")
         if (api.call("GET", "/api/v1/field/levels") or {}).get("enabled"):
             api.call("PUT", "/api/v1/field/levels", {"enabled": False})
@@ -212,7 +219,7 @@ class BuildingScenario:
         for level in range(len(building.LEVEL_NAMES)):
             api.call("PUT", f"/api/v1/field/levels/{level}/image", raw=building.plan_png(level), ctype="image/png")
         api.call("PUT", "/api/v1/field/georef", {"points": building.georef_points()})
-        have = (api.call("GET", "/api/v1/beacons") or {}).get("beacons", [])
+        have = registered_tags(api)
         key = ("uuid", "major", "minor", "room", "zone", "level", "x", "y")
         if sorted(tuple(b.get(k) for k in key) for b in have) == sorted(tuple(b[k] for k in key) for b in self.beacons):
             return
@@ -429,6 +436,9 @@ class Director:
         for i, p in enumerate(players):
             body = {"game_id": gid, "player_id": p.pid, "player_secret": p.secret, "display_name": p.name,
                     "notice_version": notice,
+                    # Position sharing is the player's own opt-in at check-in (LEG-1 to LEG-19, `share_position`,
+                    # off by default): the made-up players opt in, or the controller refuses every position they send.
+                    "share_position": True,
                     "replicas": [{"declaration_id": str(uuid.uuid4()), "replica_id": p.replica_id, "type": "aeg",
                                   "class": "rifle"}]}
             out = self.api.call("POST", "/api/v1/checkin", body, token="x")  # the check-in needs no token

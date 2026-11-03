@@ -35,11 +35,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     ATALAIA_CORE_LIB=/opt/atalaia/libatalaia_core.so \
     ATALAIA_MODEM_HOST=/opt/atalaia/modem_host \
     ATALAIA_BOX_HOST=/opt/atalaia/box_host
-# libmbedcrypto: the boxes' AES-CCM. The controller's Python packages are Ubuntu's own, as on a Raspberry Pi.
+# libmbedcrypto: the boxes' AES-CCM; libmbedtls and libmbedx509: box_host's HTTPS mode fetch (it links them since
+# PR #32; without them the host boxes do not start and the live demo restarts in a loop). The controller's Python packages are Ubuntu's own, as on a Raspberry Pi.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       python3 python3-yaml python3-cryptography python3-fastapi python3-uvicorn python3-websockets python3-httpx \
-      python3-serial python3-paho-mqtt libmbedcrypto7t64 \
+      python3-serial python3-paho-mqtt libmbedcrypto7t64 libmbedtls14t64 libmbedx509-1t64 \
  && rm -rf /var/lib/apt/lists/* \
  && useradd --uid 10001 --no-create-home --home-dir /app --shell /usr/sbin/nologin demo \
  && mkdir -p /data && chown demo /data
