@@ -9,6 +9,10 @@
 // person unlinks the pod: with a pod simulated at the transport, and with
 // the pod firmware's own code (the host pod) whose target module is
 // unplugged and plugged in again.
+//
+// Its pod's outputs fitted but not lent (EVT pod.modules' `withheld`) reach
+// the controller as node.outputs_disabled, as a box's outputs its admin has
+// not enabled (decision PROPC-6).
 
 @Timeout(Duration(minutes: 2))
 library;
@@ -78,6 +82,19 @@ class LinkEnd implements LinkSocket {
     }
   }
 
+  /// The events the prop sent of that type, their data in order.
+  List<Map<String, Object?>> events(String type) => [
+    for (final m in got)
+      if (m['type'] == 'event' && (m['event']! as Map)['type'] == type)
+        ((m['event']! as Map)['data']! as Map).cast<String, Object?>(),
+  ];
+
+  /// The event types the prop sent, in order.
+  List<Object?> get eventTypes => [
+    for (final m in got)
+      if (m['type'] == 'event') (m['event']! as Map)['type'],
+  ];
+
   /// The capability type ids of every HELLO, in order.
   List<List<Object?>> get hellos => [
     for (final m in got)
@@ -138,6 +155,12 @@ const lendingPod = PodIdent(
 
 // The phone's own: button 1, keypad 2, display 3, led 4, audio 5.
 const screenAndSpeaker = [1, 2, 3, 4, 5];
+
+/// The node.modules and node.outputs_disabled the prop sent, in order.
+List<Object?> told(LinkEnd end) => [
+  for (final t in end.eventTypes)
+    if (t == 'node.modules' || t == 'node.outputs_disabled') t,
+];
 
 Future<void> settle() async {
   for (var i = 0; i < 10; i++) {
@@ -206,6 +229,100 @@ void main() {
     await settle();
     expect(end.hellos.length, 5);
     expect(end.hellos.last, screenAndSpeaker);
+  });
+
+  test("a pod's withheld outputs are node.outputs_disabled, with each "
+      'node.modules and when they change; an older pod says nothing of '
+      'them', () async {
+    final (s, end) = linkedSession(const DeviceFeatures());
+    addTearDown(s.dispose);
+    await s.open();
+    await settle();
+    final pod = FakePodLink(ident: lendingPod);
+    await s.attachPod(PodClient(pod));
+    await until(() => end.hellos.length == 2);
+
+    // A pod from before: no `withheld`, so no node.outputs_disabled.
+    pod.event('pod', 'modules', 1, {
+      'modules': '58:target/1.0.0:hit',
+      'max_on_s': <String, Object?>{},
+    });
+    await until(() => end.events('node.modules').length == 1);
+    expect(end.events('node.outputs_disabled'), isEmpty);
+
+    // The shared vector pod_modules_withheld: an out4 with one channel lent;
+    // node.outputs_disabled first, then node.modules, as a box sends them.
+    pod.event('pod', 'modules', 2, {
+      'modules': '5c:out4/1.0.0:siren',
+      'max_on_s': {'siren': 30},
+      'withheld': '5c:out4/1.0.0:strobe,smoke,out.4',
+    });
+    await until(() => end.events('node.modules').length == 2);
+    expect(end.events('node.outputs_disabled'), [
+      {'modules': '5c:out4/1.0.0:strobe,smoke,out.4'},
+    ]);
+    expect(end.events('node.modules').last, {'modules': '5c:out4/1.0.0:siren'});
+    expect(told(end), [
+      'node.modules',
+      'node.outputs_disabled',
+      'node.modules',
+    ]);
+    expect(
+      s.log,
+      contains('node.outputs_disabled 5c:out4/1.0.0:strobe,smoke,out.4'),
+    );
+
+    // The same EVT again (after an IDENT): nothing new.
+    pod.event('pod', 'modules', 3, {
+      'modules': '5c:out4/1.0.0:siren',
+      'max_on_s': {'siren': 30},
+      'withheld': '5c:out4/1.0.0:strobe,smoke,out.4',
+    });
+    await settle();
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(end.events('node.outputs_disabled').length, 1);
+    expect(end.events('node.modules').length, 2);
+
+    // Only the withheld outputs change (a simple output's are not in the
+    // text): node.outputs_disabled alone.
+    pod.event('pod', 'modules', 4, {
+      'modules': '5c:out4/1.0.0:siren',
+      'max_on_s': {'siren': 30},
+      'withheld': 'g33:servo:horn;5c:out4/1.0.0:strobe,smoke,out.4',
+    });
+    await until(() => end.events('node.outputs_disabled').length == 2);
+    expect(end.events('node.outputs_disabled').last, {
+      'modules': 'g33:servo:horn;5c:out4/1.0.0:strobe,smoke,out.4',
+    });
+    expect(end.events('node.modules').length, 2);
+
+    // Every one lent: the empty text, as a box with every output enabled.
+    pod.event('pod', 'modules', 5, {
+      'modules': '5c:out4/1.0.0:siren,strobe,smoke,out.4',
+      'max_on_s': {'siren': 30, 'strobe': 30, 'smoke': 30, 'out.4': 30},
+      'withheld': '',
+    });
+    await until(() => end.events('node.outputs_disabled').length == 3);
+    expect(end.events('node.outputs_disabled').last, {'modules': ''});
+    expect(s.log, contains('node.outputs_disabled (none)'));
+
+    // Withheld again, then the person unlinks the pod: the empty text before
+    // node.modules' empty one.
+    pod.event('pod', 'modules', 6, {
+      'modules': '5c:out4/1.0.0:siren',
+      'max_on_s': {'siren': 30},
+      'withheld': '5c:out4/1.0.0:strobe,smoke,out.4',
+    });
+    await until(() => end.events('node.outputs_disabled').length == 4);
+    await s.unlinkPod();
+    await settle();
+    expect(end.events('node.outputs_disabled').last, {'modules': ''});
+    expect(end.events('node.modules').last, {'modules': ''});
+    final last = told(end);
+    expect(last.sublist(last.length - 2), [
+      'node.outputs_disabled',
+      'node.modules',
+    ]);
   });
 
   group('with the host pod', () {

@@ -35,6 +35,13 @@
 /// pod's IDENT changes them, the pod's link breaks or the person unlinks it
 /// (decisions PROPC-1 to PROPC-4).
 ///
+/// The pod's outputs fitted but not lent (its EVT pod.modules' `withheld`:
+/// left out of IDENT for want of room, or a module's channels on a pod not
+/// built to lend them) reach the controller as node.outputs_disabled, with
+/// each node.modules and whenever they change, as a box tells the outputs
+/// its admin has not enabled, so the console shows them the same way
+/// (decision PROPC-6).
+///
 /// A [ChangeNotifier]: the game screen rebuilds when it changes. It has no
 /// widgets and no platform code of its own (the services are injected), so
 /// the tests drive it on the real core with a manual clock.
@@ -267,6 +274,10 @@ class PropSession extends ChangeNotifier {
   /// EVT pod.modules), or null before any.
   String? _modulesTold;
 
+  /// The node.outputs_disabled text last told to the controller (the pod's
+  /// `withheld`), or null before any.
+  String? _disabledTold;
+
   /// The phone's features (read when the session opens) and the pod whose
   /// IDENT HELLO counts (null: none, or its link is down or unlinked).
   DeviceFeatures? _features;
@@ -481,6 +492,7 @@ class PropSession extends ChangeNotifier {
     outputs.detach(_nowMs);
     hits.detach();
     // Its outputs and modules are gone from this prop: the controller is told.
+    if (_disabledTold != null && _disabledTold!.isNotEmpty) _tellDisabled('');
     if (_modulesTold != null && _modulesTold!.isNotEmpty) _tellModules('');
     _capsPod = null;
     _tellCapabilities();
@@ -614,15 +626,38 @@ class PropSession extends ChangeNotifier {
   }
 
   /// The pod's EVT pod.modules (its simple outputs and the modules on its
-  /// expansion port, in node.modules' text; each lent output's longest on):
-  /// told to the controller as node.modules when the text changed, as a box
-  /// tells it (EXP-21), and the longest ons taken for the outputs' model.
+  /// expansion port, in node.modules' text; each lent output's longest on;
+  /// the outputs it does not lend): told to the controller as node.modules
+  /// when the text changed, as a box tells it (EXP-21), and the longest ons
+  /// taken for the outputs' model. Its `withheld` (sent by a pod with an
+  /// output fitted, "" when it lends every one) is node.outputs_disabled,
+  /// just before each node.modules and whenever it changes, as a box sends
+  /// it (EXPL-15, EXPL-21; decision PROPC-6). A pod from before sends no
+  /// `withheld`, and then nothing is said.
   void _podModules(Map<String, Object?> data) {
     final maxOn = data['max_on_s'];
     if (maxOn is Map) outputs.maxOn(maxOn.cast<String, Object?>());
     final text = data['modules'];
-    if (text is! String || text == _modulesTold) return;
-    _tellModules(text);
+    if (text is! String) return;
+    final changed = text != _modulesTold;
+    final withheld = data['withheld'];
+    if (withheld is String && (changed || withheld != _disabledTold)) {
+      _tellDisabled(withheld);
+    }
+    if (changed) _tellModules(text);
+  }
+
+  void _tellDisabled(String text) {
+    _disabledTold = text;
+    _log('node.outputs_disabled ${text.isEmpty ? '(none)' : text}');
+    _link?.sendEvent(
+      seq: ++_shellSeq,
+      tMs: gameTimeMs,
+      type: 'node.outputs_disabled',
+      prio: 'normal',
+      data: {'modules': text},
+    );
+    notifyListeners();
   }
 
   void _tellModules(String text) {
