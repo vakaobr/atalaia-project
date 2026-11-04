@@ -1749,11 +1749,14 @@ SECURITY_HEADERS = {
 # instance is busy, one other public instance from the OSM wiki's list (MF-51). The open orthophotos
 # (console/src/components/ortho-sources.js: the DGT's, MF-25 and MF-54; IGN España's, IGN France's and
 # PDOK's, MF-65 to MF-72; Belgium's regions', Luxembourg's, Switzerland's, eleven German Länder's,
-# Poland's and Czechia's, MF-73 to MF-80): each WMS origin both as images, the map's *Ortofoto* tiles
-# (img-src), and as a connection, the one picture fetched for the drawn image so the canvas stays
-# exportable (connect-src; each sends Access-Control-Allow-Origin, * or the page's own origin); a WMTS on
-# an origin of its own only as images (FIELD_MAP_ORTHO_TILES, MF-79). It alone may ask for the GM's
-# location (geolocation=(self), MF-43), which only moves its map and is sent nowhere.
+# Poland's and Czechia's, MF-73 to MF-80; Austria's basemap.at, MF-94 to MF-99; Baden-Württemberg's LGL,
+# MF-100 to MF-105): each WMS origin both as images, the map's *Ortofoto* tiles (img-src), and as a
+# connection, the one picture fetched for the drawn image so the canvas stays exportable (connect-src; each
+# sends Access-Control-Allow-Origin, * or the page's
+# own origin); a WMTS on an origin of its own only as images (FIELD_MAP_ORTHO_TILES, MF-79), except a source
+# with only a WMTS, whose tiles are also fetched to stitch the drawn image (here with the WMS, MF-97). It
+# alone may ask for the GM's location (geolocation=(self), MF-43), which only moves its map and is sent
+# nowhere.
 # Scripts stay same-origin; the rest of the console stays same-origin only.
 FIELD_MAP_PAGE = "/console/field-map.html"
 FIELD_MAP_ORTHOPHOTOS = (
@@ -1763,7 +1766,8 @@ FIELD_MAP_ORTHOPHOTOS = (
     "https://geoservices.bayern.de", "https://geodienste.bremen.de", "https://www.gds-srv.hessen.de",
     "https://www.geodaten-mv.de", "https://www.wms.nrw.de", "https://geo4.service24.rlp.de",
     "https://geoportal.saarland.de", "https://geodienste.sachsen.de", "https://www.geoproxy.geoportal-th.de",
-    "https://mapy.geoportal.gov.pl", "https://ags.cuzk.gov.cz")
+    "https://mapy.geoportal.gov.pl", "https://ags.cuzk.gov.cz", "https://mapsneu.wien.gv.at",
+    "https://owsproxy.lgl-bw.de")
 FIELD_MAP_ORTHO_TILES = ("https://wmts1.geoportail.lu", "https://wmts.geo.admin.ch", "https://www.wmts.nrw.de")
 FIELD_MAP_ORIGINS = {"tiles": "https://tile.openstreetmap.org", "overpass": "https://overpass-api.de",
                      "search": "https://nominatim.openstreetmap.org", "overpass_2": "https://overpass.private.coffee",

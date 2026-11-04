@@ -9,8 +9,10 @@
 -- parameters, and under `scenario` the boxes' language, the teams, the squads,
 -- the nodes the GM assigns (P4R8) and every objective's id, type, names,
 -- assignee, visibility, dependencies and points (for the per-team routing and
--- the player view). Codes and destinations are only in field.lua, which only
--- staff read.
+-- the player view). With triggers, `outputs`: the output functions they switch
+-- on each box, so the start check and the console treat them as a role's
+-- `outputs:` (draft RFC "The expansion port", EXP-22, EXP-25). Codes and
+-- destinations are only in field.lua, which only staff read.
 local package = {}
 
 local py = need("py")
@@ -103,6 +105,37 @@ local HEAD = "# "
   .. m.OBJECTIVES_PACKAGE
   .. ". Compile the manifest again rather than editing this file.\n"
 
+-- The output functions the triggers switch on each box: { node: [function, ...] }, in the
+-- triggers' order, each once, `*` (every output, off only) left out; nil without any, so a
+-- scenario without triggers compiles as before.
+local function trigger_outputs(manifest)
+  local raw = py.get(manifest, "triggers")
+  if not py.truthy(raw) then
+    return nil
+  end
+  local out = py.map()
+  for i = 1, raw.n do
+    local output = py.get(raw[i], "output")
+    local node, fn = py.get(output, "node"), py.get(output, "capability")
+    if fn ~= "*" then
+      local list = py.get(out, node)
+      if list == nil then
+        list = py.list({}, 0)
+        py.put(out, node, list)
+      end
+      local seen = false
+      for j = 1, list.n do
+        seen = seen or list[j] == fn
+      end
+      if not seen then
+        list.n = list.n + 1
+        list[list.n] = fn
+      end
+    end
+  end
+  return out.n > 0 and out or nil
+end
+
 function package.mode_yaml(manifest)
   local doc = ordered(
     "id",
@@ -162,6 +195,10 @@ function package.mode_yaml(manifest)
   end
   py.put(block, "nodes", nodes)
   py.put(block, "objectives", objectives)
+  local outputs = trigger_outputs(manifest)
+  if outputs ~= nil then
+    py.put(block, "outputs", outputs)
+  end
   py.put(doc, "scenario", block)
   return HEAD .. yaml.dump(doc)
 end

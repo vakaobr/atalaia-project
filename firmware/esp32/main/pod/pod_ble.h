@@ -7,12 +7,15 @@
  *
  *   service    4174616c-6169-6100-0000-000000000000  advertised; name atalaia-pod-XXXX
  *   Pod TX     ...0001  Notify                  the pod's frames, cut to the MTU
- *   Pod RX     ...0002  Write Without Response  the phone's frames (an encrypted link only)
+ *   Pod RX     ...0002  Write Without Response  the phone's frames (an encrypted, MITM-protected
+ *                                               link only)
  *   Pod Status ...0003  Read, Notify            battery, last RSSI, flags (3 bytes)
  *
  * One phone at a time. The link is ready, and the pod sends its IDENT, once
  * the phone is connected, the link is encrypted (LE Secure Connections,
- * decision PF4) and Pod TX notifications are on; only then do frames go out.
+ * decision PF4) with a key made by passkey entry (MITM-protected, decisions
+ * PODPK-1 and PODPK-3; pod_pair.h) and Pod TX notifications are on; only then
+ * do frames go out.
  * A frame longer than one notification (MTU - 3 bytes) is sent in pieces,
  * which the phone joins (the framing finds the boundaries). When the stack
  * is busy the bytes wait in a small queue and go at the next pod_ble_flush().
@@ -64,7 +67,7 @@ typedef struct {
     uint32_t notifications;  /* notifications sent */
     uint32_t frames_dropped; /* the link was not ready, or the queue was full */
     uint32_t writes;         /* Pod RX writes taken */
-    uint32_t writes_refused; /* Pod RX writes on a link not encrypted */
+    uint32_t writes_refused; /* Pod RX writes on a link not encrypted (or not MITM-protected) */
     uint32_t connections;
 } pod_ble_counters_t;
 
@@ -72,9 +75,11 @@ typedef struct {
     pod_ble_stack_t stack;
     pod_t *pod;
     bool require_encryption;
+    bool require_mitm; /* the encryption's key made with a passkey (PODPK-3): on with encryption */
 
     bool connected;
     bool encrypted;
+    bool authenticated; /* the link's key is MITM-protected */
     bool tx_subscribed;
     bool status_subscribed;
     bool ready;
@@ -90,7 +95,10 @@ typedef struct {
     pod_ble_counters_t count;
 } pod_ble_t;
 
+/* require_encryption also requires a MITM-protected key (require_mitm); pod_ble_require_mitm()
+ * turns that part off (the host pod, whose stub stack has no passkey). */
 void pod_ble_init(pod_ble_t *b, pod_t *pod, const pod_ble_stack_t *stack, bool require_encryption);
+void pod_ble_require_mitm(pod_ble_t *b, bool on);
 
 /* The advertising data: flags and the complete list of 128-bit service UUIDs. */
 size_t pod_ble_adv_data(uint8_t *out, size_t cap);
@@ -104,6 +112,10 @@ void pod_ble_device_name(const uint8_t addr_le[6], char out[POD_BLE_NAME_SIZE]);
 /* Stack events. */
 void pod_ble_on_connect(pod_ble_t *b, uint16_t conn);
 void pod_ble_on_disconnect(pod_ble_t *b);
+/* The link's security: encrypted, and whether its key is MITM-protected (authenticated). */
+void pod_ble_on_security(pod_ble_t *b, bool encrypted, bool authenticated);
+/* pod_ble_on_security(b, encrypted, encrypted): a stub stack's encrypted link counts as paired
+ * with a passkey. */
 void pod_ble_on_encryption(pod_ble_t *b, bool encrypted);
 void pod_ble_on_subscribe(pod_ble_t *b, pod_ble_chr_t chr, bool notify);
 void pod_ble_on_mtu(pod_ble_t *b, uint16_t mtu);

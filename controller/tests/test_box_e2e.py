@@ -415,6 +415,51 @@ class FieldTests(unittest.TestCase):
         last = self.pulses(box)[-1]
         self.assertLessEqual(last["until"] - last["t"], 500)
 
+    def test_an_output_fitted_but_not_enabled(self):
+        """EXPL-12, EXPL-13 end to end: the host box with a siren enabled and a horn fitted but not enabled
+        by its admin (`--simple-out horn,disabled`) sends node.outputs_disabled with node.modules; the
+        controller's node list has the horn as `outputs_disabled` and the siren alone as `modules`, and a
+        GM's pulse on the horn is refused with the reason."""
+        box = self.box("alpha", "--simple-out", "siren", "--simple-out", "horn,disabled")
+        gid = self.game()
+        nid = self.join(box)
+        self.assertTrue(wait_for(lambda: self.node(nid).get("outputs_disabled") is not None, 6), box.lines[-8:])
+        self.assertEqual(self.node(nid)["outputs_disabled"],
+                         [{"address": "g45", "model": "servo", "fw": None, "caps": ["horn"], "feedback": False}])
+        self.assertTrue(wait_for(lambda: self.node(nid).get("modules") is not None, 6), box.lines[-8:])
+        self.assertEqual([m["caps"] for m in self.node(nid)["modules"]], [["siren"]])
+        self.assertEqual([(o["id"], o["enabled"]) for o in box.status()["outputs"]], [("siren", True), ("horn", False)])
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={}).status_code, 200)
+        r = self.client.post(f"/api/v1/games/{gid}/nodes/{nid}/output", headers=GM,
+                             json={"capability": "horn", "act": "pulse", "ms": 1000})
+        self.assertEqual(r.status_code, 409, r.text)
+        self.assertIn("not enabled by the box's admin", r.text)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={}).status_code, 200)
+
+    def test_a_modules_output_channels_left_disabled(self):
+        """EXPL-20 end to end: the host box with a siren on a simple output and an out4 module
+        (`--module out4`, its four channels disabled until the admin enables them, EXPI8-7). Its admin
+        enables the strobe between games; in the game it joins, node.outputs_disabled carries the
+        module's entry with the three channels still disabled, while node.modules lists the module
+        whole (enabled or not), so the event is what tells them apart."""
+        box = self.box("alpha", "--simple-out", "siren", "--module", "out4")
+        box.send("@output 3 enable 1234")  # 1: the siren, 2-5: the module's channels
+        self.assertTrue(wait_for(lambda: box.logged("strobe, enabled"), 3), box.lines[-8:])
+        gid = self.game()
+        nid = self.join(box)
+        self.assertTrue(wait_for(lambda: self.node(nid).get("outputs_disabled") is not None, 6), box.lines[-8:])
+        self.assertEqual([(m["address"], m["model"], m["fw"], m["caps"]) for m in self.node(nid)["outputs_disabled"]],
+                         [("5c", "out4", "1.0.0", ["siren.2", "smoke", "out.4"])])
+        self.assertTrue(wait_for(lambda: self.node(nid).get("modules") is not None, 6), box.lines[-8:])
+        self.assertEqual([(m["address"], m["caps"]) for m in self.node(nid)["modules"]],
+                         [("g46", ["siren"]), ("5c", ["siren.2", "strobe", "smoke", "out.4"])])
+        log = self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+        self.assertEqual([e["data"]["modules"] for e in log if e["type"] == "node.outputs_disabled" and e["node"] == nid],
+                         ["5c:out4/1.0.0:siren.2,smoke,out.4"])
+        # Settings are refused while the box is in a game, so the text does not change under it.
+        box.send("@output 4 enable 1234")
+        self.assertTrue(wait_for(lambda: box.logged("output 4: not during a game"), 3), box.lines[-8:])
+
     def test_the_gm_switches_a_boxs_simple_output(self):
         """Draft RFC "The expansion port", increment 3, end to end: the controller keeps the box's
         node.modules in its node list (the simple output with "feedback": false), the start check names

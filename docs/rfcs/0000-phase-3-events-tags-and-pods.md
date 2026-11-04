@@ -133,9 +133,18 @@ Compatibility: an older node or controller treats ids 42-45 as it treats any id 
 
 Compatibility: no new frame or key. A receiver that does not know the type `output` ignores the descriptor, as for any capability type it does not use; an older codec skips the unknown descriptor key `feedback` and data key `channel` (descriptor and data values are JSON); an older controller does not know events 57-59, so both controllers must run a release that knows them before a box sends them (the RFC's increments 1 and 3 come before 2).
 
-## Amendment 7 (2026-11-04): a phone prop tells its pod's outputs and modules
+## Amendment 6 (2026-11-04): the `node.outputs_disabled` event
 
-Numbered 7 because Amendment 6 (`node.outputs_disabled`, decision EXPL-13) is on its own branch (PR #63); the two do not touch each other.
+**Adds** one event for the "outputs disabled on this box" note of the draft RFC "The expansion port" (EXP-21, EXP-28), which the maintainer decided on 2026-11-04 to build (decision EXPL-12; the choices are EXPL-13 to EXPL-19). A box leaves an output its admin has not enabled out of both its HELLO's capability types and its `node.modules`, so "outputs fitted, not enabled" looked like "no outputs fitted".
+
+- **Event:** `node.outputs_disabled` (60, normal), data `modules` (key 42, unchanged): the outputs fitted that the box's admin has not enabled, in `node.modules`' compact text (`g45:servo:horn`; a module's channels not enabled as its entry with only those ids, `5c:out4/1.0.0:siren.2,smoke`: EXPL-20), the empty text when every one is enabled. A box with an output fitted sends it with each `node.modules` (and at the same moment when no output is enabled and it sends no `node.modules`), and again if its text changes while `node.modules` does not (EXPL-21); a box without outputs never does. Its meaning is the box's whole list at that moment: a controller replaces what it kept.
+- **Why an event and not a data key of `node.modules`:** decoders refuse an unknown data key (protocol/README.md), so a `node.modules` with a new key would be lost whole on an older controller, its enabled outputs with it; a marker inside an entry (`g45:servo:horn!off`) would fail the older controller's parse of the text the same way. An unknown event is refused alone.
+- **The controllers** keep the last one per node as the node list's `outputs_disabled` (null until the box says); the start check's new `outputs_disabled` list is a note, never a refusal or a warning, for each joined box whose role's `outputs:` (or its scenario's) names one of them. The console shows it on the box's chips and in the start panel.
+- **Vectors:** `protocol/vectors/events.yaml` (one with a horn, one with the empty text), checked by the C, Python and Dart codecs; a contract case in `protocol/vectors/controller_api.json`.
+
+Compatibility: no new frame or data key. An older controller (0.7.0) refuses event 60 as an unknown event id: it logs the packet as undecodable and keeps the box's `node.modules`, so nothing it did before changes; it shows no note. A box from before never sends it: both controllers give `outputs_disabled` null and no note, as before.
+
+## Amendment 7 (2026-11-04): a phone prop tells its pod's outputs and modules
 
 **Adds** what an I/O pod says about its simple outputs and its expansion port, so that a phone prop is no longer invisible to the console's outputs (draft RFC "The expansion port", increment 9, its port half; decisions EXPI9-19 and EXPI9-21; the gap EXPI9-12 named).
 

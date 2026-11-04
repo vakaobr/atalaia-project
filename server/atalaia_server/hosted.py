@@ -13,6 +13,7 @@
     python -m atalaia_server hosted usage    [SLUG]
     python -m atalaia_server hosted quota-hits
     python -m atalaia_server hosted domain   set SLUG HOST --reason TEXT | verify SLUG | remove SLUG --reason TEXT
+    python -m atalaia_server hosted shared-history [SLUG] [--limit N] [--json]
     python -m atalaia_server hosted export   SLUG --out FILE.zip --reason TEXT
     python -m atalaia_server hosted delete   SLUG --confirm SLUG --reason TEXT
     python -m atalaia_server import-field    FILE.zip          (into a single-field server)
@@ -46,6 +47,9 @@ role that is no superuser, has no BYPASSRLS and owns nothing.
 - ``domain`` gives a field one custom host name besides ``<slug>.<domain>`` (decisions PKC-6): ``set`` records it as
   *pending* and prints the DNS TXT record the field must publish, ``verify`` reads that record and, only if it is
   there, turns the name on (routing, and a certificate through the ``ask`` endpoint), ``remove`` takes it away.
+- ``shared-history`` prints what the fields that opted in share of their game history (HUBH-*): each sharing field and
+  its newest games, game-level results only. A field that never opted in has no row to print. Each read is written to
+  the hub's audit log. ``init`` and ``migrate`` make its two tables and two functions (``HISTORY_DDL``).
 - ``export`` writes one ZIP: ``manifest.json`` (format, revision, tables in load
   order, row counts, SHA-256 of each file) and ``tables/<table>.csv`` for every
   table of the tenant's schema (``COPY ... TO STDOUT``), read in one
@@ -265,6 +269,82 @@ $fn$;
 """
 
 
+# A field's shared game history (HUBH-*, the maintainer's decision of 2026-11-04: "fields can choose to share their games
+# or not, should be an opt-in"). Two tables each field fills with its own rows only, under the same row-level policy as
+# the chrono sharing's (the caller's field from its database role, ``atalaia_caller_tenant()``; ENABLEd, not FORCEd):
+# ``atalaia_hub_history_members`` holds a row exactly while the field shares (its admin's switch), and
+# ``atalaia_hub_games`` the game-level results it shares: mode, when, the teams' scores and the winner, and the field's
+# name. Never a player id, a member list, a squad, a game's or a team's free-text name. A field that turns the switch off
+# deletes its member row and every game goes with it (ON DELETE CASCADE, HUBH-3). Two SECURITY DEFINER functions are the
+# only way across, and both answer only a field that shares itself (reciprocity, HUBH-5): ``atalaia_hub_history_read``
+# (the games of every sharing, active field, newest first, none older than the kept team results' 365 days) and
+# ``atalaia_hub_history_fields`` (which fields share, since when, how many games). They read hub tables only, never a
+# field's schema. Idempotent: run by ``init`` and by ``migrate``. The hub's operator reads the tables as the owner role
+# (``hosted shared-history``, audited).
+HISTORY_TABLES = ("atalaia_hub_history_members", "atalaia_hub_games")
+HISTORY_FUNCTIONS = ("public.atalaia_hub_history_read(timestamp with time zone, text, integer)",
+                     "public.atalaia_hub_history_fields()")
+HISTORY_KEEP_DAYS = 365  # as personal_data.RESULTS_RETENTION: a shared game never outlives the field's own team results
+HISTORY_DDL = f"""
+CREATE TABLE IF NOT EXISTS public.atalaia_hub_history_members (
+    tenant      text PRIMARY KEY CHECK (tenant ~ '^field_[a-z0-9_]{{1,40}}$'),
+    field_name  text NOT NULL DEFAULT '',
+    since       timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.atalaia_hub_games (
+    tenant      text NOT NULL REFERENCES public.atalaia_hub_history_members (tenant) ON DELETE CASCADE,
+    game_ref    text NOT NULL CHECK (game_ref ~ '^[0-9a-f]{{32}}$'),
+    mode_id     text NOT NULL CHECK (length(mode_id) <= 128),
+    started_at  timestamptz,
+    ended_at    timestamptz NOT NULL,
+    teams       jsonb NOT NULL CHECK (jsonb_typeof(teams) = 'array'),
+    winner      text CHECK (winner IS NULL OR length(winner) <= 32),
+    published_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant, game_ref)
+);
+CREATE INDEX IF NOT EXISTS atalaia_hub_games_ended ON public.atalaia_hub_games (ended_at DESC);
+ALTER TABLE public.atalaia_hub_history_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.atalaia_hub_games ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.atalaia_hub_history_members NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.atalaia_hub_games NO FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS atalaia_tenant ON public.atalaia_hub_history_members;
+DROP POLICY IF EXISTS atalaia_tenant ON public.atalaia_hub_games;
+CREATE POLICY atalaia_tenant ON public.atalaia_hub_history_members
+    USING (tenant = public.atalaia_caller_tenant()) WITH CHECK (tenant = public.atalaia_caller_tenant());
+CREATE POLICY atalaia_tenant ON public.atalaia_hub_games
+    USING (tenant = public.atalaia_caller_tenant()) WITH CHECK (tenant = public.atalaia_caller_tenant());
+CREATE OR REPLACE FUNCTION public.atalaia_hub_history_read(p_before timestamptz, p_mode text, p_limit integer)
+RETURNS TABLE (field_name text, own boolean, mode_id text, started_at timestamptz, ended_at timestamptz, teams jsonb,
+               winner text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $fn$
+    SELECT m.field_name, g.tenant = me.tenant, g.mode_id, g.started_at, g.ended_at, g.teams, g.winner
+    FROM public.atalaia_hub_history_members me
+    JOIN public.atalaia_hub_games g ON true
+    JOIN public.atalaia_hub_history_members m ON m.tenant = g.tenant
+    JOIN public.atalaia_tenants t ON t.schema_name = g.tenant
+    WHERE me.tenant = public.atalaia_caller_tenant() AND t.status = 'active'
+      AND g.ended_at > now() - interval '{HISTORY_KEEP_DAYS} days'
+      AND (p_before IS NULL OR g.ended_at < p_before) AND (p_mode IS NULL OR g.mode_id = p_mode)
+    ORDER BY g.ended_at DESC, m.field_name, g.game_ref
+    LIMIT least(greatest(coalesce(p_limit, 50), 1), 200)
+$fn$;
+CREATE OR REPLACE FUNCTION public.atalaia_hub_history_fields()
+RETURNS TABLE (field_name text, own boolean, since timestamptz, games bigint)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $fn$
+    SELECT m.field_name, m.tenant = me.tenant, m.since,
+           (SELECT count(*) FROM public.atalaia_hub_games g
+             WHERE g.tenant = m.tenant AND g.ended_at > now() - interval '{HISTORY_KEEP_DAYS} days')
+    FROM public.atalaia_hub_history_members me
+    JOIN public.atalaia_hub_history_members m ON true
+    JOIN public.atalaia_tenants t ON t.schema_name = m.tenant
+    WHERE me.tenant = public.atalaia_caller_tenant() AND t.status = 'active'
+    ORDER BY m.tenant <> me.tenant, m.field_name
+$fn$;
+"""
+TENANT_FUNCTIONS = TENANT_FUNCTIONS + HISTORY_FUNCTIONS
+
+
 class HostedError(Exception):
     """A problem to report in one line (the command exits 1)."""
 
@@ -416,7 +496,15 @@ async def apply_security(conn: asyncpg.Connection, schema: str, app_role: str, r
             f"GRANT SELECT, INSERT, UPDATE, DELETE ON public.atalaia_share_members, public.atalaia_share_records "
             f"TO {own}; "
             f"GRANT SELECT, INSERT, DELETE ON public.atalaia_share_codes TO {own}; "
-            f"GRANT EXECUTE ON FUNCTION {', '.join(TENANT_FUNCTIONS)} TO {own}")
+            f"GRANT EXECUTE ON FUNCTION {', '.join(SHARE_FUNCTIONS + (CALLER_FUNCTION,))} TO {own}")
+    # The shared game history (HUBH-*): the same, over the field's own rows; the two functions answer it only while
+    # it shares itself.
+    if await conn.fetchval("SELECT to_regclass('public.atalaia_hub_games') IS NOT NULL"):
+        await conn.execute(
+            f"GRANT USAGE ON SCHEMA public TO {own}; "
+            f"REVOKE ALL ON {', '.join('public.' + t for t in HISTORY_TABLES)} FROM {own}; "
+            f"GRANT SELECT, INSERT, UPDATE, DELETE ON {', '.join('public.' + t for t in HISTORY_TABLES)} TO {own}; "
+            f"GRANT EXECUTE ON FUNCTION {', '.join(HISTORY_FUNCTIONS + (CALLER_FUNCTION,))} TO {own}")
     return len(tables)
 
 
@@ -457,8 +545,9 @@ async def _upgrade_registry(conn: asyncpg.Connection, app_role: str) -> None:
         f"GRANT INSERT ON public.atalaia_quota_hits TO {role}; "
         f"GRANT USAGE ON SEQUENCE public.atalaia_quota_hits_id_seq TO {role}")
     await conn.execute(SHARE_DDL)
+    await conn.execute(HISTORY_DDL)
     await conn.execute(
-        f"REVOKE ALL ON {', '.join('public.' + t for t in SHARE_TABLES)} FROM PUBLIC, {role}; "
+        f"REVOKE ALL ON {', '.join('public.' + t for t in SHARE_TABLES + HISTORY_TABLES)} FROM PUBLIC, {role}; "
         f"REVOKE ALL ON FUNCTION {', '.join(TENANT_FUNCTIONS)} FROM PUBLIC, {role}")  # the fields' roles get them
 
 
@@ -625,7 +714,10 @@ SET_CONFIG_PUBLIC = (f"SELECT EXISTS (SELECT 1 FROM pg_proc p, aclexplode(coales
                      "AND a.privilege_type = 'EXECUTE')")
 SHARE_PRIVILEGES = {"atalaia_share_members": {"SELECT", "INSERT", "UPDATE", "DELETE"},
                     "atalaia_share_records": {"SELECT", "INSERT", "UPDATE", "DELETE"},
-                    "atalaia_share_codes": {"SELECT", "INSERT", "DELETE"}}
+                    "atalaia_share_codes": {"SELECT", "INSERT", "DELETE"},
+                    # HUBH-*: the shared game history, the same policy and rights as the members and records.
+                    "atalaia_hub_history_members": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+                    "atalaia_hub_games": {"SELECT", "INSERT", "UPDATE", "DELETE"}}
 
 
 def _same_policy(found: list[str], expected: str) -> bool:
@@ -639,9 +731,10 @@ async def _check_share(conn: asyncpg.Connection, app_role: str, roles: list[str]
     and not forced, exactly the one policy (the caller's own rows, by the field's database role), each field's role
     with its exact privileges and the server's login role with none, and each function a SECURITY DEFINER of the
     owner with a fixed search path that only the fields' roles may run."""
-    if not await conn.fetchval("SELECT to_regclass('public.atalaia_share_members') IS NOT NULL"):
-        problems.append("the registry is of an older release (no public.atalaia_share_members): run hosted migrate")
-        return
+    for name in ("atalaia_share_members", "atalaia_hub_games"):
+        if not await conn.fetchval("SELECT to_regclass($1) IS NOT NULL", f"public.{name}"):
+            problems.append(f"the registry is of an older release (no public.{name}): run hosted migrate")
+            return
     for name, allowed in SHARE_PRIVILEGES.items():
         table = f"public.{name}"
         row = await conn.fetchrow(
@@ -984,6 +1077,48 @@ async def waiting_quota_hits(url: str) -> int:
         await conn.close()
 
 
+# the shared game history, for the hub's operator (HUBH-*) ----------------------------------------------
+
+async def shared_history(url: str, slug: Optional[str] = None, limit: int = 50,
+                         actor: Optional[str] = None) -> dict[str, Any]:
+    """What the fields that opted in share (``hosted shared-history``): each sharing field (slug, name, status, since,
+    games) and its newest ``limit`` games (1-1000), or one field's. Only what the fields published is there: a field that
+    never opted in, or turned it off, has no row at all. Read as the owner role; the read is written to the hub's audit
+    log (who, which field, how many), never the rows."""
+    if not 1 <= limit <= 1000:
+        raise HostedError("--limit is 1-1000")
+    conn = await _connect(url)
+    try:
+        await _need_registry(conn)
+        if not await conn.fetchval("SELECT to_regclass('public.atalaia_hub_games') IS NOT NULL"):
+            raise HostedError("the registry is of an older release (no shared game history): run hosted migrate")
+        tenant = await _tenant(conn, slug) if slug else None
+        where = "WHERE m.tenant = $1" if tenant else ""
+        args: list[Any] = [tenant.schema] if tenant else []
+        fields = [dict(r) for r in await conn.fetch(
+            "SELECT t.slug, m.field_name, t.status, m.since, "
+            f"(SELECT count(*) FROM public.atalaia_hub_games g WHERE g.tenant = m.tenant AND g.ended_at > now() - "
+            f"interval '{HISTORY_KEEP_DAYS} days') AS games "
+            f"FROM public.atalaia_hub_history_members m JOIN public.atalaia_tenants t ON t.schema_name = m.tenant "
+            f"{where} ORDER BY t.slug", *args)]
+        games = [dict(r) for r in await conn.fetch(
+            "SELECT t.slug, m.field_name, g.mode_id, g.started_at, g.ended_at, g.teams, g.winner "
+            "FROM public.atalaia_hub_games g JOIN public.atalaia_hub_history_members m ON m.tenant = g.tenant "
+            "JOIN public.atalaia_tenants t ON t.schema_name = g.tenant "
+            f"{where.replace('m.tenant', 'g.tenant')} {'AND' if where else 'WHERE'} "
+            f"g.ended_at > now() - interval '{HISTORY_KEEP_DAYS} days' "
+            f"ORDER BY g.ended_at DESC, t.slug LIMIT {int(limit)}", *args)]
+        for g in games:
+            if isinstance(g["teams"], str):
+                g["teams"] = json.loads(g["teams"])
+        await _audit(conn, "hub_history_read", actor or default_actor(), tenant.slug if tenant else None,
+                     tenant.schema if tenant else None, tenant.field_id if tenant else None,
+                     {"fields": len(fields), "games": len(games)})
+        return {"fields": fields, "games": games}
+    finally:
+        await conn.close()
+
+
 # custom host names --------------------------------------------------------------------------------
 
 DOMAIN_ACTIONS = ("set", "verify", "remove")
@@ -1236,6 +1371,11 @@ async def delete_tenant(url: str, slug: str, confirm: str, reason: str, actor: O
                     "SELECT count(*) FROM public.atalaia_share_members WHERE tenant = $1", tenant.schema)
                 await conn.execute("DELETE FROM public.atalaia_share_codes WHERE tenant = $1", tenant.schema)
                 await conn.execute("DELETE FROM public.atalaia_share_members WHERE tenant = $1", tenant.schema)
+            if await conn.fetchval("SELECT to_regclass('public.atalaia_hub_games') IS NOT NULL"):
+                # The field's shared game history (HUBH-*): its games go with its member row.
+                counts["hub_games"] = await conn.fetchval(
+                    "SELECT count(*) FROM public.atalaia_hub_games WHERE tenant = $1", tenant.schema)
+                await conn.execute("DELETE FROM public.atalaia_hub_history_members WHERE tenant = $1", tenant.schema)
             await conn.execute(f"DROP SCHEMA {_q(tenant.schema)} CASCADE")
             for statement in tenant_roles.drop_sql(tenant.role, tenant.schema):  # the field's role goes with it
                 await conn.execute(statement)
@@ -1249,5 +1389,5 @@ async def delete_tenant(url: str, slug: str, confirm: str, reason: str, actor: O
 
 __all__ = ["HostedError", "TenantError", "apply_security", "challenge_record", "check_hub", "collect_quota_hits",
            "create_tenant", "delete_tenant", "export_tenant", "import_field", "init_hub", "list_tenants", "migrate_all",
-           "remove_custom_domain", "set_custom_domain", "set_quota", "set_status", "upgrade_hub", "usage",
+           "remove_custom_domain", "set_custom_domain", "set_quota", "set_status", "shared_history", "upgrade_hub", "usage",
            "verify_custom_domain", "waiting_quota_hits"]

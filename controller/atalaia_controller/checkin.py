@@ -64,6 +64,7 @@ from . import checkin_poster as posterfmt
 from .addresses import FieldAddresses, saved_poster_urls, warn_dropped
 from . import checkin_ticket as ticketfmt
 from . import import_format as importfmt
+from . import sync_format as syncfmt
 from .engine import Conflict, ControllerError, NotFound
 
 if TYPE_CHECKING:
@@ -1789,29 +1790,18 @@ class Checkin:
             decls.append(d)
         return decls
 
-    def outcomes(self, game_id: int) -> dict[str, Any]:
+    def outcomes(self, game_id: int, guests: bool = False) -> dict[str, Any]:
         """What goes back to the site server after the game (POST /api/v1/sync/checkins): per registration
         its outcome (``checked_in``: the player came; ``no_show``) and its declarations' final states, and
         the walk-ins as a count. No names, no federation numbers. A registration this controller had only
-        from the app (no roster) carries its ticket's hash, which the site server checks."""
-        regs, walkins = [], 0
-        for r in self.store.checkins(game_id):
-            arrived = r["status"] in ARRIVED or (r["status"] == "removed" and r["checked_in_at"] is not None)
-            if not r["registration_id"]:
-                walkins += arrived
-                continue
-            if not r["from_roster"] and not r["ticket_sha256"]:
-                continue
-            entry: dict[str, Any] = {
-                "registration_id": r["registration_id"], "player_id": r["player_id"],
-                "outcome": "checked_in" if arrived else "no_show",
-                "declarations": [{"declaration_id": d["declaration_id"], "state": d["state"],
-                                  "reading_id": d["reading_id"]}
-                                 for d in self.store.declarations(game_id, r["player_id"])][:20]}
-            if not r["from_roster"]:
-                entry["ticket_sha256"] = r["ticket_sha256"]
-            regs.append(entry)
-        return {"registrations": regs, "walkins": int(walkins)}
+        from the app (no roster) carries its ticket's hash, which the site server checks. With ``guests``
+        (``[sync] push_walkins``, decisions PWI-*) the walk-ins also go as guests, with their display names
+        (``sync_format.checkin_outcomes``, shared with the phone through vectors/sync.json)."""
+        rows = self.store.checkins(game_id)
+        decls: dict[str, list[dict[str, Any]]] = {}
+        for d in self.store.declarations(game_id):
+            decls.setdefault(d["player_id"], []).append(d)
+        return syncfmt.checkin_outcomes(rows, decls, guests=guests)
 
     def csv_export(self, game_id: int) -> str:
         game = self.ctrl.get_game(game_id)

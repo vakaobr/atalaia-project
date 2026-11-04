@@ -668,6 +668,18 @@ adds `modules` (a list of `{address, model, fw, caps}`), and both controllers
 module as a chip under the box (a target, an output with its functions), and
 an "outputs disabled on this box" note when the box says so.
 
+*Amended 2026-11-04 (EXPL-12, EXPL-13; draft RFC 0000 "Phase 3 events, tags and
+pods", Amendment 6):* the note travels as a **fourth event**,
+`node.outputs_disabled` (60, normal, data `modules`: the outputs fitted that the
+box's admin has not enabled, in the same compact text, the empty text when
+every one is; a module's channels not enabled as its entry with only those
+ids, EXPL-20), sent with `node.modules` by a box that has an output fitted. Not
+a key of `node.modules`: the decoders refuse an unknown data key, so an older
+controller would lose the whole `node.modules`; it refuses an unknown event
+alone. The controllers give it as the node list's `outputs_disabled`, and the
+start check adds a note (never a refusal or a warning) for a box whose role's
+`outputs:` would switch one of them.
+
 **The start check** gains capabilities: for each node that joined in a role,
 the role's `requires:` capabilities it lacks are **missing**, like a missing
 role (Start refuses unless forced); `optional:` ones it lacks are a warning.

@@ -142,6 +142,11 @@ timeout_s = 15.0                  # per request
 remote_gm = false
 library = true                    # the field's scenario library and game presets from the site server,
                                   # installed (and checked again) on every controller of the field
+# true: after a game made from a scheduled game, also send its walk-ins (players without a
+# registration) as guest registrations: player id, display name and the declared replicas'
+# chrono results; never a federation number, a team or a ticket. The site server deletes them
+# 30 days after the game (ADR-P4-8's guest rule; decisions PWI-*). Off by default: a count only.
+push_walkins = false
 
 [atak]
 # Cursor on Target for ATAK (ADR-P4-7 as amended, P4R18; atak.py). Props and the

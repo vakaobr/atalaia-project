@@ -432,9 +432,18 @@ on two links at once:
   `4174616c-6169-6100-0000-000000000000` with Pod TX (notify), Pod RX
   (write without response) and Pod Status (read, notify), advertised as
   `atalaia-pod-XXXX`, one phone at a time, a 247-byte MTU. The pod asks the
-  phone to pair (LE Secure Connections, Just Works, bonded): frames go out
-  and Pod RX writes are taken only on an encrypted link, so the game key
-  in RADIO_CMD CONFIGURE never crosses the air in the clear (decision PF4).
+  phone to pair (LE Secure Connections, bonded): frames go out and Pod RX
+  writes are taken only on an encrypted link, so the game key in RADIO_CMD
+  CONFIGURE never crosses the air in the clear (decision PF4). Pairing is by
+  passkey entry (decisions PODPK-1 to PODPK-11, `pod_pair.c`): the pod is
+  DisplayOnly and shows a random 6-digit passkey on the board's OLED
+  (`pod_display.c`, the OLED view's layout; dark otherwise) and in the log;
+  only a key made so (MITM-protected) carries frames. A bond without MITM
+  protection (Just Works, an older pod) or unknown to the pod is forgotten
+  and the link dropped with HCI reason 0x05, so the app pairs again. Holding
+  the PRG button (`CONFIG_ATALAIA_POD_BOND_CLEAR_PIN`, GPIO 0) for 5 s
+  clears every bond; `CONFIG_ATALAIA_POD_BLE_PASSKEY` off goes back to Just
+  Works, for a pod whose OLED is broken.
 
 What it lends (only what is fitted is in IDENT; decision PF6):
 
@@ -598,7 +607,7 @@ Field game options (under "Field network games"):
 - `ATALAIA_DEV_JOIN_KEY` -- a development field join key, used only when none is stored (set in `sdkconfig.wokwi` only); a box with only this key counts as unadopted
 
 Firmware update options (under "Firmware updates (OTA)", the Field Box only):
-- `ATALAIA_OTA_RELEASE_KEYS` -- the Ed25519 public keys (64 hex digits each, up to 4) whose releases the box installs; the default is the project's two release keys, root `424d053af5cdbc35` and CI `a4f6002b0122b131`, the next CI key of the 2026-11 rotation ([RELEASE_SIGNING.md](docs/RELEASE_SIGNING.md), [docs/community/keys.md](../../docs/community/keys.md)); empty: every update is refused
+- `ATALAIA_OTA_RELEASE_KEYS` -- the Ed25519 public keys (64 hex digits each, up to 4) whose releases the box installs; the default is the project's three release keys, root `424d053af5cdbc35`, CI `32b3c815ac30ad43` and the next CI key `a4f6002b0122b131` that replaces it ([RELEASE_SIGNING.md](docs/RELEASE_SIGNING.md), [docs/community/keys.md](../../docs/community/keys.md)); empty: every update is refused
 - `ATALAIA_OTA_VARIANT` -- the variant written into the image (`box`, `box-bench`, `box-dev`); a box installs only its own variant and board
 - `ATALAIA_OTA_MIN_BATTERY_PCT` -- refuse an update below this level (default 30; with a MAX17048 only)
 
@@ -742,7 +751,7 @@ channel's settings, its desired state and the rules; only the last step is the p
 | Limits | A call never runs past the channel's max on. A simple output changes state at most every 500 ms (EXP-30, EXP-36): a shorter pulse runs 500 ms, a pattern under 500 ms on or off is refused, an on within 500 ms of the last change is refused; an off never is. A script starts a channel at most twice a second (more are dropped, one `script.error` a game) |
 | Game state (EXP-29) | On only while a game runs. Every output off at boot, when the game pauses (not back on at the resume), when the sandbox halts the script, and when the game ends: before the mode's `game.end` handlers run, so an end-of-game horn they pulse is allowed, for at most **10 s** after the end (the field's CMD 12 too). The admin's test only between games |
 | Events | `output.switched` (`capability`, `ms`, `source`: `script`, `field`, `gm`, `box_admin`) for each start and each off before its time; nothing for what the game state turns off. In a field game it goes to the controller on the radio (`field_link_send_box_event`, normal priority), otherwise to the log |
-| HELLO and `node.modules` | HELLO's capabilities (key 6, `protocol/schema/capabilities.yaml`) list what the box has: button, keypad, display, led, audio, nfc, battery from the parts that started, and `output` (11) while an output is enabled. Once the controller acknowledges the HELLO the box sends `node.modules` with its enabled simple outputs, `g46:servo:siren` (EXP-36: no version, no feedback); a box with none sends nothing |
+| HELLO, `node.modules` and `node.outputs_disabled` | HELLO's capabilities (key 6, `protocol/schema/capabilities.yaml`) list what the box has: button, keypad, display, led, audio, nfc, battery from the parts that started, and `output` (11) while an output is enabled. Once the controller acknowledges the HELLO the box sends `node.modules` with its enabled simple outputs, `g46:servo:siren` (EXP-36: no version, no feedback; none enabled: no `node.modules`), and `node.outputs_disabled` with the ones fitted that its admin has not enabled, `g45:servo:horn`, then each module's output channels not enabled as its entry with only those ids, `5c:out4/1.0.0:siren.2,smoke`, or the empty text (EXPL-13, EXPL-20: `outputs_disabled_text`, `expansion_box_disabled_text`, `box_game.c` `box_game_disabled_text` and `tell_outputs_disabled`), again whenever that text changes; a box with no output fitted sends neither |
 
 **The simple output's signal** (`main/simple_out.c`, platform-free, host tests in
 `test/test_simple_out.c`; `main/simple_out_esp.c` on the ESP32): 50 Hz, **2.0 ms on, 1.0 ms off**.
@@ -763,7 +772,7 @@ part uses, the other revision's front-end pin and 45 with the buzzer (`#error` i
 `simple_out_esp.c`); `simple_out_pin_problem` checks the same at run time and in the host tests.
 A bench build has `@hang` (the game task stops for good: bench test 12, BRING_UP.md step 8b).
 
-**The host box** (`test/box_host`, `--simple-out siren[@GPIO]`, twice at most) runs the same layer
+**The host box** (`test/box_host`, `--simple-out siren[@GPIO][,disabled]`, twice at most; `,disabled`: fitted with that function, not enabled, so it is in `node.outputs_disabled` and not in `node.modules`, EXPL-13) runs the same layer
 and scheduler and prints the pulse train: `PULSE g46 t=<ms> width=<us> frames=<n> until=<ms>[ flush]`
 per burst and `PIN g46 low t=<ms>` when the last one has gone out; `status` adds `outputs`;
 `controller/tests/test_box_e2e.py` checks it against the real controller.

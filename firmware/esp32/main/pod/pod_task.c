@@ -458,6 +458,7 @@ void pod_task_start(const hal_t *hal, const pod_caps_config_t *cfg)
              CONFIG_ATALAIA_MODEM_EPOCH_WINDOW);
 
     pod_ble_init(&ble, &pod, &pod_ble_nimble_stack, POD_BLE_ENCRYPTED);
+    pod_ble_require_mitm(&ble, POD_BLE_PASSKEY); /* a passkey's key only (PODPK-3) */
 #if POD_BLE_ENABLED
     ble_on = pod_ble_nimble_start(POD_BLE_ENCRYPTED);
 #endif

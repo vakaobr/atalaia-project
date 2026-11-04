@@ -81,6 +81,9 @@ class FakeSite {
   /// A site server from before PKD-3: it refuses a reading's `limit_j`.
   bool beforePkd3 = false;
 
+  /// A site server from before PWI-*: it refuses a check-ins body's `guests`.
+  bool noGuests = false;
+
   /// GET answers by path (without the query); null: 404 Not Found.
   final gets = <String, Object?>{};
 
@@ -171,6 +174,13 @@ class FakeSite {
         }
       }
     }
+    if (noGuests && kind == 'checkins' && body!.containsKey('guests')) {
+      return (
+        400,
+        {'detail': 'invalid_body', 'error': 'unknown_field', 'path': 'guests'},
+        {},
+      );
+    }
     Map<String, Object?> checked;
     try {
       checked = syncChecks[kind]!(jsonDecode(jsonEncode(body)));
@@ -221,6 +231,8 @@ class FakeSite {
           'applied': 0,
           'ignored': 0,
           'declarations': 0,
+          'guests': (checked['guests'] as List?)?.length ?? 0,
+          'guests_ignored': 0,
         };
       default:
         answer = {'nodes': (checked['nodes']! as List).length};
@@ -373,6 +385,7 @@ void main() {
   ControllerSync client({
     String branding = 'local',
     bool library = false,
+    bool pushWalkins = false,
     String? url,
   }) {
     final c = ControllerSync(
@@ -383,6 +396,7 @@ void main() {
         timeoutS: 10,
         branding: branding,
         library: library,
+        pushWalkins: pushWalkins,
       ),
       schedule: schedule,
       wall: () => wall,
@@ -1370,6 +1384,120 @@ void main() {
       site.requests.clear();
       await c.runOnce();
       expect(site.paths(), isNot(contains('checkins'))); // sent once
+    });
+
+    // Decisions PWI-*: [sync] push_walkins, as test_sync_schedule.py.
+    Future<(ControllerSync, String)> walkinsThenEnd({
+      required bool push,
+    }) async {
+      site.gets['/api/v1/sync/schedule'] = scheduled();
+      site.gets['/api/v1/sync/claims'] = {
+        'sync_version': 1,
+        'claims': <Object?>[],
+      };
+      site.gets['/api/v1/sync/roster'] = {
+        ...roster(),
+        'registrations': <Object?>[],
+      };
+      final c = client(pushWalkins: push);
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      final made = api.handle(
+        'POST',
+        Uri.parse('/api/v1/schedule/$scheduledId/game'),
+        authorization: 'Bearer g',
+        body: '{}',
+      );
+      expect(made.status, 201, reason: '${made.body}');
+      final gid = (made.body! as Map)['id']! as int;
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      api.handle(
+        'POST',
+        Uri.parse('/api/v1/games/$gid/checkin/open'),
+        authorization: 'Bearer g',
+        body: '{}',
+      );
+      const decl = 'd1000000-0000-4000-8000-000000000001';
+      final r = api.handle(
+        'POST',
+        Uri.parse('/api/v1/checkin'),
+        body: jsonEncode({
+          'game_id': gid,
+          'player_id': 'p-cccccccccccc',
+          'player_secret': base64Url
+              .encode(List.filled(32, 3))
+              .replaceAll('=', ''),
+          'display_name': 'Rita Secreta',
+          'notice_version': 2,
+          'replicas': [
+            {
+              'declaration_id': decl,
+              'type': 'aeg',
+              'class': 'rifle',
+              'make_model': 'Tokyo Marui M4',
+            },
+          ],
+        }),
+      );
+      expect(r.status, 201, reason: '${r.body}');
+      engine.startGame(gid, force: true);
+      engine.endGame(gid);
+      return (c, decl);
+    }
+
+    test('walk-ins go as guests with push_walkins', () async {
+      final (c, decl) = await walkinsThenEnd(push: true);
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      final out = site.checkins.single;
+      expect(out['walkins'], 1);
+      expect(out['guests'], [
+        {
+          'player_id': 'p-cccccccccccc',
+          'display_name': 'Rita Secreta',
+          'declarations': [
+            {
+              'declaration_id': decl,
+              'type': 'aeg',
+              'class': 'rifle',
+              'state': 'pending',
+              'reading_id': null,
+            },
+          ],
+        },
+      ]);
+      expect(jsonEncode(out), isNot(contains('Tokyo Marui')));
+      expect((c.status()['game_day']! as Map)['walkins'], {
+        'push': true,
+        'supported': true,
+        'guests_sent': 1,
+      });
+      site.requests.clear();
+      await c.runOnce();
+      expect(site.paths(), isNot(contains('checkins'))); // sent once
+    });
+
+    test('walk-ins are a count without push_walkins', () async {
+      final (c, _) = await walkinsThenEnd(push: false);
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      final out = site.checkins.single;
+      expect(out['walkins'], 1);
+      expect(out.containsKey('guests'), isFalse);
+      expect(jsonEncode(out), isNot(contains('Rita Secreta')));
+    });
+
+    test('a site server that does not know guests gets the count', () async {
+      site.noGuests = true;
+      final (c, _) = await walkinsThenEnd(push: true);
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      final out = site.checkins.single;
+      expect(out.containsKey('guests'), isFalse);
+      expect(out['walkins'], 1);
+      expect(
+        ((c.status()['game_day']! as Map)['walkins']! as Map)['supported'],
+        isFalse,
+      );
+      site.requests.clear();
+      await c.runOnce();
+      expect(site.paths(), isNot(contains('checkins')));
     });
 
     test('a site server without game day is skipped quietly', () async {
