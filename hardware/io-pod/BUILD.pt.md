@@ -556,9 +556,18 @@ teclado, LED, áudio). Em resumo:
    ser emparelhado outra vez é emparelhado mais uma vez, e o ecrã do jogo diz
    isso (**Este módulo tem de ser emparelhado outra vez**, escreve o código
    novo). Se não resultar, uma faixa vermelha diz **A app não conseguiu voltar
-   a ligar o módulo sozinha** e porquê. O jogo continua sem o módulo; liga-o
-   outra vez no ecrã inicial do dispositivo de jogo (*Dispositivo de jogo >
-   Módulo de E/S*) depois de saíres do jogo.
+   a ligar o módulo sozinha** e porquê; uma faixa vermelha diz também quando
+   respondeu outro módulo, e indica o módulo que o jogo espera. O jogo
+   continua sem o módulo. Para voltar a ligar o mesmo módulo sem saíres do
+   jogo, toca em **Organização**, escreve o PIN da organização e toca em
+   **Ligar o módulo outra vez**: a app tenta o módulo outra vez de imediato,
+   o Android pede o código do ecrã do módulo se tiver de emparelhar, e um
+   módulo que recuse o emparelhamento é emparelhado mais uma vez sozinho.
+   Depois de ligado, a faixa desaparece e o jogo continua com o módulo (os
+   botões, as saídas e o rádio dele), sem recomeçar. Se falhar outra vez, a
+   faixa vermelha volta com o motivo novo. O módulo também pode ser ligado
+   no ecrã inicial do dispositivo de jogo (*Dispositivo de jogo > Módulo de
+   E/S*) depois de saíres do jogo.
 
 ## 11. Resolução de problemas
 
