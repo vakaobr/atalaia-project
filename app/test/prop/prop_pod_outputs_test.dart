@@ -80,6 +80,18 @@ Timer turning(PropSession s) => Timer.periodic(
   (_) => unawaited(s.advance(50)),
 );
 
+/// Until a simple output may switch on again: the phone's model has the
+/// siren off (its own pulse may end later than the pod's, which a stalled
+/// phone's lease ends early), then a simple output's 500 ms floor and a
+/// margin, on the wall clock both sides keep.
+Future<void> settled(PropSession s) async {
+  await eventually(
+    () => !s.outputs.state('siren', DateTime.now().millisecondsSinceEpoch).on,
+    "the phone's model off",
+  );
+  await Future<void>.delayed(const Duration(milliseconds: 600));
+}
+
 void main() {
   if (skipFileWithoutHosts(['ATALAIA_POD_HOST', 'ATALAIA_MODEM_HOST'])) return;
   late AtalaiaCore core;
@@ -198,8 +210,12 @@ void main() {
       );
 
       // CMD 12 from the controller (a field script, a scenario trigger), more
-      // than 500 ms after the last change (a simple output's floor).
-      await Future<void>.delayed(const Duration(milliseconds: 600));
+      // than 500 ms after the last change (a simple output's floor) on both
+      // sides: the pod's, and the phone's model, which refuses an on within
+      // 500 ms of its own off (too_soon). The two offs differ when the pod
+      // ends the pulse early (a phone that stalled 1.5 s under load: its
+      // lease), so the model's is waited for too, not only the pod's line.
+      await settled(s);
       mark = pod.mark;
       controllerSends(
         const RfCmd(
@@ -234,7 +250,7 @@ void main() {
         pod.lines.skip(mark).where((l) => l.startsWith('OUTPUT siren on')),
         isEmpty,
       );
-      await Future<void>.delayed(const Duration(milliseconds: 600));
+      await settled(s);
 
       // On again, then the session ends: its link to the pod closes and the
       // pod turns the siren off itself.
