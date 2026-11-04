@@ -11,4 +11,4 @@ port", decisions EXP-1 to EXP-15; the protocol is [protocol/expansion-port.md](.
 [BUILD.md](BUILD.md) ([pt](BUILD.pt.md)): parts and what each protects against, the pin table (checked against the
 firmware by `tools/check_wiring.py`), assembly, checks and the bench tests, safety.
 
-Status: designed, not yet built; the box's firmware reads the port from increment 8 of the RFC's plan.
+Status: designed, not yet built; the box's firmware reads the port since increment 8 of the RFC's plan (tested on a computer only).
