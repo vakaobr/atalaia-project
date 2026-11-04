@@ -41,7 +41,7 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import chrono_registry, quotas
+from . import chrono_registry, history_share, quotas
 from .models import Controller, FieldApiKey, Game, GameEvent, GameNode, GameNodeScore
 from .services import history, registration
 
@@ -285,6 +285,8 @@ async def apply(db: AsyncSession, caller: Caller, kind: str, body: dict[str, Any
         raise SyncProblem(409, quotas.CODE, extra={"quota": exc.name, "limit": exc.limit}) from None
     await _seen(db, caller, body)
     answer = await HANDLERS[kind](db, caller, body)
+    if kind in history_share.SYNC_KINDS:  # a hosted hub's shared game history, when the field opted in (HUBH-*)
+        await history_share.after_sync(db, caller.field_id, body)
     await db.commit()
     return answer
 
