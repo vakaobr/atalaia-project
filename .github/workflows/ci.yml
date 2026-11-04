@@ -676,6 +676,22 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
+      # Some ubuntu-24.04 runner images leave too little disk for the
+      # emulator ("Not enough space to create userdata partition", 7.37 GB
+      # needed). Remove the big preinstalled toolchains this job does not use:
+      # .NET, GHC, Boost, CodeQL, and every NDK but the pinned one (the next
+      # steps install it if missing). The rest of the Android SDK (platform
+      # tools, emulator, cmdline-tools, build tools) stays.
+      - name: Free disk space for the emulator
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+            /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          for d in "$ANDROID_HOME"/ndk/*; do
+            [ "$(basename "$d")" = 28.2.13676358 ] || sudo rm -rf "$d"
+          done
+          sudo rm -rf "$ANDROID_HOME/ndk-bundle"
+          df -h
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
