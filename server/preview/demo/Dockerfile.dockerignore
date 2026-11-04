@@ -5,6 +5,7 @@
 *
 !core/
 !firmware/esp32/
+!firmware/module-core/
 !simulator/atalaia_sim/
 !controller/atalaia_controller/
 !controller/console/src/
