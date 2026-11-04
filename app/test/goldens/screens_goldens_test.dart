@@ -16,12 +16,17 @@ import 'package:atalaia_app/chrono/chrono_ui.dart';
 import 'package:atalaia_app/chrono/limit_template.dart';
 import 'package:atalaia_app/chrono/reading.dart';
 import 'package:atalaia_app/chrono/replica.dart';
+import 'package:atalaia_app/core/node_types.dart';
 import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/marshal/marshal_records.dart';
 import 'package:atalaia_app/modes/mode_catalog.dart';
 import 'package:atalaia_app/player/field_feed.dart';
 import 'package:atalaia_app/player/gm_screen.dart';
 import 'package:atalaia_app/player/player_screens.dart';
+import 'package:atalaia_app/pod/pod_client.dart';
+import 'package:atalaia_app/pod/pod_pairing.dart';
+import 'package:atalaia_app/pod/pod_reconnect.dart';
+import 'package:atalaia_app/pod/pod_transports.dart';
 import 'package:atalaia_app/prop/prop_game.dart';
 import 'package:atalaia_app/prop/prop_session.dart';
 import 'package:atalaia_app/prop/prop_setup.dart';
@@ -31,6 +36,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_harness.dart';
+import '../support/fake_pod_link.dart';
 import '../support/fakes.dart';
 import '../support/marshal_trust.dart';
 import '../support/scenario_feed.dart';
@@ -135,6 +141,66 @@ void main() {
         ..screen('countdown', {'left': 287});
       await tester.pump(const Duration(milliseconds: 300));
       await snap(tester, 'prop_game', lang);
+    });
+
+    testWidgets('prop game: the pod to link again (${lang.code})', (
+      tester,
+    ) async {
+      await phone(tester);
+      // A Bluetooth pod whose bond was refused, paired again once by
+      // itself, and then a wrong passkey: the tries stopped (ROB-2, ROB-4).
+      const device = PodDevice(kind: 'ble', id: 'AA:BB', name: 'atalaia-pod');
+      final runner = FakeNodeRunner();
+      final mode = ModeCatalog.builtin().compose('org.atalaia.bomb');
+      const teams = ['red', 'blue'];
+      final setup = PropSetup(
+        mode: mode,
+        role: 'bomb',
+        teams: teams,
+        params: mode.resolveParams(const {}, teams),
+        durationMs: 30 * 60000,
+      );
+      final session = PropSession(
+        setup: setup,
+        runner: runner,
+        device: FakeDevice(),
+        texts: const PropTexts(
+          notificationTitle: '',
+          notificationRunning: '',
+          notificationLeft: '',
+        ),
+        clock: GameClock.manual,
+        reopenPod: (lost) async => null,
+        podBackoff: (attempt) => const Duration(milliseconds: 10),
+      );
+      final pod = FakeBleLink(
+        ScriptedBonds([PodPairError.needsRepair, PodPairError.wrongPasskey]),
+      );
+      await tester.runAsync(() async {
+        await session.open();
+        await session.attachPod(PodClient(pod, device: device));
+        await until(() => session.pod != null);
+        await session.start();
+        await pod.drop();
+        await until(() => session.podPhase == PodLinkPhase.relink);
+      });
+      final h = harness(language: lang, runner: runner);
+      await tester.pumpWidget(
+        h.app(
+          home: PropGameScreen(
+            setup: setup,
+            session: session,
+            modeName: mode.name(lang.code),
+          ),
+        ),
+      );
+      runner.node
+        ..timeMs = 13000
+        ..screen('countdown', {'left': 287});
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byKey(const Key('prop-pod-relink')), findsOneWidget);
+      await snap(tester, 'prop_game_pod_relink', lang);
+      await tester.runAsync(session.close);
     });
 
     testWidgets('player view (${lang.code})', (tester) async {

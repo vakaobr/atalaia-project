@@ -439,7 +439,22 @@ class _PropGameScreenState extends State<PropGameScreen> {
               style: const TextStyle(color: Colors.white),
             ),
           ),
-        if (session.podPhase == PodLinkPhase.reconnecting)
+        // Over Bluetooth, the pod pairing anew by itself (decision ROB-4):
+        // Android asks for the code on the pod's screen, so say so instead
+        // of the plain "reconnecting".
+        if (session.podPhase == PodLinkPhase.reconnecting &&
+            session.podRepairing)
+          Container(
+            width: double.infinity,
+            color: Colors.amber,
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              s.t('pod.repair'),
+              key: const Key('prop-pod-repairing'),
+              style: const TextStyle(color: Colors.black),
+            ),
+          )
+        else if (session.podPhase == PodLinkPhase.reconnecting)
           Container(
             width: double.infinity,
             color: Colors.amber,
@@ -458,6 +473,20 @@ class _PropGameScreenState extends State<PropGameScreen> {
             child: Text(
               s.t('prop.pod_refused'),
               key: const Key('prop-pod-refused'),
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        // The tries stopped: the pod is linked again by hand, and why.
+        if (session.podPhase == PodLinkPhase.relink)
+          Container(
+            width: double.infinity,
+            color: AtalaiaColors.danger,
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              s.t('pod.relink', {
+                'why': s.t(session.podRelinkMessage ?? 'pod.repair_manual'),
+              }),
+              key: const Key('prop-pod-relink'),
               style: const TextStyle(color: Colors.white),
             ),
           ),

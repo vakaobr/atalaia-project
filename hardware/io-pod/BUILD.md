@@ -522,7 +522,12 @@ with the board steps of BRING_UP.md that apply first (revision, antenna,
 3. **A game.** A prop game on the phone with the pod linked: its buttons are the
    game's teams by number, its ring shows the team, its reader checks player
    tags, and the phone's radio link to the field controller goes through the
-   pod.
+   pod. If the link drops during the game, the app opens it again by itself; a
+   pod that needs pairing again is paired once more, and the game screen says
+   so (**This pod needs pairing again**, type the new code). If that does not
+   work, a red banner says **The app could not link the pod again by itself**
+   and why. The game goes on without the pod; link it again from the prop's
+   home screen (*Prop > I/O pod*) once you have left the game.
 
 ## 11. Troubleshooting
 
